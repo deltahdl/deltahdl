@@ -80,9 +80,9 @@ static bool AnyChildExprCallsModeMethod(const Expr* e) {
   return ScalarExprFieldsCallModeMethod(e) || ListExprFieldsCallModeMethod(e);
 }
 
-// 18.5.11: a function called in a constraint cannot modify the constraints, for
-// example by calling rand_mode() or constraint_mode(). Search an expression for
-// a member-access call to either built-in method.
+// 18.5.11: a function called from a constraint may not change the constraints,
+// such as through rand_mode() or constraint_mode(). Search an expression for a
+// member-access call to either built-in method.
 static bool ExprCallsModeMethod(const Expr* e) {
   if (!e) return false;
   if (IsModeMethodCall(e)) return true;
@@ -207,7 +207,7 @@ void ClassConstraintValidator::ValidateConstraintFunctionArgs() {
     ValidateOneClassConstraintFunctionArgs(cls);
 }
 
-// 18.8: rand_mode() is built-in and cannot be overridden. A user class
+// 18.8: rand_mode() is predefined and no class may override it. A user class
 // therefore shall not declare a method named rand_mode; doing so is reported
 // 18.6.2: pre_randomize() and post_randomize() are built-in methods with a
 // fixed prototype, 'function void <name>();'. Unlike rand_mode and
@@ -258,8 +258,8 @@ void ClassConstraintValidator::ValidateOneClassBuiltinMethods(
           "'constraint_mode' is a built-in method and cannot be overridden",
           Subclause("18.9"));
     }
-    // 18.6.3: randomize() is a built-in method and cannot be overridden, so a
-    // user class shall not declare a method named randomize. (pre_randomize and
+    // 18.6.3: randomize() is predefined and no class may override it, so a user
+    // class may not declare a method of that name. (pre_randomize and
     // post_randomize are different: 18.6.2 permits overriding those, subject to
     // the prototype check below.)
     if (name == "randomize") {
@@ -419,8 +419,8 @@ void ClassConstraintValidator::ValidateOneConstraintOverride(
                 Subclause("18.5.2"));
   }
 
-  // 18.5.10: it is illegal to use the dynamic override specifiers ':initial',
-  // ':extends', or ':final' on a constraint that is qualified 'static'.
+  // 18.5.10: a 'static' constraint takes none of the dynamic override
+  // specifiers ':initial', ':extends' and ':final'.
   if (m->is_static && (m->is_constraint_initial || m->is_constraint_extends ||
                        m->is_constraint_final)) {
     diag_.Error(m->loc,
@@ -432,9 +432,9 @@ void ClassConstraintValidator::ValidateOneConstraintOverride(
 
   const auto* base = FindBaseConstraint(cls, m->name, unit_);
 
-  // 18.5.10: a pure constraint may be qualified 'static', and an overriding
-  // constraint shall match that qualification — static if the pure constraint
-  // is static, non-static if it is not.
+  // 18.5.10: 'static' is allowed on a pure constraint, and the constraint
+  // overriding it carries the same qualifier — static if the pure constraint is
+  // static, non-static if it is not.
   if (base != nullptr && base->is_pure_virtual && !m->is_pure_virtual &&
       m->is_static != base->is_static) {
     diag_.Error(

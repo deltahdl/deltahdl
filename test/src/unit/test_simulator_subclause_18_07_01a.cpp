@@ -98,8 +98,8 @@ TEST(InlineConstraintLocalScope, LocalQualifierBoundsFromCallerNames) {
   EXPECT_EQ(RunAndGet(src, "rx"), 11u);
 }
 
-// 18.7.1: as it pertains to wildcard package imports, a name written local::a
-// resolves the same declaration an unqualified a would in the calling scope.
+// 18.7.1: for wildcard package imports, local::a finds the declaration a bare a
+// would find in the calling scope.
 // Here §26.3's `import pkg::*` makes the package parameter LIMIT visible
 // unqualified in the module; the with-block then reaches it through local::,
 // which -- like a bare LIMIT -- binds to that wildcard-imported declaration.

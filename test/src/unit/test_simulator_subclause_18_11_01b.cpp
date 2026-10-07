@@ -39,8 +39,8 @@ TEST(InlineConstraintCheckerRun, NullChecksTheRelationOnTheCurrentValues) {
   EXPECT_EQ(out, "1 1 0 1\n");
 }
 
-// 18.11.1: randomize() on a class with no random variables behaves as a
-// checker of its own accord, assigning nothing and returning 1 where every
+// 18.11.1: a class without random variables turns randomize() into a checker
+// without any null argument, assigning nothing and returning 1 where every
 // constraint is satisfied and 0 otherwise.
 TEST(InlineConstraintCheckerRun, NoRandomVariablesMakesTheMethodAChecker) {
   SimFixture f;

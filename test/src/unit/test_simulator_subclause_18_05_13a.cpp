@@ -64,12 +64,11 @@ TEST(ConstraintSoft, SoftAloneIsHonored) {
   EXPECT_EQ(RunAndGet(src, "rx"), 42u);
 }
 
-// 18.5.13: when a soft constraint conflicts with the hard constraints, the
-// solver discards it and finds a solution satisfying the remaining constraints,
-// treating the discarded soft as if replaced by the value 1 (true). randomize()
-// still succeeds and the discarded preference need not hold. Here soft x == 50
-// conflicts with the hard range [10, 20], so the solver discards it and returns
-// an in-range value that is not the discarded preference.
+// 18.5.13: a soft constraint that clashes with the hard ones is dropped,
+// counted as the constant 1 (true), and the solver solves what remains.
+// randomize() still succeeds and the discarded preference need not hold. Here
+// soft x == 50 conflicts with the hard range [10, 20], so the solver discards
+// it and returns an in-range value that is not the discarded preference.
 TEST(ConstraintSoft, ConflictingSoftDiscardedAndTreatedAsTrue) {
   const char* src =
       "class C;\n"
@@ -112,12 +111,11 @@ TEST(ConstraintSoft, UnsatisfiableHardConstraintsFailSolve) {
   EXPECT_EQ(RunAndGet(src, "ok"), 0u);
 }
 
-// 18.5.13: when two or more soft constraints cannot be satisfied
-// simultaneously, one or more of them is discarded so that a solution is still
-// found (which one survives is governed by the priorities of 18.5.13.1). The
-// two mutually exclusive soft equalities x == 10 and x == 20 cannot both hold,
-// yet — unlike the hard case above — randomize() succeeds and one of the two
-// preferred values is produced.
+// 18.5.13: soft constraints that cannot all hold together lose one or more of
+// their number so that the solver still reaches a solution (which one survives
+// is governed by the priorities of 18.5.13.1). The two mutually exclusive soft
+// equalities x == 10 and x == 20 cannot both hold, yet — unlike the hard case
+// above — randomize() succeeds and one of the two preferred values is produced.
 TEST(ConstraintSoft, ConflictingSoftConstraintsResolvedByDiscarding) {
   const char* src =
       "class C;\n"
@@ -138,8 +136,8 @@ TEST(ConstraintSoft, ConflictingSoftConstraintsResolvedByDiscarding) {
   EXPECT_TRUE(rx == 10u || rx == 20u);
 }
 
-// 18.5.13: a discarded soft constraint has no effect on the solution
-// distribution — it must neither pin the variable to its preferred value nor
+// 18.5.13: once dropped, a soft constraint leaves the spread of solutions
+// untouched — it must neither pin the variable to its preferred value nor
 // remove any value the hard constraints still allow. The hard range confines x
 // to {0, 1} while the conflicting soft x == 2 is discarded. Across many
 // randomizations both feasible values still occur and the discarded preference

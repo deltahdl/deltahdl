@@ -8,11 +8,11 @@ using namespace delta;
 
 namespace {
 
-// 18.6.3: a random variable declared static is shared by all instances of
-// the class, and each randomize() call changes it in every instance: over
-// 32 rounds of a call on each of two Shared, both read the same v after
-// every call, and a call on the second changes what the first reads in
-// some round, as the design test/src/e2e/randomization_behavior.sv runs it.
+// 18.6.3: a static random variable has one copy for the whole class, so each
+// randomize() call changes it for every instance: over 32 rounds of a call on
+// each of two Shared, both read the same v after every call, and a call on the
+// second changes what the first reads in some round, as the design
+// test/src/e2e/randomization_behavior.sv runs it.
 TEST(RandomizationBehaviorRun, AStaticVariableChangesInEveryInstance) {
   SimFixture f;
   std::string out = RunCapture(
@@ -40,11 +40,11 @@ TEST(RandomizationBehaviorRun, AStaticVariableChangesInEveryInstance) {
   EXPECT_EQ(out, "64 1\n");
 }
 
-// 18.6.3: if randomize() fails the random variables retain their previous
-// values and post_randomize() is not called: with the ceiling at 0 no x
-// lies at or below it and above the inline 0, so the call returns 0, x and
-// y keep the values the first call drew, and the counter post_randomize()
-// steps stays at that call's 1.
+// 18.6.3: a failed randomize() leaves every random variable at its old value
+// and skips post_randomize(): with the ceiling at 0 no x lies at or below it
+// and above the inline 0, so the call returns 0, x and y keep the values the
+// first call drew, and the counter post_randomize() steps stays at that call's
+// 1.
 TEST(RandomizationBehaviorRun, AFailedCallRetainsTheValuesWithoutPost) {
   SimFixture f;
   std::string out = RunCapture(

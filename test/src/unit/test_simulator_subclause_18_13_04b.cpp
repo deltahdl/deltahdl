@@ -8,12 +8,12 @@ using namespace delta;
 
 namespace {
 
-// 18.13.4: get_randstate() retrieves the current internal state of an
-// object's RNG as a string, so the string has a length, two retrievals with
-// no draw between agree, an object seeded alike holds the same state, four
-// draws move the state while the other object's is kept, and the retrieved
-// state installed again with set_randstate() replays all four draws, as the
-// design test/src/e2e/get_randstate_method.sv runs it.
+// 18.13.4: get_randstate() returns a string holding the object's RNG state as
+// it stands, so the string has a length, two retrievals with no draw between
+// agree, an object seeded alike holds the same state, four draws move the state
+// while the other object's is kept, and the retrieved state installed again
+// with set_randstate() replays all four draws, as the design
+// test/src/e2e/get_randstate_method.sv runs it.
 TEST(GetRandstateRun, TheStateOfAnObjectIsReadMovedAndReplayed) {
   SimFixture f;
   std::string out = RunCapture(
@@ -53,10 +53,10 @@ TEST(GetRandstateRun, TheStateOfAnObjectIsReadMovedAndReplayed) {
   EXPECT_EQ(out, "1 1 1 1 1 4\n");
 }
 
-// 18.13.4: the state of the RNG associated with a process is retrieved with
-// the get_randstate() method of the process (9.7): the string has a length,
-// two retrievals agree, four $urandom draws move it, and the retrieved state
-// installed again replays all four.
+// 18.13.4: a process's own get_randstate() method (9.7) returns the state of
+// that process's RNG: the string has a length, two retrievals agree, four
+// $urandom draws move it, and the retrieved state installed again replays all
+// four.
 TEST(GetRandstateRun, TheStateOfTheProcessIsReadMovedAndReplayed) {
   SimFixture f;
   std::string out = RunCapture(

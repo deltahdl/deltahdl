@@ -15,12 +15,12 @@ namespace {
 // calls operate on and 18.8 supplies the rand_mode() state that the inline list
 // overrides.
 
-// 18.11: when randomize() is called with arguments, those arguments designate
-// the complete set of random variables and every other variable in the object
-// is considered a state variable. This mechanism is conceptually equivalent to
-// rand_mode() calls that enable the named variables and disable the rest. Here
-// only 'x' is named, so it is solved to satisfy its constraint while the
-// unnamed rand variable 'y' is held at its current value as a state variable.
+// 18.11: randomize() called with arguments randomizes exactly those, and reads
+// every other variable of the object as state. This mechanism is conceptually
+// equivalent to rand_mode() calls that enable the named variables and disable
+// the rest. Here only 'x' is named, so it is solved to satisfy its constraint
+// while the unnamed rand variable 'y' is held at its current value as a state
+// variable.
 TEST(InlineRandomControlRuntime, ArgListDesignatesRandomSetUnnamedHeld) {
   const char* src =
       "class CA;\n"
@@ -115,11 +115,11 @@ TEST(InlineRandomControlRuntime, NamingEnablesVariableDisabledByRandMode) {
   EXPECT_EQ(RunAndGet(src, "ry"), 200u);  // unnamed -> state variable, held
 }
 
-// 18.11: calling randomize() with arguments allows changing the random mode of
-// any class property, even one not declared rand or randc. Here 's' carries no
-// random qualifier yet is named, so it becomes an active random variable and is
-// solved to satisfy its constraint; the declared rand variable 'r', left
-// unnamed, is demoted to a state variable and held at its current value.
+// 18.11: an argument to randomize() can make any class property random for the
+// call, rand, randc or neither. Here 's' carries no random qualifier yet is
+// named, so it becomes an active random variable and is solved to satisfy its
+// constraint; the declared rand variable 'r', left unnamed, is demoted to a
+// state variable and held at its current value.
 TEST(InlineRandomControlRuntime, NamedNonRandPropertyIsRandomized) {
   const char* src =
       "class CA;\n"
@@ -144,12 +144,11 @@ TEST(InlineRandomControlRuntime, NamedNonRandPropertyIsRandomized) {
   EXPECT_EQ(RunAndGet(src, "rr"), 9u);   // declared rand, unnamed -> held
 }
 
-// 18.11: the mechanism does not affect the cyclical random mode -- it cannot
-// change a cyclical random variable into a noncyclical one. A randc variable
-// named in the inline list keeps its randc behavior, cycling through its whole
-// declared range with no repeats before any value is drawn twice. Over a 2-bit
-// randc, four successive randomize(c) calls therefore return all four distinct
-// values.
+// 18.11: the argument list leaves cyclic mode alone, so a randc variable stays
+// cyclic. A randc variable named in the inline list keeps its randc behavior,
+// cycling through its whole declared range with no repeats before any value is
+// drawn twice. Over a 2-bit randc, four successive randomize(c) calls therefore
+// return all four distinct values.
 TEST(InlineRandomControlRuntime, NamedRandcRetainsCyclicalMode) {
   const char* src =
       "class CA;\n"
@@ -176,11 +175,11 @@ TEST(InlineRandomControlRuntime, NamedRandcRetainsCyclicalMode) {
   EXPECT_EQ(RunAndGet(src, "all_distinct"), 1u);
 }
 
-// 18.11: the mechanism also cannot change a nonrandom variable into a cyclical
-// (randc) one. A property with no random qualifier that is named in the inline
-// list is randomized as a noncyclical variable. Over a single-bit domain a
-// noncyclical draw repeats consecutively at least once across many calls,
-// whereas a randc over {0,1} would strictly alternate and never do so.
+// 18.11: nor can the argument list make a nonrandom variable cyclic (randc). A
+// property with no random qualifier that is named in the inline list is
+// randomized as a noncyclical variable. Over a single-bit domain a noncyclical
+// draw repeats consecutively at least once across many calls, whereas a randc
+// over {0,1} would strictly alternate and never do so.
 TEST(InlineRandomControlRuntime, NamedNonRandNotPromotedToCyclical) {
   const char* src =
       "class CA;\n"

@@ -1,7 +1,6 @@
-// 18.6.1: randomize(), the built-in virtual method every class has, which
-// generates random values for all the active random variables of the object
-// subject to its active constraints and returns 1 where it set them all to
-// valid values and 0 otherwise.
+// 18.6.1: randomize(), the predefined virtual method of every class, which
+// draws values for the object's active random variables within its active
+// constraints and returns 1 when it gave them all valid values and 0 otherwise.
 class Packet;
   rand bit [7:0] kind;
   rand bit [7:0] size;

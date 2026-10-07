@@ -8,11 +8,10 @@ using namespace delta;
 
 namespace {
 
-// 18.17: production lists separated by | are choices the generator makes at
-// random and a list streams its items in sequence, so 200 runs of the
-// clause's example reach each of add pop done, add push done, dec pop done
-// and dec push done and nothing else, as the design
-// test/src/e2e/randsequence_statement.sv runs it.
+// 18.17: the generator picks at random among production lists set apart by |,
+// and emits a chosen list's items in order, so 200 runs of the clause's example
+// reach each of add pop done, add push done, dec pop done and dec push done and
+// nothing else, as the design test/src/e2e/randsequence_statement.sv runs it.
 TEST(RandsequenceRun, TheClausesExampleReachesItsFourOutcomes) {
   SimFixture f;
   std::string out = RunCapture(

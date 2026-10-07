@@ -76,10 +76,10 @@ TEST(ArrayReductionConstraintsRun, TheResultIsOfTheElementType) {
   EXPECT_EQ(out, "64 1\n");
 }
 
-// 18.5.7.2: the size constraints are solved first and the reduction next, so
-// a dynamic array drawn at two to six elements has the elements drawn, and
-// those alone, summing to 100 through int'(item) on every one of 64 draws,
-// over more than one size.
+// 18.5.7.2: the solver settles the size before the reduction, so a dynamic
+// array drawn at two to six elements has the elements drawn, and those alone,
+// summing to 100 through int'(item) on every one of 64 draws, over more than
+// one size.
 TEST(ArrayReductionConstraintsRun, TheSizeIsSolvedBeforeTheReduction) {
   SimFixture f;
   std::string out = RunCapture(

@@ -7,9 +7,9 @@ using namespace delta;
 
 namespace {
 
-// 18.6.3: the randomize() method is built-in and cannot be overridden. A class
-// that declares its own method named randomize is therefore an error, whatever
-// the form of the declaration.
+// 18.6.3: randomize() is predefined and no class may override it. A class that
+// declares its own method named randomize is therefore an error, whatever the
+// form of the declaration.
 TEST(BehaviorOfRandomizationMethods, RandomizeOverrideIsError) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -39,7 +39,8 @@ TEST(BehaviorOfRandomizationMethods, NoRandomizeOverrideOk) {
              "endmodule\n"));
 }
 
-// 18.6.3: pre_randomize() and post_randomize() are functions and cannot block.
+// 18.6.3: pre_randomize() and post_randomize() are functions, so neither may
+// block.
 // A time-controlling statement in pre_randomize() makes it block, which is not
 // permitted in a function and is reported as an error.
 TEST(BehaviorOfRandomizationMethods, PreRandomizeCannotBlock) {

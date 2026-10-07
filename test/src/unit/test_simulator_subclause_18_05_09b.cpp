@@ -71,11 +71,10 @@ TEST(VariableOrderingRun, TheOrderedControlIsSetHalfTheTime) {
   EXPECT_EQ(out, "1 0\n");
 }
 
-// 18.5.9: the variables may be solved in an order the ordering does not
-// give where the outcome is the same: the clause's x held to 0 and below y
-// under solve y before x has one assignment for x, so every one of 64
-// solves succeeds with x at 0 and y above it, the ordering never making the
-// solver fail.
+// 18.5.9: the solver is free to depart from the stated order when doing so
+// cannot change the outcome: the clause's x held to 0 and below y under solve y
+// before x has one assignment for x, so every one of 64 solves succeeds with x
+// at 0 and y above it, the ordering never making the solver fail.
 TEST(VariableOrderingRun, AnOrderingNeverFailsTheSolve) {
   SimFixture f;
   std::string out = RunCapture(

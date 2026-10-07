@@ -26,9 +26,9 @@ namespace delta {
 // constraint block constrains is resized to the size the size constraints
 // choose and randomized over that many elements; one whose size no block
 // constrains keeps its size and is randomized over the elements it holds.
-// 18.5.7.1: the size constraints are solved first and the iterative
-// constraints next, so the size is the solver's variable drawn ahead of the
-// others, which a foreach reads as a state variable.
+// 18.5.7.1: the solver settles size constraints before the iterative ones, so
+// the size is the solver's variable drawn ahead of the others, which a foreach
+// reads as a state variable.
 
 namespace {
 

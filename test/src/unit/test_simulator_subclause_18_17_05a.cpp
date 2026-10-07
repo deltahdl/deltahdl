@@ -346,9 +346,9 @@ TEST(RandsequenceSim, RandJoinInterleavesThreeSequences) {
   EXPECT_EQ(allran, 300u);
 }
 
-// 18.17.5: at each step the generator interleaves nonterminals only to a depth
-// of one. An operand item that is itself a nonterminal (here `a`, which expands
-// to `p q`) is treated as a single atomic unit: its own sub-productions stay
+// 18.17.5: the generator interleaves nonterminals one level deep and no deeper.
+// An operand item that is itself a nonterminal (here `a`, which expands to `p
+// q`) is treated as a single atomic unit: its own sub-productions stay
 // contiguous and are never split apart by the other sequence's productions.
 // `pq` therefore always immediately follows `pp`, while the unit as a whole is
 // still interleaved with `c d` so it does not always lead.

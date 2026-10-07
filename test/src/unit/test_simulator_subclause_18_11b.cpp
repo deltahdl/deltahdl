@@ -90,10 +90,10 @@ TEST(InlineRandomVariableControlRun, ANamedNonRandPropertyIsDrawn) {
   EXPECT_EQ(out, "1 32\n");
 }
 
-// 18.11: the random mode of a local member can be changed only where the
-// call has access to it, within its class: a method's bare randomize(secret)
-// names the method of the object executing it, succeeds, and draws the
-// local secret above the lid on every call.
+// 18.11: a local member's random mode can be switched only by a call with
+// access to it, within its class: a method's bare randomize(secret) names the
+// method of the object executing it, succeeds, and draws the local secret above
+// the lid on every call.
 TEST(InlineRandomVariableControlRun, ALocalMemberIsNamedWithinItsClass) {
   SimFixture f;
   std::string out = RunCapture(

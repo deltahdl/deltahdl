@@ -43,9 +43,9 @@ TEST(RandModeRuntime, DisabledVariableHeldWhileOthersRandomize) {
   EXPECT_EQ(RunAndGet(src, "ractive"), 123u);
 }
 
-// 18.8: the nonvoid form (called with no argument) returns the current active
-// state -- 1 (ON) when active, 0 (OFF) when inactive. All random variables are
-// initially active, so the query reads 1 before any change and 0 after
+// 18.8: called with no argument, the nonvoid form reports whether the variable
+// is active -- 1 (ON) when active, 0 (OFF) when inactive. All random variables
+// are initially active, so the query reads 1 before any change and 0 after
 // rand_mode(0).
 TEST(RandModeRuntime, NonvoidReturnsActiveState) {
   const char* src =
@@ -187,9 +187,9 @@ TEST(RandModeRuntime, InheritedRandVariableDisabledAndHeld) {
   EXPECT_EQ(RunAndGet(src, "rdy"), 44u);
 }
 
-// 18.8: an inactive variable is treated the same as one never declared rand or
-// randc, and this holds for a randc variable too -- once inactive it is not
-// cycled through its permutation but held at its current value as a state
+// 18.8: the solver handles an inactive variable as though it had never been
+// rand or randc, and this holds for a randc variable too -- once inactive it is
+// not cycled through its permutation but held at its current value as a state
 // constant, while an active rand sibling is still randomized.
 TEST(RandModeRuntime, DisabledRandcVariableHeldAsStateConstant) {
   const char* src =
@@ -216,12 +216,12 @@ TEST(RandModeRuntime, DisabledRandcVariableHeldAsStateConstant) {
   EXPECT_EQ(RunAndGet(src, "ro"), 5u);
 }
 
-// 18.8: when the random variable is an object handle, rand_mode() changes only
-// the mode of that handle variable, not the modes of the random variables
-// inside the referenced object. Disabling the rand handle 'h' stops
-// randomize() from recursing into the Inner object, so its constrained member
-// keeps the pre-set value 3; with the handle left active the same randomize()
-// recurses and the constraint pins the member to 55.
+// 18.8: on an object handle, rand_mode() switches that handle alone and leaves
+// the modes of the referenced object's random variables as they were. Disabling
+// the rand handle 'h' stops randomize() from recursing into the Inner object,
+// so its constrained member keeps the pre-set value 3; with the handle left
+// active the same randomize() recurses and the constraint pins the member to
+// 55.
 TEST(RandModeRuntime, ObjectHandleModeDoesNotCascadeIntoObject) {
   const char* src =
       "class Inner;\n"

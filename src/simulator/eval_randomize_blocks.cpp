@@ -184,14 +184,14 @@ static void AddSolveBeforeOrderings(const ClassMember* m,
   }
 }
 
-// 18.5.11: a random variable used as a function argument in a constraint
-// establishes an implicit priority -- it is solved ahead of the variables of
-// the constraint that consumes it, and its committed value is then read as a
-// state variable when the function is called for the lower-priority set. For
-// each hard relation, the rand variables appearing in a function-call argument
-// position outrank the rand variables the relation uses directly, so that
-// ordering is recorded for the solver's priority-layer pass. Only variables the
-// solver models as its own drawable variable participate, mirroring the lenient
+// 18.5.11: a random variable passed to a function in a constraint gets an
+// implicit priority -- it is solved ahead of the variables of the constraint
+// that consumes it, and its committed value is then read as a state variable
+// when the function is called for the lower-priority set. For each hard
+// relation, the rand variables appearing in a function-call argument position
+// outrank the rand variables the relation uses directly, so that ordering is
+// recorded for the solver's priority-layer pass. Only variables the solver
+// models as its own drawable variable participate, mirroring the lenient
 // treatment of unresolved references in the orderings above. A variable used
 // directly is excluded from the lower set of the same relation when it also
 // supplies an argument there, so a self-reference does not fabricate a
@@ -310,11 +310,11 @@ std::vector<const ClassMember*> ConstraintMembersInOrder(
     if (!lvl->decl) continue;
     per_level.push_back(CollectLevelConstraints(lvl, replaced));
   }
-  // 18.5.13.1: constraints in a derived class have higher soft-constraint
-  // priority than all constraints in its superclasses. The solver ranks soft
-  // priority by the order blocks are added — a block added later outranks an
-  // earlier one — so add the levels base class first and the most-derived level
-  // last. per_level was filled most-derived first, so walk it in reverse. This
+  // 18.5.13.1: a subclass's constraints outrank every constraint of its
+  // superclasses in soft-constraint priority. The solver ranks soft priority by
+  // the order blocks are added — a block added later outranks an earlier one —
+  // so add the levels base class first and the most-derived level last.
+  // per_level was filled most-derived first, so walk it in reverse. This
   // reordering is confined to soft-constraint priority: hard constraints must
   // all hold regardless of order, and the ordering/priority edges (18.5.9,
   // 18.5.11) are order-independent sets, so the solutions are unchanged. Within

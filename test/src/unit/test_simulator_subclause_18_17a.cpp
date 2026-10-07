@@ -92,9 +92,9 @@ TEST(RandsequenceSim, NamedTopProductionDesignatesEntry) {
 }
 
 TEST(RandsequenceSim, AlternativeProductionListsChosenAtRandom) {
-  // 18.17: production lists separated by '|' are a set of choices the generator
-  // makes at random. Running the block many times must exercise both
-  // alternatives while keeping every selection a valid one (total preserved).
+  // 18.17: the generator picks at random among production lists set apart by
+  // '|'. Running the block many times must exercise both alternatives while
+  // keeping every selection a valid one (total preserved).
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -217,8 +217,8 @@ TEST(RandsequenceSim, SequencedCodeBlockTerminalsRunInOrder) {
 }
 
 TEST(RandsequenceSim, ProductionIdentifiersAreLocalToRandsequenceScope) {
-  // 18.17: a randsequence statement creates its own automatic scope, and every
-  // production identifier is local to that scope. Two sibling randsequence
+  // 18.17: a randsequence statement opens an automatic scope of its own, and
+  // its production names belong to that scope alone. Two sibling randsequence
   // statements may therefore each declare a production named 'main' with no
   // collision, and each statement must resolve 'main' to the production
   // declared within itself -- not to the other statement's like-named
@@ -245,10 +245,10 @@ TEST(RandsequenceSim, ProductionIdentifiersAreLocalToRandsequenceScope) {
 }
 
 TEST(RandsequenceSim, CodeBlockLocalsAreAutomaticPerInvocation) {
-  // 18.17: each code block is an anonymous automatic scope, so a variable it
-  // declares starts fresh on every execution. Production 'p' runs twice; were
-  // its local 'y' persistent the accumulator would reach 1+2=3, but automatic
-  // lifetime makes each run observe y == 1, so acc sums to 2.
+  // 18.17: a production code block opens an automatic scope with no name, so a
+  // variable it declares starts fresh on every execution. Production 'p' runs
+  // twice; were its local 'y' persistent the accumulator would reach 1+2=3, but
+  // automatic lifetime makes each run observe y == 1, so acc sums to 2.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"

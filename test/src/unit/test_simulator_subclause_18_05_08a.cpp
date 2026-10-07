@@ -15,15 +15,14 @@ namespace {
 // class-handle declarations the rule operates on and 18.8 supplies the
 // rand_mode() state that makes a member a state variable.
 
-// 18.5.8: when an object member of a class is declared rand, all of its
-// constraints and random variables are randomized simultaneously along with the
-// enclosing object's variables and constraints; a constraint expression that
-// relates random variables from different objects is a global constraint. This
-// models the ordered-tree example: class B holds a heap value v (inherited from
-// leaf class A) and two rand subtree objects left and right, with the global
-// constraints left.v <= v and right.v > v. A single randomize() of b solves b
-// and both children as one whole, so both global constraints hold at once --
-// which per-object sequential solving could not guarantee.
+// 18.5.8: a rand object member has its own constraints and random variables
+// solved in the same pass as those of the object holding it; a constraint
+// expression that relates random variables from different objects is a global
+// constraint. This models the ordered-tree example: class B holds a heap value
+// v (inherited from leaf class A) and two rand subtree objects left and right,
+// with the global constraints left.v <= v and right.v > v. A single randomize()
+// of b solves b and both children as one whole, so both global constraints hold
+// at once -- which per-object sequential solving could not guarantee.
 TEST(GlobalConstraint, ActiveSubtreeValuesSolvedSimultaneously) {
   const char* src =
       "class A;\n"  // leaf node

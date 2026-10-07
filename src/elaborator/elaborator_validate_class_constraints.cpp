@@ -189,13 +189,13 @@ static bool IsFullyVisibleDimensionKind(DataTypeKind k) {
   }
 }
 
-// 18.5.7.1: in a foreach iterative constraint the number of loop variables
-// shall not exceed the number of dimensions of the iterated array. The array is
-// a class property, possibly inherited, so resolve the name through the class
-// and its base-class chain; a derived declaration shadows a base one. Only
-// leaf-scalar arrays (integral/vector or real) with at least one dimension are
-// checked, which excludes scalars (not array variables, hence outside this
-// rule) and complex types whose dimensionality is not fully visible.
+// 18.5.7.1: a foreach iterative constraint names no more loop variables than
+// the iterated array has dimensions. The array is a class property, possibly
+// inherited, so resolve the name through the class and its base-class chain; a
+// derived declaration shadows a base one. Only leaf-scalar arrays
+// (integral/vector or real) with at least one dimension are checked, which
+// excludes scalars (not array variables, hence outside this rule) and complex
+// types whose dimensionality is not fully visible.
 // 18.5.7.1: check a single foreach iterative-constraint reference against the
 // resolved class properties, reporting when its loop-variable count exceeds the
 // dimension count of the named array.
@@ -580,13 +580,13 @@ void ClassConstraintValidator::ValidateSolveBeforeConstraints() {
     ValidateOneClassSolveBeforeConstraints(cls);
 }
 
-// 18.5.13.1: soft constraints can only be specified on random variables; they
-// may not be specified for randc variables. Resolve each bare local variable
-// named in a soft constraint expression against the class and its base chain
-// (a derived declaration shadows a base one) and reject one that resolves to a
-// randc property. As with the solve...before and foreach checks, only simple
-// local identifiers the parser recorded are considered; a qualified reference
-// or one that does not resolve to a local property is left alone.
+// 18.5.13.1: a soft constraint applies to random variables alone, and never to
+// a randc variable. Resolve each bare local variable named in a soft constraint
+// expression against the class and its base chain (a derived declaration
+// shadows a base one) and reject one that resolves to a randc property. As with
+// the solve...before and foreach checks, only simple local identifiers the
+// parser recorded are considered; a qualified reference or one that does not
+// resolve to a local property is left alone.
 void ClassConstraintValidator::ValidateOneClassSoftConstraintVariables(
     const ClassDecl* cls) {
   auto properties = BuildClassPropertyMap(cls, unit_);

@@ -257,16 +257,16 @@ bool ConstraintSolver::SolveWith(
   // of the class via a shared static block before deciding which blocks apply.
   RefreshStaticBlockState();
 
-  // 18.5.3: a dist expression requires at least one rand variable. A
-  // distribution that lacks one makes randomization fail outright. The
-  // clause's other limitation, that a dist is not applied to a randc variable,
-  // is decided from the class text and reported by the elaborator
+  // 18.5.3: the expression a dist distributes has to involve a rand variable. A
+  // distribution that lacks one makes randomization fail outright. The clause's
+  // other limitation, that a dist is not applied to a randc variable, is
+  // decided from the class text and reported by the elaborator
   // (elaborator_validate_class_constraints.cpp), so no such distribution
   // reaches the solver.
   if (DistLacksRandVariable()) return false;
 
-  // 18.5.4: a uniqueness constraint group may not contain a randc variable and
-  // all of its members shall be of equivalent type. An illegal group makes
+  // 18.5.4: a uniqueness constraint group admits no randc variable, and its
+  // members must all have equivalent types. An illegal group makes
   // randomization fail outright.
   if (HasRandcInUnique()) return false;
   if (UniqueMembersNotEquivalentType()) return false;
@@ -278,15 +278,15 @@ bool ConstraintSolver::SolveWith(
 
   if (pre_randomize_) pre_randomize_();
 
-  // 18.6.1: the value of a state variable can render a constraint
-  // unsatisfiable; a bound folded from one that leaves an active variable
-  // no value fails the call, 18.6.3 without post_randomize().
+  // 18.6.1: a state variable's value can leave a constraint with no solution; a
+  // bound folded from one that leaves an active variable no value fails the
+  // call, 18.6.3 without post_randomize().
   if (HasEmptyDomain()) return false;
 
-  // 18.6.3: if randomize() fails, the random variables retain their previous
-  // values. The iterative solver overwrites the solved-value maps in place as
-  // it searches, so capture them here and restore them should the solve fail,
-  // so a failed randomize() leaves the variables exactly as the caller last saw
+  // 18.6.3: a failed randomize() leaves every random variable at its old value.
+  // The iterative solver overwrites the solved-value maps in place as it
+  // searches, so capture them here and restore them should the solve fail, so a
+  // failed randomize() leaves the variables exactly as the caller last saw
   // them.
   const std::unordered_map<std::string, int64_t> kPrevValues = values_;
   const std::unordered_map<std::string, double> kPrevRealValues = real_values_;
@@ -331,7 +331,7 @@ bool ConstraintSolver::SolveWith(
     real_values_ = kPrevRealValues;
   }
 
-  // 18.6.3: post_randomize() is not called when randomize() fails.
+  // 18.6.3: a failed randomize() skips post_randomize().
   if (solved && post_randomize_) post_randomize_();
   return solved;
 }
@@ -816,8 +816,8 @@ bool ConstraintSolver::SolveIterative(const std::vector<ConstraintExpr>& extra,
 }
 
 int64_t ConstraintSolver::GetValue(std::string_view name) const {
-  // 18.6.3: a static random variable is shared by all instances of its class,
-  // so its committed value lives in the shared cell. Read it there when one is
+  // 18.6.3: a static random variable has one copy for the whole class, so its
+  // committed value lives in the shared cell. Read it there when one is
   // attached, so this instance observes the value another instance most
   // recently drew rather than only the value this instance itself last solved.
   auto vit = variables_.find(std::string(name));

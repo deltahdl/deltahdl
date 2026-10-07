@@ -8,11 +8,11 @@ using namespace delta;
 
 namespace {
 
-// 18.13.5: set_randstate() sets an object's RNG internal state with the given
-// value, so a state read from an object and installed on it again replays
-// the four draws that followed the read, installed on another object it
-// makes that object continue the stream in all four draws, the installed
-// state reads back, and a third object's state is kept, as the design
+// 18.13.5: set_randstate() installs the given value as the object's RNG state,
+// so a state read from an object and installed on it again replays the four
+// draws that followed the read, installed on another object it makes that
+// object continue the stream in all four draws, the installed state reads back,
+// and a third object's state is kept, as the design
 // test/src/e2e/set_randstate_method.sv runs it.
 TEST(SetRandstateRun, TheStateInstalledOnAnObjectSetsWhatItDrawsNext) {
   SimFixture f;

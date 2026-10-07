@@ -8,11 +8,10 @@ using namespace delta;
 
 namespace {
 
-// 18.17.1: the probability that a production list is generated is
-// proportional to its weight, and a list with no weight uses 1, so 5000 runs
-// of the clause's add := 3 | dec := (1 + 1) generate add near 60% of the time
-// and dec near 40%, every run one of them, and 4000 runs of a | b := 3
-// generate a near 25% and b near 75%, as the design
+// 18.17.1: a production list is chosen in proportion to its weight, which is 1
+// when none is given, so 5000 runs of the clause's add := 3 | dec := (1 + 1)
+// generate add near 60% of the time and dec near 40%, every run one of them,
+// and 4000 runs of a | b := 3 generate a near 25% and b near 75%, as the design
 // test/src/e2e/production_weights.sv runs it.
 TEST(ProductionWeightsRun, TheWeightsSetTheProportionsAndAnAbsentOneIsOne) {
   SimFixture f;
@@ -52,11 +51,11 @@ TEST(ProductionWeightsRun, TheWeightsSetTheProportionsAndAnAbsentOneIsOne) {
   EXPECT_EQ(out, "1 1 1 1 1\n");
 }
 
-// 18.17.1: weight expressions are evaluated when their enclosing production
-// is selected, so weights change dynamically: with w = 10 the list x := w
-// beside y := (10 - w) is taken on all of 100 runs, with w = 0 on none, and
-// three picks in one statement, x zeroing w, take x then y then y, as the
-// design test/src/e2e/production_weights.sv runs it.
+// 18.17.1: a weight expression is evaluated each time its production is
+// selected, so the weights can change from one selection to the next: with w =
+// 10 the list x := w beside y := (10 - w) is taken on all of 100 runs, with w =
+// 0 on none, and three picks in one statement, x zeroing w, take x then y then
+// y, as the design test/src/e2e/production_weights.sv runs it.
 TEST(ProductionWeightsRun, WeightsAreEvaluatedWhenTheProductionIsSelected) {
   SimFixture f;
   std::string out = RunCapture(

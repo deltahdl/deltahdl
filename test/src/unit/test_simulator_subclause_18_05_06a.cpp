@@ -208,10 +208,10 @@ TEST(ConstraintIfElse, BareVariableConditionSelectsBranch) {
   EXPECT_GT(RunAndGet(src, "rd"), 10u);
 }
 
-// 18.5.6: the condition and the guarded set are interdependent and constrain
-// each other. Here mode is left free over {0, 1} but data is bounded to 15, a
-// value the then set (data < 10) forbids. The then set can only be escaped by
-// making the condition false, so the guarded set drives mode away from 1.
+// 18.5.6: the condition and the set it guards limit one another. Here mode is
+// left free over {0, 1} but data is bounded to 15, a value the then set (data <
+// 10) forbids. The then set can only be escaped by making the condition false,
+// so the guarded set drives mode away from 1.
 TEST(ConstraintIfElse, GuardedSetConstrainsCondition) {
   const char* src =
       "class C;\n"
@@ -308,11 +308,11 @@ TEST(ConstraintIfElse, UnsatisfiableElseSetUnderForcedConditionFails) {
   EXPECT_EQ(RunAndGet(src, "ok"), 0u);
 }
 
-// 18.5.6: an else omitted from a nested if sequence binds to the closest
-// preceding if that lacks one. Here the else belongs to the inner "if (b ==
-// 1)", so with a bounded to 1 and b bounded to 0 the outer condition holds, the
-// inner condition fails, and the inner else set (data > 10) applies. Had the
-// else been (incorrectly) bound to the outer if, the outer condition being true
+// 18.5.6: in nested ifs, an else belongs to the nearest earlier if still
+// without an else. Here the else belongs to the inner "if (b == 1)", so with a
+// bounded to 1 and b bounded to 0 the outer condition holds, the inner
+// condition fails, and the inner else set (data > 10) applies. Had the else
+// been (incorrectly) bound to the outer if, the outer condition being true
 // would leave data unconstrained.
 TEST(ConstraintIfElse, DanglingElseBindsToInnerIf) {
   const char* src =

@@ -33,8 +33,8 @@ class ClassConstraintValidator {
   void ValidateConstraintBlockNames();
   void ValidateOneClassConstraintNames(const ClassDecl* cls);
 
-  // 18.5.7.1: in a foreach iterative constraint the number of loop variables
-  // shall not exceed the number of dimensions of the iterated array.
+  // 18.5.7.1: a foreach iterative constraint names no more loop variables than
+  // the iterated array has dimensions.
   void ValidateForeachConstraintDims();
   void ValidateOneClassForeachConstraintDims(const ClassDecl* cls);
 
@@ -53,8 +53,8 @@ class ClassConstraintValidator {
   void ValidateSolveBeforeConstraints();
   void ValidateOneClassSolveBeforeConstraints(const ClassDecl* cls);
 
-  // 18.5.13.1: a soft constraint may be specified only on a random variable;
-  // it may not be specified for a randc variable.
+  // 18.5.13.1: a soft constraint applies to random variables alone, and never
+  // to a randc variable.
   void ValidateSoftConstraintVariables();
   void ValidateOneClassSoftConstraintVariables(const ClassDecl* cls);
 
@@ -63,8 +63,8 @@ class ClassConstraintValidator {
   void ValidateConstraintFunctionArgs();
   void ValidateOneClassConstraintFunctionArgs(const ClassDecl* cls);
 
-  // 18.8: rand_mode() is a built-in method and cannot be overridden, so a
-  // class shall not declare a method of that name.
+  // 18.8: rand_mode() is predefined and no class may override it, so no class
+  // may declare a method of that name.
   void ValidateBuiltinRandomizationMethods();
   void ValidateOneClassBuiltinMethods(const ClassDecl* cls);
 

@@ -856,8 +856,8 @@ bool Parser::ScanConstraintBodyToken(ClassMember* member, int& depth,
   if (kind == TokenKind::kKwDist) {
     Consume();
     CheckDistSet();
-    // 18.5: a dist expression forms a complete expression_or_dist and may not
-    // appear within another expression. Once the dist_list has been consumed,
+    // 18.5: a dist expression is a whole expression_or_dist and cannot be
+    // nested inside another expression. Once the dist_list has been consumed,
     // the only token that may legally follow is the ';' terminating the
     // constraint_expression; an operator, ')', or any other continuation means
     // the dist was used as an operand of a surrounding expression. A bare '}'
@@ -871,11 +871,11 @@ bool Parser::ScanConstraintBodyToken(ClassMember* member, int& depth,
     }
     return false;
   }
-  // 18.5.13.2: 'disable soft constraint_primary ;' discards the lower-priority
-  // soft constraints that reference the primary's variable. Capture the
-  // variable and consume the directive up to (not including) its ';', so its
-  // 'soft' keyword is not taken as opening a soft constraint and the terminator
-  // still resets the relation scan as usual.
+  // 18.5.13.2: 'disable soft constraint_primary ;' drops every lower-priority
+  // soft constraint naming the primary's variable. Capture the variable and
+  // consume the directive up to (not including) its ';', so its 'soft' keyword
+  // is not taken as opening a soft constraint and the terminator still resets
+  // the relation scan as usual.
   if (kind == TokenKind::kKwDisable) {
     CaptureDisableSoftConstraint(member);
     return false;

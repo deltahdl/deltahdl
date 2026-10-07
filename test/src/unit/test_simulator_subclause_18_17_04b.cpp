@@ -8,11 +8,11 @@ using namespace delta;
 
 namespace {
 
-// 18.17.4: the repeat expression's value is the number of times the
-// production is generated, so a hundred runs of the clause's
-// repeat($urandom_range(2, 6)) PUSH each push 2 to 6 times and reach both
-// ends, repeat(0) generates nothing and repeat(1 + 2) three, as the design
-// test/src/e2e/repeat_production.sv runs it.
+// 18.17.4: a repeat production is generated as many times as its expression's
+// value says, so a hundred runs of the clause's repeat($urandom_range(2, 6))
+// PUSH each push 2 to 6 times and reach both ends, repeat(0) generates nothing
+// and repeat(1 + 2) three, as the design test/src/e2e/repeat_production.sv runs
+// it.
 TEST(RepeatProductionRun, TheExpressionCountsTheGenerations) {
   SimFixture f;
   std::string out = RunCapture(
@@ -51,11 +51,10 @@ TEST(RepeatProductionRun, TheExpressionCountsTheGenerations) {
   EXPECT_EQ(out, "1 1 1 1\n");
 }
 
-// 18.17.4: the repeat cannot be terminated prematurely of itself, a break in
-// the repeated production terminating the entire randsequence block, so a
-// break in the third of five pushes leaves three pushes and the production
-// after the repeat ungenerated, as the design
-// test/src/e2e/repeat_production.sv runs it.
+// 18.17.4: nothing ends a repeat early except a break, and a break in the
+// repeated production ends the whole randsequence block, so a break in the
+// third of five pushes leaves three pushes and the production after the repeat
+// ungenerated, as the design test/src/e2e/repeat_production.sv runs it.
 TEST(RepeatProductionRun, ABreakInTheRepeatedProductionEndsTheWholeBlock) {
   SimFixture f;
   std::string out = RunCapture(

@@ -92,10 +92,10 @@ TEST(SoftConstraintsRun, TheHardSizeFailsTheContradictingCall) {
   EXPECT_EQ(out, "0 1\n");
 }
 
-// 18.5.13: a discarded soft constraint is replaced by true and has no
-// effect on the solution distribution: a soft v == 3 overridden by an
-// inline v != 3 leaves the 4-bit v spread over its other values, at least
-// eight distinct ones over 64 draws, and never 3.
+// 18.5.13: a dropped soft constraint counts as true and leaves the spread of
+// solutions untouched: a soft v == 3 overridden by an inline v != 3 leaves the
+// 4-bit v spread over its other values, at least eight distinct ones over 64
+// draws, and never 3.
 TEST(SoftConstraintsRun, ADiscardedPreferenceLeavesTheDistributionAlone) {
   SimFixture f;
   std::string out = RunCapture(

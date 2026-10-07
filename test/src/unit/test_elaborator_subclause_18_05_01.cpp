@@ -30,8 +30,8 @@ TEST(ExternalConstraintBlocks, ExplicitPrototypeWithoutBlockRejected) {
       3, "18.5.1"));
 }
 
-// 18.5.1: it is an error if more than one external constraint block is provided
-// for a given prototype.
+// 18.5.1: a prototype completed by two or more external constraint blocks is an
+// error.
 TEST(ExternalConstraintBlocks, MultipleBlocksForPrototypeRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -329,8 +329,8 @@ TEST(ExternalConstraintBlocks, BlockBodyIsCheckedLikeAnInClassBlock) {
       "18.5.4"));
 }
 
-// 18.5.1: a constraint block of the same name as a prototype in the same class
-// declaration is an error. Here the prototype is the implicit form.
+// 18.5.1: a class declaration holding both a prototype and a constraint block
+// of one name is an error. Here the prototype is the implicit form.
 TEST(ExternalConstraintBlocks, BlockSameNameAsPrototypeRejected) {
   ElabFixture f;
   EXPECT_FALSE(

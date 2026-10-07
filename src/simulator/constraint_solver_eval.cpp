@@ -327,10 +327,10 @@ size_t ClampCountToSize(
 }
 
 int64_t ConstraintSolver::FoldReduction(const ConstraintExpr& expr) const {
-  // 18.5.7.2: an array reduction method in a constraint is treated as an
-  // expression iterated over each element of the array, joined by the relevant
-  // operand for the method. Begin from the operand's identity so a fold over
-  // any number of elements is well defined, then combine each element in turn.
+  // 18.5.7.2: a reduction method in a constraint expands into one term per
+  // array element, joined by the operator the method stands for. Begin from the
+  // operand's identity so a fold over any number of elements is well defined,
+  // then combine each element in turn.
   int64_t acc = ReductionIdentity(expr.reduce_op);
 
   size_t count =
@@ -346,11 +346,10 @@ int64_t ConstraintSolver::FoldReduction(const ConstraintExpr& expr) const {
     acc = FoldReductionElement(expr.reduce_op, acc, v);
   }
 
-  // 18.5.7.2: the reduction returns a single value of the array element type,
-  // or the type of the with-clause expression when one is specified. Truncate
-  // the fold to that result type's width so a sum that would overflow the
-  // element type wraps, while a wider with-clause type (e.g. int'(item))
-  // preserves it.
+  // 18.5.7.2: the reduction yields one value, typed as the array's elements or,
+  // given a with clause, as that clause's expression. Truncate the fold to that
+  // result type's width so a sum that would overflow the element type wraps,
+  // while a wider with-clause type (e.g. int'(item)) preserves it.
   if (expr.reduce_width > 0 && expr.reduce_width < 64) {
     uint64_t mask = (static_cast<uint64_t>(1) << expr.reduce_width) - 1;
     acc = static_cast<int64_t>(static_cast<uint64_t>(acc) & mask);
@@ -369,10 +368,10 @@ bool ConstraintSolver::EvalArrayReduction(const ConstraintExpr& expr) const {
                         FoldReduction(expr), expr.lo);
 }
 
-// 18.5.4: no two members of the group hold the same value. A member of real
-// type holds its draw in real_values_ rather than values_, so it is compared
-// there; read from values_ alone a real member was never seen, and two reals
-// drawn alike passed as distinct.
+// 18.5.4: every member of the group holds a value no other member holds. A
+// member of real type holds its draw in real_values_ rather than values_, so it
+// is compared there; read from values_ alone a real member was never seen, and
+// two reals drawn alike passed as distinct.
 bool ConstraintSolver::EvalUnique(const ConstraintExpr& expr) const {
   std::unordered_set<int64_t> seen;
   std::unordered_set<double> seen_real;

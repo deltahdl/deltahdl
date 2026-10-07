@@ -32,8 +32,8 @@ TEST(ConstraintModeCall, NonvoidQueryFormParses) {
               "endfunction\n"));
 }
 
-// 18.9: when called as a void function with no constraint name, the operation
-// applies to all constraints within the object.
+// 18.9: the void form with no constraint named acts on every constraint of the
+// object.
 TEST(ConstraintModeCall, UnnamedVoidFormParses) {
   EXPECT_TRUE(
       ParseOk("class Packet;\n"

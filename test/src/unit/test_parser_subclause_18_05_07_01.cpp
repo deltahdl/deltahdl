@@ -32,7 +32,7 @@ TEST(ForeachIterativeConstraint, MultipleLoopVariablesAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5.7.1: an empty loop variable indicates no iteration over that dimension,
+// 18.5.7.1: leaving a loop variable empty skips iteration over its dimension,
 // so a position in the loop_variables list may be left blank.
 TEST(ForeachIterativeConstraint, EmptyLoopVariableAccepted) {
   auto r = Parse(

@@ -87,10 +87,10 @@ TEST(SoftConstraintPrioritiesRun, AnExternalBlockTakesItsPrototypesPlace) {
   EXPECT_EQ(out, "1 2\n");
 }
 
-// 18.5.13.1: the constraints in a contained object have lower priority than
-// all constraints in its container, and the object whose handle is declared
-// later outranks the one before it: the container ties the two values, the
-// later object prefers 2 and the earlier 1, so both take 2.
+// 18.5.13.1: a contained object's constraints rank below every constraint of
+// its container, and among contained objects the later-declared handle ranks
+// higher: the container ties the two values, the later object prefers 2 and the
+// earlier 1, so both take 2.
 TEST(SoftConstraintPrioritiesRun, TheContainerAndTheLaterHandleOutrank) {
   SimFixture f;
   std::string out = RunCapture(

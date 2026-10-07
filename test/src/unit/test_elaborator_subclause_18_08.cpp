@@ -7,8 +7,8 @@ using namespace delta;
 
 namespace {
 
-// 18.8: the rand_mode() method is built-in and cannot be overridden, so a class
-// that declares a method of that name is illegal.
+// 18.8: rand_mode() is predefined and no class may override it, so a class that
+// declares a method of that name is illegal.
 TEST(RandModeBuiltin, OverrideRejected) {
   ElabFixture f;
   EXPECT_FALSE(

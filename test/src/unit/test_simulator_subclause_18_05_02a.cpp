@@ -51,12 +51,11 @@ TEST(ConstraintInheritanceSim, DerivedConstraintHonoredThroughBaseHandle) {
   EXPECT_EQ(RunAndGet(src, "rx"), 42u);
 }
 
-// 18.5.2: a derived class inherits all constraints from its superclass, and a
-// constraint that does not share a name with a base constraint is an additional
-// constraint. Randomizing through a Base handle must satisfy both the inherited
-// base constraint (x) and the derived class's additional constraint (y),
-// confirming randomize() gathered constraints from the whole dynamic hierarchy
-// rather than only the handle's static view.
+// 18.5.2: a subclass keeps every constraint of its superclass, and a constraint
+// of its own under a new name adds to them. Randomizing through a Base handle
+// must satisfy both the inherited base constraint (x) and the derived class's
+// additional constraint (y), confirming randomize() gathered constraints from
+// the whole dynamic hierarchy rather than only the handle's static view.
 TEST(ConstraintInheritanceSim, InheritedAndAdditionalConstraintsBothHonored) {
   const char* src =
       "class Base;\n"
@@ -86,12 +85,12 @@ TEST(ConstraintInheritanceSim, InheritedAndAdditionalConstraintsBothHonored) {
   EXPECT_EQ(RunAndGet(src, "ry"), 42u);
 }
 
-// 18.5.2: a constraint in a derived class that has the same name as one in its
-// superclass replaces the inherited constraint of that name -- it does not add
-// to it. The base pins x to 10 and the derived's same-named constraint pins x
-// to 42; if the inherited constraint were still in force the two would conflict
-// and randomize() would fail. Observing success with x == 42 shows the derived
-// constraint replaced, rather than joined, the base one.
+// 18.5.2: a subclass constraint reusing a superclass constraint's name takes
+// the place of the inherited one -- it does not add to it. The base pins x to
+// 10 and the derived's same-named constraint pins x to 42; if the inherited
+// constraint were still in force the two would conflict and randomize() would
+// fail. Observing success with x == 42 shows the derived constraint replaced,
+// rather than joined, the base one.
 TEST(ConstraintInheritanceSim, SameNameDerivedConstraintReplacesInherited) {
   const char* src =
       "class Base;\n"

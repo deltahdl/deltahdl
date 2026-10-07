@@ -8,11 +8,10 @@ using namespace delta;
 
 namespace {
 
-// 18.16: an item's weight divided by the sum of all weights is the
-// probability of taking its branch, so 8000 draws of the clause's weights of
-// 3, 1 and 4 take the branches near 3/8, 1/8 and 1/2 of the time, and every
-// draw takes one branch, as the design test/src/e2e/randcase_statement.sv
-// runs it.
+// 18.16: each branch is taken with a chance equal to its share of the summed
+// weights, so 8000 draws of the clause's weights of 3, 1 and 4 take the
+// branches near 3/8, 1/8 and 1/2 of the time, and every draw takes one branch,
+// as the design test/src/e2e/randcase_statement.sv runs it.
 TEST(RandcaseRun, TheClausesWeightsSelectTheBranchesInProportion) {
   SimFixture f;
   std::string out = RunCapture(

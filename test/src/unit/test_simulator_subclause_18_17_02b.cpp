@@ -39,10 +39,10 @@ TEST(IfElseProductionRun, TheClausesPpOpPushesToTwoThenAlternates) {
   EXPECT_EQ(out, "push push pop push pop depth 1\n");
 }
 
-// 18.17.2: the else is optional and the expression may be any expression
-// evaluating to a Boolean value, so with no else a false expression
-// generates nothing and a true expression of two operands generates its
-// production, as the design test/src/e2e/if_else_production.sv runs it.
+// 18.17.2: an if-else production may omit its else, and its condition is any
+// expression with a Boolean value, so with no else a false expression generates
+// nothing and a true expression of two operands generates its production, as
+// the design test/src/e2e/if_else_production.sv runs it.
 TEST(IfElseProductionRun, WithoutElseAFalseExpressionGeneratesNothing) {
   SimFixture f;
   std::string out = RunCapture(

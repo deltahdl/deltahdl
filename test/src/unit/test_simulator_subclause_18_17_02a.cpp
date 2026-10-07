@@ -9,8 +9,8 @@ using namespace delta;
 
 namespace {
 
-// 18.17.2: when the if-else condition is false, the production following the
-// optional else is generated.
+// 18.17.2: a false if-else condition generates the production after else, when
+// there is one.
 TEST(RandsequenceSim, IfElseProductionFalseSelectsElse) {
   SimFixture f;
   auto* var = RunRandseqAndFindVar(f,
@@ -30,8 +30,8 @@ TEST(RandsequenceSim, IfElseProductionFalseSelectsElse) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// 18.17.2: when the if-else condition is true, the production following the
-// expression is generated (and the else production is not).
+// 18.17.2: a true if-else condition generates the production right after the
+// condition (and the else production is not).
 TEST(RandsequenceSim, IfElseProductionTrueSelectsThen) {
   SimFixture f;
   auto* var = RunRandseqAndFindVar(f,

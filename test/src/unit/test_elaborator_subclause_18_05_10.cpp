@@ -140,9 +140,9 @@ TEST(StaticConstraint, NonStaticPrototypeAndExternalAccepted) {
              "endmodule\n"));
 }
 
-// 18.5.10: a pure constraint may be qualified 'static', and an overriding
-// constraint must match. A static pure constraint overridden by a static
-// constraint is legal.
+// 18.5.10: 'static' is allowed on a pure constraint, and the constraint
+// overriding it carries the same qualifier. A static pure constraint overridden
+// by a static constraint is legal.
 TEST(StaticConstraint, StaticPureOverriddenByStaticAccepted) {
   EXPECT_TRUE(
       ElabOk("virtual class B;\n"

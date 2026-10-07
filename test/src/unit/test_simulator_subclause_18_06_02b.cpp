@@ -46,12 +46,11 @@ const char* const kHooked =
     "  endfunction\n"
     "endclass\n";
 
-// 18.6.2: randomize() first invokes pre_randomize() on the object and on
-// its enabled random object members, then computes and assigns the new
-// values, then invokes post_randomize() on them: pre runs at step 1 seeing
-// x as it was, post at step 2 seeing the new x below 100, and the Leaf's
-// methods run once each, as the design test/src/e2e/pre_post_randomize.sv
-// runs it.
+// 18.6.2: randomize() works in three steps: pre_randomize() on the object and
+// each enabled random object member, then the new values, then post_randomize()
+// on those same objects: pre runs at step 1 seeing x as it was, post at step 2
+// seeing the new x below 100, and the Leaf's methods run once each, as the
+// design test/src/e2e/pre_post_randomize.sv runs it.
 TEST(PrePostRandomizeRun, PreRunsBeforeTheValuesAndPostAfterOnTheTree) {
   SimFixture f;
   std::string out = RunCapture(

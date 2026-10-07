@@ -179,8 +179,8 @@ TEST(ConstraintInheritance, NonAbstractImplementsPureAccepted) {
              "endmodule\n"));
 }
 
-// 18.5.2: an abstract class that inherits a constraint may replace it with a
-// pure constraint of the same name, re-imposing the obligation on subclasses.
+// 18.5.2: an abstract class can override an inherited constraint with a
+// same-name pure constraint, re-imposing the obligation on subclasses.
 TEST(ConstraintInheritance, AbstractPureReplacesInheritedAccepted) {
   EXPECT_TRUE(
       ElabOk("class B;\n"

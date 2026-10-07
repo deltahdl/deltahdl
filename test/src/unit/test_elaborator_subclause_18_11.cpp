@@ -75,9 +75,9 @@ TEST(InlineRandomControlVisibility, PublicMemberArgAcceptedFromOutside) {
              "endmodule\n"));
 }
 
-// 18.11: the random mode of a local member may be changed by a randomize()
-// argument list from a scope that can reach that member -- namely from within
-// the class in which the local member is declared. Naming the local member in a
+// 18.11: a randomize() argument list can switch a local member's random mode
+// only from a scope with access to that member -- namely from within the class
+// in which the local member is declared. Naming the local member in a
 // randomize() call inside one of the class's own methods therefore elaborates
 // cleanly, in contrast to the same name being rejected through an external
 // handle. This is the accepting side of the access rule, with the member's

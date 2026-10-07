@@ -21,9 +21,9 @@ TEST(SubroutineCallExprParsing, VariableIdentifierList) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-// 18.11: the arguments to randomize() are limited to the names of properties of
-// the calling object; a general expression is not allowed. A property selected
-// by index is still a property name and remains acceptable.
+// 18.11: randomize() accepts as arguments only names of the calling object's
+// properties; a general expression is not allowed. A property selected by index
+// is still a property name and remains acceptable.
 TEST(SubroutineCallExprParsing, PropertySelectArgIsAccepted) {
   auto r = Parse(
       "module m;\n"

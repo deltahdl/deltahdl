@@ -361,9 +361,9 @@ bool RefsRandVar(const Expr* e, std::vector<RandInfo>& rands) {
   return AnyRefsRandVar(e->args, rands) || AnyRefsRandVar(e->elements, rands);
 }
 
-// 18.6.1: randomize() sets all of an object's active random variables AND the
-// random objects it references to valid values, succeeding only when every one
-// is solved. Solve this object's own random variables subject to its active
+// 18.6.1: randomize() gives valid values to every active random variable of an
+// object AND to the random objects it references, succeeding only when every
+// one is solved. Solve this object's own random variables subject to its active
 // constraints and write the results back, then recurse into each non-null rand
 // object-handle member so its own random members are randomized as well; the
 // overall result fails if any sub-object solve fails. The visited set breaks
@@ -384,10 +384,10 @@ bool RefsRandVar(const Expr* e, std::vector<RandInfo>& rands) {
 // active set and held as a state variable, and no value is drawn for the call.
 // Because no class member is randomized, the rand object-handle members are not
 // recursed into either -- they too are state variables for this call.
-// 18.11: naming a property in the inline argument list can change the random
-// mode of any class property, even one not declared rand or randc. A named
-// property that is not already among the rand/randc set is looked up and added
-// as an active random variable so it is solved and written back like any other.
+// 18.11: naming a property in the inline argument list can make any class
+// property random for the call, rand, randc or neither. A named property that
+// is not already among the rand/randc set is looked up and added as an active
+// random variable so it is solved and written back like any other.
 // It is added before the constraint blocks are gathered so a constraint
 // relating to it binds it as a random variable rather than a state constant.
 // The mechanism does not affect the cyclical mode, so the promoted variable is
@@ -458,13 +458,13 @@ static void BindRandcHistory(ClassObject* obj, RandInfo& ri) {
 
 // Hand each collected random variable to the solver, active or held.
 //
-// 18.11: when randomize() is called with an argument list, those arguments
-// designate the complete set of random variables for this call and every other
-// variable is considered a state variable -- conceptually equivalent to
-// rand_mode() calls that enable the named variables and disable the rest. The
-// inline list therefore fully governs the active set here, overriding the
-// persistent rand_mode() state for the duration of the call. Without an
-// argument list (18.8) the persistent per-object rand_mode() flag governs.
+// 18.11: randomize() called with an argument list randomizes exactly those
+// variables in this call and reads every other variable as state --
+// conceptually equivalent to rand_mode() calls that enable the named variables
+// and disable the rest. The inline list therefore fully governs the active set
+// here, overriding the persistent rand_mode() state for the duration of the
+// call. Without an argument list (18.8) the persistent per-object rand_mode()
+// flag governs.
 //
 // 18.8 / 18.11: a variable that is not active is not randomized; the solver
 // treats it as a state variable, holding its current value constant. That value

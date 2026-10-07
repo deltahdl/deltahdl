@@ -50,11 +50,10 @@ TEST(RandomizeMethodRun, TheVirtualMethodRandomizesTheObjectsOwnClass) {
   EXPECT_EQ(out, "32 32 32\n");
 }
 
-// 18.6.1: the addition of constraints in a derived class can render a
-// seemingly simple constraint unsatisfiable: the Oversized holds its size
-// above 100 beside the base's below 64, so randomize() returns 0 and the
-// size keeps the value it had rather than the bound the empty range was
-// collapsed onto.
+// 18.6.1: constraints a subclass adds can leave even a simple-looking
+// constraint with no solution: the Oversized holds its size above 100 beside
+// the base's below 64, so randomize() returns 0 and the size keeps the value it
+// had rather than the bound the empty range was collapsed onto.
 TEST(RandomizeMethodRun, ADerivedClassCanRenderTheConstraintsUnsatisfiable) {
   SimFixture f;
   std::string out =

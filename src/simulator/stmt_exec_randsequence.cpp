@@ -250,8 +250,8 @@ static ExecTask ExecRsProdCase(const Stmt* stmt, const RsProd& prod,
   co_return StmtResult::kDone;
 }
 
-// 18.17: every code block inside a randsequence is its own anonymous automatic
-// scope. Variables it declares are recreated on each execution and do not leak
+// 18.17: each code block inside a randsequence opens an automatic scope with no
+// name. Variables it declares are recreated on each execution and do not leak
 // to sibling code blocks or outlive the block, so we bracket the statements
 // with a fresh automatic scope.
 static ExecTask ExecRsProdCodeBlock(const RsProd& prod, SimContext& ctx,
@@ -883,8 +883,8 @@ ExecTask ExecRandsequence(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   std::string_view top = stmt->rs_top_production;
   if (top.empty()) top = stmt->rs_productions[0].name;
 
-  // 18.17: the randsequence statement creates an automatic scope enclosing the
-  // generated productions and their code blocks. Production identifiers are
+  // 18.17: a randsequence statement opens an automatic scope around the
+  // productions it generates and their code blocks. Production identifiers are
   // already resolved only within this statement, so the pushed scope provides
   // the enclosing automatic lifetime for the block.
   ctx.PushScope();

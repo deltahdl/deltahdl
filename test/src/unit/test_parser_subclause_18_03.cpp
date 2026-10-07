@@ -30,7 +30,7 @@ TEST(ConstraintFourState, TripleNotEqualOperatorRejected) {
       "18.3"));
 }
 
-// 18.3: 4-state values (x or z) are illegal in a constraint.
+// 18.3: a constraint may not contain an x or z value.
 TEST(ConstraintFourState, FourStateLiteralRejected) {
   auto r = Parse(
       "class C;\n"

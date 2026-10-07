@@ -11,7 +11,8 @@ using namespace delta;
 
 namespace {
 
-// 18.6.2: every class contains pre_randomize() and post_randomize() methods.
+// 18.6.2: pre_randomize() and post_randomize() exist in every class without
+// being declared.
 // A class that does not override them has built-in versions whose processing
 // is empty, so randomization proceeds and produces a value exactly as if they
 // were absent. The solver models a method left unoverridden as having no
@@ -35,12 +36,12 @@ TEST(PrePostRandomize, DefaultBuiltinsAreNoOpsWhenNotOverridden) {
   EXPECT_LE(kX, 100);
 }
 
-// 18.6.2: a single randomize() first invokes pre_randomize() and then, after
-// the values are computed, invokes post_randomize(). Beyond the compute
-// boundary, this fixes both the relative order of the two methods and their
-// cardinality: across one Solve() each hook fires exactly once, with
-// pre_randomize() strictly preceding post_randomize(). Recording an ordered
-// log from the solver's pre/post hook sites observes that sequence directly.
+// 18.6.2: one randomize() call runs pre_randomize() before it computes values
+// and post_randomize() after. Beyond the compute boundary, this fixes both the
+// relative order of the two methods and their cardinality: across one Solve()
+// each hook fires exactly once, with pre_randomize() strictly preceding
+// post_randomize(). Recording an ordered log from the solver's pre/post hook
+// sites observes that sequence directly.
 TEST(PrePostRandomize, PreThenPostInvokedExactlyOnceInOrder) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -60,9 +61,9 @@ TEST(PrePostRandomize, PreThenPostInvokedExactlyOnceInOrder) {
   EXPECT_EQ(events, kExpected);
 }
 
-// 18.6.2: randomize() invokes pre_randomize() first — before any new random
-// value is computed — and post_randomize() after the new values are computed
-// AND assigned. Observed through the real randomize() path from source: a user
+// 18.6.2: randomize() runs pre_randomize() before computing any new random
+// value and post_randomize() only once the new values are both computed AND
+// assigned. Observed through the real randomize() path from source: a user
 // pre_randomize() records the random member as it stands before the solve (its
 // default 0), while a user post_randomize() records the same member after the
 // solve, when the newly drawn value has already been written back onto the
@@ -95,8 +96,8 @@ TEST(PrePostRandomizeFromSource, PreObservesDefaultPostObservesAssignedValue) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.6.2: pre_randomize() and post_randomize() are not virtual, but because
-// they are called by the virtual randomize() they appear to behave as virtual
+// 18.6.2: pre_randomize() and post_randomize() are not declared virtual, yet
+// the virtual randomize() calls them, so in effect they dispatch like virtual
 // methods. Randomizing through a base-class handle bound to a derived object
 // dispatches post_randomize() to the derived override, not the base version:
 // the derived post_randomize() stamps the tag with its own marker (2), so
@@ -166,7 +167,7 @@ TEST(PrePostRandomizeFromSource, InheritedPreRandomizeRunsForDerivedObject) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.6.2: randomize() invokes post_randomize() on the object AND on all of its
+// 18.6.2: randomize() runs post_randomize() on the object AND on each of its
 // random object members. An outer object holds a rand class-handle member; a
 // single randomize() on the outer object drives the inner object's
 // post_randomize(), which reads the inner random member after it has been
@@ -203,7 +204,7 @@ TEST(PrePostRandomizeFromSource, PostRandomizeRunsOnRandObjectMember) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.6.2: randomize() invokes pre_randomize() on the object AND on all of its
+// 18.6.2: randomize() runs pre_randomize() on the object AND on each of its
 // random object members — the companion of the post_randomize()-on-member rule.
 // A single randomize() on the outer object drives the inner (rand class-handle)
 // member's pre_randomize(), which stamps its own marker (5); reading it back
@@ -312,8 +313,8 @@ TEST(PrePostRandomizeFromSource, InheritedPostRandomizeRunsForDerivedObject) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.6.2: pre_randomize() is not virtual but appears to behave virtually
-// because it is called by the virtual randomize() — the companion of the
+// 18.6.2: pre_randomize() is not declared virtual, yet dispatches like a
+// virtual method since the virtual randomize() calls it — the companion of the
 // post_randomize apparent-virtual rule. Randomizing through a base-class handle
 // bound to a derived object dispatches pre_randomize() to the derived override
 // (marker 2), not the base version (marker 1), so reading tag == 2 confirms

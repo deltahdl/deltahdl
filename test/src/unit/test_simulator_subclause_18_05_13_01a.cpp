@@ -68,10 +68,10 @@ TEST(SoftConstraintPriority, LaterConstraintBlockOutranksEarlierBlock) {
   EXPECT_EQ(RunAndGet(src, "rx"), 20u);
 }
 
-// 18.5.13.1: a soft constraint within an inline (with) constraint block has
-// higher priority than the constraints of the class being randomized. The class
-// prefers x == 10 and the `randomize() with` block prefers x == 20; the two
-// contradict, so the inline preference wins and the class one is discarded.
+// 18.5.13.1: a soft constraint in an inline (with) block outranks the
+// constraints of the class being randomized. The class prefers x == 10 and the
+// `randomize() with` block prefers x == 20; the two contradict, so the inline
+// preference wins and the class one is discarded.
 TEST(SoftConstraintPriority, InlineSoftOutranksClassSoft) {
   const char* src =
       "class C;\n"
@@ -91,9 +91,9 @@ TEST(SoftConstraintPriority, InlineSoftOutranksClassSoft) {
   EXPECT_EQ(RunAndGet(src, "rx"), 20u);
 }
 
-// 18.5.13.1: constraints in a derived class have higher priority than all
-// constraints in its superclasses. The base prefers x == 10 and the derived
-// class prefers a contradictory x == 20 for the same inherited variable;
+// 18.5.13.1: a subclass's constraints outrank every constraint of its
+// superclasses. The base prefers x == 10 and the derived class prefers a
+// contradictory x == 20 for the same inherited variable;
 // randomizing a derived object honors the derived preference and discards the
 // inherited one. The two soft constraints have distinct names, so 18.5.2
 // replacement does not apply — both are active and resolved purely by priority.
@@ -172,11 +172,11 @@ TEST(SoftConstraintPriority, BothSoftDiscardedWhenNeitherCanHold) {
   EXPECT_NE(RunAndGet(src, "rx"), 90u);
 }
 
-// 18.5.13.1: a call to randomize() that involves only soft constraints can
-// never fail. Two preferences (x == 1 and x == 2) contradict each other while a
-// third (y == 5) is independent; with no hard constraint to satisfy the solver
-// resolves the conflict by priority rather than failing — the call succeeds,
-// honoring the higher-priority x == 2 and the independent y == 5.
+// 18.5.13.1: randomize() with nothing but soft constraints always succeeds. Two
+// preferences (x == 1 and x == 2) contradict each other while a third (y == 5)
+// is independent; with no hard constraint to satisfy the solver resolves the
+// conflict by priority rather than failing — the call succeeds, honoring the
+// higher-priority x == 2 and the independent y == 5.
 TEST(SoftConstraintPriority, RandomizeWithOnlySoftNeverFails) {
   const char* src =
       "class C;\n"
@@ -200,10 +200,10 @@ TEST(SoftConstraintPriority, RandomizeWithOnlySoftNeverFails) {
   EXPECT_EQ(RunAndGet(src, "ry"), 5u);
 }
 
-// 18.5.13.1: when the soft constraints do not contradict one another (or the
-// hard constraints), the result is the same as if every constraint were
-// declared hard. The two soft preferences x == 5 and y == 7 are jointly
-// satisfiable, so both are honored exactly as hard equalities would be.
+// 18.5.13.1: soft constraints that clash with nothing, soft or hard, give the
+// result they would give if all were hard. The two soft preferences x == 5 and
+// y == 7 are jointly satisfiable, so both are honored exactly as hard
+// equalities would be.
 TEST(SoftConstraintPriority, NonContradictingSoftAllHonored) {
   const char* src =
       "class C;\n"

@@ -70,9 +70,9 @@ TEST(ConstraintDist, RangeElementRestrictsMembershipToRange) {
   EXPECT_EQ(RunAndGet(src, "outrange"), 0u);
 }
 
-// 18.5.3: a value whose total weight across the distribution is zero is treated
-// as a constraint that x not take that value. With 17 weighted zero and named
-// by no other item, only 42 is reachable, so every solve yields 42.
+// 18.5.3: a value whose weights sum to zero across the distribution is
+// excluded, as if x were constrained to avoid it. With 17 weighted zero and
+// named by no other item, only 42 is reachable, so every solve yields 42.
 TEST(ConstraintDist, ZeroTotalWeightValueExcluded) {
   const char* src =
       "class C;\n"
@@ -90,9 +90,9 @@ TEST(ConstraintDist, ZeroTotalWeightValueExcluded) {
   EXPECT_EQ(RunAndGet(src, "rx"), 42u);
 }
 
-// 18.5.3: absent any other constraints, the probability that x matches an item
-// is proportional to the item's weight. A 1000:1 ratio drives nearly every
-// sample to the heavily weighted value.
+// 18.5.3: with no other constraint in play, x lands on an item in proportion to
+// that item's weight. A 1000:1 ratio drives nearly every sample to the heavily
+// weighted value.
 TEST(ConstraintDist, ProbabilityProportionalToWeight) {
   const char* src =
       "class C;\n"
@@ -258,11 +258,10 @@ TEST(ConstraintDist, DivideWeightOnRangeIsWholeRange) {
   EXPECT_GT(at100, inr / 2);
 }
 
-// 18.5.3: the := and :/ operators assign the specified weight to an individual
-// value identically — the per-element distinction governs only ranges. Two
-// classes differing solely in which operator tags the same single-value set
-// draw the same sequence from the same object seed, so their outcome counts
-// match exactly.
+// 18.5.3: for a single value, := and :/ give it the same weight — the
+// per-element distinction governs only ranges. Two classes differing solely in
+// which operator tags the same single-value set draw the same sequence from the
+// same object seed, so their outcome counts match exactly.
 TEST(ConstraintDist, AssignAndDivideEquivalentForSingleValues) {
   const char* assign_src =
       "class C;\n"
@@ -306,9 +305,9 @@ TEST(ConstraintDist, AssignAndDivideEquivalentForSingleValues) {
   EXPECT_EQ(RunAndGet(assign_src, "c200"), RunAndGet(divide_src, "c200"));
 }
 
-// 18.5.3: if a single value occurs in multiple items, the weights allocated to
-// that value are additive. Value 200 appears in two weight-1 items and so is
-// about twice as likely as the single weight-1 value 100.
+// 18.5.3: a value named by several items gets the sum of their weights. Value
+// 200 appears in two weight-1 items and so is about twice as likely as the
+// single weight-1 value 100.
 TEST(ConstraintDist, WeightsAreAdditiveAcrossItems) {
   const char* src =
       "class C;\n"
@@ -332,9 +331,9 @@ TEST(ConstraintDist, WeightsAreAdditiveAcrossItems) {
   EXPECT_GT(RunAndGet(src, "c200"), RunAndGet(src, "c100"));
 }
 
-// 18.5.3: the additive behavior includes items explicitly weighted to zero. The
-// 50:=0 item does not exclude 50 because 50 is also covered by a nonzero range
-// item, so both 50 and 51 remain reachable and no other value appears.
+// 18.5.3: the summing counts items given a zero weight as well. The 50:=0 item
+// does not exclude 50 because 50 is also covered by a nonzero range item, so
+// both 50 and 51 remain reachable and no other value appears.
 TEST(ConstraintDist, ZeroWeightItemDoesNotConstrainWhenCoveredElsewhere) {
   const char* src =
       "class C;\n"
@@ -359,9 +358,9 @@ TEST(ConstraintDist, ZeroWeightItemDoesNotConstrainWhenCoveredElsewhere) {
   EXPECT_EQ(RunAndGet(src, "other"), 0u);
 }
 
-// 18.5.3: nonzero distribution weights do not remove values from the solution
-// space. Even weighted 100 times more lightly, value 20 is still reachable
-// across many randomizations.
+// 18.5.3: a value with a nonzero weight stays a possible solution. Even
+// weighted 100 times more lightly, value 20 is still reachable across many
+// randomizations.
 TEST(ConstraintDist, NonzeroWeightDoesNotExcludeValue) {
   const char* src =
       "class C;\n"
@@ -410,10 +409,9 @@ TEST(ConstraintDist, DefaultCoversRemainderOfDomain) {
   EXPECT_GT(RunAndGet(src, "cother"), 0u);
 }
 
-// 18.5.3: a dist expression requires that the expression contain at least one
-// rand variable. A distribution applied to a non-rand member supplies no rand
-// variable, so randomize() fails even though the class has an unrelated rand
-// member.
+// 18.5.3: the expression a dist distributes has to involve a rand variable. A
+// distribution applied to a non-rand member supplies no rand variable, so
+// randomize() fails even though the class has an unrelated rand member.
 TEST(ConstraintDist, DistRequiresRandVariableFails) {
   const char* src =
       "class C;\n"

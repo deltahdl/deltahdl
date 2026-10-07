@@ -6,12 +6,12 @@ using namespace delta;
 
 namespace {
 
-// 18.6.1: randomize() returns 1 when it successfully sets every active random
-// variable to a valid value. A single random variable (declared with §18.4
-// rand) constrained (§18.5) to a domain is randomized through the real
-// randomize() method; the call reports 1 and the assigned value lies inside the
-// declared domain. Driven from source through the full pipeline so the return
-// value and the write-back both come from the production randomize() path.
+// 18.6.1: randomize() reports 1 once it has given every active random variable
+// a valid value. A single random variable (declared with §18.4 rand)
+// constrained (§18.5) to a domain is randomized through the real randomize()
+// method; the call reports 1 and the assigned value lies inside the declared
+// domain. Driven from source through the full pipeline so the return value and
+// the write-back both come from the production randomize() path.
 TEST(RandomizeMethod, ReturnsOneAndAssignsValidValue) {
   const char* src =
       "class C;\n"
@@ -30,8 +30,8 @@ TEST(RandomizeMethod, ReturnsOneAndAssignsValidValue) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.6.1: randomize() generates the random variable's value subject to the
-// active constraints -- the constraint, not chance, dictates the result. A
+// 18.6.1: randomize() draws the random variable's value within what the active
+// constraints allow -- the constraint, not chance, dictates the result. A
 // single random variable pinned by an equality constraint is randomized through
 // the real randomize() method: the call returns 1 and the variable holds
 // exactly the value the active constraint requires, observed after driving real
@@ -74,8 +74,8 @@ TEST(RandomizeMethod, ReturnsZeroWhenUnsatisfiable) {
   EXPECT_EQ(RunAndGet(src, "ok"), 0u);
 }
 
-// 18.6.1: randomize() generates values for ALL the active random variables in
-// the object, not merely the ones a single constraint happens to mention. Three
+// 18.6.1: randomize() draws a value for EVERY active random variable of the
+// object, not merely the ones a single constraint happens to mention. Three
 // independent random variables are each constrained to a distinct disjoint
 // domain; a successful call returns 1 and every one of them lands inside its
 // own range, showing each active variable was randomized.
@@ -229,8 +229,8 @@ TEST(RandomizeMethod, RandomizeInvokedThroughThisInMethod) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.6.1: randomize() sets all the random variables AND objects to valid
-// values. A rand object-handle member names a sub-object whose own random
+// 18.6.1: randomize() gives valid values to every random variable AND random
+// object. A rand object-handle member names a sub-object whose own random
 // members must also be randomized by the enclosing call. The outer object
 // constructs its rand inner object in new(); randomizing the outer object
 // returns 1 and, without any separate call on the inner handle, the inner

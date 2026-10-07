@@ -7,9 +7,9 @@ using namespace delta;
 
 namespace {
 
-// 18.5.7.1: in a foreach iterative constraint the number of loop variables
-// shall not exceed the number of dimensions of the array. A two-dimensional
-// array iterated with two loop variables is within that limit and elaborates.
+// 18.5.7.1: a foreach iterative constraint names no more loop variables than
+// the array has dimensions. A two-dimensional array iterated with two loop
+// variables is within that limit and elaborates.
 TEST(ForeachConstraintDimensions, LoopVarsWithinDimensionsAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"

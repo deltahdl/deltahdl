@@ -17,13 +17,13 @@ namespace {
 // unknown-function call yields 0, so a returned status of 1 is itself evidence
 // the production rule ran and succeeded.
 
-// 18.12: the scope randomize function operates on the variables of the current
-// scope; its arguments specify the variables to be assigned random values, and
-// it returns 1 when it successfully sets ALL of them to valid values. Two
-// four-state variables of differing declared widths are named; each begins
-// all-x, and after the call $isunknown reads 0 for both -- so every named
-// random variable, not merely one, was actually drawn and written a concrete
-// value. This is deterministic regardless of which values the draw produced.
+// 18.12: scope randomize works on variables of the scope it is called from; its
+// arguments specify the variables to be assigned random values, and it returns
+// 1 when it successfully sets ALL of them to valid values. Two four-state
+// variables of differing declared widths are named; each begins all-x, and
+// after the call $isunknown reads 0 for both -- so every named random variable,
+// not merely one, was actually drawn and written a concrete value. This is
+// deterministic regardless of which values the draw produced.
 TEST(ScopeRandomizeRuntime, SetsAllScopeVariablesAndReturnsOne) {
   const char* src =
       "module stim;\n"

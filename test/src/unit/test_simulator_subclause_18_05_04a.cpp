@@ -16,10 +16,10 @@ namespace {
 // two members ever coincide; the illegal-group and no-effect rules are observed
 // from a single deterministic randomize() call.
 
-// 18.5.4: a unique constraint requires that no two members of the group hold
-// the same value after randomization. With three members confined to a domain
-// that barely fits three distinct values, every solve yields three different
-// values, so no pair is ever equal across many draws.
+// 18.5.4: after randomization, every member of a unique group holds a value no
+// other member holds. With three members confined to a domain that barely fits
+// three distinct values, every solve yields three different values, so no pair
+// is ever equal across many draws.
 TEST(ConstraintUnique, MembersGetDistinctValues) {
   const char* src =
       "class C;\n"
@@ -73,10 +73,9 @@ TEST(ConstraintUnique, OverConstrainedGroupFails) {
   EXPECT_EQ(RunAndGet(src, "ok"), 0u);
 }
 
-// 18.5.4: if the group of variables contains fewer than two members the
-// constraint shall have no effect and shall not cause a contradiction. A single
-// member alongside an equality that pins it still solves, and the pinned value
-// is produced.
+// 18.5.4: a group of fewer than two members makes the unique constraint a no-op
+// that can never contradict anything. A single member alongside an equality
+// that pins it still solves, and the pinned value is produced.
 TEST(ConstraintUnique, SingleMemberHasNoEffect) {
   const char* src =
       "class C;\n"

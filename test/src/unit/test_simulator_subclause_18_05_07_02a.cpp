@@ -338,12 +338,12 @@ TEST(ArrayReductionConstraint, XorReductionJoinsByBitwiseXor) {
   EXPECT_FALSE(solver2.Solve());
 }
 
-// 18.5.7.2: as with foreach iterative constraints, when an array has both size
-// constraints and array-reduction iterative constraints the size is solved
-// first and the reduction next, so only the elements that exist take part. The
-// size is pinned to 2, so the reduction folds only e0 and e1 (sum 30 < 100)
-// even though the trailing elements carry large values; folding all four would
-// give 540 and the < 100 relation would fail.
+// 18.5.7.2: an array with both size constraints and array-reduction constraints
+// has its size settled before the reduction, just as for a foreach, so only the
+// elements that exist take part. The size is pinned to 2, so the reduction
+// folds only e0 and e1 (sum 30 < 100) even though the trailing elements carry
+// large values; folding all four would give 540 and the < 100 relation would
+// fail.
 TEST(ArrayReductionConstraint, SizeConstraintBoundsReduction) {
   ConstraintSolver solver(99);
   RandVariable n = MakeVar("n", 2, 2, 32);

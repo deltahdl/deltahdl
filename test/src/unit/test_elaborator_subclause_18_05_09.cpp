@@ -7,9 +7,8 @@ using namespace delta;
 
 namespace {
 
-// 18.5.9: only random variables are allowed in a solve...before ordering — they
-// shall be rand. Ordering two rand variables is within that rule and
-// elaborates.
+// 18.5.9: a solve...before ordering names random variables and nothing else.
+// Ordering two rand variables is within that rule and elaborates.
 TEST(SolveBeforeOrdering, RandVariablesAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -38,8 +37,8 @@ TEST(SolveBeforeOrdering, NonRandVariableRejected) {
                             4, "18.5.9"));
 }
 
-// 18.5.9: randc variables are not allowed in a solve...before ordering — they
-// are always solved before any other variable. Naming a randc member is an
+// 18.5.9: a solve...before ordering may not name a randc variable, which the
+// solver settles ahead of everything else anyway. Naming a randc member is an
 // error.
 TEST(SolveBeforeOrdering, RandcVariableRejected) {
   ElabFixture f;

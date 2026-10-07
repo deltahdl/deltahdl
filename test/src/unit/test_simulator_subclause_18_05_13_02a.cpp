@@ -28,15 +28,15 @@ namespace {
 // separates the honored case (the preference always holds) from the discarded
 // case (the variable ranges freely over its hard domain).
 
-// 18.5.13.2: a single 'disable soft' directive discards *all* the
-// lower-priority soft constraints that reference the variable, not just the one
-// that would otherwise prevail. Two contradictory preferences apply to x — the
-// earlier soft x == 3 and the later soft x == 7 — so without the directive the
-// higher-priority x == 7 governs and x is 7 on every draw. 'disable soft x' in
-// a still-later block discards both: x == 7 is no longer forced (its frequency
-// collapses from every draw to about a tenth) and x == 3 is likewise not
-// favored, so x ends up uniform over the whole hard range. If only the nearest
-// or highest-priority soft were dropped, x would still be pinned or biased.
+// 18.5.13.2: one 'disable soft' drops *every* lower-priority soft constraint
+// naming the variable, not just the one that would otherwise prevail. Two
+// contradictory preferences apply to x — the earlier soft x == 3 and the later
+// soft x == 7 — so without the directive the higher-priority x == 7 governs and
+// x is 7 on every draw. 'disable soft x' in a still-later block discards both:
+// x == 7 is no longer forced (its frequency collapses from every draw to about
+// a tenth) and x == 3 is likewise not favored, so x ends up uniform over the
+// whole hard range. If only the nearest or highest-priority soft were dropped,
+// x would still be pinned or biased.
 TEST(DisableSoftConstraint, DiscardsAllLowerPrioritySoftsReferencingVariable) {
   const char* disabled =
       "class C;\n"
@@ -158,15 +158,14 @@ TEST(DisableSoftConstraint, SameBlockDirectiveSparesFollowingSoft) {
   EXPECT_EQ(RunAndGet(src, "rx"), 8u);
 }
 
-// 18.5.13.2: a 'disable soft' directive discards lower-priority soft
-// constraints regardless of whether they contradict anything, extending the
-// solution space beyond the values those preferences would have fixed. The
-// earlier block prefers x == 5; the later block discards that preference and
-// then, at higher priority, prefers x drawn from {5, 8}. With the earlier
-// preference discarded x reaches 8 a substantial fraction of the time — which
-// is impossible while the (non-contradicting) soft x == 5 is still in force,
-// since that preference would keep x at 5. This mirrors the class B example of
-// the clause.
+// 18.5.13.2: 'disable soft' drops the lower-priority soft constraints whether
+// or not anything contradicts them, extending the solution space beyond the
+// values those preferences would have fixed. The earlier block prefers x == 5;
+// the later block discards that preference and then, at higher priority,
+// prefers x drawn from {5, 8}. With the earlier preference discarded x reaches
+// 8 a substantial fraction of the time — which is impossible while the
+// (non-contradicting) soft x == 5 is still in force, since that preference
+// would keep x at 5. This mirrors the class B example of the clause.
 TEST(DisableSoftConstraint, DiscardsNonContradictingSoftWideningSolutionSpace) {
   const char* src =
       "class B;\n"

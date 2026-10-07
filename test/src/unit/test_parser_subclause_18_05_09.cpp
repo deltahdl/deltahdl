@@ -30,9 +30,9 @@ TEST(SolveBeforeOrdering, MultipleVariableListsAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5.9: array.size (with optional following parentheses) is allowed as an
-// ordering variable, and a constraint_primary may carry that array built-in
-// method call. 'solve A.size() before n' parses. This is the parse-stage claim;
+// 18.5.9: an ordering may name array.size, with or without parentheses after
+// it, and a constraint_primary may carry that array built-in method call.
+// 'solve A.size() before n' parses. This is the parse-stage claim;
 // the elaborator file for this subclause carries the semantic case.
 TEST(SolveBeforeOrdering, ArraySizeMethodAcceptedParses) {
   auto r = Parse(
@@ -57,9 +57,9 @@ TEST(SolveBeforeOrdering, ImplicitClassHandleQualifierAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5.9: a constraint block may contain both regular value constraints and
-// ordering constraints. A block mixing an inside constraint, an implication,
-// and a solve...before ordering parses as a whole.
+// 18.5.9: one constraint block can mix value constraints with ordering
+// constraints. A block mixing an inside constraint, an implication, and a
+// solve...before ordering parses as a whole.
 TEST(SolveBeforeOrdering, MixedValueAndOrderingConstraintsAccepted) {
   auto r = Parse(
       "class C;\n"

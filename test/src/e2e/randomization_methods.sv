@@ -1,7 +1,7 @@
 // 18.6: randomization methods, the built-in randomize() of the clause's
-// SimpleSum, which generates values for the active random variables of an
-// object subject to its active constraints and returns whether it set them
-// all, and the pre_randomize() and post_randomize() it calls around them.
+// SimpleSum, which draws values for an object's active random variables within
+// its active constraints and reports whether it set them all, and the
+// pre_randomize() and post_randomize() it calls around them.
 class SimpleSum;
   rand bit [7:0] x, y, z;
   constraint c { z == x + y; }

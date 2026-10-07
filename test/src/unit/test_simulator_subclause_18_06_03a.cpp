@@ -6,16 +6,15 @@ using namespace delta;
 
 namespace {
 
-// 18.6.3: random variables declared static are shared by all instances of the
-// class in which they are declared, and each randomize() changes the variable
-// in every class instance. Built from real source: a class declares `static
-// rand bit [7:0] x` constrained to a small domain, and two instances are
-// constructed. The shared cell is first seeded with a sentinel out of the
-// constraint domain; randomizing one instance draws a fresh in-domain value and
-// publishes it to the single class-wide storage, so the other instance observes
-// exactly that value too. Driven through the full pipeline, this observes the
-// production randomize path writing the drawn value to the shared static cell
-// rather than to a private per-object copy.
+// 18.6.3: a static random variable has one copy for the whole class, so
+// randomize() on any instance changes it for all of them. Built from real
+// source: a class declares `static rand bit [7:0] x` constrained to a small
+// domain, and two instances are constructed. The shared cell is first seeded
+// with a sentinel out of the constraint domain; randomizing one instance draws
+// a fresh in-domain value and publishes it to the single class-wide storage, so
+// the other instance observes exactly that value too. Driven through the full
+// pipeline, this observes the production randomize path writing the drawn value
+// to the shared static cell rather than to a private per-object copy.
 TEST(BehaviorOfRandomizationMethods, StaticRandSharedAcrossInstances) {
   const char* src =
       "class C;\n"
@@ -69,12 +68,12 @@ TEST(BehaviorOfRandomizationMethods, StaticRandcSharedAcrossInstances) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.6.3: if randomize() fails, the constraints are infeasible and the random
-// variables retain their previous values. Built from real source: a class holds
-// an infeasible constraint set (one variable pinned to two different values at
-// once), the variable is first given a known value, and the failing randomize()
-// must leave that value in place. The return status is 0 (18.6.1) and the
-// variable still holds the value it had before the call.
+// 18.6.3: a failed randomize() means the constraints have no solution, and
+// every random variable keeps the value it had. Built from real source: a class
+// holds an infeasible constraint set (one variable pinned to two different
+// values at once), the variable is first given a known value, and the failing
+// randomize() must leave that value in place. The return status is 0 (18.6.1)
+// and the variable still holds the value it had before the call.
 TEST(BehaviorOfRandomizationMethods, FailedRandomizeRetainsPreviousValue) {
   const char* src =
       "class C;\n"
@@ -156,10 +155,10 @@ TEST(BehaviorOfRandomizationMethods,
   EXPECT_EQ(RunAndGet(src, "vb"), 7u);
 }
 
-// 18.6.3: if randomize() fails, post_randomize() is not called. Built from real
-// source: a class defines a post_randomize() that counts its own invocations
-// and holds an infeasible constraint set. After the failing randomize(), the
-// counter is still zero — the post hook did not run.
+// 18.6.3: a failed randomize() skips post_randomize(). Built from real source:
+// a class defines a post_randomize() that counts its own invocations and holds
+// an infeasible constraint set. After the failing randomize(), the counter is
+// still zero — the post hook did not run.
 TEST(BehaviorOfRandomizationMethods, PostRandomizeNotCalledOnFailure) {
   const char* src =
       "class C;\n"

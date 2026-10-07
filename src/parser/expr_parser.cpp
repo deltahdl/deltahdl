@@ -771,15 +771,15 @@ bool IsStdRandomizeCall(const Expr* call) {
 }  // namespace
 
 void Parser::CheckRandomizeArgList(const Expr* call) {
-  // 18.11: the inline random variable control list passed to randomize() is
-  // limited to the names of properties of the calling object; expressions are
-  // not allowed. Recognize the call either as a bare randomize(...) or as a
-  // method call whose member name is randomize, then reject any argument that
-  // is not a plain property reference. (A null argument, 18.11.1, is lexed as
-  // an identifier and so is accepted here.) G.5 gives std::randomize the
-  // narrower list of A.8.2's randomize_call, a variable_identifier_list, so
-  // for that form an argument that is not a variable identifier -- a member
-  // access, a select or any expression -- is rejected under G.5.
+  // 18.11: randomize()'s inline random variable control list accepts only names
+  // of the calling object's properties; expressions are not allowed. Recognize
+  // the call either as a bare randomize(...) or as a method call whose member
+  // name is randomize, then reject any argument that is not a plain property
+  // reference. (A null argument, 18.11.1, is lexed as an identifier and so is
+  // accepted here.) G.5 gives std::randomize the narrower list of A.8.2's
+  // randomize_call, a variable_identifier_list, so for that form an argument
+  // that is not a variable identifier -- a member access, a select or any
+  // expression -- is rejected under G.5.
   bool is_randomize =
       call->callee == "randomize" ||
       (call->lhs != nullptr && call->lhs->kind == ExprKind::kMemberAccess &&

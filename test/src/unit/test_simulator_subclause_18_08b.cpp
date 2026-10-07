@@ -18,10 +18,10 @@ const char* const kPacket =
     "  constraint follows { dest_value == source_value + 1; }\n"
     "endclass\n";
 
-// 18.8: an inactive variable is not randomized and its value is a state
-// variable to the solver: with dest_value turned off at 41, every one of
-// 32 calls keeps it and draws source_value as 40, the one value the
-// constraint admits, as the design test/src/e2e/rand_mode.sv runs it.
+// 18.8: the solver leaves an inactive variable alone and reads its value as
+// state: with dest_value turned off at 41, every one of 32 calls keeps it and
+// draws source_value as 40, the one value the constraint admits, as the design
+// test/src/e2e/rand_mode.sv runs it.
 TEST(RandModeRun, AnInactiveVariableIsAStateVariableToTheSolver) {
   SimFixture f;
   std::string out = RunCapture(

@@ -96,10 +96,9 @@ TEST(ConstraintModeRuntime, NonvoidReturnsActiveState) {
   EXPECT_EQ(RunAndGet(src, "st_after"), 0u);
 }
 
-// 18.9: called as a void function with no constraint identifier, the operation
-// applies to all constraints within the object. Disabling every block removes
-// the conflict, so randomize() succeeds, and querying each block confirms both
-// are inactive.
+// 18.9: the void form with no constraint named acts on every constraint of the
+// object. Disabling every block removes the conflict, so randomize() succeeds,
+// and querying each block confirms both are inactive.
 TEST(ConstraintModeRuntime, UnnamedFormDisablesAllBlocks) {
   const char* src =
       "class P;\n"
@@ -125,10 +124,10 @@ TEST(ConstraintModeRuntime, UnnamedFormDisablesAllBlocks) {
   EXPECT_EQ(RunAndGet(src, "q_hi"), 0u);
 }
 
-// 18.9: the named constraint can be any constraint block in the class
-// hierarchy, including one inherited from a base class. Disabling the base
-// block through a derived handle removes the base pin, so the derived pin binds
-// the solve; the query on the base block confirms it is inactive.
+// 18.9: the constraint named may be any block of the class hierarchy, including
+// one inherited from a base class. Disabling the base block through a derived
+// handle removes the base pin, so the derived pin binds the solve; the query on
+// the base block confirms it is inactive.
 TEST(ConstraintModeRuntime, NamedFormReachesInheritedBlock) {
   const char* src =
       "class Base;\n"
@@ -187,11 +186,11 @@ TEST(ConstraintModeRuntime, NonvoidFormAsExpressionOperand) {
   EXPECT_EQ(RunAndGet(src, "r_after"), 20u);
 }
 
-// 18.9: called as a void function with no constraint identifier, the operation
-// applies to ALL constraints within the object -- including those inherited
-// from a base class. Two conflicting pins (one inherited, one derived) make
-// randomize() unsatisfiable; the no-name form disables every block across the
-// hierarchy, so the solve succeeds and querying each block reports inactive.
+// 18.9: the void form with no constraint named acts on EVERY constraint of the
+// object -- including those inherited from a base class. Two conflicting pins
+// (one inherited, one derived) make randomize() unsatisfiable; the no-name form
+// disables every block across the hierarchy, so the solve succeeds and querying
+// each block reports inactive.
 // This exercises the base-class walk in the no-name branch, distinct from the
 // same-class-only case.
 TEST(ConstraintModeRuntime, UnnamedFormDisablesInheritedBlocks) {
@@ -224,12 +223,13 @@ TEST(ConstraintModeRuntime, UnnamedFormDisablesInheritedBlocks) {
   EXPECT_EQ(RunAndGet(src, "q_der"), 0u);
 }
 
-// 18.9: the object is any expression that yields the handle in which the
-// constraint is defined -- including a subroutine's formal argument, the form
-// the clause's own example uses (a function takes the object and calls
-// constraint_mode on it). Disabling one of two conflicting pins through the
-// formal handle inside a function turns an unsatisfiable solve into one the
-// surviving pin binds, proving the call applied through the passed handle.
+// 18.9: any expression giving the handle of the object that defines the
+// constraint can stand as the object -- including a subroutine's formal
+// argument, the form the clause's own example uses (a function takes the object
+// and calls constraint_mode on it). Disabling one of two conflicting pins
+// through the formal handle inside a function turns an unsatisfiable solve into
+// one the surviving pin binds, proving the call applied through the passed
+// handle.
 TEST(ConstraintModeRuntime, ConstraintModeThroughSubroutineArgument) {
   const char* src =
       "class Packet;\n"

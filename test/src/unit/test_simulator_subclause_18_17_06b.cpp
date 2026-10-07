@@ -8,11 +8,10 @@ using namespace delta;
 
 namespace {
 
-// 18.17.6: a return aborts the current production and generation continues
-// with the next production, so the clause's TOP : P1 P2 displays A B C A B C
-// with flag 0, A B C A with flag 1, P2 aborted after A, and A C A C with
-// flag 2, B aborted twice, as the design test/src/e2e/break_and_return.sv
-// runs it.
+// 18.17.6: a return ends the current production, and generation picks up at the
+// following one, so the clause's TOP : P1 P2 displays A B C A B C with flag 0,
+// A B C A with flag 1, P2 aborted after A, and A C A C with flag 2, B aborted
+// twice, as the design test/src/e2e/break_and_return.sv runs it.
 TEST(AbortingProductionsRun, TheClausesReturnAbortsP2OnceAndBTwice) {
   SimFixture f;
   std::string out = RunCapture(
@@ -37,12 +36,12 @@ TEST(AbortingProductionsRun, TheClausesReturnAbortsP2OnceAndBTwice) {
   EXPECT_EQ(out, "0: A B C A B C\n1: A B C A\n2: A C A C\n");
 }
 
-// 18.17.6: a break executed in a production code block jumps out of the
-// randsequence block and execution continues at the next statement, so the
-// clause's SETUP breaking when the fifo is full leaves COMMAND and DATA
-// ungenerated; and a break inside a loop statement terminates the smallest
-// enclosing loop (12.8) alone, generation going on, as the design
-// test/src/e2e/break_and_return.sv runs it.
+// 18.17.6: a break in a production code block leaves the randsequence block,
+// and execution resumes at the statement after it, so the clause's SETUP
+// breaking when the fifo is full leaves COMMAND and DATA ungenerated; and a
+// break inside a loop statement terminates the smallest enclosing loop (12.8)
+// alone, generation going on, as the design test/src/e2e/break_and_return.sv
+// runs it.
 TEST(AbortingProductionsRun, ABreakLeavesTheBlockUnlessALoopEnclosesIt) {
   SimFixture f;
   std::string out = RunCapture(

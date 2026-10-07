@@ -85,8 +85,8 @@ TEST(ConstraintBlocksRun, ABlockTurnedOffByNameLeavesTheOthersHolding) {
   EXPECT_EQ(RunCapture(kSrc, f), "1 64\n$finish at time 0\n");
 }
 
-// 18.5: a block's name is unique within its class, not across classes, so
-// Other's own block named range constrains its n.
+// 18.5: constraint block names need differ only within one class, not between
+// classes, so Other's own block named range constrains its n.
 TEST(ConstraintBlocksRun, ABlockNameIsUniqueWithinItsClassAlone) {
   const std::string kSrc = Design(
       "    repeat (16) begin\n"

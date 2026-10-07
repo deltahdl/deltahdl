@@ -137,8 +137,8 @@ TEST(RandomVariableTypes, PackedTaggedUnionRandRejected) {
       3, "18.4"));
 }
 
-// 18.4: an unpacked structure may be declared rand (its random members are
-// solved concurrently).
+// 18.4: rand is allowed on an unpacked structure, and its random members are
+// then solved together.
 TEST(RandomVariableTypes, UnpackedStructRandAccepted) {
   EXPECT_TRUE(
       ElabOk("typedef struct { rand int a; int b; } s_t;\n"

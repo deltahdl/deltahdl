@@ -161,10 +161,11 @@ struct ConstraintExpr {
   // array, in which case every per-element constraint applies.
   std::string size_var;
 
-  // 18.5.5: the antecedent of an implication ("a" in a -> b) may be any
-  // integral or real expression, not only an equality test. When cond_fn is
-  // set it supplies the truth of the antecedent over the current values and
-  // takes precedence over the cond_var == cond_value short form above.
+  // 18.5.5: the left side of an implication ("a" in a -> b) can be any
+  // expression of integral or real type, not only an equality test. When
+  // cond_fn is set it supplies the truth of the antecedent over the current
+  // values and takes precedence over the cond_var == cond_value short form
+  // above.
   std::function<bool(const std::unordered_map<std::string, int64_t>&)> cond_fn;
 
   // 18.5.6: an if-else constraint guards two constraint sets with a condition.
@@ -327,8 +328,8 @@ struct RandVariable {
   // as that negative number and not as its unsigned bit pattern.
   int64_t ValueFromBits(uint64_t bits) const;
 
-  // 18.4.1: a rand variable may be of real type, in which case its random value
-  // is uniformly distributed over its range rather than over an integral
+  // 18.4.1: a rand variable can be real, and every value in its range is then
+  // equally likely, drawn from a continuous range rather than an integral
   // domain. is_real selects the real generation path; [real_min, real_max) is
   // the range the value is drawn from with a flat density, so that equal-width
   // subranges are equally likely (18.4 forbids declaring a real variable randc,
@@ -390,13 +391,13 @@ struct RandVariable {
   std::vector<int64_t> randc_domain;
   std::shared_ptr<std::vector<int64_t>> shared_randc_domain;
 
-  // 18.6.3: a random variable declared static is shared by every instance of
-  // the class in which it is declared, so the instances name one storage cell
-  // rather than one apiece. When is_static is set, shared_value holds that one
-  // cell: each randomize() that draws a value for the variable writes it there,
-  // so the change is seen by every instance, and reading the variable consults
-  // the cell rather than the per-instance solved map. A nonstatic variable
-  // leaves this null and keeps its value solely in its own solver's values_.
+  // 18.6.3: a static random variable has one copy for the whole class, so the
+  // instances name one storage cell rather than one apiece. When is_static is
+  // set, shared_value holds that one cell: each randomize() that draws a value
+  // for the variable writes it there, so the change is seen by every instance,
+  // and reading the variable consults the cell rather than the per-instance
+  // solved map. A nonstatic variable leaves this null and keeps its value
+  // solely in its own solver's values_.
   std::shared_ptr<int64_t> shared_value;
 
   // 18.5.7.1: marks a variable that holds a dynamic array's size method. Such a
@@ -546,12 +547,11 @@ class ConstraintSolver {
   // 18.6.1: whether an active variable's domain holds no value.
   bool HasEmptyDomain() const;
 
-  // 18.5.3: a dist expression requires that it contain at least one rand
-  // variable. In the solver model a distribution names the single variable it
-  // constrains, so that variable must be an active rand variable. True if any
-  // enabled distribution targets a variable that supplies no rand variable
-  // (one that is unknown to the solver or declared without the rand
-  // qualifier).
+  // 18.5.3: the expression a dist distributes has to involve a rand variable.
+  // In the solver model a distribution names the single variable it constrains,
+  // so that variable must be an active rand variable. True if any enabled
+  // distribution targets a variable that supplies no rand variable (one that is
+  // unknown to the solver or declared without the rand qualifier).
   bool DistLacksRandVariable() const;
 
   // 18.5.4: a uniqueness constraint's group admits no randc variable. True if
@@ -638,16 +638,16 @@ class ConstraintSolver {
   void ApplyDirectConstraints(const std::vector<ConstraintExpr>& extra,
                               bool include_soft);
 
-  // 18.5.7.1: the size constraints are solved first and the iterative
-  // constraints next, so the array sizes are drawn once, ahead of the
-  // attempts, from what the size constraints seed and the domain they fold,
-  // and every attempt holds the sizes drawn while it solves the other
-  // variables. An attempt that drew the sizes afresh would end on the first
-  // size at which the draws of the elements happened to meet the iterative
-  // constraints, which a size of one or two reaches within a few attempts
-  // and a size of ten as good as never, so the sizes drawn would lean to the
-  // smallest the size constraints admit. The clause has this ordering fail
-  // the solve where the size drawn admits no solution for the rest.
+  // 18.5.7.1: the solver settles size constraints before the iterative ones, so
+  // the array sizes are drawn once, ahead of the attempts, from what the size
+  // constraints seed and the domain they fold, and every attempt holds the
+  // sizes drawn while it solves the other variables. An attempt that drew the
+  // sizes afresh would end on the first size at which the draws of the elements
+  // happened to meet the iterative constraints, which a size of one or two
+  // reaches within a few attempts and a size of ten as good as never, so the
+  // sizes drawn would lean to the smallest the size constraints admit. The
+  // clause has this ordering fail the solve where the size drawn admits no
+  // solution for the rest.
   std::unordered_map<std::string, int64_t> DrawArraySizesOnce(
       const std::vector<ConstraintExpr>& extra, bool include_soft,
       const std::function<int64_t(RandVariable&)>& gen);

@@ -11,8 +11,8 @@ using namespace delta;
 
 namespace {
 
-// 18.5: operators with side effects, such as ++ and --, are not allowed in a
-// constraint expression.
+// 18.5: a constraint expression may not use an operator that changes a value,
+// such as ++ or --.
 TEST(ConstraintSideEffect, IncrementOperatorRejected) {
   auto r = Parse(
       "class C;\n"
@@ -71,7 +71,7 @@ TEST(ConstraintSideEffect, PlainArithmeticAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5: dist expressions may not appear in other expressions. A bare
+// 18.5: a dist expression cannot be nested inside another expression. A bare
 // "expression dist { dist_list }" that terminates the constraint relation is
 // the accepting form.
 TEST(ConstraintDistNesting, TopLevelDistAccepted) {

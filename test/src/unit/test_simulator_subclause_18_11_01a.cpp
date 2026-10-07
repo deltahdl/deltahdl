@@ -15,8 +15,8 @@ namespace {
 // rand/randc declarations the checker holds as state, and 18.5 supplies the
 // constraint blocks it evaluates.
 
-// 18.11.1: passing null to randomize() indicates no random variables for the
-// duration of the call, so every class member behaves as a state variable and
+// 18.11.1: a null argument to randomize() leaves the call with no random
+// variables at all, so every class member behaves as a state variable and
 // randomize() acts as a checker: it evaluates the constraints against the
 // current values and returns 1 when they all hold. This mirrors the standard's
 // own CA example (a relation between rand and non-rand members). The current
@@ -80,8 +80,8 @@ TEST(InlineConstraintChecker, NullReturnsZeroWhenConstraintViolatedHoldsState) {
   EXPECT_EQ(RunAndGet(src, "ry"), 9u);   // never randomized
 }
 
-// 18.11.1: the null argument forces randomize() to behave as a checker rather
-// than a generator. This is the sharpest contrast: with a satisfiable
+// 18.11.1: with the null argument randomize() checks the constraints instead of
+// generating values. This is the sharpest contrast: with a satisfiable
 // constraint (x == 100) that the current value violates, the checker cannot
 // solve for the satisfying value -- it holds x as a state variable, so it
 // returns 0 and leaves x unchanged. The very same class, randomized without
@@ -141,12 +141,12 @@ TEST(InlineConstraintChecker, NullHoldsRandcVariableAsState) {
   EXPECT_EQ(RunAndGet(src, "rc"), 2u);   // not cycled: held as a state variable
 }
 
-// 18.11.1: normally, calling randomize() on a class that declares no random
-// variables makes the method behave as a checker even without the null argument
-// -- it assigns no value and returns only a status. Here the class has a single
-// non-rand member constrained to a value; the checker evaluates the constraint
-// against the member's current value. One object satisfies it (returns 1), a
-// second does not (returns 0), and neither member is ever altered.
+// 18.11.1: even without the null argument, randomize() on a class that declares
+// no random variables only checks -- it assigns no value and returns only a
+// status. Here the class has a single non-rand member constrained to a value;
+// the checker evaluates the constraint against the member's current value. One
+// object satisfies it (returns 1), a second does not (returns 0), and neither
+// member is ever altered.
 TEST(InlineConstraintChecker, NoRandomVariablesActsAsChecker) {
   const char* src =
       "class CB;\n"

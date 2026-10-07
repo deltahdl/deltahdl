@@ -1,9 +1,8 @@
-// 18.6.2: pre_randomize() and post_randomize(), which every class contains
-// and randomize() calls before and after computing the new values, on the
-// object and on its enabled random object members; a derived class without
-// its own invokes the base's, one overriding them calls the base's through
-// super or skips the base's steps, and through randomize() they appear
-// virtual.
+// 18.6.2: pre_randomize() and post_randomize(), present in every class and run
+// by randomize() before and after it computes the new values, on the object and
+// each enabled random object member; a derived class without its own invokes
+// the base's, one overriding them calls the base's through super or skips the
+// base's steps, and through randomize() they appear virtual.
 class Leaf;
   rand bit [7:0] v;
   int pre_calls = 0;

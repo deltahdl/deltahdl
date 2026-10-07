@@ -1,8 +1,8 @@
 // 18.5.13.2: disabling soft constraints, the clause's A, whose disable soft
-// discards the lower-priority preference and leaves the later membership,
-// its C, whose directive discards only the soft constraints the variable
-// directly appears in, and its B, whose directive discards a preference
-// that contradicts nothing so that the soft distribution after it holds.
+// discards the lower-priority preference and leaves the later membership, its
+// C, whose directive drops just the soft constraints naming the variable
+// directly, and its B, whose directive discards a preference that contradicts
+// nothing so that the soft distribution after it holds.
 class A;
   rand int x;
   constraint A1 { soft x == 3; }

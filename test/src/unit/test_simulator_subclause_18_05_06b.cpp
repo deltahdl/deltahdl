@@ -66,12 +66,11 @@ TEST(IfElseConstraintsRun, TheConstraintSetConstrainsTheCondition) {
   EXPECT_EQ(out, "64\n");
 }
 
-// 18.5.6: an else omitted from a nested if sequence goes with the closest
-// previous if that lacks one. In the clause's example the else belongs to
-// the inner if, so a mode held to big, the literal of value 1, passes the
-// outer if and reaches neither set, and len is free to be 50. Were the else
-// the outer if's, big would demand len above 100 and randomize() would
-// refuse the 50.
+// 18.5.6: in nested ifs, an else belongs to the nearest earlier if still
+// without an else. In the clause's example the else belongs to the inner if, so
+// a mode held to big, the literal of value 1, passes the outer if and reaches
+// neither set, and len is free to be 50. Were the else the outer if's, big
+// would demand len above 100 and randomize() would refuse the 50.
 TEST(IfElseConstraintsRun, TheElseGoesWithTheClosestIfLackingOne) {
   SimFixture f;
   std::string out =

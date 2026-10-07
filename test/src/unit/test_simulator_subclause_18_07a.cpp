@@ -16,10 +16,10 @@ namespace {
 // skipped at parse time and the solve saw an empty inline set, so `with` had no
 // effect.
 
-// 18.7: the unnamed constraint_block following `with` supplies additional
-// inline constraints that are applied along with the object's constraints. Here
-// the object has no class constraint, so the inline `x == 42` alone pins x, and
-// the randomize() call reports success.
+// 18.7: the unnamed block after `with` adds inline constraints that the solver
+// honours together with the object's own. Here the object has no class
+// constraint, so the inline `x == 42` alone pins x, and the randomize() call
+// reports success.
 TEST(InlineConstraintRuntime, InlineWithBlockPinsValue) {
   const char* src =
       "class P;\n"
@@ -88,11 +88,11 @@ TEST(InlineConstraintRuntime, InlineWithBlockConflictFailsSolve) {
   EXPECT_EQ(RunAndGet(src, "rx"), 0u);
 }
 
-// 18.7: the constraint block following `with` can define all of the same
-// constraint types and forms a class constraint can, not just simple relational
-// tests. Here the inline block mixes a set-membership (inside) form with two
-// relational constraints; the solver must honor all three, leaving x == 31 as
-// the only member of {30,31,32} that also satisfies x > 30 and x < 32.
+// 18.7: the block after `with` accepts every constraint type and form a class
+// constraint accepts, not just simple relational tests. Here the inline block
+// mixes a set-membership (inside) form with two relational constraints; the
+// solver must honor all three, leaving x == 31 as the only member of {30,31,32}
+// that also satisfies x > 30 and x < 32.
 TEST(InlineConstraintRuntime, InlineWithBlockSupportsSetMembershipForm) {
   const char* src =
       "class P;\n"
@@ -161,14 +161,13 @@ TEST(InlineConstraintRuntime, InlineWithBlockReferencesSubroutineArgument) {
   EXPECT_EQ(RunAndGet(src, "rx"), 37u);
 }
 
-// 18.7: name resolution for an unrestricted inline block begins with the
-// randomize() with object class, so an unqualified name that also exists in the
+// 18.7: an unrestricted inline block looks names up in the class of the object
+// being randomized first, so an unqualified name that also exists in the
 // calling scope binds to the object's member, not the local. Here both the
 // module and class declare `x`; the inline `x < 102` constrains the object's
-// random x (kept > 100 by its class constraint) rather than the module's x
-// == 5. The only value satisfying both object constraints is 101, and 101 --
-// not a value merely > 100 -- is the visible proof the name bound to the
-// object.
+// random x (kept > 100 by its class constraint) rather than the module's x ==
+// 5. The only value satisfying both object constraints is 101, and 101 -- not a
+// value merely > 100 -- is the visible proof the name bound to the object.
 TEST(InlineConstraintRuntime, InlineWithNameResolvesToObjectClassFirst) {
   const char* src =
       "class P;\n"
@@ -263,15 +262,14 @@ TEST(InlineConstraintRuntime, InlineWithBlockSupportsIfElseForm) {
   EXPECT_EQ(RunAndGet(src, "rb"), 1u);
 }
 
-// 18.7: when the constraint block is preceded by a parenthesized
-// identifier_list it is restricted -- only the listed names resolve into the
-// object class; all other names resolve in the calling scope. Here both the
-// object and the module declare y, and the block is restricted to (x). So `x ==
-// y` binds x to the object's random x but y to the module's y (55), not the
-// object's random y. The object's own y is left free. x coming back as 55 --
-// the caller's y, a value the object's random y would almost never
-// independently equal -- is the visible proof the unlisted name resolved in the
-// calling scope.
+// 18.7: a parenthesized identifier_list ahead of the block restricts it, so
+// that only the names listed are looked up in the object class; all other names
+// resolve in the calling scope. Here both the object and the module declare y,
+// and the block is restricted to (x). So `x == y` binds x to the object's
+// random x but y to the module's y (55), not the object's random y. The
+// object's own y is left free. x coming back as 55 -- the caller's y, a value
+// the object's random y would almost never independently equal -- is the
+// visible proof the unlisted name resolved in the calling scope.
 TEST(InlineConstraintRuntime,
      RestrictedBlockResolvesUnlistedNameInCallerScope) {
   const char* src =

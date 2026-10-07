@@ -64,7 +64,7 @@ TEST(RandModifierUniformDistribution, IntegralDegenerateRangeYieldsSoleValue) {
   }
 }
 
-// 18.4.1: a rand real variable's value is uniformly distributed over its range.
+// 18.4.1: every value in a rand real variable's range is equally likely.
 // For the range 0.0..2.0 the probability of landing in 0.0..1.0 shall equal the
 // probability of landing in 1.0..2.0.
 TEST(RandModifierUniformDistribution, RealValueIsUniformAcrossEqualSubranges) {

@@ -190,11 +190,11 @@ bool IsObjectRandActive(const ClassObject* obj, std::string_view name) {
   return base == modes.end() ? true : base->second;
 }
 
-// 18.6.2: post_randomize() is invoked by randomize() after the new random
-// values have been computed AND assigned back to the object, so a user
-// post_randomize() reads the just-randomized members at their new values. It is
-// therefore called by the caller only after WriteBackSolved has published the
-// solved values, and only on a successful solve (18.6.3 skips it on failure).
+// 18.6.2: randomize() runs post_randomize() only once the new random values are
+// both computed AND written back to the object, so a user post_randomize()
+// reads the just-randomized members at their new values. It is therefore called
+// by the caller only after WriteBackSolved has published the solved values, and
+// only on a successful solve (18.6.3 skips it on failure).
 // Like pre_randomize() it is resolved on the dynamic class, giving the same
 // apparent-virtual and inherited-implementation behavior.
 void InvokePostRandomize(ClassObject* obj, const Expr* expr, SimContext& ctx,
@@ -238,12 +238,12 @@ struct InlineRandomArgs {
 // the active random set for this call. An unnamed rand variable becomes a state
 // variable and a named non-random property becomes a random one.
 //
-// 18.11.1: the special argument null designates no random variables for the
-// duration of the call -- every class member, even one declared rand or randc,
-// behaves as a state variable. This turns randomize() into an inline constraint
-// checker that evaluates all constraints against the current values and returns
-// 1 when they all hold and 0 otherwise, drawing no new value. An empty (but
-// present) active set realizes exactly that.
+// 18.11.1: a null argument leaves the call with no random variables at all --
+// every class member, even one declared rand or randc, behaves as a state
+// variable. This turns randomize() into an inline constraint checker that
+// evaluates all constraints against the current values and returns 1 when they
+// all hold and 0 otherwise, drawing no new value. An empty (but present) active
+// set realizes exactly that.
 InlineRandomArgs CollectInlineRandomArgs(const Expr* expr) {
   InlineRandomArgs args{{}, false, false};
   for (const Expr* arg : expr->args) {
@@ -381,15 +381,14 @@ bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   // variable becomes a state variable and a named non-random property becomes a
   // random one.
   //
-  // 18.11.1: the special argument null designates no random variables for the
-  // duration of the call -- every class member, even one declared rand or
-  // randc, behaves as a state variable. This turns randomize() into an inline
-  // constraint checker that evaluates all constraints against the current
-  // values and returns 1 when they all hold and 0 otherwise, drawing no new
-  // value. An empty (but present) active set realizes exactly that: no variable
-  // is in it, so each is disabled and held at its current value in
-  // RandomizeObject, and the null_checker flag additionally holds any rand
-  // sub-object as state.
+  // 18.11.1: a null argument leaves the call with no random variables at all --
+  // every class member, even one declared rand or randc, behaves as a state
+  // variable. This turns randomize() into an inline constraint checker that
+  // evaluates all constraints against the current values and returns 1 when
+  // they all hold and 0 otherwise, drawing no new value. An empty (but present)
+  // active set realizes exactly that: no variable is in it, so each is disabled
+  // and held at its current value in RandomizeObject, and the null_checker flag
+  // additionally holds any rand sub-object as state.
   InlineRandomArgs args = CollectInlineRandomArgs(expr);
   // 18.7: the members of the caller's own object that the inline block
   // names are bound as locals for the call, in a scope of their own.
@@ -534,27 +533,27 @@ bool TryEvalScopeRandomizeCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                Logic4Vec& out) {
   if (!IsScopeRandomizeForm(expr, ctx)) return false;
 
-  // 18.12: the arguments specify the variables of the current scope that are to
-  // be assigned random values. Resolve each to a live scope variable; a
-  // non-identifier argument is not a form this scope randomize path services,
-  // so defer to ordinary dispatch rather than misfire.
+  // 18.12: the arguments name the variables of the current scope that get
+  // random values. Resolve each to a live scope variable; a non-identifier
+  // argument is not a form this scope randomize path services, so defer to
+  // ordinary dispatch rather than misfire.
   ScopeTargets scope;
   if (!ResolveScopeTargets(expr, ctx, arena, scope)) return false;
   std::vector<Variable*>& targets = scope.vars;
   std::vector<std::string>& names = scope.names;
 
-  // 18.12: called with no argument, the scope randomize does not change the
-  // value of any variable and instead checks its constraints: every
-  // expression of its constraint_block is evaluated, and the call returns 0
-  // where one of them is false and 1 otherwise, so without a block (the
-  // 18.12.1 form) there is nothing to be false and it returns 1.
+  // 18.12: with no argument, scope randomize leaves every variable's value
+  // alone and only checks its constraints: every expression of its
+  // constraint_block is evaluated, and the call returns 0 where one of them is
+  // false and 1 otherwise, so without a block (the 18.12.1 form) there is
+  // nothing to be false and it returns 1.
   if (targets.empty()) {
     out = MakeLogic4VecVal(arena, 32, ScopeConstraintsHold(expr, ctx, arena));
     return true;
   }
 
-  // 18.12: the scope randomize behaves exactly as a class randomize method,
-  // only over the current scope's variables. Seed from the active per-process
+  // 18.12: scope randomize works the way a class's randomize() does, over the
+  // current scope's variables instead. Seed from the active per-process
   // generator so the draw is fresh and thread-stable (18.14.2). Each named
   // variable is a rand variable whose domain spans its declared width, and its
   // current value is seeded so a failed solve can leave it unchanged.
@@ -587,8 +586,8 @@ bool TryEvalScopeRandomizeCall(const Expr* expr, SimContext& ctx, Arena& arena,
 
   bool ok = solver.SolveWith(with_constraints);
 
-  // 18.12: the call returns 1 only when it successfully sets all the random
-  // variables to valid values, in which case each drawn value is written back;
+  // 18.12: the call reports 1 only once every random variable has a valid
+  // value, in which case each drawn value is written back;
   // otherwise it returns 0. 18.6.3: on failure the variables retain their
   // previous values, so nothing is written back.
   if (ok) {

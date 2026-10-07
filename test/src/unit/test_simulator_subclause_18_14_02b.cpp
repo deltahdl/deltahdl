@@ -121,11 +121,11 @@ TEST(ThreadStabilityRun, EachThreadIsSeededWithTheParentsNextValue) {
   EXPECT_EQ(out, "1 2\n");
 }
 
-// 18.14.2: the root of a thread execution subtree determines the seeding of
-// its children, so a subtree whose root seeds itself with 77 before forking
-// three threads and drawing once more returns the same four values forked
-// from two places of the parent, seven draws apart, as the design
-// test/src/e2e/thread_stability.sv runs it.
+// 18.14.2: a thread subtree's root decides how its child threads are seeded, so
+// a subtree whose root seeds itself with 77 before forking three threads and
+// drawing once more returns the same four values forked from two places of the
+// parent, seven draws apart, as the design test/src/e2e/thread_stability.sv
+// runs it.
 TEST(ThreadStabilityRun, ASubtreeSeededAtItsRootDrawsAlikeFromAnywhere) {
   SimFixture f;
   std::string out = RunCapture(

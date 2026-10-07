@@ -106,10 +106,10 @@ TEST(ConstraintGuard4State, NegationTruthTable) {
   EXPECT_EQ(GuardNot(GuardValue::kRandom), GuardValue::kRandom);
 }
 
-// 18.5.12: the final value of the evaluated predicate selects the outcome. A
-// TRUE result generates an unconditional constraint, FALSE eliminates it with
-// no error, ERROR generates an error so randomize() fails, and RANDOM
-// generates a conditional constraint.
+// 18.5.12: what the predicate finally evaluates to decides the result. A TRUE
+// result generates an unconditional constraint, FALSE eliminates it with no
+// error, ERROR generates an error so randomize() fails, and RANDOM generates a
+// conditional constraint.
 TEST(ConstraintGuard4State, FinalOutcomeMapping) {
   EXPECT_EQ(GuardFinalOutcome(GuardValue::kTrue), GuardOutcome::kUnconditional);
   EXPECT_EQ(GuardFinalOutcome(GuardValue::kFalse), GuardOutcome::kEliminated);
@@ -117,9 +117,10 @@ TEST(ConstraintGuard4State, FinalOutcomeMapping) {
   EXPECT_EQ(GuardFinalOutcome(GuardValue::kRandom), GuardOutcome::kConditional);
 }
 
-// 18.5.12: the operators are applied recursively until every subexpression is
-// evaluated. Here ((TRUE && error) || !FALSE) sifts the error: the conjunction
-// is ERROR, but disjunction with !FALSE == TRUE forces the whole guard TRUE.
+// 18.5.12: evaluation recurses through the operators until no subexpression is
+// left unevaluated. Here ((TRUE && error) || !FALSE) sifts the error: the
+// conjunction is ERROR, but disjunction with !FALSE == TRUE forces the whole
+// guard TRUE.
 TEST(ConstraintGuardTree, RecursiveEvaluationSiftsError) {
   GuardPredicate conj;
   conj.op = GuardPredicate::Op::kAnd;
@@ -222,8 +223,8 @@ TEST(ConstraintGuardSolver, TrueGuardImposesConstraint) {
   EXPECT_LE(solver.GetValue("x"), 20);
 }
 
-// 18.5.12: when a guard evaluates to ERROR an unconditional error is generated
-// and the constraint fails, so randomize() fails.
+// 18.5.12: a guard that comes out ERROR raises an error whatever else holds and
+// makes the constraint fail, so randomize() fails.
 TEST(ConstraintGuardSolver, ErrorGuardFailsRandomize) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -247,8 +248,8 @@ TEST(ConstraintGuardSolver, ErrorGuardFailsRandomize) {
   EXPECT_FALSE(solver.Solve());
 }
 
-// 18.5.12: treating guard subexpressions in the four-state logic prevents the
-// solver from generating evaluation errors on seemingly correct constraints.
+// 18.5.12: evaluating guard subexpressions in four-state logic keeps
+// constraints that look correct from raising evaluation errors in the solver.
 // Here a subexpression that errors (a null handle comparison) is conjoined with
 // a FALSE subexpression; the conjunction is FALSE, so the error is sifted away
 // and the guarded — otherwise unsatisfiable — constraint is simply eliminated.
@@ -315,8 +316,8 @@ TEST(ConstraintGuardSolver, ErrorSiftedByTrueDisjunctImposesConstraint) {
   EXPECT_LE(solver.GetValue("x"), 40);
 }
 
-// 18.5.12: when a guard's final value is RANDOM a conditional constraint is
-// generated, so the guarded constraint is still imposed on the solved value.
+// 18.5.12: a guard ending as RANDOM yields a conditional constraint, so the
+// guarded constraint is still imposed on the solved value.
 // This exercises the solver's handling of the RANDOM (conditional) outcome,
 // which is distinct from the TRUE (unconditional) outcome yet also lets the
 // guarded relation take effect.
@@ -347,11 +348,12 @@ TEST(ConstraintGuardSolver, RandomGuardGeneratesConstraint) {
   EXPECT_LE(solver.GetValue("x"), 40);
 }
 
-// 18.5.12: a guard is characterized by involving only constants, state
-// variables, and object handle comparisons; it is evaluated against the
-// current state before the constraints are solved. Here the guard leaf reads a
-// non-random state variable "mode": only when it holds is the guarded range
-// imposed, so the same constraint block gates differently per state.
+// 18.5.12: what marks an expression as a guard is that it reads nothing but
+// constants, state variables and comparisons of object handles; it is evaluated
+// against the current state before the constraints are solved. Here the guard
+// leaf reads a non-random state variable "mode": only when it holds is the
+// guarded range imposed, so the same constraint block gates differently per
+// state.
 TEST(ConstraintGuardSolver, GuardReadsStateVariable) {
   GuardPredicate guard;
   guard.op = GuardPredicate::Op::kLeaf;
@@ -416,10 +418,10 @@ TEST(ConstraintGuardSolver, GuardReadsStateVariable) {
   }
 }
 
-// 18.5.12: both implication (->) and if...else may be used as guards. Each is
-// an interdependent conditional constraint, and the four-state guard gates
-// whether it is created. Here the consequent / then-set is unsatisfiable, so
-// the constraint could only ever fail if generated; a FALSE guard eliminates
+// 18.5.12: a guard can take the form of an implication (->) or of if...else.
+// Each is an interdependent conditional constraint, and the four-state guard
+// gates whether it is created. Here the consequent / then-set is unsatisfiable,
+// so the constraint could only ever fail if generated; a FALSE guard eliminates
 // it, and the solve succeeds with the variable left free.
 TEST(ConstraintGuardSolver, ImplicationCanBeGuarded) {
   ConstraintSolver solver(42);

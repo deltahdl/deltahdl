@@ -69,12 +69,11 @@ TEST(RandJoinRun, TheSixOrdersOfTheClauseAppearEvenly) {
   EXPECT_EQ(out, "1 1 1\n");
 }
 
-// 18.17.5: the real expression after rand join is the degree to which the
-// length of the sequences still to be interleaved affects the choice, 0.0
-// giving the shortest remaining sequences priority and 1.0 the longest, so
-// with 0.0 A B C D and C D A B take more than half of 600 runs and with 1.0
-// the four interleaved orders do, as the design test/src/e2e/rand_join.sv
-// runs it.
+// 18.17.5: the real value after rand join weighs how much the remaining
+// sequences' lengths sway the choice, 0.0 giving the shortest remaining
+// sequences priority and 1.0 the longest, so with 0.0 A B C D and C D A B take
+// more than half of 600 runs and with 1.0 the four interleaved orders do, as
+// the design test/src/e2e/rand_join.sv runs it.
 TEST(RandJoinRun, TheExpressionPrioritizesTheShortestOrTheLongest) {
   SimFixture f;
   std::string out = RunCapture(
@@ -102,9 +101,9 @@ TEST(RandJoinRun, TheExpressionPrioritizesTheShortestOrTheLongest) {
   EXPECT_EQ(out, "1 1\n");
 }
 
-// 18.17.5: the generator interleaves nonterminals to a depth of 1, so the
-// two items of a nonterminal inside S1 stay adjacent in every one of a
-// hundred runs, as the design test/src/e2e/rand_join.sv runs it.
+// 18.17.5: the generator interleaves nonterminals one level deep, so the two
+// items of a nonterminal inside S1 stay adjacent in every one of a hundred
+// runs, as the design test/src/e2e/rand_join.sv runs it.
 TEST(RandJoinRun, NonterminalsAreInterleavedToDepthOne) {
   SimFixture f;
   std::string out = RunCapture(

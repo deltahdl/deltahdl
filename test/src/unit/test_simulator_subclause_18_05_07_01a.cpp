@@ -58,9 +58,9 @@ TEST(ForeachIterativeConstraint, AppliesConstraintToEveryElement) {
     EXPECT_GT(solver.GetValue("e" + std::to_string(i)), 0);
 }
 
-// 18.5.7.1: an array's size method is a state variable within the foreach
-// block. With the size pinned to 2, the iterative constraint applies only to
-// the two elements that exist (indices 0 and 1); the remaining elements are not
+// 18.5.7.1: within a foreach block, the array's size reads as a state variable.
+// With the size pinned to 2, the iterative constraint applies only to the two
+// elements that exist (indices 0 and 1); the remaining elements are not
 // iterated, so their conflicting hard constraints can be satisfied. Were the
 // foreach to ignore the size and constrain all four elements, e2 == 0 would
 // clash with the hard e2 == 1 and randomization would fail.
@@ -98,12 +98,13 @@ TEST(ForeachIterativeConstraint, SizeLimitsIteratedElements) {
   EXPECT_EQ(solver.GetValue("e3"), 1);  // beyond size: foreach did not apply
 }
 
-// 18.5.7.1: the size constraints are solved first and the iterative constraints
-// next; the size method behaves as a state variable in the foreach. Here the
-// size is itself random — its domain is [0:5] but a separate size constraint
-// confines it to 1 (A.size as a random variable). The foreach then reads that
-// committed value and constrains exactly the one element that exists, leaving
-// the trailing element (which carries a conflicting hard constraint) free.
+// 18.5.7.1: the solver settles size constraints before it turns to the
+// iterative ones; the size method behaves as a state variable in the foreach.
+// Here the size is itself random — its domain is [0:5] but a separate size
+// constraint confines it to 1 (A.size as a random variable). The foreach then
+// reads that committed value and constrains exactly the one element that
+// exists, leaving the trailing element (which carries a conflicting hard
+// constraint) free.
 TEST(ForeachIterativeConstraint, SizeConstraintSolvedBeforeIteration) {
   ConstraintSolver solver(123);
   RandVariable n = MakeVar("n", 0, 5);

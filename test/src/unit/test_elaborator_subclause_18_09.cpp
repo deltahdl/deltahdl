@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-// 18.9: constraint_mode() is a built-in method and cannot be overridden, so a
+// 18.9: constraint_mode() is predefined and no class may override it, so a
 // class that declares a method of that name is illegal.
 TEST(ConstraintModeBuiltin, OverrideRejected) {
   ElabFixture f;

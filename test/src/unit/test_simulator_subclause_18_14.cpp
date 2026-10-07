@@ -35,11 +35,11 @@ const char* const kDrawFive =
     "    endsequence\n"
     "  endtask\n";
 
-// 18.14: the RNG is localized to threads and objects, so a thread seeded with
-// 11 and drawn from through every kind the clause lists returns the same nine
-// values whether or not two objects randomize between, and seeded with 12 it
-// returns another first value, as the design test/src/e2e/random_stability.sv
-// runs it.
+// 18.14: each thread and each object has an RNG of its own, so a thread seeded
+// with 11 and drawn from through every kind the clause lists returns the same
+// nine values whether or not two objects randomize between, and seeded with 12
+// it returns another first value, as the design
+// test/src/e2e/random_stability.sv runs it.
 TEST(RandomStabilityRun,
      AThreadsSequenceIsUntouchedByObjectsAndSelectedBySeed) {
   SimFixture f;
@@ -83,11 +83,10 @@ TEST(RandomStabilityRun,
   EXPECT_EQ(out, "9 1\n");
 }
 
-// 18.14: the sequence a thread returns is independent of the RNG in other
-// threads, so a forked thread seeded with 3 returns the same nine values
-// beside a thread that draws nothing and beside one that draws a hundred and
-// runs every kind the clause lists, as the design
-// test/src/e2e/random_stability.sv runs it.
+// 18.14: a thread's draws do not depend on what other threads' RNGs do, so a
+// forked thread seeded with 3 returns the same nine values beside a thread that
+// draws nothing and beside one that draws a hundred and runs every kind the
+// clause lists, as the design test/src/e2e/random_stability.sv runs it.
 TEST(RandomStabilityRun, AThreadsSequenceIsUntouchedByAnotherThread) {
   SimFixture f;
   std::string out = RunCapture(

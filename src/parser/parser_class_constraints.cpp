@@ -15,13 +15,13 @@ namespace delta {
 // record it for the simulator's randomize() translation. The trial parse
 // suppresses diagnostics and rewinds the lexer, so it neither consumes input
 // nor changes what the token scan reports; special forms/braces are left to it.
-// 18.5.13: a soft constraint is the inner expression_or_dist preceded by
-// 'soft'. The inner relation is captured into constraint_soft_exprs so the
-// simulator can build it as a discardable soft solver constraint. The dist form
-// is tried first -- its dist set is not an expression, so a plain parse would
-// stop at 'dist' and capture nothing -- then a plain soft relation. The trial
-// parse rewinds, leaving the outer token scan to consume 'soft' and the
-// relation as it does for a hard one.
+// 18.5.13: a soft constraint is 'soft' followed by an expression_or_dist. The
+// inner relation is captured into constraint_soft_exprs so the simulator can
+// build it as a discardable soft solver constraint. The dist form is tried
+// first -- its dist set is not an expression, so a plain parse would stop at
+// 'dist' and capture nothing -- then a plain soft relation. The trial parse
+// rewinds, leaving the outer token scan to consume 'soft' and the relation as
+// it does for a hard one.
 void Parser::CaptureSoftConstraintRelation(ClassMember* member) {
   auto saved = lexer_.SavePos();
   diag_.PushSuppress();
@@ -40,12 +40,12 @@ void Parser::CaptureSoftConstraintRelation(ClassMember* member) {
 
 void Parser::CaptureConstraintRelation(ClassMember* member) {
   TokenKind k = CurrentToken().kind;
-  // 18.5.13: a soft constraint is the inner expression_or_dist preceded by
-  // 'soft'. Capture the inner relation into constraint_soft_exprs so the
-  // simulator can build it as a discardable soft solver constraint. Handled
-  // before the bail list below (which drops 'soft') so the preference is not
-  // silently lost. The trial parse rewinds, leaving the outer token scan to
-  // consume 'soft' and the relation as it does for a hard one.
+  // 18.5.13: a soft constraint is 'soft' followed by an expression_or_dist.
+  // Capture the inner relation into constraint_soft_exprs so the simulator can
+  // build it as a discardable soft solver constraint. Handled before the bail
+  // list below (which drops 'soft') so the preference is not silently lost. The
+  // trial parse rewinds, leaving the outer token scan to consume 'soft' and the
+  // relation as it does for a hard one.
   if (k == TokenKind::kKwSoft) {
     CaptureSoftConstraintRelation(member);
     return;
@@ -500,9 +500,9 @@ ClassMember* Parser::ParseConstraintStub(ClassMember* member) {
 }
 
 // 18.5.3: scan a dist_list ('{ dist_item { , dist_item } }') and enforce the
-// rules that govern its default specification: it shall use the :/ operator
-// (the := operator or an omitted operator is an error), and a distribution
-// shall contain at most one default specification.
+// rules that govern its default specification: it takes the :/ operator (the :=
+// operator or an omitted operator is an error), and a distribution holds one
+// default specification at most.
 void Parser::CheckDistSet() {
   if (!Match(TokenKind::kLBrace)) return;
   int depth = 1;
@@ -768,14 +768,14 @@ void Parser::CheckConstraintExprToken(const Token& tok) {
       break;
     case TokenKind::kPlusPlus:
     case TokenKind::kMinusMinus:
-      // 18.5: operators with side effects are not allowed in a constraint.
+      // 18.5: a constraint may not use an operator that changes a value.
       diag_.Error(tok.loc,
                   "operator with side effects is not allowed in a constraint",
                   Subclause("18.5"));
       break;
     case TokenKind::kIntLiteral:
     case TokenKind::kUnbasedUnsizedLiteral:
-      // 18.3: 4-state values (x or z) are illegal in a constraint.
+      // 18.3: a constraint may not contain an x or z value.
       if (LiteralHasFourStateDigit(tok.text)) {
         diag_.Error(tok.loc, "4-state value is not allowed in a constraint",
                     Subclause("18.3"));

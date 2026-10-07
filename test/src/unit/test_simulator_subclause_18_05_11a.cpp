@@ -114,12 +114,11 @@ TEST(FunctionsInConstraints, MultipleArgumentsSolvedBeforeConsumer) {
   EXPECT_EQ(RunAndGet(src, "xv"), 5u);
 }
 
-// 18.5.11: a circular dependency created by the implicit variable ordering
-// shall result in an error. Here each constraint uses the other's variable as a
-// function argument — a is an argument to the constraint on b and b is an
-// argument to the constraint on a — so each is required to be solved before the
-// other. randomize() fails outright rather than solving a self-contradictory
-// ordering.
+// 18.5.11: an implicit variable ordering that loops back on itself is an error.
+// Here each constraint uses the other's variable as a function argument — a is
+// an argument to the constraint on b and b is an argument to the constraint on
+// a — so each is required to be solved before the other. randomize() fails
+// outright rather than solving a self-contradictory ordering.
 TEST(FunctionsInConstraints, CircularArgumentOrderingFailsRandomize) {
   const char* src =
       "class C;\n"
@@ -162,7 +161,7 @@ TEST(FunctionsInConstraints, NoFunctionCallLeavesFlatSolveUnchanged) {
   EXPECT_EQ(RunAndGet(src, "eq"), 1u);
 }
 
-// 18.5.11: within a prioritized set the cyclical (randc) variables are solved
+// 18.5.11: inside one priority set the solver settles the randc variables
 // first. A randc variable keeps its no-repeat cyclic behavior even while a
 // function-argument priority orders the rand variables of the same solve: the
 // constraint x <= 2*f(y) makes y outrank x, engaging the priority-layer pass,
@@ -195,14 +194,14 @@ TEST(FunctionsInConstraints, RandcCyclesWhileArgumentPriorityActive) {
   EXPECT_EQ(RunAndGet(src, "seen"), 15u);
 }
 
-// 18.5.11: a function called in a constraint is evaluated before the constraint
-// is solved and its return value is used as a state variable — this holds even
-// when the function's own argument is an ordinary (non-random) member rather
-// than a random variable. Here inc(k) reads the non-random member k (set to 5
-// by the constructor), so the function contributes the fixed value 6 and x is
-// forced to it. No random variable is used as an argument, so no implicit
-// ordering applies; the rule observed is purely that the call is made and its
-// result drives the solve.
+// 18.5.11: the solver calls a constraint's function before solving the
+// constraint and reads the result as state — this holds even when the
+// function's own argument is an ordinary (non-random) member rather than a
+// random variable. Here inc(k) reads the non-random member k (set to 5 by the
+// constructor), so the function contributes the fixed value 6 and x is forced
+// to it. No random variable is used as an argument, so no implicit ordering
+// applies; the rule observed is purely that the call is made and its result
+// drives the solve.
 TEST(FunctionsInConstraints, FunctionOfStateVariableArgumentDrivesSolve) {
   const char* src =
       "class C;\n"
@@ -259,12 +258,12 @@ TEST(FunctionsInConstraints, SetConstrainedArgumentFeedsConsumer) {
   EXPECT_EQ(RunAndGet(src, "bad"), 0u);
 }
 
-// 18.5.11: a circular dependency created by the implicit ordering is an error
-// even when the cycle is indirect. Three constraints each use the next
-// variable as a function argument (a needs b, b needs c, c needs a), forming a
-// three-hop cycle in the priority ordering. randomize() fails outright, the
-// same outcome as a direct two-variable cycle — the ordering cannot be
-// satisfied whatever its length.
+// 18.5.11: an implicit ordering that loops back on itself is an error even
+// through intermediate variables. Three constraints each use the next variable
+// as a function argument (a needs b, b needs c, c needs a), forming a three-hop
+// cycle in the priority ordering. randomize() fails outright, the same outcome
+// as a direct two-variable cycle — the ordering cannot be satisfied whatever
+// its length.
 TEST(FunctionsInConstraints, IndirectCircularArgumentOrderingFailsRandomize) {
   const char* src =
       "class C;\n"

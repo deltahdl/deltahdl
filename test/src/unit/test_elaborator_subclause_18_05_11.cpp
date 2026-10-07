@@ -106,8 +106,8 @@ TEST(FunctionsInConstraints, RefArgumentFunctionNotInConstraintAccepted) {
              "endmodule\n"));
 }
 
-// 18.5.11: a function used in a constraint cannot modify the constraints by
-// calling rand_mode(). A constraint function whose body does so is rejected.
+// 18.5.11: a function called from a constraint may not call rand_mode() to
+// change the constraints. A constraint function whose body does so is rejected.
 TEST(FunctionsInConstraints, ConstraintFunctionCallingRandModeRejected) {
   ElabFixture f;
   EXPECT_FALSE(

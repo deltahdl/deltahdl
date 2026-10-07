@@ -126,9 +126,9 @@ TEST(ConstraintProperties, OverConstrainedProblemFails) {
   EXPECT_EQ(RunAndGet(src, "ok"), 0u);
 }
 
-// 18.3: an unconstrained random variable is assigned any value in its declared
-// range. x has no constraint, so successive randomize() draws are unrestricted
-// yet always stay within the 4-bit declared range 0..15.
+// 18.3: a random variable with no constraint can come out as any value its
+// declared range holds. x has no constraint, so successive randomize() draws
+// are unrestricted yet always stay within the 4-bit declared range 0..15.
 TEST(ConstraintProperties, UnconstrainedVariableStaysInDeclaredRange) {
   const char* src =
       "class C;\n"

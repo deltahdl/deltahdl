@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-// 18.5.13.1: soft constraints can only be specified on random variables. A soft
+// 18.5.13.1: a soft constraint applies to random variables alone. A soft
 // preference on an ordinary rand variable is within that rule and elaborates.
 TEST(SoftConstraintVariable, SoftOnRandVariableAccepted) {
   EXPECT_TRUE(
@@ -18,7 +18,7 @@ TEST(SoftConstraintVariable, SoftOnRandVariableAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.5.13.1: a soft constraint may not be specified for a randc variable.
+// 18.5.13.1: a randc variable cannot be the subject of a soft constraint.
 // Preferring a value for a randc member is therefore an error.
 TEST(SoftConstraintVariable, SoftOnRandcVariableRejected) {
   ElabFixture f;

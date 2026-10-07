@@ -75,10 +75,10 @@ TEST(ConstraintImplication, ConsequentIgnoredWhenAntecedentFalse) {
   EXPECT_EQ(RunAndGet(src, "rb"), 0u);
 }
 
-// 18.5.5: when the antecedent holds, *all* of the constraints in the consequent
-// shall be satisfied, not merely one. The consequent here is a conjunctive
-// constraint expression, so with 'a' bounded to 0 (antecedent true) the solved
-// values must obey both b == 1 and c == 1.
+// 18.5.5: a true antecedent binds the solver to *every* constraint of the
+// consequent, not merely one. The consequent here is a conjunctive constraint
+// expression, so with 'a' bounded to 0 (antecedent true) the solved values must
+// obey both b == 1 and c == 1.
 TEST(ConstraintImplication, AllConsequentConditionsEnforced) {
   const char* src =
       "class C;\n"
@@ -191,12 +191,12 @@ TEST(ConstraintImplication, BareVariableAntecedent) {
   EXPECT_EQ(RunAndGet(src, "rb"), 1u);
 }
 
-// 18.5.5: a -> b is Boolean-equivalent to (!a || b), and the two sides are
-// interdependent — conversely, if the consequent cannot be satisfied then the
-// antecedent shall be false. 'b' is bounded to 0, making the consequent b == 1
-// unsatisfiable, so the only way to satisfy the implication is for (a == 0) to
-// be false; the solver must therefore drive 'a' (free over {0, 1}) to 1. This
-// exercises the contrapositive direction.
+// 18.5.5: a -> b means the same as (!a || b), so the two sides constrain each
+// other — a consequent that cannot hold forces the antecedent false. 'b' is
+// bounded to 0, making the consequent b == 1 unsatisfiable, so the only way to
+// satisfy the implication is for (a == 0) to be false; the solver must
+// therefore drive 'a' (free over {0, 1}) to 1. This exercises the
+// contrapositive direction.
 TEST(ConstraintImplication, AntecedentDrivenFalseByUnsatisfiableConsequent) {
   const char* src =
       "class C;\n"

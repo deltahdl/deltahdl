@@ -49,12 +49,12 @@ TEST(ConstrainedRandomParsing, RandomizeWithMultiIdentifierList) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-// 18.7: the constraint block following 'with' can define all the same
-// constraint forms a class constraint can -- and, being a constraint block, is
-// subject to the same rules. A 4-state equality operator is illegal in any
-// constraint (18.3), so it is rejected inside an inline block too. This error
-// is observable only because the inline block is now captured and scanned
-// rather than skipped at parse time.
+// 18.7: the block after 'with' accepts every constraint form a class constraint
+// accepts -- and, being a constraint block, is subject to the same rules. A
+// 4-state equality operator is illegal in any constraint (18.3), so it is
+// rejected inside an inline block too. This error is observable only because
+// the inline block is now captured and scanned rather than skipped at parse
+// time.
 TEST(ConstrainedRandomParsing, RandomizeWithBlockRejectsFourStateEquality) {
   auto r = Parse(
       "class C;\n"

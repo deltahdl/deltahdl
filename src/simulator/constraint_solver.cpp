@@ -324,11 +324,11 @@ int64_t ConstraintSolver::GenerateRandValue(RandVariable& var) {
 }
 
 double ConstraintSolver::GenerateRandRealValue(RandVariable& var) {
-  // 18.4.1: random real values are uniformly distributed over their range, so
-  // the probability of landing in any subrange is proportional only to its
-  // width. A uniform_real_distribution over [real_min, real_max) realizes that
-  // flat density directly. A degenerate or inverted range collapses to the
-  // lower bound rather than invoking the distribution on an empty interval.
+  // 18.4.1: every value in a random real's range is equally likely, so the
+  // probability of landing in any subrange is proportional only to its width. A
+  // uniform_real_distribution over [real_min, real_max) realizes that flat
+  // density directly. A degenerate or inverted range collapses to the lower
+  // bound rather than invoking the distribution on an empty interval.
   if (!(var.real_min < var.real_max)) return var.real_min;
   std::uniform_real_distribution<double> dist(var.real_min, var.real_max);
   return dist(rng_);
@@ -341,11 +341,11 @@ bool ConstraintSolver::HasEmptyDomain() const {
   return false;
 }
 
-// 18.5.3: a dist expression requires that it contain at least one rand
-// variable. The distribution names the single variable it constrains, so that
-// target must resolve to an active rand variable; a target the solver does not
-// know, or one declared without the rand qualifier, leaves the distribution
-// with no rand variable to act on.
+// 18.5.3: the expression a dist distributes has to involve a rand variable. The
+// distribution names the single variable it constrains, so that target must
+// resolve to an active rand variable; a target the solver does not know, or one
+// declared without the rand qualifier, leaves the distribution with no rand
+// variable to act on.
 bool ConstraintSolver::DistLacksRandVariable() const {
   for (const auto& block : blocks_) {
     if (!block.enabled) continue;
@@ -473,7 +473,7 @@ GuardValue GuardNot(GuardValue a) {
 }
 
 GuardOutcome GuardFinalOutcome(GuardValue final_value) {
-  // 18.5.12: the final value of the evaluated predicate determines the outcome.
+  // 18.5.12: what the predicate finally evaluates to decides the result.
   switch (final_value) {
     case GuardValue::kTrue:
       return GuardOutcome::kUnconditional;
@@ -490,8 +490,8 @@ GuardOutcome GuardFinalOutcome(GuardValue final_value) {
 GuardValue EvaluateGuard(
     const GuardPredicate& pred,
     const std::unordered_map<std::string, int64_t>& values) {
-  // 18.5.12: apply the operators recursively until all subexpressions are
-  // evaluated. A malformed node (a leaf without a function, a negation or a
+  // 18.5.12: recurse through the operators until no subexpression is left
+  // unevaluated. A malformed node (a leaf without a function, a negation or a
   // missing operand) is treated as an evaluation error.
   switch (pred.op) {
     case GuardPredicate::Op::kLeaf:

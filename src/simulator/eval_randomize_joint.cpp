@@ -79,12 +79,12 @@ void CollectJointRandVariables(const std::vector<JointObject>& objects,
 }
 
 // 18.5.8: resolve a constraint operand to the path-qualified name of a joint
-// rand variable, or an empty string when the operand is not one (so it is a
-// state variable, whose current value is a constant). A bare identifier names a
-// rand member of the constraint's own object -- prefix + id. A one-level
-// handle.field member access names a rand member of a nested object reached
-// through the owner's rand handle -- prefix + handle + "." + field. Only names
-// present in the joint set qualify; everything else is a constant.
+// rand variable, or an empty string when the operand is not one (a state
+// variable, whose present value the solver reads as fixed). A bare identifier
+// names a rand member of the constraint's own object -- prefix + id. A
+// one-level handle.field member access names a rand member of a nested object
+// reached through the owner's rand handle -- prefix + handle + "." + field.
+// Only names present in the joint set qualify; everything else is a constant.
 std::string ResolveJointOperand(const Expr* e, const std::string& prefix,
                                 const std::unordered_set<std::string>& names) {
   if (e == nullptr) return {};
@@ -459,14 +459,12 @@ void CollectJointConstraints(const JointObject& jo,
   }
 }
 
-// 18.5.13.1: the objects of the tree in the order their constraints take
-// soft priority, lowest first: the constraints in a contained object have
-// lower priority than all constraints in its container, and those in
-// objects whose handles are declared later in the container have higher
-// priority, an object contained more than once taking the priority of the
-// handle declared last. So each object follows the subtrees under its
-// handles in declaration order, an object reached again moving to its
-// later place, and the root comes last.
+// 18.5.13.1: the objects of the tree in the order their constraints take soft
+// priority, lowest first: every constraint of a container outranks those of the
+// objects it contains, a later-declared handle's object outranks an earlier
+// one's, and an object held by several handles ranks with the last of them. So
+// each object follows the subtrees under its handles in declaration order, an
+// object reached again moving to its later place, and the root comes last.
 void SoftPriorityOrder(ClassObject* obj, SimContext& ctx,
                        std::vector<ClassObject*>& out,
                        std::unordered_set<const ClassObject*>& on_path) {

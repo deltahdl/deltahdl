@@ -18,11 +18,11 @@ const char* const kGatedHead =
     "  constraint c_1 { p -> soft q; }\n"
     "  constraint c_2 { soft p; }\n";
 
-// 18.5.13.2: a 'disable soft' directive discards only the soft constraints
-// the variable directly appears in. disable soft p discards c_2, where p
-// appears, and not c_1, which p only gates, so over 32 draws p comes up
-// clear in some and q is set whenever p is, as the design
-// test/src/e2e/disabling_soft_constraints.sv runs it.
+// 18.5.13.2: 'disable soft' drops just the soft constraints that name the
+// variable directly. disable soft p discards c_2, where p appears, and not c_1,
+// which p only gates, so over 32 draws p comes up clear in some and q is set
+// whenever p is, as the design test/src/e2e/disabling_soft_constraints.sv runs
+// it.
 TEST(DisablingSoftConstraintsRun, TheGateOfASoftConsequentIsNoReference) {
   SimFixture f;
   std::string out = RunCapture(

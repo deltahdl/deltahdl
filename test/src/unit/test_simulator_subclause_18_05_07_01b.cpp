@@ -35,12 +35,12 @@ std::string Counting(const std::string& decls, int draws,
          "endmodule\n";
 }
 
-// 18.5.7.1: the size method of a dynamic array can be used to constrain the
-// size of the array, and the size constraints are solved first. The
-// clause's c1 holds A.size inside {[1:10]}, so every one of 64 draws leaves
-// A holding 1 to 10 elements, read through size() and through the element
-// past the last, which reads as no element does, and more than one size is
-// drawn, which an array kept at the size it had would never show.
+// 18.5.7.1: a constraint on a dynamic array's size method sets how large the
+// array is, and the solver settles such size constraints first. The clause's c1
+// holds A.size inside {[1:10]}, so every one of 64 draws leaves A holding 1 to
+// 10 elements, read through size() and through the element past the last, which
+// reads as no element does, and more than one size is drawn, which an array
+// kept at the size it had would never show.
 TEST(ForeachIterativeConstraintsRun, ASizeConstraintSizesTheArray) {
   SimFixture f;
   std::string out = RunCapture(
@@ -65,12 +65,12 @@ TEST(ForeachIterativeConstraintsRun, ASizeConstraintSizesTheArray) {
   EXPECT_EQ(out, "64 1\n");
 }
 
-// 18.5.7.1: a predicate over a loop variable and the size of the array
-// iterated behaves as a guard against the creation of a constraint, so the
-// clause's c2 holds each element above the one before it for the indexes
-// below the last alone, and every one of 64 draws is sorted ascending
-// whatever its size, which a foreach imposing its set on every index, the
-// last element held below an element the array lacks, would fail on.
+// 18.5.7.1: a predicate that tests a loop variable against the iterated array's
+// size decides whether a constraint is created at all, so the clause's c2 holds
+// each element above the one before it for the indexes below the last alone,
+// and every one of 64 draws is sorted ascending whatever its size, which a
+// foreach imposing its set on every index, the last element held below an
+// element the array lacks, would fail on.
 TEST(ForeachIterativeConstraintsRun, APredicateGuardsTheConstraint) {
   SimFixture f;
   std::string out = RunCapture(
@@ -189,11 +189,11 @@ TEST(ForeachIterativeConstraintsRun, AGuardOverTheSizeHoldsAnEquality) {
   EXPECT_EQ(out, "16 8\n");
 }
 
-// 18.5.7.1: the size method is a state variable within the foreach block of
-// the array, solved ahead of the iterative constraints, so a foreach holding
-// each element to the size plus its index over an array held to 3 elements
-// reads the size as 3 and draws 3, 4 and 5, which the size read as anything
-// but the value drawn for it would not give.
+// 18.5.7.1: inside the array's foreach block its size reads as a state
+// variable, already settled before the iterative constraints, so a foreach
+// holding each element to the size plus its index over an array held to 3
+// elements reads the size as 3 and draws 3, 4 and 5, which the size read as
+// anything but the value drawn for it would not give.
 TEST(ForeachIterativeConstraintsRun, TheSizeIsAStateVariableInTheForeach) {
   SimFixture f;
   std::string out = RunCapture(
@@ -246,11 +246,11 @@ TEST(ForeachIterativeConstraintsRun, AnUnconstrainedSizeIsKept) {
   EXPECT_EQ(out, "5 0 3 6 9 12\n2 0 3\n0\n");
 }
 
-// 18.5.7.1: an index expression can include loop variables, constants and
-// state variables, and a predicate over a loop variable and a state variable
-// is a guard: with off a state variable holding 2, each element from index
-// 2 on is held to one more than the element off places before it, and over
-// 32 draws every draw holds B[2] one above B[0] and B[3] one above B[1].
+// 18.5.7.1: loop variables, constants and state variables may all appear in an
+// index expression, and a predicate over a loop variable and a state variable
+// is a guard: with off a state variable holding 2, each element from index 2 on
+// is held to one more than the element off places before it, and over 32 draws
+// every draw holds B[2] one above B[0] and B[3] one above B[1].
 TEST(ForeachIterativeConstraintsRun, AnIndexExpressionMayHoldAStateVariable) {
   SimFixture f;
   std::string out = RunCapture(
@@ -265,11 +265,11 @@ TEST(ForeachIterativeConstraintsRun, AnIndexExpressionMayHoldAStateVariable) {
   EXPECT_EQ(out, "32 1\n");
 }
 
-// 18.5.7.1: the scope of each loop variable is the foreach constraint
-// construct, so a loop variable named as a property of the class is the
-// index within the foreach and the property outside it: each element is
-// held to one more than its index, which a k read as the property's 100
-// would put beyond a 4-bit element, and the property keeps its 100.
+// 18.5.7.1: each loop variable is visible only within its foreach constraint,
+// so a loop variable named as a property of the class is the index within the
+// foreach and the property outside it: each element is held to one more than
+// its index, which a k read as the property's 100 would put beyond a 4-bit
+// element, and the property keeps its 100.
 TEST(ForeachIterativeConstraintsRun, TheLoopVariableShadowsAProperty) {
   SimFixture f;
   std::string out = RunCapture(

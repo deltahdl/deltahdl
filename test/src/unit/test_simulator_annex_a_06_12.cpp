@@ -30,7 +30,7 @@ TEST(RandsequenceSim, IfTrueBranchExecutes) {
 
 TEST(RandsequenceSim, ReturnTerminatesProduction) {
   SimFixture f;
-  // 18.17.6: a return aborts the generation of the *current* production only;
+  // 18.17.6: a return ends generation of the *current* production and no other;
   // the code after it in that production's block does not run, but sequence
   // generation continues with the next production in the enclosing list. Here
   // `first`'s `x = 8'd55` is skipped by the return (so x stays 10), yet

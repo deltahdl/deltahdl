@@ -137,15 +137,15 @@ TEST(VariableOrdering, OrderingNeverCausesFailure) {
   EXPECT_EQ(RunAndGet(src, "allok"), 1u);
 }
 
-// 18.5.9: a variable that is not explicitly ordered is solved with the last set
-// of ordered variables — after the ordered head — so its value is conditioned
-// on the earlier choice rather than chosen freely. With 'solve a before d', the
-// head a is drawn first and keeps a uniform 1/2 marginal, while the unnamed u
-// (constrained by 'u -> a == 0') is solved afterward: u can be 1 only when a
-// happened to be 0, giving a skewed ~1/4 marginal. Both marginals differ from
-// the ~1/3 they would share were there no ordering, showing u is solved last
-// (after a), not first. The same source is run twice, reading each marginal in
-// turn.
+// 18.5.9: a variable the ordering leaves out is solved together with the final
+// group of ordered variables — after the ordered head — so its value is
+// conditioned on the earlier choice rather than chosen freely. With 'solve a
+// before d', the head a is drawn first and keeps a uniform 1/2 marginal, while
+// the unnamed u (constrained by 'u -> a == 0') is solved afterward: u can be 1
+// only when a happened to be 0, giving a skewed ~1/4 marginal. Both marginals
+// differ from the ~1/3 they would share were there no ordering, showing u is
+// solved last (after a), not first. The same source is run twice, reading each
+// marginal in turn.
 TEST(VariableOrdering, UnorderedVariableSolvedWithLastSet) {
   const char* src =
       "class B;\n"
@@ -179,8 +179,8 @@ TEST(VariableOrdering, UnorderedVariableSolvedWithLastSet) {
   EXPECT_LE(uones, 195u);
 }
 
-// 18.5.9: variables that are only partially ordered are solved with the latest
-// set of ordered variables such that all ordering constraints are still met.
+// 18.5.9: a partly ordered variable joins the latest group of ordered variables
+// that still keeps every ordering constraint.
 // Here a and b are each ordered before c ('solve a before c; solve b before
 // c;') but are mutually unordered, so each is partially ordered. They are
 // therefore solved with the latest set that keeps them ahead of c — the set
