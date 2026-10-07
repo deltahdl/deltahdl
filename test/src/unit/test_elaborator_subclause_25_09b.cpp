@@ -27,22 +27,21 @@
 // .github/workflows/deltahdl.yml separated this file from.
 //
 // The last group leaves the statement positions and covers the expression
-// positions the other sentence of §25.9 reaches: "These components can only be
-// used in procedural statements; they cannot be used in continuous assignments
-// or sensitivity lists" (printed page 802). A component written directly in
-// either place is already rejected, by
-// Elaborator::ValidateVirtualInterfaceContAssign and
+// positions the other sentence of §25.9 reaches: the components are for
+// procedural statements only, never for continuous assignments or sensitivity
+// lists (printed page 802). A component written directly in either place is
+// already rejected, by Elaborator::ValidateVirtualInterfaceContAssign and
 // Elaborator::ValidateVirtualInterfaceSensitivity in
 // src/elaborator/elaborator_validate_datatype_ops.cpp, and
 // ComponentInContinuousAssignLhs_Error, ComponentInContinuousAssignRhs_Error
-// and ComponentInSensitivityList_Error in
-// test_elaborator_subclause_25_09a.cpp pin that. What the sentence also reaches
-// is a component written one expression deeper than those walks descend: an
-// argument of a call standing in the continuous assignment, and the `iff`
-// operand A.6.5 writes inside the event_expression a sensitivity list is made
-// of. Two acceptance cases hold the far edge, because a walk that reached too
-// far would bar a call argument in a procedural statement, which the same
-// sentence permits, and a call carrying no virtual interface at all.
+// and ComponentInSensitivityList_Error in test_elaborator_subclause_25_09a.cpp
+// pin that. What the sentence also reaches is a component written one
+// expression deeper than those walks descend: an argument of a call standing in
+// the continuous assignment, and the `iff` operand A.6.5 writes inside the
+// event_expression a sensitivity list is made of. Two acceptance cases hold the
+// far edge, because a walk that reached too far would bar a call argument in a
+// procedural statement, which the same sentence permits, and a call carrying no
+// virtual interface at all.
 
 #include <gtest/gtest.h>
 

@@ -202,11 +202,10 @@ TEST(VirtualInterfaceSim, NullReferenceNames25_9) {
                             "25.9"));
 }
 
-// §25.9: "Once a virtual interface has been initialized, all the components of
-// the underlying interface instance are directly available to the virtual
-// interface via the dot notation. These components can only be used in
-// procedural statements". The clause's own example writes a component that way
-// with a nonblocking assignment, `bus.req <= 1'b1;`, so the write is a
+// §25.9: once a virtual interface is initialized, every component of the
+// interface instance behind it is reached directly with dot notation, and only
+// in procedural statements. The clause's own example writes a component that
+// way with a nonblocking assignment, `bus.req <= 1'b1;`, so the write is a
 // redirection through the binding exactly as the read is, and what it must
 // reach is the bound instance's own variable.
 //
@@ -290,8 +289,8 @@ TEST(VirtualInterfaceSim, BlockingComponentWriteReachesInstance) {
   EXPECT_EQ(through_handle->value.ToUint64(), 0xC3u);
 }
 
-// §25.9 makes a component available through the virtual interface only "once a
-// virtual interface has been initialized", and the file's cases above hold the
+// §25.9 makes a component available through the virtual interface only once the
+// virtual interface has been initialized, and the file's cases above hold the
 // simulator to reporting a read that is not: a reference through an unbound
 // handle is a fatal run-time error carrying §25.9. A write names the component
 // by the same dot notation and through the same absent binding, so it is the

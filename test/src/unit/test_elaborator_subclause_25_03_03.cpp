@@ -60,12 +60,11 @@ TEST(GenericInterfaceReference, PartialImplicitWithNamedGenericInterface) {
   EXPECT_NE(top->children[1].resolved, nullptr);
 }
 
-// §25.3.3 states "An implicit port cannot be used to reference a generic
-// interface. A named port shall be used to reference a generic interface." The
-// port `interface a` of memMod is generic, so the `.*` connection cannot reach
-// it and the rejection is reported under §25.3.3 rather than under §23.3.2.4,
-// which states the rules for wildcard named port connections generally and says
-// nothing about a generic interface.
+// §25.3.3 states that a generic interface is reached through a named port and
+// never through an implicit one. The port `interface a` of memMod is generic,
+// so the `.*` connection cannot reach it and the rejection is reported under
+// §25.3.3 rather than under §23.3.2.4, which states the rules for wildcard
+// named port connections generally and says nothing about a generic interface.
 TEST(GenericInterfaceReference, ImplicitOnlyCannotReferenceGenericInterface) {
   ElabFixture f;
   ElaborateSrc(

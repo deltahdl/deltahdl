@@ -76,12 +76,12 @@ TEST(ParameterizedInterface, NamedOverrideAppliedToInterfaceInstance) {
   EXPECT_EQ(u0->params[0].resolved_value, 32);
 }
 
-// The claim's demonstrated effect: because an interface uses parameters "in the
-// same manner as a module," a member declared in terms of a parameter is sized
-// from that parameter, and a redefinition re-sizes it -- the interface analog
-// of a module's parameterized port width (23.2.3). This mirrors the LRM worked
+// The claim's demonstrated effect: because an interface uses parameters as a
+// module does, a member declared in terms of a parameter is sized from that
+// parameter, and a redefinition re-sizes it -- the interface analog of a
+// module's parameterized port width (23.2.3). This mirrors the LRM worked
 // example, which instantiates one default interface alongside a #(.DWIDTH(16))
-// override and describes the latter as "16-bit wide." Both instances live under
+// override and describes the latter as 16 bits wide. Both instances live under
 // the same top, so a single elaboration observes the default and the override
 // sizing the same member differently.
 TEST(ParameterizedInterface, MemberWidthTracksDefaultAndRedefinition) {
@@ -161,9 +161,9 @@ TEST(ParameterizedInterface, RedefinitionValueMayBeParentLocalparam) {
 }
 
 // Redefinition position: the POSITIONAL form `#(v)`. The LRM example shows the
-// named form; the "same manner as a module" claim equally covers a positional
-// override, which takes the ordered-assignment path rather than the by-name
-// one. Observed on an interface instance end to end.
+// named form; the claim that interfaces take parameters as modules do equally
+// covers a positional override, which takes the ordered-assignment path rather
+// than the by-name one. Observed on an interface instance end to end.
 TEST(ParameterizedInterface, PositionalRedefinitionAppliedToInterfaceInstance) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -183,13 +183,13 @@ TEST(ParameterizedInterface, PositionalRedefinitionAppliedToInterfaceInstance) {
   EXPECT_EQ(MemberWidth(u0), 28u);
 }
 
-// Negative form. §25.8 states one thing, "Interface definitions can take
-// advantage of parameters and parameter redefinition in the same manner as
-// module definitions", and states no rule of its own about a redefinition that
-// names nothing. The rule broken is §23.10.2.2's on parameter value assignment
-// by name, so a by-name override targeting a parameter the interface does not
-// declare is reported under §23.10.2.2 -- which is the claim of §25.8, that an
-// interface is judged by the module rule.
+// Negative form. §25.8 states one thing, that an interface definition uses
+// parameters and parameter redefinition just as a module definition does, and
+// states no rule of its own about a redefinition that names nothing. The rule
+// broken is §23.10.2.2's on parameter value assignment by name, so a by-name
+// override targeting a parameter the interface does not declare is reported
+// under §23.10.2.2 -- which is the claim of §25.8, that an interface is judged
+// by the module rule.
 TEST(ParameterizedInterface, UnknownParameterOverrideNameRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(

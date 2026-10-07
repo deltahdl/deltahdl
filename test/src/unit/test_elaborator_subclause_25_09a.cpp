@@ -819,8 +819,8 @@ TEST(VirtualInterfaceElaboration, InterfaceWithInterfacePortAsVi_Error) {
                             3, "25.9"));
 }
 
-// §25.9: "Virtual interfaces shall not be used as ports, interface items, or as
-// members of unions." The report that rejects one declared as a port names the
+// §25.9: a virtual interface may not serve as a port, an interface item or a
+// union member. The report that rejects one declared as a port names the
 // subclause stating the rule, which lets a caller learn which rule was enforced
 // without matching the wording of the message.
 TEST(VirtualInterfaceElaboration, PortTypeNames25_9) {

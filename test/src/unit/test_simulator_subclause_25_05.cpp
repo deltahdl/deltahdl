@@ -9,11 +9,11 @@ using namespace delta;
 namespace {
 
 // §25.5 (printed page 787): a connection may name a modport of the interface
-// instance, "hierarchical from the interface instance", and the port then
-// reaches that instance's own members. A program reading the modport's input
-// through a `Bus.tb` port sees the value the module placed on `s.q`. The
-// program's initial waits past the module's read at 3, since its end would
-// end the run (§24.3).
+// instance, named hierarchically from that instance, and the port then reaches
+// that instance's own members. A program reading the modport's input through a
+// `Bus.tb` port sees the value the module placed on `s.q`. The program's
+// initial waits past the module's read at 3, since its end would end the run
+// (§24.3).
 TEST(ModportConnectionSim, ProgramReadsModportInputThroughSelectedConnection) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface Bus;\n"

@@ -239,11 +239,11 @@ TEST(ExternTfDeclaration, ExternForkjoinWithFunctionRejected) {
 // non_port_program_item, A.1.8's checker_or_generate_item and A.1.11's
 // package_item reach task_declaration and function_declaration but no
 // prototype, and A.1.2's description admits none at compilation-unit scope.
-// §25.7 gives the prototype its purpose: "if the subroutines are defined in a
-// module using a hierarchical name, they shall also be declared as extern in
-// the interface". Each case below writes the prototype in one of those bodies
-// and expects the report at its `extern`, with the body read on past the
-// prototype's ';' so that the item after it is still recorded.
+// §25.7 gives the prototype its purpose: subroutines a module defines under a
+// hierarchical name must also be declared extern in the interface. Each case
+// below writes the prototype in one of those bodies and expects the report at
+// its `extern`, with the body read on past the prototype's ';' so that the item
+// after it is still recorded.
 
 constexpr const char* kExternOutsideInterface =
     "an extern task or function prototype is an item of an interface";

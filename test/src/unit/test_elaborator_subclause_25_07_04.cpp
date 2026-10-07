@@ -103,9 +103,9 @@ TEST(MultipleTaskExports, DuplicateNonForkjoinTaskExportFromTwoModulesIsError) {
                             7, "25.7.4"));
 }
 
-// §25.7.4's general rule is stated over "more than one module" — not only
-// repeated instances of one module type. Two DISTINCT module types exporting
-// the same non-forkjoin task into one interface instance is likewise an error.
+// §25.7.4's general rule is stated over several modules — not only repeated
+// instances of one module type. Two DISTINCT module types exporting the same
+// non-forkjoin task into one interface instance is likewise an error.
 TEST(MultipleTaskExports, DifferentModuleTypesDuplicateTaskExportIsError) {
   ElabFixture f;
   ElabOk(

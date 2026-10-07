@@ -57,13 +57,12 @@ TEST(InterfaceObjectAccessElaboration, PortMemberReadOfSignalInModport_Ok) {
              "endmodule\n"));
 }
 
-// §25.10 states that "A modport may be used to restrict access to objects
-// declared in an interface that are referenced through a port connection or
-// virtual interface by explicitly listing the accessible objects in the
-// modport". The restriction is the modport's own, stated in §25.5: "To restrict
-// interface access within a module, there are modport lists with directions
-// declared within the interface." The elaborator reports the refused access
-// under §25.5, and InterfaceModportAccess.UnlistedMemberNames25_5 in
+// §25.10 states that a modport can limit access to an interface's objects
+// reached through a port connection or a virtual interface, by listing the
+// objects that may be reached. The restriction is the modport's own, stated in
+// §25.5: the interface declares modport lists with directions to limit what a
+// module may reach of it. The elaborator reports the refused access under
+// §25.5, and InterfaceModportAccess.UnlistedMemberNames25_5 in
 // test/src/unit/test_elaborator_subclause_25_05.cpp reads the same report back
 // and asserts that subclause.
 TEST(InterfaceObjectAccessElaboration,
@@ -237,8 +236,9 @@ TEST(InterfaceObjectAccessElaboration,
 
 // Claim 1, virtual-interface-coexistence position: hierarchical access to a
 // non-modport member stays available even when the same interface instance is
-// also reached through a virtual interface, matching the "regardless of whether
-// also accessed through a virtual interface" part of the rule.
+// also reached through a virtual interface, matching the part of the rule that
+// holds whether or not the instance is also reached through a virtual
+// interface.
 TEST(InterfaceObjectAccessElaboration,
      HierarchicalAccessBypassesModportWhenAlsoAccessedViaVirtualInterface_Ok) {
   EXPECT_TRUE(
