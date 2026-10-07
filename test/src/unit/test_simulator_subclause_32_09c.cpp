@@ -1,7 +1,7 @@
 // §32.9 gives $sdf_annotate an mtm_spec operand whose legal values Table 32-5
 // lists, and TOOL_CONTROL -- the value that table marks the default, and so the
-// value a call naming no mtm_spec has -- is described there as "Annotates the
-// value as selected by the simulator". What this simulator selects is what
+// value a call naming no mtm_spec has -- is described there as annotating
+// whichever value the simulator selects. What this simulator selects is what
 // SimContext::GetDelayMode answers, which --mintypmax establishes for the whole
 // run, so a min:typ:max triple in an SDF file and a §11.11 min:typ:max
 // expression in the source cannot end up on different members.

@@ -243,7 +243,7 @@ TEST(SdfMultipleFiles, IncrementValueModifiesWhatAnEarlierFileAnnotated) {
 }
 
 // The same INCREMENT file annotated twice modifies the design twice, which is
-// what "each call annotates the design" means when two calls name one file.
+// what every call annotating the design means when two calls name one file.
 TEST(SdfMultipleFiles, RepeatingOneIncrementFileModifiesTheDesignEachTime) {
   const std::string kF1 =
       WriteSdf("rep_1.sdf", DelayFile(IopathRecord("a", "ABSOLUTE", "5")));
@@ -335,7 +335,7 @@ std::string CheckRecord(const std::string& limit) {
          limit + ")))))";
 }
 
-// "Annotated values" is not confined to module path delays: a constraint limit
+// What gets annotated is not confined to module path delays: a constraint limit
 // an earlier file annotated is overwritten by a later file's ABSOLUTE value the
 // same way a delay is.
 TEST(SdfMultipleFiles, AbsoluteValueOverwritesAConstraintFromAnEarlierFile) {

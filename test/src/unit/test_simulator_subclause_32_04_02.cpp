@@ -573,13 +573,13 @@ TEST(SdfTimingCheckBothSignalEdges, EveryEdgeNamedMustMatchBeforeAnnotation) {
 // The rest of this file is about which module *instance* an SDF timing check
 // reaches. §32.4.2 settles which declared check a record lands on -- its type,
 // its two signals, their edges and their conditions -- and §32.9 settles which
-// instance it lands in: "the SDF annotator uses the hierarchy level of the
-// specified instance for running the annotation", so a record written under
-// (INSTANCE u_first) reaches u_first and no other instance of that cell. §31.2
-// puts a system timing check in a specify block and §30.3 has that block
-// "appear inside a module declaration", so two instances of one cell declare
-// checks whose signals are spelled identically, and the instance is the only
-// thing that separates them.
+// instance it lands in: the SDF annotator runs the annotation at the hierarchy
+// level of the instance named, so a record written under (INSTANCE u_first)
+// reaches u_first and no other instance of that cell. §31.2 puts a system
+// timing check in a specify block and §30.3 has that block "appear inside a
+// module declaration", so two instances of one cell declare checks whose
+// signals are spelled identically, and the instance is the only thing that
+// separates them.
 //
 // Every case below hands AnnotateSdfToManager a design root, which no case
 // above does. SdfCellInstancePrefix (src/simulator/sdf_parser.h) answers empty
