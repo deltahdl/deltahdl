@@ -406,7 +406,9 @@ void Parser::ReportDriveStrengthAfterDelay(const Expr* delay,
     lexer_.RestorePos(saved);
     return;
   }
-  diag_.Error(loc, "drive strength shall precede any delay specified",
+  diag_.Error(loc,
+              "the drive strength comes after the delay here; it has to be "
+              "written first",
               Subclause(subclause));
   uint8_t s0 = 0, s1 = 0;
   ParseDriveStrength(s0, s1);

@@ -72,7 +72,8 @@ TEST(GateInstStrengthParsing, DelayBeforeStrengthRejected) {
       "  and #5 (strong0, strong1) g(y, a, b);\n"
       "endmodule");
   EXPECT_TRUE(ReportedError(r.diags,
-                            "drive strength shall precede any delay specified",
+                            "the drive strength comes after the delay here; it "
+                            "has to be written first",
                             3, "28.3.2"));
   EXPECT_EQ(std::count_if(r.diags.begin(), r.diags.end(),
                           [](const Diagnostic& d) {

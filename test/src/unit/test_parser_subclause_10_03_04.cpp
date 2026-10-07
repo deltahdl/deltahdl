@@ -165,7 +165,8 @@ TEST(DriveStrengthParsing, StrengthAfterDelayIsError) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_TRUE(ReportedError(r.diags,
-                            "drive strength shall precede any delay specified",
+                            "the drive strength comes after the delay here; it "
+                            "has to be written first",
                             3, "10.3.4"));
 }
 
@@ -182,7 +183,8 @@ TEST(DriveStrengthParsing, NetDeclDelayBeforeStrengthIsError) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_TRUE(ReportedError(r.diags,
-                            "drive strength shall precede any delay specified",
+                            "the drive strength comes after the delay here; it "
+                            "has to be written first",
                             2, "10.3.4"));
 }
 
