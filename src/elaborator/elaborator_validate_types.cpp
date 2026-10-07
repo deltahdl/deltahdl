@@ -403,8 +403,8 @@ void Elaborator::ValidatePackedDimOnPredefinedType(const DataType& dtype,
   if (!HasPredefinedWidth(dtype.kind)) return;
   if (!dtype.packed_dim_left) return;
   diag_.Error(loc,
-              "integer type with predefined width shall not have packed "
-              "array dimensions",
+              "packed dimensions cannot be added to an integer type whose "
+              "width is already fixed",
               Subclause("7.4.1"));
 }
 

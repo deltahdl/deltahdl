@@ -494,8 +494,8 @@ void Elaborator::ValidatePackedStructDefaults(const DataType& dtype,
   for (const auto& m : dtype.struct_members) {
     if (m.init_expr) {
       diag_.Error(loc,
-                  "members of packed structures shall not be assigned "
-                  "individual default member values",
+                  "a member of a packed structure cannot carry a default value "
+                  "of its own",
                   Subclause("7.2.2"));
       return;
     }
@@ -513,8 +513,8 @@ void Elaborator::ValidateUnpackedStructWithUnionDefaults(const DataType& dtype,
   for (const auto& m : dtype.struct_members) {
     if (m.init_expr) {
       diag_.Error(loc,
-                  "members of unpacked structures containing a union shall "
-                  "not be assigned individual default member values",
+                  "a member of an unpacked structure that contains a union "
+                  "cannot carry a default value of its own",
                   Subclause("7.2.2"));
       return;
     }

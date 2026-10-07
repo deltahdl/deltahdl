@@ -15,9 +15,10 @@ TEST(PackedArrayValidation, PackedDimOnByte_Rejected) {
       "  byte [3:0] x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "integer type with predefined width shall not have packed", 2, "7.4.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "packed dimensions cannot be added to an integer "
+                            "type whose width is already fixed",
+                            2, "7.4.1"));
 }
 
 TEST(PackedArrayValidation, PackedDimOnShortint_Rejected) {
@@ -27,9 +28,10 @@ TEST(PackedArrayValidation, PackedDimOnShortint_Rejected) {
       "  shortint [3:0] x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "integer type with predefined width shall not have packed", 2, "7.4.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "packed dimensions cannot be added to an integer "
+                            "type whose width is already fixed",
+                            2, "7.4.1"));
 }
 
 TEST(PackedArrayValidation, PackedDimOnInt_Rejected) {
@@ -39,9 +41,10 @@ TEST(PackedArrayValidation, PackedDimOnInt_Rejected) {
       "  int [3:0] x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "integer type with predefined width shall not have packed", 2, "7.4.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "packed dimensions cannot be added to an integer "
+                            "type whose width is already fixed",
+                            2, "7.4.1"));
 }
 
 TEST(PackedArrayValidation, PackedDimOnLongint_Rejected) {
@@ -51,9 +54,10 @@ TEST(PackedArrayValidation, PackedDimOnLongint_Rejected) {
       "  longint [3:0] x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "integer type with predefined width shall not have packed", 2, "7.4.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "packed dimensions cannot be added to an integer "
+                            "type whose width is already fixed",
+                            2, "7.4.1"));
 }
 
 TEST(PackedArrayValidation, PackedDimOnInteger_Rejected) {
@@ -63,9 +67,10 @@ TEST(PackedArrayValidation, PackedDimOnInteger_Rejected) {
       "  integer [3:0] x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "integer type with predefined width shall not have packed", 2, "7.4.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "packed dimensions cannot be added to an integer "
+                            "type whose width is already fixed",
+                            2, "7.4.1"));
 }
 
 TEST(PackedArrayValidation, PackedDimOnTime_Rejected) {
@@ -75,9 +80,10 @@ TEST(PackedArrayValidation, PackedDimOnTime_Rejected) {
       "  time [3:0] x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "integer type with predefined width shall not have packed", 2, "7.4.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "packed dimensions cannot be added to an integer "
+                            "type whose width is already fixed",
+                            2, "7.4.1"));
 }
 
 TEST(PackedArrayValidation, PackedDimOnLogic_Allowed) {
@@ -402,9 +408,10 @@ TEST(PackedArrayValidation, PackedDimOnIntNames7_4_1) {
       "  int [3:0] x;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "integer type with predefined width shall not have packed", 2, "7.4.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "packed dimensions cannot be added to an integer "
+                            "type whose width is already fixed",
+                            2, "7.4.1"));
 }
 
 }  // namespace

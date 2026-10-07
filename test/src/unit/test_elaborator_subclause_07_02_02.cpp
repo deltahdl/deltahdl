@@ -14,10 +14,10 @@ TEST(StructAssignmentValidation, PackedStructMemberDefault_Rejected) {
       "  struct packed { bit [3:0] lo = 5; bit [3:0] hi; } s;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "members of packed structures shall not be "
-                            "assigned individual default member values",
-                            2, "7.2.2"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a member of a packed structure cannot carry a default value of its own",
+      2, "7.2.2"));
 }
 
 TEST(StructAssignmentValidation, UnpackedStructMemberDefault_Allowed) {
@@ -42,9 +42,8 @@ TEST(StructAssignmentValidation,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "members of unpacked structures containing a union "
-                            "shall not be assigned individual default member "
-                            "values",
+                            "a member of an unpacked structure that contains a "
+                            "union cannot carry a default value of its own",
                             2, "7.2.2"));
 }
 
@@ -104,10 +103,10 @@ TEST(StructAssignmentValidation, PackedStructTypedefMemberDefault_Rejected) {
       "  msg_t m;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "members of packed structures shall not be "
-                            "assigned individual default member values",
-                            2, "7.2.2"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a member of a packed structure cannot carry a default value of its own",
+      2, "7.2.2"));
 }
 
 TEST(StructAssignmentValidation, NonConstantMemberDefault_Rejected) {
@@ -222,9 +221,8 @@ TEST(StructAssignmentValidation,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "members of unpacked structures containing a union "
-                            "shall not be assigned individual default member "
-                            "values",
+                            "a member of an unpacked structure that contains a "
+                            "union cannot carry a default value of its own",
                             2, "7.2.2"));
 }
 
