@@ -266,8 +266,8 @@ TEST(RandsequenceSim, CodeBlockLocalsAreAutomaticPerInvocation) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// §18.17: "each code block within the randsequence block creates an anonymous
-// automatic scope". CodeBlockLocalsAreAutomaticPerInvocation above covers the
+// §18.17: every code block in the randsequence block opens an anonymous
+// automatic scope. CodeBlockLocalsAreAutomaticPerInvocation above covers the
 // block written as a production of its own, which ExecRsProdCodeBlock pushes a
 // scope for. This is the other place Syntax 18-14 puts a code block:
 // `rs_rule ::= rs_production_list [ := rs_weight_specification [ rs_code_block

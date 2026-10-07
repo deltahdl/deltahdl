@@ -14,9 +14,9 @@ namespace {
 // 18.6.2: every class contains pre_randomize() and post_randomize() methods.
 // A class that does not override them has built-in versions whose processing
 // is empty, so randomization proceeds and produces a value exactly as if they
-// were absent. The solver models "not overridden" as having no pre/post hook
-// registered; with neither hook set, Solve() still randomizes successfully and
-// the default built-ins contribute no processing of their own.
+// were absent. The solver models a method left unoverridden as having no
+// pre/post hook registered; with neither hook set, Solve() still randomizes
+// successfully and the default built-ins contribute no processing of their own.
 TEST(PrePostRandomize, DefaultBuiltinsAreNoOpsWhenNotOverridden) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -67,7 +67,8 @@ TEST(PrePostRandomize, PreThenPostInvokedExactlyOnceInOrder) {
 // default 0), while a user post_randomize() records the same member after the
 // solve, when the newly drawn value has already been written back onto the
 // object (42). Seeing 0 at pre and 42 at post fixes both the pre-before-compute
-// order and the "after computed and assigned" timing of post_randomize.
+// order and the timing of post_randomize after the values are computed and
+// assigned.
 TEST(PrePostRandomizeFromSource, PreObservesDefaultPostObservesAssignedValue) {
   const char* src =
       "class C;\n"

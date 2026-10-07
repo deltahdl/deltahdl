@@ -42,7 +42,7 @@ TEST(RandModifierUniformDistribution, RepeatOnSuccessiveCallsIsRare) {
     prev = cur;
   }
   // The expected repeat fraction is ~1/256; allow generous headroom but still
-  // require it to be far below a non-uniform "frequently repeats" outcome.
+  // require it to be far below a non-uniform outcome that repeats often.
   EXPECT_LT(repeats, kSamples / 50);
 }
 
@@ -201,12 +201,12 @@ TEST(RandModifierUniformFromSource,
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.4.1 (observed end to end): "uniformly distributed over their range" means
-// the draw spans the full declared range rather than clustering. Across many
-// randomize() calls on a `rand bit [7:0]` member both extremes are reached — a
-// value under 16 and a value over 239 each appear — which a constant or narrow
-// draw could not produce. This confirms the production randomize path spreads
-// the value across the whole declared range.
+// 18.4.1 (observed end to end): being uniform over the range means the draw
+// spans the full declared range rather than clustering. Across many randomize()
+// calls on a `rand bit [7:0]` member both extremes are reached — a value under
+// 16 and a value over 239 each appear — which a constant or narrow draw could
+// not produce. This confirms the production randomize path spreads the value
+// across the whole declared range.
 TEST(RandModifierUniformFromSource, RandSpansItsDeclaredRange) {
   const char* src =
       "class C;\n"
@@ -229,8 +229,8 @@ TEST(RandModifierUniformFromSource, RandSpansItsDeclaredRange) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.4.1 (observed end to end with a real §18.5 constraint): "their range" is
-// the variable's effective admissible range, so when a genuine constraint block
+// 18.4.1 (observed end to end with a real §18.5 constraint): the range is the
+// variable's effective admissible range, so when a genuine constraint block
 // narrows a rand variable the uniform draw covers exactly that narrowed range.
 // A `rand bit [7:0] y` bounded by a `constraint` block to 10..13 (the §18.5
 // construct the rule consumes, parsed and elaborated from real syntax) is
@@ -299,14 +299,13 @@ TEST(RandModifierUniformFromSource, RandLogicTypeIsUniformOverRange) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.4.1 (observed end to end, wider integral operand form): "their range" is
-// the full declared range, so a wider integral member is uniform over its whole
+// 18.4.1 (observed end to end, wider integral operand form): the range is the
+// full declared range, so a wider integral member is uniform over its whole
 // span. A `rand bit [15:0]` (range 0..65535) randomized many times spreads
 // evenly across the two halves of the 16-bit range and reaches both extremes,
-// with every draw in range. This exercises the
-// uniform rule over a materially larger declared range than the 8-bit form,
-// confirming the production path does not clamp the distribution to a fixed
-// sub-span.
+// with every draw in range. This exercises the uniform rule over a materially
+// larger declared range than the 8-bit form, confirming the production path
+// does not clamp the distribution to a fixed sub-span.
 TEST(RandModifierUniformFromSource, RandWideIntegralIsUniformOverFullRange) {
   const char* src =
       "class C;\n"
@@ -333,22 +332,22 @@ TEST(RandModifierUniformFromSource, RandWideIntegralIsUniformOverFullRange) {
 }
 
 // 18.4.1: a rand variable is uniformly distributed over the range its
-// declared type admits -- the clause's own example calls rand bit [7:0] "an
-// 8-bit unsigned integer with a range of 0 to 255" and requires an
-// unconstrained one to be assigned a value in that range. The value drawn from
-// that range is what the constraints are solved against. A solver that drew
-// from a wider domain and only truncated on write-back would satisfy the
-// clause's stated observables -- the committed value would still be uniform
-// over the declared range -- while every constraint saw a number the variable
-// cannot hold. This makes that difference observable: 's -> d == 0' relates a
-// 1-bit s to a 2-bit d, so it holds for five of the eight value combinations
-// and randomize() shall succeed on every call. Drawn from a wider domain the
-// same relation demands an exactly-zero d while a nonzero s is near-certain,
-// so it becomes unsatisfiable in practice and randomize() fails. The relation
-// is not of the foldable variable-against-constant shape, so it is evaluated
-// against the drawn values themselves rather than seeded, which is what makes
-// the domain visible here. The second read confirms the solved pairs are
-// legal, so a wider domain cannot be traded for a wrong answer.
+// declared type admits -- the clause's own example describes rand bit [7:0] as
+// an 8-bit unsigned integer ranging over 0 to 255 and requires an unconstrained
+// one to be assigned a value in that range. The value drawn from that range is
+// what the constraints are solved against. A solver that drew from a wider
+// domain and only truncated on write-back would satisfy the clause's stated
+// observables -- the committed value would still be uniform over the declared
+// range -- while every constraint saw a number the variable cannot hold. This
+// makes that difference observable: 's -> d == 0' relates a 1-bit s to a 2-bit
+// d, so it holds for five of the eight value combinations and randomize() shall
+// succeed on every call. Drawn from a wider domain the same relation demands an
+// exactly-zero d while a nonzero s is near-certain, so it becomes unsatisfiable
+// in practice and randomize() fails. The relation is not of the foldable
+// variable-against-constant shape, so it is evaluated against the drawn values
+// themselves rather than seeded, which is what makes the domain visible here.
+// The second read confirms the solved pairs are legal, so a wider domain cannot
+// be traded for a wrong answer.
 TEST(RandModifierUniformFromSource,
      NarrowRandVariablesSolvedWithinDeclaredRange) {
   const char* src =
@@ -374,8 +373,8 @@ TEST(RandModifierUniformFromSource,
   EXPECT_EQ(RunAndGet(src, "legal"), 1u);
 }
 
-// 18.4.1 requires a rand variable's values to be uniformly distributed over
-// "their range", and 6.11.3 fixes what that range is: byte, shortint, int,
+// 18.4.1 requires a rand variable's values to be uniformly distributed over the
+// variable's range, and 6.11.3 fixes what that range is: byte, shortint, int,
 // integer and longint default to signed, so a w-bit one spans -2**(w-1) to
 // 2**(w-1)-1 and half of it is negative. The tests below observe the negative
 // half being reachable on each of the three paths that build a solver domain --
@@ -562,15 +561,16 @@ TEST(RandModifierSignedRange, UnsignedMemberKeepsItsNonNegativeRange) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.4.1 requires a rand variable's values to be uniformly distributed over
-// "their range", and reads a declaration as naming that range: `rand bit [7:0]`
-// is "an 8-bit unsigned integer with a range of 0 to 255". 6.11.3 puts bit,
-// reg, logic and time on unsigned, so a 64-bit one of those spans 0 to 2**64-1.
-// That top is one value beyond what an int64_t counts up to, and a bound held
-// as a signed number can only stop at 2**63-1 -- half the declared range, and
-// the half a constraint requiring a large value needs. The tests below pin the
-// whole range: the bound the declared type produces, the order that bound is
-// read in, and the draws and constraint solutions that follow from both.
+// 18.4.1 requires a rand variable's values to be uniformly distributed over the
+// variable's range, and reads a declaration as naming that range:
+// `rand bit [7:0]` is an 8-bit unsigned integer ranging over 0 to 255. 6.11.3
+// puts bit, reg, logic and time on unsigned, so a 64-bit one of those spans 0
+// to 2**64-1. That top is one value beyond what an int64_t counts up to, and a
+// bound held as a signed number can only stop at 2**63-1 -- half the declared
+// range, and the half a constraint requiring a large value needs. The tests
+// below pin the whole range: the bound the declared type produces, the order
+// that bound is read in, and the draws and constraint solutions that follow
+// from both.
 
 // 18.4.1 / 6.11.3: an unsigned 64-bit type spans 0 to 2**64-1, so that is the
 // domain its declaration binds. The top of the range is all ones, which is the
@@ -660,10 +660,10 @@ TEST(RandModifierUnsignedRange, InvertedDomainCollapsesOntoItsLowerBound) {
   EXPECT_EQ(v.max_val, 200);
 }
 
-// 18.4.1: an unconstrained rand variable "shall be assigned any value in the
-// range ... with equal probability", so both halves of a 64-bit unsigned range
-// are drawn. Over 200 draws from the whole range the chance of never setting
-// the high bit is 2**-200; from a domain capped at 2**63-1 it never can be set.
+// 18.4.1: an unconstrained rand variable takes every value of its range with
+// equal probability, so both halves of a 64-bit unsigned range are drawn. Over
+// 200 draws from the whole range the chance of never setting the high bit is
+// 2**-200; from a domain capped at 2**63-1 it never can be set.
 TEST(RandModifierUnsignedRange, SolverDrawsAboveTheSignedMaximum) {
   ConstraintSolver solver(11);
   RandVariable v;

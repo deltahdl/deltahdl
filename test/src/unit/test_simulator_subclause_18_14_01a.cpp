@@ -52,26 +52,25 @@ uint64_t RunInitialUrandom(uint32_t seed) {
   return ctx.FindVariable("v")->value.ToUint64();
 }
 
-// "Each module instance ... has an initialization RNG. Each initialization RNG
-// is seeded with the default seed." and "An initialization RNG shall be used in
-// the creation of static processes." The initial block is a static process; it
-// draws from a stream seeded out of the initialization RNG, so replaying the
-// run from the same initialization seed reproduces the draw exactly.
+// Every module instance has an initialization RNG seeded with the default seed,
+// and static processes are created through an initialization RNG. The initial
+// block is a static process; it draws from a stream seeded out of the
+// initialization RNG, so replaying the run from the same initialization seed
+// reproduces the draw exactly.
 TEST(RandomStabilityProperties, StaticProcessReplaysUnderSameInitSeed) {
   EXPECT_EQ(RunInitialUrandom(7), RunInitialUrandom(7));
 }
 
-// "When a static process is created, its RNG is seeded with the next value from
-// the initialization RNG of the [enclosing instance]." Reseeding the
-// initialization RNG reseeds that static process, so its draw shifts with the
-// initialization seed.
+// A static process, when created, seeds its RNG with the next value of its
+// enclosing instance's initialization RNG. Reseeding the initialization RNG
+// reseeds that static process, so its draw shifts with the initialization seed.
 TEST(RandomStabilityProperties, StaticProcessTracksInitializationSeed) {
   EXPECT_NE(RunInitialUrandom(7), RunInitialUrandom(8));
 }
 
-// "Each class instance (object) has an independent RNG for all randomization
-// methods in the class." Two objects allocated in sequence receive different
-// seeds, so they own distinct random streams.
+// Every object has an RNG of its own serving all of its class's randomization
+// methods. Two objects allocated in sequence receive different seeds, so they
+// own distinct random streams.
 TEST(RandomStabilityProperties, DistinctObjectsGetIndependentSeeds) {
   SourceManager mgr;
   Arena arena;
@@ -85,12 +84,11 @@ TEST(RandomStabilityProperties, DistinctObjectsGetIndependentSeeds) {
   EXPECT_NE(a->rng_seed, b->rng_seed);
 }
 
-// "When a class object is created by a static declaration initializer, there is
-// no active thread; thus, the RNG of the created object is seeded with the next
-// random value of the initialization RNG ...". With no current process the
-// object seed is drawn from the initialization RNG, so the first object built
-// by two identically seeded contexts gets the same seed, while a different
-// initialization seed yields a different one.
+// An object built by a static declaration initializer has no active thread, so
+// its RNG takes its seed from the next random value of the initialization RNG.
+// With no current process the object seed is drawn from the initialization RNG,
+// so the first object built by two identically seeded contexts gets the same
+// seed, while a different initialization seed yields a different one.
 TEST(RandomStabilityProperties, StaticInitObjectSeededFromInitializationRng) {
   auto first_object_seed = [](uint32_t seed) {
     SourceManager mgr;
@@ -106,10 +104,10 @@ TEST(RandomStabilityProperties, StaticInitObjectSeededFromInitializationRng) {
   EXPECT_NE(first_object_seed(123), first_object_seed(124));
 }
 
-// "Object stability shall be preserved when object and thread creation and
-// random number generation are done in the same order as before." Allocating
-// the same sequence of objects from two identically seeded contexts yields the
-// identical sequence of per-object seeds.
+// Objects stay stable as long as objects and threads are created, and random
+// numbers drawn, in the same order as before. Allocating the same sequence of
+// objects from two identically seeded contexts yields the identical sequence of
+// per-object seeds.
 TEST(RandomStabilityProperties, ObjectSeedSequenceReplaysInSameOrder) {
   auto object_seeds = [](uint32_t seed) {
     SourceManager mgr;

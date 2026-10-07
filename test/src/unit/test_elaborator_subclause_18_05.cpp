@@ -23,11 +23,11 @@ TEST(ConstraintBlockNames, DuplicateNameRejected) {
       "constraint block name 'c' is not unique within class 'C'", 4, "18.5"));
 }
 
-// §18.5 states the rule this rejection enforces in one sentence: "Constraint
-// block names shall be unique within a class." The subclause on the report is
-// what tells it from §18.5.2's rule that a derived class constraint of the
-// same name replaces the inherited one, which two same-named constraints
-// breach only when they sit in different classes of one hierarchy.
+// §18.5 states the rule this rejection enforces in one sentence: no two
+// constraint blocks of a class may share a name. The subclause on the report is
+// what tells it from §18.5.2's rule that a derived class constraint of the same
+// name replaces the inherited one, which two same-named constraints breach only
+// when they sit in different classes of one hierarchy.
 TEST(ConstraintBlockNames, DuplicateNameNames18_5) {
   ElabFixture f;
   EXPECT_FALSE(

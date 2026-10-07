@@ -102,10 +102,10 @@ TEST(ForeachConstraintDimensions, InteriorEmptySlotsCountedRejected) {
       "18.5.7.1"));
 }
 
-// 18.5.7.1: the "dimensions of the array" a foreach may iterate include a
-// variable's packed dimensions, not just its unpacked ones. A 'bit [3:0] A [2]'
-// has one packed and one unpacked dimension, so two loop variables are within
-// the limit. This isolates packed-dimension counting: were only the unpacked
+// 18.5.7.1: the array dimensions a foreach may iterate include a variable's
+// packed dimensions, not just its unpacked ones. A 'bit [3:0] A [2]' has one
+// packed and one unpacked dimension, so two loop variables are within the
+// limit. This isolates packed-dimension counting: were only the unpacked
 // dimension counted, this two-variable list would exceed the single dimension
 // and be rejected. That it is accepted shows the packed dimension counts.
 TEST(ForeachConstraintDimensions, PackedDimensionCountsTowardLimit) {

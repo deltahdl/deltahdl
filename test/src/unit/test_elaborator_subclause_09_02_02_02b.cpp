@@ -335,11 +335,10 @@ TEST(AlwaysCombLatchWarning, AssertionBothActionArmsStillInferLatch) {
                               "9.2.2.2"));
 }
 
-// §18.16 rules that "if all randcase_items specify zero weights, then no branch
-// is taken", and that the weights "can be arbitrary expressions", read while
-// the design runs. So no item of a randcase is reached on every path through
-// it, however many items are written, and a variable assigned only in one is
-// latched.
+// §18.16 rules that no branch is taken when every randcase_item's weight is
+// zero, and that the weights may be any expressions, read while the design
+// runs. So no item of a randcase is reached on every path through it, however
+// many items are written, and a variable assigned only in one is latched.
 TEST(AlwaysCombLatchWarning, RandcaseItemAssignmentInfersLatch) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -354,11 +353,11 @@ TEST(AlwaysCombLatchWarning, RandcaseItemAssignmentInfersLatch) {
                               "9.2.2.2"));
 }
 
-// §18.17 rules that production lists separated by a "|" "imply a set of
-// choices, which the generator will make at random", so a randsequence code
-// block is reached at the generator's discretion. A.6.12 gives `rs_code_block
-// ::= { { data_declaration } { statement_or_null } }`, whose statements the
-// parser keeps in RsProd::code_stmts under Stmt::rs_productions.
+// §18.17 rules that production lists separated by a "|" are alternatives the
+// generator picks among at random, so a randsequence code block is reached at
+// the generator's discretion. A.6.12 gives `rs_code_block ::= { {
+// data_declaration } { statement_or_null } }`, whose statements the parser
+// keeps in RsProd::code_stmts under Stmt::rs_productions.
 TEST(AlwaysCombLatchWarning, RandsequenceCodeBlockAssignmentInfersLatch) {
   ElabFixture f;
   auto* design = ElaborateSrc(

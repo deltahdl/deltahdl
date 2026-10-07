@@ -183,12 +183,12 @@ TEST(Constraint, LessThanConstraint) {
   EXPECT_LT(solver.GetValue("x"), 10);
 }
 
-// 18.5: "The values of random variables are determined using constraint
-// expressions that are declared using constraint blocks." A relation between
-// two random variables is such an expression, so it has to hold of the values
-// randomize() commits. Neither side is a bound the other can be folded against
-// before the solve: both are still to be drawn, and reading one of them early
-// yields the value it happens to be holding rather than the one it will take.
+// 18.5: constraint expressions declared in constraint blocks decide the values
+// of random variables. A relation between two random variables is such an
+// expression, so it has to hold of the values randomize() commits. Neither side
+// is a bound the other can be folded against before the solve: both are still
+// to be drawn, and reading one of them early yields the value it happens to be
+// holding rather than the one it will take.
 //
 // Stated from source rather than by building solver variables, because what
 // goes wrong lives in the translation from the constraint expression to the

@@ -263,13 +263,13 @@ TEST(RandModeRuntime, ObjectHandleModeDoesNotCascadeIntoObject) {
   EXPECT_EQ(RunAndGet(src, "en_v"), 55u);
 }
 
-// 18.8: an inactive variable "is treated the same as if it had not been
-// declared rand or randc", and its value is "treated as a state variable by
-// the solver". A set-membership constraint on such a variable is therefore
-// evaluated against the held value rather than used to pick a fresh one from
-// the set. The variable is held at 3, which is outside the set, so the solve
-// fails and the value is unchanged -- a solver that instead picked from the
-// set would report success and leave a member of it behind.
+// 18.8: an inactive variable is handled as though declared without rand or
+// randc, and the solver takes its value as a state variable. A set-membership
+// constraint on such a variable is therefore evaluated against the held value
+// rather than used to pick a fresh one from the set. The variable is held at 3,
+// which is outside the set, so the solve fails and the value is unchanged -- a
+// solver that instead picked from the set would report success and leave a
+// member of it behind.
 TEST(RandModeRuntime, DisabledVariableIsNotDrawnFromItsSetMembership) {
   const char* src =
       "class P;\n"

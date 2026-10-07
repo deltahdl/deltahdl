@@ -18,8 +18,8 @@ namespace {
 // through parse -> elaborate -> lower -> run, observing the committed variable
 // value rather than a hand-built call node.
 
-// "The function returns a new 32-bit random number ... The number shall be
-// unsigned." A single 32-bit draw assigned to a 64-bit target must ZERO-extend
+// The function returns a fresh 32-bit random number, and that number is
+// unsigned. A single 32-bit draw assigned to a 64-bit target must ZERO-extend
 // (upper 32 bits stay 0); a signed result would sign-extend and set them once
 // any draw has its top bit set. Accumulating the OR of 64 deterministic draws
 // (default seed 0 => a fixed sequence) makes at least one top-bit-set draw a
@@ -53,9 +53,9 @@ TEST(SysTask, UrandomIs32BitUnsignedResult) {
   EXPECT_NE(v & 0xFFFFFFFFu, 0u);
 }
 
-// "The RNG shall generate the same sequence of random numbers every time the
-// same seed is used." Re-seeding with the same value restarts the identical
-// sequence, so two seeded draws with the same seed match.
+// One seed always yields one sequence of random numbers. Re-seeding with the
+// same value restarts the identical sequence, so two seeded draws with the same
+// seed match.
 TEST(SysTask, UrandomSameSeedReplaysSequence) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -103,9 +103,8 @@ TEST(SysTask, UrandomDistinctSeedsDiverge) {
   EXPECT_NE(p->value.ToUint64(), q->value.ToUint64());
 }
 
-// "a new 32-bit random number each time it is called": the generator advances
-// per call, so a seeded draw followed by an unseeded draw yields two different
-// numbers.
+// A fresh 32-bit random number on every call: the generator advances per call,
+// so a seeded draw followed by an unseeded draw yields two different numbers.
 TEST(SysTask, UrandomAdvancesEachCall) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -129,9 +128,9 @@ TEST(SysTask, UrandomAdvancesEachCall) {
   EXPECT_NE(x->value.ToUint64(), y->value.ToUint64());
 }
 
-// "The RNG is deterministic. Each time the program executes, it cycles through
-// the same random sequence." Two independent runs of the same source, each
-// from a fresh unseeded context, draw the identical first value.
+// The RNG is deterministic, running through one random sequence on every
+// execution of the program. Two independent runs of the same source, each from
+// a fresh unseeded context, draw the identical first value.
 TEST(SysTask, UrandomDeterministicAcrossRuns) {
   const char* src =
       "module t;\n"
@@ -158,10 +157,10 @@ TEST(SysTask, UrandomDeterministicAcrossRuns) {
   EXPECT_EQ(x1->value.ToUint64(), x2->value.ToUint64());
 }
 
-// "The seed can be any integral expression." The sequence is keyed by the seed
-// VALUE, not the syntactic form: a literal, a localparam constant, a runtime
-// variable, and a constant expression that all evaluate to 7 produce the same
-// first draw.
+// Any integral expression may serve as the seed. The sequence is keyed by the
+// seed VALUE, not the syntactic form: a literal, a localparam constant, a
+// runtime variable, and a constant expression that all evaluate to 7 produce
+// the same first draw.
 TEST(SysTask, UrandomSeedFormsWithEqualValueMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -199,10 +198,10 @@ TEST(SysTask, UrandomSeedFormsWithEqualValueMatch) {
   EXPECT_EQ(d->value.ToUint64(), va);
 }
 
-// "The seed can be any integral expression." A module parameter is a distinct
-// constant path from a localparam or a bare literal, yet it keys the sequence
-// by its value: seeding with a parameter that defaults to 100 replays the same
-// first draw as seeding with the literal 100.
+// Any integral expression may serve as the seed. A module parameter is a
+// distinct constant path from a localparam or a bare literal, yet it keys the
+// sequence by its value: seeding with a parameter that defaults to 100 replays
+// the same first draw as seeding with the literal 100.
 TEST(SysTask, UrandomParameterSeedMatchesLiteral) {
   SimFixture f;
   auto* design = ElaborateSrc(

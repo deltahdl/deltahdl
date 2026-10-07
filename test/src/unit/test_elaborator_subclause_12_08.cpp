@@ -341,12 +341,11 @@ TEST(JumpStatementElaboration, BreakInsideForeachOk) {
 
 // §18.17.6 "Aborting productions—break and return" gives break and return a
 // meaning inside a randsequence production code block that §12.8 does not:
-// break "forces a jump out of the randsequence block" and return "aborts the
-// generation of the current production". Neither needs the enclosing loop or
-// the enclosing subroutine §12.8 requires, so the nine cases below are §12.8
-// cases: what they observe is the two §12.8 reports, withheld. CheckBreakScope
-// and CheckJumpLeaf in
-// src/elaborator/elaborator_validate_jump_statements.cpp emit them, and
+// break jumps out of the randsequence block and return stops generating the
+// current production. Neither needs the enclosing loop or the enclosing
+// subroutine §12.8 requires, so the nine cases below are §12.8 cases: what they
+// observe is the two §12.8 reports, withheld. CheckBreakScope and CheckJumpLeaf
+// in src/elaborator/elaborator_validate_jump_statements.cpp emit them, and
 // JumpScope::in_production_code_block is the term that withholds them.
 //
 // A.6.12 reaches an rs_code_block from two places in an rs_rule -- an rs_prod
@@ -399,10 +398,10 @@ TEST(JumpStatementElaboration, BreakInARandsequenceWeightCodeBlockOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §18.17.6: a return in a production code block "aborts the generation of the
-// current production", which is a meaning it has with no subroutine in sight,
-// so §12.8's "return statement is only allowed inside a subroutine" is not the
-// rule that governs it. The randsequence here stands in an initial block.
+// §18.17.6: a return in a production code block stops generating the current
+// production, which is a meaning it has with no subroutine in sight, so §12.8's
+// "return statement is only allowed inside a subroutine" is not the rule that
+// governs it. The randsequence here stands in an initial block.
 TEST(JumpStatementElaboration,
      ReturnInARandsequenceProductionCodeBlockOutsideASubroutineOk) {
   ElabFixture f;
@@ -492,12 +491,11 @@ TEST(JumpStatementElaboration,
                             "12.8"));
 }
 
-// §18.17.6's third sentence: "Use of the break statement within a loop
-// statement behaves as defined in 12.8. Thus, the break statement terminates
-// the smallest enclosing looping statement". The for loop here is written
+// §18.17.6's third sentence: a break inside a loop statement behaves as §12.8
+// defines, ending the smallest enclosing loop. The for loop here is written
 // inside the production code block, so the break binds to it, and the
-// enclosing-loop count has to survive the production term being set rather
-// than be replaced by it.
+// enclosing-loop count has to survive the production term being set rather than
+// be replaced by it.
 TEST(JumpStatementElaboration,
      BreakInAForLoopInARandsequenceProductionCodeBlockOk) {
   ElabFixture f;
@@ -541,16 +539,16 @@ TEST(JumpStatementElaboration,
 
 // A break in a production code block whose only enclosing loop is outside the
 // randsequence block. It binds to the randsequence block, not to that loop:
-// §18.17.6 states without qualification that "when a break statement is
-// executed from within a production code block, it forces a jump out of the
-// randsequence block", and its "within a loop statement" sentence is about a
-// loop the code block itself writes, which this source does not. So the break
-// leaves the randsequence and execution resumes after endsequence, which here
-// is the end of the for loop's body and therefore its next iteration. The
-// elaborator accepts the source on either reading, one because §18.17.6
-// exempts the break and the other because §12.8 finds it a loop; the reading
-// is what the randsequence executor has to implement, and this case fixes
-// which reading the comment in CheckBreakScope records.
+// §18.17.6 states without qualification that a break executed in a production
+// code block jumps out of the randsequence block, and its sentence on a break
+// inside a loop statement is about a loop the code block itself writes, which
+// this source does not. So the break leaves the randsequence and execution
+// resumes after endsequence, which here is the end of the for loop's body and
+// therefore its next iteration. The elaborator accepts the source on either
+// reading, one because §18.17.6 exempts the break and the other because §12.8
+// finds it a loop; the reading is what the randsequence executor has to
+// implement, and this case fixes which reading the comment in CheckBreakScope
+// records.
 TEST(JumpStatementElaboration,
      BreakInARandsequenceProductionCodeBlockInsideAnOuterLoopOk) {
   ElabFixture f;

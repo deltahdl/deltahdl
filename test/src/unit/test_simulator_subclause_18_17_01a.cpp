@@ -241,8 +241,8 @@ TEST(RandsequenceSim, LocalparamWeightSelectsProductionList) {
 }
 
 // §18.17.1, printed page 567, the sentence standing between claims 5 and 6
-// above: "Weight expressions are evaluated when their enclosing production is
-// selected, thus allowing weights to change dynamically." One selection of a
+// above: weight expressions are evaluated when the production holding them is
+// selected, so weights can change while the design runs. One selection of a
 // production evaluates each of its rules' weights once, so a weight whose
 // evaluation has an effect performs that effect once per rule.
 // rs_weight_specification admits a parenthesized expression and so a function
@@ -347,11 +347,11 @@ void RunWeightOnce(SimFixture& f, std::string_view main_rule) {
   f.scheduler.Run();
 }
 
-// §18.17.1: "an rs_weight_specification shall evaluate to an integral
-// non-negative value". A negative one was read through ToUint64 as its
-// two's-complement value, so this rule carried a weight of
-// 18446744073709551615, `b` could not be reached, and the total then wrapped to
-// zero and the first rule was returned outright. Nothing said so.
+// §18.17.1: an rs_weight_specification must evaluate to a non-negative integral
+// value. A negative one was read through ToUint64 as its two's-complement
+// value, so this rule carried a weight of 18446744073709551615, `b` could not
+// be reached, and the total then wrapped to zero and the first rule was
+// returned outright. Nothing said so.
 //
 // The weight is parenthesized because Syntax 18-14 writes
 // `rs_weight_specification ::= integral_number | ps_identifier | ( expression
@@ -418,10 +418,10 @@ void RunAbcTrial(SimFixtureSeeded& f, std::string_view main_rule,
   }
 }
 
-// §18.17.1: "the probability that a particular production list is generated is
-// proportional to its specified weight". SelectRule drew a single Urandom32
-// against a 64-bit total, so the drawn number never reached 2^32 and every rule
-// whose cumulative interval began at or beyond that was unreachable.
+// §18.17.1: a production list is generated with probability proportional to its
+// weight. SelectRule drew a single Urandom32 against a 64-bit total, so the
+// drawn number never reached 2^32 and every rule whose cumulative interval
+// began at or beyond that was unreachable.
 //
 // Two rules of 2^32 each put the boundary exactly at the end of the first, so a
 // narrow draw lands in the first every time and b is selected with probability

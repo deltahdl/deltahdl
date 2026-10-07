@@ -139,9 +139,9 @@ TEST(BehaviorOfRandomizationMethods, RandomizeTaskOverrideIsError) {
                     3, "18.6.3"));
 }
 
-// 18.6.3 (edge of B6): "cannot block" covers every time-controlling statement,
-// not just a delay. An event-control wait inside pre_randomize() is likewise a
-// blocking statement a function may not contain, and is rejected.
+// 18.6.3 (edge of B6): the ban on blocking covers every time-controlling
+// statement, not just a delay. An event-control wait inside pre_randomize() is
+// likewise a blocking statement a function may not contain, and is rejected.
 TEST(BehaviorOfRandomizationMethods, PreRandomizeWithEventControlCannotBlock) {
   ElabFixture f;
   EXPECT_FALSE(

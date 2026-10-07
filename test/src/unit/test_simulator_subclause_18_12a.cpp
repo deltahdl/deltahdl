@@ -87,13 +87,13 @@ TEST(ScopeRandomizeRuntime, NoArgumentCheckerReturnsOneAndChangesNothing) {
   EXPECT_EQ(RunAndGet(src, "a"), 42u);   // checker changes no variable
 }
 
-// 18.12: "otherwise, it returns 0." The failure branch of the scope randomize
-// maps a solve that cannot set the random variables to valid values onto a
-// returned status of 0. That mapping lives entirely in the solver stage the
-// scope randomize drives; the real trigger of an unsatisfiable solve -- a with
-// constraint_block that no draw can satisfy -- is the province of 18.12.1, so
-// the failure mapping itself is observed here against the solver directly, with
-// a constraint that demands a value no draw from the variable's domain can
+// 18.12: in every other case it returns 0. The failure branch of the scope
+// randomize maps a solve that cannot set the random variables to valid values
+// onto a returned status of 0. That mapping lives entirely in the solver stage
+// the scope randomize drives; the real trigger of an unsatisfiable solve -- a
+// with constraint_block that no draw can satisfy -- is the province of 18.12.1,
+// so the failure mapping itself is observed here against the solver directly,
+// with a constraint that demands a value no draw from the variable's domain can
 // meet.
 TEST(ScopeRandomizeRuntime, FailedSolveReturnsZero) {
   ConstraintSolver solver(7);

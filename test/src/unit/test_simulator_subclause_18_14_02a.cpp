@@ -9,11 +9,11 @@ using namespace delta;
 
 namespace {
 
-// "Random values returned from the $urandom and $urandom_range system calls,
-// std::randomize() scope randomization method, and shuffle() array
-// manipulation method are independent of thread execution order." Running the
-// fork program twice from the same starting state must yield the same draws,
-// proving the values do not depend on the scheduler's interleaving choices.
+// The random values that $urandom, $urandom_range, the std::randomize() scope
+// randomization method and the shuffle() array method return do not depend on
+// the order threads run in. Running the fork program twice from the same
+// starting state must yield the same draws, proving the values do not depend on
+// the scheduler's interleaving choices.
 TEST(ThreadStability, ForkedUrandomDrawsAreReplayable) {
   auto run = [](uint64_t& a, uint64_t& b, uint64_t& c) {
     auto vals = RunSeededAndRead(
@@ -52,10 +52,10 @@ TEST(ThreadStability, ForkedUrandomRangeDrawsAreReplayable) {
   ExpectForkedUrandomRangeDrawsReplay();
 }
 
-// "Each thread is seeded with a unique value, determined solely by its
-// parent." A fork that produces several children must give each of them its
-// own stream so that no two collide -- checked here across four siblings, whose
-// pairwise-distinct first draws also cover the minimal two-sibling case.
+// Every thread gets a seed of its own, fixed by its parent alone. A fork that
+// produces several children must give each of them its own stream so that no
+// two collide -- checked here across four siblings, whose pairwise-distinct
+// first draws also cover the minimal two-sibling case.
 TEST(ThreadStability, ManyForkedSiblingsHaveDistinctStreams) {
   auto vals = RunFourForkedSiblingUrandom();
   auto a = vals[0];
@@ -70,10 +70,9 @@ TEST(ThreadStability, ManyForkedSiblingsHaveDistinctStreams) {
   EXPECT_NE(c, d);
 }
 
-// "When a thread is created, its random state is initialized using the next
-// random value from the parent thread as a seed." Calling srandom() on the
-// parent before the fork changes the seed material the children inherit, so
-// the children's draws shift accordingly.
+// A new thread's random state is seeded with the parent thread's next random
+// value. Calling srandom() on the parent before the fork changes the seed
+// material the children inherit, so the children's draws shift accordingly.
 TEST(ThreadStability, HierarchicalSeedingFromParent) {
   auto vals1 = RunParentSeededTwoForkUrandom(/*parent_seed=*/1);
   auto vals2 = RunParentSeededTwoForkUrandom(/*parent_seed=*/2);
@@ -193,12 +192,12 @@ TEST(ThreadStability, ForkedRandsequenceSelectionsAreReplayable) {
   EXPECT_EQ(b1, b2);
 }
 
-// "Random values returned from ... the shuffle() array manipulation method are
-// independent of thread execution order." Two forked siblings each shuffle
-// their own array and record the resulting first element. Replaying the fork
-// from the same starting state must reproduce both siblings' shuffles, so the
-// permutation each thread draws is fixed by its own hierarchically seeded
-// stream rather than by the scheduler.
+// The values the shuffle() array method returns do not depend on the order
+// threads run in. Two forked siblings each shuffle their own array and record
+// the resulting first element. Replaying the fork from the same starting state
+// must reproduce both siblings' shuffles, so the permutation each thread draws
+// is fixed by its own hierarchically seeded stream rather than by the
+// scheduler.
 TEST(ThreadStability, ForkedShuffleResultsAreReplayable) {
   auto run = [](uint64_t& a, uint64_t& b) {
     auto vals = RunSeededAndRead(
@@ -225,10 +224,10 @@ TEST(ThreadStability, ForkedShuffleResultsAreReplayable) {
   EXPECT_EQ(b1, b2);
 }
 
-// "Each thread has an independent RNG for all randomization system calls
-// invoked from that thread." A draw inside a forked thread must not advance
-// the parent's RNG state -- the parent's subsequent draw is taken from its
-// own stream, unaffected by the child.
+// Every thread has an RNG of its own for all the randomization system calls it
+// makes. A draw inside a forked thread must not advance the parent's RNG state
+// -- the parent's subsequent draw is taken from its own stream, unaffected by
+// the child.
 TEST(ThreadStability, ChildDrawDoesNotAdvanceParentRng) {
   auto run = [](bool with_child_draw, uint64_t& parent_after) {
     std::string src = std::string(

@@ -143,19 +143,18 @@ TEST(RandsequenceSim, ReturnContinuesWithNextProductionEachInvocation) {
   EXPECT_EQ(trace, 1313u);
 }
 
-// break "can appear in any code block", not only a production code block. A
-// rule's weight-specification code block (`:= weight { ... }`) is a distinct
-// syntactic code-block position; a break there must still terminate the whole
+// break may stand in any code block, not only a production code block. A rule's
+// weight-specification code block (`:= weight { ... }`) is a distinct syntactic
+// code-block position; a break there must still terminate the whole
 // randsequence, so no production standing after the rule that holds it is
 // generated.
 //
 // §18.17.7 fixes when that block runs relative to the rule's own production
-// list: "Only the return values of productions already generated (i.e., to the
-// left of the code block accessing them) can be retrieved", and a block written
-// after the weight has the whole production list to its left. The clause's own
-// LIST example reads ITEM, a value-returning production of the same rule, in
-// the block after `:= 8`. So a's list generates p first and the block runs
-// after it.
+// list: a code block can retrieve only the return values of productions already
+// generated, those to its left, and a block written after the weight has the
+// whole production list to its left. The clause's own LIST example reads ITEM,
+// a value-returning production of the same rule, in the block after `:= 8`. So
+// a's list generates p first and the block runs after it.
 TEST(RandsequenceSim, BreakInWeightSpecCodeBlockTerminatesRandsequence) {
   SimFixture f;
   uint64_t x = RunModule(f,
@@ -301,8 +300,8 @@ TEST(RandsequenceSim, ReturnInTaskDoesNotReturnFromTask) {
   EXPECT_EQ(y, 24u);  // the task ran on past the randsequence, then the caller
 }
 
-// 18.17.6: break "can appear in any code block", which includes the weight
-// code block of a rule reached as a rand join operand (18.17.5). Expanding an
+// 18.17.6: break may stand in any code block, which includes the weight code
+// block of a rule reached as a rand join operand (18.17.5). Expanding an
 // operand runs that rule's weight code, so the break fires there, before any
 // interleaving, and terminates the whole randsequence: the other operand and
 // the production written after the rand join are never generated.
@@ -340,8 +339,8 @@ TEST(RandsequenceSim, BreakInRandJoinWeightCodeTerminatesRandsequence) {
   EXPECT_EQ(y, 6u);  // execution resumed after the randsequence
 }
 
-// §18.17.6: "return aborts only the current production". An operand rule's
-// code block runs once that operand has generated, so the production the
+// §18.17.6: return aborts the current production and nothing more. An operand
+// rule's code block runs once that operand has generated, so the production the
 // return aborts has already finished and there is nothing left to drop: the
 // interleaving carries on and the production written after the rand join still
 // generates.

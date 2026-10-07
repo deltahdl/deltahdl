@@ -10,8 +10,8 @@ using namespace delta;
 namespace {
 
 // §18.17.7 declares a production's formal arguments as a task prototype
-// declares them -- "the syntax for declaring the arguments to a production is
-// similar to a task prototype" -- so a formal written with a typedef name is an
+// declares them -- a production's arguments are declared much as a task
+// prototype declares them -- so a formal written with a typedef name is an
 // object of the type that name stands for (§6.18) and holds the width that type
 // declares. The cases below are that width alone; the return type's width is
 // test_simulator_subclause_18_17_07b.cpp and the rest of the clause, which

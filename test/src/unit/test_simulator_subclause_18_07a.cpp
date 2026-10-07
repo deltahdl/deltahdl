@@ -190,7 +190,7 @@ TEST(InlineConstraintRuntime, InlineWithNameResolvesToObjectClassFirst) {
   EXPECT_EQ(RunAndGet(src, "rx"), 101u);
 }
 
-// 18.7: "all the same constraint types and forms as a class" includes a
+// 18.7: admitting every constraint type and form a class admits includes a
 // distribution. An inline `x dist {42 := 1}` gives x its only weighted value,
 // so the inline distribution alone pins x to 42 -- proof the dist form is
 // captured from the with-block and applied, not just simple relations.

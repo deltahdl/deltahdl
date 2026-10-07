@@ -101,11 +101,10 @@ TEST(RandModeNamedVariable, NonRandVariableRejected) {
                             9, "18.8"));
 }
 
-// §18.8: "A compiler error shall be issued if the specified variable does not
-// exist within the class hierarchy or it exists but is not declared as rand or
-// randc." The subclause on the report is what tells this rejection from
-// §18.9's rule for constraint_mode(), whose message and location are the same
-// shape one member access away.
+// §18.8: naming a variable the class hierarchy lacks, or holds without rand or
+// randc, is a compile error. The subclause on the report is what tells this
+// rejection from §18.9's rule for constraint_mode(), whose message and location
+// are the same shape one member access away.
 TEST(RandModeNamedVariable, CalledOnANonRandomMemberNames18_8) {
   ElabFixture f;
   EXPECT_FALSE(

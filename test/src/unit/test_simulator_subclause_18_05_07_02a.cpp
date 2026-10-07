@@ -195,8 +195,8 @@ TEST(ArrayReductionConstraint, ResultTypeGovernsTruncation) {
   EXPECT_TRUE(wide.Solve());  // full sum survives in the wider with-clause type
 }
 
-// 18.5.7.2: "the relevant operand for each method" — a product() reduction
-// joins the elements by multiplication. {2,3,4} folds to 24.
+// 18.5.7.2: each method joins the elements with its own operator — a product()
+// reduction joins the elements by multiplication. {2,3,4} folds to 24.
 TEST(ArrayReductionConstraint, ProductReductionJoinsByMultiplication) {
   ConstraintSolver solver(13);
   const std::vector<std::string> kElems = {"e0", "e1", "e2"};
@@ -230,10 +230,10 @@ TEST(ArrayReductionConstraint, ProductReductionJoinsByMultiplication) {
   EXPECT_FALSE(solver2.Solve());
 }
 
-// 18.5.7.2: "the relevant operand for each method" — an and() reduction joins
-// the elements by bitwise AND. {0xFF, 0x0F, 0x3C} folds to 0x0C. The all-ones
-// identity means a fold over the listed elements leaves only the bits common to
-// all of them set.
+// 18.5.7.2: each method joins the elements with its own operator — an and()
+// reduction joins the elements by bitwise AND. {0xFF, 0x0F, 0x3C} folds to
+// 0x0C. The all-ones identity means a fold over the listed elements leaves only
+// the bits common to all of them set.
 TEST(ArrayReductionConstraint, AndReductionJoinsByBitwiseAnd) {
   ConstraintSolver solver(21);
   const std::vector<std::string> kElems = {"e0", "e1", "e2"};
@@ -266,8 +266,8 @@ TEST(ArrayReductionConstraint, AndReductionJoinsByBitwiseAnd) {
   EXPECT_FALSE(solver2.Solve());
 }
 
-// 18.5.7.2: "the relevant operand for each method" — an or() reduction joins
-// the elements by bitwise OR. {0x01, 0x02, 0x04} folds to 0x07.
+// 18.5.7.2: each method joins the elements with its own operator — an or()
+// reduction joins the elements by bitwise OR. {0x01, 0x02, 0x04} folds to 0x07.
 TEST(ArrayReductionConstraint, OrReductionJoinsByBitwiseOr) {
   ConstraintSolver solver(22);
   const std::vector<std::string> kElems = {"e0", "e1", "e2"};
@@ -302,9 +302,9 @@ TEST(ArrayReductionConstraint, OrReductionJoinsByBitwiseOr) {
   EXPECT_FALSE(solver2.Solve());
 }
 
-// 18.5.7.2: "the relevant operand for each method" — an xor() reduction joins
-// the elements by bitwise XOR. {0x0F, 0x03, 0x01} folds to 0x0D, and the zero
-// identity makes an even pairing of a bit cancel out.
+// 18.5.7.2: each method joins the elements with its own operator — an xor()
+// reduction joins the elements by bitwise XOR. {0x0F, 0x03, 0x01} folds to
+// 0x0D, and the zero identity makes an even pairing of a bit cancel out.
 TEST(ArrayReductionConstraint, XorReductionJoinsByBitwiseXor) {
   ConstraintSolver solver(23);
   const std::vector<std::string> kElems = {"e0", "e1", "e2"};

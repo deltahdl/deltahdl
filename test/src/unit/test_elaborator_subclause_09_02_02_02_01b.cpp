@@ -180,13 +180,13 @@ TEST(AlwaysCombSensitivityCollection, VarInitReadsCollected) {
   EXPECT_TRUE(ReadSignalsContain(block, "b"));
 }
 
-// §18.16: "The randcase weights can be arbitrary expressions, not just
-// constants", each of which the statement evaluates when it runs, so a variable
-// named in a weight is read within the block and no exception of §9.2.2.2.1
-// removes it. AlwaysCombSensitivityCollection.RandcaseItemStmtReadCollected
-// above covers the item's statement, the other member of a
-// Stmt::randcase_items entry. The item's assignment here takes a literal so
-// that only the weight can supply `w`.
+// §18.16: randcase weights may be any expressions, constants or not, each of
+// which the statement evaluates when it runs, so a variable named in a weight
+// is read within the block and no exception of §9.2.2.2.1 removes it.
+// AlwaysCombSensitivityCollection.RandcaseItemStmtReadCollected above covers
+// the item's statement, the other member of a Stmt::randcase_items entry. The
+// item's assignment here takes a literal so that only the weight can supply
+// `w`.
 TEST(AlwaysCombSensitivityCollection, RandcaseWeightReadCollected) {
   Arena arena;
   auto* stmt = arena.Create<Stmt>();

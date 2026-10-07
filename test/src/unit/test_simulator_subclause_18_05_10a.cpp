@@ -110,7 +110,7 @@ TEST(StaticConstraintMode, StaticModeReenableThroughOneInstanceAffectsAnother) {
   EXPECT_EQ(RunAndGet(src, "ok_on"), 0u);
 }
 
-// 18.5.10: "all instances of that particular class" reaches an inherited static
+// 18.5.10: applying to every instance of the class reaches an inherited static
 // block. Here the static block c_pin is declared in a base class (18.5.2
 // inheritance) and the conflicting c_lo in the derived class; two derived
 // instances are randomized. Disabling c_pin through one derived instance is

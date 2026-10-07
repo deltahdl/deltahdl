@@ -525,18 +525,17 @@ TEST(RandseqValuePassingSim, StringReturnLongerThanFourCharactersSurvives) {
   EXPECT_EQ(len->value.ToUint64(), 9u);
 }
 
-// §18.17: "The randsequence statement creates an automatic scope." What
-// §18.17.7 implicitly declares inside a rule is declared in that scope, so
-// nothing it declared can still be read once the statement has ended. Here the
-// rule names the value-returning production 'a' twice, which §18.17.7 declares
-// as `int a[1:2]` for the rule's code block, and the module declares a
-// variable of its own named 'a'. After the randsequence, `a[1]` is a bit-select
-// of that module variable per §11.5.1 and reads bit 1 of 8'b1010_1010, which
-// is 1. A shape recorded under the bare name 'a' and left standing reads the
-// same expression as element 1 of an array whose elements are gone, which is x
-// and so 0. The read has to come after the randsequence: one taken before it
-// reads the module variable whether the shape leaks or not, and so cannot
-// fail.
+// §18.17: a randsequence statement opens an automatic scope. What §18.17.7
+// implicitly declares inside a rule is declared in that scope, so nothing it
+// declared can still be read once the statement has ended. Here the rule names
+// the value-returning production 'a' twice, which §18.17.7 declares as
+// `int a[1:2]` for the rule's code block, and the module declares a variable of
+// its own named 'a'. After the randsequence, `a[1]` is a bit-select of that
+// module variable per §11.5.1 and reads bit 1 of 8'b1010_1010, which is 1. A
+// shape recorded under the bare name 'a' and left standing reads the same
+// expression as element 1 of an array whose elements are gone, which is x and
+// so 0. The read has to come after the randsequence: one taken before it reads
+// the module variable whether the shape leaks or not, and so cannot fail.
 TEST(RandseqValuePassingSim, ImplicitArrayShapeDoesNotOutliveTheStatement) {
   SimFixture f;
   auto [in_rule, after] =
@@ -565,16 +564,16 @@ TEST(RandseqValuePassingSim, ImplicitArrayShapeDoesNotOutliveTheStatement) {
 
 // §18.17 gives each randsequence statement an automatic scope of its own, so
 // what one statement implicitly declared is gone before the next one runs.
-// §18.17.7: "If a production appears only once in a rule, the type of the
-// implicit variable is the return type of the production" -- a scalar. The
-// first statement's rule names 'p' twice and so declares `int p[1:2]`; the
-// second statement's rule names 'p' once and so declares the scalar `int p`,
-// whose `p[1]` is a bit-select per §11.5.1 and reads bit 1 of 6, which is 1. A
-// shape left standing by the first statement reads the same expression as
-// element 1 of an array whose elements are gone, which is x and so 0. Naming
-// 'p' once in the second statement is what lets the leak show: a rule naming it
-// more than once records a shape of its own over the stale one, so the order
-// that puts the count of one last is the only one that can fail.
+// §18.17.7: a production named once in a rule gives the implicit variable the
+// production's return type -- a scalar. The first statement's rule names 'p'
+// twice and so declares `int p[1:2]`; the second statement's rule names 'p'
+// once and so declares the scalar `int p`, whose `p[1]` is a bit-select per
+// §11.5.1 and reads bit 1 of 6, which is 1. A shape left standing by the first
+// statement reads the same expression as element 1 of an array whose elements
+// are gone, which is x and so 0. Naming 'p' once in the second statement is
+// what lets the leak show: a rule naming it more than once records a shape of
+// its own over the stale one, so the order that puts the count of one last is
+// the only one that can fail.
 TEST(RandseqValuePassingSim,
      ImplicitArrayShapeDoesNotReachTheNextRandsequence) {
   SimFixture f;
@@ -605,16 +604,16 @@ TEST(RandseqValuePassingSim,
 // §18.17.7's Example 2 gives one production ('C') rules that name it once,
 // twice and three times over, so the implicit variable's shape belongs to the
 // rule that named the production and not to the production itself. §18.17 makes
-// every activation's scope automatic and says "a recursive production will
-// cause looping", so an inner activation's declarations are gone once it
-// returns. Here 'main' names 'p' twice, declaring `int p[1:2]` for main's code
-// block, while 'p' names itself three times, declaring `int p[1:3]` for its
-// own. After the inner activations have returned, %p prints main's array as an
-// assignment pattern of its elements per §21.2.1.6, which is two of them. A
-// shape recorded under the bare name 'p' and left standing by the inner
-// activations prints three, the third an element main never declared and
-// nothing ever wrote. One activation deep cannot tell the two apart, since the
-// only shape recorded is then the one being read.
+// every activation's scope automatic and says a recursive production loops, so
+// an inner activation's declarations are gone once it returns. Here 'main'
+// names 'p' twice, declaring `int p[1:2]` for main's code block, while 'p'
+// names itself three times, declaring `int p[1:3]` for its own. After the inner
+// activations have returned, %p prints main's array as an assignment pattern of
+// its elements per §21.2.1.6, which is two of them. A shape recorded under the
+// bare name 'p' and left standing by the inner activations prints three, the
+// third an element main never declared and nothing ever wrote. One activation
+// deep cannot tell the two apart, since the only shape recorded is then the one
+// being read.
 TEST(RandseqValuePassingSim, RecursiveActivationLeavesTheOuterArrayShape) {
   SimFixture f;
   auto printed = RunCapture(
@@ -703,13 +702,12 @@ void RunRandJoinCapture(SimFixture& f, std::string_view main_rules,
   r2 = got2;
 }
 
-// §18.17.7: "Within a rule, a variable is implicitly declared for each
-// production (of the rule) that returns a value", and "the return value can be
-// read in the code blocks of the production that triggered the generation of
-// the production returning a value". A rand join rule is a rule: Syntax 18-18
-// gives `rs_production_list ::= rs_prod { rs_prod } | rand join
-// [ ( expression ) ] rs_production_item rs_production_item
-// { rs_production_item }`, so each of its value-returning operands gets an
+// §18.17.7: a rule implicitly declares a variable for each of its productions
+// that returns a value, and the code blocks of the production that set off the
+// value-returning one's generation may read that value. A rand join rule is a
+// rule: Syntax 18-18 gives `rs_production_list ::= rs_prod { rs_prod } | rand
+// join [ ( expression ) ] rs_production_item rs_production_item {
+// rs_production_item }`, so each of its value-returning operands gets an
 // implicit variable of its own, named after the production because each is
 // named once.
 //
@@ -734,13 +732,13 @@ TEST(RandseqValuePassingSim, RandJoinOperandReturnValuesReachTheRuleCodeBlock) {
   EXPECT_EQ(r2, 6u);
 }
 
-// §18.17.1: "A weight is only meaningful when assigned to alternative
-// productions, that is, production lists separated by a |." The rand join rule
-// here is one of two alternatives and carries the weight, so the code block
-// that reads its operands' values belongs to a rule the weight selected rather
-// than trailing an inert one. §18.17.1 makes the probability of a production
-// list "proportional to its specified weight", so the alternative weighing 0 is
-// never generated and the join runs on every run.
+// §18.17.1: a weight means something only on alternative productions, the
+// production lists a | separates. The rand join rule here is one of two
+// alternatives and carries the weight, so the code block that reads its
+// operands' values belongs to a rule the weight selected rather than trailing
+// an inert one. §18.17.1 makes the probability of a production list
+// proportional to its weight, so the alternative weighing 0 is never generated
+// and the join runs on every run.
 //
 // The three outcomes stay apart: the join's code block reports 5 and 6, the
 // alternative writes 1 and 2, and the module variables an uncaptured name falls
@@ -756,11 +754,10 @@ TEST(RandseqValuePassingSim,
   EXPECT_EQ(r2, 6u);
 }
 
-// §18.17.7: "only the return values of productions already generated (i.e., to
-// the left of the code block accessing them) can be retrieved", and an
-// operand's whole production list is written to the left of the code block its
-// rule carries after the weight. So each operand's block reads what that
-// operand's own production returned.
+// §18.17.7: a code block can retrieve only the return values of productions
+// already generated, those to its left, and an operand's whole production list
+// is written to the left of the code block its rule carries after the weight.
+// So each operand's block reads what that operand's own production returned.
 //
 // It read nothing until the block moved. §18.17.5's interleaving expanded each
 // operand one level and ran that operand's block at expansion time, before any
@@ -792,17 +789,17 @@ TEST(RandseqValuePassingSim, RandJoinOperandRuleReadsItsOwnProductionValue) {
   EXPECT_EQ(r2, 6u);
 }
 
-// §18.17.7: "passing data to a production is similar to a task call and uses
-// the same syntax". A rand join operand is a production call like any other, so
-// its actuals are evaluated and bound to its formals. Nothing evaluated them at
-// all until the interleaving went through the same steps ExecRsProduction does:
-// D ran with prm unbound and neither 5 nor 20 was ever evaluated.
+// §18.17.7: data is passed to a production as to a task, with the same syntax.
+// A rand join operand is a production call like any other, so its actuals are
+// evaluated and bound to its formals. Nothing evaluated them at all until the
+// interleaving went through the same steps ExecRsProduction does: D ran with
+// prm unbound and neither 5 nor 20 was ever evaluated.
 //
 // Both elements are read because an operand taking no argument passes whether
 // the actuals are bound or not, and the two differ so that one bound value
-// cannot stand for the other. §18.17.7 numbers the elements "according to the
-// syntactic order of appearance", which §18.17.5's interleaving does not
-// reorder, so the expectation does not depend on the draw.
+// cannot stand for the other. §18.17.7 numbers the elements in the order they
+// appear in the source, which §18.17.5's interleaving does not reorder, so the
+// expectation does not depend on the draw.
 TEST(RandseqValuePassingSim, RandJoinOperandBindsItsActualArguments) {
   SimFixture f;
   auto [r1, r2] = RunModuleTwoVars(
@@ -822,11 +819,11 @@ TEST(RandseqValuePassingSim, RandJoinOperandBindsItsActualArguments) {
   EXPECT_EQ(r2, 20u);
 }
 
-// §18.17.7: "a production creates a scope, which encompasses all its rules and
-// code blocks", so two operands naming one production hold two of that
-// production's scopes rather than sharing one. The interleaving expanded each
-// operand's rule in the enclosing production's scope instead, where the second
-// operand's formals and implicit variables landed on top of the first's.
+// §18.17.7: a production's scope takes in all its rules and code blocks, so two
+// operands naming one production hold two of that production's scopes rather
+// than sharing one. The interleaving expanded each operand's rule in the
+// enclosing production's scope instead, where the second operand's formals and
+// implicit variables landed on top of the first's.
 //
 // Both operands name w, and each is given a different argument, so each
 // operand's block reads the k its own call bound. §18.17.5 leaves which operand

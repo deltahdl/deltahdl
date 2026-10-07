@@ -6,7 +6,7 @@ using namespace delta;
 
 namespace {
 
-// These tests drive the 18.3 "important properties of constraints" end to end.
+// These tests drive the properties of constraints that 18.3 lists end to end.
 // Each program elaborates a real class, calls randomize() on an object of it,
 // and copies the outcome into module variables the harness reads, so the
 // behavior observed is that of parse/elaborate/run applying the rule through

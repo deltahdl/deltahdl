@@ -7,11 +7,11 @@ using namespace delta;
 
 namespace {
 
-// §18.11 states "The random mode of local class members can only be changed
-// when the call to randomize() has access to those properties, that is, within
-// the scope of the class in which the local members are declared." Naming a
-// property in randomize()'s inline argument list changes that property's random
-// mode, so naming a local member through an external class handle is illegal.
+// §18.11 states that a call to randomize() may change the random mode of local
+// class members only where it can reach them, which is inside the class
+// declaring them. Naming a property in randomize()'s inline argument list
+// changes that property's random mode, so naming a local member through an
+// external class handle is illegal.
 TEST(InlineRandomControlVisibility, LocalMemberArgRejectedFromOutside) {
   ElabFixture f;
   ElabOk(
@@ -32,8 +32,8 @@ TEST(InlineRandomControlVisibility, LocalMemberArgRejectedFromOutside) {
       "18.11"));
 }
 
-// §18.11 conditions the change of random mode on the call having "access to
-// those properties". A protected member is reachable only within its class
+// §18.11 conditions the change of random mode on the call being able to reach
+// those properties. A protected member is reachable only within its class
 // hierarchy, so naming it as a randomize() argument through an external handle
 // is rejected under the same sentence.
 TEST(InlineRandomControlVisibility, ProtectedMemberArgRejectedFromOutside) {

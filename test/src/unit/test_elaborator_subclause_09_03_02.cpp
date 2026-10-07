@@ -408,8 +408,8 @@ TEST(ParallelBlockElaboration,
 // child-statement links from ForEachChildStmt in
 // src/elaborator/elaborator_validate_internal.h, which reaches
 // Stmt::rs_productions. §18.17.6 "Aborting productions—break and return" says
-// "The return statement aborts the generation of the current production", so a
-// return written in a randsequence production code block is not the enclosing
+// the return statement stops generating the current production, so a return
+// written in a randsequence production code block is not the enclosing
 // subroutine's return and "A return statement within the context of a fork-join
 // block is illegal" is not the rule that governs it. Take
 // CheckNoReturnInFork::in_production_code_block away and each source below is

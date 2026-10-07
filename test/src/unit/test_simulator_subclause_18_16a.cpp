@@ -14,9 +14,10 @@ namespace {
 
 // Runs a randcase of three branches that all carry `weight`, with `decls`
 // written among the module's declarations, and reports the counter the weights
-// advance and the branch that was selected. §18.16's "at most once" is a claim
-// about how many times a weight expression ran, so every case making it needs
-// the same run and differs only in how the weight does its counting.
+// advance and the branch that was selected. §18.16's rule that a weight is
+// evaluated no more than once is a claim about how many times a weight
+// expression ran, so every case making it needs the same run and differs only
+// in how the weight does its counting.
 void RunThreeWeightRandcase(SimFixtureSeeded& f, std::string_view decls,
                             std::string_view weight, uint64_t& cnt,
                             uint64_t& x) {
@@ -463,11 +464,11 @@ TEST(RandcaseWeightedCase, AllZeroWeightsWarningNames18_16) {
                               "randcase: all weights are zero", 5, "18.16"));
 }
 
-// §18.16: a randcase "can result in multiple calls to $urandom_range() to
-// handle numbers greater than 32 bits", so a sum wider than 32 bits is drawn
-// against in full rather than against its low half. Two branches of 2^32 each
-// put the second branch's interval entirely at or beyond 2^32, so a single
-// 32-bit draw would land in the first every time.
+// §18.16: a randcase may call $urandom_range() more than once to handle numbers
+// wider than 32 bits, so a sum wider than 32 bits is drawn against in full
+// rather than against its low half. Two branches of 2^32 each put the second
+// branch's interval entirely at or beyond 2^32, so a single 32-bit draw would
+// land in the first every time.
 //
 // randcase composed the wide draw already and the randsequence beside it did
 // not, which is what #3335 records; the two share one DrawBelow in

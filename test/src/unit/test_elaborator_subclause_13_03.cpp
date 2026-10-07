@@ -187,12 +187,12 @@ TEST(TaskElaboration, ReturnValueInARandcaseItemIsError) {
 }
 
 // The §18.17.6 case: what a return written in a randsequence production code
-// block is, and what §13.3 therefore owes it. "The return statement aborts the
-// generation of the current production", and §18.17.7 adds that "A value is
-// returned from a production by using the return with an expression", so a
-// production declared `int` returns its value exactly the way §13.3's "task
-// returns a value" report fires -- a return carrying an expression. Neither
-// return below is the task's, so neither is that report's. Take
+// block is, and what §13.3 therefore owes it. The return statement stops
+// generating the current production, and §18.17.7 adds that a production
+// returns a value through a return carrying an expression, so a production
+// declared `int` returns its value exactly the way §13.3's "task returns a
+// value" report fires -- a return carrying an expression. Neither return below
+// is the task's, so neither is that report's. Take
 // TaskBodyScope::in_production_code_block in
 // src/elaborator/elaborator_validate_funcbody.cpp away and §18.17.7's own
 // construct is rejected inside a task.

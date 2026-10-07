@@ -95,14 +95,14 @@ TEST(RandcModifierCyclic, ConstrainedRandcYieldsOnlySatisfyingValues) {
   EXPECT_EQ(seen.count(1), 1u);
 }
 
-// 18.4.2 (claim C, "constraints change" trigger): the permutation sequence is
-// recomputed not only when no remaining value can satisfy the constraints but
-// also whenever the constraints on the variable change. Draw an unconstrained
-// randc over 0..3 for a few calls, then add a constraint that excludes the
-// lower half of the range. Every value produced after the change respects the
-// new constraint — the solver re-derives the admissible permutation from the
-// changed constraint set rather than continuing to emit values from the stale,
-// fuller permutation it was cycling through before.
+// 18.4.2 (claim C, the trigger of changed constraints): the permutation
+// sequence is recomputed not only when no remaining value can satisfy the
+// constraints but also whenever the constraints on the variable change. Draw an
+// unconstrained randc over 0..3 for a few calls, then add a constraint that
+// excludes the lower half of the range. Every value produced after the change
+// respects the new constraint — the solver re-derives the admissible
+// permutation from the changed constraint set rather than continuing to emit
+// values from the stale, fuller permutation it was cycling through before.
 TEST(RandcModifierCyclic, PermutationRecomputedWhenConstraintsChange) {
   ConstraintSolver solver(41);
   solver.AddVariable(MakeRandc("x", 0, 3));

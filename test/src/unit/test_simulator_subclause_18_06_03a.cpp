@@ -38,7 +38,7 @@ TEST(BehaviorOfRandomizationMethods, StaticRandSharedAcrossInstances) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.6.3 (same rule, randc operand): the "declared static" random variable the
+// 18.6.3 (same rule, randc operand): the random variable declared static the
 // rule shares across instances can be cyclic (randc), not only plain rand. A
 // class declares `static randc bit [1:0] x` and two instances are constructed.
 // Each instance is randomized in turn; both handles observe the value the most

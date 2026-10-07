@@ -10,10 +10,10 @@ using namespace delta;
 
 namespace {
 
-// §18.17 states "The randsequence statement creates an automatic scope. All
-// production identifiers are local to the scope", so the set a production
-// identifier resolves against is exactly the productions its own randsequence
-// statement declares. These are the two reports
+// §18.17 states that a randsequence statement opens an automatic scope holding
+// all of its production identifiers, so the set a production identifier
+// resolves against is exactly the productions its own randsequence statement
+// declares. These are the two reports
 // src/elaborator/elaborator_validate_randsequence.cpp makes of a name outside
 // that set, one for an rs_production_item and one for the optional top-level
 // name the statement's parentheses carry, each a literal fragment of the
@@ -83,13 +83,12 @@ TEST(RandsequenceProductionNames, ItemNamingNoDeclaredProductionIsRejected) {
                                  kItemNamesNoProduction, "main : first second");
 }
 
-// §18.17 states that the randsequence keyword "can be followed by an optional
-// production name (inside the parentheses) that designates the name of the
-// top-level production", so that name has to designate one of the statement's
-// productions. `mian` designates nothing over a statement declaring `main`, and
-// it reaches the resolver as Stmt::rs_top_production rather than as an
-// rs_production_item, which is a position a check written over production items
-// alone never visits.
+// §18.17 states that the randsequence keyword may take, inside the parentheses,
+// an optional production name naming the top-level production, so that name has
+// to designate one of the statement's productions. `mian` designates nothing
+// over a statement declaring `main`, and it reaches the resolver as
+// Stmt::rs_top_production rather than as an rs_production_item, which is a
+// position a check written over production items alone never visits.
 TEST(RandsequenceProductionNames,
      TopLevelNameDesignatingNoProductionIsRejected) {
   ExpectReportedOverRandsequence("mian", "      main : { ; };\n",
@@ -288,11 +287,11 @@ std::string RandsequenceReadingInto(std::string_view rules) {
          "endmodule\n";
 }
 
-// §18.17.7: "Within a rule, a variable is implicitly declared for each
-// production (of the rule) that returns a value", and the value "can be read in
-// the code blocks of the production that triggered the generation". So `a` in
-// the code block below is a name the standard declares, and §23.9's report of a
-// reference to an unresolved identifier is for a name nothing declares.
+// §18.17.7: a rule implicitly declares a variable for each of its productions
+// that returns a value, and the code blocks of the production that set off the
+// generation may read it. So `a` in the code block below is a name the standard
+// declares, and §23.9's report of a reference to an unresolved identifier is
+// for a name nothing declares.
 TEST(RandsequenceProductionNames, ReturnValueReadInACodeBlockResolves) {
   ElabFixture f;
   std::string src = RandsequenceReadingInto(
@@ -303,11 +302,11 @@ TEST(RandsequenceProductionNames, ReturnValueReadInACodeBlockResolves) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §18.17.7: "A production creates a scope, which encompasses all its rules and
-// code blocks. Thus, arguments passed down to a production are available
-// throughout the production." A formal argument is therefore a declaration its
-// own code blocks may read, reached by a different field of RsProduction from
-// the implicit return variable above and so stated separately.
+// §18.17.7: a production's scope takes in all its rules and code blocks, so
+// arguments passed to the production can be used anywhere in it. A formal
+// argument is therefore a declaration its own code blocks may read, reached by
+// a different field of RsProduction from the implicit return variable above and
+// so stated separately.
 TEST(RandsequenceProductionNames, FormalArgumentReadInACodeBlockResolves) {
   ElabFixture f;
   std::string src = RandsequenceReadingInto(
@@ -318,10 +317,10 @@ TEST(RandsequenceProductionNames, FormalArgumentReadInACodeBlockResolves) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §18.17.7 declares an implicit variable for each production of the rule "that
-// returns a value", and a production with no return type "shall assume a void
-// return type". A void production therefore declares nothing, and a read of its
-// name is a read of an undeclared name.
+// §18.17.7 declares an implicit variable for each production of the rule that
+// returns a value, and a production given no return type is void. A void
+// production therefore declares nothing, and a read of its name is a read of an
+// undeclared name.
 //
 // This is what keeps the two cases above from being satisfied by declaring
 // every production name: `a` is written exactly as it is there and differs only

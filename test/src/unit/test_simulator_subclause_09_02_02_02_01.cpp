@@ -483,16 +483,16 @@ TEST(AlwaysCombSensitivitySim, BlockLocalInitializerReadRetriggersProcess) {
 }
 
 // §9.2.2.2.1 counts every net or variable read within the block, and §18.16
-// makes a randcase weight an expression the statement evaluates: "The randcase
-// weights can be arbitrary expressions, not just constants". `w` is read in the
-// two weights and nowhere else, and no exception of §9.2.2.2.1 removes it.
+// makes a randcase weight an expression the statement evaluates, any expression
+// and not only a constant. `w` is read in the two weights and nowhere else, and
+// no exception of §9.2.2.2.1 removes it.
 //
 // The weights are written so that `w` alone decides which branch runs, which is
 // what makes a failure attributable. They sum to 8 whatever `w` holds, so
-// §18.16's "all weights are zero" case never arises and a branch is selected on
-// every execution; and §18.16 never selects a zero-weight branch, so at
-// `w == 8'd8` the second weight is zero and the first branch runs, while at
-// `w == 8'd0` the first weight is zero and the second runs. The random draw
+// §18.16's case of every weight being zero never arises and a branch is
+// selected on every execution; and §18.16 never selects a zero-weight branch,
+// so at `w == 8'd8` the second weight is zero and the first branch runs, while
+// at `w == 8'd0` the first weight is zero and the second runs. The random draw
 // therefore changes nothing. `y` is 21 after the time-zero evaluation, and 35
 // only if the change to `w` at time 1 re-evaluated the block. `w` is the only
 // name the block reads -- `y` is written within the block, which exception (b)

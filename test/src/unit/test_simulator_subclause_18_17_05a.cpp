@@ -450,16 +450,16 @@ TEST(RandsequenceSim, RandJoinWeightFromLocalparam) {
   EXPECT_LT(af1, 60u);
 }
 
-// §18.17.7: "The elements of the array are assigned the values returned by the
-// instances of the production according to the syntactic order of appearance",
-// while §18.17.5 has the generator "randomly interleave two or more production
-// sequences", so which operand of a rand join generates first is settled at run
-// time. The two rules meet in the rule written here, and the reading that keeps
-// them consistent is that the element an appearance writes follows where the
-// appearance is written and not when it generated. §18.17.7 already reads that
-// way for the ordinary productions, giving the code block of `if (cond) D(5)
-// else D(20)` the declaration `int D[1:2]` whose second element the else branch
-// writes when it is the only branch that generated at all.
+// §18.17.7: the array's elements take the values the production's instances
+// return in the order those instances appear in the source, while §18.17.5 has
+// the generator interleave two or more production sequences at random, so which
+// operand of a rand join generates first is settled at run time. The two rules
+// meet in the rule written here, and the reading that keeps them consistent is
+// that the element an appearance writes follows where the appearance is written
+// and not when it generated. §18.17.7 already reads that way for the ordinary
+// productions, giving the code block of `if (cond) D(5) else D(20)` the
+// declaration `int D[1:2]` whose second element the else branch writes when it
+// is the only branch that generated at all.
 //
 // A rand join rule is a rule, so §18.17.7 declares `int p[1:2]` for the two
 // appearances of the value-returning production p. p returns a counter it

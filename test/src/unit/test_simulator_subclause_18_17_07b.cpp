@@ -10,12 +10,12 @@ using namespace delta;
 namespace {
 
 // §18.17.7 gives the implicit variable a rule declares for a value-returning
-// production "the return type of the production", so a production declared to
-// return a user-defined type returns the width that type names and not the
-// width of the expression the return statement was written with. The cases
-// below are that width alone; test_simulator_subclause_18_17_07a.cpp holds the
-// rest of the clause -- which variable an appearance writes, what a rand join
-// operand captures, and how a string return is carried.
+// production that production's return type, so a production declared to return
+// a user-defined type returns the width that type names and not the width of
+// the expression the return statement was written with. The cases below are
+// that width alone; test_simulator_subclause_18_17_07a.cpp holds the rest of
+// the clause -- which variable an appearance writes, what a rand join operand
+// captures, and how a string return is carried.
 //
 // Every case returns 8'hFF through a four-bit typedef and reads 15. The two
 // answers have to differ for the case to say anything: a typedef of exactly 32
@@ -69,14 +69,14 @@ TEST(RandseqReturnWidthSim, TypedefNameReturnTypeSizesARandJoinOperand) {
   EXPECT_EQ(r2, 7u);
 }
 
-// §18.17.7: a production named more than once in a rule is declared as "an
-// array where the element type is the return type of the production", so the
-// element width is the typedef's too. Naming the production twice takes the
-// implicit variable down CreateRuleProductionVariable's array arm, which builds
-// the name `v[i]` and creates a variable per appearance rather than the one
-// scalar the cases above write, so the width claimed for the scalar is not the
-// width claimed here. Both elements are read because either arriving at 255
-// would be the fallback.
+// §18.17.7: a production named more than once in a rule is declared as an array
+// whose element type is the production's return type, so the element width is
+// the typedef's too. Naming the production twice takes the implicit variable
+// down CreateRuleProductionVariable's array arm, which builds the name `v[i]`
+// and creates a variable per appearance rather than the one scalar the cases
+// above write, so the width claimed for the scalar is not the width claimed
+// here. Both elements are read because either arriving at 255 would be the
+// fallback.
 TEST(RandseqReturnWidthSim,
      TypedefNameReturnTypeSizesEachImplicitArrayElement) {
   SimFixture f;
