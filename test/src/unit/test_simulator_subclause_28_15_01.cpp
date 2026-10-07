@@ -183,10 +183,10 @@ TEST(Tri0Tri1NetStrengths, DeclaredTri1HighZSourceDoesNotOverride) {
 
 // ---- Per-bit qualifier: a source overrides only the bits it drives ----
 
-// "In the absence of an overriding source" applies bit by bit: a part-select
-// driver decides its own bits while every undriven bit is pulled to the
-// net-type default. A driven low nibble on a tri0 vector leaves the high nibble
-// pulled to 0.
+// The pull applying only where no other source overrides it holds bit by bit: a
+// part-select driver decides its own bits while every undriven bit is pulled to
+// the net-type default. A driven low nibble on a tri0 vector leaves the high
+// nibble pulled to 0.
 TEST(Tri0Tri1NetStrengths,
      DeclaredTri0PartSelectDriverOverridesOnlyDrivenBits) {
   SimFixture f;

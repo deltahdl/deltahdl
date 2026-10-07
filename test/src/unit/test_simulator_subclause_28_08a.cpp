@@ -8,10 +8,9 @@ using namespace delta;
 
 namespace {
 
-// §28.8 (printed page 840): "Both bidirectional terminals shall unconditionally
-// conduct signals to and from the devices, allowing signals to pass in either
-// direction", so a tran carries whichever side is driven to the other, and
-// neither side once nothing drives either.
+// §28.8 (printed page 840): both bidirectional terminals always carry signals
+// into and out of the device, in either direction, so a tran carries whichever
+// side is driven to the other, and neither side once nothing drives either.
 TEST(BidirSwitchRun, TranConductsInBothDirections) {
   SimFixture f;
   auto out = RunCapture(
@@ -66,9 +65,8 @@ TEST(BidirSwitchRun, TranifFollowsItsControl) {
             "b1=x b0=x\n");
 }
 
-// §28.8: "The control input shall be one of three types: A 4-state net, a
-// 4-state variable, or a 2-state variable." A bit control turns the switch on
-// and off as a logic one does.
+// §28.8: the control input is a 4-state net, a 4-state variable or a 2-state
+// variable. A bit control turns the switch on and off as a logic one does.
 TEST(BidirSwitchRun, TranifControlMayBeATwoStateVariable) {
   SimFixture f;
   auto out = RunCapture(
@@ -89,11 +87,10 @@ TEST(BidirSwitchRun, TranifControlMayBeATwoStateVariable) {
             "b=z\n");
 }
 
-// §28.8: "the first delay shall determine the control input turn-on delay and
-// the second delay shall determine the control input turn-off delay", with no
-// delay through the terminals themselves: a tranif1 #(3, 5) turned on at 0,
-// off at 4 and on again at 10 passes its driven side at 3, stops at 9 and
-// passes again at 13.
+// §28.8: the first delay is the control input's turn-on delay and the second
+// its turn-off delay, with no delay through the terminals themselves: a tranif1
+// #(3, 5) turned on at 0, off at 4 and on again at 10 passes its driven side at
+// 3, stops at 9 and passes again at 13.
 TEST(BidirSwitchRun, TranifTurnsOnAndOffAfterItsDelays) {
   SimFixture f;
   auto out = RunCapture(
@@ -170,8 +167,8 @@ TEST(BidirSwitchRun, SwitchesChainAndResolveTheirNetsTogether) {
   EXPECT_EQ(out, "c=St1 f=We1 g=Pu1 h=Pu1 n=St0\n");
 }
 
-// §28.8: "tran, tranif1, and tranif0 devices may also be connected to nets of
-// user-defined net types", and such a switch passes the value while it
+// §28.8: tran, tranif1 and tranif0 devices may be connected to nets of
+// user-defined net types as well, and such a switch passes the value while it
 // conducts.
 TEST(BidirSwitchRun, TranifJoinsNetsOfAUserDefinedNetType) {
   SimFixture f;

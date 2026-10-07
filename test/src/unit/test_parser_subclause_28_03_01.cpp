@@ -64,8 +64,8 @@ TEST(GateKeywordOpensDeclaration, NonKeywordIsNotGateDecl) {
   }
 }
 
-// §28.3.1's "a declaration begins with the primitive keyword" rule is not tied
-// to the top-level module-item position: a gate instantiation is a
+// §28.3.1's rule that a gate declaration opens with the primitive keyword is
+// not tied to the top-level module-item position: a gate instantiation is a
 // module-or-generate item, so the same keyword must open a declaration inside a
 // generate block too. Drive a gate through the body of a generate-if and
 // confirm the keyword still yields a gate instance in that syntactic position.

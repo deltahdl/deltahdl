@@ -339,12 +339,12 @@ TEST(StrengthResolution, RuleBCompleteEliminationProducesUnambigResult) {
 
 // §28.12.3 makes one combination per signal of known value and unambiguous
 // strength, so the weak 0 here is combined as surely as the pull 0 above it --
-// and neither moves a bound. §28.12.2 gives the strong conflict "the strength
-// levels of both signals and all the smaller strength levels", so the range
-// already runs to high impedance on both sides, and rule c returns it whole
-// each time: rule a keeps every level above the weaker driver, rule b takes the
-// rest, and the gap that leaves crosses high impedance and is filled back. A
-// second combination cannot narrow what the first left.
+// and neither moves a bound. §28.12.2 gives the strong conflict both signals'
+// strength levels and every weaker level, so the range already runs to high
+// impedance on both sides, and rule c returns it whole each time: rule a keeps
+// every level above the weaker driver, rule b takes the rest, and the gap that
+// leaves crosses high impedance and is filled back. A second combination cannot
+// narrow what the first left.
 TEST(StrengthResolution, SecondWeakerDriverBelowTheFirstWidensNothing) {
   Arena arena;
   StrengthNet sn = ResolveWidth1(arena, {{0, Strength::kStrong},
@@ -358,11 +358,11 @@ TEST(StrengthResolution, SecondWeakerDriverBelowTheFirstWidensNothing) {
 
 // The two weaker drivers are of opposite value at one level, so §28.12.3 has a
 // combination to make for each, and neither changes the range: §28.12.1 has the
-// stronger signal "dominate all the weaker drivers and determine the result",
-// and the strong conflict is stronger than both. Rules a and b take the pull
-// levels out of the range and rule c puts them back, the gap between the
-// surviving 0-side and 1-side levels crossing high impedance (Figure 28-23), so
-// the net stands at the conflict range §28.12.2 gave it.
+// stronger signal override every weaker driver and set the result, and the
+// strong conflict is stronger than both. Rules a and b take the pull levels out
+// of the range and rule c puts them back, the gap between the surviving 0-side
+// and 1-side levels crossing high impedance (Figure 28-23), so the net stands
+// at the conflict range §28.12.2 gave it.
 TEST(StrengthResolution, OppositeValueWeakerDriversAtOneLevelBothCombine) {
   Arena arena;
   StrengthNet sn = ResolveWidth1(arena, {{0, Strength::kStrong},
@@ -557,13 +557,13 @@ TEST(NetStrengthAmbigUnambig, RulesFollowTheValueAndNotTheSide) {
 }
 
 // §28.12.3 rule c where the ambiguous signal is stronger than the unambiguous
-// one throughout. §28.12.1 has the stronger signal "dominate all the weaker
-// drivers and determine the result", and the weak level the unambiguous signal
-// drives at is in no part of the result -- but the levels it removed are, since
-// rule c's gap is bounded by the surviving pieces and those sit on opposite
-// sides of the scale. Both sides therefore come back reaching high impedance,
-// and the combination has widened nothing that the ambiguous signal's own range
-// did not already admit.
+// one throughout. §28.12.1 has the stronger signal override every weaker driver
+// and set the result, and the weak level the unambiguous signal drives at is in
+// no part of the result -- but the levels it removed are, since rule c's gap is
+// bounded by the surviving pieces and those sit on opposite sides of the scale.
+// Both sides therefore come back reaching high impedance, and the combination
+// has widened nothing that the ambiguous signal's own range did not already
+// admit.
 //
 // The input is one Net::Resolve cannot present: §28.12.2 gives a conflict every
 // level below its own, so an ambiguous signal it builds runs to high impedance
@@ -656,11 +656,11 @@ TEST(StrengthResolution, SourceHighzStrengthDriverLeavesTheConflictRangeWhole) {
 // Figure 28-23: an ambiguous signal occupying the strength1 side from high
 // impedance to strong -- what §28.12.2's Figure 28-6 gives a three-state gate
 // with an unknown control -- combined with an unambiguous Pu0. The figure draws
-// one range running Pu0 through HiZ0 and HiZ1 to St1, and its prose calls it "a
-// range defined by the greatest strength in the range of the ambiguous strength
-// signal and by the strength level of the unambiguous strength signal". Rule
-// c's gap therefore crosses high impedance: a fill bounded by the unambiguous
-// level would leave the 1 side at strong and the 0 side at pull.
+// one range running Pu0 through HiZ0 and HiZ1 to St1, and its prose bounds it
+// by the greatest strength of the ambiguous signal's range and by the level of
+// the unambiguous signal. Rule c's gap therefore crosses high impedance: a fill
+// bounded by the unambiguous level would leave the 1 side at strong and the 0
+// side at pull.
 TEST(NetStrengthAmbigUnambig, Figure2823FillsAcrossHighImpedance) {
   NetStrength ambig;
   ambig.s1_hi = Strength::kStrong;

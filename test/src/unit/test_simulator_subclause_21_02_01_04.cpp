@@ -114,17 +114,16 @@ TEST(StrengthFormat, MediumCapacitorZeroIsMe0) {
 
 // §21.2.1.4: "For the unknown value, a mnemonic is used when both the 0 and 1
 // strength components are at the same strength level." §28.12.2 says which
-// level each component is, reading the 35X of Figure 28-9 as a first digit that
-// "corresponds to the highest strength0 level for the result" and a second that
-// corresponds to "the highest strength1 level for the result". The two sides
-// here are ranges, which is the shape §28.12.2 gives an equal-strength
-// conflict: the result carries "the strength levels of both signals and all the
-// smaller strength levels", drawn in Figure 28-5 as reaching down through high
+// level each component is, reading the 35X of Figure 28-9 as a first digit for
+// the result's highest strength0 level and a second for its highest strength1
+// level. The two sides here are ranges, which is the shape §28.12.2 gives an
+// equal-strength conflict: the result carries both signals' strength levels and
+// every weaker level, drawn in Figure 28-5 as reaching down through high
 // impedance on both sides. Their highest levels are both strong, so the
-// rendering is StX. Collapsing the two sides to points instead would make "both
-// components at the same level" and "no range on either side" one condition for
-// this input, and the case could not tell the clause's rule from that narrower
-// one.
+// rendering is StX. Collapsing the two sides to points instead would make the
+// two components sharing a level and neither side having a range one condition
+// for this input, and the case could not tell the clause's rule from that
+// narrower one.
 TEST(StrengthFormat, StrongUnknownSameLevelIsStX) {
   EXPECT_EQ(FormatStrength(MakeNS(Strength::kStrong, Strength::kHighz,
                                   Strength::kStrong, Strength::kHighz)),
@@ -400,8 +399,8 @@ TEST(StrengthFormat, DisplayPercentVOnPullDrivenNetShowsPu1) {
 // End-to-end: the weak driving strength We (Table 21-4, level 3) reached from a
 // real strength-specified continuous assignment (§28.12.2) driving a 0. The
 // third character is the driven 0 logic value, so the rendering is We0. This
-// also exercises the Claim-5 "no range -> mnemonic" path for a 0 value at a
-// non-strong driving level.
+// also exercises the Claim-5 path from a side without a range to a mnemonic for
+// a 0 value at a non-strong driving level.
 TEST(StrengthFormat, DisplayPercentVOnWeakDrivenNetShowsWe0) {
   SimFixture f;
   std::string out = CaptureDisplayOutput(
@@ -452,7 +451,7 @@ TEST(StrengthFormat, DisplayPercentVOnWeakConflictShowsWeX) {
 // End-to-end: the ordinary conflict. Two continuous assignments of opposite
 // value at the default drive put strong0 and strong1 on the wire, so both
 // strength components are at the strong level and §21.2.1.4 gives the result
-// the St mnemonic: StX. §28.12.2 adds "all the smaller strength levels" to that
+// the St mnemonic: StX. §28.12.2 adds every weaker strength level to that
 // result, so both lower bounds sit at high impedance, and the digit form is
 // still not what the clause asks for. Table 21-5 reads StX as "A strong driving
 // unknown value".
@@ -467,12 +466,12 @@ TEST(StrengthFormat, DisplayPercentVOnStrongConflictShowsStX) {
       "StX");
 }
 
-// End-to-end: a driver whose own value is x. §28.12.2 classifies "signals with
-// a value x" as having "strength levels consisting of subdivisions of both the
-// strength1 and the strength0 parts of the scale of strengths", so a strong
-// driver of 1'bx puts strong on both sides -- the value is unknown, the
-// strength is not. §21.2.1.4 renders that with a mnemonic, "when both the 0 and
-// 1 strength components are at the same strength level": StX.
+// End-to-end: a driver whose own value is x. §28.12.2 gives a signal of value x
+// strength levels drawn from both the strength1 and the strength0 halves of the
+// strength scale, so a strong driver of 1'bx puts strong on both sides -- the
+// value is unknown, the strength is not. §21.2.1.4 renders that with a
+// mnemonic, "when both the 0 and 1 strength components are at the same strength
+// level": StX.
 //
 // This is a different source from the equal-and-opposite conflict above, which
 // arrives at x by combining two known values. A net driven x by one driver

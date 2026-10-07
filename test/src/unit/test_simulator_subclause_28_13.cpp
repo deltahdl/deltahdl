@@ -16,12 +16,11 @@ using namespace delta;
 
 namespace {
 
-// This file covers the two rules of §28.13. "The nmos, pmos, and cmos switches
-// shall pass the strength from the data input to the output, except that a
-// supply strength shall be reduced to a strong strength." "The tran, tranif0,
-// and tranif1 switches shall not affect signal strength across the
-// bidirectional terminals, except that a supply strength shall be reduced to a
-// strong strength."
+// This file covers the two rules of §28.13. The nmos, pmos and cmos switches
+// carry the data input's strength to the output unchanged, save that a supply
+// strength drops to strong; the tran, tranif0 and tranif1 switches leave the
+// strength across their bidirectional terminals unchanged, with the same
+// exception for supply.
 //
 // The ModelAndSimulator... cases claim more than the cases around them: at each
 // of the eight strength levels, ModelReduceNonresistive in

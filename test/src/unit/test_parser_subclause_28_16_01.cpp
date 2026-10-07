@@ -173,10 +173,10 @@ TEST(MinTypMaxDelayParsing, IncompleteMinTypMaxIsRejected) {
   EXPECT_TRUE(ReportedError(r.diags, "expected ':', got ')'", 3, "11.11"));
 }
 
-// §28.16.1 extends the min:typ:max delay syntax to gate primitives
-// "including UDPs". UDP-instance delays parse through the same delay path as
-// gates, so each rise/fall slot may itself be a min:typ:max triple (UDPs are
-// limited to two delays per the §29.8 dependency, so no turn-off slot here).
+// §28.16.1 extends the min:typ:max delay syntax to gate primitives, UDPs among
+// them. UDP-instance delays parse through the same delay path as gates, so each
+// rise/fall slot may itself be a min:typ:max triple (UDPs are limited to two
+// delays per the §29.8 dependency, so no turn-off slot here).
 TEST(MinTypMaxDelayParsing, UdpInstanceDelayTriples) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"

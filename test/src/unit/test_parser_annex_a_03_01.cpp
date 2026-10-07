@@ -753,11 +753,11 @@ TEST(GateInstantiationParsing, EscapedInstanceName) {
   EXPECT_EQ(sw->gate_inst_name, "sw-0");
 }
 
-// §28.3.5 gives the one unpacked_dimension an array of instances takes: "the
-// range shall be specified by two constant expressions, left-hand index (lhi)
-// and right-hand index (rhi), separated by a colon". A.2.5's other
-// unpacked_dimension, `[ constant_expression ]`, was read and then dropped, so
-// `g[3]` was accepted silently as the one instance `g`.
+// §28.3.5 gives the one unpacked_dimension an array of instances takes: a
+// left-hand index (lhi) and a right-hand index (rhi), both constant
+// expressions, with a colon between. A.2.5's other unpacked_dimension, `[
+// constant_expression ]`, was read and then dropped, so `g[3]` was accepted
+// silently as the one instance `g`.
 TEST(GateInstantiationParsing, SizeAloneIsNoInstanceRange) {
   auto r = Parse(
       "module m;\n"
@@ -768,10 +768,10 @@ TEST(GateInstantiationParsing, SizeAloneIsNoInstanceRange) {
       2, "28.3.5"));
 }
 
-// §28.3.5: "one instance identifier shall be associated with only one range to
-// declare an array of instances". A second range after the first was reported
-// as a missing '(' under §28.3.6; it is now reported for what it is, and read
-// past, the first range standing.
+// §28.3.5: an instance identifier declaring an array of instances takes one
+// range and no more. A second range after the first was reported as a missing
+// '(' under §28.3.6; it is now reported for what it is, and read past, the
+// first range standing.
 TEST(GateInstantiationParsing, SecondInstanceRangeIsRejected) {
   auto r = Parse(
       "module m;\n"

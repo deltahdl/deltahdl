@@ -91,7 +91,7 @@ TEST(GateArrayRuntime, DistributedEnableAppliesPerElementControl) {
 
 // §28.3.6's Example 2 states that `bufif0 ar[3:0] (out, in, en);` and the four
 // separate declarations `bufif0 ar3 (out[3], in[3], en);` and so on are
-// "equivalent except for indexed instance names", so an element of an array
+// the same apart from the indexed instance names, so an element of an array
 // answers a later change of its own input bit exactly as the separate
 // declaration would. The three cases above drive their inputs once and read the
 // settled value, which holds however the elements are woken.
@@ -131,8 +131,8 @@ TEST(GateArrayRuntime, DistributedTerminalChangeReevaluatesEachElement) {
 
 // §28.3.6 (printed page 833), Example 2: `driver`'s `bufif0 ar[3:0] (out, in,
 // en)` on the module's own vector ports and `driver_equiv`'s four buffers, each
-// on one bit-select of those ports, are "equivalent except for indexed instance
-// names", so the two drive the same values onto the nets the parent connects,
+// on one bit-select of those ports, differ in nothing but the indexed instance
+// names, so the two drive the same values onto the nets the parent connects,
 // and both output z once the shared enable turns them off.
 TEST(GateArrayRuntime, ExampleTwoDriverAndDriverEquivAgree) {
   SimFixture f;

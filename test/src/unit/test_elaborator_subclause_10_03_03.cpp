@@ -165,9 +165,9 @@ TEST(AssignmentDelayElaboration, NetDeclTwoDelayOnImplicitAssign) {
 // The delay is read off the continuous assignment because that is where the
 // three slots live today (RtlirContAssign::delay), and because the assignment
 // is the only driver this source gives the net. A net with two drivers is
-// delayed on both, since §28.16 measures the delay "from any driver on the net
-// changing value", and a design that carried the delay somewhere else would
-// have to be read somewhere else here.
+// delayed on both, since §28.16 measures the delay from a change on any of the
+// net's drivers, and a design that carried the delay somewhere else would have
+// to be read somewhere else here.
 TEST(AssignmentDelayElaboration,
      NetDeclDelayWithoutAssignReachesSeparateContAssign) {
   ElabFixture f;

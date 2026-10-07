@@ -323,12 +323,11 @@ TEST(ChargeDecayProcess, NoChargeDecayTimeMeansStoredValueNeverDecays) {
 }
 
 // §28.16.2.1 (printed page 858): when the charge decay time elapses the trireg
-// "makes a transition from 1 or 0 to x", and §21.2.1.4's `%v` reports the net
-// as what it now stores, an x at its charge's size. In §28.16.2.2's own
-// example the nmos turns off at 10, the net keeps its 1 as large charge, and
-// at 60 the charge has decayed, so `%v` reads `LaX` after it where it read
-// `La1` before. Only the value was turned to x; the strength went on
-// describing the 1.
+// goes from 1 or 0 to x, and §21.2.1.4's `%v` reports the net as what it now
+// stores, an x at its charge's size. In §28.16.2.2's own example the nmos turns
+// off at 10, the net keeps its 1 as large charge, and at 60 the charge has
+// decayed, so `%v` reads `LaX` after it where it read `La1` before. Only the
+// value was turned to x; the strength went on describing the 1.
 TEST(ChargeDecayProcess, DecayedChargeReportsItsXStrength) {
   SimFixture f;
   auto out = RunCapture(

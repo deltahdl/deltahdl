@@ -59,12 +59,12 @@ TEST(GateInstStrengthParsing, StrengthPrecedesDelay) {
   EXPECT_EQ(item->gate_delay->int_val, 5u);
 }
 
-// §28.3.2 (printed page 831): the strength specification "shall follow the
-// gate type keyword and precede any delay specification", so a strength after
-// `#5` is reported under that rule, once, at its opening parenthesis, and the
-// instance after it still parses. Read as the terminal list, its keywords were
-// reported as missing expressions under §11.2 and the instance name as a
-// missing semicolon.
+// §28.3.2 (printed page 831): the strength specification comes after the gate
+// type keyword and before any delay specification, so a strength after `#5` is
+// reported under that rule, once, at its opening parenthesis, and the instance
+// after it still parses. Read as the terminal list, its keywords were reported
+// as missing expressions under §11.2 and the instance name as a missing
+// semicolon.
 TEST(GateInstStrengthParsing, DelayBeforeStrengthRejected) {
   auto r = Parse(
       "module m;\n"

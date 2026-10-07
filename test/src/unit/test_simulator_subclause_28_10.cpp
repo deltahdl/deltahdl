@@ -129,7 +129,7 @@ TEST(PullSourceSim, PulldownInstanceArrayPullsEveryBitLow) {
             "0000");
 }
 
-// §28.10's value goes on "the nets connected in its terminal list" — the source
+// §28.10's value goes on the nets its terminal list connects — the source
 // clause illustrates this with two comma-separated named instances, each
 // driving its own net. End-to-end: both nets independently settle to 1,
 // confirming the value is placed on every listed instance's terminal.

@@ -291,7 +291,7 @@ TEST(MosSwitchSimulation, PmosPassesPullDataStrengthUnchanged) {
   EXPECT_EQ(y->resolved_strength.s1_hi, Strength::kPull);
 }
 
-// The "only one case" for pmos: a supply data strength is the lone strength the
+// The single case for pmos: a supply data strength is the lone strength the
 // switch alters, dropping to strong. Completes the pmos half of §28.7's
 // nmos/pmos strength statement alongside the pull-passthrough case above.
 TEST(MosSwitchSimulation, PmosReducesSupplyDataStrengthToStrong) {
@@ -365,8 +365,8 @@ TEST(MosSwitchSimulation, NmosControlUnknownDoesNotPassDefiniteValue) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  // Ambiguous control: the switch passes "1 or z", which collapses in the
-  // ternary (§11.4.11) to x = (aval=1, bval=1), not a definite value.
+  // Ambiguous control: the switch passes either a 1 or a z, which collapses in
+  // the ternary (§11.4.11) to x = (aval=1, bval=1), not a definite value.
   auto* v = f.ctx.FindVariable("y");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.words[0].aval & 1u, 1u);
@@ -385,8 +385,8 @@ TEST(MosSwitchSimulation, NmosControlHighZDoesNotPassDefiniteValue) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  // Floating (z) control behaves like x control: passes "1 or z", which
-  // collapses in the ternary (§11.4.11) to x = (aval=1, bval=1).
+  // Floating (z) control behaves like x control: passes either a 1 or a z,
+  // which collapses in the ternary (§11.4.11) to x = (aval=1, bval=1).
   auto* v = f.ctx.FindVariable("y");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.words[0].aval & 1u, 1u);
@@ -394,10 +394,10 @@ TEST(MosSwitchSimulation, NmosControlHighZDoesNotPassDefiniteValue) {
 }
 
 // §28.7 Table 28-6 (printed page 839): with a control of x or z an nmos or a
-// pmos passes a 0 as L and a 1 as H -- "a result that has a value 0 or z" and
-// "a value 1 or z" -- which §21.2.1.4 renders with the data's strength and the
-// letter; a strong variable as data gives StL and StH, where the switch drove
-// an unqualified StX.
+// pmos passes a 0 as L and a 1 as H -- a result that is either 0 or z, and one
+// that is either 1 or z -- which §21.2.1.4 renders with the data's strength and
+// the letter; a strong variable as data gives StL and StH, where the switch
+// drove an unqualified StX.
 TEST(MosSwitchSimulation, UnknownControlPassesLAndH) {
   SimFixture f;
   auto out = RunCapture(

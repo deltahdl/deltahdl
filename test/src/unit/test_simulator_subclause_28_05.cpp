@@ -261,7 +261,7 @@ TEST(BufNotSimulation, ProductionSingleDelayAppliesToFallingOutput) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 8u);
 }
 
-// The other half of "one delay specifies both rise and fall": the same single
+// The other half of a lone delay covering both rise and fall: the same single
 // value also governs a rising output. A buf whose input rises at t=3 drives its
 // output high one delay (5) later, settling at t=8 -- the same value the
 // falling case above uses, confirming a lone delay is applied in both

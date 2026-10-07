@@ -329,15 +329,15 @@ TEST(PortConnectionElab, PrimitiveInstanceWithAScalarOutputTerminalIsAccepted) {
 
 // An instance array is the one place a terminal wider than one bit satisfies
 // §4.9.6, so the four-bit terminal below shall draw no report. §28.3.6 rules
-// that "If bit lengths are different, each instance shall get a part-select of
-// the port expression, of a bit length equal to the instance port bit length",
-// and §29.8 has a UDP instance connect its terminals by §28.3.6's rules, so
-// each of the four elements connects to one bit and the whole terminal is not
-// the width the rule measures. ValidatePrimitiveOutputTerminalWidths returns
-// early on an instance array for that reason, and this case says the early
-// return still holds now that its kind guard admits a primitive instance: a
-// check that measured the terminal anyway would reject this source with the
-// §4.9.6 report the two cases above look for.
+// that where the widths differ, each instance takes a part-select of the port
+// expression as wide as its own port, and §29.8 has a UDP instance connect its
+// terminals by §28.3.6's rules, so each of the four elements connects to one
+// bit and the whole terminal is not the width the rule measures.
+// ValidatePrimitiveOutputTerminalWidths returns early on an instance array for
+// that reason, and this case says the early return still holds now that its
+// kind guard admits a primitive instance: a check that measured the terminal
+// anyway would reject this source with the §4.9.6 report the two cases above
+// look for.
 //
 // The instance range is `[7:4]` and the terminal is declared `[3:0]` so that no
 // array index is also a bit position of the terminal, and the four recorded

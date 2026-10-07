@@ -218,13 +218,12 @@ TEST(TriregChargeStrength, BitsHoldingOneAloneLeaveTheZeroSideHighZ) {
   EXPECT_EQ(cap->resolved_strength.s1_lo, Strength::kMedium);
 }
 
-// §28.15.2 (printed page 855): a trireg "in the charge storage state (that is,
-// a driver charged the net and then went to high impedance)" drives at its
-// charge strength, so its stored value stands against a driver as a driver of
-// that strength does. After an nmos charges two triregs to 1 and turns off, a
-// `bufif1 (weak1, weak0)` driving 0 overcomes the default medium charge but not
-// a large one, which outranks weak. Resolved from their drivers alone, both
-// nets took the weak 0.
+// §28.15.2 (printed page 855): a trireg holding charge, a driver having charged
+// it and then gone to high impedance, drives at its charge strength, so its
+// stored value stands against a driver as a driver of that strength does. After
+// an nmos charges two triregs to 1 and turns off, a `bufif1 (weak1, weak0)`
+// driving 0 overcomes the default medium charge but not a large one, which
+// outranks weak. Resolved from their drivers alone, both nets took the weak 0.
 TEST(TriregStrengthSim, LargeChargeOutranksAWeakDriver) {
   SimFixture f;
   auto out = RunCapture(

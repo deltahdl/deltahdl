@@ -140,10 +140,10 @@ TEST(UdpInstanceSim, UnspecifiedInputCombinationDrivesUnknown) {
 
 // §29.8: the `delay2` written on a primitive instance is the propagation delay
 // from an input terminal to the output terminal -- at most two, a UDP having no
-// z -- and where the source writes one value §28.16 rules that "this value
-// shall be used for all propagation delays". The inputs reach (0, 1) at time
-// 100, which selects the row driving 0, and (1, 1) at time 200, which selects
-// the row driving 1. So the output terminal changes from 0 to 1 at time 205.
+// z -- and where the source writes one value §28.16 makes it the delay of every
+// propagation. The inputs reach (0, 1) at time 100, which selects the row
+// driving 0, and (1, 1) at time 200, which selects the row driving 1. So the
+// output terminal changes from 0 to 1 at time 205.
 //
 // The two samples straddle that time rather than landing on it. A sample taken
 // at time 205 would read the net in the same time slot as the delayed update

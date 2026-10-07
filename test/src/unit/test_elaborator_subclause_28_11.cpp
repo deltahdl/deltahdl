@@ -28,12 +28,10 @@ TEST(LogicStrengthModeling, ValidStrength0Strength1PairElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §28.11 states "The combinations (highz0, highz1) and (highz1, highz0) shall
-// be considered illegal", and §28.3.2 states the same prohibition of the same
-// two pairs for the construct the elaborator sees, the drive strength
-// specification: "The strength specifications (highz0, highz1) and (highz1,
-// highz0) shall be considered invalid." The report is filed under §28.3.2,
-// where that construct is defined.
+// §28.11 forbids the combinations (highz0, highz1) and (highz1, highz0), and
+// §28.3.2 forbids the same two pairs for the construct the elaborator sees, the
+// drive strength specification. The report is filed under §28.3.2, where that
+// construct is defined.
 TEST(LogicStrengthModeling, Highz0Highz1PairIsIllegal) {
   ElabFixture f;
   Elaborate(

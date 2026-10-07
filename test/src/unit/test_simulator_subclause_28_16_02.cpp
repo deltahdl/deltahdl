@@ -258,10 +258,10 @@ TEST(TriregChargeDecayRuntime, ReleasingForceDropsHeldZAndFollowsDriver) {
   EXPECT_EQ(net->resolved->value.words[0].bval & 1u, 0u);
 }
 
-// §28.16.2.1: the charge decay process ends when "the delay specified by charge
-// decay time elapses, and the trireg net makes a transition from 1 or 0 to x".
-// A charge decay time of zero is that transition happening at once, so a trireg
-// written `#(0, 0, 0)` loses its charge the moment its drivers turn off.
+// §28.16.2.1: the charge decay process ends when the charge decay time has
+// passed and the trireg net goes from 1 or 0 to x. A charge decay time of zero
+// is that transition happening at once, so a trireg written `#(0, 0, 0)` loses
+// its charge the moment its drivers turn off.
 //
 // It held the charge for the whole run instead, RtlirNet::decay_ticks recording
 // a net that does not decay as zero and the scheduler reading the count alone.

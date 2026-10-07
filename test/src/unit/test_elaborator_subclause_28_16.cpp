@@ -144,15 +144,14 @@ TEST(GateDelayElaboration, CmosSwitchDelayForwardsToContAssign) {
   EXPECT_EQ(mod->assigns[0].delay_decay->int_val, 9u);
 }
 
-// §28.16 gives a delay a direction as well as a size: a net delay is "the time
-// it takes from any driver on the net changing value to the time when the net
-// value is updated and propagated further", and §28.16.2 gives a trireg's third
-// delay as "the delay between when the drivers of a trireg net turn off and
-// when its stored charge can no longer be determined". Neither runs backwards.
-// The clause names no negative form, so a source that writes one is reported
-// rather than reinterpreted: cast into the unsigned tick counts the model runs
-// on, -5 became 18446744073709551611 and the charge decayed after six hundred
-// billion years.
+// §28.16 gives a delay a direction as well as a size: a net delay runs from a
+// change on any of the net's drivers to the moment the net's value is updated
+// and passed on, and §28.16.2 gives a trireg's third delay as running from its
+// drivers turning off to its stored charge becoming unknown. Neither runs
+// backwards. The clause names no negative form, so a source that writes one is
+// reported rather than reinterpreted: cast into the unsigned tick counts the
+// model runs on, -5 became 18446744073709551611 and the charge decayed after
+// six hundred billion years.
 //
 // Runs `decl` as the whole body of a module and asserts the report stands at
 // the declaration's own line, so the cases differ only in the delay they write.
@@ -186,19 +185,19 @@ TEST(DelaySignElaboration, NegativeGateDelayIsReported) {
   ExpectDelayReported("and #(-2) g(y, a, b);", "-2");
 }
 
-// §28.16.1: "The minimum, typical, and maximum values for each delay shall be
-// specified as expressions separated by colons ... These can be any three
-// expressions." Which of the three is the delay is settled per run, so each is
-// a delay in some run and each is checked. Reading the folded scalar instead
-// would see whichever member the active mode selects -- the typical one by
-// default -- and pass the negative written beside it.
+// §28.16.1: each delay's minimum, typical and maximum are written as three
+// expressions between colons, and any three expressions will do. Which of the
+// three is the delay is settled per run, so each is a delay in some run and
+// each is checked. Reading the folded scalar instead would see whichever member
+// the active mode selects -- the typical one by default -- and pass the
+// negative written beside it.
 TEST(DelaySignElaboration, NegativeMinimumOfAMinTypMaxDelayIsReported) {
   ExpectDelayReported("wire #(-1:2:3) w;", "-1");
 }
 
 // Zero is a delay, and §28.16.2.1 gives a decay time of zero the transition to
 // x happening at once, so the check is on the sign and not on the value being
-// positive. A rule written as "greater than zero" would reject this.
+// positive. A rule requiring the delay to exceed zero would reject this.
 TEST(DelaySignElaboration, ZeroDelayIsAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(

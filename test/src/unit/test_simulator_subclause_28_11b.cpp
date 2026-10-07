@@ -117,9 +117,8 @@ TEST(ModelAndProductionStrength, EveryEnumeratorCarriesTheSameLevel) {
   EXPECT_EQ(LevelOf(StrengthLevel::kSupply), LevelOf(Strength::kSupply));
 }
 
-// §28.11: "The combinations (highz0, highz1) and (highz1, highz0) shall be
-// considered illegal." Read as levels, both spellings name the one pair whose
-// two sides are both highz.
+// §28.11 forbids the combinations (highz0, highz1) and (highz1, highz0). Read
+// as levels, both spellings name the one pair whose two sides are both highz.
 TEST(StrengthPairModel, BothSidesHighzIsIllegal) {
   EXPECT_FALSE(
       ValidateStrengthPair(StrengthLevel::kHighz, StrengthLevel::kHighz));

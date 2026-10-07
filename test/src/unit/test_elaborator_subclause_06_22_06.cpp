@@ -45,9 +45,9 @@ TEST(MatchingNettypes, AliasAndRenamedNettypeTerminalsAccepted) {
 // §6.22.6 only defines the matching relation, listing a) "A nettype matches
 // itself and the nettype of nets declared using that nettype within the scope
 // of the nettype type identifier" and b) the renaming case; the "shall" the
-// report enforces is §28.8's "A bidirectional switch shall not connect nets of
-// two different user-defined net types or a user-defined net type and a
-// built-in net type", so the report names §28.8.
+// report enforces is §28.8's, that a bidirectional switch may not join nets of
+// two different user-defined net types, nor one of a user-defined net type to
+// one of a built-in net type, so the report names §28.8.
 TEST(MatchingNettypes, DistinctNettypeTerminalsRejected) {
   ElabFixture f;
   ElaborateSrc(

@@ -13,8 +13,8 @@ using namespace delta;
 // and A.3.4's type keywords, and what it has to say is that those four make one
 // declaration: a keyword A.3.4 names takes the instance shape A.3.1 pairs with
 // its group, and the `[ name_of_instance ]` every one of those forms opens with
-// is the same name, carrying the range §28.3.5 reads as "the instance array's
-// size".
+// is the same name, carrying the range §28.3.5 reads as how many instances the
+// array holds.
 //
 // That range is the crossing no subsection file makes, because how many
 // primitives a declaration builds is a question only A.3.1's `name_of_instance`

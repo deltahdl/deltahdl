@@ -249,10 +249,10 @@ TEST(UdpInstanceElaboration, GateInstanceInTheSameModuleStaysInAssigns) {
 // §29.8: an array of UDP instances may carry a range, and UDP instances are
 // written inside modules as gates are (§28.3), so the four-element range below
 // shall leave four entries in RtlirModule::udp_insts rather than one. §28.3.6
-// says which bit each element connects to: "If bit lengths are different, each
-// instance shall get a part-select of the port expression, of a bit length
-// equal to the instance port bit length", so the four elements take the four
-// distinct bits of the 4-bit terminal `r_out_v`.
+// says which bit each element connects to: where the widths differ, each
+// instance takes a part-select of the port expression as wide as its own port,
+// so the four elements take the four distinct bits of the 4-bit terminal
+// `r_out_v`.
 //
 // Both assertions are needed. The count alone passes an expansion that
 // connected the whole vector to all four instances, which is what the four
@@ -295,11 +295,11 @@ TEST(UdpInstanceElaboration, InstanceArrayExpandsToOneInstancePerElement) {
 }
 
 // §29.8: a UDP instance connects its terminals by §28.3.6's rules, and §28.3.6
-// rules that "Too many or too few bits to connect to all the instances shall be
-// considered an error". The array below has four elements, so its output
-// terminal is either 1 bit and broadcast to each element or 4 bits and
-// distributed across them; the 3-bit `w_out_v` is neither, and the three
-// surplus-or-missing bits connect to nothing.
+// rules that a terminal with too many or too few bits for all the instances is
+// an error. The array below has four elements, so its output terminal is either
+// 1 bit and broadcast to each element or 4 bits and distributed across them;
+// the 3-bit `w_out_v` is neither, and the three surplus-or-missing bits connect
+// to nothing.
 //
 // The report is named through ReportedError so the case cannot pass on some
 // other rejection of this source -- an unexpanded array reports nothing at all

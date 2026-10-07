@@ -252,12 +252,12 @@ TEST(NetStrengthDisjunction, VectorBitsResolvingAlikeReportWhatOneBitDoes) {
   EXPECT_FALSE(net.resolved_strength.IsAmbiguous());
 }
 
-// §28.12.2: "signals with a value x ... have strength levels consisting of
-// subdivisions of both the strength1 and the strength0 parts of the scale of
-// strengths". A driver whose value is x therefore puts its own level on both
-// sides, and both bounds sit at that level: the level is known even though the
-// value is not, so the result is not the range the equal-and-opposite conflict
-// produces, which §28.12.2 gives "all the smaller strength levels" as well.
+// §28.12.2: a signal of value x has strength levels drawn from both the
+// strength1 and the strength0 halves of the strength scale. A driver whose
+// value is x therefore puts its own level on both sides, and both bounds sit at
+// that level: the level is known even though the value is not, so the result is
+// not the range the equal-and-opposite conflict produces, which §28.12.2 gives
+// every weaker strength level as well.
 TEST(NetStrengthDisjunction, DriverOfUnknownValueRecordsItsLevelOnBothSides) {
   Arena arena;
   StrengthNet sn = MakeStrengthNet(arena, 1);

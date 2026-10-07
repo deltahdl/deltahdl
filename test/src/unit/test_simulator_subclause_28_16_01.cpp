@@ -135,9 +135,8 @@ TEST(MinTypMaxDelaySim, ProceduralDelayTripleTakesParameterMembers) {
 }
 
 // §28.16.1's list reaches one more delay position through §28.16.2, which rules
-// that "like all nets, the delay specification in a trireg net declaration can
-// contain up to three delays" and that "the third delay shall specify the
-// charge decay time". So the charge decay time may be written as three
+// that a trireg takes up to three delays as any net does and that its third is
+// the charge decay time. So the charge decay time may be written as three
 // expressions separated by colons, and which of the three the run waits out is
 // what the two runs below read back. The cases above vary the mode; this one
 // cannot, because the charge decay time is settled at elaboration and nothing
@@ -145,10 +144,10 @@ TEST(MinTypMaxDelaySim, ProceduralDelayTripleTakesParameterMembers) {
 //
 // Being settled at elaboration, the charge decay time is also not a settle time
 // the run can report the way the cases above do. §28.16.2.1 supplies the
-// observation instead: the charge decay process "shall begin when the drivers
-// of the trireg net turn off", and it ends when "the delay specified by charge
-// decay time elapses, and the trireg net makes a transition from 1 or 0 to x".
-// A stored 1 that has become x is therefore a decay time that has elapsed.
+// observation instead: the charge decay process starts when the trireg's
+// drivers turn off and ends when the charge decay time has passed and the net
+// goes from 1 or 0 to x. A stored 1 that has become x is therefore a decay time
+// that has elapsed.
 
 // Whether bit 0 of `v` reads x, which is (aval=1, bval=1). A stored 1 reads
 // (aval=1, bval=0), so this is what tells a decayed trireg from an intact one.

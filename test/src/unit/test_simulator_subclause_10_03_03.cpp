@@ -431,10 +431,10 @@ TEST(AssignmentDelaySim, InertialDelayNoIntermediateGlitch) {
 
 // §10.3.3: "A delay given to a continuous assignment shall specify the time
 // duration between a right-hand operand value change and the assignment made to
-// the left-hand side", and §28.16 measures a net delay "from any driver on the
-// net changing value to the time when the net value is updated and propagated
-// further". Both operands of `a & b` change in one time step here, which every
-// other delayed case in this file avoids by driving a one-operand or constant
+// the left-hand side", and §28.16 measures a net delay from a change on any of
+// the net's drivers to the moment the net's value is updated and passed on.
+// Both operands of `a & b` change in one time step here, which every other
+// delayed case in this file avoids by driving a one-operand or constant
 // right-hand side, so this is the first case where the assignment has more than
 // one operand change to react to at once. It fails when the second operand's
 // change costs the assignment its delay and puts the new value on y at t=9

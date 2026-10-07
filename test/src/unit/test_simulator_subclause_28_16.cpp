@@ -450,24 +450,24 @@ TEST(GateNetDelays, ProductionNetDelayDelaysSeparateContinuousAssignment) {
 }
 
 TEST(GateNetDelays, ProductionNetDelayDelaysGatePrimitiveDriver) {
-  // §28.16 defines a net delay as "the time it takes from any driver on the net
-  // changing value to the time when the net value is updated and propagated
-  // further", so which construct drives the net does not change the answer: a
-  // gate primitive is a driver on `w` exactly as the continuous assignment
-  // above is, and the same five ticks stand between its output changing and the
-  // net carrying the change. The buf carries no delay of its own, so the five
-  // ticks are the net's alone and this case rests on no rule about how a gate
-  // delay and a net delay combine.
+  // §28.16 defines a net delay as running from a change on any of the net's
+  // drivers to the moment the net's value is updated and passed on, so which
+  // construct drives the net does not change the answer: a gate primitive is a
+  // driver on `w` exactly as the continuous assignment above is, and the same
+  // five ticks stand between its output changing and the net carrying the
+  // change. The buf carries no delay of its own, so the five ticks are the
+  // net's alone and this case rests on no rule about how a gate delay and a net
+  // delay combine.
   EXPECT_EQ(SettleTicksForNetDelayDriver("buf g(w, a);"), 105u);
 }
 
 TEST(GateNetDelays, ProductionUndrivenDelayedNetAcquiresNoDriver) {
-  // §28.16 gives a net delay its effect on "any driver on the net changing
-  // value", so a declaration carrying a delay and no assignment declares a net
-  // and creates nothing that drives it. Honouring the delay on a separately
-  // written driver must not manufacture a driver where the source wrote none:
-  // the module gains no continuous assignment, the lowered net gains no driver,
-  // and the run has nothing to schedule.
+  // §28.16 gives a net delay its effect on a change of any driver on the net,
+  // so a declaration carrying a delay and no assignment declares a net and
+  // creates nothing that drives it. Honouring the delay on a separately written
+  // driver must not manufacture a driver where the source wrote none: the
+  // module gains no continuous assignment, the lowered net gains no driver, and
+  // the run has nothing to schedule.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -510,7 +510,7 @@ TEST(GateNetDelays, ProductionNetDelayIsAddedToAGatePrimitivesOwnDelay) {
 }
 
 // §29.2 makes a primitive instance's output terminal a driver on the net
-// connected to it, and §28.16 gives a net delay to "any driver on the net", so
+// connected to it, and §28.16 gives a net delay to every driver on the net, so
 // the construct driving the net does not change the answer. A gate reaches the
 // pass that gives a driver its net's delay because a gate is lowered to a
 // continuous assignment; §29.8's instances stand in RtlirModule::udp_insts and
@@ -620,11 +620,11 @@ TEST(GateNetDelays, ProductionNetDelayIgnoresAnUnselectedGenerateBlock) {
             105u);
 }
 
-// §28.16 (printed page 856): a gate delay is "the signal propagation delay
-// from any gate input to the gate output", and the input ports of the module
-// holding the gate are its inputs like any net (§23.2.2). The parent writes the
-// ports after time 0 under names of its own, `a` and `c` for the ports `a` and
-// `b`, in one time step, and the gate's output follows 4 later.
+// §28.16 (printed page 856): a gate delay is the time a signal takes from any
+// of the gate's inputs to its output, and the input ports of the module holding
+// the gate are its inputs like any net (§23.2.2). The parent writes the ports
+// after time 0 under names of its own, `a` and `c` for the ports `a` and `b`,
+// in one time step, and the gate's output follows 4 later.
 TEST(GateNetDelays, DelayedGateFollowsInputPortsWrittenInOneStep) {
   SimFixture f;
   auto out = RunCapture(
@@ -781,9 +781,9 @@ TEST(GateNetDelays, DelayedGateOutputIsUnknownUntilItsFirstTransition) {
             "t=4 y=1 v=St1\n");
 }
 
-// §28.3 (printed page 829): the instances of one declaration "shall have the
-// same drive strength and delay specification", and each of them drives its
-// own net x until that delay has passed.
+// §28.3 (printed page 829): the instances of one declaration share one drive
+// strength and one delay specification, and each of them drives its own net x
+// until that delay has passed.
 TEST(GateNetDelays, GatesOfOneDeclarationEachDriveXUntilTheSharedDelay) {
   SimFixture f;
   auto out = RunCapture(

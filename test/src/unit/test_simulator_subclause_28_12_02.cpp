@@ -248,8 +248,8 @@ static Net* RunAndFindNetW(SimFixture& f, const char* src) {
 }
 
 // Checks the settled net holds x and its resolved strength spans `hi` down to
-// HiZ on both sides of the scale, which is what the standard's "all the
-// smaller strength levels" clause makes an equal-strength conflict produce.
+// HiZ on both sides of the scale, which is what the standard's rule adding
+// every weaker strength level makes an equal-strength conflict produce.
 static void ExpectXSpanningDownToHighz(SimFixture& f, Net* net, Strength hi) {
   ASSERT_NE(net, nullptr);
   auto* var = f.ctx.FindVariable("w");
@@ -277,9 +277,9 @@ TEST(StrengthResolutionPipeline, EqualWeakOppositeValueYieldsWeakX) {
   ExpectXSpanningDownToHighz(f, net, Strength::kWeak);
 }
 
-// The "all the smaller strength levels" clause made explicit at strong: a
-// strong 1 opposing a strong 0 yields x whose range spans strong down to HiZ
-// on both sides of the scale, not just the strong endpoint.
+// The rule adding every weaker strength level, made explicit at strong: a
+// strong 1 opposing a strong 0 yields x whose range spans strong down to HiZ on
+// both sides of the scale, not just the strong endpoint.
 TEST(StrengthResolutionPipeline,
      EqualStrongOppositeValueSpansAllSmallerLevels) {
   SimFixture f;
@@ -389,9 +389,9 @@ StrengthSignal Strength1Range(StrengthLevel lo, StrengthLevel hi) {
 
 // Figure 28-9's worked example: the pull H of Figure 28-7's shape and the weak
 // L of Figure 28-8's shape combine into the 35x signal Figure 28-10 draws.
-// "In Figure 28-9, the combination of signals of ambiguous strengths produces a
-// range that includes the extremes of the signals and all the strengths between
-// them, as described in Figure 28-10."
+// In Figure 28-9, combining signals of ambiguous strength gives a range running
+// from the signals' extremes through every strength between them, which Figure
+// 28-10 draws.
 TEST(AmbiguousStrengthModelCombine, PullHAndWeakLGiveThreeFiveX) {
   StrengthSignal pull_h =
       Strength1Range(StrengthLevel::kHighz, StrengthLevel::kPull);
@@ -400,12 +400,10 @@ TEST(AmbiguousStrengthModelCombine, PullHAndWeakLGiveThreeFiveX) {
 
   StrengthSignal r = CombineAmbiguous(pull_h, weak_l);
 
-  // "The result is a value x because its range includes the values 1 and 0."
+  // The result is an x, its range taking in both 1 and 0.
   EXPECT_EQ(r.value, Val4::kX);
-  // "The number 35, which precedes the x, is a concatenation of two digits. The
-  // first is the digit 3, which corresponds to the highest strength0 level for
-  // the result. The second digit, 5, corresponds to the highest strength1 level
-  // for the result."
+  // The 35 before the x is two digits run together: the 3 is the result's
+  // highest strength0 level and the 5 its highest strength1 level.
   EXPECT_EQ(r.strength0_hi, StrengthLevel::kWeak);
   EXPECT_EQ(r.strength1_hi, StrengthLevel::kPull);
   // Figure 28-10 draws the range from We0 through HiZ0 and HiZ1 up to Pu1, so
@@ -415,12 +413,11 @@ TEST(AmbiguousStrengthModelCombine, PullHAndWeakLGiveThreeFiveX) {
 }
 
 // Figure 28-11's worked example: the two switch-network signals combine into
-// the 56x signal Figure 28-14 draws. "When the signals from the upper and lower
-// configurations in Figure 28-11 combine, the result is an unknown with a range
-// (56x) determined by the extremes of the two signals shown in Figure 28-14."
-// Neither component reaches high impedance, Figure 28-12 drawing the upper
-// signal 651 as Pu1 through St1 and Figure 28-13 drawing the lower signal 530
-// as We0 through Pu0.
+// the 56x signal Figure 28-14 draws. Combining the upper and lower
+// configurations of Figure 28-11 gives an unknown whose range (56x) is set by
+// the two signals' extremes, as Figure 28-14 shows. Neither component reaches
+// high impedance, Figure 28-12 drawing the upper signal 651 as Pu1 through St1
+// and Figure 28-13 drawing the lower signal 530 as We0 through Pu0.
 TEST(AmbiguousStrengthModelCombine, SwitchNetworkRangesGiveFiveSixX) {
   StrengthSignal upper =
       Strength1Range(StrengthLevel::kPull, StrengthLevel::kStrong);
@@ -429,7 +426,7 @@ TEST(AmbiguousStrengthModelCombine, SwitchNetworkRangesGiveFiveSixX) {
 
   StrengthSignal r = CombineAmbiguous(upper, lower);
 
-  // "The result is a value x because its range includes the values 1 and 0."
+  // The result is an x, its range taking in both 1 and 0.
   EXPECT_EQ(r.value, Val4::kX);
   // The 5 of 56x is the highest strength0 level and the 6 is the highest
   // strength1 level, which are the Pu0 and St1 extremes Figure 28-14 draws.
@@ -443,14 +440,13 @@ TEST(AmbiguousStrengthModelCombine, SwitchNetworkRangesGiveFiveSixX) {
 }
 
 // Figure 28-15's worked example: raising the lower component's extreme to
-// strong raises the result's strength0 extreme with it. "In Figure 28-11,
-// replacing the pulldown in the lower configuration with a supply0 would change
-// the range of the result to the range (Stx) described in Figure 28-15." "The
-// range in Figure 28-15 is strong x because it is unknown and the extremes of
-// both its components are strong. The extreme of the output of the lower
-// configuration is strong because the lower pmos reduces the strength of the
-// supply0 signal." The substitution moves only that extreme, so the lower
-// component keeps the We0 low end Figure 28-13 draws.
+// strong raises the result's strength0 extreme with it. Putting a supply0 in
+// place of the lower configuration's pulldown in Figure 28-11 turns the
+// result's range into the Stx of Figure 28-15, which is a strong x because the
+// value is unknown and both components reach strong, the lower one's extreme
+// being strong because its pmos weakens the supply0. The substitution moves
+// only that extreme, so the lower component keeps the We0 low end Figure 28-13
+// draws.
 TEST(AmbiguousStrengthModelCombine, StrongExtremesGiveStrongX) {
   StrengthSignal upper =
       Strength1Range(StrengthLevel::kPull, StrengthLevel::kStrong);
@@ -459,7 +455,7 @@ TEST(AmbiguousStrengthModelCombine, StrongExtremesGiveStrongX) {
 
   StrengthSignal r = CombineAmbiguous(upper, lower);
 
-  // "The result is a value x because its range includes the values 1 and 0."
+  // The result is an x, its range taking in both 1 and 0.
   EXPECT_EQ(r.value, Val4::kX);
   // Figure 28-15 draws the range from St0 up to St1, so strong is the high end
   // on both sides and high impedance the low end on both sides.
@@ -470,13 +466,11 @@ TEST(AmbiguousStrengthModelCombine, StrongExtremesGiveStrongX) {
 }
 
 // Two components on one side of the scale: a pull H and the strong H of
-// Figure 28-7 combine into the strong H range. "The combination of two signals
-// of ambiguous strength shall result in a signal of ambiguous strength. The
-// resulting signal shall have a range of strength levels that includes the
-// strength levels in its component signals." Both components run from high
-// impedance, the pull H up to Pu1 and the strong H up to St1, so the range
-// holding the levels of both is HiZ1 through St1 and no strength0 level joins
-// it.
+// Figure 28-7 combine into the strong H range. Two signals of ambiguous
+// strength combine into one of ambiguous strength, its range taking in every
+// strength level of either component. Both components run from high impedance,
+// the pull H up to Pu1 and the strong H up to St1, so the range holding the
+// levels of both is HiZ1 through St1 and no strength0 level joins it.
 //
 // The `value` field is not asserted. §28.12.2 classifies this result as a
 // signal with a value H, and Val4 in lib/cpp/test_models/model_val4.h has no H
@@ -499,13 +493,11 @@ TEST(AmbiguousStrengthModelCombine, PullHAndStrongHGiveStrongHRange) {
 // Two components of the same value, neither of which reaches high impedance: a
 // value-1 signal spanning Pu1 through St1 combines with a value-1 signal
 // spanning We1 through La1 into a value-1 signal spanning We1 through St1.
-// "The combination of two signals of ambiguous strength shall result in a
-// signal of ambiguous strength. The resulting signal shall have a range of
-// strength levels that includes the strength levels in its component signals",
-// which Figure 28-9 draws as "a range that includes the extremes of the signals
-// and all the strengths between them". We1 is the lower extreme of the two
-// components and St1 the upper, so the range runs from one to the other and no
-// further.
+// Two signals of ambiguous strength combine into one of ambiguous strength, its
+// range taking in every strength level of either component, which Figure 28-9
+// draws as a range from the signals' extremes through every strength between
+// them. We1 is the lower extreme of the two components and St1 the upper, so
+// the range runs from one to the other and no further.
 //
 // This is the case issue #3423 records. Before that issue CombineAmbiguous read
 // the strength0_hi and strength1_hi fields alone, so it answered this
@@ -515,8 +507,7 @@ TEST(AmbiguousStrengthModelCombine, PullHAndStrongHGiveStrongHRange) {
 // The value is asserted here and not in PullHAndStrongHGiveStrongHRange above,
 // because a range clear of HiZ1 is one §28.12.2 gives a defined value. Of
 // Figure 28-12's Pu1 through St1 range the clause says the upper configuration
-// of Figure 28-11 "produces a signal with a value of 1 and a range of strengths
-// (651)".
+// of Figure 28-11 gives a signal of value 1 and strength range (651).
 TEST(AmbiguousStrengthModelCombine,
      ValueOneRangesClearOfHighzKeepTheirExtreme) {
   StrengthSignal pull_to_strong_one =
@@ -547,13 +538,11 @@ std::string ResolvedStrengthOf(const std::string& body) {
 
 // §28.12.2's Figure 28-9: two three-state gates with unknown controls, one
 // passing Pu1 and one passing We0, drive one net. Each is an ambiguous signal
-// (§28.6's H and L), and "the combination of two signals of ambiguous strength
-// shall result in a signal of ambiguous strength ... a range of strength levels
-// that includes the strength levels in its component signals" -- which Figure
-// 28-10 draws as one range from We0 across high impedance to Pu1. §21.2.1.4
-// renders it 35X: "The first is the digit 3, which corresponds to the highest
-// strength0 level for the result. The second digit, 5, corresponds to the
-// highest strength1 level for the result."
+// (§28.6's H and L), and two signals of ambiguous strength combine into one of
+// ambiguous strength whose range takes in every strength level of either
+// component -- which Figure 28-10 draws as one range from We0 across high
+// impedance to Pu1. §21.2.1.4 renders it 35X, the 3 being the result's highest
+// strength0 level and the 5 its highest strength1 level.
 //
 // That two-digit form was reachable from no source. The resolution answered
 // with the strongest driver alone, so the weaker gate's side of the scale was
@@ -570,8 +559,8 @@ TEST(StrengthResolution, SourceFigure289CombinesTwoAmbiguousGates) {
 
 // The narrower claim underneath: one driver of unknown value at a known
 // strength gives the net that strength rather than high impedance. §28.12.2
-// puts such a signal on "both the strength1 and the strength0 parts of the
-// scale", and with one level on each side §21.2.1.4 names it with that level's
+// puts such a signal on both the strength1 and the strength0 halves of the
+// scale, and with one level on each side §21.2.1.4 names it with that level's
 // mnemonic.
 TEST(StrengthResolution, SourceUnknownValueDriverGivesItsOwnStrength) {
   EXPECT_EQ(ResolvedStrengthOf("  assign (pull0, pull1) y = 1'bx;\n"), "PuX\n");
@@ -579,9 +568,9 @@ TEST(StrengthResolution, SourceUnknownValueDriverGivesItsOwnStrength) {
 
 // §28.12.2 (printed page 847), Figure 28-11's upper combination: a switch with
 // an unknown control passing a strong 1 is an H, and with a pullup on the same
-// net it "produces a signal with a value of 1 and a range of strengths (651)",
-// every state the two leave the net in being a 1 -- St1 where the switch
-// passes, Pu1 where it does not.
+// net it gives a signal of value 1 and strength range (651), every state the
+// two leave the net in being a 1 -- St1 where the switch passes, Pu1 where it
+// does not.
 TEST(StrengthResolution, SourceFigure2811UpperCombinationIs651) {
   SimFixture f;
   auto out = RunCapture(
@@ -598,7 +587,7 @@ TEST(StrengthResolution, SourceFigure2811UpperCombinationIs651) {
 
 // Figure 28-11's lower combination: a pulldown passed through a switch with an
 // unknown control is an L at the pull level, and with a weak 0 beside it the
-// net has "a value 0 and a range of strengths (530)".
+// net has value 0 and strength range (530).
 TEST(StrengthResolution, SourceFigure2811LowerCombinationIs530) {
   SimFixture f;
   auto out = RunCapture(
@@ -614,11 +603,11 @@ TEST(StrengthResolution, SourceFigure2811LowerCombinationIs530) {
   EXPECT_EQ(out, "l=0 530\n");
 }
 
-// Figure 28-14: the upper and lower combinations on one net give "an unknown
-// with a range (56x) determined by the extremes of the two signals". The L's
-// pull 0 meets the pullup's pull 1 where neither switch passes, so the 0 side
-// reaches the pull level; combined with the pullup first, the L was dropped
-// as no stronger than it, and the net read 36X.
+// Figure 28-14: the upper and lower combinations on one net give an unknown
+// whose range (56x) is set by the two signals' extremes. The L's pull 0 meets
+// the pullup's pull 1 where neither switch passes, so the 0 side reaches the
+// pull level; combined with the pullup first, the L was dropped as no stronger
+// than it, and the net read 36X.
 TEST(StrengthResolution, SourceFigure2814CombinesBothAt56X) {
   SimFixture f;
   auto out = RunCapture(
@@ -637,9 +626,9 @@ TEST(StrengthResolution, SourceFigure2814CombinesBothAt56X) {
 }
 
 // Figure 28-16 (printed page 848): an and gate declared (strong1, highz0) with
-// one input x drives StH, and with a weak 0 beside it the net is "the range
-// (36x)" of Figure 28-19; an H beside a pullup alone stays 651, the weak 0
-// being reached only where the H is z and the pullup is not.
+// one input x drives StH, and with a weak 0 beside it the net takes the range
+// (36x) of Figure 28-19; an H beside a pullup alone stays 651, the weak 0 being
+// reached only where the H is z and the pullup is not.
 TEST(StrengthResolution, SourceFigure2816StrongHWithWeakZeroIs36X) {
   SimFixture f;
   auto out = RunCapture(

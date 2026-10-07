@@ -114,13 +114,11 @@ TEST(ChargeDecaySpecElaboration, TwoDelaysDoNotPopulateDecayTicks) {
   EXPECT_TRUE(found);
 }
 
-// §28.16.2.2 rules that "the third delay in a trireg net declaration shall
-// specify the charge decay time", and §28.16.2 admits §28.16.1's three-valued
-// form into that slot: "Like all nets, the delay specification in a trireg net
-// declaration can contain up to three delays." §28.16.1 in turn rules that the
-// "minimum, typical, and maximum values for each delay shall be specified as
-// expressions separated by colons", so `#(1, 2, 3:4:5)` writes a charge decay
-// time of 3, 4 or 5.
+// §28.16.2.2 rules that a trireg net declaration's third delay is its charge
+// decay time, and §28.16.2 admits §28.16.1's three-valued form into that slot,
+// a trireg taking up to three delays as any net does. §28.16.1 in turn has each
+// delay's minimum, typical and maximum written as expressions between colons,
+// so `#(1, 2, 3:4:5)` writes a charge decay time of 3, 4 or 5.
 //
 // 4 is the one this asserts, because 4 is the member elaboration can reach.
 // §11.11 orders the three as "minimum, typical, and maximum values -- in that
@@ -178,12 +176,12 @@ TEST(ChargeDecaySpecElaboration,
                               "28.16.2.2"));
 }
 
-// §28.16.2.1 makes the charge decay a process that ends when "the delay
-// specified by charge decay time elapses, and the trireg net makes a transition
-// from 1 or 0 to x", so a decay time of zero is that transition happening at
-// once. §28.16.2.2 gives the *absence* of a third delay the meaning of never
-// decaying. The two states shared one representation -- a decay_ticks of zero
-// -- so a declaration writing zero got the opposite of what it asked for.
+// §28.16.2.1 makes the charge decay a process that ends when the charge decay
+// time has passed and the trireg net goes from 1 or 0 to x, so a decay time of
+// zero is that transition happening at once. §28.16.2.2 gives the *absence* of
+// a third delay the meaning of never decaying. The two states shared one
+// representation -- a decay_ticks of zero -- so a declaration writing zero got
+// the opposite of what it asked for.
 //
 // The elaborated nets are asserted to differ in the field that now tells them
 // apart, which is where the distinction is made; the two run-time cases are in

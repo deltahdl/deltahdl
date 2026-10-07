@@ -96,14 +96,12 @@ TEST(ChargeDecayElaboration, DecayTimeFromLocalparam) {
   EXPECT_TRUE(found);
 }
 
-// §28.16.2: "Like all nets, the delay specification in a trireg net declaration
-// can contain up to three delays. The first two delays shall specify the delay
-// for transition to the 1 and 0 logic states when the trireg net is driven to
-// these states by a driver. The third delay shall specify the charge decay time
-// instead of the delay in a transition to the z logic state." "Like all nets"
-// carries §28.16.1's three-valued form into each of the three slots, so a
-// declaration may write a triple in every one of them and the charge decay time
-// is the third triple's.
+// §28.16.2: a trireg takes up to three delays as any net does; the first two
+// time a driver taking it to 1 and to 0, and the third is the charge decay time
+// rather than the delay of a move to z. That it is like any other net carries
+// §28.16.1's three-valued form into each of the three slots, so a declaration
+// may write a triple in every one of them and the charge decay time is the
+// third triple's.
 //
 // The charge decay time is 8, the typical member of the third triple. §11.11
 // orders the three as "minimum, typical, and maximum values -- in that order",
@@ -127,14 +125,11 @@ TEST(ChargeDecayElaboration, DecayTimeIsTheThirdTripleWhenEveryDelayIsATriple) {
   EXPECT_EQ(cap->decay_ticks, 8u);
 }
 
-// §28.16 gives every net's three delays one meaning -- "The first delay refers
-// to the transition to the 1 value (rise delay). The second delay refers to the
-// transition to the 0 value (fall delay). The third delay refers to the
-// transition to the high-impedance value" -- and §28.16.2 replaces the third
-// for one net type alone: "Like all nets, the delay specification in a trireg
-// net declaration can contain up to three delays ... The third delay shall
-// specify the charge decay time instead of the delay in a transition to the z
-// logic state."
+// §28.16 gives every net's three delays one meaning -- the first is the rise to
+// 1, the second the fall to 0, the third the move to high impedance -- and
+// §28.16.2 replaces the third for one net type alone: a trireg takes up to
+// three delays as any net does, but its third is the charge decay time rather
+// than the delay of a move to z.
 //
 // So a wire's third delay is a turn-off delay and no charge decay time, and the
 // three values are distinct from each other and from zero so that no

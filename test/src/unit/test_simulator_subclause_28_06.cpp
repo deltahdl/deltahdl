@@ -54,14 +54,13 @@ uint64_t SettleTime(const std::string& decl, const std::string& stim) {
 //
 // The rows where the control is a clean 0/1 are fully modelled by the lowered
 // ternary. The control x/z columns give L and H, which §28.6 defines as values
-// -- "The symbol L shall represent a result that has a value 0 or z. The symbol
-// H shall represent a result that has a value 1 or z" -- and §28.12.2 draws as
-// a strength: a range on one side of the scale, from the gate's own drive level
-// down to high impedance. The value such a gate settles on is x either way, so
-// the cases at the end of this file read the strength back with %v, which is
-// where L and H are told from an unambiguous x. A high-impedance data value on
-// a conducting gate is not one of those rows: Table 28-5 gives it a definite x,
-// which is asserted below.
+// -- L for a result that is either 0 or z, H for one that is either 1 or z --
+// and §28.12.2 draws as a strength: a range on one side of the scale, from the
+// gate's own drive level down to high impedance. The value such a gate settles
+// on is x either way, so the cases at the end of this file read the strength
+// back with %v, which is where L and H are told from an unambiguous x. A
+// high-impedance data value on a conducting gate is not one of those rows:
+// Table 28-5 gives it a definite x, which is asserted below.
 
 TEST(TristateGateSim, Bufif1ConductsWhenControlHigh) {
   // bufif1 conducts when control is 1, passing the data value.
@@ -202,7 +201,7 @@ TEST(TristateGateSim, NoDelaySpecificationPropagatesImmediately) {
 }
 
 TEST(TristateGateSim, SingleDelayAlsoTimesTurnOff) {
-  // "All output transitions" includes a turn-off: with a lone delay, dropping
+  // Every output transition includes a turn-off: with a lone delay, dropping
   // the control at t=20 moves the output to z 7 later, the same delay a data
   // change would take.
   uint64_t t = SettleTime("bufif1 #7 g(y, src, ctrl);",
@@ -245,8 +244,8 @@ std::string DriveTristateStrength(const std::string& decl,
 }
 
 // §28.6 Table 28-5, bufif1 with a control of x and a data value of 1: the gate
-// drives H, "a result that has a value 1 or z", which §28.12.2's Figure 28-6
-// draws as the output of exactly this gate and Figure 28-7 as a range on the
+// drives H, a result that is either 1 or z, which §28.12.2's Figure 28-6 draws
+// as the output of exactly this gate and Figure 28-7 as a range on the
 // strength1 side running from the driving level down to high impedance.
 // §21.2.1.4 renders that range as the level's mnemonic and the letter H: StH.
 //

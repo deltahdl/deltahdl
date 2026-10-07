@@ -16,9 +16,9 @@ using namespace delta;
 
 namespace {
 
-// This file covers the rule of §28.14: "The rnmos, rpmos, rcmos, rtran,
-// rtranif1, and rtranif0 devices shall reduce the strength of signals that pass
-// through them according to Table 28-8."
+// This file covers the rule of §28.14: the rnmos, rpmos, rcmos, rtran, rtranif1
+// and rtranif0 devices weaken the signals passing through them as Table 28-8
+// sets out.
 //
 // The ModelAndSimulator... cases claim more than the cases around them: at
 // every row of Table 28-8, ModelReduceResistive in
