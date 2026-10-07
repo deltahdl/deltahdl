@@ -264,11 +264,11 @@ TEST(StringLenElaboration,
 }
 
 // §6.16.1's len() written inside a generate block. §27.4 makes a generate
-// block "a separate scope and a new level of hierarchy when it is
-// instantiated", and §6.16.1 says nothing that would stop there, so the
-// block's own S is what the call names and N folds to 3 exactly as
-// StringLenElaboration.LenOfAStringLocalparamFoldsToTheCharacterCount above
-// has it at module level. 3 is unreachable from anything else the declaration
+// block a scope of its own and a further level of hierarchy once instantiated,
+// and §6.16.1 says nothing that would stop there, so the block's own S is what
+// the call names and N folds to 3 exactly as
+// StringLenElaboration.LenOfAStringLocalparamFoldsToTheCharacterCount above has
+// it at module level. 3 is unreachable from anything else the declaration
 // records for the reason that case gives.
 //
 // This fails while Elaborator::ProcessPendingGenerate in

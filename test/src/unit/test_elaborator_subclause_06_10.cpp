@@ -393,8 +393,8 @@ TEST(ImplicitDeclaration, PrimitiveTerminalForbiddenUnderNone) {
 // §6.10: "The implicit net declaration shall belong to the scope in which the
 // net reference appears. For example, if the implicit net is declared by a
 // reference in a generate block, then the net is implicitly declared only in
-// that generate block." A generate block "comprises a separate scope and a new
-// level of hierarchy when it is instantiated" (§27.4, printed page 821), so the
+// that generate block." A generate block forms a scope of its own and a further
+// level of hierarchy once instantiated (§27.4, printed page 821), so the
 // implicit 'w' below is a declaration of block 'a' and of nothing else, and the
 // generate block instance array named 'w' beside it is declared in top. §27.4's
 // rule that a block array name shall not conflict with another declaration
@@ -648,11 +648,11 @@ TEST(
 }
 
 // The same §6.10 and §23.9 reading where the enclosing scope is a loop generate
-// block, whose prefix §27.4 indexes "by adding the '[genvar value]' to the end
-// of the generate block identifier" and which the elaborator therefore spells
-// with the index in it. The reference to 'w' inside block 'a' names the 'w'
-// this iteration of block 'b' declared, so the module holds one net named
-// 'b_4_w' and none named 'b_4_a_w'.
+// block, whose prefix §27.4 indexes by appending the genvar's value in brackets
+// to the generate block's name and which the elaborator therefore spells with
+// the index in it. The reference to 'w' inside block 'a' names the 'w' this
+// iteration of block 'b' declared, so the module holds one net named 'b_4_w'
+// and none named 'b_4_a_w'.
 //
 // The genvar runs from 4 so that no value it takes is also the ordinal of the
 // instance the iteration creates, which is 0. A loop starting at zero makes the

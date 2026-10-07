@@ -140,9 +140,9 @@ TEST(Elaboration, StringParameterConcatenationFoldsToTheJoinedCharacters) {
 }
 
 // The same concatenation written inside a generate block. §27.4 makes a
-// generate block "a separate scope and a new level of hierarchy when it is
-// instantiated", and §6.16 says nothing that would stop at that boundary, so
-// the block's own P is what the concatenation names and Q holds the same three
+// generate block a scope of its own and a further level of hierarchy once
+// instantiated, and §6.16 says nothing that would stop at that boundary, so the
+// block's own P is what the concatenation names and Q holds the same three
 // characters the module-level case above gives it.
 //
 // This fails while Elaborator::ProcessPendingGenerate in

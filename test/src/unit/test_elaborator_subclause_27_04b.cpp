@@ -236,12 +236,12 @@ TEST(GenerateElaboration, GenerateForInitStepMismatchIncrementFormErrors) {
       "generate-for init and step assign different genvars", 4, "27.4"));
 }
 
-// §27.4: "The genvar is used as an integer during elaboration to evaluate the
-// generate loop and create instances of the generate block, but it does not
-// exist at simulation time." The sibling tests here observe that through a
-// variable count, which a change in how many variables the loop body
-// contributes would also move. This one names the claim directly: whatever
-// else the module holds, nothing in it is called by the genvar's name.
+// §27.4: the genvar serves as an integer during elaboration, to run the
+// generate loop and create the block's instances, and does not exist once
+// simulation starts. The sibling tests here observe that through a variable
+// count, which a change in how many variables the loop body contributes would
+// also move. This one names the claim directly: whatever else the module holds,
+// nothing in it is called by the genvar's name.
 TEST(GenerateElaboration, GenvarIsNotAmongTheModuleVariables) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -262,10 +262,10 @@ TEST(GenerateElaboration, GenvarIsNotAmongTheModuleVariables) {
   }
 }
 
-// §27.4: a loop generate block "comprises a separate scope and a new level of
-// hierarchy when it is instantiated", so the one instantiation written in the
-// body declares its name in a different scope on each iteration. Two iterations
-// of `child c1()` are two declarations in two scopes, not two in one.
+// §27.4: a loop generate block forms a scope of its own and a further level of
+// hierarchy once instantiated, so the one instantiation written in the body
+// declares its name in a different scope on each iteration. Two iterations of
+// `child c1()` are two declarations in two scopes, not two in one.
 TEST(GenerateElaboration, LoopIterationsDoNotRedeclareTheSameInstanceName) {
   ElabFixture f;
   auto* design = Elaborate(

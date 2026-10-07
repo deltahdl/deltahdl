@@ -454,11 +454,11 @@ TEST(DefparamElaboration, ReplacesEveryCharacterOfAStringParameter) {
 // §23.10.1 lets a defparam change a parameter "in any module, interface, or
 // program instance throughout the design using the hierarchical name of the
 // parameter", and §27.5 makes a named generate block one of the names such a
-// path is built from: "if the generate block selected for instantiation is
-// named, then this name declares a generate block instance and is the name for
-// the scope it creates. Normal rules for hierarchical naming apply." Its
-// Example 1 writes the gate instantiated inside a block named u1 as
-// `test.u1.g1`, so `g.u.P` names the child's parameter and the override lands.
+// path is built from: a selected generate block that has a name declares a
+// generate block instance by that name, which also names the scope it creates,
+// and hierarchical naming works as usual. Its Example 1 writes the gate
+// instantiated inside a block named u1 as `test.u1.g1`, so `g.u.P` names the
+// child's parameter and the override lands.
 //
 // The design records that child as `g_u`, so comparing the written `g` against
 // an instance name found nothing and the override was dropped with a warning.
@@ -506,11 +506,11 @@ TEST(DefparamElaboration, NamedGenerateBlockPathReportsNoUnresolvedTarget) {
   }
 }
 
-// §27.4: a named loop generate block "is a declaration of an array of generate
-// block instances", whose "index values in this array are the values assumed by
-// the genvar during elaboration", and §27.4 writes the resulting hierarchical
-// names as `B1[0].B2[0].B3[0].N3`. So `b[1]` selects the second block instance
-// and `b[1].u.P` names the parameter in it alone.
+// §27.4: a named loop generate block declares an array of generate block
+// instances, whose indices are the values the genvar takes during elaboration,
+// and §27.4 writes the resulting hierarchical names as `B1[0].B2[0].B3[0].N3`.
+// So `b[1]` selects the second block instance and `b[1].u.P` names the
+// parameter in it alone.
 //
 // Index 1 rather than 0, because an implementation that discards the select and
 // takes the first block instance answers index 0 correctly. Asserting the other

@@ -758,8 +758,8 @@ TEST(ConstantFunctionElaboration, BuiltinMethodOnLocalAllowed) {
 }
 
 // §13.4.3 rules that "a constant function call shall be evaluated at
-// elaboration time", and §27.4 makes a generate block "a separate scope and a
-// new level of hierarchy when it is instantiated" without exempting anything
+// elaboration time", and §27.4 makes a generate block a scope of its own and a
+// further level of hierarchy once instantiated without exempting anything
 // written in it from that. The function is among the module's own items and
 // §23.9 makes it visible from a block below, so P folds to 8 exactly as the
 // module-level InputOnlyArgOk case folds it.
@@ -819,13 +819,12 @@ TEST(ConstantFunctionRulesElaboration,
   EXPECT_EQ(p->resolved_value, 12);
 }
 
-// §27.2 rules that "all other module items, including other generate
-// constructs, are allowed in a generate block" once port declarations, specify
-// blocks and specparam declarations are excluded, so a function may be declared
-// inside one. §13.4.3 has a constant function call "evaluated at elaboration
-// time" and §23.9 has an identifier "declared locally" name the local item, so
-// the triple block 'a' declares is what the call in block 'a' names and P folds
-// to 12.
+// §27.2 rules that every other module item, generate constructs among them, may
+// stand in a generate block once port declarations, specify blocks and
+// specparam declarations are excluded, so a function may be declared inside
+// one. §13.4.3 has a constant function call "evaluated at elaboration time" and
+// §23.9 has an identifier "declared locally" name the local item, so the triple
+// block 'a' declares is what the call in block 'a' names and P folds to 12.
 //
 // The test fails with P unresolved, which ResolvedParam reports as -1.
 // RecordTaskFuncNames in src/elaborator/elaborator_items_udp.cpp fills the

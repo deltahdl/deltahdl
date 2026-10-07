@@ -159,11 +159,11 @@ TEST(ParameterizedScopeResolutionElaboration, UnadornedScopeInsideClassOk) {
 
 // §8.25.1: the explicit specialization form denotes a specific parameter in a
 // constant-expression position, so `C#(4)::p` initializing a localparam folds
-// to 4 and not to the class default of 1. §27.4 makes a generate block "a
-// separate scope and a new level of hierarchy when it is instantiated" and
-// says nothing that would stop that at the boundary, so the same initializer
-// written inside a block folds to the same 4. The class default is written 1
-// so that a fold answering the default misses.
+// to 4 and not to the class default of 1. §27.4 makes a generate block a scope
+// of its own and a further level of hierarchy once instantiated and says
+// nothing that would stop that at the boundary, so the same initializer written
+// inside a block folds to the same 4. The class default is written 1 so that a
+// fold answering the default misses.
 //
 // This fails while Elaborator::ProcessPendingGenerate in
 // src/elaborator/elaborator_generate.cpp opens no ParamClassRegistryGuard:

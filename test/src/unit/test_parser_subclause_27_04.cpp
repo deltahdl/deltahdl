@@ -69,10 +69,10 @@ TEST(LoopGenerateParsing, ForBodySingleItemRecordsNoBeginEnd) {
   // A.4.2 ends loop_generate_construct with a generate_block, which is either a
   // single generate_item or a begin-end block, and gen_body_has_begin_end says
   // which was written here as it does for a conditional generate construct.
-  // §27.5, printed page 825, rules that direct nesting "does not apply in any
-  // way to loop generate constructs", so the field is recorded in this position
-  // without that rule bearing on it: a loop generate block is a scope whether
-  // or not begin and end were written.
+  // §27.5, printed page 825, rules that direct nesting has no bearing at all on
+  // loop generate constructs, so the field is recorded in this position without
+  // that rule bearing on it: a loop generate block is a scope whether or not
+  // begin and end were written.
   auto r = Parse(
       "module m;\n"
       "  genvar i;\n"
@@ -91,11 +91,11 @@ TEST(LoopGenerateParsing, ForBodySingleItemRecordsNoBeginEnd) {
 
 // A.4.2 gives genvar_iteration three forms -- an assignment_operator on the
 // genvar, and ++ or -- before or after it -- and §27.4 says the same in prose:
-// "Both the initialization and iteration assignments in the loop generate
-// scheme shall assign to the same genvar". A `~i` in the third header position
-// names the genvar and assigns to nothing: inc_or_dec_operator is ++ or -- and
-// nothing else, so the form is reported by the parser, where every position
-// that reaches the elaborator has one of the three.
+// the initialization and the iteration assignments of the loop generate scheme
+// both assign the one genvar. A `~i` in the third header position names the
+// genvar and assigns to nothing: inc_or_dec_operator is ++ or -- and nothing
+// else, so the form is reported by the parser, where every position that
+// reaches the elaborator has one of the three.
 TEST(LoopGenerateParsing, StepThatIsANonIncrementUnaryIsRejected) {
   auto r = Parse(
       "module top();\n"

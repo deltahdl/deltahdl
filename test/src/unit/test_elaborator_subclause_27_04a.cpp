@@ -314,12 +314,12 @@ TEST(GenerateElaboration, GenerateForDuplicateBlockArrayNameErrors) {
                             7, "27.4"));
 }
 
-// §27.4: a generate block "comprises a separate scope and a new level of
-// hierarchy when it is instantiated", so the enclosing scope of a nested array
-// is one instance of the outer block rather than the module. The inner array
-// 'h' is declared once per instance of 'g', in two different scopes, so the
-// second instantiation is not a conflict with the first. Both instances of the
-// inner body are elaborated, giving one 'x' per (i, j) pair.
+// §27.4: a generate block forms a scope of its own and a further level of
+// hierarchy once instantiated, so the enclosing scope of a nested array is one
+// instance of the outer block rather than the module. The inner array 'h' is
+// declared once per instance of 'g', in two different scopes, so the second
+// instantiation is not a conflict with the first. Both instances of the inner
+// body are elaborated, giving one 'x' per (i, j) pair.
 TEST(GenerateElaboration, NestedBlockArrayNameRepeatsPerOuterInstanceOk) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -471,13 +471,13 @@ static std::set<std::string> VariableNames(const RtlirModule* mod) {
   return names;
 }
 
-// §27.4: a named generate block "is a declaration of an array of generate block
-// instances", and "the index values in this array are the values assumed by the
-// genvar during elaboration". What identifies an instance is therefore the
-// block and the index, not the genvar. Two loop generate constructs written
-// side by side over one genvar declare two arrays, and §27.4 rules that a
-// generate block "comprises a separate scope", so `blk_a`'s `v` and `blk_b`'s
-// `v` are two declarations and the flattened design has to spell them apart.
+// §27.4: a named generate block declares an array of generate block instances,
+// and its indices are the values the genvar takes during elaboration. What
+// identifies an instance is therefore the block and the index, not the genvar.
+// Two loop generate constructs written side by side over one genvar declare two
+// arrays, and §27.4 rules that a generate block forms a scope of its own, so
+// `blk_a`'s `v` and `blk_b`'s `v` are two declarations and the flattened design
+// has to spell them apart.
 //
 // Naming the flattened declaration after the genvar gave both arrays the prefix
 // `i_4_`, so the four declarations collapsed onto two names and one instance's
@@ -559,9 +559,9 @@ TEST(GenerateElaboration,
   EXPECT_NE(first, second);
 }
 
-// §27.6: "All unnamed generate blocks will be given the name genblk<n> where
-// <n> is the number assigned to its enclosing generate construct", numbering
-// the constructs of a scope from 1 in textual order. That naming is applied by
+// §27.6: every unnamed generate block is named genblk<n>, <n> being the number
+// of the generate construct holding it, numbering the constructs of a scope
+// from 1 in textual order. That naming is applied by
 // Elaborator::AssignGenerateBlockNames before elaboration, so the two unnamed
 // constructs here are `genblk1` and `genblk2`, and the §27.4 rule that
 // separates two named sibling arrays separates these two as well.
@@ -608,13 +608,12 @@ static std::set<std::string> InstanceNames(const RtlirModule* mod) {
   return names;
 }
 
-// §27.4: a generate block "comprises a separate scope and a new level of
-// hierarchy when it is instantiated", and a named loop generate block "is a
-// declaration of an array of generate block instances" whose "index values in
-// this array are the values assumed by the genvar during elaboration". A module
-// instantiated in the block body is therefore a different instance in every
-// iteration, and RtlirModuleInst::inst_name is where the flattened design has
-// to say so.
+// §27.4: a generate block forms a scope of its own and a further level of
+// hierarchy once instantiated, and a named loop generate block declares an
+// array of generate block instances whose indices are the values the genvar
+// takes during elaboration. A module instantiated in the block body is
+// therefore a different instance in every iteration, and
+// RtlirModuleInst::inst_name is where the flattened design has to say so.
 //
 // Recording the name the source wrote gave both iterations `u`, so the two
 // children of `top` shared a name and a hierarchical path and nothing told them
@@ -648,7 +647,7 @@ TEST(GenerateElaboration, LoopGenerateBlockNamesEachIterationsInstanceApart) {
 
 // §27.4: the index alone does not identify an instance, because two loop
 // generate constructs written side by side over one genvar declare two arrays
-// and each "comprises a separate scope". So the block name has to reach the
+// and each forms a scope of its own. So the block name has to reach the
 // instance name as well as the index does: with the index alone, `blk_a`'s `u`
 // and `blk_b`'s `u` at one iteration are one name, and with the name alone the
 // two iterations of one block are.

@@ -591,11 +591,11 @@ TEST(SelectElaboration, IndexedPartSelectWidthInAConcatenationIsRejected) {
 // §11.5.1: "The actual bit that is accessed by an address is, in part,
 // determined by the declaration of acc" -- the clause sets `logic [15:0] acc`
 // beside `logic [2:17] acc` and observes that one value of an index reaches a
-// different bit in each. §27.4 makes a generate block "a separate scope and a
-// new level of hierarchy when it is instantiated" and says nothing that would
-// make §11.5.1 stop there, so a parameter declared inside a block is addressed
-// over its declared range exactly as one declared among the module's own items
-// is. SelectElaboration.ParameterBitSelectIsAddressedOverItsDeclaredRange in
+// different bit in each. §27.4 makes a generate block a scope of its own and a
+// further level of hierarchy once instantiated and says nothing that would make
+// §11.5.1 stop there, so a parameter declared inside a block is addressed over
+// its declared range exactly as one declared among the module's own items is.
+// SelectElaboration.ParameterBitSelectIsAddressedOverItsDeclaredRange in
 // test_elaborator_subclause_11_05_01a.cpp is the module-level twin.
 //
 // P is declared [2:17], which ascends, so index 17 names its least significant

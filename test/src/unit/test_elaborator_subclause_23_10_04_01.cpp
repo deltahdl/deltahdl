@@ -126,10 +126,9 @@ TEST(ElaborationOrder, GenerateDrivesFurtherGenerateEvaluationOnNextIteration) {
   EXPECT_EQ(i1->children[0].module_name, "leaf");
 }
 
-// §27.5: "If the generate block selected for instantiation is not named, it
-// still creates a scope; but the declarations within it cannot be referenced
-// using hierarchical names other than from within the hierarchy instantiated by
-// the generate block itself."
+// §27.5: a selected generate block without a name still creates a scope, but
+// its declarations can be reached by hierarchical name only from inside the
+// hierarchy that block instantiates.
 //
 // `i1` sits inside an unnamed conditional generate block in `outer`, and the
 // defparam is written in `top`, outside the hierarchy that block instantiates.

@@ -181,16 +181,16 @@ TEST(GenerateSimulation, GenvarGatedConditionalDrivesValue) {
 }
 
 TEST(GenerateSimulation, GenerateIfElseIfChainSelectsFinalElse) {
-  // §27.5 requires a conditional generate construct to select "at most one
-  // generate block from a set of alternative generate blocks based on constant
-  // expressions evaluated during elaboration", and to instantiate the selected
-  // block into the model. Here no condition in the chain holds, so the final
-  // else is the selected alternative and its 64 is the only value driven onto
-  // the module-level variable the simulated run reads back. Elaborating the
-  // else arm's body without evaluating the nested condition instantiates the
-  // first else-if branch instead and yields 41, and never reaches the two
-  // alternatives past it, so each of the four constants is distinct and
-  // non-zero to name which alternative a wrong run selected.
+  // §27.5 requires a conditional generate construct to select no more than one
+  // of a set of alternative generate blocks, by constant expressions evaluated
+  // during elaboration, and to instantiate the selected block into the model.
+  // Here no condition in the chain holds, so the final else is the selected
+  // alternative and its 64 is the only value driven onto the module-level
+  // variable the simulated run reads back. Elaborating the else arm's body
+  // without evaluating the nested condition instantiates the first else-if
+  // branch instead and yields 41, and never reaches the two alternatives past
+  // it, so each of the four constants is distinct and non-zero to name which
+  // alternative a wrong run selected.
   LowerFixture f;
   auto* var = RunAndFindVar(
       "module t #(parameter SEL = 7) ();\n"

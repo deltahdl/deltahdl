@@ -16,12 +16,12 @@ using namespace delta;
 
 namespace {
 
-// §27.4, printed page 821: "It shall be an error if the name of a generate
-// block instance array conflicts with any other declaration, including any
-// other generate block instance array." The two cases below ask that of a
-// module-level declaration that is neither a net, a variable nor a port, and
-// they differ in that declaration alone, so the source and the report are
-// stated once here and each case supplies the one line that changes.
+// §27.4, printed page 821: a generate block instance array may not share its
+// name with any other declaration, another such array included. The two cases
+// below ask that of a module-level declaration that is neither a net, a
+// variable nor a port, and they differ in that declaration alone, so the source
+// and the report are stated once here and each case supplies the one line that
+// changes.
 //
 // `module_level_decl` is written at line 4 of the source, so the `for` whose
 // array name collides always stands at line 6 and the report always stands
@@ -586,10 +586,10 @@ TEST(ScopeRulesElaboration,
              "endmodule\n"));
 }
 
-// §27.4, printed page 821, rules that "It shall be an error if the name of a
-// generate block instance array conflicts with any other declaration". A module
-// instance name is such a declaration, and `a` names both the instance of
-// `child` and the loop generate block array.
+// §27.4, printed page 821, rules that a generate block instance array may not
+// share its name with any other declaration. A module instance name is such a
+// declaration, and `a` names both the instance of `child` and the loop generate
+// block array.
 //
 // Elaborator::ElaborateModuleInst records an instance name in declared_names_
 // and nowhere else: IsNameDeclared in src/elaborator/elaborator_items.cpp reads
@@ -617,9 +617,9 @@ TEST(ScopeRulesElaboration,
   ExpectLoopArrayNameConflictsWith("function void a(); endfunction");
 }
 
-// §27.4, printed page 821: a generate block "comprises a separate scope and a
-// new level of hierarchy when it is instantiated", so an item written once in
-// a loop generate body is elaborated once per iteration into a different scope
+// §27.4, printed page 821: a generate block forms a scope of its own and a
+// further level of hierarchy once instantiated, so an item written once in a
+// loop generate body is elaborated once per iteration into a different scope
 // each time and declares its name afresh rather than a second time in one
 // scope. §23.9 forbids only a second declaration within one scope, so the three
 // cases below are conforming sources and shall elaborate.

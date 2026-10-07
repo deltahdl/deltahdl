@@ -326,19 +326,17 @@ TEST(UdpInstanceElaboration, InstanceArrayTerminalOfAWrongWidthIsReported) {
 }
 
 // §29.8 puts a primitive instance inside a module as it puts a gate, and §27.3
-// rules that an instance of a generate block "brings the objects, behavioral
-// constructs, and module instances within the block into existence", so a loop
-// generate construct holding one instantiation leaves one RtlirUdpInst per
-// iteration. §27.4 says what tells those instances apart: "Within the generate
-// block of a loop generate construct, there is an implicit localparam
-// declaration ... its value within each instance of the generate block is the
-// value of the loop index at the time the instance was elaborated", usable
-// "anywhere within the generate block that a normal parameter with an integer
-// value can be used". A terminal written `y_out_v[row]` is such a use, so the
-// value that terminal resolves against has to reach the instance, and
-// RtlirUdpInst::gen_block_consts (src/elaborator/rtlir.h:261) is where it
-// rides: the iterations share one body AST, so nothing in the AST distinguishes
-// them.
+// rules that instantiating a generate block makes the objects, behavioral
+// constructs and module instances inside it exist, so a loop generate construct
+// holding one instantiation leaves one RtlirUdpInst per iteration. §27.4 says
+// what tells those instances apart: inside a loop generate construct's block
+// there is an implicit localparam whose value in each block instance is the
+// loop index at the moment that instance was elaborated, usable wherever an
+// ordinary integer parameter could be within the block. A terminal written
+// `y_out_v[row]` is such a use, so the value that terminal resolves against has
+// to reach the instance, and RtlirUdpInst::gen_block_consts
+// (src/elaborator/rtlir.h:261) is where it rides: the iterations share one body
+// AST, so nothing in the AST distinguishes them.
 //
 // Both assertions are needed. The count alone passes a loop whose two instances
 // were elaborated with one localparam value between them, which is what two
@@ -387,17 +385,16 @@ TEST(UdpInstanceElaboration, GenerateLoopStampsEachInstanceWithItsIndex) {
   EXPECT_EQ(index_values, (std::set<int64_t>{5, 6}));
 }
 
-// §27.4: a generate block "comprises a separate scope and a new level of
-// hierarchy when it is instantiated", so the `c_local` this block declares
-// belongs to the block instance rather than to `col_top`, and the elaborator
-// names it under a prefix that identifies the instance. The body AST is shared
-// across instances and still writes the simple name `c_local`, so the terminal
-// of the primitive instance can only reach that declaration through the prefix
-// the instance carries, which is the last entry of
-// RtlirUdpInst::gen_block_prefixes (src/elaborator/rtlir.h:299).
-// Lowerer::LowerUdpInst (src/simulator/lowerer_udp.cpp:321) copies the list to
-// Process::gen_prefixes, and SimContext prepends each entry to a name before
-// looking the name up.
+// §27.4: a generate block forms a scope of its own and a further level of
+// hierarchy once instantiated, so the `c_local` this block declares belongs to
+// the block instance rather than to `col_top`, and the elaborator names it
+// under a prefix that identifies the instance. The body AST is shared across
+// instances and still writes the simple name `c_local`, so the terminal of the
+// primitive instance can only reach that declaration through the prefix the
+// instance carries, which is the last entry of RtlirUdpInst::gen_block_prefixes
+// (src/elaborator/rtlir.h:299). Lowerer::LowerUdpInst
+// (src/simulator/lowerer_udp.cpp:321) copies the list to Process::gen_prefixes,
+// and SimContext prepends each entry to a name before looking the name up.
 //
 // The assertion is that the prefix, followed by the simple name the body wrote,
 // is the name the block instance's own declaration got. Stating it that way

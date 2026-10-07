@@ -11,12 +11,11 @@ using namespace delta;
 
 namespace {
 
-// §27.4: "Within the generate block of a loop generate construct, there is an
-// implicit localparam declaration. This is an integer parameter that has the
-// same name and type as the loop index, and its value within each instance of
-// the generate block is the value of the loop index at the time the instance
-// was elaborated." The genvar itself "does not exist at simulation time", so a
-// reference to the name inside the block is a reference to that localparam.
+// §27.4: inside a loop generate construct's block there is an implicit
+// localparam, an integer parameter of the loop index's name and type, whose
+// value in each block instance is the loop index at the moment that instance
+// was elaborated. The genvar itself is gone by simulation time, so a reference
+// to the name inside the block is a reference to that localparam.
 //
 // Every instance runs one shared body, so the value has to be private to the
 // instance. Delaying each instance by a different amount interleaves the four
@@ -60,10 +59,10 @@ TEST(LoopGenerateIndexSim, NestedBlockSeesBothEnclosingIndices) {
                  "out", {0u, 1u, 10u, 11u});
 }
 
-// §27.4: the implicit localparam "can be used anywhere within the generate
-// block that a normal parameter with an integer value can be used", which
-// includes a continuous assignment. Each instance's assignment drives the
-// element its own index selects, from a right-hand side its own index scales.
+// §27.4: the implicit localparam may be used wherever an ordinary integer
+// parameter could be within the block, which includes a continuous assignment.
+// Each instance's assignment drives the element its own index selects, from a
+// right-hand side its own index scales.
 TEST(LoopGenerateIndexSim, ContinuousAssignmentSeesItsInstanceIndex) {
   SimFixture f;
   RunModuleArray(f,
@@ -95,11 +94,11 @@ TEST(LoopGenerateIndexSim, NegativeIndexIsSigned) {
                  "out", {7u, 9u, 9u});
 }
 
-// §27.4: a generate block "comprises a separate scope and a new level of
-// hierarchy when it is instantiated", so a declaration inside the block belongs
-// to the instance and is named by its simple name from within it. Each instance
-// stores a different value in its own `x` and reads it back, so an instance
-// finding nothing (or finding a neighbour's) shows up as the wrong element.
+// §27.4: a generate block forms a scope of its own and a further level of
+// hierarchy once instantiated, so a declaration inside the block belongs to the
+// instance and is named by its simple name from within it. Each instance stores
+// a different value in its own `x` and reads it back, so an instance finding
+// nothing (or finding a neighbour's) shows up as the wrong element.
 TEST(LoopGenerateIndexSim, BlockLocalDeclarationIsReadBackWithinItsInstance) {
   SimFixture f;
   RunModuleArray(f,
@@ -145,12 +144,12 @@ TEST(LoopGenerateIndexSim, BlockLocalDeclarationHidesTheModuleLevelName) {
   EXPECT_EQ(outer->value.ToUint64(), 99u);
 }
 
-// §27.4: a named generate block "is a declaration of an array of generate
-// block instances", and "the index values in this array are the values assumed
-// by the genvar during elaboration". Two sibling blocks written over one genvar
-// are therefore two distinct arrays, and since each instance "comprises a
-// separate scope and a new level of hierarchy when it is instantiated", `a`'s
-// `x` at index 4 and `b`'s `x` at index 4 are different objects.
+// §27.4: a named generate block declares an array of generate block instances,
+// and its indices are the values the genvar takes during elaboration. Two
+// sibling blocks written over one genvar are therefore two distinct arrays, and
+// since each instance forms a scope of its own and a further level of hierarchy
+// once instantiated, `a`'s `x` at index 4 and `b`'s `x` at index 4 are
+// different objects.
 //
 // Every instance writes its block's constant before any instance reads one
 // back, so a run that gave the two blocks one object leaves both reads holding

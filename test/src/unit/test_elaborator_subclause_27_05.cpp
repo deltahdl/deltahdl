@@ -13,7 +13,7 @@ namespace {
 
 // Every name the variables of the elaborated source's top module carry.
 //
-// §27.5 instantiates "at most one" of the alternative generate blocks of a
+// §27.5 instantiates no more than one of the alternative generate blocks of a
 // conditional generate construct, and §27.5 also rules that the selected block
 // creates a scope whether or not it is named, so each declaration inside one
 // reaches the flattened design under the block's name and its own. The whole
@@ -130,12 +130,11 @@ TEST(GenerateElaboration, GenerateIfTrueNoElse) {
             (std::set<std::string>{"genblk1_enabled"}));
 }
 
-// §27.5: the block an `else if` stands in "consists of only one item that is
-// itself a conditional generate construct" and is not surrounded by begin-end,
-// so it is directly nested and "the generate blocks of the directly nested
-// construct are treated as if they belong to the outer construct". Every
-// alternative of the chain therefore carries the outer construct's number,
-// genblk1, rather than a number of its own.
+// §27.5: the block an `else if` stands in holds a single item, itself a
+// conditional generate construct, and is not surrounded by begin-end, so it is
+// directly nested and the nested construct's generate blocks count as the outer
+// construct's. Every alternative of the chain therefore carries the outer
+// construct's number, genblk1, rather than a number of its own.
 TEST(GenerateElaboration, GenerateIfElseIfChainSelectsMiddle) {
   ElabFixture f;
   EXPECT_EQ(ElaboratedVariableNames("module top #(parameter SEL = 1) ();\n"
@@ -151,13 +150,13 @@ TEST(GenerateElaboration, GenerateIfElseIfChainSelectsMiddle) {
             (std::set<std::string>{"genblk1_one"}));
 }
 
-// §27.5 selects "at most one generate block from a set of alternative generate
-// blocks based on constant expressions evaluated during elaboration", and an
-// `else if` puts one of those constant expressions on the else branch. The four
-// cases below fix SEL at values that only the alternative past the first
-// `else if` answers, which is what GenerateIfElseIfChainSelectsMiddle above
-// cannot do: SEL = 1 there selects the first `else if`, the one alternative
-// reached whether the nested condition is evaluated or ignored.
+// §27.5 picks no more than one of a set of alternative generate blocks, by
+// constant expressions evaluated during elaboration, and an `else if` puts one
+// of those constant expressions on the else branch. The four cases below fix
+// SEL at values that only the alternative past the first `else if` answers,
+// which is what GenerateIfElseIfChainSelectsMiddle above cannot do: SEL = 1
+// there selects the first `else if`, the one alternative reached whether the
+// nested condition is evaluated or ignored.
 //
 // Elaborator::ElaborateGenerateIf in src/elaborator/elaborator_generate.cpp
 // elaborated item->gen_else->gen_body for every else branch, and
@@ -468,10 +467,9 @@ TEST(GenerateElaboration, BlockNameCollidesWithLoopGenerateIsError) {
                             2, "27.5"));
 }
 
-// §27.5: a generate block "may consist of only one item, which need not be
-// surrounded by begin-end keywords. Even if the begin-end keywords are absent,
-// it is still a generate block, which, like all generate blocks, comprises a
-// separate scope". The single item here is a variable declaration rather than a
+// §27.5: a generate block may be a single item written without begin-end, and
+// is a generate block all the same and so, like every generate block, a scope
+// of its own. The single item here is a variable declaration rather than a
 // conditional generate construct, so the direct-nesting exception does not
 // apply and the block is a scope, named genblk1 by §27.6.
 TEST(GenerateElaboration, GenerateIfBodyWithoutBeginEnd) {
@@ -483,12 +481,12 @@ TEST(GenerateElaboration, GenerateIfBodyWithoutBeginEnd) {
             (std::set<std::string>{"genblk1_bare"}));
 }
 
-// §27.5: "If the generate block selected for instantiation is named, then this
-// name declares a generate block instance and is the name for the scope it
-// creates." Two if-generate constructs whose conditions are both true
-// instantiate two blocks, and the two scopes are what let each declare v. Both
-// declarations landing in the module's own scope made the second a
-// redeclaration of the first, so this source was rejected.
+// §27.5: a selected generate block that has a name declares a generate block
+// instance by that name, which also names the scope it creates. Two if-generate
+// constructs whose conditions are both true instantiate two blocks, and the two
+// scopes are what let each declare v. Both declarations landing in the module's
+// own scope made the second a redeclaration of the first, so this source was
+// rejected.
 TEST(GenerateElaboration, SiblingNamedIfBlocksDeclareTheSameSimpleName) {
   ElabFixture f;
   EXPECT_EQ(ElaboratedVariableNames("module top ();\n"
@@ -504,12 +502,12 @@ TEST(GenerateElaboration, SiblingNamedIfBlocksDeclareTheSameSimpleName) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §27.5: "If the generate block selected for instantiation is not named, it
-// still creates a scope." §27.6 numbers the generate constructs of a scope from
-// 1 in textual order, so the two constructs here are 1 and 2 and their blocks
-// are genblk1 and genblk2. This is the case that says the numbering runs over
-// constructs rather than over blocks: one number for both would put the two
-// declarations back in one scope.
+// §27.5: a selected generate block without a name still creates a scope. §27.6
+// numbers the generate constructs of a scope from 1 in textual order, so the
+// two constructs here are 1 and 2 and their blocks are genblk1 and genblk2.
+// This is the case that says the numbering runs over constructs rather than
+// over blocks: one number for both would put the two declarations back in one
+// scope.
 TEST(GenerateElaboration, SiblingUnnamedIfBlocksAreNumberedInOrder) {
   ElabFixture f;
   EXPECT_EQ(ElaboratedVariableNames("module top ();\n"
@@ -545,12 +543,11 @@ TEST(GenerateElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §27.5: the outer block "consists of only one item that is itself a
-// conditional generate construct" and that item "is not surrounded by
-// begin-end keywords", so the outer block "is not treated as a separate scope"
-// and contributes no name of its own. inner_v rather than genblk1_inner_v is
-// the whole claim, since the extra component would be a level of generate block
-// hierarchy §27.5 rules out.
+// §27.5: the outer block holds a single item, itself a conditional generate
+// construct, written without begin-end, so the outer block is not a scope of
+// its own and contributes no name of its own. inner_v rather than
+// genblk1_inner_v is the whole claim, since the extra component would be a
+// level of generate block hierarchy §27.5 rules out.
 TEST(GenerateElaboration, DirectlyNestedIfContributesNoScope) {
   ElabFixture f;
   EXPECT_EQ(ElaboratedVariableNames("module top ();\n"
@@ -601,13 +598,12 @@ TEST(GenerateElaboration, CaseAlternativeLabelPrefixesItsDeclaration) {
             (std::set<std::string>{"one_alt_v"}));
 }
 
-// §27.5 selects a conditional generate block "based on constant expressions
-// evaluated during elaboration", and §26.3 makes a wildcard-imported name
-// locally visible only "prior to that point within the current scope". The
-// scope holding the import here is module a, so W names nothing in module b and
-// the condition is not a constant expression there:
-// Elaborator::ElaborateGenerateIf in src/elaborator/elaborator_generate.cpp
-// warns and instantiates neither branch.
+// §27.5 selects a conditional generate block by constant expressions evaluated
+// during elaboration, and §26.3 makes a wildcard-imported name locally visible
+// only "prior to that point within the current scope". The scope holding the
+// import here is module a, so W names nothing in module b and the condition is
+// not a constant expression there: Elaborator::ElaborateGenerateIf in
+// src/elaborator/elaborator_generate.cpp warns and instantiates neither branch.
 //
 // What this fails on is the condition folding anyway, which it does when the
 // scope the condition is evaluated against is assembled after every module has
