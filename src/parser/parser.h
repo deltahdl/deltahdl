@@ -884,9 +884,9 @@ class Parser {
            current_module_->decl_kind == ModuleDeclKind::kInterface;
   }
   // True inside a checker body, a generate block of it included: A.1.8's
-  // footnote 6 has "it shall be illegal for a checker_generate_item to
-  // include any item that would be illegal in a checker_declaration outside
-  // a checker_generate_item", so the block admits what the body admits.
+  // footnote 6 forbids a checker_generate_item every item a
+  // checker_declaration forbids outside one, so the block admits what the body
+  // admits.
   bool InCheckerBody() const {
     return current_module_ &&
            current_module_->decl_kind == ModuleDeclKind::kChecker;

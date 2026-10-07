@@ -18,9 +18,9 @@ namespace delta {
 // A.2.7 writes task_prototype and function_prototype with
 // `[ dynamic_override_specifiers ]` after the keyword, so a modport_tf_port's
 // method_prototype may carry one, and the specifiers are read so that the
-// name that follows them is found; A.10's footnote 25 has "the
-// dynamic_override_specifiers shall only be legal on method declarations
-// inside a non-interface class scope", and a modport is no class, so one
+// name that follows them is found; A.10's footnote 25 admits the
+// dynamic_override_specifiers on a method declaration only within the scope
+// of a class that is not an interface class, and a modport is no class, so one
 // read here is reported at the prototype. The parser reported the prototype
 // as a missing identifier at the ':'.
 void Parser::ParseModportPrototypeSpecifiers(ModuleItem* item) {

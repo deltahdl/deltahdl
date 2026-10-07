@@ -10,8 +10,8 @@ namespace delta {
 // Answers whether the token standing after `new` opens a shallow-copy source.
 // A.2.4 gives class_new the two alternatives
 // `[ class_scope ] new [ ( list_of_arguments ) ]` and `new expression`, and
-// footnote 23 on that production requires the second's expression to "evaluate
-// to an object handle". Two tokens can open one. An identifier can name a
+// footnote 23 on that production requires the second's expression to yield an
+// object handle. Two tokens can open one. An identifier can name a
 // handle variable, and `this` is one outright: §8.11 says "The this keyword
 // denotes a predefined object handle that refers to the object that was used to
 // invoke the subroutine that this is used within".
