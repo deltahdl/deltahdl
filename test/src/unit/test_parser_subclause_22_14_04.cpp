@@ -325,7 +325,7 @@ TEST(CompilerDirectiveParsing, NoconfigFreesTheWordThatOpensAConfiguration) {
   EXPECT_TRUE(r.cu->configs.empty());
 }
 
-// "Behaves similarly to 1364-2001" is a claim about what this version still
+// That this version acts much like 1364-2001 is a claim about what it still
 // does, not only about what it drops. The eleven kept additions go on opening
 // the constructs they open under that version: `localparam` declares a
 // constant, `genvar`/`generate`/`endgenerate` build a loop generate construct,

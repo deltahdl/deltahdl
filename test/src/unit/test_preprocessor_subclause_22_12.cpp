@@ -395,13 +395,12 @@ TEST(Preprocessor, Line_LibrarySearchUnaffectedByOverride) {
   std::filesystem::remove_all(tmp_dir);
 }
 
-// §22.12's first sentence is what the three cases below are about: "The
-// compiler shall maintain the current line number and file name of the file
-// being compiled." The preprocessor's output is not that file. It splices in
-// the lines of every `include and joins a `define body that spanned
-// continuation lines, so a position in it names neither the file somebody
-// wrote nor the line they wrote it on, and a user handed one is sent to a
-// buffer they have never seen.
+// §22.12's first sentence is what the three cases below are about: the compiler
+// keeps track of the line number and file name of the file it is compiling. The
+// preprocessor's output is not that file. It splices in the lines of every
+// `include and joins a `define body that spanned continuation lines, so a
+// position in it names neither the file somebody wrote nor the line they wrote
+// it on, and a user handed one is sent to a buffer they have never seen.
 //
 // What answers for the rule is SourceManager::FormatLoc, because that is what
 // DiagEngine::Emit in src/common/diagnostic.cpp prints. The report's own

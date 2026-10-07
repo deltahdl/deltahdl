@@ -510,7 +510,7 @@ TEST(CelldefinePreprocessing, UndefinedUsageAfterTheDirectiveIsReported) {
 }
 
 // A source description is the whole compilation unit rather than one file, so
-// the "more than one pair" allowance is satisfied by pairs sitting in separate
+// the allowance for several pairs is satisfied by pairs sitting in separate
 // files, each still controlling only its own modules.
 TEST(CelldefinePreprocessing, MultiplePairsSpanningTwoFiles) {
   PreprocFixture f;

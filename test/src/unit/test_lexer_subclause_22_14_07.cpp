@@ -70,8 +70,8 @@ TEST(SystemVerilog2009KeywordList, IncludesEveryVerilog1995Keyword) {
   }
 }
 
-// The second included list, swept the same way. "All previous versions"
-// includes two lists published for the same standard -- one with the
+// The second included list, swept the same way. Taking in every earlier version
+// takes in two lists published for the same standard -- one with the
 // configuration words and one without -- and this test settles which of them
 // governs: all twenty-one entries are reserved here, and the ten the
 // configuration-free list drops are called out on their own, since they are the

@@ -65,8 +65,8 @@ TEST(KeywordVersionPreprocessing, Verilog2005OnlyTheExactSpecifierSelectsIt) {
 
 // Table 22-1 carried through a real region, swept whole. Each word arrives at
 // the lexer holding the keyword it holds under the list it comes from, which is
-// what "includes the identifiers listed in 1364-1995" amounts to once the
-// directive is in force.
+// what taking in 1364-1995's identifiers amounts to once the directive is in
+// force.
 TEST(KeywordVersionPreprocessing, Verilog2005ReservesEveryVerilog1995Keyword) {
   EXPECT_EQ(std::size(kTable221), 102u);
   for (const char* word : kTable221) {

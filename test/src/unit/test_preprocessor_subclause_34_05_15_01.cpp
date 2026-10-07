@@ -192,13 +192,13 @@ TEST(ProtectDataBlockSyntax, TheBlockBeneathTheKeywordAloneIsRecovered) {
   EXPECT_EQ(read.find("data_block"), std::string::npos) << read;
 }
 
-// §22.12 has a compiler maintain "the current line number and file name of the
-// file being compiled", and a design recovered from a data block was compiled
-// under neither. Its lines were numbered from the top of the block while the
-// file named was the one the envelope stands in, so an envelope well down a
-// file holding a design whose third line is rejected reported that file at line
-// 3 -- a line of the envelope's own surroundings, quoted as though it were the
-// text at fault.
+// §22.12 has a compiler keep track of the line number and file name of the file
+// it is compiling, and a design recovered from a data block was compiled under
+// neither. Its lines were numbered from the top of the block while the file
+// named was the one the envelope stands in, so an envelope well down a file
+// holding a design whose third line is rejected reported that file at line 3 --
+// a line of the envelope's own surroundings, quoted as though it were the text
+// at fault.
 //
 // The recovered cleartext is a source of its own, named for where its envelope
 // stands, so a report about it names a position that exists.

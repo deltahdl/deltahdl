@@ -296,14 +296,14 @@ std::string BufferWithPathDelay(const std::string& specparam,
          "endmodule\n";
 }
 
-// §30.5 with §22.7 (printed page 716): "The time unit is the unit of
-// measurement for time values such as the simulation time and delay values",
-// so a path delay is a count of the declaring module's unit, and a real one
-// keeps what its fraction the module's precision holds (§3.14.1). A specparam
-// holding 2.5 -- a real, as §6.20.5 (printed page 129) gives a specparam with
-// no range its value's range -- delays each transition by 2.5 ns under
-// `timescale 1ns / 1ps. The delay was read as 3 ticks of the 1 ps precision:
-// the specparam stored the rounded integer and the path took it unscaled.
+// §30.5 with §22.7 (printed page 716): the time unit is what time values, the
+// simulation time and delays among them, are measured in, so a path delay is a
+// count of the declaring module's unit, and a real one keeps what its fraction
+// the module's precision holds (§3.14.1). A specparam holding 2.5 -- a real, as
+// §6.20.5 (printed page 129) gives a specparam with no range its value's range
+// -- delays each transition by 2.5 ns under `timescale 1ns / 1ps. The delay was
+// read as 3 ticks of the 1 ps precision: the specparam stored the rounded
+// integer and the path took it unscaled.
 TEST(SpecifyPathDelayFromSource, RealSpecparamDelayCountsTheModuleUnit) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture(

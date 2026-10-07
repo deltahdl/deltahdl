@@ -1,5 +1,5 @@
-// §22.11 `pragma -- the "no effect on the interpretation of the source text"
-// rule, observed past the preprocessor.
+// §22.11 `pragma -- the rule that a pragma leaves the meaning of the source
+// text unchanged, observed past the preprocessor.
 //
 // The directive itself is handled in src/preprocessor/preprocessor.cpp, but its
 // defining property is about what the rest of the pipeline sees. These tests

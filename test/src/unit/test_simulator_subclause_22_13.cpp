@@ -32,11 +32,11 @@ TEST(FileAndLineMacroSimulation, LineValueDiffersPerLine) {
   EXPECT_EQ(result, 6u);
 }
 
-// Claim A: `__FILE__ expands "in the form of a string literal". The
-// preprocessor tests observe the literal text; this drives that expansion
-// through the full pipeline to confirm the produced token is a genuine,
-// consumable SV string literal. The top source is registered as "<test>", so
-// the expansion equals that path and the string comparison holds.
+// Claim A: `__FILE__ expands to a string literal. The preprocessor tests
+// observe the literal text; this drives that expansion through the full
+// pipeline to confirm the produced token is a genuine, consumable SV string
+// literal. The top source is registered as "<test>", so the expansion equals
+// that path and the string comparison holds.
 TEST(FileAndLineMacroSimulation, FileExpandsToConsumableStringLiteral) {
   auto result = PreprocessAndGet(
       "module t;\n"

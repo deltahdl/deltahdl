@@ -1,5 +1,5 @@
-// §22.11 `pragma -- the "no effect on the interpretation of the source text"
-// rule observed at the far end of the pipeline.
+// §22.11 `pragma -- the rule that a pragma leaves the meaning of the source
+// text unchanged, observed at the far end of the pipeline.
 //
 // The directive is consumed in src/preprocessor/preprocessor.cpp. These tests
 // build real SystemVerilog with unrecognized pragmas interleaved among the

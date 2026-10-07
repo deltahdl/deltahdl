@@ -42,12 +42,12 @@ TEST(TimescaleSimulation, LaterTimescaleOverrideSimulates) {
   EXPECT_EQ(result, 99u);
 }
 
-// §22.7 (printed page 716): `timescale "specifies the time unit and time
-// precision of the design elements that follow it", and "The time unit is the
-// unit of measurement for time values such as the simulation time and delay
-// values". A module under `timescale 1us / 1ns reports that scale to
-// $printtimescale, and its #1 is a microsecond, which its own $time reads as 1.
-// Every module reported 1ns / 1ns whatever the directive said.
+// §22.7 (printed page 716): `timescale sets the time unit and time precision of
+// the design elements after it, and the time unit is what time values, the
+// simulation time and delays among them, are measured in. A module under
+// `timescale 1us / 1ns reports that scale to $printtimescale, and its #1 is a
+// microsecond, which its own $time reads as 1. Every module reported 1ns / 1ns
+// whatever the directive said.
 TEST(TimescaleSimulation, DirectiveGivesTheModuleAfterItItsUnit) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture("`timescale 1us / 1ns\n"
@@ -189,11 +189,11 @@ TEST(TimescaleSimulation, GateDelayCountsItsOwnModulesUnit) {
       "y=1 2000\n");
 }
 
-// §22.7 (printed page 717): under `timescale 1 ns / 1 ps "Delays are rounded to
-// real numbers with three decimal places", the precision and not the unit
-// deciding, so under 1ns / 100ps a #1.46 is 1.5 ns: $realtime reads 1.50 and
-// $time, an integer (§20.3.1), 2. The delay was rounded to the whole unit and
-// both read 1.
+// §22.7 (printed page 717): under `timescale 1 ns / 1 ps delays are rounded to
+// reals of three decimal places, the precision and not the unit deciding, so
+// under 1ns / 100ps a #1.46 is 1.5 ns: $realtime reads 1.50 and $time, an
+// integer (§20.3.1), 2. The delay was rounded to the whole unit and both read
+// 1.
 TEST(TimescaleSimulation, RealDelayRoundsToThePrecision) {
   SimFixture f;
   EXPECT_EQ(
@@ -210,11 +210,11 @@ TEST(TimescaleSimulation, RealDelayRoundsToThePrecision) {
 }
 
 // §22.7 (printed page 717), the clause's own module: under `timescale 10 ns /
-// 1 ns, "The value of parameter d is rounded from 1.55 to 1.6 according to the
-// time precision", so `#d set = 0;` assigns at 16 ns and `#d set = 1;` at
-// 32 ns, $realtime reading 1.6 and 3.2 of the 10 ns unit. Neither assignment
-// waited at all, and a real literal, a real parameter and a real variable
-// written as delay controls each rounded to the whole unit.
+// 1 ns, parameter d's 1.55 rounds to 1.6 by the time precision, so
+// `#d set = 0;` assigns at 16 ns and `#d set = 1;` at 32 ns, $realtime reading
+// 1.6 and 3.2 of the 10 ns unit. Neither assignment waited at all, and a real
+// literal, a real parameter and a real variable written as delay controls each
+// rounded to the whole unit.
 TEST(TimescaleSimulation, ClauseExampleRealParameterDelaysAssignments) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture("`timescale 10 ns / 1 ns\n"

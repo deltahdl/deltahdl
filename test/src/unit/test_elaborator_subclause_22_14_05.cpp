@@ -54,11 +54,10 @@ TEST(Verilog2005KeywordElaboration, AddedWordBuildsNetsOfItsOwnType) {
   // scalar_net;` declares scalar_net of a type called uwire, and §6.18 -- "The
   // declaration of a user-defined data type shall precede any reference to its
   // type_identifier" -- is what refuses it, because nothing declares that type.
-  // §22.14.5 itself states only which words are reserved -- "This version
-  // includes the identifiers listed in versions 1364-1995 (see Table 22-1) and
-  // 1364-2001 (see Table 22-2) plus the additional identifiers listed in Table
-  // 22-3" -- and the keyword table in src/lexer/keywords.cpp carries that out
-  // by choosing a token kind, which files no diagnostic of its own.
+  // §22.14.5 itself states only which words are reserved -- those of 1364-1995
+  // (Table 22-1) and 1364-2001 (Table 22-2) together with the further ones of
+  // Table 22-3 -- and the keyword table in src/lexer/keywords.cpp carries that
+  // out by choosing a token kind, which files no diagnostic of its own.
   //
   // The line named here and in the cases below comes from LineInRegion in
   // lib/cpp/test_helpers/helpers_keyword_version.h rather than from a literal.

@@ -495,9 +495,9 @@ TEST(UndefPreprocessing, UndefinedMacroHasNoValue) {
   EXPECT_EQ(result.find("42"), std::string::npos);
 }
 
-// "As if it had never been defined" is an equivalence, so the removed name has
-// to behave exactly like a name the source never mentioned: same emitted text
-// and the same diagnostic outcome.
+// Behaving as though it had never been defined is an equivalence, so the
+// removed name has to behave exactly like a name the source never mentioned:
+// same emitted text and the same diagnostic outcome.
 TEST(UndefPreprocessing, RemovedMacroBehavesExactlyLikeNeverDefinedMacro) {
   PreprocFixture undefd;
   auto after_undef = Preprocess(

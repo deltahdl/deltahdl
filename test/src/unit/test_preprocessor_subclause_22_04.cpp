@@ -161,12 +161,11 @@ struct WorkingDirectoryAt {
   ~WorkingDirectoryAt() { fs::current_path(previous); }
 };
 
-// §22.4 (printed page 705): "When the filename is enclosed in double quotes
-// ("filename"), for a relative path the compiler's current working directory,
-// and optionally user-specified locations are searched." A source file named
-// without a directory, as `deltahdl 46.sv` names it from the directory holding
-// it, has no directory of its own to search, and its quoted include is found
-// in the working directory.
+// §22.4 (printed page 705): a relative filename in double quotes is looked for
+// in the compiler's current working directory and, optionally, in locations the
+// user names. A source file named without a directory, as `deltahdl 46.sv`
+// names it from the directory holding it, has no directory of its own to
+// search, and its quoted include is found in the working directory.
 TEST(Preprocessor, Include_DoubleQuote_SearchesWorkingDirectory) {
   IncludeTestDir tmp;
   tmp.WriteFile("46-inc.svh", "`define FROM_INC 10\n");
@@ -181,9 +180,9 @@ TEST(Preprocessor, Include_DoubleQuote_SearchesWorkingDirectory) {
   EXPECT_NE(result.find("10"), std::string::npos);
 }
 
-// §22.4: a filename in angle brackets is looked for in "an
-// implementation-dependent location containing files defined by the language
-// standard" alone, so the working directory is not searched for it.
+// §22.4: a filename in angle brackets is looked for only in a location, chosen
+// by the implementation, that holds the files the language standard defines, so
+// the working directory is not searched for it.
 TEST(Preprocessor, Include_AngleBracket_DoesNotSearchWorkingDirectory) {
   IncludeTestDir tmp;
   tmp.WriteFile("local.svh", "wire local_wire;\n");

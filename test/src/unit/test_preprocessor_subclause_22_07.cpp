@@ -210,9 +210,10 @@ TEST(Preprocessor, Timescale_IllegalInsideDesignElement) {
                             "22.7"));
 }
 
-// The "illegal within a design element" rule is not module-specific: the
-// directive is equally forbidden inside every design-element kind. Exercise a
-// distinct enclosing position (an interface) to confirm the same rejection.
+// The rule barring the directive inside a design element is not
+// module-specific: the directive is equally forbidden inside every
+// design-element kind. Exercise a distinct enclosing position (an interface) to
+// confirm the same rejection.
 TEST(Preprocessor, Timescale_IllegalInsideInterface) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});

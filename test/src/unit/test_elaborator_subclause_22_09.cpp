@@ -77,9 +77,9 @@ TEST(UnconnectedDriveElaboration, Pull0DrivesUnconnectedInputLow) {
   EXPECT_EQ(b->connection->int_val, 0u);
 }
 
-// §22.9: the pull applies "instead of the normal default". Without the
-// directive, the same unconnected input keeps the default high-impedance
-// connection rather than a pulled constant.
+// §22.9: the pull takes the place of the usual default. Without the directive,
+// the same unconnected input keeps the default high-impedance connection rather
+// than a pulled constant.
 TEST(UnconnectedDriveElaboration, NoDirectiveLeavesUnconnectedInputDefault) {
   ElabFixture f;
   const RtlirPortBinding* b = nullptr;
