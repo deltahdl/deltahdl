@@ -74,11 +74,11 @@ TEST(AlwaysProcedureInCheckers, AlwaysLatchInCheckerIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A.10 item 6: "It shall be illegal for a checker_generate_item to include
-// any item that would be illegal in a checker_declaration outside a
-// checker_generate_item", so the general always C.2.7 removes from a checker
-// body is removed from a generate block of that body too, whichever construct
-// holds the block: an if, its else, a for, or a case arm.
+// A.10 item 6: a checker_generate_item may hold nothing that a
+// checker_declaration could not hold outside one, so the general always C.2.7
+// removes from a checker body is removed from a generate block of that body
+// too, whichever construct holds the block: an if, its else, a for, or a case
+// arm.
 TEST(AlwaysProcedureInCheckers, GeneralAlwaysInCheckerGenerateIsRejected) {
   ElabFixture f;
   ElaborateSrc(

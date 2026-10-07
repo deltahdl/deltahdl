@@ -75,7 +75,7 @@ TEST(ClassAssignRenameParsing, ShallowCopyInDeclaration) {
 }
 
 // A.2.4's `new expression` takes any expression as the copy source, and
-// footnote 23 on class_new asks only that it "evaluate to an object handle".
+// footnote 23 on class_new asks only that its value be an object handle.
 // §8.11 (printed page 187) makes `this` one: "The this keyword denotes a
 // predefined object handle that refers to the object that was used to invoke
 // the subroutine that this is used within." A non-static class method is one of

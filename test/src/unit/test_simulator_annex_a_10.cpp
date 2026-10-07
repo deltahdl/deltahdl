@@ -1,7 +1,7 @@
-// A.10 item 2: "It shall be illegal to initialize a port that is not a
-// variable output port", so a variable output port with `= constant_expression`
-// is initialized, as §23.2.2.2's Syntax 23-4 writes it. These cases observe
-// the initializer reaching the port variable of the top module and of a child
+// A.10 item 2: a variable output port is the one kind of port that may be
+// initialized, so a variable output port with `= constant_expression` is
+// initialized, as §23.2.2.2's Syntax 23-4 writes it. These cases observe the
+// initializer reaching the port variable of the top module and of a child
 // instance, and the parent reading the child's initial value through the
 // connection.
 

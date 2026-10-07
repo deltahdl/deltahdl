@@ -431,8 +431,8 @@ TEST(ModportDeclarationParsing, PortAfterClockingDeclarationIsRejected) {
 
 // modport_tf_port ::= method_prototype | tf_identifier, and A.2.7 writes both
 // prototypes with `[ dynamic_override_specifiers ]` after the keyword, which
-// A.10's footnote 25 has "only be legal on method declarations inside a
-// non-interface class scope". A prototype carrying one was reported as a
+// A.10's footnote 25 allows them only on a method declaration in a class scope
+// that is not an interface class. A prototype carrying one was reported as a
 // missing identifier at the ':'; it is now read to its name and reported for
 // the specifier.
 TEST(ModportDeclarationParsing, PrototypeWithOverrideSpecifierIsRejected) {

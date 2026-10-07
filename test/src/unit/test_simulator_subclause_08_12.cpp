@@ -451,8 +451,8 @@ TEST(ClassAssignRenameSim, E2eDeclInitShallowCopyCopiesProperties) {
 
 // §8.11 makes `this` "a predefined object handle that refers to the object that
 // was used to invoke the subroutine that this is used within", and footnote 23
-// on A.2.4's class_new asks only that a copy source "evaluate to an object
-// handle", so `new this` copies the object the running method was called on.
+// on A.2.4's class_new asks only that a copy source's value be an object
+// handle, so `new this` copies the object the running method was called on.
 //
 // 42 is the value that discriminates. The declared default is 0 and the
 // constructor writes 7, so a run that copied returns 42, a run that constructed

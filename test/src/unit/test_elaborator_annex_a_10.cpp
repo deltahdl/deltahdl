@@ -7,11 +7,10 @@ using namespace delta;
 
 namespace {
 
-// A.10 item 2: "It shall be illegal to initialize a port that is not a
-// variable output port or to specify a default value for a port that is not
-// an input port". A variable output port with `= constant_expression` is the
-// initialized port the item permits; an output net with one is the port it
-// forbids initializing.
+// A.10 item 2: only a variable output port may be initialized, and only an
+// input port may be given a default value. A variable output port with
+// `= constant_expression` is the initialized port the item permits; an output
+// net with one is the port it forbids initializing.
 TEST(BnfClarificationElaboration, VariableOutputPortInitializerOk) {
   ElabFixture f;
   EXPECT_TRUE(ElabOk(
