@@ -55,10 +55,10 @@ void Parser::RejectInCheckerBody(const char* msg) {
 // reads every body through the same dispatch, so an item on that wider list is
 // reported here under A.1.7 when the body being read is a program's, and still
 // read, so that the body resumes after it. §24.3 names the rest of the
-// difference in prose, "it shall not contain always procedures, primitives,
-// UDPs, or declarations or instances of modules, interfaces, or other
-// programs", and those are reported under §24.3 where each is read. An
-// anonymous program sets no current_module_ and is left to
+// difference in prose, keeping out of a program every always procedure,
+// primitive and UDP, and every declaration or instance of a module, an
+// interface or another program, and those are reported under §24.3 where each
+// is read. An anonymous program sets no current_module_ and is left to
 // FilterAnonymousProgramItems in parser.cpp, which reports under A.1.11.
 void Parser::RejectInProgramBody(SourceLoc loc, const char* msg) {
   if (!InProgramBlock()) return;

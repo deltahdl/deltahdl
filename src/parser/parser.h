@@ -847,8 +847,8 @@ class Parser {
   std::unordered_set<std::string_view> known_nettypes_;
   std::unordered_set<std::string_view> known_udps_;
   // The names of the modules, interfaces and programs declared so far in this
-  // parse, extern declarations included. §24.3 has a program "shall not
-  // contain ... instances of modules, interfaces, or other programs", and an
+  // parse, extern declarations included. §24.3 keeps out of a program any
+  // instance of a module, an interface or another program, and an
   // instantiation names its cell by an identifier the parser can tell nothing
   // from, so the report is made here only for a cell declared before the
   // program that instantiates it; every other name is left to the elaborator,

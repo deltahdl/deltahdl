@@ -50,9 +50,9 @@ struct ParserAssertHelpers {
   // assertion_item that A.1.7's non_port_program_item leaves out, admitting a
   // concurrent_assertion_item alone: §16.4.3 has a deferred assertion outside
   // procedural code "treated as if it were contained in an always_comb
-  // procedure", and §24.3 has a program that "shall not contain always
-  // procedures". One in a program body is reported and still read, from the
-  // assert and assume path and from the cover path alike.
+  // procedure", and §24.3 keeps every always procedure out of a program. One
+  // in a program body is reported and still read, from the assert and assume
+  // path and from the cover path alike.
   static void RejectDeferredInProgram(Parser& p, SourceLoc loc) {
     p.RejectInProgramBody(loc,
                           "a deferred immediate assertion is not an item of a "

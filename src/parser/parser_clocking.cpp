@@ -86,10 +86,9 @@ ModuleItem* Parser::ParseClockingDecl() {
   // checker, or program; it shall not be declared inside a package.
   //
   // An anonymous program in the package is no exception, whatever its keyword
-  // suggests. §24.6 has anonymous programs used inside packages "to declare
-  // items that are part of the program-wide space without declaring a new
-  // scope", and "items declared in an anonymous program share the same name
-  // space as the package or compilation-unit scope in which they are declared"
+  // suggests. §24.6 has an anonymous program in a package declare items for
+  // the program-wide space while opening no scope of its own, its items sharing
+  // one name space with the package or compilation-unit scope that holds it
   // -- so a clocking block written in one is in the package's scope, which is
   // what this prohibits. The guard that held the report back read that clause
   // backwards, and A.1.11 keeps clocking_declaration out of
