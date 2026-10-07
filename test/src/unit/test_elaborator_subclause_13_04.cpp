@@ -549,11 +549,11 @@ TEST(FunctionElaboration, TaskEnabledFromAForStepError) {
 // stand. Five walks in src/elaborator/elaborator_validate_funcchecks.cpp
 // enforce them — BodyContainsFork and BodyContainsNonblocking and
 // BodyContainsEventScheduling for the bans on any fork construct and on a
-// statement that directly schedules an event to run once the function has
-// returned, CollectLocalDeclNames and WalkConstFuncStmt for the ban on naming
-// an identifier that is neither a parameter, a function name nor declared
-// locally in the function — and each had written out a short list of its own of
-// the thirteen child-statement links Stmt declares. They now take the list from
+// statement whose own action leaves an event pending past the function's
+// return, CollectLocalDeclNames and WalkConstFuncStmt for the ban on naming an
+// identifier that names no parameter or function and no local of the function —
+// and each had written out a short list of its own of the thirteen
+// child-statement links Stmt declares. They now take the list from
 // ForEachChildStmt in src/elaborator/elaborator_validate_internal.h, and the
 // cases below cover the positions that reaches which their own lists did not.
 //
@@ -597,12 +597,13 @@ constexpr const char* kModuleVarStmt = "t = i;";
 
 // What each walk's rule reports, with the function named `cf` by ConstFuncSrc.
 constexpr const char* kForkMsg =
-    "constant function 'cf' shall not contain fork";
+    "constant function 'cf' uses fork, which constant functions are barred "
+    "from";
 constexpr const char* kNbaMsg =
     "constant function 'cf' shall not contain nonblocking assignments";
 constexpr const char* kEventMsg =
-    "constant function 'cf' shall not contain statements that schedule events "
-    "to execute after it returns";
+    "constant function 'cf' schedules an event that would run once it has "
+    "returned, which constant functions are barred from";
 constexpr const char* kIdentMsg =
     "constant function 'cf' references identifier 'i' that is not a parameter, "
     "function name, or local declaration";
@@ -803,13 +804,13 @@ TEST(ConstantFunctionBodyReachElaboration,
 // case_expression and case_item_expressions of an rs_case.
 //
 // Stmt::wait_order_events and Stmt::cycle_delay get no case. Every statement
-// Annex A admits either in is one §13.4.3 rejects before this walk runs:
-// A.6.5 fills wait_order_events for `wait_order ( hierarchical_identifier { ,
-// hierarchical_identifier } ) action_block` alone and admits a cycle_delay in
-// a procedural_timing_control, both of which ValidateConstFuncBodyContent
-// answers with "shall not contain statements that schedule events to execute
-// after it returns", and A.6.11's clocking_drive, the other cycle_delay
-// position, is written with `<=` and is answered as a nonblocking assignment.
+// Annex A admits either in is one §13.4.3 rejects before this walk runs: A.6.5
+// fills wait_order_events for `wait_order ( hierarchical_identifier { ,
+// hierarchical_identifier } ) action_block` alone and admits a cycle_delay in a
+// procedural_timing_control, both of which ValidateConstFuncBodyContent answers
+// with "schedules an event that would run once it has returned", and A.6.11's
+// clocking_drive, the other cycle_delay position, is written with `<=` and is
+// answered as a nonblocking assignment.
 // A.6.2's blocking_assignment takes a delay_or_event_control, to which A.6.5
 // gives no cycle_delay alternative, and the one spelling reaching the walk
 // with a cycle delay on it -- `q = ##2 d;`, which src/parser/parser_stmt.cpp

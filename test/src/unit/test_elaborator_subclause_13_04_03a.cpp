@@ -47,10 +47,11 @@ TEST(ConstantFunctionRulesElaboration, OutputArgError) {
       "  localparam int P = bad_func(4);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "constant function 'bad_func' shall not have output"
-                            " arguments",
-                            6, "13.4.3"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constant function 'bad_func' declares an argument of direction output, "
+      "which constant functions are barred from",
+      6, "13.4.3"));
 }
 
 TEST(ConstantFunctionRulesElaboration, InoutArgError) {
@@ -63,10 +64,11 @@ TEST(ConstantFunctionRulesElaboration, InoutArgError) {
       "  localparam int P = bad_func(4);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "constant function 'bad_func' shall not have inout"
-                            " arguments",
-                            5, "13.4.3"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "constant function 'bad_func' declares an argument of "
+                    "direction inout, which constant functions are barred from",
+                    5, "13.4.3"));
 }
 
 TEST(ConstantFunctionRulesElaboration, RefArgError) {
@@ -79,10 +81,11 @@ TEST(ConstantFunctionRulesElaboration, RefArgError) {
       "  localparam int P = bad_func(4);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "constant function 'bad_func' shall not have ref"
-                            " arguments",
-                            5, "13.4.3"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "constant function 'bad_func' declares an argument of "
+                    "direction ref, which constant functions are barred from",
+                    5, "13.4.3"));
 }
 
 TEST(ConstantFunctionRulesElaboration, ForkStatementError) {
@@ -97,9 +100,10 @@ TEST(ConstantFunctionRulesElaboration, ForkStatementError) {
       "  localparam int P = bad_func(4);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "constant function 'bad_func' shall not contain fork", 7, "13.4.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constant function 'bad_func' uses fork, which "
+                            "constant functions are barred from",
+                            7, "13.4.3"));
 }
 
 TEST(ConstantFunctionElaboration, CallInParameterDecl) {
@@ -264,10 +268,11 @@ TEST(ConstantFunctionRulesElaboration, HierarchicalReferenceError) {
       "  localparam int P = bad_func(4);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "constant function 'bad_func' shall not contain "
-                            "hierarchical references",
-                            5, "13.4.3"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "constant function 'bad_func' uses a hierarchical "
+                    "reference, which constant functions are barred from",
+                    5, "13.4.3"));
 }
 
 // §13.4.3 (k): when a default argument is supplied it must be a constant
@@ -317,11 +322,11 @@ TEST(ConstantFunctionRulesElaboration, DelayStatementError) {
       "  localparam int P = bad_func(4);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "constant function 'bad_func' shall not contain "
-                            "statements that schedule events to execute after "
-                            "it returns",
-                            6, "13.4.3"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constant function 'bad_func' schedules an event that would run once it "
+      "has returned, which constant functions are barred from",
+      6, "13.4.3"));
 }
 
 // §13.4.3 (c): event control inside the body also schedules later execution.
@@ -337,11 +342,11 @@ TEST(ConstantFunctionRulesElaboration, EventControlError) {
       "  localparam int P = bad_func(4);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "constant function 'bad_func' shall not contain "
-                            "statements that schedule events to execute after "
-                            "it returns",
-                            7, "13.4.3"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constant function 'bad_func' schedules an event that would run once it "
+      "has returned, which constant functions are barred from",
+      7, "13.4.3"));
 }
 
 // §13.4.3 (c): triggering an event is itself an event-scheduling action.
@@ -357,11 +362,11 @@ TEST(ConstantFunctionRulesElaboration, EventTriggerError) {
       "  localparam int P = bad_func(4);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "constant function 'bad_func' shall not contain "
-                            "statements that schedule events to execute after "
-                            "it returns",
-                            7, "13.4.3"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constant function 'bad_func' schedules an event that would run once it "
+      "has returned, which constant functions are barred from",
+      7, "13.4.3"));
 }
 
 // §13.4.3 definition: arguments to a constant function call must themselves
@@ -395,11 +400,11 @@ TEST(ConstantFunctionRulesElaboration, WaitStatementError) {
       "  localparam int P = bad_func(4);\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "constant function 'bad_func' shall not contain "
-                            "statements that schedule events to execute after "
-                            "it returns",
-                            7, "13.4.3"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constant function 'bad_func' schedules an event that would run once it "
+      "has returned, which constant functions are barred from",
+      7, "13.4.3"));
 }
 
 // §13.4.3 (f): the body must only invoke other constant functions. A task
@@ -444,10 +449,11 @@ TEST(ConstantFunctionRulesElaboration, NestedCalleeWithOutputArgError) {
       f);
   // The report names the nested callee `leaf`, whose output argument the
   // recursive §13.4.3 check reaches through the outer call to `parent`.
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "constant function 'leaf' shall not have output"
-                            " arguments",
-                            10, "13.4.3"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constant function 'leaf' declares an argument of direction output, "
+      "which constant functions are barred from",
+      10, "13.4.3"));
 }
 
 // §13.4.3 (f): two constant functions calling each other must terminate

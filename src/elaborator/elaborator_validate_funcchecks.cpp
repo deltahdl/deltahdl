@@ -447,8 +447,8 @@ static void CheckConstFuncMemberAccess(const Expr* e, ConstFuncBodyCheck& chk) {
       !chk.param_names.count(root->text)) {
     chk.diag.Error(
         chk.loc,
-        std::format("constant function '{}' shall not contain hierarchical "
-                    "references",
+        std::format("constant function '{}' uses a hierarchical reference, "
+                    "which constant functions are barred from",
                     chk.func_name),
         Subclause("13.4.3"));
     chk.failed = true;
@@ -564,8 +564,8 @@ static const Expr* StatementFormSystemCall(const Stmt* s) {
 // is one list. A.6.5 gives `wait_statement ::= wait_order ( hierarchical_
 // identifier { , hierarchical_identifier } ) action_block`, and
 // Stmt::wait_order_events is filled for that statement alone, which §13.4.3's
-// ban on a statement that directly schedules an event to run once the function
-// has returned has ValidateConstFuncBodyContent reject before this runs.
+// ban on a statement whose own action leaves an event pending past the
+// function's return has ValidateConstFuncBodyContent reject before this runs.
 // Stmt::cycle_delay is the same: A.6.5 admits a cycle_delay in a
 // procedural_timing_control, rejected there as well, and A.6.11 admits one in a
 // clocking_drive, which is written with `<=` and so is rejected as a
@@ -602,8 +602,9 @@ static bool ValidateConstFuncArgs(
         arg.direction == Direction::kInout ||
         arg.direction == Direction::kRef) {
       diag.Error(loc,
-                 std::format("constant function '{}' shall not have {}"
-                             " arguments",
+                 std::format("constant function '{}' declares an argument of "
+                             "direction {}, which constant functions are "
+                             "barred from",
                              func->name,
                              arg.direction == Direction::kOutput  ? "output"
                              : arg.direction == Direction::kInout ? "inout"
@@ -636,7 +637,8 @@ static bool ValidateConstFuncBodyContent(const ModuleItem* func, SourceLoc loc,
   for (auto* s : func->func_body_stmts) {
     if (BodyContainsFork(s)) {
       diag.Error(loc,
-                 std::format("constant function '{}' shall not contain fork",
+                 std::format("constant function '{}' uses fork, which "
+                             "constant functions are barred from",
                              func->name),
                  Subclause("13.4.3"));
       return false;
@@ -652,8 +654,9 @@ static bool ValidateConstFuncBodyContent(const ModuleItem* func, SourceLoc loc,
     if (BodyContainsEventScheduling(s)) {
       diag.Error(loc,
                  std::format(
-                     "constant function '{}' shall not contain statements that "
-                     "schedule events to execute after it returns",
+                     "constant function '{}' schedules an event that would run "
+                     "once it has returned, which constant functions are "
+                     "barred from",
                      func->name),
                  Subclause("13.4.3"));
       return false;
