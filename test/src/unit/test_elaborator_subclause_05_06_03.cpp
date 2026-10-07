@@ -80,8 +80,9 @@ TEST(SystemNameElaboration, EscapedSystemTaskNameIsRejected) {
       "  initial \\$display (\"x\");\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "'$display' shall not be escaped", 2, "5.6.3"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'$display' cannot be written as an escaped identifier", 2, "5.6.3"));
 }
 
 }  // namespace

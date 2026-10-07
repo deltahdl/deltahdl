@@ -148,8 +148,8 @@ Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
   bool space_before_base = SkipSpacesAndTabs();
   if (space_before_sign || space_before_base) {
     diag_.Error(loc,
-                "white space shall not separate the apostrophe from the base "
-                "format character",
+                "the apostrophe, any 's', and the base format character of a "
+                "based number must be written together without white space",
                 Subclause("5.7.1"));
   }
   // Both callers asked ApostropheStartsBaseSpecifier first, so a base letter

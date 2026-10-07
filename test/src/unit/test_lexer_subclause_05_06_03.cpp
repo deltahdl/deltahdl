@@ -99,8 +99,9 @@ TEST(SystemNameLexing, EscapedNameIsNotSystemIdentifier) {
 // forbids escaping one: the escape is reported under §5.6.3 where it is lexed.
 TEST(SystemNameLexing, EscapedSystemTfIdentifierIsRejected) {
   auto diags = LexDiagnostics("\\$display ");
-  EXPECT_TRUE(
-      ReportedError(diags, "'$display' shall not be escaped", 1, "5.6.3"));
+  EXPECT_TRUE(ReportedError(
+      diags, "'$display' cannot be written as an escaped identifier", 1,
+      "5.6.3"));
 }
 
 // The issue's shape: the report is on the line of the escaped name, so that
@@ -111,8 +112,9 @@ TEST(SystemNameLexing, EscapedSystemTaskEnableIsRejectedOnItsLine) {
       "module t;\n"
       "  initial \\$display (\"x\");\n"
       "endmodule\n");
-  EXPECT_TRUE(
-      ReportedError(diags, "'$display' shall not be escaped", 2, "5.6.3"));
+  EXPECT_TRUE(ReportedError(
+      diags, "'$display' cannot be written as an escaped identifier", 2,
+      "5.6.3"));
 }
 
 // A name with a character outside A.9.3's set after the `$` is not a
@@ -157,7 +159,8 @@ TEST(SystemNameLexing, EscapedNameThatNoSystemNameSpellsIsAccepted) {
 // forbidden escaped, as one spelled with letters alone.
 TEST(SystemNameLexing, EscapedSystemNameWithUnderscoreAndDollarIsRejected) {
   EXPECT_TRUE(ReportedError(LexDiagnostics("\\$my$task_1 "),
-                            "shall not be escaped", 1, "5.6.3"));
+                            "cannot be written as an escaped identifier", 1,
+                            "5.6.3"));
 }
 
 }  // namespace

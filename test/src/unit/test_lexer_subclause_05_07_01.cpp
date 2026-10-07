@@ -30,8 +30,8 @@ TEST(IntegerLiteralLexing, RejectWhitespaceBetweenApostropheAndBase) {
   // character. `8' h99` writes a space between the apostrophe and the `h`, and
   // the report stands at the start of the number token, which is line 1 here.
   EXPECT_TRUE(ReportedError(LexDiagnostics("8' h99"),
-                            "white space shall not separate the apostrophe "
-                            "from the base format character",
+                            "the base format character of a based number must "
+                            "be written together without white space",
                             1, "5.7.1"));
 }
 
@@ -41,8 +41,8 @@ TEST(IntegerLiteralLexing, RejectWhitespaceBetweenApostropheAndBase) {
 // the same rule as `8' h99`.
 TEST(IntegerLiteralLexing, RejectWhitespaceBetweenApostropheAndBaseAfterSign) {
   EXPECT_TRUE(ReportedError(LexDiagnostics("8's h99"),
-                            "white space shall not separate the apostrophe "
-                            "from the base format character",
+                            "the base format character of a based number must "
+                            "be written together without white space",
                             1, "5.7.1"));
 }
 
@@ -258,8 +258,8 @@ TEST(IntegerLiteralLexing, ColumnAfterNumberAndTwoSpacesIsUnchanged) {
 // `8' h99`.
 TEST(IntegerLiteralLexing, SizelessLiteralRejectsWhitespaceBeforeBaseFormat) {
   EXPECT_TRUE(ReportedError(LexDiagnostics("' h99"),
-                            "white space shall not separate the apostrophe "
-                            "from the base format character",
+                            "the base format character of a based number must "
+                            "be written together without white space",
                             1, "5.7.1"));
 }
 
@@ -270,8 +270,8 @@ TEST(IntegerLiteralLexing, SizelessLiteralRejectsWhitespaceBeforeBaseFormat) {
 TEST(IntegerLiteralLexing,
      SizelessSignedLiteralRejectsWhitespaceBeforeBaseFormat) {
   EXPECT_TRUE(ReportedError(LexDiagnostics("'s h99"),
-                            "white space shall not separate the apostrophe "
-                            "from the base format character",
+                            "the base format character of a based number must "
+                            "be written together without white space",
                             1, "5.7.1"));
 }
 
@@ -352,7 +352,8 @@ TEST(IntegerLiteralLexing, TabBeforeTheApostropheIsAllowedAndAfterItIsNot) {
   EXPECT_TRUE(LexDiagnostics("8\t'h1").empty());
 
   EXPECT_TRUE(ReportedError(LexDiagnostics("8'\th1"),
-                            "white space shall not separate", 1, "5.7.1"));
+                            "must be written together without white space", 1,
+                            "5.7.1"));
 }
 
 // An apostrophe that ends the text opens no literal, cast or pattern, and is

@@ -776,8 +776,8 @@ Token Lexer::LexEscapedIdentifier() {
   // neither the system task nor anything a design declares.
   if (IsSystemTfSpelling(tok.text)) {
     diag_.Error(loc,
-                std::format("system task or function name '{}' shall not be "
-                            "escaped",
+                std::format("system task or function name '{}' cannot be "
+                            "written as an escaped identifier",
                             tok.text),
                 Subclause("5.6.3"));
   }
