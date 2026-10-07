@@ -582,8 +582,7 @@ bool Parser::TryParseCuTypeDeclaration(CompilationUnit* unit) {
 void Parser::ReportUnexpectedTopLevelToken() {
   if (AtClockingDecl()) {
     RejectClockingDecl(
-        "a clocking block shall not be declared outside all declarations in a "
-        "compilation unit");
+        "a clocking block cannot stand at the top level of a compilation unit");
     return;
   }
   diag_.Error(CurrentLoc(), "expected top-level declaration",

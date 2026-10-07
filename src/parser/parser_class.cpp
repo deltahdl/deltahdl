@@ -677,8 +677,8 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
   // through to the class property form, which would ask for a property name.
   if (AtClockingDecl()) {
     RejectClockingDecl(
-        "a clocking block shall not be declared inside a class; it can only be "
-        "declared inside a module, interface, checker, or program");
+        "a class body cannot hold a clocking block; only a module, an "
+        "interface, a checker or a program body can");
     return;
   }
   auto* member = arena_.Create<ClassMember>();

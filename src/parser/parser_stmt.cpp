@@ -199,8 +199,8 @@ Stmt* Parser::ParseStmtBody(std::string_view prefix_label) {
   // The three positions the sentence names are the ones that reach here.
   if (AtClockingDecl()) {
     RejectClockingDecl(
-        "a clocking block shall not be declared inside a function, task, or "
-        "procedural block");
+        "a clocking block cannot stand as a statement of a function, a task or "
+        "a procedural block");
     return arena_.Create<Stmt>();
   }
   switch (CurrentToken().kind) {

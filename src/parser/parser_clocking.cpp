@@ -95,8 +95,7 @@ ModuleItem* Parser::ParseClockingDecl() {
   // anonymous_program_item as well, so such a source now draws both reports
   // rather than only the grammar's.
   if (package_body_depth_ > 0) {
-    diag_.Error(item->loc,
-                "a clocking block shall not be declared inside a package",
+    diag_.Error(item->loc, "a package body cannot hold a clocking block",
                 Subclause("14.7"));
   }
 
@@ -174,7 +173,7 @@ void Parser::RejectClockingDecl(std::string_view message) {
 void Parser::ParseClockingItemList(ModuleItem* item) {
   while (!Check(TokenKind::kKwEndclocking) && !AtEnd()) {
     if (AtClockingDecl()) {
-      RejectClockingDecl("multiple clocking blocks cannot be nested");
+      RejectClockingDecl("a clocking block cannot hold another clocking block");
       continue;
     }
     auto before = lexer_.SavePos().pos;

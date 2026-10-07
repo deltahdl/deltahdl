@@ -71,7 +71,7 @@ TEST(ClockingScopeParse, InInterface) {
 }
 
 TEST(ClockingScopeParse, InPackageRejected) {
-  // §14.7: a clocking block shall not be declared inside a package.
+  // §14.7: a package body may not hold a clocking block.
   auto r = Parse(
       "package pkg;\n"
       "  clocking cb @(posedge clk);\n"
@@ -79,8 +79,7 @@ TEST(ClockingScopeParse, InPackageRejected) {
       "  endclocking\n"
       "endpackage\n");
   EXPECT_TRUE(ReportedError(
-      r.diags, "a clocking block shall not be declared inside a package", 2,
-      "14.7"));
+      r.diags, "a package body cannot hold a clocking block", 2, "14.7"));
 }
 
 TEST(ClockingScopeParse, DefaultClockingInPackageRejected) {
@@ -93,8 +92,7 @@ TEST(ClockingScopeParse, DefaultClockingInPackageRejected) {
       "  endclocking\n"
       "endpackage\n");
   EXPECT_TRUE(ReportedError(
-      r.diags, "a clocking block shall not be declared inside a package", 2,
-      "14.7"));
+      r.diags, "a package body cannot hold a clocking block", 2, "14.7"));
 }
 
 // Two rules turn this source away and each is asserted, so neither can be
@@ -125,12 +123,11 @@ TEST(ClockingScopeParse, InAnonymousProgramInPackageRejected) {
       "class, covergroup, and class constructor declarations",
       3, "A.1.11"));
   EXPECT_TRUE(ReportedError(
-      r.diags, "a clocking block shall not be declared inside a package", 3,
-      "14.7"));
+      r.diags, "a package body cannot hold a clocking block", 3, "14.7"));
 }
 
-// §14.7: clocking blocks "cannot be declared inside functions, tasks, or
-// packages or outside all declarations in a compilation unit". A module
+// §14.7: no clocking block may be written in a function, a task or a package,
+// nor at the top of a compilation unit outside every declaration. A module
 // declaration precedes the clocking block so that the line the report names is
 // the `clocking` keyword rather than the first line of the source, which any
 // report standing at the start of the file would also name.
@@ -143,9 +140,8 @@ TEST(ClockingScopeParse, AtCompilationUnitScopeRejected) {
       "endclocking\n");
   EXPECT_TRUE(ReportedError(
       r.diags,
-      "a clocking block shall not be declared outside all declarations in a "
-      "compilation unit",
-      3, "14.7"));
+      "a clocking block cannot stand at the top level of a compilation unit", 3,
+      "14.7"));
 }
 
 // §14.7 names the function among the scopes a clocking block cannot be
@@ -161,8 +157,8 @@ TEST(ClockingScopeParse, InFunctionRejected) {
       "endmodule\n");
   EXPECT_TRUE(ReportedError(
       r.diags,
-      "a clocking block shall not be declared inside a function, task, or "
-      "procedural block",
+      "a clocking block cannot stand as a statement of a function, a task or "
+      "a procedural block",
       3, "14.7"));
 }
 
@@ -200,12 +196,12 @@ TEST(ClockingScopeParse, InTaskRejected) {
       "endmodule\n");
   EXPECT_TRUE(ReportedError(
       r.diags,
-      "a clocking block shall not be declared inside a function, task, or "
-      "procedural block",
+      "a clocking block cannot stand as a statement of a function, a task or "
+      "a procedural block",
       3, "14.7"));
 }
 
-// §14.7: "Multiple clocking blocks cannot be nested." The inner block stands
+// §14.7: no clocking block may contain another. The inner block stands
 // where a clocking_item belongs, and is rejected under the nesting rule rather
 // than read as a malformed clocking_item.
 TEST(ClockingScopeParse, NestedClockingRejected) {
@@ -218,11 +214,12 @@ TEST(ClockingScopeParse, NestedClockingRejected) {
       "  endclocking\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedError(
-      r.diags, "multiple clocking blocks cannot be nested", 3, "14.7"));
+      r.diags, "a clocking block cannot hold another clocking block", 3,
+      "14.7"));
 }
 
-// §14.7: "A clocking block can only be declared inside a module, interface,
-// checker, or program". A class is none of the four.
+// §14.7: a clocking block belongs only in a module, an interface, a checker or
+// a program. A class is none of the four.
 TEST(ClockingScopeParse, InClassRejected) {
   auto r = Parse(
       "class c;\n"
@@ -231,8 +228,7 @@ TEST(ClockingScopeParse, InClassRejected) {
       "  endclocking\n"
       "endclass\n");
   EXPECT_TRUE(ReportedError(
-      r.diags, "a clocking block shall not be declared inside a class", 2,
-      "14.7"));
+      r.diags, "a class body cannot hold a clocking block", 2, "14.7"));
 }
 
 // One mistake draws one report in a class body too: the class body resumes at
@@ -267,8 +263,8 @@ TEST(ClockingScopeParse, InProceduralBlockRejected) {
       "endmodule\n");
   EXPECT_TRUE(ReportedError(
       r.diags,
-      "a clocking block shall not be declared inside a function, task, or "
-      "procedural block",
+      "a clocking block cannot stand as a statement of a function, a task or "
+      "a procedural block",
       3, "14.7"));
 }
 
