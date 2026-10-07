@@ -9,13 +9,13 @@ using namespace delta;
 
 namespace {
 
-// §29.3.5 second sentence — "The z values passed to UDP inputs shall be treated
-// the same as x values" — is a runtime rule: it governs how the primitive
-// evaluates when a z arrives on an input terminal. The table the rule matches
-// against is *produced* by parsing a real UDP whose header, port declarations,
-// and state table come from the §29.3.2/§29.3.4 dependencies, so these tests
-// build the primitive from real source syntax and then run the production
-// evaluator (UdpEvalState), rather than hand-assembling a table.
+// §29.3.5 second sentence — a z arriving on a UDP input counts as an x — is a
+// runtime rule: it governs how the primitive evaluates when a z arrives on an
+// input terminal. The table the rule matches against is *produced* by parsing a
+// real UDP whose header, port declarations, and state table come from the
+// §29.3.2/§29.3.4 dependencies, so these tests build the primitive from real
+// source syntax and then run the production evaluator (UdpEvalState), rather
+// than hand-assembling a table.
 //
 // UDP evaluation is not yet wired into the full simulator scheduler, so the
 // only synthetic step is the input vector handed to the evaluator; there is no
@@ -23,8 +23,8 @@ namespace {
 // arena-owned by the ParseResult, which the caller keeps alive for the lifetime
 // of the UdpEvalState.
 //
-// (The companion compile-time half of §29.3.5 — "a z in a table entry is
-// illegal" — is a parse-stage rule and is observed in the parser test file.)
+// (The companion compile-time half of §29.3.5 — no table entry may hold a z —
+// is a parse-stage rule and is observed in the parser test file.)
 
 TEST(UdpInputZAsX, CombinationalZMatchesXRow) {
   // A row keyed on x matches an input that arrives as z, because z is coerced

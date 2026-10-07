@@ -346,10 +346,10 @@ TEST(UdpPortDeclaration, RegDeclNotNamingOutputRejected) {
       r.diags, "UDP reg declaration shall name the output port", 3, "29.3.2"));
 }
 
-// §29.3.2: "Sequential UDPs shall contain a reg declaration for the output
-// port". The rows are A.5.3's `sequential_entry`, three fields separated by two
-// colons, and the output declaration says nothing about a reg, so the two
-// disagree. The report stands at the first row that says so.
+// §29.3.2: a sequential UDP must declare its output port reg. The rows are
+// A.5.3's `sequential_entry`, three fields separated by two colons, and the
+// output declaration says nothing about a reg, so the two disagree. The report
+// stands at the first row that says so.
 TEST(UdpPortDeclaration, SequentialUdpWithoutRegRejected) {
   auto r = Parse(
       "primitive dff(q, d, clk);\n"
@@ -365,7 +365,7 @@ TEST(UdpPortDeclaration, SequentialUdpWithoutRegRejected) {
                             5, "29.3.2"));
 }
 
-// §29.3.2: "Combinational UDPs cannot contain a reg declaration." The rows are
+// §29.3.2: a combinational UDP may hold no reg declaration. The rows are
 // A.5.3's `combinational_entry`, two fields separated by one colon, and the
 // output is declared reg, so the two disagree. The EXPECT_FALSE is what holds
 // the report to one per UDP: the second row breaks the rule exactly as the
@@ -406,9 +406,9 @@ TEST(UdpPortDeclaration, CombinationalUdpWithSeparateRegRejected) {
 }
 
 // §29.3.2: the output port declaration is the keyword `output` followed by one
-// output port name. The lower bound of "one name" is the rejecting counterpart
-// of OutputDeclMultipleNamesRejected: an output declaration carrying no name is
-// rejected.
+// output port name. The lower bound of a single name is the rejecting
+// counterpart of OutputDeclMultipleNamesRejected: an output declaration
+// carrying no name is rejected.
 TEST(UdpPortDeclaration, OutputDeclWithoutNameRejected) {
   auto r = Parse(
       "primitive p(out, a);\n"
@@ -425,7 +425,7 @@ TEST(UdpPortDeclaration, OutputDeclWithoutNameRejected) {
 
 // §29.3.2: the input port declaration is the keyword `input` followed by one or
 // more input port names. This is the negative of that rule -- an input
-// declaration with no name violates the "one or more" lower bound and is
+// declaration with no name violates the at-least-one lower bound and is
 // rejected.
 TEST(UdpPortDeclaration, InputDeclWithoutNameRejected) {
   auto r = Parse(

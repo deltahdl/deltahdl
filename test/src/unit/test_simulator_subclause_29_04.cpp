@@ -60,7 +60,7 @@ constexpr const char* kMultiplexer =
     "endprimitive\n";
 
 // Claim 2: an input combination that appears in the table drives the output to
-// that row's value. Includes the clause's own "first entry" walk-through:
+// that row's value. Includes the clause's own walk-through of the first entry:
 // control=0, dataA=1, dataB=0 selects dataA, so mux is 1.
 TEST(UdpCombinational, SpecifiedRowDrivesTabledOutput) {
   auto r = Parse(kMultiplexer);

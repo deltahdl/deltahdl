@@ -146,8 +146,8 @@ TEST(UdpInitialStatement, RejectsBlockStatementInInitial) {
       2, "29.3.3"));
 }
 
-// "Delays are not permitted in a UDP initial statement": a delay control before
-// the assignment is rejected.
+// A UDP initial statement may carry no delay, so a delay control before the
+// assignment is rejected.
 TEST(UdpInitialStatement, RejectsDelayBeforeAssignment) {
   auto r = Parse(
       "primitive dff(output reg q, input d, clk);\n"

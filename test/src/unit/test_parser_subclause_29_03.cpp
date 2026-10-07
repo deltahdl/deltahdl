@@ -73,11 +73,11 @@ TEST(UdpTopLevelParsing, AtLeast256UdpsAccepted) {
 }
 
 // §29.3 head owns the `udp_declaration` production of Syntax 29-1, whose
-// alternatives go beyond the two "alternate forms" that §29.3.1 describes in
-// prose. The remaining alternatives -- the two `extern` prototype forms, the
-// wildcard `( .* )` header, and the optional `endprimitive : udp_identifier`
-// end label -- appear only in §29.3's syntax box, so they are witnessed here
-// against the head's own canonical parser test.
+// alternatives go beyond the two forms §29.3.1 describes in prose. The
+// remaining alternatives -- the two `extern` prototype forms, the wildcard `(
+// .* )` header, and the optional `endprimitive : udp_identifier` end label --
+// appear only in §29.3's syntax box, so they are witnessed here against the
+// head's own canonical parser test.
 
 // udp_declaration ::= ... | extern udp_ansi_declaration
 TEST(UdpTopLevelParsing, ExternAnsiPrototypeAccepted) {

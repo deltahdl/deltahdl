@@ -71,7 +71,8 @@ TEST(UdpInitialStatement, InitialValueIsOutputAtSimulationStart) {
 // The initial statement is optional. Parsed from real source with no initial
 // statement, the sequential UDP starts in the unknown state rather than taking
 // a specified value -- the evaluator only seeds a value when has_initial is
-// set. This is §29.7's "the initial statement is optional" observed at runtime.
+// set. This is §29.7's leaving the initial statement optional, observed at
+// runtime.
 constexpr const char* kSrffNoInitial =
     "primitive srff (q, s, r);\n"
     "  output q; reg q;\n"
@@ -185,11 +186,11 @@ TEST(UdpInitialStatement, InitialValueServesAsCurrentState) {
 
 // §29.7 Example 2 with Figure 29-1 (printed pages 867-868): the standard's own
 // `dff`, its `dff1` UDP given `initial q = 1'b1` and its clk and d left
-// undriven. §29.3.5 (printed page 863) has "The z values passed to UDP inputs
-// ... treated the same as x values", so the undriven inputs make no
-// transition, the 1 stands on qi from time 0, and it reaches q through `buf #3`
-// at 3 and qb through `not #5` at 5. The z was taken for a transition from
-// the x the inputs were assumed to start at, no row matched it, and qi went x.
+// undriven. §29.3.5 (printed page 863) counts a z arriving on a UDP input as an
+// x, so the undriven inputs make no transition, the 1 stands on qi from time 0,
+// and it reaches q through `buf #3` at 3 and qb through `not #5` at 5. The z
+// was taken for a transition from the x the inputs were assumed to start at, no
+// row matched it, and qi went x.
 TEST(UdpInitialStatementRun, Figure29_1InitialValueReachesTheGates) {
   SimFixture f;
   EXPECT_EQ(RunCapture("primitive dff1 (q, clk, d);\n"
@@ -252,11 +253,11 @@ TEST(UdpInitialStatementRun, ZInputsKeepTheInitialValueAsXInputsDo) {
             "wire-z inputs qi=1  reg-x inputs qr=1\n");
 }
 
-// §29.7 (printed pages 866-867), the srff example: under `initial q = 1'b1`
-// "The output q has an initial value of 1 at the start of the simulation", so
-// a module's initial block reading the net at time 0, before any input moves
-// and before any delta passes, reads 1. It read z, the value reaching the net
-// only once the instance's own process had run.
+// §29.7 (printed pages 866-867), the srff example: under `initial q = 1'b1` the
+// output q starts the simulation at 1, so a module's initial block reading the
+// net at time 0, before any input moves and before any delta passes, reads 1.
+// It read z, the value reaching the net only once the instance's own process
+// had run.
 TEST(UdpInitialStatementRun, InitialValueIsOnTheNetAtTimeZero) {
   SimFixture f;
   EXPECT_EQ(RunCapture("primitive srff (q, s, r);\n"

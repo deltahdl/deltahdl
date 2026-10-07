@@ -560,8 +560,8 @@ TEST(UdpBodyGrammar, EdgeIndicator_SimParen01) {
 
 // udp_body ::= combinational_body | sequential_body, and only sequential_body
 // opens with `[ udp_initial_statement ]`; combinational_body opens with
-// `table`. §29.4 has the statement give "the initial value of the output" of
-// a sequential UDP. One written in a combinational UDP was accepted silently.
+// `table`. §29.4 has the statement set the output's starting value in a
+// sequential UDP. One written in a combinational UDP was accepted silently.
 TEST(UdpBodyGrammar, InitialStatementInCombinationalBodyIsRejected) {
   auto r = Parse(
       "primitive inv(output q, input a);\n"

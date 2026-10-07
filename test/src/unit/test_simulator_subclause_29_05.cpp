@@ -167,10 +167,11 @@ TEST(UdpLevelSeq, CurrentStateFieldSelectsRow) {
 // input field is matched against its input, so it accepts the abbreviation
 // symbols. A `b` current-state field (from §29.3.6) covers a held 0 or 1 but --
 // unlike `?` -- not a held x. This exercises a distinct matching branch for
-// §29.5's "the field represents the current state" rule: the row applies only
-// when the live state is 0 or 1, and is skipped (falling through to the default
-// x) when the state is x. Built from real source so the parsed current-state
-// field carries the actual `b` symbol into the production evaluator.
+// §29.5's rule that the field stands for the current state: the row applies
+// only when the live state is 0 or 1, and is skipped (falling through to the
+// default x) when the state is x. Built from real source so the parsed
+// current-state field carries the actual `b` symbol into the production
+// evaluator.
 constexpr const char* kBStateKeyed =
     "primitive bcs (q, s);\n"
     "  output q; reg q;\n"

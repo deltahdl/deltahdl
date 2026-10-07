@@ -698,15 +698,14 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
      UnnamedPrimitiveInstanceParsesInAFileAfterTheDeclaration) {
   // `myudp (q, d, clk);`, which §29.8 permits: its udp_instance is
   // `[ name_of_instance ] ( output_terminal , input_terminal
-  // { , input_terminal } )`, and the prose says "The instance name is
-  // optional, just as for gates." A parse that has not been told myudp names a
-  // primitive reaches neither instantiation arm of
-  // Parser::ParseImplicitTypeOrInst, since both want an identifier or a `#`
-  // after the name, so the item falls to Parser::ParsePlainVarDecl and the file
-  // does not parse. Nothing recovers this one during elaboration: there is no
-  // module instantiation left for Elaborator::ReclassifyForwardUdpInstances to
-  // reclassify. The item is read back as a primitive instance with no instance
-  // name and three terminals.
+  // { , input_terminal } )`, and the prose leaves the instance name optional,
+  // as it is for gates. A parse that has not been told myudp names a primitive
+  // reaches neither instantiation arm of Parser::ParseImplicitTypeOrInst, since
+  // both want an identifier or a `#` after the name, so the item falls to
+  // Parser::ParsePlainVarDecl and the file does not parse. Nothing recovers
+  // this one during elaboration: there is no module instantiation left for
+  // Elaborator::ReclassifyForwardUdpInstances to reclassify. The item is read
+  // back as a primitive instance with no instance name and three terminals.
   ScratchDir tmp;
   tmp.Write("lib.map", kLibMap);
   auto prim = tmp.Write("src/prim.sv", kAndPrimitive);

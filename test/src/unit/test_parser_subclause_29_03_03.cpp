@@ -62,9 +62,10 @@ TEST(UdpSequentialInitial, BareZeroAndOneAreSingleBitLiterals) {
   EXPECT_EQ(r1.cu->udps[0]->initial_value, '1');
 }
 
-// S3 facet "single-bit literal value": the value may be the unknown state x.
-// §29.2 gives the output three states (0, 1, x), so the initial statement must
-// admit an x-valued single-bit literal, distinct from the 0/1 forms.
+// S3 facet, the value being a single-bit literal: the value may be the unknown
+// state x. §29.2 gives the output three states (0, 1, x), so the initial
+// statement must admit an x-valued single-bit literal, distinct from the 0/1
+// forms.
 TEST(UdpSequentialInitial, UnknownSingleBitLiteralIsAccepted) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
@@ -80,9 +81,9 @@ TEST(UdpSequentialInitial, UnknownSingleBitLiteralIsAccepted) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, 'x');
 }
 
-// S3 facet "single-bit literal value": the capital base letter and capital
-// value digit form the same single-bit literal, a distinct lexical branch that
-// the parser accepts and folds to the same captured value.
+// S3 facet, the value being a single-bit literal: the capital base letter and
+// capital value digit form the same single-bit literal, a distinct lexical
+// branch that the parser accepts and folds to the same captured value.
 TEST(UdpSequentialInitial, CapitalBaseAndDigitSingleBitLiteral) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
@@ -97,9 +98,9 @@ TEST(UdpSequentialInitial, CapitalBaseAndDigitSingleBitLiteral) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, '1');
 }
 
-// S3 facet "single-bit literal value": the sized form carrying value 0. This
-// exercises the sized-base branch with a 0 digit, distinct from the bare `0`
-// literal branch and from the sized value-1 form.
+// S3 facet, the value being a single-bit literal: the sized form carrying value
+// 0. This exercises the sized-base branch with a 0 digit, distinct from the
+// bare `0` literal branch and from the sized value-1 form.
 TEST(UdpSequentialInitial, SizedZeroSingleBitLiteral) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
@@ -114,9 +115,9 @@ TEST(UdpSequentialInitial, SizedZeroSingleBitLiteral) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, '0');
 }
 
-// S3 facet "single-bit literal value": an upper-case X value digit denotes the
-// same unknown state as lower-case x. This exercises the value-capture path
-// that folds the upper-case digit down to the canonical 'x'.
+// S3 facet, the value being a single-bit literal: an upper-case X value digit
+// denotes the same unknown state as lower-case x. This exercises the
+// value-capture path that folds the upper-case digit down to the canonical 'x'.
 TEST(UdpSequentialInitial, UpperCaseUnknownDigitFoldsToX) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
@@ -147,8 +148,8 @@ TEST(UdpSequentialInitial, NonLiteralValueIsRejected) {
       "29.3.3"));
 }
 
-// S3 facet "to the output port": the assignment target must be the output
-// port, not an input.
+// S3 facet, the assignment being to the output port: the assignment target must
+// be the output port, not an input.
 TEST(UdpSequentialInitial, AssignmentMustTargetOutputPort) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
@@ -162,7 +163,8 @@ TEST(UdpSequentialInitial, AssignmentMustTargetOutputPort) {
       "29.3.3"));
 }
 
-// S3 facet "single-bit literal value": a multi-bit literal is rejected.
+// S3 facet, the value being a single-bit literal: a multi-bit literal is
+// rejected.
 TEST(UdpSequentialInitial, MultiBitLiteralIsRejected) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
@@ -177,8 +179,8 @@ TEST(UdpSequentialInitial, MultiBitLiteralIsRejected) {
       "29.3.3"));
 }
 
-// S3 facet "an assignment statement": a procedural block is not a plain
-// assignment and is rejected.
+// S3 facet, the statement being an assignment: a procedural block is not a
+// plain assignment and is rejected.
 TEST(UdpSequentialInitial, BlockStatementIsRejected) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"

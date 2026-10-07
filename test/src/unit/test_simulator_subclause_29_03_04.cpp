@@ -9,13 +9,13 @@ using namespace delta;
 
 namespace {
 
-// §29.3.4 rule S9 — "All combinations of input values that are not explicitly
-// specified result in a default output state of x" — is a runtime rule: it
-// governs what the primitive drives when the current inputs miss every table
-// row. Its input (the state table) is *produced* by parsing a real UDP whose
-// header and port declarations come from the §29.3.1/§29.3.2 dependencies, so
-// these tests build the primitive from real source syntax and then run the
-// production evaluator (UdpEvalState), rather than hand-assembling a table.
+// §29.3.4 rule S9 — any input combination the table does not list gives the
+// output x by default — is a runtime rule: it governs what the primitive drives
+// when the current inputs miss every table row. Its input (the state table) is
+// *produced* by parsing a real UDP whose header and port declarations come from
+// the §29.3.1/§29.3.2 dependencies, so these tests build the primitive from
+// real source syntax and then run the production evaluator (UdpEvalState),
+// rather than hand-assembling a table.
 //
 // UDP evaluation is not yet wired into the full simulator scheduler, so the
 // pipeline here is: parse real source -> pull the elaborated UdpDecl ->

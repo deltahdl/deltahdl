@@ -125,8 +125,8 @@ constexpr const char* kJkEdgeFf =
 // In the mixed table, the level-sensitive preset row drives the output on a
 // preset-input change while the clock is steady -- no clock edge occurs, so the
 // edge-sensitive clocking rows cannot match, and the level case sets q to 1
-// regardless of the current (unknown) state. This is §29.9's "whenever the
-// preset/clear combination is 01, the output has value 1".
+// regardless of the current (unknown) state. This is §29.9's rule that a
+// preset/clear pair of 01 always gives the output 1.
 TEST(MixedUdpEvaluation, LevelPresetDrivesOutputInMixedTable) {
   auto r = Parse(kJkEdgeFf);
   ASSERT_NE(r.cu, nullptr);
@@ -140,8 +140,8 @@ TEST(MixedUdpEvaluation, LevelPresetDrivesOutputInMixedTable) {
 }
 
 // The complementary level case: asserting clear (pc == 10) drives q to 0, again
-// on a steady clock where no edge row can fire. §29.9's "whenever the preset
-// and clear combination has value 10, the output has value 0".
+// on a steady clock where no edge row can fire. §29.9's rule that a
+// preset/clear pair of 10 always gives the output 0.
 TEST(MixedUdpEvaluation, LevelClearDrivesOutputInMixedTable) {
   auto r = Parse(kJkEdgeFf);
   ASSERT_NE(r.cu, nullptr);

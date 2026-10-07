@@ -211,15 +211,13 @@ TEST(PortConnectionElab, PrimitiveOutputPartSelectWidthFromParameter) {
 // sentence -- "Primitive terminals, including UDP terminals, are different from
 // module ports. Primitive output and inout terminals shall be connected
 // directly to 1-bit nets or 1-bit structural net expressions" -- and §29.8 adds
-// of a UDP instantiation that "The terminal connection rules remain the same as
-// outlined in 28.3.6".
+// of a UDP instantiation that it connects its terminals by §28.3.6's rules.
 //
 // The report a UDP instance provokes names its output terminal alone, because
-// §29.3.1 rules that "UDPs have multiple input ports and exactly one output
-// port; bidirectional inout ports are not permitted on UDPs". That is different
-// wording from the gate report kOneBitTerminal above matches, so the two cases
-// below spell out their own, width included: a run that measured an input
-// terminal or the vector's bounds instead of the output terminal's width
+// §29.3.1 gives a UDP many inputs, one output and no inout port at all. That is
+// different wording from the gate report kOneBitTerminal above matches, so the
+// two cases below spell out their own, width included: a run that measured an
+// input terminal or the vector's bounds instead of the output terminal's width
 // reports a different number, and matching the number is what tells those
 // apart.
 //
@@ -333,14 +331,13 @@ TEST(PortConnectionElab, PrimitiveInstanceWithAScalarOutputTerminalIsAccepted) {
 // §4.9.6, so the four-bit terminal below shall draw no report. §28.3.6 rules
 // that "If bit lengths are different, each instance shall get a part-select of
 // the port expression, of a bit length equal to the instance port bit length",
-// and §29.8 rules that "The terminal connection rules remain the same as
-// outlined in 28.3.6", so each of the four elements connects to one bit and the
-// whole terminal is not the width the rule measures.
-// ValidatePrimitiveOutputTerminalWidths returns early on an instance array for
-// that reason, and this case says the early return still holds now that its
-// kind guard admits a primitive instance: a check that measured the terminal
-// anyway would reject this source with the §4.9.6 report the two cases above
-// look for.
+// and §29.8 has a UDP instance connect its terminals by §28.3.6's rules, so
+// each of the four elements connects to one bit and the whole terminal is not
+// the width the rule measures. ValidatePrimitiveOutputTerminalWidths returns
+// early on an instance array for that reason, and this case says the early
+// return still holds now that its kind guard admits a primitive instance: a
+// check that measured the terminal anyway would reject this source with the
+// §4.9.6 report the two cases above look for.
 //
 // The instance range is `[7:4]` and the terminal is declared `[3:0]` so that no
 // array index is also a bit position of the terminal, and the four recorded

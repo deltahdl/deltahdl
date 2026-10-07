@@ -125,12 +125,12 @@ TEST(UdpDeclGrammar, UdpWithDuplicateOutputsRejected) {
                             3, "29.3.1"));
 }
 
-// §29.3.1: "UDPs have multiple input ports and exactly one output port". The
-// header is A.5.2's `udp_declaration_port_list`, whose entries are port
-// declarations, so a second `output` is a second output declaration rather than
-// a port name gone missing. The header is written over three lines because the
-// report's line is what says which `output` was named: on one line a report
-// about the first satisfies the assertion too.
+// §29.3.1: a UDP has many input ports and just one output port. The header is
+// A.5.2's `udp_declaration_port_list`, whose entries are port declarations, so
+// a second `output` is a second output declaration rather than a port name gone
+// missing. The header is written over three lines because the report's line is
+// what says which `output` was named: on one line a report about the first
+// satisfies the assertion too.
 TEST(UdpDeclGrammar, UdpDuplicateOutputInAnsiHeaderRejected) {
   auto r = Parse(
       "primitive p(output a,\n"
@@ -234,12 +234,12 @@ TEST(UdpDeclGrammar, UdpOutputNotFirstInNonAnsiPortListRejected) {
       "29.3.1"));
 }
 
-// §29.3.1: "The output port shall be the first port in the port list." A header
-// beginning `input` holds port declarations, so it is A.5.2's
-// `udp_declaration_port_list` with its entries in the wrong order rather than a
-// `udp_port_list` whose first name is missing. The report stands at the
-// misplaced port, on a line of its own so that the assertion cannot be
-// satisfied by a report about the output declaration below it.
+// §29.3.1: the output port comes first in the port list. A header beginning
+// `input` holds port declarations, so it is A.5.2's `udp_declaration_port_list`
+// with its entries in the wrong order rather than a `udp_port_list` whose first
+// name is missing. The report stands at the misplaced port, on a line of its
+// own so that the assertion cannot be satisfied by a report about the output
+// declaration below it.
 TEST(UdpDeclGrammar, UdpOutputNotFirstInAnsiHeaderRejected) {
   auto r = Parse(
       "primitive p(input a,\n"

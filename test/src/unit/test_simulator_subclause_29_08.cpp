@@ -10,10 +10,9 @@ using namespace delta;
 namespace {
 
 // §29.8 "UDP instances" is what puts a user-defined primitive into a design:
-// "Instances of UDPs are specified inside modules in the same manner as gates
-// (see 28.3)". Every case here therefore runs a whole design -- elaborate,
-// lower, run -- and reads the value the run left on the net the instance's
-// output terminal names.
+// UDP instances are written inside modules as gates are (§28.3). Every case
+// here therefore runs a whole design -- elaborate, lower, run -- and reads the
+// value the run left on the net the instance's output terminal names.
 //
 // Constructing a UdpEvalState (src/simulator/udp_eval.h) from a UdpDecl and
 // handing it an input vector, the way
@@ -42,9 +41,8 @@ constexpr const char* kAndPrimitive =
     "endprimitive\n";
 
 // A combinational primitive whose table names two of the four combinations of 0
-// and 1 on its inputs, so a run driving (1, 1) reaches §29.3.4's default: "All
-// combinations of input values that are not explicitly specified result in a
-// default output state of x."
+// and 1 on its inputs, so a run driving (1, 1) reaches §29.3.4's default, under
+// which any input combination the table does not list gives the output x.
 constexpr const char* kPartialPrimitive =
     "primitive udp_partial (y, a, b);\n"
     "  output y;\n"
@@ -57,10 +55,10 @@ constexpr const char* kPartialPrimitive =
     "endprimitive\n";
 
 // §29.5's latch, whose output q is declared reg under §29.3.2 and whose table
-// carries the current-state field §29.5 adds: "The output value of the UDP is
-// always the same as the internal state." The `-` in the third row is §29.3.6's
-// no-change symbol, so an evaluation with ena_ high leaves the state where the
-// previous evaluation put it.
+// carries the current-state field §29.5 adds, the UDP's output always equalling
+// its internal state. The `-` in the third row is §29.3.6's no-change symbol,
+// so an evaluation with ena_ high leaves the state where the previous
+// evaluation put it.
 constexpr const char* kLatchPrimitive =
     "primitive udp_latch (q, ena_, data);\n"
     "  output q; reg q;\n"
@@ -121,12 +119,12 @@ TEST(UdpInstanceSim, CombinationalInstanceDrivesOutputTerminalFromTable) {
             "0");
 }
 
-// §29.3.4: "All combinations of input values that are not explicitly specified
-// result in a default output state of x." udp_partial names no row for (1, 1),
-// so an instance driven there drives x. The first run drives (0, 1), which one
-// row does name, and it is what separates the default from an output terminal
-// nobody drives: a net with no driver settles at z, so a run reporting '1' for
-// one combination and 'x' for the other reports the primitive's own default.
+// §29.3.4: any input combination the table does not list gives the output x by
+// default. udp_partial names no row for (1, 1), so an instance driven there
+// drives x. The first run drives (0, 1), which one row does name, and it is
+// what separates the default from an output terminal nobody drives: a net with
+// no driver settles at z, so a run reporting '1' for one combination and 'x'
+// for the other reports the primitive's own default.
 TEST(UdpInstanceSim, UnspecifiedInputCombinationDrivesUnknown) {
   EXPECT_EQ(
       SettledValue(InstanceDesign(kPartialPrimitive, "udp_partial g (y, a, b);",
@@ -141,12 +139,11 @@ TEST(UdpInstanceSim, UnspecifiedInputCombinationDrivesUnknown) {
 }
 
 // §29.8: the `delay2` written on a primitive instance is the propagation delay
-// from an input terminal to the output terminal -- "Only two delays may be
-// specified because z is not supported for UDPs" -- and where the source writes
-// one value §28.16 rules that "this value shall be used for all propagation
-// delays". The inputs reach (0, 1) at time 100, which selects the row driving
-// 0, and (1, 1) at time 200, which selects the row driving 1. So the output
-// terminal changes from 0 to 1 at time 205.
+// from an input terminal to the output terminal -- at most two, a UDP having no
+// z -- and where the source writes one value §28.16 rules that "this value
+// shall be used for all propagation delays". The inputs reach (0, 1) at time
+// 100, which selects the row driving 0, and (1, 1) at time 200, which selects
+// the row driving 1. So the output terminal changes from 0 to 1 at time 205.
 //
 // The two samples straddle that time rather than landing on it. A sample taken
 // at time 205 would read the net in the same time slot as the delayed update
@@ -211,9 +208,8 @@ TEST(UdpInstanceSim, DelayOnInstanceIsChargedAtTheTicksWritten) {
 }
 
 // §29.5: a primitive whose output is declared reg holds an internal state
-// between evaluations, and "The output value of the UDP is always the same as
-// the internal state." One instance therefore keeps one state for the whole
-// run.
+// between evaluations, and its output always equals that state. One instance
+// therefore keeps one state for the whole run.
 //
 // The run drives two evaluations after the terminals have settled. At time 10
 // ena_ goes low with data high, which selects `0 1 : ? : 1` and puts the state
@@ -243,11 +239,11 @@ TEST(UdpInstanceSim, SequentialInstanceKeepsOneStateForTheRun) {
             "1");
 }
 
-// §29.8: "An optional range may be specified for an array of UDP instances",
-// and "The terminal connection rules remain the same as outlined in 28.3.6".
-// `udp_and g [3:0] (y, a, b)` is therefore four instances of udp_and, and
-// §28.3.6 connects element p to bit p of every terminal whose width is the
-// array length while broadcasting a single-bit terminal to all four.
+// §29.8: an array of UDP instances may carry a range, and a UDP instance
+// connects its terminals by §28.3.6's rules. `udp_and g [3:0] (y, a, b)` is
+// therefore four instances of udp_and, and §28.3.6 connects element p to bit p
+// of every terminal whose width is the array length while broadcasting a
+// single-bit terminal to all four.
 //
 // The first run drives a and b to different values on different bits. Its
 // expected 1000 is reached only by four evaluations of the table, each on one
@@ -286,14 +282,12 @@ TEST(UdpInstanceSim, InstanceArrayDrivesEachOutputBitFromItsOwnElement) {
             "1100");
 }
 
-// §29.4 rules that in a combinational UDP "the output state is determined
-// solely as a function of the current input states", and that "Whenever an
-// input state changes, the UDP is evaluated and the output state is set to the
-// value indicated by the row in the state table that matches all the input
-// states". The case above drives its inputs once and reads the value the single
-// evaluation every element gets at time zero, so it holds whether or not a
-// later change is ever seen. This one changes b alone at time 10 and asks for
-// the row that change selects.
+// §29.4 rules that a combinational UDP's output depends on its present inputs
+// alone, and that each change of an input evaluates the UDP and sets the output
+// to the value of the table row matching every input. The case above drives its
+// inputs once and reads the value the single evaluation every element gets at
+// time zero, so it holds whether or not a later change is ever seen. This one
+// changes b alone at time 10 and asks for the row that change selects.
 //
 // a is held still across the change so that a watcher armed on a cannot carry
 // the assertion: 1100 & 1010 is 1000 and 1100 & 0101 is 0100, so an element
@@ -346,11 +340,11 @@ TEST(UdpInstanceSim,
             "0011");
 }
 
-// §29.8 (printed page 868): "Instances of UDPs are specified inside modules in
-// the same manner as gates", with up to two delays, and a module holding one
-// is instantiated like any other (§23.3), so `and2 #1` inside `w` follows its
-// inputs one unit late exactly as the same instance at the top does. The
-// child's delayed instance never left its first value.
+// §29.8 (printed page 868): UDP instances are written inside modules as gates
+// are, with up to two delays, and a module holding one is instantiated like any
+// other (§23.3), so `and2 #1` inside `w` follows its inputs one unit late
+// exactly as the same instance at the top does. The child's delayed instance
+// never left its first value.
 TEST(UdpInstanceDelayRun, DelayedUdpInsideAChildModuleFollowsItsInputs) {
   SimFixture f;
   EXPECT_EQ(RunCapture("primitive and2 (y, a, b);\n"

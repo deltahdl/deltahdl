@@ -6,7 +6,7 @@
 // instance, and an entry naming a port annotates the driver of that output. For
 // a gate-level cell -- which is what SDF backannotation is mostly for -- that
 // driver is a gate primitive rather than a module path, and §29.8 puts a UDP
-// instance inside a module "in the same manner as gates". So
+// instance inside a module as it puts a gate. So
 // SpecifyManager::AnnotateSdfDeviceDelay falls back from the module paths to
 // the primitive drivers, and that fallback searches
 // SpecifyManager::GetPrimitiveDrivers.

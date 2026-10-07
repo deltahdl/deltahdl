@@ -200,9 +200,8 @@ TEST(UdpStateTable, SequentialDuplicateInputsWithDifferentOutputsRejected) {
 }
 
 TEST(UdpStateTable, OverlappingRowsWithDifferentOutputsRejected) {
-  // "It shall be illegal to have the same combination of inputs, including
-  // edges, specify different output values": the `?` row covers a = b = 1,
-  // which the row above it gives 1.
+  // One combination of inputs, edges counted, may not give two different
+  // outputs: the `?` row covers a = b = 1, which the row above it gives 1.
   auto r = Parse(
       "primitive p (y, a, b);\n"
       "  output y;\n"
@@ -275,8 +274,8 @@ TEST(UdpStateTable, NoChangeOutputMatchingTheStateAccepted) {
 }
 
 TEST(UdpStateTable, LevelRowBesideEdgeRowWithAnotherOutputAccepted) {
-  // A level row and an edge row are not the same combination "including
-  // edges"; §29.9 settles which of the two applies.
+  // A level row and an edge row are not the same combination once edges are
+  // counted; §29.9 settles which of the two applies.
   auto r = Parse(
       "primitive latch(output reg q, input d, input en);\n"
       "  table\n"
@@ -396,8 +395,8 @@ TEST(UdpStateTable, SequentialAllXInputsWithNonXOutputRejected) {
 }
 
 TEST(UdpStateTable, DuplicateEdgeInputsWithDifferentOutputsRejected) {
-  // The duplicate-row rule compares the whole input combination "including
-  // edges". Two rows sharing the same rising-edge transition and level inputs
+  // The duplicate-row rule compares the whole input combination, edges
+  // included. Two rows sharing the same rising-edge transition and level inputs
   // but naming different outputs collide and are rejected.
   auto r = Parse(
       "primitive seq(output reg q, input a, input b);\n"
@@ -429,11 +428,11 @@ TEST(UdpStateTable, DuplicateEdgeRowsWithSameOutputNotFlagged) {
 }
 
 TEST(UdpStateTable, AllXInputsWithOneOutputNames29_3_4) {
-  // §29.3.4: "If all input values are specified as x, then the output state
-  // shall be specified as x." The report names that subclause, so a case can
-  // tell this rejection from the several other rules a UDP table row breaks in
-  // the same way -- a row of the wrong width, a row holding z, a row whose
-  // output symbol is illegal. has_errors is the same value for all of them.
+  // §29.3.4: a row giving x for every input must give x as its output. The
+  // report names that subclause, so a case can tell this rejection from the
+  // several other rules a UDP table row breaks in the same way -- a row of the
+  // wrong width, a row holding z, a row whose output symbol is illegal.
+  // has_errors is the same value for all of them.
   auto r = Parse(
       "primitive p(output y, input a, input b);\n"
       "  table\n"
@@ -462,15 +461,14 @@ TEST(UdpStateTable, MalformedRowNames29_3_4) {
   EXPECT_TRUE(ReportedError(r.diags, "expected ';'", 4, "29.3.4"));
 }
 
-// §29.3.4: "Combinational UDPs have one field per input and one field for the
-// output", and "The order of the input state fields of each row of the state
-// table is taken directly from the port list in the UDP definition header". A
-// row of two input fields under a header naming three inputs leaves one input
-// with no field at all, so the row describes no combination of this UDP's
-// inputs. The report stands on the row's own line rather than the header's, so
-// this case tells it from the header rejections §29.3.1 writes at line 1, and
-// from AllXInputsWithOneOutputNames29_3_4 above, which names the same subclause
-// for a different rule.
+// §29.3.4: a combinational UDP's row has a field for each input and one for the
+// output, and the input fields follow the order of the port list in the UDP's
+// header. A row of two input fields under a header naming three inputs leaves
+// one input with no field at all, so the row describes no combination of this
+// UDP's inputs. The report stands on the row's own line rather than the
+// header's, so this case tells it from the header rejections §29.3.1 writes at
+// line 1, and from AllXInputsWithOneOutputNames29_3_4 above, which names the
+// same subclause for a different rule.
 //
 // Before this check the row was kept as written: UdpRowMatchesLevels
 // (src/simulator/udp_eval.cpp) compares the field count against the input
@@ -494,10 +492,10 @@ TEST(UdpStateTable, RowWithFewerFieldsThanInputsRejected) {
 // one past the colon, so the surplus is an input field and the row is again
 // one that describes no combination of the declared inputs. The row is
 // sequential, so the case also fixes that the count is over the input fields
-// alone: the current-state field between the colons is §29.3.4's "additional
-// field inserted between the input fields and the output field" and belongs
-// to no input port. A count that took it in would report `3` for the row this
-// case accepts below and `4` here.
+// alone: the current-state field between the colons is the extra field §29.3.4
+// puts between the inputs and the output, and belongs to no input port. A count
+// that took it in would report `3` for the row this case accepts below and `4`
+// here.
 TEST(UdpStateTable, SequentialRowWithMoreFieldsThanInputsRejected) {
   auto r = Parse(
       "primitive p(output reg q, input d, input clk);\n"
@@ -527,12 +525,12 @@ TEST(UdpStateTable, SequentialRowWidthCountsInputFieldsOnly) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §29.3.4 takes the field order "directly from the port list in the UDP
-// definition header", and in the udp_nonansi_declaration form of §29.3.1 that
-// list names ports the declarations after it describe. The input count a row
-// is held to is therefore the count of those declarations, two here, which the
-// row of one field falls short of. The header line is not where the report
-// stands: it stands on the row.
+// §29.3.4 takes the field order straight from the port list in the UDP's
+// header, and in the udp_nonansi_declaration form of §29.3.1 that list names
+// ports the declarations after it describe. The input count a row is held to is
+// therefore the count of those declarations, two here, which the row of one
+// field falls short of. The header line is not where the report stands: it
+// stands on the row.
 TEST(UdpStateTable, NonAnsiRowWidthIsReadOffTheInputDeclarations) {
   auto r = Parse(
       "primitive p(y, a, b);\n"
@@ -592,11 +590,11 @@ TEST(UdpStateTable, RowWidthIsNotReportedUnderAHeaderWithNoInputs) {
 }
 
 // §29.3.4 (printed page 863) with Syntax 29-1 (printed page 861): a
-// combinational_entry is a level_input_list and one output symbol, a row that
-// "defines the output for a particular combination of the input values", and
-// only a sequential entry adds "at most one input transition". A row with one
-// field after its colon therefore holds no `(01)`, and one was taken without a
-// report and the primitive run as if edge-sensitive.
+// combinational_entry is a level_input_list and one output symbol, a row giving
+// the output for one combination of input values, and only a sequential entry
+// adds room for a single input transition. A row with one field after its colon
+// therefore holds no `(01)`, and one was taken without a report and the
+// primitive run as if edge-sensitive.
 TEST(UdpStateTable, EdgeIndicatorInCombinationalRowRejected) {
   auto r = Parse(
       "primitive p (y, a, b);\n"

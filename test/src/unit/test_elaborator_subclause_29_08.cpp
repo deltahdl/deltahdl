@@ -18,10 +18,10 @@ using namespace delta;
 // gives it as `udp_instantiation ::= udp_identifier [ drive_strength ]
 // [ delay2 ] udp_instance { , udp_instance } ;` over `udp_instance ::=
 // [ name_of_instance ] ( output_terminal , input_terminal
-// { , input_terminal } )`, and the prose adds "The instance name is optional,
-// just as for gates. The terminal connection order is as specified in the UDP
-// definition. Only two delays may be specified because z is not supported for
-// UDPs."
+// { , input_terminal } )`, and the prose adds that the instance name is
+// optional as it is for gates, that the terminals connect in the order the UDP
+// definition gives, and that at most two delays may be written, a UDP having no
+// z.
 //
 // Each case below elaborates one such instantiation and reads back the
 // RtlirUdpInst (src/elaborator/rtlir.h:247) that
@@ -73,9 +73,9 @@ TEST(UdpInstanceElaboration, CombinationalPrimitiveDrivesItsOutputTerminal) {
 
 // §29.8: `udp_instance ::= [ name_of_instance ] ( output_terminal ,
 // input_terminal { , input_terminal } )` puts the output terminal first and
-// "The terminal connection order is as specified in the UDP definition", so the
-// terminal the source wrote first reaches RtlirUdpInst::output and the rest
-// reach RtlirUdpInst::inputs in that order. The three terminals carry different
+// the terminals connect in the order the UDP definition gives, so the terminal
+// the source wrote first reaches RtlirUdpInst::output and the rest reach
+// RtlirUdpInst::inputs in that order. The three terminals carry different
 // identifiers, so an implementation that filled output from a later terminal or
 // reversed the inputs reads back a different name here rather than the same
 // one.
@@ -180,12 +180,12 @@ TEST(UdpInstanceElaboration, DelayAndDriveStrengthReachTheInstance) {
   EXPECT_EQ(inst.drive_strength0, 2);
 }
 
-// §29.8: "The instance name is optional, just as for gates", so an
-// instantiation the source left unnamed still elaborates to an RtlirUdpInst,
-// with RtlirUdpInst::name empty. The terminals are asserted alongside the empty
-// name so the case cannot pass on an instance that was never recorded: an
-// absent instance has no terminals to read either, and reading them is what
-// separates "elaborated without a name" from "not elaborated".
+// §29.8: the instance name is optional, as it is for gates, so an instantiation
+// the source left unnamed still elaborates to an RtlirUdpInst, with
+// RtlirUdpInst::name empty. The terminals are asserted alongside the empty name
+// so the case cannot pass on an instance that was never recorded: an absent
+// instance has no terminals to read either, and reading them is what separates
+// an instance elaborated without a name from one not elaborated.
 TEST(UdpInstanceElaboration, UnnamedInstanceElaboratesWithAnEmptyName) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -246,14 +246,13 @@ TEST(UdpInstanceElaboration, GateInstanceInTheSameModuleStaysInAssigns) {
   EXPECT_EQ(mod->assigns[0].lhs->text, "g_out");
 }
 
-// §29.8: "An optional range may be specified for an array of UDP instances",
-// and "Instances of UDPs are specified inside modules in the same manner as
-// gates (see 28.3)", so the four-element range below shall leave four entries
-// in RtlirModule::udp_insts rather than one. §28.3.6 says which bit each
-// element connects to: "If bit lengths are different, each instance shall get a
-// part-select of the port expression, of a bit length equal to the instance
-// port bit length", so the four elements take the four distinct bits of the
-// 4-bit terminal `r_out_v`.
+// §29.8: an array of UDP instances may carry a range, and UDP instances are
+// written inside modules as gates are (§28.3), so the four-element range below
+// shall leave four entries in RtlirModule::udp_insts rather than one. §28.3.6
+// says which bit each element connects to: "If bit lengths are different, each
+// instance shall get a part-select of the port expression, of a bit length
+// equal to the instance port bit length", so the four elements take the four
+// distinct bits of the 4-bit terminal `r_out_v`.
 //
 // Both assertions are needed. The count alone passes an expansion that
 // connected the whole vector to all four instances, which is what the four
@@ -295,12 +294,12 @@ TEST(UdpInstanceElaboration, InstanceArrayExpandsToOneInstancePerElement) {
   EXPECT_EQ(output_bits, (std::set<uint64_t>{0, 1, 2, 3}));
 }
 
-// §29.8: "The terminal connection rules remain the same as outlined in 28.3.6",
-// and §28.3.6 rules that "Too many or too few bits to connect to all the
-// instances shall be considered an error". The array below has four elements,
-// so its output terminal is either 1 bit and broadcast to each element or 4
-// bits and distributed across them; the 3-bit `w_out_v` is neither, and the
-// three surplus-or-missing bits connect to nothing.
+// §29.8: a UDP instance connects its terminals by §28.3.6's rules, and §28.3.6
+// rules that "Too many or too few bits to connect to all the instances shall be
+// considered an error". The array below has four elements, so its output
+// terminal is either 1 bit and broadcast to each element or 4 bits and
+// distributed across them; the 3-bit `w_out_v` is neither, and the three
+// surplus-or-missing bits connect to nothing.
 //
 // The report is named through ReportedError so the case cannot pass on some
 // other rejection of this source -- an unexpanded array reports nothing at all
@@ -326,20 +325,20 @@ TEST(UdpInstanceElaboration, InstanceArrayTerminalOfAWrongWidthIsReported) {
       "gate or primitive array terminal width does not match", 10, "28.3.6"));
 }
 
-// §29.8 puts a primitive instance inside a module "in the same manner as
-// gates", and §27.3 rules that an instance of a generate block "brings the
-// objects, behavioral constructs, and module instances within the block into
-// existence", so a loop generate construct holding one instantiation leaves one
-// RtlirUdpInst per iteration. §27.4 says what tells those instances apart:
-// "Within the generate block of a loop generate construct, there is an implicit
-// localparam declaration ... its value within each instance of the generate
-// block is the value of the loop index at the time the instance was
-// elaborated", usable "anywhere within the generate block that a normal
-// parameter with an integer value can be used". A terminal written
-// `y_out_v[row]` is such a use, so the value that terminal resolves against has
-// to reach the instance, and RtlirUdpInst::gen_block_consts
-// (src/elaborator/rtlir.h:261) is where it rides: the iterations share one body
-// AST, so nothing in the AST distinguishes them.
+// §29.8 puts a primitive instance inside a module as it puts a gate, and §27.3
+// rules that an instance of a generate block "brings the objects, behavioral
+// constructs, and module instances within the block into existence", so a loop
+// generate construct holding one instantiation leaves one RtlirUdpInst per
+// iteration. §27.4 says what tells those instances apart: "Within the generate
+// block of a loop generate construct, there is an implicit localparam
+// declaration ... its value within each instance of the generate block is the
+// value of the loop index at the time the instance was elaborated", usable
+// "anywhere within the generate block that a normal parameter with an integer
+// value can be used". A terminal written `y_out_v[row]` is such a use, so the
+// value that terminal resolves against has to reach the instance, and
+// RtlirUdpInst::gen_block_consts (src/elaborator/rtlir.h:261) is where it
+// rides: the iterations share one body AST, so nothing in the AST distinguishes
+// them.
 //
 // Both assertions are needed. The count alone passes a loop whose two instances
 // were elaborated with one localparam value between them, which is what two
@@ -449,14 +448,13 @@ TEST(UdpInstanceElaboration, GenerateBlockPrefixNamesTheInstanceDeclarations) {
 }
 
 // §29.8: `udp_instance ::= [ name_of_instance ] ( output_terminal ,
-// input_terminal { , input_terminal } )` and "The terminal connection order is
-// as specified in the UDP definition", so the list holds one terminal for the
-// output port and one per input port of the primitive, three for `p_two`. The
-// instance below writes two, leaving the second input port with nothing
-// driving it. The report stands on the instantiation's line rather than the
-// primitive's, and names the counts, so the case tells it from the §28.3.6
-// width report the array case above expects and from any rejection of the
-// primitive itself.
+// input_terminal { , input_terminal } )` and the terminals connect in the order
+// the UDP definition gives, so the list holds one terminal for the output port
+// and one per input port of the primitive, three for `p_two`. The instance
+// below writes two, leaving the second input port with nothing driving it. The
+// report stands on the instantiation's line rather than the primitive's, and
+// names the counts, so the case tells it from the §28.3.6 width report the
+// array case above expects and from any rejection of the primitive itself.
 //
 // Before this check nothing said so: ElaborateOneUdpInst split the list at
 // index 1 whatever its length, and UdpRowMatchesLevels
