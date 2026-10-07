@@ -178,10 +178,10 @@ TEST(NonVacuityLocals, TopLevelDisableIffUsesTheAbortShape) {
       Word{L({"a"})}, *LvTopParen(LvTopProperty(Trig("a"))), LocalContext{}));
 }
 
-// §F.5.6.3 inherits §F.5.3.3's "w satisfies P nonvacuously iff w |= P and
-// w |=^non P," realized with locals. A genuine match satisfies both relations;
-// a vacuous pass (a trigger that never fires) is neutrally satisfied yet
-// rejected.
+// §F.5.6.3 carries over §F.5.3.3's definition, under which P holds nonvacuously
+// on w when both w |= P and w |=^non P, to properties with locals. A genuine
+// match satisfies both relations; a vacuous pass (a trigger that never fires)
+// is neutrally satisfied yet rejected.
 TEST(NonVacuityLocals, NonvacuousSatisfactionCombinesBothRelations) {
   EXPECT_TRUE(SatisfiesNonVacuouslyWithLocals(Word{L({"s"})}, *Strong("s"),
                                               LocalContext{}));

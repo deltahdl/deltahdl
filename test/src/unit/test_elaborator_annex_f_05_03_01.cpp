@@ -182,9 +182,8 @@ TEST(Disabling, ParenthesizedTopLevelPropagatesDisabling) {
   EXPECT_TRUE(DisablesTopLevel(Word{A({"d"})}, *t));
 }
 
-// §F.5.3.1: "T is said to pass on w if w |= T", "is disabled if w |=^d T", and
-// "fails if T neither passes nor is disabled." Pass and disabled are mutually
-// exclusive.
+// §F.5.3.1: T passes on w when w |= T, is disabled on w when w |=^d T, and
+// fails when it does neither. Pass and disabled are mutually exclusive.
 TEST(Disabling, PassDisabledFailTrichotomy) {
   auto bare = TopProperty(PropStrong(BoolSeq("a")));
   // Passes: satisfied and (being a bare property) not disabled.

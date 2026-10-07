@@ -158,8 +158,8 @@ TEST(NonVacuity, DisableIffTopLevelUsesTheAbortShape) {
                                             *TopParen(TopProperty(Trig("a")))));
 }
 
-// §F.5.3.3: "A word w satisfies property P nonvacuously iff w |= P and
-// w |=^non P." A genuine match satisfies both relations.
+// §F.5.3.3: P holds nonvacuously on a word w when both w |= P and w |=^non P. A
+// genuine match satisfies both relations.
 TEST(NonVacuity, NonvacuousSatisfactionRequiresBothRelations) {
   EXPECT_TRUE(NeutrallySatisfies(Word{L({"s"})}, *Strong("s")));
   EXPECT_TRUE(SatisfiesNonVacuously(Word{L({"s"})}, *Strong("s")));

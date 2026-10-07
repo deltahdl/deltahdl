@@ -47,8 +47,8 @@ TEST(RecursivePropertyDependencyDigraph,
 }
 
 // §F.7: a recursive property can be *reached* from properties that are not
-// themselves recursive. RESTRICTION 1 is phrased over this reachability — "a
-// property from which a recursive property can be reached".
+// themselves recursive. RESTRICTION 1 is phrased over this reachability, about
+// any property that has a path to a recursive one.
 TEST(RecursivePropertyDependencyDigraph,
      ReachabilityToRecursivePropertyIsTransitive) {
   PropertyRegistry reg;

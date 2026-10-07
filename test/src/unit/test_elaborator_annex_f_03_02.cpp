@@ -236,8 +236,8 @@ TEST(AbstractGrammar, SequenceOperandMatchingEmptyWordIsRejected) {
 }
 
 // §F.3.2: the clocked property production Q carries the same requirement for
-// its sequence operand S -- "each instance of S ... shall be a nondegenerate
-// clocked sequence". A clocked Boolean @(clk) a admits a one-letter match
+// its sequence operand S: every S it is built from must be a clocked sequence
+// that is nondegenerate. A clocked Boolean @(clk) a admits a one-letter match
 // (and not the empty word), so it meets the requirement on a clocked operand.
 TEST(AbstractGrammar, NondegenerateClockedSequenceOperandIsAccepted) {
   auto clocked = SeqClock(BoolAtom("clk"), SeqBoolean(BoolAtom("a")));

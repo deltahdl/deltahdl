@@ -7,8 +7,9 @@ using namespace delta;
 
 namespace {
 
-// §F.5.1: the clock rewrite reduces a clocked sequence to "an unclocked
-// version". Applying the transformation to @( clk ) a leaves no clock behind.
+// §F.5.1: the clock rewrite turns a clocked sequence into an equivalent one
+// with no clock. Applying the transformation to @( clk ) a leaves no clock
+// behind.
 TEST(ClockRewrite, TransformationProducesUnclockedVersion) {
   auto clocked = SeqClock(BoolAtom("clk"), SeqBoolean(BoolAtom("a")));
   ASSERT_TRUE(ContainsClock(*clocked));
@@ -16,9 +17,9 @@ TEST(ClockRewrite, TransformationProducesUnclockedVersion) {
   EXPECT_FALSE(ContainsClock(*unclocked));
 }
 
-// §F.5.1: "it is required that the conditions in event controls not be
-// dependent upon any local variables." An event condition that names an
-// ordinary signal -- not a local of the sequence -- meets the requirement.
+// §F.5.1: no condition in an event control may depend on a local variable. An
+// event condition that names an ordinary signal -- not a local of the sequence
+// -- meets the requirement.
 TEST(ClockRewrite, EventOnOrdinarySignalIsIndependent) {
   auto seq = SeqClock(BoolAtom("clk"), SeqBoolean(BoolAtom("a")));
   EXPECT_TRUE(ClockEventsAreLocalVariableIndependent(*seq));

@@ -106,9 +106,10 @@ TEST(TightSatisfaction, UnboundedRepetitionConcatenatesMatches) {
   EXPECT_FALSE(TightlySatisfies(Word{A({"a"}), A({"x"})}, *seq));
 }
 
-// §F.5.2: "If S is a clocked sequence, then w |== S iff w |== S'", where S' is
-// the §F.5.1.1 rewrite. A clocked Boolean @(clk) a matches a single letter in
-// which both clk and a hold, but not one where the clock is absent.
+// §F.5.2: a clocked sequence S tightly satisfies a word exactly when its
+// §F.5.1.1 rewrite S' does, w |== S iff w |== S'. A clocked Boolean @(clk) a
+// matches a single letter in which both clk and a hold, but not one where the
+// clock is absent.
 TEST(TightSatisfaction, ClockedSequenceEvaluatesViaRewrite) {
   auto clocked = SeqClock(BoolAtom("clk"), SeqBoolean(BoolAtom("a")));
   EXPECT_TRUE(TightlySatisfies(Word{A({"clk", "a"})}, *clocked));
@@ -144,8 +145,9 @@ TEST(TightSatisfaction, ClockedSequenceNondegeneracyUsesRewrite) {
   EXPECT_TRUE(IsNondegenerateSequence(*clocked));
 }
 
-// §F.3.2 invokes "tightly satisfied by the empty word"; §F.5.2 makes that
-// predicate concrete. R[*0] is satisfied by the empty word; a Boolean is not.
+// §F.3.2 relies on whether a sequence tightly satisfies the empty word; §F.5.2
+// makes that predicate concrete. R[*0] is satisfied by the empty word; a
+// Boolean is not.
 TEST(TightSatisfaction, EmptyWordSatisfactionIsDecidable) {
   EXPECT_TRUE(
       TightlySatisfiedByEmptyWord(*SeqNullRepeat(SeqBoolean(BoolAtom("a")))));
