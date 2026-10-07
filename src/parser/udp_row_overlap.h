@@ -1,17 +1,16 @@
 #pragma once
 
-// §29.3.4 (printed page 863): "It shall be illegal to have the same combination
-// of inputs, including edges, specify different output values." Two rows of a
+// §29.3.4 (printed page 863) makes it an error for two rows to give one
+// combination of inputs, edges counted, two different outputs. Two rows of a
 // UDP table cover the same combination where every input field of the one
 // admits a value the other's admits -- `?` standing for 0, 1 and x, `b` for 0
 // and 1, and an edge for the transitions Table 29-1 gives it -- and, for a
 // sequential UDP, their current-state fields admit a common state.
 //
-// A level row and an edge row are not compared: where the two "specify
-// different output values, the result is specified by the level-sensitive
-// case" (§29.9, printed page 869), so they are no conflict. Nor are two edge
-// rows with the edge on different inputs, a transition being of one input at a
-// time.
+// A level row and an edge row are not compared: where the two disagree on the
+// output, the level-sensitive row decides it (§29.9, printed page 869), so they
+// are no conflict. Nor are two edge rows with the edge on different inputs, a
+// transition being of one input at a time.
 
 #include "parser/ast_specify.h"
 

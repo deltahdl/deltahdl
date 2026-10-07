@@ -24,8 +24,8 @@ namespace delta {
 // of expressions and left both to elaboration, which reports the count for a
 // primitive it resolves and the output terminal for none; each is now reported
 // where the instance is read, the count under A.5.4 and the terminal under
-// §28.3 as a gate's is, §29.8 having a UDP instantiated "in the same manner as
-// gates".
+// §28.3 as a gate's is, since §29.8 has a UDP instance written the way a gate
+// instance is.
 ModuleItem* Parser::ParseOneUdpInstance(const Token& udp_tok, SourceLoc loc) {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kUdpInst;
@@ -115,9 +115,9 @@ void Parser::ValidateUdpHeader(UdpDecl* udp) {
   }
 }
 
-// §29.3.4 (printed page 863): "It shall be illegal to have the same
-// combination of inputs, including edges, specify different output values."
-// Reported once per table, at the later row of the first pair found.
+// §29.3.4 (printed page 863) makes it an error for two rows to give one
+// combination of inputs, edges counted, two different outputs. Reported once
+// per table, at the later row of the first pair found.
 void Parser::ValidateUdpTable(UdpDecl* udp) {
   for (size_t j = 1; j < udp->table.size(); ++j) {
     for (size_t i = 0; i < j; ++i) {
@@ -416,10 +416,10 @@ static void ValidateUdpRowStateAndOutput(DiagEngine& diag,
 }
 
 // §29.3.4 (printed page 863) with Syntax 29-1 (printed page 861): a
-// combinational row "defines the output for a particular combination of the
-// input values", its inputs a level_input_list, while a sequential row adds "at
-// most one input transition" -- so an edge indicator, `(01)` or r, f, p, n or
-// *, stands in a row written as a sequential entry alone.
+// combinational row gives the output for one set of input levels, its inputs a
+// level_input_list, while a sequential row may also let a single input change
+// -- so an edge indicator, `(01)` or r, f, p, n or *, stands in a row written
+// as a sequential entry alone.
 static bool UdpRowHasEdge(const UdpTableRow& row) {
   for (char c : row.inputs) {
     if (UdpInputIsEdge(c)) return true;
@@ -443,13 +443,12 @@ static void ValidateUdpTableRow(DiagEngine& diag, bool row_is_sequential,
   ValidateUdpRowStateAndOutput(diag, row_is_sequential, row, row_loc);
 }
 
-// §29.3.2 requires a UDP's two statements about its own form to agree:
-// "Sequential UDPs shall contain a reg declaration for the output port" and
-// "Combinational UDPs cannot contain a reg declaration". `udp->is_sequential`
-// carries the first statement, the presence of a reg; `row_is_sequential`
-// carries the second, the form the table entry was written in. Reports once per
-// UDP, at the first row that disagrees, since one missing or surplus reg is one
-// mistake however many rows stand under it.
+// §29.3.2 requires a UDP's two statements about its own form to agree: a
+// sequential UDP declares its output port reg, and a combinational one declares
+// no reg. `udp->is_sequential` carries the first statement, the presence of a
+// reg; `row_is_sequential` carries the second, the form the table entry was
+// written in. Reports once per UDP, at the first row that disagrees, since one
+// missing or surplus reg is one mistake however many rows stand under it.
 static void ValidateUdpRowAgainstRegDecl(DiagEngine& diag, const UdpDecl* udp,
                                          bool row_is_sequential,
                                          SourceLoc row_loc,
@@ -464,15 +463,15 @@ static void ValidateUdpRowAgainstRegDecl(DiagEngine& diag, const UdpDecl* udp,
 }
 
 // §29.3.4 reads a row's input fields off the header's port list by position:
-// "The order of the input state fields of each row of the state table is taken
-// directly from the port list in the UDP definition header", and it gives a row
-// "one field per input and one field for the output". A row carrying some other
-// number of fields therefore names no combination of this UDP's inputs at all.
-// UdpRowMatchesLevels (src/simulator/udp_eval.cpp) answers no match for such a
-// row whatever the inputs are, so the primitive falls to §29.3.4's default of
-// "a default output state of x" and runs as though the row had not been
-// written. Reports once per UDP, at the first row that disagrees, since one
-// port list read wrong is one mistake however many rows stand under it.
+// the fields stand for the inputs in the order the UDP definition header lists
+// them, one field to each input, with one more for the output. A row carrying
+// some other number of fields therefore names no combination of this UDP's
+// inputs at all. UdpRowMatchesLevels (src/simulator/udp_eval.cpp) answers no
+// match for such a row whatever the inputs are, so the primitive runs as
+// though the row had not been written, giving x for any combination no other
+// row lists, as §29.3.4 has it. Reports once per UDP, at the first row that
+// disagrees, since one port list read wrong is one mistake however many rows
+// stand under it.
 //
 // Says nothing where the header declared no inputs: ValidateUdpHeader has
 // already reported that, every row would disagree with a port list that is not
@@ -667,9 +666,9 @@ static void ValidateUdpInitialHeader(DiagEngine& diag, const UdpDecl* udp,
 // differ in what they hold and not in what order they hold it: the first holds
 // `udp_output_declaration` and `udp_input_declaration` entries, each introduced
 // by a direction keyword, and the second holds bare port identifiers. Choosing
-// on the keyword rather than on `output` alone is what lets §29.3.1's "The
-// output port shall be the first port in the port list" be reported against a
-// list that declares its ports in the wrong order, rather than the leading
+// on the keyword rather than on `output` alone is what lets §29.3.1's rule that
+// the output port lead the port list be reported against a list that declares
+// its ports in the wrong order, rather than the leading
 // `input` being reported as a port identifier gone missing. `inout` counts
 // because §29.3.1 permits no such port on a UDP at all, so a list holding one
 // is a declaration list with an illegal entry and never a list of names. `reg`
@@ -682,10 +681,9 @@ bool Parser::UdpPortListIsDeclarations() {
 
 // Parses A.5.2's `udp_declaration_port_list` through the closing parenthesis
 // and the semicolon after it, reporting §29.3.1's two rules over the entries as
-// they were written: "UDPs have multiple input ports and exactly one output
-// port", and "The output port shall be the first port in the port list". Both
-// header forms answer them in the same words, the second in
-// ReconcileUdpNonAnsiPortList.
+// they were written: a UDP has one output port and no more, and that port
+// comes first in the port list. Both header forms answer them in the same
+// words, the second in ReconcileUdpNonAnsiPortList.
 // Reads one entry of A.5.2's `udp_declaration_port_list` without placing it, so
 // that what the entry declared is available to §29.3.1's rules before the
 // UdpDecl is written to.
@@ -715,8 +713,8 @@ UdpAnsiPortEntry Parser::ParseUdpAnsiPortEntry() {
 }
 
 // Places one entry of A.5.2's `udp_declaration_port_list` on `udp`, reporting
-// §29.3.1's "UDPs have multiple input ports and exactly one output port" where
-// a second output declaration arrives. Returns whether the entry was taken as
+// §29.3.1's limit of one output port to a UDP where a second output
+// declaration arrives. Returns whether the entry was taken as
 // the output port, which is not the same as whether it declared one.
 static bool PlaceUdpAnsiPortEntry(DiagEngine& diag, UdpDecl* udp,
                                   const UdpAnsiPortEntry& entry) {
@@ -840,9 +838,9 @@ UdpDecl* Parser::ParseUdpDecl() {
 
   if (Check(TokenKind::kKwInitial)) {
     // A.5.3 writes `[ udp_initial_statement ]` into sequential_body alone,
-    // combinational_body opening with `table`; §29.4 has the statement give
-    // "the initial value of the output" of a sequential UDP, and a
-    // combinational UDP's output has no state to initialize.
+    // combinational_body opening with `table`; §29.4 has the statement set
+    // the value a sequential UDP's output starts from, and a combinational
+    // UDP's output has no state to initialize.
     if (!udp->is_sequential) {
       diag_.Error(CurrentLoc(),
                   "a UDP initial statement stands in a sequential body; a "
