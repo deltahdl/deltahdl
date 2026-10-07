@@ -9,14 +9,14 @@
 
 namespace delta {
 
-// §23.9 lists the elements that define a new scope: "Modules, Interfaces,
-// Programs, Checkers, Packages, Classes, Tasks, Functions, begin-end blocks
-// (named or unnamed), fork-join blocks (named or unnamed), Generate blocks"
-// (printed page 761 of IEEE 1800-2023). A type name declared inside one
-// is a type name there and not in the design element after it. Constructing
-// this records what known_types_ and known_nettypes_ held on the way in;
-// destroying it puts both back. §6.6.7's ParseNettypeDecl fills the two
-// together, and a nettype name decides how `#` after an identifier is read,
+// §23.9 (printed page 761 of IEEE 1800-2023) lists the elements that each open
+// a new scope: a module, an interface, a program, a checker, a package, a
+// class, a task, a function, a begin-end block and a fork-join block, each of
+// the two whether it is named or not, and a generate block. A type name
+// declared inside one is a type name there and not in the design element after
+// it. Constructing this records what known_types_ and known_nettypes_ held on
+// the way in; destroying it puts both back. §6.6.7's ParseNettypeDecl fills the
+// two together, and a nettype name decides how `#` after an identifier is read,
 // so restoring one without the other leaves the leak for that reading.
 //
 // All eleven of that list are guarded: a module, an interface, a program and

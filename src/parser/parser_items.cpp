@@ -823,12 +823,11 @@ void Parser::ParsePlainVarDecl(const Token& name_tok,
 // Whether the item beginning with an identifier this parser holds no
 // declaration for is a data declaration rather than an instantiation. A.4.1.1
 // gives `hierarchical_instance ::= name_of_instance ( [ list_of_port_
-// connections ] )`, and §23.3.2 repeats it in prose: "The parentheses shall be
-// required on all module instantiations, even when the instantiated module does
-// not have ports." So a declarator reaching `;`, `=` or `,` -- or the end of
-// its dimensions -- without a `(` cannot be an instance, whatever the leading
-// name turns out to name, and every variable_decl_assignment A.2.4 admits has
-// that shape.
+// connections ] )`, and §23.3.2 repeats it in prose: every module instantiation
+// writes the parentheses, a module without ports included. So a declarator
+// reaching `;`, `=` or `,` -- or the end of its dimensions -- without a `(`
+// cannot be an instance, whatever the leading name turns out to name, and every
+// variable_decl_assignment A.2.4 admits has that shape.
 //
 // LooksLikeScopedInstTail answers this same question for the `pkg :: type_id`
 // form, and it is called rather than restated so that the bare and the scoped

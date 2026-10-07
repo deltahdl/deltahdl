@@ -250,10 +250,9 @@ struct ParserPortHelpers {
 
   // Parse the data type of an ANSI port, handling the explicit `var`,
   // `interconnect`, and plain forms. §23.2.2.3 counts `var` among the port
-  // kinds -- "the term port kind is used to mean any of the net type keywords,
-  // or the keyword var" -- so it says what the port is rather than what type it
-  // has, and the type written after it is parsed the same way as one written
-  // with no port kind at all.
+  // kinds -- a port kind there being either a net type keyword or `var` -- so
+  // it says what the port is rather than what type it has, and the type written
+  // after it is parsed the same way as one written with no port kind at all.
   static void ParseAnsiPortDataType(Parser& p, PortDecl& port) {
     if (p.Match(TokenKind::kKwVar)) {
       port.has_explicit_var = true;

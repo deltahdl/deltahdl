@@ -258,12 +258,12 @@ struct GenerateCaseItem {
 
   // §27.6 gave this generate block its name, the genblk<n> name it gives every
   // unnamed generate block, rather than the source writing one.
-  // §23.6 rules that objects declared in an unnamed generate block "can be
-  // referenced by hierarchical names only from within the block and within any
-  // hierarchy instantiated by the block", so a path written outside must not
-  // reach through the name even though elaboration has one to spell. The name
-  // is assigned into the field the source would have filled, so nothing
-  // downstream can tell the two apart without this.
+  // §23.6 rules that a hierarchical name reaches an object declared in an
+  // unnamed generate block only from inside that block or from the hierarchy it
+  // instantiates, so a path written outside must not reach through the name
+  // even though elaboration has one to spell. The name is assigned into the
+  // field the source would have filled, so nothing downstream can tell the two
+  // apart without this.
   bool name_is_generated = false;
 
   // True when the block held in body was written with the `begin` and `end`
@@ -592,12 +592,12 @@ struct ModuleItem {
 
   // §27.6 gave this generate block its name, the genblk<n> name it gives every
   // unnamed generate block, rather than the source writing one.
-  // §23.6 rules that objects declared in an unnamed generate block "can be
-  // referenced by hierarchical names only from within the block and within any
-  // hierarchy instantiated by the block", so a path written outside must not
-  // reach through the name even though elaboration has one to spell. The name
-  // is assigned into the field the source would have filled, so nothing
-  // downstream can tell the two apart without this.
+  // §23.6 rules that a hierarchical name reaches an object declared in an
+  // unnamed generate block only from inside that block or from the hierarchy it
+  // instantiates, so a path written outside must not reach through the name
+  // even though elaboration has one to spell. The name is assigned into the
+  // field the source would have filled, so nothing downstream can tell the two
+  // apart without this.
   bool name_is_generated = false;
   ModuleItem* gen_else = nullptr;
   std::vector<GenerateCaseItem> gen_case_items;
