@@ -106,9 +106,9 @@ TEST(ScopeModel, NamedBlockIsAlwaysScope) {
 
 // D1 (boundary/error cases): a null block is not a scope; an unnamed begin with
 // no members at all has no block item declaration and so is not a scope (the
-// boundary of "directly contains a declaration"); and a kind §37.12 does not
-// give a conditional scope rule to - here a module - is not classified as one
-// of these blocks.
+// boundary of a block that itself holds a declaration); and a kind §37.12 does
+// not give a conditional scope rule to - here a module - is not classified as
+// one of these blocks.
 TEST(ScopeModel, BlockScopeIsScopeRejectsNullEmptyAndNonBlockKinds) {
   EXPECT_FALSE(VpiBlockScopeIsScope(nullptr));
 

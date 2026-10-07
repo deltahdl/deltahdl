@@ -241,8 +241,8 @@ TEST_F(Callback, TheSingleArrowReachesNothingWhereTheDiagramDrawsNone) {
   EXPECT_EQ(vpi_handle(vpiCallback, VpiHandleOf(&module)), nullptr);
 }
 
-// Detail 2: "To get callback objects not related to the above objects, the
-// second argument to vpi_iterate() shall be NULL." So the NULL form hands back
+// Detail 2: callback objects tied to none of the objects above are reached by
+// passing NULL as vpi_iterate()'s second argument. So the NULL form hands back
 // the callbacks the diagram's single arrow leaves unreachable - one placed on
 // no object, and one placed on an object of a kind that arrow is not drawn from
 // - and not the ones a prim term, an expr, a time queue or a stmt reaches.

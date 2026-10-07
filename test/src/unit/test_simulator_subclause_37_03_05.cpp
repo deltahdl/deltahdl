@@ -143,11 +143,11 @@ TEST_F(ExpressionsWithSideEffects, PutValueWithSideEffectingIndexIsAnError) {
   EXPECT_EQ(post_inc.side_effect_count, 0);
 }
 
-// Claim C (edge - "any of its index expressions"): the guard checks every index
-// expression, not just the first. A multi-dimensional select whose leading
-// index is side-effect-free but whose trailing index has side effects -
-// my_array[2][--i] - is still rejected, exercising the loop past the clean
-// index before it fires on the side-effecting one.
+// Claim C (edge - every one of the select's index expressions): the guard
+// checks every index expression, not just the first. A multi-dimensional select
+// whose leading index is side-effect-free but whose trailing index has side
+// effects - my_array[2][--i] - is still rejected, exercising the loop past the
+// clean index before it fires on the side-effecting one.
 TEST_F(ExpressionsWithSideEffects,
        PutValueWithLaterSideEffectingIndexIsAnError) {
   VpiObject leading;  // the side-effect-free index 2

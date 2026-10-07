@@ -325,8 +325,7 @@ TEST(NetDriversAndLoads, LoadIterationReachesAPortBitWithAComplexExpression) {
   ASSERT_EQ(loads.size(), 1u);
   EXPECT_TRUE(VpiIterationContains(loads, &port_bit));
 
-  // Detail 1: "Access to the complex expression shall be available using
-  // vpi_handle(vpiHighConn, portH)".
+  // Detail 1: vpi_handle(vpiHighConn, portH) reaches the complex expression.
   EXPECT_EQ(ctx.Handle(vpiHighConn, loads[0]), &expr);
 }
 

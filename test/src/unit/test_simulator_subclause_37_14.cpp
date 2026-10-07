@@ -331,9 +331,8 @@ TEST_F(PortModelInARun, AnInstanceReachesThePortsItDeclares) {
   RunAModuleOfThreePorts(f);
 
   EXPECT_EQ(g_ports_seen, 3);
-  // §37.14 detail 9: "vpiPortIndex can be used to determine the port order. The
-  // first port has a port index of zero", and detail 8 has a named port report
-  // the name it was given.
+  // §37.14 detail 9: vpiPortIndex gives a port's place in the order, counting
+  // from zero, and detail 8 has a named port report the name it was given.
   EXPECT_EQ(g_first_port_name, "a");
   EXPECT_EQ(g_first_port_index, 0);
   EXPECT_EQ(g_first_port_direction, vpiInput);
@@ -345,10 +344,10 @@ TEST_F(PortModelInARun, ThePortsWidthDecidesScalarAndVector) {
   SimFixture f;
   RunAModuleOfThreePorts(f);
 
-  // §37.14 detail 6: "properties vpiScalar and vpiVector shall indicate whether
-  // the port is 1 bit or more than 1 bit. They shall not indicate anything
-  // about what is connected to the port." Both ports here are connected to a
-  // net of their own width, so what separates them is the declaration.
+  // §37.14 detail 6: vpiScalar and vpiVector tell whether the port itself is
+  // one bit wide or wider, and say nothing about what the port is connected to.
+  // Both ports here are connected to a net of their own width, so what
+  // separates them is the declaration.
   ASSERT_EQ(g_ports_seen, 3);
   EXPECT_EQ(g_wide_port_size, 8);
   EXPECT_EQ(g_wide_port_vector, 1);

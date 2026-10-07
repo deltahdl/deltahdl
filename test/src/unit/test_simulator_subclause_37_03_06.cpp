@@ -142,12 +142,12 @@ TEST_F(VpiObjectProtection, GetStrIsProtectedIsPermittedOnProtectedObject) {
 }
 
 // Claim (relationship half of the general rule): the protected-object guard
-// covers access to an object's *relationships*, not only its properties -
-// "access to relationships and properties of a protected object shall be an
-// error." Traversing a one-to-one relationship out of a protected reference
-// object records an error and yields no handle, whereas the identical traversal
-// from an ordinary object resolves normally. This confirms the guard keys off
-// the reference object's protection state rather than the traversal itself.
+// covers access to an object's *relationships*, not only its properties - a
+// protected object's relationships are as closed to access as its properties.
+// Traversing a one-to-one relationship out of a protected reference object
+// records an error and yields no handle, whereas the identical traversal from
+// an ordinary object resolves normally. This confirms the guard keys off the
+// reference object's protection state rather than the traversal itself.
 TEST_F(VpiObjectProtection, RelationshipAccessOnProtectedObjectIsAnError) {
   VpiObject child;
   child.type = vpiNet;

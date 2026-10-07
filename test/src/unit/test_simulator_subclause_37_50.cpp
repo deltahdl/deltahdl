@@ -121,9 +121,9 @@ TEST(ConcurrentAssertionModel, CoverReportsIsCoverSequence) {
   EXPECT_EQ(ctx.Get(vpiIsCoverSequence, &prop_cover), 0);
 }
 
-// Claim 4 "false otherwise": vpiIsCoverSequence is meaningful only for a cover,
-// so a concurrent assertion of a different kind (here an assert) reports 0 for
-// the same property - the other input kind for the same query.
+// Claim 4, the false arm: vpiIsCoverSequence is meaningful only for a cover, so
+// a concurrent assertion of a different kind (here an assert) reports 0 for the
+// same property - the other input kind for the same query.
 TEST(ConcurrentAssertionModel, NonCoverReportsIsCoverSequenceFalse) {
   VpiContext ctx;
   VpiObject assertion;

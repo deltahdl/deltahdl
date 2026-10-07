@@ -220,7 +220,7 @@ TEST_F(UdpModel, TableEntryValueRejectsOtherFormats) {
 // renderings - the binary/octal/hexadecimal radix strings - and the scalar/real
 // numeric forms are still not among the two allowed forms, so the table-entry
 // guard refuses each of them. This pins the boundary that a guard checking only
-// for "a string format" would wrongly let through.
+// for a string format alone would wrongly let through.
 TEST_F(UdpModel, TableEntryValueRejectsStringLikeAndNumericFormats) {
   auto* var = sim_ctx_.CreateVariable("te_edge", 16);
   var->value = MakeLogic4VecVal(arena_, 16, 0x4142);

@@ -12,15 +12,14 @@
 namespace delta {
 namespace {
 
-// §37.3.8 (Managing transient objects). "One may obtain a handle to an object
-// during its lifetime, and it remains valid only as long as the object exists.
-// For a static object, one may therefore keep its handle indefinitely. For a
-// transient object, one may release its handle after use or expect that handle
-// to be released and become invalid when the object ceases to exist."
+// §37.3.8 (Managing transient objects). A handle got during an object's life is
+// valid only while the object exists, so a static object's handle can be kept
+// for good, while a transient object's handle is either released after use or
+// left to be released, and to lapse, when the object goes away.
 //
-// The subclause's own rule is the second paragraph: "The life of a transient
-// object may be tracked through various callbacks, depending on the specific
-// type of object", followed by the list of which callbacks those are -
+// The subclause's own rule is the second paragraph: callbacks, which differ
+// with the kind of object, let an application follow a transient object's
+// life, followed by the list of which callbacks those are -
 // cbCreateObj, cbReclaimObj, cbStartofFrame, cbEndOfFrame, cbStartOfThread,
 // cbEndOfThread, and cbEndOfObject. So an application that registers one of
 // them is called when the life event it names happens to a transient object.

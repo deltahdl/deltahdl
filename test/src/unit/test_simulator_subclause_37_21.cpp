@@ -219,13 +219,13 @@ TEST(VariableDriversAndLoads, UnionDriverDescendsThroughNestedAggregateMember) {
   EXPECT_TRUE(VpiIterationContains(drivers, &deep_driver));
 }
 
-// Detail 2: "vpiDrivers/Loads for any variable array should include driver/load
-// for entire array/vector or any portion of an array/vector to which a handle
-// can be obtained." A var select is that portion (§37.19), so an array
-// variable's vpiDriver iteration reaches the driver of the element a select
-// names alongside the driver of the whole array. Only the detail 1 arm was
-// applied, so an array was walked as an ordinary variable and reported the
-// whole-array driver alone.
+// Detail 2: a variable array's vpiDrivers and vpiLoads take in the drivers and
+// loads of the whole array or vector and of every part of it a handle can be
+// had to. A var select is that portion (§37.19), so an array variable's
+// vpiDriver iteration reaches the driver of the element a select names
+// alongside the driver of the whole array. Only the detail 1 arm was applied,
+// so an array was walked as an ordinary variable and reported the whole-array
+// driver alone.
 TEST(VariableDriversAndLoads, ArrayDriverIncludesTheDriverOfAPortionOfIt) {
   VpiContext ctx;
 

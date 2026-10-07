@@ -308,9 +308,8 @@ TEST_F(FrameSim, PutValueWithoutDelayOnAutomaticVariableIsApplied) {
 }
 
 // -----------------------------------------------------------------------------
-// §37.43 detail 4: "There is at most only one active frame at any time in a
-// given thread. To get a handle to the currently active frame, use
-// vpi_handle(vpiFrame, NULL)."
+// §37.43 detail 4: a thread has no more than one active frame at a time, and
+// vpi_handle(vpiFrame, NULL) returns a handle to the one active now.
 //
 // Every case above builds its frames by hand, so what they observe is what the
 // model reports about an object rather than where such an object comes from --
@@ -409,10 +408,10 @@ TEST_F(FrameModelInARun, AFrameActivatedFromAnotherReportsItAsItsParent) {
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
 
-  // §37.43 detail 5: "The vpiParent relation shall indicate the frame from
-  // which the child frame was activated." The thread worked its way one step
-  // further down the call chain here than in the case above, and that step is
-  // the whole of the difference in what the application sees.
+  // §37.43 detail 5: a child frame's vpiParent is the frame it was activated
+  // from. The thread worked its way one step further down the call chain here
+  // than in the case above, and that step is the whole of the difference in
+  // what the application sees.
   ASSERT_TRUE(g_frame_found);
   EXPECT_EQ(g_frame_is_active, 1);
   EXPECT_TRUE(g_frame_has_a_parent_frame);

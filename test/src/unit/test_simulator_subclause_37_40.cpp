@@ -58,8 +58,9 @@ TEST_F(TimingCheck, RefAndDataTermsAreReached) {
   EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(reached_data)), vpiTchkTerm);
 }
 
-// Detail 1 ("if any"): a timing check that has no data event reports NULL for
-// vpiTchkDataTerm, while its reference term is still reached.
+// Detail 1 (the data event being optional): a timing check that has no data
+// event reports NULL for vpiTchkDataTerm, while its reference term is still
+// reached.
 TEST_F(TimingCheck, DataTermIsNullWhenCheckHasNoDataEvent) {
   VpiObject ref_term;
   ref_term.type = vpiTchkTerm;

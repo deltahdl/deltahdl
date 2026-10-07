@@ -19,8 +19,8 @@ namespace {
 // unlike the looping statements of §37.66 - a forever carries no controlling
 // condition.
 //
-// §37.4.1 makes a dotted enclosure a class that "groups other objects and
-// classes" rather than a kind of its own, so the body a forever reaches carries
+// §37.4.1 makes a dotted enclosure a class that groups other objects and
+// classes rather than a kind of its own, so the body a forever reaches carries
 // the kind a statement of a design carries - an unnamed begin, an assignment, a
 // nested forever - and never vpiStmt, which is the class's name. Read the other
 // way, as a child whose own type is the relation tag, the relation reached the

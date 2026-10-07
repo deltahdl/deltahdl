@@ -256,9 +256,9 @@ class IntermodulePathInARun : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §37.37 detail 1: "To get to an intermodule path, vpi_handle_multi(
-// vpiInterModPath, port1, port2) can be used." The two ports one signal runs
-// between have a path; two ports on different signals have none.
+// §37.37 detail 1: vpi_handle_multi(vpiInterModPath, port1, port2) is how an
+// intermodule path is reached. The two ports one signal runs between have a
+// path; two ports on different signals have none.
 TEST_F(IntermodulePathInARun, ConnectedPortsReachThePathBetweenThem) {
   RegisterPathProbe();
 

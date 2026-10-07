@@ -11,10 +11,10 @@
 namespace delta {
 namespace {
 
-// §37.1 names what Clause 37 is for: "using VPI data models" and "VPI data
-// model diagrams". Using one begins somewhere, and §37.5 detail 1 says where -
-// "top-level modules shall be accessed using vpi_iterate() with a NULL
-// reference object". An application walks down from there.
+// §37.1 names what Clause 37 is for: working with the VPI data models and the
+// diagrams that draw them. Using one begins somewhere, and §37.5 detail 1 says
+// where - the top-level modules are reached by vpi_iterate() with a NULL
+// reference object. An application walks down from there.
 //
 // A design had no such object to reach. The simulator keys an instance's
 // objects on a flat name and a top module carries the empty prefix, so what the

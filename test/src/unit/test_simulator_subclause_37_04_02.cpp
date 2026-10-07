@@ -16,11 +16,10 @@ namespace {
 
 // §37.4.2 (Diagram key for accessing properties) says how a property drawn on
 // an object in the data model diagrams is read back, and it does so by naming
-// both the routine and the type: "Integer and Boolean properties are accessed
-// with the routine vpi_get(). These properties are of type PLI_INT32", and
-// "String properties are accessed with routine vpi_get_str(). String properties
-// are of type PLI_BYTE8 *." Complex properties for time and logic value are
-// left to the routines the diagram indicates instead.
+// both the routine and the type: vpi_get() reads integer and Boolean
+// properties, which are PLI_INT32, and vpi_get_str() reads string properties,
+// which are PLI_BYTE8 *. Complex properties for time and logic value are left
+// to the routines the diagram indicates instead.
 //
 // The clause writes each access out as a line of an application, which is what
 // these cases run: a property is not accessible in the sense §37.4.2 means
@@ -44,8 +43,8 @@ class VpiPropertyAccess : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// Claim: "Integer and Boolean properties are accessed with the routine
-// vpi_get()." These are the clause's two example lines, run unchanged.
+// Claim: vpi_get() is the routine for integer and Boolean properties. These are
+// the clause's two example lines, run unchanged.
 TEST_F(VpiPropertyAccess, IntegerAndBooleanPropertiesComeFromVpiGet) {
   vpiHandle obj_h = VpiHandleOf(ObjH());
 
@@ -56,11 +55,10 @@ TEST_F(VpiPropertyAccess, IntegerAndBooleanPropertiesComeFromVpiGet) {
   EXPECT_EQ(size, 8);
 }
 
-// Claim: "These properties are of type PLI_INT32." The value vpi_get() hands
-// back is of that type, not merely of one that converts to it - an application
-// that stores the result in a PLI_INT32 is copying the clause, and a routine
-// answering in some other width would leave it doing a conversion the clause
-// does not write.
+// Claim: those properties are PLI_INT32. The value vpi_get() hands back is of
+// that type, not merely of one that converts to it - an application that stores
+// the result in a PLI_INT32 is copying the clause, and a routine answering in
+// some other width would leave it doing a conversion the clause does not write.
 TEST_F(VpiPropertyAccess, AnIntegerPropertyIsOfTypePliInt32) {
   vpiHandle obj_h = VpiHandleOf(ObjH());
 
@@ -68,11 +66,11 @@ TEST_F(VpiPropertyAccess, AnIntegerPropertyIsOfTypePliInt32) {
   EXPECT_EQ(sizeof(vpi_get(vpiSize, obj_h)), sizeof(PLI_INT32));
 }
 
-// Claim: "String properties are accessed with routine vpi_get_str(). String
-// properties are of type PLI_BYTE8 *." This is the clause's third example line,
-// and the declared type of the variable it assigns to is the point of it: a
-// pointer to const cannot be stored in a PLI_BYTE8 *, so a routine handing one
-// back is not answering with the type the clause gives a string property.
+// Claim: vpi_get_str() is the routine for string properties, which are
+// PLI_BYTE8 *. This is the clause's third example line, and the declared type
+// of the variable it assigns to is the point of it: a pointer to const cannot
+// be stored in a PLI_BYTE8 *, so a routine handing one back is not answering
+// with the type the clause gives a string property.
 TEST_F(VpiPropertyAccess, AStringPropertyComesFromVpiGetStrAsPliByte8) {
   vpiHandle obj_h = VpiHandleOf(ObjH());
 
@@ -97,10 +95,10 @@ TEST_F(VpiPropertyAccess, EachKindIsReadThroughItsOwnRoutine) {
   EXPECT_EQ(vpi_get_str(vpiSize, obj_h), nullptr);
 }
 
-// Claim: "Complex properties for time and logic value are accessed with the
-// indicated routines." A logic value is one of those, and the routine the
-// diagrams indicate for it is vpi_get_value(), which fills a caller's
-// s_vpi_value rather than answering with a PLI_INT32.
+// Claim: a time or logic value property, being complex, is read with the
+// routine the diagram names for it. A logic value is one of those, and the
+// routine the diagrams indicate for it is vpi_get_value(), which fills a
+// caller's s_vpi_value rather than answering with a PLI_INT32.
 TEST_F(VpiPropertyAccess, AComplexValuePropertyComesFromItsOwnRoutine) {
   Arena arena;
   Variable backing;

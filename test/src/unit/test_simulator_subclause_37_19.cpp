@@ -110,9 +110,9 @@ TEST_F(VariableSelectObject, AnAutomaticParentMakesItNonConstant) {
 }
 
 // Detail 1 read down a chain of selects. The second condition names what the
-// prefix has to be - "an unpacked array with static bounds" - so a select whose
-// prefix is another select is not a constant select however constant its own
-// index is, while the select directly over the array is one.
+// prefix has to be - an unpacked array whose bounds are fixed - so a select
+// whose prefix is another select is not a constant select however constant its
+// own index is, while the select directly over the array is one.
 TEST_F(VariableSelectObject, ASelectOfASelectIsNotAConstantSelect) {
   VpiObject outer_index;
   outer_index.type = vpiConstant;

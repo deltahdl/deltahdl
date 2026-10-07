@@ -103,8 +103,8 @@ TEST_F(VpiFileAndLineProperty, ExceptedKindsHaveNoFile) {
 // vpi_get_str() do with an object that carries them; it says nothing about an
 // object of an elaborated design carrying them at all. Nothing under src/ ever
 // wrote either property, so every net, variable and port of every design
-// answered zero and NULL, and "applicable to every object that corresponds to
-// some object within the source code" held for no object of any design.
+// answered zero and NULL, and the rule that the two properties apply to every
+// object standing for something in the source held for no object of any design.
 // -----------------------------------------------------------------------------
 
 // What the application read. A calltf is a plain C function with no return path
@@ -234,10 +234,10 @@ TEST_F(VpiLocationInARun, ADeclaredNetReportsTheFileItWasDeclaredIn) {
   EXPECT_EQ(g_net_file, "<test>");
 }
 
-// §37.3.3 applies to "every object that corresponds to some object within the
-// source code", which a variable declaration does as much as a net one. The
-// two stand on different lines, so a variable reporting the net's line would
-// pass a case that only asked whether some line came back.
+// §37.3.3 applies to every object standing for something in the source, which a
+// variable declaration does as much as a net one. The two stand on different
+// lines, so a variable reporting the net's line would pass a case that only
+// asked whether some line came back.
 TEST_F(VpiLocationInARun, ADeclaredVariableReportsItsOwnLine) {
   RegisterLocationProbe();
 

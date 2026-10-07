@@ -16,12 +16,11 @@ namespace {
 // for the procedural continuous assignment family. The clause carries no BNF,
 // no numbered Details, and no 'shall' sentences - it is the diagram alone. The
 // diagram draws two dotted enclosures with no name, which §37.4.1 makes
-// unnamed classes: groupings that "shall not be referenced as a group
-// elsewhere", so what each says is that its members draw the same edges and
-// nothing names the pair. The first holds a force and an assign statement and
-// carries two single arrows, vpiRhs and vpiLhs, each to an expr; the second
-// holds a deassign and a release and carries vpiLhs alone, those two naming a
-// target and supplying no value.
+// unnamed classes: groupings nothing else may name as a group, so what each
+// says is that its members draw the same edges and nothing names the pair. The
+// first holds a force and an assign statement and carries two single arrows,
+// vpiRhs and vpiLhs, each to an expr; the second holds a deassign and a release
+// and carries vpiLhs alone, those two naming a target and supplying no value.
 //
 // Each edge needs dedicated production code because both sides are expression
 // kinds (an operation, a reference, a constant, ...), not the vpiLhs / vpiRhs

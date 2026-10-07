@@ -84,7 +84,7 @@ TEST_F(VpiGetPropertySim, TimePropertyWithNullObjectReportsSimulationTimeUnit) {
 
 // §38.6: querying a protected object is an error, and on an error vpi_get()
 // returns vpiUndefined. Per §37.3.6 (printed p.1003) the vpiType and
-// vpiIsProtected properties are explicitly "permitted for all objects", so the
+// vpiIsProtected properties are expressly allowed on every object, so the
 // refusal must be observed through some other property -- here vpiSize, which a
 // module (a non-expression object) does not exempt from the protection rule.
 TEST_F(VpiGetPropertySim, ProtectedObjectQueryReturnsVpiUndefined) {

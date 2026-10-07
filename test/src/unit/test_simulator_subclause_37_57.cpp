@@ -50,10 +50,10 @@ TEST(LetExprModel, ArgumentsFollowFormalOrderAndFillDefaults) {
   EXPECT_EQ(args[2], &a2);
 }
 
-// §37.57 detail 1 (the "should the instantiation not provide a value" clause
-// when there is no default): an omitted argument whose formal has no default
-// value yields a null argument in that position, so later arguments still align
-// with their own formals rather than shifting left.
+// §37.57 detail 1 (an argument the instantiation leaves out, when the formal
+// has no default): an omitted argument whose formal has no default value yields
+// a null argument in that position, so later arguments still align with their
+// own formals rather than shifting left.
 TEST(LetExprModel, OmittedArgumentWithoutDefaultIsNull) {
   VpiObject a2;
 
@@ -154,11 +154,11 @@ TEST_F(LetExprIteration, TheArgumentIterationReachesTheActualsInFormalOrder) {
   EXPECT_EQ(VpiObjectOf(args[1]), &a1);
 }
 
-// §37.57 detail 1: "If a formal has a default value, that value shall appear as
-// the argument should the instantiation not provide a value for that argument."
-// The instantiation leaves the first port empty - written the way §37.42
-// detail 8 writes an omitted argument - so the formal's default stands in its
-// place and the actual it did write keeps the second position.
+// §37.57 detail 1: when the instantiation gives a formal with a default no
+// value, the default appears as its argument. The instantiation leaves the
+// first port empty - written the way §37.42 detail 8 writes an omitted argument
+// - so the formal's default stands in its place and the actual it did write
+// keeps the second position.
 TEST_F(LetExprIteration, AnOmittedArgumentComesBackAsItsFormalsDefault) {
   VpiObject default0;
   default0.type = vpiConstant;

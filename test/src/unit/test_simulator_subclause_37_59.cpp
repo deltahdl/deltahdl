@@ -31,7 +31,7 @@ namespace {
 // nets and other objects are not expressions.
 //
 // One of the members drawn inside it is the `simple expr` class, and §37.4.1
-// makes a class a grouping of "other objects and classes" rather than a kind of
+// makes a class a grouping of other objects and classes rather than a kind of
 // its own, so what the expr class holds includes what that one holds. §37.58
 // draws `simple expr` holding a ref obj, a parameter, a spec param, a var
 // select and a bit select. Only the ref obj was admitted here, as though a

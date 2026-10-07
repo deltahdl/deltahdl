@@ -13,14 +13,13 @@ namespace {
 
 // §37.4.3 (Diagram key for traversing relationships) says how an arrow in a
 // data model diagram is walked. A single arrow is a one-to-one relationship
-// "accessed with the routine vpi_handle()" and a double arrow a one-to-many one
-// "accessed with the routine vpi_scan()", each written out as the line of an
-// application that walks it; a tag on the arrow replaces the target's own type
-// in the request; and an arrow that "originates from a circle is traversed
-// using NULL for the ref_h". Everything else is drawn from a reference object,
-// and the closing sentence gives the untagged request its name: "the type used
-// for access is determined by adding 'vpi' to the beginning of the word within
-// the enclosure, with each word's first letter being a capital".
+// walked with vpi_handle() and a double arrow a one-to-many one walked with
+// vpi_scan(), each written out as the line of an application that walks it; a
+// tag on the arrow replaces the target's own type in the request; and an arrow
+// drawn out of a circle is followed with NULL as the ref_h. Everything else is
+// drawn from a reference object, and the closing sentence gives the untagged
+// request its name: the word in the target's enclosure with `vpi` put in front
+// and every word capitalized.
 class VpiRelationTraversal : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }

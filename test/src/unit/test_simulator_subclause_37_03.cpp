@@ -11,25 +11,22 @@
 namespace delta {
 namespace {
 
-// §37.3 -- VPI object classifications. "VPI objects are classified using data
-// model diagrams. These diagrams provide a graphical representation of those
-// objects within a SystemVerilog design to which the VPI routines shall provide
-// access. The diagrams shall show the relationships between objects and the
-// properties of each object."
+// §37.3 -- VPI object classifications. Data model diagrams classify the VPI
+// objects: they draw the objects of a SystemVerilog design that the VPI
+// routines must give access to, with the relationships among them and each
+// one's properties.
 //
-// The clause reads one for the reader: "As an example, the simplified diagram
-// in Figure 37-1 shows that there is a one-to-many relationship from objects of
-// type module to objects of type net and a one-to-one relationship from objects
-// of type net to objects of type module. Objects of type net have properties
-// vpiName, vpiVector, and vpiSize with data types string, Boolean, and integer,
-// respectively."
+// The clause reads one for the reader: Figure 37-1, simplified, has one module
+// reach many nets and each net reach one module, and gives a net the
+// properties vpiName, vpiVector and vpiSize, a string, a Boolean and an integer
+// in that order.
 //
 // That is two relations and three properties, stated of a design rather than of
 // a diagram, and the cases below ask a design for all five. What makes them
 // §37.3's rather than §37.16's is that the clause is what says a diagram is a
-// claim about "those objects within a SystemVerilog design to which the VPI
-// routines shall provide access": a relation drawn and not reachable, or a
-// property named and not answered, is the diagram failing to classify anything.
+// claim about the design objects the VPI routines must give access to: a
+// relation drawn and not reachable, or a property named and not answered, is
+// the diagram failing to classify anything.
 
 // What the application found. A calltf is a plain C function with no return
 // path to the case that provoked it, and §38.11 has vpi_get_str hand back one

@@ -83,12 +83,12 @@ TEST(MemoryModel, MemoryWordIterationGatedToRegArray) {
 
 // -----------------------------------------------------------------------------
 // The other half of detail 1, and the property beside it. vpiMemory and
-// vpiMemoryWord "have been converted into methods that will return objects of
-// type vpiRegArray and vpiReg, respectively". The word half was answered; the
-// memory half was not, so vpi_iterate(vpiMemory, scope) looked for a child
-// whose own type is the legacy vpiMemory kind - which no design builds - and
-// reached none of a scope's memories. vpiIsMemory, drawn on the reg array
-// beside it, was dispatched by nothing and answered FALSE for every one.
+// vpiMemoryWord are now methods, the first returning vpiRegArray objects and
+// the second vpiReg ones. The word half was answered; the memory half was not,
+// so vpi_iterate(vpiMemory, scope) looked for a child whose own type is the
+// legacy vpiMemory kind - which no design builds - and reached none of a
+// scope's memories. vpiIsMemory, drawn on the reg array beside it, was
+// dispatched by nothing and answered FALSE for every one.
 // -----------------------------------------------------------------------------
 
 // Detail 1: the vpiMemory iteration returns objects of type vpiRegArray, so a

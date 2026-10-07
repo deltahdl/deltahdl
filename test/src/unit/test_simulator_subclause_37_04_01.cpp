@@ -18,11 +18,11 @@ namespace {
 // diagrams of §37.5 onward are read with. It names five notations, and the two
 // that decide what an implementation answers are the enclosures: a solid one
 // holds an object, bold where the object is defined and normal where it is
-// referenced, and a dotted one holds a class -- "bold italic letters in a
-// dotted enclosure indicate a class definition, where the class groups other
-// objects and classes". A class is that grouping and nothing else. It has no
-// object of its own, so no object's vpiType is a class constant, and a relation
-// drawn to a class reaches the objects the class groups.
+// referenced, and a dotted one holds a class -- a name in bold italics inside a
+// dotted enclosure defines a class, which groups other objects and classes. A
+// class is that grouping and nothing else. It has no object of its own, so no
+// object's vpiType is a class constant, and a relation drawn to a class reaches
+// the objects the class groups.
 //
 // §37.17 draws `variables` as such a class, and the object definitions inside
 // its enclosure are what vpiVariables names: a logic var, an int var, a string

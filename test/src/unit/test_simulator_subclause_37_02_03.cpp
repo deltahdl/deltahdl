@@ -10,17 +10,17 @@
 namespace delta {
 namespace {
 
-// §37.2.3 (Handle comparison): "Handle equivalence cannot be determined with a
-// C '==' comparison. The function vpi_compare_objects() compares the objects
-// they refer to. It returns the value 1 if the objects they refer to are the
-// same object); otherwise it returns the value 0."
+// §37.2.3 (Handle comparison): comparing two handles with C's `==` does not say
+// whether they are equivalent; vpi_compare_objects() compares the objects
+// behind them instead, answering 1 when they are one object and 0 when not.
 //
-// §37.2.1 is what makes that so: a tool "may create two distinct handles or may
-// provide the same handle in both cases", so an application holding two handles
-// to one object cannot tell from the pointers. What the clause asks of a tool
-// is that it not make the same mistake: where the simulator itself asks whether
-// two handles name one object, it has to ask §38.3's question rather than
-// compare the pointers - and in two places it compared the pointers.
+// §37.2.1 is what makes that so: asked twice for one object, a tool may hand
+// back two different handles or the same one twice, so an application holding
+// two handles to one object cannot tell from the pointers. What the clause asks
+// of a tool is that it not make the same mistake: where the simulator itself
+// asks whether two handles name one object, it has to ask §38.3's question
+// rather than compare the pointers - and in two places it compared the
+// pointers.
 class VpiHandleComparison : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -83,9 +83,9 @@ TEST_F(VpiHandleComparison, ACallbackIsNotFoundThroughAnotherObject) {
   EXPECT_EQ(vpi_iterate(vpiCallback, VpiHandleOf(unwatched)), nullptr);
 }
 
-// §37.2.2 items 2 and 3 release "handles to callbacks placed on these objects",
-// and §37.2.3 says which callbacks those are: the ones §38.3 calls placed on
-// the object, whichever handle registered them.
+// §37.2.2 items 2 and 3 release the handles of the callbacks placed on those
+// objects, and §37.2.3 says which callbacks those are: the ones §38.3 calls
+// placed on the object, whichever handle registered them.
 TEST_F(VpiHandleComparison, ReleasingAnObjectReleasesItsCallbacksAnyHandle) {
   VpiHandle mod = ctx_.CreateModule("top", "top");
   VpiHandle other = ctx_.CreateHandleFor(mod);

@@ -11,9 +11,9 @@
 namespace delta {
 namespace {
 
-// §37.4 (Key to data model diagrams): "This subclause contains the keys to the
-// symbols used in the data model diagrams. Keys are provided for objects and
-// classes, traversing relationships, and accessing properties."
+// §37.4 (Key to data model diagrams): the subclause holds the keys to the
+// diagrams' symbols, one each for objects and classes, for traversing
+// relationships and for accessing properties.
 //
 // That is the claim of the subclause itself rather than of any one of its three
 // children: the three keys together are what a data model diagram is read with,
@@ -131,9 +131,9 @@ TEST_F(VpiDataModelDiagramKeys, FigureOneIsReadByTheThreeKeys) {
   EXPECT_EQ(g_net_type, vpiNet);
   EXPECT_EQ(g_module_type, vpiModule);
 
-  // §37.4.2: "objects of type net have properties vpiName, vpiVector, and
-  // vpiSize with data types string, Boolean, and integer, respectively", plus
-  // the vpiFullName the figure draws beside vpiName.
+  // §37.4.2: a net's properties vpiName, vpiVector and vpiSize are a string, a
+  // Boolean and an integer in that order, plus the vpiFullName the figure draws
+  // beside vpiName.
   EXPECT_EQ(g_net_name, "w");
   EXPECT_EQ(g_net_full_name, "t.m1.w");
   EXPECT_EQ(g_net_size, 8);

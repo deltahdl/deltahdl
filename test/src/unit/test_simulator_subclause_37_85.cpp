@@ -35,14 +35,14 @@ namespace {
 // vpiTypedef/vpiNetTypedef iterations) restate the instance rule already
 // implemented for §37.10, so they add no production for this clause.
 //
-// Details 3 and 4 - "References to gen vars within the gen scope shall be
-// treated as local parameters" and "Parameters within the gen scope shall be
-// treated as local parameters" - were read as elaboration semantics with no VPI
-// query of their own. They have one: §37.28 draws vpiLocalParam on a parameter,
-// and being treated as a local parameter is what that property reports. It
-// reported the flag the declaration set, so a parameter written as a plain
-// parameter inside a gen scope answered that an override could still reach it,
-// which one elaboration of a generate has already settled.
+// Details 3 and 4 - a reference to a gen var inside the gen scope, and a
+// parameter inside it, each count as a local parameter - were read as
+// elaboration semantics with no VPI query of their own. They have one: §37.28
+// draws vpiLocalParam on a parameter, and being treated as a local parameter is
+// what that property reports. It reported the flag the declaration set, so a
+// parameter written as a plain parameter inside a gen scope answered that an
+// override could still reach it, which one elaboration of a generate has
+// already settled.
 //
 // The fixture installs a context so the public vpi_get, vpi_handle, and
 // vpi_handle_by_index entry points run their real dispatch over the test

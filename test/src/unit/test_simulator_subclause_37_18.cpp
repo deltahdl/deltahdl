@@ -242,10 +242,10 @@ TEST(PackedArrayVarModel, VectorAlwaysTrueForPackedArrayVar) {
   EXPECT_FALSE(VpiVariableScalar(q));
 }
 
-// Detail 1: "vpiVector and vpiPacked for these objects and their underlying
-// struct var, union var, or enum var elements shall always be TRUE." A packed
-// array var is packed by construction, so the property does not wait on a flag
-// the object was built with; nor does an element underlying one.
+// Detail 1: vpiVector and vpiPacked are TRUE for these objects, and for the
+// struct var, union var and enum var elements beneath them, without exception.
+// A packed array var is packed by construction, so the property does not wait
+// on a flag the object was built with; nor does an element underlying one.
 TEST(PackedArrayVarPublic, PackedIsAlwaysTrueForAPackedArrayAndItsElements) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);

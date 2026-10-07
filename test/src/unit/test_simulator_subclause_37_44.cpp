@@ -138,12 +138,12 @@ TEST(ThreadModel, ThreadIterationIsEmptyWhenNoneSpawned) {
 }
 
 // -----------------------------------------------------------------------------
-// §37.44 detail 1: "A thread is a SystemVerilog process such as an always
-// procedure or a branch of a fork construct." Every case above builds its
-// threads by hand, which says what the model reports about an object and
-// nothing about where such an object comes from -- and no run produced one at
-// all, so the whole of this model answered for a design only in a test that
-// wrote the design's threads itself.
+// §37.44 detail 1: a thread is a SystemVerilog process, an always procedure or
+// one branch of a fork for example. Every case above builds its threads by
+// hand, which says what the model reports about an object and nothing about
+// where such an object comes from -- and no run produced one at all, so the
+// whole of this model answered for a design only in a test that wrote the
+// design's threads itself.
 //
 // The cases below run a design and let an application reach the threads it has,
 // through the iteration the diagram's circle relation draws: vpi_iterate with a

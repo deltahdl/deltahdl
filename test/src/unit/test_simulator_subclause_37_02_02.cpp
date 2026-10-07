@@ -157,11 +157,11 @@ TEST_F(VpiHandleReleaseSim, ReclaimingClassObjectReleasesAutomaticNotStatic) {
   EXPECT_FALSE(vpi_ctx_.HandleReleased(static_member));
 }
 
-// §37.2.2 (list item a): "Handles may also be released as part of the action of
-// other VPI function calls, in particular: a) vpi_remove_callback() releases
-// the associated callback handle." Removing a callback stopped it from being
-// delivered and left its handle live, so a program that had removed a callback
-// still held a handle every routine accepted.
+// §37.2.2 (list item a): some VPI calls release a handle as part of what they
+// do, and vpi_remove_callback() is one, releasing the handle of the callback it
+// removes. Removing a callback stopped it from being delivered and left its
+// handle live, so a program that had removed a callback still held a handle
+// every routine accepted.
 TEST_F(VpiHandleReleaseSim, RemovingACallbackReleasesItsHandle) {
   s_cb_data data = {};
   data.reason = cbEndOfSimulation;
@@ -179,9 +179,9 @@ TEST_F(VpiHandleReleaseSim, RemovingACallbackReleasesItsHandle) {
 }
 
 // §37.2.2 (list item a): the release is of the handle the call was given. A
-// callback the program did not remove keeps its own handle, which is what
-// "other VPI programs shall be able to continue to refer to objects using
-// handles that they have not released" asks of a release.
+// callback the program did not remove keeps its own handle, which is what the
+// clause asks of a release: any other VPI program can still reach objects
+// through the handles it has not released itself.
 TEST_F(VpiHandleReleaseSim, RemovingOneCallbackLeavesAnotherHandleLive) {
   s_cb_data first = {};
   first.reason = cbEndOfSimulation;
