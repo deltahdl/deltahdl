@@ -87,8 +87,8 @@ TEST(ContAssignStatementElaboration, NettypeLhsWithSelectErrors) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "continuous assignment to a nettype net shall not contain indexing or "
-      "select",
+      "a continuous assignment to a net of a user-defined nettype drives the "
+      "whole net and cannot index or select into it",
       4, "10.3.2"));
 }
 
@@ -107,8 +107,8 @@ TEST(ContAssignStatementElaboration, NettypeLhsWithPartSelectErrors) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "continuous assignment to a nettype net shall not contain indexing or "
-      "select",
+      "a continuous assignment to a net of a user-defined nettype drives the "
+      "whole net and cannot index or select into it",
       4, "10.3.2"));
 }
 
@@ -242,8 +242,8 @@ TEST(ContAssignStatementElaboration, NettypeLhsWithMemberAccessErrors) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "continuous assignment to a nettype net shall not contain indexing or "
-      "select",
+      "a continuous assignment to a net of a user-defined nettype drives the "
+      "whole net and cannot index or select into it",
       4, "10.3.2"));
 }
 

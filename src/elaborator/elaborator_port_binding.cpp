@@ -682,8 +682,7 @@ void Elaborator::CheckExplicitConnLegality(const PortBindScope& scope,
   if (conn_expr &&
       IllegalPatternPortConnection(conn_expr, binding.direction, port)) {
     diag_.Error(conn_expr->range.start,
-                "assignment pattern expression shall not be used in a "
-                "port expression",
+                "an assignment pattern cannot be connected to this port",
                 Subclause("10.8"));
   }
 

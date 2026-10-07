@@ -149,7 +149,7 @@ TEST(ContinuousAssignDeclElaboration, InterconnectNetDeclAssignIsError) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "interconnect net shall not have a net declaration assignment", 2,
+      "an interconnect net cannot be given a value where it is declared", 2,
       "10.3.1"));
 }
 
@@ -183,7 +183,7 @@ TEST(ContinuousAssignDeclElaboration, InterconnectVectorNetDeclAssignIsError) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "interconnect net shall not have a net declaration assignment", 2,
+      "an interconnect net cannot be given a value where it is declared", 2,
       "10.3.1"));
 }
 

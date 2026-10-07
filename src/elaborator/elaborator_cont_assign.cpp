@@ -53,8 +53,8 @@ void Elaborator::ValidateContAssignNettypeAndDelay(ModuleItem* item) {
     if (base && base->kind == ExprKind::kIdentifier &&
         nettype_net_names_.count(base->text) != 0) {
       diag_.Error(item->loc,
-                  "continuous assignment to a nettype net shall not contain "
-                  "indexing or select",
+                  "a continuous assignment to a net of a user-defined nettype "
+                  "drives the whole net and cannot index or select into it",
                   Subclause("10.3.2"));
     }
   }
@@ -63,8 +63,8 @@ void Elaborator::ValidateContAssignNettypeAndDelay(ModuleItem* item) {
     if (base && base->kind == ExprKind::kIdentifier &&
         nettype_net_names_.count(base->text) != 0) {
       diag_.Error(item->loc,
-                  "continuous assignment to a nettype net shall not contain "
-                  "indexing or select",
+                  "a continuous assignment to a net of a user-defined nettype "
+                  "drives the whole net and cannot index or select into it",
                   Subclause("10.3.2"));
     }
   }

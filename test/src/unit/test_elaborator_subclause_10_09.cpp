@@ -85,8 +85,7 @@ TEST(AssignmentPatternElaboration, ErrorPatternExpressionInPort) {
   // §10.8, not §10.9: a cast pattern in a port connection is what is reported.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "assignment pattern expression shall not be used in a port expression", 4,
-      "10.8"));
+      "an assignment pattern cannot be connected to this port", 4, "10.8"));
 }
 
 TEST(AssignmentPatternElaboration, ErrorLhsNamedKeys) {

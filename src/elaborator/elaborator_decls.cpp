@@ -459,9 +459,10 @@ static void LowerNetDeclAssignment(const ModuleItem* item, const RtlirNet& net,
                                    NetDeclLowerSink sink, DiagEngine& diag) {
   if (!item->init_expr) return;
   if (item->data_type.is_interconnect) {
-    diag.Error(item->loc,
-               "interconnect net shall not have a net declaration assignment",
-               Subclause("10.3.1"));
+    diag.Error(
+        item->loc,
+        "an interconnect net cannot be given a value where it is declared",
+        Subclause("10.3.1"));
     return;
   }
   sink.cont_assign_targets.emplace(item->name, item->loc);

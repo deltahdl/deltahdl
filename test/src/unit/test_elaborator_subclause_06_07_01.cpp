@@ -344,7 +344,7 @@ TEST(NetDataType, ImplicitSignedNetIsLogic) {
 }
 
 // --- Interconnect net restriction (§6.7.1) ---
-// An interconnect net shall not have assignment expressions.
+// An interconnect net takes no value in its own declaration.
 
 TEST(InterconnectNet, AssignmentExpressionIsRejected) {
   ElabFixture f;
@@ -353,7 +353,7 @@ TEST(InterconnectNet, AssignmentExpressionIsRejected) {
   // declaration assignment the interconnect net may not have is stated.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "interconnect net shall not have a net declaration assignment", 1,
+      "an interconnect net cannot be given a value where it is declared", 1,
       "10.3.1"));
 }
 

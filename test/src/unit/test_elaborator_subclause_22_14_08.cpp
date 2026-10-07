@@ -128,7 +128,7 @@ TEST(SystemVerilog2012KeywordElaboration, AddedInterconnectNetsReachTheDesign) {
       ic_assign, "m");
   EXPECT_TRUE(ReportedError(
       ic_assign.diag.Diagnostics(),
-      "interconnect net shall not have a net declaration assignment",
+      "an interconnect net cannot be given a value where it is declared",
       LineInRegion(2), "10.3.1"));
   ElabFixture wire_assign;
   ElaborateWithPreprocessor(
