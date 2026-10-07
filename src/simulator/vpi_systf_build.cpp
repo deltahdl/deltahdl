@@ -46,7 +46,7 @@ struct BuildPeriod {
 // cbEndOfCompile callbacks, and a compiletf is what verifies the arguments
 // (§36.8.2) through the very routines the sizetf phase withholds.
 void CallBuildPeriodRoutinesForCall(const Expr* call, BuildPeriod& period) {
-  if (call == nullptr || call->kind != ExprKind::kSystemCall) return;
+  if (call->kind != ExprKind::kSystemCall) return;
   if (!period.called.insert(call).second) return;
   const s_vpi_systf_data* data =
       period.vpi.ResolveSystf(std::string(call->callee).c_str());
@@ -84,9 +84,11 @@ void CallBuildPeriodRoutinesInStmt(const Stmt* stmt, BuildPeriod& period) {
   });
 }
 
+// Every module the walk reaches is resolved: an instance naming no module is
+// an elaboration error, and a design holding one is never lowered, so neither
+// a top module nor a child's resolved module is null here.
 void CallBuildPeriodRoutinesInModule(const RtlirModule* mod,
                                      BuildPeriod& period) {
-  if (mod == nullptr) return;
   for (const auto& proc : mod->processes) {
     CallBuildPeriodRoutinesInStmt(proc.body, period);
   }
