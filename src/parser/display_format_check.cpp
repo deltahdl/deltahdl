@@ -15,7 +15,7 @@ namespace {
 // §21.2's display and write tasks, §21.2.2's strobe and §21.2.3's monitor
 // tasks, the file forms §21.3.2 gives each of them, §21.3.3's $swrite family,
 // whose arguments are of the kinds $fwrite takes, and §20.10's severity tasks,
-// whose message has "the same syntax as $display". Every string literal
+// whose message is written as $display's arguments are. Every string literal
 // argument of one is a format.
 bool IsFormatListTask(std::string_view name) {
   static constexpr std::string_view kStems[] = {
