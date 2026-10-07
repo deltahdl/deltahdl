@@ -10,12 +10,12 @@ using namespace delta;
 namespace {
 
 // §19.5 creates bins automatically for a coverpoint of an integral expression
-// only, so a coverpoint of a real expression shall declare at least one
-// explicit `bins`. The expression is real when it names a real variable or a
-// real covergroup formal, or when an operand of its arithmetic is real; an
-// explicit data type before the label decides the coverpoint's type in place
-// of the expression's. An ignore_bins item is not a `bins` construct, and a
-// comparison of real operands is integral.
+// only, so a coverpoint of a real expression is left without bins unless it
+// declares an explicit `bins` of its own. The expression is real when it names
+// a real variable or a real covergroup formal, or when an operand of its
+// arithmetic is real; an explicit data type before the label decides the
+// coverpoint's type in place of the expression's. An ignore_bins item is not a
+// `bins` construct, and a comparison of real operands is integral.
 TEST(RealCoverpointBins, RealCoverpointWithoutBinsIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -37,11 +37,11 @@ TEST(RealCoverpointBins, RealCoverpointWithoutBinsIsError) {
       "endmodule\n",
       f);
   for (uint32_t line : {5u, 6u, 7u, 8u, 9u, 10u}) {
-    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                              "a coverpoint of a real expression has no "
-                              "automatic bins; it shall declare at least one "
-                              "'bins'",
-                              line, "19.5"));
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(),
+                      "nothing creates bins for a coverpoint of a real "
+                      "expression, so declare at least one 'bins' for it",
+                      line, "19.5"));
   }
   EXPECT_EQ(f.diag.ErrorCount(), 6u);
 }
@@ -88,13 +88,12 @@ TEST(RealCoverpointBins, EmbeddedCovergroupsAreCheckedLikeModuleOnes) {
                             "covergroup 'dg' nor a variable",
                             6, "19.6"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "a coverpoint of a real expression has no "
-                            "automatic bins; it shall declare at least one "
-                            "'bins'",
+                            "nothing creates bins for a coverpoint of a real "
+                            "expression, so declare at least one 'bins' for it",
                             14, "19.5"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "cross item 'mr' is a real variable; a cross shall "
-                            "not include a real variable directly",
+                            "cross item 'mr' is a real variable, which a cross "
+                            "can reach only through a coverpoint",
                             24, "19.6"));
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }

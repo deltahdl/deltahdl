@@ -28,8 +28,8 @@ TEST(RealCoverpointDefaultBin, DefaultBinArrayOfRealCoverpointIsError) {
       f);
   for (uint32_t line : {5u, 6u}) {
     EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                              "a default bin of a real coverpoint shall not "
-                              "be an array of bins",
+                              "a real coverpoint's default bin is a single bin "
+                              "and cannot be declared as an array",
                               line, "19.5.1"));
   }
   EXPECT_EQ(f.diag.ErrorCount(), 2u);

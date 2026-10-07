@@ -8,9 +8,8 @@ using namespace delta;
 namespace {
 
 // §19.6: a cross_item that names a variable implicitly creates a coverpoint
-// over it, and may do so only for an integral variable; a cross shall not
-// include a real variable directly, though it may cross a coverpoint of a real
-// expression.
+// over it, and may do so only for an integral variable; a real variable takes
+// part in a cross only through a coverpoint of a real expression.
 TEST(CrossItems, RealVariableCrossItemIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -26,8 +25,8 @@ TEST(CrossItems, RealVariableCrossItemIsError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "cross item 'r' is a real variable; a cross shall "
-                            "not include a real variable directly",
+                            "cross item 'r' is a real variable, which a cross "
+                            "can reach only through a coverpoint",
                             6, "19.6"));
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }

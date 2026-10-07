@@ -192,8 +192,8 @@ void CheckRealCoverpoint(const CoverPointDecl& cp, DiagEngine& diag) {
     has_bins = has_bins || bins.keyword == BinsKeyword::kBins;
     if (bins.kind == BinsOrOptionsKind::kDefault && bins.is_array) {
       diag.Error(bins.loc,
-                 "a default bin of a real coverpoint shall not be an array of "
-                 "bins",
+                 "a real coverpoint's default bin is a single bin and cannot "
+                 "be declared as an array",
                  Subclause("19.5.1"));
     }
     if (bins.with_expr != nullptr ||
@@ -210,8 +210,8 @@ void CheckRealCoverpoint(const CoverPointDecl& cp, DiagEngine& diag) {
   }
   if (!has_bins) {
     diag.Error(cp.loc,
-               "a coverpoint of a real expression has no automatic bins; it "
-               "shall declare at least one 'bins'",
+               "nothing creates bins for a coverpoint of a real expression, so "
+               "declare at least one 'bins' for it",
                Subclause("19.5"));
   }
 }
@@ -225,8 +225,8 @@ void CheckCrossItems(const CoverCrossDecl& cross, const CovergroupScope& scope,
     if (auto type = scope.TypeOf(item.name)) {
       if (IsRealType(*type)) {
         diag.Error(item.loc,
-                   std::format("cross item '{}' is a real variable; a cross "
-                               "shall not include a real variable directly",
+                   std::format("cross item '{}' is a real variable, which a "
+                               "cross can reach only through a coverpoint",
                                item.name),
                    Subclause("19.6"));
       }
