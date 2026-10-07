@@ -45,7 +45,7 @@ TEST(GlobalClockingParse, GlobalClockingInGenerateBlockIsError) {
       "  end\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedError(
-      r.diags, "global clocking shall not be declared in a generate block", 4,
+      r.diags, "a generate block cannot hold a global clocking declaration", 4,
       "14.14"));
 }
 

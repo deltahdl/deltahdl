@@ -105,7 +105,7 @@ ModuleItem* Parser::ParseClockingDecl() {
     item->is_global_clocking = true;
     if (InGenerateBlock()) {
       diag_.Error(item->loc,
-                  "global clocking shall not be declared in a generate block",
+                  "a generate block cannot hold a global clocking declaration",
                   Subclause("14.14"));
     }
   }
