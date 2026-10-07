@@ -64,13 +64,12 @@ void Parser::ParseSpecparamDecl(std::vector<ModuleItem*>& items) {
     if (item->name.starts_with("PATHPULSE$")) {
       // The parentheses are optional, which Syntax 30-7 does not admit. §30.7.1
       // prints `PATHPULSE$ = 3;` in its own worked example and its prose reads
-      // the 3 back off it -- "it acquires reject and error limit of 3, as
-      // defined by the last PATHPULSE$ declaration" -- while Syntax 30-7 and
-      // A.2.4 both parenthesize the limit list. The two disagree, and a source
-      // written from the example has to parse. Without the parentheses there is
-      // one limit and §30.7.1 makes it serve as both: "If only the reject limit
-      // value is specified, it shall apply to both the reject limit and the
-      // error limit." A comma after an unparenthesized limit opens the next
+      // the 3 back off it, as the reject and error limit the last PATHPULSE$
+      // declaration sets -- while Syntax 30-7 and A.2.4 both parenthesize the
+      // limit list. The two disagree, and a source written from the example
+      // has to parse. Without the parentheses there is one limit and §30.7.1
+      // makes it serve as both: a reject limit given alone is the error limit
+      // too. A comma after an unparenthesized limit opens the next
       // specparam of the declaration, so only the parenthesized form reads one.
       bool parenthesized = Match(TokenKind::kLParen);
       item->init_expr = ParseMinTypMaxExpr();
@@ -360,8 +359,8 @@ bool Parser::TryParseParenthesizedPathDelays(std::vector<Expr*>& delays) {
 }
 
 // A.7.4's path_delay_value: a list_of_path_delay_expressions bare or in
-// parentheses, §30.5 having "one or more delay values" on the right-hand side
-// that "may be optionally enclosed in a pair of parentheses". The list holds
+// parentheses, §30.5 putting at least one delay value on the right-hand side,
+// with parentheses around them allowed but not required. The list holds
 // one, two, three, six or twelve values, and no other count, whichever
 // alternative holds it.
 void Parser::ParsePathDelays(std::vector<Expr*>& delays) {
@@ -433,7 +432,7 @@ bool Parser::ParsePolarityPrefixedParallelPath(SpecifyItem* item) {
 }
 
 // Consume the path operator that separates source and destination terminals.
-// §30.4.2 gives a simple path "one of two forms", `source *> destination` and
+// §30.4.2 gives a simple path two forms, `source *> destination` and
 // `source => destination`, and A.7.2 admits no other token in that place.
 // Anything else is reported where the operator was due; a token that could
 // not open the destination is consumed so that the destination after it is
@@ -860,9 +859,9 @@ static void DecodePathpulseName(SpecifyItem& sp) {
 }
 
 // §30.7.1 (printed page 887): a PATHPULSE$ specparam's module path terminals
-// "shall conform to the rules for module path inputs and outputs, with the
-// following restriction: the terminals may not be a bit-select or part-select
-// of a vector." Syntax 30-7 spells the name out of two terminal descriptors,
+// follow the rules for the inputs and outputs of a module path, except that
+// neither may select a bit or a part of a vector. Syntax 30-7 spells the name
+// out of two terminal descriptors,
 // each admitting a range, so `PATHPULSE$a[0]$y` is that syntax with a select
 // the restriction forbids. The name reads up to the select as one identifier,
 // and what follows it up to the `=` -- the select and whatever terminal comes
@@ -900,8 +899,8 @@ void Parser::ParseSpecparamInSpecify(std::vector<SpecifyItem*>& items) {
     // The parentheses are optional here for the reason ParseSpecparamDecl above
     // states at length: §30.7.1's example writes `PATHPULSE$ = 3;` and Syntax
     // 30-7 parenthesizes. An unparenthesized limit leaves pathpulse_error null,
-    // which is how §30.7.1's "it shall apply to both the reject limit and the
-    // error limit" reaches ApplyPulseControlOverride in
+    // which is how §30.7.1's rule that a lone reject limit is the error limit
+    // too reaches ApplyPulseControlOverride in
     // src/simulator/specify_pulse.cpp -- that function takes a cleared
     // has_error as the instruction to use the reject limit for both.
     bool parenthesized = Match(TokenKind::kLParen);
