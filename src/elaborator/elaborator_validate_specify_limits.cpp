@@ -101,6 +101,11 @@ void ValidateTimingCheckFlags(const ModuleDecl* mod, DiagEngine& diag) {
   }
 }
 
+// §31.2: timing check limit values, like module path delays, are constant
+// expressions that may include specparams. Every operand of a
+// timing_check_limit must therefore be a literal or a specparam declared in the
+// same specify block; a net or variable reference is not constant and is
+// rejected, exactly as for module-path delays.
 void ValidateTimingCheckLimitOperands(const ModuleDecl* mod, DiagEngine& diag) {
   for (auto* item : mod->items) {
     if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
