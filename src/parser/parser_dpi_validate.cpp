@@ -49,8 +49,8 @@ DpiFormalTypeVerdict ClassifyDpiFormalType(const DataType& type) {
   if (type.kind == DataTypeKind::kUnion && !type.is_packed) {
     return DpiFormalTypeVerdict::kUnpackedUnion;
   }
-  // §35.5.6: the clause permits a struct or a union as a type "constructed from
-  // the supported types", so an aggregate is only as permitted as its members
+  // §35.5.6: the clause permits a struct or a union built out of the types it
+  // supports, so an aggregate is only as permitted as its members
   // are. Each member is decided by its own kind, and a member that is itself an
   // inline aggregate is decided by recursing into the type parsed for it.
   // struct_members is empty for every other kind, which ends the walk; a null
@@ -68,8 +68,8 @@ DpiFormalTypeVerdict ClassifyDpiFormalType(const DataType& type) {
   return DpiFormalTypeVerdict::kPermitted;
 }
 
-// §35.5.5: the result type of an imported function is restricted to "small
-// values" -- a tighter set than the §35.5.6 formal-argument types. The
+// §35.5.5: the result type of an imported function is restricted to small
+// values -- a tighter set than the §35.5.6 formal-argument types. The
 // permitted results are void, the C-compatible scalar integer and real types,
 // chandle, string, and *scalar* (single-bit, unpacked) bit/logic. Packed
 // bit/logic vectors, the wide 4-state vector types (integer, time), and

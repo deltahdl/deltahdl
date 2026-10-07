@@ -72,8 +72,8 @@ struct ParserDpiHelpers {
   }
 
   // §35.5.4: with no explicit c_identifier the linkage name defaults to the
-  // SystemVerilog subroutine name, and the clause requires conformance of a
-  // linkage name reached "either directly or indirectly". §5.6 admits `$` in a
+  // SystemVerilog subroutine name, and the clause holds a linkage name to the
+  // same conformance whether it was written or defaulted. §5.6 admits `$` in a
   // simple identifier, so a legal subroutine name is not always a legal C one.
   static void CheckDefaultedLinkageName(Parser& p, const ModuleItem* item,
                                         const Token& name_tok) {
@@ -95,8 +95,9 @@ struct ParserDpiHelpers {
   }
 
   // Footnote 25 of Syntax 35-1: the dynamic_override_specifiers that
-  // function_prototype and task_prototype admit "shall only be legal on method
-  // declarations inside a non-interface class scope", and an import
+  // function_prototype and task_prototype admit are legal on a method
+  // declaration only within the scope of a class that is not an interface
+  // class, and an import
   // declaration is never one. Consuming them here is what lets the report name
   // that rule rather than the identifier the parser went on to expect. The
   // message names the import declaration because §8.20 states the same rule
@@ -125,9 +126,9 @@ ModuleItem* Parser::ParseDpiImport() {
   ParserDpiHelpers::ParseDpiSpecString(*this, item);
 
   // §35.5.4, Syntax 35-1: `dpi_function_import_property ::= context | pure`,
-  // one alternative of two, and §35.5.1.3 says the same in prose -- "Special
-  // properties can be specified for an imported subroutine as pure or as
-  // context." So the property is read once, whichever of the two comes first.
+  // one alternative of two, and §35.5.1.3 says the same in prose, giving an
+  // imported subroutine either pure or context as its special property. So the
+  // property is read once, whichever of the two comes first.
   if (Match(TokenKind::kKwPure)) {
     item->dpi_is_pure = true;
   } else if (Match(TokenKind::kKwContext)) {
