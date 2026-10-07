@@ -47,7 +47,8 @@ TEST(PatternMatching, RealLiteralPatternRejected) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "constant expression pattern shall be of integral type", 7, "12.6"));
+      "only an integral expression can serve as a constant expression pattern",
+      7, "12.6"));
 }
 
 // §12.6: same rule applied to the binary `matches` operator.
@@ -65,7 +66,8 @@ TEST(PatternMatching, RealLiteralPatternInMatchesOperatorRejected) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "constant expression pattern shall be of integral type", 6, "12.6"));
+      "only an integral expression can serve as a constant expression pattern",
+      6, "12.6"));
 }
 
 // §12.6: a string literal is not of integral type, so it is also rejected
@@ -84,7 +86,8 @@ TEST(PatternMatching, StringLiteralPatternRejected) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "constant expression pattern shall be of integral type", 6, "12.6"));
+      "only an integral expression can serve as a constant expression pattern",
+      6, "12.6"));
 }
 
 // §12.6: a constant expression pattern (11.2.1) may be a localparam, not just a
@@ -251,7 +254,8 @@ TEST(PatternMatching, RealLiteralPatternNames12_6) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "constant expression pattern shall be of integral type", 7, "12.6"));
+      "only an integral expression can serve as a constant expression pattern",
+      7, "12.6"));
 }
 
 // §12.6 requires a constant expression pattern to be of integral type and puts
@@ -280,7 +284,8 @@ TEST(PatternMatching, ARealLiteralPatternInAForInitializerIsReported) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "constant expression pattern shall be of integral type", 5, "12.6"));
+      "only an integral expression can serve as a constant expression pattern",
+      5, "12.6"));
 }
 
 // Stmt::for_steps holds the same loop's step assignments, a member of its own
@@ -297,7 +302,8 @@ TEST(PatternMatching, ARealLiteralPatternInAForStepIsReported) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "constant expression pattern shall be of integral type", 5, "12.6"));
+      "only an integral expression can serve as a constant expression pattern",
+      5, "12.6"));
 }
 
 // §16.3 gives `action_block ::= statement_or_null | [ statement ] else
@@ -316,7 +322,8 @@ TEST(PatternMatching, ARealLiteralPatternInAnAssertionPassStatementIsReported) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "constant expression pattern shall be of integral type", 5, "12.6"));
+      "only an integral expression can serve as a constant expression pattern",
+      5, "12.6"));
 }
 
 TEST(PatternMatching, ARealLiteralPatternInAnAssertionFailStatementIsReported) {
@@ -331,7 +338,8 @@ TEST(PatternMatching, ARealLiteralPatternInAnAssertionFailStatementIsReported) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "constant expression pattern shall be of integral type", 5, "12.6"));
+      "only an integral expression can serve as a constant expression pattern",
+      5, "12.6"));
 }
 
 // A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
@@ -353,7 +361,8 @@ TEST(PatternMatching, ARealLiteralPatternInARandsequenceCodeBlockIsReported) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "constant expression pattern shall be of integral type", 6, "12.6"));
+      "only an integral expression can serve as a constant expression pattern",
+      6, "12.6"));
 }
 
 // §18.17.1 lets a weight specification be followed by a code block of its own,
@@ -378,7 +387,8 @@ TEST(PatternMatching,
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "constant expression pattern shall be of integral type", 7, "12.6"));
+      "only an integral expression can serve as a constant expression pattern",
+      7, "12.6"));
 }
 
 // §12.6: a pattern of the form `. variable_identifier` declares a new variable

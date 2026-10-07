@@ -215,8 +215,8 @@ DataTypeKind ObviousLiteralKind(const Expr* e) {
   }
 }
 
-// In a value-returning function, a return statement shall carry an
-// expression of the correct type. The void-with-expression case is
+// §12.8: a return in a function that yields a value needs an expression, and
+// one whose type fits the function. The void-with-expression case is
 // reported elsewhere; the type check here catches narrow but clearly
 // wrong mismatches (string-vs-integral, real-vs-string, etc.).
 void CheckValueReturningFuncReturn(const Stmt* s, std::string_view func_name,
@@ -227,7 +227,7 @@ void CheckValueReturningFuncReturn(const Stmt* s, std::string_view func_name,
     if (s->expr == nullptr) {
       diag.Error(s->range.start,
                  std::format("return statement in non-void function '{}' "
-                             "shall have an expression",
+                             "gives no value to return",
                              func_name),
                  Subclause("12.8"));
       return;

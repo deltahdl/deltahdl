@@ -141,10 +141,10 @@ TEST(FunctionReturnElaboration, NonVoidFunctionBareReturnError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "return statement in non-void function 'f' shall "
-                            "have an expression",
-                            3, "12.8"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "return statement in non-void function 'f' gives no value to return", 3,
+      "12.8"));
 }
 
 TEST(FunctionReturnElaboration, VoidReturnWithValueInNestedBlockError) {

@@ -652,7 +652,8 @@ class Elaborator : public ElaboratorClassRules {
   // continuous or procedural assignment to it inside the module is illegal.
   void ValidateInputPortAssignments(const ModuleDecl* decl);
 
-  // §12.6: a constant expression pattern shall be of integral type.
+  // §12.6: only an integral expression can serve as a constant expression
+  // pattern.
   void ValidateMatchesPatternIntegral(const ModuleDecl* decl);
 
   // §12.6.1: the tested expression of a pattern-matching case statement shall

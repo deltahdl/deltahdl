@@ -883,10 +883,10 @@ TEST(Elaboration, EnumFunctionReturnWithoutCastIsReported) {
                             "value of non-enum variable 'i' returned from "
                             "enum function 'h' without cast",
                             5, "6.19.3"));
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "return statement in non-void function 'z' shall "
-                            "have an expression",
-                            11, "12.8"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "return statement in non-void function 'z' gives no value to return", 11,
+      "12.8"));
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 

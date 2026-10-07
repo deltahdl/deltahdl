@@ -109,8 +109,8 @@ TEST(JumpStatementSyntaxParsing, ReturnVoid) {
   EXPECT_EQ(ret->expr, nullptr);
 }
 
-// §12.8 prose: in a function returning a value, the return
-// statement shall have an expression. The optional `[ expression ]` of
+// §12.8 prose: a return in a function that yields a value needs an
+// expression to yield. The optional `[ expression ]` of
 // the jump_statement production itself is covered by
 // JumpStatementSyntaxParsing.ReturnWithExpressionBnf in
 // test_parser_annex_a_06_05.cpp.

@@ -179,12 +179,11 @@ static bool IsNonIntegralConstantPattern(const Expr* e) {
   return false;
 }
 
-// §12.6: pattern identifiers (the `. variable_identifier` binding form) shall
-// be unique within a single pattern; the same name cannot bind in more than one
-// position. Reports the second and later use of any repeated name among the
-// bindings ForEachPatternBinding (elaborator_validate_internal.h) hands over,
-// which is the one walk of Syntax 12-4's nesting forms the §23.9 scope rule
-// reads the same names off.
+// §12.6: a name bound by a pattern identifier (the `. variable_identifier`
+// binding form) can appear at only one place in a pattern. Reports the second
+// and later use of any repeated name among the bindings ForEachPatternBinding
+// (elaborator_validate_internal.h) hands over, which is the one walk of
+// Syntax 12-4's nesting forms the §23.9 scope rule reads the same names off.
 static void CollectPatternBindings(const Expr* p,
                                    std::unordered_set<std::string_view>& seen,
                                    DiagEngine& diag) {
@@ -210,7 +209,8 @@ static void CheckMatchesPattern(const Expr* pat, DiagEngine& diag) {
   }
   if (IsNonIntegralConstantPattern(p)) {
     diag.Error(p->range.start,
-               "constant expression pattern shall be of integral type",
+               "only an integral expression can serve as a constant "
+               "expression pattern",
                Subclause("12.6"));
   }
   std::unordered_set<std::string_view> seen;

@@ -229,7 +229,7 @@ TEST(JumpStatementElaboration, BareReturnInValueReturningFunctionIsError) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "return statement in non-void function 'compute' "
-                            "shall have an expression",
+                            "gives no value to return",
                             3, "12.8"));
 }
 
