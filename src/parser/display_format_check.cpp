@@ -14,8 +14,8 @@ namespace {
 
 // §21.2's display and write tasks, §21.2.2's strobe and §21.2.3's monitor
 // tasks, the file forms §21.3.2 gives each of them, §21.3.3's $swrite family,
-// which "accepts the same type of arguments" as $fwrite, and §20.10's severity
-// tasks, whose message has "the same syntax as $display". Every string literal
+// whose arguments are of the kinds $fwrite takes, and §20.10's severity tasks,
+// whose message has "the same syntax as $display". Every string literal
 // argument of one is a format.
 bool IsFormatListTask(std::string_view name) {
   static constexpr std::string_view kStems[] = {
@@ -56,9 +56,9 @@ bool IsDefinedSpecifier(char c) {
              static_cast<unsigned char>(c)))) != std::string_view::npos;
 }
 
-// §21.2.1.1 (printed page 658): Table 21-2's real specifiers "have the full
-// formatting capabilities available in the C language", its flags among them;
-// no other specifier takes one.
+// §21.2.1.1 (printed page 658): Table 21-2's real specifiers format a value
+// with everything C's own conversions offer, its flags among them; no other
+// specifier takes one.
 bool IsRealSpecifier(char c) {
   char lower = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
   return lower == 'e' || lower == 'f' || lower == 'g';
@@ -85,11 +85,11 @@ size_t ConversionLetter(std::string_view fmt, size_t i, bool& flagged) {
   return j;
 }
 
-// Whether the conversion whose letter is at `j`, or which the literal's end
-// cut short there, is one the standard defines. Table 21-1 and Table 21-2
-// (printed pages 656 and 658) define each specifier by its letter, and
-// §21.2.1.2 (printed page 659) allows only "a non-negative decimal integer
-// constant" between the % and an integer specifier's letter, so a C flag before
+// Whether the conversion whose letter is at `j`, or which the literal's end cut
+// short there, is one the standard defines. Table 21-1 and Table 21-2 (printed
+// pages 656 and 658) define each specifier by its letter, and §21.2.1.2
+// (printed page 659) allows nothing but a decimal integer constant that is not
+// negative between the % and an integer specifier's letter, so a C flag before
 // one, `%-6d`, makes a specifier neither defines; only Table 21-2's real
 // specifiers take the flags.
 bool IsDefinedConversion(std::string_view fmt, size_t j, bool flagged) {
@@ -138,9 +138,8 @@ void CheckIfLiteral(const Expr* arg, std::string_view task, DiagEngine& diag) {
 
 void CheckDisplayFormatLiterals(const Expr* call, DiagEngine& diag) {
   std::string_view task = call->callee;
-  // §21.3.3: $sformat "always interprets its second argument, and only its
-  // second argument, as a format string", and $sformatf "behaves like
-  // $sformat" with the format first.
+  // §21.3.3: $sformat reads its second argument as a format string and never
+  // any other, and $sformatf works as $sformat does with the format first.
   if (task == "$sformat") {
     if (call->args.size() > 1) CheckIfLiteral(call->args[1], task, diag);
     return;
