@@ -854,8 +854,8 @@ class Parser {
   // program that instantiates it; every other name is left to the elaborator,
   // which knows every declaration and reports the same rule. A checker's name
   // is never here, since A.1.7's non_port_program_item reaches a
-  // checker_instantiation through concurrent_assertion_item and §17.3 has a
-  // checker instantiated "wherever a concurrent assertion may appear".
+  // checker_instantiation through concurrent_assertion_item and §17.3 lets a
+  // checker be instantiated at any place a concurrent assertion can be.
   std::unordered_set<std::string_view> declared_design_elements_;
 
   // What each package and each class declared, keyed by its own name and kept

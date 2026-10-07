@@ -23,8 +23,9 @@ namespace delta {
 // data_type_or_implicit | sequence | untyped`. A checker formal written with
 // a data type, or with none, is kData and carries the type in its data_type;
 // one written with one of the three keywords carries the keyword here. §17.2
-// has the first formal of a checker "assumed to be input untyped" when its
-// type is omitted, so a checker's first formal with no type is kUntyped.
+// gives the first formal of a checker the direction input and the type untyped
+// when its type is omitted, so a checker's first formal with no type is
+// kUntyped.
 enum class PropertyFormalType : uint8_t {
   kData,
   kSequence,

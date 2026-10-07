@@ -37,8 +37,8 @@ namespace delta {
 // through the same dispatch. So an item on that wider list is reported here
 // under A.1.8, at the token that opens it, when the body being read is a
 // checker's; the item is still read, so that the body resumes after it. §17.2
-// says the same of the design elements in prose, "modules, interfaces,
-// programs, and packages shall not be declared inside checkers", and the
+// says the same of the design elements in prose, forbidding a declaration of a
+// module, an interface, a program or a package within a checker, and the
 // elaborator reports those with the nets §17.7 refuses.
 void Parser::RejectInCheckerBody(const char* msg) {
   if (!InCheckerBody()) return;

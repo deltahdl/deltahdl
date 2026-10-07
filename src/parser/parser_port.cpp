@@ -560,16 +560,15 @@ static const char* FormalTypeKeyword(PropertyFormalType type) {
   }
 }
 
-// §17.2's two rules on the type of a checker formal: "if the argument has an
-// explicit direction qualifier, it shall be an error to omit its type", and
-// "the type of an output argument shall not be of untyped, sequence, or
-// property". `type_omitted` and `direction_written` record the port as it was
-// written, before ResolvePortDefaults gave it the direction and type it
-// inherits, since inheriting is what an omitted type and direction do. A
-// formal that omits its type with a direction written breaks the first rule
-// whichever direction it is, so an output written `output a` is reported once,
-// under that rule; the second is left the output written with one of the
-// three keywords, or inheriting one.
+// §17.2's two rules on the type of a checker formal: a formal written with a
+// direction must also be written with a type, and an output formal may not be
+// typed untyped, sequence or property. `type_omitted` and `direction_written`
+// record the port as it was written, before ResolvePortDefaults gave it the
+// direction and type it inherits, since inheriting is what an omitted type and
+// direction do. A formal that omits its type with a direction written breaks
+// the first rule whichever direction it is, so an output written `output a` is
+// reported once, under that rule; the second is left the output written with
+// one of the three keywords, or inheriting one.
 static void DiagnoseCheckerFormalType(const PortDecl& port, bool type_omitted,
                                       bool direction_written, bool is_checker,
                                       DiagEngine& diag) {
@@ -617,9 +616,9 @@ static void ResolvePortDefaults(PortDecl& port, const PortDecl* prev,
     port.direction = InheritedPortDirection(prev, is_checker);
   }
 
-  // §17.2: a checker's first formal with its type omitted "is assumed to be
-  // input untyped", and a formal of one of the keyword types has no data type
-  // to resolve.
+  // §17.2: a checker's first formal with its type omitted takes the direction
+  // input and the type untyped, and a formal of one of the keyword types has
+  // no data type to resolve.
   if (is_checker && !prev && FormalTypeOmitted(port)) {
     port.formal_type = PropertyFormalType::kUntyped;
   }
