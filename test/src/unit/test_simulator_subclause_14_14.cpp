@@ -58,17 +58,16 @@ TEST(GlobalClockingSim, GlobalAndDefaultCoexist) {
   EXPECT_NE(cmgr.Find("dclk"), nullptr);
 }
 
-// §14.14: "The $global_clock system function shall be used to explicitly refer
-// to the event expression in the effective global clocking declaration", and
-// its lookup rule a) resolves that reference against the global clocking
-// declaration in the enclosing module instance. The three cases below
-// elaborate, lower and run the design, because acceptance is not what §14.14
-// requires: the cases in test/src/unit/test_elaborator_subclause_14_14.cpp
-// stop at elaboration, where a process that arms no watcher and stays
-// suspended at @($global_clock) for the whole run looks exactly like one that
-// resumes on every clocking event. Only a value the process wrote separates
-// the two, so each case here drives the declared clock and reads that value
-// back.
+// §14.14: $global_clock is how a source names the event expression of the
+// global clocking declaration in effect, and its lookup rule a) resolves that
+// reference against the global clocking declaration in the enclosing module
+// instance. The three cases below elaborate, lower and run the design, because
+// acceptance is not what §14.14 requires: the cases in
+// test/src/unit/test_elaborator_subclause_14_14.cpp stop at elaboration, where
+// a process that arms no watcher and stays suspended at @($global_clock) for
+// the whole run looks exactly like one that resumes on every clocking event.
+// Only a value the process wrote separates the two, so each case here drives
+// the declared clock and reads that value back.
 //
 // The declaration is on `posedge clk` and the run drives three rises (t=5,
 // t=15, t=25) with two falls between them, so the body runs three times. `clk`
@@ -210,12 +209,12 @@ TEST(GlobalClockingSim, GlobalClockInARandcaseItemResumesThatProcess) {
 }
 
 // §14.14 lookup rule b): a $global_clock reference in a scope that declares no
-// global clocking of its own resolves against "a global clocking declaration in
-// the parent module, interface, or checker instance scope of the enclosing
-// instantiation". The three cases below run the design, because the elaborator
-// cases in test/src/unit/test_elaborator_subclause_14_14.cpp assert only that
-// such a source is accepted, and a process that arms no watcher and stays
-// suspended at @($global_clock) for the whole run is accepted too.
+// global clocking of its own resolves against a global clocking declared in the
+// module, interface or checker instance that instantiates the scope. The three
+// cases below run the design, because the elaborator cases in
+// test/src/unit/test_elaborator_subclause_14_14.cpp assert only that such a
+// source is accepted, and a process that arms no watcher and stays suspended at
+// @($global_clock) for the whole run is accepted too.
 //
 // The declaration is in an instantiated child rather than in the top module,
 // which is the shape §14.14's own example uses. The three cases at the end of
@@ -336,8 +335,8 @@ TEST(GlobalClockingSim, AChildsOwnGlobalClockingBeatsItsAncestors) {
 // rather than in an instantiated child. Rule b) states no exception for that
 // block: it is the scope the climb stops at, so a declaration there is the
 // effective one for every reference below that finds no nearer declaration of
-// its own, and the result is still "the event expression of that global
-// clocking declaration" -- the top's own signal.
+// its own, and the result is still that declaration's event expression -- the
+// top's own signal.
 //
 // The top-level hierarchy block is not an instance and has no instance name to
 // reach its signals through, so the name written for a reference below it is

@@ -366,8 +366,8 @@ TEST(AlwaysCombVsAlwaysStar, AlwaysCombRejectsNestedDelay) {
 // §9.2.2.2.2: "Statements in an always_comb shall not include those that block,
 // have blocking timing or event controls, or fork-join statements." A cycle
 // delay is a blocking timing control: §14.11 lists cycle_delay under
-// procedural_timing_control and rules that "The cycle delay timing control
-// shall wait for the specified number of clocking block events."
+// procedural_timing_control and has it hold the process until the given count
+// of clocking block events has passed.
 //
 // The three cases below assert through ReportedError, as every rejection case
 // in this file does, because any rejection satisfies a bare error flag

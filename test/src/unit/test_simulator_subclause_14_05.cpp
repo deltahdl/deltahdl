@@ -64,10 +64,9 @@ TEST(ClockingHierExprSim, InoutHierSignalBidirectional) {
   EXPECT_EQ(bidir->value.ToUint64(), 0x11u);
 }
 
-// §14.5 (printed page 357): "Any signal in a clocking block can be associated
-// with an arbitrary hierarchical expression", so `input st = u.state` samples
-// `u.state`, where it sampled a signal of the clockvar's own name, which there
-// is none of.
+// §14.5 (printed page 357) lets a clocking block signal stand for any
+// hierarchical expression, so `input st = u.state` samples `u.state`, where it
+// sampled a signal of the clockvar's own name, which there is none of.
 TEST(ClockingHierExprSim, ClockvarBoundToAnotherNameSamplesIt) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module sub;\n"

@@ -109,7 +109,8 @@ TEST(SyncEventSim, SlicedClockingInputUsesSynchronousBitAtFixedIndex) {
 
   // The dynamic index `a` is read a single time, at the instant the event
   // control executes. Capturing it once and reusing the captured value here
-  // models §14.15's "evaluated once when the @ expression executes" rule.
+  // models §14.15's rule of a single evaluation at the moment the @ expression
+  // executes.
   const uint32_t kCapturedIndex = 1;
 
   SchedulePosedge(f, clk, 5);   // drive clk high so prev==1 before the negedge

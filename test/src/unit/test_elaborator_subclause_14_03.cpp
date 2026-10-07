@@ -132,10 +132,10 @@ TEST(ClockingBlockElab, ClockingBlockNegedgeEventElaborates) {
 }
 
 TEST(ClockingBlockElab, NegativeConstantInputSkewRejected) {
-  // §14.3: "The delay_control shall be either a time literal or a constant
-  // expression that evaluates to a non-negative integer value." A skew that
-  // folds to a negative integer breaks the non-negative half. Literal constant
-  // form (§11.2.1).
+  // §14.3 requires a skew's delay_control to be a time literal or else a
+  // constant expression whose value is an integer no less than zero. A skew
+  // that folds to a negative integer breaks the non-negative half. Literal
+  // constant form (§11.2.1).
   ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
@@ -158,8 +158,8 @@ TEST(ClockingBlockElab, NegativeConstantInputSkewRejected) {
 }
 
 TEST(ClockingBlockElab, NegativeParameterOutputSkewRejected) {
-  // §14.3: "The delay_control shall be either a time literal or a constant
-  // expression that evaluates to a non-negative integer value." Parameter
+  // §14.3 requires a skew's delay_control to be a time literal or else a
+  // constant expression whose value is an integer no less than zero. Parameter
   // constant form (§11.2.1) of a value that breaks the non-negative half.
   ElabFixture f;
   EXPECT_FALSE(
@@ -191,8 +191,8 @@ TEST(ClockingBlockElab, NegativeParameterOutputSkewRejected) {
 }
 
 TEST(ClockingBlockElab, NegativeLocalparamSkewRejected) {
-  // §14.3: "The delay_control shall be either a time literal or a constant
-  // expression that evaluates to a non-negative integer value." Localparam
+  // §14.3 requires a skew's delay_control to be a time literal or else a
+  // constant expression whose value is an integer no less than zero. Localparam
   // constant form (§11.2.1) of a value that breaks the non-negative half.
   ElabFixture f;
   EXPECT_FALSE(
@@ -216,8 +216,8 @@ TEST(ClockingBlockElab, NegativeLocalparamSkewRejected) {
 }
 
 TEST(ClockingBlockElab, NegativeDefaultInputSkewRejected) {
-  // §14.3: "The delay_control shall be either a time literal or a constant
-  // expression that evaluates to a non-negative integer value." Here the
+  // §14.3 requires a skew's delay_control to be a time literal or else a
+  // constant expression whose value is an integer no less than zero. Here the
   // offending delay_control is the input half of a default_skew clocking item.
   ElabFixture f;
   EXPECT_FALSE(
@@ -293,8 +293,8 @@ TEST(ClockingBlockElab, TimeLiteralSkewAccepted) {
 }
 
 TEST(ClockingBlockElab, NegativeDefaultOutputSkewRejected) {
-  // §14.3: "The delay_control shall be either a time literal or a constant
-  // expression that evaluates to a non-negative integer value." Here the
+  // §14.3 requires a skew's delay_control to be a time literal or else a
+  // constant expression whose value is an integer no less than zero. Here the
   // offending delay_control is the output half of a default_skew clocking item.
   ElabFixture f;
   EXPECT_FALSE(
@@ -383,9 +383,9 @@ TEST(ClockingBlockElab, WriteToInputClockvarNonblockingError) {
 }
 
 TEST(ClockingBlockElab, NonIntegerRealSkewRejected) {
-  // §14.3: "The delay_control shall be either a time literal or a constant
-  // expression that evaluates to a non-negative integer value." A fractional
-  // real constant is neither, so it breaks the integer half of the
+  // §14.3 requires a skew's delay_control to be a time literal or else a
+  // constant expression whose value is an integer no less than zero. A
+  // fractional real constant is neither, so it breaks the integer half of the
   // requirement.
   ElabFixture f;
   EXPECT_FALSE(
@@ -423,10 +423,10 @@ TEST(ClockingBlockElab, FractionalTimeLiteralSkewAccepted) {
 }
 
 TEST(ClockingBlockElab, SignalSkewNamesTheSignal) {
-  // §14.3: "The delay_control shall be either a time literal or a constant
-  // expression that evaluates to a non-negative integer value." A block may
-  // carry a legal default_skew item and an offending signal skew at once, so
-  // the report names the clocking signal whose skew it read.
+  // §14.3 requires a skew's delay_control to be a time literal or else a
+  // constant expression whose value is an integer no less than zero. A block
+  // may carry a legal default_skew item and an offending signal skew at once,
+  // so the report names the clocking signal whose skew it read.
   ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
@@ -447,13 +447,14 @@ TEST(ClockingBlockElab, SignalSkewNamesTheSignal) {
 }
 
 TEST(ClockingBlockElab, NonNegativeIntegerSkewStillAccepted) {
-  // §14.3: "The delay_control shall be either a time literal or a constant
-  // expression that evaluates to a non-negative integer value." A skew that is
-  // a non-negative integer satisfies both halves and shall draw no report. The
-  // case guards the accepting path against a rejection built into the report:
-  // CheckClockingSkew in src/elaborator/elaborator_validate_clocking.cpp reads
-  // the folded value to compose its message, and a value read on every skew is
-  // a value that can be reported on every skew.
+  // §14.3 requires a skew's delay_control to be a time literal or else a
+  // constant expression whose value is an integer no less than zero. A skew
+  // that is a non-negative integer satisfies both halves and shall draw no
+  // report. The case guards the accepting path against a rejection built into
+  // the report: CheckClockingSkew in
+  // src/elaborator/elaborator_validate_clocking.cpp reads the folded value to
+  // compose its message, and a value read on every skew is a value that can be
+  // reported on every skew.
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"

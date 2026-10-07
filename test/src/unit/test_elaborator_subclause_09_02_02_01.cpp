@@ -104,11 +104,10 @@ TEST(GeneralPurposeAlwaysElaboration, AlwaysWithEventControlInBodyNoWarning) {
 }
 
 // §9.2.2.1 warns about an always procedure with "no control for simulation
-// time to advance". A cycle delay is such a control: §14.11 rules that it
-// "shall wait for the specified number of clocking block events", so the
-// process yields and the loop is not a zero-delay one. The module carries the
-// default clocking §14.11 requires of a module using `##`, so nothing else in
-// it is wrong.
+// time to advance". A cycle delay is such a control: §14.11 has it hold the
+// process for as many clocking block events as it counts, so the process yields
+// and the loop is not a zero-delay one. The module carries the default clocking
+// §14.11 requires of a module using `##`, so nothing else in it is wrong.
 TEST(GeneralPurposeAlwaysElaboration, AlwaysWithCycleDelayInBodyNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(

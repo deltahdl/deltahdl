@@ -116,7 +116,7 @@ TEST(DefaultClockingElab, DuplicateDefaultClockingViaAssignmentErrors) {
                             8, "14.12"));
 }
 
-// §14.12 (claim E, mixed forms): the "only one default clocking per scope" rule
+// §14.12 (claim E, mixed forms): the rule allowing a scope one default clocking
 // spans both spellings of a default. An inline default clocking declaration and
 // a later "default clocking <id>;" assignment together specify the default
 // twice in the same module and shall be a compiler error, even though the

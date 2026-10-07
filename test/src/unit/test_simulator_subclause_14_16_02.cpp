@@ -231,8 +231,8 @@ TEST(SyncDriveSignals, MultipleClockingOutputsOnNetResolveByNetType) {
   Net net;
   net.resolved = n;
   // Two drivers stand for two clocking outputs; both carry the (strong1,
-  // strong0) strength §14.16 assigns to a clockvar net driver. The third
-  // driver represents "any other drivers on the net."
+  // strong0) strength §14.16 assigns to a clockvar net driver. The third driver
+  // represents the net's other drivers.
   net.drivers.push_back(
       MakeLogic4VecVal(f.arena, 4, 0b0001));  // clocking out A
   net.drivers.push_back(

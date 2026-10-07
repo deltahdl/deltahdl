@@ -178,8 +178,8 @@ TEST(GlobalClockingElab, DuplicateGlobalClockingInCheckerErrors) {
 }
 
 // §14.14: the report that refuses a second global clocking declaration names
-// the subclause stating the rule ("A given module, interface, checker, or
-// program shall contain at most one global clocking declaration").
+// the subclause stating the rule (a module, interface, checker or program may
+// declare no more than one global clocking).
 TEST(GlobalClockingElab, DuplicateGlobalClockingNames14_14) {
   ElabFixture f;
   ElaborateSrc(
@@ -276,13 +276,13 @@ TEST(GlobalClockingElab, ProcessBodyWithNoGlobalClockIsSharedBetweenInstances) {
          "process body is allocated again for every instantiation";
 }
 
-// §14.14 ends both of its lookup rules "the lookup terminates and shall result
-// in an error", and states no condition on where the reference stands, so a
-// $global_clock written in any statement position of a module that declares no
-// global clocking and is instantiated under none is an error. The seven cases
-// below each put the reference in one such position, and each is a position
-// Elaborator::ValidateGlobalClockReference reached only once its search took
-// its list of nested statements from ForEachChildStmt in
+// §14.14 ends both of its lookup rules by making a reference that finds no
+// declaration an error, and states no condition on where the reference stands,
+// so a $global_clock written in any statement position of a module that
+// declares no global clocking and is instantiated under none is an error. The
+// seven cases below each put the reference in one such position, and each is a
+// position Elaborator::ValidateGlobalClockReference reached only once its
+// search took its list of nested statements from ForEachChildStmt in
 // src/elaborator/elaborator_validate_internal.h. Every one of them elaborated
 // clean beforehand, and an event control among them then armed no watcher and
 // suspended its process for the whole run.

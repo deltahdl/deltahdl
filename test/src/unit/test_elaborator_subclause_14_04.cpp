@@ -7,9 +7,9 @@ using namespace delta;
 
 namespace {
 
-// §14.4: "A skew shall be a constant expression and can be specified as a
-// parameter." A plain integer-literal skew is the simplest constant form and
-// must elaborate cleanly.
+// §14.4: a skew is a constant expression, and a parameter may supply it. A
+// plain integer-literal skew is the simplest constant form and must elaborate
+// cleanly.
 TEST(ClockingSkewConstExpr, LiteralSkewElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"

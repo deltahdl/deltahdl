@@ -150,12 +150,12 @@ TEST(SyncDriveSim, ClockvarNetDriverInitIsHighZ) {
   EXPECT_EQ(v.words[0].bval, 0xFFu);
 }
 
-// §14.16: "Clocking block outputs (output or inout) are used to drive values
-// onto their corresponding signals, but at a specified time." The cases above
-// drive the primitive from C++ on a ClockingManager they build themselves,
-// which says nothing about whether a design's `cb.sig <= 8'hFE;` reaches it.
-// This one starts from source: the block is declared, the drive is written as
-// §14.16 spells it, and the signal is read afterwards.
+// §14.16: a clocking block's output and inout clockvars drive their signals, at
+// the time the block specifies. The cases above drive the primitive from C++ on
+// a ClockingManager they build themselves, which says nothing about whether a
+// design's `cb.sig <= 8'hFE;` reaches it. This one starts from source: the
+// block is declared, the drive is written as §14.16 spells it, and the signal
+// is read afterwards.
 //
 // sig is seeded to 8'h00 and driven to 8'hFE, so the value read back can only
 // have come from the drive.
@@ -180,10 +180,10 @@ TEST(SyncDriveSim, SynchronousDriveFromSourceDrivesTheSignal) {
 }
 
 // §14.16 makes the drive a property of the block's outputs: a clocking block
-// input "is used to sample" its signal and is not a drive target. A design
-// writing the same statement against an input clockvar must therefore leave the
-// signal alone, which is what separates the recognition above from one that
-// drives whatever member it is handed.
+// input samples its signal and is not a drive target. A design writing the same
+// statement against an input clockvar must therefore leave the signal alone,
+// which is what separates the recognition above from one that drives whatever
+// member it is handed.
 TEST(SyncDriveSim, DriveToAnInputClockvarLeavesTheSignalAlone) {
   SimFixture f;
   auto* sig = RunAndFindVar(

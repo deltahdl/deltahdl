@@ -794,8 +794,8 @@ TEST(GlobalClockingParse, RejectsClockingItems) {
 // input clocking_skew output clocking_skew`, and `clocking_skew ::=
 // edge_identifier [ delay_control ] | delay_control`, so each direction of a
 // default item carries a skew of its own. §14.3 gives the item its purpose --
-// "A single skew can be specified for the entire block by using a default
-// clocking item" -- and a direction written without one specifies nothing.
+// one skew written in a default clocking item applies to the whole block -- and
+// a direction written without one specifies nothing.
 TEST(ClockingSkewParse, DefaultInputWithoutSkewIsRejected) {
   auto r = Parse(
       "module m;\n"

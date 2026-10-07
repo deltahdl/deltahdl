@@ -350,13 +350,13 @@ TEST(ClockingEventSim, NegedgeBlockFiresOnTheFallOfAnUnwatchedClock) {
   EXPECT_EQ(fired, 1);
 }
 
-// §14.10: "Upon processing its specified clocking event, a clocking block shall
-// trigger the event associated with the clocking block name. This event shall
-// be triggered in the Observed region and is referred to as a clocking block
-// event." The cases above drive ClockingManager::NotifyBlockEvent through a
-// manager and an event variable the test builds itself, which says nothing
-// about whether a design's `always @(cb)` attaches to anything. This one starts
-// from source, on §14.10's own example shape.
+// §14.10: each time a clocking block's clocking event occurs, the block
+// triggers the event its name stands for, in the Observed region; that event is
+// the clocking block event. The cases above drive
+// ClockingManager::NotifyBlockEvent through a manager and an event variable the
+// test builds itself, which says nothing about whether a design's
+// `always @(cb)` attaches to anything. This one starts from source, on §14.10's
+// own example shape.
 //
 // The clock rises twice, at t=5 and t=15, so a process attached to the block's
 // event runs twice; one attached to nothing runs not at all and leaves hits at
