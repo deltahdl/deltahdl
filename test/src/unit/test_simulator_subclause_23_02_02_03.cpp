@@ -12,12 +12,11 @@ using namespace delta;
 
 namespace {
 
-// §23.2.2.3 decides whether a port is a net or a variable: "an implicit data
-// type declaration implies a net unless the var keyword is used", an input or
-// inout with no port kind "shall default to a net of default net type", and an
-// output with no port kind is a net where its data type is omitted or implicit
-// and a variable where an explicit data type is given. A ref port is always a
-// variable.
+// §23.2.2.3 decides whether a port is a net or a variable: an implicit data
+// type declaration makes a net unless var is written, an input or inout with no
+// port kind is a net of the default net type, and an output with no port kind
+// is a net where its data type is omitted or implicit and a variable where an
+// explicit data type is given. A ref port is always a variable.
 //
 // A port the clause makes a net is a net, and everything a net carries applies
 // to it: §28.12 resolves its drivers against each other, and the strength that

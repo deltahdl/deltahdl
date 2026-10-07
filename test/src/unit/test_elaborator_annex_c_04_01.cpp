@@ -156,9 +156,9 @@ TEST(DefparamSupport, DefparamNamingNoParameterOfTheTopWarns) {
 }
 
 // §23.10.1 holds for a path through the top as for one through the writer's
-// own instances: a defparam in a generate block "shall not change a parameter
-// value outside that hierarchy", so one that names the top-level module is
-// reported rather than applied.
+// own instances: a defparam in a generate block may not change a parameter
+// outside that hierarchy, so one that names the top-level module is reported
+// rather than applied.
 TEST(DefparamSupport, DefparamInGenerateBlockCannotReachOutThroughTheTop) {
   ElabFixture f;
   ElaborateSrc(

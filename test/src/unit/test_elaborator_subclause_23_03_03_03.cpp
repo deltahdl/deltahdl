@@ -174,12 +174,11 @@ TEST(PortConnectionRulesForNetsElaboration, InoutNetPortOmittedByNameNoError) {
              "endmodule\n"));
 }
 
-// §23.3.3.3 governs a port declaration that "has a net type, such as wire", and
-// its inout rule reads "An inout can be connected to a net (or a concatenation
-// of nets) of a compatible data type or left unconnected, but cannot be
-// connected to a variable." The port here is declared `inout wire`, so it is
-// this rule rather than §23.3.3.2's, which opens on a port declared with a
-// variable data type.
+// §23.3.3.3 governs a port declaration with a net type, wire for one, and its
+// inout rule lets an inout connect to a net, or a concatenation of nets, of a
+// compatible data type, or stay unconnected, but never connect to a variable.
+// The port here is declared `inout wire`, so it is this rule rather than
+// §23.3.3.2's, which opens on a port declared with a variable data type.
 TEST(PortConnectionRulesForNetsElaboration,
      VariableConnectedToInoutNetPortErrors) {
   ElabFixture f;

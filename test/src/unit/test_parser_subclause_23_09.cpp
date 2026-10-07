@@ -97,11 +97,11 @@ TEST(ModuleScopeParse, CompilationUnitTypedefIsATypeInEveryModule) {
   }
 }
 
-// §23.9's list of scopes runs past the design elements above: "Tasks,
-// Functions, begin-end blocks (named or unnamed), fork-join blocks (named or
-// unnamed), Generate blocks". A type name declared in one of those five is not
-// a type name in the module after it, and the five cases below each declare one
-// and then reuse the identifier outside the scope that declared it.
+// §23.9's list of scopes runs past the design elements above: tasks, functions,
+// begin-end and fork-join blocks named or not, and generate blocks. A type name
+// declared in one of those five is not a type name in the module after it, and
+// the five cases below each declare one and then reuse the identifier outside
+// the scope that declared it.
 //
 // Every case writes `localparam T = 1;` for the reuse, because A.2.1.1 gives a
 // parameter declaration an optional data type: with T no longer a type name the

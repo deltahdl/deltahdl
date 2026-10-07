@@ -8,10 +8,10 @@ using namespace delta;
 
 namespace {
 
-// Section 23.3.3.1 leaves coercion optional ("may be coerced") but mandates a
-// warning when a mis-directed port is not coerced. This implementation never
-// coerces, so every coercion-eligible port must produce the SHALL warning while
-// remaining a non-error (elaboration still succeeds).
+// Section 23.3.3.1 leaves coercion optional but mandates a warning when a
+// mis-directed port is not coerced. This implementation never coerces, so every
+// coercion-eligible port must produce the SHALL warning while remaining a
+// non-error (elaboration still succeeds).
 
 // C2, input branch: an input port driven inside the instantiated module is used
 // as an output/inout, so the warning is issued (and it is not an error).
@@ -153,12 +153,11 @@ TEST(PortCoercionElaboration, NonAnsiInputPortDrivenWarns) {
 
 // The counterpart to the case above, and the reason a non-ANSI input cannot
 // simply be assumed a net. §23.2.2.1 lets a port whose direction declaration
-// named no type "be again declared in a net or variable declaration", so the
-// body's `reg a;` is what settles the port's kind. With it the port is a
-// variable, §23.3.3.2's "assignments to variables declared as input ports shall
-// be illegal" applies, and the coercion of §23.3.3.1 does not -- the same
-// header, distinguished only by the body declaration, must be an error rather
-// than a warning.
+// named no type be declared again as a net or a variable, so the body's
+// `reg a;` is what settles the port's kind. With it the port is a variable,
+// §23.3.3.2's ban on assigning to a variable declared as an input port applies,
+// and the coercion of §23.3.3.1 does not -- the same header, distinguished only
+// by the body declaration, must be an error rather than a warning.
 TEST(PortCoercionElaboration,
      NonAnsiInputPortRedeclaredAsVariableDrivenErrors) {
   ElabFixture f;

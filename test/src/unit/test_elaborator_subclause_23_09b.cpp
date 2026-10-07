@@ -1,11 +1,11 @@
 // Tests for the §23.9 scope rules as they reach a parameter declared inside a
-// generate block. §23.9 lists "Generate blocks" among the elements that "define
-// a new scope", and rules that an identifier "referenced directly (without a
-// hierarchical path)" is declared "locally or within a module, interface,
-// program, checker, task, function, named block, or generate block that is
-// higher in the same branch of the name tree". Every case here states where a
-// parameter is declared, where it is referenced from, and which of the two
-// answers §23.9 gives.
+// generate block. §23.9 lists generate blocks among the elements that open a
+// new scope, and rules that an identifier referenced directly, with no
+// hierarchical path, is declared in its own scope or in a module, interface,
+// program, checker, task, function, named block or generate block above it in
+// the same branch of the name tree. Every case here states where a parameter is
+// declared, where it is referenced from, and which of the two answers §23.9
+// gives.
 //
 // The cases over the rest of §23.9 -- one identifier declaring one item in a
 // scope, and the upward search stopping at a module boundary -- are in
@@ -40,13 +40,13 @@ uint32_t WidthOfNetNamed(const RtlirModule* mod, std::string_view name) {
   return found == nullptr ? 0 : found->width;
 }
 
-// §23.9 lists "Generate blocks" among the elements that "define a new scope",
-// and rules that an identifier "referenced directly (without a hierarchical
-// path)" is declared "locally or within a module, interface, program, checker,
-// task, function, named block, or generate block that is higher in the same
-// branch of the name tree". Block 'a' is not higher in the module's own branch,
-// so the W its localparam declares is not what the module-level range names,
-// and `wire [W-1:0] w;` sizes to the 1 bit a scalar net gets.
+// §23.9 lists generate blocks among the elements that open a new scope, and
+// rules that an identifier referenced directly, with no hierarchical path, is
+// declared in its own scope or in a module, interface, program, checker, task,
+// function, named block or generate block above it in the same branch of the
+// name tree. Block 'a' is not higher in the module's own branch, so the W its
+// localparam declares is not what the module-level range names, and
+// `wire [W-1:0] w;` sizes to the 1 bit a scalar net gets.
 //
 // The test fails when the net is 4 bits wide. Elaborator::BuildParamScope in
 // src/elaborator/elaborator_items_scope.cpp keys the ScopeMap every constant
@@ -73,8 +73,8 @@ TEST(GenerateBlockScope,
 }
 
 // The same reading where the range stands in a sibling generate block. Blocks
-// 'a' and 'c' are siblings, so neither is "higher in the same branch of the
-// name tree" than the other and block 'a''s W is not what block 'c''s range
+// 'a' and 'c' are siblings, so neither stands above the other in the same
+// branch of the name tree and block 'a''s W is not what block 'c''s range
 // names. Neither block is at module level, so the case cannot pass by
 // Elaborator::ScopedName being the identity.
 TEST(GenerateBlockScope,
@@ -121,11 +121,10 @@ TEST(GenerateBlockScope, ParameterOfAGenerateBlockStillFoldsInsideThatBlock) {
       << "block 'a' localparam W should size a net in block 'a'";
 }
 
-// §23.9 rules that the search for a directly referenced identifier "shall
-// continue upward until an item by that name is found or until a module,
-// interface, program, or checker boundary is encountered", so a parameter of
-// the module is found from inside every generate block in it. The net is 4 bits
-// wide.
+// §23.9 rules that the search for a directly referenced identifier climbs until
+// it finds an item of that name or reaches the edge of a module, interface,
+// program or checker, so a parameter of the module is found from inside every
+// generate block in it. The net is 4 bits wide.
 //
 // This is the other case a fix must not lose, and it is the direction the
 // defect does not run in: a module's parameter was always visible in a block,
@@ -196,8 +195,8 @@ TEST(GenerateBlockScope,
 
 // The direction the scope test must not lose, and the one that went red when
 // the readers were given a test that refused every block-local parameter.
-// §23.9 has an identifier "declared locally" name the local item, so a defparam
-// written inside block 'a' does name block 'a''s P and c.S takes its
+// §23.9 has an identifier declared in the scope itself name that local item, so
+// a defparam written inside block 'a' does name block 'a''s P and c.S takes its
 // characters.
 //
 // The instance stands in block 'a' beside the defparam and the localparam.
@@ -229,9 +228,9 @@ TEST(GenerateBlockScope,
 }
 
 // §23.9 reaches §6.16.1's len() by the same route it reaches a bare reference.
-// Blocks 'a' and 'b' are siblings, so neither is "higher in the same branch of
-// the name tree" than the other, and the P block 'b' measures is not the P
-// block 'a' declared. N is left with no value rather than with 4.
+// Blocks 'a' and 'b' are siblings, so neither stands above the other in the
+// same branch of the name tree, and the P block 'b' measures is not the P block
+// 'a' declared. N is left with no value rather than with 4.
 //
 // The case became able to fail when Elaborator::ProcessPendingGenerate in
 // src/elaborator/elaborator_generate.cpp began opening a

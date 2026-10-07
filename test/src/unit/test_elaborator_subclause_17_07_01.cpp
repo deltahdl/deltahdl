@@ -417,11 +417,11 @@ TEST(CheckerVariableAssignment,
 }
 
 // §17.7.1 bars a blocking assignment to a free checker variable, and §23.9
-// decides which declaration the assignment target reaches -- "If it is declared
-// locally, then the local item shall be used" -- listing a begin-end block
-// among the scopes a declaration can be local to. So the `x` assigned below is
-// the block's own `bit x`, the free variable is not written at all, and nothing
-// is illegal here.
+// decides which declaration the assignment target reaches -- a local
+// declaration is the one used -- listing a begin-end block among the scopes a
+// declaration can be local to. So the `x` assigned below is the block's own
+// `bit x`, the free variable is not written at all, and nothing is illegal
+// here.
 //
 // The rule resolved nothing: it matched the leftmost component of the target
 // against the set of free variable names, so this legal source was refused. The

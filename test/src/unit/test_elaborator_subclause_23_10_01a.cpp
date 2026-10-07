@@ -148,11 +148,11 @@ TEST(DefparamElaboration, RhsRejectsNonConstantExpression) {
                             6, "23.10.1"));
 }
 
-// §23.10.1: "a defparam statement in a hierarchy in or under a generate block
-// instance (see Clause 27) or an array of instances shall not change a
-// parameter value outside that hierarchy." `u` is instantiated by `top` and
-// not by block `g`, so the statement inside `g` is refused and `P` keeps the
-// value its own declaration gave it.
+// §23.10.1: a defparam statement in or under a generate block instance (Clause
+// 27) or an array of instances may not change a parameter outside that
+// hierarchy. `u` is instantiated by `top` and not by block `g`, so the
+// statement inside `g` is refused and `P` keeps the value its own declaration
+// gave it.
 TEST(DefparamElaboration, DefparamInGenerateBlockCannotEscapeScope) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -196,14 +196,14 @@ TEST(DefparamElaboration, RhsRejectsHierarchicalReference) {
                             9, "23.10.1"));
 }
 
-// §23.10.1: "Each instantiation of a generate block is considered to be a
-// separate hierarchy scope", so a statement standing in `g2` reaches only what
-// `g2` holds. `g1.u` is a name §23.6 defines and the design holds, and it is
-// outside `g2`, so the statement is refused rather than merely left with
-// nothing to bind to. This asserted the "target not found" warning while the
-// path could not be read at all: the elaborator compared `g1` against the
-// flattened instance name `g1_u`, so a statement reaching a real sibling and
-// one naming nothing produced the same report.
+// §23.10.1: each instantiation of a generate block counts as a hierarchy scope
+// of its own, so a statement standing in `g2` reaches only what `g2` holds.
+// `g1.u` is a name §23.6 defines and the design holds, and it is outside `g2`,
+// so the statement is refused rather than merely left with nothing to bind to.
+// This asserted the "target not found" warning while the path could not be read
+// at all: the elaborator compared `g1` against the flattened instance name
+// `g1_u`, so a statement reaching a real sibling and one naming nothing
+// produced the same report.
 TEST(DefparamElaboration, DefparamInGenerateCannotTargetSiblingScope) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -229,7 +229,7 @@ TEST(DefparamElaboration, DefparamInGenerateCannotTargetSiblingScope) {
 }
 
 // §23.10.1 bars a defparam in a generate block from changing a parameter
-// "outside that hierarchy" and bars nothing inside it, so a statement whose
+// outside that hierarchy and bars nothing inside it, so a statement whose
 // target is instantiated by the block that holds it takes effect.
 TEST(DefparamElaboration, AppliesInsideTheGenerateBlockThatHoldsIt) {
   ElabFixture f;
@@ -252,11 +252,11 @@ TEST(DefparamElaboration, AppliesInsideTheGenerateBlockThatHoldsIt) {
   EXPECT_TRUE(u->params[0].is_resolved);
 }
 
-// §23.10.1: "Each instantiation of a generate block is considered to be a
-// separate hierarchy scope", so every iteration of the loop applies its own
-// statement to its own instance. The clause's example writes the genvar on the
-// right-hand side -- `defparam somename[i+1].my_flop.xyz = i ;` -- which is why
-// the two instances are asserted to hold different values.
+// §23.10.1: each instantiation of a generate block counts as a hierarchy scope
+// of its own, so every iteration of the loop applies its own statement to its
+// own instance. The clause's example writes the genvar on the right-hand side
+// -- `defparam somename[i+1].my_flop.xyz = i ;` -- which is why the two
+// instances are asserted to hold different values.
 TEST(DefparamElaboration, AppliesOncePerLoopGenerateBlockInstance) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -451,12 +451,12 @@ TEST(DefparamElaboration, ReplacesEveryCharacterOfAStringParameter) {
   EXPECT_EQ(u->params[0].resolved_string, "configured");
 }
 
-// §23.10.1 lets a defparam change a parameter "in any module, interface, or
-// program instance throughout the design using the hierarchical name of the
-// parameter", and §27.5 makes a named generate block one of the names such a
-// path is built from: a selected generate block that has a name declares a
-// generate block instance by that name, which also names the scope it creates,
-// and hierarchical naming works as usual. Its Example 1 writes the gate
+// §23.10.1 lets a defparam change a parameter of any module, interface or
+// program instance anywhere in the design by the parameter's hierarchical name,
+// and §27.5 makes a named generate block one of the names such a path is built
+// from: a selected generate block that has a name declares a generate block
+// instance by that name, which also names the scope it creates, and
+// hierarchical naming works as usual. Its Example 1 writes the gate
 // instantiated inside a block named u1 as `test.u1.g1`, so `g.u.P` names the
 // child's parameter and the override lands.
 //
@@ -539,8 +539,8 @@ TEST(DefparamElaboration, ReachesAParameterInOneIterationOfALoopGenerateBlock) {
   EXPECT_EQ(second->params[0].resolved_value, 99);
 }
 
-// §23.6 makes each node of a hierarchical name "a separate scope with respect
-// to identifiers", so the `u` inside block instance `b[0]` and the `u` declared
+// §23.6 makes each node of a hierarchical name a scope of its own for
+// identifiers, so the `u` inside block instance `b[0]` and the `u` declared
 // beside the block are two objects and `b[0].u.P` names the first.
 //
 // This is the half of the defect that wrote the wrong parameter rather than
@@ -574,11 +574,11 @@ TEST(DefparamElaboration,
 }
 
 // §27.6 gives every unnamed generate block the name genblk<n>, and §23.6 still
-// refuses a path written outside it: objects declared in one "can be referenced
-// by hierarchical names only from within the block and within any hierarchy
-// instantiated by the block". So `u.genblk1.i1.P` names nothing, even though
-// the elaborator spells that block genblk1 and reaches what it holds under
-// exactly that prefix.
+// refuses a path written outside it: objects declared in one are reached by
+// hierarchical name only from inside the block and the hierarchy it
+// instantiates. So `u.genblk1.i1.P` names nothing, even though the elaborator
+// spells that block genblk1 and reaches what it holds under exactly that
+// prefix.
 //
 // This is what tells a name the source wrote from one §27.6 assigned. The two
 // are the same field by the time a generate block is elaborated, so without

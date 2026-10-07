@@ -308,15 +308,14 @@ TEST(ScopeRulesElaboration,
                             9, "23.9"));
 }
 
-// §23.9 lists "fork-join blocks (named or unnamed)" beside "begin-end blocks
-// (named or unnamed)" among the elements that define a new scope, and an
-// identifier shall be used to declare only one item within a scope, so two
-// variables sharing a name directly inside one fork are illegal. This case
-// fails while CheckOneBlockLocals in
-// src/elaborator/elaborator_scope_rules.cpp is reached only for a
-// StmtKind::kBlock node, because Parser::ParseForkStmt puts a declaration
-// written inside a fork into Stmt::fork_stmts on a StmtKind::kFork node, which
-// that guard never compares against itself.
+// §23.9 lists fork-join blocks, named or not, beside begin-end blocks, named or
+// not, among the elements that define a new scope, and an identifier shall be
+// used to declare only one item within a scope, so two variables sharing a name
+// directly inside one fork are illegal. This case fails while
+// CheckOneBlockLocals in src/elaborator/elaborator_scope_rules.cpp is reached
+// only for a StmtKind::kBlock node, because Parser::ParseForkStmt puts a
+// declaration written inside a fork into Stmt::fork_stmts on a StmtKind::kFork
+// node, which that guard never compares against itself.
 //
 // One source covers all three closing keywords. Parser::ParseForkStmt in
 // src/parser/parser_stmt.cpp records the closing keyword in
@@ -391,12 +390,12 @@ TEST(ScopeRulesElaboration, SameLocalNameInForkAndEnclosingBlockOk) {
              "endmodule\n"));
 }
 
-// §23.9: "if the item is a variable, it shall stop at a module boundary". `v`
-// is declared in `top` and read in `child`, so the upward search from `child`
-// ends at the module boundary and the read names nothing. The elaborator is
-// silent on this shape today because the collector that gathers bare reads
-// takes a single identifier standing alone as the whole right-hand side, and
-// here `v` sits inside the larger expression `v + 0`.
+// §23.9: a search for a variable stops at the module's edge. `v` is declared in
+// `top` and read in `child`, so the upward search from `child` ends at the
+// module boundary and the read names nothing. The elaborator is silent on this
+// shape today because the collector that gathers bare reads takes a single
+// identifier standing alone as the whole right-hand side, and here `v` sits
+// inside the larger expression `v + 0`.
 TEST(ScopeRulesElaboration,
      DirectVariableReadInExpressionStopsAtModuleBoundary) {
   ElabFixture f;
@@ -416,12 +415,12 @@ TEST(ScopeRulesElaboration,
                             4, "23.9"));
 }
 
-// §23.9: "if the item is a variable, it shall stop at a module boundary". The
-// read is the initializer of a module-item declaration rather than a statement,
-// and `v` is declared only in `top`, so the search from `child` stops at the
-// boundary. The elaborator is silent on this shape today because a declaration
-// initializer is visited by no collector: the walk gathers reads from
-// statements and never descends into the expression a declaration carries.
+// §23.9: a search for a variable stops at the module's edge. The read is the
+// initializer of a module-item declaration rather than a statement, and `v` is
+// declared only in `top`, so the search from `child` stops at the boundary. The
+// elaborator is silent on this shape today because a declaration initializer is
+// visited by no collector: the walk gathers reads from statements and never
+// descends into the expression a declaration carries.
 TEST(ScopeRulesElaboration,
      DirectVariableReadInDeclarationInitializerStopsAtModuleBoundary) {
   ElabFixture f;
@@ -438,12 +437,12 @@ TEST(ScopeRulesElaboration,
                             2, "23.9"));
 }
 
-// §23.9: "if the item is a variable, it shall stop at a module boundary". The
-// rule holds for a read written in a task body as much as for one written in an
-// initial procedure, since the boundary the search stops at is the module's and
-// not the statement's. The elaborator is silent on this shape today because a
-// task body is a context the module-item walk does not enter: it reaches the
-// task's declaration and stops there rather than walking the statements inside.
+// §23.9: a search for a variable stops at the module's edge. The rule holds for
+// a read written in a task body as much as for one written in an initial
+// procedure, since the boundary the search stops at is the module's and not the
+// statement's. The elaborator is silent on this shape today because a task body
+// is a context the module-item walk does not enter: it reaches the task's
+// declaration and stops there rather than walking the statements inside.
 TEST(ScopeRulesElaboration, DirectVariableReadInTaskBodyStopsAtModuleBoundary) {
   ElabFixture f;
   ElabOk(
@@ -462,13 +461,13 @@ TEST(ScopeRulesElaboration, DirectVariableReadInTaskBodyStopsAtModuleBoundary) {
                             4, "23.9"));
 }
 
-// §23.9: "if the item is a variable, it shall stop at a module boundary". The
-// read stands in an initial procedure written directly in `child`, beside a for
-// generate construct that has nothing to do with it, and `v` is declared only
-// in `top`. The elaborator is silent on this shape today because a module
-// holding a generate construct is skipped whole: the presence of the generate
-// item takes the whole module out of the walk, so the reads written outside it
-// are never collected either.
+// §23.9: a search for a variable stops at the module's edge. The read stands in
+// an initial procedure written directly in `child`, beside a for generate
+// construct that has nothing to do with it, and `v` is declared only in `top`.
+// The elaborator is silent on this shape today because a module holding a
+// generate construct is skipped whole: the presence of the generate item takes
+// the whole module out of the walk, so the reads written outside it are never
+// collected either.
 TEST(ScopeRulesElaboration,
      DirectVariableReadStopsAtModuleBoundaryInModuleHoldingGenerateFor) {
   ElabFixture f;
@@ -530,11 +529,11 @@ TEST(ScopeRulesElaboration, BareNameDeclaredInAGenerateBlockIsStillAccepted) {
              "endmodule\n"));
 }
 
-// §23.9 lists "Generate blocks" among "the following elements define a new
-// scope in SystemVerilog", and rules that "An identifier shall be used to
-// declare only one item within a scope". Each module opens its own scope, so a
-// generate block in one module and a generate block in another declare their
-// names in two scopes that share nothing, and the same name in both is legal.
+// §23.9 lists generate blocks among the elements that open a new scope in
+// SystemVerilog, and rules that a scope may declare one item only under any one
+// identifier. Each module opens its own scope, so a generate block in one
+// module and a generate block in another declare their names in two scopes that
+// share nothing, and the same name in both is legal.
 //
 // A generate construct is not elaborated where it is written:
 // Elaborator::ElaborateItems queues it into pending_generates_ and
@@ -691,10 +690,10 @@ TEST(ScopeRulesElaboration, LoopGenerateTaskNameRepeatsPerIteration) {
   ExpectLoopBodyItemDeclaresItsNameOncePerIteration("", "task tk(); endtask");
 }
 
-// §23.9 still rules that "An identifier shall be used to declare only one item
-// within a scope", so two gate instances sharing a name directly in one module
-// scope are illegal however a name inside a generate block is keyed. This case
-// is what a fix that deleted the check rather than scoping its key would break.
+// §23.9 still rules that a scope may declare one item only under any one
+// identifier, so two gate instances sharing a name directly in one module scope
+// are illegal however a name inside a generate block is keyed. This case is
+// what a fix that deleted the check rather than scoping its key would break.
 //
 // src/elaborator/elaborator_items.cpp is the emission site:
 // CheckGateInstNameDiagnostics formats "redeclaration of '{}'" from
@@ -724,12 +723,12 @@ TEST(ScopeRulesElaboration, DuplicateGateInstanceNamesInOneScopeRejected) {
 // ForEachRandsequenceRuleStmt reaches by different members, so each is its own
 // position and each gets its own case.
 
-// §23.9 rules that an identifier "referenced directly (without a hierarchical
-// path)" is declared "locally or within a module, interface, program, checker,
-// task, function, named block, or generate block that is higher in the same
-// branch of the name tree", and puts no condition on the statement the
-// reference stands in. Each case here assigns to `z`, which nothing declares,
-// from one position CollectScopeWalk did not reach before.
+// §23.9 rules that an identifier referenced directly, with no hierarchical
+// path, is declared in its own scope or in a module, interface, program,
+// checker, task, function, named block or generate block above it in the same
+// branch of the name tree, and puts no condition on the statement the reference
+// stands in. Each case here assigns to `z`, which nothing declares, from one
+// position CollectScopeWalk did not reach before.
 //
 // `stmt` is written at line 4 and may run to several lines, so the line the
 // report stands at is read back out of the source rather than counted.
@@ -794,10 +793,10 @@ TEST(ScopeRulesElaboration,
       "    end");
 }
 
-// §23.9 rules that "An identifier shall be used to declare only one item within
-// a scope" and lists "begin-end blocks (named or unnamed)" among the elements
-// that define one, putting no condition on the statement the block stands in.
-// Each case here writes a block declaring `a` twice into one position
+// §23.9 rules that a scope may declare one item only under any one identifier
+// and lists begin-end blocks, named or not, among the elements that define one,
+// putting no condition on the statement the block stands in. Each case here
+// writes a block declaring `a` twice into one position
 // CheckBlockLocalRedeclarations did not reach before.
 //
 // CheckOneBlockLocals in src/elaborator/elaborator_scope_rules.cpp is the
@@ -845,10 +844,10 @@ TEST(ScopeRulesElaboration, DuplicateBlockLocalInARandsequenceWeightCodeBlock) {
       "    end");
 }
 
-// §23.9 rules that "An identifier shall be used to declare only one item within
-// a scope" and lists "begin-end blocks (named or unnamed)" among the elements
-// that define one, putting no condition on the statement the block stands in.
-// The five cases below write a block declaring `a` twice into one position
+// §23.9 rules that a scope may declare one item only under any one identifier
+// and lists begin-end blocks, named or not, among the elements that define one,
+// putting no condition on the statement the block stands in. The five cases
+// below write a block declaring `a` twice into one position
 // CheckSubroutineBodyRedeclarations in
 // src/elaborator/elaborator_validate_funcbody.cpp did not reach before it took
 // its list from ForEachChildStmt in

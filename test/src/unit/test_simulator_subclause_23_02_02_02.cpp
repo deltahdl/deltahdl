@@ -6,15 +6,15 @@ using namespace delta;
 
 namespace {
 
-// §23.2.2.2 (printed pages 734-735): "ANSI style port declarations can be
-// explicitly named, allowing elements of arrays and structures,
-// concatenations of elements, and assignment pattern expressions of elements
-// declared in a module ... to be specified on the port list", and the clause's
-// own mymod writes `output .P1(r[3:0]), output .P2(r[7:4]), ref .Y(x)`. P1
-// and P2 carry the two halves of r out, 5 and 10 of 8'hA5, and Y is the
-// module's x, so the parent's y reads the 77 written to x. Each port was
-// storage of its own that nothing inside the module reached: P1 and P2 read x
-// and y read 0, while the plain input R beside them was right.
+// §23.2.2.2 (printed pages 734-735): an ANSI-style port can be named
+// explicitly, so that array and structure elements, concatenations of elements
+// and assignment patterns of elements a module declares can stand in the port
+// list, and the clause's own mymod writes
+// `output .P1(r[3:0]), output .P2(r[7:4]), ref .Y(x)`. P1 and P2 carry the two
+// halves of r out, 5 and 10 of 8'hA5, and Y is the module's x, so the parent's
+// y reads the 77 written to x. Each port was storage of its own that nothing
+// inside the module reached: P1 and P2 read x and y read 0, while the plain
+// input R beside them was right.
 TEST(AnsiExplicitlyNamedPortSimulation, PortsCarryTheirPortExpressions) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module mymod(output .P1(r[3:0]), output .P2(r[7:4]), "

@@ -202,8 +202,8 @@ TEST(NonAnsiStylePortDeclarations, EscapedIdentifierPortReference) {
 }
 
 // §23.2.2.1: the concatenation port_expression form admits bit-selects and
-// part-selects of internal vectors as its elements, not only plain names ("a
-// concatenation of any of the above").
+// part-selects of internal vectors as its elements, not only plain names, the
+// concatenation taking any of the other forms.
 TEST(NonAnsiStylePortDeclarations, ConcatenationOfSelectsPortExpression) {
   auto r = Parse("module m({a[3:0], b[1]}); endmodule\n");
   ASSERT_NE(r.cu, nullptr);

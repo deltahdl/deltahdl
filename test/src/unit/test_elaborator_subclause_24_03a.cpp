@@ -459,10 +459,9 @@ TEST(ProgramConstruct, ProgramSignalRefFromAnAnonymousProgramClassIsError) {
 
 // §24.3 bars a reference to a program signal, which the clause defines as a net
 // or variable a program's scope declares. §23.9 decides which declaration a
-// reference reaches -- "If it is declared locally, then the local item shall be
-// used" -- and a begin-end block is one of the scopes it lists, so a
-// block-local `p` is what `p.a` names and the nested program `p` is not reached
-// at all.
+// reference reaches -- a local declaration is the one used -- and a begin-end
+// block is one of the scopes it lists, so a block-local `p` is what `p.a` names
+// and the nested program `p` is not reached at all.
 //
 // The rule resolved nothing: it matched the leftmost component of a member
 // access against the set of program instance names, so this legal source was

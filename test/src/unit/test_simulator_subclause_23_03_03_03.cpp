@@ -236,11 +236,11 @@ TEST(PortConnectionRulesForNetsSimulation, NetDrivenToTheZItHoldsDoesNotWake) {
             "data=170 at 2\n");
 }
 
-// §23.3.3.3: a net port is a net, "If left unconnected, it shall have the
-// value 'z" -- an explicit `input wire` and an implicit `input` read z, and an
-// output net port its own drivers leave undriven gives the net above z -- where
-// a variable port (§23.3.3.2) reads its type's default x. The explicit
-// `output wire` port read 0 before its drivers ran.
+// §23.3.3.3: a net port is a net, and one left unconnected has the value z --
+// an explicit `input wire` and an implicit `input` read z, and an output net
+// port its own drivers leave undriven gives the net above z -- where a variable
+// port (§23.3.3.2) reads its type's default x. The explicit `output wire` port
+// read 0 before its drivers ran.
 TEST(PortConnectionRulesForNetsSimulation, NetPortsStartAtHighZ) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module sub(input wire [3:0] i, input var logic [3:0] "

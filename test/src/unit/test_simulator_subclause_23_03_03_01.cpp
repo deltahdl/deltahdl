@@ -6,11 +6,11 @@ using namespace delta;
 
 namespace {
 
-// §23.3.3.1 (printed page 747): "A port that is declared as input (output)
-// but used as an output (input) or inout may be coerced to inout." An input
-// net port the module drives is coerced, so the port and the parent's net are
-// one net and the module's `assign a = 1'b1` reaches `top.w`. The port was
-// warned about and left an input, the parent's w reading z.
+// §23.3.3.1 (printed page 747): a port declared input (output) but used as an
+// output (input) or inout may be coerced to inout. An input net port the module
+// drives is coerced, so the port and the parent's net are one net and the
+// module's `assign a = 1'b1` reaches `top.w`. The port was warned about and
+// left an input, the parent's w reading z.
 TEST(PortCoercionSim, DrivenInputNetPortIsCoercedToInout) {
   SimFixture f;
   EXPECT_EQ(

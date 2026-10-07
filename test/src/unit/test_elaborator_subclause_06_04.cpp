@@ -5,9 +5,9 @@
 // structure, unpacked union, or unpacked array data type."
 //
 // The rejections below are therefore reported under the subclauses that do
-// restrict what a design may write with the classification: §23.2.2.4, "A
-// module declaration may specify a default value for each singular input
-// port", and §6.22.2, which decides when two aggregate types are equivalent.
+// restrict what a design may write with the classification: §23.2.2.4, under
+// which a module declaration may give each singular input port a default value,
+// and §6.22.2, which decides when two aggregate types are equivalent.
 
 #include <gtest/gtest.h>
 
@@ -310,8 +310,7 @@ TEST(SingularAggregateTypes, SingularVectorPortDefaultAccepted) {
 
 // A §7.4 unpacked array is aggregate; its aggregate-ness lives on the unpacked
 // dimensions of the declaration, so the port default must be rejected. The
-// report names §23.2.2.4, which permits a default "for each singular input
-// port".
+// report names §23.2.2.4, which permits a default for each singular input port.
 TEST(SingularAggregateTypes, UnpackedArrayPortDefaultRejected) {
   ElabFixture f;
   auto* design = Elaborate(

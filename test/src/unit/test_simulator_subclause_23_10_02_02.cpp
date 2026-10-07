@@ -93,12 +93,12 @@ TEST(StringParamOverride,
             "John Smith\n");
 }
 
-// §23.10 (printed page 764): "An override value shall be converted to the
-// type of the parameter", so `.R(3.25)` on `parameter real R` makes R 3.25;
-// and a parameter with neither type nor range takes "the type and range of
-// the new value", so `.Q(2.5)` makes Q the real 2.5, 64 bits. A real
-// override was folded as an integer, had no value and was dropped: R kept
-// 1.5 and Q read 0.0. The instance with no real override keeps Q integral.
+// §23.10 (printed page 764): an override value is converted to the parameter's
+// type, so `.R(3.25)` on `parameter real R` makes R 3.25; and a parameter with
+// neither type nor range takes the new value's type and range, so `.Q(2.5)`
+// makes Q the real 2.5, 64 bits. A real override was folded as an integer, had
+// no value and was dropped: R kept 1.5 and Q read 0.0. The instance with no
+// real override keeps Q integral.
 TEST(NamedParamAssignment, RealOverrideTakesTheParametersTypeOrGivesItsOwn) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module m #(parameter Q = 5, parameter real R = 1.5,\n"

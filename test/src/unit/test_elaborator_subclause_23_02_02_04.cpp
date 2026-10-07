@@ -12,10 +12,10 @@ TEST(DefaultPortValueElaboration, InputPortWithDefaultElaborates) {
 }
 
 // §23.2.2.2's Syntax 23-4 writes `[ = constant_expression ]` behind a
-// variable port's identifier, and its footnote 2 has it "illegal to initialize
-// a port that is not a variable output port or to specify a default value for
-// a port that is not an input port": on a variable output port the expression
-// is the port's initializer, not a §23.2.2.4 default, and is legal.
+// variable port's identifier, and its footnote 2 lets only a variable output
+// port be initialized and only an input port take a default: on a variable
+// output port the expression is the port's initializer, not a §23.2.2.4
+// default, and is legal.
 TEST(DefaultPortValueElaboration, VariableOutputPortWithInitializerElaborates) {
   ElabFixture f;
   EXPECT_TRUE(ElabOk("module m(output logic q = 1'b0); endmodule", f));

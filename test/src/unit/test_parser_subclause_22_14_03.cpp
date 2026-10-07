@@ -340,11 +340,11 @@ TEST(CompilerDirectiveParsing, WordOutsideVerilog2001ListIsNotAKeyword) {
   // `variable_decl_assignment ::= variable_identifier { variable_dimension }
   // [ = expression ]`. It cannot be an instantiation either, because A.4.1.1
   // gives `hierarchical_instance ::= name_of_instance ( [ list_of_port_
-  // connections ] )` and §23.3.2 states in prose that "The parentheses shall be
-  // required on all module instantiations", while this source holds no `(`.
-  // §6.18 is what refuses the type name, at elaboration, since nothing declares
-  // it. The paired source outside the region is the same three lines read as
-  // the process the word opens where it is a keyword.
+  // connections ] )` and §23.3.2 states in prose that every module
+  // instantiation needs the parentheses, while this source holds no `(`. §6.18
+  // is what refuses the type name, at elaboration, since nothing declares it.
+  // The paired source outside the region is the same three lines read as the
+  // process the word opens where it is a keyword.
   auto as_process =
       ParseWithPreprocessor(In2001("module m;\n"
                                    "  reg r;\n"

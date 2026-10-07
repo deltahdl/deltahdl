@@ -1,12 +1,11 @@
 // §23.9 "Scope rules" lists Modules first among the elements that define a new
 // scope, and fixes where a direct (non-hierarchical) reference is allowed to
-// look: "If it is declared locally, then the local shall be used; if not, the
-// search shall continue upward until an item by that name is found or until a
-// module, interface, program, or checker boundary is encountered. If the item
-// is a variable, it shall stop at a module boundary". Example 1 restates the
-// limit for Figure 23-2: "The scope available to upward searching extends
-// outward to all containing rectangles -- with the boundary of the module A as
-// the outer limit."
+// look: a local declaration is used if there is one, and otherwise the search
+// climbs until it finds an item of that name or reaches the edge of a module,
+// interface, program or checker, a search for a variable stopping at the
+// module's edge. Example 1 restates the limit for Figure 23-2: the upward
+// search reaches every enclosing rectangle, the module A's edge being the
+// farthest.
 //
 // This file covers that rule for the identifiers inside a *declaration
 // initializer* of a variable declared in an instantiated module: `int q = P;`
@@ -49,11 +48,11 @@ namespace {
 
 // A parameter is the item §23.9 protects most sharply, because a parameter is
 // instance-specific: `child #(.P(7)) u1();` gives u1 its own P, and the local
-// P is what "if it is declared locally, then the local shall be used" names.
-// No existing case initializes a child's variable from that child's own
-// parameter; UpwardParameterReferenceSimulation reads `parent.P` by
-// hierarchical path from an `initial` block, which is neither a direct
-// reference nor a declaration initializer.
+// P is what the rule that a local declaration is the one used picks out. No
+// existing case initializes a child's variable from that child's own parameter;
+// UpwardParameterReferenceSimulation reads `parent.P` by hierarchical path from
+// an `initial` block, which is neither a direct reference nor a declaration
+// initializer.
 TEST(InstanceScopeSimulation, ChildInitializerReadsOwnInstanceParameter) {
   SimFixture f;
   auto* q = RunAndFindVar(
@@ -93,12 +92,12 @@ TEST(InstanceScopeSimulation,
   EXPECT_EQ(q2->value.ToUint64(), 9u);
 }
 
-// "If it is declared locally, then the local shall be used" -- the child
-// declares its own `a`, so the search must not leave the child at all, even
-// though the top declares a variable of the same name that is already
-// initialized by the time the child's declarations are lowered. 0xA5 and 0x3C
-// share no bits that would let a wrong read pass, and both are nonzero so
-// neither can be confused with an unresolved identifier's zero.
+// A local declaration is the one used -- the child declares its own `a`, so the
+// search must not leave the child at all, even though the top declares a
+// variable of the same name that is already initialized by the time the child's
+// declarations are lowered. 0xA5 and 0x3C share no bits that would let a wrong
+// read pass, and both are nonzero so neither can be confused with an unresolved
+// identifier's zero.
 TEST(InstanceScopeSimulation,
      ChildInitializerPrefersOwnDeclarationOverTopSameName) {
   SimFixture f;
@@ -194,14 +193,14 @@ TEST(InstanceScopeSimulation, ChildDynArrayNewCopiesFromOwnInstanceSource) {
   EXPECT_EQ(dst->elements[0].ToUint64(), 4u);
 }
 
-// §23.9 stops the upward search for a variable at the enclosing module: "the
-// search shall continue upward until an item by that name is found or until a
-// module, interface, program, or checker boundary is encountered. If the item
-// is a variable, it shall stop at a module boundary". `v` is declared in `top`
-// alone, so from inside instance `u1` the bare name `v` names nothing and must
-// resolve to nothing. The six cases above cannot catch this, because each one
-// declares the name it reads in the child, so each resolves at the prefixed key
-// and never reaches the bare-name lookup this case is about.
+// §23.9 stops the upward search for a variable at the enclosing module: the
+// search climbs until it finds an item of that name or reaches the edge of a
+// module, interface, program or checker, and a search for a variable stops at
+// the module's edge. `v` is declared in `top` alone, so from inside instance
+// `u1` the bare name `v` names nothing and must resolve to nothing. The six
+// cases above cannot catch this, because each one declares the name it reads in
+// the child, so each resolves at the prefixed key and never reaches the
+// bare-name lookup this case is about.
 TEST(InstanceScopeSimulation,
      BareNameDoesNotReachTopVariableFromInsideInstance) {
   SimFixture f;
@@ -223,13 +222,13 @@ TEST(InstanceScopeSimulation,
   EXPECT_EQ(f.ctx.FindVariable("v"), nullptr);
 }
 
-// §23.9: "If it is declared locally, then the local shall be used". `q` is
-// declared in the child, so under prefix `u1.` it must still resolve, and to
-// the child's own copy holding 7. This case exists to constrain the fix rather
-// than to catch the defect: it passes today, and it is what fails if the bare
-// name is stopped by narrowing the *prefixed* lookup instead of the bare one.
-// Do not delete it as redundant with the case above -- that case alone is
-// satisfied by a resolution that finds nothing at all.
+// §23.9: a local declaration is the one used. `q` is declared in the child, so
+// under prefix `u1.` it must still resolve, and to the child's own copy holding
+// 7. This case exists to constrain the fix rather than to catch the defect: it
+// passes today, and it is what fails if the bare name is stopped by narrowing
+// the *prefixed* lookup instead of the bare one. Do not delete it as redundant
+// with the case above -- that case alone is satisfied by a resolution that
+// finds nothing at all.
 TEST(InstanceScopeSimulation, LocalNameStillResolvesUnderInstancePrefix) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -251,15 +250,14 @@ TEST(InstanceScopeSimulation, LocalNameStillResolvesUnderInstancePrefix) {
 }
 
 // §23.8 "Upwards name referencing" permits by hierarchical path exactly what
-// §23.9 denies to a direct reference: "A lower level module can reference items
-// in a module above it in the hierarchy. Variables can be referenced if the
-// name of the higher level module or its instance name is known." Syntax 23-8
-// gives the form as `module_identifier . item_name`, with variable_identifier
-// among the item names, so `top.v` must still resolve to the top's `v` holding
-// 3 from inside `u1`. This case exists to constrain the fix rather than to
-// catch the defect: it passes today, and it is what fails if the upward reach
-// is removed outright instead of being restricted to the dotted form. Do not
-// delete it as redundant with the §23.8 cases in
+// §23.9 denies to a direct reference: a lower-level module may refer to items
+// of a module above it, and to variables when it knows that module's name or
+// instance name. Syntax 23-8 gives the form as `module_identifier . item_name`,
+// with variable_identifier among the item names, so `top.v` must still resolve
+// to the top's `v` holding 3 from inside `u1`. This case exists to constrain
+// the fix rather than to catch the defect: it passes today, and it is what
+// fails if the upward reach is removed outright instead of being restricted to
+// the dotted form. Do not delete it as redundant with the §23.8 cases in
 // test/src/unit/test_simulator_subclause_23_08.cpp -- every one of those runs
 // inside an `initial` block, where the prefix comes from the running process,
 // so none covers the dotted climb under a lowering prefix. `top` is the name
@@ -291,16 +289,15 @@ TEST(InstanceScopeSimulation, HierarchicalNameStillClimbsPastModuleBoundary) {
 // objects that never change. SystemVerilog provides three elaboration-time
 // constants: parameter, localparam, and specparam." So the variable-specific
 // sentence of §23.9 does not name it, and this case rests on the general one
-// above that sentence: "the search shall continue upward until an item by that
-// name is found or until a module, interface, program, or checker boundary is
-// encountered." A parameter is none of the task, function, named block or
-// generate block that sentence lets past a module boundary, so a bare `P`
-// inside `u1` must resolve to nothing even though the top declares one. This
-// catches what the case above it cannot: a parameter is lowered by
-// Lowerer::LowerParams rather than as a module variable, so a fix that stops
-// the boundary crossing for one need not stop it for the other. The two
-// parameter cases at the top of this file read the child's own `P`, which
-// resolves at the prefixed key.
+// above that sentence: the search climbs until it finds an item of that name or
+// reaches the edge of a module, interface, program or checker. A parameter is
+// none of the task, function, named block or generate block that sentence lets
+// past a module boundary, so a bare `P` inside `u1` must resolve to nothing
+// even though the top declares one. This catches what the case above it cannot:
+// a parameter is lowered by Lowerer::LowerParams rather than as a module
+// variable, so a fix that stops the boundary crossing for one need not stop it
+// for the other. The two parameter cases at the top of this file read the
+// child's own `P`, which resolves at the prefixed key.
 TEST(InstanceScopeSimulation, BareParameterNameDoesNotReachTopParameter) {
   SimFixture f;
   auto* design = ElaborateSrc(

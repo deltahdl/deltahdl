@@ -26,11 +26,11 @@ TEST(InterfacePortConnectionRulesElaboration,
              "endmodule\n"));
 }
 
-// §23.3.3.4: "any type" for a generic interface port is genuine, not an
-// accidental match. A generic port accepts an instance of `other_if` even
-// though a named `bus_if` port rejects that exact type (see
-// NamedInterfacePortConnectedToDifferentTypeErrors), witnessing that the
-// generic port carries no required type to check against.
+// §23.3.3.4: a generic interface port taking any type is genuine for a generic
+// interface port is genuine, not an accidental match. A generic port accepts an
+// instance of `other_if` even though a named `bus_if` port rejects that exact
+// type (see NamedInterfacePortConnectedToDifferentTypeErrors), witnessing that
+// the generic port carries no required type to check against.
 TEST(InterfacePortConnectionRulesElaboration,
      GenericInterfacePortConnectedToDistinctInterfaceType) {
   EXPECT_TRUE(

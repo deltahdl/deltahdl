@@ -27,18 +27,15 @@ TEST(HierarchicalNameSynthesis, ModuleInstanceHierarchyLowers) {
 
 // The assertion names §23.6 because `c1.sig` is a hierarchical name rather
 // than a member of a packed structure. §23.6 defines the reference this source
-// writes: "Any named SystemVerilog object or hierarchical name reference can be
-// referenced uniquely in its full form by concatenating the names of the
-// modules, module instance names, generate blocks, tasks, functions, assertion
-// labels, named assertion action blocks, or named blocks that contain it. The
-// period character shall be used to separate each of the names in the
-// hierarchy". §23.7 is what tells the construct from a member select: "The
-// distinguishing aspect of a hierarchical name is that the first component of
-// the name matches a scope name while the first name component of a member
-// select matches a data object or interface port name". `c1` is the instance
-// name of the `child c1()` instantiation and so matches a scope name, while
-// `p` in a member select `p.hi` matches a declared variable.
-// Parser::ParseMemberAccessChain builds both constructs as
+// writes: any named object or hierarchical name reference can be named uniquely
+// in full by joining, with periods, the names of the modules, module instances,
+// generate blocks, tasks, functions, assertion labels, named assertion action
+// blocks or named blocks that contain it. §23.7 is what tells the construct
+// from a member select: a hierarchical name's first component matches a scope
+// name, while a member select's first component matches a data object or an
+// interface port. `c1` is the instance name of the `child c1()` instantiation
+// and so matches a scope name, while `p` in a member select `p.hi` matches a
+// declared variable. Parser::ParseMemberAccessChain builds both constructs as
 // ExprKind::kMemberAccess, so SynthLower is what has to tell them apart before
 // it reports one. This case fails if SynthLower reports the §7.2.1
 // packed-structure message for a name whose first component is a child

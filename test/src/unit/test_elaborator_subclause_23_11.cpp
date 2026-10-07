@@ -704,11 +704,11 @@ TEST(BindDirective, BindInstantiationTooManyPositionalOverridesIsError) {
                     4, "23.10.2.1"));
 }
 
-// §23.11: "A bind target scope shall be a module or an interface. A bind target
-// instance shall be an instance of a module or an interface." A target that is
-// neither denotes nothing bindable, and the report that says so names the
-// subclause, which lets a caller learn which rule was enforced without matching
-// the wording of the message.
+// §23.11: a bind target scope is a module or an interface, and a bind target
+// instance is an instance of one. A target that is neither denotes nothing
+// bindable, and the report that says so names the subclause, which lets a
+// caller learn which rule was enforced without matching the wording of the
+// message.
 TEST(BindDirective, TargetIsNeitherScopeNorInstanceNames23_11) {
   ElabFixture f;
   ElaborateSrc(
@@ -782,10 +782,10 @@ TEST(BindDirective, TargetInstanceListAtUnitScopeIsAFullPath) {
   EXPECT_EQ(BoundInChild(design, "c2", "p"), 1);
 }
 
-// §23.11: "A bind target instance shall be an instance of a module or an
-// interface", and a listed one is an instance of the target scope. nosuch
-// names nothing and m1 is an instance of another module, so each entry is
-// reported; both were passed over in silence.
+// §23.11: a bind target instance is an instance of a module or an interface,
+// and a listed one is an instance of the target scope. nosuch names nothing and
+// m1 is an instance of another module, so each entry is reported; both were
+// passed over in silence.
 TEST(BindDirective, TargetInstanceListEntryNamingNoInstanceIsReported) {
   ElabFixture f;
   ElaborateSrc(

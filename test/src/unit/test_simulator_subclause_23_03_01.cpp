@@ -70,11 +70,11 @@ TEST(TopLevelModules, DollarRootDisambiguatesFromLocalScope) {
   EXPECT_EQ(v->value.ToUint64(), 20u);
 }
 
-// §23.3.1 (printed page 740): "$root allows explicit access to the top of the
-// instantiation tree. This is useful to disambiguate a local path (which
-// takes precedence) from the rooted path." Inside A, `B.v` is A's own B and
-// `$root.A_top.B.v` the B beside A; the rooted name was stripped to `B.v`
-// and read from A like the local one.
+// §23.3.1 (printed page 740): $root names the top of the instantiation tree
+// outright, which tells a rooted path apart from a local one, the local one
+// otherwise winning. Inside A, `B.v` is A's own B and `$root.A_top.B.v` the B
+// beside A; the rooted name was stripped to `B.v` and read from A like the
+// local one.
 TEST(TopLevelModulesAndRoot, RootedPathReachesTheTopLevelInstanceNotTheLocal) {
   SimFixture f;
   EXPECT_EQ(
@@ -121,11 +121,11 @@ TEST(TopLevelModulesAndRoot, RootedPathWritesAndNetsReachTheTopLevelInstance) {
             "5 9\n7 4\n");
 }
 
-// §23.3.1 (printed page 740): "A top-level module is implicitly instantiated
-// once, and its instance name is the same as the module name", each such
-// instance a scope of its own (§23.9), so `int x` in t1 and in t2 are two
-// variables. The two tops' declarations were stored under one name, and each
-// read the value the other wrote: both xs read 2.
+// §23.3.1 (printed page 740): each top-level module is instantiated once,
+// implicitly, under its own name as instance name, each such instance a scope
+// of its own (§23.9), so `int x` in t1 and in t2 are two variables. The two
+// tops' declarations were stored under one name, and each read the value the
+// other wrote: both xs read 2.
 TEST(TopLevelModulesAndRoot, ParallelTopsKeepTheirOwnDeclarations) {
   SimFixture f;
   auto* design = ElaborateSrcAllTops(

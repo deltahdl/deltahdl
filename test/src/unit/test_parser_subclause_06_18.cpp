@@ -302,9 +302,9 @@ TEST(DataTypeParsing, TypeReferenceBeforeDeclarationParsesAsADataDeclaration) {
 // dimensions are the same data_declaration. None of them can be an
 // instantiation: A.4.1.1 gives
 // `hierarchical_instance ::= name_of_instance ( [ list_of_port_connections ] )`
-// and §23.3.2 states it in prose -- "The parentheses shall be required on all
-// module instantiations, even when the instantiated module does not have
-// ports." -- and not one of the four sources contains a `(`.
+// and §23.3.2 states it in prose -- every module instantiation needs the
+// parentheses, even of a module with no ports -- and not one of the four
+// sources contains a `(`.
 //
 // Each case asserts the node the parser built and not merely that nothing was
 // reported, because the behaviour these replace reported an error and built a
@@ -390,7 +390,7 @@ TEST(ParserUndeclaredTypeDecl, AnUnsizedDimensionIsADataDeclaration) {
 // cases above and stop the parser recognising an instantiation at all.
 TEST(ParserUndeclaredTypeDecl, ANamedInstanceWithPortsIsStillAnInstantiation) {
   // The port-connection list A.4.1.1 requires, and §23.3.2 permits the module
-  // to be "one declared later", so the parser cannot settle this by looking for
+  // to be declared further on, so the parser cannot settle this by looking for
   // a declaration.
   auto r = Parse(
       "module m;\n"

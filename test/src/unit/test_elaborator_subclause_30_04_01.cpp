@@ -189,11 +189,11 @@ TEST(SpecifyTerminalElaboration, VariableSourceNames30_4_1) {
       ReportedError(f.diag.Diagnostics(), "must be a net", 3, "30.4.1"));
 }
 
-// §23.2.2.3 (printed page 735): "An implicit data type declaration implies a
-// net unless the var keyword is used", so a non-ANSI `input a;` -- the way the
-// standard's own specify examples declare their ports -- is a net and a legal
-// path source (§30.4.1). Its data type was left implicit rather than marked a
-// net, and the path was refused as a path from a variable.
+// §23.2.2.3 (printed page 735): an implicit data type declaration makes a net
+// unless var is written, so a non-ANSI `input a;` -- the way the standard's own
+// specify examples declare their ports -- is a net and a legal path source
+// (§30.4.1). Its data type was left implicit rather than marked a net, and the
+// path was refused as a path from a variable.
 TEST(SpecifyTerminalElaboration, NonAnsiInputWithNoTypeIsANetSource) {
   ElabFixture f;
   auto* design = ElaborateSrc(

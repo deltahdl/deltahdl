@@ -340,19 +340,19 @@ TEST(HierarchicalNameElaboration,
       "23.6"));
 }
 
-// §23.6 says a hierarchical name reference names its object "by concatenating
-// the names of the modules, module instance names, generate blocks, tasks,
-// functions ... that contain it", and puts no condition on where the reference
-// is written. Every position a statement holds a statement in is therefore one
-// the two rules below reach: the unresolved-member report, and the instance
-// select §23.6 requires when an instance array name is not the last path
-// element. CollectMemberAccessInStmt in
-// src/elaborator/elaborator_scope_rules_hier.cpp, which gathers the accesses
-// both checks read, had written out twelve of the thirteen child-statement
-// links Stmt declares and now takes the list from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h. The missing link was
-// Stmt::rs_productions; the cases below cover the two statement lists a
-// randsequence production holds, once for each of the two rules.
+// §23.6 says a hierarchical name reference names its object by joining the
+// names of the modules, module instances, generate blocks, tasks, functions and
+// the rest that contain it, and puts no condition on where the reference is
+// written. Every position a statement holds a statement in is therefore one the
+// two rules below reach: the unresolved-member report, and the instance select
+// §23.6 requires when an instance array name is not the last path element.
+// CollectMemberAccessInStmt in src/elaborator/elaborator_scope_rules_hier.cpp,
+// which gathers the accesses both checks read, had written out twelve of the
+// thirteen child-statement links Stmt declares and now takes the list from
+// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The
+// missing link was Stmt::rs_productions; the cases below cover the two
+// statement lists a randsequence production holds, once for each of the two
+// rules.
 
 // A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
 // }`, so a randsequence production's code block holds ordinary procedural
@@ -408,10 +408,10 @@ TEST(HierarchicalNameElaboration,
                             7, "23.6"));
 }
 
-// §23.6: "If the array name is not the last path element in the hierarchical
-// name, the instance select expression is required." A reference written in a
-// randsequence production's code block is subject to that as one written in a
-// continuous assignment is.
+// §23.6: an array name that is not the last element of a hierarchical path
+// needs its instance select expression. A reference written in a randsequence
+// production's code block is subject to that as one written in a continuous
+// assignment is.
 TEST(HierarchicalNameElaboration,
      InstanceArrayRefMissingSelectInARandsequenceCodeBlockIsReported) {
   ElabFixture f;
@@ -463,13 +463,12 @@ TEST(HierarchicalNameElaboration,
                             9, "23.6"));
 }
 
-// §23.6 ends "Hierarchical references into checkers (see Clause 17) shall not
-// be permitted", putting no condition on where the reference is written, so
-// every position a statement holds a statement in is one the report reaches.
-// WalkStmtsForCheckerRef in
-// src/elaborator/elaborator_validate_hier_refs.cpp had written out nine of
-// the thirteen child-statement links Stmt declares and now takes the
-// list from ForEachChildStmt in
+// §23.6 ends by forbidding hierarchical references into checkers (Clause 17),
+// putting no condition on where the reference is written, so every position a
+// statement holds a statement in is one the report reaches.
+// WalkStmtsForCheckerRef in src/elaborator/elaborator_validate_hier_refs.cpp
+// had written out nine of the thirteen child-statement links Stmt declares and
+// now takes the list from ForEachChildStmt in
 // src/elaborator/elaborator_validate_internal.h. The four cases below stand in
 // the four positions it was missing, each of which elaborated clean beforehand
 // with the reference into the checker left unreported.
@@ -572,10 +571,9 @@ TEST(HierarchicalNameElaboration,
 
 // §23.6 bars a hierarchical reference into a checker, and §23.7 decides which
 // dotted names are hierarchical: the first component is resolved, and where it
-// "resolves to a data object or interface port. The dotted name shall be
-// considered to be a select of that data object or interface port." §23.9 says
-// which declaration that first component reaches -- "If it is declared locally,
-// then the local item shall be used" -- and a begin-end block is one of the
+// names a data object or an interface port, the dotted name selects from that
+// object or port. §23.9 says which declaration that first component reaches --
+// a local declaration is the one used -- and a begin-end block is one of the
 // scopes it lists, so a block-local `chk_inst` is what `chk_inst.a` selects
 // from and the checker instance is not reached at all.
 //

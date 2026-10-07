@@ -249,11 +249,11 @@ TEST(ConcurrentAssertionSampling, TimeZeroTickReadsTheDefaultSampledValue) {
 }
 
 // §16.5.1 puts no condition on where the variable a property reads is declared,
-// and §23.6 makes a hierarchical name an ordinary way to reach one: "The
-// instance name ... is used to unambiguously gain access" to a name inside
-// another instance. So `u.req` is sampled exactly as a name the module declares
-// itself, and the value the property reads at a clock tick is the one `u.req`
-// held in the Preponed region of that time slot.
+// and §23.6 makes a hierarchical name an ordinary way to reach one, the
+// instance name giving unambiguous access to a name inside another instance. So
+// `u.req` is sampled exactly as a name the module declares itself, and the
+// value the property reads at a clock tick is the one `u.req` held in the
+// Preponed region of that time slot.
 //
 // The write and the tick stand in one time step here, which is the only shape
 // that tells a sampled read from a live one: `u.req` is 0 in the Preponed

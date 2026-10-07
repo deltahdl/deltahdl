@@ -187,12 +187,11 @@ TEST(CompilerDirectiveParsing,
   //
   // The first is not rejected at all. A.4.1.1 gives `hierarchical_instance ::=
   // name_of_instance ( [ list_of_port_connections ] )` and §23.3.2 repeats it
-  // in prose -- "The parentheses shall be required on all module
-  // instantiations, even when the instantiated module does not have ports" --
-  // so `int counted = 21;` cannot be an instantiation, and A.2.4 admits it as
-  // a variable_decl_assignment carrying its own initializer. So
-  // Parser::ParseImplicitTypeOrInst builds a data declaration whose
-  // type_identifier is the undeclared name `int`, and §6.18 -- "The
+  // in prose -- every module instantiation needs the parentheses, even of a
+  // module with no ports -- so `int counted = 21;` cannot be an instantiation,
+  // and A.2.4 admits it as a variable_decl_assignment carrying its own
+  // initializer. So Parser::ParseImplicitTypeOrInst builds a data declaration
+  // whose type_identifier is the undeclared name `int`, and §6.18 -- "The
   // declaration of a user-defined data type shall precede any reference to its
   // type_identifier" -- is what refuses it, at elaboration, which no parse
   // reaches. The tree is what says the words carried no keyword meaning: the

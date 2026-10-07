@@ -211,11 +211,11 @@ TEST(TaskAndFunctionNameResolutionSimulation,
   EXPECT_EQ(v->value.ToUint64(), 111u);
 }
 
-// §23.8.1 (printed pages 760-761): a subroutine name is looked up "in the
-// complete compilation unit of the reference" before the search steps up, so
-// Example 1's `x = f(1)` in the unit's task t is the unit's function f, and
-// Example 2's `f()` in generate block b is b's own f. With both examples in
-// one design, t enabled from inside b called b's void f and read 0.
+// §23.8.1 (printed pages 760-761): a subroutine name is looked up in the whole
+// compilation unit of the reference before the search steps up, so Example 1's
+// `x = f(1)` in the unit's task t is the unit's function f, and Example 2's
+// `f()` in generate block b is b's own f. With both examples in one design, t
+// enabled from inside b called b's void f and read 0.
 TEST(TaskAndFunctionNameResolutionSimulation,
      UnitTaskCallFromGenerateBlockReachesTheUnitFunction) {
   SimFixture f;

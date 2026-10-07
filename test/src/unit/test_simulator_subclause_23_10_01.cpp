@@ -135,12 +135,11 @@ TEST(DefparamSimulation, ADefparamNamingAnotherParameterKeepsEveryCharacter) {
   EXPECT_EQ(Logic4VecToString(var->value), "John Smith");
 }
 
-// §23.10 (printed page 764), the clause's own example: "the defparam of f1.A
-// with the value 3.1415 is performed by converting the floating-point number
-// 3.1415 into a fixed-point number 3", and "the defparam of f1.B with the
-// value 3.1415 replaces B's current value of 3'h2 with the floating-point
-// number 3.1415". Folded as an integer, each right-hand side was reported as
-// not constant and both read 0.0.
+// §23.10 (printed page 764), the clause's own example: the defparam of f1.A
+// with 3.1415 converts the floating-point 3.1415 to the fixed-point 3, and the
+// defparam of f1.B with 3.1415 replaces B's 3'h2 with the floating-point
+// 3.1415. Folded as an integer, each right-hand side was reported as not
+// constant and both read 0.0.
 TEST(DefparamSimulation, RealRightHandSideTakesTheParametersTypeOrItsOwn) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module m1;\n"

@@ -604,13 +604,12 @@ TEST(ImplicitDeclaration,
 // §6.10 assumes no implicit net for an identifier declared "in any scope whose
 // declarations can be directly referenced from" the scope the assignment
 // appears in, and §23.9 rules that a generate block one level out is such a
-// scope: an identifier referenced in a generate block "shall be declared either
-// within the ... generate block locally or within a module, interface, program,
-// checker, task, function, named block, or generate block that is higher in the
-// same branch of the name tree". Block 'b' is higher in the same branch than
-// block 'a', so the reference to 'w' inside 'a' names the net 'b' declared and
-// declares nothing. The module holds one net named 'b_w' and none named
-// 'b_a_w'.
+// scope: an identifier referenced in a generate block must be declared in that
+// block itself or in a module, interface, program, checker, task, function,
+// named block or generate block above it in the same branch of the name tree.
+// Block 'b' is higher in the same branch than block 'a', so the reference to
+// 'w' inside 'a' names the net 'b' declared and declares nothing. The module
+// holds one net named 'b_w' and none named 'b_a_w'.
 //
 // The test fails when mod->nets holds an entry named 'b_a_w', which
 // Elaborator::MaybeCreateImplicitNet in src/elaborator/elaborator_items.cpp
@@ -724,11 +723,11 @@ TEST(ImplicitDeclaration,
 
 // §6.10 assumes an implicit net for an identifier not declared "in the scope
 // where the continuous assignment statement appears or in any scope whose
-// declarations can be directly referenced from" it, and §23.9 lists "Generate
-// blocks" among the elements that "define a new scope". The localparam 'P'
-// belongs to block 'a' alone, and neither the module scope the assignment
-// stands in nor any scope it can reference directly is block 'a', so the
-// assignment declares a net named 'P'.
+// declarations can be directly referenced from" it, and §23.9 lists generate
+// blocks among the elements that open a new scope. The localparam 'P' belongs
+// to block 'a' alone, and neither the module scope the assignment stands in nor
+// any scope it can reference directly is block 'a', so the assignment declares
+// a net named 'P'.
 //
 // The test fails when mod->nets holds no entry named 'P'. IsParamDeclared in
 // src/elaborator/elaborator_items.cpp reads RtlirModule::params, whose entries
@@ -759,10 +758,10 @@ TEST(ImplicitDeclaration,
 }
 
 // The same reading where the reference stands in a sibling generate block.
-// §23.9 rules that an identifier "referenced directly (without a hierarchical
-// path)" is declared "locally or within a module, interface, program, checker,
-// task, function, named block, or generate block that is higher in the same
-// branch of the name tree", and block 'a' is not higher in block 'c''s branch:
+// §23.9 rules that an identifier referenced directly, with no hierarchical
+// path, is declared in its own scope or in a module, interface, program,
+// checker, task, function, named block or generate block above it in the same
+// branch of the name tree, and block 'a' is not higher in block 'c''s branch:
 // they are siblings. Block 'c' therefore declares a net named 'c_P'.
 //
 // Neither block is at module level, so the case cannot pass by

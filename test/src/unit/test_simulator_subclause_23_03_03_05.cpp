@@ -100,13 +100,13 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
 }
 
 // §23.3.3.5 (printed page 748): an unpacked array connection is split across
-// an array of instances, "each element of the port connection shall be matched
-// to the port left index to left index, right index to right index": u[3],
-// the leftmost of u[3:0], takes ins[0], the leftmost of ins[0:3], and its
-// output lands in outs[0]. The element was chosen counting from the right
-// end of the instance array and the left end of the connection, so u[3]
-// took ins[3]. `leaf k[3]` is k[0] to k[2], three instances, each on its own
-// element; it was one instance, k[1] and k[2] never driven.
+// an array of instances, each element of the connection matched to the port
+// left index to left index and right index to right index: u[3], the leftmost
+// of u[3:0], takes ins[0], the leftmost of ins[0:3], and its output lands in
+// outs[0]. The element was chosen counting from the right end of the instance
+// array and the left end of the connection, so u[3] took ins[3]. `leaf k[3]` is
+// k[0] to k[2], three instances, each on its own element; it was one instance,
+// k[1] and k[2] never driven.
 TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
      UnpackedConnectionMatchesLeftIndexToLeftIndex) {
   SimFixture f;
@@ -131,12 +131,12 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
 }
 
 // §23.3.3.5 (printed page 748): an unpacked array port connected to an
-// unpacked array has "each element of the port connection ... matched to the
-// port left index to left index", so `input var int i[3]` on `int one[3] =
-// '{5, 6, 7}` reads 5, 6 and 7, and `input logic [3:0] l[2]` on `'{9, 10}`
-// reads 9 and 10 -- unsigned, as the element is declared. The port was one
-// value of an element's width, i[0] to i[2] reading the bits of 7 and l[0],
-// l[1] those of 10; s.i[1] names the port's element from above.
+// unpacked array has each element of the connection matched to the port left
+// index to left index, so `input var int i[3]` on `int one[3] = '{5, 6, 7}`
+// reads 5, 6 and 7, and `input logic [3:0] l[2]` on `'{9, 10}` reads 9 and 10
+// -- unsigned, as the element is declared. The port was one value of an
+// element's width, i[0] to i[2] reading the bits of 7 and l[0], l[1] those of
+// 10; s.i[1] names the port's element from above.
 TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
      UnpackedArrayPortReadsEachElementOfItsConnection) {
   SimFixture f;

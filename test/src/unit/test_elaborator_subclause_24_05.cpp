@@ -199,10 +199,10 @@ TEST(ProgramSubroutineCall, ProgramTaskCallInARandsequenceCodeBlockIsError) {
 
 // §24.5 bars a design module from calling a program subroutine, and a program
 // subroutine is one declared in a program. §23.9 decides which declaration a
-// call reaches -- "If it is declared locally, then the local item shall be
-// used" -- and it lists a begin-end block among the scopes a declaration can be
-// local to, so `p.go()` under a block-local `p` calls that object's method and
-// reaches the nested program not at all.
+// call reaches -- a local declaration is the one used -- and it lists a
+// begin-end block among the scopes a declaration can be local to, so `p.go()`
+// under a block-local `p` calls that object's method and reaches the nested
+// program not at all.
 //
 // The rule resolved nothing: IsProgramSubroutineCallExpr matched the leftmost
 // component of the callee against the set of program instance names, so this

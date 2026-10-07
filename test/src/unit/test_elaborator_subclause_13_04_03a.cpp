@@ -788,7 +788,7 @@ TEST(ConstantFunctionRulesElaboration,
 }
 
 // The scope the call is folded in. §23.9 stops the upward search for a directly
-// referenced identifier at "a module, interface, program, or checker boundary",
+// referenced identifier at the edge of a module, interface, program or checker,
 // so the scale that block 'a' of module m2 calls is m2's own and P folds to 12
 // rather than to the 8 m1's scale would give it.
 //
@@ -823,8 +823,9 @@ TEST(ConstantFunctionRulesElaboration,
 // stand in a generate block once port declarations, specify blocks and
 // specparam declarations are excluded, so a function may be declared inside
 // one. §13.4.3 has a constant function call "evaluated at elaboration time" and
-// §23.9 has an identifier "declared locally" name the local item, so the triple
-// block 'a' declares is what the call in block 'a' names and P folds to 12.
+// §23.9 has an identifier declared in the scope itself name that local item, so
+// the triple block 'a' declares is what the call in block 'a' names and P folds
+// to 12.
 //
 // The test fails with P unresolved, which ResolvedParam reports as -1.
 // RecordTaskFuncNames in src/elaborator/elaborator_items_udp.cpp fills the
@@ -852,11 +853,11 @@ TEST(ConstantFunctionRulesElaboration,
   EXPECT_EQ(ResolvedParam(design, "P"), 12);
 }
 
-// The control the case above needs. §23.9 lists "Generate blocks" among the
-// elements that "define a new scope", and blocks 'a' and 'b' are siblings, so
-// neither is "higher in the same branch of the name tree" than the other and
-// the triple block 'a' declares is not what a call in block 'b' names. N is
-// left with no value.
+// The control the case above needs. §23.9 lists generate blocks among the
+// elements that open a new scope, and blocks 'a' and 'b' are siblings, so
+// neither stands above the other in the same branch of the name tree and the
+// triple block 'a' declares is not what a call in block 'b' names. N is left
+// with no value.
 //
 // The test fails when N is resolved, which is what a fix that recorded every
 // generate block's functions into one table for the module would leave: such a
@@ -883,11 +884,10 @@ TEST(ConstantFunctionRulesElaboration,
 }
 
 // The direction §23.9 does carry across a generate block boundary. The clause
-// has the search for a directly referenced identifier "continue upward until an
-// item by that name is found or until a module, interface, program, or checker
-// boundary is encountered", and a generate block is not one of those
-// boundaries, so block 'b' nested inside block 'a' names block 'a''s triple and
-// P folds to 12.
+// has the search for a directly referenced identifier climb until it finds an
+// item of that name or reaches the edge of a module, interface, program or
+// checker, and a generate block is not one of those boundaries, so block 'b'
+// nested inside block 'a' names block 'a''s triple and P folds to 12.
 //
 // This is the case a fresh table per block fails: block 'b' declares no
 // function of its own, so it has what it inherited or nothing.

@@ -130,13 +130,12 @@ TEST(PortDeclaration, VarTypedScalarPortsElaborate) {
 }
 
 // §23.2.2: an enumeration is an admitted port data type, and §23.2.2.3 decides
-// the port kind separately from it: "If the port kind is omitted: for input and
-// inout ports, the port shall default to a net of default net type." No
-// exception is made for a port that names a data type -- that clause's own
-// `module mh1 (integer x);` means `inout wire integer x`, and `module mh7
-// (input var integer x);` shows that `var` is what makes an input a variable.
-// So the inline enum port carries the enum kind at its base (int) width and is
-// a net.
+// the port kind separately from it: an input or inout port with no port kind is
+// a net of the default net type. No exception is made for a port that names a
+// data type -- that clause's own `module mh1 (integer x);` means
+// `inout wire integer x`, and `module mh7 (input var integer x);` shows that
+// `var` is what makes an input a variable. So the inline enum port carries the
+// enum kind at its base (int) width and is a net.
 //
 // Being a net, it is a net the standard forbids. §6.7.1 admits only a 4-state
 // integral type as a net's data type, so that "a net is composed entirely of
@@ -161,13 +160,11 @@ TEST(PortDeclaration, EnumPortElaboratesAsANetWhenThePortKindIsOmitted) {
                             "net data type must be 4-state", 2, "6.7.1"));
 }
 
-// The same port with `var` written in front of it. §23.2.2.3 counts `var`
-// among the port kinds -- "the term port kind is used to mean any of the net
-// type keywords, or the keyword var, which are used to explicitly declare a
-// port of one of these kinds" -- so it says what the port is, not what type it
-// has. The port is then a variable rather than the net an input defaults to,
-// and §6.7.1 is about nets, so the very enumeration rejected just above is
-// accepted here.
+// The same port with `var` written in front of it. §23.2.2.3 counts `var` among
+// the port kinds -- the net type keywords and var, written to declare a port of
+// one of those kinds -- so it says what the port is, not what type it has. The
+// port is then a variable rather than the net an input defaults to, and §6.7.1
+// is about nets, so the very enumeration rejected just above is accepted here.
 //
 // The two sources differ by that one word, which is what makes this pair worth
 // having: it reads the effect of `var` rather than the acceptability of an
@@ -249,11 +246,11 @@ TEST(PortDeclaration, TwoStateInputPortIsRejected) {
 }
 
 // The asymmetry §23.2.2.3 draws, and the reason the rejection above cannot be
-// written as "a 2-state port data type is illegal". For an output "if the data
-// type is declared with the explicit data_type syntax, the port kind shall
-// default to variable", and the clause's `module mh11(output integer x);`
-// means `output var integer x`. A variable is outside §6.7.1 entirely, so the
-// same 2-state data type is accepted here.
+// written as a ban on 2-state port data types. An output whose data type is
+// written with the explicit data_type syntax defaults to the variable port
+// kind, and the clause's `module mh11(output integer x);` means
+// `output var integer x`. A variable is outside §6.7.1 entirely, so the same
+// 2-state data type is accepted here.
 TEST(PortDeclaration, TwoStateOutputPortIsAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(

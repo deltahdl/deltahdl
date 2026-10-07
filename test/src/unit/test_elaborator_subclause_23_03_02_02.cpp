@@ -226,11 +226,10 @@ TEST(NamedPortConnectionElaboration, ReversedOrderBindsCorrectly) {
   EXPECT_TRUE(found_b);
 }
 
-// §23.3.2.2: "The port_name shall be the name specified in the module
-// declaration." A named connection whose port_name names no port of the
-// instantiated module breaches that, and the report naming it carries the
-// subclause, so a caller learns which rule was enforced without matching the
-// wording of the message.
+// §23.3.2.2: the port_name must be a port the module declaration names. A named
+// connection whose port_name names no port of the instantiated module breaches
+// that, and the report naming it carries the subclause, so a caller learns
+// which rule was enforced without matching the wording of the message.
 TEST(NamedPortConnectionElaboration, PortNameNamesNoPortNames23_3_2_2) {
   ElabFixture f;
   ElaborateSrc(
@@ -245,10 +244,10 @@ TEST(NamedPortConnectionElaboration, PortNameNamesNoPortNames23_3_2_2) {
                               "23.3.2.2"));
 }
 
-// §23.3.2.2 (printed page 744): "Multiple module instance port connections
-// are not allowed", and the clause's example connecting an input, an output
-// and an inout port twice each is "illegal". Each port named twice is
-// reported, once; both connections were applied without a word.
+// §23.3.2.2 (printed page 744): a port may be connected only once in an
+// instance, and the clause's example connecting an input, an output and an
+// inout port twice each is "illegal". Each port named twice is reported, once;
+// both connections were applied without a word.
 TEST(NamedPortConnectionElaboration, PortConnectedTwiceIsError) {
   ElabFixture f;
   ElaborateSrc(

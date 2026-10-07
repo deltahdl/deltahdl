@@ -68,12 +68,11 @@ TEST(DottedNameSynthesis, NestedStructMemberSelectIsReportedUnlowered) {
 // member name `sig` and differ only in the name they start from, so a
 // discrimination that reads the member name, the depth of the chain or the
 // order the assignments were written in gets one of the two wrong. §23.7 is the
-// subclause that rules them apart: "The distinguishing aspect of a hierarchical
-// name is that the first component of the name matches a scope name while the
-// first name component of a member select matches a data object or interface
-// port name." `p` is a pair_t variable, so `p.sig` is the member select §7.2.1
-// defines. `c1` is an instance of module child, so `c1.sig` is the hierarchical
-// name §23.6 defines.
+// subclause that rules them apart: a hierarchical name's first component
+// matches a scope name, while a member select's first component matches a data
+// object or an interface port. `p` is a pair_t variable, so `p.sig` is the
+// member select §7.2.1 defines. `c1` is an instance of module child, so
+// `c1.sig` is the hierarchical name §23.6 defines.
 //
 // The two ReportedError calls are the claim this case makes. The claim is that
 // two dotted names in one module draw two different reports, and one call

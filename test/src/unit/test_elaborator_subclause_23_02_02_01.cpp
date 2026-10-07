@@ -223,8 +223,8 @@ TEST(NonAnsiStylePortDeclarations, ImplicitPortNetSignednessFollowsPort) {
 
 // §23.2.2.1: real-source form of the implicit-net-signedness rule. A non-ANSI
 // port that has no explicit net declaration is not materialized as a separate
-// net; it stands for the implicit net directly, so the "unsigned unless the
-// port is declared signed" rule manifests on the port itself. Driven through
+// net; it stands for the implicit net directly, so the rule that a port is
+// unsigned unless declared signed manifests on the port itself. Driven through
 // parse+elaborate with no net declarations for either port.
 TEST(NonAnsiStylePortDeclarations, SignedPortWithoutNetDeclFollowsDeclaration) {
   ElabFixture f;
@@ -418,7 +418,7 @@ TEST(NonAnsiStylePortDeclarations,
 
 // §23.2.2.1 (negative): a part-select implicit port carries no port name, so a
 // named connection using the base identifier must not resolve to it — the LRM's
-// split-vector example that "cannot use named port connections." The port is
+// split-vector example that named port connections cannot reach. The port is
 // built from real non-ANSI source and reached through the named-connection path
 // of 23.3.2.2.
 TEST(NonAnsiStylePortDeclarations, ImplicitPartSelectPortNotConnectableByName) {
@@ -475,12 +475,11 @@ TEST(NonAnsiStylePortDeclarations, SelectPortFixKeepsSimplePortNameable) {
       << "a simple-identifier implicit port keeps its name after the fix";
 }
 
-// §23.2.2.1: each port_identifier in the list of ports "shall also be declared
-// in the body of the module as one of the following port declarations: input,
-// output, inout, ref, or as an interface port". A header port the body never
-// gives a direction breaches that, and the report naming it carries the
-// subclause, so a caller learns which rule was enforced without matching the
-// wording of the message.
+// §23.2.2.1: each port_identifier in the list of ports must also be declared in
+// the module body as an input, output, inout or ref port, or as an interface
+// port. A header port the body never gives a direction breaches that, and the
+// report naming it carries the subclause, so a caller learns which rule was
+// enforced without matching the wording of the message.
 TEST(NonAnsiStylePortDeclarations, PortWithoutADirectionNames23_2_2_1) {
   ElabFixture f;
   ElaborateSrc(

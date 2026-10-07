@@ -8,9 +8,9 @@ using namespace delta;
 
 namespace {
 
-// §23.11 (printed page 773): "All identifiers in the bind instantiation are
-// referenced from the bind target's point of view", and the standard's example
-// binds `i_mycheck(.*, ...)`, so the ports `.*` reaches connect to the target's
+// §23.11 (printed page 773): every identifier of a bind instantiation is
+// resolved as seen from the bind target, and the standard's example binds
+// `i_mycheck(.*, ...)`, so the ports `.*` reaches connect to the target's
 // signals of their names (§23.3.2.4). A bound instance built its connections
 // from the named and ordered ones alone, and v1 read x and v2 0.
 TEST(BindInstantiation, WildcardConnectsPortsToTargetSignals) {

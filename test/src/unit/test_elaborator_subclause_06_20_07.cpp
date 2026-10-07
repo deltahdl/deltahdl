@@ -302,14 +302,14 @@ TEST(DollarConstantElaboration, DollarParameterNotResolved) {
   }
 }
 
-// §23.9 lists "Generate blocks" among the elements that "define a new scope",
-// and rules that an identifier "referenced directly (without a hierarchical
-// path)" is declared "locally or within a module, interface, program, checker,
-// task, function, named block, or generate block that is higher in the same
-// branch of the name tree". Block 'a' is not higher in the module's own branch,
-// so the P that block 'a' assigned $ is not what the module-level Q names, and
-// the §6.20.7 propagation this file's
-// DollarParameterAssignedToAnotherIsUnbounded asserts does not reach it.
+// §23.9 lists generate blocks among the elements that open a new scope, and
+// rules that an identifier referenced directly, with no hierarchical path, is
+// declared in its own scope or in a module, interface, program, checker, task,
+// function, named block or generate block above it in the same branch of the
+// name tree. Block 'a' is not higher in the module's own branch, so the P that
+// block 'a' assigned $ is not what the module-level Q names, and the §6.20.7
+// propagation this file's DollarParameterAssignedToAnotherIsUnbounded asserts
+// does not reach it.
 //
 // The test fails when Q comes out unbounded. Elaborator::RefersToUnboundedParam
 // in src/elaborator/elaborator_items_scope.cpp matches RtlirParamDecl::name,
@@ -342,9 +342,9 @@ TEST(DollarConstantElaboration,
 }
 
 // The direction the scope test must not lose. §23.9 rules that an identifier
-// "declared locally" is what a direct reference names, so block 'a''s own P is
-// what block 'a''s Q names, and §6.20.7's propagation carries the unbounded
-// flag across it exactly as this file's
+// declared in the scope itself is what a direct reference names, so block 'a''s
+// own P is what block 'a''s Q names, and §6.20.7's propagation carries the
+// unbounded flag across it exactly as this file's
 // DollarParameterAssignedToAnotherIsUnbounded has it do at module level.
 //
 // The test fails when Q comes out bounded, which is what a check that dropped

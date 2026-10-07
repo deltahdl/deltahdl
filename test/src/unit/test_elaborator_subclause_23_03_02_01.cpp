@@ -292,12 +292,11 @@ TEST(OrderedPortElaboration, NonAnsiChildPortsBindByPosition) {
   EXPECT_EQ(bindings[1].width, 8u);
 }
 
-// §23.3.2.1: "the port expressions listed for the module instance shall be in
-// the same order as the ports listed in the module declaration", so an
-// instantiation listing more expressions than the module has ports has no port
-// for the last of them. The report that says so names the subclause stating the
-// rule, which lets a caller learn which rule was enforced without matching the
-// wording of the message.
+// §23.3.2.1: an instance lists its port expressions in the order the module
+// declaration lists its ports, so an instantiation listing more expressions
+// than the module has ports has no port for the last of them. The report that
+// says so names the subclause stating the rule, which lets a caller learn which
+// rule was enforced without matching the wording of the message.
 TEST(OrderedPortElaboration, TooManyOrderedConnectionsNames23_3_2_1) {
   ElabFixture f;
   ElaborateSrc(

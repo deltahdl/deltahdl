@@ -25,18 +25,17 @@ TEST(ScopeResolutionPrefixSynthesis, PackagePrefixParamSynthesizes) {
 
 // The assertion names §23.7.1 because `pkg::level` is a name written with the
 // scope resolution operator rather than a member of a packed structure.
-// §23.7.1 defines what this source writes: "A name with a package or class
-// scope resolution prefix (::) shall always resolve in a downwards manner and
-// shall never be subject to the upwards resolution rules in 23.8. If the
-// prefix name can be resolved using the normal scope resolution rules, the
-// '::' shall denote the class scope resolution operator. Otherwise the '::'
-// shall denote the package scope resolution operator." Parser::MakeMemberAccess
-// in src/parser/expr_parser.cpp builds this name as ExprKind::kMemberAccess and
-// records the operator in Expr::is_scope_resolution, and it builds the member
-// select `p.hi` and the hierarchical name `c1.sig` as that same kind, so
-// SynthLower is what has to tell the three apart before it reports one. This
-// case fails while SynthLower reports the §7.2.1 packed-structure message for a
-// name written with `::`, which is what it reports today.
+// §23.7.1 defines what this source writes: a name with a package or class scope
+// resolution prefix (::) always resolves downwards and never by §23.8's upward
+// rules, and the :: is the class scope resolution operator when the normal
+// scope rules resolve the prefix, the package one otherwise.
+// Parser::MakeMemberAccess in src/parser/expr_parser.cpp builds this name as
+// ExprKind::kMemberAccess and records the operator in
+// Expr::is_scope_resolution, and it builds the member select `p.hi` and the
+// hierarchical name `c1.sig` as that same kind, so SynthLower is what has to
+// tell the three apart before it reports one. This case fails while SynthLower
+// reports the §7.2.1 packed-structure message for a name written with `::`,
+// which is what it reports today.
 //
 // The source reads a package variable on the right-hand side of a continuous
 // assignment, because that is a position the elaborator hands to

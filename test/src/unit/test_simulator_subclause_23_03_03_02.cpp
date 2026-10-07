@@ -158,13 +158,12 @@ TEST(PortConnectionRulesForVariablesSimulation,
   EXPECT_EQ(var->value.ToString(), "00000000");
 }
 
-// §23.3.3.2 (printed page 747): "References to the port variable shall be
-// treated as hierarchical references to the variable to which it is connected
-// in its instantiation", so a ref port drives nothing: the parent's v keeps
-// its initializer 10, the parent writes 20 after the child read 10, the child
-// reads that 20, and its r + 11 lands in v as 31. The connection was recorded
-// as an output port's, and v's initializer and the parent's write were
-// refused as a second driver.
+// §23.3.3.2 (printed page 747): a reference to the port variable acts as a
+// hierarchical reference to the variable the instantiation connects it to, so a
+// ref port drives nothing: the parent's v keeps its initializer 10, the parent
+// writes 20 after the child read 10, the child reads that 20, and its r + 11
+// lands in v as 31. The connection was recorded as an output port's, and v's
+// initializer and the parent's write were refused as a second driver.
 TEST(RefPortSimulation, WritesOnEitherSideAreSeenOnTheOther) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module child(ref int r);\n"
