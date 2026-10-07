@@ -576,8 +576,8 @@ bool Parser::TryParseCuTypeDeclaration(CompilationUnit* unit) {
 }
 
 // The current token opens no top-level declaration. §14.7 names one such token
-// outright — a clocking block "cannot be declared ... outside all declarations
-// in a compilation unit" — so that rule is reported before the general §3.12.1
+// outright, forbidding a clocking block in a compilation unit's scope outside
+// every other declaration, so that rule is reported before the general §3.12.1
 // one, which says only that the token was not expected here.
 void Parser::ReportUnexpectedTopLevelToken() {
   if (AtClockingDecl()) {

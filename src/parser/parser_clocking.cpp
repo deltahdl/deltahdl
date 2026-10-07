@@ -82,8 +82,8 @@ ModuleItem* Parser::ParseClockingDecl() {
   item->kind = ModuleItemKind::kClockingBlock;
   item->loc = CurrentLoc();
 
-  // §14.7: a clocking block can only be declared inside a module, interface,
-  // checker, or program; it shall not be declared inside a package.
+  // §14.7: the bodies that may hold a clocking block are those of a module, an
+  // interface, a checker and a program, and a package body may not.
   //
   // An anonymous program in the package is no exception, whatever its keyword
   // suggests. §24.6 has an anonymous program in a package declare items for
@@ -159,13 +159,13 @@ bool Parser::AtClockingDecl() {
   return is_clocking;
 }
 
-// §14.7 rules that a clocking block "can only be declared inside a module,
-// interface, checker, or program", and that "Multiple clocking blocks cannot be
-// nested". Reports `message` at the `clocking` keyword, then reads the
-// declaration with Parser::ParseClockingDecl and discards it, so the enclosing
-// body resumes after `endclocking` instead of reporting the same tokens again
-// under whatever rule its own fallback happens to name. `message` states where
-// the block was found, which differs at every call site.
+// §14.7 rules that a clocking block belongs only in a module, an interface, a
+// checker or a program, and that no clocking block may contain another. Reports
+// `message` at the `clocking` keyword, then reads the declaration with
+// Parser::ParseClockingDecl and discards it, so the enclosing body resumes
+// after `endclocking` instead of reporting the same tokens again under whatever
+// rule its own fallback happens to name. `message` states where the block was
+// found, which differs at every call site.
 void Parser::RejectClockingDecl(std::string_view message) {
   diag_.Error(CurrentLoc(), std::string(message), Subclause("14.7"));
   ParseClockingDecl();
@@ -225,10 +225,10 @@ void Parser::ParseClockingDefaultSkew(const Token& direction, Edge& edge,
 // the block-wide skews rather than declaring a signal. A.6.11 writes it as
 // `default_skew ::= input clocking_skew | output clocking_skew | input
 // clocking_skew output clocking_skew`: at least one direction, each with its
-// skew, and the input skew before the output skew. §14.3 says what it is for --
-// "A single skew can be specified for the entire block by using a default
-// clocking item" -- so a `default` item that specifies no skew has nothing to
-// set, and was taken silently before as a block that set neither default.
+// skew, and the input skew before the output skew. §14.3 says what it is for:
+// it gives one skew to every signal of the block at once, so a `default` item
+// that specifies no skew has nothing to set, and was taken silently before as
+// a block that set neither default.
 void Parser::ParseClockingDefaultSkews(ModuleItem* item) {
   auto default_tok = Consume();  // 'default'
   bool has_direction = false;
