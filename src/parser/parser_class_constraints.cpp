@@ -512,16 +512,16 @@ void Parser::CheckDistSet() {
       Token def = Consume();
       if (++default_count > 1) {
         diag_.Error(def.loc,
-                    "a distribution shall contain at most one default "
-                    "specification",
+                    "this distribution already has a default specification; it "
+                    "can have only one",
                     Subclause("18.5.3"));
       }
       if (CheckColonSlash()) {
         MatchColonSlash();
       } else {
         diag_.Error(def.loc,
-                    "a default distribution specification shall use the :/ "
-                    "operator",
+                    "a distribution's default specification takes its weight "
+                    "through :/ and nothing else",
                     Subclause("18.5.3"));
       }
     } else if (Match(TokenKind::kLBrace)) {

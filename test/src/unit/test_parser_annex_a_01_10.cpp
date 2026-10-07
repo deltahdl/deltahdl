@@ -724,9 +724,10 @@ TEST(ConstraintItemsParsing, ErrorDistDefaultEqualWeight) {
       "  rand int x;\n"
       "  constraint c { x dist { [0:9] :/ 1, default := 1 }; }\n"
       "endclass\n");
-  EXPECT_TRUE(ReportedError(
-      r.diags, "a default distribution specification shall use the :/ operator",
-      3, "18.5.3"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a distribution's default specification takes its "
+                            "weight through :/ and nothing else",
+                            3, "18.5.3"));
 }
 
 }  // namespace

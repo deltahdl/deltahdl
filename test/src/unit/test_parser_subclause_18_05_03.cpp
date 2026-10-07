@@ -58,9 +58,10 @@ TEST(ConstraintDistParsing, DefaultWithAssignWeightRejected) {
       "  rand int x;\n"
       "  constraint c { x dist {[100:102]:/3, default:=1}; }\n"
       "endclass\n");
-  EXPECT_TRUE(ReportedError(
-      r.diags, "a default distribution specification shall use the :/ operator",
-      3, "18.5.3"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a distribution's default specification takes its "
+                            "weight through :/ and nothing else",
+                            3, "18.5.3"));
 }
 
 // 18.5.3: a default specification written without its :/ operator is an error.
@@ -70,9 +71,10 @@ TEST(ConstraintDistParsing, DefaultWithoutWeightOperatorRejected) {
       "  rand int x;\n"
       "  constraint c { x dist {100:=1, default 5}; }\n"
       "endclass\n");
-  EXPECT_TRUE(ReportedError(
-      r.diags, "a default distribution specification shall use the :/ operator",
-      3, "18.5.3"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a distribution's default specification takes its "
+                            "weight through :/ and nothing else",
+                            3, "18.5.3"));
 }
 
 // 18.5.3: a distribution may hold one default specification, never two.
@@ -82,9 +84,10 @@ TEST(ConstraintDistParsing, MultipleDefaultsRejected) {
       "  rand int x;\n"
       "  constraint c { x dist {default:/1, default:/2}; }\n"
       "endclass\n");
-  EXPECT_TRUE(ReportedError(
-      r.diags, "a distribution shall contain at most one default specification",
-      3, "18.5.3"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "this distribution already has a default "
+                            "specification; it can have only one",
+                            3, "18.5.3"));
 }
 
 }  // namespace
