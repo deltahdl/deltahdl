@@ -32,8 +32,8 @@ TEST(EventWaitElaborator, BareWaitSyntaxElaborates) {
              "endmodule\n"));
 }
 
-// §15.5.2 states only how a process waits, "The @ operator blocks the calling
-// process until the given event is triggered", and states no rule about what an
+// §15.5.2 states only how a process waits, holding the process that applies @
+// to an event until that event is triggered, and states no rule about what an
 // event expression may call. That rule is §9.4.2, which permits a method in an
 // event control expression only "as long as the type of the return value is
 // singular and the method is defined as a function, not a task", so the

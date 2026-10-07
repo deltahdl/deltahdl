@@ -67,7 +67,8 @@ TEST(IpcSync, SemaphoreTryGetSuccessIsNotError) {
 // §15.3.4: try_get() is the non-blocking counterpart of get(). On a bucket that
 // cannot satisfy the request, get() reports a block (the caller would suspend),
 // whereas try_get() returns immediately with 0 and leaves the bucket untouched.
-// This contrast pins the defining "without blocking" behavior of the subclause.
+// This contrast pins the subclause's defining behavior, a request that never
+// blocks.
 TEST(IpcSync, SemaphoreTryGetDoesNotBlockWhereGetWould) {
   delta::SemaphoreObject sem(1);
   EXPECT_EQ(sem.Get(2), delta::SemGetStatus::kBlock);

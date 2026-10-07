@@ -394,9 +394,9 @@ TEST(AlwaysCombVsAlwaysStar, CycleDelayInAlwaysCombErrors) {
                             "9.2.2.2.2"));
 }
 
-// §9.2.2.2.2 forbids a statement that blocks, and §15.5.4 rules that "The
-// wait_order construct suspends the calling process until all of the specified
-// events are triggered in the given order". Its Syntax 15-2 is wait_order (
+// §9.2.2.2.2 forbids a statement that blocks, and §15.5.4 has wait_order hold
+// the process that runs it until the events it names have all been triggered,
+// one after another in the order written. Its Syntax 15-2 is wait_order (
 // hierarchical_identifier { , hierarchical_identifier } ) action_block, where
 // action_block ::= statement_or_null, so the null action written here is the
 // whole statement and the two arguments are declared events.
@@ -439,8 +439,8 @@ TEST(AlwaysCombVsAlwaysStar, ExpectInAlwaysCombErrors) {
 }
 
 // The boundary of the same rule. §9.2.2.2.2 reaches a statement that blocks,
-// and §15.5.1 rules that with the ->> operator "the statement executes without
-// blocking, and it creates a nonblocking assign update event", so a nonblocking
+// and §15.5.1 has a statement using the ->> operator complete at once,
+// scheduling the trigger as a nonblocking assign update event, so a nonblocking
 // event trigger is not one and an always_comb containing it stands.
 //
 // The claim is only that no error cites §9.2.2.2.2, so any other diagnostic the

@@ -43,9 +43,10 @@ TEST(IpcSync, TriggerNullEventHasNoEffect) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// The "no effect" rule applies to both trigger operators. This exercises the
-// nonblocking trigger (->>) path on a null event; the process must run straight
-// through without blocking or disturbing simulation.
+// The rule that triggering a null event does nothing applies to both trigger
+// operators. This exercises the nonblocking trigger (->>) path on a null event;
+// the process must run straight through without blocking or disturbing
+// simulation.
 TEST(IpcSync, NonblockingTriggerNullEventHasNoEffect) {
   LowerFixture f;
   auto* var = RunAndFindVar(

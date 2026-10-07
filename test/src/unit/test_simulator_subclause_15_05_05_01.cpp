@@ -95,7 +95,8 @@ TEST(IpcSync, ProcessBlockedBeforeMergeDoesNotUnblock) {
 // A single trigger on one merged name must reach processes waiting on every
 // other name merged into the same synchronization object, not just one. This
 // observes the watcher list of the shared Variable being drained for multiple
-// distinct alias names (the "also triggers a and b" multi-target case).
+// distinct alias names (the case where one trigger reaches more than one other
+// name).
 TEST(IpcSync, MergedTriggerWakesAllAliasWaiters) {
   LowerFixture f;
   auto [r1, r2] = RunModuleTwoVars(f,

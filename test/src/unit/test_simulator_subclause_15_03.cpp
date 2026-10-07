@@ -221,11 +221,11 @@ TEST(SemaphoreSim, GetProcuresAvailableKeysWithoutWaiting) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// §15.3: "all others shall wait until a sufficient number of keys are returned
-// to the bucket". The one key is held from time 0, so the second process
-// reaches its get() at time 1 and cannot pass it until the put() at time 5.
-// The time it recorded is what says it waited: a get() that did not wait would
-// have recorded 1.
+// §15.3: a process whose request exceeds the keys in the bucket waits until
+// enough of them have been put back. The one key is held from time 0, so the
+// second process reaches its get() at time 1 and cannot pass it until the put()
+// at time 5. The time it recorded is what says it waited: a get() that did not
+// wait would have recorded 1.
 TEST(SemaphoreSim, GetWaitsUntilKeysAreReturned) {
   SimFixture f;
   auto* var = RunAndFindVar(
