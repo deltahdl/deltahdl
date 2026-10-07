@@ -37,10 +37,14 @@ std::string g_bus_name;
 int g_bus_size = 0;
 int g_bus_vector = -1;
 int g_scalar_vector = -1;
+int g_module_scalar = -1;
+int g_module_vector = -1;
 
 PLI_INT32 Figure371Calltf(PLI_BYTE8*) {
   vpiHandle mod = vpi_handle_by_name(VpiText("m1"), nullptr);
   if (mod == nullptr) return 0;
+  g_module_scalar = vpi_get(vpiScalar, mod);
+  g_module_vector = vpi_get(vpiVector, mod);
 
   // The one-to-many relation, which §38.23 walks with an iterator.
   vpiHandle nets = vpi_iterate(vpiNet, mod);
@@ -76,6 +80,8 @@ void RegisterFigureProbe() {
   g_bus_size = 0;
   g_bus_vector = -1;
   g_scalar_vector = -1;
+  g_module_scalar = -1;
+  g_module_vector = -1;
 
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
@@ -140,6 +146,20 @@ TEST_F(VpiObjectClassifications, TheThreePropertiesOfANetAreAnswered) {
   // port and to nothing else.
   EXPECT_EQ(g_bus_vector, 1);
   EXPECT_EQ(g_scalar_vector, 0);
+}
+
+// The figure names vpiVector on the net and not on the module, and §37.10
+// gives a module neither vpiScalar nor vpiVector, so the module both relations
+// start from answers FALSE to each Boolean rather than a value read off some
+// width it does not have.
+TEST_F(VpiObjectClassifications, TheModuleIsNeitherScalarNorVector) {
+  RegisterFigureProbe();
+
+  SimFixture f;
+  RunFigure371(f);
+
+  EXPECT_EQ(g_module_scalar, 0);
+  EXPECT_EQ(g_module_vector, 0);
 }
 
 }  // namespace
