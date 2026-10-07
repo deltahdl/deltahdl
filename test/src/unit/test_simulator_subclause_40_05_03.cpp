@@ -171,14 +171,14 @@ TEST_F(VpiCoverageControlSim, CoverageIsControllableOnlyAtInstanceLevel) {
   EXPECT_EQ(vpi_ctx_.GetCoverageControlState().StopCount("top.dut"), 1u);
 }
 
-// C3 read the way the sentence is written: the control is over "an instance
-// handle" or "an assertion handle", and statement, toggle and FSM coverage are
-// "controllable only at the instance level and not on a per-statement, signal,
-// or FSM basis". A signal handle is that per-signal basis, so it is a bad
-// argument rather than a scope of its own. The scope it would have named is one
-// a coverage engine really does keep - toggle coverage is kept per signal - so
-// taken off the handle's name alone the request started collection on that one
-// signal and reported `SV_COV_OK for it.
+// C3 read the way the sentence is written: the control takes an instance handle
+// or an assertion handle, and statement, toggle and FSM coverage are controlled
+// for a whole instance, never for one statement, one signal or one FSM. A
+// signal handle is that per-signal basis, so it is a bad argument rather than a
+// scope of its own. The scope it would have named is one a coverage engine
+// really does keep - toggle coverage is kept per signal - so taken off the
+// handle's name alone the request started collection on that one signal and
+// reported `SV_COV_OK for it.
 TEST_F(VpiCoverageControlSim, ASignalHandleIsNotAScopeCoverageIsControlledAt) {
   vpi_ctx_.GetCoverageControlState().SetAvailability(
       "top.dut.sig", CoverageAvailability::kFull);

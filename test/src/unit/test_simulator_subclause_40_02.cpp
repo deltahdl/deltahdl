@@ -18,14 +18,13 @@ using namespace delta;
 
 namespace {
 
-// §40.2 "Overview" says what the clause is for in one sentence: "This clause
-// defines the coverage API in SystemVerilog." One API, and a SystemVerilog one:
-// the access functions §40.3.2 gives a design are how coverage is controlled
-// and read, and §40.5's VPI routines are named extensions of that API rather
-// than a second one of their own - §40.5.3 has them "carry the semantics of
-// $coverage_control()". So the coverage a PLI application starts is the
-// coverage the design's own $coverage_get reports, and these tests drive one
-// side and read the other.
+// §40.2 "Overview" says what the clause is for in one sentence: it defines
+// SystemVerilog's coverage API. One API, and a SystemVerilog one: the access
+// functions §40.3.2 gives a design are how coverage is controlled and read, and
+// §40.5's VPI routines are named extensions of that API rather than a second
+// one of their own - §40.5.3 gives them the meaning $coverage_control() has. So
+// the coverage a PLI application starts is the coverage the design's own
+// $coverage_get reports, and these tests drive one side and read the other.
 
 constexpr std::string_view kScope = "top.dut";
 constexpr int kToggle = 23;  // §40.3.1 SV_COV_TOGGLE

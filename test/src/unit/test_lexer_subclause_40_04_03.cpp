@@ -141,12 +141,12 @@ TEST(FsmConcatPragmaLexing, RecognizedWithinModuleBody) {
   EXPECT_EQ(pragmas[0].enum_name, "state_e");
 }
 
-// §40.4.3: "Bit-selects or part-selects of signals cannot be used in the
-// concatenation." A comment carrying the whole of the form around the braces is
-// an FSM its author meant to specify, so the prohibition that stopped it being
-// one is reported rather than leaving the FSM unrecognized with nothing to say
-// why. It is a warning because the prohibition is on what the tool can use: the
-// comment annotates a design that is legal with or without it.
+// §40.4.3: the concatenation may not name a bit or part select of a signal. A
+// comment carrying the whole of the form around the braces is an FSM its author
+// meant to specify, so the prohibition that stopped it being one is reported
+// rather than leaving the FSM unrecognized with nothing to say why. It is a
+// warning because the prohibition is on what the tool can use: the comment
+// annotates a design that is legal with or without it.
 TEST(FsmConcatPragmaLexing, SelectMemberIsReportedAgainstTheProhibition) {
   const std::string kSrc =
       "module fsm;\n"

@@ -142,8 +142,8 @@ TEST(CoverageGet, MissingArgumentsIsBadArgument) {
 }
 
 // §40.3.2.1 Table 40-2 governs this query's scope_def too: with `SV_COV_HIER
-// the current coverage is the sum over the named instance "and any hierarchy
-// below it", and with `SV_COV_MODULE it is the named instance alone. The two
+// the current coverage is the sum over the named instance and everything
+// beneath it, and with `SV_COV_MODULE it is the named instance alone. The two
 // answers differ by exactly what the instances below hold.
 TEST(CoverageGet, TheScopeDefinitionDecidesWhatIsSummed) {
   SimFixture f;
@@ -159,8 +159,8 @@ TEST(CoverageGet, TheScopeDefinitionDecidesWhatIsSummed) {
 }
 
 // §40.3.2.1 Table 40-2's definition-name column reaches this query too, which
-// is what §40.3.2.3 means by the current coverage "in this/these
-// hierarchy(ies)": a string that is not an instance path names a module
+// is what §40.3.2.3 means by the current coverage of the hierarchy or
+// hierarchies named: a string that is not an instance path names a module
 // definition, and what has been covered is then summed over every instance of
 // that module - with the hierarchy below those instances under `SV_COV_HIER and
 // without it under `SV_COV_MODULE.
@@ -178,15 +178,15 @@ TEST(CoverageGet, ADefinitionNameSumsOverEveryInstanceOfThatModule) {
 }
 
 // The value this query obtains is the *current* one, and §40.3.2.1's
-// `SV_COV_RESET "resets all available coverage information in the specified
-// hierarchy": what the covered-item counts hold is that information, so after a
-// reset the query reports that nothing of the type has been covered rather than
-// the count it stood at. `SV_COV_NOCOV is how that reads back, since a current
-// coverage value is a pos_num strictly greater than zero - and it is
-// `SV_COV_NOCOV rather than `SV_COV_ERROR because the reset cleared the scope's
-// coverage rather than removing the scope. The reset walks the hierarchy the
-// scope_def names, on the same reading of Table 40-2 the query uses, so it
-// reaches what is below the named instance and nothing outside it.
+// `SV_COV_RESET clears whatever coverage information the named hierarchy holds:
+// what the covered-item counts hold is that information, so after a reset the
+// query reports that nothing of the type has been covered rather than the count
+// it stood at. `SV_COV_NOCOV is how that reads back, since a current coverage
+// value is a pos_num strictly greater than zero - and it is `SV_COV_NOCOV
+// rather than `SV_COV_ERROR because the reset cleared the scope's coverage
+// rather than removing the scope. The reset walks the hierarchy the scope_def
+// names, on the same reading of Table 40-2 the query uses, so it reaches what
+// is below the named instance and nothing outside it.
 TEST(CoverageGet, ResettingCoverageClearsTheCurrentValue) {
   SimFixture f;
   Cov(f).SetAvailability("top.dut", CoverageAvailability::kFull);
@@ -203,12 +203,11 @@ TEST(CoverageGet, ResettingCoverageClearsTheCurrentValue) {
   EXPECT_EQ(RunGet(f, kToggle, kHier, "top.other"), 100);
 }
 
-// §40.3.2.2's maximum "shall remain constant across the duration of the
-// simulation", so a reset that clears the current coverage value leaves the
-// coverable items it is a fraction of untouched: the scope still offers the
-// same 100% after the reset as before it, which is what makes coverage% =
-// coverage_get()/coverage_get_max() * 100 read 0% rather than become
-// undefined.
+// §40.3.2.2's maximum may not change while the simulation runs, so a reset that
+// clears the current coverage value leaves the coverable items it is a fraction
+// of untouched: the scope still offers the same 100% after the reset as before
+// it, which is what makes coverage% = coverage_get()/coverage_get_max() * 100
+// read 0% rather than become undefined.
 TEST(CoverageGet, ResettingTheCurrentValueLeavesTheMaximumStanding) {
   SimFixture f;
   Cov(f).SetAvailability(std::string(kScope), CoverageAvailability::kFull);

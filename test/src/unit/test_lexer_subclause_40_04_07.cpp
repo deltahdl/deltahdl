@@ -121,7 +121,8 @@ TEST(FsmOneLineCommentPragmaLexing, RecognizedInBothBlockAndOneLineComments) {
 }
 
 // The current-state signal pragma (§40.4.1's `tool state_vector signal enum E`)
-// is one of "these pragmas," so it too is recognized in a one-line comment.
+// is among the pragmas §40.4.7 speaks of, so it too is recognized in a one-line
+// comment.
 TEST(FsmOneLineCommentPragmaLexing,
      RecognizesStateVectorCurrentStatePragmaInOneLineComment) {
   const std::string kSrc =
@@ -139,7 +140,7 @@ TEST(FsmOneLineCommentPragmaLexing,
 }
 
 // The part-select pragma form (§40.4.2) is likewise recognized in a one-line
-// comment, confirming the breadth of "these pragmas" carries into the `//`
+// comment, confirming that every pragma §40.4.7 speaks of reaches the `//`
 // comment path and not just the enum-only form of the LRM example.
 TEST(FsmOneLineCommentPragmaLexing,
      RecognizesPartSelectPragmaInOneLineComment) {

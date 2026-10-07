@@ -92,10 +92,10 @@ TEST(CoverageSave, SavedDataAreRetrievableByMergeWithTheSameName) {
   EXPECT_EQ(Cov(f).CoverageGet("top.dut", kToggle), 10);
 }
 
-// §40.3.2.5 saves "the current state of coverage", so the entry holds the
-// levels as they stood when the save ran rather than a view that follows
-// collection afterwards: what the design covers after the save is not in it,
-// and a merge of that name brings back the earlier state.
+// §40.3.2.5 saves coverage as it stands at the moment of the call, so the entry
+// holds the levels as they stood when the save ran rather than a view that
+// follows collection afterwards: what the design covers after the save is not
+// in it, and a merge of that name brings back the earlier state.
 TEST(CoverageSave, TheEntryHoldsTheCoverageAsItStoodAtTheSave) {
   SimFixture f;
   const std::string kScope = "top.dut";

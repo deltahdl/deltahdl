@@ -123,12 +123,13 @@ TEST(FsmSameDeclarationPragmaLexing, NothingIsAssumedAboutAdditionalSignals) {
   ExpectOnlyCsIsSignalBearing(pragmas);
 }
 
-// R1 + R2 at the minimal "declaration of multiple signals": exactly two
-// signals. The state_vector pragma names cs and the enum-only pragma binds the
-// FSM enumeration. With only cs and ns declared, the first following signal
-// (cs) is the current state and the second (ns) is the next state — there is no
-// trailing signal for the ignore rule to act on. The lexer still records one
-// signal-bearing pragma (cs) and surfaces both names in declaration order.
+// R1 + R2 at the smallest declaration that declares more than one signal:
+// exactly two signals. The state_vector pragma names cs and the enum-only
+// pragma binds the FSM enumeration. With only cs and ns declared, the first
+// following signal (cs) is the current state and the second (ns) is the next
+// state — there is no trailing signal for the ignore rule to act on. The lexer
+// still records one signal-bearing pragma (cs) and surfaces both names in
+// declaration order.
 TEST(FsmSameDeclarationPragmaLexing,
      TwoSignalDeclarationAssignsCurrentThenNextState) {
   const std::string kSrc =

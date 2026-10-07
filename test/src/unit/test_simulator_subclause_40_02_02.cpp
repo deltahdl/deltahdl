@@ -11,16 +11,16 @@ using namespace delta;
 namespace {
 
 // §40.2.2 "Nomenclature" defines the three coverage terms the rest of clause 40
-// is written in. Assertion coverage is "for each assertion, whether it has had
-// at least one success", with implementations permitting "querying for further
-// details, such as attempt counts, success counts, failure counts". FSM
-// coverage is "the number of states in an FSM that this simulation reached",
-// and the standard "does not require FSM automatic extraction, but a standard
-// mechanism to force specific extraction is available via pragmas". Statement
-// coverage is "whether a statement has been executed", where "covered means it
-// executed at least once", with the execution count queryable and the
-// granularity "per-statement or per-statement block depending on the query".
-// These tests read each term back out of what answers for it.
+// is written in. Assertion coverage records, assertion by assertion, whether
+// each has succeeded at least once, and an implementation may also answer
+// queries for finer figures such as how many attempts, successes and failures
+// there were. FSM coverage counts the states of an FSM the simulation has
+// reached; the standard does not oblige a tool to extract FSMs on its own, but
+// gives pragmas as a standard way to make it extract one. Statement coverage
+// records whether a statement has run, a statement being covered once it has
+// run at least once, with the execution count queryable and the answer given
+// for one statement or for a block of them, as the query asks. These tests read
+// each term back out of what answers for it.
 
 // §40.2.2, assertion coverage: whether the assertion has had a success. One
 // that succeeded is covered, one that was attempted and never succeeded is not,
@@ -164,11 +164,11 @@ TEST(CoverageNomenclature, StatementCoverageIsExecutionAtLeastOnce) {
   EXPECT_EQ(CoveredCount(never_executed), 0u);
 }
 
-// §40.2.2, statement coverage granularity: "per-statement or per-statement
-// block depending on the query". The same term answers for one statement and
-// for the block that holds it - the block reports how many of its statements
-// are covered, out of how many it holds, where the single statement reports
-// itself alone.
+// §40.2.2, statement coverage granularity: the query decides whether the answer
+// is for one statement or for a block of them. The same term answers for one
+// statement and for the block that holds it - the block reports how many of its
+// statements are covered, out of how many it holds, where the single statement
+// reports itself alone.
 TEST(CoverageNomenclature, StatementGranularityFollowsTheQuery) {
   EntityCoverage block;
   block.total = 12;

@@ -11,9 +11,9 @@
 
 using namespace delta;
 
-// §40.4.8 — Example. The clause is one sentence pointing at Figure 40-2, "an
-// example of FSM specified with pragmas", and the figure is one module carrying
-// the whole of §40.4 at once:
+// §40.4.8 — Example. The clause is one sentence pointing at Figure 40-2, which
+// shows an FSM written with pragmas, and the figure is one module carrying the
+// whole of §40.4 at once:
 //
 //     module m3;
 //
@@ -91,12 +91,12 @@ TEST(FsmPragmaExampleLexing, TheFigureIsDrawnWithThreePragmasOfOneFsm) {
   }
 }
 
-// "Signal ns holds the next state" - §40.4.4's rule, read off where the figure
-// puts the pragma rather than off the name the annotation happens to point at.
-// The enumeration pragma stands after the bit range of one declaration among
-// four that are alike but for their names, and `ns` is the signal following it.
-// A reader that took the next-state signal from anywhere else would name `cs`,
-// `clk` or `rst` just as readily.
+// The figure's label on `ns`, the next-state signal - §40.4.4's rule, read off
+// where the figure puts the pragma rather than off the name the annotation
+// happens to point at. The enumeration pragma stands after the bit range of one
+// declaration among four that are alike but for their names, and `ns` is the
+// signal following it. A reader that took the next-state signal from anywhere
+// else would name `cs`, `clk` or `rst` just as readily.
 TEST(FsmPragmaExampleLexing,
      TheSignalFollowingTheFirstPragmaHoldsTheNextState) {
   const std::vector<std::string> kNextState = {"ns"};
@@ -105,11 +105,11 @@ TEST(FsmPragmaExampleLexing,
   EXPECT_EQ(NamesFollowingEnumPragma(TheFigure(), 0), kNextState);
 }
 
-// "Signal cs holds the current state" - §40.4.1's rule. The figure names that
-// signal inside the pragma instead of by position, and writes the pragma on a
-// line of its own two lines below the declaration it is about, so the current
-// state is read from the pragma's own operand and the distance from the
-// declaration is nothing to it.
+// The figure's label on `cs`, the current-state signal - §40.4.1's rule. The
+// figure names that signal inside the pragma instead of by position, and writes
+// the pragma on a line of its own two lines below the declaration it is about,
+// so the current state is read from the pragma's own operand and the distance
+// from the declaration is nothing to it.
 TEST(FsmPragmaExampleLexing, TheStateVectorPragmaNamesTheCurrentStateSignal) {
   auto pragmas = CollectFsmPragmas(TheFigure());
   ASSERT_EQ(pragmas.size(), 3u);
@@ -118,12 +118,12 @@ TEST(FsmPragmaExampleLexing, TheStateVectorPragmaNamesTheCurrentStateSignal) {
   EXPECT_EQ(pragmas[1].enum_name, "MY_FSM");
 }
 
-// "p1, p2, and p3 are possible states of the FSM" - §40.4.6's rule. The figure
-// takes that clause's first placement, the pragma immediately after the
-// `parameter` keyword with no bit width, and the states are the names following
-// it as far as the semicolon that ends the declaration. They are read from the
-// third pragma rather than the first, which is why the figure needs both to be
-// reachable.
+// The figure's label on `p1`, `p2` and `p3`, the FSM's possible states -
+// §40.4.6's rule. The figure takes that clause's first placement, the pragma
+// immediately after the `parameter` keyword with no bit width, and the states
+// are the names following it as far as the semicolon that ends the declaration.
+// They are read from the third pragma rather than the first, which is why the
+// figure needs both to be reachable.
 TEST(FsmPragmaExampleLexing, TheNamesFollowingTheLastPragmaArePossibleStates) {
   const std::vector<std::string> kPossibleStates = {"p1", "p2", "p3"};
 

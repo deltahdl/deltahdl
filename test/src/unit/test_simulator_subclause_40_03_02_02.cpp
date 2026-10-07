@@ -158,13 +158,13 @@ TEST(CoverageGetMax, TheScopeDefinitionDecidesWhatIsSummed) {
 }
 
 // §40.3.2.1 Table 40-2's definition-name column, which is what §40.3.2.2 means
-// by the sum "over the given hierarchy(ies)": a string that is not an instance
-// path names a module definition, and 100% coverage of it is then the coverable
-// items of every instance of that module. Under `SV_COV_HIER the sum includes
-// "all coverage for all hierarchy below those instances"; under `SV_COV_MODULE
-// it is the instances alone, "excluding any hierarchy below those instances".
-// The two answers differ here by exactly what the child instance holds, and
-// neither counts the instance of another module.
+// by a sum over the hierarchy or hierarchies named: a string that is not an
+// instance path names a module definition, and 100% coverage of it is then the
+// coverable items of every instance of that module. Under `SV_COV_HIER the sum
+// takes in everything beneath those instances; under `SV_COV_MODULE it is the
+// instances alone, with nothing beneath them. The two answers differ here by
+// exactly what the child instance holds, and neither counts the instance of
+// another module.
 TEST(CoverageGetMax, ADefinitionNameSumsOverEveryInstanceOfThatModule) {
   SimFixture f;
   Cov(f).SetCoverableItems("top.u1", kToggle, 3);
@@ -179,12 +179,12 @@ TEST(CoverageGetMax, ADefinitionNameSumsOverEveryInstanceOfThatModule) {
   EXPECT_EQ(RunGetMax(f, kToggle, kModule, "other"), 7);
 }
 
-// Table 40-2's note has instance names "referenced by hierarchical paths", and
-// a path "need not include any . if the path refers to an instance in the
-// current context" - so one string can read either way, and a string the design
-// registered a scope under is that scope. Here the maximum reported for "leaf"
-// is the instance called leaf, not the sum over the instances of a module
-// definition that happens to share the name.
+// Table 40-2's note names instances by hierarchical path, and lets a path that
+// refers to an instance of the current context leave out every `.` - so one
+// string can read either way, and a string the design registered a scope under
+// is that scope. Here the maximum reported for "leaf" is the instance called
+// leaf, not the sum over the instances of a module definition that happens to
+// share the name.
 TEST(CoverageGetMax, AStringNamingAnInstanceIsReadAsThatInstance) {
   SimFixture f;
   Cov(f).SetCoverableItems("leaf", kToggle, 2);

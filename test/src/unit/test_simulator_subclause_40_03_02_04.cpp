@@ -101,11 +101,11 @@ TEST(CoverageMerge, MissingArgumentsIsBadArgument) {
             kError);
 }
 
-// §40.3.2.4 "loads and merges coverage data ... into the simulator", so a merge
-// that reports `SV_COV_OK leaves the simulation holding what the database held:
-// the covered-item counts it was written with become part of the coverage this
-// simulation reports, which is the only sense in which the data were loaded
-// rather than merely located.
+// §40.3.2.4's function reads coverage data into the simulator and merges it
+// with what is there, so a merge that reports `SV_COV_OK leaves the simulation
+// holding what the database held: the covered-item counts it was written with
+// become part of the coverage this simulation reports, which is the only sense
+// in which the data were loaded rather than merely located.
 TEST(CoverageMerge, LoadsTheCoverageDataIntoTheSimulation) {
   SimFixture f;
   Cov(f).RegisterCoverageDatabase(std::string(kName), /*from_this_design=*/true,

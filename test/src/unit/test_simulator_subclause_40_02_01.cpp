@@ -19,15 +19,14 @@ using namespace delta;
 namespace {
 
 // §40.2.1 "SystemVerilog coverage API" lists the criteria the API is written
-// to: (a) it "shall be similar for all coverages", a common interface across
-// the coverage types; (b) "at a minimum" statement, toggle, FSM and assertion
-// coverage "shall be supported"; (c) it "shall be extensible in a transparent
-// manner, i.e., adding a new coverage type shall not break any existing
-// coverage usage"; and (d) it "shall provide means to obtain coverage
-// information from specific subhierarchies of the design without requiring the
-// user to enumerate all instances in those hierarchies". These tests hold the
-// four to the access functions of §40.3.2 and the routines of §40.5.3, which
-// are what the API is made of.
+// to: (a) it works alike for every kind of coverage, a common interface across
+// the coverage types; (b) it supports statement, toggle, FSM and assertion
+// coverage, and may support more; (c) a new coverage type can be added to it
+// without disturbing any use of the existing ones; and (d) it can report the
+// coverage of a chosen part of the design's hierarchy without the user listing
+// every instance in that part. These tests hold the four to the access
+// functions of §40.3.2 and the routines of §40.5.3, which are what the API is
+// made of.
 
 constexpr int kAssertion = 20;  // §40.3.1 SV_COV_ASSERTION
 constexpr int kFsmState = 21;   // §40.3.1 SV_COV_FSM_STATE
@@ -132,8 +131,8 @@ TEST(CoverageApiCriteria, TheVpiSideNamesTheSameMinimumTypes) {
 // Criterion (c): a coverage type this tool has no notion of - a vendor's own,
 // say - goes through the same interface and reports that it offers no coverage,
 // and asking for it leaves every other type answering exactly as it did. That
-// is what "adding a new coverage type shall not break any existing coverage
-// usage" asks of the interface.
+// is what criterion (c) asks of the interface: a new coverage type leaves every
+// existing use as it was.
 TEST(CoverageApiCriteria, AnUnknownCoverageTypeBreaksNoExistingUsage) {
   SimFixture f;
   CoverageControlState& cov = f.ctx.GetCoverageControlState();

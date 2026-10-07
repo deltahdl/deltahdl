@@ -217,9 +217,9 @@ int RunControlWithScopeDef(SimFixture& f, int control, int scope_def,
 constexpr int kSvCovModule = 10;
 constexpr int kSvCovHier = 11;
 
-// §40.3.2.1 Table 40-2, the `SV_COV_HIER row: the control reaches "the named
-// instance and any hierarchy below it", so starting collection over an instance
-// starts it in the instances below that one as well.
+// §40.3.2.1 Table 40-2, the `SV_COV_HIER row: the control reaches the named
+// instance and everything beneath it in the hierarchy, so starting collection
+// over an instance starts it in the instances below that one as well.
 TEST(CoverageControl, HierReachesTheHierarchyBelowTheNamedInstance) {
   SimFixture f;
   Cov(f).SetAvailability("top.dut", CoverageAvailability::kFull);
@@ -235,9 +235,9 @@ TEST(CoverageControl, HierReachesTheHierarchyBelowTheNamedInstance) {
 }
 
 // §40.3.2.1 Table 40-2, the `SV_COV_MODULE row: the control reaches the named
-// instance alone, "excluding any hierarchy in instances below that instance".
-// The two scope definitions differ in exactly this, which the run below the
-// instance is what shows.
+// instance alone, leaving out the instances beneath it. The two scope
+// definitions differ in exactly this, which the run below the instance is what
+// shows.
 TEST(CoverageControl, ModuleReachesTheNamedInstanceAlone) {
   SimFixture f;
   Cov(f).SetAvailability("top.dut", CoverageAvailability::kFull);
@@ -249,10 +249,10 @@ TEST(CoverageControl, ModuleReachesTheNamedInstanceAlone) {
   EXPECT_FALSE(Cov(f).IsCollecting("top.dut.u1"));
 }
 
-// §40.3.2.1: "`SV_COV_PARTIAL, on a check or start operation, denotes that
-// coverage is only partially available in the specified hierarchy." Over a
-// hierarchy, that is what an instance below the named one offering no coverage
-// makes of a start the named instance alone would have reported `SV_COV_OK for.
+// §40.3.2.1: a check or start that answers `SV_COV_PARTIAL says some, but not
+// all, of the named hierarchy offers coverage. Over a hierarchy, that is what
+// an instance below the named one offering no coverage makes of a start the
+// named instance alone would have reported `SV_COV_OK for.
 TEST(CoverageControl, APartlyCoverableHierarchyReportsPartial) {
   SimFixture f;
   Cov(f).SetAvailability("top.dut", CoverageAvailability::kFull);
@@ -263,9 +263,9 @@ TEST(CoverageControl, APartlyCoverableHierarchyReportsPartial) {
 }
 
 // §40.3.2.1 Table 40-2, the definition-name column: a string that is not an
-// instance path names a module definition, and the control then applies to "all
-// instances of the given module" rather than to one. `SV_COV_MODULE excludes
-// the hierarchy below each of those instances, which is what the child instance
+// instance path names a module definition, and the control then applies to
+// every instance of that module rather than to one. `SV_COV_MODULE excludes the
+// hierarchy below each of those instances, which is what the child instance
 // left uncollected here shows, and the status reported is of everything the
 // call reached.
 TEST(CoverageControl, ADefinitionNameControlsEveryInstanceOfThatModule) {
@@ -301,9 +301,9 @@ TEST(CoverageControl, ADefinitionNameReportsTheStatusOfAllItsInstances) {
 }
 
 // §40.3.2.1: the scope definitions are the two the clause names, and a call
-// that wrote something else wrote a bad argument - reported with `SV_COV_ERROR
-// "on all operations ... typically due to errors in arguments" - rather than
-// being taken for one of them.
+// that wrote something else wrote a bad argument - reported with `SV_COV_ERROR,
+// which any operation can answer and which a wrong argument is the usual cause
+// of - rather than being taken for one of them.
 TEST(CoverageControl, AnUnknownScopeDefinitionIsABadArgument) {
   SimFixture f;
   Cov(f).SetAvailability("top.dut", CoverageAvailability::kFull);

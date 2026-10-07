@@ -4,14 +4,13 @@
 // which is exactly what it has to say: §40.5.1's enumerations, §40.5.2's
 // extension of vpi_get() and §40.5.3's extension of vpi_control() are one
 // extension of one API, not three. §40.5.3 says so of every operation it
-// defines - the semantics and behavior "are per the $coverage_control() system
-// function", "per the equivalent system function $coverage_save()", "per the
-// equivalent system function $coverage_merge()" - and §40.5.2 says it of the
-// query, the number of covered items of a coverage type in an instance being
-// the figure $coverage_get reports for that instance. So a coverage type named
-// through VPI and the same type named through §40.3.1's `SV_COV_* macros are
-// one type, a database one door writes is one the other door reads, and what
-// one door resets is what the other stops reporting.
+// defines - each behaves as the system function it matches does,
+// $coverage_control(), $coverage_save() or $coverage_merge() - and §40.5.2 says
+// it of the query, the number of covered items of a coverage type in an
+// instance being the figure $coverage_get reports for that instance. So a
+// coverage type named through VPI and the same type named through §40.3.1's
+// `SV_COV_* macros are one type, a database one door writes is one the other
+// door reads, and what one door resets is what the other stops reporting.
 //
 // Each subclause has a file of its own that drives its own door. These cases
 // are the crossings, which no one of those files can make: the state is primed
@@ -76,11 +75,11 @@ class VpiCoverageExtensions : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §40.5.3: vpi_control(vpiCoverageMerge, ...) is specified "per the equivalent
-// system function $coverage_merge()", so the database a $coverage_save wrote
-// under `SV_COV_ASSERTION is a database it can load. Naming the type
-// vpiAssertCoverage instead of `SV_COV_ASSERTION is a difference of spelling
-// between two clauses, not of which coverage is meant.
+// §40.5.3: vpi_control(vpiCoverageMerge, ...) behaves as $coverage_merge()
+// does, so the database a $coverage_save wrote under `SV_COV_ASSERTION is a
+// database it can load. Naming the type vpiAssertCoverage instead of
+// `SV_COV_ASSERTION is a difference of spelling between two clauses, not of
+// which coverage is meant.
 TEST_F(VpiCoverageExtensions, WhatTheSystemFunctionSavedTheVpiMergeLoads) {
   Cov().SetCoverageAvailableForSave(kSvCovAssertion, true);
   ASSERT_EQ(
@@ -115,11 +114,11 @@ TEST_F(VpiCoverageExtensions, AVpiSaveOfATypeWithNoCoverageStillSavesNothing) {
   EXPECT_EQ(Cov().SaveCount("vpi.cov"), 0u);
 }
 
-// §40.5.2: vpi_get(<coverageType>, instance_handle) "returns the number of
-// covered items of the given coverage type in the given instance", which is
-// what $coverage_get reports for the same instance (§40.3.2.3). Both doors are
-// asked over one scope that has covered 7 of its 12 coverable statements, and
-// the clause is that they answer alike.
+// §40.5.2: vpi_get(<coverageType>, instance_handle) gives how many items of
+// that coverage type the instance has covered, which is what $coverage_get
+// reports for the same instance (§40.3.2.3). Both doors are asked over one
+// scope that has covered 7 of its 12 coverable statements, and the clause is
+// that they answer alike.
 TEST_F(VpiCoverageExtensions, TheVpiQueryReportsTheCoverageTheLanguageReports) {
   Cov().SetCoverableItems("top.dut", kSvCovStatement, 12);
   Cov().SetCoveredItems("top.dut", kSvCovStatement, 7);
@@ -130,10 +129,10 @@ TEST_F(VpiCoverageExtensions, TheVpiQueryReportsTheCoverageTheLanguageReports) {
             RunCoverageGet(f_, kSvCovStatement, "top.dut"));
 }
 
-// The two halves of the extension over one state: §40.5.3's reset "resets all
-// available coverage information in the specified hierarchy" (§40.3.2.1), and
-// what it resets is what §40.5.2's query was reporting. A query answered out of
-// a store of its own would go on reporting the 7 covered statements after the
+// The two halves of the extension over one state: §40.5.3's reset clears
+// whatever coverage information the named hierarchy holds (§40.3.2.1), and what
+// it resets is what §40.5.2's query was reporting. A query answered out of a
+// store of its own would go on reporting the 7 covered statements after the
 // control had cleared them, and the language's own function would disagree with
 // it.
 TEST_F(VpiCoverageExtensions, TheVpiControlResetsWhatTheVpiQueryReports) {
