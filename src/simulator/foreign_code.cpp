@@ -73,7 +73,7 @@ std::string ParseBootstrapEntry(std::string_view line, std::size_t line_no,
                                 std::string* error) {
   if (line.empty() || !IsBlank(line.front())) {
     *error = "line " + std::to_string(line_no) +
-             ": a library entry shall be preceded by at least one blank";
+             ": a library entry has to be indented by one or more blanks";
     return "";
   }
   std::size_t begin = 0;

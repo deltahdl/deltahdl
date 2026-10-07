@@ -60,7 +60,7 @@ TEST(ForeignCodeBootstrapFile, AnEntryIsOnePathPrecededByABlank) {
   const ForeignCodeBootstrap kUnpreceded =
       ParseForeignCodeBootstrap("#!SV_LIBRARIES\nmyclibs/lib1\n");
   EXPECT_EQ(kUnpreceded.error,
-            "line 2: a library entry shall be preceded by at least one blank");
+            "line 2: a library entry has to be indented by one or more blanks");
   const ForeignCodeBootstrap kTwo =
       ParseForeignCodeBootstrap("#!SV_LIBRARIES\n lib1 lib2\n");
   EXPECT_EQ(kTwo.error,
