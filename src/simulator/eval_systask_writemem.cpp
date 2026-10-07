@@ -104,7 +104,9 @@ static void WriteMemQueue(const WritememEval& eval, const QueueObject* q,
 
 // §21.5: writes a fixed unpacked array as a bare sequence of words. The
 // optional start_addr / finish_addr bound the range that is written; a finish
-// below start emits the words in descending address order.
+// below start emits the words in descending address order. Every registration
+// of a one-dimensional array creates a variable for each address in
+// [arr_lo, arr_hi] under the key built here, so each lookup finds one.
 template <class EmitFn>
 static void WriteMemArray(const WritememEval& eval, const std::string& mem_name,
                           const ArrayInfo* ai, EmitFn emit) {
@@ -117,9 +119,7 @@ static void WriteMemArray(const WritememEval& eval, const std::string& mem_name,
   WriteMemAddressRange(
       start_addr, finish_addr, arr_lo, arr_hi, [&](int64_t addr) {
         std::string elem = mem_name + "[" + std::to_string(addr) + "]";
-        if (auto* var = ctx.FindVariable(elem)) {
-          emit(var->value);
-        }
+        emit(ctx.FindVariable(elem)->value);
       });
 }
 

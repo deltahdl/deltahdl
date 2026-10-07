@@ -447,4 +447,185 @@ TEST(WritememSim, HierarchicallyNamedArrayIsDumped) {
   std::remove(path.c_str());
 }
 
+// §21.5 (Syntax 21-13) with §7.10: a queue is dumped through the same address
+// window as a fixed array, so a finish below the start writes its elements
+// from the start index down.
+TEST(WritememSim, QueueWindowDescendsWhenFinishIsBelowStart) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_t2105_q_desc.mem";
+  RunCapture(
+      "module t;\n"
+      "  logic [7:0] q [$];\n"
+      "  initial begin\n"
+      "    q.push_back(8'h0a); q.push_back(8'h0b); q.push_back(8'h0c);\n"
+      "    $writememh(\"" +
+          path +
+          "\", q, 2, 0);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(SlurpFile(path), "0c\n0b\n0a\n");
+  std::remove(path.c_str());
+}
+
+// §21.5 with §7.10: a window reaching past both ends of a queue writes the
+// elements the queue holds and nothing for the indices it does not; a
+// longint start of -1 puts the window's first address below index 0.
+TEST(WritememSim, QueueWindowPastBothEndsWritesOnlyTheElements) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_t2105_q_wide.mem";
+  RunCapture(
+      "module t;\n"
+      "  logic [7:0] q [$];\n"
+      "  longint first = -1;\n"
+      "  initial begin\n"
+      "    q.push_back(8'h0a); q.push_back(8'h0b);\n"
+      "    $writememh(\"" +
+          path +
+          "\", q, first, 3);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(SlurpFile(path), "0a\n0b\n");
+  std::remove(path.c_str());
+}
+
+// §21.5 with §7.10: an empty queue has no words, so its dump is a file with
+// nothing in it -- created, as every $writemem call creates its file.
+TEST(WritememSim, EmptyQueueDumpsAnEmptyFile) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_t2105_q_empty.mem";
+  std::remove(path.c_str());
+  RunCapture(
+      "module t;\n"
+      "  logic [7:0] q [$];\n"
+      "  initial $writememh(\"" +
+          path +
+          "\", q);\n"
+          "endmodule\n",
+      f);
+  EXPECT_TRUE(std::ifstream(path).good());
+  EXPECT_EQ(SlurpFile(path), "");
+  std::remove(path.c_str());
+}
+
+// §21.5 with §21.4.3: start_addr and finish_addr address the highest
+// dimension of a multidimensional array. A window from 3 down to 0 over
+// m[1:2][0:1] skips the addresses outside 1..2 and writes the two rows in
+// descending order, each row's words from its low index up.
+TEST(WritememSim, MultiDimWindowDescendsAndSkipsAddressesOutsideIt) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_t2105_md_win.mem";
+  RunCapture(
+      "module t;\n"
+      "  logic [7:0] m [1:2][0:1];\n"
+      "  initial begin\n"
+      "    m[1][0] = 8'h11; m[1][1] = 8'h12;\n"
+      "    m[2][0] = 8'h21; m[2][1] = 8'h22;\n"
+      "    $writememh(\"" +
+          path +
+          "\", m, 3, 0);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(SlurpFile(path), "21\n22\n11\n12\n");
+  std::remove(path.c_str());
+}
+
+// §21.5: a window reaching below and above a fixed array's bounds writes the
+// words at the addresses the array has and none for the others.
+TEST(WritememSim, ArrayWindowPastBothBoundsWritesOnlyTheWords) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_t2105_arr_wide.mem";
+  RunCapture(
+      "module t;\n"
+      "  logic [7:0] m [2:3];\n"
+      "  initial begin\n"
+      "    m[2] = 8'h22; m[3] = 8'h33;\n"
+      "    $writememh(\"" +
+          path +
+          "\", m, 1, 4);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(SlurpFile(path), "22\n33\n");
+  std::remove(path.c_str());
+}
+
+// §21.5 with §8.5: a class's array property is dumped through the same
+// window, so a window from 3 down to 0 over data[1:2] writes the property's
+// two words in descending order and nothing for the addresses beyond them.
+TEST(WritememSim, ArrayPropertyWindowDescendsAndSkipsAddressesOutsideIt) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_t2105_prop_win.mem";
+  RunCapture(
+      "module t;\n"
+      "  class Mem;\n"
+      "    logic [7:0] data[1:2];\n"
+      "  endclass\n"
+      "  Mem m;\n"
+      "  initial begin\n"
+      "    m = new;\n"
+      "    m.data[1] = 8'haa; m.data[2] = 8'hbb;\n"
+      "    $writememh(\"" +
+          path +
+          "\", m.data, 3, 0);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(SlurpFile(path), "bb\naa\n");
+  std::remove(path.c_str());
+}
+
+// §21.5 with §7.5 and §8.5: a dynamic array property not yet sized by new[]
+// has no words, so its dump is an empty file.
+TEST(WritememSim, UnsizedDynamicArrayPropertyDumpsAnEmptyFile) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_t2105_prop_empty.mem";
+  std::remove(path.c_str());
+  RunCapture(
+      "module t;\n"
+      "  class Mem;\n"
+      "    logic [7:0] data[];\n"
+      "  endclass\n"
+      "  Mem m;\n"
+      "  initial begin\n"
+      "    m = new;\n"
+      "    $writememh(\"" +
+          path +
+          "\", m.data);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_TRUE(std::ifstream(path).good());
+  EXPECT_EQ(SlurpFile(path), "");
+  std::remove(path.c_str());
+}
+
+// Negative form for $writememb: a path that cannot be opened writes nothing,
+// the warning names $writememb, the task the source called, and the run
+// continues past the call.
+TEST(WritememSim, UnopenablePathWarningNamesWritememb) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_t2105_no_such_dir/out_b.mem";
+  testing::internal::CaptureStderr();
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic [7:0] m [0:0];\n"
+      "  initial begin\n"
+      "    m[0] = 8'h01;\n"
+      "    $writememb(\"" +
+          path +
+          "\", m);\n"
+          "    $display(\"alive\");\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  std::string err = testing::internal::GetCapturedStderr();
+  EXPECT_EQ(out, "alive\n");
+  EXPECT_NE(err.find("$writememb: cannot open file: " + path),
+            std::string::npos);
+  EXPECT_FALSE(std::ifstream(path).good());
+}
+
 }  // namespace
