@@ -46,7 +46,7 @@ enum class SequenceUsageContext : uint8_t {
 //       match. Disallows kAdmitsOnlyEmpty even though kAdmitsOnlyEmpty would
 //       otherwise be admissible under (c).
 //   (b) antecedent of |->: shall be nondegenerate.
-//   (c) antecedent of |=>: shall admit at least one match (so kAdmitsNoMatch
+//   (c) antecedent of |=>: needs some match, empty or not (so kAdmitsNoMatch
 //       is illegal). kAdmitsOnlyEmpty is explicitly allowed here.
 bool IsSequenceUsageLegal(SequenceUsageContext ctx, SequenceMatchClass m);
 

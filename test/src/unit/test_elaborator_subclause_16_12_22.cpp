@@ -73,15 +73,15 @@ TEST(Nondegeneracy, ADegenerateAntecedentOfOverlappingImplicationIsRejected) {
                             6, "16.12.22"));
 }
 
-// §16.12.22 (c): the antecedent of |=> shall admit at least one match; an
+// §16.12.22 (c): an antecedent of |=> with no match at all is illegal; an
 // instance of never among its operands leaves it none.
 TEST(Nondegeneracy,
      AnAntecedentOfNonoverlappingImplicationWithNoMatchIsRejected) {
   ElabFixture f;
   Elaborate(NondegeneracySource("a ##1 never |=> b"), f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "the antecedent of |=> admits no match; it shall "
-                            "admit at least one match",
+                            "the antecedent of |=> admits no match; it needs "
+                            "some match, even an empty one",
                             6, "16.12.22"));
 }
 
@@ -157,7 +157,7 @@ TEST(Nondegeneracy, AdmitsAnyEmptyMatchHelperClassifies) {
 }
 
 TEST(Nondegeneracy, RuleCNonoverlappingAntecedentAllowsEmptyOnly) {
-  // §16.12.22(c): the antecedent of |=> shall admit at least one match. A
+  // §16.12.22(c): an antecedent of |=> needs some match to be legal. A
   // sequence that admits only empty matches is explicitly allowed here.
   EXPECT_FALSE(IsSequenceUsageLegal(
       SequenceUsageContext::kNonoverlappingImplicationAntecedent,

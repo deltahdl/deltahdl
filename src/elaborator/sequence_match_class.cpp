@@ -193,7 +193,7 @@ std::string_view Rule(SequenceUsageContext ctx) {
     case SequenceUsageContext::kOverlappingImplicationAntecedent:
       return "shall be nondegenerate";
     case SequenceUsageContext::kNonoverlappingImplicationAntecedent:
-      return "shall admit at least one match";
+      return "needs some match, even an empty one";
   }
   return "";
 }
