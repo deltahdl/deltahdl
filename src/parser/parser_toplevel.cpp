@@ -45,8 +45,8 @@ void ParseGateInstanceTail(Parser& p, ModuleItem* item, bool has_name) {
     if (p.Check(TokenKind::kLBracket)) p.ParseInstanceRange(item, true);
     while (p.Check(TokenKind::kLBracket)) {
       p.diag_.Error(p.CurrentLoc(),
-                    "one instance identifier shall be associated with only "
-                    "one range to declare an array of instances",
+                    "an array of instances takes a single range after its "
+                    "instance identifier, not a second one",
                     Subclause("28.3.5"));
       p.ParseInstanceRange(item, false);
     }

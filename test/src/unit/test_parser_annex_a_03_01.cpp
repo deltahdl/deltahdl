@@ -778,8 +778,7 @@ TEST(GateInstantiationParsing, SecondInstanceRangeIsRejected) {
       "  and g[0:3][1:0] (y, a, b);\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedError(
-      r.diags, "one instance identifier shall be associated with only one", 2,
-      "28.3.5"));
+      r.diags, "an array of instances takes a single range", 2, "28.3.5"));
   EXPECT_FALSE(ReportedError(r.diags, "expected '('", 2, "28.3.6"));
   ASSERT_NE(r.cu, nullptr);
   auto* g = FindGateByKind(r.cu->modules[0]->items, GateKind::kAnd);

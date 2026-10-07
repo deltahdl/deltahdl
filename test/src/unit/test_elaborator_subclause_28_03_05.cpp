@@ -134,8 +134,8 @@ TEST(ModuleInstanceArrayElaboration, RangeExpandsToInstanceCount) {
   EXPECT_EQ(design->top_modules[0]->children.size(), 4u);
 }
 
-// §28.3.5: one instance identifier may be associated with only one range;
-// reusing `u` for a second array is an illegal redeclaration.
+// §28.3.5: an instance identifier names one array with one range, so reusing
+// `u` for a second array is an illegal redeclaration.
 TEST(ModuleInstanceArrayElaboration, ReusedArrayInstanceNameRejected) {
   ElabFixture f;
   Elaborate(
