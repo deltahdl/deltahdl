@@ -164,11 +164,11 @@ TEST(PrimarySim, BitsResultUsableAsLocalparamValue) {
   EXPECT_EQ(n->value.ToUint64(), 16u);
 }
 
-// §20.6.2: "the $bits system function returns the number of bits required to
-// hold an expression as a bit stream", and the 0 it also defines is reserved
-// for "a dynamically sized expression that is currently empty", which
-// BitsOfCurrentlyEmptyQueueReturnsZero above covers. `byte` is fixed-size, so
-// §6.11 Table 6-8's eight bits is the only answer here.
+// §20.6.2: $bits returns how many bits it takes to hold an expression as a bit
+// stream, and the 0 it also defines is kept for a dynamically sized expression
+// that is empty at the time, which BitsOfCurrentlyEmptyQueueReturnsZero above
+// covers. `byte` is fixed-size, so §6.11 Table 6-8's eight bits is the only
+// answer here.
 //
 // The declaration takes its type through a class scope prefix, and the class is
 // written inside the module. That resolution happens in the elaborator, but
@@ -191,12 +191,12 @@ TEST(PrimarySim, BitsOfAModuleLocalClassScopedTypedefVariable) {
   EXPECT_EQ(n->value.ToUint64(), 8u);
 }
 
-// §20.6.2 (printed page 629): $bits answers "the number of bits required to
-// hold an expression as a bit stream", which for a fixed-size unpacked array
-// is every element's: 16 for `logic [7:0] m [0:1]` and for the net array
-// `wire [7:0] w [0:1]`, 48 for `logic [7:0] md [2][3]`, 24 for its row
-// md[1], 128 for `int a [4]`. Read at run time the name was one element's
-// worth, and each answered its element's 8 or 32.
+// §20.6.2 (printed page 629): $bits answers how many bits it takes to hold an
+// expression as a bit stream, which for a fixed-size unpacked array is every
+// element's: 16 for `logic [7:0] m [0:1]` and for the net array
+// `wire [7:0] w [0:1]`, 48 for `logic [7:0] md [2][3]`, 24 for its row md[1],
+// 128 for `int a [4]`. Read at run time the name was one element's worth, and
+// each answered its element's 8 or 32.
 TEST(PrimarySim, BitsOfFixedSizeUnpackedArraysCountEveryElement) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"

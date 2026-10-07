@@ -149,14 +149,13 @@ TEST(RealMath, AtanhMatchesC) {  // $atanh ≡ atanh; atanh(0.5) to six sig figs
 }
 
 // ---------------------------------------------------------------------------
-// §20.8.2 (C1): "shall accept real value arguments." The C-match tests above
-// all pass a real literal, so literal acceptance is already covered; this
-// exercises the other production path — a real argument produced by a real
-// variable declaration — whose fractional result confirms the value is carried
-// as a real, not truncated. (Using a real math function inside a constant
-// expression — e.g. a `localparam real` initializer — is a §20.8/§11.2.1
-// concern folded at elaboration, a different pipeline stage, so it is not
-// exercised here.)
+// §20.8.2 (C1): the functions take real arguments. The C-match tests above all
+// pass a real literal, so literal acceptance is already covered; this exercises
+// the other production path — a real argument produced by a real variable
+// declaration — whose fractional result confirms the value is carried as a
+// real, not truncated. (Using a real math function inside a constant expression
+// — e.g. a `localparam real` initializer — is a §20.8/§11.2.1 concern folded at
+// elaboration, a different pipeline stage, so it is not exercised here.)
 
 TEST(RealMath, AcceptsRealVariableArgument) {
   SimFixture f;
@@ -169,8 +168,8 @@ TEST(RealMath, AcceptsRealVariableArgument) {
   EXPECT_EQ(out, "1.5\n");
 }
 
-// §20.8.2 (C1): "return a `real` result type." %g renders the payload as a
-// double regardless of type, so it cannot distinguish a real result from an
+// §20.8.2 (C1): the functions return a `real` result. %g renders the payload as
+// a double regardless of type, so it cannot distinguish a real result from an
 // integral one — but %d can: a real-typed value takes the truncate-to-integer
 // path ($pow(2,10) == 1024.0 -> "1024"), whereas an integral value would render
 // the raw 64-bit double bit pattern as a huge decimal. A clean "1024" therefore
@@ -186,9 +185,9 @@ TEST(RealMath, ReturnsRealResultType) {
 }
 
 // ---------------------------------------------------------------------------
-// §20.8.2 (C2): "behavior shall match the equivalent C function" extends to the
-// C function's out-of-domain and singular behavior, since %g renders exactly
-// what the C library returns.
+// §20.8.2 (C2): behaving as the matching C function does extends to the C
+// function's out-of-domain and singular behavior, since %g renders exactly what
+// the C library returns.
 
 TEST(RealMath, SqrtOfNegativeMatchesCNaN) {
   SimFixture f;

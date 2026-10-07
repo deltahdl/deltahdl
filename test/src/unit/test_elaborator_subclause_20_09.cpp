@@ -328,7 +328,7 @@ TEST(BitVectorFunctionArgs, RejectsRealArgumentInARandsequenceCodeBlock) {
 }
 
 // §20.9's reject list is a property of the argument's own type -- the clause
-// asks that "the expression argument" be of a bit-stream type -- and a virtual
+// asks that the expression argument be of a bit-stream type -- and a virtual
 // interface handle is not one while a signal of the interface it is bound to
 // is. So the check has to stop at the member rather than judge it by the object
 // it selects from, which is what made this case worth writing beside

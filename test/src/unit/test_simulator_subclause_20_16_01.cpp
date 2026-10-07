@@ -19,10 +19,9 @@ namespace {
 // AND-array (one output, two inputs) so the array-type behavior is observable
 // from the final value of the output term.
 
-// §20.16.1: "the output terms are updated without any delay." The output is
-// readable as its newly computed value in the same time step, with no
-// intervening delay control - here captured into another variable on the very
-// next statement.
+// §20.16.1: the output terms are updated with no delay. The output is readable
+// as its newly computed value in the same time step, with no intervening delay
+// control - here captured into another variable on the very next statement.
 TEST(PlaArrayType, OutputsUpdatedWithoutDelay) {
   SimFixture f;
   uint64_t cap = RunModule(f,

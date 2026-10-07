@@ -159,8 +159,8 @@ TEST(StochasticQueueStatus, RemoveFromUndefinedQueue) {
 // §20.15.6: $q_full is a function that returns 0/1 fullness but also reports a
 // status code through its trailing output. An undefined q_id reports value 2;
 // once the queue is live the status is OK. Reading the status back confirms the
-// function participates in the "every task and function returns a status code"
-// requirement.
+// function takes part in the requirement that every task and function return a
+// status code.
 TEST(StochasticQueueStatus, FullReportsStatus) {
   auto out = RunBody(
       "    if ($q_full(3, st)) ;\n"  // undefined

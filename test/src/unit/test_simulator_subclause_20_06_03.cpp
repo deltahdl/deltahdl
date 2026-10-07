@@ -116,7 +116,7 @@ TEST(RangeSystemFunctionSim, HierarchicalUnboundedParameterReturnsTrue) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §20.6.3: the "otherwise returns false" branch holds for the hierarchical
+// §20.6.3: the branch that returns false otherwise holds for the hierarchical
 // operand form too — a submodule parameter given an ordinary bounded value is
 // not $, so a dotted query of it yields 1'b0.
 TEST(RangeSystemFunctionSim, HierarchicalBoundedParameterReturnsFalse) {

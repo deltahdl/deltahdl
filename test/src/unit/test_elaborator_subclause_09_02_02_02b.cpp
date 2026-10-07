@@ -318,9 +318,9 @@ TEST(AlwaysCombLatchWarning, AssertionFailStatementAssignmentInfersLatch) {
 // alone would make the two arms a two-way choice on the assertion expression,
 // covering its whole domain the way an if with an else covers a condition's,
 // and an every-path answer built on §16.3 alone would report no latch here. But
-// §20.11 gives $assertcontrol "the capability to enable/disable action block
-// execution of assertions and expect statements", so there is a way through the
-// statement that runs neither arm and leaves `y` holding its previous value.
+// §20.11 lets $assertcontrol turn the action blocks of assertions and expect
+// statements on and off, so there is a way through the statement that runs
+// neither arm and leaves `y` holding its previous value.
 TEST(AlwaysCombLatchWarning, AssertionBothActionArmsStillInferLatch) {
   ElabFixture f;
   auto* design = ElaborateSrc(

@@ -9,8 +9,8 @@
 // scaling rules ($time's rounding, $stime's 32-bit truncation, $realtime's
 // fractional real) belong to §20.3.1–§20.3.3 and are covered there; here the
 // default 1 ns unit / 1 ns precision leaves the tick count unscaled so each
-// function's value equals the elapsed delay, isolating the "current time"
-// claim this head owns.
+// function's value equals the elapsed delay, isolating the claim about the
+// current time that this head owns.
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
@@ -92,8 +92,8 @@ TEST(TimeFunctionSim, StimeTracksAdvancingScheduler) {
 }
 
 // §20.3: before any delay the current simulation time is zero, and all three
-// functions report it as such. This anchors the "current time" claim at the
-// start of the run, complementing the nonzero-time cases above.
+// functions report it as such. This anchors the current-time claim at the start
+// of the run, complementing the nonzero-time cases above.
 TEST(TimeFunctionSim, AllThreeReportZeroAtTimeZero) {
   SimFixture f;
   std::string out = RunCapture(

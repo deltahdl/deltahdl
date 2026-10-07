@@ -183,11 +183,11 @@ TEST(BitsCallRestrictions, BitsOnInterfaceClassObjectIsError) {
       "20.6.2"));
 }
 
-// §20.6.2 says "It shall be an error to: -- Use the $bits system function
-// directly with a dynamically sized data type identifier", and states no
-// condition on where the call stands. So the error is owed wherever a statement
-// can be written, and the five cases below each put the call in one statement
-// position of a module whose 'qt' is a queue typedef.
+// §20.6.2 makes it an error to call $bits directly on the identifier of a
+// dynamically sized data type, and states no condition on where the call
+// stands. So the error is owed wherever a statement can be written, and the
+// five cases below each put the call in one statement position of a module
+// whose 'qt' is a queue typedef.
 //
 // Each of those five is a position
 // Elaborator::ValidateBitsCallRestrictions reached only once CheckBitsCallStmt

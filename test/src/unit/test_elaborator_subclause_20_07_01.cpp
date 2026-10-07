@@ -255,16 +255,15 @@ TEST(ArrayQueryVariableDim, SizeOfDynamicInnerDimensionNames20_7_1) {
                             4, "20.7.1"));
 }
 
-// §20.7.1 says that when a §20.7 query function is "called with arguments (v,
-// n) where v denotes some array variable and n is greater than 1, then it
-// shall be an error if the dimension indicated by n is a variable-sized
-// dimension", and names no position the call may stand in. Each of the five
-// cases below writes the call in one such position, and each is a position
-// CheckArrayQueryOnVarDimStmt in
-// src/elaborator/elaborator_validate_queries.cpp reached only once it took its
-// list of nested statements from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h. Every one of them elaborated
-// clean beforehand, with an inner variable-sized dimension left queried.
+// §20.7.1 says that when a §20.7 query function is called as (v, n) on an array
+// variable v with n above 1, the dimension n names must not be a variable-sized
+// one, and names no position the call may stand in. Each of the five cases
+// below writes the call in one such position, and each is a position
+// CheckArrayQueryOnVarDimStmt in src/elaborator/elaborator_validate_queries.cpp
+// reached only once it took its list of nested statements from ForEachChildStmt
+// in src/elaborator/elaborator_validate_internal.h. Every one of them
+// elaborated clean beforehand, with an inner variable-sized dimension left
+// queried.
 //
 // Each case names a different query function, and the three forms §20.7 counts
 // as variable-sized -- the dynamic array, the queue and the wildcard

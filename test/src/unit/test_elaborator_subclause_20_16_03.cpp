@@ -7,8 +7,8 @@ using namespace delta;
 
 namespace {
 
-// §20.16.3: "PLA input terms, output terms, and memory shall be specified in
-// ascending order." The LRM's own examples declare the memory as
+// §20.16.3: a PLA's input terms, output terms and memory are all given in
+// ascending order. The LRM's own examples declare the memory as
 // `logic [1:n] mem[1:m]`, with both the width (packed) and depth (unpacked)
 // ranges ascending; such a call elaborates cleanly.
 TEST(PlaAscendingOrder, AscendingMemoryAndTermsAreAccepted) {
@@ -202,15 +202,14 @@ TEST(PlaAscendingOrder, NonPlaTaskNameIsNotRangeChecked) {
 }
 
 // §20.16.3 states its rule over the memory and term arguments of a PLA
-// modeling system task -- "PLA input terms, output terms, and memory shall be
-// specified in ascending order" -- and names no position the call may stand
-// in. Each of the four cases below writes the call in one such position, and
-// each is a position CheckPlaAscendingStmt in
-// src/elaborator/elaborator_validate_queries.cpp reached only once it took its
-// list of nested statements from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h. Every one of them elaborated
-// clean beforehand, with a descending range left where the clause requires an
-// ascending one.
+// modeling system task -- input terms, output terms and memory all given in
+// ascending order -- and names no position the call may stand in. Each of the
+// four cases below writes the call in one such position, and each is a position
+// CheckPlaAscendingStmt in src/elaborator/elaborator_validate_queries.cpp
+// reached only once it took its list of nested statements from ForEachChildStmt
+// in src/elaborator/elaborator_validate_internal.h. Every one of them
+// elaborated clean beforehand, with a descending range left where the clause
+// requires an ascending one.
 //
 // Stmt::for_steps is the fifth position that list added and it carries no case
 // here, for the reason the same conversion records in

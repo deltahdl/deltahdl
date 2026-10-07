@@ -33,10 +33,10 @@ std::string WritePersonalityFile(const std::string& tag,
 // the polarity of the participating input. These tests drive small synchronous
 // arrays so the per-bit interpretation is observable from the output term.
 
-// §20.16.4 array format: "A 1 means take the input value, and a 0 means do not
-// take the input value." With an AND-array selecting only the high input, the
-// low input (whose personality bit is 0) is excluded from the reduction, so a
-// low value there cannot pull the AND result down.
+// §20.16.4 array format: a 1 takes the input value and a 0 leaves it out. With
+// an AND-array selecting only the high input, the low input (whose personality
+// bit is 0) is excluded from the reduction, so a low value there cannot pull
+// the AND result down.
 TEST(PlaPersonalityFormat, ArrayFormatOneTakesInputZeroExcludesIt) {
   SimFixture f;
   uint64_t out = RunModule(
@@ -58,10 +58,9 @@ TEST(PlaPersonalityFormat, ArrayFormatOneTakesInputZeroExcludesIt) {
 // §20.16.4: the two personality formats are differentiated by whether the array
 // or the plane system call is used, and they interpret the very same memory bit
 // differently. Driving identical personality memory and inputs through an
-// AND-array and an AND-plane, a 0 bit means "do not take the input" in the
-// array format (leaving the AND identity 1) but "take the complemented input"
-// in the plane format (~1 = 0). The two calls therefore disagree on the same
-// memory.
+// AND-array and an AND-plane, a 0 bit leaves the input out in the array format
+// (leaving the AND identity 1) but takes the complemented input in the plane
+// format (~1 = 0). The two calls therefore disagree on the same memory.
 TEST(PlaPersonalityFormat, ArrayAndPlaneFormatsDifferOnSameMemory) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -88,8 +87,8 @@ TEST(PlaPersonalityFormat, ArrayAndPlaneFormatsDifferOnSameMemory) {
   EXPECT_EQ(outp->value.ToUint64(), 0u);  // plane: 0 complements the input
 }
 
-// §20.16.4 plane format: an x code takes the "worst case" of the input value.
-// The engine contributes an unknown for that term, so the reduced output bit is
+// §20.16.4 plane format: an x code takes the worst case of the input value. The
+// engine contributes an unknown for that term, so the reduced output bit is
 // itself unknown rather than a clean 0 or 1.
 TEST(PlaPersonalityFormat, PlaneFormatWorstCaseCodeYieldsUnknown) {
   SimFixture f;

@@ -108,9 +108,9 @@ TEST(SysTask, ShortrealtobitsRoundsToNearestRepresentation) {
 }
 
 // §20.5 declares the operand of $shortrealtobits a shortreal_val, and the task
-// "converts values from a shortreal type to the 32-bit vector representation of
-// the real number". §6.12 makes a shortreal a C float, so a shortreal variable
-// already holds that 32-bit representation and the task is a round trip on it.
+// turns a shortreal value into the 32-bit vector that represents it. §6.12
+// makes a shortreal a C float, so a shortreal variable already holds that
+// 32-bit representation and the task is a round trip on it.
 //
 // ShortrealtobitsReinterpretsShortrealAs32Bits and
 // ShortrealtobitsRoundsToNearestRepresentation above build the operand with
@@ -189,7 +189,8 @@ TEST(SysTask, BitstorealInvertsRealtobitsRoundTrip) {
 }
 
 // The signedness casts change only the signedness, never the bit pattern, so
-// the "same value" guarantee holds even when the most significant bit is set.
+// the guarantee of an unchanged value holds even when the most significant bit
+// is set.
 TEST(SysTask, CastFunctionsPreserveValueWithHighBitSet) {
   SysTaskFixture f;
   auto in = EvalExpr(MkInt(f.arena, 0xFFFFFFFFu), f.ctx, f.arena);

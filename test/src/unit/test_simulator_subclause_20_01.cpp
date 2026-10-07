@@ -50,10 +50,9 @@ std::string NotImplemented(const std::string& name) {
 }
 
 // §20.1 catalogues the system tasks and system functions SystemVerilog has,
-// naming each of them under the subclause that defines it, and says that
-// "Clause 21 presents additional system tasks and system functions that are
-// specific to I/O operations". A `$name` outside those two clauses is a call
-// this simulator can carry out no part of.
+// naming each of them under the subclause that defines it, and points to Clause
+// 21 for the further system tasks and functions that are about I/O. A `$name`
+// outside those two clauses is a call this simulator can carry out no part of.
 //
 // Every such call evaluated to a one-bit zero and was discarded in silence,
 // because EvalPrngCall stood at the end of the dispatch chain and answered

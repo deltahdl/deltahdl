@@ -197,14 +197,13 @@ TEST(PlaOutputTerms, SyncNandPlaneTaskRecognizedSoNetOutputRejected) {
 }
 
 // §20.16 states its rule over the arguments of a PLA modeling system task --
-// "the input terms can be nets or variables whereas the output terms shall
-// only be variables" -- and names no position the call may stand in. Each of
-// the four cases below writes the call in one such position, and each is a
-// position CheckPlaOutputTermsStmt in
-// src/elaborator/elaborator_validate_queries.cpp reached only once it took its
-// list of nested statements from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h. Every one of them elaborated
-// clean beforehand, with a net left driven as a PLA output term.
+// the input terms may be nets or variables, but the output terms must be
+// variables -- and names no position the call may stand in. Each of the four
+// cases below writes the call in one such position, and each is a position
+// CheckPlaOutputTermsStmt in src/elaborator/elaborator_validate_queries.cpp
+// reached only once it took its list of nested statements from ForEachChildStmt
+// in src/elaborator/elaborator_validate_internal.h. Every one of them
+// elaborated clean beforehand, with a net left driven as a PLA output term.
 //
 // Stmt::for_steps is the fifth position that list added and it carries no case
 // here. A PLA task returns no value, so it is neither the right-hand side of

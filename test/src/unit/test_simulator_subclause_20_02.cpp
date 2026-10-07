@@ -169,13 +169,12 @@ TEST(SimControlSim, FinishLevelFromLocalparamSelectsStatistics) {
   EXPECT_NE(captured.str().find("statistics"), std::string::npos);
 }
 
-// §20.2: "The $finish system task causes the simulator to exit and pass control
-// back to the host operating system." A $finish reached from a randsequence
-// production code block ends the run there, so the production standing after it
-// in the rule is never generated and the variable its code block writes is left
-// as the run found it. §18.17.6 gives a randsequence a meaning for break and
-// for return and none for $finish, so nothing in the generation of `main`
-// absorbs the request to halt.
+// §20.2: $finish makes the simulator exit and hand control back to the host
+// operating system. A $finish reached from a randsequence production code block
+// ends the run there, so the production standing after it in the rule is never
+// generated and the variable its code block writes is left as the run found it.
+// §18.17.6 gives a randsequence a meaning for break and for return and none for
+// $finish, so nothing in the generation of `main` absorbs the request to halt.
 TEST(SimControlSim, FinishInARandsequenceProductionCodeBlockEndsGeneration) {
   SimFixture f;
   auto* design = ElaborateSrc(

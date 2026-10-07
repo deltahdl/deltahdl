@@ -93,9 +93,9 @@ TEST(TimeformatSysTask, DefaultFormatPadsToTwentyColumns) {
   EXPECT_EQ(out, "[" + std::string(19, ' ') + "3]\n");
 }
 
-// §20.4.3: the configuration persists "for all %t formats in the design until
-// another $timeformat system task is invoked", so a single call governs every
-// later %t rendering, not just the next one.
+// §20.4.3: the configuration holds for every %t format of the design until the
+// next $timeformat call, so a single call governs every later %t rendering, not
+// just the next one.
 TEST(TimeformatSysTask, FormatPersistsAcrossDisplays) {
   SimFixture f;
   std::string out = RunCapture(
