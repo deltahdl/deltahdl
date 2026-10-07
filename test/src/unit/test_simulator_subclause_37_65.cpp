@@ -70,6 +70,12 @@ TEST_F(EventControl, NullAndEmptyEventControlsReportNoStatement) {
   EXPECT_EQ(VpiEventControlStmt(&bare), nullptr);
 }
 
+// Condition edge: a null handle reports no condition, as it reports no
+// statement above.
+TEST_F(EventControl, NullEventControlReportsNoCondition) {
+  EXPECT_EQ(VpiEventControlConditionExpr(nullptr), nullptr);
+}
+
 // D1 end to end: the rule is applied by the public vpi_handle(vpiStmt, ...)
 // dispatch. The assignment-associated event control yields a null statement,
 // while a standalone event control yields its statement child through the same
