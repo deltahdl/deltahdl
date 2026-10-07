@@ -233,7 +233,7 @@ TEST(GenerateElaboration, GenerateForInitStepMismatchIncrementFormErrors) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "generate-for init and step shall assign to the same genvar", 4, "27.4"));
+      "generate-for init and step assign different genvars", 4, "27.4"));
 }
 
 // §27.4: "The genvar is used as an integer during elaboration to evaluate the
@@ -331,9 +331,9 @@ TEST(GenerateElaboration, GenerateForInitReferencesOwnGenvarNames27_4) {
       "  endgenerate\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "generate-for init shall not reference the loop index", 3, "27.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "generate-for init reads the loop's own genvar", 3,
+                            "27.4"));
 }
 
 // §27.4 requires the genvar initialization assignment to be a constant

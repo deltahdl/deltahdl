@@ -602,26 +602,25 @@ static std::optional<std::string_view> ValidateGenerateForHeader(
 
   if (ExprReferencesName(item->gen_init->rhs, genvar_name)) {
     diag.Error(item->loc,
-               "generate-for init shall not reference the loop index on the "
+               "generate-for init reads the loop's own genvar on its "
                "right-hand side",
                Subclause("27.4"));
     return std::nullopt;
   }
 
   if (GenvarIterationName(item->gen_step) != genvar_name) {
-    diag.Error(item->loc,
-               "generate-for init and step shall assign to the same genvar",
+    diag.Error(item->loc, "generate-for init and step assign different genvars",
                Subclause("27.4"));
     return std::nullopt;
   }
 
-  // §27.4: it shall be an error if any bit of the genvar is set to x or z
-  // during evaluation. An x/z initialization value triggers a dedicated
+  // §27.4: a genvar that takes an x or z bit at any point of the loop's
+  // evaluation is an error. An x/z initialization value triggers a dedicated
   // error rather than the generic non-constant warning.
   if (ExprHasXZLiteral(item->gen_init->rhs)) {
     diag.Error(item->loc,
-               "generate-for genvar shall not have any bit set to x or z "
-               "during evaluation, and the initialization assignment sets one",
+               "generate-for genvar must hold no x or z bit while the loop is "
+               "evaluated, and the initialization assignment sets one",
                Subclause("27.4"));
     return std::nullopt;
   }
@@ -759,8 +758,8 @@ static bool AdvanceGenerateForGenvar(DiagEngine& diag, const ModuleItem* item,
                                      ScopeMap& loop_scope) {
   if (GenerateForStepHasXZLiteral(item)) {
     diag.Error(item->loc,
-               "generate-for genvar shall not have any bit set to x or z "
-               "during evaluation, and the iteration assignment sets one",
+               "generate-for genvar must hold no x or z bit while the loop is "
+               "evaluated, and the iteration assignment sets one",
                Subclause("27.4"));
     return false;
   }

@@ -244,7 +244,7 @@ TEST(GenerateElaboration, GenerateForInitStepDifferentVariablesErrors) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "generate-for init and step shall assign to the same genvar", 4, "27.4"));
+      "generate-for init and step assign different genvars", 4, "27.4"));
 }
 
 TEST(GenerateElaboration, GenerateForInitReferencesOwnGenvarErrors) {
@@ -259,8 +259,8 @@ TEST(GenerateElaboration, GenerateForInitReferencesOwnGenvarErrors) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "generate-for init shall not reference the loop "
-                            "index on the right-hand side",
+                            "generate-for init reads the loop's own genvar on "
+                            "its right-hand side",
                             3, "27.4"));
 }
 
@@ -387,8 +387,8 @@ TEST(GenerateElaboration, GenerateForGenvarXZInitErrors) {
   // reports stand at the `for` keyword on line 3, so the half of the header
   // the message names is the only thing that separates them.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "generate-for genvar shall not have any bit set to "
-                            "x or z during evaluation, and the initialization "
+                            "generate-for genvar must hold no x or z bit while "
+                            "the loop is evaluated, and the initialization "
                             "assignment sets one",
                             3, "27.4"));
 }
@@ -412,8 +412,8 @@ TEST(GenerateElaboration, GenerateForGenvarXZStepErrors) {
   // stand at the same line under the same subclause, so the message is the only
   // thing that can.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "generate-for genvar shall not have any bit set to "
-                            "x or z during evaluation, and the iteration "
+                            "generate-for genvar must hold no x or z bit while "
+                            "the loop is evaluated, and the iteration "
                             "assignment sets one",
                             3, "27.4"));
 }
@@ -426,11 +426,11 @@ TEST(GenerateElaboration, GenerateForGenvarXZStepErrors) {
 // for, and the negative assertion is what says the reports do not overlap.
 TEST(GenerateElaboration, GenerateForGenvarXZReportsNameWhichHalfOfTheHeader) {
   constexpr const char* kInitMsg =
-      "generate-for genvar shall not have any bit set to x or z during "
-      "evaluation, and the initialization assignment sets one";
+      "generate-for genvar must hold no x or z bit while the loop is "
+      "evaluated, and the initialization assignment sets one";
   constexpr const char* kIterationMsg =
-      "generate-for genvar shall not have any bit set to x or z during "
-      "evaluation, and the iteration assignment sets one";
+      "generate-for genvar must hold no x or z bit while the loop is "
+      "evaluated, and the iteration assignment sets one";
 
   ElabFixture init;
   ElaborateSrc(
