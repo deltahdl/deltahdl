@@ -285,11 +285,11 @@ TEST(Coverage, LoadCumulativeCoverageHandlesMultipleTypes) {
 
 // $get_coverage() is a system function returning the overall coverage of all
 // coverage group types as a real in the range 0 to 100, computed as §19.11
-// describes. That computation names this case explicitly: "$get_coverage shall
-// return a value of 100.0 if called on a design that has no covergroup
-// instances". The empty design is the fully-covered case, not the uncovered
-// one, because a coverpoint contributing no bins leaves a zero denominator and
-// is excluded from the calculation rather than counted as a miss.
+// describes. That computation names this case explicitly: $get_coverage returns
+// 100.0 for a design holding no covergroup instance. The empty design is the
+// fully-covered case, not the uncovered one, because a coverpoint contributing
+// no bins leaves a zero denominator and is excluded from the calculation rather
+// than counted as a miss.
 TEST(Coverage, GetCoverageSyscallEmptyDesignReturnsOneHundred) {
   const std::string kSrc =
       "module t;\n"

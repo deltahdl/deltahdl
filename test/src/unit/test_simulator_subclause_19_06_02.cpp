@@ -91,8 +91,8 @@ TEST(Coverage, IgnoredProductExcludedFromOtherCrossBin) {
 // excluded. Exclusion matches on the whole cross product (the tuple of chosen
 // bin indices): a near-miss product that differs in a single coverpoint index
 // is kept, and an ignored entry that names a product not present in the cross
-// removes nothing. This pins the boundary of "all products that satisfy" — no
-// more than the satisfying set is dropped.
+// removes nothing. This pins the boundary of dropping every product that
+// satisfies the expression — no more than the satisfying set is dropped.
 TEST(Coverage, OnlyMatchingProductsAreExcluded) {
   std::vector<std::vector<size_t>> products = {{0, 0}, {0, 1}, {1, 0}};
   // {1,0} is present and is dropped; {0,2} differs from {0,1} in one index and

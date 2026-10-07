@@ -233,8 +233,9 @@ TEST(AutoBinCreation, RealCoverpointNotEligible) {
   EXPECT_FALSE(CoverageDB::ShouldAutoCreateBins(&cp));
 }
 
-// LRM 19.5.3: the "no bins except ignored or illegal" test admits an ignore bin
-// as the sole bin — an ignore-only coverpoint still receives automatic bins.
+// LRM 19.5.3: the test for a coverpoint with no bins but ignored or illegal
+// ones admits an ignore bin as the sole bin — an ignore-only coverpoint still
+// receives automatic bins.
 TEST(AutoBinCreation, IgnoreOnlyBinsDoNotSuppressAutoBins) {
   CoverPoint cp;
   CoverBin ignore;

@@ -95,9 +95,9 @@ TEST(CovergroupDeclParsing, NamedCovergroupWithExtendsIsRejected) {
 }
 
 TEST(CovergroupDeclParsing, DerivedCovergroupTakesNoPortList) {
-  // §19.4.1 (printed page 581): "If the base covergroup has a list of arguments
-  // specified, the derived covergroup implicitly has the same list of
-  // arguments." So the derived one declares none of its own.
+  // §19.4.1 (printed page 581): a derived covergroup takes over its base's
+  // argument list, when the base has one. So the derived one declares none of
+  // its own.
   auto r = Parse(
       "module m;\n"
       "  covergroup extends base_cg (int x);\n"
@@ -109,10 +109,10 @@ TEST(CovergroupDeclParsing, DerivedCovergroupTakesNoPortList) {
 }
 
 TEST(CovergroupDeclParsing, DerivedCovergroupTakesNoCoverageEvent) {
-  // §19.4.1 (printed page 581): "If the base covergroup has a coverage event
-  // specified, the derived covergroup shall use that coverage event." The
-  // second alternative admits no coverage_event, and this is the half of that
-  // rule the port-list case above cannot reach.
+  // §19.4.1 (printed page 581): a derived covergroup must use the coverage
+  // event its base names, if the base names one. The second alternative admits
+  // no coverage_event, and this is the half of that rule the port-list case
+  // above cannot reach.
   auto r = Parse(
       "module m;\n"
       "  covergroup extends base_cg @(posedge clk);\n"
@@ -332,9 +332,9 @@ TEST(CovergroupDeclParsing, CoverPoint_ComplexExpression) {
 }
 
 // cover_point's label may be preceded by a data_type_or_implicit: §19.5
-// (printed page 583) has "a data type for the coverpoint may be specified
-// explicitly or implicitly in data_type_or_implicit", and "if a data type is
-// specified, then a cover_point_identifier shall also be specified".
+// (printed page 583) lets data_type_or_implicit give the coverpoint a data
+// type, explicitly or implicitly, and requires a cover_point_identifier
+// whenever a data type is given.
 TEST(CovergroupDeclParsing, CoverPoint_WithDataType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

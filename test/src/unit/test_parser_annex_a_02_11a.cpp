@@ -346,10 +346,10 @@ TEST(CovergroupDeclParsing, ErrorBlockEventMissingBeginOrEnd) {
 
 // A.2.11's hierarchical_btf_identifier has three forms, and the third,
 // `[ hierarchical_identifier . | class_scope ] method_identifier`, names a
-// method through A.8.4's class_scope, `class_type ::`. §19.3 (printed page
-// 577) has the event name "a named block, task, function, or class method".
-// The parser read the name as identifiers joined by '.', so the '::' was
-// reported as a missing ')'.
+// method through A.8.4's class_scope, `class_type ::`. §19.3 (printed page 577)
+// has the event name denote a named block, a task, a function or a class
+// method. The parser read the name as identifiers joined by '.', so the '::'
+// was reported as a missing ')'.
 TEST(CovergroupDeclParsing, HierarchicalBtfIdentifier_ClassScope) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

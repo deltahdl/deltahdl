@@ -200,11 +200,11 @@ TEST(CovergroupDeclElaboration, FullCovergroupElaborates) {
 //   endgroup [ : covergroup_identifier ]
 //
 // which carries a footnote, and §19.4.1 is where that footnote leads: the
-// alternative belongs to embedded covergroups, and "it shall be an error to use
-// the extends declaration if the covergroup_identifier has not previously been
-// defined in a base class of the enclosing class". A covergroup declared in a
-// module has no enclosing class, so no covergroup_identifier can satisfy that
-// requirement and the form is rejected wherever it appears outside one.
+// alternative belongs to embedded covergroups, and an extends declaration is an
+// error unless a base class of the enclosing class has already defined the
+// covergroup_identifier. A covergroup declared in a module has no enclosing
+// class, so no covergroup_identifier can satisfy that requirement and the form
+// is rejected wherever it appears outside one.
 //
 // Note the alternative names no derived covergroup of its own -- the identifier
 // follows extends and names the base, and the derived covergroup takes that
