@@ -107,7 +107,7 @@ static std::string ClockingSkewMessage(std::string_view role,
                                        std::string_view breach,
                                        std::string_view value) {
   return std::format(
-      "{} is {} ({}); a clocking skew shall be a non-negative integer value",
+      "{} is {} ({}); a clocking skew has to be a whole number of zero or more",
       role, breach, value);
 }
 
@@ -142,8 +142,8 @@ static void CheckClockingSkewRealValue(const Expr* delay,
 // §14.4 limits a clocking skew to constant expressions, parameters among them.
 // Any skew delay that cannot be folded against the module's parameter scope
 // (e.g. a reference to a net or variable) violates the rule.
-// §14.3: a skew delay_control is either a time literal or a constant expression
-// that evaluates to a non-negative integer value. A time literal is inherently
+// §14.3: a skew delay_control is a time literal, or else a constant expression
+// whose value is a whole number of zero or more. A time literal is inherently
 // a non-negative time value and may be fractional (e.g. a step-scaled delay),
 // so it is exempt from the integer requirement. The 1step pseudo-literal folds
 // to 0 and is accepted.

@@ -150,11 +150,11 @@ TEST(ClockingBlockElab, NegativeConstantInputSkewRejected) {
   // integer path of CheckClockingSkew in
   // src/elaborator/elaborator_validate_clocking.cpp, so the report names that
   // signal, the negative half of the requirement, and -1.
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "input skew of clocking signal 'a' is negative "
-                            "(-1); a clocking skew shall be a non-negative "
-                            "integer value",
-                            5, "14.3"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "input skew of clocking signal 'a' is negative (-1); a "
+                    "clocking skew has to be a whole number of zero or more",
+                    5, "14.3"));
 }
 
 TEST(ClockingBlockElab, NegativeParameterOutputSkewRejected) {
@@ -183,11 +183,11 @@ TEST(ClockingBlockElab, NegativeParameterOutputSkewRejected) {
   // output-only signal's skew in ClockingSignalDecl::skew_delay and leaves
   // out_skew_delay null, so the role a report names reads sig.direction rather
   // than the field the skew arrived in.
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "output skew of clocking signal 'a' is negative "
-                            "(-1); a clocking skew shall be a non-negative "
-                            "integer value",
-                            6, "14.3"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "output skew of clocking signal 'a' is negative (-1); a "
+                    "clocking skew has to be a whole number of zero or more",
+                    6, "14.3"));
 }
 
 TEST(ClockingBlockElab, NegativeLocalparamSkewRejected) {
@@ -208,11 +208,11 @@ TEST(ClockingBlockElab, NegativeLocalparamSkewRejected) {
   // `LP` folds to -2 on the integer path of CheckClockingSkew in
   // src/elaborator/elaborator_validate_clocking.cpp, and the skew stands on the
   // input of clocking signal 'a'.
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "input skew of clocking signal 'a' is negative "
-                            "(-2); a clocking skew shall be a non-negative "
-                            "integer value",
-                            6, "14.3"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "input skew of clocking signal 'a' is negative (-2); a "
+                    "clocking skew has to be a whole number of zero or more",
+                    6, "14.3"));
 }
 
 TEST(ClockingBlockElab, NegativeDefaultInputSkewRejected) {
@@ -235,7 +235,7 @@ TEST(ClockingBlockElab, NegativeDefaultInputSkewRejected) {
   // nothing.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "default input skew is negative (-1); a clocking "
-                            "skew shall be a non-negative integer value",
+                            "skew has to be a whole number of zero or more",
                             5, "14.3"));
 }
 
@@ -314,7 +314,7 @@ TEST(ClockingBlockElab, NegativeDefaultOutputSkewRejected) {
   // breaks the other half of the same line.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "default output skew is negative (-1); a clocking "
-                            "skew shall be a non-negative integer value",
+                            "skew has to be a whole number of zero or more",
                             5, "14.3"));
 }
 
@@ -403,11 +403,11 @@ TEST(ClockingBlockElab, NonIntegerRealSkewRejected) {
   // src/elaborator/elaborator_validate_clocking.cpp rather than the integer
   // path of CheckClockingSkew. Naming the integer half and 1.5 is what keeps
   // this case from passing on a negative integer skew.
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "input skew of clocking signal 'a' is not an "
-                            "integer (1.5); a clocking skew shall be a "
-                            "non-negative integer value",
-                            5, "14.3"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "input skew of clocking signal 'a' is not an integer (1.5); a clocking "
+      "skew has to be a whole number of zero or more",
+      5, "14.3"));
 }
 
 TEST(ClockingBlockElab, FractionalTimeLiteralSkewAccepted) {
