@@ -290,10 +290,11 @@ inline void ApplyModuleDirectives(
 // the declarations stay in the arena that parsed them and the target gains
 // pointers to them.
 //
-// §33.2.1 rules that "a library is a named collection of cells" and that "a
-// cell is a design element (see 3.2), such as a module, primitive, interface,
-// program, package, or configuration". Its six are introduced by "such as", and
-// the definition it defers to is §3.2's, which names seven: the module of
+// §33.2.1 defines a library as a named set of cells and a cell as a design
+// element in the sense of §3.2, and it then lists six kinds as examples: the
+// module, primitive, interface, program, package and configuration. The list
+// only illustrates, and the definition it points to is §3.2's, which names
+// seven: the module of
 // Clause 23, the program of Clause 24, the interface of Clause 25, the checker
 // of Clause 17, the package of Clause 26, the primitive of Clause 28 and the
 // configuration of Clause 33. Reading §33.2.1's examples as the whole
@@ -308,9 +309,9 @@ inline void ApplyModuleDirectives(
 // a caller assembling one unit out of several source descriptions on one
 // command line -- case a) -- calls AppendCompilationUnitDeclarations below as
 // well. `libraries` and `lib_includes` stay because they are not a source
-// description's to contribute: §33.3.1 has the library map file "automatically
-// read by the parser prior to parsing any source files specified on the
-// command line", and Syntax 33-2 gives library_declaration and
+// description's to contribute: §33.3.1 has the parser read the library map
+// file on its own before any source file the command line names, and
+// Syntax 33-2 gives library_declaration and
 // include_statement only in library_text.
 inline void AppendCellDeclarations(CompilationUnit& target,
                                    const CompilationUnit& src) {

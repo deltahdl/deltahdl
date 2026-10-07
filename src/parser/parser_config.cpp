@@ -144,9 +144,9 @@ void Parser::ParseUseClause(ConfigRule* rule) {
 
   // A.1.5 gives use_clause three forms, and each names something: a cell, a
   // list of named_parameter_assignment, or a cell with such a list. §33.4.1.6
-  // says what the clause is for, "it specifies the exact library and cell to
-  // which a selected cell or instance is bound", and a `use` followed by its
-  // terminator, or by the `: config` suffix alone, specifies nothing.
+  // says what the clause is for, naming the library and cell that a selected
+  // cell or instance binds to, and a `use` followed by its terminator, or by
+  // the `: config` suffix alone, names nothing.
   if (rule->use_cell.empty() && rule->use_params.empty() &&
       !rule->use_param_reset_all) {
     diag_.Error(use_loc,
@@ -240,8 +240,8 @@ ConfigRule* Parser::ParseConfigRule() {
   if (Check(TokenKind::kKwDefault)) {
     Consume();
     rule->kind = ConfigRuleKind::kDefault;
-    // §33.4.1.2 (printed page 938): "The use expansion clause (see 33.4.1.6)
-    // cannot be used with a default selection clause." The rule is reported
+    // §33.4.1.2 (printed page 938) bars a use expansion clause (§33.4.1.6)
+    // from a default selection clause. The rule is reported
     // under that subclause, once, and the use clause is still read to its end
     // so the rules after it parse as rules.
     if (Check(TokenKind::kKwUse)) {

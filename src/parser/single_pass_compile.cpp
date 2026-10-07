@@ -195,10 +195,10 @@ CompileOutcome SinglePassCompiler::MapIntoLibrary(const std::string& path,
   // another module of its name loudly enough to warn about (§33.3.1.1).
   //
   // All seven design element kinds, in the order AppendCellDeclarations in
-  // src/parser/ast_design.h moves them. §33.2.1 rules that "a library is a
-  // named collection of cells" and that "a cell is a design element (see 3.2),
-  // such as a module, primitive, interface, program, package, or
-  // configuration"; its six are introduced by "such as", and §3.2 names seven:
+  // src/parser/ast_design.h moves them. §33.2.1 defines a library as a named
+  // set of cells and a cell as a design element in the sense of §3.2, and
+  // lists six kinds only as examples: the module, primitive, interface,
+  // program, package and configuration. §3.2 names seven:
   // the module of Clause 23, the program of Clause 24, the interface of Clause
   // 25, the checker of Clause 17, the package of Clause 26, the primitive of
   // Clause 28 and the configuration of Clause 33. The two lists

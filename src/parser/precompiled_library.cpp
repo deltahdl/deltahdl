@@ -383,11 +383,10 @@ void DropCells(std::vector<Decl*>& cells, std::string_view library,
   });
 }
 
-// §33.3.1 (printed page 937): "If multiple cells with the same name map to the
-// same library, then the last cell encountered shall be written to the
-// library. This is to support a "separate-compile" use model ... where it is
-// assumed that encountering a cell after it has previously been compiled is
-// intended to be a recompiling of the cell." Each record is a later encounter
+// §33.3.1 (printed page 937): when two or more cells of one name map to one
+// library, the one encountered last is what the library keeps. The rule
+// serves separate compilation, where a cell met again after it was compiled
+// is taken to be that cell recompiled. Each record is a later encounter
 // than every record before it, so a cell it declares replaces whatever cell of
 // that name the library already holds -- in the one namespace modules,
 // interfaces, programs, checkers, primitives and configurations share, and
