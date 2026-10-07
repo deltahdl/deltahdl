@@ -1,14 +1,14 @@
 // Annex C.4.1: defparam statements. The statement is identified for
-// deprecation, and "this current standard still requires tools to support"
-// it, in the placements the subclause names as what makes it costly: before
-// or after the instance it modifies, at the end of the file, in a separate
-// file, and hierarchically. A defparam written in a separate file is one
-// written in a module of its own, which names the instance it modifies from
-// the root of the hierarchy: §23.8 resolves a name whose leading step names no
-// scope of the writing module upward, and the root it reaches is a top-level
-// module, which is how §23.10.4.2's own example, `defparam m.n.p = 1;` written
-// in the m1 that m instantiates, reaches m's instance n. These cases observe
-// the elaborator supporting each placement.
+// deprecation, yet tools must still support it under this edition, in the
+// placements the subclause names as what makes it costly: before or after the
+// instance it modifies, at the end of the file, in a separate file, and
+// hierarchically. A defparam written in a separate file is one written in a
+// module of its own, which names the instance it modifies from the root of the
+// hierarchy: §23.8 resolves a name whose leading step names no scope of the
+// writing module upward, and the root it reaches is a top-level module, which
+// is how §23.10.4.2's own example, `defparam m.n.p = 1;` written in the m1 that
+// m instantiates, reaches m's instance n. These cases observe the elaborator
+// supporting each placement.
 
 #include <gtest/gtest.h>
 
@@ -36,7 +36,7 @@ int64_t ParamValue(const RtlirModule* mod, std::string_view name) {
   return -1;
 }
 
-// C.4.1: "A defparam statement can precede the instance to be modified".
+// C.4.1: a defparam may be written before the instance it modifies.
 TEST(DefparamSupport, DefparamBeforeTheInstanceApplies) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -51,11 +51,11 @@ TEST(DefparamSupport, DefparamBeforeTheInstanceApplies) {
   EXPECT_EQ(ParamValue(FirstChild(design->top_modules[0]), "P"), 5);
 }
 
-// C.4.1: "can be in a separate file from the instance to be modified". A
-// separate file holds a module of its own, a top-level one, whose defparam
-// names the instance from the top-level module that holds it. Both modules
-// are roots, so the design is elaborated with every uninstantiated module a
-// top (§23.3.1) rather than with the last module alone.
+// C.4.1: a defparam may be written in a file other than the one holding the
+// instance it modifies. A separate file holds a module of its own, a top-level
+// one, whose defparam names the instance from the top-level module that holds
+// it. Both modules are roots, so the design is elaborated with every
+// uninstantiated module a top (§23.3.1) rather than with the last module alone.
 TEST(DefparamSupport, DefparamInASeparateTopModuleReachesTheInstance) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -117,8 +117,8 @@ TEST(DefparamSupport, DefparamThroughTheTopLevelModuleReachesTheWriter) {
   EXPECT_NE(FirstChild(m1), nullptr);
 }
 
-// C.4.1: a defparam "can modify parameters hierarchically that are in turn
-// passed to other defparam statements to modify", so a defparam whose target
+// C.4.1: a defparam may modify, through the hierarchy, a parameter that another
+// defparam then passes on to modify a further one, so a defparam whose target
 // another defparam reads on its right-hand side is applied first, §23.10.4.1
 // deferring a statement whose target is not yet resolved.
 TEST(DefparamSupport, DefparamValueFlowsIntoAnotherDefparam) {

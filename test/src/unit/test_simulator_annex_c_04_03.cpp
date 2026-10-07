@@ -9,21 +9,21 @@
 // Annex C.4.3: VPI definitions.
 //
 // C.4.3 lists the object, relationship and property definitions deprecated to
-// correct and improve VPI, "some ... inherited from IEEE Std 1364 (see 36.12.1)
-// and some ... changed or removed to maintain consistency with related
-// improvements". What it states of its own is where each still stands:
+// correct and improve VPI, some of them carried over from IEEE Std 1364 (see
+// §36.12.1) and others altered or dropped to stay consistent with related
+// improvements. What it states of its own is where each still stands:
 //
-//   1) vpiMemory "no longer represents a VPI object type, except under certain
-//      backwards compatibility modes (see 36.12.1)", and is still a
-//      relationship (§37.20 detail 1);
+//   1) vpiMemory is a VPI object type only under some of the backwards
+//      compatibility modes of §36.12.1, and is still a relationship (§37.20
+//      detail 1);
 //   2) vpiMemoryWord the same, its elements now being vpiLogicVar (vpiReg);
-//   3) the vpiArray property "now has only limited use in IEEE Std 1364
-//      backwards compatibility modes when vpiIntegerVar, vpiTimeVar, and
-//      vpiRealVar could represent arrays", vpiArrayMember having replaced it;
-//   4) vpiValid is inconsistent with its purpose and validity "is implicit in
-//      their existence" (§38.36.1);
-//   5) vpiInterfaceDecl "has been made equivalent to vpiVirtualInterfaceVar"
-//      (§37.32 detail 11).
+//   3) the vpiArray property survives only in the IEEE Std 1364 backwards
+//      compatibility modes, where vpiIntegerVar, vpiTimeVar and vpiRealVar
+//      could stand for arrays, vpiArrayMember having replaced it;
+//   4) vpiValid is inconsistent with its purpose, since an object that exists
+//      is valid by that fact alone (§38.36.1);
+//   5) vpiInterfaceDecl now means the same as vpiVirtualInterfaceVar (§37.32
+//      detail 11).
 //
 // Item 5 is a definition in simulator/sv_vpi_user.h and Annex M's tests read
 // it; items 4 and the relationships of 1 and 2 are §38.36.1's and §37.20's.
@@ -94,8 +94,8 @@ class VpiDeprecatedDefinitions : public ::testing::Test {
 
 // Items 1 and 2 with Table 36-10 rows 1 and 2, Y for IEEE Std 1364-1995: under
 // that mode an unpacked unidimensional reg array is a vpiMemory object and its
-// element a vpiMemoryWord object, as §36.12.1 detail 1 has them "exclusively
-// characterized".
+// element a vpiMemoryWord object, which under §36.12.1 detail 1 is the only way
+// that mode characterizes them.
 TEST_F(VpiDeprecatedDefinitions, MemoryAndItsWordAreObjectsUnderThe1995Mode) {
   ASSERT_TRUE(ctx_.SetDefaultCompatibilityMode(vpiMode1364v1995));
   EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&memory_)), vpiMemory);
@@ -104,7 +104,8 @@ TEST_F(VpiDeprecatedDefinitions, MemoryAndItsWordAreObjectsUnderThe1995Mode) {
 }
 
 // Rows 1 and 2, D for IEEE Std 1364-2001: the objects are "present, but use
-// discouraged", so an application compiled for that version still meets them.
+// discouraged" by the table's legend, so an application compiled for that
+// version still meets them.
 TEST_F(VpiDeprecatedDefinitions, MemoryAndItsWordAreObjectsUnderThe2001Mode) {
   EXPECT_EQ(vpi_get_1364v2001(vpiType, VpiHandleOf(&memory_)), vpiMemory);
   EXPECT_EQ(vpi_get_1364v2001(vpiType, VpiHandleOf(&word_)), vpiMemoryWord);
@@ -123,9 +124,9 @@ TEST_F(VpiDeprecatedDefinitions, MemoryIsAnArrayOfRegsFrom2005On) {
   EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&word_)), vpiReg);
 }
 
-// Row 1 has "unpacked unidimensional reg arrays" as the memories; an array of
-// two unpacked dimensions is the vpiRegArray IEEE Std 1364-2001 introduced for
-// it under every mode.
+// Row 1 takes a memory to be a reg array with one unpacked dimension; an array
+// of two unpacked dimensions is the vpiRegArray IEEE Std 1364-2001 introduced
+// for it under every mode.
 TEST_F(VpiDeprecatedDefinitions, AMultidimensionalRegArrayIsNoMemoryObject) {
   memory_.array_dim_indices = {{0, 1}, {0, 1}};
   ASSERT_TRUE(ctx_.SetDefaultCompatibilityMode(vpiMode1364v1995));
@@ -149,8 +150,8 @@ TEST_F(VpiDeprecatedDefinitions, ARegOutsideAMemoryIsARegUnderThe1995Mode) {
 
 // Item 3 with rows 3 and 4, Y for every IEEE 1364 standard: under such a mode
 // an unpacked array of integer or time variables is a vpiIntegerVar or
-// vpiTimeVar object whose vpiArray property "returned TRUE when they were
-// arrays", and the single variable of the kind answers FALSE.
+// vpiTimeVar object whose vpiArray property was TRUE for one that is an array,
+// and the single variable of the kind answers FALSE.
 TEST_F(VpiDeprecatedDefinitions,
        IntegerAndTimeArraysAreVariablesWithVpiArrayUnderThe1364Modes) {
   ASSERT_TRUE(ctx_.SetDefaultCompatibilityMode(vpiMode1364v1995));
@@ -176,9 +177,9 @@ TEST_F(VpiDeprecatedDefinitions, ARealArrayIsARealVarFrom2001To2005) {
   EXPECT_EQ(vpi_get_1364v1995(vpiArray, VpiHandleOf(&real_array_)), 0);
 }
 
-// Item 3: vpiArray "indicated when vpiReg types represented elements of
-// vpiRegArrays", so under the 2005 mode, where a memory's word is a vpiReg,
-// the word answers TRUE and a reg that is no element answers FALSE.
+// Item 3: vpiArray told whether a vpiReg was an element of a vpiRegArray, so
+// under the 2005 mode, where a memory's word is a vpiReg, the word answers TRUE
+// and a reg that is no element answers FALSE.
 TEST_F(VpiDeprecatedDefinitions, ARegElementOfAnArrayReportsVpiArrayUnder2005) {
   VpiObject reg;
   reg.type = vpiReg;
@@ -204,11 +205,10 @@ TEST_F(VpiDeprecatedDefinitions, AnArrayOfAnotherKindStaysAnArrayObject) {
   EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&empty_array)), vpiRegArray);
 }
 
-// Item 3: in this standard "the vpiArrayMember property is now used, thus
-// replacing the original use of vpiArray", so outside the IEEE 1364 modes
-// vpiArray is no property of an array or its element and an integer array is
-// the vpiRegArray (vpiArrayVar) of §37.17, under the native behavior and an
-// IEEE 1800 mode alike.
+// Item 3: this edition uses the vpiArrayMember property where vpiArray was used
+// before, so outside the IEEE 1364 modes vpiArray is no property of an array or
+// its element and an integer array is the vpiRegArray (vpiArrayVar) of §37.17,
+// under the native behavior and an IEEE 1800 mode alike.
 TEST_F(VpiDeprecatedDefinitions, VpiArrayIsNoPropertyOfThisStandard) {
   EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&integer_array_)), vpiRegArray);
   EXPECT_EQ(vpi_get(vpiArray, VpiHandleOf(&integer_array_)), 0);

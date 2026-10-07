@@ -16,11 +16,11 @@
 // checker body is rejected, while the three specialized forms are accepted.
 //
 // The rule is enforced by CheckCheckerBodyItemRules in
-// src/elaborator/elaborator_items_udp.cpp, the same place the other "what may
-// appear in a checker body" rules live. It reports as an error under §17.5,
-// which lists the always procedures a checker admits; Annex C.2.7 records why
-// the general form is not among them. These tests observe that production code
-// by elaborating each form and reading back the report.
+// src/elaborator/elaborator_items_udp.cpp, the same place the other rules on
+// what a checker body may hold live. It reports as an error under §17.5, which
+// lists the always procedures a checker admits; Annex C.2.7 records why the
+// general form is not among them. These tests observe that production code by
+// elaborating each form and reading back the report.
 
 namespace {
 

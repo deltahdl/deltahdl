@@ -1,16 +1,16 @@
 // Annex C.4.2: procedural assign and deassign statements.
 //
 // C.4.2 puts the procedural assign and deassign statements on the deprecation
-// list and has "this current standard still requires tools to support" them,
-// which §10.6.1 specifies and its tests observe. What C.4.2 states of its own
-// is where the two forms of the assign statement are placed: "continuous
-// assignments, placed outside any procedures" and "procedural continuous
-// assignments, placed within a procedure". A.6.2 has deassign, and the force
-// and release C.4.2 offers in place of assign and deassign, in the
-// procedural_continuous_assignment alone, a statement_item, so one of the
-// three written where a module item stands is a statement outside any
-// procedure: the parser reports it under C.4.2 at its keyword and reads on to
-// the ';' so that the items behind it are still read.
+// list while still requiring tools to support them under this edition, which
+// §10.6.1 specifies and its tests observe. What C.4.2 states of its own is
+// where the two forms of the assign statement are placed: a continuous
+// assignment stands outside every procedure, and a procedural continuous
+// assignment stands inside one. A.6.2 has deassign, and the force and release
+// C.4.2 offers in place of assign and deassign, in the
+// procedural_continuous_assignment alone, a statement_item, so one of the three
+// written where a module item stands is a statement outside any procedure: the
+// parser reports it under C.4.2 at its keyword and reads on to the ';' so that
+// the items behind it are still read.
 
 #include <gtest/gtest.h>
 
