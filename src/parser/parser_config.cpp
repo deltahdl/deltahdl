@@ -246,8 +246,8 @@ ConfigRule* Parser::ParseConfigRule() {
     // so the rules after it parse as rules.
     if (Check(TokenKind::kKwUse)) {
       diag_.Error(CurrentLoc(),
-                  "a use expansion clause cannot be used with a default "
-                  "selection clause",
+                  "a default selection clause expands only through a liblist "
+                  "clause, not through a use clause",
                   Subclause("33.4.1.2"));
       ParseUseClause(rule);
     } else {

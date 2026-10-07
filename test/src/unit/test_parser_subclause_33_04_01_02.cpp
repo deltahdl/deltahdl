@@ -16,8 +16,8 @@ TEST(ConfigDefaultClause, DefaultUseClauseRejected) {
   // A default selection clause cannot take a use expansion clause (§33.4.1.6),
   // so the pairing is reported under §33.4.1.2, at the 'use' written where only
   // a liblist may stand.
-  EXPECT_TRUE(ReportedError(r.diags, "use expansion clause cannot be used", 3,
-                            "33.4.1.2"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "not through a use clause", 3, "33.4.1.2"));
 }
 
 TEST(ConfigDefaultClause, DefaultUseClauseIsTheOnlyReport) {
@@ -32,8 +32,8 @@ TEST(ConfigDefaultClause, DefaultUseClauseIsTheOnlyReport) {
       "module top;\n"
       "endmodule\n");
   EXPECT_EQ(r.diags.size(), 1u);
-  EXPECT_TRUE(ReportedError(r.diags, "use expansion clause cannot be used", 3,
-                            "33.4.1.2"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "not through a use clause", 3, "33.4.1.2"));
   ASSERT_NE(r.cu, nullptr);
   EXPECT_EQ(r.cu->configs.size(), 1u);
   EXPECT_EQ(r.cu->modules.size(), 1u);
