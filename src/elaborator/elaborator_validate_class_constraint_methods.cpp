@@ -80,8 +80,8 @@ static bool AnyChildExprCallsModeMethod(const Expr* e) {
   return ScalarExprFieldsCallModeMethod(e) || ListExprFieldsCallModeMethod(e);
 }
 
-// 18.5.11: a function called from a constraint may not change the constraints,
-// such as through rand_mode() or constraint_mode(). Search an expression for a
+// 18.5.11: a function used by a constraint leaves the constraints alone, so it
+// makes no rand_mode() or constraint_mode() call. Search an expression for a
 // member-access call to either built-in method.
 static bool ExprCallsModeMethod(const Expr* e) {
   if (!e) return false;
@@ -150,11 +150,10 @@ static bool StmtCallsModeMethod(const Stmt* s) {
 }
 
 // 18.5.11: enforce the restrictions on a function used in a constraint:
-//   - It shall not have output, inout, or (non-const) ref arguments — only
-//     input and const ref are permitted, so the call cannot write back into the
-//     solver's variables.
-//   - It cannot modify the constraints, e.g. by calling rand_mode() or
-//     constraint_mode().
+//   - Its arguments are input or const ref; an output, inout or non-const ref
+//     one would let the call write back into the solver's variables.
+//   - Its body leaves the constraints as they are, so it makes no call to
+//     rand_mode() or constraint_mode().
 // The parser records every unqualified call in a constraint body; here each
 // callee that resolves to a method of the enclosing class hierarchy is checked.
 // A name that does not resolve to a class function (a free function or an array
