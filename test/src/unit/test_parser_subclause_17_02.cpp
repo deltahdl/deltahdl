@@ -354,20 +354,21 @@ TEST(CheckerDeclaration, FirstFormalWithoutTypeIsInputUntyped) {
             PropertyFormalType::kUntyped);
 }
 
-// §17.2: an output argument may not have the type untyped, sequence or
-// property; the same three keyword types are the input formals' to take.
+// §17.2: untyped, sequence and property are types an input argument can have
+// and an output argument cannot.
 TEST(CheckerDeclaration, OutputFormalOfKeywordTypeIsError) {
   auto r = Parse(
       "checker c(output sequence s, input bit x, untyped u, property p, "
       "output q);\n"
       "endchecker\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(ReportedError(
-      r.diags, "the type of checker output formal 's' shall not be 'sequence'",
-      1, "17.2"));
-  EXPECT_FALSE(ReportedError(r.diags, "the type of checker output formal 'u'",
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "checker output formal 's' is declared 'sequence', "
+                            "a type only an input formal can take",
+                            1, "17.2"));
+  EXPECT_FALSE(ReportedError(r.diags, "checker output formal 'u' is declared",
                              1, "17.2"));
-  EXPECT_FALSE(ReportedError(r.diags, "the type of checker output formal 'p'",
+  EXPECT_FALSE(ReportedError(r.diags, "checker output formal 'p' is declared",
                              1, "17.2"));
   EXPECT_TRUE(ReportedError(r.diags,
                             "checker formal 'q' has an explicit direction, so "
@@ -380,9 +381,10 @@ TEST(CheckerDeclaration, OutputFormalOfKeywordTypeIsError) {
 TEST(CheckerDeclaration, OutputFormalInheritingDirectionOfKeywordTypeIsError) {
   auto r = Parse("checker c(output bit x, untyped u); endchecker\n");
   ASSERT_NE(r.cu, nullptr);
-  EXPECT_TRUE(ReportedError(
-      r.diags, "the type of checker output formal 'u' shall not be 'untyped'",
-      1, "17.2"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "checker output formal 'u' is declared 'untyped', "
+                            "a type only an input formal can take",
+                            1, "17.2"));
 }
 
 // §17.2: an output formal that carries a type is accepted, confirming the

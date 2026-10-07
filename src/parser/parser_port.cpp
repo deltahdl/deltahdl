@@ -584,8 +584,8 @@ static void DiagnoseCheckerFormalType(const PortDecl& port, bool type_omitted,
   if (port.direction == Direction::kOutput &&
       port.formal_type != PropertyFormalType::kData) {
     diag.Error(port.loc,
-               std::format("the type of checker output formal '{}' shall not "
-                           "be '{}'",
+               std::format("checker output formal '{}' is declared '{}', a "
+                           "type only an input formal can take",
                            port.name, FormalTypeKeyword(port.formal_type)),
                Subclause("17.2"));
   }
