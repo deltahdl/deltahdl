@@ -73,10 +73,9 @@ TEST_F(VerifyParseTest, CheckerInstantiationRejectsRepeatedWildcard) {
   ASSERT_EQ(unit->checkers.size(), 1u);
   // §23.3.2 owns the at-most-one-`.*` rule the parser reports here; §17.3
   // repeats it for checker instantiations but has no report of its own.
-  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
-                            ".* port connection shall appear at most once in a "
-                            "port connection list",
-                            8, "23.3.2"));
+  EXPECT_TRUE(ReportedError(
+      diag_.Diagnostics(),
+      ".* already appears earlier in this port connection list", 8, "23.3.2"));
 }
 
 TEST_F(VerifyParseTest, CheckerInstantiationEmptyConnectionList) {

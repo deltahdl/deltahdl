@@ -209,9 +209,8 @@ TEST(ModuleInstantiationGrammar, ErrorDuplicateWildcardPort) {
   // §23.3.2 owns the at-most-one rule for `.*`; A.4.1.1 only lists the
   // alternative.
   EXPECT_TRUE(ReportedError(
-      r.diags,
-      ".* port connection shall appear at most once in a port connection list",
-      1, "23.3.2"));
+      r.diags, ".* already appears earlier in this port connection list", 1,
+      "23.3.2"));
 }
 
 // named_port_connection ::= { attribute_instance } . port_identifier

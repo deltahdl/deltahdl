@@ -13,10 +13,9 @@ TEST(ModuleInstantiationParser, MultipleWildcardPortConnectionsRejected) {
       "module top;\n"
       "  child u0(.*, .*);\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedError(r.diags,
-                            ".* port connection shall appear at most once in a "
-                            "port connection list",
-                            2, "23.3.2"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, ".* already appears earlier in this port connection list", 2,
+      "23.3.2"));
 }
 
 TEST(ModuleInstantiationParser,

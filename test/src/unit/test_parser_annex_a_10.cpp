@@ -239,18 +239,16 @@ TEST(BnfClarificationParsing, ErrorFullSubroutinePortOmitsIdentifier) {
                             2, "13.3"));
 }
 
-// §A.10 item 34: the `.*` token pair may appear at most once in a port
-// connection list.
+// §A.10 item 34: a port connection list takes `.*` once and no more.
 TEST(BnfClarificationParsing, ErrorDoubleWildcardPortConnection) {
   auto r = Parse(
       "module m;\n"
       "  sub u(.*, .*);\n"
       "endmodule\n");
   // §23.3.2 owns the port connection list rules.
-  EXPECT_TRUE(ReportedError(r.diags,
-                            ".* port connection shall appear at most once in a "
-                            "port connection list",
-                            2, "23.3.2"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, ".* already appears earlier in this port connection list", 2,
+      "23.3.2"));
 }
 
 // §A.10 item 15: a package import statement may not appear directly within a

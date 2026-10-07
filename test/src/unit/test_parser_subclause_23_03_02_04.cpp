@@ -108,10 +108,9 @@ TEST(WildcardPortConnectionParsing, WildcardAppearsAtMostOnce) {
       "endmodule\n");
   // Parser::ParsePortConnection in src/parser/parser_inst.cpp files this report
   // under §23.3.2, the parent of the subclause this file is named for.
-  EXPECT_TRUE(ReportedError(r.diags,
-                            ".* port connection shall appear at most once in a "
-                            "port connection list",
-                            2, "23.3.2"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, ".* already appears earlier in this port connection list", 2,
+      "23.3.2"));
 }
 
 TEST(WildcardPortConnectionParsing, WildcardCannotMixWithPositional) {

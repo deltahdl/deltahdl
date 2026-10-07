@@ -278,8 +278,7 @@ bool Parser::ParsePortConnection(ModuleItem* item) {
     Consume();
     if (item->inst_wildcard) {
       diag_.Error(loc,
-                  ".* port connection shall appear at most once in a "
-                  "port connection list",
+                  ".* already appears earlier in this port connection list",
                   Subclause("23.3.2"));
     }
     item->inst_wildcard = true;
