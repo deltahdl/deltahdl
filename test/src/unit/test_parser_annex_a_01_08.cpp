@@ -560,7 +560,7 @@ TEST(CheckerItemsParsing, CheckerPortSequenceAndPropertyFormals) {
 }
 
 // A formal written as a bare identifier after a keyword-typed one takes that
-// type, as §17.2 has it take "the type of the previous formal argument".
+// type, as §17.2 has it inherit the type of the formal argument before it.
 TEST(CheckerItemsParsing, CheckerPortKeywordTypeInheritedByBareFormal) {
   auto r = Parse(
       "checker chk(sequence s, t);\n"
@@ -748,11 +748,11 @@ TEST(CheckerItemsParsing, CheckerBodyPortDeclarationRejected) {
       HasItemOfKind(r.cu->checkers[0]->items, ModuleItemKind::kInitialBlock));
 }
 
-// §17.2: "modules, interfaces, programs, and packages shall not be declared
-// inside checkers". The first three are items the elaborator reports; a
-// package is no item of any body, and was reported as an unexpected token of
-// a module body, under §23.2.4, with the package's own items then read as
-// the checker's.
+// §17.2: a checker may not hold the declaration of a module, an interface, a
+// program or a package. The first three are items the elaborator reports; a
+// package is no item of any body, and was reported as an unexpected token of a
+// module body, under §23.2.4, with the package's own items then read as the
+// checker's.
 TEST(CheckerItemsParsing, CheckerPackageDeclarationRejected) {
   auto r = Parse(
       "checker c;\n"

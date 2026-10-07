@@ -180,14 +180,15 @@ TEST(CycleDelayElab, CheckerScopeWithoutDefaultClockingErrors) {
 // program scopes above: supplying the default clocking §14.11 asks for does not
 // make this legal, because a second rule reaches it first.
 //
-// §17.5: an initial procedure in a checker body "may contain let declarations,
-// immediate, deferred, and concurrent assertions, and a procedural timing
-// control statement using an event control only". A.6.5 lists the three
-// alternatives of procedural_timing_control -- delay_control, event_control and
-// cycle_delay -- as siblings, so a cycle delay is not an event control and has
-// no place in a checker initial procedure whatever clocking is in effect.
-// §14.11's own description points the same way: it defines ## as a wait for
-// clocking block events, which is what it does, not what the grammar calls it.
+// §17.5: what an initial procedure in a checker body may hold is limited to let
+// declarations, the immediate, deferred and concurrent assertions, and
+// procedural timing control statements whose control is an event control. A.6.5
+// lists the three alternatives of procedural_timing_control -- delay_control,
+// event_control and cycle_delay -- as siblings, so a cycle delay is not an
+// event control and has no place in a checker initial procedure whatever
+// clocking is in effect. §14.11's own description points the same way: it
+// defines ## as a wait for clocking block events, which is what it does, not
+// what the grammar calls it.
 //
 // So §14.11 naming the checker among its four scopes is not about a cycle delay
 // written as a procedural statement in a checker procedure. The distinction

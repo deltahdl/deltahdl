@@ -7,10 +7,10 @@ namespace {
 
 // A checker body admits an initial procedure alongside a variable
 // declaration. The variable takes its value from its declaration rather than
-// from the procedure: §17.7.1 states that "a checker variable may not be
-// assigned in an initial procedure, but may be initialized in its
-// declaration", and gives `bit v; initial v = 1'b0;` as illegal against
-// `bit w = 1'b0;` as legal. This test previously used the illegal form.
+// from the procedure: §17.7.1 forbids assigning a checker variable in an
+// initial procedure while allowing it an initializer in its declaration, and
+// gives `bit v; initial v = 1'b0;` as illegal against `bit w = 1'b0;` as legal.
+// This test previously used the illegal form.
 TEST(CheckerProcedures, InitialProcedureBesideAnInitializedVariable) {
   ElabFixture f;
   auto* design = ElaborateSrc(

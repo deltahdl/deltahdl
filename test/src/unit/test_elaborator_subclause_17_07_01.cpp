@@ -285,19 +285,19 @@ TEST(CheckerVariableAssignment, RhsSequenceTriggeredElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §17.7.1 says "A checker variable may not be assigned in an initial procedure,
-// but may be initialized in its declaration" and names no statement the
-// assignment is allowed to stand in, so every position a statement holds a
-// statement in that a checker initial procedure can reach is one the report
-// reaches. WalkStmtsForCheckerVarAssignInInitial in
-// src/elaborator/elaborator_validate_hier_refs.cpp had written out nine of
-// the thirteen child-statement links Stmt declares and now takes the
-// list from ForEachChildStmt in src/elaborator/elaborator_validate_internal.h.
+// §17.7.1 bars assigning a checker variable in an initial procedure, allowing
+// only an initializer in its declaration, and names no statement the assignment
+// is allowed to stand in, so every position a statement holds a statement in
+// that a checker initial procedure can reach is one the report reaches.
+// WalkStmtsForCheckerVarAssignInInitial in
+// src/elaborator/elaborator_validate_hier_refs.cpp had written out nine of the
+// thirteen child-statement links Stmt declares and now takes the list from
+// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h.
 //
 // Of the four links it was missing, two are reachable and are covered below.
-// §17.5 settles which: "An initial procedure in a checker body may contain let
-// declarations, immediate, deferred, and concurrent assertions, and a
-// procedural timing control statement using an event control only." An
+// §17.5 settles which: an initial procedure in a checker body holds nothing but
+// let declarations, the immediate, deferred and concurrent assertions, and
+// procedural timing control statements whose control is an event control. An
 // immediate assertion is on that list and A.6.10 gives
 // `simple_immediate_assert_statement ::= assert ( expression ) action_block`,
 // whose two arms the parser keeps in Stmt::assert_pass_stmt and
@@ -446,12 +446,11 @@ TEST(CheckerVariableAssignment,
 
 // The true positive beside the case above: the same procedure with the
 // shadowing declaration taken out, so the target reaches the free variable and
-// §17.7.1's "Continuous assignments and blocking procedural assignments to free
-// checker variables shall be illegal" applies. A fix that silenced the rule
-// wherever the assignment stood inside a block would pass the case above and
-// fail this one. BlockingAssignmentToFreeVariableRejected above covers the same
-// rule over a procedure whose body is the assignment itself, with no block
-// between them.
+// §17.7.1's ban on continuous and blocking procedural assignments to free
+// checker variables applies. A fix that silenced the rule wherever the
+// assignment stood inside a block would pass the case above and fail this one.
+// BlockingAssignmentToFreeVariableRejected above covers the same rule over a
+// procedure whose body is the assignment itself, with no block between them.
 TEST(CheckerVariableAssignment,
      ABlockingAssignmentToAFreeVariableWithNoShadowingDeclarationIsReported) {
   ElabFixture f;

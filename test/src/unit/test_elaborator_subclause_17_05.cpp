@@ -226,8 +226,8 @@ TEST(CheckerProcedures, CheckerInitialProcedureElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk;\n"
-      // §17.7.1: a checker variable "may not be assigned in an initial
-      // procedure, but may be initialized in its declaration".
+      // §17.7.1: a checker variable takes no assignment in an initial
+      // procedure, though its declaration may initialize it.
       "  logic ok = 1'b0;\n"
       "  initial $display(\"chk\");\n"
       "endchecker\n",
@@ -429,7 +429,7 @@ TEST(CheckerProcedures,
 
 TEST(CheckerProcedures,
      ForLoopHeaderInCheckerAlwaysFfIsNotABlockingAssignment) {
-  // §17.5 admits "Loop statements (see 12.7)" in a checker always procedure
+  // §17.5 admits the loop statements of §12.7 in a checker always procedure
   // with none of the always_comb/always_latch restriction it writes beside
   // blocking assignments, and A.6.8 gives a for_initialization only a
   // list_of_variable_assignments and a for_step_assignment only an
@@ -453,11 +453,12 @@ TEST(CheckerProcedures,
 }
 
 TEST(CheckerProcedures, DelayInCheckerInitialAssertionPassActionIsRejected) {
-  // §17.5: an initial procedure in a checker "may contain let declarations,
-  // immediate, deferred, and concurrent assertions, and a procedural timing
-  // control statement using an event control only", so the pass arm §16.3 gives
-  // the immediate assertion it admits is a position the timing-control
-  // restriction reaches. The delay is the only timing control in the source.
+  // §17.5: what an initial procedure in a checker may hold is limited to let
+  // declarations, the immediate, deferred and concurrent assertions, and
+  // procedural timing control statements whose control is an event control, so
+  // the pass arm §16.3 gives the immediate assertion it admits is a position
+  // the timing-control restriction reaches. The delay is the only timing
+  // control in the source.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk(input logic d);\n"

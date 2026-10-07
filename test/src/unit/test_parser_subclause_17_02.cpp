@@ -302,9 +302,9 @@ TEST(CheckerDeclaration, InputPortDefaultValueParses) {
   EXPECT_NE(r.cu->checkers[0]->ports[0].default_value, nullptr);
 }
 
-// §17.2: "if the argument has an explicit direction qualifier, it shall be an
-// error to omit its type". An output formal that omits its type breaks that
-// rule before the one on untyped outputs, and is reported under it (the
+// §17.2: a formal argument written with an explicit direction qualifier is in
+// error when its type is left out. An output formal that omits its type breaks
+// that rule before the one on untyped outputs, and is reported under it (the
 // counterpart accept path is covered by the typed-output tests above).
 TEST(CheckerDeclaration, UntypedOutputFormalIsError) {
   auto r = Parse("checker c(output a); endchecker\n");
@@ -335,9 +335,9 @@ TEST(CheckerDeclaration, DirectedFormalWithImplicitTypeIsAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §17.2: "if the argument is the first argument of the checker, it is assumed
-// to be input untyped" when its type is omitted, and a later formal with
-// neither direction nor type takes both from the one before it.
+// §17.2: the checker's first formal argument, when its type is omitted, is
+// taken to be an untyped input, and a later formal with neither direction nor
+// type takes both from the one before it.
 TEST(CheckerDeclaration, FirstFormalWithoutTypeIsInputUntyped) {
   auto r = Parse("checker c(a, b); endchecker\n");
   ASSERT_NE(r.cu, nullptr);
@@ -354,8 +354,8 @@ TEST(CheckerDeclaration, FirstFormalWithoutTypeIsInputUntyped) {
             PropertyFormalType::kUntyped);
 }
 
-// §17.2: "the type of an output argument shall not be of untyped, sequence,
-// or property"; the same three keyword types are the input formals' to take.
+// §17.2: an output argument may not have the type untyped, sequence or
+// property; the same three keyword types are the input formals' to take.
 TEST(CheckerDeclaration, OutputFormalOfKeywordTypeIsError) {
   auto r = Parse(
       "checker c(output sequence s, input bit x, untyped u, property p, "

@@ -339,9 +339,9 @@ TEST(NonPortProgramItem, ErrorDeferredImmediateAssertionInProgramIsRejected) {
 }
 
 // A concurrent_assertion_item reaches A.4.1.4's checker_instantiation, and
-// §17.3 has a checker instantiated "wherever a concurrent assertion may
-// appear"; the parser reported every instantiation in a program under §24.3,
-// the checker's with the module's it forbids.
+// §17.3 lets a checker be instantiated in any place a concurrent assertion can
+// stand; the parser reported every instantiation in a program under §24.3, the
+// checker's with the module's it forbids.
 TEST(NonPortProgramItem, ConcurrentAssertionItemCheckerInstantiation) {
   auto r = Parse(
       "checker chk(input logic a);\n"

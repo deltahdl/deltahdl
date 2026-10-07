@@ -75,7 +75,7 @@ TEST(CheckerSchedulingSemantics,
   }
 }
 
-// §17.7.3: the phrase "similarly to programs, see 24.3.1" is normative — a
+// §17.7.3: the clause's reference to programs and §24.3.1 is normative — a
 // checker's change-sensitive/blocking statements do not merely happen to land
 // in the Reactive region, they land there because they use the *same* placement
 // the program-reactive path applies. Observe that the checker mapping is the
