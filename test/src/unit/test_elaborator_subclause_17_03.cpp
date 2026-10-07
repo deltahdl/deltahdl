@@ -154,7 +154,7 @@ TEST(ProceduralCheckerInstantiation, AModuleCannotBeInstantiatedInAProcedure) {
                             6, "17.3"));
 }
 
-// §17.3: a checker shall not be instantiated in a procedure of another
+// §17.3: procedural code inside one checker cannot instantiate another
 // checker.
 TEST(ProceduralCheckerInstantiation, NotInAProcedureOfAnotherChecker) {
   ElabFixture f;
@@ -173,8 +173,8 @@ TEST(ProceduralCheckerInstantiation, NotInAProcedureOfAnotherChecker) {
       "endmodule\n",
       f, "top");
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "checker 'inner' shall not be instantiated in a "
-                            "procedure of another checker",
+                            "checker 'inner' cannot be instantiated in "
+                            "procedural code that belongs to another checker",
                             6, "17.3"));
 }
 
@@ -215,8 +215,8 @@ TEST(ProceduralCheckerInstantiation, AnUnknownNameIsReported) {
                             "23.3.2"));
 }
 
-// §17.3: a checker shall not be instantiated in a fork-join, fork-join_any
-// or fork-join_none block, a block nested in the fork among its statements;
+// §17.3: no checker instance may stand inside a fork-join, fork-join_any or
+// fork-join_none block, a block nested in the fork among its statements;
 // one standing after the join is a procedural checker instance as usual.
 TEST(ProceduralCheckerInstantiation, NotInAForkBlock) {
   ElabFixture f;
@@ -236,7 +236,7 @@ TEST(ProceduralCheckerInstantiation, NotInAForkBlock) {
       "endmodule\n",
       f, "top");
   const char* const kMessage =
-      "a checker shall not be instantiated in a fork-join, fork-join_any or "
+      "a checker instance cannot stand inside a fork-join, fork-join_any or "
       "fork-join_none block";
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 8, "17.3"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 9, "17.3"));

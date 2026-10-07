@@ -33,8 +33,8 @@ void AppendLoopLocals(const Stmt& s, std::vector<std::string_view>& locals) {
   }
 }
 
-// §17.3: a checker shall not be instantiated in a fork-join, fork-join_any
-// or fork-join_none block, so one a fork statement encloses, `in_fork`, is
+// §17.3: no checker instance may stand inside a fork-join, fork-join_any or
+// fork-join_none block, so one a fork statement encloses, `in_fork`, is
 // reported and left out. `locals` are the variables the enclosing blocks
 // and loops declare before `s`.
 void CollectCheckerInstantiations(
@@ -43,7 +43,7 @@ void CollectCheckerInstantiations(
   if (s == nullptr) return;
   if (s->kind == StmtKind::kCheckerInstantiation && in_fork) {
     diag.Error(s->range.start,
-               "a checker shall not be instantiated in a fork-join, "
+               "a checker instance cannot stand inside a fork-join, "
                "fork-join_any or fork-join_none block",
                Subclause("17.3"));
   } else if (s->kind == StmtKind::kCheckerInstantiation) {
@@ -83,8 +83,8 @@ bool AdmitProceduralCheckerInstance(const ModuleItem* item,
   }
   if (mod->is_checker) {
     diag.Error(item->loc,
-               std::format("checker '{}' shall not be instantiated in a "
-                           "procedure of another checker",
+               std::format("checker '{}' cannot be instantiated in procedural "
+                           "code that belongs to another checker",
                            item->inst_module),
                Subclause("17.3"));
     return false;
