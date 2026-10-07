@@ -333,12 +333,12 @@ bool Parser::TryParseDeclKeywordItem(std::vector<ModuleItem*>& items) {
 // stands: interface_or_generate_item admits it, and the bodies A.1.4, A.1.7,
 // A.1.8 and A.1.11 give a module, a program, a checker and a package do not,
 // while a class reads its own `extern` under A.1.9's class_method. §25.7 says
-// what the prototype is for, "if the subroutines are defined in a module using
-// a hierarchical name, they shall also be declared as extern in the
-// interface". So one written in any body but an interface's is reported at
-// the keyword. The prototype is still read, so that the body resumes after
-// its own ';'. An anonymous program is left to FilterAnonymousProgramItems in
-// parser.cpp, which reports every prototype under A.1.11 and drops it.
+// what the prototype is for: an interface declares a task or function extern
+// when a module defines it through a hierarchical name. So one written in any
+// body but an interface's is reported at the keyword. The prototype is still
+// read, so that the body resumes after its own ';'. An anonymous program is
+// left to FilterAnonymousProgramItems in parser.cpp, which reports every
+// prototype under A.1.11 and drops it.
 ModuleItem* Parser::ParseExternTfDeclaration(SourceLoc extern_loc) {
   if (!InInterfaceBody() && !in_anonymous_program_) {
     diag_.Error(extern_loc,
