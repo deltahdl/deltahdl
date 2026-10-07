@@ -103,11 +103,11 @@ TEST(ClockingScopeParse, DefaultClockingInPackageRejected) {
 // no clocking_declaration is among them.
 //
 // §14.7's package prohibition reaches it too. §24.6 has an anonymous program
-// declare items "without declaring a new scope", its items sharing "the same
-// name space as the package or compilation-unit scope in which they are
-// declared", so a clocking block written in one is in the package's scope. The
-// keyword `program` naming the construct is what made the parser read it as a
-// program scope and hold this report back.
+// declare items without opening a scope of its own, its items sharing one name
+// space with the package or compilation-unit scope that holds them, so a
+// clocking block written in one is in the package's scope. The keyword
+// `program` naming the construct is what made the parser read it as a program
+// scope and hold this report back.
 TEST(ClockingScopeParse, InAnonymousProgramInPackageRejected) {
   auto r = Parse(
       "package pkg;\n"

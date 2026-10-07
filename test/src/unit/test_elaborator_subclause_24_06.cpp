@@ -207,15 +207,14 @@ TEST(AnonymousProgramNameSpaceSharing,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §24.6 opens by ruling that "the set of program definitions and instances
-// define a space of program-wide data, tasks, and functions that is accessible
-// only to programs", and its NOTE states the consequence for an anonymous
-// program: "identifiers declared inside an anonymous program cannot be
-// referenced outside any program block". §24.3 says what a program block is,
-// giving `program_declaration` its syntax and ruling that "references to
-// program signals from outside any program block shall be an error"; the same
-// paragraph makes a reference from one program scope to another legal, which is
-// what ProgramCallingAnonymousProgramTaskElaborates below stands for.
+// §24.6 opens by ruling that program definitions and instances together make a
+// space of program-wide data, tasks and functions that only programs can reach,
+// and its NOTE draws the consequence for an anonymous program: nothing outside
+// every program block can refer to an identifier it declares. §24.3 says what a
+// program block is, giving `program_declaration` its syntax and ruling that
+// referencing a program signal from outside every program block is an error;
+// the same paragraph makes a reference from one program scope to another legal,
+// which is what ProgramCallingAnonymousProgramTaskElaborates below stands for.
 //
 // The three rejection cases below share this substring rather than the whole
 // sentence so that one literal serves every position a reference can stand in.
@@ -247,9 +246,9 @@ TEST(AnonymousProgramWideSpace, ModuleCallingAnonymousProgramTaskIsError) {
       ReportedError(f.diag.Diagnostics(), kNotReferencedOutside, 5, "24.6"));
 }
 
-// §24.6: the space is "accessible only to programs", not accessible to nobody.
-// A named program is a program block, so the identical call made from inside
-// one is legal and elaborates. Without this case, refusing the call from every
+// §24.6: the space is reachable by programs alone, not accessible to nobody. A
+// named program is a program block, so the identical call made from inside one
+// is legal and elaborates. Without this case, refusing the call from every
 // scope satisfies the case above while leaving the anonymous program with no
 // caller at all, which is the opposite of what the clause is for.
 TEST(AnonymousProgramWideSpace, ProgramCallingAnonymousProgramTaskElaborates) {
@@ -268,13 +267,13 @@ TEST(AnonymousProgramWideSpace, ProgramCallingAnonymousProgramTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §24.6: "anonymous programs can be used inside packages (see Clause 26) or
-// compilation-unit scopes (see 3.12.1)", and the space is one space however the
-// item was declared. A package's items are held in PackageDecl::items rather
-// than in CompilationUnit::cu_items and reach a module through the import
-// (§26.3), so this is a second route into the module and not the first one
-// written twice: a check placed only where the compilation-unit names are
-// gathered leaves this call unreported.
+// §24.6: an anonymous program may stand inside a package (Clause 26) or a
+// compilation-unit scope (§3.12.1), and the space is one space however the item
+// was declared. A package's items are held in PackageDecl::items rather than in
+// CompilationUnit::cu_items and reach a module through the import (§26.3), so
+// this is a second route into the module and not the first one written twice: a
+// check placed only where the compilation-unit names are gathered leaves this
+// call unreported.
 TEST(AnonymousProgramWideSpace,
      ModuleCallingImportedAnonymousProgramTaskIsError) {
   ElabFixture f;
@@ -293,14 +292,14 @@ TEST(AnonymousProgramWideSpace,
       ReportedError(f.diag.Diagnostics(), kNotReferencedOutside, 8, "24.6"));
 }
 
-// §24.6's NOTE bars every "identifier declared inside an anonymous program"
-// from being referenced outside a program block, and puts no kind on the
-// identifier. A.1.11 gives `anonymous_program_item ::= task_declaration |
+// §24.6's NOTE bars every identifier an anonymous program declares from being
+// referenced outside a program block, and puts no kind on the identifier.
+// A.1.11 gives `anonymous_program_item ::= task_declaration |
 // function_declaration | class_declaration | interface_class_declaration |
 // covergroup_declaration | class_constructor_declaration | ;`, so a class is
-// one of the things an anonymous program declares, and §24.3 counts "class
-// definitions" among a program block's contents. The subject the clause's first
-// sentence enumerates -- "data, tasks, and functions" -- is therefore not the
+// one of the things an anonymous program declares, and §24.3 counts class
+// definitions among a program block's contents. The subject the clause's first
+// sentence enumerates -- data, tasks and functions -- is therefore not the
 // limit of what the NOTE covers, and a rule written over subroutine calls alone
 // leaves the type name reachable.
 //
@@ -328,16 +327,15 @@ TEST(AnonymousProgramWideSpace,
 }
 
 // §24.6's note bars a reference to an anonymous program's identifier from
-// "outside any program block", and the clause names the two scopes an anonymous
-// program stands in without distinguishing them: "anonymous programs can be
-// used inside packages (see Clause 26) or compilation-unit scopes (see
-// 3.12.1)". Neither a package nor the compilation unit is a program block, so
-// an item of either that is not itself in an anonymous program is a place the
-// note reaches, exactly as a module's item is. Every case above writes the
-// reference inside a module or a program, whose items are in ModuleDecl::items;
-// a package's items are in PackageDecl::items and the compilation unit's in
-// CompilationUnit::cu_items, and a check reading module declarations reaches
-// neither list.
+// outside every program block, and the clause names the two scopes an anonymous
+// program stands in without telling them apart: a package (Clause 26) and a
+// compilation-unit scope (§3.12.1). Neither a package nor the compilation unit
+// is a program block, so an item of either that is not itself in an anonymous
+// program is a place the note reaches, exactly as a module's item is. Every
+// case above writes the reference inside a module or a program, whose items are
+// in ModuleDecl::items; a package's items are in PackageDecl::items and the
+// compilation unit's in CompilationUnit::cu_items, and a check reading module
+// declarations reaches neither list.
 void ExpectProgramWideSpaceRefRejected(const std::string& src, uint32_t line) {
   ElabFixture f;
   ElaborateSrc(src, f, "top");
@@ -368,8 +366,8 @@ TEST(AnonymousProgramWideSpace, PackageTaskCallingAnonymousProgramTaskIsError) {
 
 // §24.6: the reference is the package variable's own type name, naming the
 // class the package's anonymous program declared. A.1.11 admits a class into an
-// anonymous program and §24.3 counts "class definitions" among a program
-// block's contents, so the type name is an identifier the note covers.
+// anonymous program and §24.3 counts class definitions among a program block's
+// contents, so the type name is an identifier the note covers.
 // ModuleDeclaringAnonymousProgramClassHandleIsError above is the same
 // declaration written in a module, and the report stands at the declaration
 // rather than inside a statement.
@@ -402,12 +400,12 @@ TEST(AnonymousProgramWideSpace,
       4);
 }
 
-// §24.6 makes the program-wide space "accessible only to programs", and an
+// §24.6 makes the program-wide space reachable by programs alone, and an
 // anonymous program is a program block: the items it declares are that space's
 // own declarations. So one anonymous program naming another's task is not a
-// reference "outside any program block", and it shall elaborate. This is what
-// keeps the space usable, because the package and compilation-unit items the
-// three cases above are reported from are the same two lists an anonymous
+// reference from outside every program block, and it shall elaborate. This is
+// what keeps the space usable, because the package and compilation-unit items
+// the three cases above are reported from are the same two lists an anonymous
 // program's own items stand in, and a walk that did not pass over them would
 // leave the anonymous program's task with no caller at all.
 TEST(AnonymousProgramWideSpace,
@@ -429,9 +427,9 @@ TEST(AnonymousProgramWideSpace,
 }
 
 // §24.6 shares an anonymous program's name space with the surrounding package
-// or compilation-unit scope "and with nothing below it", so a block-local `t`
-// is a different thing from the anonymous program's `t` and a reference to it
-// is not the reference the note bars. The rule matched identifier text with
+// or compilation-unit scope and with nothing below it, so a block-local `t` is
+// a different thing from the anonymous program's `t` and a reference to it is
+// not the reference the note bars. The rule matched identifier text with
 // nothing resolving the reference first, so this legal source was refused.
 //
 // The local carries the anonymous program's name deliberately: one named
@@ -498,7 +496,7 @@ TEST(AnonymousProgramWideSpace,
 }
 
 // §24.6's note bars a reference to an anonymous program's declaration from
-// "outside any program block" and names no position such a reference may not
+// outside every program block and names no position such a reference may not
 // stand in. A class method is outside every program block, and the walk read an
 // item's own statements and never the methods of a class it declares -- so
 // putting the call in a class rather than beside it was enough to get past the

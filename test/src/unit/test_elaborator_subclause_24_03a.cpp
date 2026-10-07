@@ -245,15 +245,14 @@ TEST(ProgramConstruct, AnonymousProgramHierRefToProgramIsError) {
                             6, "24.3"));
 }
 
-// §24.3 closes its account of hierarchical references with "However, anonymous
-// programs shall not contain hierarchical references to other program scopes",
-// and puts no condition on where the anonymous program itself stands. §24.6
-// says where it may stand -- "anonymous programs can be used inside packages
-// (see Clause 26) or compilation-unit scopes (see 3.12.1)" -- and A.1.11 makes
-// anonymous_program a package_item, so the two placements are one rule.
-// AnonymousProgramHierRefToProgramIsError above writes the reference at
-// compilation-unit scope; the two cases below write the same reference in a
-// package, whose items Parser::TryParsePackageBodyItem puts into
+// §24.3 closes its account of hierarchical references by barring an anonymous
+// program from referring hierarchically to another program's scope, and puts no
+// condition on where the anonymous program itself stands. §24.6 says where it
+// may stand -- inside a package (Clause 26) or a compilation-unit scope
+// (§3.12.1) -- and A.1.11 makes anonymous_program a package_item, so the two
+// placements are one rule. AnonymousProgramHierRefToProgramIsError above writes
+// the reference at compilation-unit scope; the two cases below write the same
+// reference in a package, whose items Parser::TryParsePackageBodyItem puts into
 // PackageDecl::items rather than into CompilationUnit::cu_items.
 constexpr std::string_view kProgramSignalFromOutside =
     "hierarchical reference to program signal from outside the program is not "
@@ -328,16 +327,15 @@ TEST(ProgramConstruct, PackageAnonymousProgramWithoutHierRefElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §24.3 says "References to program signals from outside any program block
-// shall be an error" and puts no condition on where the reference is written,
+// §24.3 rules that referencing a program signal from outside every program
+// block is an error, and puts no condition on where the reference is written,
 // so every position a statement holds a statement in is one the report reaches.
-// WalkStmtsForProgramRef in
-// src/elaborator/elaborator_validate_hier_refs.cpp had written out nine of
-// the thirteen child-statement links Stmt declares and now takes the
-// list from ForEachChildStmt in src/elaborator/elaborator_validate_internal.h.
-// The four cases below stand in the four positions it was missing, each of
-// which elaborated clean beforehand with the reference into the program left
-// unreported.
+// WalkStmtsForProgramRef in src/elaborator/elaborator_validate_hier_refs.cpp
+// had written out nine of the thirteen child-statement links Stmt declares and
+// now takes the list from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. The four cases below stand in
+// the four positions it was missing, each of which elaborated clean beforehand
+// with the reference into the program left unreported.
 
 // A.6.10 gives `simple_immediate_assert_statement ::= assert ( expression )
 // action_block` and §16.3 gives `action_block ::= statement_or_null |
@@ -427,9 +425,9 @@ TEST(ProgramConstruct, ProgramSignalRefInARandsequenceCodeBlockIsError) {
                             8, "24.3"));
 }
 
-// §24.3: "anonymous programs shall not contain hierarchical references to other
-// program scopes", and the clause puts no condition on where in the anonymous
-// program the reference stands. A.1.11 admits a class_declaration as an
+// §24.3: an anonymous program may not refer hierarchically to another program's
+// scope, and the clause puts no condition on where in the anonymous program the
+// reference stands. A.1.11 admits a class_declaration as an
 // anonymous_program_item, so a method of such a class is in the anonymous
 // program and the reference it makes is one the clause reaches.
 //
@@ -459,12 +457,12 @@ TEST(ProgramConstruct, ProgramSignalRefFromAnAnonymousProgramClassIsError) {
                             7, "24.3"));
 }
 
-// §24.3 bars a reference to a "program signal", which the clause defines as a
-// net or variable "declared within the scope of a program". §23.9 decides which
-// declaration a reference reaches -- "If it is declared locally, then the local
-// item shall be used" -- and a begin-end block is one of the scopes it lists,
-// so a block-local `p` is what `p.a` names and the nested program `p` is not
-// reached at all.
+// §24.3 bars a reference to a program signal, which the clause defines as a net
+// or variable a program's scope declares. §23.9 decides which declaration a
+// reference reaches -- "If it is declared locally, then the local item shall be
+// used" -- and a begin-end block is one of the scopes it lists, so a
+// block-local `p` is what `p.a` names and the nested program `p` is not reached
+// at all.
 //
 // The rule resolved nothing: it matched the leftmost component of a member
 // access against the set of program instance names, so this legal source was
@@ -514,12 +512,12 @@ TEST(ProgramConstruct, AProgramSignalRefWithNoShadowingDeclarationIsReported) {
                             7, "24.3"));
 }
 
-// §24.3's third sentence -- "anonymous programs shall not contain hierarchical
-// references to other program scopes" -- is read over a different set: the
-// named programs of the compilation unit rather than the program instances of
-// one module. It matched identifier text the same way, and §23.9 shadows it the
-// same way: a function is a scope, so a declaration at the head of its body is
-// what `ps.sampled` names.
+// §24.3's third sentence -- barring an anonymous program from referring
+// hierarchically to another program's scope -- is read over a different set:
+// the named programs of the compilation unit rather than the program instances
+// of one module. It matched identifier text the same way, and §23.9 shadows it
+// the same way: a function is a scope, so a declaration at the head of its body
+// is what `ps.sampled` names.
 TEST(ProgramConstruct,
      AnAnonymousProgramSubroutineLocalOfAProgramNameIsNotAHierRef) {
   ElabFixture f;
@@ -592,8 +590,8 @@ TEST(ProgramConstruct,
                             7, "24.3"));
 }
 
-// §24.3 says "References to program signals from outside any program block
-// shall be an error" and names no position the reference may stand in, and
+// §24.3 rules that referencing a program signal from outside every program
+// block is an error, and names no position the reference may stand in, and
 // §23.9 makes a task a scope within the module rather than outside it. So a
 // module task body is one of the places outside the program that the sentence
 // reaches. The rule read a continuous assignment and the body of a procedural
@@ -691,8 +689,8 @@ TEST(ProgramConstruct, AFormalOfAProgramInstanceNameIsNotAProgramSignalRef) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §24.3 says "References to program signals from outside any program block
-// shall be an error" and names no position the reference may stand in. A class
+// §24.3 rules that referencing a program signal from outside every program
+// block is an error, and names no position the reference may stand in. A class
 // declared in the module is outside every program block, so a method of it is
 // reached exactly as a task of the module is -- and a class is where a
 // verification environment puts its code. The rule read the module's items and
@@ -803,11 +801,10 @@ TEST(ProgramConstruct,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §24.3: a program "shall not contain ... instances of modules, interfaces, or
-// other programs". The parser reports an instance of a cell it has seen
-// declared; a cell declared after the program is an identifier the parser can
-// tell nothing from, and the elaborator, which knows every declaration, is
-// what reports it.
+// §24.3: a program may hold no instance of a module, an interface or another
+// program. The parser reports an instance of a cell it has seen declared; a
+// cell declared after the program is an identifier the parser can tell nothing
+// from, and the elaborator, which knows every declaration, is what reports it.
 TEST(ProgramConstruct, ModuleDeclaredAfterProgramInstantiatingItIsError) {
   ProgramElabFixture f;
   ElaborateSource(

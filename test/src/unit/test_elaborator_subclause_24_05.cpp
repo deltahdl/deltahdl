@@ -24,9 +24,9 @@ TEST(ProgramSubroutineCall, ModuleCallingProgramTaskIsError) {
                             5, "24.5"));
 }
 
-// §24.5 says "program subroutines" -- the illegal-from-design rule covers
-// functions as well as tasks. A design module calling a program function in an
-// expression position must also be rejected.
+// §24.5 speaks of program subroutines in general -- the illegal-from-design
+// rule covers functions as well as tasks. A design module calling a program
+// function in an expression position must also be rejected.
 TEST(ProgramSubroutineCall, ModuleCallingProgramFunctionIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -104,15 +104,14 @@ TEST(ProgramSubroutineCall, ProgramCallingDesignModuleTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §24.5 says "Calling program subroutines from within design modules is illegal
-// and shall result in an error" and names no position the call is allowed in,
-// so every position a statement holds a statement in is one the report reaches.
-// WalkStmtForProgramCall in
-// src/elaborator/elaborator_validate_hier_refs.cpp had written out nine of
-// the thirteen child-statement links Stmt declares and now takes the
-// list from ForEachChildStmt in src/elaborator/elaborator_validate_internal.h.
-// The four cases below stand in the four positions it was missing, each of
-// which elaborated clean beforehand with the illegal call left unreported.
+// §24.5 rules that a design module calling a program subroutine is an error,
+// and names no position the call is allowed in, so every position a statement
+// holds a statement in is one the report reaches. WalkStmtForProgramCall in
+// src/elaborator/elaborator_validate_hier_refs.cpp had written out nine of the
+// thirteen child-statement links Stmt declares and now takes the list from
+// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The four
+// cases below stand in the four positions it was missing, each of which
+// elaborated clean beforehand with the illegal call left unreported.
 
 // A.6.10 gives `simple_immediate_assert_statement ::= assert ( expression )
 // action_block` and §16.3 gives `action_block ::= statement_or_null |
@@ -198,12 +197,12 @@ TEST(ProgramSubroutineCall, ProgramTaskCallInARandsequenceCodeBlockIsError) {
                             7, "24.5"));
 }
 
-// §24.5 bars "calling program subroutines from within design modules", and a
-// program subroutine is one declared in a program. §23.9 decides which
-// declaration a call reaches -- "If it is declared locally, then the local item
-// shall be used" -- and it lists a begin-end block among the scopes a
-// declaration can be local to, so `p.go()` under a block-local `p` calls that
-// object's method and reaches the nested program not at all.
+// §24.5 bars a design module from calling a program subroutine, and a program
+// subroutine is one declared in a program. §23.9 decides which declaration a
+// call reaches -- "If it is declared locally, then the local item shall be
+// used" -- and it lists a begin-end block among the scopes a declaration can be
+// local to, so `p.go()` under a block-local `p` calls that object's method and
+// reaches the nested program not at all.
 //
 // The rule resolved nothing: IsProgramSubroutineCallExpr matched the leftmost
 // component of the callee against the set of program instance names, so this
@@ -284,12 +283,12 @@ TEST(ProgramSubroutineCall,
                             9, "24.5"));
 }
 
-// §24.5 says "Calling program subroutines from within design modules is illegal
-// and shall result in an error" and names no position the call may stand in. A
-// task the module declares is within the design module, so a call written there
-// is one the sentence reaches. The rule read a continuous assignment and the
-// body of a procedural block and nothing else, and a task's statements are in
-// neither, so this source elaborated clean.
+// §24.5 rules that a design module calling a program subroutine is an error,
+// and names no position the call may stand in. A task the module declares is
+// within the design module, so a call written there is one the sentence
+// reaches. The rule read a continuous assignment and the body of a procedural
+// block and nothing else, and a task's statements are in neither, so this
+// source elaborated clean.
 TEST(ProgramSubroutineCall, AProgramSubroutineCallInAModuleTaskBodyIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -381,11 +380,11 @@ TEST(ProgramSubroutineCall,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §24.5 says "Calling program subroutines from within design modules is illegal
-// and shall result in an error" and names no position the call may stand in. A
-// class declared in the module is within that design module, so a method of it
-// is reached exactly as a task of the module is. The rule read the module's
-// items and no class among them, so this source elaborated clean.
+// §24.5 rules that a design module calling a program subroutine is an error,
+// and names no position the call may stand in. A class declared in the module
+// is within that design module, so a method of it is reached exactly as a task
+// of the module is. The rule read the module's items and no class among them,
+// so this source elaborated clean.
 TEST(ProgramSubroutineCall,
      AProgramSubroutineCallInAModuleClassMethodIsReported) {
   ElabFixture f;

@@ -191,8 +191,8 @@ TEST(ProgramInstantiationGrammar, EscapedNameAndParamExpressionForms) {
 }
 
 // A.1.4's module_common_item admits program_instantiation and A.1.6's
-// interface_or_generate_item reaches module_common_item, as §24.3 has it,
-// "program blocks can be nested within modules or interfaces"; a program is
+// interface_or_generate_item reaches module_common_item, as §24.3 has it, a
+// program block may be nested in a module or an interface; a program is
 // instantiated inside an interface and inside a generate block of it.
 TEST(ProgramInstantiationGrammar, ProgramInstantiatedInsideInterface) {
   auto r = Parse(

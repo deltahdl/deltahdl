@@ -6,13 +6,12 @@
 
 namespace {
 
-// §24.7 rules that calling $exit "from a thread or its descendant thread that
-// does not originate in an initial procedure in a program shall be ignored",
-// and the always_ff procedure below is such a thread. Ignored at simulation is
-// not synthesizable, so the synthesizer still withholds the netlist, and it
-// reports the call as the §5.6.3 system task it is rather than under §24.7:
-// the subclause governs what a program does with $exit, not what hardware the
-// call describes.
+// §24.7 rules that a call of $exit from a thread, or a descendant of one, that
+// did not start in a program's initial procedure is ignored, and the always_ff
+// procedure below is such a thread. Ignored at simulation is not synthesizable,
+// so the synthesizer still withholds the netlist, and it reports the call as
+// the §5.6.3 system task it is rather than under §24.7: the subclause governs
+// what a program does with $exit, not what hardware the call describes.
 TEST(ProgramControlTasksSynth, ExitOutsideAProgramInitialIsStillReported) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

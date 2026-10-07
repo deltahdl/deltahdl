@@ -59,13 +59,13 @@ TEST(ProgramConstructSim, NoImplicitFinishWithoutProgramInitial) {
   EXPECT_FALSE(f.ctx.StopRequested());
 }
 
-// §24.3: the implicit $finish fires "immediately after all the threads ...
-// within all programs have ended" -- not when the first one ends. Two program
-// blocks whose initials complete at different times (t=20 and t=60) must both
-// run to completion before the run stops. If the stop fired when the earlier
-// initial (p1) ended at t=20, p2's #60 delay would be cut off and b would keep
-// its reset value; observing b==2 shows the run waited for the latest-ending
-// program initial across both blocks.
+// §24.3: the implicit $finish fires as soon as every thread of every program
+// has ended -- not when the first one ends. Two program blocks whose initials
+// complete at different times (t=20 and t=60) must both run to completion
+// before the run stops. If the stop fired when the earlier initial (p1) ended
+// at t=20, p2's #60 delay would be cut off and b would keep its reset value;
+// observing b==2 shows the run waited for the latest-ending program initial
+// across both blocks.
 TEST(ProgramConstructSim,
      ImplicitFinishWaitsForLatestProgramInitialAcrossBlocks) {
   SimFixture f;
