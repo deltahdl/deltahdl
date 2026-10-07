@@ -123,9 +123,9 @@ TEST(DeferredFlushPoints, FlushOnEmptyQueueIsSafeNoOp) {
 // forms call a void function that records the report in a flag, which §16.4
 // schedules in the Reactive region. A final deferred assertion cannot use that
 // vehicle: §16.4 requires its subroutine to be one that is legal to call in the
-// Postponed region, and §4.4.2.9 says of that region that "it is illegal to
-// write values to any net or variable", so the final test reports through
-// $error and observes it with LastSeverity().
+// Postponed region, and §4.4.2.9 says of that region that no net or variable
+// may be written there, so the final test reports through $error and observes
+// it with LastSeverity().
 
 // §16.4.2 (bullet 2): an always_comb procedure that queues a deferred report
 // and is then re-run by a dependent-signal transition in the same time step

@@ -340,15 +340,14 @@ TEST(DynamicArrayNewSimulation, DeclNegativeSizeNames7_5_1) {
 }
 
 // §7.5.1: `new[n]` with no initialization expression owes the array n storage
-// elements rather than one value read n times -- "the elements are
-// initialized to the default value for their type", each of them, and §6.8
-// makes each "an abstraction of a data storage element" that "shall store a
-// value from one assignment to the next". What a test of that asserts is that
-// no two entries name one buffer, since equal bits cannot tell a copy from a
-// shared buffer: a shared buffer reads equal by construction. The default
-// value read back beside the pointers is what stops a case passing on
-// elements the run never initialized at all. Both callers declare `int`, whose
-// default value under Table 6-7 is 0.
+// elements rather than one value read n times -- each element starts at its
+// type's default value, and §6.8 makes each a data storage element that keeps
+// its value from one assignment to the next. What a test of that asserts is
+// that no two entries name one buffer, since equal bits cannot tell a copy from
+// a shared buffer: a shared buffer reads equal by construction. The default
+// value read back beside the pointers is what stops a case passing on elements
+// the run never initialized at all. Both callers declare `int`, whose default
+// value under Table 6-7 is 0.
 //
 // Both spellings of the constructor make this claim and reach the store
 // through different code, so it is written once here and made twice. A fatal
@@ -367,16 +366,14 @@ void ExpectDefaultElementsOwnWords(const QueueObject* q, size_t n) {
   }
 }
 
-// §7.5.1 on the constructor's other store: "The optional initialization
-// expression is used to initialize the dynamic array", and "Resizing or
-// reinitializing a previously initialized dynamic array using new is
-// destructive; no preexisting array data is preserved (unless reinitialized
-// with its old contents -- see preceding), and all preexisting references to
-// array elements become outdated". A destination entry left sharing a buffer
-// with a live source entry is exactly such a preexisting reference that did
-// not become outdated: the source goes on naming the storage the destination
-// was just given, and a later write through either name would be read back
-// through the other.
+// §7.5.1 on the constructor's other store: the optional initialization
+// expression initializes the dynamic array, and resizing or reinitializing an
+// already initialized dynamic array with new destroys its old data, unless it
+// is reinitialized with that data, and outdates every existing reference to its
+// elements. A destination entry left sharing a buffer with a live source entry
+// is exactly such a preexisting reference that did not become outdated: the
+// source goes on naming the storage the destination was just given, and a later
+// write through either name would be read back through the other.
 //
 // ExpectOwnWordsCopy carries the storage-identity claim at every position and
 // compares both planes of every word beside it. The expected values are what
@@ -445,14 +442,14 @@ TEST(DynamicArrayNewSimulation, NewWithInitGivesDestinationItsOwnWords) {
       f.ctx.FindQueue("s"), f.ctx.FindQueue("d"), {0x12345678u, 0x0BADF00Du}));
 }
 
-// §7.5.1 puts the two spellings of the constructor under one rule: it "may
-// appear in place of the right-hand side expression of variable declaration
-// assignments and blocking procedural assignments when the left-hand side
-// indicates a dynamic array". The declaration half is lowered rather than
-// executed, so its two stores are its own and the pair above does not reach
-// them. This one is LowerDynArrayNewInit's std::vector::assign(n, value),
-// which copy-constructs every slot it makes from the one value it is handed,
-// so `int d[] = new[3];` held one buffer read three times.
+// §7.5.1 puts the two spellings of the constructor under one rule: it may stand
+// as the right-hand side of a variable declaration assignment or a blocking
+// procedural assignment whose left-hand side is a dynamic array. The
+// declaration half is lowered rather than executed, so its two stores are its
+// own and the pair above does not reach them. This one is
+// LowerDynArrayNewInit's std::vector::assign(n, value), which copy-constructs
+// every slot it makes from the one value it is handed, so `int d[] = new[3];`
+// held one buffer read three times.
 TEST(DynamicArrayNewSimulation, DeclNewWithoutInitGivesEachElementItsOwnWords) {
   SimFixture f;
   auto* design = ElaborateSrc(

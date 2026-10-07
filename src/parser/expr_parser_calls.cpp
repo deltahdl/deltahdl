@@ -220,8 +220,8 @@ Expr* Parser::ParseCastExpr() {
   // A.8.4's casting_type is `simple_type | constant_primary | signing |
   // string | const`, and `void` is none of them: A.6.9 writes `void ' (
   // function_subroutine_call ) ;` as a subroutine_call_statement and nowhere
-  // else, §13.4.1 having it discard a function's return value "as a
-  // statement". Parser::ParseVoidCastCallStmt reads that statement, so a
+  // else, §13.4.1 having it discard a function's return value when the call is
+  // a statement. Parser::ParseVoidCastCallStmt reads that statement, so a
   // `void'` reaching the expression parser stands where an expression does.
   if (type_tok.kind == TokenKind::kKwVoid) {
     diag_.Error(type_tok.loc,

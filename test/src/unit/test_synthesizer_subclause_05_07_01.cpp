@@ -131,10 +131,9 @@ TEST(IntegerLiteralSynthesis, SignedLiteralSynthesizes) {
 }
 
 // The test fails on a synthesizer that answers `AigGraph::kConstTrue` at bit 64
-// of `y`, which is what `assign y = 128'd5;` lowers to today. §5.7.1 rules that
-// "If the size of the unsigned number is smaller than the size specified for
-// the literal constant, the unsigned number shall be padded to the left with
-// zeros", so every bit of `128'd5` above bit 2 is zero and bit 64 of `y` is
+// of `y`, which is what `assign y = 128'd5;` lowers to today. §5.7.1 pads an
+// unsigned number narrower than the literal's size with zeros on the left, so
+// every bit of `128'd5` above bit 2 is zero and bit 64 of `y` is
 // `AigGraph::kConstFalse`. `SynthLower::LowerExprBit` in
 // src/synthesizer/synth_lower.cpp answers a literal's bit as
 // `((expr->int_val >> bit) & 1u)`, and `Expr::int_val` in src/parser/ast_expr.h

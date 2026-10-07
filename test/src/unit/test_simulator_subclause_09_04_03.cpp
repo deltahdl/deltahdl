@@ -264,13 +264,13 @@ TEST(LevelSensitiveEventSimulation, WaitTwoStateIntConditionUnblocks) {
   EXPECT_EQ(val, 42u);
 }
 
-// §9.4.3: "the wait statement shall evaluate a condition; if it is false, the
-// procedural statements following the wait statement shall remain blocked until
-// that condition becomes true." Every case above writes its condition on a
-// whole variable. This one writes it on a single bit, which is the operand
-// whose collected name is BuildSelectPrefix's `v[1]` -- a position within a
-// vector, which SimContext::FindVariable resolves to no object, so
-// ExecWaitStatement armed no watcher and the condition was never re-tested.
+// §9.4.3: a wait statement evaluates its condition, and while the condition is
+// false the statements after the wait stay blocked until it becomes true. Every
+// case above writes its condition on a whole variable. This one writes it on a
+// single bit, which is the operand whose collected name is BuildSelectPrefix's
+// `v[1]` -- a position within a vector, which SimContext::FindVariable resolves
+// to no object, so ExecWaitStatement armed no watcher and the condition was
+// never re-tested.
 //
 // v starts all zero and x starts at 0, so a wait that never resumes leaves x
 // at 0 rather than at 42, and only the bit the condition reads is set at time
@@ -294,17 +294,16 @@ TEST(LevelSensitiveEventSimulation, WaitOnABitSelectResumesWhenThatBitChanges) {
 }
 
 // §9.4.3 states level-sensitive event control as an obligation about the truth
-// of a condition rather than as a reaction to a change: "The wait statement
-// shall evaluate a condition; and, if it is not true (as defined in 12.4), the
-// procedural statements following the wait statement shall remain blocked
-// until that condition becomes true before continuing." The clause draws the
-// contrast itself -- the wait is "level-sensitive, as opposed to basic event
-// control (specified by the @ character), which is edge-sensitive" -- so a
-// §9.4.2 case does not stand in for this one: any route that observes the
-// condition becoming true would satisfy §9.4.3. In this implementation,
-// though, a wait parks on the same AnyChangeAwaiter that @ parks on and is
-// released only by the written variable's watcher notification, so the two
-// mechanisms fail together, which is what earns this clause its own case.
+// of a condition rather than as a reaction to a change: a wait statement
+// evaluates its condition, and while the condition is not true (in the §12.4
+// sense) the statements after the wait stay blocked until it becomes true. The
+// clause draws the contrast itself -- the wait is level-sensitive, unlike the
+// edge-sensitive basic event control written with @ -- so a §9.4.2 case does
+// not stand in for this one: any route that observes the condition becoming
+// true would satisfy §9.4.3. In this implementation, though, a wait parks on
+// the same AnyChangeAwaiter that @ parks on and is released only by the written
+// variable's watcher notification, so the two mechanisms fail together, which
+// is what earns this clause its own case.
 //
 // The writer has to be a void function called with parentheses, because that
 // is the only call form whose body runs through ExecFunctionBody and its
@@ -340,27 +339,26 @@ TEST(LevelSensitiveEventSimulation, WaitResumesOnVoidFunctionWrite) {
 }
 
 // §9.4.3 states level-sensitive event control as an obligation about the truth
-// of a condition: "The wait statement shall evaluate a condition; and, if it is
-// not true (as defined in 12.4), the procedural statements following the wait
-// statement shall remain blocked until that condition becomes true before
-// continuing." The clause names its own contrast -- the wait is
-// "level-sensitive, as opposed to basic event control (specified by the @
-// character), which is edge-sensitive" -- so a §9.4.2 case does not stand in
-// for this one: any route that observed the condition becoming true would
-// satisfy §9.4.3, and the clause asks for none in particular. In this
-// implementation, though, ExecWait parks on the same AnyChangeAwaiter that @
-// parks on, released only by the watcher notification of a variable the
-// condition reads, so the level-sensitive and the edge-sensitive constructs
-// fail together on one missing notification. That shared dependence is what
-// earns this clause a case of its own rather than a §9.4.2 one standing in.
+// of a condition: a wait statement evaluates its condition, and while the
+// condition is not true (in the §12.4 sense) the statements after the wait stay
+// blocked until it becomes true. The clause names its own contrast -- the wait
+// is level-sensitive, unlike the edge-sensitive basic event control written
+// with @ -- so a §9.4.2 case does not stand in for this one: any route that
+// observed the condition becoming true would satisfy §9.4.3, and the clause
+// asks for none in particular. In this implementation, though, ExecWait parks
+// on the same AnyChangeAwaiter that @ parks on, released only by the watcher
+// notification of a variable the condition reads, so the level-sensitive and
+// the edge-sensitive constructs fail together on one missing notification. That
+// shared dependence is what earns this clause a case of its own rather than a
+// §9.4.2 one standing in.
 //
 // The writer here is the increment operator in the ordinary body of a process:
 // a bare `i++;` is a kExprStmt, which ExecStmt routes through
 // ExecInlineTaskCall to EvalExpr and on to EvalIncDec, whose store to
 // var->value said nothing to the variable's watchers. §11.4.2 makes these
-// operators blocking assignments, so §9.4.2's "change in the value of the
-// expression" covers an increment exactly as it covers an `=`, and a wait
-// reading the incremented variable must be released by one.
+// operators blocking assignments, so §9.4.2's change in the expression's value
+// covers an increment exactly as it covers an `=`, and a wait reading the
+// incremented variable must be released by one.
 //
 // Three processes, so that the value the released statement copies is written
 // by neither of the others at the moment it parks: `tag` holds 8'd12 when the

@@ -246,12 +246,11 @@ TEST(CastOperatorSim, SizeCastFoldsInLocalparamInitializer) {
   EXPECT_EQ(var->value.ToUint64(), 0x0Cu);
 }
 
-// §9.4.2: "A non-edge implicit event shall be detected on any change in the
-// value of the expression", and the clause names no writer whose change is
-// exempt. A system task that writes one of its arguments has written a user
-// variable, so a process parked on it resumes -- which every case above could
-// pass without, the store having happened all along and the value being what
-// they read back.
+// §9.4.2: a non-edge implicit event is detected whenever the expression's value
+// changes, and the clause names no writer whose change is exempt. A system task
+// that writes one of its arguments has written a user variable, so a process
+// parked on it resumes -- which every case above could pass without, the store
+// having happened all along and the value being what they read back.
 TEST(CastOperatorSim, CastDestinationWakesAnEventControlOnIt) {
   SimFixture f;
   auto* var = RunAndFindVar(

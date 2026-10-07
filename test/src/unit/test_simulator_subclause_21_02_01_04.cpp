@@ -570,7 +570,7 @@ TEST(StrengthFormat, VectorNetOperandToPercentVIsReported) {
 }
 
 // The one-bit vector, settled explicitly rather than by accident: §6.9 makes an
-// object a scalar by its being "declared ... without a range specification", so
+// object a scalar by its being declared with no range specification, so
 // `wire [0:0] w` is a vector however wide it is, and %v does not admit it. A
 // check written on the width alone would accept this.
 TEST(StrengthFormat, SingleBitVectorNetOperandToPercentVIsReported) {
@@ -607,14 +607,13 @@ TEST(StrengthFormat, VectorNetUnderAnIntegerSpecifierIsNotReported) {
 }
 
 // §21.2.1.4 asks a %v for a matching scalar reference, and §11.5.1 has a
-// bit-select "specif[y] the single bit of vector acc that is addressed by the
-// operand index". One bit of a net is the scalar whose strength the clause
-// reports, so a bit-select of a vector net is the operand form that asks about
-// it, and the three characters for the bit named are what it renders. The net
-// as a whole drives both sides here -- bit 0 a 1 and the rest a 0, at the
-// (strong1, strong0) §10.3.4 defaults a continuous assignment to -- so a
-// rendering taken from the net rather than the bit would be the unknown value's
-// StX instead.
+// bit-select name the one bit of vector acc that the operand index addresses.
+// One bit of a net is the scalar whose strength the clause reports, so a
+// bit-select of a vector net is the operand form that asks about it, and the
+// three characters for the bit named are what it renders. The net as a whole
+// drives both sides here -- bit 0 a 1 and the rest a 0, at the (strong1,
+// strong0) §10.3.4 defaults a continuous assignment to -- so a rendering taken
+// from the net rather than the bit would be the unknown value's StX instead.
 TEST(StrengthFormat, BitSelectOfVectorNetRendersThatBitsStrength) {
   ExpectPercentVOutput(
       "module m;\n"
@@ -643,11 +642,10 @@ TEST(StrengthFormat, BitSelectReadsTheStrengthOfTheBitItNames) {
       "[St1][Pu0]");
 }
 
-// §11.5.1: "the actual bit that is accessed by an address is, in part,
-// determined by the declaration". The declaration here ascends, so index 1 is
-// the most significant bit of the two and index 2 the least; the value 2'b01
-// therefore drives a 0 at index 1. An index read as a storage offset instead
-// would answer with the other bit.
+// §11.5.1: the declaration helps decide which bit an address reaches. The
+// declaration here ascends, so index 1 is the most significant bit of the two
+// and index 2 the least; the value 2'b01 therefore drives a 0 at index 1. An
+// index read as a storage offset instead would answer with the other bit.
 TEST(StrengthFormat, BitSelectResolvesItsIndexAgainstTheDeclaredRange) {
   ExpectPercentVOutput(
       "module m;\n"
@@ -658,11 +656,10 @@ TEST(StrengthFormat, BitSelectResolvesItsIndexAgainstTheDeclaredRange) {
       "[St0][St1]");
 }
 
-// §11.5.1 gives an out-of-bounds bit-select the value x: "if the value of addr
-// is out of bounds, then vect[addr] returns x". Such an operand names no bit of
-// the net, so there is no scalar whose strength could be reported and nothing
-// is rendered for it -- the same empty rendering an operand naming no net at
-// all gets.
+// §11.5.1 gives an out-of-bounds bit-select the value x: vect[addr] with addr
+// out of bounds returns x. Such an operand names no bit of the net, so there is
+// no scalar whose strength could be reported and nothing is rendered for it --
+// the same empty rendering an operand naming no net at all gets.
 TEST(StrengthFormat, OutOfRangeBitSelectOfNetRendersNothing) {
   ExpectPercentVOutput(
       "module m;\n"

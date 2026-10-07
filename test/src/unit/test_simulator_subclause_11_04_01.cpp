@@ -198,9 +198,9 @@ TEST(LvalueSim, CompoundAssignAsAnExpressionEvaluatesBitSelectIndexOnce) {
       "data", 0x08u);
 }
 
-// §11.4.1 makes `a op= b` "semantically equivalent to a blocking assignment",
-// and a blocking assignment writes its target once. A subroutine body runs on
-// the statement executor in eval_function_body.cpp rather than the one in
+// §11.4.1 makes `a op= b` the same in meaning as a blocking assignment, and a
+// blocking assignment writes its target once. A subroutine body runs on the
+// statement executor in eval_function_body.cpp rather than the one in
 // statement_assign_core.cpp, and that executor evaluated the statement's
 // right-hand side -- which the parser builds as the compound operator over the
 // statement's own left-hand side, so evaluating it had already written the
@@ -541,12 +541,11 @@ TEST(LvalueSim, ConcatLvalueReachesElementsAboveTheFirstWord) {
   EXPECT_EQ(var->value.ToUint64(), 0x1234000000000000ull);
 }
 
-// §11.4.1 makes `a op= b` "semantically equivalent to a blocking assignment",
-// writing `a[i]+=2;` as the same statement as `a[i] = a[i] +2;`. So §10.7
-// truncates the result into the target as it would any other assignment, and
-// §6.11.2 converts the unknowns a 2-state target has no room for. The result
-// was written over the target instead, so the target took the operation's
-// width.
+// §11.4.1 makes `a op= b` the same in meaning as a blocking assignment, writing
+// `a[i]+=2;` as the same statement as `a[i] = a[i] +2;`. So §10.7 truncates the
+// result into the target as it would any other assignment, and §6.11.2 converts
+// the unknowns a 2-state target has no room for. The result was written over
+// the target instead, so the target took the operation's width.
 
 // The eight bits the addition is evaluated at do not fit the four the target
 // declares. 17 is what the target read when it took the operation's width; 1 is
@@ -592,12 +591,12 @@ TEST(LvalueSim, CompoundAssignZeroesXzIntoATwoStateTarget) {
 
 // §11.4.1 makes `i += 1.75` the blocking assignment `i = i + 1.75`, so
 // §11.8.1 evaluates the sum in real arithmetic and §6.12.1 then converts the
-// real to the integer target "by rounding to the nearest integer" with ties
-// away from zero. 2.75 is away from the tie, so the answer is 3 and the two
-// wrong answers it excludes are distinct from it and from each other:
-// truncation reads 2, and a raw resize of the 64-bit IEEE-754 double into a
-// 32-bit target reads 0, since the low word of 2.75's bit pattern
-// (0x4006000000000000) is zero.
+// real to the integer target by rounding to the nearest integer with ties away
+// from zero. 2.75 is away from the tie, so the answer is 3 and the two wrong
+// answers it excludes are distinct from it and from each other: truncation
+// reads 2, and a raw resize of the 64-bit IEEE-754 double into a 32-bit target
+// reads 0, since the low word of 2.75's bit pattern (0x4006000000000000) is
+// zero.
 TEST(LvalueSim, CompoundAssignOfARealToAnIntegerTarget) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -639,12 +638,12 @@ TEST(LvalueSim, CompoundAssignOfARealToAnIntegerTargetInAFunctionBody) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// §11.3.6: an assignment expression "casts the right-hand side to the left-hand
-// data type, stacks it, updates the left-hand side, and returns the stacked
-// value", and "the data type of the value that is returned is the data type of
-// the left-hand side". So what `b = (a += 1)` reads is what `a` holds, not what
-// the addition produced: `b = (a+=1)` is the clause's own example. Sixteen is
-// the untruncated sum, and zero is the four bits `a` keeps of it.
+// §11.3.6: an assignment expression casts its right-hand side to the left-hand
+// data type, stacks it, updates the left-hand side and returns what it stacked,
+// and the returned value takes the left-hand side's data type. So what
+// `b = (a += 1)` reads is what `a` holds, not what the addition produced:
+// `b = (a+=1)` is the clause's own example. Sixteen is the untruncated sum, and
+// zero is the four bits `a` keeps of it.
 TEST(LvalueSim, CompoundAssignExpressionYieldsTheTargetsDataType) {
   SimFixture f;
   auto* var = RunAndFindVar(

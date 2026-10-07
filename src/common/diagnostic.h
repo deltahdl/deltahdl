@@ -88,9 +88,9 @@ class DiagEngine {
 
   // The source description a report's location is read against. A caller that
   // has to name a file rather than format a report reads it here: §37.3.3's
-  // vpiFile hands a PLI application "the source file an object came from", and
-  // a SourceLoc carries only the file_id this tool made up, which no
-  // application can resolve.
+  // vpiFile hands a PLI application the source file an object came from, and a
+  // SourceLoc carries only the file_id this tool made up, which no application
+  // can resolve.
   const SourceManager& Sources() const { return src_mgr_; }
 
   void SetWarningsAsErrors(bool val) { warnings_as_errors_ = val; }

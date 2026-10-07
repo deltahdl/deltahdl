@@ -128,9 +128,9 @@ TEST(FunctionDeclParsing, IntegerTypesAsFunctionParams) {
   EXPECT_EQ(item->func_args[1].name, "b");
 }
 
-// §13.4 p.341: "an implicit syntax that indicates only the ranges of the
-// packed dimensions and, optionally, the signedness" — note the plural
-// "packed dimensions". A function return type may carry multiple packed
+// §13.4 (printed page 341) lets a return type be given implicitly by the ranges
+// of its packed dimensions alone, optionally with a signedness, and the
+// dimensions are plural. A function return type may carry multiple packed
 // dimensions, as in the LRM example `function [3:0][7:0] myfunc4(...)`.
 TEST(FunctionDeclParsing, FuncReturnTypeImplicitMultiPackedDims) {
   auto r = Parse(

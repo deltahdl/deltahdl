@@ -234,9 +234,8 @@ TEST(ConcatenationSim, ConcatMixedWidths) {
   EXPECT_EQ(var->value.ToUint64(), 0xABCu);
 }
 
-// §11.4.12 says "Unsized constant numbers shall not be allowed in
-// concatenations", a property of the concatenation and not of the statement
-// holding it.
+// §11.4.12 bars unsized constant numbers from a concatenation, a property of
+// the concatenation and not of the statement holding it.
 //
 // ElaboratorOperationRules::WalkStmtsForUnsizedInConcat in
 // src/elaborator/elaborator_validate_operations_arrays.cpp reached six of the

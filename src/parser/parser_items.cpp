@@ -869,13 +869,13 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
   // A declarator with no port-connection list after it, which A.4.1.1 does not
   // admit as a hierarchical_instance whatever the leading name turns out to be:
   // the parentheses are not optional there. Reading the shape as an
-  // instantiation is what made a reference breaching §6.18 -- "The declaration
-  // of a user-defined data type shall precede any reference to its
-  // type_identifier" -- come back as a missing port connection list under
-  // §23.3.2. Recording it as the data declaration it also spells lets the parse
-  // finish with the name kept, and Elaborator::ReportUndeclaredTypeName decides
-  // which of the two the source meant, because the module names the answer
-  // turns on are the elaborator's and not this parser's.
+  // instantiation is what made a reference breaching §6.18 -- a user-defined
+  // data type is declared before any reference to its type_identifier -- come
+  // back as a missing port connection list under §23.3.2. Recording it as the
+  // data declaration it also spells lets the parse finish with the name kept,
+  // and Elaborator::ReportUndeclaredTypeName decides which of the two the
+  // source meant, because the module names the answer turns on are the
+  // elaborator's and not this parser's.
   if (LooksLikeUndeclaredTypeDecl()) {
     auto start = items.size();
     ParseVarDeclList(items, MakeNamedType(name_tok.text));

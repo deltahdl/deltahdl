@@ -266,14 +266,14 @@ TEST(DataTypeParsing, InterfacePortTypedef) {
   EXPECT_EQ(td->typedef_type.type_name, "data_t");
 }
 
-// §6.18 rules that "The declaration of a user-defined data type shall precede
-// any reference to its type_identifier". `my_type x;` written above the typedef
-// breaches it, and the breach is not the parser's to report: the same two
-// identifiers and semicolon are what a module instantiation missing its port
-// connection list spells, this parser holds no table of module names, and a
-// module may be instantiated above its own declaration. What the parser records
-// is the data declaration the shape also spells, with the type name kept, so
-// that the elaborator has the name to report about.
+// §6.18 requires a user-defined data type to be declared before any reference
+// to its type_identifier. `my_type x;` written above the typedef breaches it,
+// and the breach is not the parser's to report: the same two identifiers and
+// semicolon are what a module instantiation missing its port connection list
+// spells, this parser holds no table of module names, and a module may be
+// instantiated above its own declaration. What the parser records is the data
+// declaration the shape also spells, with the type name kept, so that the
+// elaborator has the name to report about.
 // UserDefinedTypeElaboration.TypeReferenceBeforeItsDeclarationIsReported in
 // test/src/unit/test_elaborator_subclause_06_18.cpp is where the §6.18 report
 // is asserted.

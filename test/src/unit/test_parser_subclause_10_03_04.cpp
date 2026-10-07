@@ -152,11 +152,11 @@ TEST(DriveStrengthParsing, NetDeclStrengthBeforeDelay) {
   EXPECT_NE(item->net_delay, nullptr);
 }
 
-// §10.3.4: the strength specification "shall immediately follow the keyword
-// (either the keyword for the net type or `assign`) and precede any delay
-// specified", which §A.6.1 writes as `assign [ drive_strength ] [ delay3 ]
-// list_of_net_assignments ;`. The report stands at the strength's own opening
-// parenthesis on line 3, which is the token in the wrong place.
+// §10.3.4: the strength specification comes right after the keyword, the net
+// type's or `assign`, and ahead of any delay, which §A.6.1 writes as `assign [
+// drive_strength ] [ delay3 ] list_of_net_assignments ;`. The report stands at
+// the strength's own opening parenthesis on line 3, which is the token in the
+// wrong place.
 TEST(DriveStrengthParsing, StrengthAfterDelayIsError) {
   auto r = Parse(
       "module m;\n"

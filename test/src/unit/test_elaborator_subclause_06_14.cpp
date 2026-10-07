@@ -120,8 +120,8 @@ TEST(ChandleDataType, ChandleInoutPort_Error) {
 }
 
 // The rule §6.14 states here is reported under the clause that states the
-// obligation, §7.3.2 ("Dynamic types and chandle types shall not be used in
-// untagged unions"), and stands at the `typedef` keyword.
+// obligation, §7.3.2 (no dynamic type or chandle type in an untagged union),
+// and stands at the `typedef` keyword.
 TEST(ChandleDataType, ChandleInUntaggedUnion_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -179,12 +179,13 @@ TEST(ChandleDataType, ChandleAssociativeArrayElementRead_Ok) {
 }
 
 TEST(ChandleDataType, ChandleAssociativeArrayElementWrite_Ok) {
-  // §6.14: "Chandles can be inserted into associative arrays", and the handle
+  // §6.14: a chandle may be inserted into an associative array, and the handle
   // inserted may come from a chandle variable rather than being the null the
   // insertion test above uses. Writing one into an element is an assignment
-  // between two chandles, so neither the "assigned to variables of any other
-  // type" prohibition nor the "only from another chandle" rule is violated.
-  // This is the write counterpart of the element read above.
+  // between two chandles, so neither the prohibition on assigning a chandle to
+  // a variable of another type nor the rule admitting assignment only from
+  // another chandle is violated. This is the write counterpart of the element
+  // read above.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -202,8 +203,9 @@ TEST(ChandleDataType, ChandleScalarBitSelect_Error) {
   // still illegal. This is the negative counterpart to the associative-array
   // element access above -- the array base is what makes the index legal, not
   // chandle. The lvalue is a chandle, so the assign-to-other-type rule is not
-  // what fires; the "only from another chandle or null" rule reports at the
-  // same line, and naming the bit-select report is what tells the two apart.
+  // what fires; the rule admitting assignment only from another chandle or null
+  // reports at the same line, and naming the bit-select report is what tells
+  // the two apart.
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"

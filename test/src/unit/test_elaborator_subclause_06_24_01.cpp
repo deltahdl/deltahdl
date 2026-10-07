@@ -312,11 +312,11 @@ TEST(CastOperatorElaboration, ShortrealVarInSignedCastError) {
                     4, "6.24.1"));
 }
 
-// §5.8: a time literal "is interpreted as a realtime value scaled to the
-// current time unit", so 2.1ns is a real value and not a value of the type
-// named time, which §6.11 defines as a 64-bit integral type. §6.24.1 requires
-// the expression inside a signing cast to be an integral value, so
-// signed'(2.1ns) breaks that rule exactly as signed'(2.5) does at
+// §5.8: a time literal reads as a realtime value scaled to the current time
+// unit, so 2.1ns is a real value and not a value of the type named time, which
+// §6.11 defines as a 64-bit integral type. §6.24.1 requires the expression
+// inside a signing cast to be an integral value, so signed'(2.1ns) breaks that
+// rule exactly as signed'(2.5) does at
 // CastOperatorElaboration.RealLiteralInSignedCastError above.
 TEST(CastOperatorElaboration, TimeLiteralInSignedCastError) {
   ElabFixture f;
@@ -367,10 +367,9 @@ TEST(CastOperatorSim, CastByteTruncate) {
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }
 
-// §6.24.1: "It shall be an error if the size specified is zero or negative."
-// The subclause on the report is what tells this rejection from §6.24.3's
-// bit-stream cast rules, which a cast naming a type rather than a width
-// breaches instead.
+// §6.24.1: a size of zero or below is an error. The subclause on the report is
+// what tells this rejection from §6.24.3's bit-stream cast rules, which a cast
+// naming a type rather than a width breaches instead.
 TEST(CastOperatorElaboration, SizeCastZeroWidthNames6_24_1) {
   ElabFixture f;
   ElabOk(
@@ -385,13 +384,13 @@ TEST(CastOperatorElaboration, SizeCastZeroWidthNames6_24_1) {
       "size cast target width must be a positive constant", 4, "6.24.1"));
 }
 
-// §6.24.1: "If the casting type is a constant expression with a positive
-// integral value, the expression in parentheses shall be padded or truncated to
-// the size specified." So 4'(20) is 20 truncated to four bits: 20 is 5'b10100,
-// its low four bits are 4'b0100, and the value is 4. §6.20.4 makes a
-// localparam identical to a parameter but for the ways it can be overridden, so
-// one holding that value is a constant expression and legal as a packed range
-// bound, and `logic [W-1:0] r` with W folded to 4 is [3:0] -- four bits wide.
+// §6.24.1: a casting type that is a constant expression of positive integral
+// value pads or truncates the parenthesized expression to that size. So 4'(20)
+// is 20 truncated to four bits: 20 is 5'b10100, its low four bits are 4'b0100,
+// and the value is 4. §6.20.4 makes a localparam identical to a parameter but
+// for the ways it can be overridden, so one holding that value is a constant
+// expression and legal as a packed range bound, and `logic [W-1:0] r` with W
+// folded to 4 is [3:0] -- four bits wide.
 //
 // This reads the recorded width rather than the absence of a diagnostic because
 // an initializer accepted as constant and then folded to nothing reports

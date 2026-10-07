@@ -2,12 +2,11 @@
 // must not lose: on the write side the target's own bits outside the window,
 // whatever word they live in, and the x and z those bits and the value's bits
 // hold; on the read side the state of the very bit the select names.
-// §11.5.1 says a part-select partly out of range "shall, when written, only
-// affect the bits that are in range", and the bits a select does not name are
-// no more the write's to touch than the ones past the end are; §6.3.1 gives a
-// 4-state vector four values per bit and §6.11.2 makes `logic` one of the
-// 4-state types, so "leave alone" means the x or z stands, not that the bit
-// reads 0.
+// §11.5.1 says a part-select partly out of range writes only the bits that lie
+// in range, and the bits a select does not name are no more the write's to
+// touch than the ones past the end are; §6.3.1 gives a 4-state vector four
+// values per bit and §6.11.2 makes `logic` one of the 4-state types, so "leave
+// alone" means the x or z stands, not that the bit reads 0.
 //
 // Every case here declares a target wider than one 64-bit word, or one holding
 // x, or both, and asserts on Logic4Vec::ToString or on the words directly.
@@ -25,13 +24,13 @@
 // bounds -- and every target it declares is 32 bits or fewer and is loaded
 // with a known value first, so no case there can see a word boundary or an
 // unknown bit. test/src/unit/test_simulator_subclause_11_05_01b.cpp is the
-// other half of the clause, "The actual bit that is accessed by an address
-// is, in part, determined by the declaration of acc", and declares ranges that
-// do not end at zero or that ascend; every other target here is [N:0], where
-// an index and the bit offset it reaches are the same number, so nothing else
-// here depends on that rule. BitSelectWriteTakesAnAscendingDeclarationsBits is
-// the one case here that does, and it is here rather than there because what
-// it holds to the declaration is the writer.
+// other half of the clause, under which the declaration of acc helps decide
+// which bit an address reaches, and declares ranges that do not end at zero or
+// that ascend; every other target here is [N:0], where an index and the bit
+// offset it reaches are the same number, so nothing else here depends on that
+// rule. BitSelectWriteTakesAnAscendingDeclarationsBits is the one case here
+// that does, and it is here rather than there because what it holds to the
+// declaration is the writer.
 //
 // A case takes one of two routes, the two the siblings take. It runs a module
 // source through RunAndFindVar in lib/cpp/test_fixtures/fixture_simulator.h
@@ -70,9 +69,9 @@ using namespace delta;
 namespace {
 
 // §11.5.1 lets `w[3:0] = 4'h0` affect w[3:0], and w[99:4] is not in that
-// window: "only affect the bits that are in range" is said of the bits past an
-// end, and the bits above a window that lies wholly inside the vector are no
-// more the write's to touch. All 96 of them must still read 1.
+// window: the in-range limit on a write is said of the bits past an end, and
+// the bits above a window that lies wholly inside the vector are no more the
+// write's to touch. All 96 of them must still read 1.
 //
 // The target is `'1` and the value 4'h0 so that every 1 in the answer can only
 // have come from the target and every 0 only from the value. A target of zero
@@ -128,11 +127,10 @@ TEST(ExpressionSim, BitSelectWriteKeepsTheTargetBitsAboveTheFirstWord) {
   EXPECT_EQ(var->value.ToString(), std::string(99, '1') + "0");
 }
 
-// §6.3.1: "All bits of 4-state vectors can be independently set to one of the
-// four basic values", and §6.11.2 lists `logic` among the 4-state types, whose
-// values "have additional bits, which encode the x and z states". So the six
-// bits §11.5.1 leaves outside the window of `a[1:0] = 2'b11` hold x, not 0,
-// and `a` must read 8'bxxxxxx11.
+// §6.3.1: each bit of a 4-state vector may independently take any of the four
+// basic values, and §6.11.2 lists `logic` among the 4-state types, whose values
+// carry extra bits encoding x and z. So the six bits §11.5.1 leaves outside the
+// window of `a[1:0] = 2'b11` hold x, not 0, and `a` must read 8'bxxxxxx11.
 //
 // The target is 8'hxx rather than a wider or partly known value because the
 // question here is the encoding alone, not the word boundary: eight bits keep
@@ -398,13 +396,13 @@ TEST(SelectBoundaryBehavior, PackedElementWriteAgreesWithItsStorageBits) {
   EXPECT_EQ(stored & ~window, uint64_t{0});
 }
 
-// §11.5.1: "the actual bit that is accessed by an address is, in part,
-// determined by the declaration of acc". `logic [0:7] asc` ascends, so its
-// right-hand bound 7 names its least significant bit -- the reading §11.5.1
-// fixes for its own `logic [0:31] b_vect`, whose `b_vect[0 +: 8]` it gives as
-// `b_vect[0:7]`, counting up the declaration from the significant end. Index 6
-// therefore sits one place above the least significant bit, and `asc[6] =
-// 1'b1` on a zeroed target must leave asc reading 8'h02.
+// §11.5.1: the declaration of acc helps decide which bit an address reaches.
+// `logic [0:7] asc` ascends, so its right-hand bound 7 names its least
+// significant bit -- the reading §11.5.1 fixes for its own
+// `logic [0:31] b_vect`, whose `b_vect[0 +: 8]` it gives as `b_vect[0:7]`,
+// counting up the declaration from the significant end. Index 6 therefore sits
+// one place above the least significant bit, and `asc[6] = 1'b1` on a zeroed
+// target must leave asc reading 8'h02.
 //
 // An ascending declaration is where a resolution that ignored the declaration
 // would part from one that honours it: taken as [7:0], index 6 would be bit
@@ -436,10 +434,9 @@ TEST(SelectBoundaryBehavior, BitSelectWriteTakesAnAscendingDeclarationsBits) {
 }
 
 // §11.5.1 gives an invalid address one answer on the write side: a select whose
-// address carries x or z "shall have no effect on the data stored when
-// written". An indexed part-select has two expressions and the clause does not
-// privilege one of them, so an unknown width invalidates the address exactly as
-// an unknown base does.
+// address carries x or z stores nothing when written. An indexed part-select
+// has two expressions and the clause does not privilege one of them, so an
+// unknown width invalidates the address exactly as an unknown base does.
 //
 // Only one of the two was tested for. The blocking writer resolved §11.5.1 by
 // its own walk and checked the base alone, running its width through
@@ -471,13 +468,12 @@ TEST(SelectBoundaryBehavior, PartSelectWithAnUnknownWidthBoundWritesNothing) {
 }
 
 // §11.5.1 gives a bit-select "the value of the bit" it addresses, and §6.3.1
-// says "all bits of 4-state vectors can be independently set to one of the
-// four basic values", x among them. So a bit-select of a bit holding x is
-// 1'bx. The sharpest way to say that is not to assert on the bit-select alone
-// but against the part-select spelling of the very same window in the very
-// same run: `a[0]` and `a[0:0]` name one bit of one variable, and §11.5.1
-// gives them the same answer or the clause has two readings. Today they
-// disagree.
+// says each bit of a 4-state vector may independently take any of the four
+// basic values, x among them. So a bit-select of a bit holding x is 1'bx. The
+// sharpest way to say that is not to assert on the bit-select alone but against
+// the part-select spelling of the very same window in the very same run: `a[0]`
+// and `a[0:0]` name one bit of one variable, and §11.5.1 gives them the same
+// answer or the clause has two readings. Today they disagree.
 //
 // The two spellings reach two bodies of code. `a[0:0]` carries an index_end,
 // so EvalSelect routes it to EvalPackedPartSelect and on to ExtractBitField in
@@ -608,12 +604,11 @@ TEST(SelectBoundaryBehavior, BitSelectAboveTheFirstWordReadsThatWordsBit) {
   EXPECT_EQ(lo->value.ToString(), "0");
 }
 
-// §11.5.1: "Part-selects that are partially out of range shall, when read,
-// return x for the bits that are out of range." `a[70:0]` on a `logic [7:0] a`
-// names seventy-one indices, of which only a[7:0] are in range; result
-// positions 8 through 70 are not, and all sixty-three of them must read x --
-// including the seven that sit at position 64 and above, in the result's
-// second word.
+// §11.5.1: a part-select partly out of range reads x for its out-of-range bits.
+// `a[70:0]` on a `logic [7:0] a` names seventy-one indices, of which only
+// a[7:0] are in range; result positions 8 through 70 are not, and all
+// sixty-three of them must read x -- including the seven that sit at position
+// 64 and above, in the result's second word.
 //
 // The second word is where the answer is still wrong. EvalSelect's two read
 // paths in src/simulator/eval_select.cpp now copy the window with
@@ -795,10 +790,10 @@ TEST(ExpressionSim, PartSelectWriteToAClassPropertyLeavesItsUnknownBits) {
 // §11.5.1 spells the two part-select forms separately -- `vect[msb_expr :
 // lsb_expr]` against `down_vect[lsb_base_expr +: width_expr]` -- and the second
 // expression means a different thing in each: an index in the first, a width in
-// the second, where "width_expr shall be a positive constant integer
-// expression". The reader for a select whose first index is x asked neither
-// which form it held and took that expression as the width for both, so the
-// span `a[1'bx : 4]` names was read off the number 4.
+// the second, where width_expr must be a constant integer expression greater
+// than zero. The reader for a select whose first index is x asked neither which
+// form it held and took that expression as the width for both, so the span
+// `a[1'bx : 4]` names was read off the number 4.
 //
 // The clause bounds the span by the declaration rather than by that number:
 // the first index of the non-indexed form is the more significant end of the
@@ -834,9 +829,8 @@ TEST(SelectXZHandling,
   EXPECT_EQ(narrow_result.ToString(), "xx");
 }
 
-// §11.5.1: "a part-select that is x or z shall yield the value x when read".
-// The first bound here is x, so that is the whole of the answer, and `r` must
-// read 4'bxxxx.
+// §11.5.1: a part-select that is x or z reads as x. The first bound here is x,
+// so that is the whole of the answer, and `r` must read 4'bxxxx.
 //
 // It read 4'b0000, which is the one answer the sentence forbids -- 0 is what a
 // 2-state out-of-range select yields and `r` is `logic`. The route there was
@@ -867,13 +861,13 @@ TEST(SelectXZHandling, NonIndexedPartSelectWithAnUnknownFirstBoundReadsAllX) {
   EXPECT_EQ(var->value.ToString(), "xxxx");
 }
 
-// §11.5.1 makes the base of an indexed part-select the expression that "can
-// vary at run time", so an x base is the ordinary case for these two forms
-// rather than the odd one, and the width stays the number the syntax states.
-// Both forms are here because they are what a fix that stopped reading the
-// second expression as a width outright would break: for `+:` and `-:` it is
-// the width, and 4 is what §11.5.1's "width_expr shall be a positive constant
-// integer expression" makes it whichever way the select runs from its base.
+// §11.5.1 makes the base of an indexed part-select the expression that may vary
+// at run time, so an x base is the ordinary case for these two forms rather
+// than the odd one, and the width stays the number the syntax states. Both
+// forms are here because they are what a fix that stopped reading the second
+// expression as a width outright would break: for `+:` and `-:` it is the
+// width, and 4 is what §11.5.1's requirement of a constant integer width
+// greater than zero makes it whichever way the select runs from its base.
 TEST(SelectXZHandling, IndexedPartSelectWithAnUnknownBaseKeepsItsWidth) {
   SimFixture f;
   auto* v = f.ctx.CreateVariable("ipsv", 8);

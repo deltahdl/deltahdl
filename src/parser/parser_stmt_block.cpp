@@ -18,13 +18,12 @@
 
 namespace delta {
 
-// §9.3.4: "a matching block name may be specified after the block end, join,
-// join_any, or join_none keyword, preceded by a colon", and "it shall be an
-// error if the name at the end is different from the block name at the
-// beginning". A.4.2's generate_block ends the same way, `end [ :
-// generate_block_identifier ]`, so Parser::ParseGenerateBody reads its end
-// label here too. The block's name is the inline one after `begin` or `fork`
-// where there is one, else the §9.3.5 label before it.
+// §9.3.4: a matching block name may follow the closing end, join, join_any or
+// join_none keyword after a colon, and a name at the end that differs from the
+// one at the beginning is an error. A.4.2's generate_block ends the same way,
+// `end [ : generate_block_identifier ]`, so Parser::ParseGenerateBody reads its
+// end label here too. The block's name is the inline one after `begin` or
+// `fork` where there is one, else the §9.3.5 label before it.
 void Parser::MatchEndBlockLabel(std::string_view inline_label,
                                 std::string_view prefix_label) {
   std::string_view block_name =
@@ -58,13 +57,13 @@ std::string_view Parser::TryParseStmtLabel() {
 }
 
 // Reports the two placements §9.3.5 forbids a statement label, and answers
-// whether it reported one: "A label can be specified before any procedural
-// statement (any non-declaration statement that can appear inside a begin-end
-// block)", and "A label cannot appear before the end, join, join_any, or
-// join_none, as these keywords do not form a statement". Call it at the head of
-// a body loop rather than from Parser::ParseStmt, where the label is taken,
-// because each recovery is the loop's: the closing keyword has to survive for
-// the loop's own terminator test, and the declaration has to reach the loop's
+// whether it reported one: a label may precede any procedural statement,
+// meaning any statement other than a declaration that a begin-end block can
+// hold, and no label may stand before end, join, join_any or join_none, since
+// those keywords are not statements. Call it at the head of a body loop rather
+// than from Parser::ParseStmt, where the label is taken, because each recovery
+// is the loop's: the closing keyword has to survive for the loop's own
+// terminator test, and the declaration has to reach the loop's
 // Parser::ParseBlockVarDecls branch. Consumes the label and its colon when it
 // reports, so the next iteration reads what the label stood before and the loop
 // makes progress; restores the position otherwise, leaving a legal label for

@@ -35,12 +35,12 @@ TEST(ClassConstraintElaboration, WeakReferenceAsMemberOk) {
 
 // The declaration position decides which of the four sites enforcing this rule
 // fires, and all four cite §8.30.1. That is the subclause carrying the sentence
-// they enforce -- "The parameter type T shall be a class type; all other types
-// shall result in a compiler error" -- while §8.30 "Weak references" is the
-// heading above it and states no rule. Two of the four cited §8.30 until #3058,
-// so the same breach named a different clause depending on where the
-// declaration stood. Asserting one subclause across all five cases is what a
-// single site drifting again would break.
+// they enforce -- T has to be a class type, and any other type is a
+// compile-time error -- while §8.30 "Weak references" is the heading above it
+// and states no rule. Two of the four cited §8.30 until #3058, so the same
+// breach named a different clause depending on where the declaration stood.
+// Asserting one subclause across all five cases is what a single site drifting
+// again would break.
 TEST(ClassConstraintElaboration, WeakReferenceNonClassTypeError) {
   ElabFixture f;
   ElabOk(
@@ -186,9 +186,9 @@ TEST(ClassConstraintElaboration, WeakReferenceTypedefNonClassError) {
                             4, "8.30.1"));
 }
 
-// §8.30.1 rules that "The parameter type T shall be a class type; all other
-// types shall result in a compiler error", and puts no condition on the
-// statement the declaration stands in. ValidateLocalWeakRefDecls in
+// §8.30.1 requires the parameter type T to be a class type and makes any other
+// type a compile-time error, and puts no condition on the statement the
+// declaration stands in. ValidateLocalWeakRefDecls in
 // src/elaborator/elaborator_scope_rules.cpp is the site that answers for a
 // declaration inside a procedural block, and it had written out nine of the
 // thirteen child-statement links Stmt declares. It now takes the list from

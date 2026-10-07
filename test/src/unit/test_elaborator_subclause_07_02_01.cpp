@@ -246,13 +246,12 @@ TEST(PackedStructTyping, AnyFourStateMember_StructIsFourState) {
   EXPECT_TRUE(mod->variables[0].is_4state);
 }
 
-// §7.2.1: "Only packed data types and the integer data types summarized in
-// Table 6-8 shall be legal in packed structures." A real member is neither.
-// The subclause on the report is what tells this rejection from the rules §7.2
-// carries over the same declaration -- the void-member rule and the
-// random-qualifier rule -- which are reported under 7.2 rather than 7.2.1.
-// This case reaches the elaborator through the preprocessor, which the
-// ElaborateSrc case above does not.
+// §7.2.1: a packed structure admits only packed data types and the integer data
+// types of Table 6-8. A real member is neither. The subclause on the report is
+// what tells this rejection from the rules §7.2 carries over the same
+// declaration -- the void-member rule and the random-qualifier rule -- which
+// are reported under 7.2 rather than 7.2.1. This case reaches the elaborator
+// through the preprocessor, which the ElaborateSrc case above does not.
 TEST(PackedStructValidation, PackedStructRealMemberNames7_2_1) {
   ElabFixture f;
   ElabOk(

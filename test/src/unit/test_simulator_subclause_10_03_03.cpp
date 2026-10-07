@@ -286,10 +286,10 @@ TEST(AssignmentDelaySim, ANetDelaySettlesAVectorWholeWhenItsBitsDisagree) {
 }
 
 // The same two bits under the other form, which is the one §10.3.3 restricts by
-// name: "if the assignment is to a vector net, then the rising and falling
-// delays shall not be applied to the individual bits if the assignment is
-// included in the declaration". The delay is part of the continuous assignment
-// here rather than a net delay, and the vector still settles whole at 52.
+// name: a continuous assignment written in a vector net's declaration does not
+// apply its rise and fall delays bit by bit. The delay is part of the
+// continuous assignment here rather than a net delay, and the vector still
+// settles whole at 52.
 //
 // Without this case beside the one above, the clause's contrast is stated on
 // one side only, which is the gap #3372 records.
@@ -429,17 +429,16 @@ TEST(AssignmentDelaySim, InertialDelayNoIntermediateGlitch) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §10.3.3: "A delay given to a continuous assignment shall specify the time
-// duration between a right-hand operand value change and the assignment made to
-// the left-hand side", and §28.16 measures a net delay from a change on any of
-// the net's drivers to the moment the net's value is updated and passed on.
-// Both operands of `a & b` change in one time step here, which every other
-// delayed case in this file avoids by driving a one-operand or constant
-// right-hand side, so this is the first case where the assignment has more than
-// one operand change to react to at once. It fails when the second operand's
-// change costs the assignment its delay and puts the new value on y at t=9
-// rather than t=15: y_mid, sampled at t=11, then reads 8'h38 instead of the
-// 8'hC0 y still holds.
+// §10.3.3: a continuous assignment's delay is the time from a right-hand
+// operand's change to the assignment of the left-hand side, and §28.16 measures
+// a net delay from a change on any of the net's drivers to the moment the net's
+// value is updated and passed on. Both operands of `a & b` change in one time
+// step here, which every other delayed case in this file avoids by driving a
+// one-operand or constant right-hand side, so this is the first case where the
+// assignment has more than one operand change to react to at once. It fails
+// when the second operand's change costs the assignment its delay and puts the
+// new value on y at t=9 rather than t=15: y_mid, sampled at t=11, then reads
+// 8'h38 instead of the 8'hC0 y still holds.
 //
 // §4.7 leaves the order of active events within one region free, so neither
 // sample stands at the change instant (t=9) or at the expiry instant (t=15).
@@ -555,11 +554,11 @@ TEST(AssignmentDelaySim, ThreeOperandsChangingInOneStepCommitOnce) {
 
 // §10.3.3 chooses between an assignment's two delays from the transition the
 // assignment makes, and §11.5.1 says which bits that transition is over: a
-// partially out-of-range part-select "shall, when written, only affect the bits
-// that are in range", and those bits take the value's bits at and above the
-// select's own low ones. `a[1 -: 4]` is `a[1:-2]`, so a[1] takes src[3] and
-// a[0] takes src[2]: 4'b0011 lands 2'b00 on a pair already holding 2'b11, which
-// is a transition to zero and takes "the second delay", the fall delay of 3.
+// partially out-of-range part-select writes only the bits that lie in range,
+// and those bits take the value's bits at and above the select's own low ones.
+// `a[1 -: 4]` is `a[1:-2]`, so a[1] takes src[3] and a[0] takes src[2]: 4'b0011
+// lands 2'b00 on a pair already holding 2'b11, which is a transition to zero
+// and takes "the second delay", the fall delay of 3.
 //
 // The comparison was between the whole four-bit value as written and the two
 // in-range bits it lands on -- not the same bits, and not even the same width.

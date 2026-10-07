@@ -500,12 +500,12 @@ TEST(QueueRef, QueueRefOutOfBoundsFallsBackToValue) {
 // §13.5.2 makes a ref argument the caller's own object rather than a copy, so
 // the copy-out a queue element ref needs -- an element being a bare vector
 // rather than a Variable to alias -- is a write to the caller's queue, and
-// §9.4.2 has it announce itself: "Changing the value of object data members,
-// aggregate elements, or the size of a dynamically sized array referenced by a
-// method or function shall cause the event expression to be reevaluated". The
-// watchers are on the variable the queue was declared under. 99 against 20 is
-// the discriminating pair: 20 is what a run that notified on push_back and not
-// on the writeback leaves standing.
+// §9.4.2 has it announce itself: a change to an object data member, an
+// aggregate element, or the size of a dynamically sized array a method or
+// function references makes the event expression be reevaluated. The watchers
+// are on the variable the queue was declared under. 99 against 20 is the
+// discriminating pair: 20 is what a run that notified on push_back and not on
+// the writeback leaves standing.
 TEST(QueueRef, RefElementWritebackWakesAnAlwaysCombReadingTheElement) {
   auto v = RunAndGet(
       "module t;\n"
@@ -596,8 +596,8 @@ TEST(PassByRef, RefWholeVariableWriteWakesAnAlwaysCombReadingIt) {
   EXPECT_EQ(v, 99u);
 }
 
-// §13.5.2: "arguments passed by reference are not copied into the subroutine
-// area, rather, a reference to the original argument is passed", matched on
+// §13.5.2: an argument passed by reference is not copied into the subroutine's
+// area; the subroutine gets a reference to the original instead, matched on
 // equivalent data types, and §6.18 makes a name standing for the element type
 // equivalent to it. The gate that decides whether the reference is formed asked
 // a width that a typedef name answers 0 for, so the bind was declined and the

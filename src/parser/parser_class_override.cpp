@@ -10,10 +10,10 @@
 // opposite order, `virtual function :final :extends void f2();` under the
 // comment "OK: f2 shall not be overridden in subclasses of A" (printed page
 // 198), and no sentence in §8.20 or Syntax 8-1 constrains the order either way:
-// the clause's rule for the pair, on printed page 197, is "final may be
-// combined with either initial or extends", which names no order. The example
-// is illustrative and does not derive from the normative production, so the
-// production decides and the example is reported rather than followed.
+// the clause's rule for the pair, on printed page 197, lets final go with
+// either initial or extends, which names no order. The example is illustrative
+// and does not derive from the normative production, so the production decides
+// and the example is reported rather than followed.
 //
 // These functions are their own translation unit rather than part of
 // src/parser/parser_class.cpp, which they would take to 969 lines, inside the
@@ -43,9 +43,9 @@ struct ParserClassOverrideHelpers {
   // whether it did. Each category holds one specifier: a second final_specifier
   // and a second initial_or_extends_specifier are both refused. The case of the
   // latter where the two differ is the one §8.20 states in its own words,
-  // "initial and extends are mutually exclusive; specifying both in a method
-  // declaration shall result in an error", so it keeps the message #3107 gave
-  // it. A reported specifier is not recorded, which is what keeps
+  // that initial and extends exclude each other and a method declaration giving
+  // both is an error, so it keeps the message #3107 gave it. A reported
+  // specifier is not recorded, which is what keeps
   // ModuleItem::is_method_initial and ModuleItem::is_method_extends from both
   // ending up true and Elaborator::ValidateOneMethodOverride from being handed
   // a pair the clause forbids.

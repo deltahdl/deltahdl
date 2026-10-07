@@ -270,11 +270,11 @@ TEST(AssignmentWithinExpression, CompoundAssignToAStructMemberUpdatesIt) {
       {{"s", 0x28u}, {"q", 8u}});
 }
 
-// §11.3.6 gives the returned value "the data type of the left-hand side", and a
-// select is a left-hand side of its own type: `d[3:0]` names four bits however
-// wide the operation that produced the value was. The write was already right,
-// each writer sizing what it stores by what it is storing into; it is the value
-// the surrounding expression reads that carried the operation's width.
+// §11.3.6 gives the returned value the left-hand side's data type, and a select
+// is a left-hand side of its own type: `d[3:0]` names four bits however wide
+// the operation that produced the value was. The write was already right, each
+// writer sizing what it stores by what it is storing into; it is the value the
+// surrounding expression reads that carried the operation's width.
 TEST(AssignmentWithinExpression,
      CompoundAssignToPartSelectYieldsTheSelectWidth) {
   RunAndCheck(

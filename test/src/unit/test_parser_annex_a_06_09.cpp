@@ -97,7 +97,7 @@ TEST(SubroutineCallStatementParsing, VoidCastRequiresSemicolon) {
 }
 
 // void ' ( function_subroutine_call ) ; wraps a function_subroutine_call and
-// nothing else; §13.4.1 has the cast discard "the return value" of a function
+// nothing else; §13.4.1 has the cast discard the returned value of a function
 // called as a statement. The parser read the cast as one of any expression, so
 // `void'(a + b);` was accepted silently.
 TEST(SubroutineCallStatementParsing, VoidCastOfNonCallIsRejected) {

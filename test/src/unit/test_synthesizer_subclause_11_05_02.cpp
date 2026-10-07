@@ -14,11 +14,10 @@ namespace {
 // `ASSERT_NE(aig, nullptr)` holds over it.
 //
 // Every array below is declared with a low address other than zero wherever the
-// case is about the address. §11.5.2 rules that "the address bounds given in
-// the declaration of the memory determine the effect of the address
-// expression", and in an array declared `[0:N]` an address and an element
-// offset are the same number, so a case on `[0:N]` passes whether the
-// declaration was read or not.
+// case is about the address. §11.5.2 rules that the bounds the memory's
+// declaration gives decide what an address expression reaches, and in an array
+// declared `[0:N]` an address and an element offset are the same number, so a
+// case on `[0:N]` passes whether the declaration was read or not.
 
 // The test fails on a lowering that builds nothing for an element of an
 // unpacked array, which is what the synthesizer did in both directions: a write
@@ -64,10 +63,10 @@ TEST(ArrayAddressing, ElementAddressResolvesAgainstTheDeclaredAddressRange) {
 }
 
 // The test fails on a lowering that reads a descending declaration as naming
-// different elements than an ascending one. §7.4.2 admits a first value
-// "greater than, equal to, or less than the second value", and either way an
-// address names the element carrying that address, so `mem[4]` and `mem[1]` of
-// `[4:1]` are two elements and reading one does not answer the other.
+// different elements than an ascending one. §7.4.2 admits a first value greater
+// than, equal to or less than the second, and either way an address names the
+// element carrying that address, so `mem[4]` and `mem[1]` of `[4:1]` are two
+// elements and reading one does not answer the other.
 TEST(ArrayAddressing, DescendingAddressRangeReachesTheOppositeElement) {
   ExpectInputSweep(
       "module m(input [7:0] a, output [7:0] y);\n"
@@ -80,10 +79,9 @@ TEST(ArrayAddressing, DescendingAddressRangeReachesTheOppositeElement) {
 
 // The test fails on a lowering that resolves only an address it can fold, which
 // every case above passes because each writes its address as a literal. §11.5.2
-// rules that "The addr_expr can be any integer expression", so an address
-// arriving on a port is an address the subclause defines, and the netlist owes
-// a choice among the elements. `addr` is the only input, so the driven word is
-// the address.
+// lets addr_expr be any integer expression, so an address arriving on a port is
+// an address the subclause defines, and the netlist owes a choice among the
+// elements. `addr` is the only input, so the driven word is the address.
 TEST(ArrayAddressing, VariableAddressSelectsAmongTheElements) {
   ExpectInputSweep(
       "module m(input [1:0] addr, output [7:0] y);\n"
@@ -98,11 +96,10 @@ TEST(ArrayAddressing, VariableAddressSelectsAmongTheElements) {
 }
 
 // The test fails on a lowering that wraps an address past the end of the array
-// onto an element that is in range. §11.5.2 rules that an address that "is out
-// of bounds" gives the value §7.4.5 describes, and a 2-state value reads 0
-// where a 4-state one reads x, which is what an AIG node can carry. Every
-// element is driven here, so a wrap would answer the input word rather than
-// zero.
+// onto an element that is in range. §11.5.2 rules that an out-of-bounds address
+// gives the value §7.4.5 describes, and a 2-state value reads 0 where a 4-state
+// one reads x, which is what an AIG node can carry. Every element is driven
+// here, so a wrap would answer the input word rather than zero.
 TEST(ArrayAddressing, AddressOutOfTheDeclaredRangeReadsZero) {
   ExpectInputSweep(
       "module m(input [7:0] a, output [7:0] y);\n"
@@ -117,11 +114,10 @@ TEST(ArrayAddressing, AddressOutOfTheDeclaredRangeReadsZero) {
 }
 
 // The test fails on a lowering that answers an element and stops there. §11.5.2
-// rules that once the word is selected, "bit-selects and part-selects shall be
-// addressed in the same manner as net and variable bit-selects and part-selects
-// (see 11.5.1)", so the `[3]` is resolved against the element's own declared
-// range `[8:1]` and reaches storage offset 2 of the element. No case above
-// writes a select over a select.
+// rules that once the word is selected, its bit-selects and part-selects are
+// addressed as a net's or a variable's are (§11.5.1), so the `[3]` is resolved
+// against the element's own declared range `[8:1]` and reaches storage offset 2
+// of the element. No case above writes a select over a select.
 TEST(ArrayAddressing, BitSelectOfAnElementResolvesAgainstThePackedRange) {
   ExpectInputSweep(
       "module m(input [8:1] a, output y);\n"
@@ -153,12 +149,12 @@ TEST(ArrayAddressing, WriteToOneElementLeavesTheOtherElementsAlone) {
 }
 
 // The test fails on a lowering that gives an array port one element's storage
-// and no addressing. §11.5.2 rules that "the address bounds given in the
-// declaration of the memory determine the effect of the address expression",
-// and the declaration here is a port declaration. `mem[1]` is the element at
-// the low address, so `SynthLower::MapPorts` puts it in the low four input
-// bits. Today the elaborator records the port with no address bounds, so the
-// read is reported as having no lowering.
+// and no addressing. §11.5.2 rules that the bounds the memory's declaration
+// gives decide what an address expression reaches, and the declaration here is
+// a port declaration. `mem[1]` is the element at the low address, so
+// `SynthLower::MapPorts` puts it in the low four input bits. Today the
+// elaborator records the port with no address bounds, so the read is reported
+// as having no lowering.
 TEST(ArrayAddressing, ElementOfAnArrayPortCarriesWhatWasDrivenIntoIt) {
   ExpectInputSweep(
       "module m(input [3:0] mem [1:2], output [3:0] y);\n"
@@ -182,12 +178,11 @@ TEST(ArrayAddressing, ElementOfAnArrayPortDoesNotCarryAnotherElement) {
 }
 
 // The test fails on a lowering that lets an address past the top of an array
-// port reach storage. §11.5.2 rules that "If the address is invalid (it is out
-// of bounds ...) then the value of the reference shall be as described in
-// 7.4.5", and address 3 is one past the top of `[1:2]`, which is out of bounds
-// only if the declaration's bounds were recorded. Today the elaborator records
-// the port with no address bounds, so the read is reported as having no
-// lowering.
+// port reach storage. §11.5.2 sends an invalid address, such as one out of
+// bounds, to §7.4.5 for the value it reads, and address 3 is one past the top
+// of `[1:2]`, which is out of bounds only if the declaration's bounds were
+// recorded. Today the elaborator records the port with no address bounds, so
+// the read is reported as having no lowering.
 TEST(ArrayAddressing, ArrayPortAddressResolvesAgainstTheDeclaredAddressRange) {
   ExpectInputSweep(
       "module m(input [3:0] mem [1:2], output [3:0] y);\n"
@@ -244,11 +239,10 @@ TEST(ArrayAddressing, TwoDimensionalAddressReachesOneElementOnly) {
 
 // The test fails on a lowering that counts the second address from zero, which
 // would take the `[1]` of `mem[1][1]` for the first element of the second
-// dimension and answer what `mem[1][3]` holds. §11.5.2 rules that "the address
-// bounds given in the declaration of the memory determine the effect of the
-// address expression", and address 1 is outside the second dimension's `[3:4]`.
-// Today a variable of more than one dimension gets no shape, so the read is
-// reported.
+// dimension and answer what `mem[1][3]` holds. §11.5.2 rules that the bounds
+// the memory's declaration gives decide what an address expression reaches, and
+// address 1 is outside the second dimension's `[3:4]`. Today a variable of more
+// than one dimension gets no shape, so the read is reported.
 TEST(ArrayAddressing, SecondDimensionAddressResolvesAgainstItsOwnBounds) {
   ExpectInputSweep(
       "module m(input [7:0] a, output [7:0] y);\n"

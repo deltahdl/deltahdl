@@ -1,13 +1,13 @@
 // §3.14.2.2 puts a timeunit or timeprecision declaration written outside every
-// design element in the compilation-unit scope: "There shall be at most one
-// time unit and one time precision for any module, program, package, or
-// interface definition or in any compilation-unit scope." Every case here
-// writes such a declaration into a file compiled through SinglePassCompiler and
-// reads the value back off the elaborated design, which is the pair of objects
-// no other test in this tier spans: the parser writes the declaration onto the
-// CompilationUnit it built for one file, and what the elaborator reads is the
-// merged unit AppendCompilationUnitDeclarations in src/parser/ast_design.h
-// assembled out of the command line.
+// design element in the compilation-unit scope: a module, program, package or
+// interface definition, or a compilation-unit scope, has at most one time unit
+// and one time precision. Every case here writes such a declaration into a file
+// compiled through SinglePassCompiler and reads the value back off the
+// elaborated design, which is the pair of objects no other test in this tier
+// spans: the parser writes the declaration onto the CompilationUnit it built
+// for one file, and what the elaborator reads is the merged unit
+// AppendCompilationUnitDeclarations in src/parser/ast_design.h assembled out of
+// the command line.
 //
 // The cases from ConflictingCompilationUnitTimeunitsAcrossFilesAreReported
 // onwards write a declaration into each of two files of one command line and
@@ -83,11 +83,10 @@ const RtlirModule* SoleTopModule(RtlirDesign* design) {
 TEST(SinglePassCompileTimescale, ACompilationUnitTimeunitReachesTheDesign) {
   // One file whose first item is `timeunit 100ps;`, written outside the module
   // that follows it. §3.14.2.2 gives that declaration to the compilation-unit
-  // scope -- "There shall be at most one time unit and one time precision for
-  // any module, program, package, or interface definition or in any
-  // compilation-unit scope" -- and requires the position: "If specified, the
-  // timeunit and timeprecision declarations shall precede any other items in
-  // the current time scope."
+  // scope -- a module, program, package or interface definition, or a
+  // compilation-unit scope, has at most one time unit and one time precision --
+  // and requires the position: timeunit and timeprecision declarations, where
+  // given, come before any other item of the time scope.
   //
   // The reader is src/elaborator/elaborator.cpp, which sets
   // design->cu_timescale.unit and .magnitude only under unit->has_cu_timeunit.
@@ -117,11 +116,10 @@ TEST(SinglePassCompileTimescale, ACompilationUnitTimeunitReachesTheDesign) {
 
 TEST(SinglePassCompileTimescale,
      ACompilationUnitTimeprecisionReachesTheDesign) {
-  // The precision half on its own, in the second form §3.14.2.2 gives it: "The
-  // time unit and precision can be declared by the timeunit and timeprecision
-  // keywords, respectively, and set to a time literal." The declaration stands
-  // outside the module, so it is the compilation unit's precision and not that
-  // module's.
+  // The precision half on its own, in the second form §3.14.2.2 gives it: the
+  // timeunit and timeprecision keywords declare the time unit and the
+  // precision, each set to a time literal. The declaration stands outside the
+  // module, so it is the compilation unit's precision and not that module's.
   //
   // This is a separate case from the time unit rather than the same one twice.
   // src/elaborator/elaborator.cpp gates design->cu_timescale.precision and
@@ -149,12 +147,11 @@ TEST(SinglePassCompileTimescale,
   // Two files on one command line: the first declares `timeunit 100ps;` and no
   // design element at all, the second declares a module that declares no time
   // unit of its own. §3.12.1 case a) makes the two files one compilation unit
-  // -- "all files on a given compilation command line make a single compilation
-  // unit" -- so the declaration in the first is the second's compilation-unit
-  // scope, and §3.14.2.3 case c) then decides the module's time unit: "Else, if
-  // the compilation-unit scope specifies a time unit (outside all other
-  // declarations), then the time unit shall be set to the time units of the
-  // compilation unit."
+  // -- one command line's files form one compilation unit -- so the declaration
+  // in the first is the second's compilation-unit scope, and §3.14.2.3 case c)
+  // then decides the module's time unit: failing the earlier cases, a time unit
+  // the compilation-unit scope specifies outside all other declarations becomes
+  // the module's.
   //
   // The reader is src/elaborator/elaborator_module.cpp, which falls back to
   // unit->cu_time_unit and unit->cu_time_unit_magnitude for a design element
@@ -189,10 +186,10 @@ TEST(SinglePassCompileTimescale,
   // unit's: the first file declares `timeprecision 10ps;` outside every design
   // element, the second declares a module that declares neither a time unit nor
   // a precision. §3.14.3 makes that declaration the tick size of the whole run:
-  // "The global time precision, also called the simulation time unit, is the
-  // minimum of all the timeprecision statements, all the time precision
-  // arguments to timeunit declarations, and the smallest time precision
-  // argument of all the `timescale compiler directives in the design."
+  // the global time precision, or simulation time unit, is the smallest of
+  // every timeprecision statement, every precision argument of a timeunit
+  // declaration, and the precision arguments of every `timescale directive in
+  // the design.
   //
   // The reader is ComputeGlobalTimePrecision in src/parser/time_resolve.cpp,
   // which offers cu->cu_time_prec to the minimum only under
@@ -216,21 +213,20 @@ TEST(SinglePassCompileTimescale,
 }
 
 // The cases below put a compilation-unit declaration in each of two files of
-// one command line. §3.12.1 case a) makes the two one compilation unit -- "All
-// files on a given compilation command line make a single compilation unit (in
-// which case the declarations within those files are accessible following
-// normal visibility rules throughout the entire set of files)" -- so the two
-// declarations stand in one time scope, and §3.14.2.2 rules on the pair: "The
-// timeunit and timeprecision declarations can be repeated as later items, but
-// shall match the previous declaration within the current time scope."
+// one command line. §3.12.1 case a) makes the two one compilation unit -- every
+// file of one command line belongs to one compilation unit, its declarations
+// visible across those files under the normal visibility rules -- so the two
+// declarations stand in one time scope, and §3.14.2.2 rules on the pair: a
+// timeunit or timeprecision declaration may be repeated later, but has to match
+// the earlier one in the same time scope.
 //
 // The declaration in src/first.sv stands on line 1 of that file and the one in
 // src/second.sv on line 2 of its own, so the line a report stands at says which
 // of the two declarations it names. Two declarations on one line number are
 // what a case cannot tell apart, and the standard leaves room for the second
-// file to open with something: §3.14.2.2 requires only that "the timeunit and
-// timeprecision declarations shall precede any other items in the current time
-// scope", and a comment is no item.
+// file to open with something: §3.14.2.2 requires only that the timeunit and
+// timeprecision declarations come before any other item of the time scope, and
+// a comment is no item.
 
 // The declaration src/first.sv carries, one per case: the time unit for three
 // of them and the time precision for the one that is about the precision. The
@@ -262,11 +258,11 @@ void CompileTwoFileCommandLine(CommandLineHarness& h, const ScratchDir& tmp,
 TEST(SinglePassCompileTimescale,
      ConflictingCompilationUnitTimeunitsAcrossFilesAreReported) {
   // `timeunit 1ps;` in one file of a command line and `timeunit 1ns;` in
-  // another, which §3.14.2.2 forbids: the repeat "shall match the previous
-  // declaration within the current time scope", and §3.12.1 case a) is what
-  // makes the two files one time scope. What the source description costs is a
-  // run at the wrong tick size with nothing said, since §3.14.2.3 case c) makes
-  // the compilation unit's time unit the fallback for every design element
+  // another, which §3.14.2.2 forbids: the repeat has to match the earlier
+  // declaration in the same time scope, and §3.12.1 case a) is what makes the
+  // two files one time scope. What the source description costs is a run at the
+  // wrong tick size with nothing said, since §3.14.2.3 case c) makes the
+  // compilation unit's time unit the fallback for every design element
   // declaring none of its own and the two readings are a factor of a thousand
   // apart.
   //
@@ -294,9 +290,8 @@ TEST(SinglePassCompileTimescale,
 TEST(SinglePassCompileTimescale,
      ConflictingCompilationUnitTimeprecisionsAcrossFilesAreReported) {
   // The precision half of the same rule, which §3.14.2.2 states of both at
-  // once: "There shall be at most one time unit and one time precision for any
-  // module, program, package, or interface definition or in any
-  // compilation-unit scope."
+  // once: a module, program, package or interface definition, or a
+  // compilation-unit scope, has at most one time unit and one time precision.
   //
   // This is a separate case from the time unit rather than the same one twice.
   // CheckCuTimeunitConsistency in src/parser/parser.cpp reaches the two through
@@ -322,12 +317,12 @@ TEST(SinglePassCompileTimescale,
 
 TEST(SinglePassCompileTimescale,
      AMatchingCompilationUnitTimeunitInASecondFileIsAccepted) {
-  // Both files declare `timeunit 1ps;`, which §3.14.2.2 permits: "The timeunit
-  // and timeprecision declarations can be repeated as later items, but shall
-  // match the previous declaration within the current time scope." A repeat
-  // that matches is a conforming source description, so a comparison across
-  // files that reported every second declaration rather than every differing
-  // one fails here while passing the two cases above.
+  // Both files declare `timeunit 1ps;`, which §3.14.2.2 permits: a timeunit or
+  // timeprecision declaration may be repeated later so long as it matches the
+  // earlier one in the same time scope. A repeat that matches is a conforming
+  // source description, so a comparison across files that reported every second
+  // declaration rather than every differing one fails here while passing the
+  // two cases above.
   //
   // The assertion is over every diagnostic the run recorded rather than over
   // DiagEngine::HasErrors(), because a report about a declaration the standard
@@ -360,8 +355,8 @@ TEST(SinglePassCompileTimescale,
 
 TEST(SinglePassCompileTimescale, ConflictingMagnitudesInOneUnitAreReported) {
   // `timeunit 1ps;` against `timeunit 10ps;`, which name one time unit and
-  // differ only in the magnitude. §3.14.2.2 requires the repeat to "match the
-  // previous declaration", and a declaration is the time literal §5.8 admits
+  // differ only in the magnitude. §3.14.2.2 requires the repeat to match the
+  // earlier declaration, and a declaration is the time literal §5.8 admits
   // rather than the unit alone, so these two do not match and the second is
   // reported.
   //

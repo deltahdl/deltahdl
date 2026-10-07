@@ -738,8 +738,8 @@ TEST(ConstantFunctionElaboration, DefaultArgumentFromLocalparamFolds) {
 // §13.4.3 (f) exception: calling a built-in method on a variable local to the
 // function is explicitly permitted, even though a general non-constant-function
 // call would be rejected. Here the array reduction `.sum()` is invoked on a
-// body-local array, so no "non-constant invocation" error is raised. (On a
-// non-local root the same access would trip the identifier/hierarchical rule,
+// body-local array, so no error about a non-constant invocation is raised. (On
+// a non-local root the same access would trip the identifier/hierarchical rule,
 // as ExternalNetReferenceError / HierarchicalReferenceError show.)
 TEST(ConstantFunctionElaboration, BuiltinMethodOnLocalAllowed) {
   ElabFixture f;
@@ -757,12 +757,12 @@ TEST(ConstantFunctionElaboration, BuiltinMethodOnLocalAllowed) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4.3 rules that "a constant function call shall be evaluated at
-// elaboration time", and §27.4 makes a generate block a scope of its own and a
-// further level of hierarchy once instantiated without exempting anything
-// written in it from that. The function is among the module's own items and
-// §23.9 makes it visible from a block below, so P folds to 8 exactly as the
-// module-level InputOnlyArgOk case folds it.
+// §13.4.3 has a constant function call evaluated during elaboration, and §27.4
+// makes a generate block a scope of its own and a further level of hierarchy
+// once instantiated without exempting anything written in it from that. The
+// function is among the module's own items and §23.9 makes it visible from a
+// block below, so P folds to 8 exactly as the module-level InputOnlyArgOk case
+// folds it.
 //
 // The test fails with P unresolved, which ResolvedParam reports as -1.
 // Elaborator::ResolveDefparamsAndGenerates in src/elaborator/elaborator.cpp
@@ -822,7 +822,7 @@ TEST(ConstantFunctionRulesElaboration,
 // §27.2 rules that every other module item, generate constructs among them, may
 // stand in a generate block once port declarations, specify blocks and
 // specparam declarations are excluded, so a function may be declared inside
-// one. §13.4.3 has a constant function call "evaluated at elaboration time" and
+// one. §13.4.3 has a constant function call evaluated during elaboration and
 // §23.9 has an identifier declared in the scope itself name that local item, so
 // the triple block 'a' declares is what the call in block 'a' names and P folds
 // to 12.

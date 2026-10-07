@@ -223,8 +223,8 @@ TEST(ModuleScopeParse, TaskTypedefIsStillATypeInsideItsOwnTask) {
 // The two remaining scopes of §23.9's eleven, a package and a class, differ
 // from the nine above in that the standard hands their type names to another
 // scope by name. §26.3 gives an importing scope a package's identifiers without
-// the package name in front, and §8.13 gives a subclass "the members of the
-// base class". So each is stated twice below: the name is gone where nothing
+// the package name in front, and §8.13 gives a subclass the base class's
+// members. So each is stated twice below: the name is gone where nothing
 // brought it in, and present where something did. A guard that only takes names
 // away turns every legal import into a parse failure, which is what the first
 // pair of cases would not notice on its own.

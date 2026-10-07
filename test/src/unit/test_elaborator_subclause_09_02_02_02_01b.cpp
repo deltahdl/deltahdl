@@ -37,9 +37,9 @@ bool ReadSignalsContain(const Stmt* body, std::string_view name) {
 
 // §16.3 keeps an immediate assertion's action_block statements in
 // Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. §9.2.2.2.1 (printed page
-// 223) says "Expressions used in assertion action blocks do not contribute to
-// the implicit sensitivity list of an always_comb", so a read in either stays
-// out of the list.
+// 223) says an expression in an assertion action block adds nothing to an
+// always_comb's implicit sensitivity list, so a read in either stays out of the
+// list.
 Stmt* MakeImmediateAssert(Arena& arena, Stmt* pass_stmt, Stmt* fail_stmt) {
   auto* s = arena.Create<Stmt>();
   s->kind = StmtKind::kAssertImmediate;
@@ -71,9 +71,9 @@ Stmt* MakeRandsequence(Arena& arena, Stmt* prod_code, Stmt* weight_code) {
   return s;
 }
 
-// §9.2.2.2.1 (printed page 223): "Expressions used in assertion action blocks
-// do not contribute to the implicit sensitivity list of an always_comb." These
-// two are the collection-level counterpart of
+// §9.2.2.2.1 (printed page 223): an expression in an assertion action block
+// adds nothing to an always_comb's implicit sensitivity list. These two are the
+// collection-level counterpart of
 // AlwaysCombSensitivityInference.AssertBothPassAndFailActionsExcluded below,
 // and they are what fails if CollectStmtReads is ever handed the whole of
 // ForEachChildStmt instead of stopping at the two action-block links.
@@ -114,9 +114,9 @@ TEST(AlwaysCombSensitivityCollection, RandsequenceCodeBlockReadCollected) {
   EXPECT_TRUE(ReadSignalsContain(stmt, "d"));
 }
 
-// §9.2.2.2.1 exception (a) leaves out "any expansion of a variable declared
-// within the block", and names no statement position, so a variable declared
-// in a randcase item's statement is as local as one declared in the enclosing
+// §9.2.2.2.1 exception (a) leaves out every expansion of a variable the block
+// declares, and names no statement position, so a variable declared in a
+// randcase item's statement is as local as one declared in the enclosing
 // sequential block. §18.16 gives that item a statement, which the parser keeps
 // in the second member of a Stmt::randcase_items entry.
 //
@@ -197,12 +197,12 @@ TEST(AlwaysCombSensitivityCollection, RandcaseWeightReadCollected) {
   EXPECT_TRUE(ReadSignalsContain(stmt, "w"));
 }
 
-// §9.2.2.2.1 counts a read "within any function called within the block" and
-// puts no condition on where in the block the call stands. The only call here
-// is in the initializer of a block-local declaration, and it is passed a
-// literal, so `a` reaches the list only if CollectCallNamesFromStmt reads
-// Stmt::var_init. That is a different walk from the one the two cases above
-// pin, and it fails separately.
+// §9.2.2.2.1 counts a read inside any function the block calls and puts no
+// condition on where in the block the call stands. The only call here is in the
+// initializer of a block-local declaration, and it is passed a literal, so `a`
+// reaches the list only if CollectCallNamesFromStmt reads Stmt::var_init. That
+// is a different walk from the one the two cases above pin, and it fails
+// separately.
 TEST(AlwaysCombSensitivityInference, VarInitFunctionCallReadInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(

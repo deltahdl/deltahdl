@@ -158,7 +158,7 @@ TEST(TaskAndFunctionNameResolutionElaboration,
   // The compilation-unit lookup that §23.8.1 inserts is independent of source
   // order: a bare call in an earlier module resolves to a function whose
   // definition appears later in the unit. This is the exception §3.12.1 carves
-  // out from its "names shall already be defined" rule for task/function names.
+  // out from its rule that names be defined already for task/function names.
   auto* design = ElaborateSrc(
       "module m;\n"
       "  integer x;\n"

@@ -19,11 +19,10 @@ namespace {
 // same file both return early when the target is not `ExprKind::kIdentifier`.
 //
 // Every declaration below has a low bound other than zero, deliberately.
-// §11.5.1 rules that "The actual bit that is accessed by an address is, in
-// part, determined by the declaration", and in a vector declared `[N:0]` an
-// index and a storage offset are the same number. A lowering that used an
-// index as a storage offset would pass every `[N:0]` case whether it read the
-// declaration or not.
+// §11.5.1 rules that the declaration helps decide which bit an address reaches,
+// and in a vector declared `[N:0]` an index and a storage offset are the same
+// number. A lowering that used an index as a storage offset would pass every
+// `[N:0]` case whether it read the declaration or not.
 
 // The test fails on any lowering that builds nothing for a bit-select, since
 // this is the first case. It also fails a lowering that takes index 3 as
@@ -152,13 +151,12 @@ TEST(VectorSelect, ConcatenationLvalueSplitLowersItsPartSelects) {
 
 // The test fails on a lowering that resolves only an index it can fold, which
 // every case above passes because each writes its index as a literal. §11.5.1
-// rules that a bit-select "can be addressed using an expression that shall be
-// evaluated in a self-determined context", so `s` reaching the netlist as a
-// port is a bit-select the standard defines. Such a select chooses among the
-// bits of `data` rather than renaming them, and the four values of `s` name the
-// four indices 5 through 8, which are storage offsets 4 through 7 under the
-// declaration `[8:1]`. Bit 0 to 7 of the driven word is `data` and bit 8 to 9
-// is `s`, in the order the ports are declared.
+// lets a bit-select be addressed by an expression evaluated as self-determined,
+// so `s` reaching the netlist as a port is a bit-select the standard defines.
+// Such a select chooses among the bits of `data` rather than renaming them, and
+// the four values of `s` name the four indices 5 through 8, which are storage
+// offsets 4 through 7 under the declaration `[8:1]`. Bit 0 to 7 of the driven
+// word is `data` and bit 8 to 9 is `s`, in the order the ports are declared.
 TEST(VectorSelect, BitSelectByAVariableIndexChoosesAmongTheBits) {
   ExpectInputSweep(
       "module m(input [8:1] data, input [1:0] s, output y);\n"
@@ -174,11 +172,10 @@ TEST(VectorSelect, BitSelectByAVariableIndexChoosesAmongTheBits) {
 // The test fails on a lowering that reaches a bit-select by a variable index
 // and builds nothing for an indexed part-select by one, which
 // VectorSelect.BitSelectByAVariableIndexChoosesAmongTheBits passes. §11.5.1
-// rules that "The lsb_base_expr and msb_base_expr can vary at run time" while
-// the width "shall be a positive constant integer expression", so this is the
-// form the subclause writes `dword[8*sel +: 8]` in. The two bits addressed are
-// the indices `s + 3` and `s + 4`, which are storage offsets `s + 2` and
-// `s + 3`.
+// lets lsb_base_expr and msb_base_expr vary at run time while the width must be
+// a constant integer expression greater than zero, so this is the form the
+// subclause writes `dword[8*sel +: 8]` in. The two bits addressed are the
+// indices `s + 3` and `s + 4`, which are storage offsets `s + 2` and `s + 3`.
 TEST(VectorSelect, IndexedPartSelectByAVariableBaseAscendsFromIt) {
   ExpectInputSweep(
       "module m(input [8:1] data, input [1:0] s, output [1:0] y);\n"
@@ -253,12 +250,11 @@ TEST(VectorSelect, SelectOverAnArithmeticExpressionCarriesItsBits) {
 }
 
 // §11.4.12 admits the other operand a select can be written on that carries no
-// declaration: "a concatenation ... can be used on the left-hand side of an
-// assignment" and is "treated as a packed vector of bits", so `{a, b}[2:1]`
-// names bit 2 and bit 1 of the four-bit vector the concatenation makes. Those
-// are the low bit of `a` and the high bit of `b`, which no single declaration
-// holds, so a lowering that answered through one signal's bits cannot produce
-// them.
+// declaration: a concatenation may stand on the left-hand side of an assignment
+// and is a packed vector of bits, so `{a, b}[2:1]` names bit 2 and bit 1 of the
+// four-bit vector the concatenation makes. Those are the low bit of `a` and the
+// high bit of `b`, which no single declaration holds, so a lowering that
+// answered through one signal's bits cannot produce them.
 TEST(VectorSelect, SelectOverAConcatenationCrossesItsOperands) {
   ExpectInputSweep(
       "module m(input [1:0] a, input [1:0] b, output [1:0] y);\n"

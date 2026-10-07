@@ -13,8 +13,8 @@ namespace {
 // production vpi_get mapping of the VpiObject accessibility flags onto the
 // vpiExplicitScalared/vpiExplicitVectored/vpiExpanded properties.
 
-// "the PLI shall consider the net expanded" for a scalared net: the explicit
-// scalared property is true and the net reports as expanded.
+// The PLI treats a scalared net as expanded: the explicit scalared property is
+// true and the net reports as expanded.
 TEST(VectorNetAccessibility, ScalaredNetIsExpandedToPli) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);

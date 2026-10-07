@@ -152,8 +152,8 @@ TEST(StringMethods, LenReturnsIntWidth) {
   EXPECT_EQ(result.width, 32u);
 }
 
-// §6.18: "the type of the object is the type the name stands for", so a
-// variable declared with a typedef of `string` is a string and §6.16 gives it
+// §6.18: an object declared with the name has the type the name stands for, so
+// a variable declared with a typedef of `string` is a string and §6.16 gives it
 // no declared width. Every declaration path recognised a string by the kind
 // written at the declaration, which is kNamed for such a name, so the variable
 // took the 32-bit carrier a type nothing could size falls back to and was never

@@ -147,12 +147,12 @@ TEST(OperatorElaboration, WildcardNeqOnChandle) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.4.6 states "The wildcard equality operator is equivalent to the logical
-// equality operator if its operands are class handles, interface class handles,
-// chandles or the literal null", so ==? on class handles is held to the rule
-// §11.4.5 states for the logical equality operator: one operand shall be
-// assignment compatible with the other. Handles of unrelated class types are
-// not, so the comparison is rejected and the report names §11.4.5.
+// §11.4.6 makes wildcard equality on class handles, interface class handles,
+// chandles or the literal null behave as logical equality, so ==? on class
+// handles is held to the rule §11.4.5 states for the logical equality operator:
+// one operand shall be assignment compatible with the other. Handles of
+// unrelated class types are not, so the comparison is rejected and the report
+// names §11.4.5.
 TEST(OperatorElaboration, WildcardEqIncompatibleClassHandlesRejected) {
   ElabFixture f;
   ElaborateSrc(

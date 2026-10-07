@@ -70,9 +70,9 @@ TEST(Elaboration, StringReplicationXZMultiplierRejected) {
                             3, "11.4.12.1"));
 }
 
-// §6.16: "A single character of a string variable may be selected for reading
-// or writing by indexing the variable." Both directions are accepted: the read
-// and the write are the same selection.
+// §6.16: indexing a string variable selects one character of it to read or
+// write. Both directions are accepted: the read and the write are the same
+// selection.
 TEST(Elaboration, StringVarMayBeIndexedForReadingAndWriting) {
   EXPECT_TRUE(
       ElabOk("module top;\n"

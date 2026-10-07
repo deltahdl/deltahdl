@@ -85,7 +85,7 @@ TEST(VectorSpecification, UnsignedVectorZeroExtends) {
 // §6.9.1: the unsigned-by-default rule is overridden when the vector is
 // declared signed. The same 4-bit pattern that a plain vector carries as 15 is
 // instead interpreted as -1 and sign-extended when widened. This is the
-// accepting counterpart that pins the "unless declared to be signed" exception:
+// accepting counterpart that pins the exception for a vector declared signed:
 // only the signed keyword on the declaration differs from
 // UnsignedVectorZeroExtends, and it flips zero-extension to sign-extension.
 TEST(VectorSpecification, SignedVectorSignExtends) {

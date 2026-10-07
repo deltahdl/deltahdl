@@ -311,8 +311,8 @@ TEST(PliPreObservedSim,
   EXPECT_EQ(sched.IllegalPreObservedScheduleCount(), 1u);
 }
 
-// §4.4.3.5 forbids writing "any net or variable" from the region. A VPI write
-// to a net (rather than a variable) from a Pre-Observed callback is likewise
+// §4.4.3.5 forbids writing any net or variable from the region. A VPI write to
+// a net (rather than a variable) from a Pre-Observed callback is likewise
 // recorded as a write violation.
 TEST(PliPreObservedSim, VpiPutValueOnNetFromPreObservedRecordsWriteViolation) {
   Arena arena;

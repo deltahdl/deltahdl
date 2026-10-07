@@ -363,13 +363,13 @@ TEST(ParameterizedClassElaboration, NamedClassParameterAssignedTwiceIsError) {
                             5, "23.10.2.2"));
 }
 
-// §8.25 instantiates a parameterized class object "using the same parameter
-// override rules (see 23.10)", and §23.10.2 gives a parameter override a
-// constant expression as its value, so the module variable `v` is not a legal
-// argument of the specialization `C#(v)`. An elaborator that folds the argument
-// only where a later constant expression happens to read it accepts this
-// declaration and carries C's own default of 1 in place of the value the source
-// wrote, so the report is the only thing that says the source is wrong.
+// §8.25 instantiates a parameterized class object by the parameter override
+// rules of §23.10, and §23.10.2 gives a parameter override a constant
+// expression as its value, so the module variable `v` is not a legal argument
+// of the specialization `C#(v)`. An elaborator that folds the argument only
+// where a later constant expression happens to read it accepts this declaration
+// and carries C's own default of 1 in place of the value the source wrote, so
+// the report is the only thing that says the source is wrong.
 TEST(ParameterizedClassElaboration,
      NonConstantValueArgumentInDeclarationIsError) {
   ElabFixture f;
@@ -406,10 +406,10 @@ TEST(ParameterizedClassElaboration,
 }
 
 // The same rule over an extends clause rather than a declaration. §8.25 rules
-// that instances of a parameterized class are instantiated "using the same
-// parameter override rules (see 23.10)" (printed page 203), and §23.10.2 gives
-// an override a constant expression, so the module variable `v` is not a legal
-// argument of `C#(v)` wherever the specialization is written.
+// that instances of a parameterized class are instantiated by the parameter
+// override rules of §23.10 (printed page 203), and §23.10.2 gives an override a
+// constant expression, so the module variable `v` is not a legal argument of
+// `C#(v)` wherever the specialization is written.
 // Elaborator::ValidateSpecializationArgsConstant reports the declaration form
 // at elaborator_decls_var.cpp and reaches no inheritance clause, so nothing
 // said this source was wrong: the class silently took C's own default of 1 in

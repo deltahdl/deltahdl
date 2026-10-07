@@ -17,9 +17,9 @@ namespace {
 // function's type decides how the source calls its PLI application. What the
 // two types then differ in is the position the call may stand in. A task may
 // stand wherever a void function may (see §13.4), and §13.4.1 has one such
-// place -- "function calls may be used as expressions unless of type void,
-// which are statements" -- while a function may stand wherever a SystemVerilog
-// function may, and returns a value.
+// place -- a call to a void function is a statement, where any other function
+// call may be an expression -- while a function may stand wherever a
+// SystemVerilog function may, and returns a value.
 //
 // So every case here registers one application twice, under the two types, and
 // holds the design source still. The type is the only thing that moves, which

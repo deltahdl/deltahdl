@@ -61,11 +61,11 @@ void ExpectAlwaysCombSweep(std::string_view stmt,
   }
 }
 
-// §11.4.2 rules that "these increment and decrement assignment operators behave
-// as blocking assignments", so `y++` has to leave `a + 1` in the netlist
-// exactly as `y = y + 1` would. The test fails on a synthesizer that lowers the
-// assignment above the increment and passes the increment over, which leaves
-// `y` carrying `a`.
+// §11.4.2 has the increment and decrement operators act as blocking
+// assignments, so `y++` has to leave `a + 1` in the netlist exactly as
+// `y = y + 1` would. The test fails on a synthesizer that lowers the assignment
+// above the increment and passes the increment over, which leaves `y` carrying
+// `a`.
 TEST(IncrementSynthesis, PostfixIncrementLowersAsABlockingAssignment) {
   ExpectAlwaysCombSweep("y++", [](uint64_t a) { return (a + 1) & 0xFU; });
 }
@@ -165,15 +165,14 @@ TEST(IncrementSynthesis,
                             6, ""));
 }
 
-// §11.4.2 rules that the increment and decrement operators "do not need
-// parentheses when used in expressions", and this synthesizer has no lowering
-// for one written there. `i++` in `y = (i++) + 1` reaches
-// `SynthLower::LowerExprBit` as an `ExprKind::kPostfixUnary`, because
-// `SynthLower::LowerIncDecStmt` is reached only from `SynthLower::LowerStmt`
-// for a `StmtKind::kExprStmt` and this operator is an operand of the
-// right-hand side of a blocking assignment. The statement gets that far
-// because `SynthLower::CheckExprSynthesizable` rejects an
-// `ExprKind::kSystemCall` alone.
+// §11.4.2 rules that the increment and decrement operators may be written in an
+// expression without parentheses, and this synthesizer has no lowering for one
+// written there. `i++` in `y = (i++) + 1` reaches `SynthLower::LowerExprBit` as
+// an `ExprKind::kPostfixUnary`, because `SynthLower::LowerIncDecStmt` is
+// reached only from `SynthLower::LowerStmt` for a `StmtKind::kExprStmt` and
+// this operator is an operand of the right-hand side of a blocking assignment.
+// The statement gets that far because `SynthLower::CheckExprSynthesizable`
+// rejects an `ExprKind::kSystemCall` alone.
 //
 // Every case above writes the operator as a whole statement, so none reaches
 // the expression position: the four sweeps run `y++`, `++y`, `y--` and `--y`

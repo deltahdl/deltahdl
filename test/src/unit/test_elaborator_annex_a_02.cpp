@@ -20,10 +20,10 @@ using namespace delta;
 //     specparam_declaration ::=
 //         specparam [ packed_dimension ] list_of_specparam_assignments ;
 //
-// - while §6.20.5 admits it in two places: "A specparam ... may be declared
-// inside a specify block or in the module body." Two declaration sites, one
-// production, so a specparam written in a specify block is as wide as the same
-// declaration written in the module body and no other rule applies to it.
+// - while §6.20.5 admits it in two places: a specparam may be declared in a
+// specify block or in the module body. Two declaration sites, one production,
+// so a specparam written in a specify block is as wide as the same declaration
+// written in the module body and no other rule applies to it.
 
 namespace {
 
@@ -60,11 +60,10 @@ TEST(DeclarationSectionElaboration, ARangeSizesASpecparamAtEitherSite) {
 }
 
 // And the rule that applies when the production's range is left out: §6.20.5
-// gives such a specparam "the range of its final value", which for a 4-bit
-// sized literal is 4 bits. That reading is of the declaration rather than of
-// where it stands, so the specify-block site takes it too; that site had
-// answered 32 for every specparam, which is neither the declared range nor the
-// value's.
+// gives such a specparam the range of its final value, which for a 4-bit sized
+// literal is 4 bits. That reading is of the declaration rather than of where it
+// stands, so the specify-block site takes it too; that site had answered 32 for
+// every specparam, which is neither the declared range nor the value's.
 TEST(DeclarationSectionElaboration,
      AValueSizesARangelessSpecparamAtEitherSite) {
   ElabFixture f;

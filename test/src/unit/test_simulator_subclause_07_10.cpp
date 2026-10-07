@@ -71,16 +71,15 @@ TEST(QueueAccess, ZeroIndexIsFirstAndDollarIsLast) {
   EXPECT_EQ(last->value.ToUint64(), 30u);
 }
 
-// §7.10.1: "Queues shall support the same operations that can be performed on
-// fixed-size unpacked arrays", and §9.4.2 puts the duty of announcing an
-// aggregate element's change on the writer -- "Changing the value of object
-// data members, aggregate elements, or the size of a dynamically sized array
-// referenced by a method or function shall cause the event expression to be
-// reevaluated". A queue's elements live outside the variable registered under
-// its name, so the indexed write has to notify that variable's watchers the way
-// every mutating method does. 99 against 20 is the discriminating pair: 20 is
-// the value a run that notified on push_back and not on the indexed write
-// leaves standing, so no partial fix reads it.
+// §7.10.1: a queue supports every operation a fixed-size unpacked array does,
+// and §9.4.2 puts the duty of announcing an aggregate element's change on the
+// writer -- a change to an object data member, an aggregate element, or the
+// size of a dynamically sized array a method or function references makes the
+// event expression be reevaluated. A queue's elements live outside the variable
+// registered under its name, so the indexed write has to notify that variable's
+// watchers the way every mutating method does. 99 against 20 is the
+// discriminating pair: 20 is the value a run that notified on push_back and not
+// on the indexed write leaves standing, so no partial fix reads it.
 TEST(QueueAccess, IndexedElementWriteWakesAnAlwaysCombThatReadsTheElement) {
   SimFixture f;
   auto* var = RunAndFindVar(

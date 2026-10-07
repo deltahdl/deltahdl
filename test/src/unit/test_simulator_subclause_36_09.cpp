@@ -166,13 +166,12 @@ TEST_F(PliMechanism, ANameEncounteredInADeclarationReachesItsApplications) {
 
   // Both reasons are reached, which is what the case is about. The order is
   // not asserted, and it is the standard rather than this simulator that
-  // leaves it open: §10.5 has "setting the initial value of a static variable
-  // as part of the variable declaration ... occur before any initial or always
-  // procedures are started", which is inside the build here, while §38.37.1
-  // has the compiletf run while the simulation's data structure is being
-  // compiled or built -- one period, and nothing in either clause ordering the
-  // two within it. A case asserting an order would be asserting a rule the
-  // standard does not state.
+  // leaves it open: §10.5 has the initial value a static variable's declaration
+  // sets take effect before any initial or always procedure starts, which is
+  // inside the build here, while §38.37.1 has the compiletf run while the
+  // simulation's data structure is being compiled or built -- one period, and
+  // nothing in either clause ordering the two within it. A case asserting an
+  // order would be asserting a rule the standard does not state.
   EXPECT_EQ(std::count(g_reached.begin(), g_reached.end(), "probe-compiletf"),
             1);
   EXPECT_EQ(std::count(g_reached.begin(), g_reached.end(), "probe-calltf"), 1);

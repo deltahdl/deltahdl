@@ -475,12 +475,12 @@ TEST(TriregResolution, DrivenStrengthTracksSupplyContinuousAssign) {
   EXPECT_EQ(net->resolved_strength.s1_lo, Strength::kSupply);
 }
 
-// §6.6.4: the capacitive state is a property of the net, not of its width --
-// "when all the drivers of a trireg net are at the high-impedance value (z),
-// the trireg net retains its last driven value". Every other test here uses a
-// scalar trireg, so a vectored one is covered separately: the all-z test is
-// per bit, and a check written against whole machine words rather than the
-// declared width would answer differently for the two shapes.
+// §6.6.4: the capacitive state is a property of the net, not of its width -- a
+// trireg net whose drivers are all z keeps the value last driven onto it. Every
+// other test here uses a scalar trireg, so a vectored one is covered
+// separately: the all-z test is per bit, and a check written against whole
+// machine words rather than the declared width would answer differently for the
+// two shapes.
 TEST(TriregResolution, VectoredTriregEntersCapacitiveStateAndHoldsItsValue) {
   SimFixture f;
   auto* design = ElaborateSrc(

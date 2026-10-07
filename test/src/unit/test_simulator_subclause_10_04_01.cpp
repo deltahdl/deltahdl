@@ -191,13 +191,13 @@ TEST(BlockingAssignSim, StructMemberLhsWritesComposeFullStruct) {
   EXPECT_EQ(result, 0xABCDu);
 }
 
-// §6.8: "A variable is an abstraction of a data storage element. A variable
-// shall store a value from one assignment to the next." Two declarations are
-// two storage elements, so a statement that only reads one of them cannot
-// change what it stores. A §10.4.1 assignment therefore has to leave its
-// target holding a copy of the right-hand value; a target that instead shares
-// the source's storage is one storage element under two names, and the value
-// the source stores no longer runs from one assignment to the next.
+// §6.8: a variable stands for a data storage element and keeps its value from
+// one assignment to the next. Two declarations are two storage elements, so a
+// statement that only reads one of them cannot change what it stores. A §10.4.1
+// assignment therefore has to leave its target holding a copy of the right-hand
+// value; a target that instead shares the source's storage is one storage
+// element under two names, and the value the source stores no longer runs from
+// one assignment to the next.
 //
 // A 2-state target makes the sharing observable within the one statement.
 // §6.11.2 gives `bit` no unknown values, so the assignment coerces the stored

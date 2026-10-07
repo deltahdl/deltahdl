@@ -653,12 +653,12 @@ TEST(CompilationUnitParsing, DesignElementsInterleaveWithNonDesignElements) {
 }
 
 TEST(ModuleItem, ConstructNotAllowedAtTheTopLevelNames3_12_1) {
-  // §3.12.1: the compilation-unit scope "can contain any item that can be
-  // defined within a package (see 26.2) and bind constructs as well". An
-  // always procedure is neither, and it is not a design element, so it belongs
-  // to no compilation unit. The report names §3.12.1, which is what tells this
-  // rejection from a design element that failed inside its own body: both
-  // leave has_errors true and both leave r.cu->modules empty.
+  // §3.12.1: the compilation-unit scope may hold any item a package may (§26.2)
+  // and bind constructs too. An always procedure is neither, and it is not a
+  // design element, so it belongs to no compilation unit. The report names
+  // §3.12.1, which is what tells this rejection from a design element that
+  // failed inside its own body: both leave has_errors true and both leave
+  // r.cu->modules empty.
   auto r = Parse("always @(*) x = 1;\n");
   EXPECT_TRUE(
       ReportedError(r.diags, "expected top-level declaration", 1, "3.12.1"));

@@ -15,8 +15,8 @@ using namespace delta;
 namespace {
 
 // §6.20.6, not §6.8, is what a const without an initializer breaches: §6.8
-// says only that "A variable can be declared with an initializer", while
-// §6.20.6 "Const constants" is where the requirement to initialize one lives.
+// says only that a variable may be declared with an initializer, while §6.20.6
+// "Const constants" is where the requirement to initialize one lives.
 TEST(VarDecl, ConstWithoutInitializerIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -117,11 +117,11 @@ TEST(VarDecl, VarImplicitElaboratesAsLogic) {
   EXPECT_TRUE(mod->variables[0].is_4state);
 }
 
-// §6.8 footnote 14 to Syntax 6-3: "In a data_declaration that is not within a
-// procedural context, it shall be illegal to use the automatic keyword." A
-// package-level variable declaration is such a data_declaration. The report
-// naming §6.8 is the parser's, raised in Parser::ParseDataDeclItem where the
-// keyword is read, which ElaborateSrc leaves in the fixture's engine.
+// §6.8 footnote 14 to Syntax 6-3: the automatic keyword is illegal in a
+// data_declaration outside a procedural context. A package-level variable
+// declaration is such a data_declaration. The report naming §6.8 is the
+// parser's, raised in Parser::ParseDataDeclItem where the keyword is read,
+// which ElaborateSrc leaves in the fixture's engine.
 TEST(VarDecl, AutomaticInPackageIsError) {
   ElabFixture f;
   // §6.8's rule against a lifetime keyword here is the parser's, so the source
@@ -304,12 +304,11 @@ TEST(VarDecl, VarRangeOnlyEquivalentToVarLogic) {
   EXPECT_EQ(mod->variables[0].is_signed, mod->variables[1].is_signed);
 }
 
-// §6.8 on the initial value a static variable may take: "Initial values are
-// not constrained to simple constants; they can include run-time expressions,
-// including dynamic memory allocation. For example, a static class handle or a
-// mailbox can be created and initialized by calling its new method (see
-// 15.4.1), or static variables can be initialized to random values by calling
-// the $urandom system task."
+// §6.8 on the initial value a static variable may take: it need not be a simple
+// constant and may be a run-time expression, dynamic memory allocation
+// included, so a static class handle or mailbox may be created by calling its
+// new method (§15.4.1), and a static variable may start at a random value from
+// $urandom.
 //
 // The three tests below hold that for a static variable declared inside a
 // subroutine, which is where the elaborator used to require a constant

@@ -225,11 +225,11 @@ TEST(ArrayLiteralSim, MultipleIndexKeysWithDefault) {
 // §10.9.1 over a descending range. A pattern's expressions match the array's
 // elements in the order the declaration writes them, left to right: §10.10.1
 // gives `int A3[1:3]; A3 = '{1, 2, 3};` as A3[1]=1, A3[2]=2, A3[3]=3, and
-// §10.10 arranges the elements a concatenation represents "in left-to-right
-// order to form the resulting array". The leftmost element of [1:0] is arr[1],
-// so 30 lands there and 40 in arr[0] -- the reverse of what the expressions
-// read as, which is what makes a descending range worth a test of its own.
-// RunModuleArray checks by index, so the expectation is written that way.
+// §10.10 arranges the elements a concatenation represents left to right to form
+// the resulting array. The leftmost element of [1:0] is arr[1], so 30 lands
+// there and 40 in arr[0] -- the reverse of what the expressions read as, which
+// is what makes a descending range worth a test of its own. RunModuleArray
+// checks by index, so the expectation is written that way.
 TEST(ArrayLiteralSim, DescendingRangeAssignment) {
   SimFixture f;
   RunModuleArray(f,
@@ -651,16 +651,16 @@ TEST(ArrayLiteralSim, NestedReplicationVarInitFillsEveryLeaf) {
   }
 }
 
-// §10.9.1: "The expressions shall match element for element, and the braces
-// shall match the array dimensions." A nested positional pattern in a
-// declaration initializer therefore has an order to get right as well as a set
-// of values: the outer pattern's first item is the subarray at the first index
-// of the outer dimension, and within it the items run across the inner
-// dimension. The declared bounds start at 1, so the first leaf is g[1][1] and
-// the sixth g[2][3]; six distinct nonzero bytes tell a leaf that took the right
-// item from one that took a neighbour's, and tell either from the 2-state '0 of
-// §6.8's Table 6-7 that a leaf keeps when the initializer never reaches it.
-// Every bit of a bit [7:0] leaf is known, so ToUint64 reads all eight.
+// §10.9.1: the expressions correspond element by element and the braces follow
+// the array's dimensions. A nested positional pattern in a declaration
+// initializer therefore has an order to get right as well as a set of values:
+// the outer pattern's first item is the subarray at the first index of the
+// outer dimension, and within it the items run across the inner dimension. The
+// declared bounds start at 1, so the first leaf is g[1][1] and the sixth
+// g[2][3]; six distinct nonzero bytes tell a leaf that took the right item from
+// one that took a neighbour's, and tell either from the 2-state '0 of §6.8's
+// Table 6-7 that a leaf keeps when the initializer never reaches it. Every bit
+// of a bit [7:0] leaf is known, so ToUint64 reads all eight.
 TEST(ArrayLiteralSim, PositionalNestedVarInitIsRowMajor) {
   SimFixture f;
   Array2x3 g = RunAndFetch2x3(
@@ -685,15 +685,15 @@ TEST(ArrayLiteralSim, PositionalNestedVarInitIsRowMajor) {
 
 // §10.9.1 describes one array pattern, and nothing in the clause distinguishes
 // the pattern that initializes an array in its declaration from the pattern a
-// procedural assignment gives the same array: both "match element for element",
-// so both arrays here have to end the run holding the same six values. Writing
-// the two in one module is what makes the reading exact. Should the leaves of
-// `d` differ from the leaves of `p`, the difference is between a declaration
-// and a statement and not between one array shape and another, the two arrays
-// being declared alike; and should both hold the values, no route to a leaf has
-// been left out. The values run 10 to 60 so that a leaf reading 0 is a leaf
-// nothing wrote rather than a leaf written from the pattern. Both arrays are
-// int, every bit known, so ToUint64 reads each leaf whole.
+// procedural assignment gives the same array: both correspond element by
+// element, so both arrays here have to end the run holding the same six values.
+// Writing the two in one module is what makes the reading exact. Should the
+// leaves of `d` differ from the leaves of `p`, the difference is between a
+// declaration and a statement and not between one array shape and another, the
+// two arrays being declared alike; and should both hold the values, no route to
+// a leaf has been left out. The values run 10 to 60 so that a leaf reading 0 is
+// a leaf nothing wrote rather than a leaf written from the pattern. Both arrays
+// are int, every bit known, so ToUint64 reads each leaf whole.
 TEST(ArrayLiteralSim, VarInitLeafMatchesProceduralAssignLeaf) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -845,14 +845,13 @@ TEST(ArrayLiteralSim, AscendingDimsUnchangedByPerDimensionDirection) {
   }
 }
 
-// §10.9.1 gives a keyed array pattern three rules -- "For index:value ...",
-// "For type:value, if the element or subarray type of the array matches this
-// type, then each element or subarray that has not already been set by an
-// index key above shall be set to the value", and the default that covers what
-// neither reached -- and writes none of the three for one dimension only. The
-// element type of `p [1:2][1:3]` is int, which matches the `int` key, so the
-// type key has to reach all six leaves just as it reaches all three elements of
-// the one-dimensional `int arr [0:2] = '{int: 42}` above. A multidimensional
+// §10.9.1 gives a keyed array pattern three rules -- the index:value rule, the
+// type:value rule that sets every element or subarray of a matching type not
+// already set by an index key, and the default that covers what neither reached
+// -- and writes none of the three for one dimension only. The element type of
+// `p [1:2][1:3]` is int, which matches the `int` key, so the type key has to
+// reach all six leaves just as it reaches all three elements of the
+// one-dimensional `int arr [0:2] = '{int: 42}` above. A multidimensional
 // array's leaves are filled by a walk of their own, and this is the case that
 // asks whether that walk consults the type key at all: a walk that asks only
 // for an index key and then a default finds neither in '{int: 7} and leaves
@@ -861,8 +860,8 @@ TEST(ArrayLiteralSim, AscendingDimsUnchangedByPerDimensionDirection) {
 // type keys already, so reading the two arrays together says which spelling of
 // the one pattern is wrong rather than only that a leaf holds the wrong number.
 // 7 is not 0, so a leaf nothing wrote is never mistaken for one the pattern
-// filled. Every bit of an int leaf is known, so ToUint64, which projects
-// aval & ~bval, reads one whole.
+// filled. Every bit of an int leaf is known, so ToUint64, which projects aval &
+// ~bval, reads one whole.
 TEST(ArrayLiteralSim, TypeKeyReachesEveryLeafOfMultidimAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -887,21 +886,20 @@ TEST(ArrayLiteralSim, TypeKeyReachesEveryLeafOfMultidimAssign) {
 }
 
 // §10.9.1 states the three rules in an order and says so: an index key sets its
-// element, "For type:value ... each element or subarray that has not already
-// been set by an index key above shall be set to the value", and
-// "The default:value applies to elements or subarrays that are not matched by
-// either index or type key." One pattern carrying all three settles the order
-// on a multidimensional target, where each of the two rows of `q [1:2][1:3]` is
-// a subarray the outer pattern's keys are matched against. Address 1 is named
-// by the index key, so that row takes 100 although the `int` key matches its
-// type as well; address 2 is named by no index key, so the type key takes it
-// and the row reads 7; and 55 appears nowhere, the default having nothing left
-// to cover. Each row would read differently under any other order -- type
-// before index puts 7 in both rows, default before type puts 55 at address 2 --
-// so the three values separate the clause's order from the alternatives rather
-// than merely showing a key was read. A row is broadcast whole, so all three of
-// its leaves are checked and a partial fill cannot pass for a complete one.
-// Every leaf is an int with all bits known, so ToUint64 reads one whole.
+// element, a type:value sets each element or subarray of its type that no index
+// key has set, and a default:value covers whatever neither an index key nor a
+// type key matched. One pattern carrying all three settles the order on a
+// multidimensional target, where each of the two rows of `q [1:2][1:3]` is a
+// subarray the outer pattern's keys are matched against. Address 1 is named by
+// the index key, so that row takes 100 although the `int` key matches its type
+// as well; address 2 is named by no index key, so the type key takes it and the
+// row reads 7; and 55 appears nowhere, the default having nothing left to
+// cover. Each row would read differently under any other order -- type before
+// index puts 7 in both rows, default before type puts 55 at address 2 -- so the
+// three values separate the clause's order from the alternatives rather than
+// merely showing a key was read. A row is broadcast whole, so all three of its
+// leaves are checked and a partial fill cannot pass for a complete one. Every
+// leaf is an int with all bits known, so ToUint64 reads one whole.
 TEST(ArrayLiteralSim, MultidimKeyOrderIsIndexThenTypeThenDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(

@@ -121,12 +121,12 @@ TEST(ChargeDecaySpecElaboration, TwoDelaysDoNotPopulateDecayTicks) {
 // so `#(1, 2, 3:4:5)` writes a charge decay time of 3, 4 or 5.
 //
 // 4 is the one this asserts, because 4 is the member elaboration can reach.
-// §11.11 orders the three as "minimum, typical, and maximum values -- in that
-// order", and the typical member is what a design elaborates with: the delay
-// mode that would name a different member is DelayMode in
-// src/simulator/sim_context_types.h, which only SimContext::SetDelayMode
-// writes and which nothing in production calls. #3264 covers that, and until it
-// is settled a case asserting 3 or 5 has no way to ask for them.
+// §11.11 orders the three as minimum, then typical, then maximum, and the
+// typical member is what a design elaborates with: the delay mode that would
+// name a different member is DelayMode in src/simulator/sim_context_types.h,
+// which only SimContext::SetDelayMode writes and which nothing in production
+// calls. #3264 covers that, and until it is settled a case asserting 3 or 5 has
+// no way to ask for them.
 //
 // The rise and fall delays are 1 and 2 so that a decay time read off the wrong
 // position of the declaration answers 1 or 2 rather than one of the members,

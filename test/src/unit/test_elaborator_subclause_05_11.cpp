@@ -17,12 +17,12 @@ TEST(ArrayLiteralElaboration, MatchingElementCountElaborates) {
              "endmodule\n"));
 }
 
-// §5.11 — "The nesting of braces shall follow the number of dimensions, unlike
-// in C." What rejects the flat list is the §10.9.1 element count: the outer
-// dimension [1:2] takes two elements and the flat list offers six. §5.11 states
-// no report of its own, opening instead with "Array literals are array
-// assignment patterns or pattern expressions with constant member expressions
-// (see 10.9.1)", so §10.9.1 is where the rule the report enforces is stated.
+// §5.11 — braces nest once per dimension, which C does not require. What
+// rejects the flat list is the §10.9.1 element count: the outer dimension [1:2]
+// takes two elements and the flat list offers six. §5.11 states no report of
+// its own, opening instead by making an array literal an array assignment
+// pattern or pattern expression with constant member expressions (§10.9.1), so
+// §10.9.1 is where the rule the report enforces is stated.
 TEST(ArrayLiteralElaboration, FlatLiteralForMultiDimRejected) {
   ElabFixture f;
   ElaborateSrc(

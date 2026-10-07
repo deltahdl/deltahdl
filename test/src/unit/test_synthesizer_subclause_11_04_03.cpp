@@ -29,11 +29,10 @@ TEST(ArithmeticSynthesis, SubtractionLowersToTheDifferenceOfItsOperands) {
 }
 
 // The test fails when `y++` has a lowering and `a + 4'd1` has none, which is
-// the state of the synthesizer today. §11.4.2 rules that "these increment and
-// decrement assignment operators behave as blocking assignments", which makes
-// the two spellings one operation, and
-// IncrementSynthesis.PostfixIncrementLowersAsABlockingAssignment in
-// test/src/unit/test_synthesizer_subclause_11_04_02.cpp already expects
+// the state of the synthesizer today. §11.4.2 has the increment and decrement
+// operators act as blocking assignments, which makes the two spellings one
+// operation, and IncrementSynthesis.PostfixIncrementLowersAsABlockingAssignment
+// in test/src/unit/test_synthesizer_subclause_11_04_02.cpp already expects
 // `(a + 1) & 0xF` of `y++` over the same four-bit operand.
 //
 // The module declares `a` alone, so there is no second input to drive and the
@@ -92,11 +91,10 @@ TEST(ArithmeticSynthesis, PowerIsReportedRatherThanLoweredToZero) {
 // src/synthesizer/synth_lower.cpp handles `TokenKind::kTilde` and
 // `TokenKind::kBang` and then ends `return operand;`, so every other unary
 // operator answers the operand's own bit at the index asked for. Table 11-6 of
-// §11.4.3 gives `-m` as "Unary minus m", and §11.4.3.1 rules that "Signed
-// values, except for those assigned to real variables, shall use a
-// two's-complement representation". Bit `bit` of the negation depends on every
-// operand bit below it, so no lowering reading the operand at `bit` alone can
-// answer it.
+// §11.4.3 gives `-m` as "Unary minus m", and §11.4.3.1 represents signed values
+// in two's complement, those assigned to real variables apart. Bit `bit` of the
+// negation depends on every operand bit below it, so no lowering reading the
+// operand at `bit` alone can answer it.
 //
 // The four cases above drive binary operators, which reach
 // `SynthLower::LowerAddSubBit` and the reports rather than the unary arm, so

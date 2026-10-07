@@ -918,11 +918,11 @@ void Parser::ParseSpecparamInSpecify(std::vector<SpecifyItem*>& items) {
     auto* sp = arena_.Create<SpecifyItem>();
     sp->kind = SpecifyItemKind::kSpecparam;
     sp->loc = kw_loc;
-    // A.2.1.1 writes one `specparam_declaration` and §6.20.5 admits it "inside
-    // a specify block or in the module body", so the range the declaration
-    // carries reaches the item here as it does in ParseSpecparamDecl above.
-    // Parsed and dropped, a specparam written inside a specify block was the
-    // one declaration of the two whose declared range said nothing.
+    // A.2.1.1 writes one `specparam_declaration` and §6.20.5 admits it in a
+    // specify block or in the module body, so the range the declaration carries
+    // reaches the item here as it does in ParseSpecparamDecl above. Parsed and
+    // dropped, a specparam written inside a specify block was the one
+    // declaration of the two whose declared range said nothing.
     sp->param_packed_left = packed_left;
     sp->param_packed_right = packed_right;
     sp->param_name = Expect(TokenKind::kIdentifier, Subclause("6.20.5")).text;

@@ -180,9 +180,9 @@ TEST_F(VcdFileSyntaxSim, WholeFileConformsToDumpFileGrammar) {
 // realtime | reg | supply0 | supply1 | time | tri | triand | trior | trireg |
 // tri0 | tri1 | wand | wire | wor", so a named event is declared under the
 // event keyword the grammar lists for it rather than under a net keyword.
-// §21.7.2.3: the size is the variable's number of bits, and §6.17: "The event
-// data type provides a handle to a synchronization object" -- a handle is no
-// number of bits, so the size is 0.
+// §21.7.2.3: the size is the variable's number of bits, and §6.17: the event
+// data type is a handle to a synchronization object -- a handle is no number of
+// bits, so the size is 0.
 //
 // What no other case catches: WholeFileConformsToDumpFileGrammar validates
 // every $var body through CheckVarSection, which accepts any keyword

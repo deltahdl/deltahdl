@@ -27,16 +27,14 @@ struct CliOptions {
   std::vector<std::string> include_dirs;
 
   std::vector<std::string> lib_search_order;
-  // §33.3.1 (printed page 935): "all compliant tools shall provide a mechanism
-  // to specify one or more library map files to be used for a particular
-  // invocation of the tool". A command-line word ending in .map is one, read
-  // in the order written and ahead of every source description.
+  // §33.3.1 (printed page 935): every compliant tool has to let an invocation
+  // name one or more library map files. A command-line word ending in .map is
+  // one, read in the order written and ahead of every source description.
   std::vector<std::string> library_map_files;
-  // §33.5.4: "the tool that actually does the binding only needs to be given
-  // the lib.cell specification for the top-level cell(s) and/or the config to
-  // be used". `config` is that config, named by --config, and
-  // `precompiled_libs` are the files --load-lib names for the separate
-  // compilation flow of §33.5.3, whose cells "shall persist" between the
+  // §33.5.4: the binding tool needs only the lib.cell specification of the
+  // top-level cells, the config to use, or both. `config` is that config, named
+  // by --config, and `precompiled_libs` are the files --load-lib names for the
+  // separate compilation flow of §33.5.3, whose cells persist between the
   // invocation that compiled them and the one that binds them.
   std::string config;
   std::vector<std::string> precompiled_libs;
@@ -61,10 +59,10 @@ struct CliOptions {
   std::vector<ForeignCodeLibList> sv_liblists;
 
   std::vector<std::pair<std::string, std::string>> defines;
-  // §21.6 (printed page 680): the plusargs, the arguments "provided to the
-  // simulation" that "are visually distinguished from other simulator
-  // arguments by their starting with the plus (+) character", each kept
-  // without that sign, which $test$plusargs and $value$plusargs match without.
+  // §21.6 (printed page 680): the plusargs, the arguments given to the
+  // simulation and told apart from other simulator arguments by their leading
+  // plus (+) character, each kept without that sign, which $test$plusargs and
+  // $value$plusargs match without.
   std::vector<std::string> plus_args;
   // §27.4 bounds a loop generate scheme's iteration count nowhere, so this is
   // a budget rather than a rule. It exists so a design that generates more

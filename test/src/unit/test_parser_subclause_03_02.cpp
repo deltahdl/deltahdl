@@ -9,9 +9,9 @@ namespace {
 
 // §3.2 decides what AppendCellDeclarations moves, because §33.2.1 makes a
 // library a named set of cells and a cell a design element in §3.2's sense.
-// §3.2 names seven: "a SystemVerilog module (see Clause 23), program (see
-// Clause 24), interface (see Clause 25), checker (see Clause 17), package (see
-// Clause 26), primitive (see Clause 28) or configuration (see Clause 33)".
+// §3.2 names seven: a module (Clause 23), program (Clause 24), interface
+// (Clause 25), checker (Clause 17), package (Clause 26), primitive (Clause 28)
+// or configuration (Clause 33).
 //
 // All seven are declared in one source here rather than one kind per case, so a
 // merge that drops a kind is caught whichever kind it drops. The checker is the
@@ -73,10 +73,10 @@ TEST(AppendCellDeclarations, CheckerReachesTheTargetUnderItsOwnName) {
   EXPECT_EQ(target.checkers[0]->name, "chk");
 }
 
-// The boundary the two cases above need. §3.12.1 rules that "items defined in
-// the compilation-unit scope cannot be accessed by name from outside the
-// compilation unit", so what a source declares outside every design element
-// stays with the unit that parsed it.
+// The boundary the two cases above need. §3.12.1 puts items defined in the
+// compilation-unit scope out of reach by name from outside the compilation
+// unit, so what a source declares outside every design element stays with the
+// unit that parsed it.
 //
 // Without this, widening the merge to every list CompilationUnit holds would
 // satisfy the two cases above while carrying a compilation-unit class and

@@ -410,16 +410,16 @@ TEST(DisableStatementExecution, DisableTaskWithForceDoesNotCrash) {
   LowerAndRun(design, f);
 }
 
-// §9.6.2: "The disable statement shall terminate the activity of a task or a
-// named block. Execution shall resume at the statement following the block or
-// following the task-enabling statement." Runs `rules` as the body of a
-// randsequence written inside the named block `blk`. `in_rs` is written by a
-// code block of the randsequence, `after_rs` by the statement standing after
-// the randsequence and still inside `blk`, and `after_blk` by the statement
-// standing after `blk`. A `disable blk` the rules reach therefore terminates
-// `blk`, leaving `after_rs` unwritten, and resumes at `after_blk`. The two
-// cases below differ only in which of the code blocks §18.17.1 admits holds
-// the disable, so they share the module, the lowering and the run.
+// §9.6.2: disable ends the activity of a task or a named block, and execution
+// resumes at the statement after the block or after the statement that enabled
+// the task. Runs `rules` as the body of a randsequence written inside the named
+// block `blk`. `in_rs` is written by a code block of the randsequence,
+// `after_rs` by the statement standing after the randsequence and still inside
+// `blk`, and `after_blk` by the statement standing after `blk`. A `disable blk`
+// the rules reach therefore terminates `blk`, leaving `after_rs` unwritten, and
+// resumes at `after_blk`. The two cases below differ only in which of the code
+// blocks §18.17.1 admits holds the disable, so they share the module, the
+// lowering and the run.
 void RunRandseqDisableTrial(SimFixture& f, std::string_view rules) {
   std::string src =
       "module t;\n"
@@ -439,13 +439,12 @@ void RunRandseqDisableTrial(SimFixture& f, std::string_view rules) {
                    {{"in_rs", 37u}, {"after_rs", 0u}, {"after_blk", 93u}});
 }
 
-// §9.6.2: "The disable statement can be used within blocks and tasks to
-// disable the particular block or task containing the disable statement", and
-// disabling a named block terminates it, execution resuming at the statement
-// following the block. A production code block of a randsequence written
-// inside `blk` is inside `blk`, so the disable it executes terminates `blk`
-// rather than being absorbed by the randsequence: §18.17.6 gives a randsequence
-// a meaning for break and for return and none for disable.
+// §9.6.2: a disable written inside a block or task can disable the very block
+// or task that holds it, and disabling a named block terminates it, execution
+// resuming at the statement following the block. A production code block of a
+// randsequence written inside `blk` is inside `blk`, so the disable it executes
+// terminates `blk` rather than being absorbed by the randsequence: §18.17.6
+// gives a randsequence a meaning for break and for return and none for disable.
 TEST(DisableStatementExecution,
      DisableInARandsequenceProductionCodeBlockTerminatesTheBlock) {
   SimFixture f;

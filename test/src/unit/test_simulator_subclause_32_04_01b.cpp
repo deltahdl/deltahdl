@@ -105,11 +105,11 @@ std::string DeviceOnBOut(const std::string& instance_path,
 
 // The cell the §32.4.3 cases instantiate: one output port driven by one `and`
 // gate whose §28.16 delay is not a literal but the specparam tgate, declared at
-// 13. §6.20.5 permits a specparam "both within the specify block (see
-// Clause 30) and in the main module body" and requires of the second site only
-// that the declaration "be declared before it is referenced", which is the site
-// used here: the gate reading tgate is a module item, so the cell needs no
-// specify block and declares no module path at all.
+// 13. §6.20.5 permits a specparam both in the specify block (Clause 30) and in
+// the main module body and requires of the second site only that the
+// declaration come before any reference to it, which is the site used here: the
+// gate reading tgate is a module item, so the cell needs no specify block and
+// declares no module path at all.
 const char* TimedCellText() {
   return "module gate_timed(input t_in0, input t_in1, output t_out);\n"
          "  specparam tgate = 13;\n"

@@ -149,11 +149,11 @@ TEST(StreamReorderingElaboration, LocalparamPositiveSliceSizeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.4.14.2: "If a constant integral expression is used, it shall be an error
-// for the value of the expression to be zero or negative." The subclause on
-// the report is what tells this rejection from §11.4.14.1's rules about the
-// operands the same streaming concatenation packs, which decide whether the
-// braces to the right of the slice size are legal.
+// §11.4.14.2: a constant integral expression used as the slice size is an error
+// when its value is zero or below. The subclause on the report is what tells
+// this rejection from §11.4.14.1's rules about the operands the same streaming
+// concatenation packs, which decide whether the braces to the right of the
+// slice size are legal.
 TEST(StreamReorderingElaboration, ZeroSliceSizeNames11_4_14_2) {
   ElabFixture f;
   ElabOk(

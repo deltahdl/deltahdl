@@ -131,9 +131,9 @@ TEST(AssignmentPatternSimulation, LhsPositionalUnpackingTwoElements) {
 //
 // The EXPECT_FALSE(f.has_errors) is what makes this case about the typed
 // spelling at all, and it is the only assertion here that can be. §10.9 obliges
-// each member expression to have "the same number of bits as the corresponding
-// element in the data type of the assignment pattern expression", so the bare
-// `'{a, b}` slices 16'hABCD into exactly the bytes `pair_t'{a, b}` does, and
+// each member expression to have as many bits as the matching element of the
+// assignment pattern expression's data type, so the bare `'{a, b}` slices
+// 16'hABCD into exactly the bytes `pair_t'{a, b}` does, and
 // LhsPositionalUnpackingTwoElements above already runs that spelling on the
 // same two values. When the type prefix was mistaken for the data type of a
 // §6.8 declaration, the two reports left the position on the `'{` and the
@@ -335,11 +335,10 @@ TEST(AssignmentPatternSimulation, PatternInForLoop) {
   EXPECT_EQ(var->value.ToUint64(), 1800u);
 }
 
-// §10.9: "A positional notation without keys can also be used", and an
-// assignment pattern "specifies a correspondence between a collection of
-// expressions and the fields and elements in a data object". §10.10.3 writes
-// one whose expressions are string literals and says what the correspondence
-// leaves behind:
+// §10.9: an assignment pattern may also be positional, with no keys, and it
+// pairs a collection of expressions with the fields and elements of a data
+// object. §10.10.3 writes one whose expressions are string literals and says
+// what the correspondence leaves behind:
 //
 //   SQ = '{"element 0", "element 1"};   // assignment pattern, two strings
 //

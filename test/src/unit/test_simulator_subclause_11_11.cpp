@@ -152,10 +152,10 @@ TEST(MinTypMaxSim, MembersFromParameterConstants) {
   }
 }
 
-// §11.11 "used wherever expressions can appear": the triplet members may be
-// arbitrary (non-constant) expressions, not just constants. Here they are
-// runtime variables assigned before the triplet is read; the selected member
-// still follows the active mode, confirming member evaluation runs at
+// §11.11 lets the form stand wherever an expression may: the triplet members
+// may be arbitrary (non-constant) expressions, not just constants. Here they
+// are runtime variables assigned before the triplet is read; the selected
+// member still follows the active mode, confirming member evaluation runs at
 // simulation time over real variable values.
 TEST(MinTypMaxSim, MembersFromRuntimeVariables) {
   const char* src =

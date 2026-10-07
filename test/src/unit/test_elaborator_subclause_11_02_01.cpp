@@ -242,12 +242,11 @@ TEST(ConstantExpressionElaboration, GenvarOperandInConstantExpr) {
 }
 
 // §11.2.1 requires that a constant built-in method call be folded during
-// elaboration: "when used in constant expressions, these function calls shall
-// be evaluated at elaboration time". §6.19.5.5 decides the value the call
-// folds to, since "The num() method returns the number of elements in the
-// given enumeration". `color_t` declares RED, GREEN and BLUE, so `N` resolves
-// to 3. No other quantity in this source is 3, so a fold that read some other
-// count would not reach the same answer.
+// elaboration: such a call in a constant expression is evaluated while
+// elaborating. §6.19.5.5 decides the value the call folds to, since num()
+// returns how many elements the enumeration has. `color_t` declares RED, GREEN
+// and BLUE, so `N` resolves to 3. No other quantity in this source is 3, so a
+// fold that read some other count would not reach the same answer.
 TEST(ConstantExpressionElaboration, EnumNumFoldsToTheMemberCount) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -268,10 +267,10 @@ TEST(ConstantExpressionElaboration, EnumNumFoldsToTheMemberCount) {
 }
 
 // §11.2.1 requires the fold wherever a constant expression is required, and not
-// only where a localparam initializer asks for a value: "when used in constant
-// expressions, these function calls shall be evaluated at elaboration time". A
-// packed range is such a place, so `S.len()*8-1:0` sizes `v` at elaboration
-// time. §6.16.1 makes `S.len()` 3, so the range is [23:0] and `v` is 24 bits.
+// only where a localparam initializer asks for a value: such a call in a
+// constant expression is evaluated while elaborating. A packed range is such a
+// place, so `S.len()*8-1:0` sizes `v` at elaboration time. §6.16.1 makes
+// `S.len()` 3, so the range is [23:0] and `v` is 24 bits.
 //
 // 24 is not a default. A range whose bounds did not fold leaves the width at
 // the 1 `RtlirVariable::width` initializes to, and no other quantity in this
@@ -296,13 +295,13 @@ TEST(ConstantExpressionElaboration, StringParameterLenSizesAPackedRange) {
 
 // §11.2.1 makes `c.num()` a constant built-in method call although `c` is a
 // variable and not a constant expression. The clause rules that built-in
-// methods "whose value does not depend on the current value of the identifier
-// are constant built-in method calls if the input arguments are constant
-// expressions even when the identifier is not constant". §6.19.5.5 makes
-// num() such a method, because the number of elements in an enumeration is
-// fixed by the declaration of `color_t` rather than by what `c` holds. §7.2.2
-// requires a struct member default to be a constant expression, so this
-// source is accepted and nothing is reported.
+// methods whose result never depends on what the identifier currently holds
+// count as constant built-in method calls once their input arguments are
+// constant expressions, constant identifier or not. §6.19.5.5 makes num() such
+// a method, because the number of elements in an enumeration is fixed by the
+// declaration of `color_t` rather than by what `c` holds. §7.2.2 requires a
+// struct member default to be a constant expression, so this source is accepted
+// and nothing is reported.
 TEST(ConstantExpressionElaboration, EnumNumIsConstantWhereTheIdentifierIsNot) {
   ElabFixture f;
   ElaborateSrc(
@@ -319,13 +318,12 @@ TEST(ConstantExpressionElaboration, EnumNumIsConstantWhereTheIdentifierIsNot) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §5.13 rules that "a built-in method can only be associated with a particular
-// data type", and it associates size() with a dynamic array. No built-in
-// method is associated with an integer, so `P.size()` names no built-in method
-// call and §11.2.1 admits it nowhere a constant expression is required. §7.2.2
-// requires a struct member default to be a constant expression, so the
-// declaration is rejected. Before the fix nothing was reported and the
-// member's value was left unresolved.
+// §5.13 ties each built-in method to a particular data type, and it associates
+// size() with a dynamic array. No built-in method is associated with an
+// integer, so `P.size()` names no built-in method call and §11.2.1 admits it
+// nowhere a constant expression is required. §7.2.2 requires a struct member
+// default to be a constant expression, so the declaration is rejected. Before
+// the fix nothing was reported and the member's value was left unresolved.
 //
 // The report stands at the typedef's own line, which is line 3 of this source,
 // rather than at the member's line 4. That is where
@@ -350,15 +348,14 @@ TEST(ConstantExpressionElaboration,
                             3, "7.2.2"));
 }
 
-// §11.7 rules that "the $signed and $unsigned system functions ... shall
-// evaluate the input expression and return a one-dimensional packed array with
-// the same number of bits and value of the input expression and the signedness
-// defined by the function", so `$unsigned(4'b1100)` is four bits wide and not
-// thirty-two. A specparam is what makes that inferred width observable: §6.20.5
-// gives a specparam with no range specification the range of its final value,
-// and Elaborator::ElaborateSpecparam in src/elaborator/elaborator_items.cpp
-// takes RtlirVariable::width from InferExprWidth, so the width recorded for
-// `tW` is the width the signing conversion was inferred to have.
+// §11.7 has $signed and $unsigned evaluate the input expression and return a
+// one-dimensional packed array of its width and value, with the signedness the
+// function names, so `$unsigned(4'b1100)` is four bits wide and not thirty-two.
+// A specparam is what makes that inferred width observable: §6.20.5 gives a
+// specparam with no range specification the range of its final value, and
+// Elaborator::ElaborateSpecparam in src/elaborator/elaborator_items.cpp takes
+// RtlirVariable::width from InferExprWidth, so the width recorded for `tW` is
+// the width the signing conversion was inferred to have.
 //
 // 4 is not a default here. A width that did not come from the operand is the
 // 32 InferExprWidth answers for every other system function, which is what this

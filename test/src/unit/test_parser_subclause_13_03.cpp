@@ -541,9 +541,8 @@ TEST(TaskAndFunctionParsing,
 // dynamic_override_specifiers ] [ lifetime ] task_body_declaration`, so nothing
 // may precede `task`. A.1.9 puts `virtual` in `method_qualifier`, which reaches
 // a task_declaration only through `class_method`, and §8.20 states the same in
-// prose: "A method of a class may be identified with the keyword virtual."
-// Where the qualifier does belong is
-// VirtualMethodParsing.VirtualTaskExtendsSpecifier in
+// prose: a class method may carry the keyword virtual. Where the qualifier does
+// belong is VirtualMethodParsing.VirtualTaskExtendsSpecifier in
 // test/src/unit/test_parser_subclause_08_20.cpp, which declares one in a class.
 TEST(TaskAndFunctionParsing, VirtualTaskAtModuleScopeRejected) {
   auto r = Parse(

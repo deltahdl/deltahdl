@@ -54,12 +54,12 @@ TEST(IdentifierElaboration, IdentifierInExpressionElaborates) {
              "endmodule\n"));
 }
 
-// §5.6: "Identifiers shall be case sensitive." The elaborator files no report
-// of its own under §5.6 for this and should not: case sensitivity decides
-// whether two spellings are one name, so its only observable consequence is
-// that `Foo` names nothing. The rule that is reported is §23.9's, and naming
-// it here is what separates `Foo` failing to resolve from the source failing
-// for any other reason.
+// §5.6: identifiers are case sensitive. The elaborator files no report of its
+// own under §5.6 for this and should not: case sensitivity decides whether two
+// spellings are one name, so its only observable consequence is that `Foo`
+// names nothing. The rule that is reported is §23.9's, and naming it here is
+// what separates `Foo` failing to resolve from the source failing for any other
+// reason.
 TEST(IdentifierElaboration, CaseMismatchedReferenceFailsToResolve) {
   ElabFixture f;
   ElaborateSrc(
@@ -74,8 +74,8 @@ TEST(IdentifierElaboration, CaseMismatchedReferenceFailsToResolve) {
                             "23.9"));
 }
 
-// §5.6: "If an identifier exceeds the implementation-specific length limit, an
-// error shall be reported." The limit "shall be at least 1024 characters", and
+// §5.6: an identifier longer than the implementation's length limit draws an
+// error report. The limit may be no lower than 1024 characters, and
 // Lexer::LexIdentifier in src/lexer/lexer.cpp sets it at exactly 1024. The
 // report is the lexer's because the limit is a rule about the token, so the
 // subclause is asserted here rather than an elaborator report being added for

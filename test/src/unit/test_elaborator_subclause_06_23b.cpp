@@ -650,12 +650,11 @@ TEST(TypeOperatorElab, ClassScopedTypedefAsTypeParamDefault) {
   EXPECT_TRUE(v->is_signed);
 }
 
-// §6.23 rules that "A type reference used in an equality, inequality, case
-// equality, or case inequality comparison shall only be compared with another
-// type reference", and A.10 admits a type_reference primary under those four
-// operators alone. CheckTypeRefCompareOp in
-// src/elaborator/elaborator_validate_operations.cpp is that rule, and
-// WalkStmtsForTypeRefCompare carries it down a statement tree.
+// §6.23 lets a type reference in an equality, inequality, case equality or case
+// inequality comparison be compared only with another type reference, and A.10
+// admits a type_reference primary under those four operators alone.
+// CheckTypeRefCompareOp in src/elaborator/elaborator_validate_operations.cpp is
+// that rule, and WalkStmtsForTypeRefCompare carries it down a statement tree.
 //
 // That walk wrote out six of the thirteen child-statement links Stmt declares
 // and now takes the list from ForEachChildStmt in
@@ -741,12 +740,11 @@ TEST(TypeOperatorElab, TypeRefComparedToLiteralInARandsequenceCodeBlock) {
       "    end");
 }
 
-// §6.23 rules that the expression the type operator is applied to "shall not
-// contain any hierarchical references or references to elements of dynamic
-// objects", and a select of a dynamic array element is the smallest such
-// reference. CheckTypeRefArgInner in
-// src/elaborator/elaborator_validate_operations.cpp is that rule, and
-// WalkStmtsForTypeRefArg carries it down a statement tree.
+// §6.23 rules that the expression the type operator is applied to may hold no
+// hierarchical reference and no reference to an element of a dynamic object,
+// and a select of a dynamic array element is the smallest such reference.
+// CheckTypeRefArgInner in src/elaborator/elaborator_validate_operations.cpp is
+// that rule, and WalkStmtsForTypeRefArg carries it down a statement tree.
 //
 // That walk wrote out six of the thirteen child-statement links Stmt declares
 // and now takes the list from ForEachChildStmt in

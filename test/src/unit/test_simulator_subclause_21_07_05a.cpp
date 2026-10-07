@@ -356,10 +356,10 @@ const char kStringBesideIntTop[] =
 // has eight rows -- bit, logic, int, shortint, longint, byte, enum and
 // shortreal -- and no string row, and §21.7.5 states only that some
 // SystemVerilog types can go into a standard VCD file disguised as an IEEE Std
-// 1364-2005 type, so no masquerade exists for a string. §6.16 ("Variables of
-// type string are dynamic as their length may vary during simulation") is why
-// the table can give it none: §21.7.2.3 defines the size field as the
-// variable's number of bits, and a dynamically sized object has no such number.
+// 1364-2005 type, so no masquerade exists for a string. §6.16 (a string
+// variable is dynamic, its length free to change during simulation) is why the
+// table can give it none: §21.7.2.3 defines the size field as the variable's
+// number of bits, and a dynamically sized object has no such number.
 //
 // Every other case in this file asserts a keyword and a size for a type
 // Table 21-11 lists, or an absence for a type the §21.7.5 prose excludes

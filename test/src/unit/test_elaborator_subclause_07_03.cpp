@@ -8,8 +8,8 @@ using namespace delta;
 namespace {
 
 // §7.3 states as prose that a chandle may not be a member of an untagged
-// union; §7.3.2 states the obligation ("Dynamic types and chandle types shall
-// not be used in untagged unions"), so the report names §7.3.2.
+// union; §7.3.2 states the obligation (no dynamic type or chandle type in an
+// untagged union), so the report names §7.3.2.
 TEST(UnionDeclarationValidation, ChandleInUnpackedUnion_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -63,8 +63,8 @@ TEST(UnionDeclarationValidation, UnpackedUnionBasic_OK) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// The void-member rule is §7.2's ("A void member is only allowed in tagged
-// unions"), not §7.3's, so the report names §7.2 at both positions below.
+// The void-member rule is §7.2's (a void member only in a tagged union), not
+// §7.3's, so the report names §7.2 at both positions below.
 TEST(UnionDeclarationValidation, VoidMemberInUnpackedUnion_Rejected) {
   ElabFixture f;
   ElaborateSrc(

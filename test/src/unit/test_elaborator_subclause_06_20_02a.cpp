@@ -382,10 +382,10 @@ TEST(ValueParameters, IntegerParameterFromNegativeRealRoundsAwayFromZero) {
   EXPECT_EQ(p.resolved_value, -3);
 }
 
-// §6.20.2 (R3): "a parameter with a type but no range is of the type
-// specified." The rule must adapt to each admitted integer type, so a shortint
-// parameter carries that type's 16-bit width. Input form distinct from the
-// int/byte tests: a different concrete two-state type.
+// §6.20.2 (R3): a parameter given a type and no range has that type. The rule
+// must adapt to each admitted integer type, so a shortint parameter carries
+// that type's 16-bit width. Input form distinct from the int/byte tests: a
+// different concrete two-state type.
 TEST(ValueParameters, ShortintTypedParameterTakesShortintWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -438,12 +438,11 @@ TEST(ValueParameters, BitTypedParameterTakesSingleBitWidth) {
   EXPECT_EQ(p.decl_width, 1u);
 }
 
-// §6.20.2 (R2): a ranged, untyped parameter "shall be unsigned" and its range
-// is not affected by an override. A negative override value therefore does not
-// make the parameter signed: -1 into a 4-bit unsigned parameter is coerced to
-// its unsigned representation (15), not left as -1. This is the
-// negative-override input form, complementing the large-positive override test
-// above.
+// §6.20.2 (R2): a ranged, untyped parameter is unsigned and its range is not
+// affected by an override. A negative override value therefore does not make
+// the parameter signed: -1 into a 4-bit unsigned parameter is coerced to its
+// unsigned representation (15), not left as -1. This is the negative-override
+// input form, complementing the large-positive override test above.
 TEST(ValueParameters, NegativeOverrideIntoUnsignedRangeBecomesUnsigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -507,8 +506,8 @@ TEST(ValueParameters, PartSelectOfIntegerTypedParameterAllowed) {
 // integral types. A real parameter is not integral, so a bit-select of it is
 // not allowed; here a continuous assignment reads bit 0 of a real parameter and
 // the elaborator rejects it. Built from real value-parameter syntax and driven
-// through the full parse+elaborate pipeline. §11.5.1 names "a real variable or
-// real parameter" as the alternative this operand falls under, so the report
+// through the full parse+elaborate pipeline. §11.5.1 names a real variable or
+// real parameter as the alternative this operand falls under, so the report
 // names a real parameter rather than a scalar.
 TEST(ValueParameters, BitSelectOfRealParameterRejected) {
   ElabFixture f;
@@ -547,15 +546,15 @@ TEST(ValueParameters, HierarchicalReferenceInConditionalDefaultNamesItsLine) {
       "parameter 'P' value contains a hierarchical reference", 2, "6.20.2"));
 }
 
-// §6.20.2: "A parameter constant can have a type specification and a range
-// specification", so a parameter's value is a constant expression. A class
-// #() parameter port whose default names a module variable has no constant
-// value, and RecordClassParam in src/elaborator/elaborator_resolve.cpp
-// stands the report at that default expression's range.start -- the `v` on
-// line 4. Before that report the parameter was left out of the scope
-// altogether, which read to every later consumer as a name it could not see
-// rather than as a value the source got wrong, so the source elaborated with
-// the parameter silently absent.
+// §6.20.2: a parameter constant may carry a type specification and a range
+// specification, so a parameter's value is a constant expression. A class #()
+// parameter port whose default names a module variable has no constant value,
+// and RecordClassParam in src/elaborator/elaborator_resolve.cpp stands the
+// report at that default expression's range.start -- the `v` on line 4. Before
+// that report the parameter was left out of the scope altogether, which read to
+// every later consumer as a name it could not see rather than as a value the
+// source got wrong, so the source elaborated with the parameter silently
+// absent.
 TEST(ValueParameters, NonConstantClassParamDefaultIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -570,15 +569,14 @@ TEST(ValueParameters, NonConstantClassParamDefaultIsRejected) {
       "class parameter 'P' value is not a constant expression", 4, "6.20.2"));
 }
 
-// §6.20.1 rules that "all param_assignments appearing within a class body
-// shall become localparam declarations regardless of the presence or absence
-// of a parameter_port_list" (printed page 125 of IEEE 1800-2023), so a
-// parameter declared in the class body is under the §6.20.2 constancy rule
-// exactly as a
-// #() parameter port is. The two reach RecordClassParam through different
-// loops in RegisterClassParams -- cls->params for the ports, cls->members for
-// the body declarations -- so a fix covering only the ports leaves this one
-// silent. The default's `v` stands on line 5.
+// §6.20.1 rules that every param_assignment in a class body becomes a
+// localparam declaration whether or not there is a parameter_port_list (printed
+// page 125 of IEEE 1800-2023), so a parameter declared in the class body is
+// under the §6.20.2 constancy rule exactly as a #() parameter port is. The two
+// reach RecordClassParam through different loops in RegisterClassParams --
+// cls->params for the ports, cls->members for the body declarations -- so a fix
+// covering only the ports leaves this one silent. The default's `v` stands on
+// line 5.
 TEST(ValueParameters, NonConstantClassBodyParamDefaultIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -594,12 +592,12 @@ TEST(ValueParameters, NonConstantClassBodyParamDefaultIsRejected) {
       "class parameter 'P' value is not a constant expression", 5, "6.20.2"));
 }
 
-// §6.20.1: "in a list of parameter constants, a parameter can depend on
-// earlier parameters", which holds inside a class body as it does in a module.
+// §6.20.1: in a list of parameter constants a parameter may depend on the ones
+// before it, which holds inside a class body as it does in a module.
 // `B = A * 2` is therefore a constant expression and the source is legal. This
 // is what the cheapest repair of the two rejections above would break, by
-// folding each class parameter against the compilation unit alone and
-// reporting every one that names a sibling.
+// folding each class parameter against the compilation unit alone and reporting
+// every one that names a sibling.
 TEST(ValueParameters, ClassParamDefaultDependsOnEarlierClassParam) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -630,14 +628,14 @@ TEST(ValueParameters, ClassParamDefaultComputedFromTypeParamIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.20.2: "Hierarchical names are not allowed." The sentence admits no
-// exception for a hierarchical name whose target happens to be a parameter, so
-// `parent.P` is a breach of it although `P` is a parameter of `parent`. What
-// the clause rules out is the target's being reached hierarchically. Reading
-// the parameter from the declaration of `parent` rather than from an
-// elaborated instance of it is what makes the value wrong: an instance
-// override of `P` supplied under §23.10.2 does not reach `K`, so two instances
-// of `child` under differently-overridden parents would take the same `K`.
+// §6.20.2: hierarchical names are forbidden. The sentence admits no exception
+// for a hierarchical name whose target happens to be a parameter, so `parent.P`
+// is a breach of it although `P` is a parameter of `parent`. What the clause
+// rules out is the target's being reached hierarchically. Reading the parameter
+// from the declaration of `parent` rather than from an elaborated instance of
+// it is what makes the value wrong: an instance override of `P` supplied under
+// §23.10.2 does not reach `K`, so two instances of `child` under
+// differently-overridden parents would take the same `K`.
 TEST(ValueParameters,
      HierarchicalParameterReferenceInParameterValueIsReported) {
   ElabFixture f;
@@ -699,7 +697,7 @@ TEST(ValueParameters, HierarchicalVariableReferenceInParameterValueIsReported) {
 }
 
 // §6.20.2 states three rules in three consecutive sentences, and this is the
-// middle one: "Package references are allowed." It sits between what a value
+// middle one: package references are permitted. It sits between what a value
 // parameter may be set to and the sentence forbidding hierarchical names, and
 // it was the untested one, so `p::N` was rejected under the sentence three
 // words after it. Sharing a width or a depth through a package parameter is
@@ -762,8 +760,9 @@ TEST(ValueParameters, PackageParameterReferenceResolvesItsValue) {
 // §6.20.2 forbids a hierarchical name, and a method call is not one. §23.6
 // makes a hierarchical name one qualified by the scope it is declared in, while
 // `NAME.len()` is §13.5's `expression.method(...)` written on a parameter of
-// this very module. §11.2.1 admits "a constant function of these" and §6.16.1
-// associates len() with string, so the source is legal and was rejected.
+// this very module. §11.2.1 admits a constant function of such operands and
+// §6.16.1 associates len() with string, so the source is legal and was
+// rejected.
 TEST(ValueParameters, MethodCallOnAStringParameterIsAcceptedInAParameterValue) {
   ElabFixture f;
   auto* design = ElaborateSrc(

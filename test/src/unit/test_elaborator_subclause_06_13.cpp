@@ -1,8 +1,8 @@
-// Tests for §6.13 "Void data type", whose whole text is: "The void data type
-// represents nonexistent data. This type can be specified as the return type of
-// functions to indicate no return value. This type can also be used for members
-// of tagged unions (see 7.3.2)." §6.13 states no restriction of its own, so a
-// value-bearing return in a void function is reported under §13.4.1.
+// Tests for §6.13 "Void data type", whose whole text says that void stands for
+// nonexistent data, may be a function's return type to show it returns nothing,
+// and may type a tagged union member (§7.3.2). §6.13 states no restriction of
+// its own, so a value-bearing return in a void function is reported under
+// §13.4.1.
 
 #include <gtest/gtest.h>
 
@@ -27,10 +27,9 @@ TEST(VoidDataType, VoidNot4State) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kVoid));
 }
 
-// §6.13 says only that void "can be specified as the return type of functions
-// to indicate no return value"; §13.4.1 is where a return statement carrying an
-// expression in such a function is made illegal, so that is the subclause the
-// report names.
+// §6.13 says only that void may be a function's return type, showing it returns
+// nothing; §13.4.1 is where a return statement carrying an expression in such a
+// function is made illegal, so that is the subclause the report names.
 TEST(VoidDataType, VoidFunctionReturnsValue_Error) {
   ElabFixture f;
   ElaborateSrc(

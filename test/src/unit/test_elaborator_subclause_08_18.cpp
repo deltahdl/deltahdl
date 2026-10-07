@@ -516,11 +516,11 @@ TEST(DataHidingElaboration,
              "endmodule\n"));
 }
 
-// §6.21 says of a declaration in a block that "These variables are visible to
-// the unnamed block and any nested blocks below it", so the class a handle's
-// name stands for ends where its block does. The table the checks read was a
-// member written straight into and unwound by nothing, so a handle declared in
-// one procedural block rebound its name for the rest of the module.
+// §6.21 says of a declaration in a block that such variables are visible to the
+// block and every block nested below it, so the class a handle's name stands
+// for ends where its block does. The table the checks read was a member written
+// straight into and unwound by nothing, so a handle declared in one procedural
+// block rebound its name for the rest of the module.
 //
 // Here the module declares `p` a Packet, whose member is local, and an earlier
 // block declares its own `p` as an Open, whose member is not. The access in the

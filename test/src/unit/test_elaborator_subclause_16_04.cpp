@@ -70,9 +70,9 @@ TEST(DeferredAssertionElaboration, OmittedActionsAccepted) {
 // §16.4: each pass or fail statement present in a deferred assertion's
 // action_block is required to be one subroutine call, and since begin is a
 // statement and no subroutine call, a begin-end block around either is ruled
-// out. §1.5 defines shall as a mandatory requirement "from which no deviation
-// is permitted", so each of the forms below is illegal source and elaboration
-// rejects it rather than reporting it and carrying on.
+// out. §1.5 defines shall as a mandatory requirement admitting no deviation, so
+// each of the forms below is illegal source and elaboration rejects it rather
+// than reporting it and carrying on.
 TEST(DeferredAssertionElaboration, BeginEndPassBlockRejected) {
   ElabFixture f;
   auto* design = Elaborate(

@@ -356,12 +356,12 @@ TEST(ConstExpr, FunctionCallWithNonConstantArgNotConstant) {
   EXPECT_FALSE(IsConstantExpr(e, {}));
 }
 
-// §11.2.1: "Built-in method calls that meet the above conditions are constant
-// built-in method calls if the identifier and input arguments are constant
-// expressions." `arr` is in no scope here, so it is not a constant expression
-// and neither is the call. This is the case whose wrong answer went unseen:
-// ConstEvalInt cannot evaluate `arr.size()` either, so calling it constant left
-// the value unresolved with nothing reported.
+// §11.2.1: such a built-in method call counts as constant once both its
+// identifier and its input arguments are constant expressions. `arr` is in no
+// scope here, so it is not a constant expression and neither is the call. This
+// is the case whose wrong answer went unseen: ConstEvalInt cannot evaluate
+// `arr.size()` either, so calling it constant left the value unresolved with
+// nothing reported.
 TEST(ConstExpr, BuiltinMethodSizeWithParensOnNonConstantIdentifierNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("arr.size()", f);
@@ -377,11 +377,11 @@ TEST(ConstExpr, BuiltinMethodSizeNoParensOnNonConstantIdentifierNotConstant) {
 }
 
 // `bits` names no built-in method at all. `$bits` is a system function
-// (§20.6.2), and §7.11 gives the array query system functions as "$left,
-// $right, $low, $high, $increment, $size, $dimensions, and
-// $unpacked_dimensions", each spelled with its `$`. So `v.bits` is an ordinary
-// member access, and an ordinary member access is constant only when the
-// compound name `v.bits` is a parameter in scope. No scope is passed here.
+// (§20.6.2), and §7.11 gives the array query system functions as $left, $right,
+// $low, $high, $increment, $size, $dimensions and $unpacked_dimensions, each
+// spelled with its `$`. So `v.bits` is an ordinary member access, and an
+// ordinary member access is constant only when the compound name `v.bits` is a
+// parameter in scope. No scope is passed here.
 TEST(ConstExpr, MemberNamedBitsWithNoCompoundParameterNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("v.bits", f);
@@ -389,13 +389,13 @@ TEST(ConstExpr, MemberNamedBitsWithNoCompoundParameterNotConstant) {
 }
 
 // A name off the array query list without its `$` names nothing the standard
-// defines. §7.11 states that "SystemVerilog provides system functions to return
-// information about an array. These are $left, $right, $low, $high, $increment,
-// $size, $dimensions, and $unpacked_dimensions." `left` alone is none of them,
-// so `v.left` is decided as an ordinary member access and is constant only when
-// the compound name `v.left` is a parameter in scope. No scope is passed here.
-// This is the claim the §5.13 built-in method names rest on, which are
-// "dynamic_array.size, associative_array.num, and string.len" and no others.
+// defines. §7.11 names the system functions that report on an array: $left,
+// $right, $low, $high, $increment, $size, $dimensions and $unpacked_dimensions.
+// `left` alone is none of them, so `v.left` is decided as an ordinary member
+// access and is constant only when the compound name `v.left` is a parameter in
+// scope. No scope is passed here. This is the claim the §5.13 built-in method
+// names rest on, which are "dynamic_array.size, associative_array.num, and
+// string.len" and no others.
 TEST(ConstExpr, ArrayQueryNameWithoutItsDollarIsNotABuiltinMethod) {
   EvalFixture f;
   auto* e = ParseExprFrom("v.left", f);
@@ -403,11 +403,10 @@ TEST(ConstExpr, ArrayQueryNameWithoutItsDollarIsNotABuiltinMethod) {
 }
 
 // `A.size()` names no built-in method. `A` is in scope with the value 0, so it
-// holds an integer, and §5.13 rules that "a built-in method can only be
-// associated with a particular data type", associating none with an integer.
-// §11.2.1 rules of a constant built-in method call that "when used in constant
-// expressions, these function calls shall be evaluated at elaboration time",
-// and there is nothing here to evaluate at elaboration time.
+// holds an integer, and §5.13 ties each built-in method to a particular data
+// type, associating none with an integer. §11.2.1 has a constant built-in
+// method call in a constant expression evaluated during elaboration, and there
+// is nothing here to evaluate at elaboration time.
 TEST(ConstExpr, BuiltinMethodSizeOnAnIntegerParameterNotConstant) {
   EvalFixture f;
   ScopeMap scope = {{"A", 0}};

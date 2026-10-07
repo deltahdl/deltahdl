@@ -137,8 +137,7 @@ TEST(ValueParameters, RealClassParamDefaultOfAModuleScopedClassIsAccepted) {
 }
 
 // §6.20.2's first rule: a parameter declared with neither type nor range takes
-// the type of its final value, and "if the expression is real, the parameter
-// is real".
+// the type of its final value, and a real expression makes the parameter real.
 TEST(ValueParameters, UntypedClassParamWithARealDefaultIsAccepted) {
   EXPECT_TRUE(
       ElabOk("class C #(D = 1.5);\n"

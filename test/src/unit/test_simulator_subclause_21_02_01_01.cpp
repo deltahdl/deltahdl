@@ -72,11 +72,10 @@ TEST(SysTask, RealFormatDecimal) {
 }
 
 // §21.2.1.1: the Table 21-2 real specifiers render the value the argument
-// carries, and §6.12 fixes what a shortreal argument carries -- "The shortreal
-// data type is the same as a C float", with footnote 19 adding that "The real
-// and shortreal types are represented as described by IEEE Std 754". A real
-// vector 32 bits wide therefore holds a single-precision pattern and has to be
-// decoded as a float, not as the low half of a double.
+// carries, and §6.12 fixes what a shortreal argument carries -- shortreal
+// matches a C float, and footnote 19 adds that real and shortreal follow IEEE
+// Std 754. A real vector 32 bits wide therefore holds a single-precision
+// pattern and has to be decoded as a float, not as the low half of a double.
 //
 // Every other real case in this file builds a 64-bit vector, so the renderer is
 // never reached with a 32-bit one and the width-blind decode is invisible to

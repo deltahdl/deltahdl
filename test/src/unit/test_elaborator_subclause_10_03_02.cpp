@@ -92,8 +92,8 @@ TEST(ContAssignStatementElaboration, NettypeLhsWithSelectErrors) {
       4, "10.3.2"));
 }
 
-// The rule forbids "indexing or select operations" into the nettype value.
-// A bit-select is the indexing form; a part-select of a vector nettype is the
+// The rule forbids indexing into or selecting from the nettype value. A
+// bit-select is the indexing form; a part-select of a vector nettype is the
 // distinct select form and must be rejected the same way, since a continuous
 // assignment to a nettype net must drive the entire nettype value.
 TEST(ContAssignStatementElaboration, NettypeLhsWithPartSelectErrors) {

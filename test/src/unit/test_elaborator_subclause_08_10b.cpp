@@ -1,12 +1,12 @@
 // §8.10 "Static methods": the positions a static method body holds an
 // expression in, each written with the name of a non-static class property.
 //
-// §8.10 says "Access to non-static members or to the special this handle within
-// the body of a static method is illegal and results in a compiler error." It
-// names no position in that body where the access is permitted, so every
-// position ForEachChildExpr in src/elaborator/elaborator_validate_internal.h
-// admits is a position the rule reaches, and so is every child link
-// AnyExprChild admits one level down.
+// §8.10 makes an access to a non-static member, or to the special this handle,
+// inside a static method's body an illegal compile-time error. It names no
+// position in that body where the access is permitted, so every position
+// ForEachChildExpr in src/elaborator/elaborator_validate_internal.h admits is a
+// position the rule reaches, and so is every child link AnyExprChild admits one
+// level down.
 //
 // StmtRefsNonStaticMember read four of those sixteen statement positions and
 // ExprRefsNonStaticMember ten of those thirteen links, so an access written
@@ -58,12 +58,12 @@ namespace {
 // report ambiguous about which access it found.
 //
 // `declares_i` writes `int i;` into the same block. §6.21 says of a declaration
-// in a block that "These variables are visible to the unnamed block and any
-// nested blocks below it", so the name in the statement under test is then the
-// local and not the property. That is the accepting half of each pair below,
-// and the pair is what tells the two walks apart: the reporter alone would
-// report an access to a name the block does declare, and the collection of the
-// names a block declares would suppress a report nothing was making.
+// in a block that such variables are visible to the block and every block
+// nested below it, so the name in the statement under test is then the local
+// and not the property. That is the accepting half of each pair below, and the
+// pair is what tells the two walks apart: the reporter alone would report an
+// access to a name the block does declare, and the collection of the names a
+// block declares would suppress a report nothing was making.
 std::string StaticMethodBodySrc(const std::string& stmt, bool declares_i) {
   return "class C;\n"
          "  int i;\n"

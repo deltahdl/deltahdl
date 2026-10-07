@@ -335,25 +335,24 @@ TEST(InterfaceClassDiamond, SameSpecializationInsideAModuleOk) {
              "endmodule\n"));
 }
 
-// §8.26.6.3 rules that "Each unique parameterization of a parameterized
-// interface class is an interface class specialization", and that different
+// §8.26.6.3 makes every distinct parameterization of a parameterized interface
+// class an interface class specialization of its own, and that different
 // specializations of one parameterized interface class inherited by the same
 // interface class are not a diamond. IntfBase#(A) and IntfBase#(B) are
 // therefore different interface class types, so the parameter SIZE inherited
-// through both collides and must be resolved. The named constants are the
-// point of this test: it makes the same claim as
+// through both collides and must be resolved. The named constants are the point
+// of this test: it makes the same claim as
 // DifferentValueSpecializationsNotDiamondError above, which writes its
 // arguments as the literals 1 and 2, and a literal is the one form the
 // specialization key builder folds without consulting a parameter scope. That
 // test therefore passes whether the scope is consulted or not, and this one
-// does not.
-// The same source as TwoLocalparamArgumentsAreTwoSpecializations with the
-// localparams moved into the module, which is the one variable that test holds
-// fixed. §8.26.6.3 makes every distinct parameterization of a parameterized
-// interface class a specialization of its own (printed page 214) and makes no
-// exception for where the argument's value is declared, so IntfBase#(A) and
-// IntfBase#(B) are two specializations here as much as at compilation-unit
-// scope and SIZE collides under §8.26.6.3.
+// does not. The same source as TwoLocalparamArgumentsAreTwoSpecializations with
+// the localparams moved into the module, which is the one variable that test
+// holds fixed. §8.26.6.3 makes every distinct parameterization of a
+// parameterized interface class a specialization of its own (printed page 214)
+// and makes no exception for where the argument's value is declared, so
+// IntfBase#(A) and IntfBase#(B) are two specializations here as much as at
+// compilation-unit scope and SIZE collides under §8.26.6.3.
 //
 // Elaborator::ValidateInterfaceClassRules runs before any module is elaborated,
 // so A and B have a value only where the module's own items are folded. Without
@@ -442,15 +441,15 @@ TEST(InterfaceClassSpecialization,
       "8.26.6.3"));
 }
 
-// §8.26.6.3 rules that where inherited parameters "originate from the same
-// interface class ... only one copy of SIZE shall be inherited ... so it shall
-// not be considered a conflict". This is the boundary that rules out keying a
-// specialization by the source position of its argument: two extends clauses
-// naming the one localparam A are the one parameterization, and splitting them
-// would report a conflict between a parameterization and itself. This test
-// passes both before and after the change asked for by
-// InterfaceClassSpecialization.TwoLocalparamArgumentsAreTwoSpecializations,
-// and it is here to keep that fix from over-splitting.
+// §8.26.6.3 rules that where inherited parameters come from the same interface
+// class, a single copy of SIZE is inherited and no conflict arises. This is the
+// boundary that rules out keying a specialization by the source position of its
+// argument: two extends clauses naming the one localparam A are the one
+// parameterization, and splitting them would report a conflict between a
+// parameterization and itself. This test passes both before and after the
+// change asked for by
+// InterfaceClassSpecialization.TwoLocalparamArgumentsAreTwoSpecializations, and
+// it is here to keep that fix from over-splitting.
 TEST(InterfaceClassSpecialization,
      OneLocalparamArgumentReachedTwiceIsOneSpecialization) {
   EXPECT_TRUE(

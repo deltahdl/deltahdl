@@ -1,9 +1,9 @@
-// §11.11 gives a min:typ:max expression three values and says "the three
-// values allow a design to be tested with minimum, typical, or maximum delay
-// values", so which of the three a constant expression folds to is one setting
-// for a whole elaboration. DelayModeGuard in src/elaborator/const_eval.h
-// installs that setting and ActiveDelayMode answers it; these cases are over
-// what ConstEvalFull in src/elaborator/const_eval_func.cpp does with it.
+// §11.11 gives a min:typ:max expression three values and says the three let a
+// design be tested with its minimum, typical or maximum delays, so which of the
+// three a constant expression folds to is one setting for a whole elaboration.
+// DelayModeGuard in src/elaborator/const_eval.h installs that setting and
+// ActiveDelayMode answers it; these cases are over what ConstEvalFull in
+// src/elaborator/const_eval_func.cpp does with it.
 //
 // The design each case elaborates writes the triple in parentheses, which
 // A.8.4 admits as `constant_primary ::= ( constant_mintypmax_expression )` and
@@ -57,16 +57,16 @@ int64_t FoldedTripleParam(ElabFixture& f) {
   return p->resolved_value;
 }
 
-// §11.11 orders the three "minimum, typical, and maximum values -- in that
-// order", and the typical member is what the folder takes when nothing has
-// asked for another. This is what a run given no --mintypmax gets.
+// §11.11 orders the three as minimum, then typical, then maximum, and the
+// typical member is what the folder takes when nothing has asked for another.
+// This is what a run given no --mintypmax gets.
 TEST(MinTypMaxElaboration, TypicalMemberFoldsWhenNoDelayModeGuardIsLive) {
   ElabFixture f;
   EXPECT_EQ(FoldedTripleParam(f), 22);
 }
 
-// The minimum member, which §11.11's "tested with minimum ... delay values" is
-// about. Nothing but the live guard differs from the case above.
+// The minimum member, which §11.11's testing with minimum delays is about.
+// Nothing but the live guard differs from the case above.
 TEST(MinTypMaxElaboration, MinimumMemberFoldsWhileAMinimumGuardIsLive) {
   ElabFixture f;
   DelayModeGuard guard(DelayMode::kMin);
@@ -99,20 +99,18 @@ TEST(MinTypMaxElaboration, AGuardRestoresTheModeItFoundRatherThanTheDefault) {
   EXPECT_EQ(FoldedTripleParam(after_inner), 33);
 }
 
-// §11.11 says the form is an expression and not a delay alone -- "Values
-// expressed in min:typ:max format can be used in expressions. The min:typ:max
-// format can be used wherever expressions can appear" -- so it stands as an
-// operand, and an operand is sized. InferExprWidth answered 0 for it, which
-// sizes it as nothing wherever a context reads a width: a concatenation holding
-// one contributes no bits for it and is wrong about how many it moved.
+// §11.11 says the form is an expression and not a delay alone -- a min:typ:max
+// value may stand in an expression, anywhere an expression may -- so it stands
+// as an operand, and an operand is sized. InferExprWidth answered 0 for it,
+// which sizes it as nothing wherever a context reads a width: a concatenation
+// holding one contributes no bits for it and is wrong about how many it moved.
 //
 // Which member's width it takes is what Example 1 settles. `(a:b:c) + (d:e:f)`
-// is read member by member -- "The minimum value is the sum of a+d; the typical
-// value is b+e; the maximum value is c+f" -- so the form stands for the one
-// member the run selects, and its width is that member's rather than anything
-// composed of the three. The members below are sized 4, 8 and 16 bits, all
-// different from each other and from the 0 the case is against, so no
-// coincidence answers for the rule.
+// is read member by member -- its minimum is a+d, its typical b+e and its
+// maximum c+f -- so the form stands for the one member the run selects, and its
+// width is that member's rather than anything composed of the three. The
+// members below are sized 4, 8 and 16 bits, all different from each other and
+// from the 0 the case is against, so no coincidence answers for the rule.
 constexpr std::string_view kSizedTriple = "(4'd1:8'd2:16'd3)";
 
 TEST(MinTypMaxElaboration, WidthIsTheTypicalMembersByDefault) {

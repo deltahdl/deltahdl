@@ -236,24 +236,22 @@ static void ExpectSelectNbaWritesNothingAndKeepsItsEvent(const std::string& src,
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  // §11.5.1's "no effect on the data stored when written": no bit of x moved.
+  // §11.5.1's rule that such a write stores nothing: no bit of x moved.
   EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 0x00u);
   // Every event the run took from the primed stock came back to it.
   EXPECT_EQ(pool.FreeCount(), kPrimedEvents);
 }
 
-// §4.9.4 has a nonblocking assignment compute "the left-hand target" from "the
-// values in effect when the update is placed in the event region", so the index
+// §4.9.4 has a nonblocking assignment compute its left-hand target from the
+// values in effect when the update is placed in the event region, so the index
 // of a select target is resolved where the update is scheduled. §11.5.1 leaves
-// that resolution nothing to write when the index carries x -- "a part-select
-// that is x or z shall yield the value x when read and shall have no effect on
-// the data stored when written", and its bullet list has
-// `vect[expression that returns x]` return x -- so the update is dropped and
-// `x` keeps the 8'h00 the blocking write left. `i` is never assigned, so it
-// holds 3'bxxx: §6.11.2 makes `logic` one of the 4-state types, "types that can
-// have unknown and high-impedance values", and §6.8's Table 6-7 -- "the default
-// values for variables if no initializer is specified" -- gives a 4-state
-// integral variable 'x.
+// that resolution nothing to write when the index carries x -- a part-select
+// that is x or z reads as x and stores nothing when written, and its bullet
+// list has `vect[expression that returns x]` return x -- so the update is
+// dropped and `x` keeps the 8'h00 the blocking write left. `i` is never
+// assigned, so it holds 3'bxxx: §6.11.2 makes `logic` one of the 4-state types,
+// types able to hold x and z values, and §6.8's Table 6-7 of default values for
+// uninitialized variables gives a 4-state integral variable 'x.
 //
 // Dropping the write is what the clause asks for; abandoning the event taken to
 // carry it is not. The scheduling path acquires an Event from the pool before
@@ -279,17 +277,16 @@ TEST(NonblockingAssignSchedulingSim,
 }
 
 // The same abandonment reached by the other of §11.5.1's two routes into a
-// select that addresses no bit of its object: not an index carrying x, but "a
-// part-select that addresses a range of bits that are completely out of the
-// address bounds of the vector", which `x[9:8]` on a `logic [7:0] x` is -- both
-// of its indices sit above the declared 7. The clause gives it the same
-// treatment, "no effect on the data stored when written", so `x` keeps 8'h00,
-// and the same event goes with it. The two are worth having separately because
-// they reach the drop through different arithmetic: the first stops at the
-// unknown-bits test on the evaluated index, this one at the range test in
-// PartSelectStorageBits, and only the shared zero width they both answer with
-// tells the scheduling path there is nothing to place. This one also returned
-// 31 of 32.
+// select that addresses no bit of its object: not an index carrying x, but a
+// part-select whose bits all lie outside the vector's address bounds, which
+// `x[9:8]` on a `logic [7:0] x` is -- both of its indices sit above the
+// declared 7. The clause gives it the same treatment, storing nothing when
+// written, so `x` keeps 8'h00, and the same event goes with it. The two are
+// worth having separately because they reach the drop through different
+// arithmetic: the first stops at the unknown-bits test on the evaluated index,
+// this one at the range test in PartSelectStorageBits, and only the shared zero
+// width they both answer with tells the scheduling path there is nothing to
+// place. This one also returned 31 of 32.
 TEST(NonblockingAssignSchedulingSim,
      DroppedOutOfRangePartSelectNbaReturnsItsEvent) {
   SimFixture f;
@@ -305,15 +302,14 @@ TEST(NonblockingAssignSchedulingSim,
       f);
 }
 
-// §4.9.4 requires "the values in effect when the update is placed in the event
-// region" to compute "both the right-hand value and the left-hand target", and
-// §10.4.2 spells the target half out: "if the variable_lvalue requires an
-// evaluation, such as an index expression, class handle, or virtual interface
-// reference, it shall be evaluated at the same time as the expression on the
-// right-hand side". Nothing in either sentence exempts an lvalue that is a
-// concatenation: the index expressions inside its elements are part of the
-// left-hand target, so `idx` is read where the `<=` executes and not where the
-// deferred update runs.
+// §4.9.4 computes both the right-hand value and the left-hand target from the
+// values in effect when the update is placed in the event region, and §10.4.2
+// spells the target half out: whatever in the variable_lvalue needs evaluating,
+// an index expression, a class handle or a virtual interface reference, is
+// evaluated together with the right-hand side. Nothing in either sentence
+// exempts an lvalue that is a concatenation: the index expressions inside its
+// elements are part of the left-hand target, so `idx` is read where the `<=`
+// executes and not where the deferred update runs.
 //
 // `idx` is 0 at that point, so the top bit of the 9-bit right-hand side -- a 1
 // -- belongs in `a[0]`, leaving a at 8'h01, and the remaining eight bits give b
@@ -403,11 +399,10 @@ TEST(NonblockingAssignSchedulingSim,
 // The streaming half of the same rule. §11.4.14 makes a streaming concatenation
 // a legal variable_lvalue, and the with-range of §11.4.14.4 -- Syntax 11-5's
 // array_range_expression -- is an index expression inside it, so §10.4.2 has it
-// "evaluated at the same time as the expression on the right-hand side" like
-// any other. This is the only shape in which the streaming arm's deferral is
-// observable: a plain element there names its object outright and never reads
-// an index, so the with-range is the one place a later write to `idx` has
-// anything to move.
+// evaluated together with the right-hand side like any other. This is the only
+// shape in which the streaming arm's deferral is observable: a plain element
+// there names its object outright and never reads an index, so the with-range
+// is the one place a later write to `idx` has anything to move.
 //
 // `idx` is 0 when the update is placed, so `arr with [0 +: 2]` is elements 0
 // and 1, and a right-shift stream lays 16'hABCD into them in order. Re-reading
@@ -475,11 +470,11 @@ static void ExpectSampledStructSurvivesMemberDeposit(const std::string& src) {
 }
 
 // §4.9.4 claim 3, the right-hand-value half that the concatenation cases above
-// state for the left-hand target: "the values in effect when the update is
-// placed in the event region are used to compute both the right-hand value and
-// the left-hand target". So a nonblocking assignment carries the value its
-// right-hand side had where the statement ran, whatever happens to the objects
-// it was read from before the NBA region.
+// state for the left-hand target: the right-hand value and the left-hand target
+// are both computed from the values in effect when the update enters the event
+// region. So a nonblocking assignment carries the value its right-hand side had
+// where the statement ran, whatever happens to the objects it was read from
+// before the NBA region.
 //
 // The writer has to be one that can reach a value already sampled, and most
 // cannot. Assigning the source variable as a whole -- `d <= s; s = 16'h00BB;`

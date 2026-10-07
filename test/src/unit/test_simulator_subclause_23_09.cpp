@@ -285,19 +285,19 @@ TEST(InstanceScopeSimulation, HierarchicalNameStillClimbsPastModuleBoundary) {
   EXPECT_EQ(v->value.ToUint64(), 3u);
 }
 
-// §6.20 makes `P` a constant and not a variable: "Constants are named data
-// objects that never change. SystemVerilog provides three elaboration-time
-// constants: parameter, localparam, and specparam." So the variable-specific
-// sentence of §23.9 does not name it, and this case rests on the general one
-// above that sentence: the search climbs until it finds an item of that name or
-// reaches the edge of a module, interface, program or checker. A parameter is
-// none of the task, function, named block or generate block that sentence lets
-// past a module boundary, so a bare `P` inside `u1` must resolve to nothing
-// even though the top declares one. This catches what the case above it cannot:
-// a parameter is lowered by Lowerer::LowerParams rather than as a module
-// variable, so a fix that stops the boundary crossing for one need not stop it
-// for the other. The two parameter cases at the top of this file read the
-// child's own `P`, which resolves at the prefixed key.
+// §6.20 makes `P` a constant and not a variable: a constant is a named data
+// object that never changes, and parameter, localparam and specparam are the
+// three elaboration-time constants. So the variable-specific sentence of §23.9
+// does not name it, and this case rests on the general one above that sentence:
+// the search climbs until it finds an item of that name or reaches the edge of
+// a module, interface, program or checker. A parameter is none of the task,
+// function, named block or generate block that sentence lets past a module
+// boundary, so a bare `P` inside `u1` must resolve to nothing even though the
+// top declares one. This catches what the case above it cannot: a parameter is
+// lowered by Lowerer::LowerParams rather than as a module variable, so a fix
+// that stops the boundary crossing for one need not stop it for the other. The
+// two parameter cases at the top of this file read the child's own `P`, which
+// resolves at the prefixed key.
 TEST(InstanceScopeSimulation, BareParameterNameDoesNotReachTopParameter) {
   SimFixture f;
   auto* design = ElaborateSrc(

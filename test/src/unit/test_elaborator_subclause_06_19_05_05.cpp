@@ -1,7 +1,7 @@
 // Tests for §6.19.5.5 "Num()", whose whole text is the prototype "function int
-// num();" and the sentence "The num() method returns the number of elements in
-// the given enumeration." It states no restriction a design can violate, so the
-// rejection below is reported under §6.19.3.
+// num();" and a sentence saying num() returns how many elements the enumeration
+// has. It states no restriction a design can violate, so the rejection below is
+// reported under §6.19.3.
 
 #include <gtest/gtest.h>
 

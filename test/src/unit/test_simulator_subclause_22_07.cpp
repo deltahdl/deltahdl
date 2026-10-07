@@ -61,10 +61,10 @@ TEST(TimescaleSimulation, DirectiveGivesTheModuleAfterItItsUnit) {
             "Time scale of (t) is 1us / 1ns\n1\n");
 }
 
-// §3.14.2.3 (printed page 60): a module declaring no timeunit takes "the units
-// of the last `timescale directive", so two directives before two modules give
-// each its own, and each module's $printtimescale with no argument reports its
-// own scope's.
+// §3.14.2.3 (printed page 60): a module declaring no timeunit takes the units
+// of the most recent `timescale directive, so two directives before two modules
+// give each its own, and each module's $printtimescale with no argument reports
+// its own scope's.
 TEST(TimescaleSimulation, EachModuleTakesTheDirectiveBeforeIt) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture("`timescale 1us / 1ns\n"
@@ -108,10 +108,10 @@ TEST(TimescaleSimulation, DelaysAndTimeReadEachModulesOwnUnit) {
             "a 10\nb 2\na 10000\n");
 }
 
-// §3.14.2.3 (printed page 60): "The time unit of the compilation-unit scope can
-// only be set by a timeunit declaration, not a `timescale directive", so a task
-// of a class the compilation unit declares waits its #5 in that scope's unit,
-// the 1 ns default, whichever module calls it: 0.005 of the calling module's
+// §3.14.2.3 (printed page 60): only a timeunit declaration, never a `timescale
+// directive, sets the compilation-unit scope's time unit, so a task of a class
+// the compilation unit declares waits its #5 in that scope's unit, the 1 ns
+// default, whichever module calls it: 0.005 of the calling module's
 // microseconds. The task waited 5 of the caller's units.
 TEST(TimescaleSimulation, CompilationUnitClassTaskWaitsInTheUnitsUnit) {
   SimFixture f;

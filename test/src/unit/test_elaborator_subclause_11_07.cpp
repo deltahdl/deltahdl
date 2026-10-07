@@ -73,15 +73,14 @@ TEST(SignedExprElaboration, NestedSignedUnsignedElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.7: the `$signed` and `$unsigned` system functions "shall evaluate the
-// input expression and return a one-dimensional packed array with the same
-// number of bits and value of the input expression and the signedness defined
-// by the function". A signing conversion is therefore as wide as its operand,
-// so `$signed(4'b1100)` is four bits rather than the thirty-two bits an
-// ordinary system function's integer result has. §11.7 gives the two spellings
-// of the conversion one example and one value, so the cast spelling is
-// asserted beside the system-function spelling: the width of `$signed(...)`
-// alone would not say that the two spellings agree.
+// §11.7: the `$signed` and `$unsigned` system functions evaluate the input
+// expression and return a one-dimensional packed array of its width and value,
+// with the signedness the function names. A signing conversion is therefore as
+// wide as its operand, so `$signed(4'b1100)` is four bits rather than the
+// thirty-two bits an ordinary system function's integer result has. §11.7 gives
+// the two spellings of the conversion one example and one value, so the cast
+// spelling is asserted beside the system-function spelling: the width of
+// `$signed(...)` alone would not say that the two spellings agree.
 TEST(SignedExprElaboration,
      SignedSystemFunctionAndSignedCastAreBothFourBitsWide) {
   TypedefMap typedefs;
@@ -103,15 +102,15 @@ TEST(SignedExprElaboration,
   EXPECT_EQ(InferExprWidth(&cast, typedefs), 4u);
 }
 
-// §11.7: `$signed` returns "a one-dimensional packed array with the same
-// number of bits and value of the input expression", so an elaborator check
-// that measures `$signed(4'b1100)` counts four bits. This is that count where
-// a caller writes it down: ElaboratorOperationRules::CheckBitStreamCastExpr in
+// §11.7: `$signed` returns a one-dimensional packed array of the input
+// expression's width and value, so an elaborator check that measures
+// `$signed(4'b1100)` counts four bits. This is that count where a caller writes
+// it down: ElaboratorOperationRules::CheckBitStreamCastExpr in
 // src/elaborator/elaborator_validate_operations_streaming.cpp sizes the source
-// of a bit-stream cast through InferExprWidth, and §6.24.3 has it reject a
-// cast between fixed-size types of different sizes whose destination is
-// unpacked, naming both widths in the report. Sizing the conversion at
-// thirty-two bits puts the wrong number in that sentence.
+// of a bit-stream cast through InferExprWidth, and §6.24.3 has it reject a cast
+// between fixed-size types of different sizes whose destination is unpacked,
+// naming both widths in the report. Sizing the conversion at thirty-two bits
+// puts the wrong number in that sentence.
 TEST(SignedExprElaboration,
      BitStreamCastReportsFourBitsForASignedSystemFunction) {
   ElabFixture f;
@@ -129,12 +128,11 @@ TEST(SignedExprElaboration,
                             4, "6.24.3"));
 }
 
-// §11.7: `$signed` "shall evaluate the input expression and return a
-// one-dimensional packed array with the same number of bits and value of the
-// input expression", and a real has no packed-array bits to return, so a real
-// variable is not something the conversion can be applied to. These four cases
-// cite §11.7 rather than §6.24.1 because §6.24.1 states the rule for the cast
-// spelling, `signed'(rv)`, which
+// §11.7: `$signed` evaluates the input expression and returns a one-dimensional
+// packed array of its width and value, and a real has no packed-array bits to
+// return, so a real variable is not something the conversion can be applied to.
+// These four cases cite §11.7 rather than §6.24.1 because §6.24.1 states the
+// rule for the cast spelling, `signed'(rv)`, which
 // test/src/unit/test_elaborator_subclause_06_24_01.cpp already covers at
 // CastOperatorElaboration.RealVarInSignedCastError and its neighbours. §11.7 is
 // the clause that governs the system-function spelling, and the report names
@@ -154,9 +152,8 @@ TEST(SignedExprElaboration, RealVarInSignedSystemFunctionRejected) {
 }
 
 // §11.7 defines `$unsigned` by the same sentence it defines `$signed` by, the
-// two differing only in "the signedness defined by the function", so the
-// packed-array requirement on the input expression governs `$unsigned` as
-// well.
+// two differing only in the signedness each function names, so the packed-array
+// requirement on the input expression governs `$unsigned` as well.
 TEST(SignedExprElaboration, RealVarInUnsignedSystemFunctionRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -206,12 +203,11 @@ TEST(SignedExprElaboration, ShortrealVarInUnsignedSystemFunctionRejected) {
       "expression inside $unsigned shall be an integral value", 4, "11.7"));
 }
 
-// §11.7: `$signed` "shall evaluate the input expression and return a
-// one-dimensional packed array with the same number of bits and value of the
-// input expression", and §5.8 interprets a time literal as a realtime value
-// scaled to the current time unit, so 2.1ns has no packed-array bits for the
-// conversion to return. This case cites §11.7 rather than §6.24.1 because
-// §6.24.1 states the rule for the cast spelling, signed'(2.1ns), which
+// §11.7: `$signed` evaluates the input expression and returns a one-dimensional
+// packed array of its width and value, and §5.8 interprets a time literal as a
+// realtime value scaled to the current time unit, so 2.1ns has no packed-array
+// bits for the conversion to return. This case cites §11.7 rather than §6.24.1
+// because §6.24.1 states the rule for the cast spelling, signed'(2.1ns), which
 // test/src/unit/test_elaborator_subclause_06_24_01.cpp covers at
 // CastOperatorElaboration.TimeLiteralInSignedCastError.
 TEST(SignedExprElaboration, TimeLiteralArgumentToSignedSystemFunctionRejected) {

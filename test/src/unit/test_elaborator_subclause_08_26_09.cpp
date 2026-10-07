@@ -237,9 +237,9 @@ TEST(InterfaceClassPrePostRandomize,
 
 TEST(InterfaceClassPrePostRandomize,
      PrePostRandomizeDeclaredInTwoExtendedInterfacesNoConflict) {
-  // §8.26.9: "pre_randomize() and post_randomize() shall not cause method name
-  // conflicts", so an interface class may extend two interface classes that
-  // both declare them.
+  // §8.26.9: pre_randomize() and post_randomize() never make a method name
+  // conflict, so an interface class may extend two interface classes that both
+  // declare them.
   //
   // The declarations have to be the ones §18.6.2 fixes. It gives the prototypes
   // as `function void pre_randomize();` and `function void post_randomize();`,

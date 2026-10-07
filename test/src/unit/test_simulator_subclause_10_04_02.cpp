@@ -116,13 +116,13 @@ TEST(NonblockingAssignSim, SwapExchangesValuesInTwoSteps) {
 }
 
 // §10.4.2 Example 7: intra-assignment-delayed nonblocking assignments in a loop
-// make assignments to the same variable "without cancelling previous
-// assignments". The loop runs entirely at time 0, scheduling six updates of
-// i[0] = 0,1,0,1,0,1 at times 0,10,20,30,40,50. Each scheduled update must
-// carry its own sampled value and fire at its own time -- a single shared
-// pending slot would let the last-scheduled value win everywhere and drop the
-// intervening updates. A second block strobes r1 mid-window to observe the
-// distinct values as they take effect.
+// make assignments to the same variable without cancelling the earlier ones.
+// The loop runs entirely at time 0, scheduling six updates of i[0] =
+// 0,1,0,1,0,1 at times 0,10,20,30,40,50. Each scheduled update must carry its
+// own sampled value and fire at its own time -- a single shared pending slot
+// would let the last-scheduled value win everywhere and drop the intervening
+// updates. A second block strobes r1 mid-window to observe the distinct values
+// as they take effect.
 TEST(NonblockingAssignSim, DelayedNbasToSameVarDoNotCancelEachOther) {
   SimFixture f;
   auto* design = ElaborateLowerRun(f,
@@ -149,20 +149,19 @@ TEST(NonblockingAssignSim, DelayedNbasToSameVarDoNotCancelEachOther) {
 }
 
 // §10.4.2 gives the nonblocking form the same target the blocking form takes:
-// "In this syntax, variable_lvalue is a data type that is valid for a
-// procedural assignment statement", and §11.4.12 makes a concatenation one of
-// those -- "The concatenation is treated as a packed vector of bits. It can be
-// used on the left-hand side of an assignment". So `{a, b} <= 16'h1234` has to
-// distribute across a and b exactly as `{a, b} = 16'h1234` does, a taking the
-// high byte and b the low one. It did not: ScheduleNonblockingAssign carried an
-// arm for a streaming concatenation and none for a plain one, and
-// ResolveLhsVariable answers null for a concatenation, so the statement fell
-// out of the bottom of the function having scheduled no write and reported no
-// diagnostic. This is the IsConcatLhs gate and the ScheduleConcatNba arm behind
-// it. Both variables are pre-loaded with sentinels that neither expected value
-// can be, because a target left holding its old value is what the defect
-// produced; starting them at zero would let "scheduled nothing at all" pass as
-// "assigned zero".
+// variable_lvalue there is any data type a procedural assignment statement
+// accepts, and §11.4.12 makes a concatenation one of those -- a concatenation
+// is a packed vector of bits and may stand on the left-hand side of an
+// assignment. So `{a, b} <= 16'h1234` has to distribute across a and b exactly
+// as `{a, b} = 16'h1234` does, a taking the high byte and b the low one. It did
+// not: ScheduleNonblockingAssign carried an arm for a streaming concatenation
+// and none for a plain one, and ResolveLhsVariable answers null for a
+// concatenation, so the statement fell out of the bottom of the function having
+// scheduled no write and reported no diagnostic. This is the IsConcatLhs gate
+// and the ScheduleConcatNba arm behind it. Both variables are pre-loaded with
+// sentinels that neither expected value can be, because a target left holding
+// its old value is what the defect produced; starting them at zero would let
+// "scheduled nothing at all" pass as "assigned zero".
 TEST(NonblockingAssignSim, ConcatenationTargetDistributesToItsElements) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -178,16 +177,16 @@ TEST(NonblockingAssignSim, ConcatenationTargetDistributesToItsElements) {
   LowerRunAndCheck(f, design, {{"a", 0x12u}, {"b", 0x34u}});
 }
 
-// §10.4.2: a nonblocking assignment "evaluates the right-hand side expression,
-// schedules the assignment ... to occur at the end of the current time step",
-// so the statement after it still reads what the target held before. A
-// concatenation target is under the same rule, since the clause distinguishes
-// its left-hand sides only by what a procedural assignment accepts. Reading a
-// into sample on the very next statement therefore has to answer the old byte
-// while a ends the time step holding the new one. This is what the deferral in
-// ScheduleConcatNba claims: the unpacker runs from inside an update-region
-// callback, not where the statement executed. Doing the distribution eagerly at
-// schedule time would leave sample holding 0x12.
+// §10.4.2: a nonblocking assignment evaluates its right-hand side and schedules
+// the assignment for the end of the current time step, so the statement after
+// it still reads what the target held before. A concatenation target is under
+// the same rule, since the clause distinguishes its left-hand sides only by
+// what a procedural assignment accepts. Reading a into sample on the very next
+// statement therefore has to answer the old byte while a ends the time step
+// holding the new one. This is what the deferral in ScheduleConcatNba claims:
+// the unpacker runs from inside an update-region callback, not where the
+// statement executed. Doing the distribution eagerly at schedule time would
+// leave sample holding 0x12.
 TEST(NonblockingAssignSim, ConcatenationTargetIsWrittenInTheNbaRegion) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -284,23 +283,22 @@ TEST(NonblockingAssignSim, ConcatenationTargetWritesOnlyTheBitsASelectNames) {
   LowerRunAndCheck(f, design, {{"a", 0xF9u}, {"b", 0xABu}});
 }
 
-// §9.4.2 makes `@(a)` an implicit event on the expression a -- "The execution
-// of a procedural statement can be synchronized with a value change of an
-// expression, known as an implicit event" -- and settles what such an event
-// answers to: "A non-edge implicit event shall be detected on any change in
-// the value of the expression." The clause draws no distinction by which
-// statement form produced the change, nor by whether the change touched the
-// whole variable or four of its bits. §4.9.4 says where a nonblocking
-// assignment makes that change: it "schedules the update as an NBA update
-// event ... in the current time step", so the write is performed from
+// §9.4.2 makes `@(a)` an implicit event on the expression a -- a procedural
+// statement may wait on a value change of an expression, which is an implicit
+// event -- and settles what such an event answers to: a non-edge implicit event
+// is detected whenever the expression's value changes. The clause draws no
+// distinction by which statement form produced the change, nor by whether the
+// change touched the whole variable or four of its bits. §4.9.4 says where a
+// nonblocking assignment makes that change: it schedules the update as an NBA
+// update event in the current time step, so the write is performed from
 // ScheduleConcatNba's deferred callback rather than where the statement
 // executed. That callback is the third route into UnpackConcatLhs, beside the
 // blocking statement and the subroutine body, and it is the route this case
 // claims. All three inherited one omission: the select-element arm wrote
 // through WriteBitSelect and continued to the next element without notifying
 // the variable's watchers, though the whole-variable arm two lines below it
-// notified, so a took its new value in the update region and nothing waiting
-// on a ever ran.
+// notified, so a took its new value in the update region and nothing waiting on
+// a ever ran.
 //
 // The observation is a count rather than a flag because the count says which
 // of two failures happened. a is written twice, once by an ordinary
@@ -333,25 +331,24 @@ TEST(NonblockingAssignSim,
 }
 
 // §11.5.1 rules on a part-select that hangs off the end of the object it
-// selects from: "Part-selects that are partially out of range shall, when
-// read, return x for the bits that are out of range and shall, when written,
-// only affect the bits that are in range." The clause asks of the two bounds
-// of a non-indexed part-select only that they be "constant integer
-// expressions", each "evaluated in a self-determined context", and §5.7.1
-// leaves an unsized decimal signed, so the `-2` in `a[1:-2]` is the negative 2
-// and the select names indices 1, 0, -1 and -2. Only 1 and 0 lie inside
+// selects from: a part-select partly out of range reads x for its out-of-range
+// bits, and a write to it changes only the bits in range. The clause asks of
+// the two bounds of a non-indexed part-select only that they be constant
+// integer expressions, each evaluated as self-determined, and §5.7.1 leaves an
+// unsized decimal signed, so the `-2` in `a[1:-2]` is the negative 2 and the
+// select names indices 1, 0, -1 and -2. Only 1 and 0 lie inside
 // `logic [7:0] a`; being the select's most significant end they take the
 // value's bits 3 and 2, so `4'b1101` leaves `a` at 8'h03.
 //
-// §10.4.2 asks of a nonblocking target only that "variable_lvalue is a data
-// type that is valid for a procedural assignment statement", which is the
-// left-hand side §10.4.1 gives the blocking form -- whose own examples include
+// §10.4.2 asks of a nonblocking target only that variable_lvalue is any data
+// type a procedural assignment statement accepts, which is the left-hand side
+// §10.4.1 gives the blocking form -- whose own examples include
 // `rega[3:5] = 7; // a part-select`. What §10.4 separates the two statements by
-// is procedural flow, "different procedural flows in sequential blocks", and
-// not which bits a select names. So `b` takes the same write in the blocking
-// form beside `a` and the two are asserted equal: the equality is the thing
-// only this case can say, and pinning 8'h03 on `a` beside it is what stops the
-// pair passing by being wrong together.
+// is procedural flow within sequential blocks, and not which bits a select
+// names. So `b` takes the same write in the blocking form beside `a` and the
+// two are asserted equal: the equality is the thing only this case can say, and
+// pinning 8'h03 on `a` beside it is what stops the pair passing by being wrong
+// together.
 // ExpressionSim.NonIndexedPartSelectBelowLowBoundWritesInRangeBitsOnly in
 // test_simulator_subclause_11_05_01a.cpp holds the blocking side of this line
 // on its own.
@@ -391,10 +388,10 @@ TEST(NonblockingAssignSim,
 
 // The indexed spelling of that same select, which §11.5.1 makes one select with
 // it: the clause's own example reads `a_vect[15 -: 8] // == a_vect[15 : 8]`,
-// the `-:` form selecting "starting at the base and descending the bit range",
-// so at base 1 and width 4 `a[1 -: 4]` is `a[1:-2]`. Indices 1 and 0 are again
-// the ones in range and again the select's most significant end, so `4'b1101`
-// leaves `a` at 8'h03 here too.
+// the `-:` form selecting from the base downward, so at base 1 and width 4
+// `a[1 -: 4]` is `a[1:-2]`. Indices 1 and 0 are again the ones in range and
+// again the select's most significant end, so `4'b1101` leaves `a` at 8'h03
+// here too.
 //
 // This is the source-offset half of the defect and the half a repair of the
 // bound's sign alone would leave standing. ResolvePartSelectNbaRange folded a
@@ -416,12 +413,11 @@ TEST(NonblockingAssignSim, SelectTargetRunningOffLowEndWritesItsOwnHighBits) {
   LowerRunAndCheck(f, design, {{"a", 0x03u}});
 }
 
-// §11.5.1: "The actual bit that is accessed by an address is, in part,
-// determined by the declaration of acc", the clause putting `logic [15:0] acc;`
-// and `logic [2:17] acc;` side by side to show one index reaching a different
-// bit under each. On `logic [15:8] a` the indices 9 and 8 are the object's two
-// least significant bits, wholly in range, so `a[9:8] <= 2'b11` leaves `a` at
-// 8'h03.
+// §11.5.1: the declaration of acc helps decide which bit an address reaches,
+// the clause putting `logic [15:0] acc;` and `logic [2:17] acc;` side by side
+// to show one index reaching a different bit under each. On `logic [15:8] a`
+// the indices 9 and 8 are the object's two least significant bits, wholly in
+// range, so `a[9:8] <= 2'b11` leaves `a` at 8'h03.
 //
 // This is the case that separates "the window is computed wrongly" from "the
 // declaration is never consulted at all". The nonblocking path took each index
@@ -479,8 +475,8 @@ TEST(NonblockingAssignSim, SelectTargetRunningOffHighEndStillTakesItsLowBits) {
 }
 
 // §10.4.2: the left-hand side of a nonblocking assignment names the variable
-// "to which the value is assigned", and a compound select names one element of
-// a multidimensional unpacked array -- an element §7.4.2 gives storage of its
+// that receives the value, and a compound select names one element of a
+// multidimensional unpacked array -- an element §7.4.2 gives storage of its
 // own, which CreateMultiDimLeaves registers under the name "A[1][2]". Reaching
 // that element through two index expressions rather than one changes nothing
 // about which object the update region writes.
@@ -541,14 +537,14 @@ TEST(NonblockingAssignSim, MultidimElementTargetLeavesTheArrayBaseAlone) {
 }
 
 // §10.4.2 gives the nonblocking form the target the blocking form takes --
-// "variable_lvalue is a data type that is valid for a procedural assignment
-// statement" -- and A.8.5 makes a dotted path onto a class property the first
-// production of variable_lvalue. §8.3 keeps that property in the object the
-// handle designates rather than in any variable of the module, which is the
-// whole of what went wrong here: ResolveLhsVariable rebuilt the name "h.f" and
-// asked ctx.FindVariable, the variable table holds no such key because the
-// property is a member of ClassObject, and ScheduleNonblockingAssign returned
-// on the null before acquiring an update event -- no write, no event and no
+// variable_lvalue is any data type a procedural assignment statement accepts --
+// and A.8.5 makes a dotted path onto a class property the first production of
+// variable_lvalue. §8.3 keeps that property in the object the handle designates
+// rather than in any variable of the module, which is the whole of what went
+// wrong here: ResolveLhsVariable rebuilt the name "h.f" and asked
+// ctx.FindVariable, the variable table holds no such key because the property
+// is a member of ClassObject, and ScheduleNonblockingAssign returned on the
+// null before acquiring an update event -- no write, no event and no
 // diagnostic. The blocking form reaches the property through AssignToScalarLhs,
 // which falls back to the struct-field writer for a member access, so the two
 // forms disagreed about whether the statement happened at all.
@@ -581,11 +577,11 @@ TEST(NonblockingAssignSim, ClassPropertyTargetReceivesTheScheduledWrite) {
 }
 
 // The same sentence of §10.4.2 settles when the handle in that path is read: a
-// "class handle" in the left-hand side "shall be evaluated at the same time as
-// the expression on the right-hand side", which is where the statement
-// executes and not where the update region runs. So `h.f <= 8'hA5` followed by
-// `h = other` in the same time step writes the object h designated when the
-// statement ran, and leaves the object it was pointed at afterwards alone.
+// class handle in the left-hand side is evaluated together with the right-hand
+// side, which is where the statement executes and not where the update region
+// runs. So `h.f <= 8'hA5` followed by `h = other` in the same time step writes
+// the object h designated when the statement ran, and leaves the object it was
+// pointed at afterwards alone.
 //
 // This is the case that pins the design of the member-access arm rather than
 // its existence. Resolving the property from inside the update callback -- the

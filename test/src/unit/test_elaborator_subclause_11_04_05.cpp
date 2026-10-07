@@ -184,9 +184,8 @@ TEST(OperatorElaboration, ClassHandleCaseEqualityCompatibleElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.4.5 states "The logical equality (or case equality) operator is a legal
-// operation if either operand is a class handle or the literal null, and one of
-// the operands is assignment compatible with the other." Two handles of
+// §11.4.5 allows logical or case equality on a class handle or the literal null
+// only when one operand is assignment compatible with the other. Two handles of
 // unrelated classes are not assignment compatible, so the equality comparison
 // is rejected. This is the discriminating negative for the compatibility
 // requirement above.

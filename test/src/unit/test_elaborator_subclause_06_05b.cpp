@@ -7,8 +7,8 @@
 
 namespace {
 
-// §6.5 rules on printed page 91 that "Data shall be declared before they are
-// used, apart from implicit nets", and two walks in
+// §6.5 rules on printed page 91 that data is declared before it is used,
+// implicit nets aside, and two walks in
 // src/elaborator/elaborator_scope_rules_names.cpp answer that question of a
 // procedural assignment: CollectProcLocalNames gathers the names a procedural
 // block declares and CollectProcRhsIdents gathers the names its assignments
@@ -99,11 +99,10 @@ TEST(NetsAndVariables, BlockLocalReadInARandsequenceWeightCodeBlockIsAccepted) {
 // of the six checks that reduce an lvalue to its base. Its member arm followed
 // `base`, a field only a select carries, so it walked off the end of every
 // dotted name and answered nothing, and each caller reads nothing as "no base
-// to check". §6.5's rule against "a mixture of procedural and continuous
-// assignments writing to any term in the expansion of the longest static prefix
-// of a variable" is the one that makes that observable: the continuous
-// assignment names `v` and the procedural one names a member of it, which is a
-// term in the same expansion.
+// to check". §6.5's rule against procedural and continuous assignments mixed
+// over the terms of one variable's longest static prefix expansion is the one
+// that makes that observable: the continuous assignment names `v` and the
+// procedural one names a member of it, which is a term in the same expansion.
 TEST(NetsAndVariables,
      MemberQualifiedProceduralTargetIsAWriteToItsBaseVariable) {
   ElabFixture f;
@@ -192,8 +191,8 @@ TEST(NetsAndVariables, TypedOutputPortIsAVariableAProcedureMayWrite) {
              f));
 }
 
-// §6.5 (printed page 90): "A net can be written by one or more continuous
-// assignments", the single-assignment rule being stated of a variable's
+// §6.5 (printed page 90): any number of continuous assignments, one or more,
+// may write a net, the single-assignment rule being stated of a variable's
 // longest static prefix alone. Two continuous assignments to one bit of a
 // vector net, or to one element of a wor array, are two drivers the net type
 // resolves, and were reported as overlapping elements.

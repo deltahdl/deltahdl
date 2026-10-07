@@ -25,14 +25,14 @@ TEST(NettypeElaboration, UserDefinedNettypeCreatesNet) {
   EXPECT_TRUE(found_net);
 }
 
-// §6.7.1 says what it covers in its first sentence -- net declarations "whose
-// net type is not a user-defined nettype" -- and this net's net type is one, so
-// the list of data types that subclause admits is not asked of it. §6.7.2 says
-// only that "a net declared with a nettype uses the data type and any
-// associated resolution function for that nettype", so a 2-state data type
-// stands here where `wire bit [7:0] w;` would be rejected. The nettype above
-// this one is declared over `logic`, where accepting and rejecting the 2-state
-// case look alike; this is the one that tells them apart.
+// §6.7.1 says what it covers in its first sentence -- net declarations whose
+// net type is no user-defined nettype -- and this net's net type is one, so the
+// list of data types that subclause admits is not asked of it. §6.7.2 says only
+// that a net declared with a nettype takes that nettype's data type and
+// resolution function, if any, so a 2-state data type stands here where
+// `wire bit [7:0] w;` would be rejected. The nettype above this one is declared
+// over `logic`, where accepting and rejecting the 2-state case look alike; this
+// is the one that tells them apart.
 TEST(NettypeElaboration, NettypeWithTwoStateDataTypeCreatesNet) {
   ElabFixture f;
   auto* design = ElaborateSrc(

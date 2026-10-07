@@ -520,7 +520,7 @@ TEST(ExprType, BasedLiteralUnsignedZeroExtendedFullPipeline) {
 
 // The 's' notation flips the same literal to signed, so the identical value is
 // now sign-extended into the wider target. This is the discriminating negative
-// of the rule above and exercises the "except where s notation is used" branch.
+// of the rule above and exercises the branch for the s notation exception.
 TEST(ExprType, SignedBasedLiteralSignExtendedFullPipeline) {
   auto val = RunAndGet(
       "module t;\n"

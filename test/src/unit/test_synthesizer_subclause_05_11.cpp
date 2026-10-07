@@ -9,11 +9,11 @@ using namespace delta;
 namespace {
 
 // What the synthesizer answers for the array literal §5.11 defines. §5.11 rules
-// that "Array literals are syntactically similar to C initializers, but with
-// the replication operator ( {{}} ) allowed", and that "Array literals are
-// array assignment patterns or pattern expressions with constant member
-// expressions (see 10.9.1)". Each case below writes one of the forms §5.11
-// states and asserts the report that form draws.
+// that an array literal is written much like a C initializer, the replication
+// operator ( {{}} ) also allowed, and that it is an array assignment pattern or
+// pattern expression with constant member expressions (§10.9.1). Each case
+// below writes one of the forms §5.11 states and asserts the report that form
+// draws.
 //
 // Until this change this file wrote no array literal at all. It held an
 // unpacked array declaration and two continuous assignments to its elements,
@@ -27,9 +27,8 @@ namespace {
 // expression kind an array literal arrives as, and NonSynthExprRule in the same
 // file reports both.
 
-// §5.11 rules that an array literal "shall have a type, which may be either
-// explicitly indicated with a prefix or implicitly indicated by an
-// assignment-like context (see 10.8)". Written with no prefix, the literal
+// §5.11 rules that an array literal has a type, given either by a prefix or by
+// an assignment-like context (§10.8). Written with no prefix, the literal
 // reaches SynthLower::LowerExprBit as ExprKind::kAssignmentPattern, which
 // NonSynthExprRule reports under §10.9.
 TEST(ArrayLiteralSynth, UntypedArrayLiteralIsReportedUnlowered) {
@@ -92,13 +91,12 @@ TEST(ArrayLiteralSynth, TypePrefixedArrayLiteralIsReportedUnloweredAsACast) {
                             "6.24.1"));
 }
 
-// The nested literal §5.11 writes, where "The nesting of braces shall follow
-// the number of dimensions" and a replication operator may stand inside them.
-// This is §5.11's own example `int n[1:2][1:3] = '{'{0,1,2},'{3{4}}};` written
-// as a continuous assignment. The three cases above each write one brace pair
-// over one dimension, so none of them reaches the outer
-// ExprKind::kAssignmentPattern whose elements are themselves patterns, which is
-// the node SynthLower::LowerExprBit meets here.
+// The nested literal §5.11 writes, where braces nest once per dimension and a
+// replication operator may stand inside them. This is §5.11's own example
+// `int n[1:2][1:3] = '{'{0,1,2},'{3{4}}};` written as a continuous assignment.
+// The three cases above each write one brace pair over one dimension, so none
+// of them reaches the outer ExprKind::kAssignmentPattern whose elements are
+// themselves patterns, which is the node SynthLower::LowerExprBit meets here.
 TEST(ArrayLiteralSynth, NestedArrayLiteralIsReportedUnlowered) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

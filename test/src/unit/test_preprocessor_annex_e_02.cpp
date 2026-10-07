@@ -36,10 +36,10 @@ TEST(Preprocessor, DefaultDecayTime_RealArgument) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NEAR(pp.DefaultDecayTimeReal(), 3.5, 1e-9);
   EXPECT_FALSE(pp.DefaultDecayTimeInfinite());
-  // §3.14.1 rounds a delay value rather than truncating it -- "if the precision
-  // is the same as the time units, then delay values are rounded off to whole
-  // numbers (integers)" -- so the count the directive yields is 4. Nothing
-  // asserted this count before, and truncation gave 3.
+  // §3.14.1 rounds a delay value rather than truncating it -- with the
+  // precision equal to the time unit, delay values round to whole numbers -- so
+  // the count the directive yields is 4. Nothing asserted this count before,
+  // and truncation gave 3.
   EXPECT_EQ(pp.DefaultDecayTime(), 4u);
 }
 

@@ -147,11 +147,11 @@ TEST(UdpInstanceSim, UnspecifiedInputCombinationDrivesUnknown) {
 //
 // The two samples straddle that time rather than landing on it. A sample taken
 // at time 205 would read the net in the same time slot as the delayed update
-// writes it, and §4.7 rules that "active events can be taken off the Active or
-// Reactive event region and processed in any order", so which of the two values
-// it read would not be decided by §29.8. Time 204 is four time units after the
-// input change, where a delay dropped between the parser and the run would
-// already show 1, and time 206 is past the point where the delay has elapsed.
+// writes it, and §4.7 lets active events be taken off the Active or Reactive
+// event region and processed in any order, so which of the two values it read
+// would not be decided by §29.8. Time 204 is four time units after the input
+// change, where a delay dropped between the parser and the run would already
+// show 1, and time 206 is past the point where the delay has elapsed.
 //
 // The value read at time 204 is put there by the transition at time 100 rather
 // than by the values the initial block writes at time 0. A primitive instance
@@ -257,9 +257,9 @@ TEST(UdpInstanceSim, SequentialInstanceKeepsOneStateForTheRun) {
 // satisfies both.
 //
 // Both values are read after Scheduler::Run has returned, which is strictly
-// after every event this design schedules, so §4.7's rule that active events
-// "can be taken off the Active or Reactive event region and processed in any
-// order" does not decide what is read.
+// after every event this design schedules, so §4.7's rule letting active events
+// leave the Active or Reactive event region in any order does not decide what
+// is read.
 TEST(UdpInstanceSim, InstanceArrayDrivesEachOutputBitFromItsOwnElement) {
   EXPECT_EQ(SettledValue(std::string(kAndPrimitive) +
                              "module m;\n"

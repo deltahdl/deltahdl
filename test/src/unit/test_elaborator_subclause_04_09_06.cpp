@@ -208,10 +208,10 @@ TEST(PortConnectionElab, PrimitiveOutputPartSelectWidthFromParameter) {
 
 // The rest of this file covers the same rule for a user-defined primitive
 // instance rather than a gate instance. §4.9.6 states it for both in one
-// sentence -- "Primitive terminals, including UDP terminals, are different from
-// module ports. Primitive output and inout terminals shall be connected
-// directly to 1-bit nets or 1-bit structural net expressions" -- and §29.8 adds
-// of a UDP instantiation that it connects its terminals by §28.3.6's rules.
+// sentence -- primitive terminals, UDP terminals among them, are not module
+// ports, and a primitive's output and inout terminals connect straight to 1-bit
+// nets or 1-bit structural net expressions -- and §29.8 adds of a UDP
+// instantiation that it connects its terminals by §28.3.6's rules.
 //
 // The report a UDP instance provokes names its output terminal alone, because
 // §29.3.1 gives a UDP many inputs, one output and no inout port at all. That is

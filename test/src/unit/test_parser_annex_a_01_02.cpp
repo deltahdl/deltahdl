@@ -619,8 +619,8 @@ TEST(SourceText, ErrorMissingEndmodule) {
 // --- timeunits_declaration gives the slash to `timeunit` alone:
 // `timeunit time_literal [ / time_literal ] ;` against `timeprecision
 // time_literal ;`, and §3.14.2.2 says which keyword the second argument
-// belongs to: "The time precision may also be declared using an optional
-// second argument to the timeunit keyword using the slash separator." ---
+// belongs to: the time precision may also be given as an optional second,
+// slash-separated argument of the timeunit keyword. ---
 
 TEST(SourceText, TimeprecisionWithSlashIsRejectedInCompilationUnit) {
   auto r = Parse("timeprecision 1ns / 1ps;\nmodule m; endmodule\n");

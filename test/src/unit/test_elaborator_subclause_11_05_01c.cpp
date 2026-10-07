@@ -5,12 +5,12 @@
 
 using namespace delta;
 
-// §11.5.1 says of a non-indexed part-select `vect[msb_expr:lsb_expr]` that
-// "The first expression shall address a more significant bit than the second
-// expression", and states no condition on where the select stands. §11.5 makes
-// a part-select an operand, so the rule is owed wherever an expression can be
-// written, which is wherever a statement can be written. The four cases here
-// each put one reversed part-select in one statement position.
+// §11.5.1 requires of a non-indexed part-select `vect[msb_expr:lsb_expr]` that
+// the first expression address a more significant bit than the second, and
+// states no condition on where the select stands. §11.5 makes a part-select an
+// operand, so the rule is owed wherever an expression can be written, which is
+// wherever a statement can be written. The four cases here each put one
+// reversed part-select in one statement position.
 //
 // Each of those four is a position Elaborator::ValidatePartSelectBounds reached
 // only once CheckPartSelectBoundsStmt in
@@ -103,12 +103,11 @@ TEST(SelectElaboration, ReversedPartSelectInARandsequenceCodeBlockNames11_5_1) {
                             "11.5.1"));
 }
 
-// §11.4.12 says of a select of a concatenation that "Such a select shall not be
-// legal as a net_lvalue, variable_lvalue, or in any equivalent use, such as on
-// the left-hand side of an assignment", and states no condition on the
-// statement the assignment stands in. The report names §11.4.12 rather than
-// this file's §11.5.1, because it is the concatenation and not the bounds of
-// the select that makes the lvalue illegal.
+// §11.4.12 bars a select of a concatenation as a net_lvalue, a variable_lvalue
+// or any equivalent use, the left-hand side of an assignment among them, and
+// states no condition on the statement the assignment stands in. The report
+// names §11.4.12 rather than this file's §11.5.1, because it is the
+// concatenation and not the bounds of the select that makes the lvalue illegal.
 //
 // ElaboratorOperationRules::WalkStmtsForSelectOnConcatLvalue in
 // src/elaborator/elaborator_validate_operations_arrays.cpp reached six of the
@@ -247,11 +246,11 @@ TEST(SelectElaboration, SelectOnConcatLvalueInAForLoopStepNames11_4_12) {
                             "11.4.12"));
 }
 
-// §11.5.1 bars a bit-select or part-select of a scalar alone, and §6.18 makes
-// a variable declared through a typedef the type the typedef names: `B y`
-// under `typedef logic [7:0] B` is an eight-bit vector, `T x` under `typedef
-// logic [1:0][3:0] T` a packed array, and `W w` under `typedef int W` an
-// integer atom. None of them is a scalar, so their selects elaborate. The
+// §11.5.1 bars a bit-select or part-select of a scalar alone, and §6.18 makes a
+// variable declared through a typedef the type the typedef names: `B y` under
+// `typedef logic [7:0] B` is an eight-bit vector, `T x` under
+// `typedef logic [1:0][3:0] T` a packed array, and `W w` under `typedef int W`
+// an integer atom. None of them is a scalar, so their selects elaborate. The
 // name was not followed to the type it stands for, and every one of them was
 // reported as a select of a scalar.
 TEST(SelectElaboration, SelectsOfTypedefDeclaredVectorsElaborate) {

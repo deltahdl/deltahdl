@@ -94,10 +94,9 @@ static NettypeResolutionSig ConformingSig() {
   return sig;
 }
 
-// §6.6.7: "A user-defined resolution function for a net of a user-defined
-// nettype with a data type T shall be a function with a return type of T and a
-// single input argument whose type is a dynamic array of elements of type T."
-// The case fails when ValidateNettypeResolutionFunction answers anything but
+// §6.6.7: the resolution function of a user-defined nettype over data type T
+// returns T and takes one input argument, a dynamic array of T elements. The
+// case fails when ValidateNettypeResolutionFunction answers anything but
 // kReturnType for a signature whose only fault is the return type.
 TEST(NettypeElaboration, ResolutionFunctionWrongReturnTypeRejected) {
   auto sig = ConformingSig();
@@ -106,10 +105,10 @@ TEST(NettypeElaboration, ResolutionFunctionWrongReturnTypeRejected) {
             NettypeResolutionRule::kReturnType);
 }
 
-// §6.6.7: "A resolution function shall be automatic (or preserve no state
-// information) and have no side effects." The case fails when
-// ValidateNettypeResolutionFunction answers anything but kAutomaticLifetime for
-// a signature whose only fault is the lifetime.
+// §6.6.7: a resolution function is automatic, or keeps no state, and has no
+// side effects. The case fails when ValidateNettypeResolutionFunction answers
+// anything but kAutomaticLifetime for a signature whose only fault is the
+// lifetime.
 TEST(NettypeElaboration, ResolutionFunctionNonAutomaticRejected) {
   auto sig = ConformingSig();
   sig.is_automatic = false;
@@ -117,11 +116,10 @@ TEST(NettypeElaboration, ResolutionFunctionNonAutomaticRejected) {
             NettypeResolutionRule::kAutomaticLifetime);
 }
 
-// §6.6.7: "While a class function method may be used for a resolution function,
-// such functions shall be class static methods as the method call occurs in a
-// context where no class object is involved in the call." The case fails when
-// ValidateNettypeResolutionFunction answers anything but kClassStaticMethod for
-// a class method that is not static.
+// §6.6.7: a class function method may serve as a resolution function only if it
+// is static, since the call happens with no class object involved. The case
+// fails when ValidateNettypeResolutionFunction answers anything but
+// kClassStaticMethod for a class method that is not static.
 TEST(NettypeElaboration, ResolutionFunctionNonStaticClassMethodRejected) {
   auto sig = ConformingSig();
   sig.is_class_method = true;
@@ -130,10 +128,10 @@ TEST(NettypeElaboration, ResolutionFunctionNonStaticClassMethodRejected) {
             NettypeResolutionRule::kClassStaticMethod);
 }
 
-// §6.6.7 admits the class method that is static: "While a class function method
-// may be used for a resolution function, such functions shall be class static
-// methods". The case fails when ValidateNettypeResolutionFunction names any
-// rule broken by a static class method conforming in every other field.
+// §6.6.7 admits the class method that is static, a class function method
+// serving as a resolution function only when static. The case fails when
+// ValidateNettypeResolutionFunction names any rule broken by a static class
+// method conforming in every other field.
 TEST(NettypeElaboration, ResolutionFunctionStaticClassMethodAccepted) {
   auto sig = ConformingSig();
   sig.is_class_method = true;
@@ -142,12 +140,11 @@ TEST(NettypeElaboration, ResolutionFunctionStaticClassMethodAccepted) {
             NettypeResolutionRule::kConforming);
 }
 
-// §6.6.7: "While a class function method may be used for a resolution function,
-// such functions shall be class static methods as the method call occurs in a
-// context where no class object is involved in the call." The case fails unless
-// the run reports "shall be a static class method" at line 7, the `nettype`
-// declaration, under §6.6.7. Driven from source through parse + elaborate,
-// where ResolutionFunctionNonStaticClassMethodRejected above hands
+// §6.6.7: a class function method may serve as a resolution function only if it
+// is static, since the call happens with no class object involved. The case
+// fails unless the run reports "shall be a static class method" at line 7, the
+// `nettype` declaration, under §6.6.7. Driven from source through parse +
+// elaborate, where ResolutionFunctionNonStaticClassMethodRejected above hands
 // ValidateNettypeResolutionFunction the two flags directly: this one asserts
 // that `with C::res` reaches the class method the source named, and `res`
 // breaks no other requirement §6.6.7 states, so the class-static rule is the
@@ -354,7 +351,7 @@ TEST(NettypeElaboration, ConformingResolutionFunctionAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.6.7 requires "a single input argument", and Tsum here takes two. The case
+// §6.6.7 requires exactly one input argument, and Tsum here takes two. The case
 // fails unless the run reports "shall take a single input argument" at line 6,
 // the `nettype` declaration, under §6.6.7. No other §6.6.7 report ends there:
 // the argument-direction report continues "and this one is not declared input".
@@ -373,10 +370,10 @@ TEST(NettypeElaboration, ResolutionFunctionArgumentCountNamesItsOwnRule) {
                             "shall take a single input argument", 6, "6.6.7"));
 }
 
-// §6.6.7 requires a resolution function for a nettype with data type T to "be a
-// function with a return type of T", and Tsum here returns U. The case fails
-// unless the run reports "shall have a return type of 'T'" at line 8, the
-// `nettype` declaration, under §6.6.7.
+// §6.6.7 requires a resolution function for a nettype with data type T to
+// return T, and Tsum here returns U. The case fails unless the run reports
+// "shall have a return type of 'T'" at line 8, the `nettype` declaration, under
+// §6.6.7.
 TEST(NettypeElaboration, ResolutionFunctionReturnTypeNamesItsOwnRule) {
   ElabFixture f;
   Elaborate(
@@ -394,9 +391,9 @@ TEST(NettypeElaboration, ResolutionFunctionReturnTypeNamesItsOwnRule) {
                             "shall have a return type of 'T'", 8, "6.6.7"));
 }
 
-// §6.6.7 requires the argument's "type is a dynamic array of elements of type
-// T", and `input T driver[4]` is a fixed-size array. The case fails unless the
-// run reports "a dynamic array rather than a fixed-size array" at line 6, the
+// §6.6.7 requires the argument to be a dynamic array of T elements, and
+// `input T driver[4]` is a fixed-size array. The case fails unless the run
+// reports "a dynamic array rather than a fixed-size array" at line 6, the
 // `nettype` declaration, under §6.6.7.
 TEST(NettypeElaboration,
      ResolutionFunctionDynamicArrayArgumentNamesItsOwnRule) {
@@ -415,7 +412,7 @@ TEST(NettypeElaboration,
                             "6.6.7"));
 }
 
-// §6.6.7 admits "a single input argument", so an `output` argument breaks the
+// §6.6.7 admits exactly one input argument, so an `output` argument breaks the
 // clause even though the count is right. The case fails unless the run reports
 // "and this one is not declared input" at line 6, the `nettype` declaration,
 // under §6.6.7.
@@ -434,7 +431,7 @@ TEST(NettypeElaboration, ResolutionFunctionOutputArgumentRejected) {
                             "and this one is not declared input", 6, "6.6.7"));
 }
 
-// §6.6.7 admits "a single input argument", so a `ref` argument breaks the
+// §6.6.7 admits exactly one input argument, so a `ref` argument breaks the
 // clause as an `output` one does. The case fails unless the run reports "and
 // this one is not declared input" at line 6, the `nettype` declaration, under
 // §6.6.7.
@@ -453,10 +450,10 @@ TEST(NettypeElaboration, ResolutionFunctionRefArgumentRejected) {
                             "and this one is not declared input", 6, "6.6.7"));
 }
 
-// §6.6.7 requires the argument to be "a dynamic array of elements of type T",
-// and Tsum here takes a dynamic array of U against a nettype whose data type is
-// T. The case fails unless the run reports "dynamic array of elements of type
-// 'T'" at line 8, the `nettype` declaration, under §6.6.7.
+// §6.6.7 requires the argument to be a dynamic array of T elements, and Tsum
+// here takes a dynamic array of U against a nettype whose data type is T. The
+// case fails unless the run reports "dynamic array of elements of type 'T'" at
+// line 8, the `nettype` declaration, under §6.6.7.
 TEST(NettypeElaboration,
      ResolutionFunctionArgumentElementTypeMismatchRejected) {
   ElabFixture f;

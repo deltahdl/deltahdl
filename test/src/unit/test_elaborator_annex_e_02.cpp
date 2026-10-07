@@ -137,11 +137,10 @@ TEST(Elaborator, DefaultDecayTime_LaterOverridesAtElabLevel) {
 
 // C1 (real_constant) x C3: a real-valued directive still drives the decay time
 // applied to a trireg. E.2 admits a real_constant and gives no conversion of
-// its own, so §3.14.1 settles what it becomes -- "the time precision specifies
-// how delay values are rounded before being used in simulation", and where the
-// precision is the time unit itself "delay values are rounded off to whole
-// numbers (integers)". The count is rounded and not truncated, so 3.5 is a
-// decay time of 4.
+// its own, so §3.14.1 settles what it becomes -- the time precision fixes how a
+// delay value is rounded before simulation uses it, and where the precision
+// equals the time unit, delay values round to whole numbers. The count is
+// rounded and not truncated, so 3.5 is a decay time of 4.
 TEST(Elaborator, DefaultDecayTime_RealArgumentAppliesToTrireg) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(

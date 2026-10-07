@@ -223,19 +223,19 @@ TEST(StreamingUnpackSim, NullClassHandleTargetIsSkipped) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §11.4.14.3: the unpack splits the stream "into one or more variables", and
+// §11.4.14.3: the unpack splits the stream into one or more variables, and
 // Syntax 11-4 makes every item of the target list a stream_expression, that is
 // an expression -- so `a[3:0]` is a four-bit element: it claims four bits of
 // the stream and deposits them in the four bits it names, leaving `a[7:4]`
 // standing.
 //
 // The expected values follow from the clause alone. The target list is 4 + 8 =
-// 12 bits and the source holds 16, and "if the source expression contains more
-// bits than are needed, the appropriate number of bits shall be consumed from
-// its left (most significant) end", so the stream is the top twelve bits of
-// 16'h9ABC, namely 12'h9AB, and 4'hC is discarded. §11.4.14.2 has `>>` perform
-// no re-ordering, so the leading 4'h9 goes to `a[3:0]` and the remaining 8'hAB
-// to `b`. `a` therefore reads 8'hF9, its upper nibble surviving, and `b` 8'hAB.
+// 12 bits and the source holds 16, and a source holding more bits than needed
+// gives up the needed bits from its left (most significant) end, so the stream
+// is the top twelve bits of 16'h9ABC, namely 12'h9AB, and 4'hC is discarded.
+// §11.4.14.2 has `>>` perform no re-ordering, so the leading 4'h9 goes to
+// `a[3:0]` and the remaining 8'hAB to `b`. `a` therefore reads 8'hF9, its upper
+// nibble surviving, and `b` 8'hAB.
 //
 // CollectStreamElements sized the element at the whole width of `a` and
 // WriteStreamElement stored the slice over the whole of `a`, both resolving the
@@ -267,12 +267,12 @@ TEST(StreamingUnpackSim, SelectElementTakesOnlyTheBitsItNames) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 0xABu);
 }
 
-// §11.4.14.3: "if more bits are needed than are provided by the source
-// expression, an error shall be generated" -- and here none are. `{a[3:0], b}`
-// needs 4 + 8 = 12 bits and the source supplies exactly 12, so no bits are
-// consumed from either end: the stream is 12'h9AB whole, `a[3:0]` takes 4'h9
-// over the low nibble of 8'hF0 and `b` takes 8'hAB, the same answers the
-// wider-source case derives, reached without any surplus to drop.
+// §11.4.14.3: needing more bits than the source expression provides is an error
+// -- and here none are. `{a[3:0], b}` needs 4 + 8 = 12 bits and the source
+// supplies exactly 12, so no bits are consumed from either end: the stream is
+// 12'h9AB whole, `a[3:0]` takes 4'h9 over the low nibble of 8'hF0 and `b` takes
+// 8'hAB, the same answers the wider-source case derives, reached without any
+// surplus to drop.
 //
 // Because CollectStreamElements answered 16 for this list,
 // UnpackStreamingConcatLhs compared 12 against 16, reported "too few bits in
@@ -310,14 +310,13 @@ TEST(StreamingUnpackSim, SelectElementSizesTheStreamByItsOwnWidth) {
 }
 
 // §11.4.14.1 appends each stream_expression's own bit-stream to the generic
-// stream -- "Each stream_expression within the stream_concatenation ... is
-// converted to a bit-stream and appended to a packed array (stream) of bits" --
-// so how many bits a target element claims is a question about the expression,
-// and §11.5.1 answers it for an invalid address without taking the bits away:
-// "if the bit-select address is invalid (it is out of bounds or has one or more
-// x or z bits), then the value returned by the reference shall be x for 4-state
-// and 0 for 2-state values", while saying separately that such a write "shall
-// have no effect on the data stored". A value, not an absence. So `a[9]` on a
+// stream -- each stream_expression of the stream_concatenation becomes a
+// bit-stream added to the end of a packed array (stream) of bits -- so how many
+// bits a target element claims is a question about the expression, and §11.5.1
+// answers it for an invalid address without taking the bits away: a bit-select
+// whose address is invalid, out of bounds or holding an x or z bit, returns x
+// for a 4-state value and 0 for a 2-state one, while saying separately that
+// such a write stores nothing. A value, not an absence. So `a[9]` on a
 // `logic [7:0] a` is one bit of the stream that reaches nothing.
 //
 // 17'h1AAC3 laid out is 1_1010101_0_11000011. The list names 8 + 1 + 8 = 17
@@ -367,12 +366,11 @@ TEST(StreamingUnpackSim,
 
 // The same defect reached through a part-select, which is what separates "an
 // invalid select element claims one bit" from "an invalid select element claims
-// the width its indices name". §11.5.1 has a part-select address "several
-// contiguous bits", and of the wholly out-of-range one it says only that it
-// "shall yield the value x when read and shall have no effect on the data
-// stored when written" -- nothing there narrows the bits the indices name -- so
-// `a[11:9]` on a `logic [7:0] a` is three bits of the stream and none of them
-// reaches `a`.
+// the width its indices name". §11.5.1 has a part-select address a run of
+// contiguous bits, and of the wholly out-of-range one it says only that it
+// reads as x and stores nothing when written -- nothing there narrows the bits
+// the indices name -- so `a[11:9]` on a `logic [7:0] a` is three bits of the
+// stream and none of them reaches `a`.
 //
 // 19'h6ABC3 is 11010101_011_11000011: the list names 8 + 3 + 8 = 19 bits
 // against a 19-bit source, so `c` takes bits [18:11] = 8'hD5, `a[11:9]` takes
@@ -410,12 +408,11 @@ TEST(StreamingUnpackSim,
 }
 
 // §11.5.1 gives the partially out-of-range part-select its own rule, and not
-// the one it gives the wholly out-of-range one: such a select "shall, when
-// read, return x for the bits that are out of range and shall, when written,
-// only affect the bits that are in range". Which of its bits land says nothing
-// about how wide the element is, since §11.4.14.1 makes a stream_expression's
-// contribution its expression's bit-stream, so `a[9:6]` is four bits of the
-// stream and two of them reach `a`.
+// the one it gives the wholly out-of-range one: such a select reads x for its
+// out-of-range bits and writes only its in-range ones. Which of its bits land
+// says nothing about how wide the element is, since §11.4.14.1 makes a
+// stream_expression's contribution its expression's bit-stream, so `a[9:6]` is
+// four bits of the stream and two of them reach `a`.
 //
 // This is the shape the wholly out-of-bounds cases above cannot reach, because
 // SelectStorageBits answers two here rather than zero: a repair that only
@@ -589,10 +586,10 @@ TEST(StreamingUnpackSim, ShortStreamForwardResolveNames11_4_14_3) {
                             "11.4.14.3"));
 }
 
-// §11.4.14.3: "if more bits are needed than are provided by the source
-// expression, an error shall be generated" -- and the invalid select element is
-// what decides whether more are needed. `{c, a[9], b}` names 8 + 1 + 8 = 17
-// bits and 16'hD5C3 supplies sixteen, one short, so the report is required.
+// §11.4.14.3: needing more bits than the source expression provides is an error
+// -- and the invalid select element is what decides whether more are needed.
+// `{c, a[9], b}` names 8 + 1 + 8 = 17 bits and 16'hD5C3 supplies sixteen, one
+// short, so the report is required.
 //
 // Every other case here has the bits it needs, which is what makes this shape
 // the only one that catches the suppressed report. UnpackStreamingConcatLhs

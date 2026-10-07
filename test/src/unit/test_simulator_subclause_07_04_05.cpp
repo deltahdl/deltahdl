@@ -372,7 +372,7 @@ TEST(ArrayIndexingAndSlicing, IndexedMinusPartSelectOnMultidimCoversItsWidth) {
   EXPECT_EQ(RunAndGet(src, "indexed"), 0x0000005000000040ull);
 }
 
-// §7.4.5: "A slice name of an unpacked array is an unpacked array." The
+// §7.4.5: a slice name of an unpacked array is itself an unpacked array. The
 // clause's own example assigns a two-element slice to a two-element array:
 //
 //   bit signed [31:0] busA [7:0];   // unpacked array of 8 32-bit vectors
@@ -469,11 +469,11 @@ TEST(ArrayIndexingAndSlicing, ClauseExampleDescendingArraysPairByPosition) {
                  "busB", {0x60u, 0x70u});
 }
 
-// §7.4.5: "A slice name of an unpacked array is an unpacked array", and one
-// unpacked array is assigned to another by position, not by index. A descending
-// source names its highest-indexed element first, so that element fills the
-// ascending destination's lowest. Pairing by ascending index at both ends would
-// instead leave `dst[0] == src[0]`, which is the reverse of this.
+// §7.4.5: a slice name of an unpacked array is itself an unpacked array, and
+// one unpacked array is assigned to another by position, not by index. A
+// descending source names its highest-indexed element first, so that element
+// fills the ascending destination's lowest. Pairing by ascending index at both
+// ends would instead leave `dst[0] == src[0]`, which is the reverse of this.
 TEST(ArrayIndexingAndSlicing, DescendingSourceSliceFillsAscendingDestination) {
   SimFixture f;
   RunModuleArray(f,
@@ -545,15 +545,15 @@ TEST(ArrayIndexingAndSlicing,
                  "dst", {0xA0u, 0xB0u});
 }
 
-// §7.4.5 (printed page 156): "A single element of a packed or unpacked array
-// can be selected using an indexed name", stated with `bit [3:0] [7:0] j;` and
-// `k = j[2]; // select a single 8-bit element from j`. A module port carries
-// packed dimensions the same way a variable or a net does, so an index on a
-// port declared with more than one of them names an element and not a bit. The
-// select sits inside the instantiated module and the parent reads back what it
-// drives, so Lowerer::CreateChildModulePorts in src/simulator/lowerer_child.cpp
-// is the path that records the element width. 32'hDEADBEEF tells the two
-// readings apart: element 1 is 8'hBE, while bit 1 is 1.
+// §7.4.5 (printed page 156): an indexed name selects one element of a packed or
+// unpacked array, stated with `bit [3:0] [7:0] j;` and `k = j[2]; // select a
+// single 8-bit element from j`. A module port carries packed dimensions the
+// same way a variable or a net does, so an index on a port declared with more
+// than one of them names an element and not a bit. The select sits inside the
+// instantiated module and the parent reads back what it drives, so
+// Lowerer::CreateChildModulePorts in src/simulator/lowerer_child.cpp is the
+// path that records the element width. 32'hDEADBEEF tells the two readings
+// apart: element 1 is 8'hBE, while bit 1 is 1.
 TEST(ArrayIndexingAndSlicing, PortSingleIndexSelectsAPackedElement) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -612,17 +612,17 @@ TEST(ArrayIndexingAndSlicing, NetSingleIndexSelectsAPackedElement) {
   EXPECT_EQ(var->value.ToUint64(), 0xBEu);
 }
 
-// §7.4.5 makes "a slice name of an unpacked array ... an unpacked array", and
-// §6.8 makes every element it names a storage element of its own: "A variable
-// is an abstraction of a data storage element. A variable shall store a value
-// from one assignment to the next." So `echo[0:1] = wave[0:1]` has to leave
-// these two arrays four variables and not two.
-// CollectUnpackedSliceElements (src/simulator/eval_select.cpp) answered each
-// position of the run with the source element variable's own Logic4Vec, and
-// WriteUnpackedSliceElements (src/simulator/statement_assign_core.cpp) stores
-// what it is handed; a Logic4Vec copies its `words` pointer rather than the
-// words (src/common/types.h), so the window and the source it was filled from
-// ran on one buffer per position.
+// §7.4.5 makes a slice name of an unpacked array itself an unpacked array, and
+// §6.8 makes every element it names a storage element of its own: a variable
+// stands for a data storage element and keeps its value from one assignment to
+// the next. So `echo[0:1] = wave[0:1]` has to leave these two arrays four
+// variables and not two. CollectUnpackedSliceElements
+// (src/simulator/eval_select.cpp) answered each position of the run with the
+// source element variable's own Logic4Vec, and WriteUnpackedSliceElements
+// (src/simulator/statement_assign_core.cpp) stores what it is handed; a
+// Logic4Vec copies its `words` pointer rather than the words
+// (src/common/types.h), so the window and the source it was filled from ran on
+// one buffer per position.
 //
 // Eight bits on both sides is load-bearing. The writer resizes each element to
 // the destination's width, and ResizeToWidth answers its argument untouched
@@ -689,8 +689,8 @@ TEST(ArrayIndexingAndSlicing, SliceWindowElementsGetTheirOwnWords) {
 // collector is therefore the only place this shape can be made to own its
 // words, which is what this case stands over: a run answered with the source
 // elements' own Logic4Vecs left `limb[0]` and `trunk[0]` one storage element,
-// against §6.8, which gives each of the four a value it holds "from one
-// assignment to the next".
+// against §6.8, which gives each of the four a value it keeps from one
+// assignment to the next.
 //
 // Sixteen bits on both sides for the reason the eight above were: the writer
 // resizes to the destination's element width and a mismatch would allocate,
@@ -728,13 +728,12 @@ TEST(ArrayIndexingAndSlicing, ArrayFilledFromASliceGetsItsOwnWords) {
   EXPECT_EQ(taken->value.words[0].bval & 0xFFFFu, 0x0000u);
 }
 
-// §7.4.5: "Reading from an unpacked array of any kind with an invalid index
-// shall return the value specified in Table 7-1", and the table gives a
-// 4-state integral element 'x. §7.4.5 has the slice's size constant and its
-// position variable, so `a[i +: 2]` running one past the end is the form the
-// clause itself names rather than a corner. The element spelling of this read
-// answers the table correctly, and the slice spelling answered '0 for every
-// array whatever its element type.
+// §7.4.5: a read of any unpacked array through an invalid index returns the
+// Table 7-1 value, and the table gives a 4-state integral element 'x. §7.4.5
+// has the slice's size constant and its position variable, so `a[i +: 2]`
+// running one past the end is the form the clause itself names rather than a
+// corner. The element spelling of this read answers the table correctly, and
+// the slice spelling answered '0 for every array whatever its element type.
 TEST(ArrayIndexingAndSlicing, SliceOfA4StateArrayReadsXForAMissingElement) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -798,12 +797,12 @@ TEST(ArrayIndexingAndSlicing, PackedSliceReadIsXForAMissingElement) {
   EXPECT_EQ(var->value.ToString(), "xxxxxxxx00100010");
 }
 
-// §6.3.1: "All bits of 4-state vectors can be independently set to one of the
-// four basic values", and a slice read as one packed value is a concatenation
-// of such vectors. The assembly took each element through ToUint64, which
-// projects `aval & ~bval`, and wrote the aval plane alone, so no element could
-// carry an x or a z out of it. ToUint64 cannot see the difference either --
-// it reads an all-x element as 0 -- so the assertion is on ToString.
+// §6.3.1: each bit of a 4-state vector may independently take any of the four
+// basic values, and a slice read as one packed value is a concatenation of such
+// vectors. The assembly took each element through ToUint64, which projects
+// `aval & ~bval`, and wrote the aval plane alone, so no element could carry an
+// x or a z out of it. ToUint64 cannot see the difference either -- it reads an
+// all-x element as 0 -- so the assertion is on ToString.
 TEST(ArrayIndexingAndSlicing, ArraySliceAsValueKeepsXAndZ) {
   SimFixture f;
   auto* var = RunAndFindVar(

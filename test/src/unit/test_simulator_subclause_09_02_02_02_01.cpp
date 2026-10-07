@@ -281,14 +281,13 @@ TEST(AlwaysCombSensitivitySim, TaskCallInAlwaysCombExecutes) {
 }
 
 // §9.2.2.2.1 (printed page 223) settles what an immediate assertion inside an
-// always_comb contributes: "An expression used in an immediate assertion (see
-// 16.3) within the procedure, or in any function called within the procedure,
-// contributes to the implicit sensitivity list of an always_comb as if that
-// expression were used as a condition of an if statement. Expressions used in
-// assertion action blocks do not contribute to the implicit sensitivity list of
-// an always_comb." Its worked example writes `disable_error` in the else action
-// and states the block "shall trigger whenever b, c or e changes", naming the
-// action block's identifier in neither list.
+// always_comb contributes: an expression in an immediate assertion (§16.3) in
+// the procedure, or in a function the procedure calls, joins the always_comb's
+// implicit sensitivity list as though it were an if statement's condition,
+// while an expression in an assertion action block adds nothing to that list.
+// Its worked example writes `disable_error` in the else action and has the
+// block trigger on any change of b, c or e, naming the action block's
+// identifier in neither list.
 //
 // So `en`, the assertion expression, is in the list, and `a`, read only in the
 // pass statement, is not. `a` moves from 10 to 20 at time 1 while `en` is held,
@@ -338,13 +337,13 @@ TEST(AlwaysCombSensitivitySim, AssertFailStatementReadStaysOutOfSensitivity) {
   EXPECT_EQ(y->value.ToUint64(), 13u);
 }
 
-// §9.2.2.2.1: the implicit sensitivity list holds "each net or variable
-// identifier or select expression that is read within the block", and its three
-// exceptions name a declaration, a write and a timing control expression. None
-// of them names a statement position, and the action-block exclusion on printed
-// page 223 is about assertion action blocks alone, so a read inside a randcase
-// item counts. `a` is read only in the item, moves from 10 to 20 at time 1, and
-// the re-evaluated block leaves 23 behind. The single item carries weight 3, so
+// §9.2.2.2.1: the implicit sensitivity list holds every net or variable
+// identifier or select expression the block reads, and its three exceptions
+// name a declaration, a write and a timing control expression. None of them
+// names a statement position, and the action-block exclusion on printed page
+// 223 is about assertion action blocks alone, so a read inside a randcase item
+// counts. `a` is read only in the item, moves from 10 to 20 at time 1, and the
+// re-evaluated block leaves 23 behind. The single item carries weight 3, so
 // §18.16 selects it on every draw whatever the random number is.
 TEST(AlwaysCombSensitivitySim, RandcaseItemReadRetriggersProcess) {
   SimFixture f;
@@ -392,16 +391,16 @@ TEST(AlwaysCombSensitivitySim, RandsequenceCodeBlockReadRetriggersProcess) {
   EXPECT_EQ(y->value.ToUint64(), 23u);
 }
 
-// §9.2.2.2.1 exception (b) leaves out of the implicit sensitivity list "any
-// expression that is also written within the block", and names no statement
-// position, so a write standing in an assertion action block is a write within
-// the block. `tmp` is read by `y = tmp;` and written by the pass statement, so
-// exception (b) removes it and the procedure does not re-trigger on its own
-// assignment. The count of evaluations is what distinguishes that from a
-// procedure sensitive to `tmp`: such a procedure evaluates once at time zero,
-// drives `tmp` from x to 13, wakes on that change and evaluates a second time.
-// Both evaluations compute the same 13, so the printed line is the only place
-// the extra pass shows.
+// §9.2.2.2.1 exception (b) leaves out of the implicit sensitivity list any
+// expression the block also writes, and names no statement position, so a write
+// standing in an assertion action block is a write within the block. `tmp` is
+// read by `y = tmp;` and written by the pass statement, so exception (b)
+// removes it and the procedure does not re-trigger on its own assignment. The
+// count of evaluations is what distinguishes that from a procedure sensitive to
+// `tmp`: such a procedure evaluates once at time zero, drives `tmp` from x to
+// 13, wakes on that change and evaluates a second time. Both evaluations
+// compute the same 13, so the printed line is the only place the extra pass
+// shows.
 TEST(AlwaysCombSensitivitySim, ActionBlockWriteKeepsNameOutOfSensitivity) {
   SimFixture f;
   std::string out = RunCapture(
@@ -451,16 +450,16 @@ TEST(AlwaysCombSensitivitySim, ActionBlockFunctionCallStaysOutOfSensitivity) {
 }
 
 // §9.2.2.2.1 puts in the implicit sensitivity list every net or variable
-// identifier "that is read within the block", and A.2.4 gives a
-// variable_decl_assignment an initializer, which is where `a` and `b` are read
-// here and nowhere else. None of the clause's three exceptions removes them:
-// neither is declared within the block, neither is written within it, and an
-// initializer is not a timing control expression. So the change to `a` at time
-// 1 re-evaluates the block: `y` is 13 after the time-zero evaluation and 23
-// after the second one, and a block that never woke leaves 13 behind. `tmp` is
-// declared automatic, so §6.21 runs its initializer on every evaluation; a
-// static one would be initialized once, and §6.21 requires the `static` to be
-// written where it has an initializer in a procedural block.
+// identifier the block reads, and A.2.4 gives a variable_decl_assignment an
+// initializer, which is where `a` and `b` are read here and nowhere else. None
+// of the clause's three exceptions removes them: neither is declared within the
+// block, neither is written within it, and an initializer is not a timing
+// control expression. So the change to `a` at time 1 re-evaluates the block:
+// `y` is 13 after the time-zero evaluation and 23 after the second one, and a
+// block that never woke leaves 13 behind. `tmp` is declared automatic, so §6.21
+// runs its initializer on every evaluation; a static one would be initialized
+// once, and §6.21 requires the `static` to be written where it has an
+// initializer in a procedural block.
 TEST(AlwaysCombSensitivitySim, BlockLocalInitializerReadRetriggersProcess) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -520,8 +519,8 @@ TEST(AlwaysCombSensitivitySim, RandcaseWeightReadRetriggersProcess) {
   EXPECT_EQ(y->value.ToUint64(), 35u);
 }
 
-// §9.2.2.2.1 counts a read "within any function called within the block" and
-// puts no condition on where in the block the call stands. `a` is read only in
+// §9.2.2.2.1 counts a read inside any function the block calls and puts no
+// condition on where in the block the call stands. `a` is read only in
 // `plus_a`, and `plus_a` is called only from the initializer of a block-local
 // declaration, so `a` reaches the implicit sensitivity list only through the
 // walk that collects the names of called functions. That is a separate walk
@@ -579,12 +578,12 @@ bool RunTwoSignalDesign(SimFixture& f) {
   return true;
 }
 
-// §9.2.2.2.1 puts on the implicit sensitivity list "the expansions of the
-// longest static prefix of each net or variable identifier or select expression
-// that is read", and an expansion is an object of the design. `b[3]` names a
-// position within `b` and no object, SimContext::FindVariable resolving a
-// declared name against one Variable per declaration, so it belongs to no
-// expansion and is not on the list.
+// §9.2.2.2.1 puts on the implicit sensitivity list the expansion of the longest
+// static prefix of every net or variable identifier or select expression it
+// reads, and an expansion is an object of the design. `b[3]` names a position
+// within `b` and no object, SimContext::FindVariable resolving a declared name
+// against one Variable per declaration, so it belongs to no expansion and is
+// not on the list.
 //
 // Watching it is what the list was doing. The awaiters skip a name they cannot
 // resolve when they arm, so the name contributed nothing but its presence, and
@@ -614,7 +613,7 @@ TEST(ImplicitSensitivityWatchList, KeepsEveryNameThatDesignatesAnObject) {
 // whatever it drives holds its last value for the rest of the run, reported
 // nowhere. The list has to reach that test empty for the loop to evaluate once
 // and finish, which is what §9.2.2.2.1 leaves for a procedure with nothing on
-// its sensitivity list -- it "is automatically triggered once at time zero".
+// its sensitivity list -- it runs once, automatically, at time zero.
 TEST(ImplicitSensitivityWatchList, EmptiesAListWhoseNamesAllDesignateNoObject) {
   SimFixture f;
   ASSERT_TRUE(RunTwoSignalDesign(f));
@@ -623,13 +622,13 @@ TEST(ImplicitSensitivityWatchList, EmptiesAListWhoseNamesAllDesignateNoObject) {
   EXPECT_TRUE(names.empty());
 }
 
-// §9.2.2.2.1: "The implicit sensitivity list of an always_comb includes the
-// expansions of the longest static prefix of each net or variable identifier or
-// select expression that is read within the block". An unpacked array's element
-// is a Variable of its own, and every element writer notifies that Variable
-// rather than the one the array's name denotes, so watching the base name alone
-// left this block reading Table 6-7's 'x for the rest of the run. 8'hEF against
-// that x is the discriminating pair: ToUint64 reads an all-x value as 0.
+// §9.2.2.2.1: an always_comb's implicit sensitivity list holds the expansion of
+// the longest static prefix of every net or variable identifier or select
+// expression the block reads. An unpacked array's element is a Variable of its
+// own, and every element writer notifies that Variable rather than the one the
+// array's name denotes, so watching the base name alone left this block reading
+// Table 6-7's 'x for the rest of the run. 8'hEF against that x is the
+// discriminating pair: ToUint64 reads an all-x value as 0.
 TEST(AlwaysCombSensitivitySim, ReactsToAWriteOfTheArrayElementItReads) {
   SimFixture f;
   auto* var = RunAndFindVar(

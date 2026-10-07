@@ -172,17 +172,16 @@ void Parser::ParseClassExtendsClause(ClassDecl* decl, bool is_implements) {
 }
 
 // Makes the type names of the classes decl derives from type names in decl's
-// own body. §8.13 gives a subclass "the members of the base class", and §8.26.3
-// gives an extending interface class the parameters and typedefs of the
-// interface class it extends.
+// own body. §8.13 gives a subclass the base class's members, and §8.26.3 gives
+// an extending interface class the parameters and typedefs of the interface
+// class it extends.
 //
-// decl->implements_types is read here as well, although §8.26.3 rules that
-// "Parameters and typedefs within an interface class are inherited by extending
-// interface classes, but are not inherited by implementing interface classes",
-// and gives `class ClassA implements IntfC; t1_t t1_i;` as an error on printed
-// page 210. That rule decides whether a reference is legal, and this table
-// decides only how the tokens group.
-// Elaborator::CheckImplementsTypeAccessOfType in
+// decl->implements_types is read here as well, although §8.26.3 passes an
+// interface class's parameters and typedefs to the interface classes that
+// extend it and not to the classes that implement it, and gives
+// `class ClassA implements IntfC; t1_t t1_i;` as an error on printed page 210.
+// That rule decides whether a reference is legal, and this table decides only
+// how the tokens group. Elaborator::CheckImplementsTypeAccessOfType in
 // src/elaborator/elaborator_validate_class_inheritance.cpp is what reports the
 // illegal reference against §8.26.3, and it can only report a declaration the
 // parser read as one. Leaving implements out here would replace that report
@@ -462,19 +461,18 @@ void Parser::ValidateConstructorQualifiers(ClassMember* member) {
 
 // Reports a method body written after a `pure virtual` prototype, and discards
 // it. §8.21 (printed page 199) states the rule as a definition rather than as
-// an error: a pure virtual method "shall be indicated with the keyword pure
-// together with not providing a method body". Syntax 8-1 (printed page 180)
-// says the same in the grammar, admitting only
-// `pure virtual { class_item_qualifier } method_prototype ;`, and a prototype
-// ends at the port list. An empty body still counts, because §8.21's own NOTE
-// rules that "A method without a statement body is still a legal, callable
-// method". The body's `endfunction` or `endtask` is not the next token when the
-// body holds statements, so this scans for it and restores the lexer position
-// when there is none. The scan stops at `endclass` and at a further `function`
-// or `task`, past which the keyword found would close something else. The body
-// is discarded rather than parsed, which is what keeps what it declares out of
-// the class: Parser::ParseClassMembers would otherwise read `int x = 1;` as a
-// class property and report the rest under §8.5.
+// an error: a pure virtual method is marked by the keyword pure and by having
+// no method body. Syntax 8-1 (printed page 180) says the same in the grammar,
+// admitting only `pure virtual { class_item_qualifier } method_prototype ;`,
+// and a prototype ends at the port list. An empty body still counts, because
+// §8.21's own NOTE keeps a method with no statement body a legal method that
+// can be called. The body's `endfunction` or `endtask` is not the next token
+// when the body holds statements, so this scans for it and restores the lexer
+// position when there is none. The scan stops at `endclass` and at a further
+// `function` or `task`, past which the keyword found would close something
+// else. The body is discarded rather than parsed, which is what keeps what it
+// declares out of the class: Parser::ParseClassMembers would otherwise read
+// `int x = 1;` as a class property and report the rest under §8.5.
 void Parser::RejectPureVirtualMethodBody(const ClassMember* member,
                                          bool is_func) {
   if (!member->is_pure_virtual) return;

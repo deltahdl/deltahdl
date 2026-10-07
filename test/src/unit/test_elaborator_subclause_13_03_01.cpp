@@ -61,16 +61,16 @@ TEST(StaticAutomaticTask, AutoTaskItemHierRefInInitialError) {
       "13.3.1"));
 }
 
-// §13.3.1 says the items of an automatic task "are allocated dynamically for
-// each concurrent task entry" and "cannot be accessed by hierarchical
-// references", naming no position such a reference is allowed to stand in, so
+// §13.3.1 says the items of an automatic task get fresh storage for every
+// concurrent entry into the task and are out of reach of hierarchical
+// references, naming no position such a reference is allowed to stand in, so
 // every position a statement holds a statement in is one the report reaches.
-// WalkStmtsForAutoRef in
-// src/elaborator/elaborator_validate_hier_refs.cpp had written out nine of
-// the thirteen child-statement links Stmt declares and now takes the
-// list from ForEachChildStmt in src/elaborator/elaborator_validate_internal.h.
-// The four cases below stand in the four positions it was missing. The same
-// walk carries §13.4.2's report for a function, whose four cases are in
+// WalkStmtsForAutoRef in src/elaborator/elaborator_validate_hier_refs.cpp had
+// written out nine of the thirteen child-statement links Stmt declares and now
+// takes the list from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. The four cases below stand in
+// the four positions it was missing. The same walk carries §13.4.2's report for
+// a function, whose four cases are in
 // test/src/unit/test_elaborator_subclause_13_04_02.cpp.
 
 // A.6.10 gives `simple_immediate_assert_statement ::= assert ( expression )

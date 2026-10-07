@@ -125,12 +125,12 @@ TEST(SystemNameLexing, EscapedNameThatIsNoSystemTfIdentifierReportsNothing) {
   EXPECT_TRUE(LexDiagnostics("$display ").empty());
 }
 
-// §5.6.3: "Additional user-defined system tasks and system functions can be
-// defined using the PLI, as described in Clause 36." What a name of one may be
-// is therefore Clause 36's to say and not this subclause's, and §5.6's cap on
-// "the maximum length of identifiers" does not reach a name that is neither of
-// the two things §5.6 calls an identifier. A name past that cap is one system
-// identifier here; §36.3's own file holds the rule and both sides of it.
+// §5.6.3: further user-defined system tasks and system functions may be defined
+// through the PLI of Clause 36. What a name of one may be is therefore Clause
+// 36's to say and not this subclause's, and §5.6's cap on identifier length
+// does not reach a name that is neither of the two things §5.6 calls an
+// identifier. A name past that cap is one system identifier here; §36.3's own
+// file holds the rule and both sides of it.
 TEST(SystemNameLexing, LengthIsClause36sToBoundAndItBoundsNone) {
   std::string id = "$" + std::string(2000, 'a');
   id += " ";

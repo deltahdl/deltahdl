@@ -12,12 +12,11 @@ namespace {
 // no concrete index domain, so an index-returning locator (which would have to
 // return that index type) is illegal. The rule is applied at elaboration; the
 // input is built from the real `int aa[*];` declaration syntax (§7.8.1) and a
-// real locator call driven through the elaborator. §7.12.1 states "Associative
-// arrays that specify a wildcard index type shall not be allowed" of the index
-// locator methods, and §7.8.1 states the same prohibition from the array's
-// side -- "Associative arrays that specify a wildcard index type shall not be
-// used in a foreach loop (see 12.7.3) or with an array manipulation method
-// (see 7.12) that returns an index value or array of values" -- so the report
+// real locator call driven through the elaborator. §7.12.1 bars the index
+// locator methods from an associative array with a wildcard index type, and
+// §7.8.1 states the same prohibition from the array's side -- such an array may
+// not be used in a foreach loop (§12.7.3) or with an array manipulation method
+// (§7.12) that returns an index value or an array of values -- so the report
 // names §7.8.1.
 TEST(ArrayLocatorWildcard, FindIndexOnWildcardIsRejected) {
   ElabFixture f;

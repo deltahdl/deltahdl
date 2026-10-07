@@ -9,13 +9,12 @@ using namespace delta;
 namespace {
 
 // What the synthesizer answers for each matching rule §10.9.1 states, over an
-// array. §10.9.1 rules that in an array assignment pattern "The expressions
-// shall match element for element, and the braces shall match the array
-// dimensions", gives the replication in which "Each replication shall represent
-// an entire single dimension", gives the `default` keyword for setting "array
-// elements to a value without having to keep track of how many members there
-// are", and states the index:value rule as "An index:value specifies an
-// explicit value for a keyed element index". One case per rule below.
+// array. §10.9.1 rules that in an array assignment pattern the expressions
+// correspond element by element and the braces follow the array's dimensions,
+// gives a replication that stands for one whole dimension, gives the `default`
+// keyword for setting array elements to a value without counting how many there
+// are, and states the index:value rule as giving an explicit value to a keyed
+// element index. One case per rule below.
 //
 // Until this change this file wrote no assignment pattern at all. It held an
 // unpacked array declaration and two continuous assignments to its elements,
@@ -71,11 +70,11 @@ TEST(ArrayPatternSynth, IndexKeyedPatternOverAnArrayIsReportedUnlowered) {
                             3, "10.9"));
 }
 
-// The default:value rule, which "applies to elements or subarrays that are not
-// matched by either index or type key". Here it matches every element, so the
-// pattern carries one item for an array of four and the item count says
-// nothing about the element count -- the case above and this one differ in
-// that as well as in the key.
+// The default:value rule, which covers the elements or subarrays neither an
+// index key nor a type key matched. Here it matches every element, so the
+// pattern carries one item for an array of four and the item count says nothing
+// about the element count -- the case above and this one differ in that as well
+// as in the key.
 TEST(ArrayPatternSynth, DefaultKeyedPatternOverAnArrayIsReportedUnlowered) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -92,13 +91,12 @@ TEST(ArrayPatternSynth, DefaultKeyedPatternOverAnArrayIsReportedUnlowered) {
                             3, "10.9"));
 }
 
-// The replication §10.9.1 borrows from §11.4.12.1, where "Each replication
-// shall represent an entire single dimension". §11.4.12.1 replication over a
-// bit vector is a lowering this synthesizer does have, in
-// SynthLower::LowerReplicateBit, so this case is what tells the replication
-// inside braces from the one outside them: the braces make the node
-// ExprKind::kAssignmentPattern rather than ExprKind::kReplicate, and it is
-// reported.
+// The replication §10.9.1 borrows from §11.4.12.1, where each replication
+// stands for one whole dimension. §11.4.12.1 replication over a bit vector is a
+// lowering this synthesizer does have, in SynthLower::LowerReplicateBit, so
+// this case is what tells the replication inside braces from the one outside
+// them: the braces make the node ExprKind::kAssignmentPattern rather than
+// ExprKind::kReplicate, and it is reported.
 TEST(ArrayPatternSynth, ReplicatedPatternOverAnArrayIsReportedUnlowered) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

@@ -252,10 +252,10 @@ TEST(SelectElaboration, RealParameterSelectError) {
       "  assign y = P[0];\n"
       "endmodule\n",
       f);
-  // §11.5.1: "A bit-select or part-select of a scalar, or of a real variable or
-  // real parameter, shall be illegal." `P` is a real parameter, which is the
-  // sentence's second alternative. This fails when the report names a scalar,
-  // which is its first.
+  // §11.5.1: a bit-select or part-select of a scalar, a real variable or a real
+  // parameter is illegal. `P` is a real parameter, which is the sentence's
+  // second alternative. This fails when the report names a scalar, which is its
+  // first.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select of a real parameter is illegal", 4,
                             "11.5.1"));
@@ -409,13 +409,12 @@ TEST(SelectElaboration, AscendingDeclReversedPartSelectError) {
                             "11.5.1"));
 }
 
-// §11.5.1: "Bit-selects extract a particular bit from a vector, packed array,
-// packed structure, parameter, or concatenation", and "The actual bit that is
-// accessed by an address is, in part, determined by the declaration of acc" --
-// the clause sets `logic [15:0] acc` beside `logic [2:17] acc` and observes
-// that one value of an index reaches a different bit in each. A parameter is
-// one of the operands named there, so a select on one is addressed over the
-// range the parameter was declared with.
+// §11.5.1: a bit-select takes one bit out of a vector, a packed array, a packed
+// structure, a parameter or a concatenation, and the declaration of acc helps
+// decide which bit an address reaches -- the clause sets `logic [15:0] acc`
+// beside `logic [2:17] acc` and observes that one value of an index reaches a
+// different bit in each. A parameter is one of the operands named there, so a
+// select on one is addressed over the range the parameter was declared with.
 //
 // P is declared [8:1], so index 8 names its most significant bit and index 1
 // its least, and 8'b1010_0101 puts a 1 at index 8. Reading the index as a
@@ -443,14 +442,14 @@ TEST(SelectElaboration, ParameterBitSelectIsAddressedOverItsDeclaredRange) {
   EXPECT_EQ(b->resolved_value, 1);
 }
 
-// The same rule for a part-select, which §11.5 admits on a parameter as well:
-// "A part-select operand shall be used to reference a group of adjacent bits in
-// a vector net, vector variable, packed array, packed structure, or parameter."
-// Indices 8 through 5 of `[8:1] P` are the top four bits of 8'b1010_0101, so
-// P[8:5] is 4'b1010. Taking the two indices as distances from the least
-// significant end selects one place lower and answers 4'b0101 instead -- the
-// same four bits shifted, which is why the pattern is chosen so the two are
-// different values rather than a palindrome.
+// The same rule for a part-select, which §11.5 admits on a parameter as well: a
+// part-select operand names a run of adjacent bits in a vector net, a vector
+// variable, a packed array, a packed structure or a parameter. Indices 8
+// through 5 of `[8:1] P` are the top four bits of 8'b1010_0101, so P[8:5] is
+// 4'b1010. Taking the two indices as distances from the least significant end
+// selects one place lower and answers 4'b0101 instead -- the same four bits
+// shifted, which is why the pattern is chosen so the two are different values
+// rather than a palindrome.
 TEST(SelectElaboration, ParameterPartSelectIsAddressedOverItsDeclaredRange) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -528,8 +527,8 @@ TEST(SelectElaboration, ParameterPartSelectOverARangeEndingAtZero) {
   EXPECT_EQ(u->resolved_value, 0b1010);
 }
 
-// §11.5.1 admits a part-select of a "packed array", and an address supplied to
-// a packed array selects one of its inner vectors: `arr[1]` of
+// §11.5.1 admits a part-select of a packed array, and an address supplied to a
+// packed array selects one of its inner vectors: `arr[1]` of
 // `logic [1:0][0:7] arr` is a vector declared [0:7]. That range counts upward,
 // so its more significant bit is the one with the smaller index and [0:3] names
 // the first four bits of the selected vector in order.
@@ -590,13 +589,12 @@ TEST(SelectElaboration,
                             "11.5.1"));
 }
 
-// §11.5.1 restates §6.12's prohibition of a bit-select or part-select of a
-// real variable, and extends it to a scalar and to a real parameter. The
-// sentence names two constructs, and `a[3:0]` is the second of them, so a
-// report naming a bit-select names the construct that was not written. This
-// fails when CheckRealSelectNode in src/elaborator/elaborator_validate.cpp
-// emits one message for every select rather than choosing on the node's own
-// `index_end`.
+// §11.5.1 restates §6.12's prohibition of a bit-select or part-select of a real
+// variable, and extends it to a scalar and to a real parameter. The sentence
+// names two constructs, and `a[3:0]` is the second of them, so a report naming
+// a bit-select names the construct that was not written. This fails when
+// CheckRealSelectNode in src/elaborator/elaborator_validate.cpp emits one
+// message for every select rather than choosing on the node's own `index_end`.
 TEST(RealSelect, PartSelectOfARealNamesPartSelect) {
   ElabFixture f;
   ElaborateSrc(
@@ -698,7 +696,7 @@ TEST(RealSelect, SelectOfARealDrawsOneReport) {
                        << recorded;
 }
 
-// §11.5.1 lists "a scalar" and "a real variable or real parameter" as separate
+// §11.5.1 lists a scalar and a real variable or real parameter as separate
 // alternatives, so a select on a real is reported as a real wherever it is
 // written. This fails when CheckRealSelect is called on continuous assignments
 // alone and no CheckRealSelectStmt walks procedural statements: the select then
@@ -719,19 +717,19 @@ TEST(RealSelect, SelectOfARealInAProceduralStatementNamesTheRealRule) {
 }
 
 // §11.5.2 "Array and memory addressing": an address written after the name of
-// an array selects one of that array's elements -- "The syntax for a memory
-// address shall consist of the name of the memory and an expression for the
-// address" -- and only "Once selected" do bit-selects and part-selects of the
-// selected word fall to §11.5.1. So `arr[i]` on `real arr[4]` selects one real
-// element, and is not a select of bits out of a real.
+// an array selects one of that array's elements -- a memory address is written
+// as the memory's name followed by an expression for the address -- and only
+// once the word is selected do bit-selects and part-selects of the selected
+// word fall to §11.5.1. So `arr[i]` on `real arr[4]` selects one real element,
+// and is not a select of bits out of a real.
 //
 // This fails when CheckRealSelectNode in src/elaborator/elaborator_validate.cpp
 // decides its operand is a real by looking the base name up in var_types_,
 // which records the type kind of every variable including one declared with an
-// unpacked dimension. §11.5.1's sentence -- "A bit-select or part-select of a
-// scalar, or of a real variable or real parameter, shall be illegal" -- names a
-// real variable, and `arr` is an array whose elements are real rather than a
-// real variable, so the check reaches past the rule it enforces.
+// unpacked dimension. §11.5.1's sentence -- a bit-select or part-select of a
+// scalar, a real variable or a real parameter is illegal -- names a real
+// variable, and `arr` is an array whose elements are real rather than a real
+// variable, so the check reaches past the rule it enforces.
 TEST(RealSelect, ElementSelectOfAnUnpackedArrayOfRealsIsLegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -768,12 +766,11 @@ TEST(RealSelect, ElementSelectOfAnUnpackedArrayOfRealsAsATargetIsLegal) {
 // The third position §11.5.1's check reaches: the right-hand side of a
 // continuous assignment, which src/elaborator/elaborator_validate_matches.cpp
 // passes to CheckRealSelect separately from the procedural walk above. §10.3.2
-// makes the assignment itself legal -- "The continuous assignment statement
-// shall place a continuous assignment on a net or variable data type" -- so
-// `real v` is a permitted target, and §11.5.2 makes `arr[0]` an element select
-// rather than a select of bits out of a real. The index is a literal here, so
-// this also pins that the overreach does not depend on the index being a
-// variable.
+// makes the assignment itself legal -- a continuous assignment statement may
+// target a net or a variable data type -- so `real v` is a permitted target,
+// and §11.5.2 makes `arr[0]` an element select rather than a select of bits out
+// of a real. The index is a literal here, so this also pins that the overreach
+// does not depend on the index being a variable.
 TEST(RealSelect, ContinuousAssignFromAnUnpackedArrayOfRealsIsLegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -786,12 +783,11 @@ TEST(RealSelect, ContinuousAssignFromAnUnpackedArrayOfRealsIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.5.1: "A bit-select or part-select of a scalar, or of a real variable or
-// real parameter, shall be illegal." A real parameter is an operand of the
-// sentence's second alternative, so `P[0]` draws a report naming a real
-// parameter. This fails while PopulateValueParamInfo in
-// src/elaborator/elaborator_items.cpp records a real parameter in
-// scalar_var_names, because CheckScalarSelectNode in
+// §11.5.1: a bit-select or part-select of a scalar, a real variable or a real
+// parameter is illegal. A real parameter is an operand of the sentence's second
+// alternative, so `P[0]` draws a report naming a real parameter. This fails
+// while PopulateValueParamInfo in src/elaborator/elaborator_items.cpp records a
+// real parameter in scalar_var_names, because CheckScalarSelectNode in
 // src/elaborator/elaborator_validate.cpp then reports the first alternative
 // instead.
 TEST(RealSelect, BitSelectOfARealParameterNamesTheRealRule) {

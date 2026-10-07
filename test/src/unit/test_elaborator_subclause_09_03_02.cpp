@@ -241,15 +241,14 @@ TEST(ParallelBlockElaboration, RefArgInForkJoinAnyBlockItemInitAllowed) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.3.2 says "Within a fork-join_any or fork-join_none block, it shall be
-// illegal to refer to formal arguments passed by reference other than in the
-// initialization value expressions of variables declared in a
-// block_item_declaration of the fork, unless the argument is declared ref
-// static", and puts no condition on the statement position the reference
+// §9.3.2 bars a fork-join_any or fork-join_none block from referring to a
+// formal argument passed by reference anywhere but the initializer of a
+// variable its block_item_declaration declares, unless the argument is declared
+// ref static, and puts no condition on the statement position the reference
 // stands in. A randsequence production's code block holds ordinary procedural
-// statements, which A.6.12 gives as `rs_code_block ::= { { data_declaration }
-// { statement_or_null } }`, and the parser keeps them in RsProd::code_stmts
-// and RsRule::weight_code, reached through Stmt::rs_productions. That is the
+// statements, which A.6.12 gives as `rs_code_block ::= { { data_declaration } {
+// statement_or_null } }`, and the parser keeps them in RsProd::code_stmts and
+// RsRule::weight_code, reached through Stmt::rs_productions. That is the
 // thirteenth of the child-statement links src/parser/ast_stmt.h declares, and
 // the only one CheckStmtForRefArgs in
 // src/elaborator/elaborator_validate_funcbody.cpp did not walk before it took
@@ -502,9 +501,9 @@ size_t CountReports(const ElabFixture& f, std::string_view needle) {
   return n;
 }
 
-// §9.3.2: "A return statement within the context of a fork-join block is
-// illegal and shall result in a compilation error." One return inside two
-// fork-join blocks is one return in that context, so it is one error.
+// §9.3.2: a return inside a fork-join block is illegal and a compilation error.
+// One return inside two fork-join blocks is one return in that context, so it
+// is one error.
 //
 // It was two. CheckNoReturnInFork descends every child-statement link,
 // Stmt::fork_stmts among them, so an entry made at the outer fork already

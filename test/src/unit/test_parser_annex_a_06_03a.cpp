@@ -125,10 +125,10 @@ TEST(BlockNameParsing, MismatchedEndLabelForkJoinErrors) {
 }
 
 TEST(BlockNameParsing, EndLabelWithoutStartLabelErrors) {
-  // §9.3.4 (printed p.229): "It shall be an error if the name at the end is
-  // different from the block name at the beginning." A block with no name at
-  // begin but a name after end has a name "different from" (none at) the
-  // beginning, so an end label without a matching start label is illegal.
+  // §9.3.4 (printed p.229): a name at the end that differs from the block's
+  // name at the beginning is an error. A block with no name at begin but a name
+  // after end has a name that differs from the absent one at the beginning, so
+  // an end label without a matching start label is illegal.
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

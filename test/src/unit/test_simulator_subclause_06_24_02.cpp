@@ -373,10 +373,10 @@ const char* const kInvalidCastInFunction =
     "  end\n"
     "endmodule\n";
 
-// §6.24.2: "When called as a task, $cast attempts to assign the source
-// expression to the destination variable. If the assignment is invalid, a
-// run-time error occurs." The clause says nothing about where the call is
-// written, so a subroutine body owes the same report as an initial block.
+// §6.24.2: $cast called as a task tries to assign the source expression to the
+// destination variable, and an invalid assignment is a run-time error. The
+// clause says nothing about where the call is written, so a subroutine body
+// owes the same report as an initial block.
 TEST(DynamicCastSim, TaskFormInvalidInFunctionBodyRaisesRuntimeError) {
   SimFixture f;
   auto* design = ElaborateLowerRun(f, kInvalidCastInFunction);
@@ -397,7 +397,7 @@ TEST(DynamicCastSim, TaskFormInvalidInFunctionBodyNames6_24_2) {
                             5, "6.24.2"));
 }
 
-// §6.24.2: "the destination variable is left unchanged". The destination holds
+// §6.24.2: the destination variable keeps its value. The destination holds
 // GREEN when the invalid cast runs, so it still holds GREEN afterwards. Raising
 // the report while letting the assignment through would satisfy the two tests
 // above and break this one.

@@ -549,13 +549,12 @@ constexpr const char* kLeafBesideACuTypedef =
 
 TEST(SeparateCompilationBinding,
      CompilationUnitDeclarationDoesNotCrossAPrecompiledRecord) {
-  // §3.12.1 case b): "each file is a separate compilation unit (in which case
-  // the declarations in each compilation-unit scope are accessible only within
-  // its corresponding file)". A precompiled record was written by a compiler
-  // invocation of its own, so the unit it is read into is not the unit it was
-  // compiled in, and the typedef the description wrote outside every design
-  // element stays behind. The cell does cross, which is the whole point of
-  // precompiling it.
+  // §3.12.1 case b): every file is a compilation unit of its own, the
+  // declarations of each compilation-unit scope visible only within its file. A
+  // precompiled record was written by a compiler invocation of its own, so the
+  // unit it is read into is not the unit it was compiled in, and the typedef
+  // the description wrote outside every design element stays behind. The cell
+  // does cross, which is the whole point of precompiling it.
   ScratchDir tmp;
   auto path = tmp.dir / "rtlLib.dpl";
   Precompile(kLeafBesideACuTypedef, "rtlLib", path);

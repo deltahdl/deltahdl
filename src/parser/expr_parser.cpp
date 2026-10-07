@@ -510,8 +510,8 @@ Expr* Parser::MakeMemberAccess(Expr* base) {
               (is_scope && Check(TokenKind::kKwThis))
           ? Consume()
           : ExpectIdentifier(Subclause(is_scope ? "23.7.1" : "23.7"));
-  // §8.12: "It shall be illegal to use a typed constructor call for a shallow
-  // copy (see 8.8)." A.2.4 gives class_new the two alternatives
+  // §8.12: a typed constructor call (§8.8) may not make a shallow copy. A.2.4
+  // gives class_new the two alternatives
   // `[ class_scope ] new [ ( list_of_arguments ) ]` and `new expression`, and
   // only the second takes the copy source, so no legal parse puts a copy source
   // after a class-scoped `new`. Consuming that source leaves the caller a

@@ -1,16 +1,15 @@
-// Tests for §6.19.4 "Enumerated types in numerical expressions": "Elements of
-// enumerated type variables can be used in numerical expressions. The value
-// used in the expression is the numerical value associated with the enumerated
-// value ... An enum variable or identifier used as part of an expression is
-// automatically cast to the base type of the enum declaration (either
-// explicitly or using int as the default)."
+// Tests for §6.19.4 "Enumerated types in numerical expressions": an enumerated
+// variable may appear in a numerical expression, where it contributes the
+// numerical value of its enumerated value, an enum variable or identifier in an
+// expression being cast automatically to the enum declaration's base type,
+// explicit or the default int.
 //
-// The restriction §6.19.4 closes with -- "A cast shall be required for an
-// expression that is assigned to an enum variable where the type of the
-// expression is not equivalent to the enumeration type of the variable" --
-// restates §6.19.3, "assignment of arbitrary expressions to an enumerated
-// variable requires an explicit cast". One elaborator path enforces both, and
-// it names §6.19.3, so that is the subclause the rejections below read back.
+// The restriction §6.19.4 closes with -- an expression assigned to an enum
+// variable needs a cast unless its type is equivalent to the variable's
+// enumeration type -- restates §6.19.3's demand for an explicit cast when an
+// arbitrary expression is assigned to an enumerated variable. One elaborator
+// path enforces both, and it names §6.19.3, so that is the subclause the
+// rejections below read back.
 
 #include <gtest/gtest.h>
 

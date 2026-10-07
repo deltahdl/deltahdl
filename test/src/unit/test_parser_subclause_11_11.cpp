@@ -31,10 +31,10 @@ TEST(MinTypMaxParse, TripletBuildsThreeOrderedExprs) {
   EXPECT_EQ(e->rhs->int_val, 30u);        // max
 }
 
-// §11.11 "used wherever expressions can appear" (Example 1): two parenthesized
-// triplets combined by a binary operator. Each operand must parse as its own
-// mintypmax node — the general parenthesized-primary path recognizes the form,
-// not just the delay positions.
+// §11.11 lets the form stand wherever an expression may (Example 1): two
+// parenthesized triplets combined by a binary operator. Each operand must parse
+// as its own mintypmax node — the general parenthesized-primary path recognizes
+// the form, not just the delay positions.
 TEST(MinTypMaxParse, TripletsAsBinaryOperands) {
   auto r = Parse("module t; initial x = (1:2:3) + (4:5:6); endmodule");
   ASSERT_FALSE(r.has_errors);

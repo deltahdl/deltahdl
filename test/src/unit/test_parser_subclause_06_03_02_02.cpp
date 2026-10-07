@@ -1,9 +1,8 @@
-// §6.3.2.2 Drive strength: "The drive strength specification allows a
-// continuous assignment to be placed on a net in the same statement that
-// declares that net." What the parser owes that sentence is the pairing --
-// the strength and the assignment reaching one declaration together, with the
-// strength0 and strength1 keywords landing on their own fields whichever order
-// they were written in.
+// §6.3.2.2 Drive strength: the drive strength specification lets the statement
+// that declares a net also place a continuous assignment on it. What the parser
+// owes that sentence is the pairing -- the strength and the assignment reaching
+// one declaration together, with the strength0 and strength1 keywords landing
+// on their own fields whichever order they were written in.
 //
 // Every source below drives strength0 and strength1 to different values
 // (weak0 is 2, pull1 is 3), so a reading that swapped the two fields, or
@@ -82,14 +81,14 @@ TEST(NetDeclDriveStrengthParsing, StrengthHeadsAListOfSeparateDeclarators) {
   EXPECT_EQ(items[1]->init_expr, nullptr);
 }
 
-// §6.3.2 attaches one condition to a drive strength -- "Drive strength shall
-// only be used when placing a continuous assignment on a net in the same
-// statement that declares the net" -- and says nothing about which net type
-// carries it. §A.2.1.3 gives `net_declaration ::= net_type [ drive_strength |
-// charge_strength ] [ vectored | scalared ] data_type_or_implicit [ delay3 ]
-// list_of_net_decl_assignments ;` and §A.2.2.1 lists `trireg` among the
-// alternatives of `net_type`, so the strength is available here exactly as it
-// is on a `wire`. The two strengths differ, as everywhere else in this file.
+// §6.3.2 attaches one condition to a drive strength -- drive strength is used
+// only where a net's declaring statement also places a continuous assignment on
+// it -- and says nothing about which net type carries it. §A.2.1.3 gives
+// `net_declaration ::= net_type [ drive_strength | charge_strength ] [ vectored
+// | scalared ] data_type_or_implicit [ delay3 ] list_of_net_decl_assignments
+// ;` and §A.2.2.1 lists `trireg` among the alternatives of `net_type`, so the
+// strength is available here exactly as it is on a `wire`. The two strengths
+// differ, as everywhere else in this file.
 TEST(NetDeclDriveStrengthParsing, TriregCarriesAStrengthWithItsAssignment) {
   auto r = Parse(
       "module m;\n"

@@ -297,12 +297,12 @@ TEST(ArrayLiteralElaboration, ArrayItemInPatternInAForLoopStepNames10_9_1) {
                             "10.9.1"));
 }
 
-// §10.9.1's type key covers "each field ... whose type matches the type", so a
-// key naming a type the elements are not declared with covers nothing: this
-// pattern names no element by index, carries no default and matches none by
-// type, which "Every element shall be covered by one of these rules" forbids.
-// The coverage check counted any type keyword as covering the whole array and
-// let it through, and the simulator then invented a value for all three.
+// §10.9.1's type key covers each field whose type matches its type, so a key
+// naming a type the elements are not declared with covers nothing: this pattern
+// names no element by index, carries no default and matches none by type, which
+// the requirement that one of these rules cover every element forbids. The
+// coverage check counted any type keyword as covering the whole array and let
+// it through, and the simulator then invented a value for all three.
 TEST(ArrayLiteralElaboration, TypeKeyThatCannotMatchDoesNotCoverTheArray) {
   ElabFixture f;
   ElaborateSrc(
@@ -326,10 +326,10 @@ TEST(ArrayLiteralElaboration, TypeKeyMatchingTheElementTypeCoversTheArray) {
              "endmodule\n"));
 }
 
-// §10.9.1 recurses "into each subarray of the array using the rules in this
-// subclause and the type and default keys", so a key matching the leaf element
-// type covers a multidimensional array at every level. The check must ask the
-// element type rather than a subarray's, or this legal source starts failing.
+// §10.9.1 descends into each subarray of the array, applying the same rules and
+// the type and default keys, so a key matching the leaf element type covers a
+// multidimensional array at every level. The check must ask the element type
+// rather than a subarray's, or this legal source starts failing.
 TEST(ArrayLiteralElaboration, TypeKeyCoversEveryDimensionOfAMultidimArray) {
   EXPECT_TRUE(
       ElabOk("module t;\n"

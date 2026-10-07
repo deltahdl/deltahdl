@@ -468,13 +468,13 @@ TEST(ClassScopeResolutionElaboration,
       "6.18"));
 }
 
-// §8.23 (printed page 200): "Because classes and other scopes can have the same
-// identifiers, the class scope resolution operator uniquely identifies a
-// member, a parameter or local parameter of a particular class", which the
-// clause writes out as `b.print( Base::bin, bin );  // Base::bin and bin are
-// different`. The two my_type declarations below therefore have to differ in
-// width, or the case passes whether the prefix was read or dropped: 32 is the
-// int inside Cfg, and the module's byte would answer 8.
+// §8.23 (printed page 200): since classes and other scopes may share
+// identifiers, the class scope resolution operator picks out one member,
+// parameter or local parameter of one class, which the clause writes out as
+// `b.print( Base::bin, bin );  // Base::bin and bin are different`. The two
+// my_type declarations below therefore have to differ in width, or the case
+// passes whether the prefix was read or dropped: 32 is the int inside Cfg, and
+// the module's byte would answer 8.
 //
 // The widths are read back rather than elaboration being asserted to succeed,
 // because nothing reports a named type that resolved to nothing. EvalTypeWidth
@@ -687,10 +687,10 @@ TEST(ClassScopeResolutionElaboration,
                     6, "8.23"));
 }
 
-// §8.23: "Type declarations nested inside a class scope are public and can be
-// accessed outside the class", and nothing in the clause makes where the class
-// itself stands part of the rule. ScopedTypedefSizesWithNoUnqualifiedName above
-// is this source with `class Cfg` written above the module instead, and that is
+// §8.23: a type declared inside a class scope is public and reachable from
+// outside the class, and nothing in the clause makes where the class itself
+// stands part of the rule. ScopedTypedefSizesWithNoUnqualifiedName above is
+// this source with `class Cfg` written above the module instead, and that is
 // the one arrangement the typedef map covered: RegisterClassTypedefs in
 // src/elaborator/elaborator_resolve.cpp walks CompilationUnit::classes, which
 // the parser fills from a top-of-file class alone, so no "Cfg::my_type" key was
@@ -771,11 +771,11 @@ TEST(ClassScopeResolutionElaboration,
   EXPECT_EQ(w->width, 8u);
 }
 
-// §8.23: "When a type name is used, the name shall resolve to a type after
-// elaboration." A prefix naming a visible class that declares no such type
-// resolves to nothing, and what that produced was a zero-bit unsigned object
-// and silence -- which is how test/src/e2e/decl_class_scope.sv ran all the way
-// to printing a 0 with nothing said about why.
+// §8.23: a type name in use has to resolve to a type once elaboration is done.
+// A prefix naming a visible class that declares no such type resolves to
+// nothing, and what that produced was a zero-bit unsigned object and silence --
+// which is how test/src/e2e/decl_class_scope.sv ran all the way to printing a 0
+// with nothing said about why.
 TEST(ClassScopeResolutionElaboration, ScopedTypedefNamingNoSuchTypeIsError) {
   ElabFixture f;
   ElaborateSrc(

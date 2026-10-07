@@ -483,9 +483,9 @@ TEST(StringDataType, RelationalLessThanWithStringLiteralOperand) {
   EXPECT_EQ(r->value.ToUint64(), 1u);
 }
 
-// §6.16 (printed page 112): "When using the string data type instead of an
-// integral variable, strings can be of arbitrary length and no truncation
-// occurs." The source is the declaration §6.16 gives as its own example,
+// §6.16 (printed page 112): a string held in the string data type rather than
+// an integral variable may be any length and is never truncated. The source is
+// the declaration §6.16 gives as its own example,
 // `parameter string default_name = "John Smith"`, and ten characters is long
 // enough to fail both ways the value used to be cut: the §11.10 fold into
 // RtlirParamDecl::resolved_value keeps the low eight, and the 32-bit fallback
@@ -537,11 +537,11 @@ TEST(StringDataType, StringParameterIsRegisteredAsAStringVariable) {
 }
 
 // §11.2.1 lists "parameters" among the operands a constant expression consists
-// of, so `parameter string B = A;` is one, and §6.16 rules that with the string
-// type "strings can be of arbitrary length and no truncation occurs". A fold
-// that took only a literal left B holding the §11.10 packed number instead,
-// which is 32 bits wide because a string carries no declared width, so exactly
-// the last four characters survived and this printed "mith".
+// of, so `parameter string B = A;` is one, and §6.16 lets a string-typed value
+// be any length without truncation. A fold that took only a literal left B
+// holding the §11.10 packed number instead, which is 32 bits wide because a
+// string carries no declared width, so exactly the last four characters
+// survived and this printed "mith".
 TEST(StringDataType,
      AParameterInitializedFromAnotherStringParameterKeepsEveryCharacter) {
   SimFixture f;
@@ -583,15 +583,14 @@ TEST(StringDataType,
             "ababab\n");
 }
 
-// §6.16: "The string data type is an ordered collection of characters." An
-// element of an array of strings is a string, so a bare $display of one has to
-// render its characters. §21.2.1.1 gives $display the decimal default radix
-// that a value of any other type takes, and an element read back without the
-// string mark took it: `$display(a[0])` printed the packed number the six
-// characters spell instead of the characters. The assertion cannot use %s,
-// because FormatArg in src/simulator/eval_format.cpp renders %s through
-// FormatValueAsString whatever the value is marked, so a %s form passes either
-// way.
+// §6.16: a string is an ordered collection of characters. An element of an
+// array of strings is a string, so a bare $display of one has to render its
+// characters. §21.2.1.1 gives $display the decimal default radix that a value
+// of any other type takes, and an element read back without the string mark
+// took it: `$display(a[0])` printed the packed number the six characters spell
+// instead of the characters. The assertion cannot use %s, because FormatArg in
+// src/simulator/eval_format.cpp renders %s through FormatValueAsString whatever
+// the value is marked, so a %s form passes either way.
 TEST(StringDataType, AnElementOfAnArrayOfStringsDisplaysItsCharacters) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module m;\n"

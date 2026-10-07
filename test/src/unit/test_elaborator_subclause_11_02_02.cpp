@@ -54,11 +54,10 @@ TEST(AggregateExpr, StructPassedToFunction) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.2.2 states "If the two operands of a comparison operator are aggregate
-// expressions, they shall be of equivalent type as defined in 6.22.2", and
-// §6.22.2 is where equivalence is defined. The report names §6.22.2 because
-// that is the definition the check applies, and because
-// test/src/unit/test_elaborator_subclause_06_22_02.cpp and
+// §11.2.2 requires two aggregate operands of a comparison operator to have
+// equivalent types in the §6.22.2 sense, and §6.22.2 is where equivalence is
+// defined. The report names §6.22.2 because that is the definition the check
+// applies, and because test/src/unit/test_elaborator_subclause_06_22_02.cpp and
 // test/src/unit/test_elaborator_subclause_06_04.cpp already read this same
 // message as §6.22.2's.
 TEST(AggregateExpr, NonEquivalentTypeComparisonError) {
@@ -323,9 +322,10 @@ TEST(AggregateExpr, EquivalentArraySliceComparison) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.2.2 names "A multi-element slice of an unpacked array" as an aggregate
-// expression, so slices of non-equivalent array types are non-equivalent
-// operands and the report names the §6.22.2 definition they fail.
+// §11.2.2 counts a slice of several elements of an unpacked array as an
+// aggregate expression, so slices of non-equivalent array types are
+// non-equivalent operands and the report names the §6.22.2 definition they
+// fail.
 TEST(AggregateExpr, NonEquivalentArraySliceComparisonError) {
   ElabFixture f;
   auto* design = ElaborateSrc(

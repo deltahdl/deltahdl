@@ -76,11 +76,10 @@ TEST(ClassAssignRenameParsing, ShallowCopyInDeclaration) {
 
 // A.2.4's `new expression` takes any expression as the copy source, and
 // footnote 23 on class_new asks only that its value be an object handle.
-// §8.11 (printed page 187) makes `this` one: "The this keyword denotes a
-// predefined object handle that refers to the object that was used to invoke
-// the subroutine that this is used within." A non-static class method is one of
-// the five contexts that clause admits `this` in, so this source is legal and
-// copies the object the method was invoked on.
+// §8.11 (printed page 187) makes `this` one: a predefined object handle to the
+// object the enclosing subroutine was invoked on. A non-static class method is
+// one of the five contexts that clause admits `this` in, so this source is
+// legal and copies the object the method was invoked on.
 //
 // The case fails on a run that reads the copy source only when it begins with
 // an identifier. `this` is then left standing where the statement terminator
@@ -153,8 +152,8 @@ TEST(ClassAssignRenameParsing, DeepChainedMemberAccess) {
               "endmodule\n"));
 }
 
-// §8.12 (printed page 188): "It shall be illegal to use a typed constructor
-// call for a shallow copy (see 8.8)." A.2.4 gives class_new the alternatives
+// §8.12 (printed page 188): a typed constructor call (§8.8) may not make a
+// shallow copy. A.2.4 gives class_new the alternatives
 // `[ class_scope ] new [ ( list_of_arguments ) ]` and `new expression`, so the
 // copy source belongs to the alternative carrying no class scope. The plain
 // `c2 = new c1;` form is accepted by
@@ -244,10 +243,10 @@ TEST(ClassAssignRenameParsing,
 }
 
 TEST(ClassAssignRenameParsing, TypedConstructorCallWithArgumentAccepted) {
-  // §8.8 (printed page 186): "Arguments may be passed to a typed constructor
-  // call if appropriate, just as for an ordinary constructor." Without this
-  // case the §8.12 report above is satisfied by refusing every class-scoped
-  // `new`, since the copy source is the only thing that makes one illegal.
+  // §8.8 (printed page 186): a typed constructor call may take arguments where
+  // they fit, as an ordinary constructor does. Without this case the §8.12
+  // report above is satisfied by refusing every class-scoped `new`, since the
+  // copy source is the only thing that makes one illegal.
   EXPECT_TRUE(
       ParseOk("class C;\n"
               "  int x;\n"

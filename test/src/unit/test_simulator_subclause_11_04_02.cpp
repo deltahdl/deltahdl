@@ -175,7 +175,7 @@ TEST(ExpressionSim, IncrementDrivesForLoopIteration) {
 // storage/read path, so inc/dec runs on a genuinely produced real operand
 // rather than a hand-assembled one. `res` captures the operator's return value
 // so the prefix (new) / postfix (old) distinction is observable alongside the
-// §11.4.2 "adjust real operands by 1.0" rule.
+// §11.4.2 rule that real operands step by 1.0.
 static void RunRealBody(SimFixture& f, const std::string& body, double* rv,
                         double* res) {
   auto* design = ElaborateSrc(
@@ -320,18 +320,16 @@ TEST(ExpressionSim, IncrementEvaluatesItsIndexOnce) {
   LowerRunAndCheck(f, design, {{"arr[2]", 11u}, {"idx_calls", 1u}});
 }
 
-// §11.4.2 states that the increment and decrement operators "behave as blocking
-// assignments", and §11.4.1 states that an assignment operator "is semantically
-// equivalent to a blocking assignment", so `i++` and `i += 1` are one
-// assignment of one arithmetic result and §11.4.3 governs both alike: "for the
-// arithmetic operators, if any operand bit value is the unknown value x or the
-// high-impedance value z, then the entire result value shall be x". The
-// increment computed its new value as a uint64_t round-trip through
-// Logic4Vec::ToUint64, which projects `aval & ~bval` and so reads an x or a z
-// as a 0 and hands back a value every bit of which is known. The readings below
-// are of what that projection lost, and each takes its result from the words
-// rather than from ToUint64, which can express neither an unknown nor a bit
-// above 63.
+// §11.4.2 states that the increment and decrement operators act as blocking
+// assignments, and §11.4.1 that an assignment operator does the same as a
+// blocking assignment, so `i++` and `i += 1` are one assignment of one
+// arithmetic result and §11.4.3 governs both alike: an arithmetic operator with
+// any x or z operand bit gives an all-x result. The increment computed its new
+// value as a uint64_t round-trip through Logic4Vec::ToUint64, which projects
+// `aval & ~bval` and so reads an x or a z as a 0 and hands back a value every
+// bit of which is known. The readings below are of what that projection lost,
+// and each takes its result from the words rather than from ToUint64, which can
+// express neither an unknown nor a bit above 63.
 
 // Elaborates and runs a module whose module items are `decls` and whose
 // `initial` block body is `body`, then returns the variable `name` the run left

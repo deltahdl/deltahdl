@@ -16,11 +16,11 @@ namespace {
 // `SynthLower::LowerUnaryBit` in src/synthesizer/synth_lower.cpp handles
 // `TokenKind::kTilde` and `TokenKind::kBang` and then ends `return operand;`,
 // so every other unary operator answers the operand's own bit at the index
-// asked for while the run reports success. §11.4.9 rules that "The unary
-// reduction operators shall perform a bitwise operation on a single operand to
-// produce a single-bit result", so the netlist owes the answer in bit 0 and
-// zero in bits 1 to 3, which is why each case compares the whole four-bit
-// output word rather than its low bit.
+// asked for while the run reports success. §11.4.9 has a unary reduction
+// operator apply a bitwise operation across one operand to give a one-bit
+// result, so the netlist owes the answer in bit 0 and zero in bits 1 to 3,
+// which is why each case compares the whole four-bit output word rather than
+// its low bit.
 //
 // Each case sweeps all sixteen values of `a`, because `&a`, `|a` and `^a` each
 // agree with a lowering that copies the operand at an all-zeros operand, so a
@@ -41,10 +41,9 @@ TEST(ReductionSynthesis, ReductionAndLowersToTheConjunctionOfItsOperandBits) {
 // The test fails on a fix that reaches `TokenKind::kAmp` and leaves
 // `TokenKind::kTildeAmp` on the fall-through of `SynthLower::LowerUnaryBit`,
 // which ReductionSynthesis.ReductionAndLowersToTheConjunctionOfItsOperandBits
-// passes. §11.4.9 rules that "For reduction NAND, reduction NOR, and reduction
-// XNOR operators, the result shall be computed by inverting the result of the
-// reduction AND, reduction OR, and reduction XOR operation, respectively", so
-// the expected value is the complement of the case above at every operand.
+// passes. §11.4.9 computes reduction NAND, NOR and XNOR as the inverse of
+// reduction AND, OR and XOR respectively, so the expected value is the
+// complement of the case above at every operand.
 TEST(ReductionSynthesis, ReductionNandLowersToTheComplementOfTheReductionAnd) {
   ExpectAssignSweep(
       ModuleAssigning("input [3:0] a", "~&a"), 1,

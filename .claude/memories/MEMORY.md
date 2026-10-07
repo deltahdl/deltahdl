@@ -8,7 +8,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 - [Pushing to main](pushing-to-main.md) — commit straight to `main` and push a finished change without asking; there are no pull requests here.
 - [One commit is a whole body of work](one-commit-is-a-whole-body-of-work.md) — a push holds a matter solved end to end, or a batch of issues of one matter solved in full, never one step of either.
-- [Grouping issues into one push](grouping-issues-into-a-push.md) — every open issue of one clause and one `src/` subsystem, bounded by the matter and never by a count, solved uncommitted and committed once; CI, build, shared-fixture and red-run fixes go alone.
+- [Grouping issues into one push](grouping-issues-into-a-push.md) — every open issue of one clause and one `src/` subsystem, bounded by the matter and never by a count, solved uncommitted and committed once; every comment-only issue is one batch whatever its clause; CI, build, shared-fixture and red-run fixes go alone.
 - [Draining the push queue first](draining-the-push-queue-first.md) — while commits sit unpushed, take no new issue; squash them in queue order, never by file-disjointness, and push until none are left.
 - [Staging explicit paths](git-add-explicit-paths.md) — never `git add -A` or `git add .`; name every path.
 - [git add stages nothing when one pathspec misses](git-add-all-or-nothing-pathspecs.md) — never name a removed path to `git add`; it then stages none of them.
@@ -72,7 +72,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [gh run list --commit takes a full SHA](gh-run-list-commit-takes-a-full-sha.md) — pass `$(git rev-parse HEAD)`; a short SHA lists no run, and a watcher waiting on it never ends.
 - [Watching a run in the background](watching-a-run-in-the-background.md) — a background shell or a Monitor, never a foreground `gh run watch`.
 - [Long-running commands in the background](long-running-commands-in-the-background.md) — anything over about a minute (a `gh` sweep, a CI watch) runs with `run_in_background: true`, then the turn ends; a foreground command holds back every cron reminder.
-- [Waiting while a CI run is in progress](waiting-while-a-ci-run-is-in-progress.md) — while any CI run of any workflow is in progress, only wait: no diagnosis, edits or commits until it lands.
+- [Waiting while a CI run is in progress](waiting-while-a-ci-run-is-in-progress.md) — while any CI run of any workflow is in progress, only wait: no diagnosis, edits or commits until it lands, except preparing comment-only edits.
 - [Fixing a red run after a push](fixing-a-red-run.md) — when a push's own run goes red, the pushing session fixes it, caused or inherited, in a push of its own before the next batch.
 - [Gate limits live in tracked files](gate-limits-live-in-tracked-files.md) — read the linter config or workflow threshold rather than running the gate.
 - [Read the sv-tests log first](reading-the-sv-tests-log-first.md) — deltahdl's own output is already under every FAIL line.

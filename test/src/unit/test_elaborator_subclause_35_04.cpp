@@ -210,10 +210,10 @@ TEST(DpiGlobalNameElab, APackageDeclarationJoinsTheVersionStringAgreement) {
                             6, "35.4"));
 }
 
-// §35.4: §3.12.1 gives the compilation-unit scope "all declarations that lie
-// outside any other scope" and says it "can contain any item that can be
-// defined within a package", so a DPI declaration written outside every module
-// and package is in a scope of its own and is held to the same rules.
+// §35.4: §3.12.1 gives the compilation-unit scope every declaration outside any
+// other scope and lets it hold any item a package may, so a DPI declaration
+// written outside every module and package is in a scope of its own and is held
+// to the same rules.
 TEST(DpiGlobalNameElab,
      ACompilationUnitDeclarationJoinsTheVersionStringAgreement) {
   ElabFixture f;

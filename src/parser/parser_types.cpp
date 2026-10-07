@@ -204,16 +204,15 @@ void Parser::ParsePackedDims(DataType& dtype) {
     if (!Check(TokenKind::kLBracket)) return;
     Consume();
     dtype.packed_dim_left = ParseExpr();
-    // §7.4.1 states the rule both these calls enforce: "Each packed dimension
-    // in a packed array declaration shall be specified by a range
-    // specification of the form [ constant_expression : constant_expression
-    // ]", and its NOTE rules out the single-number form "[8]" by name. "Each
-    // packed dimension" covers the first as squarely as the fifth, so the
-    // first names the clause the loop below already names rather than a second
-    // one. §6.9 has no rule to cite here. It defines a scalar and a vector and
-    // defers the form to §7.4, and this function parses the packed dimensions
-    // of a struct, union, enum, named type and port type, none of which is a
-    // vector.
+    // §7.4.1 states the rule both these calls enforce: every packed dimension
+    // of a packed array declaration takes a range specification [
+    // constant_expression : constant_expression ], and its NOTE rules out the
+    // single-number form "[8]" by name. Every packed dimension covers the first
+    // as squarely as the fifth, so the first names the clause the loop below
+    // already names rather than a second one. §6.9 has no rule to cite here. It
+    // defines a scalar and a vector and defers the form to §7.4, and this
+    // function parses the packed dimensions of a struct, union, enum, named
+    // type and port type, none of which is a vector.
     Expect(TokenKind::kColon, Subclause("7.4.1"));
     dtype.packed_dim_right = ParseExpr();
     Expect(TokenKind::kRBracket, Subclause("7.4.1"));
@@ -614,9 +613,9 @@ Expr* Parser::ParseAssocIndexDim() {
     packed->kind = ExprKind::kBinary;
     packed->op = TokenKind::kColon;
     packed->lhs = ParseExpr();
-    // §7.4.1 states the rule both these calls enforce: "Each packed dimension
-    // in a packed array declaration shall be specified by a range specification
-    // of the form [ constant_expression : constant_expression ]".
+    // §7.4.1 states the rule both these calls enforce: every packed dimension
+    // of a packed array declaration takes a range specification [
+    // constant_expression : constant_expression ].
     Expect(TokenKind::kColon, Subclause("7.4.1"));
     packed->rhs = ParseExpr();
     Expect(TokenKind::kRBracket, Subclause("7.4.1"));

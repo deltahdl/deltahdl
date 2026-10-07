@@ -5,12 +5,11 @@
 
 using namespace delta;
 
-// §7.4.6 states the operations an associative array as a whole admits:
-// "Associative arrays cannot be sliced, but reading, writing and equality
-// operations can be performed on such arrays as a whole or on a single element
-// of such an array". An arithmetic operator is none of the three, so it
-// requires the array to be selected down to an element first, and the clause
-// names no statement in which the requirement is suspended.
+// §7.4.6 states the operations an associative array as a whole admits: no
+// slicing, but reading, writing and equality on the whole array or on one
+// element of it. An arithmetic operator is none of the three, so it requires
+// the array to be selected down to an element first, and the clause names no
+// statement in which the requirement is suspended.
 //
 // The seven cases here are seven statement positions a walk has to take its
 // list of nested statements from ForEachChildStmt in

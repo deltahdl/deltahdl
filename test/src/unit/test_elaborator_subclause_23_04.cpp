@@ -435,11 +435,11 @@ TEST(NestedModuleElaboration, ImplicitNetForAnOuterNameRefersOutward) {
 // §6.10 with §23.4: the outer name space being visible does not make a name
 // declared below the nested module's text one the nested module's assignment
 // was preceded by, and §6.10 assumes an implicit net of the assignment's own
-// scope for a name "not declared previously" there or in a scope it can
+// scope for a name with no earlier declaration there or in a scope it can
 // directly reference. An outer w declared between M's endmodule and its
 // instance is declared after the assignment, so M's net w refers to nothing
-// outward. The names visible to M were taken where the instance stood, so w
-// was among them and the net was marked outward.
+// outward. The names visible to M were taken where the instance stood, so w was
+// among them and the net was marked outward.
 TEST(NestedModuleElaboration,
      ImplicitNetForAnOuterNameDeclaredBelowTheNestedDeclarationIsItsOwn) {
   ElabFixture f;

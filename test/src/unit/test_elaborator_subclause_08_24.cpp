@@ -45,12 +45,12 @@ TEST(OutOfBlockDeclElaboration, UnknownClassError) {
 }
 
 // §8.24: an out-of-block declaration ties a method body back to a prototype
-// the class body declared extern, and "the out-of-block method declaration
-// shall match the prototype declaration exactly". A body naming a method the
-// class never declared extern has no prototype to match. The subclause on the
-// report is what tells this rejection from §8.23's rule about what the class
-// scope resolution operator may name, which the same `C::foo` breaches when C
-// is not a class at all.
+// the class body declared extern, and the out-of-block declaration has to match
+// that prototype exactly. A body naming a method the class never declared
+// extern has no prototype to match. The subclause on the report is what tells
+// this rejection from §8.23's rule about what the class scope resolution
+// operator may name, which the same `C::foo` breaches when C is not a class at
+// all.
 TEST(OutOfBlockDeclElaboration, NoMatchingPrototypeNames8_24) {
   ElabFixture f;
   ElabOk(
@@ -436,9 +436,9 @@ TEST(OutOfBlockDeclElaboration, ThisInModuleOutOfBlockMethodIsAccepted) {
              "endmodule\n"));
 }
 
-// §8.10 (printed pages 186-187): "Access ... to the special this handle within
-// the body of a static method is illegal", and an out-of-block body is that
-// method's body wherever it stands. Neither scope reported it.
+// §8.10 (printed pages 186-187) makes access to the special this handle inside
+// a static method's body illegal, and an out-of-block body is that method's
+// body wherever it stands. Neither scope reported it.
 TEST(OutOfBlockDeclElaboration, ThisInModuleStaticOutOfBlockMethodIsError) {
   ElabFixture f;
   ElabOk(

@@ -376,12 +376,12 @@ TEST(ClassSim, E2eReassignToNewObjectOldHandleLost) {
 // --- §8.29 sole normative shall, observed through the full pipeline ---------
 //
 // The synthetic CollectGarbage tests above hand-build objects with MakeObj and
-// call the collector directly. §8.29's rule that "the system shall reclaim any
-// object no longer being used" depends on how the object is produced (a real
-// `new`, §8.4) and how it stops being used (a null assignment / leaving scope),
-// so the tests below build the object from source, run the design, and only
-// then observe the production collector applying strong-reachability to a live
-// heap. Root discovery relies on the lowerer registering class-handle variables
+// call the collector directly. §8.29's rule that the system reclaims every
+// object no longer in use depends on how the object is produced (a real `new`,
+// §8.4) and how it stops being used (a null assignment / leaving scope), so the
+// tests below build the object from source, run the design, and only then
+// observe the production collector applying strong-reachability to a live heap.
+// Root discovery relies on the lowerer registering class-handle variables
 // (lowerer_var.cpp), so no reachability metadata is stubbed here.
 
 namespace {

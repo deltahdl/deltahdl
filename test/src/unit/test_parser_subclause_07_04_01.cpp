@@ -41,8 +41,8 @@ TEST(PackedArrayParsing, ConstantRangeInPackedDim) {
   EXPECT_EQ(item->data_type.packed_dim_right->int_val, 0u);
 }
 
-// The §7.4.1 NOTE rules this source out by name: "a packed array dimension may
-// not be declared with only a single number, e.g., [8]". The ':' the parser
+// The §7.4.1 NOTE rules this source out by name: a packed array dimension
+// written as a single number, such as [8], is not allowed. The ':' the parser
 // wanted is the one §7.4.1 writes into the range specification.
 TEST(PackedArrayParsing, SingleNumberDimIsError) {
   auto r = Parse("module m; logic [8] x; endmodule\n");

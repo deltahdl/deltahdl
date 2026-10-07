@@ -219,12 +219,11 @@ int VpiCompatModeNamed(std::string_view name) {
   return 0;
 }
 
-// §36.12.2.2: "A means to set the default VPI compatibility mode shall be made
-// available by the simulation provider", and "only one such default mode shall
-// be selectable for a given simulation run". This is that means. A name that is
-// no mode, and a second switch naming a mode other than the first's, are
-// consumed and refused as TryParseMinTypMaxArg refuses a bad value; the same
-// mode named again selects nothing new and is accepted, as
+// §36.12.2.2: the simulation provider has to offer a way to set the default VPI
+// compatibility mode, with one such default per simulation run. This is that
+// means. A name that is no mode, and a second switch naming a mode other than
+// the first's, are consumed and refused as TryParseMinTypMaxArg refuses a bad
+// value; the same mode named again selects nothing new and is accepted, as
 // VpiContext::SetDefaultCompatibilityMode accepts it.
 bool TryParseVpiCompatModeArg(std::string_view arg, int& i, int argc,
                               const char* const argv[], CliOptions& opts) {
@@ -296,10 +295,10 @@ bool TryParseGeneralFlag(std::string_view arg, CliOptions& opts) {
   return false;
 }
 
-// §31.9.4 (printed page 923): "the ability of simulators to handle negative
-// values in $setuphold and $recrem timing checks shall be enabled with an
-// invocation option", and the clause names "an invocation option turning off
-// all timing checks" beside it.
+// §31.9.4 (printed page 923): an invocation option has to turn on a simulator's
+// handling of negative values in $setuphold and $recrem timing checks, and the
+// clause names an invocation option that turns off every timing check beside
+// it.
 bool TryParseTimingCheckFlag(std::string_view arg, CliOptions& opts) {
   if (arg == "--negative-timing-checks") {
     opts.negative_timing_checks = true;

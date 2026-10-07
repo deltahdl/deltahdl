@@ -10,11 +10,10 @@ using namespace delta;
 namespace {
 
 // §35.5: an imported function is used much as a native SystemVerilog function
-// is. An imported task is used where a native task is used, so §13.4's "a
-// function shall not enable a task" reaches a call to one. §35.5.1.1's note is
-// what makes the rule matter here rather than being a formality: an imported
-// task can consume time, which is the whole reason a function may not enable
-// one.
+// is. An imported task is used where a native task is used, so §13.4's bar on a
+// function enabling a task reaches a call to one. §35.5.1.1's note is what
+// makes the rule matter here rather than being a formality: an imported task
+// can consume time, which is the whole reason a function may not enable one.
 TEST(DpiImportedSubroutineUsage, FunctionCannotEnableAnImportedTask) {
   ElabFixture f;
   Elaborate(R"(

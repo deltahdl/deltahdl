@@ -7,13 +7,13 @@ using namespace delta;
 
 namespace {
 
-// §6.20: "Constants are named data objects that never change. SystemVerilog
-// provides three elaboration-time constants: parameter, localparam, and
-// specparam." A procedural assignment that writes one breaks that sentence, and
-// the sentence says nothing about the shape of the write or about where the
-// statement making it stands. The cases in the numbered files beside this one
-// cover the constants themselves; these cover the writes, one per shape the
-// report used to be absent from.
+// §6.20: a constant is a named data object that never changes, and parameter,
+// localparam and specparam are the three elaboration-time constants. A
+// procedural assignment that writes one breaks that sentence, and the sentence
+// says nothing about the shape of the write or about where the statement making
+// it stands. The cases in the numbered files beside this one cover the
+// constants themselves; these cover the writes, one per shape the report used
+// to be absent from.
 //
 // Every case here uses a parameter unless it says otherwise, because
 // Elaborator::const_names_ takes the three kinds together and the report is the
@@ -188,10 +188,10 @@ TEST(ConstAssignElaboration, AWriteToAVariableThroughABitSelectIsAccepted) {
              "endmodule\n"));
 }
 
-// §6.16.2's putc "replaces the ith character in str with the given integral
-// value", so the call writes S, and §6.20 says a constant never changes. A call
-// is not an assignment, so no walk over left-hand sides reaches it: at run time
-// a parameter is an ordinary variable with no flag marking it constant, and the
+// §6.16.2's putc puts the given integral value in place of the ith character of
+// str, so the call writes S, and §6.20 says a constant never changes. A call is
+// not an assignment, so no walk over left-hand sides reaches it: at run time a
+// parameter is an ordinary variable with no flag marking it constant, and the
 // write reached StringWriteByte with nothing left to refuse it.
 TEST(ConstAssignElaboration, APutcOnAStringParameterIsReported) {
   ElabFixture f;
@@ -205,9 +205,9 @@ TEST(ConstAssignElaboration, APutcOnAStringParameterIsReported) {
                             3, "6.20"));
 }
 
-// §6.16.10's itoa "stores the ASCII decimal representation of i into str". It
-// reaches a different helper from putc, so a repair naming one method would
-// leave the other five.
+// §6.16.10's itoa writes the ASCII decimal form of i into str. It reaches a
+// different helper from putc, so a repair naming one method would leave the
+// other five.
 TEST(ConstAssignElaboration, AnItoaOnAStringParameterIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -245,10 +245,10 @@ TEST(ConstAssignElaboration, APutcOnAStringVariableIsAccepted) {
              "endmodule\n"));
 }
 
-// §6.16.3's getc "returns the ASCII code of the ith character in str" and
-// writes nothing, so it stays legal on a constant. This is what keeps the check
-// on whether the method writes its object rather than on whether a string
-// method was called on a constant at all.
+// §6.16.3's getc gives the ASCII code of str's ith character and writes
+// nothing, so it stays legal on a constant. This is what keeps the check on
+// whether the method writes its object rather than on whether a string method
+// was called on a constant at all.
 TEST(ConstAssignElaboration, AGetcOnAStringParameterIsAccepted) {
   EXPECT_TRUE(
       ElabOk("module top;\n"

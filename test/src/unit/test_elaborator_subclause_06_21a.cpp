@@ -181,16 +181,15 @@ TEST(ScopeAndLifetimeElaboration, StaticVarForceInTaskSucceeds) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.21 is the clause for this report, not §13.3.2. §6.21 says "Automatic
-// variables and elements of dynamically sized array variables shall not be
-// written with nonblocking, continuous, or procedural continuous assignments",
-// and that sentence is about how a variable was declared rather than about
-// which task declared it. §13.3.2's four bullets open "Because variables
-// declared in automatic tasks are deallocated at the end of the task
-// invocation", so they reach a variable of an automatic task only, and `drive`
-// carries the `static` keyword. §13.3.1 is what makes the declaration legal
-// there: "Specific local variables can be declared as automatic within a static
-// task or as static within an automatic task."
+// §6.21 is the clause for this report, not §13.3.2. §6.21 bars nonblocking,
+// continuous and procedural continuous assignments from writing an automatic
+// variable or an element of a dynamically sized array variable, and that
+// sentence is about how a variable was declared rather than about which task
+// declared it. §13.3.2's four bullets rest on an automatic task's variables
+// being freed when the task invocation ends, so they reach a variable of an
+// automatic task only, and `drive` carries the `static` keyword. §13.3.1 is
+// what makes the declaration legal there: it lets a static task declare a given
+// local variable automatic, and an automatic task declare one static.
 TEST(ScopeAndLifetimeElaboration, StaticTaskAutoVarNonblockingIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -206,12 +205,12 @@ TEST(ScopeAndLifetimeElaboration, StaticTaskAutoVarNonblockingIsError) {
                             "6.21"));
 }
 
-// The sentence broken here is §6.21's last one: "References to automatic
-// variables and elements or members of dynamic variables shall be limited to
-// procedural blocks." An intra-assignment event control holds the reference to
+// The sentence broken here is §6.21's last one: references to automatic
+// variables, and to elements or members of dynamic variables, are confined to
+// procedural blocks. An intra-assignment event control holds the reference to
 // `gate` until the event fires, which is after the statement that named it has
-// finished. §13.3.2 has a bullet for the same construct, "They shall not be
-// referenced in intra-assignment event controls of nonblocking assignments",
+// finished. §13.3.2 has a bullet for the same construct, barring such a
+// variable from the intra-assignment event control of a nonblocking assignment,
 // but its subject is a variable declared in an automatic task and `sync` is a
 // static one.
 TEST(ScopeAndLifetimeElaboration,
@@ -234,11 +233,11 @@ TEST(ScopeAndLifetimeElaboration,
 
 // $monitor keeps reading its arguments for the remainder of the simulation, so
 // naming `sample` in one places a reference to an automatic variable outside
-// the block that declared it, which §6.21's "References to automatic variables
-// ... shall be limited to procedural blocks" forbids. The citation is §6.21
-// rather than §13.3.2 because `probe` is declared `task static`, and §13.3.2's
-// bullet "They shall not be traced with system tasks such as $monitor and
-// $dumpvars" governs variables of automatic tasks.
+// the block that declared it, which §6.21's confinement of automatic-variable
+// references to procedural blocks forbids. The citation is §6.21 rather than
+// §13.3.2 because `probe` is declared `task static`, and §13.3.2's bullet
+// keeping such variables out of tracing system tasks like $monitor and
+// $dumpvars governs variables of automatic tasks.
 TEST(ScopeAndLifetimeElaboration, StaticTaskAutoVarMonitorIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -280,8 +279,8 @@ TEST(ScopeAndLifetimeElaboration, StaticTaskAutoVarForceIsError) {
 // reaches it through the same sentence that reaches `force`. It is pinned apart
 // from StaticTaskAutoVarForceIsError so that a change routing only one of the
 // two statement kinds to the check shows up. §13.3.2's own bullet names both,
-// "They shall not be referenced by assign or force procedural continuous
-// assignments", and applies to neither statement here, since `latch_it` is a
+// keeping such variables out of assign and force procedural continuous
+// assignments, and applies to neither statement here, since `latch_it` is a
 // static task.
 TEST(ScopeAndLifetimeElaboration, StaticTaskAutoVarProcAssignIsError) {
   ElabFixture f;
@@ -299,12 +298,12 @@ TEST(ScopeAndLifetimeElaboration, StaticTaskAutoVarProcAssignIsError) {
                             4, "6.21"));
 }
 
-// §6.21 accepts this: "Variables declared inside a static task, function, or
-// block are local in scope and default to a static lifetime", so `total` is
-// static and no restriction on automatic variables reaches it. This is the
-// input that makes the five rejections above mean something. Without it a test
-// over `automatic int` passes whether the elaborator reads the declaration's
-// lifetime or assumes one from the task's.
+// §6.21 accepts this: a variable declared in a static task, function or block
+// is local to it and static by default, so `total` is static and no restriction
+// on automatic variables reaches it. This is the input that makes the five
+// rejections above mean something. Without it a test over `automatic int`
+// passes whether the elaborator reads the declaration's lifetime or assumes one
+// from the task's.
 TEST(ScopeAndLifetimeElaboration, StaticTaskDefaultLifetimeVarNonblockingOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -602,11 +601,11 @@ TEST(ScopeAndLifetimeElaboration, ForLoopVariableDefaultsAutomaticElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.21's "elements of dynamically sized array variables shall not be written
-// with nonblocking ... assignments" is decided by the assignment's target, not
-// by where the statement stands, and §18.16 makes each randcase_item's body a
-// statement_or_null. DynamicArrayElementNonblockingIsError above writes the
-// same assignment directly under `initial` and expects the same report.
+// §6.21's bar on nonblocking writes to elements of dynamically sized array
+// variables is decided by the assignment's target, not by where the statement
+// stands, and §18.16 makes each randcase_item's body a statement_or_null.
+// DynamicArrayElementNonblockingIsError above writes the same assignment
+// directly under `initial` and expects the same report.
 TEST(ScopeAndLifetimeElaboration,
      NonblockingAssignToDynamicArrayElementInARandcaseArmIsError) {
   ElabFixture f;
@@ -897,11 +896,11 @@ TEST(ScopeAndLifetimeElaboration, BlockScopedParamSizedArrayElementNbaIsOk) {
 }
 
 // §27.6 makes a generate block's declarations declarations of the module, so
-// §6.21's "elements of dynamically sized array variables shall not be written
-// with nonblocking ... assignments" is the same rule inside one. The construct
-// holds its contents in its own nested lists rather than beside the module's
-// other items, and the walk read only the latter, so no statement written in a
-// generate block was ever handed to the check.
+// §6.21's bar on nonblocking writes to elements of dynamically sized array
+// variables is the same rule inside one. The construct holds its contents in
+// its own nested lists rather than beside the module's other items, and the
+// walk read only the latter, so no statement written in a generate block was
+// ever handed to the check.
 //
 // The three lists are here in one module because they are three fields rather
 // than three rules: the block of an if, the block its else records on an item

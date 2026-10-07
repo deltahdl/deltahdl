@@ -172,16 +172,16 @@ TEST(EqualityOperatorSim, CaseInequalityXZMismatchIsKnownTrue) {
   EXPECT_EQ(r->value.words[0].bval & 1u, 0u);
 }
 
-// §11.4.5: "Bits that are x or z shall be included in the comparison and shall
-// match for the result to be considered equal", and "The result of these
-// operators shall always be a known value". Table 6-7 gives a `logic [7:0]`
-// scalar and an element of a `logic [7:0]` array the same 'x default, so the
-// two compare equal to each other and to the literal spelling the same value,
-// whichever producer built them -- the element's came from MakeAllX and the
-// scalar's from SimContext::CreateVariable. `arr[0] === s` is the
-// discriminating half: two values of one declared type and one default, with
-// no literal to be right about. The width is 8 rather than 64 because a width
-// that fills its last word leaves no bits above itself to disagree over.
+// §11.4.5: x and z bits take part in the comparison and have to match for the
+// operands to be equal, and the result of these operators is always known.
+// Table 6-7 gives a `logic [7:0]` scalar and an element of a `logic [7:0]`
+// array the same 'x default, so the two compare equal to each other and to the
+// literal spelling the same value, whichever producer built them -- the
+// element's came from MakeAllX and the scalar's from
+// SimContext::CreateVariable. `arr[0] === s` is the discriminating half: two
+// values of one declared type and one default, with no literal to be right
+// about. The width is 8 rather than 64 because a width that fills its last word
+// leaves no bits above itself to disagree over.
 TEST(EqualityOperatorSim, CaseEqualityMatchesTable67DefaultOfArrayElement) {
   SimFixture f;
   auto* design = ElaborateSrc(

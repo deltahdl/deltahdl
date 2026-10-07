@@ -237,12 +237,12 @@ TEST(PackedStructSimulation, MemberWriteUpdatesWholeVector) {
 }
 
 // §7.2.1 makes a member of a packed structure a named window on the bits of one
-// variable -- the members "are packed together in memory without gaps" -- and
-// §10.4.2 asks of a nonblocking target only that "variable_lvalue is a data
-// type that is valid for a procedural assignment statement", which A.8.5 opens
-// with the dotted member path. So `s.b <= 8'hA5` has to reach the same eight
-// bits that WriteTwoStateValueToBitMember_OverwritesPriorX above reaches with
-// `=`, the two forms differing only in when the write lands.
+// variable -- the members sit side by side in memory with no gaps -- and
+// §10.4.2 asks of a nonblocking target only that variable_lvalue is any data
+// type a procedural assignment statement accepts, which A.8.5 opens with the
+// dotted member path. So `s.b <= 8'hA5` has to reach the same eight bits that
+// WriteTwoStateValueToBitMember_OverwritesPriorX above reaches with `=`, the
+// two forms differing only in when the write lands.
 //
 // They differed in whether it landed at all. ScheduleNonblockingAssign resolved
 // a member-access target through ResolveLhsVariable, which rebuilds the dotted

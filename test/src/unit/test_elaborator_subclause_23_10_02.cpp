@@ -216,9 +216,9 @@ TEST(ModuleInstanceParameterValueAssignment,
   EXPECT_EQ(u0->params[1].resolved_value, 50);
 }
 
-// §6.16 rules that for the string data type "no truncation occurs", and
-// §23.10.2 puts an overridden parameter's value under that rule as much as a
-// declared one. "configured" is ten characters, which is past both the eight
+// §6.16 rules that for the string data type nothing is truncated, and §23.10.2
+// puts an overridden parameter's value under that rule as much as a declared
+// one. "configured" is ten characters, which is past both the eight
 // RtlirParamDecl::resolved_value can hold and the four the 32-bit lowering
 // keeps, so this asserts the characters reached the elaborated parameter rather
 // than that some wider number did. is_string_value is asserted beside them

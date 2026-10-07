@@ -40,11 +40,10 @@ TEST(ArrayIndexingElaboration, IndexedPartSelectWidthLocalparamAccepted) {
 // is a run-time variable (not a constant expression) is rejected at
 // elaboration. Only the size must be constant; the position (base) here is
 // deliberately also a variable to show it is the width, not the position, that
-// is illegal. §7.4.5 states "The size of the part-select or slice shall be
-// constant, but the position can be variable", and §11.5.1 states the same
-// rule for the vector operand this select addresses -- "The width of a
-// part-select is always constant" -- so the report names §11.5.1.
-// ObjectPropertyElaboration.InstanceParamAccessIsNotConstant, in
+// is illegal. §7.4.5 fixes the size of a part-select or slice while letting its
+// position vary, and §11.5.1 states the same rule for the vector operand this
+// select addresses -- a part-select's width never varies -- so the report names
+// §11.5.1. ObjectPropertyElaboration.InstanceParamAccessIsNotConstant, in
 // test/src/unit/test_elaborator_subclause_08_05.cpp, already asserts §11.5.1
 // for this message.
 TEST(ArrayIndexingElaboration, NonConstantPartSelectWidthRejected) {

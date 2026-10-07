@@ -69,12 +69,11 @@ TEST(SuperElaboration, SuperInStaticMethodError) {
       "'this' and 'super' shall not be used in a static method", 5, "8.10"));
 }
 
-// §8.15: "The super keyword is used from within a derived class to refer to
-// members, class value parameters, or local value parameters of the base
-// class." A class that extends nothing has no base class for super to name.
-// The subclause on the report is what tells this rejection from §8.10's rule
-// about super in a static method, which the same keyword in a different
-// position breaches.
+// §8.15: inside a derived class, super names the members, class value
+// parameters or local value parameters of the base class. A class that extends
+// nothing has no base class for super to name. The subclause on the report is
+// what tells this rejection from §8.10's rule about super in a static method,
+// which the same keyword in a different position breaches.
 TEST(SuperElaboration, SuperOutsideASubclassNames8_15) {
   ElabFixture f;
   ElabOk(

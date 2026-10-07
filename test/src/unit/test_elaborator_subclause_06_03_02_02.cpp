@@ -1,9 +1,8 @@
-// §6.3.2.2 Drive strength: "The drive strength specification allows a
-// continuous assignment to be placed on a net in the same statement that
-// declares that net." §6.3.2 states the same thing as the restriction it is --
-// drive strength "shall only be used when placing a continuous assignment on a
-// net in the same statement that declares the net" -- so a declaration
-// carrying a strength and no assignment is what the rule rejects.
+// §6.3.2.2 Drive strength: the drive strength specification lets the statement
+// that declares a net also place a continuous assignment on it. §6.3.2 states
+// the same thing as the restriction it is -- drive strength is used only where
+// the net's declaring statement also places a continuous assignment on it -- so
+// a declaration carrying a strength and no assignment is what the rule rejects.
 //
 // The plain pair, one net declared with a strength and one without an
 // assignment beside it, is covered under §6.3.2, where the restriction is

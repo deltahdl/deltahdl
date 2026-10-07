@@ -42,9 +42,9 @@ uint64_t RunAndReadVar(SimFixture& f, const std::string& src,
   return v ? v->value.ToUint64() : ~0ull;
 }
 
-// "shall ... include ... the right-hand side of assignments": changing an RHS
-// operand after the initial settle must re-trigger the block. If `a` were not
-// in the implied list, y would keep its t=0 value 0x03 instead of 0x12.
+// The right-hand side of an assignment is included: changing an RHS operand
+// after the initial settle must re-trigger the block. If `a` were not in the
+// implied list, y would keep its t=0 value 0x03 instead of 0x12.
 TEST(ImplicitSensitivitySim, WakesOnRhsOperandChange) {
   SimFixture f;
   uint64_t y = RunAndReadVar(f,
@@ -79,8 +79,8 @@ TEST(ImplicitSensitivitySim, WakesOnSecondRhsOperandChange) {
   EXPECT_EQ(y, 0x25u);
 }
 
-// "shall ... include ... subroutine calls": an argument passed to a called
-// function is read, so a change to it re-triggers the block.
+// Subroutine calls are included: an argument passed to a called function is
+// read, so a change to it re-triggers the block.
 TEST(ImplicitSensitivitySim, WakesOnSubroutineArgChange) {
   SimFixture f;
   uint64_t y =
@@ -101,8 +101,8 @@ TEST(ImplicitSensitivitySim, WakesOnSubroutineArgChange) {
   EXPECT_EQ(y, 0x0Au);
 }
 
-// "shall ... include ... case ... expressions": the case selector is read even
-// though it never appears on the RHS of an assignment.
+// Case expressions are included: the case selector is read even though it never
+// appears on the RHS of an assignment.
 TEST(ImplicitSensitivitySim, WakesOnCaseSelectorChange) {
   SimFixture f;
   uint64_t y = RunAndReadVar(f,
@@ -125,12 +125,12 @@ TEST(ImplicitSensitivitySim, WakesOnCaseSelectorChange) {
   EXPECT_EQ(y, 0x20u);
 }
 
-// "shall ... include ... case item expressions": a variable appearing only in
-// a case-item label (the reverse-case idiom `case (1'b1) sig[k]:`) is read, so
-// a change to it re-triggers. Here `state` is never on an RHS and is not the
-// case selector (which is the constant 1'b1); it drives the block solely
-// through the item labels. If it were left out of the implied list, y would
-// keep its first value 0x11 instead of updating to 0x33.
+// Case item expressions are included: a variable appearing only in a case-item
+// label (the reverse-case idiom `case (1'b1) sig[k]:`) is read, so a change to
+// it re-triggers. Here `state` is never on an RHS and is not the case selector
+// (which is the constant 1'b1); it drives the block solely through the item
+// labels. If it were left out of the implied list, y would keep its first value
+// 0x11 instead of updating to 0x33.
 TEST(ImplicitSensitivitySim, WakesOnCaseItemExprChange) {
   SimFixture f;
   uint64_t y = RunAndReadVar(f,
@@ -154,8 +154,8 @@ TEST(ImplicitSensitivitySim, WakesOnCaseItemExprChange) {
   EXPECT_EQ(y, 0x33u);
 }
 
-// "shall ... include ... conditional expressions": the `?:` selector is read.
-// sel appears only in the condition, never as an assignment RHS operand.
+// Conditional expressions are included: the `?:` selector is read. sel appears
+// only in the condition, never as an assignment RHS operand.
 TEST(ImplicitSensitivitySim, WakesOnConditionalSelectorChange) {
   SimFixture f;
   uint64_t y = RunAndReadVar(f,
@@ -173,10 +173,10 @@ TEST(ImplicitSensitivitySim, WakesOnConditionalSelectorChange) {
   EXPECT_EQ(y, 0xAAu);
 }
 
-// "shall ... include ... an index variable on the left-hand side of
-// assignments": idx is read (to pick the target bit) even though it appears on
-// the LHS. A change to idx re-triggers, setting a second bit; y[0] set by the
-// first pass survives because only the selected bit is written.
+// An index variable on the left-hand side of an assignment is included: idx is
+// read (to pick the target bit) even though it appears on the LHS. A change to
+// idx re-triggers, setting a second bit; y[0] set by the first pass survives
+// because only the selected bit is written.
 TEST(ImplicitSensitivitySim, WakesOnLhsIndexChange) {
   SimFixture f;
   uint64_t y = RunAndReadVar(f,
@@ -195,10 +195,10 @@ TEST(ImplicitSensitivitySim, WakesOnLhsIndexChange) {
   EXPECT_EQ(y, 0b0101u);
 }
 
-// "adding all nets and variables that are read": nets are admitted alongside
-// variables. The wire w is driven by a continuous assignment (§10.3); when its
-// value changes the @* block re-triggers. Built from real source and run end to
-// end — the net's value is produced by the assign, not hand-set. If nets were
+// Every net and variable read is added: nets are admitted alongside variables.
+// The wire w is driven by a continuous assignment (§10.3); when its value
+// changes the @* block re-triggers. Built from real source and run end to end —
+// the net's value is produced by the assign, not hand-set. If nets were
 // excluded from the implied list, y would keep its t=0 value 0.
 TEST(ImplicitSensitivitySim, WakesOnNetOperandChange) {
   SimFixture f;

@@ -42,11 +42,11 @@ TEST(ClassObjectElaboration, ForwardTypedefInterfaceClassOk) {
              "endmodule\n"));
 }
 
-// §6.18 carries the rule: "The actual data type definition of a forward typedef
-// declaration shall be resolved within the same local scope or generate block."
-// §8.27 restates it for a forward class declaration and says so, opening "As
-// with other forward typedefs as described in 6.18", so both sites pass
-// Subclause("6.18"). Elaborator::ValidateForwardClassTypedefs in
+// §6.18 carries the rule: a forward typedef's actual data type definition is
+// resolved within the same local scope or generate block. §8.27 restates it for
+// a forward class declaration and says so, opening with a pointer to the
+// forward typedefs of §6.18, so both sites pass Subclause("6.18").
+// Elaborator::ValidateForwardClassTypedefs in
 // src/elaborator/elaborator_validate_classes.cpp walks the compilation unit's
 // items and Elaborator::ValidateForwardTypedefsInScope in
 // src/elaborator/elaborator_scope_rules_enclosing.cpp walks a ModuleDecl's

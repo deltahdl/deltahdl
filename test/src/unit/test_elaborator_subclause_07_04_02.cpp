@@ -260,11 +260,11 @@ TEST(UnpackedArrayValidation, ZeroValuedParameterSizeFormRejected) {
 }
 
 // §7.4.2 writes a fixed-size unpacked dimension as a range of element
-// addresses, and §11.5.2 rules that "the address bounds given in the
-// declaration of the memory determine the effect of the address expression",
-// so both values written are part of the declaration. The elaborator records
-// only `std::min` of each pair, in `unpacked_dim_los`, and only from two
-// dimensions up; of `[3:1]` it keeps the 1 and the declared 3 is gone.
+// addresses, and §11.5.2 rules that the bounds the memory's declaration gives
+// decide what an address expression reaches, so both values written are part of
+// the declaration. The elaborator records only `std::min` of each pair, in
+// `unpacked_dim_los`, and only from two dimensions up; of `[3:1]` it keeps the
+// 1 and the declared 3 is gone.
 TEST(UnpackedArrayValidation, EachDimensionKeepsBothDeclaredBounds) {
   ElabFixture f;
   auto* design =
@@ -278,11 +278,11 @@ TEST(UnpackedArrayValidation, EachDimensionKeepsBothDeclaredBounds) {
             std::make_pair(int64_t{3}, int64_t{1}));
 }
 
-// §7.4.2 rules that in a dimension's range "the first value may be greater
-// than, equal to, or less than the second value", so `[3:1]` and `[1:3]` are
-// two different declarations and the record has to tell them apart. Both
-// collapse to `std::min` of the pair, which is 1 for either, so the two
-// declarations leave the same `unpacked_dim_los`.
+// §7.4.2 lets the first value of a dimension's range be greater than, equal to
+// or less than the second, so `[3:1]` and `[1:3]` are two different
+// declarations and the record has to tell them apart. Both collapse to
+// `std::min` of the pair, which is 1 for either, so the two declarations leave
+// the same `unpacked_dim_los`.
 TEST(UnpackedArrayValidation, OppositeSecondDimensionRecordsDifferently) {
   ElabFixture f1;
   auto* d1 = Elaborate("module m; logic [7:0] x [1:2][3:1]; endmodule\n", f1);

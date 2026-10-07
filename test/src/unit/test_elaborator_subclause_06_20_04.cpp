@@ -215,8 +215,8 @@ TEST(LocalparamElaboration, StickyLocalparamPortRejectsInstanceOverride) {
                             "23.10.2.2"));
 }
 
-// §6.20.4: a localparam "can be assigned constant expressions (see 11.2.1)",
-// and §11.2.1 does not list a variable among the operands one consists of. The
+// §6.20.4: a localparam may be assigned constant expressions (§11.2.1), and
+// §11.2.1 does not list a variable among the operands one consists of. The
 // initializer here is a bare identifier naming a variable, which is the
 // simplest spelling of the rule and the one that shows the check tests the
 // expression rather than its ExprKind.
@@ -270,8 +270,8 @@ TEST(LocalparamElaboration, SpecializationOverrideThatDoesNotFoldIsReported) {
       "localparam 'N' initializer is not a constant expression", 5, "6.20.4"));
 }
 
-// §6.20.4: a localparam is "assigned constant expressions ... containing
-// parameters", so an initializer naming another parameter is exactly what the
+// §6.20.4: a localparam is assigned constant expressions that may contain
+// parameters, so an initializer naming another parameter is exactly what the
 // clause permits. This is what the check above must not reject.
 TEST(LocalparamElaboration, ConstantIdentifierInitializerIsAccepted) {
   ElabFixture f;
@@ -285,13 +285,13 @@ TEST(LocalparamElaboration, ConstantIdentifierInitializerIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.20.4: "local parameters can be declared in a generate block, package,
-// class body, or compilation-unit scope. In these contexts, the parameter
-// keyword shall be a synonym for the localparam keyword." The nine cases below
-// vary the scope the declaration sits in while holding the initializer fixed at
-// the bare identifier NonConstantIdentifierInitializerIsReported uses, because
-// the scope is what the check was keyed on: it read a module's top-level items
-// alone, so every case above passes whether or not any other scope is reached.
+// §6.20.4: a local parameter may be declared in a generate block, package,
+// class body or compilation-unit scope, where the parameter keyword means
+// localparam. The nine cases below vary the scope the declaration sits in while
+// holding the initializer fixed at the bare identifier
+// NonConstantIdentifierInitializerIsReported uses, because the scope is what
+// the check was keyed on: it read a module's top-level items alone, so every
+// case above passes whether or not any other scope is reached.
 
 // A conditional generate block. Its items are in ModuleItem::gen_body rather
 // than in the module's item list, which is what the module-level loop reads.

@@ -646,9 +646,9 @@ TEST(AssignmentExtensionTruncationSim, StringLocalHasNoWidthToTruncateTo) {
   EXPECT_EQ(x->value.ToUint64(), 11u);
 }
 
-// §6.8 executes a declaration's initializer "as if the assignment were made
-// from an initial procedure", which §10.8 makes an assignment-like context, so
-// §10.7 truncates it into the width the declaration established.
+// §6.8 executes a declaration's initializer as though an initial procedure made
+// the assignment, which §10.8 makes an assignment-like context, so §10.7
+// truncates it into the width the declaration established.
 // DeclarationInitializerTruncates above claims that for a declaration at module
 // scope, which Lowerer::CoerceVarInitValue serves; a declaration written inside
 // a procedural block is created and initialized by ExecVarDeclImpl in
@@ -718,10 +718,10 @@ TEST(AssignmentExtensionTruncationSim,
   EXPECT_EQ(x->value.ToUint64(), 11u);
 }
 
-// §10.4 lists "Bit-selects, part-selects, and slices of packed arrays" among
-// the left-hand sides a procedural assignment may take, alongside the elements
-// of Clause 7's arrays, and puts such assignments "within procedures such as
-// always, initial, task, and function". The subroutine body's executor looked
+// §10.4 lists bit-selects, part-selects and slices of packed arrays among the
+// left-hand sides a procedural assignment may take, alongside the elements of
+// Clause 7's arrays, and puts such assignments inside procedures, always,
+// initial, task and function among them. The subroutine body's executor looked
 // for an element variable named `a[i]` and nothing else, so of those forms only
 // an unpacked array element was reached, and what it reached it wrote whole.
 

@@ -265,11 +265,10 @@ TEST(DpiDeclElab, SignatureUnpackedBoundsMismatchUnderSameLinkageIsError) {
 }
 
 // §35.5.4 makes the bounds part of the type, and §7.4.1 writes each of them as
-// a constant_expression -- "Each packed dimension in a packed array
-// declaration shall be specified by a range specification of the form [
-// constant_expression : constant_expression ]" -- so a bound is the value its
-// expression evaluates to and not the text it was written with. [3+4:0] and
-// [7:0] are one type, and the two declarations agree.
+// a constant_expression -- each packed dimension of a packed array declaration
+// takes a range specification [ constant_expression : constant_expression ] --
+// so a bound is the value its expression evaluates to and not the text it was
+// written with. [3+4:0] and [7:0] are one type, and the two declarations agree.
 TEST(DpiDeclElab, SignaturePackedBoundsAgreeingAfterFoldingUnderSameLinkageOk) {
   ElabFixture f;
   Elaborate(R"(

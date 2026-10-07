@@ -1,12 +1,10 @@
 // §11.5.1 Vector bit-select and part-select addressing, for the bound the rest
 // of the family does not exercise: the second one. The clause's sentence on
-// printed page 296 -- "A part-select that addresses a range of bits that are
-// completely out of the address bounds ... or a part-select that is x or z
-// shall yield the value x when read and shall have no effect on the data
-// stored when written" -- is said of the select, not of one of its two
-// addresses, and "Both msb_expr and lsb_expr shall be constant integer
-// expressions" makes both of them addresses. So `a[3 : 1'bx]` is as much an
-// x select as `a[1'bx : 3]` is.
+// printed page 296 -- that a part-select wholly outside the address bounds, or
+// one that is x or z, reads as x and stores nothing when written -- is said of
+// the select, not of one of its two addresses, and its requirement that
+// msb_expr and lsb_expr both be constant integer expressions makes both of them
+// addresses. So `a[3 : 1'bx]` is as much an x select as `a[1'bx : 3]` is.
 //
 // Every case here leaves the first bound a plain constant and makes the second
 // one unknown, which is what separates this file from its siblings.
@@ -46,12 +44,11 @@ using namespace delta;
 
 namespace {
 
-// §11.5.1 gives a part-select that "is x or z" the value x when read. The
-// second bound reached SelectBoundValue, whose Logic4Vec::ToUint64 is the
-// projection src/common/types.h calls "numeric/boolean" and which reads an x
-// and a z alike as 0, so `a[3 : 1'bx]` became the well-formed select `a[3:0]`
-// and answered the four real bits 4'b0101 -- an answer with no unknown
-// anywhere in it.
+// §11.5.1 gives a part-select that is x or z the value x when read. The second
+// bound reached SelectBoundValue, whose Logic4Vec::ToUint64 is the projection
+// src/common/types.h calls "numeric/boolean" and which reads an x and a z alike
+// as 0, so `a[3 : 1'bx]` became the well-formed select `a[3:0]` and answered
+// the four real bits 4'b0101 -- an answer with no unknown anywhere in it.
 //
 // `a` holds 8'hA5 rather than zeros so that the bits the wrong select names
 // are not themselves all x or all 0: 4'b0101 is what the defect answers, and
@@ -83,11 +80,11 @@ TEST(SelectXZHandling, NonIndexedPartSelectWithAnUnknownSecondBoundReadsAllX) {
   EXPECT_EQ(rz->value.ToString(), "xxxx");
 }
 
-// The other half of the same sentence: such a select "shall have no effect on
-// the data stored when written". The value is 2'b00 into an object whose
-// a[1:0] is 2'b01, so the write that must not happen would change exactly one
-// bit -- neither "wrote zeros where zeros already were" nor "wrote the value's
-// low bits" can satisfy the assertion.
+// The other half of the same sentence: such a select stores nothing when
+// written. The value is 2'b00 into an object whose a[1:0] is 2'b01, so the
+// write that must not happen would change exactly one bit -- neither "wrote
+// zeros where zeros already were" nor "wrote the value's low bits" can satisfy
+// the assertion.
 //
 // This is the write companion of PartSelectXZIndexWriteNoEffect in
 // test_simulator_subclause_11_05_01a.cpp with the unknown moved from the first

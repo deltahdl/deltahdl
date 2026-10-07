@@ -66,9 +66,9 @@ TEST(UnpackedArraySimulation, ParameterSizedArrayElementAccess) {
 // module-scope scalar, because a block-local array's element variables go away
 // with the block and cannot be looked up once the run has ended.
 
-// §7.4.2: "[size] shall mean the same as [0:size-1]", so index 2 of `int a[3]`
-// is the top element and holds what was written to it. A bit-select of the
-// carrier writes bit 2 instead, and 9 truncated to that one bit reads 1.
+// §7.4.2: [size] is shorthand for [0:size-1], so index 2 of `int a[3]` is the
+// top element and holds what was written to it. A bit-select of the carrier
+// writes bit 2 instead, and 9 truncated to that one bit reads 1.
 TEST(UnpackedArraySimulation, SizeFormInAProceduralBlockAddressesElements) {
   auto v = RunAndGet(
       "module t;\n"
@@ -207,14 +207,13 @@ TEST(UnpackedArraySimulation, ChildInstanceForeachAndSizeSeeTheArray) {
   EXPECT_EQ(r->value.ToUint64(), 4100u);
 }
 
-// §7.4.2 (printed page 154): "Elements of net arrays can be used in the same
-// fashion as a scalar or vector net", so each element is driven and resolved
-// apart from the others. `assign n[1] = 1'b1;` drives n[1] alone and leaves
-// n[0] and n[2] undriven at z; the two drivers of the wor element r[0] are
-// or-ed and r[1], driven by neither, is z; and a bit-select of an element of
-// `wire [3:0] v[2:1]` drives that one bit of it. The array was held as one
-// net of an element's width, so n[1] selected a bit it did not have and read
-// x, as did every element.
+// §7.4.2 (printed page 154): an element of a net array is used as a scalar or
+// vector net is, so each element is driven and resolved apart from the others.
+// `assign n[1] = 1'b1;` drives n[1] alone and leaves n[0] and n[2] undriven at
+// z; the two drivers of the wor element r[0] are or-ed and r[1], driven by
+// neither, is z; and a bit-select of an element of `wire [3:0] v[2:1]` drives
+// that one bit of it. The array was held as one net of an element's width, so
+// n[1] selected a bit it did not have and read x, as did every element.
 TEST(UnpackedArraySimulation, NetArrayElementsAreNetsOfTheirOwn) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"

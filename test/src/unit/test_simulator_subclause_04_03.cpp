@@ -77,7 +77,7 @@ TEST(EventSimulationSim, VariableStateChangePropagatesToSensitiveProcess) {
   EXPECT_EQ(b->value.ToUint64(), 42u);
 }
 
-// §4.3 names "net or variable" as the state whose change is an update event, so
+// §4.3 names a net or variable as the state whose change is an update event, so
 // the rule -- including the "change" qualifier -- applies to a net as much as a
 // variable. A continuous assignment makes the net `y` follow `a`. Three net
 // state changes are genuine update events that evaluate the process watching

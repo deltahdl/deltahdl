@@ -22,10 +22,10 @@ namespace {
 
 // The value both a class parameter's default and an override of it are written
 // as here: a bare identifier naming a variable. §6.8 makes that variable and
-// the object's stored parameter two data storage elements, each storing "a
-// value from one assignment to the next", so a store of the value the
-// identifier produced has to take the words rather than the pointer to them --
-// EvalExpr answers a bare identifier with the variable's own vector.
+// the object's stored parameter two data storage elements, each keeping its
+// value from one assignment to the next, so a store of the value the identifier
+// produced has to take the words rather than the pointer to them -- EvalExpr
+// answers a bare identifier with the variable's own vector.
 constexpr uint64_t kSeed = 0xDEADBEEFu;
 constexpr uint64_t kSeedLowByteCleared = 0xDEADBE00u;
 

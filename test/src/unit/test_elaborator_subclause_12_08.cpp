@@ -440,9 +440,9 @@ TEST(JumpStatementElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.8 says of a value-returning function that "the return statement shall
-// have an expression of the correct type", and CheckValueReturningFuncReturn
-// in src/elaborator/elaborator_validate_jump_statements.cpp reports the bare
+// §12.8 requires a return in a value-returning function to carry an expression
+// of the right type, and CheckValueReturningFuncReturn in
+// src/elaborator/elaborator_validate_jump_statements.cpp reports the bare
 // return that breaks it. §18.17.6 makes the bare return below abort the
 // production rather than the function, so it is not the function's return and
 // that report is not about it. This is the case that pins the one exclusion
@@ -467,8 +467,8 @@ TEST(JumpStatementElaboration,
 }
 
 // §18.17.6 names break and return and says nothing about continue, so a
-// continue in a production code block keeps the §12.8 rule that it "can only
-// be used in a loop", which CheckContinueScope in
+// continue in a production code block keeps the §12.8 rule confining it to a
+// loop, which CheckContinueScope in
 // src/elaborator/elaborator_validate_jump_statements.cpp enforces with no
 // §18.17.6 term of its own. Without this case, an implementation that exempted
 // every jump statement written inside a randsequence would pass all the cases
@@ -573,11 +573,10 @@ TEST(JumpStatementElaboration,
 // StmtKind::kCycleDelay, StmtKind::kEventControl and StmtKind::kWait as well
 // as for the loop statements, and CheckJumpRulesChildren in
 // src/elaborator/elaborator_validate_jump_statements.cpp reaches it through
-// ForEachChildStmt. §12.8 says "the continue and break statements can only be
-// used in a loop" and "the return statement can only be used in a subroutine"
-// without qualifying either by what a statement is waiting for, so a jump
-// written after a delay, a cycle delay, an event control or a wait is judged
-// exactly as one written on its own.
+// ForEachChildStmt. §12.8 confines continue and break to a loop and return to a
+// subroutine without qualifying either by what a statement is waiting for, so a
+// jump written after a delay, a cycle delay, an event control or a wait is
+// judged exactly as one written on its own.
 
 // §12.8: the break is the whole body of a delay control, and no loop encloses
 // the delay control, so the break is not inside a loop.
@@ -654,8 +653,8 @@ TEST(JumpStatementElaboration, BreakAfterACycleDelayIsError) {
                             "break statement is not inside a loop", 5, "12.8"));
 }
 
-// The third §12.8 report through the same link: "the return statement can only
-// be used in a subroutine", and an initial block is not one. CheckJumpLeaf in
+// The third §12.8 report through the same link: return belongs in a subroutine,
+// and an initial block is not one. CheckJumpLeaf in
 // src/elaborator/elaborator_validate_jump_statements.cpp emits it, reading
 // JumpScope::in_subroutine, which an event control neither sets nor clears.
 TEST(JumpStatementElaboration,
@@ -689,10 +688,9 @@ TEST(JumpStatementElaboration, BreakAfterADelayControlInsideAForLoopOk) {
 }
 
 // The enclosing fork-join count passes through a delay control too, which is
-// what selects §12.8's second break report rather than its first: "the
-// continue and break statements cannot be used inside a fork-join block to
-// control a loop outside the fork-join block". The for loop stands outside the
-// fork.
+// what selects §12.8's second break report rather than its first: a continue or
+// break inside a fork-join block may not control a loop outside it. The for
+// loop stands outside the fork.
 TEST(JumpStatementElaboration,
      BreakAfterADelayControlInsideAForkInsideALoopIsError) {
   ElabFixture f;
@@ -738,10 +736,9 @@ TEST(JumpStatementElaboration,
 // CheckValueReturningFuncReturn stops at the randsequence statement, so it
 // excludes that list along with the production code blocks. §18.17.6 makes the
 // bare return below abort the production rather than the function, so §13.4.1's
-// "when the return statement is used, nonvoid functions shall specify an
-// expression with the return" is not about it. The production `a` has an empty
-// code block, which leaves the weight block as the only place the return can
-// stand.
+// demand that a nonvoid function's return carry an expression is not about it.
+// The production `a` has an empty code block, which leaves the weight block as
+// the only place the return can stand.
 TEST(JumpStatementElaboration,
      ReturnInARandsequenceWeightCodeBlockInAValueReturningFunctionOk) {
   ElabFixture f;

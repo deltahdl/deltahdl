@@ -38,9 +38,9 @@ TEST(BidirSwitchRun, TranConductsInBothDirections) {
 
 // §28.8: a tranif1 conducts while its control is 1 and a tranif0 while it is
 // 0, each blocking otherwise; with the control x, §4.9.5 (printed page 71) has
-// the network solved "with these transistors set to all possible combinations
-// of fully conducting and nonconducting", and a node with no "unique logic
-// level in all cases" -- 1 when on, z when off -- is x.
+// the network solved for every combination of these transistors fully
+// conducting or not, and a node with no single logic level across all of them
+// -- 1 when on, z when off -- is x.
 TEST(BidirSwitchRun, TranifFollowsItsControl) {
   SimFixture f;
   auto out = RunCapture(

@@ -33,9 +33,9 @@ TEST(QueueDeclarationElaboration, BoundedQueueDimensionRecordsCapacity) {
   EXPECT_EQ(mod->variables[0].queue_max_size, 8);
 }
 
-// Observes the "constant_expression shall evaluate to a positive integer
-// value" rule. Anything non-positive (zero or negative) trips the same check
-// in the elaborator; a single negative-bound case suffices to pin the rule.
+// Observes the rule that constant_expression evaluate to a positive integer.
+// Anything non-positive (zero or negative) trips the same check in the
+// elaborator; a single negative-bound case suffices to pin the rule.
 TEST(QueueDeclarationElaboration, NonPositiveBoundEmitsError) {
   ElabFixture f;
   auto* design = Elaborate("module m; int q [$:-1]; endmodule\n", f);
@@ -67,10 +67,10 @@ TEST(QueueDeclarationElaboration, LocalparamBoundRecordsCapacity) {
   EXPECT_EQ(q->queue_max_size, 8);
 }
 
-// The same constant-expression path must still enforce "shall evaluate to a
-// positive integer": a parameter that evaluates non-positive trips the error,
-// proving the bound is genuinely evaluated in the parameter scope rather than
-// silently dropped (which would leave the queue unbounded with no diagnostic).
+// The same constant-expression path must still enforce the positive-integer
+// rule: a parameter that evaluates non-positive trips the error, proving the
+// bound is genuinely evaluated in the parameter scope rather than silently
+// dropped (which would leave the queue unbounded with no diagnostic).
 TEST(QueueDeclarationElaboration, ParameterNonPositiveBoundEmitsError) {
   ElabFixture f;
   auto* design = Elaborate(

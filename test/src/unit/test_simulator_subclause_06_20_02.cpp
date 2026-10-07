@@ -19,7 +19,7 @@ using namespace delta;
 
 namespace {
 
-// §6.20.2: "A parameter declared with a real type" takes a real value, so a
+// §6.20.2: a parameter declared with a real type takes a real value, so a
 // fractional default must read back whole. A value truncated to an integer
 // would display 2, and one that failed to resolve would leave the name
 // undeclared and display 0.

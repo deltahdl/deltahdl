@@ -529,8 +529,8 @@ TEST(QueueOps, OutOfBoundsWriteWarningNames7_10_1) {
                               "queue write index out of bounds", 0, "7.10.1"));
 }
 
-// §7.10: "A queue is declared by specifying the queue dimension `[$]`", and
-// the subclause puts no scope on that: a declaration inside a procedural block
+// §7.10: a queue is declared by writing the queue dimension `[$]`, and the
+// subclause puts no scope on that: a declaration inside a procedural block
 // declares a queue exactly as one among a module's items does. So the queue
 // methods of §7.10.2 operate on the elements the pushes left, and `q.size()`
 // reads back the two of them rather than answering for a scalar variable that

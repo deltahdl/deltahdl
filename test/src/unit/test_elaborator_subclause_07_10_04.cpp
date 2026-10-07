@@ -52,8 +52,8 @@ TEST(QueueAssignElaboration, BareSliceToDollarMinusOneOk) {
 }
 
 // §7.10.4: `q = { q[0:pos-1], e, q[pos:$] }` elaborates. §7.10.1 rules that
-// slice bounds "are not required to be constant expressions", so a bound that
-// names a variable has to survive elaboration.
+// slice bounds need not be constant expressions, so a bound that names a
+// variable has to survive elaboration.
 TEST(QueueAssignElaboration, ConcatWithVariableBoundSlicesOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"

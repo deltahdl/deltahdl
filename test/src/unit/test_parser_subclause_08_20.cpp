@@ -36,10 +36,10 @@ TEST(VirtualMethodParsing, MethodExtendsSpecifier) {
   ASSERT_FALSE(r.has_errors);
 }
 
-// §8.20 (printed page 197): "initial and extends are mutually exclusive;
-// specifying both in a method declaration shall result in an error." The three
-// cases above accept each specifier alone, which is what keeps this one from
-// being satisfied by a parser that refused every specifier.
+// §8.20 (printed page 197): initial and extends exclude each other, and a
+// method declaration giving both is an error. The three cases above accept each
+// specifier alone, which is what keeps this one from being satisfied by a
+// parser that refused every specifier.
 TEST(VirtualMethodParsing, InitialAndExtendsTogetherIsRejected) {
   auto r = Parse(
       "class C;\n"

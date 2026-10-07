@@ -1,13 +1,12 @@
-// Tests for §6.10 "Implicit declarations": "In the absence of an explicit
-// declaration, an implicit net of default net type shall be assumed" in the
-// three circumstances the subclause lists -- a port expression declaration, an
+// Tests for §6.10 "Implicit declarations": where no explicit declaration
+// exists, an implicit net of the default net type is assumed in the three
+// circumstances the subclause lists -- a port expression declaration, an
 // instance terminal or port connection list, and the left-hand side of a
 // continuous assignment.
 //
-// §6.10 closes by deferring the `default_nettype none case: "See 22.8 for a
-// discussion of control of the type for implicitly declared nets with the
-// `default_nettype compiler directive." The rejections below therefore name
-// §22.8.
+// §6.10 closes by deferring the `default_nettype none case to §22.8, which
+// covers how the `default_nettype compiler directive controls the type of
+// implicitly declared nets. The rejections below therefore name §22.8.
 
 #include <gtest/gtest.h>
 
@@ -390,10 +389,9 @@ TEST(ImplicitDeclaration, PrimitiveTerminalForbiddenUnderNone) {
                             "implicit net 'y' forbidden by", 2, "22.8"));
 }
 
-// §6.10: "The implicit net declaration shall belong to the scope in which the
-// net reference appears. For example, if the implicit net is declared by a
-// reference in a generate block, then the net is implicitly declared only in
-// that generate block." A generate block forms a scope of its own and a further
+// §6.10: an implicit net belongs to the scope where the net reference stands,
+// so one declared by a reference in a generate block is declared in that
+// generate block alone. A generate block forms a scope of its own and a further
 // level of hierarchy once instantiated (§27.4, printed page 821), so the
 // implicit 'w' below is a declaration of block 'a' and of nothing else, and the
 // generate block instance array named 'w' beside it is declared in top. §27.4's
@@ -432,12 +430,12 @@ TEST(ImplicitDeclaration, ImplicitNetInAGenerateBlockIsNotAModuleScopeName) {
   EXPECT_TRUE(w1) << "generate block array 'w' instance 1 not elaborated";
 }
 
-// §6.10 assumes an implicit net only for an identifier that "has not been
-// declared previously in the scope", and §23.9 leaves the explicit declaration
-// that follows it a second declaration of one name in one scope. This is the
-// case the fix above must not lose: recording the implicit net under its bare
-// name meant the explicit 'wire w' inside the same block was keyed under the
-// block's prefix, matched nothing, and was accepted.
+// §6.10 assumes an implicit net only for an identifier that has no earlier
+// declaration in the scope, and §23.9 leaves the explicit declaration that
+// follows it a second declaration of one name in one scope. This is the case
+// the fix above must not lose: recording the implicit net under its bare name
+// meant the explicit 'wire w' inside the same block was keyed under the block's
+// prefix, matched nothing, and was accepted.
 TEST(ImplicitDeclaration, ExplicitNetAfterImplicitInOneGenerateBlockIsRedecl) {
   ElabFixture f;
   ElaborateSrc(
@@ -494,10 +492,10 @@ TEST(ImplicitDeclaration, ImplicitNetInALoopGenerateBlockIsNamedPerIteration) {
   EXPECT_EQ(bare, 0) << "no net belongs to top under the bare name";
 }
 
-// §6.10 assumes an implicit net only for an identifier that "has not been
-// declared previously in the scope where the ... assignment appears", and the
-// explicit 'wire w' inside generate block 'a' is that previous declaration.
-// Block 'a' therefore holds one net named 'a_w'.
+// §6.10 assumes an implicit net only for an identifier that has no earlier
+// declaration in the scope where the assignment stands, and the explicit 'wire
+// w' inside generate block 'a' is that previous declaration. Block 'a'
+// therefore holds one net named 'a_w'.
 //
 // The test fails when mod->nets holds two entries named 'a_w'.
 // Elaborator::MaybeCreateImplicitNet in src/elaborator/elaborator_items.cpp
@@ -528,11 +526,10 @@ TEST(ImplicitDeclaration, ExplicitNetNotDuplicatedByImplicitInAGenerateBlock) {
 }
 
 // §6.10 declares one implicit net for one undeclared identifier in one scope:
-// "The implicit net declaration shall belong to the scope in which the net
-// reference appears", and only a reference "from outside the generate block or
-// in another generate block within the same module" declares another one. Both
-// references to 'w' below stand in generate block 'a', so block 'a' holds one
-// net named 'a_w'.
+// an implicit net belongs to the scope where the net reference stands, and only
+// a reference from outside the generate block, or from another generate block
+// of the same module, declares another one. Both references to 'w' below stand
+// in generate block 'a', so block 'a' holds one net named 'a_w'.
 //
 // The test fails when mod->nets holds two entries named 'a_w'. Two callers of
 // Elaborator::MaybeCreateImplicitNet see this one identifier:
@@ -565,11 +562,11 @@ TEST(ImplicitDeclaration,
   EXPECT_EQ(count, 1) << "two references to 'w' should declare one net 'a_w'";
 }
 
-// §6.10 assumes no implicit net for an identifier declared "in any scope whose
-// declarations can be directly referenced from" the scope the assignment
-// appears in, and the module scope of 'top' is such a scope for generate block
-// 'a'. The reference to 'w' inside block 'a' names the module's own net and
-// declares nothing, so 'top' holds one net named 'w' and none named 'a_w'.
+// §6.10 assumes no implicit net for an identifier declared in a scope directly
+// referenceable from the scope the assignment appears in, and the module scope
+// of 'top' is such a scope for generate block 'a'. The reference to 'w' inside
+// block 'a' names the module's own net and declares nothing, so 'top' holds one
+// net named 'w' and none named 'a_w'.
 //
 // The test fails when mod->nets holds an entry named 'a_w', which
 // Elaborator::MaybeCreateImplicitNet in src/elaborator/elaborator_items.cpp
@@ -601,15 +598,15 @@ TEST(ImplicitDeclaration,
   EXPECT_EQ(bare, 1) << "the module's net 'w' should not be duplicated";
 }
 
-// §6.10 assumes no implicit net for an identifier declared "in any scope whose
-// declarations can be directly referenced from" the scope the assignment
-// appears in, and §23.9 rules that a generate block one level out is such a
-// scope: an identifier referenced in a generate block must be declared in that
-// block itself or in a module, interface, program, checker, task, function,
-// named block or generate block above it in the same branch of the name tree.
-// Block 'b' is higher in the same branch than block 'a', so the reference to
-// 'w' inside 'a' names the net 'b' declared and declares nothing. The module
-// holds one net named 'b_w' and none named 'b_a_w'.
+// §6.10 assumes no implicit net for an identifier declared in a scope directly
+// referenceable from the scope the assignment appears in, and §23.9 rules that
+// a generate block one level out is such a scope: an identifier referenced in a
+// generate block must be declared in that block itself or in a module,
+// interface, program, checker, task, function, named block or generate block
+// above it in the same branch of the name tree. Block 'b' is higher in the same
+// branch than block 'a', so the reference to 'w' inside 'a' names the net 'b'
+// declared and declares nothing. The module holds one net named 'b_w' and none
+// named 'b_a_w'.
 //
 // The test fails when mod->nets holds an entry named 'b_a_w', which
 // Elaborator::MaybeCreateImplicitNet in src/elaborator/elaborator_items.cpp
@@ -686,12 +683,11 @@ TEST(ImplicitDeclaration,
   EXPECT_EQ(enclosing, 1) << "block 'b' net 'b_4_w' should not be duplicated";
 }
 
-// §6.10 rules that "The implicit net declaration shall belong to the scope in
-// which the net reference appears" and that "if the implicit net is declared by
-// a reference in a generate block, then the net is implicitly declared only in
-// that generate block". Nothing declares 'w' here, so the reference in block
-// 'a' declares it, and the net belongs to 'a' rather than to 'b' or to the
-// module: one net named 'b_a_w'.
+// §6.10 rules that an implicit net belongs to the scope where the net reference
+// stands, so that one declared by a reference in a generate block is declared
+// in that block alone. Nothing declares 'w' here, so the reference in block 'a'
+// declares it, and the net belongs to 'a' rather than to 'b' or to the module:
+// one net named 'b_a_w'.
 //
 // This is what the upward walk over the enclosing blocks must not lose. A walk
 // that answered that some enclosing scope declared the name would push no net
@@ -721,13 +717,12 @@ TEST(ImplicitDeclaration,
   EXPECT_EQ(count, 1) << "block 'a' should declare exactly one net 'b_a_w'";
 }
 
-// §6.10 assumes an implicit net for an identifier not declared "in the scope
-// where the continuous assignment statement appears or in any scope whose
-// declarations can be directly referenced from" it, and §23.9 lists generate
-// blocks among the elements that open a new scope. The localparam 'P' belongs
-// to block 'a' alone, and neither the module scope the assignment stands in nor
-// any scope it can reference directly is block 'a', so the assignment declares
-// a net named 'P'.
+// §6.10 assumes an implicit net for an identifier declared neither in the scope
+// of the continuous assignment nor in any scope directly referenceable from it,
+// and §23.9 lists generate blocks among the elements that open a new scope. The
+// localparam 'P' belongs to block 'a' alone, and neither the module scope the
+// assignment stands in nor any scope it can reference directly is block 'a', so
+// the assignment declares a net named 'P'.
 //
 // The test fails when mod->nets holds no entry named 'P'. IsParamDeclared in
 // src/elaborator/elaborator_items.cpp reads RtlirModule::params, whose entries
@@ -793,11 +788,11 @@ TEST(ImplicitDeclaration,
   EXPECT_EQ(count, 1) << "block 'c' should declare one net 'c_P'";
 }
 
-// §6.10 assumes no implicit net for an identifier declared "in any scope whose
-// declarations can be directly referenced from" the scope the reference stands
-// in, and a parameter of the module is such a declaration for every generate
-// block in it. The reference in block 'a' names the module's parameter, so no
-// net is created under either spelling.
+// §6.10 assumes no implicit net for an identifier declared in a scope directly
+// referenceable from the scope the reference stands in, and a parameter of the
+// module is such a declaration for every generate block in it. The reference in
+// block 'a' names the module's parameter, so no net is created under either
+// spelling.
 //
 // This is the case the fix must not lose. §23.3.3.3 lets any expression drive
 // an input port, so a parameter named as a port actual is the expression that

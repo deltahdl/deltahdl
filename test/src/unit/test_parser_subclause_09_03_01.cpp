@@ -344,8 +344,8 @@ TEST(BlockItemDeclParsing, AttributeInstanceBeforeBlockItem) {
   EXPECT_EQ(body->stmts[0]->attrs[0].name, "foo");
 }
 
-// §9.3.1 is what makes the `end` obligatory: a sequential block is "delimited
-// by the keywords begin and end", so a source that runs out before the closing
+// §9.3.1 is what makes the `end` obligatory: a sequential block is bounded by
+// the keywords begin and end, so a source that runs out before the closing
 // keyword breaches that subclause and no other. The sentence Parser::Expect
 // writes names the token it wanted rather than the rule, so the subclause on
 // the record is the only thing that says which rule was read. The block's

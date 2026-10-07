@@ -113,8 +113,8 @@ TEST(EvalOp, ConcatWidthIsSumOfElements) {
   EXPECT_EQ(result.ToUint64(), 0xABCu);
 }
 
-// §10.4 puts procedural assignments "within procedures such as always, initial,
-// task, and function", so §11.4.12's left-hand concatenation is the same
+// §10.4 puts procedural assignments inside procedures, always, initial, task
+// and function among them, so §11.4.12's left-hand concatenation is the same
 // statement inside a subroutine body as in the initial block above. The
 // subroutine body runs on the statement executor in eval_function_body.cpp,
 // which named no concatenation form at all, so the assignment wrote nothing and
@@ -215,14 +215,14 @@ TEST(ConcatenationSim, LhsConcatInAFunctionBodyWritesOnlyTheBitsASelectNames) {
 }
 
 // §4.9.3 puts the obligation on the writer of a blocking assignment: when the
-// process is returned it "performs the assignment to the left-hand side and
-// enables any events based upon the update of the left-hand side". §9.4.2 says
-// which events those are for an event control written `@(a)`: "A non-edge
-// implicit event shall be detected on any change in the value of the
-// expression." The clause draws no distinction by the statement form that
-// produced the change, nor by whether the change touched the whole variable or
-// four of its bits, so a concatenation target whose element is a select owes
-// the same wake-up as a plain assignment to that select.
+// process is returned it makes the assignment to the left-hand side and enables
+// the events that update triggers. §9.4.2 says which events those are for an
+// event control written `@(a)`: a non-edge implicit event is detected whenever
+// the expression's value changes. The clause draws no distinction by the
+// statement form that produced the change, nor by whether the change touched
+// the whole variable or four of its bits, so a concatenation target whose
+// element is a select owes the same wake-up as a plain assignment to that
+// select.
 //
 // UnpackConcatLhs wrote a select element through WriteBitSelect and continued
 // straight to the next element. WriteBitSelect notifies nobody -- its three
@@ -302,14 +302,13 @@ TEST(ConcatenationSim,
 }
 
 // §11.5.1 gives an out-of-bounds bit-select a value rather than an absence. It
-// makes a bit-select the extraction of "a particular bit from a vector", and
-// where "the bit-select address is invalid (it is out of bounds or has one or
-// more x or z bits), then the value returned by the reference shall be x for
-// 4-state and 0 for 2-state values". The same clause says separately of the
-// write that it "shall have no effect on the data stored when written". So
-// `a[9]` on a [7:0] `a` is one bit of the concatenation whichever bit of `a` it
-// fails to address -- §11.6.1's Table 11-21 sizes `{i,...,j}` at L(i)+...+L(j),
-// and L(a[9]) is one -- and it is a bit that reaches nothing.
+// makes a bit-select the extraction of one bit from a vector, and has an
+// invalid bit-select address, out of bounds or holding an x or z bit, return x
+// for a 4-state value and 0 for a 2-state one. The same clause says separately
+// of the write that it stores nothing when written. So `a[9]` on a [7:0] `a` is
+// one bit of the concatenation whichever bit of `a` it fails to address --
+// §11.6.1's Table 11-21 sizes `{i,...,j}` at L(i)+...+L(j), and L(a[9]) is one
+// -- and it is a bit that reaches nothing.
 //
 // 17'h1AAC3 laid out is 1_1010101_0_11000011, so `c` owns bits [16:9] = 8'hD5,
 // `a[9]` is bit [8], and `b` owns bits [7:0] = 8'hC3. UnpackConcatLhs sized the
@@ -338,11 +337,11 @@ TEST(ConcatenationSim,
 
 // The same defect reached through a part-select, which is what separates "a
 // select element reserves one bit" from "a select element reserves the width
-// its indices name". §11.5.1 has a part-select address "several contiguous
-// bits", and of the wholly out-of-range one it says only that it "shall yield
-// the value x when read and shall have no effect on the data stored when
-// written" -- nothing there narrows the bits the indices name -- so `a[11:9]`
-// is three bits of the nineteen and none of them reaches `a`.
+// its indices name". §11.5.1 has a part-select address a run of contiguous
+// bits, and of the wholly out-of-range one it says only that it reads as x and
+// stores nothing when written -- nothing there narrows the bits the indices
+// name -- so `a[11:9]` is three bits of the nineteen and none of them reaches
+// `a`.
 //
 // 19'h6ABC3 is 11010101_011_11000011: `c` owns bits [18:11] = 8'hD5, `a[11:9]`
 // bits [10:8], and `b` bits [7:0] = 8'hC3. Reserving nothing for the element
@@ -368,11 +367,11 @@ TEST(ConcatenationSim,
 }
 
 // §11.5.1 gives the partially out-of-range part-select its own rule, and not
-// the one it gives the wholly out-of-range one: such a select "shall, when
-// read, return x for the bits that are out of range and shall, when written,
-// only affect the bits that are in range". Which of its bits land says nothing
-// about how wide the element is, since §11.6.1 sizes an element from the
-// expression, so `a[9:6]` is four bits of the twenty and two of them reach `a`.
+// the one it gives the wholly out-of-range one: such a select reads x for its
+// out-of-range bits and writes only its in-range ones. Which of its bits land
+// says nothing about how wide the element is, since §11.6.1 sizes an element
+// from the expression, so `a[9:6]` is four bits of the twenty and two of them
+// reach `a`.
 //
 // 20'hD5AC3 is 11010101_1010_11000011: `c` owns bits [19:12] = 8'hD5, `a[9:6]`
 // takes bits [11:8] = 4'b1010, and `b` bits [7:0] = 8'hC3. Of those four bits
@@ -404,14 +403,14 @@ TEST(ConcatenationSim,
 
 // The in-bounds companion, and the element the ordinary case stands to lose.
 // §7.4.1 makes one index of a packed multidimensional array address an element
-// rather than a bit, which §11.5.1 states as "the actual bit that is accessed
-// by an address is, in part, determined by the declaration": `pa[1]` on a
-// [3:0][7:0] `pa` is eight bits and not one. A fix that answered §11.5.1's
-// bit-select width -- one -- for every select carrying no second index would
-// draw this concatenation's boundaries seven bits out and read 8'hBF into `c`,
-// and would satisfy the three cases above while doing it. This case passes
-// before the fix and reads the same values after it, so it is what says the
-// fix left the in-bounds select where it was.
+// rather than a bit, which §11.5.1 states by having the declaration help decide
+// which bit an address reaches: `pa[1]` on a [3:0][7:0] `pa` is eight bits and
+// not one. A fix that answered §11.5.1's bit-select width -- one -- for every
+// select carrying no second index would draw this concatenation's boundaries
+// seven bits out and read 8'hBF into `c`, and would satisfy the three cases
+// above while doing it. This case passes before the fix and reads the same
+// values after it, so it is what says the fix left the in-bounds select where
+// it was.
 //
 // 24'hD57EC3: `c` owns bits [23:16] = 8'hD5, `pa[1]` bits [15:8] = 8'h7E, and
 // `b` bits [7:0] = 8'hC3. `pa` is read whole rather than through `pa[1]`, so a
@@ -434,9 +433,9 @@ TEST(ConcatenationSim, LhsConcatPackedArrayElementReservesItsElementWidth) {
   EXPECT_EQ(RunAndGet(src, "c"), 0xD5u);
 }
 
-// §11.5.1 requires an indexed part-select's width expression to "be a positive
-// constant", so a width of zero names no bit of the object: `a[3 +: 0]` is not
-// a narrow select, it is no select at all. §11.6.1's Table 11-21 sizes
+// §11.5.1 requires an indexed part-select's width expression to be a constant
+// greater than zero, so a width of zero names no bit of the object: `a[3 +: 0]`
+// is not a narrow select, it is no select at all. §11.6.1's Table 11-21 sizes
 // `{i,...,j}` at L(i)+...+L(j), and an element naming no bit adds nothing to
 // that sum, so the elements above it sit where they would sit if it were not
 // written.
@@ -502,14 +501,14 @@ TEST(ConcatenationSim, LhsConcatZeroWidthPartSelectElementClaimsNoBits) {
 }
 
 // §11.6.1 sizes an expression by the context it stands in, and §10.7 makes an
-// assignment's context "the size of the left-hand side of the assignment", so
-// the concatenation target is what the right-hand expression is evaluated at.
-// Table 11-21 sizes {i,...,j} at L(i)+...+L(j) and §11.5.1 gives a part-select
-// the width its indices name, so `{x[3:0], y}` on two [7:0] variables is a
-// twelve-bit context and not a sixteen-bit one. The width the concatenation
-// hands the expression and the width it cuts the result into are one width, and
-// LhsContextWidth read the resolved variable whole for every element that was
-// not itself a concatenation: eight for `x[3:0]`, where UnpackConcatLhs asks
+// assignment's context the size of its left-hand side, so the concatenation
+// target is what the right-hand expression is evaluated at. Table 11-21 sizes
+// {i,...,j} at L(i)+...+L(j) and §11.5.1 gives a part-select the width its
+// indices name, so `{x[3:0], y}` on two [7:0] variables is a twelve-bit context
+// and not a sixteen-bit one. The width the concatenation hands the expression
+// and the width it cuts the result into are one width, and LhsContextWidth read
+// the resolved variable whole for every element that was not itself a
+// concatenation: eight for `x[3:0]`, where UnpackConcatLhs asks
 // ConcatLhsElemWidth and is told four.
 //
 // Most operators cannot tell the two contexts apart, so most of them prove
@@ -616,11 +615,11 @@ TEST(ConcatenationSim,
   EXPECT_EQ(RunAndGet(src, "q"), 0x52u);
 }
 
-// §11.5.1 requires an indexed part-select's width expression to "be a positive
-// constant", so a zero width is not a narrow select a writer may pass over in
-// silence: it is a select the clause does not admit at all. The bit-select
-// writer says so -- WriteBitSelectBits calls ReportZeroWidthPartSelect ahead of
-// the resolution, and that report is what
+// §11.5.1 requires an indexed part-select's width expression to be a constant
+// greater than zero, so a zero width is not a narrow select a writer may pass
+// over in silence: it is a select the clause does not admit at all. The
+// bit-select writer says so -- WriteBitSelectBits calls
+// ReportZeroWidthPartSelect ahead of the resolution, and that report is what
 // SelectBoundaryBehavior.ZeroWidthPartSelectWriteNames11_5_1 in
 // test_simulator_subclause_11_05_01a.cpp reads -- and §11.4.14.1's streaming
 // unpack reaches the same reporter through the same writer. UnpackConcatLhs did
@@ -683,10 +682,10 @@ TEST(ConcatenationSim, LhsConcatZeroWidthPartSelectElementNames11_5_1) {
 // three shapes: an element resolving to no variable at all, a non-indexed
 // part-select whose bounds carry x or z, and the indexed part-select whose
 // declared width is zero. §11.5.1 states its positive-constant requirement of
-// the third alone; of the second it says only that an invalid address "shall
-// have no effect on the data stored when written", which settles a value and
-// rejects nothing. A writer reporting wherever the element came out zero bits
-// wide would therefore report on a statement the clause admits.
+// the third alone; of the second it says only that an invalid address stores
+// nothing when written, which settles a value and rejects nothing. A writer
+// reporting wherever the element came out zero bits wide would therefore report
+// on a statement the clause admits.
 //
 // ReportZeroWidthPartSelect gates itself on the two indexed forms for that
 // reason, and this case is what holds that gate shut. `mid[msb:0]` with `msb`
@@ -726,14 +725,13 @@ TEST(ConcatenationSim, LhsConcatUnknownBoundPartSelectElementReportsNothing) {
   EXPECT_EQ(hi->value.ToUint64(), 0xD5u);
 }
 
-// §11.4.12 makes a concatenation lvalue "a packed vector of bits" whose
-// elements each receive their own bits, and §7.4.2 makes `out[i]` on an
-// unpacked array a reference to one whole element. The lone-target write
-// honours that; the same target written inside a concatenation resolved to the
-// variable the lowerer creates under the array's name -- one element wide and
-// read by nothing -- and deposited one bit of the slice there. `b` taking 8'hCD
-// is what says the division of the value was right all along and only the
-// deposit was not.
+// §11.4.12 makes a concatenation lvalue a packed vector of bits whose elements
+// each receive their own bits, and §7.4.2 makes `out[i]` on an unpacked array a
+// reference to one whole element. The lone-target write honours that; the same
+// target written inside a concatenation resolved to the variable the lowerer
+// creates under the array's name -- one element wide and read by nothing -- and
+// deposited one bit of the slice there. `b` taking 8'hCD is what says the
+// division of the value was right all along and only the deposit was not.
 TEST(ConcatenationSim, LhsConcatWritesAnUnpackedArrayElement) {
   const char* src =
       "module t;\n"

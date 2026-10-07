@@ -274,9 +274,8 @@ TEST(ReplicationElaboration, ParameterNegativeMultiplierRejected) {
                             "11.4.12.1"));
 }
 
-// §11.4.12.1 says a replication "shall not appear on the left-hand side of an
-// assignment", a rule about the lvalue and not about the statement the
-// assignment stands in.
+// §11.4.12.1 keeps a replication off the left-hand side of an assignment, a
+// rule about the lvalue and not about the statement the assignment stands in.
 //
 // ElaboratorOperationRules::WalkStmtsForReplicateLvalue in
 // src/elaborator/elaborator_validate_operations_arrays.cpp reached six of the

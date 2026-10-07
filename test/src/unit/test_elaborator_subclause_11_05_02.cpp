@@ -76,20 +76,20 @@ TEST(ArrayAddressingElaboration, PartSelectAfterAllThreeDimensionsAddressed) {
 
 // The cases below all leave one dimension unaddressed, so §11.5.2's rule about
 // reaching into a word does not reach them. That rule is written about
-// bit-selects and part-selects of array elements — "the desired word shall
-// first be selected by supplying an address for each dimension" — and §7.4.5
-// defines a part-select as a selection of contiguous bits of a packed array.
-// A trailing range over a dimension carrying no address selects contiguous
-// *elements* instead, which §7.4.5 calls a slice and permits: "Slices of an
-// array can only apply to one dimension, but other dimensions can have single
-// index values in an expression." What decides these cases is therefore not the
-// unaddressed dimension but the direction the range is written in.
+// bit-selects and part-selects of array elements — the word is selected first,
+// with one address per dimension — and §7.4.5 defines a part-select as a
+// selection of contiguous bits of a packed array. A trailing range over a
+// dimension carrying no address selects contiguous *elements* instead, which
+// §7.4.5 calls a slice and permits: a slice covers one dimension only, while
+// the other dimensions may take single indices in the expression. What decides
+// these cases is therefore not the unaddressed dimension but the direction the
+// range is written in.
 
-// §11.5.1 requires the first index of a range to "address a more significant
-// bit than the second expression", and §11.5.2 sends an array's ranges to that
-// same rule. The third dimension is declared [0:7] and counts upward, so its
-// more significant element is the one with the smaller index and [0:3] names
-// its first four elements in order.
+// §11.5.1 requires the first index of a range to address a more significant bit
+// than the second, and §11.5.2 sends an array's ranges to that same rule. The
+// third dimension is declared [0:7] and counts upward, so its more significant
+// element is the one with the smaller index and [0:3] names its first four
+// elements in order.
 TEST(ArrayAddressingElaboration, AscendingSliceOfAnAscendingDimensionIsLegal) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -205,14 +205,14 @@ TEST(ArrayAddressingElaboration,
              "endmodule\n"));
 }
 
-// §7.4.2: "Unpacked arrays can be made of any data type", and "Elements of net
-// arrays can be used in the same fashion as a scalar or vector net" — the
-// clause names connecting module instance ports inside loop generate constructs
-// as what net arrays are for. Indexing one was refused outright, because
-// Elaborator::ElaborateNetDecl asked only whether the net carried a packed
-// dimension and so made `wire w [3:0]` a scalar. The range is written [3:0]
-// rather than [0:3] because on a range starting at zero an index and a storage
-// offset are the same number, so code confusing the two answers correctly.
+// §7.4.2: an unpacked array may have any element data type, and an element of a
+// net array is used as a scalar or vector net is — the clause names connecting
+// module instance ports inside loop generate constructs as what net arrays are
+// for. Indexing one was refused outright, because Elaborator::ElaborateNetDecl
+// asked only whether the net carried a packed dimension and so made
+// `wire w [3:0]` a scalar. The range is written [3:0] rather than [0:3] because
+// on a range starting at zero an index and a storage offset are the same
+// number, so code confusing the two answers correctly.
 TEST(ArrayAddressingElaboration, IndexingAnUnpackedNetArrayIsLegal) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -222,10 +222,10 @@ TEST(ArrayAddressingElaboration, IndexingAnUnpackedNetArrayIsLegal) {
              "endmodule\n"));
 }
 
-// §11.5.1: "A bit-select or part-select of a scalar ... shall be illegal." A
-// net with no dimension at all is still a scalar, which is what stops the fix
-// above from emptying scalar_var_names_ for every net. No test named a scalar
-// net before, so the rule was pinned for variables alone.
+// §11.5.1: a bit-select or part-select of a scalar is illegal. A net with no
+// dimension at all is still a scalar, which is what stops the fix above from
+// emptying scalar_var_names_ for every net. No test named a scalar net before,
+// so the rule was pinned for variables alone.
 TEST(ArrayAddressingElaboration, IndexingAScalarNetIsStillIllegal) {
   ElabFixture f;
   ElabOk(
@@ -287,12 +287,12 @@ TEST(ArrayAddressingElaboration, DescendingSliceOfASizedDimensionIsIllegal) {
 
 // The four cases below address every dimension, so the trailing range is a
 // part-select of the word the addressing selected rather than a slice. §11.5.2
-// sends it to §11.5.1 -- "Once selected, bit-selects and part-selects shall be
-// addressed in the same manner as net and variable bit-selects and
-// part-selects" -- and §11.5.1 requires the first index to address a more
-// significant bit than the second. Which index that is comes from the element's
-// own declared range, so the same part-select is legal against one element
-// declaration and illegal against the other.
+// sends it to §11.5.1 -- once the word is selected, its bit-selects and
+// part-selects are addressed as a net's or a variable's are -- and §11.5.1
+// requires the first index to address a more significant bit than the second.
+// Which index that is comes from the element's own declared range, so the same
+// part-select is legal against one element declaration and illegal against the
+// other.
 //
 // Every other array in this file declares its element [7:0]. On a range ending
 // at zero the index of a bit and its distance from the least significant end

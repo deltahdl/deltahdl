@@ -133,9 +133,9 @@ TEST(SvaEngine, FlushClearsQueue) {
 // test, which is legal because §16.4 schedules that call in the Reactive
 // region. A final action cannot use that vehicle: §16.4 requires its subroutine
 // to be one that is legal to call in the Postponed region, and §4.4.2.9 says of
-// that region that "it is illegal to write values to any net or variable", so
-// the final test reports through a severity system task instead and observes it
-// with LastSeverity().
+// that region that no net or variable may be written there, so the final test
+// reports through a severity system task instead and observes it with
+// LastSeverity().
 
 TEST(AssertionStatementSim, ObservedDeferredActionFiresAfterFollowingStmt) {
   SimFixture f;

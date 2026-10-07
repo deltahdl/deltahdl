@@ -316,9 +316,9 @@ TEST(SubroutineCallElaboration, InoutArgSelectOk) {
 // cases below cover one newly reached position each.
 
 // A.6.3's par_block holds a list of statement_or_null between fork and its
-// join_keyword, which the parser keeps in Stmt::fork_stmts. §13.4.4 grants a
-// fork-join_none written inside a function "any statements that are legal
-// within a task", so a call in a fork arm is a call §13.5 governs.
+// join_keyword, which the parser keeps in Stmt::fork_stmts. §13.4.4 lets a
+// fork-join_none written inside a function hold whatever statements a task may,
+// so a call in a fork arm is a call §13.5 governs.
 TEST(SubroutineCallElaboration, OutputArgLiteralInForkArmError) {
   ElabFixture f;
   ElaborateSrc(

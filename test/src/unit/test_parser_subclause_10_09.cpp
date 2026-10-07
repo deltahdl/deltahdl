@@ -313,11 +313,11 @@ TEST(AssignmentPatternParsing, PsTypeIdentifierAsExpressionType) {
 // §10.9 gives the form its own production, `assignment_pattern_expression ::=
 // [ assignment_pattern_expression_type ] assignment_pattern`, whose type is one
 // of `ps_type_identifier`, `ps_parameter_identifier`, `integer_atom_type` or
-// `type_reference`, and the clause puts the whole of it on the left: "When an
-// assignment pattern expression is used in a left-hand expression, the
-// positional notation shall be required". So `pair_t'{a, b} = 16'hABCD;` is an
-// assignment whose target carries a type-name prefix, and the clause's own
-// example writes exactly that as a procedural statement.
+// `type_reference`, and the clause puts the whole of it on the left: an
+// assignment pattern used in a left-hand expression has to be positional. So
+// `pair_t'{a, b} = 16'hABCD;` is an assignment whose target carries a type-name
+// prefix, and the clause's own example writes exactly that as a procedural
+// statement.
 //
 // Between `begin` and `end` it was read instead as a §6.8 `data_declaration`
 // opening with the data type `pair_t`, and rejected at the apostrophe with
@@ -325,10 +325,10 @@ TEST(AssignmentPatternParsing, PsTypeIdentifierAsExpressionType) {
 // The wrong answer is not visible in the values. Neither rejection consumes the
 // token it names, so the body loop goes on to read the bare `'{a, b} =
 // 16'hABCD;` that the abandoned declaration left standing, and §10.9 requires
-// each member expression to have "the same number of bits as the corresponding
-// element in the data type of the assignment pattern expression", which makes
-// the bare pattern slice the right-hand value exactly as the typed one does.
-// Reading `a` and `b` back therefore passes either way.
+// each member expression to have as many bits as the matching element of the
+// assignment pattern expression's data type, which makes the bare pattern slice
+// the right-hand value exactly as the typed one does. Reading `a` and `b` back
+// therefore passes either way.
 //
 // The shape is what discriminates. A block that parsed this source holds one
 // statement; a block that misparsed it holds two, the fabricated declaration
@@ -360,11 +360,10 @@ TEST(AssignmentPatternParsing,
 }
 
 // §10.4.2 gives the nonblocking assignment the same target the blocking one
-// takes: "variable_lvalue is a data type that is valid for a procedural
-// assignment statement", the words §10.4.1 uses at Syntax 10-2. §10.9's typed
-// assignment pattern expression is such a target, so both spellings of the
-// operator accept it and both were rejected at the apostrophe with the two §6.8
-// reports.
+// takes: its variable_lvalue is any data type a procedural assignment statement
+// accepts, as §10.4.1 says at Syntax 10-2. §10.9's typed assignment pattern
+// expression is such a target, so both spellings of the operator accept it and
+// both were rejected at the apostrophe with the two §6.8 reports.
 //
 // This is written out rather than folded into the case above because the
 // question is settled by a list that names the two operators separately, so an

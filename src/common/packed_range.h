@@ -6,11 +6,11 @@
 namespace delta {
 
 // §11.5.1: the declared bit range that a bit-select or part-select resolves its
-// indices against. "The actual bit that is accessed by an address is, in part,
-// determined by the declaration": `logic [15:0] acc` and `logic [2:17] acc` are
-// both sixteen bits wide, and the same value of an index addresses a different
-// bit of each. The bounds are kept as written rather than sorted, because which
-// one is the least significant end follows from the order.
+// indices against. The declaration helps decide which bit an address reaches:
+// `logic [15:0] acc` and `logic [2:17] acc` are both sixteen bits wide, and the
+// same value of an index addresses a different bit of each. The bounds are kept
+// as written rather than sorted, because which one is the least significant end
+// follows from the order.
 //
 // This lives in src/common/ so that the elaborator, the simulator and the
 // synthesizer answer which bit a select names from one definition. Two of them
@@ -51,7 +51,7 @@ struct PackedRange {
   // How far above the least significant end of the range `idx` sits. The
   // right-hand bound is that end whichever way the range runs: §11.5.1 reads
   // `logic [0:31] b_vect; b_vect[0 +: 8]` as `b_vect[0:7]`, ascending the range
-  // from a base that "shall address a more significant bit than the second"
+  // from a base that has to address a more significant bit than the second
   // expression, so index 31 of that declaration is its least significant bit.
   //
   // The mapping is linear rather than clamped, so an `idx` outside the range
@@ -78,9 +78,9 @@ struct PackedRange {
 };
 
 // The two declared indices a part-select addresses, together with the width its
-// syntax states. An indexed part-select spells the width out and it "shall be a
-// positive constant"; a non-indexed part-select carries no separate width and
-// reports 1, which is never the zero that is rejected.
+// syntax states. An indexed part-select spells the width out and it has to be a
+// constant greater than zero; a non-indexed part-select carries no separate
+// width and reports 1, which is never the zero that is rejected.
 struct PartSelectIndices {
   int64_t first = 0;
   int64_t second = 0;
@@ -91,17 +91,17 @@ struct PartSelectIndices {
 // end of the vector, and a bit count. A width of zero means the select lies
 // wholly outside the vector, which §11.5.1 makes read as x and write nothing.
 //
-// §11.5.1 has a partially out-of-range part-select "when written, only affect
-// the bits that are in range", which is two answers and not one: `lo` and
-// `width` are the bits of the object that are written, and `src_lo` is where in
-// the value the bits they receive begin. It counts the select's own low bits
-// that fall below the range -- zero for a select running off the high end,
-// whose landing bits are the value's least significant ones, and positive for
-// one running off the low end. Both writers took the value's low bits either
-// way: §11.5.1 reads `a[1 -: 4]` on `logic [7:0] a` as `a[1:-2]`, whose most
-// significant end is index 1, so `a[1]` takes the value's bit 3 and `a[0]` its
-// bit 2 and `a[1 -: 4] = 4'b1101` must leave `a` at 8'h03; taking the value's
-// bits [1:0] left it at 8'h01.
+// §11.5.1 has a write through a partially out-of-range part-select reach only
+// the bits in range, which is two answers and not one: `lo` and `width` are the
+// bits of the object that are written, and `src_lo` is where in the value the
+// bits they receive begin. It counts the select's own low bits that fall below
+// the range -- zero for a select running off the high end, whose landing bits
+// are the value's least significant ones, and positive for one running off the
+// low end. Both writers took the value's low bits either way: §11.5.1 reads
+// `a[1 -: 4]` on `logic [7:0] a` as `a[1:-2]`, whose most significant end is
+// index 1, so `a[1]` takes the value's bit 3 and `a[0]` its bit 2 and
+// `a[1 -: 4] = 4'b1101` must leave `a` at 8'h03; taking the value's bits [1:0]
+// left it at 8'h01.
 struct PartSelectBits {
   uint32_t lo = 0;
   uint32_t width = 0;
@@ -128,8 +128,8 @@ inline PartSelectIndices PartSelectTargetIndices(int64_t idx, int64_t end_val,
 
 // Where the declared indices `first` and `second` land in storage, resolved
 // against `range`. Both are brought inside the range first, so a part-select
-// that runs off one end covers "only the bits that are in range"; one that
-// misses the range entirely covers none.
+// that runs off one end covers only its in-range bits; one that misses the
+// range entirely covers none.
 //
 // The source offset comes from the same clamp. OffsetOf is linear rather than
 // clamped, so the select's own bit k -- k above its least significant end --

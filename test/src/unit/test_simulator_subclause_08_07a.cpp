@@ -353,13 +353,12 @@ TEST(ClassConstructorSim, DeclarationInitializerConstructs) {
             55u);
 }
 
-// §8.7: "Even though `new` does not specify a return type, the left-hand side
-// of the assignment determines the return type." Inside a constructor the left
-// side may be a class-handle property of the enclosing class, named without a
-// `this.` prefix, and that property's declared type is what is constructed. The
-// constructed object's own constructor runs, so reading a property through the
-// nested handle observes the value it set -- which a null handle could not
-// produce.
+// §8.7: `new` names no return type, so the assignment's left-hand side decides
+// it. Inside a constructor the left side may be a class-handle property of the
+// enclosing class, named without a `this.` prefix, and that property's declared
+// type is what is constructed. The constructed object's own constructor runs,
+// so reading a property through the nested handle observes the value it set --
+// which a null handle could not produce.
 TEST(ClassConstructorSim, ConstructorConstructsClassHandleProperty) {
   EXPECT_EQ(RunAndGet("class Inner;\n"
                       "  int q;\n"
@@ -458,7 +457,7 @@ TEST(ClassConstructorSim, MethodConstructsClassHandleProperty) {
             17u);
 }
 
-// §8.7: "a class property can be declared with an initial value", and §6.8 runs
+// §8.7: a class property may be declared with an initial value, and §6.8 runs
 // that initializer as an assignment into the property being declared -- so the
 // value it reads is a value it has no licence to write. EvalExpr answers a
 // property read with the object's own stored vector, and a Logic4Vec copies its
@@ -502,11 +501,11 @@ TEST(ClassConstructorSim, TwoStateInitializerLeavesItsSourcesXBits) {
   EXPECT_EQ(taken->value.ToUint64(), 5u);
 }
 
-// §8.7: "each property declared in the class shall be initialized to its
-// explicit default value", and §6.8 then has the property, being storage of
-// its own, "store a value from one assignment to the next". The property and
-// the variable its initializer read are two storage elements, so the value the
-// constructor stores has to be the property's own words.
+// §8.7: each property the class declares starts at its explicit default value,
+// and §6.8 then has the property, being storage of its own, keep its value from
+// one assignment to the next. The property and the variable its initializer
+// read are two storage elements, so the value the constructor stores has to be
+// the property's own words.
 //
 // CoerceToPropertyType took its copy below its early return, and the early
 // return is the one this declaration takes: CollectClassMembers sizes a

@@ -14,10 +14,9 @@
 // variable the select left its answer in.
 //
 // Every vector here is declared [N:0], where an index and the bit offset it
-// reaches are the same number. The other half of the clause -- that "the actual
-// bit that is accessed by an address is, in part, determined by the
-// declaration", which only a range not ending at zero or a range that ascends
-// can show -- is covered in
+// reaches are the same number. The other half of the clause -- that the
+// declaration helps decide which bit an address reaches, which only a range not
+// ending at zero or a range that ascends can show -- is covered in
 // test/src/unit/test_simulator_subclause_11_05_01b.cpp.
 
 #include <gtest/gtest.h>
@@ -493,16 +492,15 @@ TEST(ExpressionSim, PartSelectPartiallyOutOfBoundsWriteAffectsInRangeOnly) {
 // and -2: the clause gives `a_vect[15 -: 8]` as `a_vect[15 : 8]` for
 // `logic [31:0] a_vect`, so the base names the select's most significant end
 // and the width descends from it. Only indices 1 and 0 lie inside
-// `logic [7:0] a`, and of a write the clause says "Part-selects that are
-// partially out of range shall, when read, return x for the bits that are out
-// of range and shall, when written, only affect the bits that are in range."
-// Which bits of the right-hand value those two receive follows from the select
-// being a four-bit vector whose bit 3 is index 1 and whose bit 2 is index 0:
-// `a[1]` takes value bit 3 and `a[0]` takes value bit 2, so `4'b1101` puts 1
-// on both and `a` reads 8'h03. Taking the value's own least significant bits
-// instead -- `2'b01` -- read 8'h01, which is what this pins. `4'b1101`
-// discriminates because its high half `2'b11` differs from its low half
-// `2'b01`; an all-ones value such as `4'hF` answers 8'h03 either way. `a`
+// `logic [7:0] a`, and of a write the clause says a part-select partly out of
+// range reads x for its out-of-range bits, and a write to it changes only the
+// bits in range. Which bits of the right-hand value those two receive follows
+// from the select being a four-bit vector whose bit 3 is index 1 and whose bit
+// 2 is index 0: `a[1]` takes value bit 3 and `a[0]` takes value bit 2, so
+// `4'b1101` puts 1 on both and `a` reads 8'h03. Taking the value's own least
+// significant bits instead -- `2'b01` -- read 8'h01, which is what this pins.
+// `4'b1101` discriminates because its high half `2'b11` differs from its low
+// half `2'b01`; an all-ones value such as `4'hF` answers 8'h03 either way. `a`
 // starts at 8'h00 so that every bit set in the outcome is one this write put
 // there.
 TEST(ExpressionSim, PartSelectRunningOffLowEndWritesItsOwnHighBits) {
@@ -519,15 +517,15 @@ TEST(ExpressionSim, PartSelectRunningOffLowEndWritesItsOwnHighBits) {
 
 // The same sentence where the select runs off both ends at once. `a[9 -: 12]`
 // on `logic [7:0] a` addresses the twelve indices 9 down to -2, of which
-// "the bits that are in range" are the whole object, indices 7 through 0. The
-// select is a twelve-bit vector whose bit k is index k-2, so index 7 takes
-// value bit 9 and index 0 takes value bit 2: the eight bits `a` receives are
-// the value's bits 9 through 2, its middle, with two bits spare above and two
-// below. Of `12'hABC` (1010_1011_1100) those are 1010_1111, so `a` reads
-// 8'hAF. Taking the value's least significant eight bits reads 8'hBC. This
-// case pins the distance the value is shifted rather than only its direction:
-// a shift of one would read 8'h5E and a shift of three 8'h57, so only the two
-// indices that fall below zero give 8'hAF.
+// the bits in range are the whole object, indices 7 through 0. The select is a
+// twelve-bit vector whose bit k is index k-2, so index 7 takes value bit 9 and
+// index 0 takes value bit 2: the eight bits `a` receives are the value's bits 9
+// through 2, its middle, with two bits spare above and two below. Of `12'hABC`
+// (1010_1011_1100) those are 1010_1111, so `a` reads 8'hAF. Taking the value's
+// least significant eight bits reads 8'hBC. This case pins the distance the
+// value is shifted rather than only its direction: a shift of one would read
+// 8'h5E and a shift of three 8'h57, so only the two indices that fall below
+// zero give 8'hAF.
 TEST(ExpressionSim, PartSelectRunningOffBothEndsWritesItsMiddleBits) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -565,16 +563,15 @@ TEST(ExpressionSim, PartSelectRunningOffHighEndStillTakesItsLowBits) {
 
 // §11.5.1's non-indexed form, `vect[msb_expr:lsb_expr]`, reaching the same four
 // indices as the `-:` case above. The clause asks of the two bounds only that
-// they be "constant integer expressions", each "evaluated in a self-determined
-// context", and that "the first expression shall address a more significant bit
-// than the second expression"; on `logic [7:0] a` the more significant end is
-// the numerically larger index, so `a[1:-2]` is well formed and names the run
-// 1, 0, -1, -2. The clause's own `a_vect[15 -: 8] // == a_vect[15 : 8]` read at
-// base 1 and width 4 is `a[1 -: 4] == a[1:-2]`: the two spellings are one
-// select and have to answer alike. Indices 1 and 0 are the ones inside `a`, the
-// write "shall ... only affect the bits that are in range", and being the
-// select's most significant end they take value bits 3 and 2, so `4'b1101`
-// leaves `a` at 8'h03.
+// they be constant integer expressions, each evaluated as self-determined, and
+// that the first address a more significant bit than the second; on
+// `logic [7:0] a` the more significant end is the numerically larger index, so
+// `a[1:-2]` is well formed and names the run 1, 0, -1, -2. The clause's own
+// `a_vect[15 -: 8] // == a_vect[15 : 8]` read at base 1 and width 4 is
+// `a[1 -: 4] == a[1:-2]`: the two spellings are one select and have to answer
+// alike. Indices 1 and 0 are the ones inside `a`, the write reaches only the
+// bits in range, and being the select's most significant end they take value
+// bits 3 and 2, so `4'b1101` leaves `a` at 8'h03.
 //
 // The second bound is a unary minus over an unsized decimal, which §11.6.1
 // gives 32 bits, and it reached the declared range as the unsigned 4294967294.
@@ -614,24 +611,24 @@ TEST(ExpressionSim, NonIndexedPartSelectBelowLowBoundWritesInRangeBitsOnly) {
 
 // The other reading of a bound whose most significant bit is set, which a
 // repair of the negative one must not take. §11.5.1 has each bound of a
-// non-indexed part-select "evaluated in a self-determined context", and §5.7.1
-// leaves a based literal written without an `s` unsigned, so `4'hE` is the
-// four-bit unsigned 14 and `4'hB` is 11: `u[4'hE : 4'hB]` is `u[14:11]`, wholly
-// inside `logic [15:0] u`, with nothing out of range at all. Bit 3 of the
-// select is index 14 and bit 0 is index 11, so `4'b1101` sets u[14], u[13] and
-// u[11] and clears u[12], and `u` reads 16'h6800.
+// non-indexed part-select evaluated as self-determined, and §5.7.1 leaves a
+// based literal written without an `s` unsigned, so `4'hE` is the four-bit
+// unsigned 14 and `4'hB` is 11: `u[4'hE : 4'hB]` is `u[14:11]`, wholly inside
+// `logic [15:0] u`, with nothing out of range at all. Bit 3 of the select is
+// index 14 and bit 0 is index 11, so `4'b1101` sets u[14], u[13] and u[11] and
+// clears u[12], and `u` reads 16'h6800.
 //
 // Having the top bit set within its own width is the whole of what these two
 // bounds share with a negative one, -2 being the 32-bit 0xFFFFFFFE. A
 // sign-aware read of a bound must therefore turn on the signedness the value
 // carries and not on that bit: a repair that extends from the value's own width
 // whenever the bit is set reads these as -2 and -5, and `u[-2:-5]` is a
-// part-select "completely out of the address bounds of the vector", which the
-// clause says "shall have no effect on the data stored when written" -- `u`
-// would still read 16'h0000. Those two answers are what separate taken as
-// written from sign-extended. `4'b1101` rather than `4'hF` again: an all-ones
-// value reads 16'h7800 and cannot tell u[12] from its neighbours, and 16'h0000
-// as the starting value makes every set bit one this write is answerable for.
+// part-select wholly outside the vector's address bounds, which the clause says
+// stores nothing when written -- `u` would still read 16'h0000. Those two
+// answers are what separate taken as written from sign-extended. `4'b1101`
+// rather than `4'hF` again: an all-ones value reads 16'h7800 and cannot tell
+// u[12] from its neighbours, and 16'h0000 as the starting value makes every set
+// bit one this write is answerable for.
 TEST(ExpressionSim, UnsignedPartSelectBoundKeepsItsTopBitAsMagnitude) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -765,12 +762,12 @@ TEST(SelectBoundaryBehavior, PartSelectPartialOOBWriteInRangeOnly) {
 // The low-end write at WriteBitSelect itself, the one writer the blocking,
 // compound, increment, expression and subroutine-body forms of an assignment
 // all reach. §11.5.1 makes `plw[1 -: 4]` the indices 1, 0, -1 and -2 and lets
-// the write "only affect the bits that are in range", which here are `plw[1]`
-// and `plw[0]`; being the select's most significant end, they take the value's
-// bits 3 and 2. `4'hD` is 4'b1101, so both take 1 and `plw` reads 8'h03. The
-// value's own low two bits are 2'b01 and read 8'h01. `4'hD` is chosen over the
-// `4'hF` that SelectBoundaryBehavior.PartSelectPartialOOBWriteInRangeOnly
-// writes for exactly that reason: an all-ones value cannot separate the two.
+// the write reach only the bits in range, which here are `plw[1]` and `plw[0]`;
+// being the select's most significant end, they take the value's bits 3 and 2.
+// `4'hD` is 4'b1101, so both take 1 and `plw` reads 8'h03. The value's own low
+// two bits are 2'b01 and read 8'h01. `4'hD` is chosen over the `4'hF` that
+// SelectBoundaryBehavior.PartSelectPartialOOBWriteInRangeOnly writes for
+// exactly that reason: an all-ones value cannot separate the two.
 TEST(SelectBoundaryBehavior, PartSelectPartialOOBLowEndSourceBits) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("plw", 8);
@@ -798,19 +795,19 @@ TEST(SelectBoundaryBehavior, PartSelectPartialOOBLowEndSourceBits) {
 // PartSelectStorageBits clamps {1, 4294967294} against the [7:0] range to a
 // window of {lo: 1, width: 7}: `nlw` read 8'h1A. With its sign it is -2, which
 // the range clamps to its low end at index 0, and §11.5.1 leaves the write to
-// "only affect the bits that are in range" -- nlw[1] and nlw[0]. They are the
-// select's most significant end and so take value bits 3 and 2; `4'hD` is
-// 4'b1101, so both take 1 and `nlw` reads 8'h03. `4'hD` rather than the `4'hF`
-// of SelectBoundaryBehavior.PartSelectPartialOOBWriteInRangeOnly for the reason
+// reach only the bits in range -- nlw[1] and nlw[0]. They are the select's most
+// significant end and so take value bits 3 and 2; `4'hD` is 4'b1101, so both
+// take 1 and `nlw` reads 8'h03. `4'hD` rather than the `4'hF` of
+// SelectBoundaryBehavior.PartSelectPartialOOBWriteInRangeOnly for the reason
 // given above PartSelectPartialOOBLowEndSourceBits: an all-ones value cannot
 // separate the value's own low bits from the bits the in-range indices name.
-// The read side of the same select. §11.5.1: a part-select "partially out of
-// range shall, when read, return x for the bits that are out of range", and the
-// bits that are out of range are the select's own least significant ones --
-// index 1 is the more significant end, so indices -1 and -2 are result bits 1
-// and 0. Reading the bound through ToUint64 gave the second bound 4294967294,
-// which is not merely a wrong window: the width is computed from the pair, so
-// the read asked for a vector of 4294967294 bits.
+// The read side of the same select. §11.5.1: a part-select partly out of range
+// reads x for its out-of-range bits, and the bits that are out of range are the
+// select's own least significant ones -- index 1 is the more significant end,
+// so indices -1 and -2 are result bits 1 and 0. Reading the bound through
+// ToUint64 gave the second bound 4294967294, which is not merely a wrong
+// window: the width is computed from the pair, so the read asked for a vector
+// of 4294967294 bits.
 //
 // 8'hA5 is 1010_0101, so a[1] is 0 and a[0] is 1 and the two bits that are in
 // range read 01. A value whose two low bits were alike could not tell them

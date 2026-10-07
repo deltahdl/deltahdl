@@ -10,13 +10,13 @@ using namespace delta;
 namespace {
 
 // §13.3.2 reaches a variable of an automatic task and nothing else. Its four
-// bullets open "Because variables declared in automatic tasks are deallocated
-// at the end of the task invocation, they shall not be used in certain
-// constructs that might refer to them after that point", so every rejection
-// case below declares its task `task automatic`. A variable a static task
-// declares `automatic` is a different declaration, because §13.3.1 says
-// "Specific local variables can be declared as automatic within a static task
-// or as static within an automatic task." That variable answers to §6.21, and
+// bullets rest on the variables of an automatic task being freed when the task
+// invocation ends, which keeps them out of constructs that could still refer to
+// them afterwards, so every rejection case below declares its task
+// `task automatic`. A variable a static task declares `automatic` is a
+// different declaration, because §13.3.1 lets a static task declare a given
+// local variable automatic, and an automatic task declare one static. That
+// variable answers to §6.21, and
 // test/src/unit/test_elaborator_subclause_06_21.cpp covers it.
 TEST(TaskBodyElaboration, AutoTaskLocalInNonblockingAssignError) {
   ElabFixture f;
@@ -496,9 +496,8 @@ TEST(TaskBodyElaboration,
 
 // A.6.8 gives `for_step_assignment ::= operator_assignment |
 // inc_or_dec_expression | function_subroutine_call`, and a system task call is
-// a function_subroutine_call, so §13.3.2's fourth bullet -- "They shall not be
-// traced with system tasks such as $monitor and $dumpvars" -- reaches a for
-// step.
+// a function_subroutine_call, so §13.3.2's fourth bullet -- no tracing by
+// system tasks like $monitor and $dumpvars -- reaches a for step.
 TEST(TaskBodyElaboration, AutoTaskLocalInMonitorInAForStepError) {
   ElabFixture f;
   ElaborateSrc(

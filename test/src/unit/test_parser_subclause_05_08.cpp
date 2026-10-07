@@ -68,10 +68,10 @@ TEST(TimeLiteralParsing, TimeLiteralExprKind) {
 }
 
 TEST(TimeLiteralParsing, TimeLiteralRealVal) {
-  // 5.8: a time literal "is interpreted as a realtime value scaled to the
-  // current time unit." With the module time unit set to us, the literal 2.5us
-  // is in that same unit, so it is captured unscaled as 2.5. (Without an
-  // explicit timeunit the default unit is ns, which would scale 2.5us to 2500.)
+  // 5.8: a time literal reads as a realtime value scaled to the current time
+  // unit. With the module time unit set to us, the literal 2.5us is in that
+  // same unit, so it is captured unscaled as 2.5. (Without an explicit timeunit
+  // the default unit is ns, which would scale 2.5us to 2500.)
   auto r = Parse(
       "module m;\n"
       "  timeunit 1us;\n"

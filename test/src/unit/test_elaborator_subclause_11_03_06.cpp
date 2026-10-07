@@ -64,11 +64,10 @@ TEST(AssignmentWithinExpressionElaboration,
              "endmodule\n"));
 }
 
-// §11.3.6 says "It shall be illegal to include an assignment operator in an
-// event expression, in an expression within a procedural continuous
-// assignment, or in an expression that is not within a procedural statement",
-// and names no statement the procedural continuous assignment may stand in to
-// escape that.
+// §11.3.6 bars an assignment operator from an event expression, from an
+// expression in a procedural continuous assignment and from any expression
+// outside a procedural statement, and names no statement the procedural
+// continuous assignment may stand in to escape that.
 // ElaboratorOperationRules::WalkStmtsForAssignInExpr in
 // src/elaborator/elaborator_validate_cast_ops.cpp had written out six of the
 // thirteen child-statement links Stmt declares and now takes the list from

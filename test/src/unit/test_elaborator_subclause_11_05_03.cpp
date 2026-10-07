@@ -187,14 +187,14 @@ TEST(LongestStaticPrefix, LongestStaticPrefixPackageRefConstIdx) {
 // to the whole array, so the two processes appear to over-drive one target.
 //
 // §11.5.3 prohibits nothing. Its opening sentence says the longest static
-// prefix "is the longest part of the select for which an analysis tool has
-// known values following elaboration", and its second sentence names where the
-// concept is used: "This concept is used when describing implicit sensitivity
-// lists (see 9.2.2.2) and when describing error conditions for drivers of logic
-// ports (see 6.5)." Every rejection below is therefore reported under the rule
-// the prefix is computed for -- §9.2.2.2 between two processes, and §10.3.2
-// between a process and a continuous assignment -- and the subclause on the
-// report is what tells one from the other.
+// prefix is the longest part of a select whose values an analysis tool knows
+// once elaboration is done, and its second sentence names where the concept is
+// used: in describing implicit sensitivity lists (§9.2.2.2) and the error
+// conditions for drivers of logic ports (§6.5). Every rejection below is
+// therefore reported under the rule the prefix is computed for -- §9.2.2.2
+// between two processes, and §10.3.2 between a process and a continuous
+// assignment -- and the subclause on the report is what tells one from the
+// other.
 
 // §11.2.1 literal index form: two literal-indexed elements are distinct static
 // prefixes, so separate always_comb processes driving arr[0] and arr[1] do not
@@ -506,10 +506,10 @@ TEST(LongestStaticPrefixDriver, MultiDimVariableInnerIndexCollapsesToBase) {
 //
 // `stmt` stands in the initial procedure, so the prefix it contributes reaches
 // the rule through the general procedural driver set alone, which is what
-// CollectStmtLhsPrefixes fills. §9.2.2.2 is the rule reported, its "shall not
-// be assigned by any other process" being what the always_comb and the initial
-// procedure break between them, and §11.5.3 is what makes the report name the
-// bit `v[0]` rather than the whole vector `v`.
+// CollectStmtLhsPrefixes fills. §9.2.2.2 is the rule reported, its bar on any
+// other process assigning the same variable being what the always_comb and the
+// initial procedure break between them, and §11.5.3 is what makes the report
+// name the bit `v[0]` rather than the whole vector `v`.
 //
 // The report stands at the always_comb, which is line 4 of every source built
 // here whatever `stmt` runs to, and the line is read back out of the source

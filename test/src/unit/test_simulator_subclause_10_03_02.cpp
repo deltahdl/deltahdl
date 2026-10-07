@@ -134,11 +134,11 @@ TEST(ContAssignStatementSim, ContAssignDrivesImplicitlyDeclaredNet) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §10.3.2: "Nets can be driven by multiple continuous assignments or by a
-// mixture of primitive outputs, module outputs, and continuous assignments." A
-// continuous assignment into a select of a net is one of those drivers, so the
-// net has a driver to resolve rather than a value written into it behind
-// resolution's back. A whole-identifier target cannot fail this.
+// §10.3.2: a net may be driven by several continuous assignments, or by a mix
+// of primitive outputs, module outputs and continuous assignments. A continuous
+// assignment into a select of a net is one of those drivers, so the net has a
+// driver to resolve rather than a value written into it behind resolution's
+// back. A whole-identifier target cannot fail this.
 TEST(ContAssignStatementSim, SelectTargetRegistersADriverOnTheNet) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -156,7 +156,7 @@ TEST(ContAssignStatementSim, SelectTargetRegistersADriverOnTheNet) {
 
 // The driver drives only the bits the select names, and high impedance
 // everywhere else, so §28.12 decides the rest of the net from its other
-// sources. §6.6.5 gives a tri0 net "a continuous 0 of pull strength" wherever
+// sources. §6.6.5 gives a tri0 net a continuous pull-strength 0 wherever
 // nothing overrides it, and that is what the undriven nibble resolves to: the
 // low nibble is the assignment's strong 1 and the high nibble the net's own
 // pull 0. Written into storage rather than resolved, the net would report the
@@ -201,14 +201,14 @@ TEST(ContAssignStatementSim, OverlappingSelectTargetsResolveAgainstEachOther) {
   EXPECT_EQ(w->resolved->value.ToString(), "0xx1");
 }
 
-// §11.5.1: "Part-selects that are partially out of range shall, when read,
-// return x for the bits that are out of range and shall, when written, only
-// affect the bits that are in range." The indexed form `a[1 -: 4]` descends
-// from its base, so on `[7:0] a` it names indices 1, 0, -1 and -2, and the two
-// of those inside the net are the select's own most significant end. They take
-// the value's most significant end with them: a[1] takes 4'b1101's bit 3 and
-// a[0] its bit 2, both 1. §6.6.5 gives a tri0 a continuous pull 0 wherever no
-// driver reaches, which is the other six bits, so `a` reads 8'h03.
+// §11.5.1: a part-select partly out of range reads x for its out-of-range bits,
+// and a write to it changes only the bits in range. The indexed form
+// `a[1 -: 4]` descends from its base, so on `[7:0] a` it names indices 1, 0, -1
+// and -2, and the two of those inside the net are the select's own most
+// significant end. They take the value's most significant end with them: a[1]
+// takes 4'b1101's bit 3 and a[0] its bit 2, both 1. §6.6.5 gives a tri0 a
+// continuous pull 0 wherever no driver reaches, which is the other six bits, so
+// `a` reads 8'h03.
 //
 // `4'b1101` is what lets this case fail. A driver that kept the value's least
 // significant bits and simply narrowed the window it drove them into would put
@@ -318,9 +318,9 @@ TEST(ContAssignStatementSim, SelectTargetRunningOffBothEndsLandsItsMiddleBits) {
 }
 
 // §10.3.2's Example 2 is written exactly this way -- `assign {carry_out,
-// sum_out} = ina + inb + carry_in;` -- and the clause has "Nets can be driven
-// by multiple continuous assignments or by a mixture of primitive outputs,
-// module outputs, and continuous assignments" without excepting the ones a
+// sum_out} = ina + inb + carry_in;` -- and the clause lets a net be driven by
+// several continuous assignments or by a mix of primitive outputs, module
+// outputs and continuous assignments, without excepting the ones a
 // concatenation names. Each element of such a target is elaborated into an
 // assignment of its own slice, so each whole-identifier element is a driver on
 // its net, and this holds that.
@@ -473,8 +473,8 @@ TEST(ContAssignStatementSim, NestedConcatTargetEvaluatesAtTheOutermostWidth) {
 }
 
 // Widening the right-hand side must not change its type. §11.8.1 makes an
-// expression's type depend only on its operands and makes a result unsigned "if
-// any operand is unsigned", and §11.6.1's assignment context then extends a
+// expression's type depend only on its operands and makes a result unsigned
+// when any operand is unsigned, and §11.6.1's assignment context then extends a
 // signed right-hand side by replicating its sign. `a` is a signed 4-bit -1
 // driving a five-bit target, so every bit of the target is 1: `c` reads 1 and
 // `s` reads 15. Extending it as an unsigned value instead leaves `c` at 0,
@@ -500,14 +500,14 @@ TEST(ContAssignStatementSim, ConcatTargetSignExtendsASignedRhs) {
   EXPECT_EQ(sv->value.ToUint64(), 0xFu);
 }
 
-// §10.3.2: a continuous assignment "shall be evaluated ... whenever the value
-// of any operand changes" -- the operands of the whole right-hand side, for a
-// concatenation target as for any other. Each element of such a target is
-// elaborated into an assignment of its own slice of the right-hand side, a
-// select standing on the widened expression rather than on a name, and the
-// sensitivity walk read no operand through that select: `{carry_out, sum_out}`
-// took the sum of the values the operands had at time zero and never moved
-// again, whatever ina and inb later did.
+// §10.3.2: a continuous assignment is evaluated whenever any operand's value
+// changes -- the operands of the whole right-hand side, for a concatenation
+// target as for any other. Each element of such a target is elaborated into an
+// assignment of its own slice of the right-hand side, a select standing on the
+// widened expression rather than on a name, and the sensitivity walk read no
+// operand through that select: `{carry_out, sum_out}` took the sum of the
+// values the operands had at time zero and never moved again, whatever ina and
+// inb later did.
 TEST(ContAssignStatementSim, ConcatTargetFollowsItsOperandsAfterTimeZero) {
   SimFixture f;
   std::string out = RunCapture(

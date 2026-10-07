@@ -385,14 +385,14 @@ void Lexer::TryRecognizeFsmPartSelectPragma(
 
 void Lexer::ReportConcatSelectProhibition(std::string_view inside,
                                           SourceLoc loc) {
-  // §40.4.3: "Bit-selects or part-selects of signals cannot be used in the
-  // concatenation." The caller has matched the whole of the form around the
-  // braces - the keywords, the FSM name, the enumeration binding - so a select
-  // between them is an FSM its author meant to specify and the prohibition is
-  // what stopped it being one. Saying so is the difference between an FSM the
-  // user can see went unrecognized and one that quietly did. A member that
-  // breaks some other rule is not this report: the comment is then one the
-  // recognizer passed over rather than a prohibition it applied.
+  // §40.4.3: the concatenation may hold no bit-select or part-select of a
+  // signal. The caller has matched the whole of the form around the braces -
+  // the keywords, the FSM name, the enumeration binding - so a select between
+  // them is an FSM its author meant to specify and the prohibition is what
+  // stopped it being one. Saying so is the difference between an FSM the user
+  // can see went unrecognized and one that quietly did. A member that breaks
+  // some other rule is not this report: the comment is then one the recognizer
+  // passed over rather than a prohibition it applied.
   //
   // The source stays legal, so this is a warning rather than an error: a pragma
   // is a comment, and a comment the tool cannot use leaves the design it
@@ -734,17 +734,16 @@ Token Lexer::LexSystemIdentifier() {
   tok.loc = loc;
   tok.text = source_.substr(start, pos_ - start);
   // No length is checked here, unlike LexIdentifier and LexEscapedIdentifier.
-  // §5.6 lets an implementation cap "the maximum length of identifiers", and an
-  // identifier there is "either a simple identifier or an escaped identifier"
-  // -- a simple identifier's first character "shall not be a digit or $", so a
-  // name this lexes is neither. §5.6.3 hands its rules to Clause 36 instead
-  // ("Additional user-defined system tasks and system functions can be defined
-  // using the PLI, as described in Clause 36"), and §36.3 states them: the name
-  // begins with $, its remaining characters are letters, digits, underscores or
-  // dollar signs, it is case sensitive, and "the name can be any size, and all
-  // characters are significant". A.9.3's system_tf_identifier production bounds
-  // no length either, and footnote 55 adds only that the $ is not followed by
-  // white space and that the name is not escaped.
+  // §5.6 lets an implementation cap identifier length, and an identifier there
+  // is a simple or an escaped identifier -- a simple identifier may not begin
+  // with a digit or $, so a name this lexes is neither. §5.6.3 hands its rules
+  // to Clause 36 instead, where the PLI defines further user-defined system
+  // tasks and functions, and §36.3 states them: the name begins with $, its
+  // remaining characters are letters, digits, underscores or dollar signs, it
+  // is case sensitive, and it may be any length with every character
+  // significant. A.9.3's system_tf_identifier production bounds no length
+  // either, and footnote 55 adds only that the $ is not followed by white space
+  // and that the name is not escaped.
   return tok;
 }
 

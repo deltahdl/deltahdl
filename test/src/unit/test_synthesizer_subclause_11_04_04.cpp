@@ -82,12 +82,12 @@ TEST(RelationalSynthesis, SignedComparisonReadsItsOperandsAsSigned) {
 }
 
 // The test fails on a lowering that reads the comparison as signed because one
-// operand was declared signed. §11.4.4 rules that "when one or both operands of
-// a relational operator are unsigned, the expression shall be interpreted as a
-// comparison between unsigned values", so the module below owes the comparison
-// of the raw four-bit patterns even though `a` is signed. The case above and
-// this one disagree at every pair whose operands differ in their top bit, so no
-// lowering passes both without reading the signedness of both operands.
+// operand was declared signed. §11.4.4 reads a relational expression with an
+// unsigned operand as a comparison of unsigned values, so the module below owes
+// the comparison of the raw four-bit patterns even though `a` is signed. The
+// case above and this one disagree at every pair whose operands differ in their
+// top bit, so no lowering passes both without reading the signedness of both
+// operands.
 TEST(RelationalSynthesis, OneUnsignedOperandMakesTheComparisonUnsigned) {
   ExpectAssignSweep(
       ModuleAssigning("input signed [3:0] a, input [3:0] b", "a < b"), 16,
@@ -103,9 +103,8 @@ TEST(RelationalSynthesis, OneUnsignedOperandMakesTheComparisonUnsigned) {
 // therefore carried out over the wider signal operand or 64 positions,
 // whichever was larger, whatever the literal's size constant said.
 //
-// §11.4.4 carries the same extension rule as §11.4.5, which rules that "If the
-// operands are of unequal bit lengths, the smaller operand shall be
-// zero-extended to the size of the larger operand".
+// §11.4.4 carries the same extension rule as §11.4.5, which rules that the
+// narrower operand is zero-extended to the wider one's size.
 // `128'h1_0000_0000_0000_0000` is 128 bits, so the four-bit `a` is
 // zero-extended to 128 bits. Bit 64 of the literal is 1 and every bit of the
 // extended `a` from 4 up is 0, so the literal stands above `a` at all sixteen

@@ -541,10 +541,10 @@ TEST(GenerateInstantiationGrammar, CaseGenerateWithoutItemsRejected) {
 // generate_block ::= ... begin [ : generate_block_identifier ] { generate_item
 // }
 //   end [ : generate_block_identifier ]
-// The identifier after `end` is the one the block opened with: §9.3.4 has "it
-// shall be an error if the name at the end is different from the block name
-// at the beginning", and a block with no name has none for it to match. The
-// parser skipped whatever identifier stood there.
+// The identifier after `end` is the one the block opened with: §9.3.4 makes it
+// an error for the name at the end to differ from the block's name at the
+// beginning, and a block with no name has none for it to match. The parser
+// skipped whatever identifier stood there.
 TEST(GenerateInstantiationGrammar, GenerateBlockEndLabelMismatchRejected) {
   auto r = Parse(
       "module m;\n"

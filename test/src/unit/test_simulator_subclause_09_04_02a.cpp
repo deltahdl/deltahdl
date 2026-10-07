@@ -156,10 +156,9 @@ TEST(EventControlSim, NoEventOnSameValueWrite) {
 }
 
 // §9.4.2 (printed page 232) closes with the rule this case holds the simulator
-// to: "A change of value in any operand of the expression without a change in
-// the result of the expression shall not be detected as an event." A write that
-// deposits the value the variable already holds changes no operand's value, so
-// `@(sig)` shall not resume on it.
+// to: a change in an operand that leaves the expression's result unchanged is
+// not detected as an event. A write that deposits the value the variable
+// already holds changes no operand's value, so `@(sig)` shall not resume on it.
 //
 // This is the discriminating replacement for NoEventOnSameValueWrite above,
 // which offers the same three writes but reads a variable the waiting process
@@ -659,9 +658,9 @@ TEST(EventControlSim, ClockingBlockInputResolvesThroughClockingManager) {
   EXPECT_EQ(data->watchers.size(), 1u);
 }
 
-// The "edge event ... only on the LSB" rule discriminated: an upper bit
-// toggles while the LSB is held constant, so a posedge must NOT fire. A
-// broken any-bit implementation would resume and write x.
+// The LSB-only edge-event rule discriminated: an upper bit toggles while the
+// LSB is held constant, so a posedge must NOT fire. A broken any-bit
+// implementation would resume and write x.
 TEST(EventControlSim, PosedgeIgnoresUpperBitChangeWhenLsbHeld) {
   SimFixture f;
   auto* var = RunAndFindVar(

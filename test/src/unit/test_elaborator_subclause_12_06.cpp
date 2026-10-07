@@ -29,7 +29,7 @@ TEST(CaseMatchesElaboration, CaseMatchesWithGuardElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.6: "A constant expression pattern shall be of integral type."
+// §12.6 admits only an integral type for a constant expression pattern.
 TEST(PatternMatching, RealLiteralPatternRejected) {
   SimFixture f;
   ElaborateSrc(
@@ -170,7 +170,7 @@ TEST(PatternMatching, IntegerLiteralPatternAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.6: "Pattern identifiers shall be unique in the pattern" — the same
+// §12.6 keeps pattern identifiers distinct within a pattern: the same
 // identifier cannot bind in more than one position of a single pattern. Here
 // the structure pattern binds `r1` twice, which is rejected.
 TEST(PatternMatching, DuplicatePatternIdentifierRejected) {

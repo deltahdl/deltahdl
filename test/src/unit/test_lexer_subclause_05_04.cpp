@@ -294,9 +294,9 @@ TEST(LexicalConventionLexing, BlockCloseWithoutOpenIsOperators) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kEof);
 }
 
-// §5.4 is what makes the closing */ obligatory: a block comment "shall start
-// with /* and end with */". The rejection records that clause, so a reader of
-// the run recovers the rule without matching the wording of the message.
+// §5.4 is what makes the closing */ obligatory: a block comment opens with /*
+// and closes with */. The rejection records that clause, so a reader of the run
+// recovers the rule without matching the wording of the message.
 TEST(LexicalConventionLexing, UnterminatedBlockCommentNames5_4) {
   auto diags = LexDiagnostics("a /* never closed");
   EXPECT_TRUE(ReportedError(diags, "unterminated block comment", 1, "5.4"));

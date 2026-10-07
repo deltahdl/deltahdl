@@ -274,9 +274,8 @@ TEST(SignedXZ, UnaryMinusOnXSignedYieldsAllX) {
   EXPECT_EQ(v.words[0].bval & 0xFu, 0xFu);
 }
 
-// (C) "the entire resultant value being an x" also covers operations that
-// produce a 1-bit result: a relational comparison of an x-bearing signed value
-// yields a single x bit.
+// (C) an all-x result also covers operations that produce a 1-bit result: a
+// relational comparison of an x-bearing signed value yields a single x bit.
 TEST(SignedXZ, RelationalWithXYieldsSingleXBit) {
   SimFixture f;
   auto v = RunVar(

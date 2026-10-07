@@ -284,11 +284,12 @@ TEST(FunctionReturnSim, BuiltinMethodCallAsImplicitVariableInExpression) {
   EXPECT_EQ(r, 7u);
 }
 
-// §13.4.1: the implicitly declared internal variable "has the same type as
-// the function return value", so a `return` of a wider expression is an
-// assignment to that variable rather than a replacement of it, and the caller
-// sees the declared eight bits. The value returned here needs nine to survive
-// whole, so a result that kept the expression's own width would read 0x134.
+// §13.4.1: the internal variable the function implicitly declares takes the
+// type of the function's return value, so a `return` of a wider expression is
+// an assignment to that variable rather than a replacement of it, and the
+// caller sees the declared eight bits. The value returned here needs nine to
+// survive whole, so a result that kept the expression's own width would read
+// 0x134.
 TEST(FunctionReturnSim, ReturnValueTakesTheDeclaredWidthOfTheFunction) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -374,10 +375,10 @@ TEST(FunctionReturnSim, TypedefReturnTypeWiderThanTheFallbackKeepsItsHighBits) {
 }
 
 // §13.4.1's implicitly declared variable is one storage element, and §6.8 makes
-// every other declaration one of its own: "A variable is an abstraction of a
-// data storage element. A variable shall store a value from one assignment to
-// the next." A statement in a function body that only reads `x` therefore
-// cannot change what `x` stores, whatever it does to its own target.
+// every other declaration one of its own: a variable stands for a data storage
+// element and keeps its value from one assignment to the next. A statement in a
+// function body that only reads `x` therefore cannot change what `x` stores,
+// whatever it does to its own target.
 //
 // A subroutine body runs on its own statement executor -- a void function
 // called with parentheses is declined by SetupTaskCall and reaches
@@ -386,9 +387,9 @@ TEST(FunctionReturnSim, TypedefReturnTypeWiderThanTheFallbackKeepsItsHighBits) {
 // right-hand value straight into the target, and a Logic4Vec copies its `words`
 // pointer rather than the words: with the resize declining to build anything at
 // equal widths, `y` was left naming `x`'s storage. The line after the store
-// coerces a 2-state target in place -- §6.11.2: "any unknown or high-impedance
-// bits shall be converted to zeros" -- and the coercion travelled back through
-// that alias to clear the unknowns of `x`, in the statement that only read it.
+// coerces a 2-state target in place -- §6.11.2: any x or z bits become zeros --
+// and the coercion travelled back through that alias to clear the unknowns of
+// `x`, in the statement that only read it.
 //
 // The eight bits on each side are load-bearing. Unequal widths make the
 // assignment resize, which builds the value in a fresh store and hides the
@@ -468,11 +469,11 @@ TEST(FunctionReturnSim, TaskBodyCopyRunsOnTheOrdinaryStatementExecutor) {
 
 // The same §6.8 independence of storage elements, reached through a write that
 // lands after the copy rather than inside it, and with no 2-state coercion
-// anywhere in it. §7.2.1 makes a packed struct "a single vector", so assigning
-// one of its members deposits into a window of the whole struct's storage,
-// writing through the words the struct already holds. A target left naming its
-// source's storage therefore takes every later member write to the target back
-// to the source, which records an assignment it never received.
+// anywhere in it. §7.2.1 makes a packed struct one vector, so assigning one of
+// its members deposits into a window of the whole struct's storage, writing
+// through the words the struct already holds. A target left naming its source's
+// storage therefore takes every later member write to the target back to the
+// source, which records an assignment it never received.
 //
 // Both statements sit in the function body, so the copy and the deposit are
 // both executed by the subroutine-body executor. A packed struct lays its first
@@ -514,10 +515,10 @@ TEST(FunctionReturnSim, MemberDepositAfterABodyCopyLeavesTheSourceIntact) {
 
 // §13.4.1 makes the value a `return` hands back an assignment to the function's
 // implicitly declared internal variable, and §6.8 makes that variable a storage
-// element of its own: "A variable is an abstraction of a data storage element.
-// A variable shall store a value from one assignment to the next." A statement
-// spelled `return pattern;` therefore only reads `pattern`, and nothing the
-// declared return type does to the result may reach back into what was read.
+// element of its own: a variable stands for a data storage element and keeps
+// its value from one assignment to the next. A statement spelled
+// `return pattern;` therefore only reads `pattern`, and nothing the declared
+// return type does to the result may reach back into what was read.
 //
 // The two forms §13.4.1 offers are executed apart, which is why the claim has
 // to be made twice. The assignment form `f = expr;` is an ordinary blocking
@@ -528,9 +529,9 @@ TEST(FunctionReturnSim, MemberDepositAfterABodyCopyLeavesTheSourceIntact) {
 // rather than the words, and ResizeToWidth hands a value already at the
 // declared width straight back. So a `bit [7:0]` function's implicit variable
 // was left naming `pattern`'s storage, and §6.11.2's conversion of the result
-// -- "any unknown or high-impedance bits shall be converted to zeros" -- is an
-// in-place write that travelled through the alias and cleared the unknowns of
-// `pattern`, in the statement that only read it.
+// -- any x or z bits become zeros -- is an in-place write that travelled
+// through the alias and cleared the unknowns of `pattern`, in the statement
+// that only read it.
 //
 // The eight bits on each side are load-bearing. A return type wider or narrower
 // than the returned variable makes ResizeToWidth build the result in a fresh
@@ -616,15 +617,15 @@ TEST(FunctionReturnSim, ReturnOfAnInoutFormalLeavesTheCallersActualIntact) {
 }
 
 // The other form §13.4.1 names, stated as the boundary of the two cases above
-// rather than as a third way to break them: "the value returned by the function
-// is the value of that internal variable", and the subclause reaches that
-// variable either by a `return` or by an assignment to the function's own name.
-// The name-assign form is a blocking assignment in the body, so it is
-// ExecFuncBlockingAssign that executes it, and that executor already copies the
-// right-hand words before any store can keep them. This case therefore holds on
-// both sides of the fix the two above ask for; it is not discriminating for the
-// aliased `return`, and what it does discriminate against is the name-assign
-// form being rerouted onto a path that stores the read variable's own words.
+// rather than as a third way to break them: the function returns whatever that
+// internal variable holds, and the subclause reaches that variable either by a
+// `return` or by an assignment to the function's own name. The name-assign form
+// is a blocking assignment in the body, so it is ExecFuncBlockingAssign that
+// executes it, and that executor already copies the right-hand words before any
+// store can keep them. This case therefore holds on both sides of the fix the
+// two above ask for; it is not discriminating for the aliased `return`, and
+// what it does discriminate against is the name-assign form being rerouted onto
+// a path that stores the read variable's own words.
 //
 // It is worth writing because the target here is §13.4.1's implicit variable
 // itself, whose 2-state-ness comes from the declared return type rather than

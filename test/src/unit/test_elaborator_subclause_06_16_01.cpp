@@ -8,8 +8,8 @@ using namespace delta;
 
 namespace {
 
-// §6.16.1: "str.len() returns the length of the string, i.e., the number of
-// characters in the string". `S` holds "abc", so `N` resolves to 3.
+// §6.16.1: str.len() gives the string's length, its count of characters. `S`
+// holds "abc", so `N` resolves to 3.
 //
 // 3 is not reachable by accident from anything else this declaration records.
 // §11.10 packs "abc" into the constant number 0x616263, which is 6382179, so an
@@ -35,8 +35,8 @@ TEST(StringLenElaboration, LenOfAStringLocalparamFoldsToTheCharacterCount) {
   EXPECT_EQ(n->resolved_value, 3);
 }
 
-// §6.16.1 states the empty string separately: "If str is "", then str.len()
-// returns 0". `N` resolves to 0.
+// §6.16.1 states the empty string separately: for str equal to "", str.len()
+// returns 0. `N` resolves to 0.
 //
 // 0 is also what `RtlirParamDecl::resolved_value` holds before anything
 // resolves it, so the value alone would pass against an elaborator that folded
@@ -60,8 +60,8 @@ TEST(StringLenElaboration, LenOfTheEmptyStringFoldsToZero) {
   EXPECT_EQ(n->resolved_value, 0);
 }
 
-// §6.16 rules that "strings can be of arbitrary length and no truncation
-// occurs", so a nine-character string has length 9 and `N` resolves to 9.
+// §6.16 lets a string be any length without truncation, so a nine-character
+// string has length 9 and `N` resolves to 9.
 //
 // Nine characters is past what the packed form fits. §11.10 keeps one byte per
 // character, and `RtlirParamDecl::resolved_value` is 64 bits, so the packed
@@ -137,10 +137,10 @@ TEST(StringLenElaboration, LenOfAStringParameterPortFoldsToTheCharacterCount) {
   EXPECT_EQ(n->resolved_value, 5);
 }
 
-// The boundary the five tests above need. §5.13 rules that "a built-in method
-// can only be associated with a particular data type", and §6.16.1 associates
-// len() with `string` alone. `S` is declared `int` here, so `S.len()` names no
-// built-in method and there is no length to fold: `N` stays unresolved.
+// The boundary the five tests above need. §5.13 ties each built-in method to a
+// particular data type, and §6.16.1 associates len() with `string` alone. `S`
+// is declared `int` here, so `S.len()` names no built-in method and there is no
+// length to fold: `N` stays unresolved.
 //
 // Without this, a fix that answered len() for every parameter whatever its
 // declared type would satisfy all five.
@@ -169,9 +169,9 @@ TEST(StringLenElaboration, LenOfAnIntegerParameterDoesNotFold) {
       "localparam 'N' initializer is not a constant expression", 3, "6.20.4"));
 }
 
-// §6.16 rules that "A string variable shall not contain the special character
-// "\0". Assigning the value 0 to a string character shall be ignored." So the
-// value of "a\0b" is the two characters "ab", and §6.16.1's count of them is 2.
+// §6.16 keeps the special character "\0" out of a string variable and ignores
+// an assignment of 0 to a string character. So the value of "a\0b" is the two
+// characters "ab", and §6.16.1's count of them is 2.
 //
 // 2 is the number the run time already answers, because Lowerer::LowerParams
 // packs the parameter through StripStringZeros in src/simulator/lowerer.cpp.
@@ -217,9 +217,9 @@ TEST(StringLenElaboration, LenIgnoresAHexNulEscapeInTheInitializer) {
   EXPECT_EQ(n->resolved_value, 2);
 }
 
-// An initializer of nothing but the forbidden character. §6.16 rules that "An
-// empty string has zero length", and this is the input where keeping the zero
-// bytes and dropping them differ by the whole of the answer rather than by one.
+// An initializer of nothing but the forbidden character. §6.16 gives an empty
+// string zero length, and this is the input where keeping the zero bytes and
+// dropping them differ by the whole of the answer rather than by one.
 TEST(StringLenElaboration, LenOfAnAllNulInitializerIsZero) {
   ElabFixture f;
   auto* design = ElaborateSrc(

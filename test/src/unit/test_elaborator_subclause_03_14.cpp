@@ -81,7 +81,7 @@ TEST(DesignBuildingBlockElaboration, PrecisionFinerByMagnitudeAccepted) {
              "endmodule\n"));
 }
 
-// The precision-no-coarser-than-unit rule names "a design element", which
+// The precision-no-coarser-than-unit rule names a design element, which
 // includes packages. A package is not elaborated through the module item path,
 // so the separate-statement form of the check must be applied to packages in
 // their own right. Each package is paired with a top module that specifies its

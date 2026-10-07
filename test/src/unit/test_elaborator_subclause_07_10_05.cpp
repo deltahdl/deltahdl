@@ -32,9 +32,8 @@ TEST(BoundedQueueElaboration, BoundOfOneIsValid) {
 }
 
 // The rule on the bound's value belongs to §7.10, which states under Syntax
-// 7-4 "constant_expression shall evaluate to a positive integer value";
-// §7.10.5 states only how a bounded queue behaves once declared, so the report
-// names §7.10.
+// 7-4 that constant_expression evaluate to a positive integer; §7.10.5 states
+// only how a bounded queue behaves once declared, so the report names §7.10.
 TEST(BoundedQueueElaboration, BoundOfZeroIsError) {
   ElabFixture f;
   ElaborateSrc("module m; int q [$:0]; endmodule\n", f);
@@ -52,10 +51,10 @@ TEST(BoundedQueueElaboration, NegativeBoundIsError) {
                             "7.10"));
 }
 
-// §7.10, Syntax 7-4: the bound in `[$:N]` "shall evaluate to a positive
-// integer value", and the subclause puts no scope on that, so a declaration
-// inside a procedural block is held to it as a module item's declaration is.
-// The report names §7.10 for the reason given above BoundOfZeroIsError.
+// §7.10, Syntax 7-4: the bound in `[$:N]` has to evaluate to a positive
+// integer, and the subclause puts no scope on that, so a declaration inside a
+// procedural block is held to it as a module item's declaration is. The report
+// names §7.10 for the reason given above BoundOfZeroIsError.
 TEST(BoundedQueueElaboration, BlockScopedBoundOfZeroIsError) {
   ElabFixture f;
   ElaborateSrc(

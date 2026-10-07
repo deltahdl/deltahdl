@@ -5,18 +5,18 @@
 // The first is the multiple-driver rule where the procedure reaches the second
 // driver through a function it calls and the call is written somewhere other
 // than a right-hand side. The clause says of the variables an always_comb
-// assigns that they "shall not be assigned by any other process", and that this
-// "includes variables assigned within functions called by the procedure but not
-// those assigned within tasks called by the procedure". It puts no condition on
-// where in the procedure the call stands, so every case in that family names
-// one position a statement or an expression holds an expression in and asserts
-// the same report. The cases where the call is written where a call is usually
-// written are in test_elaborator_subclause_09_02_02_02a.cpp.
+// assigns that no other process may assign them, and that this covers variables
+// assigned in functions the procedure calls but not those assigned in tasks it
+// calls. It puts no condition on where in the procedure the call stands, so
+// every case in that family names one position a statement or an expression
+// holds an expression in and asserts the same report. The cases where the call
+// is written where a call is usually written are in
+// test_elaborator_subclause_09_02_02_02a.cpp.
 //
-// The second is the latch-inference warning the clause asks for -- "warn if the
-// behavior within an always_comb procedure does not represent combinational
-// logic, such as if latched behavior can be inferred" -- read at one statement
-// position each. Those cases begin below the multiple-driver ones.
+// The second is the latch-inference warning the clause asks for -- warn when an
+// always_comb procedure's behavior is not combinational, for instance when a
+// latch can be inferred -- read at one statement position each. Those cases
+// begin below the multiple-driver ones.
 //
 // The third, at the end of the file, is the multiple-driver rule where a
 // procedure declares a variable of its own: in a for loop's header (§12.7.1) or
@@ -395,12 +395,12 @@ TEST(AlwaysCombLatchWarning, ForkJoinNoneArmAssignmentInfersLatch) {
 }
 
 // The other direction, at the two positions of a for header. §12.7.1 step a)
-// "executes one or more for_initialization assignments" once and under no
-// condition, so a variable initialized there is assigned on every path through
-// the loop however the body is written. `y` is assigned nowhere else
-// unconditionally -- the body's if has no else -- so the initialization is the
-// whole of the answer, and a walk that skipped it would warn about a procedure
-// that describes combinational logic.
+// makes the for_initialization assignments once and under no condition, so a
+// variable initialized there is assigned on every path through the loop however
+// the body is written. `y` is assigned nowhere else unconditionally -- the
+// body's if has no else -- so the initialization is the whole of the answer,
+// and a walk that skipped it would warn about a procedure that describes
+// combinational logic.
 TEST(AlwaysCombLatchWarning, ForInitializationAssignmentIsCombinational) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -418,11 +418,11 @@ TEST(AlwaysCombLatchWarning, ForInitializationAssignmentIsCombinational) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §12.7.1 step c) "executes one or more for_step assignments ... then repeats
-// step b)", so a step assignment is made once the body has run, which this
-// check counts as taken for the reason it counts any loop body as taken. The
-// initialization is omitted here, which A.6.8 permits, so the step is the only
-// position that can put `y` on every path.
+// §12.7.1 step c) makes the for_step assignments and then goes back to step b),
+// so a step assignment is made once the body has run, which this check counts
+// as taken for the reason it counts any loop body as taken. The initialization
+// is omitted here, which A.6.8 permits, so the step is the only position that
+// can put `y` on every path.
 TEST(AlwaysCombLatchWarning, ForStepAssignmentIsCombinational) {
   ElabFixture f;
   auto* design = ElaborateSrc(

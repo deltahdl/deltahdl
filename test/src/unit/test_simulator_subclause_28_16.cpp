@@ -23,12 +23,12 @@ static uint64_t SettleTicks(const std::string& src) {
 }
 
 // §10.3.3: a delay written on a net declaration that assigns nothing is a net
-// delay, and "any value change that is to be applied to [the net] by some other
-// statement shall be delayed" by it before it takes effect. Runs a module whose
-// net `w` carries a declaration delay of five and is driven by `driver` alone,
-// with the value that driver reads rising at t=100, and returns the time the
-// run settles at. The two cases using it differ in nothing but that driver, so
-// the module they share is written once here.
+// delay, and every value change another statement applies to the net waits on
+// it before it takes effect. Runs a module whose net `w` carries a declaration
+// delay of five and is driven by `driver` alone, with the value that driver
+// reads rising at t=100, and returns the time the run settles at. The two cases
+// using it differ in nothing but that driver, so the module they share is
+// written once here.
 static uint64_t SettleTicksForNetDelayDriver(const std::string& driver) {
   return SettleTicks(
       "module m;\n"
@@ -436,16 +436,15 @@ TEST(GateNetDelays, ProductionDelayValueFromConstantExpressionSelectsSlot) {
 }
 
 TEST(GateNetDelays, ProductionNetDelayDelaysSeparateContinuousAssignment) {
-  // §10.3.3 names this arrangement and rules on it: "Specifying the delay in a
-  // continuous assignment that is part of the net declaration shall be treated
-  // differently from specifying a net delay and then making a continuous
-  // assignment to the net." The declaration `wire #5 w;` assigns nothing, so
-  // its delay is a net delay, and every value change another statement applies
-  // to `w` waits five ticks before it takes effect. The continuous assignment
-  // drives `w` from a rise at t=100, so the run settles at 105. Every other net
-  // delay case in this file writes the initializer form, whose delay belongs to
-  // the assignment the declaration makes and reaches the net by a route this
-  // source does not use.
+  // §10.3.3 names this arrangement and rules on it: a delay on a continuous
+  // assignment written in a net declaration is treated differently from a net
+  // delay followed by a separate continuous assignment to the net. The
+  // declaration `wire #5 w;` assigns nothing, so its delay is a net delay, and
+  // every value change another statement applies to `w` waits five ticks before
+  // it takes effect. The continuous assignment drives `w` from a rise at t=100,
+  // so the run settles at 105. Every other net delay case in this file writes
+  // the initializer form, whose delay belongs to the assignment the declaration
+  // makes and reaches the net by a route this source does not use.
   EXPECT_EQ(SettleTicksForNetDelayDriver("assign w = a;"), 105u);
 }
 
@@ -485,13 +484,13 @@ TEST(GateNetDelays, ProductionUndrivenDelayedNetAcquiresNoDriver) {
 }
 
 // §10.3.3 states the addition as the rule a net delay is held to. Ruling on the
-// declaration that carries its own continuous assignment it says "the delay is
-// part of the continuous assignment and is not a net delay. Thus, it shall not
-// be added to the delay of other drivers on the net" -- a "thus" that follows
-// only where a delay that is a net delay is added to them. §28.16 gives the two
-// consecutive segments of one path, the driver's from its inputs to its output
-// and the net's from that output changing to the net updating, so the time from
-// the one to the other is their sum.
+// declaration that carries its own continuous assignment it says the delay
+// belongs to the continuous assignment rather than being a net delay, and so is
+// not added to the delay of the net's other drivers -- a conclusion that
+// follows only where a delay that is a net delay is added to them. §28.16 gives
+// the two consecutive segments of one path, the driver's from its inputs to its
+// output and the net's from that output changing to the net updating, so the
+// time from the one to the other is their sum.
 //
 // The driver's delay was kept and the net's discarded, so this settled at 102
 // rather than 107. The two delays are 2 and 5 -- neither a multiple of the
@@ -731,7 +730,7 @@ TEST(GateNetDelays, DelayedAssignFollowsInputPorts) {
 // gate's pending transition inside the instance: the port `b` goes on following
 // `b` of the parent, and the gate's output with it. The change at 10 falls in
 // the time slot the gate's x->0 of time 0 matures in, and §4.7 (printed page
-// 69) lets the two be taken "in any order", so whether a 0 is seen at 10 is
+// 69) lets the two be taken in either order, so whether a 0 is seen at 10 is
 // left open; the 1 by 20 and the 0 at 40 are not.
 TEST(GateNetDelays, InputPortKeepsFollowingAfterItCancelsAPendingTransition) {
   SimFixture f;
@@ -758,10 +757,10 @@ TEST(GateNetDelays, InputPortKeepsFollowingAfterItCancelsAPendingTransition) {
             "t=45 u.b=0 w=0\n");
 }
 
-// §6.6 (printed page 91): a net's value "shall be determined by the values of
-// its drivers", and it is z only "if no driver is connected". A delayed gate is
-// connected from the start and has computed nothing until its first transition
-// lands (§28.16, printed page 856), so its net reads x, at the gate's strong
+// §6.6 (printed page 91): a net's value comes from the values of its drivers,
+// and it is z only when no driver is connected. A delayed gate is connected
+// from the start and has computed nothing until its first transition lands
+// (§28.16, printed page 856), so its net reads x, at the gate's strong
 // strength, until the delay elapses.
 TEST(GateNetDelays, DelayedGateOutputIsUnknownUntilItsFirstTransition) {
   SimFixture f;
@@ -843,16 +842,14 @@ TEST(GateNetDelays, DisabledThreeStateGateTurnsOffAfterItsTurnOffDelay) {
             "t=7 v=z HiZ\n");
 }
 
-// §10.3.3 (printed page 250), whose scalar delays are "treated in the same
-// way as for gate delays": "In situations where a right-hand operand changes
-// before a previous change has had time to propagate to the left-hand side",
-// the new value is evaluated, and "If this right-hand side value differs from
-// the value currently scheduled to propagate to the left-hand side, then the
-// currently scheduled propagation event is descheduled." An or #30 whose input
-// rises at 15 has its 1 due at 45; the input falls again at 35, the 0 now
-// evaluated differs from the pending 1, and the 1 is descheduled -- a 20-unit
-// pulse is shorter than the 30-unit delay and never reaches the output, only
-// the 0 landing, 30 after the fall.
+// §10.3.3 (printed page 250), whose scalar delays are handled as gate delays
+// are: when a right-hand operand changes before an earlier change has reached
+// the left-hand side, the new value is evaluated, and a value differing from
+// the one scheduled to propagate deschedules that pending propagation event. An
+// or #30 whose input rises at 15 has its 1 due at 45; the input falls again at
+// 35, the 0 now evaluated differs from the pending 1, and the 1 is descheduled
+// -- a 20-unit pulse is shorter than the 30-unit delay and never reaches the
+// output, only the 0 landing, 30 after the fall.
 TEST(GateNetDelays, PulseShorterThanTheGateDelayNeverReachesTheOutput) {
   SimFixture f;
   auto out = RunCapture(

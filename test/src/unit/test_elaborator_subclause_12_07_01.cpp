@@ -70,12 +70,11 @@ TEST(LoopStatementElaboration, ForCommaSeparatedTypedInitElaborates) {
 }
 
 // §12.7.1 states that declaring the control variables in the for_initialization
-// "creates an implicit begin-end block around the loop", and that "This block
-// creates a new hierarchical scope, making the variables local to the loop
-// scope". The elaborator keeps that rule by never admitting the name outside
-// the loop, so the reference after the loop is left with no declaration at all
-// and is reported under §23.9, which states the scope rules that decide where a
-// name is visible.
+// wraps the loop in an implicit begin-end block, and that the block is a new
+// hierarchical scope to which the variables are local. The elaborator keeps
+// that rule by never admitting the name outside the loop, so the reference
+// after the loop is left with no declaration at all and is reported under
+// §23.9, which states the scope rules that decide where a name is visible.
 TEST(LoopStatementElaboration, ForTypedInitNotVisibleAfterLoop) {
   ElabFixture f;
   ElaborateSrc(

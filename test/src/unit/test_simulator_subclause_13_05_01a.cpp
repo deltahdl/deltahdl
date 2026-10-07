@@ -173,10 +173,10 @@ TEST(PassByValueSim, UnpackedArrayArgumentCopiedElementwise) {
                    {{"packet[0]", 3u}, {"packet[1]", 4u}, {"total", 7u}});
 }
 
-// §13.5.1 copies each argument into the subroutine area, and §10.8 lists "the
-// passing of a value to a subroutine input, output, or inout argument" among
-// the assignment-like contexts, so §10.7 truncates or extends the actual into
-// the width the formal's type declares. §6.18 makes a formal written with a
+// §13.5.1 copies each argument into the subroutine area, and §10.8 lists
+// passing a value to a subroutine's input, output or inout argument among the
+// assignment-like contexts, so §10.7 truncates or extends the actual into the
+// width the formal's type declares. §6.18 makes a formal written with a
 // user-defined type name an object of the type that name stands for, which is
 // the width in question here.
 //
@@ -280,15 +280,14 @@ TEST(PassByValueSim, ForwardDeclaredClassFormalKeepsTheWholeHandle) {
   LowerRunAndCheck(f, design, {{"y", 42u}});
 }
 
-// §13.5.1 passes an input argument by copying "the values of the actual
-// arguments" into the formal, and §6.11.2 -- "any unknown or high-impedance
-// bits shall be converted to zeros" -- converts that copy where the formal is
-// declared 2-state. The conversion is entitled to the copy and to nothing
-// else: a call that names `carried` and does no more than read it must leave
-// every bit of `carried` standing. The binding handed it the actual's own
-// storage instead -- EvalExpr answers a bare identifier with the caller's
-// variable's Logic4Vec, and a Logic4Vec copies its words pointer -- so the
-// in-place conversion cleared the caller's unknowns from inside a call that
+// §13.5.1 passes an input argument by copying the actual argument's value into
+// the formal, and §6.11.2 -- any x or z bits become zeros -- converts that copy
+// where the formal is declared 2-state. The conversion is entitled to the copy
+// and to nothing else: a call that names `carried` and does no more than read
+// it must leave every bit of `carried` standing. The binding handed it the
+// actual's own storage instead -- EvalExpr answers a bare identifier with the
+// caller's variable's Logic4Vec, and a Logic4Vec copies its words pointer -- so
+// the in-place conversion cleared the caller's unknowns from inside a call that
 // wrote nothing.
 //
 // The two widths must match, and 8 is written on both declarations for that
@@ -345,13 +344,13 @@ TEST(PassByValueSim, ActualBoundToASameWidthTwoStateFormalKeepsItsUnknowns) {
 // element and the conversion: a formal of a different width would be handed a
 // freshly allocated buffer and the element could not be touched.
 //
-// z as well as x, because §6.11.2 converts "any unknown or high-impedance
-// bits" and the two are stored apart. 8'b11x0z101 is aval 0xE5 with bval 0x28,
-// and the conversion of it is aval 0xC5 with bval 0x00 -- what `copied` alone
-// is entitled to hold, while `lanes[1]`, read once and never written after the
-// call, must still hold what the initial block put there. A conversion that
-// dropped the x bit and kept the z would answer the same aval and leave bval
-// at 0x08, which is why bval is asserted on both.
+// z as well as x, because §6.11.2 converts both x and z bits and the two are
+// stored apart. 8'b11x0z101 is aval 0xE5 with bval 0x28, and the conversion of
+// it is aval 0xC5 with bval 0x00 -- what `copied` alone is entitled to hold,
+// while `lanes[1]`, read once and never written after the call, must still hold
+// what the initial block put there. A conversion that dropped the x bit and
+// kept the z would answer the same aval and leave bval at 0x08, which is why
+// bval is asserted on both.
 TEST(PassByValueSim, ArrayElementActualKeepsItsUnknownsAcrossTheBinding) {
   SimFixture f;
   auto* lane = RunAndFindVar(
@@ -426,14 +425,13 @@ TEST(PassByValueSim, NarrowerFormalTruncatesWithoutTouchingTheActual) {
   EXPECT_EQ(read_back->value.words[0].bval & 0xFFu, 0x0u);
 }
 
-// §13.5.1: "This argument passing mechanism works by copying each argument into
-// the subroutine area ... If the arguments are changed within the subroutine,
-// the changes are not visible outside the subroutine." The four aggregate binds
-// copied the container and every entry's Logic4Vec, which carries the words
-// pointer rather than the words, so the formal's entries were the actual's.
-// §7.8.7's write to bits of an element is the writer that shows it:
-// DepositBitField writes through the words it finds, so the callee's write
-// landed in the caller's array as well.
+// §13.5.1: passing by value copies each argument into the subroutine's own
+// area, so a change the subroutine makes to an argument is not seen outside it.
+// The four aggregate binds copied the container and every entry's Logic4Vec,
+// which carries the words pointer rather than the words, so the formal's
+// entries were the actual's. §7.8.7's write to bits of an element is the writer
+// that shows it: DepositBitField writes through the words it finds, so the
+// callee's write landed in the caller's array as well.
 TEST(PassByValueSim, AssocFormalElementBitsAreNotTheActualsWords) {
   auto v = RunAndGet(
       "module t;\n"

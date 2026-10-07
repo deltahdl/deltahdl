@@ -339,10 +339,10 @@ TEST(ClassObjectElaboration, ClassHandleCompareCompatibleOk) {
 }
 
 // §8.4 allows == and != on two handles; which pairs of handles they may be
-// applied to is §11.4.5's "one of the operands is assignment compatible with
-// the other". That is the subclause the site in
-// src/elaborator/elaborator_validate_class_handles.cpp passes for two
-// unrelated classes, so it is the one asserted here.
+// applied to is §11.4.5's requirement that one operand be assignment compatible
+// with the other. That is the subclause the site in
+// src/elaborator/elaborator_validate_class_handles.cpp passes for two unrelated
+// classes, so it is the one asserted here.
 TEST(ClassObjectElaboration, ClassHandleCompareIncompatibleError) {
   ElabFixture f;
   ElaborateSrc(

@@ -353,7 +353,7 @@ TEST(SimulationAlgorithmSim,
 }
 
 // End-to-end observation of execute_region's update-event branch through a
-// distinct input form of "a process sensitive to the object" (the §4.3
+// distinct input form of a process sensitive to the object (the §4.3
 // construct): a process armed with an explicit level-sensitive event control.
 // When the driven variable is updated at a later time slot, the update event
 // schedules evaluation of the sensitive process, which recomputes its target.

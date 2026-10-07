@@ -477,9 +477,9 @@ struct TwoStateFormal {
 // value, suitably coerced, and has the assignments between the temporary and
 // the actual follow SystemVerilog's ordinary rules for assignment and automatic
 // coercion. §6.11.2 is what those rules say where the type on the other side
-// holds no unknown bit: the assignment converts "any unknown or high-impedance
-// bits in the value ... to zeros". The actual is 4'b10x1 and the formal is int,
-// so the body is handed 4'b1001.
+// holds no unknown bit: the assignment turns any x or z bits of the value into
+// zeros. The actual is 4'b10x1 and the formal is int, so the body is handed
+// 4'b1001.
 TEST(DpiArgumentPassingInADesign, AnUnknownBitOfATwoStateFormalArrivesAsZero) {
   TwoStateFormal run(DataTypeKind::kInt, SvLogicVecVal{0b1011, 0b0010});
 

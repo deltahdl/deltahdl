@@ -41,13 +41,12 @@ TEST(NetStrengths, ChargeStrengthAcceptedOnTrireg) {
   EXPECT_TRUE(found);
 }
 
-// §6.3.2 states "Charge strength shall only be used when declaring a net of
-// type trireg", so a charge-strength keyword on any other net type is
-// rejected. The report names §6.3.2.1, the subclause devoted to the charge
-// strength specification, which restates the rule as "The charge strength
-// specification shall be used only with trireg nets". It is raised in
-// Parser::ParseNetStrength, where the specification is read, and ElaborateSrc
-// leaves it in the fixture's engine.
+// §6.3.2 allows charge strength only on a trireg net declaration, so a
+// charge-strength keyword on any other net type is rejected. The report names
+// §6.3.2.1, the subclause devoted to the charge strength specification, which
+// restates the rule by keeping the charge strength specification to trireg
+// nets. It is raised in Parser::ParseNetStrength, where the specification is
+// read, and ElaborateSrc leaves it in the fixture's engine.
 TEST(NetStrengths, ChargeStrengthRejectedOnNonTrireg) {
   ElabFixture f;
   // The charge-strength rule is reported while parsing, so this case reaches
@@ -62,12 +61,12 @@ TEST(NetStrengths, ChargeStrengthRejectedOnNonTrireg) {
                             2, "6.3.2.1"));
 }
 
-// §6.3.2 states "Drive strength shall only be used when placing a continuous
-// assignment on a net in the same statement that declares the net", so a
-// declaration carrying a strength and no assignment is rejected. §6.3.2 is the
-// subclause the report names: §6.3.2.2 says only that the specification
-// "allows" the assignment, and §10.3.4 says only where a strength may be
-// written and that it applies to scalar nets.
+// §6.3.2 states drive strength is used only where a net's declaring statement
+// also places a continuous assignment on it, so a declaration carrying a
+// strength and no assignment is rejected. §6.3.2 is the subclause the report
+// names: §6.3.2.2 says only that the specification "allows" the assignment, and
+// §10.3.4 says only where a strength may be written and that it applies to
+// scalar nets.
 TEST(NetStrengths, DriveStrengthRejectedWithoutAssignment) {
   ElabFixture f;
   Elaborate(

@@ -111,9 +111,8 @@ TEST(UnpackedArrayConcatSim, ConcatWithArrayItemsExpandsLeftToRight) {
   EXPECT_EQ(q->elements[3].ToUint64(), 40u);
 }
 
-// §10.10: an array item "shall represent as many elements as exist in that
-// item, arranged in the same left-to-right order as they would appear in the
-// array item itself". Left to right is the order the declaration writes, so
+// §10.10: an array item stands for all of its elements, in the left-to-right
+// order it holds them. Left to right is the order the declaration writes, so
 // `int A[1:0]` contributes A[1] first. Each element is written through its own
 // subscript rather than through an assignment pattern, so that the order the
 // pattern would fill the array in cannot cancel the order the concatenation
@@ -183,13 +182,12 @@ TEST(UnpackedArrayConcatSim, EmptyConcatToFixedSizeError) {
                             0, "10.10"));
 }
 
-// §10.10: "It shall be an error if the size of the resulting array differs from
-// the number of elements in a fixed-size target." The size-mismatch rule is a
-// runtime rule that fires only when the fixed-size target and the concatenation
-// meet in a procedural assignment, so it must be driven from real source (a
-// declaration + an initial-block assignment) rather than from a hand-built
-// ArrayInfo. Elaboration stays clean; the error appears when the assignment
-// runs.
+// §10.10: a resulting array whose size differs from a fixed-size target's
+// element count is an error. The size-mismatch rule is a runtime rule that
+// fires only when the fixed-size target and the concatenation meet in a
+// procedural assignment, so it must be driven from real source (a declaration +
+// an initial-block assignment) rather than from a hand-built ArrayInfo.
+// Elaboration stays clean; the error appears when the assignment runs.
 TEST(UnpackedArrayConcatSim, FixedSizeMismatchFromSourceErrorsAtRuntime) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -209,12 +207,12 @@ TEST(UnpackedArrayConcatSim, FixedSizeMismatchFromSourceErrorsAtRuntime) {
                             3, "10.10"));
 }
 
-// §10.10: "If the size exceeds the maximum number of elements of a bounded
-// queue, then elements beyond the upper bound of the target shall be ignored
-// and a warning shall be issued." The bound comes from the queue_dimension of
-// §7.10 (`[$:1]` → capacity 2), so this weaves §7.10's bounded-queue target
-// with §10.10's overflow rule and is driven end to end from source: the third
-// item is dropped and a warning is raised, leaving exactly two elements.
+// §10.10: when the size exceeds a bounded queue's maximum, the elements past
+// the target's upper bound are dropped with a warning. The bound comes from the
+// queue_dimension of §7.10 (`[$:1]` → capacity 2), so this weaves §7.10's
+// bounded-queue target with §10.10's overflow rule and is driven end to end
+// from source: the third item is dropped and a warning is raised, leaving
+// exactly two elements.
 TEST(UnpackedArrayConcatSim, BoundedQueueOverflowFromSourceTruncatesAndWarns) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -275,13 +273,12 @@ TEST(UnpackedArrayConcatSim, NonblockingSizeMismatchNames10_10) {
                             "10.10"));
 }
 
-// §10.10: an item naming an unpacked array "shall represent as many elements
-// as exist in that item, arranged in the same left-to-right order as they
-// would appear in the array item itself", so `b = {a}` hands the two elements
-// of `a` to the two elements of `b`, in that order. Each of those four names
-// is a variable in its own right, so the concatenation has to leave `b[0]`
-// holding its own words; ExpectOwnWordsCopy is where that claim and the
-// reasoning behind the pointer comparison live.
+// §10.10: an item naming an unpacked array stands for all of its elements, in
+// the left-to-right order it holds them, so `b = {a}` hands the two elements of
+// `a` to the two elements of `b`, in that order. Each of those four names is a
+// variable in its own right, so the concatenation has to leave `b[0]` holding
+// its own words; ExpectOwnWordsCopy is where that claim and the reasoning
+// behind the pointer comparison live.
 //
 // The widths match here, which is the case that hides the bug: the collector
 // pushes the source variable's own vector and the resize on the store returns

@@ -135,10 +135,9 @@ TEST(ClassConstructorElaboration, ProtectedConstructorAccessibleToSubclass) {
              "endmodule\n"));
 }
 
-// §8.7 states "The new operation is defined as a function with no return type,
-// and like any other function, it shall be nonblocking", which defers the
-// nonblocking requirement to the rule §13.4 states for every function. The
-// report therefore names §13.4.
+// §8.7 defines new as a function with no return type that, like every function,
+// must not block, which defers the nonblocking requirement to the rule §13.4
+// states for every function. The report therefore names §13.4.
 TEST(ClassConstructorElaboration, ConstructorWithTimingControlError) {
   ElabFixture f;
   ElabOk(

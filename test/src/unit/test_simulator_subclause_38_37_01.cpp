@@ -112,7 +112,7 @@ TEST_F(VpiSystfCallbacksRegistration, AcceptsWellFormedName) {
 
 // §38.37.1: a name may be as long as a SystemVerilog identifier may and no
 // longer. §5.6 sets that for an identifier -- an implementation may cap it,
-// "but the limit shall be at least 1024 characters" -- and this tool's cap is
+// though at no fewer than 1024 characters -- and this tool's cap is
 // kMaxIdentifierLength, the one src/lexer/lexer.cpp measures an identifier
 // against. A name of exactly that length is the longest the rule admits, so the
 // registration stands.
@@ -130,9 +130,9 @@ TEST_F(VpiSystfCallbacksRegistration, AcceptsANameAtTheIdentifierMaximum) {
 
 // §38.37.1 with one character more: the name is past the maximum, so the
 // registration is refused -- no callback object, nothing stored -- and §5.6's
-// "an error shall be reported" is what vpi_chk_error reads back. Every
-// character of this name is one §38.37.1 calls legal, so length is the only
-// thing that can have refused it.
+// required error report is what vpi_chk_error reads back. Every character of
+// this name is one §38.37.1 calls legal, so length is the only thing that can
+// have refused it.
 TEST_F(VpiSystfCallbacksRegistration, RejectsANameBeyondTheIdentifierMaximum) {
   std::string name = "$" + std::string(kMaxIdentifierLength, 'a');
   s_vpi_systf_data data = {};

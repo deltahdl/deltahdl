@@ -378,10 +378,10 @@ TEST(ClassSim, UnresolvedMethodReturnsNull) {
 }
 
 // §23.2.4 (printed page 739) admits a class among a module's items, and §8.24
-// (printed page 202) has its out-of-block declarations "declared in the same
-// scope as the class declaration", so the bodies follow the class among the
-// module's items and `this` in them names the object. The elaborator took
-// each for a subroutine of the module and refused its `this` under §8.11.
+// (printed page 202) has its out-of-block declarations made in the scope that
+// declares the class, so the bodies follow the class among the module's items
+// and `this` in them names the object. The elaborator took each for a
+// subroutine of the module and refused its `this` under §8.11.
 TEST(ClassSim, OutOfBlockBodiesAmongModuleItemsAreTheClassMethods) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"

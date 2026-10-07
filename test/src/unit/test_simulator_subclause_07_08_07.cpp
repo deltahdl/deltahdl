@@ -453,17 +453,17 @@ TEST(AssocArrayAllocation, RefArgAllocatesWithTheUserSpecifiedDefault) {
   EXPECT_EQ(v, 9u);
 }
 
-// §7.8.7: the nonexistent element "shall be allocated with its default or
-// user-specified initial value". Allocated *with* the value -- the entry takes
-// it, and §6.8 then makes the entry "an abstraction of a data storage element"
-// that "shall store a value from one assignment to the next". AssocAllocValue
-// returned the array's own default_value rather than a copy of it, and
-// Logic4Vec carries its `words` pointer rather than the words, so the entry
-// this write allocates was the stored default. The write is a part-select,
-// which deposits into the words it finds instead of replacing them, so the
-// deposit landed in the default too and the array's default read 16'h00AB
-// from then on. The read is of a key that was never allocated, which §7.8.6
-// answers with the user-specified default of §7.9.11.
+// §7.8.7: the nonexistent element is allocated holding its default or
+// user-specified initial value. Allocated *with* the value -- the entry takes
+// it, and §6.8 then makes the entry a data storage element that keeps its value
+// from one assignment to the next. AssocAllocValue returned the array's own
+// default_value rather than a copy of it, and Logic4Vec carries its `words`
+// pointer rather than the words, so the entry this write allocates was the
+// stored default. The write is a part-select, which deposits into the words it
+// finds instead of replacing them, so the deposit landed in the default too and
+// the array's default read 16'h00AB from then on. The read is of a key that was
+// never allocated, which §7.8.6 answers with the user-specified default of
+// §7.9.11.
 TEST(AssocArrayAllocation, PartSelectWriteLeavesTheUserDefaultIntact) {
   auto v = RunAndGet(
       "module t;\n"

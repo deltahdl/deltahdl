@@ -82,10 +82,10 @@ TEST(UnpackedArrayConcatElaboration, ReplicationTargetingUnpackedArrayError) {
                             "10.10.1"));
 }
 
-// §10.10.1: the element-type rule ("every element item shall be of the same
-// type as the element type of the target array") also governs an assignment
-// pattern that initializes the array in its declaration, not only a procedural
-// assignment. An array-typed item is illegal there too.
+// §10.10.1: the element-type rule (each element item has to have the target
+// array's element type) also governs an assignment pattern that initializes the
+// array in its declaration, not only a procedural assignment. An array-typed
+// item is illegal there too.
 TEST(UnpackedArrayConcatElaboration, ArrayItemInDeclInitPatternError) {
   ElabFixture f;
   auto* design = ElaborateSrc(

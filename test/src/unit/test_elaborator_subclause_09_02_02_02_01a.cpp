@@ -260,10 +260,10 @@ Expr* MakeMember(Arena& arena, Expr* obj, std::string_view field) {
   return e;
 }
 
-// §9.2.2.2.1 asks for "the expansions of the longest static prefix of each net
-// or variable identifier or select expression that is read", so the prefix
-// `a[1]` and the identifier it stands on are both collected. The bare name is
-// there because it is the only one of the two that names a simulation object:
+// §9.2.2.2.1 asks for the expansion of the longest static prefix of every net
+// or variable identifier or select expression it reads, so the prefix `a[1]`
+// and the identifier it stands on are both collected. The bare name is there
+// because it is the only one of the two that names a simulation object:
 // `logic [3:0] a` is one Variable named `a`, so a watcher can be armed on `a`
 // and cannot be armed on `a[1]`. This case asserted the bare name absent until
 // an array of UDP instances -- whose every terminal is a literal bit-select --
@@ -492,12 +492,12 @@ TEST(AlwaysCombSensitivityInference, TaskCallBodyExcludedFromSensitivity) {
   ExpectSensitivityExcludes(design->top_modules[0]->processes[0], {"ext"});
 }
 
-// §9.2.2.2.1 (printed page 223): "Expressions used in assertion action blocks
-// do not contribute to the implicit sensitivity list of an always_comb." The
-// sentence before it puts the asserted expression itself in the list, "as if
-// that expression were used as a condition of an if statement", so b is in and
-// c and d are out. That is the clause's own example, whose always_comb triggers
-// on b, c and e while the disable_error read in its else branch stays out.
+// §9.2.2.2.1 (printed page 223): an expression in an assertion action block
+// adds nothing to an always_comb's implicit sensitivity list. The sentence
+// before it puts the asserted expression itself in the list, as though it were
+// an if statement's condition, so b is in and c and d are out. That is the
+// clause's own example, whose always_comb triggers on b, c and e while the
+// disable_error read in its else branch stays out.
 //
 // This case is the reason CollectStmtReads stops at Stmt::assert_pass_stmt and
 // Stmt::assert_fail_stmt rather than descending every link ForEachChildStmt
@@ -764,11 +764,11 @@ TEST(AlwaysCombSensitivityInference, ClassScopeResolvedCallArgInSensitivity) {
   ExpectSensitivityContains(proc, {"a"});
   ExpectSensitivityExcludes(proc, {"C"});
 }
-// §9.2.2.2.1 asks for "the expansions of the longest static prefix", plural,
-// and both of them reach the list: the base identifier, which is the expansion
-// that names an object for a packed vector, and the prefix itself, which is the
-// one that names an object for an unpacked array, whose elements are variables
-// of their own. Watching only the base left an always_comb reading `arr[1]`
+// §9.2.2.2.1 asks for the longest static prefix's expansions, plural, and both
+// of them reach the list: the base identifier, which is the expansion that
+// names an object for a packed vector, and the prefix itself, which is the one
+// that names an object for an unpacked array, whose elements are variables of
+// their own. Watching only the base left an always_comb reading `arr[1]`
 // watching a variable no element write touches.
 TEST(AlwaysCombSensitivityInference, ArrayElementReadListsPrefixAndBase) {
   ElabFixture f;

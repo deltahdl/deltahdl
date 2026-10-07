@@ -725,11 +725,11 @@ TEST(AssignmentPatternFormat,
             "'{'{ON, OFF}, '{OFF, ON}}\n");
 }
 
-// §21.2.1.6 with §7.6 (printed page 160): elements correspond "by the
-// left-to-right order of elements in each array", so the pattern %p prints
-// lists each dimension from its left bound -- a[3] first for int a[3:0], and in
-// dr[1:0][2:3] the subarray dr[1] first, itself from dr[1][2]. Printing from
-// the lowest address gave a pattern that, assigned back, reverses the array.
+// §21.2.1.6 with §7.6 (printed page 160): elements correspond in each array's
+// left-to-right element order, so the pattern %p prints lists each dimension
+// from its left bound -- a[3] first for int a[3:0], and in dr[1:0][2:3] the
+// subarray dr[1] first, itself from dr[1][2]. Printing from the lowest address
+// gave a pattern that, assigned back, reverses the array.
 TEST(AssignmentPatternFormat, DescendingDimensionPrintsFromItsLeftBound) {
   auto out = RunSim(
       "module top;\n"

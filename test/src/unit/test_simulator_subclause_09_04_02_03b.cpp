@@ -88,10 +88,10 @@ TEST(ConditionalEventIffSim, IffConditionHighImpedanceSuppresses) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §9.4.2.3: "the event expression only triggers if the expression after the
-// iff is true". A named event is an event expression like any other, so a
-// trigger arriving while the guard is false leaves the waiting process where
-// it was. Both triggers here arrive with `en` at zero.
+// §9.4.2.3: the event expression triggers only when the expression after iff is
+// true. A named event is an event expression like any other, so a trigger
+// arriving while the guard is false leaves the waiting process where it was.
+// Both triggers here arrive with `en` at zero.
 TEST(ConditionalEventIffSim, IffOnNamedEventFalseSuppresses) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -143,7 +143,7 @@ TEST(ConditionalEventIffSim, IffOnNamedEventTrueResumes) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §9.4.2.3: "iff has precedence over or", so `@(a iff c or b)` is
+// §9.4.2.3: iff binds tighter than or, so `@(a iff c or b)` is
 // `@((a iff c) or b)` and the guard covers `a` alone. `c` stays zero
 // throughout: the change to `a` is suppressed and the change to `b` is not, so
 // the body runs exactly once. A guard read as covering the whole list would

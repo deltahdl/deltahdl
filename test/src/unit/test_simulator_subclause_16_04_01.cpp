@@ -25,9 +25,9 @@ namespace {
 // test, which is legal because §16.4 schedules that call in the Reactive
 // region. A final action cannot use that vehicle: §16.4 requires its subroutine
 // to be one that is legal to call in the Postponed region, and §4.4.2.9 says of
-// that region that "it is illegal to write values to any net or variable", so
-// the final tests report through a severity system task and observe it with
-// LastSeverity() and LastSeverityMsg().
+// that region that no net or variable may be written there, so the final tests
+// report through a severity system task and observe it with LastSeverity() and
+// LastSeverityMsg().
 
 // §16.4.1: a passing observed (#0) deferred assertion's pass action is a
 // pending report -- deferred, not run inline -- so its effect still lands by

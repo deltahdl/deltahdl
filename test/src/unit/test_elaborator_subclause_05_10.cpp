@@ -60,9 +60,10 @@ TEST(StructLiteralElaboration, StructLiteralVarInit) {
              "endmodule\n"));
 }
 
-// §5.10 opens "Structure literals are structure assignment patterns or pattern
-// expressions with constant member expressions (see 10.9.2)", so it states no
-// member-key rule of its own and the report names §10.9.2, where the rule is.
+// §5.10 opens by making a structure literal a structure assignment pattern or
+// pattern expression with constant member expressions (§10.9.2), so it states
+// no member-key rule of its own and the report names §10.9.2, where the rule
+// is.
 TEST(StructLiteralElaboration, InvalidMemberName) {
   ElabFixture f;
   ElaborateSrc(

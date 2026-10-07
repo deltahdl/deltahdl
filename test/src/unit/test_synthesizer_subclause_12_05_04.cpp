@@ -61,14 +61,14 @@ TEST(CaseInsideStatementSynth, RangeItemDoesNotSelectAValueOutsideItsBounds) {
       });
 }
 
-// §12.5.4 rules that "the inside operator uses asymmetric wildcard matching
-// (see 11.4.6)", and that "the case_expression shall be the left operand, and
-// each case_item_expression shall be the right operand", so a `?` in the item
-// masks that bit position and a bit of the selector never masks anything. The
-// subclause's own example gives `3'b0?0` as matching `'b000 'b010 'b0x0 'b0z0`,
-// and a netlist carries no x or z on an input, so 0 and 2 are the reachable
-// matches. A lowering that read the wildcard off the selector instead would
-// answer y = 2 at every value.
+// §12.5.4 has case inside match through the inside operator's asymmetric
+// wildcard matching (§11.4.6), with the case_expression as the left operand and
+// each case_item_expression as the right, so a `?` in the item masks that bit
+// position and a bit of the selector never masks anything. The subclause's own
+// example gives `3'b0?0` as matching `'b000 'b010 'b0x0 'b0z0`, and a netlist
+// carries no x or z on an input, so 0 and 2 are the reachable matches. A
+// lowering that read the wildcard off the selector instead would answer y = 2
+// at every value.
 TEST(CaseInsideStatementSynth, WildcardItemMatchesUnderAsymmetricMatching) {
   ExpectInputSweep(
       "module m(input logic [2:0] sel, output logic [1:0] y);\n"

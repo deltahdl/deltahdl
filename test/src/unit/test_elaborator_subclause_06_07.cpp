@@ -81,7 +81,7 @@ TEST(NetDecl, ScalaredWithPackedDimOk) {
 }
 
 TEST(NetDecl, VectoredWithSingleBitPackedDimOk) {
-  // A single-bit packed range still satisfies "at least one packed dimension":
+  // A single-bit packed range still satisfies the one-packed-dimension minimum:
   // the accept path here rides the packed-dimension guard, not a width > 1
   // shortcut, since [0:0] is one bit wide.
   ElabFixture f;
@@ -127,7 +127,7 @@ TEST(NetDecl, VectoredPackedStructNetSatisfiesPackedRequirement) {
 
 // §6.7's net_declaration production admits vectored and scalared but states no
 // obligation about either. §6.9.2 is the sentence that confines the two
-// keywords to "vector net declarations", so ValidateVectoredScalaredNet in
+// keywords to vector net declarations, so ValidateVectoredScalaredNet in
 // src/elaborator/elaborator_decls.cpp files the report under §6.9.2 and the
 // four cases below name that subclause rather than the one this file covers.
 TEST(NetDecl, VectoredWithoutPackedDimEmitsError) {

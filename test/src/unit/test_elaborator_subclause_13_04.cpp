@@ -526,9 +526,9 @@ TEST(FunctionElaboration, InputOnlyArgCallInContAssignOk) {
 // src/elaborator/elaborator_validate_internal.h. A.6.8 gives
 // `for_step_assignment ::= operator_assignment | inc_or_dec_expression |
 // function_subroutine_call`, and a task enable is a function_subroutine_call,
-// so §13.4 rule b) -- "A function shall not enable tasks regardless of whether
-// those tasks contain time-controlling statements" -- reaches a for step. It
-// went unenforced there while the walk wrote out its own list of nine links.
+// so §13.4 rule b) -- no function may enable a task, whether or not the task
+// holds a time-controlling statement -- reaches a for step. It went unenforced
+// there while the walk wrote out its own list of nine links.
 TEST(FunctionElaboration, TaskEnabledFromAForStepError) {
   ElabFixture f;
   ElaborateSrc(
@@ -548,13 +548,12 @@ TEST(FunctionElaboration, TaskEnabledFromAForStepError) {
 // them says where in the body the statement or expression breaking one may
 // stand. Five walks in src/elaborator/elaborator_validate_funcchecks.cpp
 // enforce them — BodyContainsFork and BodyContainsNonblocking and
-// BodyContainsEventScheduling for "shall not contain any fork constructs" and
-// "shall not contain a statement that directly schedules an event to execute
-// after the function has returned", CollectLocalDeclNames and
-// WalkConstFuncStmt for "shall not reference any identifiers that are not
-// either parameter or function names, or declared locally to the current
-// function" — and each had written out a short list of its own of the thirteen
-// child-statement links Stmt declares. They now take the list from
+// BodyContainsEventScheduling for the bans on any fork construct and on a
+// statement that directly schedules an event to run once the function has
+// returned, CollectLocalDeclNames and WalkConstFuncStmt for the ban on naming
+// an identifier that is neither a parameter, a function name nor declared
+// locally in the function — and each had written out a short list of its own of
+// the thirteen child-statement links Stmt declares. They now take the list from
 // ForEachChildStmt in src/elaborator/elaborator_validate_internal.h, and the
 // cases below cover the positions that reaches which their own lists did not.
 //
@@ -580,8 +579,8 @@ TEST(FunctionElaboration, TaskEnabledFromAForStepError) {
 // nonblocking assignment, a timing control or a declaration.
 // src/parser/parser_stmt_block.cpp fills Stmt::fork_stmts on a StmtKind::kFork
 // alone, so BodyContainsFork answers at that fork before descending, and
-// §13.4.3's "shall not contain any fork constructs" stops the other four walks
-// before they see the inside of one.
+// §13.4.3's ban on any fork construct stops the other four walks before they
+// see the inside of one.
 //
 // These cases cover §13.4.3 and belong in
 // test/src/unit/test_elaborator_subclause_13_04_03.cpp. They stand here because

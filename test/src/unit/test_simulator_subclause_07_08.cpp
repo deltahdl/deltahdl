@@ -120,14 +120,13 @@ TEST(AssocArraySimulation, WholeArrayCopyDuplicatesEntries) {
   EXPECT_EQ(v, 77u);
 }
 
-// §9.4.2 has a non-edge implicit event "detected on any change in the value of
-// the expression" and names an aggregate element as a lawful operand of one:
-// "Object (class instance) members or aggregate elements can be any type as
-// long as the result of the expression is a singular value". The clause puts
-// the duty on the writer -- "Changing the value of object data members,
-// aggregate elements ... shall cause the event expression to be reevaluated" --
-// and an associative array's entries live outside the variable an @(aa[3]) arms
-// its watcher on, so the write has to announce the change itself.
+// §9.4.2 has a non-edge implicit event detected whenever the expression's value
+// changes and names an aggregate element as a lawful operand of one, of any
+// type so long as the expression yields a singular value. The clause puts the
+// duty on the writer -- a change to an object data member or an aggregate
+// element makes the event expression be reevaluated -- and an associative
+// array's entries live outside the variable an @(aa[3]) arms its watcher on, so
+// the write has to announce the change itself.
 TEST(AssocArraySimulation, AssocElementWriteWakesAnEventControlOnThatElement) {
   auto v = RunAndGet(
       "module t;\n"
@@ -195,9 +194,9 @@ TEST(AssocArraySimulation, AssocElementWriteWakesAnAlwaysCombThatReadsIt) {
 // name: every index write stored nothing and every read answered the element
 // type's default, with nothing reported (#3614).
 
-// §7.8: "allocate storage for elements only when they are used". The write is
-// what uses the element, and the read is what says the storage it allocated is
-// the storage the key reaches.
+// §7.8: storage for an element is allocated only once the element is used. The
+// write is what uses the element, and the read is what says the storage it
+// allocated is the storage the key reaches.
 TEST(AssocArraySimulation, ADeclarationInsideAFunctionBuildsTheArray) {
   auto v = RunAndGet(
       "module t;\n"

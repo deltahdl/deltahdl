@@ -1,8 +1,7 @@
 // Tests for §6.4 "Singular and aggregate types", which classifies data types
-// and states no restriction a design can violate: "A singular type shall be
-// any data type except an unpacked structure, unpacked union, or unpacked
-// array (see 7.4 on arrays). An aggregate type shall be any unpacked
-// structure, unpacked union, or unpacked array data type."
+// and states no restriction a design can violate: every data type but an
+// unpacked structure, unpacked union or unpacked array (§7.4) is singular, and
+// those three are the aggregate types.
 //
 // The rejections below are therefore reported under the subclauses that do
 // restrict what a design may write with the classification: §23.2.2.4, under
@@ -445,9 +444,9 @@ TEST(SingularAggregateTypes, UnpackedArrayOfPackedStructPortDefaultRejected) {
 // aggregates (a second syntactic position: an expression operand). Two
 // non-equivalent unpacked structures are both classified aggregate, so the
 // comparison is rejected. The report names §6.22.2, which makes an anonymous
-// unpacked struct "equivalent to itself among data objects declared within the
-// same declaration statement and no other data types". Built from real
-// declaration + expression syntax and driven through elaboration.
+// unpacked struct equivalent only to itself, and only among data objects of the
+// same declaration statement. Built from real declaration + expression syntax
+// and driven through elaboration.
 TEST(SingularAggregateTypes, NonEquivalentUnpackedStructComparisonRejected) {
   ElabFixture f;
   auto* design = Elaborate(

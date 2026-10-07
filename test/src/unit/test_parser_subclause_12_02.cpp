@@ -1,8 +1,8 @@
-// Tests for §12.2 "Overview", whose one rule is that "procedural programming
-// statements shall be contained within any of the following constructs": the
-// six blocks that activate on their own -- initial, always, always_comb,
-// always_latch, always_ff and final -- and the two that activate when called,
-// task and function.
+// Tests for §12.2 "Overview", whose one rule is that procedural programming
+// statements stand only inside the constructs it lists: the six blocks that
+// activate on their own -- initial, always, always_comb, always_latch,
+// always_ff and final -- and the two that activate when called, task and
+// function.
 //
 // The rule has two halves and needs both. Each of the eight has to take a
 // procedural statement, and a procedural statement written where none of the

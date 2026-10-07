@@ -399,10 +399,10 @@ TEST(CaseMatchesItemSim, CaseMatchesFirstOfOverlappingPatternsWins) {
 }
 
 // §12.6.1: a `unique` pattern-matching case implies not only that at most one
-// item is selected but also that *some* item shall be selected. With no item
-// matching the selector and no default present, that "some item" requirement is
-// violated, so the unique check reports a violation. This is the other half of
-// unique's meaning from the already-covered overlap case.
+// item is selected but also that *some* item is selected. With no item matching
+// the selector and no default present, that second requirement is violated, so
+// the unique check reports a violation. This is the other half of unique's
+// meaning from the already-covered overlap case.
 TEST(CaseMatchesItemSim, UniqueCaseMatchesNoMatchViolation) {
   SimFixture f;
   RunModuleNoVar(f,
@@ -420,9 +420,9 @@ TEST(CaseMatchesItemSim, UniqueCaseMatchesNoMatchViolation) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §12.6.1: the "some item shall be selected" requirement of `unique` is
-// satisfied by a default item, so a unique pattern-matching case that matches
-// no explicit item but has a default runs the default without a violation.
+// §12.6.1: the requirement of `unique` that some item be selected is satisfied
+// by a default item, so a unique pattern-matching case that matches no explicit
+// item but has a default runs the default without a violation.
 TEST(CaseMatchesItemSim, UniqueCaseMatchesNoMatchWithDefaultNoViolation) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,

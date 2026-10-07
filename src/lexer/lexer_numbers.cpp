@@ -88,10 +88,10 @@ void Lexer::ValidateDecimalXZ(SourceLoc loc, char base_letter,
 // run. `loc` is the start of the literal, which is where both reports stand.
 void Lexer::ReportMissingValueToken(SourceLoc loc) {
   if ((Current() == '+' || Current() == '-')) {
-    // §5.7.1: "A plus or minus operator between the base format and the number
-    // is an illegal syntax", which Example 3 writes as `8 'd -6`. The sign is
-    // no part of the value token, so a literal written with one arrives here
-    // with an empty run and the sign still unread.
+    // §5.7.1 makes a plus or minus sign between the base format and the number
+    // illegal syntax, which Example 3 writes as `8 'd -6`. The sign is no part
+    // of the value token, so a literal written with one arrives here with an
+    // empty run and the sign still unread.
     diag_.Error(loc,
                 "plus or minus operator between the base format and the number "
                 "is illegal syntax",
@@ -136,12 +136,11 @@ void Lexer::ValidateBaseDigits(SourceLoc loc, char base_letter,
 Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
   Advance();
 
-  // §5.7.1: "The apostrophe character and the base format character shall not
-  // be separated by any white space." The optional s/S signed marker stands
-  // between them, so white space is forbidden on either side of it. Read the
-  // literal as it was written whatever the answer, so that one token still
-  // spans it, and report the sentence once even when both places carry white
-  // space.
+  // §5.7.1 forbids white space between the apostrophe and the base format
+  // character. The optional s/S signed marker stands between them, so white
+  // space is forbidden on either side of it. Read the literal as it was written
+  // whatever the answer, so that one token still spans it, and report the
+  // sentence once even when both places carry white space.
   bool space_before_sign = SkipSpacesAndTabs();
   if ((Current() == 's' || Current() == 'S')) {
     Advance();
@@ -158,19 +157,18 @@ Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
   char base_letter = Current();
   Advance();
 
-  // §5.7.1: "The unsigned number token shall immediately follow the base
-  // format, optionally preceded by white space." This white space is legal, so
-  // stepping over it draws no report.
+  // §5.7.1 puts the unsigned number token straight after the base format, white
+  // space between them allowed. This white space is legal, so stepping over it
+  // draws no report.
   SkipSpacesAndTabs();
   uint32_t before_digits = pos_;
-  // §5.7.1: "The third token, an unsigned number, shall consist of digits that
-  // are legal for the specified base format." A letter or digit that is illegal
-  // for the base is still written where the value token belongs, so the run
-  // covers every alphanumeric character and Lexer::ValidateBaseDigits judges
-  // what it collected against the base. Ending the run at the first character
-  // no base accepts would hand that function a span it can never reject for a
-  // hexadecimal literal, and would leave `4'hG` reported as a literal carrying
-  // no value at all.
+  // §5.7.1 makes the third token, the unsigned number, out of digits legal for
+  // its base format. A letter or digit that is illegal for the base is still
+  // written where the value token belongs, so the run covers every alphanumeric
+  // character and Lexer::ValidateBaseDigits judges what it collected against
+  // the base. Ending the run at the first character no base accepts would hand
+  // that function a span it can never reject for a hexadecimal literal, and
+  // would leave `4'hG` reported as a literal carrying no value at all.
   while ((std::isalnum(static_cast<unsigned char>(Current())) ||
           Current() == '_' || Current() == '?')) {
     Advance();

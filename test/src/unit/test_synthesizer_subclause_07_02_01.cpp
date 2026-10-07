@@ -22,10 +22,9 @@ namespace {
 // `lowering_incomplete_` and reports, and its comment says the location is what
 // tells the reader which statement went missing.
 
-// The test fails on a fix that covers `ExprKind::kSelect` alone. §7.2.1 rules
-// that "A packed structure is a mechanism for subdividing a vector into
-// subfields, which can be conveniently accessed as members", so the target
-// names bits of a vector the netlist holds.
+// The test fails on a fix that covers `ExprKind::kSelect` alone. §7.2.1 makes a
+// packed structure a way of dividing a vector into subfields reached as
+// members, so the target names bits of a vector the netlist holds.
 TEST(PackedStructTarget, AssignToAStructMemberIsReportedRatherThanDropped) {
   SynthFixture f;
   const auto* mod =

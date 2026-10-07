@@ -26,10 +26,9 @@ TEST(IntegerLiteralLexing, SpaceBreaksNumberIntoTwo) {
 }
 
 TEST(IntegerLiteralLexing, RejectWhitespaceBetweenApostropheAndBase) {
-  // §5.7.1 states "The apostrophe character and the base format character shall
-  // not be separated by any white space". `8' h99` writes a space between the
-  // apostrophe and the `h`, and the report stands at the start of the number
-  // token, which is line 1 here.
+  // §5.7.1 forbids white space between the apostrophe and the base format
+  // character. `8' h99` writes a space between the apostrophe and the `h`, and
+  // the report stands at the start of the number token, which is line 1 here.
   EXPECT_TRUE(ReportedError(LexDiagnostics("8' h99"),
                             "white space shall not separate the apostrophe "
                             "from the base format character",
@@ -90,20 +89,19 @@ TEST(IntegerLiteralLexing, RejectIllegalOctalDigit) {
                             "illegal digit for specified base", 1, "5.7.1"));
 }
 
-// §5.7.1 rules that "The third token, an unsigned number, shall consist of
-// digits that are legal for the specified base format", and `G` is legal for no
-// base. This case is what makes the 'h'/'H' arm of Lexer::ValidateBaseDigits
-// reachable: it goes red if the value run in Lexer::LexBasedNumber stops at `G`
-// instead of collecting it, because the literal is then reported as one with no
-// value at all.
+// §5.7.1 makes the third token, the unsigned number, out of digits legal for
+// its base format, and `G` is legal for no base. This case is what makes the
+// 'h'/'H' arm of Lexer::ValidateBaseDigits reachable: it goes red if the value
+// run in Lexer::LexBasedNumber stops at `G` instead of collecting it, because
+// the literal is then reported as one with no value at all.
 TEST(IntegerLiteralLexing, RejectIllegalHexDigit) {
   EXPECT_TRUE(ReportedError(LexDiagnostics("4'hG"),
                             "illegal digit for specified base", 1, "5.7.1"));
 }
 
-// §5.7.1 rules that "The hexadecimal digits a to f shall be case insensitive",
-// so `g` is illegal in the case `G` is illegal in. The two cases are decided by
-// one std::isxdigit call, and this one goes red for a rejection written to read
+// §5.7.1 makes the hexadecimal digits a to f case insensitive, so `g` is
+// illegal in the case `G` is illegal in. The two cases are decided by one
+// std::isxdigit call, and this one goes red for a rejection written to read
 // uppercase offenders alone.
 TEST(IntegerLiteralLexing, RejectIllegalLowercaseHexDigit) {
   EXPECT_TRUE(ReportedError(LexDiagnostics("4'hg"),
@@ -123,11 +121,10 @@ TEST(IntegerLiteralLexing, IllegalHexDigitLexesOneIntLiteral) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kEof);
 }
 
-// §5.7.1 rules that "A plus or minus operator between the base format and the
-// number is an illegal syntax", and its Example 3 writes `8 'd -6` as illegal
-// syntax. This fails when the sign is reported as the neighbouring sentence of
-// the same subclause, which is what a literal carrying no value token at all
-// breaches.
+// §5.7.1 makes a plus or minus sign between the base format and the number
+// illegal syntax, and its Example 3 writes `8 'd -6` as illegal syntax. This
+// fails when the sign is reported as the neighbouring sentence of the same
+// subclause, which is what a literal carrying no value token at all breaches.
 TEST(IntegerLiteralLexing, RejectSignBetweenBaseAndDigits) {
   EXPECT_TRUE(ReportedError(LexDiagnostics("8'd-6"),
                             "plus or minus operator between the base format "
@@ -201,11 +198,11 @@ TEST(IntegerLiteralLexing, RejectMissingValueDigits) {
                             "5.7.1"));
 }
 
-// §5.7.1 states the rule in these words: "In a decimal literal constant, the
-// unsigned number token shall not contain any x, z, or ? digits, unless there
-// is exactly one digit in the token". The rejection records that subclause, so
-// an assertion can claim this rule was enforced rather than the one about
-// digits legal for the base, which the same literal can also breach.
+// §5.7.1 states the rule: in a decimal literal constant the unsigned number
+// token holds no x, z or ? digit unless it is a single digit. The rejection
+// records that subclause, so an assertion can claim this rule was enforced
+// rather than the one about digits legal for the base, which the same literal
+// can also breach.
 TEST(IntegerLiteralLexing, MoreThanOneXInADecimalLiteralNames5_7_1) {
   auto diags = LexDiagnostics("2'd1x");
   EXPECT_TRUE(ReportedError(
@@ -253,12 +250,12 @@ TEST(IntegerLiteralLexing, ColumnAfterNumberAndTwoSpacesIsUnchanged) {
   EXPECT_EQ(tokens[1].loc.column, 4u);
 }
 
-// §5.7.1 composes a based literal of "up to three tokens—an optional size
-// constant, an apostrophe character (') followed by a base format character,
-// and the digits representing the value of the number", so a literal written
-// with no size constant is still a based literal. The sentence "The apostrophe
-// character and the base format character shall not be separated by any white
-// space" therefore governs `' h99` exactly as it governs `8' h99`.
+// §5.7.1 composes a based literal of at most three tokens, an optional size
+// constant, an apostrophe (') with a base format character, and the digits of
+// the value, so a literal written with no size constant is still a based
+// literal. The rule keeping white space from between the apostrophe and the
+// base format character therefore governs `' h99` exactly as it governs
+// `8' h99`.
 TEST(IntegerLiteralLexing, SizelessLiteralRejectsWhitespaceBeforeBaseFormat) {
   EXPECT_TRUE(ReportedError(LexDiagnostics("' h99"),
                             "white space shall not separate the apostrophe "
@@ -302,13 +299,12 @@ TEST(IntegerLiteralLexing, SizelessCastApostropheBeforeParenIsItsOwnToken) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kApostrophe);
 }
 
-// §5.7.1 writes "An unsized unsigned single-bit value can be specified by
-// preceding the single-bit value with an apostrophe ('), but without the base
-// specifier", giving `'0`, `'1`, `'X`, `'x`, `'Z` and `'z`. They carry no base
-// format character at all, so the sentence "The apostrophe character and the
-// base format character shall not be separated by any white space" says nothing
-// about them, and routing `' h99` to Lexer::LexBasedNumber must leave `'0`
-// lexing as one kUnbasedUnsizedLiteral token.
+// §5.7.1 lets an unsized unsigned single-bit value be written as an apostrophe
+// (') before the bit with no base specifier, giving `'0`, `'1`, `'X`, `'x`,
+// `'Z` and `'z`. They carry no base format character at all, so the rule
+// keeping white space from between the apostrophe and the base format character
+// says nothing about them, and routing `' h99` to Lexer::LexBasedNumber must
+// leave `'0` lexing as one kUnbasedUnsizedLiteral token.
 TEST(IntegerLiteralLexing, UnbasedUnsizedZeroKeepsItsOwnTokenKind) {
   auto r = LexOne("'0");
   EXPECT_EQ(r.token.kind, TokenKind::kUnbasedUnsizedLiteral);
@@ -325,12 +321,12 @@ TEST(IntegerLiteralLexing, UnbasedUnsizedZeroRejectsWhitespaceAfterApostrophe) {
                             1, "5.2"));
 }
 
-// §5.7.1 writes "The unsigned number token shall immediately follow the base
-// format, optionally preceded by white space", and its Example 1 gives the
-// size-less `'h 837FF` as a hexadecimal number. That white space stands after
-// the base format rather than before it, so the same route that reports the
-// separation §5.7.1 forbids must take this literal without a word: one
-// kIntLiteral spanning it, and nothing reported.
+// §5.7.1 puts the unsigned number token straight after the base format, white
+// space between them allowed, and its Example 1 gives the size-less `'h 837FF`
+// as a hexadecimal number. That white space stands after the base format rather
+// than before it, so the same route that reports the separation §5.7.1 forbids
+// must take this literal without a word: one kIntLiteral spanning it, and
+// nothing reported.
 TEST(IntegerLiteralLexing, SizelessLiteralAllowsWhitespaceBeforeDigits) {
   EXPECT_TRUE(LexDiagnostics("'h 837FF").empty());
 }

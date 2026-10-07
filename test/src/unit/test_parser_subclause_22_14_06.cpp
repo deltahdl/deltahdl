@@ -191,9 +191,9 @@ TEST(CompilerDirectiveParsing,
   // module with no ports -- so `int counted = 21;` cannot be an instantiation,
   // and A.2.4 admits it as a variable_decl_assignment carrying its own
   // initializer. So Parser::ParseImplicitTypeOrInst builds a data declaration
-  // whose type_identifier is the undeclared name `int`, and §6.18 -- "The
-  // declaration of a user-defined data type shall precede any reference to its
-  // type_identifier" -- is what refuses it, at elaboration, which no parse
+  // whose type_identifier is the undeclared name `int`, and §6.18 -- a
+  // user-defined data type is declared before any reference to its
+  // type_identifier -- is what refuses it, at elaboration, which no parse
   // reaches. The tree is what says the words carried no keyword meaning: the
   // declared name is `counted` and `int` is a type nothing declared, where
   // under "1800-2005" above `int` is the type and nothing is undeclared.

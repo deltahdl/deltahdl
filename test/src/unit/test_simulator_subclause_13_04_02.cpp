@@ -95,7 +95,8 @@ TEST(FunctionLifetimeSim, StaticLocalInAutomaticFunctionRetainsValue) {
 // function is reallocated (and re-initialized) on every call rather than
 // sharing the function's static storage. acc restarts at 0 each call, so the
 // second call returns 3, not the 8 a static local would accumulate. This is the
-// "automatic within a static function" half of the override rule.
+// half of the override rule that makes a local automatic inside a static
+// function.
 TEST(FunctionLifetimeSim, AutomaticLocalInStaticFunctionIsFresh) {
   auto val = RunAndGet(
       "module t;\n"

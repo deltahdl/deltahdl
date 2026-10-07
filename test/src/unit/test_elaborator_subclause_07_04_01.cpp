@@ -120,12 +120,11 @@ TEST(PackedArrayValidation, PackedDimElaboratesWidth) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
-// §7.4.1 states that the bounds of "each packed dimension in a packed array
-// declaration" may be "any integer value—positive, negative, or zero, with no
-// unknown (x) or high-impedance (z) bits", so it governs the first dimension
-// exactly as it governs a later one. These two cases put the x and the z in
-// the first dimension; XzInExtraPackedDim_Rejected puts one in a later
-// dimension.
+// §7.4.1 lets the bounds of every packed dimension of a packed array
+// declaration be any integer, positive, negative or zero, so long as no bit is
+// x or z, so it governs the first dimension exactly as it governs a later one.
+// These two cases put the x and the z in the first dimension;
+// XzInExtraPackedDim_Rejected puts one in a later dimension.
 TEST(PackedArrayValidation, XzInPackedDimLeft_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -389,13 +388,13 @@ TEST(PackedArrayValidation, PackedDimLocalparamBoundWidth) {
   EXPECT_EQ(x->width, 8u);
 }
 
-// §7.4.1: "Integer types with predefined widths shall not have packed array
-// dimensions declared. These types are byte, shortint, int, longint, integer,
-// and time." The message on the report is what tells this rejection from the
-// x-or-z rule §7.4.1 states for a range bound, which the same bracketed
-// dimension breaches when its bounds rather than its type are at fault. This
-// case reaches the check through ElabOk, which preprocesses the source first,
-// where PackedDimOnInt_Rejected reaches it through ElaborateSrc.
+// §7.4.1: the integer types with predefined widths, byte, shortint, int,
+// longint, integer and time, take no declared packed array dimension. The
+// message on the report is what tells this rejection from the x-or-z rule
+// §7.4.1 states for a range bound, which the same bracketed dimension breaches
+// when its bounds rather than its type are at fault. This case reaches the
+// check through ElabOk, which preprocesses the source first, where
+// PackedDimOnInt_Rejected reaches it through ElaborateSrc.
 TEST(PackedArrayValidation, PackedDimOnIntNames7_4_1) {
   ElabFixture f;
   ElabOk(

@@ -280,9 +280,9 @@ TEST(StaticMethodElaboration, StaticMethodThisInCallArgError) {
 // Elaborator::ValidateOneClassStaticMethods scans a static method's body and
 // reports the method once.
 
-// §8.10: "A static method has no access to non-static members (class properties
-// or methods)", and it puts no condition on the statement the access is written
-// in. A.6.3 gives `par_block ::= fork [ : block_identifier ] {
+// §8.10: a static method cannot reach non-static members, whether class
+// properties or methods, and it puts no condition on the statement the access
+// is written in. A.6.3 gives `par_block ::= fork [ : block_identifier ] {
 // block_item_declaration } { statement_or_null } join_keyword`, so a fork holds
 // both halves of this pair: the statement here, and the declaration in the case
 // below it, which Parser::ParseBlockVarDecls in
@@ -579,14 +579,13 @@ TEST(StaticMethodElaboration,
              "endmodule\n"));
 }
 
-// §12.7.1: a for header that declares its control variables "creates an
-// implicit begin-end block around the loop, containing declarations of the
-// loop variables with automatic lifetime. This block creates a new
-// hierarchical scope, making the variables local to the loop scope." So `i` in
-// the body below is the header's own variable and not the class property `i`.
-// §8.10 therefore has nothing to report, and the source is as ordinary a loop
-// as SystemVerilog has. The property is declared for the case to mean anything:
-// without it §8.10 is silent whatever the collection does, because
+// §12.7.1: a for header that declares its control variables wraps the loop in
+// an implicit begin-end block that declares them with automatic lifetime, and
+// that block is a new hierarchical scope to which the variables are local. So
+// `i` in the body below is the header's own variable and not the class property
+// `i`. §8.10 therefore has nothing to report, and the source is as ordinary a
+// loop as SystemVerilog has. The property is declared for the case to mean
+// anything: without it §8.10 is silent whatever the collection does, because
 // CollectNonStaticMemberNames returns an empty set and
 // ValidateOneClassStaticMethods stops before it looks at any statement.
 TEST(StaticMethodElaboration, ForHeaderControlVariableShadowsTheProperty) {
@@ -632,11 +631,11 @@ TEST(StaticMethodElaboration, UntypedForHeaderVariableIsStillTheProperty) {
                             3, "8.10"));
 }
 
-// §12.7.1: a for header that declares its control variables "creates an
-// implicit begin-end block around the loop ... making the variables local to
-// the loop scope". `x = i;` stands after that block has ended, so `i` there is
-// the class property and §8.10 bars the access. The loop body names nothing,
-// which leaves the statement after the loop as the only access in the source.
+// §12.7.1: a for header that declares its control variables wraps the loop in
+// an implicit begin-end block whose scope the variables are local to. `x = i;`
+// stands after that block has ended, so `i` there is the class property and
+// §8.10 bars the access. The loop body names nothing, which leaves the
+// statement after the loop as the only access in the source.
 TEST(StaticMethodElaboration,
      ForHeaderControlVariableIsOutOfScopeAfterTheLoop) {
   ElabFixture f;
@@ -658,11 +657,11 @@ TEST(StaticMethodElaboration,
                             3, "8.10"));
 }
 
-// §6.21: "Variables may also be declared in unnamed blocks. These variables are
-// visible to the unnamed block and any nested blocks below it." The block below
-// is named, which §9.3.4 makes no difference to here, and either way `i` is
-// visible to the block and not to the statement after it. So `i = 1;` inside is
-// the block's own variable and `x = i;` outside is the class property.
+// §6.21: variables may also be declared in unnamed blocks, where the block and
+// every block nested in it can see them. The block below is named, which §9.3.4
+// makes no difference to here, and either way `i` is visible to the block and
+// not to the statement after it. So `i = 1;` inside is the block's own variable
+// and `x = i;` outside is the class property.
 TEST(StaticMethodElaboration, BlockLocalIsOutOfScopeAfterTheBlock) {
   ElabFixture f;
   ElabOk(
@@ -687,7 +686,7 @@ TEST(StaticMethodElaboration, BlockLocalIsOutOfScopeAfterTheBlock) {
 }
 
 // The other direction of the same sentence of §6.21: a declaration is visible
-// to "any nested blocks below it", so `i` declared in the outer block still
+// to every block nested below it, so `i` declared in the outer block still
 // shadows the property two blocks down. This is what a fix that narrows the
 // scope too far breaks, and neither case above would catch that.
 TEST(StaticMethodElaboration, BlockLocalShadowsThePropertyInANestedBlock) {

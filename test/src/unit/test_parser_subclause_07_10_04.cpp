@@ -81,8 +81,8 @@ TEST(QueueAssignParsing, DollarBoundIsNamedDollar) {
 }
 
 // §7.10.4: the upper bound of `q = q[0:$-1]` is an expression over `$` rather
-// than a bare bound, which §7.10.1 allows by saying the slice bounds "may be
-// arbitrary integral expressions".
+// than a bare bound, which §7.10.1 allows by saying the slice bounds may be any
+// integral expressions.
 TEST(QueueAssignParsing, DollarMinusOneBoundIsBinary) {
   auto r = Parse(
       "module m;\n"

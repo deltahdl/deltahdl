@@ -69,12 +69,11 @@ TEST(UnpackedArrayConcatElaboration, ChandleArrayTargetDisambiguatedAsConcat) {
 // force and rejects {c1, c2}. The same expression accepted in the array case
 // above is an error here purely because the target is not an unpacked array,
 // which is exactly the distinction §10.10.2 draws. §10.10.2 states only where
-// the braces are routed -- "If concatenation braces appear in an
-// assignment-like context with an unpacked array target, they unambiguously act
-// as an unpacked array concatenation ... Otherwise, they form a vector or
-// string concatenation" -- and prohibits nothing itself, so the report names
-// the rule that does reject the source: §6.14's, that a chandle admits only
-// assignment from another chandle.
+// the braces are routed -- braces in an assignment-like context with an
+// unpacked array target are an unpacked array concatenation, and otherwise a
+// vector or string concatenation -- and prohibits nothing itself, so the report
+// names the rule that does reject the source: §6.14's, that a chandle admits
+// only assignment from another chandle.
 TEST(UnpackedArrayConcatElaboration, ScalarChandleTargetKeepsScalarRule) {
   ElabFixture f;
   auto* design = ElaborateSrc(

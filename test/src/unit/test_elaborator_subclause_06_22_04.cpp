@@ -115,11 +115,10 @@ TEST(CastCompatibleElaboration, CastExpressionBetweenIntAndEnumElaborates) {
 // an integral-valued expression assigned to an enum with no cast must be
 // rejected. The RHS is a binary expression so it is unambiguously integral
 // (a bare name could otherwise be an enum member and needs no cast). §6.22.4
-// states only the definition "All assignment-compatible types, plus all
-// nonequivalent types that have defined explicit casting rules, are
-// cast-compatible types", with no "shall", so the obligation the report
-// enforces is §6.19.3's strong typing of enumerations and the report names
-// §6.19.3.
+// states only the definition of cast-compatible types as the
+// assignment-compatible types plus the nonequivalent types with explicit
+// casting rules defined, with no "shall", so the obligation the report enforces
+// is §6.19.3's strong typing of enumerations and the report names §6.19.3.
 TEST(CastCompatibleElaboration, IntegralAssignedToEnumWithoutCastIsRejected) {
   ElabFixture f;
   ElaborateSrc(

@@ -227,10 +227,10 @@ TEST(DeferredDisableOutermost, DoesNotAffectOtherProcessQueue) {
 //
 // A final deferred assertion cannot use that vehicle. §16.4 requires its
 // subroutine to be one that is legal to call in the Postponed region, and
-// §4.4.2.9 says of that region that "it is illegal to write values to any net
-// or variable" -- so a function setting a flag is exactly what is ruled out.
-// The final tests report through $error, a system task §16.4 names among the
-// permitted subroutines, and observe it with LastSeverity() instead.
+// §4.4.2.9 says of that region that no net or variable may be written there --
+// so a function setting a flag is exactly what is ruled out. The final tests
+// report through $error, a system task §16.4 names among the permitted
+// subroutines, and observe it with LastSeverity() instead.
 
 // §16.4.4 Claim B (outermost scope): a process (b3) that disables another
 // procedure's outermost scope (b2) flushes b2's pending deferred report. The
@@ -428,10 +428,10 @@ TEST(DisableOutermostScopeLive, DisableFlushesFinalDeferredReport) {
 
 // §16.4.4 Claim B combined with §9.6.2: the flush reaches a procedure that is
 // suspended on its event control, and reaching it that way must not terminate
-// it. §9.6.2 says of a block that is not currently executing that "the disable
-// has no effect", so b2 is still armed after b3 disables it: the second `a`
-// edge runs b2 again and its `assert #0 (1)` passes, incrementing runs to 2.
-// The first activation's failing report was flushed, so flag stays 0.
+// it. §9.6.2 says of a block that is not currently executing that disabling it
+// does nothing, so b2 is still armed after b3 disables it: the second `a` edge
+// runs b2 again and its `assert #0 (1)` passes, incrementing runs to 2. The
+// first activation's failing report was flushed, so flag stays 0.
 TEST(DisableOutermostScopeLive, FlushedProcedureStaysArmedForItsNextTrigger) {
   SimFixture f;
   auto* runs = RunAndFindVar(

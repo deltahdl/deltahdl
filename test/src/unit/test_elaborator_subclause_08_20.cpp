@@ -400,12 +400,12 @@ TEST(VirtualMethodElaboration, OverrideDefaultPresenceMismatchError) {
                             "': presence of default must match", 5, "8.20"));
 }
 
-// §8.20 states the whole of the override signature rule: "Virtual method
-// overrides in subclasses shall have matching argument types, identical
-// argument names, identical qualifiers, and identical directions to the
-// prototype." The subclause on the report is what tells this rejection from
-// §8.14's rule about which member a base-class handle reaches, which the same
-// two class declarations can also breach.
+// §8.20 states the whole of the override signature rule: a virtual method
+// override in a subclass matches the prototype's argument types and repeats its
+// argument names, qualifiers and directions exactly. The subclause on the
+// report is what tells this rejection from §8.14's rule about which member a
+// base-class handle reaches, which the same two class declarations can also
+// breach.
 TEST(VirtualMethodElaboration,
      SignatureDiffersFromTheOverriddenMemberNames8_20) {
   ElabFixture f;

@@ -205,11 +205,11 @@ TEST(ReactiveRegionSim, ConcurrentAssertionActionBlockHomeIsReactive) {
   EXPECT_EQ(ConcurrentAssertActionRegion(), Region::kReactive);
 }
 
-// §4.4.2.6 D2 end-to-end: "the code in action blocks of concurrent assertions
-// are scheduled in the Reactive region", and §4.4 puts that region after the
-// whole active region set. A design reading in the same time slot therefore
-// sees the value from before the action ran, whichever process the scheduler
-// reached first.
+// §4.4.2.6 D2 end-to-end: the code of a concurrent assertion's action blocks is
+// scheduled in the Reactive region, and §4.4 puts that region after the whole
+// active region set. A design reading in the same time slot therefore sees the
+// value from before the action ran, whichever process the scheduler reached
+// first.
 //
 // The reader waits one #0 so it reads from the Inactive region rather than
 // racing the assertion inside the Active one: Inactive precedes Observed and

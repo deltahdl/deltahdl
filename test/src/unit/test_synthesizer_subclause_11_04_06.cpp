@@ -13,10 +13,10 @@ namespace {
 // `SynthLower::LowerBinaryBit` in src/synthesizer/synth_lower.cpp answers
 // `AigGraph::kConstFalse` for the operator, so the netlist says no value of `a`
 // ever matches. Table 11-10 of §11.4.6 defines `a ==? b` as "a equals b, x and
-// z values in b act as wildcards", and §11.4.6 rules that "a wildcard bit
-// matches any bit value (0, 1, z, or x) in the corresponding bit of the left
-// operand being compared against it" while any other bit is compared as for the
-// logical equality operator, yielding 1'b1 when the relation is true.
+// z values in b act as wildcards", and §11.4.6 lets a wildcard bit match
+// whatever value (0, 1, z or x) the left operand holds at that position, while
+// any other bit is compared as for the logical equality operator, yielding 1'b1
+// when the relation is true.
 //
 // The literal wildcards its two low bits and compares its two high bits, so the
 // answer is one exactly when bit 3 of `a` is one and bit 2 of `a` is zero,
@@ -52,12 +52,12 @@ TEST(WildcardEqualitySynthesis,
 }
 
 // The test fails when `assign y = a ==? b;` lowers to a netlist rather than to
-// a report. §11.4.6 rules that `==?` treats "x and z values in a given bit
-// position of their right operand as a wildcard", and a bare identifier carries
-// no literal text to read those positions out of, so a graph built anyway would
-// silently answer a plain equality for an operator the design wrote wildcards
-// for. The netlist is the failure this guards against, because it is accepted
-// without a word and nothing tells the reader the wildcards were dropped.
+// a report. §11.4.6 rules that `==?` takes an x or z bit of its right operand
+// as a wildcard, and a bare identifier carries no literal text to read those
+// positions out of, so a graph built anyway would silently answer a plain
+// equality for an operator the design wrote wildcards for. The netlist is the
+// failure this guards against, because it is accepted without a word and
+// nothing tells the reader the wildcards were dropped.
 TEST(WildcardEqualitySynthesis,
      WildcardEqualityWithANonLiteralRightOperandIsReported) {
   ExpectAssignReported(

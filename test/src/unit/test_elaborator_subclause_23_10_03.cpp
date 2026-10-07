@@ -253,10 +253,9 @@ TEST(ParameterDependence, TypeOverrideToIntegralMakesClassDefaultLegal) {
 
 // §23.10.3 says of this source only that T2 needs an override at instantiation,
 // so p2 is evaluated only with the type that override supplies. What makes the
-// override compulsory is §6.20.1: "If no default value is specified for a
-// parameter of a design element, then an overriding parameter value shall be
-// specified in every instantiation of that design element", which is the rule
-// the missing override is reported under.
+// override compulsory is §6.20.1: a design element parameter with no default
+// has to be overridden in every instantiation of that element, which is the
+// rule the missing override is reported under.
 TEST(ParameterDependence, NoDefaultTypeParamWithDependentRequiresOverride) {
   ElabFixture f;
   ElaborateSrc(

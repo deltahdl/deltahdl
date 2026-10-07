@@ -255,10 +255,10 @@ TEST(InterconnectElaboration, ProceduralReadViaSelectIndexIsError) {
       "6.6.8"));
 }
 
-// §6.6.8 speaks of "a net or port declared as interconnect": an interconnect
-// PORT is likewise a typeless/generic net. A module that declares an
-// interconnect port elaborates and the port is recorded as interconnect
-// (Claim A, port input form).
+// §6.6.8 speaks of a net or port declared as interconnect: an interconnect PORT
+// is likewise a typeless/generic net. A module that declares an interconnect
+// port elaborates and the port is recorded as interconnect (Claim A, port input
+// form).
 TEST(InterconnectElaboration, InterconnectPortDeclIsGeneric) {
   ElabFixture f;
   auto* design = ElaborateSrc(

@@ -269,9 +269,9 @@ TEST(AlwaysCombVsAlwaysStar, AlwaysStarAllowsWait) {
 }
 
 TEST(AlwaysCombVsAlwaysStar, JoinAnyInAlwaysCombErrors) {
-  // The §9.2.2.2.2 prohibition names "fork-join statements" as a category, so
-  // it covers every join variant, not just plain join. fork...join_any parses
-  // to the same kFork node (with a join_any join_kind), and always_comb must
+  // The §9.2.2.2.2 prohibition names fork-join statements as a category, so it
+  // covers every join variant, not just plain join. fork...join_any parses to
+  // the same kFork node (with a join_any join_kind), and always_comb must
   // reject it exactly as it rejects fork...join.
   ElabFixture f;
   ElaborateSrc(
@@ -363,11 +363,10 @@ TEST(AlwaysCombVsAlwaysStar, AlwaysCombRejectsNestedDelay) {
                             "9.2.2.2.2"));
 }
 
-// §9.2.2.2.2: "Statements in an always_comb shall not include those that block,
-// have blocking timing or event controls, or fork-join statements." A cycle
-// delay is a blocking timing control: §14.11 lists cycle_delay under
-// procedural_timing_control and has it hold the process until the given count
-// of clocking block events has passed.
+// §9.2.2.2.2: an always_comb may hold no statement that blocks, no blocking
+// timing or event control and no fork-join. A cycle delay is a blocking timing
+// control: §14.11 lists cycle_delay under procedural_timing_control and has it
+// hold the process until the given count of clocking block events has passed.
 //
 // The three cases below assert through ReportedError, as every rejection case
 // in this file does, because any rejection satisfies a bare error flag
@@ -469,12 +468,12 @@ TEST(AlwaysCombVsAlwaysStar, NonblockingEventTriggerInAlwaysCombAccepted) {
       << cited;
 }
 
-// §9.2.2.2.2 states two of its three rules of "statements in an always_comb" --
-// that they "shall not include those that block, have blocking timing or event
-// controls, or fork-join statements" -- and names no statement either rule is
-// suspended inside. StmtHasForkJoin and StmtBlocks in
-// src/elaborator/elaborator_process.cpp answer the two, and each wrote out its
-// own shorter list of the thirteen statement links ForEachChildStmt in
+// §9.2.2.2.2 states two of its three rules on an always_comb's statements --
+// that none of them blocks, carries a blocking timing or event control, or is a
+// fork-join -- and names no statement either rule is suspended inside.
+// StmtHasForkJoin and StmtBlocks in src/elaborator/elaborator_process.cpp
+// answer the two, and each wrote out its own shorter list of the thirteen
+// statement links ForEachChildStmt in
 // src/elaborator/elaborator_validate_internal.h names. The cases below name one
 // newly reached link each.
 //

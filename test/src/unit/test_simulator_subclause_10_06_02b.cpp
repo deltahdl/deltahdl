@@ -8,9 +8,9 @@
 // increment, an assignment written as an expression rather than as a statement,
 // a bit-select and a part-select target, the nonblocking forms of those
 // selects, an element of a concatenation left-hand side, and each of the ones
-// the subroutine-body executor has its own execution of, written in a task or
-// a function body. The release companions among them are what say the decline
-// is bounded by the release rather than standing for the rest of the run.
+// the subroutine-body executor has its own execution of, written in a task or a
+// function body. The release companions among them are what say the decline is
+// bounded by the release rather than standing for the rest of the run.
 
 #include <gtest/gtest.h>
 
@@ -22,16 +22,15 @@ using namespace delta;
 
 namespace {
 
-// §10.6.2: "A force statement to a variable shall override a procedural
-// assignment, continuous assignment or an assign procedural continuous
-// assignment to the variable until a release procedural statement is executed
-// on the variable." §10.4 lists "Nonblocking procedural assignment statements
-// (see 10.4.2)" as one of the three kinds of procedural assignment statement,
-// and lists "Bit-selects, part-selects, and slices of packed arrays" among the
-// forms "The left-hand side of a procedural assignment can take", so indexing
-// the target of a `<=` leaves it inside the class a force overrides. The
-// clause's own "It shall not be a bit-select or a part-select of a variable"
-// restricts what may be forced, not what a force overrides.
+// §10.6.2: a force on a variable overrides any procedural assignment,
+// continuous assignment or assign procedural continuous assignment to it until
+// a release is executed on that variable. §10.4 lists the nonblocking
+// procedural assignment statement (§10.4.2) as one of the three kinds of
+// procedural assignment statement, and lists bit-selects, part-selects and
+// slices of packed arrays among the forms a procedural assignment's left-hand
+// side may take, so indexing the target of a `<=` leaves it inside the class a
+// force overrides. The clause's own bar on forcing a bit-select or part-select
+// of a variable restricts what may be forced, not what a force overrides.
 //
 // This is ForcePreventsNonblockingAssign, in the sibling file, with the target
 // indexed, and it is the case that claims SetupBitSelectNbaCallback.
@@ -92,12 +91,11 @@ TEST(ForceReleaseSim, ForcePreventsANonblockingPartSelectAssign) {
   EXPECT_EQ(x->value.ToUint64(), 50u);
 }
 
-// §10.6.2: "A force statement to a variable shall override a procedural
-// assignment, continuous assignment or an assign procedural continuous
-// assignment to the variable until a release procedural statement is executed
-// on the variable." §11.4.1 states a compound assignment as one of those
-// assignments -- "an assignment operator is semantically equivalent to a
-// blocking assignment" -- and §10.4 puts a blocking assignment written in an
+// §10.6.2: a force on a variable overrides any procedural assignment,
+// continuous assignment or assign procedural continuous assignment to it until
+// a release is executed on that variable. §11.4.1 states a compound assignment
+// as one of those assignments -- an assignment operator means the same as a
+// blocking assignment -- and §10.4 puts a blocking assignment written in an
 // initial block among the procedural assignments, so `x += 8'd10;` is the same
 // statement ForcePreventsBlockingAssign writes in the sibling file, and the
 // force declines it the same way.
@@ -125,13 +123,12 @@ TEST(ForceReleaseSim, ForcePreventsACompoundAssign) {
 }
 
 // §11.4.2 states the increment and decrement operators as blocking assignments
-// -- "These increment and decrement assignment operators behave as blocking
-// assignments" -- so §10.6.2 overrides `x++` exactly as it overrides the
-// `x = 8'd100;` of ForcePreventsBlockingAssign and the `x += 8'd10;` of
-// ForcePreventsACompoundAssign above. A bare `x++;` is an expression statement
-// naming no subroutine, so ExecInlineTaskCall declines it and hands it to
-// EvalExpr; the increment therefore happens in the expression evaluator rather
-// than on any statement-assignment path.
+// -- they act as blocking assignments -- so §10.6.2 overrides `x++` exactly as
+// it overrides the `x = 8'd100;` of ForcePreventsBlockingAssign and the
+// `x += 8'd10;` of ForcePreventsACompoundAssign above. A bare `x++;` is an
+// expression statement naming no subroutine, so ExecInlineTaskCall declines it
+// and hands it to EvalExpr; the increment therefore happens in the expression
+// evaluator rather than on any statement-assignment path.
 //
 // That is why this case failed while the two above passed. EvalIncDec stores
 // into var->value itself instead of calling WriteVar, so the guard #3506 put
@@ -196,20 +193,19 @@ TEST(ForceReleaseSim, ForcePreventsAnIncrementWithoutChangingWhatItYields) {
 // ForcePreventsACompoundAssign above had already been made to read 50.
 //
 // y is what says the decline is confined to the write. §11.3.6 has an
-// assignment expression "evaluates the right-hand side, casts the right-hand
-// side to the left-hand data type, stacks it, updates the left-hand side, and
-// returns the stacked value": the value is stacked before the update, so what
-// comes back is the value the operator computed and not a re-read of the
-// target. The addition produces 60 whichever way the update goes, so y takes
-// 60 while x stays at 50. A decline written as an early return from
-// EvalCompoundAssign, or as returning what the forced target still holds,
-// would leave y at 50 and satisfy the assertions on x alone.
+// assignment expression evaluate its right-hand side, cast that to the
+// left-hand data type, stack it, update the left-hand side and return what it
+// stacked: the value is stacked before the update, so what comes back is the
+// value the operator computed and not a re-read of the target. The addition
+// produces 60 whichever way the update goes, so y takes 60 while x stays at 50.
+// A decline written as an early return from EvalCompoundAssign, or as returning
+// what the forced target still holds, would leave y at 50 and satisfy the
+// assertions on x alone.
 //
 // LvalueSim.CompoundAssignExpressionYieldsTheTargetsDataType in
 // test_simulator_subclause_11_04_01.cpp reads the rest of the same sentence,
-// that "the data type of the value that is returned is the data type of the
-// left-hand side" -- which is what sizes this 60 at x's eight bits rather than
-// at the literal's.
+// that the returned value takes the left-hand side's data type -- which is what
+// sizes this 60 at x's eight bits rather than at the literal's.
 TEST(ForceReleaseSim, ForcePreventsACompoundAssignWrittenAsAnExpression) {
   SimFixture f;
   auto* x = RunAndFindVar(
@@ -231,14 +227,13 @@ TEST(ForceReleaseSim, ForcePreventsACompoundAssignWrittenAsAnExpression) {
   EXPECT_EQ(y->value.ToUint64(), 60u);
 }
 
-// §10.6.2: "A force statement to a variable shall override a procedural
-// assignment, continuous assignment or an assign procedural continuous
-// assignment to the variable until a release procedural statement is executed
-// on the variable." §10.4 puts a blocking assignment written in an initial
-// block among those procedural assignments, and naming a bit-select as the
-// target does not take the statement out of that class -- the clause's own "It
-// shall not be a bit-select or a part-select of a variable" restricts what may
-// be forced, not what a force overrides.
+// §10.6.2: a force on a variable overrides any procedural assignment,
+// continuous assignment or assign procedural continuous assignment to it until
+// a release is executed on that variable. §10.4 puts a blocking assignment
+// written in an initial block among those procedural assignments, and naming a
+// bit-select as the target does not take the statement out of that class -- the
+// clause's own bar on forcing a bit-select or part-select of a variable
+// restricts what may be forced, not what a force overrides.
 //
 // This is ForcePreventsBlockingAssign with the target indexed, and it is the
 // case that claims WriteBitSelect. Every whole-variable writer declines --
@@ -324,17 +319,16 @@ TEST(ForceReleaseSim, ForcePreventsABitSelectCompoundAssign) {
   EXPECT_EQ(x->value.ToUint64(), 50u);
 }
 
-// §10.6.2: "A force statement to a variable shall override a procedural
-// assignment, continuous assignment or an assign procedural continuous
-// assignment to the variable until a release procedural statement is executed
-// on the variable." §11.4.12 makes a concatenation a left-hand side -- "The
-// concatenation is treated as a packed vector of bits. It can be used on the
-// left-hand side of an assignment or in an expression" -- and §10.4.1 lists
+// §10.6.2: a force on a variable overrides any procedural assignment,
+// continuous assignment or assign procedural continuous assignment to it until
+// a release is executed on that variable. §11.4.12 makes a concatenation a
+// left-hand side -- a concatenation is a packed vector of bits that may stand
+// on an assignment's left-hand side or in an expression -- and §10.4.1 lists
 // `{carry, acc} = rega + regb;   // a concatenation` among its examples of a
-// blocking procedural assignment, which §10.4 puts among the assignments
-// occurring "within procedures such as always, initial, task, and function".
-// An element of a concatenation left-hand side therefore receives a procedural
-// assignment, and a force on that element overrides it.
+// blocking procedural assignment, which §10.4 puts among the assignments made
+// inside always, initial, task and function procedures and the like. An element
+// of a concatenation left-hand side therefore receives a procedural assignment,
+// and a force on that element overrides it.
 //
 // UnpackConcatLhs is the writer every concatenation target reaches, and its
 // whole-variable element deposit consulted the flag nowhere, so a took the high
@@ -368,8 +362,8 @@ TEST(ForceReleaseSim, ForcePreventsAConcatenationElementAssign) {
   EXPECT_EQ(b->value.ToUint64(), 0x34u);
 }
 
-// §10.4 puts procedural assignments "within procedures such as always, initial,
-// task, and function", so the assignment a force overrides is the same
+// §10.4 puts procedural assignments inside procedures, always, initial, task
+// and function among them, so the assignment a force overrides is the same
 // statement wherever it is written.
 //
 // A task called with parentheses runs its body on the ordinary statement
@@ -429,7 +423,7 @@ TEST(ForceReleaseSim, ForcePreventsAFunctionBodyAssign) {
 // executor performs, so this case and ForcePreventsACompoundAssign above now
 // reach WriteVar by one route rather than two. What it claims is that the rule
 // holds for the subroutine route as well, §10.4 putting procedural assignments
-// "within procedures such as always, initial, task, and function".
+// inside procedures, always, initial, task and function among them.
 //
 // Before #3500 this case failed for a different reason than the initial-block
 // one: the statement's right-hand side is itself the compound operator, so
@@ -468,9 +462,9 @@ TEST(ForceReleaseSim, ForcePreventsACompoundAssignInAFunctionBody) {
 // ForcePreventsABitSelectAssign's route instead of claiming a new one; a void
 // function called with parentheses is declined by SetupTaskCall and reaches
 // ExecFunctionBody, exactly as ForcePreventsAFunctionBodyAssign above records.
-// §10.4 puts procedural assignments "within procedures such as always, initial,
-// task, and function", so this is the same statement wherever it is written,
-// and it read 58 here as well.
+// §10.4 puts procedural assignments inside procedures, always, initial, task
+// and function among them, so this is the same statement wherever it is
+// written, and it read 58 here as well.
 TEST(ForceReleaseSim, ForcePreventsABitSelectAssignInAFunctionBody) {
   SimFixture f;
   auto* x = RunAndFindVar(
@@ -497,9 +491,9 @@ TEST(ForceReleaseSim, ForcePreventsABitSelectAssignInAFunctionBody) {
 // subroutine-body executor reaches the same element deposit without ever
 // passing ExecFuncIdentifierAssign, the arm that carries the is_forced check --
 // a decline written into that arm rather than into UnpackConcatLhs would leave
-// this form overriding the force. §10.4 puts procedural assignments "within
-// procedures such as always, initial, task, and function", so this is the same
-// statement wherever it is written, and a read 18 here as well.
+// this form overriding the force. §10.4 puts procedural assignments inside
+// procedures, always, initial, task and function among them, so this is the
+// same statement wherever it is written, and a read 18 here as well.
 //
 // A void function is what claims that executor and not a task: SetupTaskCall
 // claims a kTaskDecl and ExecInlineTaskCall then walks the body through the
@@ -529,12 +523,11 @@ TEST(ForceReleaseSim, ForcePreventsAConcatenationElementAssignInAFunctionBody) {
   EXPECT_EQ(b->value.ToUint64(), 0x34u);
 }
 
-// The other half of §10.6.2: the override lasts "until a release procedural
-// statement is executed on the variable", and a released variable "shall
-// maintain its current value until the next procedural assignment to the
-// variable is executed". That next assignment is the one inside the task here,
-// so this is what says the decline above is bounded by the release rather than
-// standing for the rest of the run.
+// The other half of §10.6.2: the override lasts until a release is executed on
+// the variable, and a released variable keeps its current value until the next
+// procedural assignment to it executes. That next assignment is the one inside
+// the task here, so this is what says the decline above is bounded by the
+// release rather than standing for the rest of the run.
 TEST(ForceReleaseSim, ReleaseThenATaskBodyAssignResumes) {
   SimFixture f;
   auto* x = RunAndFindVar(
@@ -558,10 +551,10 @@ TEST(ForceReleaseSim, ReleaseThenATaskBodyAssignResumes) {
 }
 
 // The compound operator's half of the other rule in §10.6.2: the override lasts
-// "until a release procedural statement is executed on the variable", and a
-// released variable "shall maintain its current value until the next procedural
-// assignment to the variable is executed". Here that next assignment is itself
-// a compound one, so the released 50 becomes 77 rather than staying at 50.
+// until a release is executed on the variable, and a released variable keeps
+// its current value until the next procedural assignment to it executes. Here
+// that next assignment is itself a compound one, so the released 50 becomes 77
+// rather than staying at 50.
 //
 // ForcePreventsACompoundAssign and ForcePreventsACompoundAssignInAFunctionBody
 // are the only other cases in this file that reach WriteVar, and both expect it
@@ -589,12 +582,11 @@ TEST(ForceReleaseSim, ReleaseThenACompoundAssignResumes) {
 }
 
 // The select form's half of the other rule in §10.6.2: the override lasts
-// "until a release procedural statement is executed on the variable", and a
-// released variable "shall maintain its current value until the next procedural
-// assignment to the variable is executed". Every select case above expects
-// WriteBitSelect to write nothing, so a decline that never lifted would satisfy
-// all four of them; this is what says the decline is the force's and is bounded
-// by the release.
+// until a release is executed on the variable, and a released variable keeps
+// its current value until the next procedural assignment to it executes. Every
+// select case above expects WriteBitSelect to write nothing, so a decline that
+// never lifted would satisfy all four of them; this is what says the decline is
+// the force's and is bounded by the release.
 //
 // The forced 50 is 8'b0011_0010, in which bit 3 and bit 0 are both clear, so
 // the two writes separate three outcomes. 50 is the decline never lifting and
@@ -622,18 +614,17 @@ TEST(ForceReleaseSim, ReleaseThenABitSelectAssignResumes) {
   EXPECT_EQ(x->value.ToUint64(), 51u);
 }
 
-// §10.6.2: "A force statement to a variable shall override a procedural
-// assignment, continuous assignment or an assign procedural continuous
-// assignment to the variable until a release procedural statement is executed
-// on the variable." §11.4.14.3 makes each name in a streaming target the
-// recipient of an assignment -- "When a streaming_concatenation appears as the
-// target of an assignment, the streaming operators perform the reverse
-// operation; i.e., to unpack a stream of bits into one or more variables" --
-// and §10.4 puts a blocking assignment written in an initial block among the
-// procedural assignments occurring "within procedures such as always, initial,
-// task, and function". Writing the target as a streaming concatenation does not
-// take the statement out of the class the force overrides, so a keeps 50 and
-// the slice it would have taken is dropped.
+// §10.6.2: a force on a variable overrides any procedural assignment,
+// continuous assignment or assign procedural continuous assignment to it until
+// a release is executed on that variable. §11.4.14.3 makes each name in a
+// streaming target the recipient of an assignment -- a streaming_concatenation
+// used as an assignment target runs the operators in reverse, unpacking a
+// bit-stream into one or more variables -- and §10.4 puts a blocking assignment
+// written in an initial block among the procedural assignments made inside
+// always, initial, task and function procedures and the like. Writing the
+// target as a streaming concatenation does not take the statement out of the
+// class the force overrides, so a keeps 50 and the slice it would have taken is
+// dropped.
 //
 // UnpackStreamingConcatLhs is the writer every streaming target reaches, and
 // this statement takes its default pass: ShouldForwardResolveUnpack claims only
@@ -647,11 +638,11 @@ TEST(ForceReleaseSim, ReleaseThenABitSelectAssignResumes) {
 // 16'hABCD and read 171 where §10.6.2 leaves it at the forced 50.
 //
 // b is what says only the forced element was declined rather than the whole
-// statement dropped. §11.4.14.3 consumes the stream "from its left (most
-// significant) end" and §11.4.14.2 has `>>` perform "no re-ordering", so the
-// sixteen bits reach the two eight-bit targets in the order they are written:
-// a's 8'hAB and b's 8'hCD. b is seeded with 8'h0F first, a value neither slice
-// carries, so a b left alone reads 15 and not the 205 it has to take.
+// statement dropped. §11.4.14.3 consumes the stream starting at its most
+// significant end and §11.4.14.2 has `>>` leave the order alone, so the sixteen
+// bits reach the two eight-bit targets in the order they are written: a's 8'hAB
+// and b's 8'hCD. b is seeded with 8'h0F first, a value neither slice carries,
+// so a b left alone reads 15 and not the 205 it has to take.
 TEST(ForceReleaseSim, ForcePreventsAStreamingConcatTargetWrite) {
   SimFixture f;
   auto* a = RunAndFindVar(
@@ -680,10 +671,9 @@ TEST(ForceReleaseSim, ForcePreventsAStreamingConcatTargetWrite) {
 // the NBA region of time 0, after the `force a = 8'd50;` written below the
 // assignment has run in the active region. §10.4 names the nonblocking form
 // among the procedural assignments whatever its left-hand side is, and §10.6.2
-// asks what stands when the assignment is carried out: the force "shall
-// override a procedural assignment ... until a release procedural statement is
-// executed on the variable", and none has been, so the write finds a forced and
-// declines it.
+// asks what stands when the assignment is carried out: the force overrides a
+// procedural assignment until a release is executed on the variable, and none
+// has been, so the write finds a forced and declines it.
 //
 // The force is written after the assignment rather than before it because that
 // is the order which separates a check inside the write from one asked at
@@ -720,11 +710,10 @@ TEST(ForceReleaseSim, ForcePreventsANonblockingStreamingConcatTargetWrite) {
 }
 
 // The streaming form's half of the other rule in §10.6.2: the override lasts
-// "until a release procedural statement is executed on the variable", after
-// which the variable "shall not immediately change value and shall maintain its
-// current value until the next procedural assignment to the variable is
-// executed". That next assignment is the streaming one, so a leaves the forced
-// 50 for the 8'hAB its slice carries and reads 171.
+// until a release is executed on the variable, after which the variable does
+// not change at once and keeps its current value until the next procedural
+// assignment to it executes. That next assignment is the streaming one, so a
+// leaves the forced 50 for the 8'hAB its slice carries and reads 171.
 //
 // The two cases above expect StoreStreamValueToVar to write nothing to a, and a
 // decline that never lifted -- one keyed on a condition the release does not
@@ -755,13 +744,13 @@ TEST(ForceReleaseSim, ReleaseThenAStreamingConcatTargetWriteResumes) {
   EXPECT_EQ(vb->value.ToUint64(), 0xCDu);
 }
 
-// §10.6.2 gives force "a reference to a singular variable" among its targets,
-// and §6.4 makes singular "any data type except an unpacked structure, unpacked
-// union, or unpacked array" -- which an element of one of those is, whatever
-// the container's own type. A queue element is therefore a target of the
-// statement, and the override the rest of this file reads on a variable is read
-// here on an element: the write of 3 while the force stands is ignored, and the
-// write of 7 after the release lands.
+// §10.6.2 gives force a reference to a singular variable among its targets, and
+// §6.4 makes singular every data type but an unpacked structure, unpacked union
+// or unpacked array -- which an element of one of those is, whatever the
+// container's own type. A queue element is therefore a target of the statement,
+// and the override the rest of this file reads on a variable is read here on an
+// element: the write of 3 while the force stands is ignored, and the write of 7
+// after the release lands.
 //
 // The element lives in a QueueObject as a bare Logic4Vec, so the resolution
 // answered the one-element carrier registered under the queue's own name --
@@ -826,11 +815,11 @@ TEST(ForceReleaseSim, ForceOfAnAssociativeElementOverridesAWriteToIt) {
   EXPECT_EQ(r3->value.ToUint64(), 4u);
 }
 
-// §10.6.2's force is a continuous assignment rather than one write: "if b or c
-// changes, a will be forced to the new value of the expression b + f(c)". The
-// element follows its expression for the same reason a variable does, so
-// raising `a` from 1 to 10 moves q[0] from 3 to 12 with no further statement
-// naming it. A force that only wrote once passes the case above and fails this.
+// §10.6.2's force is a continuous assignment rather than one write: a change of
+// b or c forces a to the new value of b + f(c). The element follows its
+// expression for the same reason a variable does, so raising `a` from 1 to 10
+// moves q[0] from 3 to 12 with no further statement naming it. A force that
+// only wrote once passes the case above and fails this.
 TEST(ForceReleaseSim, ForceOfAQueueElementFollowsItsExpression) {
   SimFixture f;
   auto* r1 = RunAndFindVar(

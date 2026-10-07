@@ -300,9 +300,8 @@ TEST(WiredNetE2e, PlainWireConflictIsX) {
             1u);
 }
 
-// §6.6.3, C4: "The net types wor and trior shall be identical [...] in
-// functionality." Same 0/1 driver pair, declared trior, resolves to 1 exactly
-// as the wor case does.
+// §6.6.3, C4: wor and trior behave identically. Same 0/1 driver pair, declared
+// trior, resolves to 1 exactly as the wor case does.
 TEST(WiredNetE2e, TriorMatchesWorFunctionality) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  trior w;\n"
@@ -318,9 +317,8 @@ TEST(WiredNetE2e, TriorMatchesWorFunctionality) {
             1u);
 }
 
-// §6.6.3, C5: "The net types wand and triand shall be identical [...] in
-// functionality." Same 1/0 driver pair, declared triand, resolves to 0 exactly
-// as the wand case does.
+// §6.6.3, C5: wand and triand behave identically. Same 1/0 driver pair,
+// declared triand, resolves to 0 exactly as the wand case does.
 TEST(WiredNetE2e, TriandMatchesWandFunctionality) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  triand w;\n"
@@ -387,8 +385,8 @@ TEST(WiredNetE2e, WandHighZDriverYieldsToZero) {
             0u);
 }
 
-// §6.6.3, three drivers: "if any driver is 0, the value of the net is 0."
-// Two drivers hold 1 and a third holds 0; the wand net resolves to 0.
+// §6.6.3, three drivers: a single 0 driver makes the net 0. Two drivers hold 1
+// and a third holds 0; the wand net resolves to 0.
 TEST(WiredNetE2e, WandThreeDriversAnyZeroIsZero) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  wand w;\n"
@@ -405,9 +403,8 @@ TEST(WiredNetE2e, WandThreeDriversAnyZeroIsZero) {
             0u);
 }
 
-// §6.6.3, three drivers: "when any of the drivers is 1, the resulting value of
-// the net is 1." Two drivers hold 0 and a third holds 1; the wor net resolves
-// to 1.
+// §6.6.3, three drivers: a single 1 driver makes the net 1. Two drivers hold 0
+// and a third holds 1; the wor net resolves to 1.
 TEST(WiredNetE2e, WorThreeDriversAnyOneIsOne) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  wor w;\n"

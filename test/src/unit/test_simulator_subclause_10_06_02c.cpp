@@ -86,12 +86,12 @@ TEST(ForceReleaseSim, ChildInstanceReleaseReresolvesFromTheInstancesDriver) {
   EXPECT_EQ(r->value.ToUint64(), 10u);
 }
 
-// §10.6.2 (printed page 258): "When released, the net shall immediately be
-// assigned the value determined by the drivers of the net", and a net no
-// driver reaches is z (§6.7.1). The forced 1 stood on the undriven `wire a`
-// after its release. An element of a net array is forced and released as the
-// net it is (§7.4.2): `force n[0]` holds n[0] and what reads it, `release`
-// hands it back to z, and a bit of the element v[0] goes back to its driver.
+// §10.6.2 (printed page 258): on release, the net at once takes the value its
+// drivers determine, and a net no driver reaches is z (§6.7.1). The forced 1
+// stood on the undriven `wire a` after its release. An element of a net array
+// is forced and released as the net it is (§7.4.2): `force n[0]` holds n[0] and
+// what reads it, `release` hands it back to z, and a bit of the element v[0]
+// goes back to its driver.
 TEST(ForceReleaseSim, ReleasedUndrivenNetAndNetArrayElementReadTheirDrivers) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"

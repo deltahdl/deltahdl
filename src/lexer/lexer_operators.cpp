@@ -22,11 +22,11 @@ uint32_t Lexer::SkipWhitespaceFrom(uint32_t p) const {
 // Decide what the apostrophe at the current position opens.
 //
 // The left brace and left parenthesis are looked for past any white space.
-// §5.3 rules that white space "shall be ignored except when they serve to
-// separate other lexical tokens", A.8.4 writes the cast as
-// `casting_type ' ( expression )` and A.6.7.1 writes `assignment_pattern ::=
-// ' { expression { , expression } }`, so the apostrophe and the bracket after
-// it are two terminals apiece and `int ' (x)` and `' {1, 2}` are legal.
+// §5.3 ignores white space except where it separates lexical tokens, A.8.4
+// writes the cast as `casting_type ' ( expression )` and A.6.7.1 writes
+// `assignment_pattern ::= ' { expression { , expression } }`, so the apostrophe
+// and the bracket after it are two terminals apiece and `int ' (x)` and
+// `' {1, 2}` are legal.
 //
 // The single-bit forms are looked for at the next character only. A.8.7 writes
 // `unbased_unsigned_literal ::= '0 | '1 | 'x | 'X | 'z | 'Z`, six terminals

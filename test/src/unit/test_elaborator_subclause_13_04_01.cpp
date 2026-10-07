@@ -341,10 +341,9 @@ TEST(FunctionReturnElaboration, SystemFunctionAllowedAsImplicitVariable) {
 // §9.3.2 already rejected this return, through CheckNoReturnInFork, but
 // §13.4.1's own report about the value it carries was never made: nothing in
 // CheckFuncBodyStmt descended into a fork. §13.4.4 exempts the statements under
-// a fork-join_none -- "Within a function, a fork-join_none construct may
-// contain any statements that are legal within a task" -- and the walk still
-// stops at one, so the fork here is the fork-join §13.4 rule a) forbids
-// outright.
+// a fork-join_none -- inside a function, one may hold whatever statements a
+// task may -- and the walk still stops at one, so the fork here is the
+// fork-join §13.4 rule a) forbids outright.
 TEST(FunctionReturnElaboration, VoidFunctionReturnWithValueInsideAForkJoin) {
   ElabFixture f;
   ElaborateSrc(
@@ -362,10 +361,9 @@ TEST(FunctionReturnElaboration, VoidFunctionReturnWithValueInsideAForkJoin) {
 
 // A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
 // }`, so a randsequence production's code block holds the data declaration
-// §13.4.1's "It shall also be illegal to declare another object with the same
-// name as the function inside the function scope" is about. The parser keeps it
-// in RsProd::code_stmts, reached through Stmt::rs_productions and through no
-// other member of Stmt.
+// §13.4.1's ban on declaring, inside a function's scope, another object named
+// after the function is about. The parser keeps it in RsProd::code_stmts,
+// reached through Stmt::rs_productions and through no other member of Stmt.
 TEST(FunctionReturnElaboration, VarNamedAsFunctionInARandsequenceCodeBlock) {
   ElabFixture f;
   ElaborateSrc(

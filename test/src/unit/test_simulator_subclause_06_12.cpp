@@ -34,13 +34,12 @@ TEST(RealDataType, ShortrealHasSinglePrecision) {
   EXPECT_EQ(v, 1u);
 }
 
-// §6.12: "The shortreal data type is the same as a C float", and footnote 19
-// on the same page: "The real and shortreal types are represented as described
-// by IEEE Std 754". A shortreal therefore holds a 32-bit single-precision
-// pattern, and every reader of that storage has to decode it as a float. This
-// case reads the value back out through a format specification, which is the
-// decode path a user reaches with $display, $write and $sformat, and which is
-// distinct from the real<-shortreal widening.
+// §6.12: shortreal matches a C float, and footnote 19 on the same page has real
+// and shortreal represented as IEEE Std 754 describes. A shortreal therefore
+// holds a 32-bit single-precision pattern, and every reader of that storage has
+// to decode it as a float. This case reads the value back out through a format
+// specification, which is the decode path a user reaches with $display, $write
+// and $sformat, and which is distinct from the real<-shortreal widening.
 //
 // Nothing above it covers that path. ShortrealHasSinglePrecision reads through
 // `rs = s`, the one decode that is already width-aware, so it passes whatever

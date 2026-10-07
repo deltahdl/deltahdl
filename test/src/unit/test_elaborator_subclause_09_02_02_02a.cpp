@@ -575,9 +575,9 @@ TEST(AlwaysCombMultiDriver, MultiDriverCombAndInitialErrors) {
 }
 
 TEST(AlwaysCombMultiDriver, MultiDriverCombAndFinalErrors) {
-  // §9.2.2.2: "The variables assigned on the left-hand side of assignments
-  // shall not be assigned by any other process." §9.2 makes the final procedure
-  // a process, so a final block assigning an always_comb target is illegal.
+  // §9.2.2.2: no other process may assign a variable the always_comb assigns.
+  // §9.2 makes the final procedure a process, so a final block assigning an
+  // always_comb target is illegal.
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -692,11 +692,10 @@ TEST(AlwaysCombLatchWarning, NestedIncompleteIfWarnsLatch) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §9.2.2.2 asks a tool to "warn if the behavior within an always_comb procedure
-// does not represent combinational logic, such as if latched behavior can be
-// inferred". The subject is the behavior, so an incomplete case is not the
-// question by itself: what matters is whether a value survives a pass through
-// the procedure.
+// §9.2.2.2 asks a tool to warn when an always_comb procedure's behavior is not
+// combinational, for instance when a latch can be inferred. The subject is the
+// behavior, so an incomplete case is not the question by itself: what matters
+// is whether a value survives a pass through the procedure.
 //
 // Here `y` is assigned before the case runs, so every path out of the procedure
 // leaves `y` holding a value computed from `a` and `b` on this pass. Nothing is

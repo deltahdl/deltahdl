@@ -35,9 +35,9 @@ TEST(EventWaitElaborator, BareWaitSyntaxElaborates) {
 // §15.5.2 states only how a process waits, holding the process that applies @
 // to an event until that event is triggered, and states no rule about what an
 // event expression may call. That rule is §9.4.2, which permits a method in an
-// event control expression only "as long as the type of the return value is
-// singular and the method is defined as a function, not a task", so the
-// rejection of `@(t())` is reported under §9.4.2.
+// event control expression only when the method is a function, not a task,
+// whose return type is singular, so the rejection of `@(t())` is reported under
+// §9.4.2.
 TEST(EventWaitElaborator, WaitOnTaskCallRejected) {
   ElabFixture f;
   ElabOk(

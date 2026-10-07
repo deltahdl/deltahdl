@@ -46,9 +46,9 @@ TEST(TaggedUnionValidation, ChandleInTaggedUnion_Allowed) {
 }
 
 // The same chandle member is barred in an untagged union: only the tagged
-// form makes such a member type-safe. §7.3.2 states "Dynamic types and chandle
-// types shall not be used in untagged unions, but may be used in tagged
-// unions", so the report names §7.3.2.
+// form makes such a member type-safe. §7.3.2 allows dynamic types and chandle
+// types in tagged unions and forbids them in untagged ones, so the report names
+// §7.3.2.
 TEST(TaggedUnionValidation, ChandleInUntaggedUnion_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -146,9 +146,9 @@ TEST(TaggedUnionValidation, PackedTaggedUnionDifferentWidths_Allowed) {
 }
 
 // A real is not a packed type, so it cannot be a member of a packed union.
-// §7.3.2 states no rule about member types; the rule is §7.2.1's "Only packed
-// data types and the integer data types summarized in Table 6-8 shall be legal
-// in packed structures", so the report names §7.2.1.
+// §7.3.2 states no rule about member types; the rule is §7.2.1's, admitting
+// only packed data types and the integer data types of Table 6-8 in a packed
+// structure, so the report names §7.2.1.
 TEST(TaggedUnionValidation, PackedTaggedUnionRealMember_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -230,8 +230,8 @@ TEST(TaggedUnionPackedRepr, NineMemberTagIsFourBits) {
 // A tagged-union expression can only name a member that the union actually
 // declares; using an undeclared name in the tag position must elicit a
 // diagnostic from the elaborator's tagged-expression check. §7.3.2 defers the
-// rule with "Members of tagged unions can be referenced as tagged expressions.
-// See 11.9", so the report names §11.9.
+// rule, sending tagged-expression references to tagged union members to §11.9,
+// so the report names §11.9.
 TEST(TaggedUnionValidation, TaggedAssignmentInvalidMemberName_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -263,8 +263,8 @@ TEST(TaggedUnionValidation, PackedTaggedUnionVoidMember_Allowed) {
 
 // The same void member is still barred in a packed untagged union, where no
 // tag exists to make a value-less arm meaningful. The rule is syntax note 20)
-// printed under Syntax 7-1 in §7.2, "It shall be legal to declare a void
-// struct_union_member only within tagged unions", so the report names §7.2.
+// printed under Syntax 7-1 in §7.2, which allows a void struct_union_member in
+// a tagged union alone, so the report names §7.2.
 TEST(TaggedUnionValidation, PackedUntaggedUnionVoidMember_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -502,10 +502,10 @@ TEST(TaggedUnionValidation, UnpackedUntaggedUnionVoidMember_Rejected) {
                             "7.2"));
 }
 
-// §7.3.2 defers the rule on a tagged expression to §11.9 -- "Members of tagged
-// unions can be referenced as tagged expressions. See 11.9" -- and §11.9
-// requires the name written after `tagged` to be a member of the target's
-// tagged union type. CheckTaggedMemberName in
+// §7.3.2 defers the rule on a tagged expression to §11.9 -- a member of a
+// tagged union may be referenced as a tagged expression, as §11.9 describes --
+// and §11.9 requires the name written after `tagged` to be a member of the
+// target's tagged union type. CheckTaggedMemberName in
 // src/elaborator/elaborator_validate_operations.cpp is that rule, and
 // WalkStmtsForTaggedExpr carries it down a statement tree, judging every
 // blocking and nonblocking assignment it reaches.

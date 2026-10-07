@@ -261,16 +261,16 @@ TEST(LoopStatementSim, ForLabeledLoopRuns) {
 }
 
 // §12.7.1 has the for statement declare its control variable in the loop's own
-// implicit block -- "the loop variable is local to the loop" -- so `for (int i
-// = seed; ...)` declares a storage element of its own and §6.8's "A variable
-// shall store a value from one assignment to the next" holds for `seed` across
-// the whole loop: the header reads it once and no part of the loop names it
-// again. ExecFuncForInits stored what EvalExpr answered, EvalExpr answers a
-// bare identifier with the source variable's own Logic4Vec, and a Logic4Vec
-// copies its `words` pointer rather than the words, so the header left `i` and
-// `seed` one element until OwnRhsWords was put around the initializer. This
-// site does not even resize on the way in, so unlike a body declaration it
-// shared the buffer at any width the source has.
+// implicit block -- the loop variable belongs to the loop alone -- so
+// `for (int i = seed; ...)` declares a storage element of its own and §6.8's
+// rule that a variable keeps its value from one assignment to the next holds
+// for `seed` across the whole loop: the header reads it once and no part of the
+// loop names it again. ExecFuncForInits stored what EvalExpr answered, EvalExpr
+// answers a bare identifier with the source variable's own Logic4Vec, and a
+// Logic4Vec copies its `words` pointer rather than the words, so the header
+// left `i` and `seed` one element until OwnRhsWords was put around the
+// initializer. This site does not even resize on the way in, so unlike a body
+// declaration it shared the buffer at any width the source has.
 //
 // The loop is written inside a function body because that is where this
 // header's variables are created: ExecFuncForInits builds them for a for in a
@@ -282,18 +282,18 @@ TEST(LoopStatementSim, ForLabeledLoopRuns) {
 // header could share its buffer again and `seed` would still read 8'b1x0z0000
 // out, because no writer left in the tree reaches a for-header local's words in
 // place. The writer that did reach them was §13.5.1's argument binding, which
-// copied "the values of the actual arguments" by copying the pointer while
-// §6.11.2 -- "any unknown or high-impedance bits shall be converted to zeros"
-// -- converted that copy in place, so handing the loop variable to a `bit
-// [7:0]` formal cleared `seed`'s unknowns in the iteration that only read it.
-// That binder takes its own copy since #3564, and the writers beside it decline
-// for reasons of their own: WritePartSelect deposits into a fresh extract of
-// the target rather than through it, so `i[3] = 1'b1` cannot reach past `i`;
-// this site marks no local 2-state (it never writes is_4state), so no
-// CoerceTo2State ever runs on one; and it registers no struct fields, so no
-// member deposit resolves against a for-header local. A 2-state coercion added
-// here without the copy above it is the regression this stands against, and
-// #3567 is the open reason someone will come to add one.
+// copied the actual arguments' values by copying the pointer while §6.11.2 --
+// any x or z bits become zeros -- converted that copy in place, so handing the
+// loop variable to a `bit [7:0]` formal cleared `seed`'s unknowns in the
+// iteration that only read it. That binder takes its own copy since #3564, and
+// the writers beside it decline for reasons of their own: WritePartSelect
+// deposits into a fresh extract of the target rather than through it, so
+// `i[3] = 1'b1` cannot reach past `i`; this site marks no local 2-state (it
+// never writes is_4state), so no CoerceTo2State ever runs on one; and it
+// registers no struct fields, so no member deposit resolves against a
+// for-header local. A 2-state coercion added here without the copy above it is
+// the regression this stands against, and #3567 is the open reason someone will
+// come to add one.
 //
 // `turns` rather than `i` is what ends the loop, and it is a second header
 // local for that alone. It cannot hold an unknown bit: it is initialized from
@@ -373,13 +373,13 @@ TEST(LoopStatementSim, ForHeaderLocalInASubroutineTakesItsDeclaredWidth) {
   EXPECT_EQ(var->value.ToUint64(), 32u);
 }
 
-// §6.11.2: "when a 4-state value is automatically converted to a 2-state value,
-// any unknown or high-impedance bits shall be converted to zeros". `int` is one
-// of the 2-state types, and Variable::is_4state -- which is what every later
-// store consults to make that conversion -- defaults to true and was never set
-// here, so the counter kept the x and the z its initializer read. $isunknown is
-// the instrument: the value's own unknown bits are what a read of it into a
-// 2-state variable would hide.
+// §6.11.2: an automatic conversion of a 4-state value to a 2-state one turns
+// any x or z bits into zeros. `int` is one of the 2-state types, and
+// Variable::is_4state -- which is what every later store consults to make that
+// conversion -- defaults to true and was never set here, so the counter kept
+// the x and the z its initializer read. $isunknown is the instrument: the
+// value's own unknown bits are what a read of it into a 2-state variable would
+// hide.
 TEST(LoopStatementSim,
      ForHeaderLocalInASubroutineDropsItsInitializersUnknowns) {
   SimFixture f;

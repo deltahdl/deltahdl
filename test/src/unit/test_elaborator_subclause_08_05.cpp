@@ -100,8 +100,8 @@ TEST(ObjectPropertyElaboration, ParameterValueAccessViaInstanceElaborates) {
              "endmodule\n"));
 }
 
-// §8.5 states "Accessing data types using a class handle is not allowed" and
-// gives `$display ((v.T)'(3.45));` as its illegal example.
+// §8.5 forbids reaching a data type through a class handle and gives
+// `$display ((v.T)'(3.45));` as its illegal example.
 TEST(ObjectPropertyElaboration, TypeParamAccessViaHandleIsIllegal) {
   ElabFixture f;
   ElabOk(
@@ -121,10 +121,10 @@ TEST(ObjectPropertyElaboration, TypeParamAccessViaHandleIsIllegal) {
                             "8.5"));
 }
 
-// §8.5 says of a parameter value read through an instance name "Such an
-// expression is not a constant expression". The rule that rejects the source is
-// §11.5.1's, which requires the width of an indexed part-select to be a
-// constant expression, so the report names §11.5.1 rather than §8.5.
+// §8.5 says of a parameter value read through an instance name that it is not a
+// constant expression. The rule that rejects the source is §11.5.1's, which
+// requires the width of an indexed part-select to be a constant expression, so
+// the report names §11.5.1 rather than §8.5.
 TEST(ObjectPropertyElaboration, InstanceParamAccessIsNotConstant) {
   ElabFixture f;
   ElabOk(

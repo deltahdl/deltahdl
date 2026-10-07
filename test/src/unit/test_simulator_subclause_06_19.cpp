@@ -57,7 +57,7 @@ TEST(EnumerationSimulation, ParameterSeededEnumValuePropagatesAtRuntime) {
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
 
-// §6.19: "An enumerated type declares a set of integral named constants", and
+// §6.19: an enumerated type declares a set of named integral constants, and
 // Syntax 6-5 places the enum form among the data_type productions, so the
 // clause's own example -- `enum {red, yellow, green} light1, light2;` -- gives
 // red, yellow and green values without any typedef. Read one back at runtime:

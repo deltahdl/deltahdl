@@ -248,10 +248,10 @@ TEST(NetDataType, TwoStatePackedStructIsRejected) {
                             "net data type must be 4-state", 2, "6.7.1"));
 }
 
-// §6.19: "In the absence of a data type declaration, the default data type
-// shall be int", and the clause's own example calls `enum {red, yellow, green}`
-// an "anonymous int type". int is 2-state, so an enumeration written with no
-// base is not a valid net data type under §6.7.1 item a.
+// §6.19: an enumeration declared with no data type takes int, and the clause's
+// own example calls `enum {red, yellow, green}` an "anonymous int type". int is
+// 2-state, so an enumeration written with no base is not a valid net data type
+// under §6.7.1 item a.
 TEST(NetDataType, EnumWithNoBaseIsRejected) {
   ElabFixture f;
   ElaborateSrc(

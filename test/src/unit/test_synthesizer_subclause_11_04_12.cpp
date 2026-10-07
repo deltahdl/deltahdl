@@ -20,14 +20,14 @@ namespace {
 // target to constant zero while the run reports success.
 
 // The test fails on any lowering that builds nothing for a concatenation, since
-// this is the first case. §11.4.12 rules that "A concatenation is the result of
-// the joining together of bits resulting from one or more expressions", and its
-// example gives `{a, b[3:0], w, 3'b101}` as equivalent to `{a, b[3], b[2],
-// b[1], b[0], w, 1'b1, 1'b0, 1'b1}`, so the leftmost operand takes the most
-// significant bits. `a` is three bits wide and `b` is two rather than the two
-// being equal, so a lowering that gives both the same offset, or that swaps
-// which one is significant, disagrees at some value. Two operands of equal
-// width would separate neither.
+// this is the first case. §11.4.12 defines a concatenation as the bits of one
+// or more expressions joined together, and its example gives
+// `{a, b[3:0], w, 3'b101}` as equivalent to
+// `{a, b[3], b[2], b[1], b[0], w, 1'b1, 1'b0, 1'b1}`, so the leftmost operand
+// takes the most significant bits. `a` is three bits wide and `b` is two rather
+// than the two being equal, so a lowering that gives both the same offset, or
+// that swaps which one is significant, disagrees at some value. Two operands of
+// equal width would separate neither.
 TEST(ConcatenationSynthesis, ConcatenationPlacesEachOperandAtItsOwnOffset) {
   ExpectInputSweep(
       "module m(input [2:0] a, input [1:0] b, output logic [4:0] y);\n"
@@ -54,9 +54,9 @@ TEST(ConcatenationSynthesis, ConcatenatedLiteralCarriesItsOwnBits) {
 }
 
 // The test fails on a lowering that answers nothing for a nested
-// concatenation, which the two cases above pass. §11.4.12 rules that "The
-// concatenation is treated as a packed vector of bits", so a concatenation is
-// an operand of another concatenation.
+// concatenation, which the two cases above pass. §11.4.12 makes a concatenation
+// a packed vector of bits, so a concatenation is an operand of another
+// concatenation.
 TEST(ConcatenationSynthesis, NestedConcatenationJoinsAsOneVector) {
   ExpectInputSweep(
       "module m(input [2:0] a, input b, input c, output logic [4:0] y);\n"
@@ -73,11 +73,10 @@ TEST(ConcatenationSynthesis, NestedConcatenationJoinsAsOneVector) {
 // The test fails on a fix that answers constant zero for an operand whose width
 // the synthesizer cannot compute and reports nothing, which is the silent wrong
 // answer the three cases above are about, narrowed rather than removed.
-// §11.4.12 rules that "the size of each operand in the concatenation is needed
-// to calculate the complete size of the concatenation", so an operand whose
-// width the synthesizer cannot compute is one it cannot place.
-// `SynthLower::ExprWidth` reads no function's declaration, so a call is such an
-// operand.
+// §11.4.12 needs each operand's size to work out the concatenation's whole
+// size, so an operand whose width the synthesizer cannot compute is one it
+// cannot place. `SynthLower::ExprWidth` reads no function's declaration, so a
+// call is such an operand.
 TEST(ConcatenationSynthesis, AnOperandOfUnknownWidthIsReported) {
   SynthFixture f;
   const auto* mod =
@@ -251,12 +250,12 @@ TEST(ConcatenationSynthesis, APowerOperandIsReportedForItsOperator) {
 // went missing.
 
 // The test fails on a fix that assumes a concatenation target was already split
-// into one assignment per element. §11.4.12 rules that a concatenation "is
-// treated as a packed vector of bits" and "can be used on the left-hand side of
-// an assignment". The cases above write their concatenation as the source of
-// an assignment. `Elaborator::ElaborateContAssign` splits a concatenation
-// target of a continuous assignment into one assignment per element, which is
-// what VectorSelect.ConcatenationLvalueSplitLowersItsPartSelects in
+// into one assignment per element. §11.4.12 makes a concatenation a packed
+// vector of bits that may stand on the left-hand side of an assignment. The
+// cases above write their concatenation as the source of an assignment.
+// `Elaborator::ElaborateContAssign` splits a concatenation target of a
+// continuous assignment into one assignment per element, which is what
+// VectorSelect.ConcatenationLvalueSplitLowersItsPartSelects in
 // test/src/unit/test_synthesizer_subclause_11_05_01.cpp covers; nothing does
 // the same for a procedural assignment.
 TEST(ConcatenationTarget,

@@ -116,10 +116,10 @@ TEST(PliPreActiveSim, PreActiveReadWriteContrastWithPreponed) {
   EXPECT_EQ(active_sample, 55);
 }
 
-// Edge case for "create events before the Active region is evaluated": an event
-// created while inside Pre-Active that is itself scheduled into Pre-Active for
-// the current time slot must still be drained within the same Pre-Active pass,
-// ahead of any Active event.
+// Edge case for the guarantee that events are created before the Active region
+// is evaluated: an event created while inside Pre-Active that is itself
+// scheduled into Pre-Active for the current time slot must still be drained
+// within the same Pre-Active pass, ahead of any Active event.
 TEST(PliPreActiveSim, PreActiveCreatedPreActiveEventRunsBeforeActive) {
   Arena arena;
   Scheduler sched(arena);
@@ -168,14 +168,14 @@ TEST(PliPreActiveSim, PreActiveWritesAndSchedulingAreNotFlaggedIllegal) {
   EXPECT_EQ(sched.IllegalPostponedScheduleCount(), 0u);
 }
 
-// The "write values ... before events in the Active region are evaluated" facet
-// of §4.4.3.2, driven through the real VPI write path rather than the synthetic
-// NoteWriteAttempt shortcut used above. A vpi_put_value() issued from a
-// Pre-Active PLI callback flows through PutValueApplyWriteAndForce, so it both
-// takes effect (an Active-region read via vpi_get_value() sees the new value,
-// proving the write landed ahead of the Active region) and is left un-flagged:
-// unlike the read-only Preponed/Postponed/Pre-Observed regions, a Pre-Active
-// write records no illegal-write violation.
+// §4.4.3.2's facet that values are written before the Active region's events
+// are evaluated, driven through the real VPI write path rather than the
+// synthetic NoteWriteAttempt shortcut used above. A vpi_put_value() issued from
+// a Pre-Active PLI callback flows through PutValueApplyWriteAndForce, so it
+// both takes effect (an Active-region read via vpi_get_value() sees the new
+// value, proving the write landed ahead of the Active region) and is left
+// un-flagged: unlike the read-only Preponed/Postponed/Pre-Observed regions, a
+// Pre-Active write records no illegal-write violation.
 TEST(PliPreActiveSim, VpiPutValueFromPreActiveTakesEffectAndIsNotFlagged) {
   Arena arena;
   Scheduler sched(arena);

@@ -7,12 +7,12 @@ using namespace delta;
 namespace {
 
 TEST(ClassDeclaration, MalformedClassItemNames8_3) {
-  // §8.3, Syntax 8-1 footnote 10: "In any one declaration, only one of
-  // protected or local is allowed, only one of rand or randc is allowed, and
-  // static and/or virtual can appear only once." The report names §8.3, which
-  // is what tells this rejection from every other way a class body is
-  // rejected: a member whose type will not parse, a stray token, an end label
-  // that does not match. All of them leave has_errors true.
+  // §8.3, Syntax 8-1 footnote 10: a single declaration takes at most one of
+  // protected and local, at most one of rand and randc, and static and virtual
+  // once each at most. The report names §8.3, which is what tells this
+  // rejection from every other way a class body is rejected: a member whose
+  // type will not parse, a stray token, an end label that does not match. All
+  // of them leave has_errors true.
   auto r = Parse(
       "class C;\n"
       "  local protected int x;\n"

@@ -11,11 +11,10 @@ TEST(LexicalConventionParsing, EscapedIdentifierAsName) {
   EXPECT_TRUE(ParseOk("module t; wire \\bus+index ; endmodule"));
 }
 
-// 5.6.1: an escaped keyword is the exception to "an escaped identifier is
-// treated the same as a nonescaped identifier" -- it is treated as a
-// user-defined identifier, so it can name a declaration. The §5.6.2 file
-// carries the complementary rule that such a keyword is no longer read as a
-// keyword.
+// 5.6.1: an escaped keyword is the exception to treating an escaped identifier
+// as its nonescaped spelling -- it is treated as a user-defined identifier, so
+// it can name a declaration. The §5.6.2 file carries the complementary rule
+// that such a keyword is no longer read as a keyword.
 TEST(LexicalConventionParsing, EscapedKeywordIsUserDefinedIdentifier) {
   EXPECT_TRUE(ParseOk("module t; wire \\module ; endmodule"));
 }

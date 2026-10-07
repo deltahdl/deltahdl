@@ -453,13 +453,12 @@ TEST(NonblockingAssignSim, NBAReplicationRHS) {
   EXPECT_EQ(var->value.ToUint64(), 0xAAu);
 }
 
-// §10.4.2 states "It shall be illegal to make nonblocking assignments to
-// automatic variables or to elements of dynamically sized array variables". For
-// a variable of an automatic task the rejection is reported under §13.3.2,
-// which states the same prohibition with the reason it exists: such variables
-// are deallocated at the end of the task invocation, so "They shall not be
-// assigned values using nonblocking assignments or procedural continuous
-// assignments."
+// §10.4.2 forbids a nonblocking assignment to an automatic variable or to an
+// element of a dynamically sized array variable. For a variable of an automatic
+// task the rejection is reported under §13.3.2, which states the same
+// prohibition with the reason it exists: such variables are deallocated at the
+// end of the task invocation, so neither a nonblocking assignment nor a
+// procedural continuous assignment may give them a value.
 TEST(NonblockingAssignSim, AutomaticVariableNbaIsError) {
   SimFixture f;
   ElaborateSrc(
@@ -478,11 +477,10 @@ TEST(NonblockingAssignSim, AutomaticVariableNbaIsError) {
 
 // §10.4.2 bars a nonblocking assignment to an element of a dynamically sized
 // array variable, and a queue is one. §6.21 states the same prohibition and
-// states it for continuous and procedural continuous assignments as well:
-// "Automatic variables and elements of dynamically sized array variables shall
-// not be written with nonblocking, continuous, or procedural continuous
-// assignments." The check enforces both halves of that sentence, so the report
-// names §6.21.
+// states it for continuous and procedural continuous assignments as well: no
+// nonblocking, continuous or procedural continuous assignment may write an
+// automatic variable or an element of a dynamically sized array variable. The
+// check enforces both halves of that sentence, so the report names §6.21.
 TEST(NonblockingAssignSim, QueueElementNbaIsError) {
   SimFixture f;
   ElaborateSrc(
@@ -542,12 +540,12 @@ TEST(NonblockingAssignSim, DynamicArrayElementNbaIsError) {
 
 // The member-qualified spelling of the same target. `b[2].x` is a name for bits
 // inside the element `b[2]`, so a write to it is a write to an element of a
-// dynamically sized array variable and §10.4.2's "It shall be illegal to make
-// nonblocking assignments to ... elements of dynamically sized array variables"
-// reaches it exactly as it reaches AssociativeArrayElementNbaIsError above. The
-// standard states the wider form itself in §6.21's closing sentence, which
-// limits references to "elements or members of dynamic variables", so a member
-// path is not a way out of the restriction the element is under.
+// dynamically sized array variable and §10.4.2's ban on a nonblocking
+// assignment to an element of a dynamically sized array variable reaches it
+// exactly as it reaches AssociativeArrayElementNbaIsError above. The standard
+// states the wider form itself in §6.21's closing sentence, which limits
+// references to elements or members of dynamic variables, so a member path is
+// not a way out of the restriction the element is under.
 //
 // §7.8.7 is why an associative array is the one to write it on: a member write
 // to an element that does not exist allocates the element, which is the storage
@@ -615,8 +613,8 @@ TEST(NonblockingAssignSim, DynamicArrayElementMemberNbaIsError) {
 // What the three cases above must not cost. §7.2.1 packs a structure's members
 // into the bits of one variable of fixed size, so `w.tag` is a window on `w`
 // and nothing about it is dynamically sized; §10.4.2 asks of a nonblocking
-// target only that it be "a data type that is valid for a procedural assignment
-// statement", which this is. The elaborator therefore has nothing to report.
+// target only that it be any data type a procedural assignment statement
+// accepts, which this is. The elaborator therefore has nothing to report.
 //
 // A check that read the dot rather than what stands to the left of it would
 // reject this, and it would still pass every rejection case above. That is what
@@ -639,9 +637,9 @@ TEST(NonblockingAssignSim, PackedStructMemberNbaElaboratesClean) {
 // The other legal member target, and the one furthest from an array element: a
 // class property lives in the object a handle designates, allocated by `new`
 // and reached through no index at all. §10.4.2 names the shape outright where
-// it settles when the handle is read -- "a class handle in the left-hand side
-// shall be evaluated at the same time as the expression on the right-hand
-// side" -- which it would have no reason to say of a target it forbade.
+// it settles when the handle is read -- a class handle in the left-hand side is
+// evaluated together with the right-hand side -- which it would have no reason
+// to say of a target it forbade.
 TEST(NonblockingAssignSim, ClassPropertyNbaElaboratesClean) {
   SimFixture f;
   auto* design = ElaborateSrc(

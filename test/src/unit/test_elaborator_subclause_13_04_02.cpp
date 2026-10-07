@@ -35,10 +35,10 @@ TEST(FunctionLifetimeElaboration, RecursiveAutomaticFunctionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4.2: "Automatic function items cannot be accessed by hierarchical
-// references." A path into an automatic function's local is rejected, and the
-// report names §13.4.2 rather than §13.3.1, which states the same sentence for
-// a task and is a different rule about a different construct.
+// §13.4.2: hierarchical references cannot reach the items of an automatic
+// function. A path into an automatic function's local is rejected, and the
+// report names §13.4.2 rather than §13.3.1, which states the same rule for a
+// task and is a different rule about a different construct.
 TEST(FunctionLifetimeElaboration, AutoFunctionItemHierRefInContAssignError) {
   ElabFixture f;
   ElaborateSrc(
@@ -92,15 +92,15 @@ TEST(FunctionLifetimeElaboration, AutoFunctionItemHierRefInInitialError) {
       "hierarchical reference to object in automatic function", 7, "13.4.2"));
 }
 
-// §13.4.2 says "Automatic function items cannot be accessed by hierarchical
-// references" and names no position such a reference is allowed to stand in,
-// so every position a statement holds a statement in is one the report reaches.
-// WalkStmtsForAutoRef in
-// src/elaborator/elaborator_validate_hier_refs.cpp had written out nine of
-// the thirteen child-statement links Stmt declares and now takes the
-// list from ForEachChildStmt in src/elaborator/elaborator_validate_internal.h.
-// The four cases below stand in the four positions it was missing, once for
-// this clause's report; the same four for §13.3.1's task report are in
+// §13.4.2 puts the items of an automatic function out of reach of hierarchical
+// references and names no position such a reference is allowed to stand in, so
+// every position a statement holds a statement in is one the report reaches.
+// WalkStmtsForAutoRef in src/elaborator/elaborator_validate_hier_refs.cpp had
+// written out nine of the thirteen child-statement links Stmt declares and now
+// takes the list from ForEachChildStmt in
+// src/elaborator/elaborator_validate_internal.h. The four cases below stand in
+// the four positions it was missing, once for this clause's report; the same
+// four for §13.3.1's task report are in
 // test/src/unit/test_elaborator_subclause_13_03_01.cpp, which is a different
 // rule about a different construct and a report of its own.
 

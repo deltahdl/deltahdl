@@ -399,14 +399,14 @@ TEST(ChainedConstructorElaboration, SuperNewInCaseItemError) {
 // an `if`, which is the list StmtSubtreeHasSuperNew walks after the `if` has
 // already settled that the position guards.
 //
-// Every one of them is a rejection, because §8.17 states "To use this
-// approach, super.new(...) shall be the first executable statement in the
-// function new" and each of these positions is reached only after something
-// else has run: a fork arm after the fork statement and in no order §9.3.2
-// defines against its siblings, a for step after an iteration of the body, an
-// action block after the immediate assertion has passed or failed (§16.3), a
-// randcase arm after the weighted draw has selected it (§18.16), and a
-// randsequence production after the generator has reached it (§18.17).
+// Every one of them is a rejection, because §8.17 requires super.new(...) to be
+// the first executable statement of the function new for this approach and each
+// of these positions is reached only after something else has run: a fork arm
+// after the fork statement and in no order §9.3.2 defines against its siblings,
+// a for step after an iteration of the body, an action block after the
+// immediate assertion has passed or failed (§16.3), a randcase arm after the
+// weighted draw has selected it (§18.16), and a randsequence production after
+// the generator has reached it (§18.17).
 //
 // Stmt::for_inits is the seventh link and takes no case. A.6.8 gives
 // `for_initialization ::= list_of_variable_assignments | for_variable_

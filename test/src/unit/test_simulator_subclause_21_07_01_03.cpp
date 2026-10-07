@@ -137,16 +137,16 @@ TEST_F(DumpOffOnSysTask, DumpoffCheckpointRecordsEveryVariableAsX) {
 }
 
 // §21.7.1.3: executing $dumpoff makes a checkpoint that dumps every selected
-// variable as x. §6.17: "The event data type provides a handle to a
-// synchronization object" -- a handle has no x state to record, and the writer
-// says so elsewhere by emitting nothing for an untriggered event, so the two
-// must agree. DumpoffCheckpointRecordsEveryVariableAsX above reads the x
-// records of a scalar and a vector and DumpoffRecordsRealVariableAsRealZero the
-// one type excused from the x form; no case in this file declares an event, so
-// the bx record the checkpoint wrote for one -- an event's zero-width storage
-// falling to the vector arm -- went unasserted. This half of the defect is
-// independent of the $var keyword, so a fix that corrects only the declaration
-// cannot pass this case.
+// variable as x. §6.17: the event data type is a handle to a synchronization
+// object -- a handle has no x state to record, and the writer says so elsewhere
+// by emitting nothing for an untriggered event, so the two must agree.
+// DumpoffCheckpointRecordsEveryVariableAsX above reads the x records of a
+// scalar and a vector and DumpoffRecordsRealVariableAsRealZero the one type
+// excused from the x form; no case in this file declares an event, so the bx
+// record the checkpoint wrote for one -- an event's zero-width storage falling
+// to the vector arm -- went unasserted. This half of the defect is independent
+// of the $var keyword, so a fix that corrects only the declaration cannot pass
+// this case.
 //
 // The registration is the driver's own, SimContext::RegisterVcdSignals, rather
 // than the sorted registration this file's RunVcd uses: that is the step which

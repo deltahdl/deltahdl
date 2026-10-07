@@ -356,8 +356,7 @@ TEST(QueueAssign, SourceSliceToLastMinusOneEquivPopBack) {
 
 // §7.10.4: `q = { q[0:pos-1], e, q[pos:$] }` leaves what `q.insert(pos, e)`
 // would leave. `pos` is a variable, which is what §7.10.1 means by saying the
-// slice bounds "may be arbitrary integral expressions and, in particular, are
-// not required to be constant expressions".
+// slice bounds may be any integral expressions, constant or not.
 TEST(QueueAssign, SourceConcatInsertAtPosEquivInsert) {
   RunAndExpectQueue(
       "module t;\n"
@@ -402,9 +401,9 @@ TEST(QueueAssign, SourceSliceDropsFirstAndLast) {
       "q", {4, 8, 16});
 }
 
-// §7.10.3: "any reference to elements of the queue will become outdated by the
-// assignment operation". A reference taken after the assignment is not one of
-// those, so it still writes back.
+// §7.10.3: the assignment outdates every reference to the queue's elements. A
+// reference taken after the assignment is not one of those, so it still writes
+// back.
 TEST(QueueAssign, SourceRefTakenAfterAssignWritesBack) {
   RunAndExpectQueue(
       "module t;\n"
@@ -547,14 +546,13 @@ TEST(QueueAssignNba, RefTakenAfterAssignWritesBack) {
       "q", {2, 99, 8, 6});
 }
 
-// §7.10.1: "an invalid index value (i.e., a 4-state expression whose value has
-// one or more x or z bits, or a value that lies outside 0...$) shall cause a
-// read operation to return the value appropriate for a nonexistent array entry
-// of the queue's element type (as described in Table 7-1 in 7.4.5)". On a
-// three-element queue the index 5 lies outside 0...$, so `q[5]` written as an
-// item of the §7.10.4 concatenation still contributes one element, and Table
-// 7-1 makes that element 'x for the 4-state element type `logic [31:0]`. A
-// read that contributes nothing leaves a queue of one element instead of two.
+// §7.10.1: a read through an invalid index, a 4-state value with an x or z bit
+// or a value outside 0...$, returns what a nonexistent entry of the queue's
+// element type reads as (Table 7-1, §7.4.5). On a three-element queue the index
+// 5 lies outside 0...$, so `q[5]` written as an item of the §7.10.4
+// concatenation still contributes one element, and Table 7-1 makes that element
+// 'x for the 4-state element type `logic [31:0]`. A read that contributes
+// nothing leaves a queue of one element instead of two.
 TEST(QueueAssign, SourceConcatItemOutOfRangeIndexContributesX) {
   SimFixture f;
   ElaborateLowerRun(f,
@@ -615,16 +613,15 @@ TEST(QueueAssign,
 }
 
 // §10.10 makes an item of an unpacked array concatenation that names an array
-// "represent as many elements as exist in that item, arranged in the same
-// left-to-right order as they would appear in the array item itself", so
-// `q = {a}` leaves the queue holding what `a[0]` and `a[1]` hold. Holding, not
-// naming: §7.10.3 says that when "the target of an assignment is an entire
-// queue, references to any element of the original queue shall become
-// outdated", and a queue entry left sharing a buffer with the live array
-// element it was collected from is exactly such an outdated reference, one the
-// next assignment to `a[0]` would still write through. ExpectOwnWordsCopy makes
-// the storage-identity claim; the read of 0xA5 after it keeps the test from
-// passing on a queue of two entries the run never filled.
+// stand for all of that item's elements, in the left-to-right order the item
+// holds them, so `q = {a}` leaves the queue holding what `a[0]` and `a[1]`
+// hold. Holding, not naming: §7.10.3 says that an assignment to a whole queue
+// outdates every reference to an element of the original queue, and a queue
+// entry left sharing a buffer with the live array element it was collected from
+// is exactly such an outdated reference, one the next assignment to `a[0]`
+// would still write through. ExpectOwnWordsCopy makes the storage-identity
+// claim; the read of 0xA5 after it keeps the test from passing on a queue of
+// two entries the run never filled.
 TEST(QueueAssign, SourceConcatItemNamingArrayGivesQueueItsOwnElementWords) {
   SimFixture f;
   auto* a0 = RunAndFindVar(

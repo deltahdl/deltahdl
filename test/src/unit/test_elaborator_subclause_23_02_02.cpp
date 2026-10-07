@@ -138,10 +138,10 @@ TEST(PortDeclaration, VarTypedScalarPortsElaborate) {
 // enum kind at its base (int) width and is a net.
 //
 // Being a net, it is a net the standard forbids. §6.7.1 admits only a 4-state
-// integral type as a net's data type, so that "a net is composed entirely of
-// 4-state bits", and an enumeration with no explicit base has the 2-state `int`
-// base of §6.19. So the port carries the enum kind at its base width, is a net,
-// and is rejected -- all three read off the same declaration.
+// integral type as a net's data type, so that every bit of a net is 4-state,
+// and an enumeration with no explicit base has the 2-state `int` base of §6.19.
+// So the port carries the enum kind at its base width, is a net, and is
+// rejected -- all three read off the same declaration.
 TEST(PortDeclaration, EnumPortElaboratesAsANetWhenThePortKindIsOmitted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -360,13 +360,13 @@ void ExpectSolePortUnpackedSize(const char* src, uint32_t size) {
   EXPECT_EQ(port.unpacked_dim_sizes[0], size);
 }
 
-// §7.4.2: "Unpacked arrays shall be declared by specifying the element address
-// range(s) after the declared identifier", so `[1:4]` addresses elements 1
-// through 4. §11.5.2 makes those bounds decide what a select reads: "the
-// address bounds given in the declaration of the memory determine the effect of
-// the address expression". RtlirPort records a size per dimension and no bound
-// of any kind, so this port and one declared `[0:3]` read back identically
-// after elaboration and `mem[1]` reaches a different element of each.
+// §7.4.2: an unpacked array is declared with its element address ranges after
+// the identifier, so `[1:4]` addresses elements 1 through 4. §11.5.2 makes
+// those bounds decide what a select reads: the bounds the memory's declaration
+// gives decide what an address expression reaches. RtlirPort records a size per
+// dimension and no bound of any kind, so this port and one declared `[0:3]`
+// read back identically after elaboration and `mem[1]` reaches a different
+// element of each.
 TEST(PortDeclaration, UnpackedArrayPortRecordsItsAddressBounds) {
   ExpectSolePortUnpackedBounds(
       "module m(\n"
@@ -376,10 +376,10 @@ TEST(PortDeclaration, UnpackedArrayPortRecordsItsAddressBounds) {
       1, 4);
 }
 
-// §7.4.2: "[size] shall mean the same as [0:size-1]", so this port holds the
-// same four elements the port above holds, at addresses 0 through 3 rather
-// than 1 through 4. RtlirPort records size 4 for both and no bound of any
-// kind, so the two declarations are indistinguishable once elaborated.
+// §7.4.2: [size] is shorthand for [0:size-1], so this port holds the same four
+// elements the port above holds, at addresses 0 through 3 rather than 1 through
+// 4. RtlirPort records size 4 for both and no bound of any kind, so the two
+// declarations are indistinguishable once elaborated.
 TEST(PortDeclaration, UnpackedArrayPortDistinguishesTheSizeFormFromARange) {
   ExpectSolePortUnpackedBounds(
       "module m(\n"
@@ -389,12 +389,11 @@ TEST(PortDeclaration, UnpackedArrayPortDistinguishesTheSizeFormFromARange) {
       0, 3);
 }
 
-// §7.4.2 on the two indices of a range specification: "The first value may be
-// greater than, equal to, or less than the second value." Written the greater
-// way round, element 4 is the first of the array rather than the last.
-// RtlirPort records size 4 and no bound of any kind, so a descending
-// declaration reads back exactly as `[1:4]` does and the order written is
-// lost.
+// §7.4.2 on the two indices of a range specification: either may be the larger,
+// or the two may be equal. Written the greater way round, element 4 is the
+// first of the array rather than the last. RtlirPort records size 4 and no
+// bound of any kind, so a descending declaration reads back exactly as `[1:4]`
+// does and the order written is lost.
 TEST(PortDeclaration, DescendingUnpackedArrayPortRecordsItsDeclaredOrder) {
   ExpectSolePortUnpackedBounds(
       "module m(\n"
@@ -404,15 +403,14 @@ TEST(PortDeclaration, DescendingUnpackedArrayPortRecordsItsDeclaredOrder) {
       4, 1);
 }
 
-// §7.4.2: "A fixed-size unpacked dimension may also be specified by a single
-// positive constant integer expression to specify the number of elements in
-// the unpacked dimension", and a parameter of the module is such an
-// expression. The fold is done in an empty scope, where `N` resolves to
-// nothing, so the dimension is dropped and RtlirPort records no dimension at
+// §7.4.2: a fixed-size unpacked dimension may instead be given as one positive
+// constant integer expression, its element count, and a parameter of the module
+// is such an expression. The fold is done in an empty scope, where `N` resolves
+// to nothing, so the dimension is dropped and RtlirPort records no dimension at
 // all rather than a size without a bound. §11.5.2 then never gets its first
-// step -- "the desired word shall first be selected by supplying an address
-// for each dimension" -- because the synthesizer is never told the name is an
-// array, and it lowers `mem[2]` as a §11.5.1 bit-select of the one element.
+// step -- the word is selected first, with one address per dimension -- because
+// the synthesizer is never told the name is an array, and it lowers `mem[2]` as
+// a §11.5.1 bit-select of the one element.
 TEST(PortDeclaration, ParameterSizedUnpackedArrayPortFolds) {
   ExpectSolePortUnpackedSize(
       "module m #(parameter int N = 4) (\n"
@@ -422,14 +420,14 @@ TEST(PortDeclaration, ParameterSizedUnpackedArrayPortFolds) {
       4);
 }
 
-// The bound form of the same declaration. §7.4.2: "Each fixed-size unpacked
-// dimension shall be specified by a range specification of the form
-// [ constant_expression : constant_expression ]", so a parameter stands as the
-// second index as readily as it stands as a size. It is resolved in the same
-// empty scope, so the dimension is dropped and RtlirPort records no dimension
-// at all. §11.5.2's "the desired word shall first be selected by supplying an
-// address for each dimension" is again never reached, and the synthesizer
-// lowers `mem[2]` as a §11.5.1 bit-select of the one element.
+// The bound form of the same declaration. §7.4.2: a fixed-size unpacked
+// dimension is given by a range specification [ constant_expression :
+// constant_expression ], so a parameter stands as the second index as readily
+// as it stands as a size. It is resolved in the same empty scope, so the
+// dimension is dropped and RtlirPort records no dimension at all. §11.5.2's
+// step of selecting the word first, one address per dimension, is again never
+// reached, and the synthesizer lowers `mem[2]` as a §11.5.1 bit-select of the
+// one element.
 TEST(PortDeclaration, ParameterBoundedUnpackedArrayPortFolds) {
   ExpectSolePortUnpackedBounds(
       "module m #(parameter int N = 4) (\n"
@@ -444,10 +442,10 @@ TEST(PortDeclaration, ParameterBoundedUnpackedArrayPortFolds) {
 // on this shape already folds, so the scope holding `N` is reachable where the
 // port declaration is elaborated; the unpacked dimension is folded somewhere
 // else and comes back with nothing, so RtlirPort records no dimension at all
-// rather than the range §7.4.2 makes the size mean, "[size] shall mean the
-// same as [0:size-1]". §11.5.2's "the desired word shall first be selected by
-// supplying an address for each dimension" is never reached, and the
-// synthesizer lowers `mem[2]` as a §11.5.1 bit-select of the one element.
+// rather than the [0:size-1] range §7.4.2 makes a lone [size] stand for.
+// §11.5.2's step of selecting the word first, one address per dimension, is
+// never reached, and the synthesizer lowers `mem[2]` as a §11.5.1 bit-select of
+// the one element.
 TEST(PortDeclaration, BodyParameterSizedUnpackedArrayPortFolds) {
   ExpectSolePortUnpackedSize(
       "module m(mem);\n"

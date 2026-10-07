@@ -278,8 +278,8 @@ TEST(AlwaysLatchElaboration, AlwaysLatchAndGeneralAlwaysSameVarErrors) {
       "variable 'q' driven by always_latch and another process", 3, "9.2.2.2"));
 }
 
-// The "any other process" in §9.2.2.2's single-driver rule, applied to
-// always_latch via §9.2.2.3, also covers an initial block driving the same
+// The other processes that §9.2.2.2's single-driver rule bars, applied to
+// always_latch via §9.2.2.3, also cover an initial block driving the same
 // variable.
 TEST(AlwaysLatchElaboration, AlwaysLatchAndInitialSameVarErrors) {
   ElabFixture f;
@@ -313,8 +313,8 @@ TEST(AlwaysLatchElaboration, AlwaysLatchAndGeneralAlwaysDifferentVarsNoError) {
 }
 
 // The latch-inference check recurses into begin-end blocks: an incomplete if
-// nested inside a block still infers a latch, so no "does not represent latched
-// logic" warning is raised.
+// nested inside a block still infers a latch, so no warning that the behavior
+// is not latched logic is raised.
 TEST(AlwaysLatchElaboration, BlockWrappingIncompleteIfNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -331,7 +331,7 @@ TEST(AlwaysLatchElaboration, BlockWrappingIncompleteIfNoWarning) {
 }
 
 // §9.2.2.3 applies §9.2.2.2's single-driver rule to always_latch. The forbidden
-// "other process" also includes an always_comb procedure driving the same
+// other process also includes an always_comb procedure driving the same
 // variable, a distinct process form from the latch/continuous/general cases.
 TEST(AlwaysLatchElaboration, MultiDriverAlwaysLatchAndAlwaysCombErrors) {
   ElabFixture f;
@@ -386,12 +386,12 @@ TEST(AlwaysLatchElaboration, TwoAlwaysLatchSameArrayElementErrors) {
                             "9.2.2.2"));
 }
 
-// §9.2.2.3 asks a tool to "warn if the behavior in an always_latch construct
-// does not represent latched logic". The subject is the behavior, so an
-// incomplete if is not the question by itself. Here the if narrows a value `q`
-// has already been given on this pass, so every path leaves `q` holding
-// something computed from `d` and `e` and nothing is carried over. There is no
-// latch to model, and the warning says so.
+// §9.2.2.3 asks a tool to warn when an always_latch's behavior is not latched
+// logic. The subject is the behavior, so an incomplete if is not the question
+// by itself. Here the if narrows a value `q` has already been given on this
+// pass, so every path leaves `q` holding something computed from `d` and `e`
+// and nothing is carried over. There is no latch to model, and the warning says
+// so.
 TEST(AlwaysLatchElaboration,
      UnconditionalAssignBeforeIncompleteIfWarnsNoLatch) {
   ElabFixture f;
@@ -490,11 +490,11 @@ TEST(AlwaysLatchElaboration, IndependentArrayElementsLocalparamIndexNoError) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.2.2.3 rules that "All statements in 9.2.2.2 shall apply to always_latch",
+// §9.2.2.3 rules that everything §9.2.2.2 states applies to always_latch too,
 // and §9.2.2.2.2 is where those statements say that a statement in the
-// procedure "shall not include those that block, have blocking timing or event
-// controls". §14.11 has a cycle delay wait for the specified number of clocking
-// block events, so `##3` blocks and an always_latch shall not contain it.
+// procedure may not block or carry a blocking timing or event control. §14.11
+// has a cycle delay wait for the specified number of clocking block events, so
+// `##3` blocks and an always_latch shall not contain it.
 //
 // The subclause asserted is the one the emission site passes, which is
 // §9.2.2.3 for an always_latch and §9.2.2.2.2 for an always_comb, because
@@ -520,7 +520,7 @@ TEST(AlwaysLatchElaboration, CycleDelayInAlwaysLatchErrors) {
                             "9.2.2.3"));
 }
 
-// §9.2.2.3 rules that "all statements in 9.2.2.2 shall apply to always_latch",
+// §9.2.2.3 rules that everything §9.2.2.2 states applies to always_latch too,
 // so the question §9.2.2.2 asks of an always_comb is asked here in reverse: an
 // always_latch whose body leaves nothing held describes no latch and is warned
 // about. AssignedOnEveryPath in src/elaborator/elaborator_process.cpp is what

@@ -494,8 +494,8 @@ TEST(PackageItemsParsing, AnonymousProgramWithFunctionDeclIsAccepted) {
 
 // package_item reaches package_or_generate_item_declaration, which lists no
 // specparam_declaration; A.1.4's non_port_module_item is what does, and
-// §6.20.5 has a specparam "declared inside a module or specify block". One in
-// a package body was accepted silently and recorded as an item of the package,
+// §6.20.5 has a specparam declared inside a module or a specify block. One in a
+// package body was accepted silently and recorded as an item of the package,
 // where the specify block beside it was already reported under §30.3.
 TEST(PackageItemsParsing, ErrorSpecparamInPackageIsRejected) {
   auto r = Parse(

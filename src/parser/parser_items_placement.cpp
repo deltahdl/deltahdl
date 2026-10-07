@@ -195,14 +195,13 @@ bool Parser::TryRejectBodyPortDecl() {
 // alone: A.1.4's non_port_module_item admits specify_block and
 // specparam_declaration, and the bodies A.1.6, A.1.7 and A.1.8 give an
 // interface, a program and a checker admit neither. §30.3 and §6.20.5 say the
-// same in prose, the specify block being "defined within a module" and a
-// specparam one that "shall be declared inside a module or specify block". A
-// package intercepts its own `specify` in Parser::ParsePackageDecl, and an
-// anonymous program is left to FilterAnonymousProgramItems in parser.cpp,
-// which reports under A.1.11, so the bodies reported here are the three
-// design elements and a package's `specparam`. A generate block is reported
-// under §27.2 instead, whichever body holds it, since that is the rule the
-// block breaks first.
+// same in prose, the specify block being defined within a module and a
+// specparam declared inside a module or a specify block. A package intercepts
+// its own `specify` in Parser::ParsePackageDecl, and an anonymous program is
+// left to FilterAnonymousProgramItems in parser.cpp, which reports under
+// A.1.11, so the bodies reported here are the three design elements and a
+// package's `specparam`. A generate block is reported under §27.2 instead,
+// whichever body holds it, since that is the rule the block breaks first.
 bool Parser::TryParseSpecifyItem(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwSpecify)) {
     if (InGenerateBlock()) {

@@ -127,23 +127,21 @@ void ExpectAlwaysCombRunCount(const char* src, uint64_t expected_runs) {
 TEST(AlwaysCombSim,
      AlwaysCombDoesNotRetriggerWhenAnOutOfBoundsBitSelectWriteChangesNothing) {
   // §11.5.1 (printed page 296) says a bit-select address outside the vector's
-  // range "shall have no effect on the data stored when written", and §9.4.2
-  // (printed page 232) says "a change of value in any operand of the expression
-  // without a change in the result of the expression shall not be detected as
-  // an event". §9.2.2.2 (printed page 222) gives an always_comb "an inferred
-  // sensitivity list", which is the list §9.4.2 governs. So the write of a[9]
-  // to an 8-bit `a` stores no bit and owes the procedure no event.
+  // range stores nothing when written, and §9.4.2 (printed page 232) says a
+  // change in an operand that leaves the expression's result unchanged is not
+  // detected as an event. §9.2.2.2 (printed page 222) gives an always_comb an
+  // inferred sensitivity list, which is the list §9.4.2 governs. So the write
+  // of a[9] to an 8-bit `a` stores no bit and owes the procedure no event.
   //
   // Why the count is 2 rather than 3 or 1. The inferred list is {a} alone:
-  // exception (b) of §9.2.2.2.1 leaves out "any expression that is also written
-  // within the block", which here is `b` and `runs`, and InferSensitivity is
-  // called with exclude_written true for an always_comb.
-  // Lowerer::LowerProcesses lowers the non-initial processes ahead of the
-  // initial ones, so at time zero the always_comb evaluates first (`runs` 1)
-  // and arms its watcher while `a` is still 8'hxx; the initial block then
-  // writes 8'd0, a genuine change of the one listed expression, and `runs`
-  // reaches 2. At time 1 the out-of-bounds write stores nothing and the count
-  // must stay at 2.
+  // exception (b) of §9.2.2.2.1 leaves out any expression the block also
+  // writes, which here is `b` and `runs`, and InferSensitivity is called with
+  // exclude_written true for an always_comb. Lowerer::LowerProcesses lowers the
+  // non-initial processes ahead of the initial ones, so at time zero the
+  // always_comb evaluates first (`runs` 1) and arms its watcher while `a` is
+  // still 8'hxx; the initial block then writes 8'd0, a genuine change of the
+  // one listed expression, and `runs` reaches 2. At time 1 the out-of-bounds
+  // write stores nothing and the count must stay at 2.
   //
   // Reading 3 is the defect. A select write that returned having written
   // nothing still notified the variable's watchers, and the AnyChangeAwaiter an
@@ -200,24 +198,23 @@ TEST(AlwaysCombSim,
 
 TEST(AlwaysCombSim,
      AlwaysCombDoesNotRetriggerWhenAWriteDepositsTheValueTheVariableHolds) {
-  // §9.4.2 (printed page 232, last line of the clause) says "a change of value
-  // in any operand of the expression without a change in the result of the
-  // expression shall not be detected as an event", and §9.2.2.2 (printed page
-  // 222) gives an always_comb "an inferred sensitivity list that includes the
-  // expressions defined in 9.2.2.2.1" -- the list §9.4.2 governs. A store that
-  // deposits the bits the variable already holds changes no result, so it owes
-  // the procedure no event, however genuinely the store itself happened.
+  // §9.4.2 (printed page 232, last line of the clause) says a change in an
+  // operand that leaves the expression's result unchanged is not detected as an
+  // event, and §9.2.2.2 (printed page 222) gives an always_comb an inferred
+  // sensitivity list holding the expressions §9.2.2.2.1 defines -- the list
+  // §9.4.2 governs. A store that deposits the bits the variable already holds
+  // changes no result, so it owes the procedure no event, however genuinely the
+  // store itself happened.
   //
   // Why the count is 2 rather than 3 or 1. The inferred list is {a} alone:
-  // exception (b) of §9.2.2.2.1 leaves out "any expression that is also written
-  // within the block", which here is `b` and `runs`, and InferSensitivity is
-  // called with exclude_written true for an always_comb.
-  // Lowerer::LowerProcesses lowers the non-initial processes ahead of the
-  // initial ones, so at time zero the always_comb evaluates first (`runs` 1)
-  // and arms its watcher while `a` is still 8'hxx; the initial block then
-  // writes 8'd5, a genuine change of the one listed expression, and `runs`
-  // reaches 2. At time 1 the second write of 8'd5 changes nothing and the count
-  // must stay at 2.
+  // exception (b) of §9.2.2.2.1 leaves out any expression the block also
+  // writes, which here is `b` and `runs`, and InferSensitivity is called with
+  // exclude_written true for an always_comb. Lowerer::LowerProcesses lowers the
+  // non-initial processes ahead of the initial ones, so at time zero the
+  // always_comb evaluates first (`runs` 1) and arms its watcher while `a` is
+  // still 8'hxx; the initial block then writes 8'd5, a genuine change of the
+  // one listed expression, and `runs` reaches 2. At time 1 the second write of
+  // 8'd5 changes nothing and the count must stay at 2.
   //
   // Reading 3 is the defect. The write takes ApplyGenericBlockingAssign's
   // fall-through into AssignToScalarLhs, which stores the identical bits and
@@ -352,13 +349,13 @@ TEST(AlwaysCombSim, AlwaysCombChainedDependency) {
   EXPECT_EQ(c->value.ToUint64(), 12u);
 }
 
-// §9.2.2.2 (printed page 222) gives an always_comb "an inferred sensitivity
-// list that includes the expressions defined in 9.2.2.2.1", and §9.4.2
-// (printed page 232) makes an event out of "any change in the value of the
-// expression" on such a list. §11.4.2 states the increment and decrement
-// operators as blocking assignments, so a bare `i++;` in a process body is a
-// change of `i` exactly as `i = i + 1;` would be, and the combinational
-// procedure reading `i` owes an evaluation to it.
+// §9.2.2.2 (printed page 222) gives an always_comb an inferred sensitivity list
+// holding the expressions §9.2.2.2.1 defines, and §9.4.2 (printed page 232)
+// makes an event out of any change in the expression's value on such a list.
+// §11.4.2 states the increment and decrement operators as blocking assignments,
+// so a bare `i++;` in a process body is a change of `i` exactly as `i = i + 1;`
+// would be, and the combinational procedure reading `i` owes an evaluation to
+// it.
 //
 // The route is the ordinary process body, not a subroutine's: `i++;` is a
 // kExprStmt that ExecStmt hands to ExecInlineTaskCall, whose non-call

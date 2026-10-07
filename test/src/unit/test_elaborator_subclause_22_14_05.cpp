@@ -51,9 +51,9 @@ TEST(Verilog2005KeywordElaboration, AddedWordBuildsNetsOfItsOwnType) {
   EXPECT_TRUE(n->is_signed);
 
   // Under "1364-2001" the word is an ordinary identifier, so `uwire
-  // scalar_net;` declares scalar_net of a type called uwire, and §6.18 -- "The
-  // declaration of a user-defined data type shall precede any reference to its
-  // type_identifier" -- is what refuses it, because nothing declares that type.
+  // scalar_net;` declares scalar_net of a type called uwire, and §6.18 -- a
+  // user-defined data type is declared before any reference to its
+  // type_identifier -- is what refuses it, because nothing declares that type.
   // §22.14.5 itself states only which words are reserved -- those of 1364-1995
   // (Table 22-1) and 1364-2001 (Table 22-2) together with the further ones of
   // Table 22-3 -- and the keyword table in src/lexer/keywords.cpp carries that

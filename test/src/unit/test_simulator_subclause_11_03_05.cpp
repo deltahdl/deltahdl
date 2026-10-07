@@ -15,11 +15,11 @@ using namespace delta;
 //       expressions are always evaluated.
 //   C3  When short circuiting occurs, the side effects (and run-time errors) of
 //       the skipped operand shall not occur.
-// The clause frames all three around "the side effects caused by calling a
-// function". These tests therefore observe the rule the way the LRM does: a
-// function with a real, observable side effect appears as the operand that may
-// be skipped, and the test checks whether that side effect happened after the
-// full pipeline (elaborate -> lower -> run) executes real source.
+// The clause frames all three around the side effects of a function call. These
+// tests therefore observe the rule the way the LRM does: a function with a
+// real, observable side effect appears as the operand that may be skipped, and
+// the test checks whether that side effect happened after the full pipeline
+// (elaborate -> lower -> run) executes real source.
 //
 // The side-effect vehicle is `incr`, a function that bumps the module-scope
 // counter `cnt` through an inout argument (the copy-back happens only when the

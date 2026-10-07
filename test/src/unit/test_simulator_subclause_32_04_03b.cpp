@@ -46,11 +46,11 @@
 // case asserts on before reading through it.
 //
 // The other declaration site is issue #3396, and the last three cases are its.
-// §6.20.5 permits a specparam "both within the specify block (see Clause 30)
-// and in the main module body", and §32.4.3 states no exception for either
-// site, while RegisterSpecparams in src/simulator/specify_register.cpp walks
-// the SpecifyItemKind::kSpecparam items of the specify blocks it is given and
-// so reaches the first site alone. A specparam declared in the module body is
+// §6.20.5 permits a specparam both in the specify block (Clause 30) and in the
+// main module body, and §32.4.3 states no exception for either site, while
+// RegisterSpecparams in src/simulator/specify_register.cpp walks the
+// SpecifyItemKind::kSpecparam items of the specify blocks it is given and so
+// reaches the first site alone. A specparam declared in the module body is
 // bound to no SpecifyManager, so SpecifyManager::IsDeclaredSpecparam answers
 // false for it and ApplyAnnotatedSpecparam returns before writing anything.
 // With the last three cases the file covers both of §6.20.5's sites.

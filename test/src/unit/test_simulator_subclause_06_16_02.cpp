@@ -76,9 +76,9 @@ TEST(StringMethods, PutcReplacesMiddleCharacterFromVariableIndex) {
   EXPECT_EQ(v, 1u);
 }
 
-// §6.16.2: the replacement value is "the given integral value" -- it need not
-// be a character-literal operand. Supply the ASCII code of 'A' as a plain
-// numeric literal and confirm the character it produces.
+// §6.16.2: the replacement value is any integral value given -- it need not be
+// a character-literal operand. Supply the ASCII code of 'A' as a plain numeric
+// literal and confirm the character it produces.
 TEST(StringMethods, PutcAcceptsNumericIntegralValue) {
   auto v = RunAndGet(
       "module t;\n"

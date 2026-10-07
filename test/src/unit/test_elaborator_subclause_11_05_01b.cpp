@@ -79,10 +79,10 @@ TEST(RealSelect, BitSelectOfARealArrayElementAsATargetIsIllegal) {
                             "6.12"));
 }
 
-// §11.5.1's other alternative, reached by the same §11.5.2 route: "A bit-select
-// or part-select of a scalar, or of a real variable or real parameter, shall be
-// illegal." `s` is declared `logic s[4]`, so `s[i]` selects one scalar element
-// and `[0]` selects a bit out of that scalar.
+// §11.5.1's other alternative, reached by the same §11.5.2 route: a bit-select
+// or part-select of a scalar, a real variable or a real parameter is illegal.
+// `s` is declared `logic s[4]`, so `s[i]` selects one scalar element and `[0]`
+// selects a bit out of that scalar.
 //
 // This fails while CheckScalarSelectNode in
 // src/elaborator/elaborator_validate.cpp opens with ExprIdent(e->base) and
@@ -104,12 +104,11 @@ TEST(SelectElaboration, BitSelectOfAScalarArrayElementIsIllegal) {
 }
 
 // The control that stops a fix from rejecting the case §11.5.2 exists to
-// permit. §11.5.2 reads: "To express bit-selects or part-selects of array
-// elements, the desired word shall first be selected by supplying an address
-// for each dimension." `mem[i]` is that one address and selects the word, and
-// `[0]` then bit-selects a vector element, which §11.5.1 bars only for a scalar
-// or a real. This fails when a fix reports every second address rather than
-// reading the element's type.
+// permit. §11.5.2 has a bit-select or part-select of an array element select
+// the word first, with one address per dimension. `mem[i]` is that one address
+// and selects the word, and `[0]` then bit-selects a vector element, which
+// §11.5.1 bars only for a scalar or a real. This fails when a fix reports every
+// second address rather than reading the element's type.
 TEST(SelectElaboration, BitSelectOfAPackedArrayElementIsStillLegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -123,7 +122,7 @@ TEST(SelectElaboration, BitSelectOfAPackedArrayElementIsStillLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// This pins that "an address for each dimension" is counted against the
+// This pins that the one address per dimension is counted against the
 // declaration rather than assumed to be one. `mem` is declared with two
 // unpacked dimensions, so `mem[i][i]` selects the word and `[0]` is the first
 // address past the declaration's dimensions. This fails when a fix treats the
@@ -142,11 +141,11 @@ TEST(SelectElaboration, BitSelectOfATwoDimensionalArrayElementIsStillLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.5.1: "A bit-select or part-select of a scalar, or of a real variable or
-// real parameter, shall be illegal." The sentence names the parameter and not
-// the position the parameter is written in, so a real parameter declared in a
-// parameter port list draws the same report as one declared in the module
-// body. This fails while a parameter port reaches BuildParamDeclShell in
+// §11.5.1: a bit-select or part-select of a scalar, a real variable or a real
+// parameter is illegal. The sentence names the parameter and not the position
+// the parameter is written in, so a real parameter declared in a parameter port
+// list draws the same report as one declared in the module body. This fails
+// while a parameter port reaches BuildParamDeclShell in
 // src/elaborator/elaborator_module.cpp, which writes the name into none of the
 // elaborator's name sets. CheckRealSelectNode in
 // src/elaborator/elaborator_validate.cpp then finds no entry for `P` in
@@ -188,10 +187,10 @@ TEST(RealSelect, PartSelectOfARealParameterPortNamesPartSelect) {
 // BuildParamDeclShell in src/elaborator/elaborator_module.cpp distinguishes a
 // localparam port from a parameter port through `decl->localparam_port_names`,
 // which it reads to set `pd.is_localparam`. §6.20.2 makes a localparam a value
-// parameter, so §11.5.1 -- "A bit-select or part-select of a scalar, or of a
-// real variable or real parameter, shall be illegal" -- reaches it the same
-// way. This fails when a fix registers the name only where
-// `decl->localparam_port_names` does not hold it.
+// parameter, so §11.5.1 -- a bit-select or part-select of a scalar, a real
+// variable or a real parameter is illegal -- reaches it the same way. This
+// fails when a fix registers the name only where `decl->localparam_port_names`
+// does not hold it.
 TEST(RealSelect, BitSelectOfARealLocalparamPortNamesTheRealRule) {
   ElabFixture f;
   ElaborateSrc(
@@ -206,11 +205,10 @@ TEST(RealSelect, BitSelectOfARealLocalparamPortNamesTheRealRule) {
 }
 
 // The control that keeps a legal use of a real parameter port legal. §11.5.1
-// bars one construct -- "A bit-select or part-select of a scalar, or of a real
-// variable or real parameter, shall be illegal" -- and `assign v = P;` writes
-// neither a bit-select nor a part-select, so the source is legal. This stops a
-// fix that reports every use of a real parameter port rather than every select
-// of one.
+// bars one construct -- a bit-select or part-select of a scalar, a real
+// variable or a real parameter is illegal -- and `assign v = P;` writes neither
+// a bit-select nor a part-select, so the source is legal. This stops a fix that
+// reports every use of a real parameter port rather than every select of one.
 TEST(RealSelect, RealParameterPortWithNoSelectIsLegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -224,11 +222,10 @@ TEST(RealSelect, RealParameterPortWithNoSelectIsLegal) {
 
 // The statement RealSelect.BitSelectOfARealArrayElementIsIllegal writes in an
 // initial procedure, written in an always_comb procedure instead. §9.2.2.2
-// says what that procedure is: "SystemVerilog provides a special always_comb
-// procedure for modeling combinational logic behavior." The clause does not
-// change what a statement inside the procedure may contain. §11.5.1 therefore
-// bars `arr[i][0]` here exactly as it bars the same select in an initial
-// procedure.
+// says what that procedure is: a special procedure for modeling combinational
+// logic. The clause does not change what a statement inside the procedure may
+// contain. §11.5.1 therefore bars `arr[i][0]` here exactly as it bars the same
+// select in an initial procedure.
 //
 // This fails while `is_proc` in
 // src/elaborator/elaborator_validate_matches.cpp names kAlwaysBlock and
@@ -250,11 +247,10 @@ TEST(RealSelect, BitSelectOfARealArrayElementInAlwaysCombIsIllegal) {
 }
 
 // The same select written in an always_ff procedure. §9.2.2.4 says what that
-// procedure is: "The always_ff procedure can be used to model synthesizable
-// flip-flop logic behavior." The clause does not change what a statement
-// inside the procedure may contain. §11.5.1 therefore bars `arr[i][0]` here as
-// well, and the event control the procedure requires decides nothing about the
-// select.
+// procedure is: a procedure that can model synthesizable flip-flop logic. The
+// clause does not change what a statement inside the procedure may contain.
+// §11.5.1 therefore bars `arr[i][0]` here as well, and the event control the
+// procedure requires decides nothing about the select.
 //
 // This fails while `is_proc` in
 // src/elaborator/elaborator_validate_matches.cpp names kAlwaysBlock and
@@ -277,11 +273,10 @@ TEST(RealSelect, BitSelectOfARealArrayElementInAlwaysFfIsIllegal) {
                             "6.12"));
 }
 
-// The same select written in an always_latch procedure. §9.2.2.3 says what
-// that procedure is: "SystemVerilog also provides a special always_latch
-// procedure for modeling latched logic behavior." The clause does not change
-// what a statement inside the procedure may contain. §11.5.1 therefore bars
-// `arr[i][0]` here as well.
+// The same select written in an always_latch procedure. §9.2.2.3 says what that
+// procedure is: a special procedure for modeling latched logic. The clause does
+// not change what a statement inside the procedure may contain. §11.5.1
+// therefore bars `arr[i][0]` here as well.
 //
 // This fails while `is_proc` in
 // src/elaborator/elaborator_validate_matches.cpp names kAlwaysBlock and
@@ -302,13 +297,12 @@ TEST(RealSelect, BitSelectOfARealArrayElementInAlwaysLatchIsIllegal) {
                             "6.12"));
 }
 
-// The same select written in a final procedure. §9.2.3 says what that
-// procedure is: "The final procedure is like an initial procedure, defining a
-// procedural block of statements, except that it occurs at the end of
-// simulation time and executes without delays." The clause does not change
-// what a statement inside the procedure may contain. §11.5.1 therefore bars
-// `arr[i][0]` here exactly as it bars the same select in the initial procedure
-// the clause compares this one to.
+// The same select written in a final procedure. §9.2.3 says what that procedure
+// is: a procedural block of statements like an initial procedure, but one that
+// runs at the end of simulation time and without delays. The clause does not
+// change what a statement inside the procedure may contain. §11.5.1 therefore
+// bars `arr[i][0]` here exactly as it bars the same select in the initial
+// procedure the clause compares this one to.
 //
 // This fails while `is_proc` in
 // src/elaborator/elaborator_validate_matches.cpp names kAlwaysBlock and
@@ -404,13 +398,12 @@ TEST(SelectElaboration, PartSelectInARandsequenceCodeBlockIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.5.1 says where a select may stand by saying nothing about it: "A
-// bit-select or part-select of a scalar, or of a real variable or real
-// parameter, shall be illegal." The sentence bars the operand, so it bars the
-// operand wherever an expression may be written, and §11.5 writes out several
-// of those places -- "A concatenation of other operands (including nested
-// concatenations) can be specified as an operand" and "A function call is an
-// operand".
+// §11.5.1 says where a select may stand by saying nothing about it: a
+// bit-select or part-select of a scalar, a real variable or a real parameter is
+// illegal. The sentence bars the operand, so it bars the operand wherever an
+// expression may be written, and §11.5 writes out several of those places -- a
+// concatenation of other operands, nested ones included, may be an operand, and
+// so may a function call.
 //
 // The cases below stand in the positions CheckRealSelect, CheckScalarSelect and
 // CheckIndexedPartSelectWidth in src/elaborator/elaborator_validate.cpp did not
@@ -472,8 +465,8 @@ TEST(RealSelect, BitSelectOfARealInAConditionalFalseArmIsIllegal) {
 }
 
 // A call argument, reached through `args`. §11.5 makes the call itself an
-// operand -- "A function call is an operand" -- and the argument inside it is
-// an expression like any other, so §11.5.1 bars this select too.
+// operand -- a function call counts as one -- and the argument inside it is an
+// expression like any other, so §11.5.1 bars this select too.
 TEST(RealSelect, BitSelectOfARealInACallArgumentIsIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -568,8 +561,8 @@ TEST(SelectElaboration, ScalarBitSelectInAConditionalTrueArmIsRejected) {
                             5, "11.5.1"));
 }
 
-// §11.5.1's rule on the indexed part-select in an unwalked position: "the
-// width_expr shall be a positive constant integer expression".
+// §11.5.1's rule on the indexed part-select in an unwalked position: the
+// width_expr must be a constant integer expression greater than zero.
 // CheckIndexedPartSelectWidth in src/elaborator/elaborator_validate.cpp is the
 // third walk written in the four-link shape, and a concatenation element is a
 // position none of the three reached.
@@ -588,13 +581,13 @@ TEST(SelectElaboration, IndexedPartSelectWidthInAConcatenationIsRejected) {
       "indexed part-select width must be a constant expression", 5, "11.5.1"));
 }
 
-// §11.5.1: "The actual bit that is accessed by an address is, in part,
-// determined by the declaration of acc" -- the clause sets `logic [15:0] acc`
-// beside `logic [2:17] acc` and observes that one value of an index reaches a
-// different bit in each. §27.4 makes a generate block a scope of its own and a
-// further level of hierarchy once instantiated and says nothing that would make
-// §11.5.1 stop there, so a parameter declared inside a block is addressed over
-// its declared range exactly as one declared among the module's own items is.
+// §11.5.1: the declaration of acc helps decide which bit an address reaches --
+// the clause sets `logic [15:0] acc` beside `logic [2:17] acc` and observes
+// that one value of an index reaches a different bit in each. §27.4 makes a
+// generate block a scope of its own and a further level of hierarchy once
+// instantiated and says nothing that would make §11.5.1 stop there, so a
+// parameter declared inside a block is addressed over its declared range
+// exactly as one declared among the module's own items is.
 // SelectElaboration.ParameterBitSelectIsAddressedOverItsDeclaredRange in
 // test_elaborator_subclause_11_05_01a.cpp is the module-level twin.
 //

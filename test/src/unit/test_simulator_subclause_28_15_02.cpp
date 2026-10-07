@@ -187,12 +187,12 @@ TEST(TriregChargeStrength,
   EXPECT_NE(cap->resolved_strength.s1_hi, Strength::kSmall);
 }
 
-// §6.6.4 has a trireg retain "its last driven value", and that value is one per
-// bit; §28.12 resolves each bit of a net on its own. So a vector whose bits do
-// not hold the same value is charged on both sides of the scale at once, and
-// the pair the net reports spans them. Bit 0 holds 1 and bit 1 holds 0 here,
-// and reading either bit alone would report one side and call the other high
-// impedance.
+// §6.6.4 has a trireg retain the value last driven onto it, and that value is
+// one per bit; §28.12 resolves each bit of a net on its own. So a vector whose
+// bits do not hold the same value is charged on both sides of the scale at
+// once, and the pair the net reports spans them. Bit 0 holds 1 and bit 1 holds
+// 0 here, and reading either bit alone would report one side and call the other
+// high impedance.
 TEST(TriregChargeStrength, BitsHoldingDifferentValuesChargeBothSides) {
   SimFixture f;
   Net* cap = ChargeThenRelease("trireg [1:0] cap;", "2'b01", "2'bz", f);

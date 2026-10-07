@@ -835,11 +835,11 @@ TEST(VirtualInterfaceElaboration, PortTypeNames25_9) {
 }
 
 // §25.9 bars a component from a sensitivity list, and §9.2.2.2 gives an
-// always_comb "an inferred sensitivity list that includes the expressions
-// defined in 9.2.2.2.1" -- a list the tool derives is a sensitivity list, and
-// the clause draws no distinction. Naming the line of the always_comb is what
-// makes this discriminating: a report against the module or the declaration
-// would satisfy a bare HasErrors() and fail here.
+// always_comb an inferred sensitivity list holding the expressions §9.2.2.2.1
+// defines -- a list the tool derives is a sensitivity list, and the clause
+// draws no distinction. Naming the line of the always_comb is what makes this
+// discriminating: a report against the module or the declaration would satisfy
+// a bare HasErrors() and fail here.
 TEST(VirtualInterfaceElaboration,
      ComponentInInferredAlwaysCombSensitivity_Error) {
   ElabFixture f;
@@ -877,10 +877,10 @@ TEST(VirtualInterfaceElaboration,
       "25.9"));
 }
 
-// §9.2.2.2.2: "always @* waits until a change occurs on a signal in the
-// inferred sensitivity list". A third inferring kind, reached by
-// is_star_sensitivity rather than by the procedure kind, so a check keyed on
-// the two kinds above leaves it open.
+// §9.2.2.2.2: always @* waits for a change on a signal of its inferred
+// sensitivity list. A third inferring kind, reached by is_star_sensitivity
+// rather than by the procedure kind, so a check keyed on the two kinds above
+// leaves it open.
 TEST(VirtualInterfaceElaboration, ComponentInStarSensitivityList_Error) {
   ElabFixture f;
   ElaborateSrc(

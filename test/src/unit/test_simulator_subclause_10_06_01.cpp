@@ -245,16 +245,16 @@ TEST(ProceduralContinuousAssignSim, ReAssignClearsOldRhsWatcher) {
   EXPECT_EQ(q->value.ToUint64(), 2u);
 }
 
-// §10.6.1: "The left-hand side of the assignment in the assign statement shall
-// be a singular variable reference or a concatenation of variables." The
-// concatenation is the second of the two forms the clause admits, and
+// §10.6.1: an assign statement's left-hand side is a singular variable
+// reference or a concatenation of variables. The concatenation is the second of
+// the two forms the clause admits, and
 // ProceduralAssignDeassignElaboration.AssignConcatenationLhs accepts
 // `assign {a, b} = 2'b10;`, so the statement reaches the simulator and owes
 // each element the bits its own width claims of the one right-hand value, the
-// leftmost element taking the most significant ones: 8'h12 for a and 8'h34
-// for b out of 16'h1234. The later `a = 8'd7;` is what reads the clause's own
-// sentence back -- the assign "shall override all procedural assignments to a
-// variable" -- so a reading 8'h12 says the override reached the element as well
+// leftmost element taking the most significant ones: 8'h12 for a and 8'h34 for
+// b out of 16'h1234. The later `a = 8'd7;` is what reads the clause's own
+// sentence back -- the assign overrides every procedural assignment to the
+// variable -- so a reading 8'h12 says the override reached the element as well
 // as the value did.
 //
 // The wrong answer was that nothing happened at all, and silently: the executor
@@ -286,10 +286,9 @@ TEST(ProceduralContinuousAssignSim,
   EXPECT_TRUE(b->is_forced);
 }
 
-// §10.6.1: "The deassign procedural statement shall end an assign procedural
-// continuous assignment to a variable. The value of the variable shall remain
-// the same until the variable is assigned a new value through a procedural
-// assignment or a procedural continuous assignment."
+// §10.6.1: deassign ends an assign procedural continuous assignment to a
+// variable, which then holds its value until a procedural assignment or
+// procedural continuous assignment gives it a new one.
 // ProceduralAssignDeassignElaboration.DeassignConcatenationLhs accepts
 // `deassign {a, b};` after the same assign, so the deassign has to end the
 // assignment on every element the assign made, and each element keeps the slice
@@ -321,13 +320,13 @@ TEST(ProceduralContinuousAssignSim,
   EXPECT_EQ(b->value.ToUint64(), 0x34u);
 }
 
-// §10.6.1 names "a concatenation of variables" without bounding its nesting,
-// and ProceduralAssignDeassignElaboration.AssignNestedConcatOfVariablesLhs
-// accepts `assign {a, {b, c}} = 3'b101;` on that reading, so an inner
-// concatenation is one more element of the outer one and distributes its own
-// slice among its own elements the way §11.4.12 treats every concatenation
-// lvalue. Out of 24'h123456 the outer's first element a takes 8'h12, the inner
-// takes the remaining 16 bits and hands 8'h34 to b and 8'h56 to c.
+// §10.6.1 names a concatenation of variables without bounding its nesting, and
+// ProceduralAssignDeassignElaboration.AssignNestedConcatOfVariablesLhs accepts
+// `assign {a, {b, c}} = 3'b101;` on that reading, so an inner concatenation is
+// one more element of the outer one and distributes its own slice among its own
+// elements the way §11.4.12 treats every concatenation lvalue. Out of
+// 24'h123456 the outer's first element a takes 8'h12, the inner takes the
+// remaining 16 bits and hands 8'h34 to b and 8'h56 to c.
 //
 // The wrong answer was that nothing happened at all. An arm that walked one
 // level of elements and wrote each resolved variable is the other wrong answer

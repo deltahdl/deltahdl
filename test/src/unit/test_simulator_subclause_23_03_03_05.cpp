@@ -192,9 +192,10 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
 
 // §23.3.3.3 makes an inout port one net with its connection, and an array
 // port is so element by element: the parent drives bus[0] and the child b[1],
-// and each is seen from both sides. §7.4.2 (printed page 154) has "Net arrays
-// are useful for connecting to ports of module instances", and the net array
-// was refused as a connection at all, the check asking for a variable array.
+// and each is seen from both sides. §7.4.2 (printed page 154) gives connecting
+// to the ports of module instances as what a net array is for, and the net
+// array was refused as a connection at all, the check asking for a variable
+// array.
 TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
      InoutArrayPortIsItsNetArrayElementByElement) {
   SimFixture f;

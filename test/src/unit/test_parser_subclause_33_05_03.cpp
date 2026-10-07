@@ -51,12 +51,12 @@ TEST(SeparateCompilationTool, SaveFailsWhenLocationUnwritable) {
   EXPECT_FALSE(fs::exists(path, ec));
 }
 
-// Every cell kind, which §33.2.1 makes every design element §3.2 defines: "a
-// cell is a design element (see 3.2)", and §3.2 names a module, program,
-// interface, checker, package, primitive and configuration. The checker is
-// declared here because it is a cell like the other six and was reaching no
-// loaded unit at all, which left this case asserting six of the seven kinds its
-// name claims.
+// Every cell kind, which §33.2.1 makes every design element §3.2 defines, a
+// cell being a design element in the §3.2 sense, and §3.2 names a module,
+// program, interface, checker, package, primitive and configuration. The
+// checker is declared here because it is a cell like the other six and was
+// reaching no loaded unit at all, which left this case asserting six of the
+// seven kinds its name claims.
 //
 // The library tag is asserted for each kind alongside the count. A bind reaches
 // a cell by library name as well as by cell name, so a declaration that arrived

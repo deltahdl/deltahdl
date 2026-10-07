@@ -208,10 +208,10 @@ TEST(TaskMemorySim, StaticTaskConcurrentInvocationsShareStorage) {
   LowerRunAndCheck(f, design, {{"r1", 22u}, {"r2", 22u}});
 }
 
-// §13.3.2: variables of a static task, "including input, output, and inout
-// type arguments, shall retain their values between invocations". An output
-// queue formal is copied nothing into, so the second call pushes onto what
-// the first left in it, and the actual receives both elements.
+// §13.3.2: variables of a static task, its input, output and inout arguments
+// among them, keep their values from one invocation to the next. An output
+// queue formal is copied nothing into, so the second call pushes onto what the
+// first left in it, and the actual receives both elements.
 TEST(TaskMemorySim, StaticTaskOutputQueueFormalRetainsValue) {
   auto val = RunAndGet(
       "module t;\n"

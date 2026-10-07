@@ -157,11 +157,11 @@ TEST(UnpackedArrayConcatElaboration, DynamicArrayTargetElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// "An unpacked array concatenation may appear as the source expression in an
-// assignment-like context and shall not appear in any other context." A
-// fixed-size unpacked target is one of the three legal slowest-varying
-// dimensions (fixed-size, queue, dynamic). Mixing array and scalar items in
-// the source — the LRM's `{A, 4, 5, A, 6}` shape — must elaborate cleanly.
+// §10.10 allows an unpacked array concatenation only as the source expression
+// of an assignment-like context. A fixed-size unpacked target is one of the
+// three legal slowest-varying dimensions (fixed-size, queue, dynamic). Mixing
+// array and scalar items in the source — the LRM's `{A, 4, 5, A, 6}` shape —
+// must elaborate cleanly.
 TEST(UnpackedArrayConcatElaboration, MixedItemsForFixedSizeTarget) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -414,9 +414,9 @@ TEST(UnpackedArrayConcatElaboration,
 
 // §10.10 requires the target of an unpacked array concatenation to be an array
 // whose slowest-varying dimension is unpacked fixed-size, queue or dynamic, and
-// says "A target of any other type (including associative array) shall be
-// illegal". It names no statement the assignment is allowed to stand in
-// unjudged. WalkStmtsForAssocConcatTarget in
+// makes a target of any other type, an associative array included, illegal. It
+// names no statement the assignment is allowed to stand in unjudged.
+// WalkStmtsForAssocConcatTarget in
 // src/elaborator/elaborator_validate_cast_ops.cpp had written out six of the
 // thirteen child-statement links Stmt declares and now takes the list from
 // ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The seven

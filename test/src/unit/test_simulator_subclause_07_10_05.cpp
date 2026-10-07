@@ -336,11 +336,10 @@ QueueObject* RunAndFindQ(const std::string& src, SimFixture& f) {
   return f.ctx.FindQueue("q");
 }
 
-// §7.10.5: "if, after any operation that writes to a bounded queue variable,
-// that variable has any elements beyond its bound, then all such out-of-bounds
-// elements shall be discarded". `new[3]` sizes a queue declared `[$:1]` past
-// the two elements it may hold, so the third is dropped and the two the queue
-// keeps are the first two of the initializing array.
+// §7.10.5: once any write leaves a bounded queue holding elements past its
+// bound, those elements are discarded. `new[3]` sizes a queue declared `[$:1]`
+// past the two elements it may hold, so the third is dropped and the two the
+// queue keeps are the first two of the initializing array.
 TEST(BoundedQueue, NewArrayInProcedureTruncatesToBound) {
   SimFixture f;
   auto* q = RunAndFindQ(
@@ -356,8 +355,8 @@ TEST(BoundedQueue, NewArrayInProcedureTruncatesToBound) {
   EXPECT_EQ(q->elements[1].ToUint64(), 20u);
 }
 
-// §7.10.5: the same discard "shall be issued" a warning, and the report the
-// `new[]` on line 4 raises names §7.10.5 as the rule it enforces.
+// §7.10.5: the same discard comes with a warning, and the report the `new[]` on
+// line 4 raises names §7.10.5 as the rule it enforces.
 TEST(BoundedQueue, NewArrayInProcedureWarningNames7_10_5) {
   SimFixture f;
   auto* q = RunAndFindQ(
@@ -372,10 +371,9 @@ TEST(BoundedQueue, NewArrayInProcedureWarningNames7_10_5) {
                               "bounded queue overflow in new[]", 4, "7.10.5"));
 }
 
-// §7.10.5: "Operations on bounded queues shall behave exactly as if the queue
-// were unbounded except that" the bound is exceeded. `new[3]` on a queue
-// declared `[$:3]` stays inside the four elements allowed, so nothing is
-// discarded and no warning is issued.
+// §7.10.5: a bounded queue behaves just as an unbounded one does until the
+// bound is exceeded. `new[3]` on a queue declared `[$:3]` stays inside the four
+// elements allowed, so nothing is discarded and no warning is issued.
 TEST(BoundedQueue, NewArrayWithinBoundNoWarning) {
   SimFixture f;
   auto* q = RunAndFindQ(
@@ -468,10 +466,10 @@ TEST(BoundedQueue, DeclInitWithinBoundNoWarning) {
   EXPECT_EQ(FindDiag(f, "bounded queue overflow"), nullptr);
 }
 
-// §7.10.5: "any operation that writes to a bounded queue variable" covers a
-// nonblocking assignment, whose write lands when the update event runs rather
-// than when the statement executes, so the source advances time before the
-// queue is read back. The third item is discarded.
+// §7.10.5: any write to a bounded queue variable covers a nonblocking
+// assignment, whose write lands when the update event runs rather than when the
+// statement executes, so the source advances time before the queue is read
+// back. The third item is discarded.
 TEST(BoundedQueue, NonblockingAssignTruncatesToBound) {
   SimFixture f;
   auto* q = RunAndFindQ(
@@ -705,11 +703,10 @@ TEST(BoundedQueue, StreamingUnpackWithRangeWithinBoundNoWarning) {
   EXPECT_EQ(FindDiag(f, "bounded queue overflow"), nullptr);
 }
 
-// §7.10.5: "if, after any operation that writes to a bounded queue variable,
-// that variable has any elements beyond its bound, then all such out-of-bounds
-// elements shall be discarded". §7.10 declares a queue wherever the
-// declaration stands, so `[$:1]` inside a procedural block bounds that queue
-// at two elements and the third push_back leaves two behind. The queue is the
+// §7.10.5: once any write leaves a bounded queue holding elements past its
+// bound, those elements are discarded. §7.10 declares a queue wherever the
+// declaration stands, so `[$:1]` inside a procedural block bounds that queue at
+// two elements and the third push_back leaves two behind. The queue is the
 // block's own, which §6.21 lets no name from outside the block reach, so the
 // block copies what it kept into the module's variables.
 TEST(BoundedQueue, BlockScopedBoundTruncatesPushBack) {
@@ -731,8 +728,8 @@ TEST(BoundedQueue, BlockScopedBoundTruncatesPushBack) {
   EXPECT_EQ(RunAndGet(src, "e1"), 20u);
 }
 
-// §7.10.5: the same discard "shall be issued" a warning, and the report the
-// push_back on line 6 raises names §7.10.5 as the rule it enforces.
+// §7.10.5: the same discard comes with a warning, and the report the push_back
+// on line 6 raises names §7.10.5 as the rule it enforces.
 TEST(BoundedQueue, BlockScopedBoundWarningNames7_10_5) {
   SimFixture f;
   auto* design = ElaborateSrc(

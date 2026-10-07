@@ -242,10 +242,10 @@ TEST(SignedAndUnsigned, DefaultSignedIntegerReturnValueSignExtends) {
   EXPECT_EQ(d->value.ToUint64(), 0xFFFFFFFFFFFFFFFFull);
 }
 
-// §6.11.3: "The data types byte, shortint, int, integer, and longint default
-// to signed." A for-init declaration declares a variable like any other, so an
-// int loop variable is signed and -1 < 3 holds. Created from its width alone it
-// was unsigned, -1 stood as 4294967295, and the body ran no times at all.
+// §6.11.3: byte, shortint, int, integer and longint are signed by default. A
+// for-init declaration declares a variable like any other, so an int loop
+// variable is signed and -1 < 3 holds. Created from its width alone it was
+// unsigned, -1 stood as 4294967295, and the body ran no times at all.
 //
 // The loop variable is popped when the loop ends, so what the count reaches is
 // what says it was signed; there is no variable left to read the flag off.
@@ -288,11 +288,11 @@ TEST(SignedAndUnsigned, ForInitIntLoopVariableIsSignedInAFunctionBody) {
   EXPECT_EQ(f.ctx.FindVariable("count")->value.ToUint64(), 4u);
 }
 
-// §6.11.3 again for the other half of the sentence: "The data types time, bit,
-// reg, and logic default to unsigned, as do arrays of these types." A loop
-// counting down from 8'hFF while it exceeds zero runs 255 times unsigned and no
-// times at all signed, where 8'hFF is -1. Without this a fix that marked every
-// loop variable signed would satisfy the two cases above.
+// §6.11.3 again for the other half of the sentence: time, bit, reg and logic,
+// and arrays of them, are unsigned by default. A loop counting down from 8'hFF
+// while it exceeds zero runs 255 times unsigned and no times at all signed,
+// where 8'hFF is -1. Without this a fix that marked every loop variable signed
+// would satisfy the two cases above.
 TEST(SignedAndUnsigned, ForInitLogicVectorLoopVariableStaysUnsigned) {
   SimFixture f;
   auto* design = ElaborateSrc(

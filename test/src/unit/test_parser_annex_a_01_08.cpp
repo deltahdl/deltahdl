@@ -467,8 +467,8 @@ TEST(CheckerItemsParsing, CheckerDefaultDisableIffMissingSemicolonRejected) {
 
 // checker_or_generate_item admits no specify_block or specparam_declaration:
 // A.1.4's non_port_module_item lists both, and A.1.8 lists neither, §30.3
-// placing the specify block inside a module and §6.20.5 a specparam "declared
-// inside a module or specify block". Each was accepted in a checker body
+// placing the specify block inside a module and §6.20.5 a specparam declared
+// inside a module or a specify block. Each was accepted in a checker body
 // silently and recorded as an item of it.
 
 TEST(CheckerItemsParsing, CheckerSpecifyBlockRejected) {

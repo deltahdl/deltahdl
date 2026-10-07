@@ -40,10 +40,9 @@ TEST(EqualitySynthesis, InequalityLowersToTheComparisonOfItsOperands) {
 
 // The test fails on a lowering that compares over the narrower operand's width
 // alone, which the two cases above pass because their operands are the same
-// width. §11.4.5 rules that where one or both operands are unsigned, "if the
-// operands are of unequal bit lengths, the smaller operand shall be
-// zero-extended to the size of the larger operand", so the two-bit `b` is
-// compared against the whole of the four-bit `a`: `a` is unequal to `b`
+// width. §11.4.5 rules that where one or both operands are unsigned, the
+// narrower operand is zero-extended to the wider one's size, so the two-bit `b`
+// is compared against the whole of the four-bit `a`: `a` is unequal to `b`
 // wherever `a` exceeds three, and a comparison of the low two bits alone
 // answers 1 at four against zero.
 TEST(EqualitySynthesis, EqualityOfUnequalWidthsZeroExtendsTheNarrowerOperand) {
@@ -52,11 +51,11 @@ TEST(EqualitySynthesis, EqualityOfUnequalWidthsZeroExtendsTheNarrowerOperand) {
       [](uint64_t a, uint64_t b) -> uint64_t { return a == b ? 1U : 0U; });
 }
 
-// §11.4.5 rules that "the result shall be 1'b0 if the comparison fails and
-// 1'b1 if it succeeds", so the equality of two four-bit operands is one bit
-// wide: bit 0 of `y` carries the comparison and the three bits above it are
-// zero. The test fails on a lowering that answers the comparison at every bit
-// index, which drives `y` to 15 where §11.4.5 asks for 1.
+// §11.4.5 gives the comparison 1'b1 when it holds and 1'b0 when it does not, so
+// the equality of two four-bit operands is one bit wide: bit 0 of `y` carries
+// the comparison and the three bits above it are zero. The test fails on a
+// lowering that answers the comparison at every bit index, which drives `y` to
+// 15 where §11.4.5 asks for 1.
 //
 // The case names the whole four-bit output word at one equal pair and one
 // unequal pair rather than sweeping, so the width of the result is what it
@@ -82,8 +81,8 @@ TEST(EqualitySynthesis, EqualityCarriesItsResultInBitZeroAlone) {
 // The test fails on a fix that reaches the logical equality operators and
 // leaves `===` answering constant zero, which the cases above pass. Table 11-9
 // of §11.4.5 defines `a === b` as "a equal to b, including x and z", and
-// §11.4.5 rules that for the case equality operators the result "shall always
-// be a known value, either 1'b1 or 1'b0".
+// §11.4.5 rules that for the case equality operators the result is always
+// known, 1'b1 or 1'b0.
 //
 // `===` is expected to answer what `==` answers here because an `AigGraph` node
 // holds two values, so no value this netlist can represent is x or z. Over the
@@ -156,9 +155,8 @@ TEST(EqualitySynthesis,
 // therefore carried out over the wider signal operand or 64 positions,
 // whichever was larger, whatever the literal's size constant said.
 //
-// §11.4.5 rules that the four equality operators "compare operands bit for
-// bit", and that "If the operands are of unequal bit lengths, the smaller
-// operand shall be zero-extended to the size of the larger operand".
+// §11.4.5 rules that the four equality operators compare their operands bit by
+// bit, and that the narrower operand is zero-extended to the wider one's size.
 // `128'h1_0000_0000_0000_0000` is 128 bits, so the four-bit `a` is
 // zero-extended to 128 bits. Bit 64 of the extended `a` is 0 and bit 64 of the
 // literal is 1, so the two differ at every value of `a` and the equality is 0

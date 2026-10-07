@@ -267,13 +267,13 @@ TEST(ObjectPropertySim, LocalParameterAccessedViaInstance) {
             42u);
 }
 
-// §10.4 puts procedural assignments "within procedures such as always, initial,
-// task, and function", so an assignment to a property from a method is one and
-// §10.7 truncates or extends it into the object the declaration made. §8.2's
-// own Packet is the case: it declares `bit [3:0] command;` beside a `clean`
-// task that assigns to it, and to `initiator_id` the `5'bx` §6.11.2 gives a
-// `bit` no room for. The property took the value's width instead, so both
-// survived.
+// §10.4 puts procedural assignments inside procedures, always, initial, task
+// and function among them, so an assignment to a property from a method is one
+// and §10.7 truncates or extends it into the object the declaration made.
+// §8.2's own Packet is the case: it declares `bit [3:0] command;` beside a
+// `clean` task that assigns to it, and to `initiator_id` the `5'bx` §6.11.2
+// gives a `bit` no room for. The property took the value's width instead, so
+// both survived.
 
 // The width. Eight bits of 8'hFF into the four `command` declares reads 15;
 // the property carrying the literal's own width reads 255.

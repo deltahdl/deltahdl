@@ -206,7 +206,7 @@ TEST(EventControlElaboration,
                             5, "9.4.2"));
 }
 
-// §9.4.2 says "Event expressions shall return singular values" and puts no
+// §9.4.2 requires an event expression to return a singular value and puts no
 // condition on where the statement the event control precedes stands. A.6.4
 // makes a procedural_timing_control_statement a statement_item, so an event
 // control may be written in every position a statement holds a statement in,

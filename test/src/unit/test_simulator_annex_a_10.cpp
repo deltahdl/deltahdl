@@ -17,8 +17,8 @@ using namespace delta;
 namespace {
 
 // The top module's own output port variable holds its initializer, and the
-// initial procedure reads it, §6.8 having the initialization happen "before
-// any initial or always procedures are started".
+// initial procedure reads it, §6.8 having the initialization happen before any
+// initial or always procedure starts.
 TEST(PortInitializerSimulation, TopOutputPortHoldsItsInitializer) {
   SimFixture f;
   auto out = RunCapture(

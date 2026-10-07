@@ -418,13 +418,12 @@ TEST(AlwaysLatchBasicSim, BeginEndBlockWithArithmetic) {
   EXPECT_EQ(q->value.ToUint64(), 0x30u);
 }
 
-// §9.2.2.3: "The always_latch construct is identical to the always_comb
-// construct except that software tools should perform additional checks and
-// warn if the behavior in an always_latch construct does not represent latched
-// logic", and "All statements in 9.2.2.2 shall apply to always_latch". So the
-// implicit sensitivity list of an always_latch is the one §9.2.2.2.1 defines,
-// including the sentence on printed page 223 that expressions used in assertion
-// action blocks do not contribute to it.
+// §9.2.2.3: always_latch is always_comb with extra checks a tool should make,
+// warning when the behavior is not latched logic, and everything §9.2.2.2
+// states applies to always_latch too. So the implicit sensitivity list of an
+// always_latch is the one §9.2.2.2.1 defines, including the sentence on printed
+// page 223 that expressions used in assertion action blocks do not contribute
+// to it.
 //
 // `en` is the assertion expression and is in the list; `d` is read only in the
 // pass statement and is not. `d` moves from 10 to 20 at time 1 with `en` held,

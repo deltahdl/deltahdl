@@ -120,11 +120,11 @@ TEST(ForceReleaseElaboration, ForcePartSelectUserNettypeNetIsError) {
                             "nettype is not a legal force LHS", 4, "10.6.2"));
 }
 
-// §10.6.2 (printed page 257): "A force or release statement shall not be
-// applied to a variable that is being assigned by a mixture of continuous and
-// procedural assignments." §6.5 rejects the mixture itself and its report
-// stands at the continuous assignment on line 3, so naming that report proves
-// nothing about the force; this names §10.6.2's own, at the force on line 6.
+// §10.6.2 (printed page 257): force and release may not be applied to a
+// variable assigned by a mixture of continuous and procedural assignments. §6.5
+// rejects the mixture itself and its report stands at the continuous assignment
+// on line 3, so naming that report proves nothing about the force; this names
+// §10.6.2's own, at the force on line 6.
 TEST(ForceReleaseElaboration, ForceOnAMixedAssignmentVariableNamesItsOwnRule) {
   ElabFixture f;
   ElaborateSrc(
@@ -144,10 +144,10 @@ TEST(ForceReleaseElaboration, ForceOnAMixedAssignmentVariableNamesItsOwnRule) {
 
 TEST(ForceReleaseElaboration,
      ForceOnAVariableWithOnlyAContinuousAssignmentIsAccepted) {
-  // §6.5 (printed page 91): "A force statement is neither a continuous nor a
-  // procedural assignment." So a lone force beside a continuous assignment is
-  // no mixture, and this is what stops the rule from rejecting every force on a
-  // continuously assigned variable.
+  // §6.5 (printed page 91): a force statement counts as neither a continuous
+  // nor a procedural assignment. So a lone force beside a continuous assignment
+  // is no mixture, and this is what stops the rule from rejecting every force
+  // on a continuously assigned variable.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -194,8 +194,8 @@ TEST(ForceReleaseElaboration, ForceConcatWithBitSelectVariableIsError) {
 }
 
 // §10.6.2 admits a constant bit-select of a vector net as a force target, and a
-// constant expression per §11.2.1 is not only a literal but also a parameter.
-// A parameter-indexed net bit-select is therefore a legal force LHS.
+// constant expression per §11.2.1 is not only a literal but also a parameter. A
+// parameter-indexed net bit-select is therefore a legal force LHS.
 TEST(ForceReleaseElaboration, ForceParamBitSelectNetElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -344,13 +344,13 @@ TEST(ForceReleaseElaboration,
                             "10.6.2"));
 }
 
-// §10.6.2: "A force or release statement shall not be applied to a variable
-// that is being assigned by a mixture of continuous and procedural
-// assignments." The mixture and the force are both written as member-qualified
-// names here, so the case rests on the reduction of a dotted lvalue to the data
-// object it writes -- §23.7's first name component -- which the walk behind
-// CollectProcTargets and CollectForceReleaseTargets answered as nothing for
-// every dotted name until it followed the field the parser fills.
+// §10.6.2: force and release may not be applied to a variable assigned by a
+// mixture of continuous and procedural assignments. The mixture and the force
+// are both written as member-qualified names here, so the case rests on the
+// reduction of a dotted lvalue to the data object it writes -- §23.7's first
+// name component -- which the walk behind CollectProcTargets and
+// CollectForceReleaseTargets answered as nothing for every dotted name until it
+// followed the field the parser fills.
 TEST(ForceReleaseElaboration, ForceOverAMemberQualifiedMixedTargetIsReported) {
   ElabFixture f;
   ElaborateSrc(

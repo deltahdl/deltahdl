@@ -116,10 +116,9 @@ TEST(ConditionalStatementSim, IfElseIfBlockBodyDefaultElseExecutes) {
   EXPECT_EQ(yv->value.ToUint64(), 66u);
 }
 
-// §12.4.1: "The expressions shall be evaluated in order. If any expression is
-// true, the statement associated with it shall be executed, and this shall
-// terminate the whole chain." When an earlier condition is true, a later
-// condition carrying a side effect must never be evaluated. The second
+// §12.4.1: the conditions are evaluated in order, and the first true one runs
+// its statement and ends the whole chain. When an earlier condition is true, a
+// later condition carrying a side effect must never be evaluated. The second
 // condition here post-increments i; because the first condition is true the
 // chain terminates before it, so i stays at its initial value.
 TEST(ConditionalStatementSim, IfElseIfFirstTrueSkipsLaterConditionSideEffect) {

@@ -104,13 +104,13 @@ TEST(ChargeDecayElaboration, DecayTimeFromLocalparam) {
 // third triple's.
 //
 // The charge decay time is 8, the typical member of the third triple. §11.11
-// orders the three as "minimum, typical, and maximum values -- in that order",
-// and the typical member is the one elaboration can reach: nothing in
-// production writes the DelayMode in src/simulator/sim_context_types.h that
-// would name another, which is #3264. A decay time read off the first triple
-// answers 2, one taking the third triple's minimum answers 7, and a fold that
-// gives up on a triple answers 0 -- which §28.16.2.1 makes a trireg that never
-// decays, the opposite of what this declaration asks for.
+// orders the three as minimum, then typical, then maximum, and the typical
+// member is the one elaboration can reach: nothing in production writes the
+// DelayMode in src/simulator/sim_context_types.h that would name another, which
+// is #3264. A decay time read off the first triple answers 2, one taking the
+// third triple's minimum answers 7, and a fold that gives up on a triple
+// answers 0 -- which §28.16.2.1 makes a trireg that never decays, the opposite
+// of what this declaration asks for.
 TEST(ChargeDecayElaboration, DecayTimeIsTheThirdTripleWhenEveryDelayIsATriple) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -197,12 +197,12 @@ TEST(ChargeDecayElaboration, DefaultDecayTimeDoesNotReachANonTrireg) {
 
 // A.2.2.3 writes delay_value over "unsigned_number | real_number |
 // ps_identifier | time_literal | 1step", so a decay time with a decimal point
-// is a form the grammar admits. §3.14.1 settles what it becomes: "the time
-// precision specifies how delay values are rounded before being used in
-// simulation", and where the precision is the time unit itself "delay values
-// are rounded off to whole numbers (integers)". RtlirNet::decay_ticks is a raw
-// tick count that nothing scales later, so the rounding is the elaborator's,
-// and 50.5 is a decay time of 51 rather than a net left holding its charge.
+// is a form the grammar admits. §3.14.1 settles what it becomes: the time
+// precision fixes how a delay value is rounded before simulation uses it, and
+// where the precision equals the time unit, delay values round to whole
+// numbers. RtlirNet::decay_ticks is a raw tick count that nothing scales later,
+// so the rounding is the elaborator's, and 50.5 is a decay time of 51 rather
+// than a net left holding its charge.
 TEST(ChargeDecayElaboration, RealThirdDelayRoundsToADecayTime) {
   ElabFixture f;
   auto* design = ElaborateSrc(

@@ -58,9 +58,9 @@ TEST(PrimaryLexing, TimeUnitFemtoseconds) {
 // Lexing "int ' (x)" yields the int keyword token, then TokenKind::kApostrophe,
 // then TokenKind::kLParen. A.8.4 writes cast ::= casting_type ' ( expression ),
 // so the apostrophe and the ( are two separate grammar terminals. §5.3 rules
-// that white space "shall be ignored except when they serve to separate other
-// lexical tokens", so a space standing between those two terminals separates
-// them and carries nothing else.
+// that white space is ignored except where it separates lexical tokens, so a
+// space standing between those two terminals separates them and carries nothing
+// else.
 TEST(PrimaryLexing,
      WhiteSpaceBetweenApostropheAndLParenLexesApostropheThenLParen) {
   auto tokens = Lex("int ' (x)");

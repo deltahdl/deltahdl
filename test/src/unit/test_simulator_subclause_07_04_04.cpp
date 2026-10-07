@@ -124,15 +124,15 @@ TEST(MultidimensionalArraySimulation,
 }
 
 TEST(MultidimensionalArraySimulation, NonblockingReachesSameElementAsBlocking) {
-  // §10.4.2: the variable_lvalue of a nonblocking assignment is "a data type
-  // that is valid for a procedural assignment statement", and §7.4.5 makes an
-  // indexed name one such lvalue, so `A[1][2] <= 9` must land in the very
-  // element `A[1][2] = 9` would have written. The two elements are read out of
-  // the run by their own names rather than summed, because a sum cannot say
-  // which of them carried the value -- nor that the array's base variable took
-  // it instead. The delay lets the update region run: a nonblocking assignment
-  // read back at time 0 still shows the old value. 9 is odd on purpose; an
-  // even value would leave a wrongly written base variable at 0 as well.
+  // §10.4.2: the variable_lvalue of a nonblocking assignment is any data type a
+  // procedural assignment statement accepts, and §7.4.5 makes an indexed name
+  // one such lvalue, so `A[1][2] <= 9` must land in the very element
+  // `A[1][2] = 9` would have written. The two elements are read out of the run
+  // by their own names rather than summed, because a sum cannot say which of
+  // them carried the value -- nor that the array's base variable took it
+  // instead. The delay lets the update region run: a nonblocking assignment
+  // read back at time 0 still shows the old value. 9 is odd on purpose; an even
+  // value would leave a wrongly written base variable at 0 as well.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -157,10 +157,10 @@ TEST(MultidimensionalArraySimulation, NonblockingReachesSameElementAsBlocking) {
 // §7.4.4 makes a multidimensional array an array of arrays, so the name of one
 // of its inner arrays is itself an aggregate and `mirror[0][0] = bank[0][0]`
 // copies the two elements that inner array holds. §6.8 gives each of those
-// four names its own storage -- "A variable is an abstraction of a data storage
-// element. A variable shall store a value from one assignment to the next" --
-// which TrySubarrayAssign (src/simulator/statement_assign_core.cpp) has to
-// leave standing. It gathers the source subarray by walking the context for the
+// four names its own storage -- a variable stands for a data storage element
+// and keeps its value from one assignment to the next -- which
+// TrySubarrayAssign (src/simulator/statement_assign_core.cpp) has to leave
+// standing. It gathers the source subarray by walking the context for the
 // leaves under that prefix and stores each leaf's Logic4Vec into the matching
 // destination leaf, and a Logic4Vec copies its `words` pointer rather than the
 // words (src/common/types.h), so the two subarrays were one row of storage read
@@ -216,8 +216,8 @@ TEST(MultidimensionalArraySimulation, SubarrayCopyElementsGetTheirOwnWords) {
   EXPECT_EQ(carried->value.words[0].aval & 0xFFu, 0x3Cu);
 }
 
-// §7.4.4: "A multidimensional array is an array of arrays", so `int
-// a[0:1][0:2]` is two arrays of three, six elements in all. A declaration
+// §7.4.4: a multidimensional array is an array whose elements are arrays, so
+// `int a[0:1][0:2]` is two arrays of three, six elements in all. A declaration
 // inside a begin-end block was built from its first dimension alone, so the
 // array had two elements and a write to `a[1][2]` reached a leaf nothing had
 // created. The read is what says so: the write was silent either way.
@@ -287,14 +287,14 @@ TEST(MultidimensionalArraySimulation, ModuleScopeArrayAgreesWithTheBlockLocal) {
   EXPECT_EQ(v, 7u);
 }
 
-// §7.4.5: "Writing to an array with an invalid index shall perform no
-// operation, with the exceptions of writing to element [$+1] of a queue ... and
-// creating a new element of an associative array". A fixed unpacked array is
-// neither exception, and the write invented a variable for the name it built
-// instead -- 32 bits wide whatever the element type declared, in the
-// design-wide table under a name FindVariable will not read back from inside an
-// instance, and made again on every execution. Nothing existing under the name
-// afterwards is what says the operation was not performed.
+// §7.4.5: a write through an invalid index does nothing, apart from a write to
+// element [$+1] of a queue and the creation of a new associative array element.
+// A fixed unpacked array is neither exception, and the write invented a
+// variable for the name it built instead -- 32 bits wide whatever the element
+// type declared, in the design-wide table under a name FindVariable will not
+// read back from inside an instance, and made again on every execution. Nothing
+// existing under the name afterwards is what says the operation was not
+// performed.
 TEST(MultidimensionalArraySimulation,
      WriteToAnAbsentCompoundElementIsNoOperation) {
   SimFixture f;
@@ -354,11 +354,10 @@ TEST(MultidimensionalArraySimulation, WriteToAPresentCompoundElementReachesIt) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-// §7.4.4: "Multiple packed dimensions can also be defined in stages with
-// typedef", whose example `typedef bit [1:5] bsix; bsix [1:10] v5;` is 50 bits
-// -- the use-site range multiplies the width the name stands for rather than
-// replacing it. `nib [1:0] x` on a `typedef bit [3:0] nib` is therefore eight
-// bits.
+// §7.4.4: packed dimensions may also be built up in stages through typedef,
+// whose example `typedef bit [1:5] bsix; bsix [1:10] v5;` is 50 bits -- the
+// use-site range multiplies the width the name stands for rather than replacing
+// it. `nib [1:0] x` on a `typedef bit [3:0] nib` is therefore eight bits.
 //
 // It was two: the width came from a reader that tested the packed dimensions
 // before the name and answered from the range alone, so the declaration took
@@ -420,9 +419,9 @@ TEST(MultidimensionalArraySimulation,
   EXPECT_EQ(v, 0xDu);
 }
 
-// §6.18 makes a declared object "the type the name stands for" and §7.4.4 keeps
-// a typedef's unpacked dimensions in the type rather than in the declaration
-// that uses the name, so `q_t qu;` declares a queue wherever it is written. A
+// §6.18 gives a declared object the type the name stands for and §7.4.4 keeps a
+// typedef's unpacked dimensions in the type rather than in the declaration that
+// uses the name, so `q_t qu;` declares a queue wherever it is written. A
 // declaration among a module's items adopted those dimensions; one written
 // inside a subroutine is a statement and adopted nothing, so the local was a
 // plain vector of the element's width and push_back reached no store at all.

@@ -372,9 +372,9 @@ TEST(ParameterOverride, TypeParameterOverriddenByPackageScopedTypeName) {
   ExpectVariableWidth(SoleChildInstance(design), "data", 16u);
 }
 
-// §8.25 (printed page 204) states that "a generic class is not a type; only a
-// concrete specialization represents a type", and that two specializations are
-// the same type only when all their parameters are the same. So Buf#(byte) and
+// §8.25 (printed page 204) states that a generic class is not itself a type,
+// only a concrete specialization is, and that two specializations are the same
+// type only when all their parameters are the same. So Buf#(byte) and
 // Buf#(shortint) name different types, and the elem_t of the first is a byte.
 // The width is read back because an override that dropped the #(byte) would
 // still name a type and so would be reported nowhere: the child's variable
@@ -445,12 +445,12 @@ TEST(ParameterOverride, TypeParameterOverriddenByASecondClassSpecialization) {
   ExpectVariableWidth(SoleChildInstance(design), "data", 16u);
 }
 
-// §8.25.1 (printed page 205) states that "the default specialization of a
-// parameterized class is the specialization of the parameterized class with an
-// empty parameter override list", and that outside the class the explicit
-// specialization form is what a scope resolution shall be written with. So
-// Buf#()::elem_t names elem_t with T at the int its declaration gives, 32 bits,
-// and neither the child's declared default of 64 nor a failure to name a type.
+// §8.25.1 (printed page 205) states that a parameterized class's default
+// specialization is the one written with an empty parameter override list, and
+// that outside the class the explicit specialization form is what a scope
+// resolution shall be written with. So Buf#()::elem_t names elem_t with T at
+// the int its declaration gives, 32 bits, and neither the child's declared
+// default of 64 nor a failure to name a type.
 TEST(ParameterOverride, TypeParameterOverriddenByDefaultClassSpecialization) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -469,13 +469,13 @@ TEST(ParameterOverride, TypeParameterOverriddenByDefaultClassSpecialization) {
   ExpectVariableWidth(SoleChildInstance(design), "data", 32u);
 }
 
-// §8.25.1 (printed page 205) states that "not all parameterized classes have a
-// default specialization since it is legal for a class to not provide parameter
-// defaults", and that in that case "all specializations shall override at least
-// those parameters with no defaults". D#(4) overrides the only such parameter,
-// so the child's handle is declared from a concrete specialization and nothing
-// is reported. The companion below writes D unspecialized and is reported, so
-// this case cannot pass by nothing ever being reported here.
+// §8.25.1 (printed page 205) states that a parameterized class may lack a
+// default specialization, since a class need not give its parameters defaults,
+// and that every specialization of such a class then overrides at least the
+// parameters without defaults. D#(4) overrides the only such parameter, so the
+// child's handle is declared from a concrete specialization and nothing is
+// reported. The companion below writes D unspecialized and is reported, so this
+// case cannot pass by nothing ever being reported here.
 TEST(ParameterOverride,
      BareClassSpecializationOverrideSuppliesTheClassParameter) {
   ElabFixture f;

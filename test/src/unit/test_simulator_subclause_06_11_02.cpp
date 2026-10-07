@@ -464,10 +464,10 @@ TEST(TwoStateAndFourState, FunctionBodyLocalOfATypedefNameKeepsXz) {
 // `bit` function was kept where the same value assigned to a `bit` of the
 // design was cleared.
 
-// §10.8 makes "the passing of a value to a subroutine input, output, or inout
-// argument" an assignment-like context, so the conversion belongs at the copy
-// in. The formal is read back out through a 4-state variable, so what is read
-// is the formal's own conversion and not a second one at the target.
+// §10.8 makes passing a value to a subroutine's input, output or inout argument
+// an assignment-like context, so the conversion belongs at the copy in. The
+// formal is read back out through a 4-state variable, so what is read is the
+// formal's own conversion and not a second one at the target.
 TEST(TwoStateAndFourState, TwoStateFormalZeroesXzAtTheCall) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -558,16 +558,15 @@ TEST(TwoStateAndFourState, TwoStateFunctionNameAssignZeroesXz) {
   EXPECT_EQ(var->value.ToUint64(), 0xA4u);
 }
 
-// §6.11.2, printed p.110: "any unknown or high-impedance bits shall be
-// converted to zeros." The rule is stated of the 2-state type of the object
-// written, and an element of an unpacked array is an object of the array's
-// element type, so how many dimensions the declaration wrote cannot change the
-// answer. It did. The two-dimensional leaf carried the declaration's 2-state
-// flag and coerced; the one-dimensional leaf was created without it and
-// defaulted to 4-state, so the coercion never fired and the same 8'hxx stayed
-// unknown in c[0] while it read zero in d[0][0]. Both spellings are written in
-// the one run, and both asserted, so the case states the disagreement rather
-// than one half of it.
+// §6.11.2, printed p.110: any x or z bits become zeros. The rule is stated of
+// the 2-state type of the object written, and an element of an unpacked array
+// is an object of the array's element type, so how many dimensions the
+// declaration wrote cannot change the answer. It did. The two-dimensional leaf
+// carried the declaration's 2-state flag and coerced; the one-dimensional leaf
+// was created without it and defaulted to 4-state, so the coercion never fired
+// and the same 8'hxx stayed unknown in c[0] while it read zero in d[0][0]. Both
+// spellings are written in the one run, and both asserted, so the case states
+// the disagreement rather than one half of it.
 //
 // ToUint64 is no use here: it projects aval & ~bval, so an x reads as zero
 // whether or not it was converted, and every one of these cases would have
@@ -595,12 +594,11 @@ TEST(TwoStateAndFourState, TwoStateUnpackedElementZeroesXzAtEitherRank) {
   EXPECT_EQ(vd->value.ToString(), vc->value.ToString());
 }
 
-// The clause names "unknown or high-impedance" bits together and converts both,
-// and only the bval plane tells the two apart: x is (aval=1, bval=1) and z is
-// (aval=0, bval=1). A value that is all z therefore sets a bit pattern the x
-// case above never reaches -- every aval bit clear -- and pins that the rule's
-// second word is covered too, rather than leaving z to the coercion's
-// arithmetic by inference.
+// The clause names x and z bits together and converts both, and only the bval
+// plane tells the two apart: x is (aval=1, bval=1) and z is (aval=0, bval=1). A
+// value that is all z therefore sets a bit pattern the x case above never
+// reaches -- every aval bit clear -- and pins that the rule's second word is
+// covered too, rather than leaving z to the coercion's arithmetic by inference.
 TEST(TwoStateAndFourState, TwoStateUnpackedElementZeroesHighImpedance) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -705,10 +703,10 @@ TEST(TwoStateAndFourState, TwoStateBodyLocalKeepsTheKnownBitsOfItsInitializer) {
   EXPECT_EQ(var->value.ToUint64(), 0xA4u);
 }
 
-// §10.5 makes a variable declaration assignment "a special case of procedural
-// assignment", so §6.11.2's conversion reaches an array's initializer element
-// by element -- §10.9.1 evaluating each pattern item in the assignment context
-// of its element. The three helpers that fill a one-dimensional array's leaves
+// §10.5 makes a variable declaration assignment a special case of procedural
+// assignment, so §6.11.2's conversion reaches an array's initializer element by
+// element -- §10.9.1 evaluating each pattern item in the assignment context of
+// its element. The three helpers that fill a one-dimensional array's leaves
 // stored the item resized and not converted, so the one spelling that is both a
 // declaration initializer and an array element kept the x that the same value
 // loses in a scalar declaration and in a runtime write to the same element.

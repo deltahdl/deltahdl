@@ -32,11 +32,11 @@ std::string WideStructSource(std::string_view body) {
          "endmodule\n";
 }
 
-// §10.9.2: "A member:value specifies an explicit value for a named member of
-// the structure", and the member is the bits the member occupies. 8'hA5 and
-// 64'h42 are chosen so that the answer a placement into words[0] alone gave --
-// the two ORed together, 0xE7 -- is neither of them, and so that a case using
-// all-ones values could not pass on the OR by accident.
+// §10.9.2: a member:value gives an explicit value to a named member of the
+// structure, and the member is the bits the member occupies. 8'hA5 and 64'h42
+// are chosen so that the answer a placement into words[0] alone gave -- the two
+// ORed together, 0xE7 -- is neither of them, and so that a case using all-ones
+// values could not pass on the OR by accident.
 TEST(StructPatternSimulation,
      WideStructNamedPatternPlacesAMemberAboveTheFirstWord) {
   SimFixture f;
@@ -51,11 +51,11 @@ TEST(StructPatternSimulation,
   EXPECT_EQ(var->value.words[0].bval, 0u);
 }
 
-// §6.3.1: "All bits of 4-state vectors can be independently set to one of the
-// four basic values", and §10.9.2 evaluates a member expression in the context
-// of an assignment to the member, which for a logic member carries x and z.
-// `b`'s known 0x42 is what makes this discriminating: a result that came out
-// all-x or all-0 fails, and only the per-member answer passes.
+// §6.3.1: each bit of a 4-state vector may independently take any of the four
+// basic values, and §10.9.2 evaluates a member expression in the context of an
+// assignment to the member, which for a logic member carries x and z. `b`'s
+// known 0x42 is what makes this discriminating: a result that came out all-x or
+// all-0 fails, and only the per-member answer passes.
 TEST(StructPatternSimulation, NamedStructPatternCarriesAnUnknownMemberValue) {
   SimFixture f;
   auto* var = RunAndFindVar(

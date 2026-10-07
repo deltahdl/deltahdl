@@ -793,19 +793,18 @@ TEST(ReadmemFileLoadSim, UnopenableFileStatesNoRuleOfTheStandard) {
   EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), "cannot open file", 3, ""));
 }
 
-// §9.4.2: "A non-edge implicit event shall be detected on any change in the
-// value of the expression", and the clause names no writer whose change is
-// exempt. A system task that writes one of its arguments has written a user
-// variable, so a process parked on it resumes -- which every case above could
-// pass without, the store having happened all along and the value being what
-// they read back.
-// §21.4's load writes the memory's elements, which is what a testbench most
-// often waits on. The wait is the route that reaches them: CollectSelectReads
-// puts the folded prefix `mem[2]` into the read set beside the base name, so a
-// watcher stands on the very element the load writes. An always_comb reading
-// the same element would not do -- its inferred sensitivity list reduces every
-// read to its base signal name, so it watches `mem` and no element write of any
-// kind reaches it, which is #3592 rather than anything §21.4 decides.
+// §9.4.2: a non-edge implicit event is detected whenever the expression's value
+// changes, and the clause names no writer whose change is exempt. A system task
+// that writes one of its arguments has written a user variable, so a process
+// parked on it resumes -- which every case above could pass without, the store
+// having happened all along and the value being what they read back. §21.4's
+// load writes the memory's elements, which is what a testbench most often waits
+// on. The wait is the route that reaches them: CollectSelectReads puts the
+// folded prefix `mem[2]` into the read set beside the base name, so a watcher
+// stands on the very element the load writes. An always_comb reading the same
+// element would not do -- its inferred sensitivity list reduces every read to
+// its base signal name, so it watches `mem` and no element write of any kind
+// reaches it, which is #3592 rather than anything §21.4 decides.
 TEST(ReadmemFileLoadSim, LoadedElementReleasesAWaitOnIt) {
   SimFixture f;
   std::string path = WriteData("event_h", "AB\nCD\nEF\n");

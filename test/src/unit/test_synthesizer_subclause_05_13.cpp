@@ -9,13 +9,12 @@ using namespace delta;
 namespace {
 
 // What the synthesizer answers for the built-in method §5.13 defines. §5.13
-// rules that "SystemVerilog uses a C++ -like class method calling syntax, in
-// which a subroutine is called using the dot notation (.)", writes that call as
-// `object.task_or_function()`, gives `dynamic_array.size`,
-// `associative_array.num` and `string.len` as its examples, and rules that
-// "When a subroutine built-in method call specifies no arguments, the empty
-// parentheses, (), following the subroutine name are optional". The two forms
-// of that call are the two cases below.
+// calls a subroutine with the dot notation (.), much as C++ calls a class
+// method, writes that call as `object.task_or_function()`, gives
+// `dynamic_array.size`, `associative_array.num` and `string.len` as its
+// examples, and makes the empty parentheses () after the subroutine name
+// optional for a built-in method call with no arguments. The two forms of that
+// call are the two cases below.
 //
 // Until this change this file wrote no method call at all, and no dot. It held
 // an unpacked array declaration and two continuous assignments to its

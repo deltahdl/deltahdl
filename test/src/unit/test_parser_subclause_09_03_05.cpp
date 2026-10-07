@@ -440,10 +440,10 @@ TEST(StatementLabelParsing, PrefixLabelMatchesJoinLabelOnFork) {
 }
 
 TEST(StatementLabelParsing, LabelBeforeEndIsError) {
-  // §9.3.5: "A label cannot appear before the end, join, join_any, or
-  // join_none, as these keywords do not form a statement." The report names the
-  // keyword, so each of the four sources below fixes a different message. It
-  // stands at the label on line 4, not at the keyword.
+  // §9.3.5: no label may stand before end, join, join_any or join_none, since
+  // those keywords are not statements. The report names the keyword, so each of
+  // the four sources below fixes a different message. It stands at the label on
+  // line 4, not at the keyword.
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -487,9 +487,9 @@ TEST(StatementLabelParsing, LabelBeforeJoinIsError) {
 }
 
 TEST(StatementLabelParsing, LabelBeforeDeclarationIsError) {
-  // §9.3.5: "A label can be specified before any procedural statement (any
-  // non-declaration statement that can appear inside a begin-end block)." A
-  // data declaration is not one, so a label before it is rejected. This message
+  // §9.3.5: a label may precede any procedural statement, meaning any statement
+  // other than a declaration that a begin-end block can hold. A data
+  // declaration is not one, so a label before it is rejected. This message
   // differs from the keyword one above and from the "cannot have both a
   // statement label and a block name" report the same subclause already
   // carries, which is what keeps the three §9.3.5 rules apart.

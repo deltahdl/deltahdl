@@ -177,19 +177,19 @@ TEST(EventControlSim, ForStepIncrementWakesAnEventControl) {
   EXPECT_EQ(k->value.ToUint64(), 4u);
 }
 
-// §10.6.2: a force "shall override a procedural assignment ... until a release
-// procedural statement is executed on the variable", so an increment under a
-// force stores nothing -- and a change nobody made is not a change §9.4.2 asks
-// anyone to detect. That is why the notification belongs inside the is_forced
-// gate and not after it, and this case is what holds it there: p stays at the
-// forced 5 across two increments, and the process parked on @(p) is still
-// parked when the run ends. The awaiter is armed at time 1, after the force at
-// time 0, so the force's own effect on p cannot be what leaves fired at 0; only
-// the two increments at times 2 and 3 are being watched. Unlike the three cases
-// above this one reads the same values before the fix and after it. It is not a
-// test of the missing notification but of where the notification was put: it
-// fails only for a build that notifies outside the gate, which would set fired
-// to 1 while p still read 5.
+// §10.6.2: a force overrides a procedural assignment until a release is
+// executed on the variable, so an increment under a force stores nothing -- and
+// a change nobody made is not a change §9.4.2 asks anyone to detect. That is
+// why the notification belongs inside the is_forced gate and not after it, and
+// this case is what holds it there: p stays at the forced 5 across two
+// increments, and the process parked on @(p) is still parked when the run ends.
+// The awaiter is armed at time 1, after the force at time 0, so the force's own
+// effect on p cannot be what leaves fired at 0; only the two increments at
+// times 2 and 3 are being watched. Unlike the three cases above this one reads
+// the same values before the fix and after it. It is not a test of the missing
+// notification but of where the notification was put: it fails only for a build
+// that notifies outside the gate, which would set fired to 1 while p still read
+// 5.
 TEST(EventControlSim, ForcedTargetIncrementWakesNoEventControl) {
   SimFixture f;
   auto* fired = RunAndFindVar(

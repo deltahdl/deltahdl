@@ -33,10 +33,9 @@ namespace {
 // however the rule comes to be written.
 //
 // Every declaration below has a low bound other than zero. §11.5.1 rules that
-// "The actual bit that is accessed by an address is, in part, determined by the
-// declaration", and in a vector declared `[N:0]` an index and a storage offset
-// are the same number. A case declared `[N:0]` passes whether either component
-// read the declaration or not.
+// the declaration helps decide which bit an address reaches, and in a vector
+// declared `[N:0]` an index and a storage offset are the same number. A case
+// declared `[N:0]` passes whether either component read the declaration or not.
 
 // Drive `input_word` into the module that `data_range`, `y_range` and
 // `select_expr` describe, once through the netlist the synthesizer builds for

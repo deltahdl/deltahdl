@@ -185,11 +185,11 @@ TEST(AdditionBitLength, TaskBodyWiderLhsPreservesCarry) {
   EXPECT_EQ(var->value.ToUint64(), 0x10000u);
 }
 
-// §11.6 sizes the addition by "the bit length of the largest operand, including
-// the left-hand side", so a left-hand side no wider than the operands adds no
-// bit and the carry is still dropped. This is the half that says the context is
-// the target's own width rather than some width large enough to hold anything:
-// a body that widened every sum to a word would report 0x10000 here too.
+// §11.6 sizes the addition by its widest operand, the left-hand side included,
+// so a left-hand side no wider than the operands adds no bit and the carry is
+// still dropped. This is the half that says the context is the target's own
+// width rather than some width large enough to hold anything: a body that
+// widened every sum to a word would report 0x10000 here too.
 TEST(AdditionBitLength, FunctionBodySameWidthLhsStillDropsCarry) {
   SimFixture f;
   auto* var = RunAndFindVar(

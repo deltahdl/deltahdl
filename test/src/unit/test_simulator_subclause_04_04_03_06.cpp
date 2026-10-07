@@ -92,8 +92,8 @@ TEST(PliPostObservedSim, PostObservedProvidesReadOnlySnapshotAfterObserved) {
 
 // End-to-end coverage of §4.4.3.6's read guarantee, building the consumed value
 // from real source syntax rather than a hand-scheduled event. §4.4.3.6 lets a
-// Post-Observed PLI callback read values settled by the Observed region "or an
-// earlier region"; an NBA update is exactly such an earlier active-set region.
+// Post-Observed PLI callback read values settled by the Observed region or an
+// earlier one; an NBA update is exactly such an earlier active-set region.
 // Parsing/elaborating/lowering `q <= 8'd42` schedules q's update into the real
 // NBA region at time 0. A Post-Observed callback in that same slot (the only
 // way PLI code reaches this region - there is no HDL syntax for it) must sample

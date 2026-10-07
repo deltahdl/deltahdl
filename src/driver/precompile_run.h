@@ -27,10 +27,9 @@ PreprocConfig PreprocConfigFor(const CliOptions& opts,
 std::optional<std::string> ReadSource(const std::string& path);
 
 // §33.5.3's separate compilation tool: the invocation that compiles source
-// descriptions into a library rather than binding a design. "It is essential
-// that library cells persist, and the compiled forms shall, therefore, exist
-// somewhere in the filesystem", which is what --precompile-out names and what a
-// later --load-lib reads.
+// descriptions into a library rather than binding a design. Library cells have
+// to persist, so their compiled forms live somewhere in the filesystem, which
+// is what --precompile-out names and what a later --load-lib reads.
 //
 // Each source is preprocessed as an ordinary compile preprocesses it and
 // parsed once, its errors reported at its own file and line through `diag`;

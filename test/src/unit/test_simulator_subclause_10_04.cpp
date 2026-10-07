@@ -67,7 +67,7 @@ TEST(ProceduralAssignSim, BlockingFlowIsSequentialOverwrite) {
   EXPECT_EQ(b, 2u);
 }
 
-// §10.4 lists "aggregate variables (Clause 7)" as a legal procedural-assignment
+// §10.4 lists an aggregate variable (Clause 7) as a legal procedural-assignment
 // left-hand form. Assigning a whole unpacked array with an array literal drives
 // each element and observes that the aggregate LHS received the value.
 TEST(ProceduralAssignSim, AggregateVariableWholeArrayLhs) {
@@ -86,9 +86,9 @@ TEST(ProceduralAssignSim, AggregateVariableWholeArrayLhs) {
       f, design, {{"m0", 0xAAu}, {"m1", 0xBBu}, {"m2", 0xCCu}, {"m3", 0xDDu}});
 }
 
-// §10.4 lists "part-selects ... of packed arrays" as a legal LHS form. A
-// procedural assignment to a packed part-select updates exactly the selected
-// bit range and leaves the surrounding bits untouched.
+// §10.4 lists a part-select of a packed array as a legal LHS form. A procedural
+// assignment to a packed part-select updates exactly the selected bit range and
+// leaves the surrounding bits untouched.
 TEST(ProceduralAssignSim, PackedPartSelectLhs) {
   auto pk = RunAndGet(
       "module t;\n"
@@ -102,7 +102,7 @@ TEST(ProceduralAssignSim, PackedPartSelectLhs) {
   EXPECT_EQ(pk, 0x78u);
 }
 
-// §10.4 lists "slices of unpacked arrays" as a legal LHS form. A procedural
+// §10.4 lists a slice of an unpacked array as a legal LHS form. A procedural
 // assignment to an unpacked slice writes exactly the sliced elements and leaves
 // the neighbours untouched. The check is order-agnostic (element ordering
 // within the slice is governed by Clause 7, not §10.4): it observes that both
@@ -123,7 +123,7 @@ TEST(ProceduralAssignSim, UnpackedArraySliceLhs) {
   LowerRunAndCheck(f, design, {{"a0", 0u}, {"a3", 0u}, {"asum", 7u}});
 }
 
-// §10.4 form "aggregate variables (Clause 7)", built from §7.2 real syntax: a
+// §10.4's aggregate-variable form (Clause 7), built from §7.2 real syntax: a
 // whole packed-struct variable is a legal procedural-assignment LHS. Assigning
 // a value to the struct as a whole drives its members, observed via the
 // members.
@@ -142,7 +142,7 @@ TEST(ProceduralAssignSim, PackedStructWholeAssignLhs) {
   LowerRunAndCheck(f, design, {{"hi", 0xCu}, {"lo", 0x5u}});
 }
 
-// §10.4 form "aggregate variables (Clause 7)", built from §7.3 real syntax: a
+// §10.4's aggregate-variable form (Clause 7), built from §7.3 real syntax: a
 // whole packed-union variable is a legal procedural-assignment LHS. Assigning
 // to the union writes the shared storage, observed through a member read.
 TEST(ProceduralAssignSim, PackedUnionWholeAssignLhs) {
@@ -159,7 +159,7 @@ TEST(ProceduralAssignSim, PackedUnionWholeAssignLhs) {
   EXPECT_EQ(b, 0xA3u);
 }
 
-// §10.4 form "bit-selects ... of packed arrays": a procedural assignment to a
+// §10.4's form for a bit-select of a packed array: a procedural assignment to a
 // single bit-select updates only that bit, observed at runtime.
 TEST(ProceduralAssignSim, PackedBitSelectLhs) {
   auto v = RunAndGet(
@@ -201,8 +201,8 @@ TEST(ProceduralAssignSim, NonblockingFlowSwapsInSameBlock) {
   EXPECT_EQ(b, 1u);
 }
 
-// §10.4 puts procedural assignments "within procedures such as always,
-// initial, task, and function", and names one set of left-hand sides for all of
+// §10.4 puts procedural assignments inside procedures, always, initial, task
+// and function among them, and names one set of left-hand sides for all of
 // them. So a form legal in an initial block is legal in a subroutine body, and
 // the cases below write each one from inside a class method: ExecClassMethod
 // (src/simulator/eval_function.cpp) is the only route into a class body, so a
@@ -215,7 +215,7 @@ TEST(ProceduralAssignSim, NonblockingFlowSwapsInSameBlock) {
 // observes is the assignment inside the body rather than anything about how a
 // property is reached.
 
-// §10.4's "aggregate variables (Clause 7)" as an array pattern, which drives
+// §10.4's aggregate-variable form (Clause 7) as an array pattern, which drives
 // each element. The sum is read back rather than one element, so a pattern that
 // landed on the array's carrier instead of on its elements answers zero.
 TEST(ClassMethodAssignSim, AnArrayPatternAssignsFromAClassMethod) {
@@ -260,8 +260,8 @@ TEST(ClassMethodAssignSim, AStreamingTargetAssignsFromAClassMethod) {
             0xDEADu);
 }
 
-// §11.4.12's concatenation target: "The concatenation is treated as a packed
-// vector of bits. It can be used on the left-hand side of an assignment."
+// §11.4.12's concatenation target: a concatenation is a packed vector of bits
+// and may stand on the left-hand side of an assignment.
 TEST(ClassMethodAssignSim, AConcatenationTargetAssignsFromAClassMethod) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  function int split();\n"
@@ -282,14 +282,14 @@ TEST(ClassMethodAssignSim, AConcatenationTargetAssignsFromAClassMethod) {
             0x50Cu);
 }
 
-// §10.4's "slices of unpacked arrays", which writes exactly the sliced elements
-// and leaves the neighbours untouched. The two sliced elements are read back as
-// their sum at sixteen times, and the two beside them as themselves, so a write
-// that landed on the array's carrier rather than on its elements answers zero
-// and one that spilled into a neighbour answers more than 0x70. The sum is what
-// is read of the slice because element ordering within one is Clause 7's
-// question rather than §10.4's, which is what UnpackedArraySliceLhs above says
-// of the same statement outside a subroutine.
+// §10.4's form for a slice of an unpacked array, which writes exactly the
+// sliced elements and leaves the neighbours untouched. The two sliced elements
+// are read back as their sum at sixteen times, and the two beside them as
+// themselves, so a write that landed on the array's carrier rather than on its
+// elements answers zero and one that spilled into a neighbour answers more than
+// 0x70. The sum is what is read of the slice because element ordering within
+// one is Clause 7's question rather than §10.4's, which is what
+// UnpackedArraySliceLhs above says of the same statement outside a subroutine.
 TEST(ClassMethodAssignSim, AnUnpackedSliceAssignsFromAClassMethod) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  function int slice();\n"

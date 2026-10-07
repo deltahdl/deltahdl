@@ -2,7 +2,10 @@
 name: grouping-issues-into-a-push
 description: "A push solves every open issue of one matter, meaning one clause of IEEE 1800-2023 fixed in one subsystem of deltahdl. The matter bounds the batch, never a count. The batch is solved in the working tree and committed once. Changes to what verifies or what everything runs through go alone."
 metadata:
+  node_type: memory
   type: feedback
+  originSessionId: 1997291c-6fc2-4d5f-a1af-6b8a60d0dbe9
+  modified: 2026-10-07T11:12:45.135Z
 ---
 
 # Grouping issues into one push
@@ -35,6 +38,10 @@ A push solves a batch made of every open issue that shares one matter. The matte
    - The body gives each issue its own paragraph.
    - The message ends with one `Closes #N` line per issue ([[one-closing-keyword-per-issue]]).
 5. **Push and read the run.** Once it is clean, confirm that every issue the message closes is closed ([[confirming-a-push-closed-its-issues]]). When the run goes red, trace each failing job to the issue whose change it names, and fix it per [[fixing-a-red-run]]. When an issue's fix cannot be repaired, revert it and reopen the issue per [[a-revert-does-not-reopen]].
+
+A change that touches only comments is one matter whatever clause or subsystem it cites. Every open comment-only issue goes in a single batch, test/ and src/ together. A diagnostic's text is not a comment: tests assert it, so it stays batched by clause and subsystem.
+
+**Why:** A comment cannot change a build, a test or a report, so splitting such issues by clause traces nothing. It only charges each clause a CI wait of its own.
 
 Some changes go in a push of their own and are never batched:
 

@@ -1,8 +1,8 @@
 // §11.5.1 Vector bit-select and part-select addressing, for the half of the
-// clause that says "The actual bit that is accessed by an address is, in part,
-// determined by the declaration of acc". The clause makes the point with
-// `logic [15:0] acc` beside `logic [2:17] acc`, two sixteen-bit vectors in
-// which the same value of an index names a different bit.
+// clause that says the declaration of acc helps decide which bit an address
+// reaches. The clause makes the point with `logic [15:0] acc` beside
+// `logic [2:17] acc`, two sixteen-bit vectors in which the same value of an
+// index names a different bit.
 //
 // Every case here declares a range that does not end at zero, or a range that
 // ascends, so that the declaration is doing the work. A vector declared [N:0]
@@ -164,13 +164,13 @@ TEST(DeclaredRangeSelect, ArrayElementKeepsItsDeclaredRange) {
 }
 
 // §11.5.1 makes its point about `logic [15:0] acc` and `logic [2:17] acc`, but
-// what it settles is that "the actual bit that is accessed by an address is, in
-// part, determined by the declaration" -- and a net is declared with a packed
-// dimension in exactly the same way a variable is. So the three cases below are
-// the net counterparts of the variable cases above: the low bound of a
-// descending range names the least significant bit, the left bound of an
-// ascending range names the most significant one, and a part-select is bounded
-// by the range as written rather than by [width-1:0].
+// what it settles is that the declaration helps decide which bit an address
+// reaches -- and a net is declared with a packed dimension in exactly the same
+// way a variable is. So the three cases below are the net counterparts of the
+// variable cases above: the low bound of a descending range names the least
+// significant bit, the left bound of an ascending range names the most
+// significant one, and a part-select is bounded by the range as written rather
+// than by [width-1:0].
 TEST(DeclaredRangeSelect, NetBitSelectLowBoundIsLeastSignificantBit) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -294,12 +294,12 @@ TEST(DeclaredRangeSelect, InstanceArrayConnectionSlicesAnAscendingRange) {
 }
 
 // A module port carries a packed dimension the same way a variable or a net
-// does, so "the actual bit that is accessed by an address is, in part,
-// determined by the declaration" governs a select on a port too. A port is the
-// one declaration a module header holds and no body declaration repeats, so
-// these three cases put the select inside the instantiated module and read the
-// scalar or vector it drives back out. Each parent signal is declared [N:0] so
-// that only the port's own range is doing the work.
+// does, so the rule that the declaration helps decide which bit an address
+// reaches governs a select on a port too. A port is the one declaration a
+// module header holds and no body declaration repeats, so these three cases put
+// the select inside the instantiated module and read the scalar or vector it
+// drives back out. Each parent signal is declared [N:0] so that only the port's
+// own range is doing the work.
 TEST(DeclaredRangeSelect, PortBitSelectLowBoundIsLeastSignificantBit) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -374,19 +374,19 @@ std::string DeclaredRangeLeafInstantiated() {
          "endmodule\n";
 }
 
-// §11.5.1: "The actual bit that is accessed by an address is, in part,
-// determined by the declaration" -- so `logic [8:1] x` reaches the same bit
-// whether its module is the top or a child instance. Every case above declares
-// its vector in the source's last module, which ElaborateSrc in
-// lib/cpp/test_fixtures/fixture_simulator.h elaborates as the single top, and
-// the three Port cases put a declaration under an instance on a port header
-// rather than in a module body, so no case above selects through a range
-// declared in an instantiated module's body. The two answers are asserted equal
-// to each other rather than either against a literal, so the case fails on any
-// divergence between the two paths however either comes to resolve the index.
-// One design cannot hold both positions of one module -- a module is not an
-// instance beneath itself -- so the same module text is run twice instead, and
-// the child's answer is read under the instance-prefixed name it is stored by.
+// §11.5.1: the declaration helps decide which bit an address reaches -- so
+// `logic [8:1] x` reaches the same bit whether its module is the top or a child
+// instance. Every case above declares its vector in the source's last module,
+// which ElaborateSrc in lib/cpp/test_fixtures/fixture_simulator.h elaborates as
+// the single top, and the three Port cases put a declaration under an instance
+// on a port header rather than in a module body, so no case above selects
+// through a range declared in an instantiated module's body. The two answers
+// are asserted equal to each other rather than either against a literal, so the
+// case fails on any divergence between the two paths however either comes to
+// resolve the index. One design cannot hold both positions of one module -- a
+// module is not an instance beneath itself -- so the same module text is run
+// twice instead, and the child's answer is read under the instance-prefixed
+// name it is stored by.
 TEST(DeclaredRangeSelect, TopAndChildInstanceBodyVectorsSelectAlike) {
   SimFixture top_f;
   auto* top_r = RunAndFindVar(kDeclaredRangeLeaf, top_f, "r");
@@ -403,14 +403,14 @@ TEST(DeclaredRangeSelect, TopAndChildInstanceBodyVectorsSelectAlike) {
 }
 
 // The declarations a procedure and a subroutine body make are declarations
-// too, and the clause's "determined by the declaration" says nothing about
-// where one stands. Neither recorded a range: a procedure's local went through
+// too, and the clause's appeal to the declaration says nothing about where one
+// stands. Neither recorded a range: a procedure's local went through
 // ExecVarDeclImpl and a body's through CreateFuncLocalVar, both of which sized
 // the variable and stopped, so every such vector was addressed as [width-1:0]
 // whatever its declaration wrote (#3808). 6'h2D under [15:10] puts 1,0,1,1,0,1
-// at indices 15 down to 10: [13:10] is 4'b1101, 13, and [15:12] is 4'b1011,
-// 11. Addressed as [5:0] both selects lie outside the vector and read x; a
-// range recorded the wrong way round reads the other window's bits reversed.
+// at indices 15 down to 10: [13:10] is 4'b1101, 13, and [15:12] is 4'b1011, 11.
+// Addressed as [5:0] both selects lie outside the vector and read x; a range
+// recorded the wrong way round reads the other window's bits reversed.
 TEST(DeclaredRangeSelect, ProcedureLocalKeepsItsDeclaredRange) {
   SimFixture f;
   auto* var = RunAndFindVar(

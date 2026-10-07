@@ -45,10 +45,10 @@ TEST(AssignmentCompatibleElaboration, FunctionReturnAcceptsIntegralValue) {
 // A string return type is not assignment compatible with an integral literal
 // (no equivalence and no implicit casting rule), so IsAssignmentCompatible
 // returns false and the return statement is rejected. §6.22.3 states only the
-// definition "All equivalent types, and all nonequivalent types that have
-// implicit casting rules defined between them, are assignment-compatible
-// types", with no "shall", so the obligation the report enforces is §12.8's on
-// a return statement and the report names §12.8.
+// definition of assignment-compatible types as the equivalent types plus the
+// nonequivalent types with implicit casting rules between them, with no
+// "shall", so the obligation the report enforces is §12.8's on a return
+// statement and the report names §12.8.
 TEST(AssignmentCompatibleElaboration, FunctionReturnRejectsIncompatibleValue) {
   ElabFixture f;
   auto* design = ElaborateSrc(

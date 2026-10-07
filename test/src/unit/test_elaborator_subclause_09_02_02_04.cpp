@@ -274,12 +274,12 @@ TEST(AlwaysFFElaboration, MultiDriverViaFunctionCallErrors) {
 }
 
 // The §9.2.2.4 example event control is the richest accepting form of the
-// "one and only one event control" rule: a single @(...) whose event
-// expression combines an edge-with-iff guard and a second edge via `or`
-// (the §9.4.2 event_expression machinery). Two events under one event control
-// is still a single event control, so it must elaborate cleanly, keep both
-// events in the sensitivity list, and -- being edge-triggered -- raise no
-// not-sequential warning. The iff guard on the first event must survive.
+// exactly-one-event-control rule: a single @(...) whose event expression
+// combines an edge-with-iff guard and a second edge via `or` (the §9.4.2
+// event_expression machinery). Two events under one event control is still a
+// single event control, so it must elaborate cleanly, keep both events in the
+// sensitivity list, and -- being edge-triggered -- raise no not-sequential
+// warning. The iff guard on the first event must survive.
 TEST(AlwaysFFElaboration, EdgeIffOrEventControlAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -339,11 +339,10 @@ TEST(AlwaysFFElaboration, MissingEventControlNames9_2_2_4) {
                             "9.2.2.4"));
 }
 
-// §9.2.2.4: "The always_ff procedure imposes the restriction that it contains
-// one and only one event control and no blocking timing controls." A cycle
-// delay is a blocking timing control: §14.11 lists cycle_delay under
-// procedural_timing_control and has ## wait for the named number of clocking
-// block events.
+// §9.2.2.4: an always_ff holds exactly one event control and no blocking timing
+// control. A cycle delay is a blocking timing control: §14.11 lists cycle_delay
+// under procedural_timing_control and has ## wait for the named number of
+// clocking block events.
 //
 // The case names 9.2.2.4 rather than 9.2.2.2.2 because a different sentence
 // forbids a blocking statement in each procedure -- §9.2.2.2.2's for

@@ -312,14 +312,14 @@ TEST(ClassSim, UninitializedHandleDetectableAsNull) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// 8.4: an object "is used by first declaring a variable of that class type
-// (that holds an object handle) and then creating an object of that class
-// (using the new function) and assigning it to the variable" -- the clause
-// illustrates it with `Packet p; p = new;`. Nothing there makes the
-// construction depend on the construct the declaration sits in, so a handle
-// local to a function body is constructed exactly as one in an initial block
-// is. The handle is compared against null rather than a property being read,
-// so the test reports whether an object exists rather than what it contains.
+// 8.4: an object is used by declaring a variable of the class type, which holds
+// an object handle, then creating an object of the class with new and assigning
+// it to that variable -- the clause illustrates it with `Packet p; p = new;`.
+// Nothing there makes the construction depend on the construct the declaration
+// sits in, so a handle local to a function body is constructed exactly as one
+// in an initial block is. The handle is compared against null rather than a
+// property being read, so the test reports whether an object exists rather than
+// what it contains.
 TEST(ClassSim, NewConstructsHandleDeclaredInFunctionBody) {
   const char* src =
       "class P;\n"

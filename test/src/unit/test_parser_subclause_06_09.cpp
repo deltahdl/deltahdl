@@ -257,11 +257,11 @@ TEST(ScalarAndVectorDeclaration, MultidimensionalPackedArrayIsNotAVector) {
 
 // A vector's malformed range is reported under §7.4.1 and not under §6.9.
 // §6.9 states no range form to cite: it defines a scalar and a vector and then
-// defers the form, saying "Vectors are packed arrays of scalars (see 7.4)".
-// §7.4.1 is where the form is written, as "Each packed dimension in a packed
-// array declaration shall be specified by a range specification of the form
-// [ constant_expression : constant_expression ]". The case belongs in this
-// file because the spelling under test is a vector's.
+// defers the form, calling vectors packed arrays of scalars (§7.4). §7.4.1 is
+// where the form is written, as a range specification [ constant_expression :
+// constant_expression ] for every packed dimension of a packed array
+// declaration. The case belongs in this file because the spelling under test is
+// a vector's.
 TEST(DataType, MalformedVectorRangeNamesThePackedArrayClause) {
   auto r = Parse(
       "module m;\n"

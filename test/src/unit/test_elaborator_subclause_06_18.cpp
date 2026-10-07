@@ -447,11 +447,11 @@ TEST(UserDefinedTypeElaboration, ForwardTypedefScopePrefixClass_Legal) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.18: a typedef "gives a user-defined name to an existing data type", and
-// the clause counts unpacked array types among those -- it notes that a
-// user-defined name is needed for a type parameter value "when unpacked array
-// types are used". A variable declared with such a name is therefore of that
-// array type, dimensions included, and a queue dimension makes it a queue.
+// §6.18: a typedef names an existing data type, and the clause counts unpacked
+// array types among those -- it notes that a user-defined name is needed for a
+// type parameter value where unpacked array types are involved. A variable
+// declared with such a name is therefore of that array type, dimensions
+// included, and a queue dimension makes it a queue.
 TEST(UserDefinedTypeElaboration, QueueTypedefDeclaresAQueue) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -507,8 +507,8 @@ TEST(UserDefinedTypeElaboration, FixedArrayTypedefStillSizesTheVariable) {
 }
 
 // ---------------------------------------------------------------------------
-// Claim: "The declaration of a user-defined data type shall precede any
-// reference to its type_identifier."
+// Claim: a user-defined data type is declared before any reference to its
+// type_identifier.
 //
 // The three cases below are the ones the parser cannot answer, because
 // `my_type x;` is the two identifiers and semicolon a module instantiation
@@ -538,12 +538,12 @@ TEST(UserDefinedTypeElaboration, TypeReferenceBeforeItsDeclarationIsReported) {
 // A list of declarators references the type_identifier once. A.2.1.3 writes
 // `data_declaration ::= [ const ] [ var ] [ lifetime ] data_type_or_implicit
 // list_of_variable_decl_assignments ;`, putting the type ahead of the whole
-// list, so §6.18's "any reference to its type_identifier" is one reference here
-// and earns one report however many names follow. Parser::ParseVarDeclList
-// builds one ModuleItem per declarator and marks every one of them as
-// undeclared at parse, so the count is what holds the report to the declaration
-// rather than to the names; the ReportedError beside it is what says which rule
-// the one report enforces, which a count states nothing about on its own.
+// list, so §6.18's reference to the type_identifier is one reference here and
+// earns one report however many names follow. Parser::ParseVarDeclList builds
+// one ModuleItem per declarator and marks every one of them as undeclared at
+// parse, so the count is what holds the report to the declaration rather than
+// to the names; the ReportedError beside it is what says which rule the one
+// report enforces, which a count states nothing about on its own.
 TEST(UserDefinedTypeElaboration,
      TypeReferenceBeforeItsDeclarationInAListIsReportedOnce) {
   ElabFixture f;
@@ -603,9 +603,9 @@ TEST(UserDefinedTypeElaboration,
                             5, "6.18"));
 }
 
-// §6.18: "the type of the object is the type the name stands for", and the
-// dimensions written on a typedef belong to that type -- what arr_t stands for
-// is four ints, not one. The parser leaves those dimensions beside the data
+// §6.18: an object declared with the name has the type the name stands for, and
+// the dimensions written on a typedef belong to that type -- what arr_t stands
+// for is four ints, not one. The parser leaves those dimensions beside the data
 // type rather than in it, so the elaborated table used to record the element's
 // width and a reader could not tell it from a singular type's: arr_t answered
 // the same 32 that i_t does. The singular typedef is asserted alongside the

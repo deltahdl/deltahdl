@@ -157,17 +157,17 @@ TEST(FunctionSim, TypedefNameLocalWiderThanOneWordKeepsItsHighBits) {
   EXPECT_EQ(val, 1095216660481ull);
 }
 
-// §6.8: "A variable is an abstraction of a data storage element. A variable
-// shall store a value from one assignment to the next." A declaration in a
-// subroutine body declares a storage element of its own, so `logic [7:0]
-// mirror = held;` reads `held` and must leave `held` holding what it was last
-// assigned. CreateFuncLocalVar stored what EvalExpr answered; EvalExpr answers
-// a bare identifier with the source variable's own Logic4Vec, a Logic4Vec
-// copies its `words` pointer rather than the words, and ResizeToWidth hands
-// back a value already at the declared width -- so the declaration left
-// `mirror` and `held` one element. The eight bits on each side are
-// load-bearing: a declared width other than the source's makes the resize
-// build the value in a fresh store, which hides the sharing entirely.
+// §6.8: a variable stands for a data storage element and keeps its value from
+// one assignment to the next. A declaration in a subroutine body declares a
+// storage element of its own, so `logic [7:0] mirror = held;` reads `held` and
+// must leave `held` holding what it was last assigned. CreateFuncLocalVar
+// stored what EvalExpr answered; EvalExpr answers a bare identifier with the
+// source variable's own Logic4Vec, a Logic4Vec copies its `words` pointer
+// rather than the words, and ResizeToWidth hands back a value already at the
+// declared width -- so the declaration left `mirror` and `held` one element.
+// The eight bits on each side are load-bearing: a declared width other than the
+// source's makes the resize build the value in a fresh store, which hides the
+// sharing entirely.
 //
 // The declaration itself writes nothing in place, so it takes a later writer
 // to show the sharing, and which writer it is decides what this case can be. A
@@ -176,12 +176,11 @@ TEST(FunctionSim, TypedefNameLocalWiderThanOneWordKeepsItsHighBits) {
 // place before it coerces, so a later store leaves `held`'s buffer
 // unreferenced rather than writing through it. The writer that does reach it
 // is the one that coerces a vector it did not build: §13.5.1 passes an input
-// argument by copying "the values of the actual arguments" into the formal,
-// and §6.11.2 -- "When a 4-state value is automatically converted to a 2-state
-// value, any unknown or high-impedance bits shall be converted to zeros" --
-// converts that copy in place. Handing `mirror` to a `bit [7:0]` formal of its
-// own width therefore cleared `held`'s unknowns from inside a call that read
-// nothing but a local copy of it.
+// argument by copying the actual argument's value into the formal, and §6.11.2
+// -- an automatic conversion of a 4-state value to a 2-state one turns any x or
+// z bits into zeros -- converts that copy in place. Handing `mirror` to a
+// `bit [7:0]` formal of its own width therefore cleared `held`'s unknowns from
+// inside a call that read nothing but a local copy of it.
 //
 // That the conversion reaches the actual's own buffer is a defect of this
 // same family at the binding site (#3564), and it is what makes this case
@@ -234,12 +233,12 @@ TEST(FunctionSim, DeclaredLocalInitializedFromAVariableGetsItsOwnWords) {
 // element -- a variable the source names only through an index, and one no
 // later store in the subroutine mentions at all.
 //
-// z as well as x, because §6.11.2 converts "any unknown or high-impedance
-// bits" and the two are stored apart: 8'b1zz01x10 is aval 0x8E with bval 0x64,
-// a z digit being aval 0 with bval 1 where an x digit is aval 1 with bval 1,
-// and the conversion of it is aval 0x8A with bval 0x00. bval is what separates
-// the two states: a conversion that dropped the x bits and kept the z bits
-// would answer the same aval and leave bval at 0x60.
+// z as well as x, because §6.11.2 converts both x and z bits and the two are
+// stored apart: 8'b1zz01x10 is aval 0x8E with bval 0x64, a z digit being aval 0
+// with bval 1 where an x digit is aval 1 with bval 1, and the conversion of it
+// is aval 0x8A with bval 0x00. bval is what separates the two states: a
+// conversion that dropped the x bits and kept the z bits would answer the same
+// aval and leave bval at 0x60.
 //
 // That the conversion reaches the actual's own buffer is a defect of this
 // same family at the binding site (#3564), and it is what makes this case

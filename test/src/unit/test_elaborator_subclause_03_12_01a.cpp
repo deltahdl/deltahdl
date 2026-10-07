@@ -299,19 +299,19 @@ TEST(CompilationUnitElaboration, ForwardReferenceToCuScopeTaskAccepted) {
 
 namespace {
 
-// §3.12.1 case a): "all files on a given compilation command line make a single
-// compilation unit (in which case the declarations within those files are
-// accessible following normal visibility rules throughout the entire set of
-// files)". Every test above hands the elaborator one source description, which
-// cannot tell that model from case b) -- "each file is a separate compilation
-// unit" -- because with one file the two agree. These drive a command line of
-// two files through SinglePassCompiler, which is the path that implements case
-// a), and ask what a declaration written outside every design element in one
-// file is worth in the other.
+// §3.12.1 case a): every file on one compilation command line belongs to a
+// single compilation unit, whose declarations are visible across all of those
+// files under the normal visibility rules. Every test above hands the
+// elaborator one source description, which cannot tell that model from case b),
+// where every file is a compilation unit of its own, because with one file the
+// two agree. These drive a command line of two files through
+// SinglePassCompiler, which is the path that implements case a), and ask what a
+// declaration written outside every design element in one file is worth in the
+// other.
 //
-// The declaration kinds are the ones §3.12.1 names: "although the
-// compilation-unit scope is not a package, it can contain any item that can be
-// defined within a package (see 26.2) and bind constructs as well (see 23.11)".
+// The declaration kinds are the ones §3.12.1 names: the compilation-unit scope,
+// though no package, may hold any item a package may (§26.2) and bind
+// constructs too (§23.11).
 
 // The infrastructure one command line is compiled and elaborated against.
 struct CommandLineHarness {
@@ -628,12 +628,12 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
 TEST(CompilationUnitScopeAcrossCommandLineFiles,
      CompilationUnitBindReachesTheDesign) {
   // §3.12.1 names bind constructs alongside the package items: the
-  // compilation-unit scope "can contain any item that can be defined within a
-  // package (see 26.2) and bind constructs as well (see 23.11)". The bind is
-  // written in one file and its target `cpu` is declared in another, so this is
-  // the same visibility the typedef cases ask about. It is here because losing
-  // a bind changes the design rather than only a diagnostic: the bound instance
-  // is simply absent, and nothing is reported about it.
+  // compilation-unit scope may hold any item a package may (§26.2) and bind
+  // constructs too (§23.11). The bind is written in one file and its target
+  // `cpu` is declared in another, so this is the same visibility the typedef
+  // cases ask about. It is here because losing a bind changes the design rather
+  // than only a diagnostic: the bound instance is simply absent, and nothing is
+  // reported about it.
   ScratchDir tmp;
   tmp.Write("lib.map", kLibMap);
   auto probe = tmp.Write("src/probe.sv",
@@ -841,15 +841,14 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
   // src/parser/single_pass_compile.cpp:210-211 without parsing anything.
   //
   // §3.14.2.2 puts a timeunit declaration written outside every design element
-  // in the compilation-unit scope -- "There shall be at most one time unit and
-  // one time precision for any module, program, package, or interface
-  // definition or in any compilation-unit scope" -- and §20.4.1 makes that
-  // scope's time unit the $unit argument's, which is what
-  // RtlirDesign::cu_timescale holds. One description declares it, so the two
-  // runs have to report it alike: a carry written into MapIntoLibrary alone
-  // would make a design's time unit turn on whether this run compiled the file
-  // or an earlier one did, which is the difference §3.12.1 case a) leaves no
-  // room for.
+  // in the compilation-unit scope -- a module, program, package or interface
+  // definition, or a compilation-unit scope, has at most one time unit and one
+  // time precision -- and §20.4.1 makes that scope's time unit the $unit
+  // argument's, which is what RtlirDesign::cu_timescale holds. One description
+  // declares it, so the two runs have to report it alike: a carry written into
+  // MapIntoLibrary alone would make a design's time unit turn on whether this
+  // run compiled the file or an earlier one did, which is the difference
+  // §3.12.1 case a) leaves no room for.
   //
   // `timeunit 100ps / 10fs;` is §3.14.2.2's own example, and each of its four
   // values differs from the one a compilation unit that declared nothing

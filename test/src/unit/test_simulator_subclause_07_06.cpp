@@ -266,13 +266,13 @@ TEST(ArrayAssignmentSimulation, FixedSizeMismatchNames7_6) {
       "array size mismatch in assignment to fixed-size array", 4, "7.6"));
 }
 
-// §6.8 (printed p.105): "A variable is an abstraction of a data storage
-// element. A variable shall store a value from one assignment to the next."
-// Each element of an unpacked array is one such storage element, so `a[0]` and
-// `b[0]` are two of them, and the whole-array copy `b = a;` has to leave the
-// destination element holding its own words rather than the pointer to the
-// source's that a plain Logic4Vec assignment copies (types.h: the struct holds
-// Logic4Word* words, and assigning it copies the pointer).
+// §6.8 (printed p.105): a variable stands for a data storage element and keeps
+// its value from one assignment to the next. Each element of an unpacked array
+// is one such storage element, so `a[0]` and `b[0]` are two of them, and the
+// whole-array copy `b = a;` has to leave the destination element holding its
+// own words rather than the pointer to the source's that a plain Logic4Vec
+// assignment copies (types.h: the struct holds Logic4Word* words, and assigning
+// it copies the pointer).
 //
 // The claim is made on the storage identity rather than on a value read back
 // from SystemVerilog because no source-level reader can currently tell the two

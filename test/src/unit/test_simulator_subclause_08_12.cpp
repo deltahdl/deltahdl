@@ -449,10 +449,10 @@ TEST(ClassAssignRenameSim, E2eDeclInitShallowCopyCopiesProperties) {
   LowerRunAndCheck(f, design, {{"result", 55u}});
 }
 
-// §8.11 makes `this` "a predefined object handle that refers to the object that
-// was used to invoke the subroutine that this is used within", and footnote 23
-// on A.2.4's class_new asks only that a copy source's value be an object
-// handle, so `new this` copies the object the running method was called on.
+// §8.11 makes `this` a predefined object handle to the object the enclosing
+// subroutine was invoked on, and footnote 23 on A.2.4's class_new asks only
+// that a copy source's value be an object handle, so `new this` copies the
+// object the running method was called on.
 //
 // 42 is the value that discriminates. The declared default is 0 and the
 // constructor writes 7, so a run that copied returns 42, a run that constructed
@@ -484,11 +484,11 @@ TEST(ClassAssignRenameSim, E2eNewThisCopiesTheInvokingObjectsProperties) {
             42u);
 }
 
-// §8.12 step 3 assigns "a handle to the newly created object", so the copy is a
-// second object rather than another name for the first. Writing through the
-// copy and reading both back is what separates the two: a run that returned the
-// invoking object's own handle instead of a copy leaves r1 at 99 rather than
-// 10, and passes E2eNewThisCopiesTheInvokingObjectsProperties either way.
+// §8.12 step 3 assigns a handle to the new object, so the copy is a second
+// object rather than another name for the first. Writing through the copy and
+// reading both back is what separates the two: a run that returned the invoking
+// object's own handle instead of a copy leaves r1 at 99 rather than 10, and
+// passes E2eNewThisCopiesTheInvokingObjectsProperties either way.
 TEST(ClassAssignRenameSim, E2eNewThisCopyIsADistinctObject) {
   SimFixture f;
   auto* design = ElaborateSrc(

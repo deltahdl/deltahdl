@@ -1,9 +1,8 @@
-// Tests for §6.9.2 "Vector net accessibility": "Vectored and scalared shall be
-// optional advisory keywords to be used in vector net declarations. If these
-// keywords are implemented, certain operations on vector nets may be
-// restricted. If the keyword vectored is used, bit-selects and part-selects and
-// strength specifications may not be permitted ... If the keyword scalared is
-// used, bit-selects and part-selects of the net shall be permitted."
+// Tests for §6.9.2 "Vector net accessibility": vectored and scalared are
+// optional advisory keywords for vector net declarations, and where they are
+// implemented they may restrict operations on a vector net -- vectored possibly
+// forbidding bit-selects, part-selects and strength specifications, while
+// scalared permits bit-selects and part-selects of the net.
 
 #include <gtest/gtest.h>
 
@@ -57,10 +56,9 @@ TEST(VectorNetAccessibility, ScalaredWithPackedDimOk) {
   EXPECT_TRUE(ValidateNetDecl(info));
 }
 
-// §6.9.2: "Vectored and scalared shall be optional advisory keywords to be used
-// in vector net declarations." A net with no packed dimension is not a vector
-// net, so vectored on it is rejected under §6.9.2 and not under some other
-// rule.
+// §6.9.2: vectored and scalared are optional advisory keywords for vector net
+// declarations. A net with no packed dimension is not a vector net, so vectored
+// on it is rejected under §6.9.2 and not under some other rule.
 TEST(VectorNetAccessibility, VectoredWithoutPackedDimIsError) {
   ElabFixture f;
   ElaborateSrc(

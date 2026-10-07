@@ -126,7 +126,7 @@ TEST(SystemTfNameLexing, AllCharactersAreSignificant) {
 }
 
 // S4: 1024 characters is where §5.6 lets an implementation stop reading an
-// identifier -- "the limit shall be at least 1024 characters" -- so a name of
+// identifier -- the limit may be no lower than 1024 characters -- so a name of
 // exactly that length is the last one both readings of the rule accept.
 TEST(SystemTfNameLexing, AName1024CharactersLongIsAccepted) {
   std::string name = "$";
@@ -140,13 +140,12 @@ TEST(SystemTfNameLexing, AName1024CharactersLongIsAccepted) {
 }
 
 // S4 is where the two part. §5.6 caps an identifier, but an identifier there is
-// "either a simple identifier or an escaped identifier" and a simple
-// identifier's first character "shall not be a digit or $", so a system task or
-// system function name is neither; §5.6.3 hands its rules to Clause 36
-// ("Additional user-defined system tasks and system functions can be defined
-// using the PLI, as described in Clause 36"), and this is the rule Clause 36
-// gives: "The name can be any size, and all characters are significant." So a
-// name past that cap is lexed whole, with no diagnostic.
+// a simple or an escaped identifier, and a simple identifier may not begin with
+// a digit or $, so a system task or system function name is neither; §5.6.3
+// hands its rules to Clause 36, where the PLI defines further user-defined
+// system tasks and functions, and this is the rule Clause 36 gives: such a name
+// may be of any length, every character significant. So a name past that cap is
+// lexed whole, with no diagnostic.
 TEST(SystemTfNameLexing, ANameLongerThan1024CharactersIsStillOneName) {
   std::string name = "$";
   name.append(2000, 'a');

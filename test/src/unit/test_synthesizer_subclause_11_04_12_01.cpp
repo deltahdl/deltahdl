@@ -19,12 +19,11 @@ namespace {
 // target to constant zero while the run reports success.
 
 // The test fails on any lowering that builds nothing for a replication, since
-// this is the first case. §11.4.12.1 rules that a multiplier "indicates a
-// joining together of that many copies of the concatenation", and gives
-// `{4{w}}` the same value as `{w, w, w, w}`. The multiplier is 3 and `a` is two
-// bits wide, so the copy index and the bit index within a copy are different
-// numbers; a multiplier equal to the operand width would let a lowering that
-// divided by the wrong one pass.
+// this is the first case. §11.4.12.1 has a multiplier join that many copies of
+// the concatenation, and gives `{4{w}}` the same value as `{w, w, w, w}`. The
+// multiplier is 3 and `a` is two bits wide, so the copy index and the bit index
+// within a copy are different numbers; a multiplier equal to the operand width
+// would let a lowering that divided by the wrong one pass.
 TEST(ReplicationSynthesis, ReplicationJoinsThatManyCopiesOfItsOperand) {
   ExpectInputSweep(
       "module m(input [1:0] a, output logic [5:0] y);\n"

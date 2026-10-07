@@ -50,8 +50,8 @@ TEST(StreamReordering, TypeSliceSizeByteReversesBytesRealSource) {
   EXPECT_EQ(var->value.ToUint64(), 0xCDABu);
 }
 
-// §11.4.14.2: "if a type is used, the block size shall be the number of bits in
-// that type." A `shortint` slice is 16 bits, so streaming a 32-bit value with
+// §11.4.14.2: a slice_size given as a type makes the block as many bits wide as
+// the type. A `shortint` slice is 16 bits, so streaming a 32-bit value with
 // `<<` swaps the two 16-bit halves (0xABCD1234 -> 0x1234ABCD) -- the same
 // re-ordering an explicit `<< 16` produces. Distinguishing this from a whole-
 // value single block confirms the type is resolved to its bit width rather than
