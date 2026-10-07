@@ -67,29 +67,28 @@ static void ValidateRandAggregateMember(const ClassMember* m,
   if (resolved->kind == DataTypeKind::kUnion) {
     if (!resolved->is_packed) {
       diag.Error(m->loc,
-                 std::format("unpacked union '{}' shall not be declared "
-                             "rand or randc",
+                 std::format("unpacked union '{}' takes neither the rand nor "
+                             "the randc qualifier",
                              m->name),
                  Subclause("18.4"));
     } else if (resolved->is_tagged) {
       diag.Error(m->loc,
-                 std::format("packed tagged union '{}' shall not be "
-                             "declared rand or randc",
+                 std::format("packed tagged union '{}' takes neither the rand "
+                             "nor the randc qualifier",
                              m->name),
                  Subclause("18.4"));
     }
     return;
   }
   // An unpacked structure may be declared rand (its random members are solved
-  // concurrently), but shall not be declared randc: randc cycles over a single
+  // concurrently), though never randc: randc cycles over a single
   // integral declared range, which an unpacked aggregate does not present. A
   // packed structure is treated as an integral value, so randc is allowed there
   // and is not rejected here.
   if (m->is_randc && resolved->kind == DataTypeKind::kStruct &&
       !resolved->is_packed) {
     diag.Error(m->loc,
-               std::format("unpacked structure '{}' shall not be "
-                           "declared randc",
+               std::format("unpacked structure '{}' can be rand but not randc",
                            m->name),
                Subclause("18.4"));
   }
@@ -101,12 +100,12 @@ void ClassConstraintValidator::ValidateOneClassRandomVariables(
     if (m->kind != ClassMemberKind::kProperty) continue;
     const DataType& dt = m->data_type;
 
-    // A real variable shall not be declared randc.
+    // §18.4 lets a real variable be rand, never randc.
     if (m->is_randc && IsRealDataType(dt.kind)) {
-      diag_.Error(m->loc,
-                  std::format("real variable '{}' shall not be declared randc",
-                              m->name),
-                  Subclause("18.4"));
+      diag_.Error(
+          m->loc,
+          std::format("real variable '{}' can be rand but not randc", m->name),
+          Subclause("18.4"));
     }
 
     // An object handle may be declared rand but never randc: randomization
@@ -114,10 +113,10 @@ void ClassConstraintValidator::ValidateOneClassRandomVariables(
     // itself, so there is no cyclic value sequence for randc to permute.
     if (m->is_randc && dt.kind == DataTypeKind::kNamed &&
         FindClassDecl(dt.type_name, unit_) != nullptr) {
-      diag_.Error(m->loc,
-                  std::format("object handle '{}' shall not be declared randc",
-                              m->name),
-                  Subclause("18.4"));
+      diag_.Error(
+          m->loc,
+          std::format("object handle '{}' can be rand but not randc", m->name),
+          Subclause("18.4"));
     }
 
     if (m->is_rand || m->is_randc)

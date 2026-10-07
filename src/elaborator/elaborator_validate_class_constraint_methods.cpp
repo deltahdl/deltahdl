@@ -169,12 +169,11 @@ static void ValidateConstraintCallee(const ConstraintFunctionCallRef& ref,
                arg.direction == Direction::kInout ||
                (arg.direction == Direction::kRef && !arg.is_const);
     if (bad) {
-      diag.Error(
-          ref.loc,
-          std::format("function '{}' used in a constraint shall not have "
-                      "output, inout, or non-const ref arguments",
-                      ref.callee),
-          Subclause("18.5.11"));
+      diag.Error(ref.loc,
+                 std::format("function '{}' is called in a constraint, so each "
+                             "of its arguments must be an input or a const ref",
+                             ref.callee),
+                 Subclause("18.5.11"));
       break;
     }
   }
@@ -591,8 +590,8 @@ void ClassConstraintValidator::ValidateConstraintInheritance() {
       // abstract (virtual) class.
       if (m->is_pure_virtual && !cls->is_virtual) {
         diag_.Error(m->loc,
-                    std::format("pure constraint '{}' shall not be declared in "
-                                "non-abstract class '{}'",
+                    std::format("pure constraint '{}' needs an abstract class, "
+                                "and class '{}' is not declared virtual",
                                 m->name, cls->name),
                     Subclause("18.5.2"));
       }
@@ -612,8 +611,8 @@ void ClassConstraintValidator::ValidateExternalConstraints() {
     ValidateOneClassExternalConstraints(cls);
   }
 
-  // 18.5.1: an external constraint block shall appear in the same scope as its
-  // class declaration and after that class declaration. The block is paired
+  // 18.5.1 puts an external constraint block in the scope that declares its
+  // class, following the end of that declaration. The block is paired
   // with the class of its own scope; flag a block whose scope declares no class
   // of that name, and a block that precedes the end of its class declaration.
   for (const auto& ext : unit_->external_constraints) {
@@ -621,8 +620,8 @@ void ClassConstraintValidator::ValidateExternalConstraints() {
     if (target == nullptr) {
       diag_.Error(
           ext.loc,
-          std::format("external constraint block '{}::{}' shall "
-                      "appear in the scope that declares class '{}'",
+          std::format("external constraint block '{}::{}' has no class '{}' "
+                      "declared in its own scope",
                       ext.class_name, ext.constraint_name, ext.class_name),
           Subclause("18.5.1"));
       continue;
@@ -630,8 +629,8 @@ void ClassConstraintValidator::ValidateExternalConstraints() {
     if (LocStrictlyBefore(ext.loc, target->range.end)) {
       diag_.Error(
           ext.loc,
-          std::format("external constraint block '{}::{}' shall appear "
-                      "after the declaration of class '{}'",
+          std::format("external constraint block '{}::{}' comes before the "
+                      "declaration of class '{}' ends",
                       ext.class_name, ext.constraint_name, ext.class_name),
           Subclause("18.5.1"));
     }

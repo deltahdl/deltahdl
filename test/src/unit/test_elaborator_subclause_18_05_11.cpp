@@ -21,7 +21,7 @@ TEST(FunctionsInConstraints, InputArgumentFunctionAccepted) {
              "endmodule\n"));
 }
 
-// 18.5.11: a function used in a constraint shall not have output arguments.
+// 18.5.11: an output argument rules a function out of use in a constraint.
 TEST(FunctionsInConstraints, OutputArgumentFunctionRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -35,12 +35,12 @@ TEST(FunctionsInConstraints, OutputArgumentFunctionRejected) {
              "endmodule\n",
              f));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "function 'f' used in a constraint shall not have "
-                            "output, inout, or non-const ref arguments",
+                            "function 'f' is called in a constraint, so each "
+                            "of its arguments must be an input or a const ref",
                             5, "18.5.11"));
 }
 
-// 18.5.11: a function used in a constraint shall not have inout arguments.
+// 18.5.11: an inout argument rules a function out of use in a constraint.
 TEST(FunctionsInConstraints, InoutArgumentFunctionRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -54,8 +54,8 @@ TEST(FunctionsInConstraints, InoutArgumentFunctionRejected) {
              "endmodule\n",
              f));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "function 'f' used in a constraint shall not have "
-                            "output, inout, or non-const ref arguments",
+                            "function 'f' is called in a constraint, so each "
+                            "of its arguments must be an input or a const ref",
                             5, "18.5.11"));
 }
 
@@ -74,8 +74,8 @@ TEST(FunctionsInConstraints, NonConstRefArgumentFunctionRejected) {
              "endmodule\n",
              f));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "function 'f' used in a constraint shall not have "
-                            "output, inout, or non-const ref arguments",
+                            "function 'f' is called in a constraint, so each "
+                            "of its arguments must be an input or a const ref",
                             5, "18.5.11"));
 }
 
@@ -183,8 +183,8 @@ TEST(FunctionsInConstraints, BaseClassFunctionWithOutputArgRejected) {
              "endmodule\n",
              f));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "function 'f' used in a constraint shall not have "
-                            "output, inout, or non-const ref arguments",
+                            "function 'f' is called in a constraint, so each "
+                            "of its arguments must be an input or a const ref",
                             7, "18.5.11"));
 }
 
@@ -205,8 +205,8 @@ TEST(FunctionsInConstraints, LaterArgumentBadDirectionRejected) {
              "endmodule\n",
              f));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "function 'f' used in a constraint shall not have "
-                            "output, inout, or non-const ref arguments",
+                            "function 'f' is called in a constraint, so each "
+                            "of its arguments must be an input or a const ref",
                             5, "18.5.11"));
 }
 
@@ -265,10 +265,11 @@ TEST(FunctionsInConstraints, NestedConstraintCallInnerFunctionChecked) {
       "module m;\n"
       "endmodule\n",
       f));
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "function 'inner' used in a constraint shall not "
-                            "have output, inout, or non-const ref arguments",
-                            6, "18.5.11"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "function 'inner' is called in a constraint, so each of "
+                    "its arguments must be an input or a const ref",
+                    6, "18.5.11"));
 }
 
 // 18.5.11 forbids the call anywhere in a function that appears in a

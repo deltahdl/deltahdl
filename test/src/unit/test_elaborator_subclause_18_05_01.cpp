@@ -51,8 +51,8 @@ TEST(ExternalConstraintBlocks, MultipleBlocksForPrototypeRejected) {
                             3, "18.5.1"));
 }
 
-// 18.5.1: an external constraint block shall appear after the declaration of
-// its class; a block placed before the class is an error.
+// 18.5.1: an external constraint block belongs after its class's declaration,
+// so a block placed before the class is an error.
 TEST(ExternalConstraintBlocks, BlockBeforeClassRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -65,8 +65,8 @@ TEST(ExternalConstraintBlocks, BlockBeforeClassRejected) {
              "endmodule\n",
              f));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "external constraint block 'C::proto2' shall "
-                            "appear after the declaration of class 'C'",
+                            "external constraint block 'C::proto2' comes "
+                            "before the declaration of class 'C' ends",
                             1, "18.5.1"));
 }
 
@@ -87,8 +87,8 @@ TEST(ExternalConstraintBlocks, BlockBeforeClassInPackageRejected) {
              "endmodule\n",
              f));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "external constraint block 'C::proto2' shall "
-                            "appear after the declaration of class 'C'",
+                            "external constraint block 'C::proto2' comes "
+                            "before the declaration of class 'C' ends",
                             2, "18.5.1"));
 }
 
@@ -102,8 +102,8 @@ TEST(ExternalConstraintBlocks, BlockForUndeclaredClassRejected) {
              "endmodule\n",
              f));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "external constraint block 'D::c' shall appear in "
-                            "the scope that declares class 'D'",
+                            "external constraint block 'D::c' has no class 'D' "
+                            "declared in its own scope",
                             1, "18.5.1"));
 }
 
@@ -125,8 +125,8 @@ TEST(ExternalConstraintBlocks, BlockForOtherPackagesClassRejected) {
              "endmodule\n",
              f));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "external constraint block 'D::c' shall appear in "
-                            "the scope that declares class 'D'",
+                            "external constraint block 'D::c' has no class 'D' "
+                            "declared in its own scope",
                             8, "18.5.1"));
 }
 
@@ -143,8 +143,8 @@ TEST(ExternalConstraintBlocks, BlockBeforeClassInModuleRejected) {
              "endmodule\n",
              f));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "external constraint block 'C::p' shall "
-                            "appear after the declaration of class 'C'",
+                            "external constraint block 'C::p' comes before the "
+                            "declaration of class 'C' ends",
                             2, "18.5.1"));
 }
 
@@ -162,8 +162,8 @@ TEST(ExternalConstraintBlocks, BlockInModuleForUnitClassRejected) {
              "endmodule\n",
              f));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "external constraint block 'C::p' shall appear in "
-                            "the scope that declares class 'C'",
+                            "external constraint block 'C::p' has no class 'C' "
+                            "declared in its own scope",
                             6, "18.5.1"));
 }
 

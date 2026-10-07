@@ -82,8 +82,8 @@ TEST(ConstraintElaboration, ClassWithPureConstraintPrototype) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "pure constraint 'c' shall not be declared in "
-                            "non-abstract class 'C'",
+                            "pure constraint 'c' needs an abstract class, and "
+                            "class 'C' is not declared virtual",
                             3, "18.5.2"));
 }
 

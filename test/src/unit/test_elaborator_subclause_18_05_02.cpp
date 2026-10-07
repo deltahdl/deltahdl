@@ -113,8 +113,8 @@ TEST(ConstraintInheritance, ExtendsFinalOverridingAccepted) {
              "endmodule\n"));
 }
 
-// 18.5.2: a pure constraint represents an obligation and shall not be declared
-// in a non-abstract (non-virtual) class.
+// 18.5.2: a pure constraint is an obligation left for a subclass to meet, so
+// only an abstract (virtual) class may declare one.
 TEST(ConstraintInheritance, PureConstraintInNonAbstractRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -125,10 +125,10 @@ TEST(ConstraintInheritance, PureConstraintInNonAbstractRejected) {
              "module m;\n"
              "endmodule\n",
              f));
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "pure constraint 'c' shall not be declared in non-abstract class 'C'", 3,
-      "18.5.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "pure constraint 'c' needs an abstract class, and "
+                            "class 'C' is not declared virtual",
+                            3, "18.5.2"));
 }
 
 // 18.5.2: an abstract (virtual) class may declare pure constraints.

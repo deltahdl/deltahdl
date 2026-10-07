@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-// 18.4: real variables shall not be declared randc.
+// 18.4: a real variable may be rand, but randc is refused for it.
 TEST(RandomVariableTypes, RealRandcRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -17,7 +17,7 @@ TEST(RandomVariableTypes, RealRandcRejected) {
              "module m; endmodule\n",
              f));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "real variable 'r' shall not be declared randc", 2,
+                            "real variable 'r' can be rand but not randc", 2,
                             "18.4"));
 }
 
@@ -30,7 +30,7 @@ TEST(RandomVariableTypes, ShortrealRandcRejected) {
              "module m; endmodule\n",
              f));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "real variable 'r' shall not be declared randc", 2,
+                            "real variable 'r' can be rand but not randc", 2,
                             "18.4"));
 }
 
@@ -52,7 +52,7 @@ TEST(RandomVariableTypes, IntegralRandcAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.4: object handles shall not be declared randc.
+// 18.4: an object handle may be rand, but randc is refused for it.
 TEST(RandomVariableTypes, ObjectHandleRandcRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -64,7 +64,7 @@ TEST(RandomVariableTypes, ObjectHandleRandcRejected) {
              "module m; endmodule\n",
              f));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "object handle 'h' shall not be declared randc", 4,
+                            "object handle 'h' can be rand but not randc", 4,
                             "18.4"));
 }
 
@@ -79,7 +79,7 @@ TEST(RandomVariableTypes, ObjectHandleRandAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.4: an unpacked union shall not be declared rand or randc.
+// 18.4: neither rand nor randc is accepted on an unpacked union.
 TEST(RandomVariableTypes, UnpackedUnionRandRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -91,7 +91,8 @@ TEST(RandomVariableTypes, UnpackedUnionRandRejected) {
              f));
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "unpacked union 'u' shall not be declared rand or randc", 3, "18.4"));
+      "unpacked union 'u' takes neither the rand nor the randc qualifier", 3,
+      "18.4"));
 }
 
 // 18.4: a packed untagged union may be declared rand (treated as integral).
@@ -120,7 +121,7 @@ TEST(RandomVariableTypes, PackedUntaggedUnionRandcAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.4: a packed tagged union shall not be declared rand or randc.
+// 18.4: neither rand nor randc is accepted on a packed tagged union.
 TEST(RandomVariableTypes, PackedTaggedUnionRandRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -132,8 +133,8 @@ TEST(RandomVariableTypes, PackedTaggedUnionRandRejected) {
              f));
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "packed tagged union 'u' shall not be declared rand or randc", 3,
-      "18.4"));
+      "packed tagged union 'u' takes neither the rand nor the randc qualifier",
+      3, "18.4"));
 }
 
 // 18.4: an unpacked structure may be declared rand (its random members are
@@ -147,7 +148,7 @@ TEST(RandomVariableTypes, UnpackedStructRandAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.4: unpacked structures shall not be declared randc. The identical
+// 18.4: an unpacked structure may be rand but is refused randc. The identical
 // declaration is accepted as rand above, isolating the rule to the randc
 // qualifier on an unpacked aggregate.
 TEST(RandomVariableTypes, UnpackedStructRandcRejected) {
@@ -159,9 +160,9 @@ TEST(RandomVariableTypes, UnpackedStructRandcRejected) {
              "endclass\n"
              "module m; endmodule\n",
              f));
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "unpacked structure 's' shall not be declared randc", 3, "18.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked structure 's' can be rand but not randc",
+                            3, "18.4"));
 }
 
 // 18.4: a packed structure is treated as an integral value, so it may be
@@ -245,7 +246,7 @@ TEST(RandomVariableTypes, RealtimeRandcRejected) {
              "module m; endmodule\n",
              f));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "real variable 'r' shall not be declared randc", 2,
+                            "real variable 'r' can be rand but not randc", 2,
                             "18.4"));
 }
 
