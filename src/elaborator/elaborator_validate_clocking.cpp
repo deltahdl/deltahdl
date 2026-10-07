@@ -139,9 +139,9 @@ static void CheckClockingSkewRealValue(const Expr* delay,
   }
 }
 
-// §14.4: a clocking skew shall be a constant expression; a parameter is an
-// acceptable form. Any skew delay that cannot be folded against the module's
-// parameter scope (e.g. a reference to a net or variable) violates the rule.
+// §14.4 limits a clocking skew to constant expressions, parameters among them.
+// Any skew delay that cannot be folded against the module's parameter scope
+// (e.g. a reference to a net or variable) violates the rule.
 // §14.3: a skew delay_control is either a time literal or a constant expression
 // that evaluates to a non-negative integer value. A time literal is inherently
 // a non-negative time value and may be fractional (e.g. a step-scaled delay),
@@ -153,7 +153,8 @@ static void CheckClockingSkew(const Expr* delay, const ScopeMap& skew_scope,
   if (delay->kind == ExprKind::kTimeLiteral) return;
   if (!IsConstantExpr(delay, skew_scope)) {
     diag.Error(delay->range.start,
-               "clocking skew shall be a constant expression",
+               "this clocking skew is not a constant expression; only "
+               "constants and parameters may set a skew",
                Subclause("14.4"));
     return;
   }
@@ -182,9 +183,9 @@ void Elaborator::ValidateClockingBlock(ModuleItem* item,
                 Subclause("14.3"));
   }
 
-  // §14.4: a clocking skew shall be a constant expression; a parameter is an
-  // acceptable form. Any skew delay that cannot be folded against the module's
-  // parameter scope (e.g. a reference to a net or variable) violates the rule.
+  // §14.4 limits a clocking skew to constant expressions, parameters among
+  // them. Any skew delay that cannot be folded against the module's parameter
+  // scope (e.g. a reference to a net or variable) violates the rule.
   ScopeMap skew_scope = mod ? BuildParamScope(mod) : ScopeMap{};
   CheckClockingSkew(item->default_input_skew_delay, skew_scope,
                     "default input skew", diag_);

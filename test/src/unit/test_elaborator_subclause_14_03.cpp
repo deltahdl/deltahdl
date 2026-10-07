@@ -275,8 +275,9 @@ TEST(ClockingBlockElab, NonConstantSkewRejected) {
   // src/elaborator/elaborator_validate_clocking.cpp reports that under §14.4
   // and returns.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "clocking skew shall be a constant expression", 6,
-                            "14.4"));
+                            "this clocking skew is not a constant expression; "
+                            "only constants and parameters may set a skew",
+                            6, "14.4"));
 }
 
 TEST(ClockingBlockElab, TimeLiteralSkewAccepted) {

@@ -118,8 +118,9 @@ TEST(ClockingSkewConstExpr, VariableInputSkewRejected) {
              "endmodule\n",
              f));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "clocking skew shall be a constant expression", 5,
-                            "14.4"));
+                            "this clocking skew is not a constant expression; "
+                            "only constants and parameters may set a skew",
+                            5, "14.4"));
 }
 
 // §14.4: the same constant-expression requirement applies to an output skew.
@@ -135,8 +136,9 @@ TEST(ClockingSkewConstExpr, VariableOutputSkewRejected) {
              "endmodule\n",
              f));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "clocking skew shall be a constant expression", 5,
-                            "14.4"));
+                            "this clocking skew is not a constant expression; "
+                            "only constants and parameters may set a skew",
+                            5, "14.4"));
 }
 
 // §14.4: the requirement covers the block-wide default skews as well as
@@ -154,8 +156,9 @@ TEST(ClockingSkewConstExpr, VariableDefaultSkewRejected) {
              "endmodule\n",
              f));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "clocking skew shall be a constant expression", 5,
-                            "14.4"));
+                            "this clocking skew is not a constant expression; "
+                            "only constants and parameters may set a skew",
+                            5, "14.4"));
 }
 
 // §14.4: the report that refuses a non-constant skew names the subclause
@@ -174,8 +177,9 @@ TEST(ClockingSkewConstExpr, VariableSkewNames14_4) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "clocking skew shall be a constant expression", 5,
-                            "14.4"));
+                            "this clocking skew is not a constant expression; "
+                            "only constants and parameters may set a skew",
+                            5, "14.4"));
   for (const auto& reported : f.diag.Diagnostics()) {
     EXPECT_EQ(reported.message.find("§"), std::string::npos);
   }
