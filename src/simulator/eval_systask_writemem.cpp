@@ -226,6 +226,52 @@ static bool NamesUnpackedArray(SimContext& ctx, const std::string& name) {
          ctx.FindQueue(name) != nullptr || ctx.FindArrayInfo(name) != nullptr;
 }
 
+// §21.5: the memory a $writemem call dumps -- a class's array property, or
+// the container its memory_name names, with the associative array that name
+// denotes when it is one.
+struct WritememTarget {
+  ClassArrayRef class_array;
+  bool is_class_array = false;
+  std::string mem_name;
+  const AssocArrayObject* aa = nullptr;
+};
+
+// Resolves the memory_name operand of `eval.expr` into `target`, reporting
+// and returning false when it names nothing the task can dump. Both checks run
+// before the file is opened, so an illegal call leaves any existing file as
+// it was.
+static bool ResolveWritememTarget(const WritememEval& eval, bool is_hex,
+                                  WritememTarget& target) {
+  const Expr* mem = eval.expr->args[1];
+  SimContext& ctx = eval.ctx;
+  std::string task = "$writemem" + std::string(is_hex ? "h" : "b");
+  target.is_class_array =
+      ResolveClassArray(mem, ctx, eval.arena, target.class_array);
+  // §21.5: the tasks dump a memory array (§7.4.3), so a memory_name naming
+  // anything else -- a plain variable, a literal -- is reported.
+  bool names_memory =
+      target.is_class_array || (MemoryName(mem, target.mem_name) &&
+                                NamesUnpackedArray(ctx, target.mem_name));
+  if (!names_memory) {
+    ctx.GetDiag().Error(mem->range.start,
+                        task + ": memory_name is not an unpacked array",
+                        Subclause("21.5"));
+    return false;
+  }
+  // §21.5.3: an associative array is a legal $writemem argument only when its
+  // index type is integral (see §21.4.1) — a string-keyed array has no numeric
+  // @-address form.
+  target.aa = ctx.FindAssocArray(target.mem_name);
+  if (target.aa != nullptr && target.aa->is_string_key) {
+    ctx.GetDiag().Error(
+        mem->range.start,
+        task + ": associative array index must be of an integral type",
+        Subclause("21.5.3"));
+    return false;
+  }
+  return true;
+}
+
 Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
                        bool is_hex) {
   // §21.5's syntax: a filename and a memory_name, each required. A call short
@@ -244,35 +290,9 @@ Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
   // bytes spell the name; EvalStringArg covers all three.
   std::string filename = EvalStringArg(expr->args[0], ctx, arena);
 
-  ClassArrayRef class_array;
-  bool is_class_array =
-      ResolveClassArray(expr->args[1], ctx, arena, class_array);
-  // §21.5: the tasks dump a memory array (§7.4.3), so a memory_name naming
-  // anything else -- a plain variable, a literal -- is reported. Like the
-  // index check below, this runs before the file is opened, so the illegal
-  // call leaves any existing file as it was.
-  std::string mem_name;
-  bool names_memory = is_class_array || (MemoryName(expr->args[1], mem_name) &&
-                                         NamesUnpackedArray(ctx, mem_name));
-  if (!names_memory) {
-    ctx.GetDiag().Error(expr->args[1]->range.start,
-                        "$writemem" + std::string(is_hex ? "h" : "b") +
-                            ": memory_name is not an unpacked array",
-                        Subclause("21.5"));
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
-
-  // §21.5.3: an associative array is a legal $writemem argument only when its
-  // index type is integral (see §21.4.1) — a string-keyed array has no numeric
-  // @-address form. The check runs before the file is opened, so an illegal
-  // call is rejected without disturbing any existing file.
-  const AssocArrayObject* aa = ctx.FindAssocArray(mem_name);
-  if (aa != nullptr && aa->is_string_key) {
-    ctx.GetDiag().Error(
-        expr->args[1]->range.start,
-        "$writemem" + std::string(is_hex ? "h" : "b") +
-            ": associative array index must be of an integral type",
-        Subclause("21.5.3"));
+  WritememEval eval{expr, ctx, arena};
+  WritememTarget target;
+  if (!ResolveWritememTarget(eval, is_hex, target)) {
     return MakeLogic4VecVal(arena, 1, 0);
   }
 
@@ -294,16 +314,16 @@ Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
 
   // §21.5.3: an associative array's keys are sparse, so its words carry an
   // @-address prefix; the keys are emitted in ascending order.
-  if (aa != nullptr) {
-    WriteAssocMem(ofs, is_hex, aa);
+  if (target.aa != nullptr) {
+    WriteAssocMem(ofs, is_hex, target.aa);
     return MakeLogic4VecVal(arena, 1, 0);
   }
 
-  if (is_class_array) {
-    WriteMemClassArray(WritememEval{expr, ctx, arena}, class_array, emit);
+  if (target.is_class_array) {
+    WriteMemClassArray(eval, target.class_array, emit);
     return MakeLogic4VecVal(arena, 1, 0);
   }
-  WriteMemContainer(WritememEval{expr, ctx, arena}, mem_name, emit);
+  WriteMemContainer(eval, target.mem_name, emit);
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
