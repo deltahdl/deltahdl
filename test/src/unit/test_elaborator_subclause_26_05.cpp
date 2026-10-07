@@ -169,9 +169,9 @@ TEST(PackageImport, ExplicitImportWithWildcardFromOtherPackageAllowed) {
 
 // Table 26-1 of §26.5, row `import p::c;`, column "In a scope containing a
 // wildcard import of c": the import of p::c makes every earlier reference to c
-// illegal. The reference to c binds through `import q::*`, so the later `import
-// p::c` is the illegal one. The report names §26.5 because §26.3 states the
-// other import-legality rules but not this one.
+// illegal. The reference to c binds through `import q::*`, so the later
+// `import p::c` is the illegal one. The report names §26.5 because §26.3 states
+// the other import-legality rules but not this one.
 TEST(PackageImport, ExplicitImportAfterWildcardReferenceIsIllegal) {
   ElabFixture f;
   ElabOk(

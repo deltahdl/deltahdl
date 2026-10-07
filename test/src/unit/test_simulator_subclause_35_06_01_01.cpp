@@ -89,10 +89,10 @@ TEST(DpiWysiwygOpenArray, NonOpenFormalSeenAsDeclaredType) {
 }
 
 // §35.6.1.1: each unsized unpacked dimension of a formal takes the range of the
-// matching dimension of the actual. §35.5.6.1 declares `MyType a_10x5
-// [11:20][6:2]` and binds it to `MyType i [][]`, so the formal's first
-// dimension runs 11 to 20 -- the actual's own bounds, not a range built from
-// its size.
+// matching dimension of the actual. §35.5.6.1 declares
+// `MyType a_10x5 [11:20][6:2]` and binds it to `MyType i [][]`, so the formal's
+// first dimension runs 11 to 20 -- the actual's own bounds, not a range built
+// from its size.
 TEST(DpiWysiwygOpenArray, UnpackedDimensionTakesTheActualsOwnRange) {
   SvOpenArrayHandle h = DpiRuntime::MakeOpenArrayFromUnpackedActual(
       nullptr, SvActualDimension{11, 20}, 32);

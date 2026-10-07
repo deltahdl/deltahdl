@@ -755,8 +755,8 @@ TEST(GateInstantiationParsing, EscapedInstanceName) {
 
 // §28.3.5 gives the one unpacked_dimension an array of instances takes: a
 // left-hand index (lhi) and a right-hand index (rhi), both constant
-// expressions, with a colon between. A.2.5's other unpacked_dimension, `[
-// constant_expression ]`, was read and then dropped, so `g[3]` was accepted
+// expressions, with a colon between. A.2.5's other unpacked_dimension,
+// `[ constant_expression ]`, was read and then dropped, so `g[3]` was accepted
 // silently as the one instance `g`.
 TEST(GateInstantiationParsing, SizeAloneIsNoInstanceRange) {
   auto r = Parse(

@@ -223,10 +223,10 @@ TEST(ConfigLiblistClause, DefaultSelectedListSearchedInOrder) {
 // instantiates two `mid` cells and `mid`/`leaf` each exist in both libB and
 // libR. With `default liblist libR` and `instance top.m1 liblist libB`, the m1
 // subtree (mid and its leaf) binds entirely from libB and the m2 subtree binds
-// entirely from libR. The earlier form of this test forced `instance top.m
-// liblist libB` while placing `mid` only in a third library, so the instance's
-// own cell could not bind at all -- which is correct behavior, not the
-// inheritance the test meant to check.
+// entirely from libR. The earlier form of this test forced
+// `instance top.m liblist libB` while placing `mid` only in a third library, so
+// the instance's own cell could not bind at all -- which is correct behavior,
+// not the inheritance the test meant to check.
 TEST(ConfigLiblistClause, LiblistInheritedBySubhierarchy) {
   SourceManager mgr;
   Arena arena;

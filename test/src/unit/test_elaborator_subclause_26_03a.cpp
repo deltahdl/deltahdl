@@ -399,10 +399,10 @@ TEST(PackageImport, UnresolvedReferenceIsError) {
 // §26.3 rules that a wildcard import makes an identifier potentially locally
 // visible at a point of a scope when a wildcard import of the package stands
 // earlier in that same scope, and the clause's own example on printed page 809
-// writes both import forms in a module body and then declares `teeth_t
-// myteeth;` with the type they made visible. So an import in the body carries a
-// package's typedefs and parameters into the module, exactly as one in the
-// header does under §26.4.
+// writes both import forms in a module body and then declares
+// `teeth_t myteeth;` with the type they made visible. So an import in the body
+// carries a package's typedefs and parameters into the module, exactly as one
+// in the header does under §26.4.
 //
 // The four cases below read the elaborated declaration back rather than
 // asserting that elaboration succeeded, because nothing reports an unresolved

@@ -37,13 +37,14 @@
 // why the `edge[z1]` case expects the same answer an `edge[x1]` case would get.
 //
 // §31.5 makes the two shorthands lists of those descriptors rather than a
-// second kind of edge: `posedge clr` means `edge[01, 0x, x1] clr`, and `negedge
-// clr` means `edge[10, x0, 1x] clr`. The three `edge[01, 0x, x1]` cases are
-// that equivalence read one descriptor at a time, so the general form and the
-// shorthand agree on all three transitions a posedge admits. The `edge[01]` and
-// `edge[1x]` cases are the other half of §31.5, that edge-control specifiers
-// can name edge transitions besides posedge and negedge: each names one
-// descriptor of a shorthand's list and is answered by that descriptor alone.
+// second kind of edge: `posedge clr` means `edge[01, 0x, x1] clr`, and
+// `negedge clr` means `edge[10, x0, 1x] clr`. The three `edge[01, 0x, x1]`
+// cases are that equivalence read one descriptor at a time, so the general form
+// and the shorthand agree on all three transitions a posedge admits. The
+// `edge[01]` and `edge[1x]` cases are the other half of §31.5, that
+// edge-control specifiers can name edge transitions besides posedge and
+// negedge: each names one descriptor of a shorthand's list and is answered by
+// that descriptor alone.
 //
 // The first two cases share one design, one limit and one stimulus, and differ
 // in the value the clock arrives at. That is what shows the descriptor list

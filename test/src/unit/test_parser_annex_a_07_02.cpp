@@ -470,10 +470,10 @@ TEST_F(SpecifyTest, StateDependentIfnoneSimplePath) {
   EXPECT_EQ(p->condition, nullptr);
 }
 
-// --- The path operator: §30.4.2 gives a simple path two forms, `source *>
-// destination` and `source => destination`, and A.7.2 writes `=>` into
-// parallel_path_description and `*>` into full_path_description with no third
-// token in that place. ---
+// --- The path operator: §30.4.2 gives a simple path two forms,
+// `source *> destination` and `source => destination`, and A.7.2 writes `=>`
+// into parallel_path_description and `*>` into full_path_description with no
+// third token in that place. ---
 
 TEST(SpecifyPathParsing, ErrorPathEqualsIsNoPathOperator) {
   auto r = Parse(

@@ -60,11 +60,11 @@
 // At MODE 5 every condition is false and no specify path is active, which is
 // the third case. §30.6 rules that where a module path delay and a distributed
 // delay both reach an output each path takes the larger of its two delays, and
-// with no active path there is no module path delay to be the larger: `assign y
-// = a;` carries no delay of its own, so `y` follows `a` in the same time slot
-// and the transition prints at the time the stimulus was written. That answer
-// is 0 added time units, which is apart from all five of 3, 4, 5, 6 and 7
-// rather than from one of them.
+// with no active path there is no module path delay to be the larger:
+// `assign y = a;` carries no delay of its own, so `y` follows `a` in the same
+// time slot and the transition prints at the time the stimulus was written.
+// That answer is 0 added time units, which is apart from all five of 3, 4, 5, 6
+// and 7 rather than from one of them.
 //
 // The fourth and fifth cases are §30.4.4.4's ifnone path beside one
 // conditional path. The ifnone keyword gives a path its default state-dependent
