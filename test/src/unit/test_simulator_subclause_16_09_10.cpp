@@ -65,7 +65,7 @@ TEST(SvaEngine, WithinStartNoEarlierThanOuterStart) {
   EXPECT_FALSE(EvalSequenceWithin(SequenceMatchSpan{true, 2, 10},
                                   SequenceMatchSpan{true, 3, 11})
                    .matched);
-  // Coincident start at tick 3 satisfies the "no earlier" bound.
+  // Coincident start at tick 3 satisfies the bound on how early it may start.
   EXPECT_TRUE(EvalSequenceWithin(SequenceMatchSpan{true, 3, 10},
                                  SequenceMatchSpan{true, 3, 11})
                   .matched);
@@ -79,7 +79,8 @@ TEST(SvaEngine, WithinEndNoLaterThanOuterEnd) {
   EXPECT_FALSE(EvalSequenceWithin(SequenceMatchSpan{true, 4, 12},
                                   SequenceMatchSpan{true, 3, 11})
                    .matched);
-  // Coincident completion at tick 11 satisfies the "no later" bound.
+  // Coincident completion at tick 11 satisfies the bound on how late it may
+  // complete.
   EXPECT_TRUE(EvalSequenceWithin(SequenceMatchSpan{true, 4, 11},
                                  SequenceMatchSpan{true, 3, 11})
                   .matched);

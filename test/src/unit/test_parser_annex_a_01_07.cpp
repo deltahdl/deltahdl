@@ -320,10 +320,10 @@ TEST(NonPortProgramItem, ErrorDefparamInProgramIsRejected) {
 // --- non_port_program_item admits a concurrent_assertion_item and not
 // A.1.4's assertion_item ---
 // assertion_item's other alternative is A.6.10's
-// deferred_immediate_assertion_item, and §16.4.3 has a deferred assertion
-// outside procedural code "treated as if it were contained in an always_comb
-// procedure", which §24.3 has a program not contain. Both deferral forms were
-// accepted in a program body silently.
+// deferred_immediate_assertion_item, and §16.4.3 treats a deferred assertion
+// outside procedural code as though an always_comb procedure held it, which
+// §24.3 has a program not contain. Both deferral forms were accepted in a
+// program body silently.
 TEST(NonPortProgramItem, ErrorDeferredImmediateAssertionInProgramIsRejected) {
   auto r = Parse(
       "program p;\n"

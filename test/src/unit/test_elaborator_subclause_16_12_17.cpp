@@ -46,8 +46,8 @@ TEST(RecursivePropertyDetection, SelfInstantiationIsRecursiveSingleCallIsNot) {
   EXPECT_TRUE(reg.ReachesRecursiveProperty(&rec));
 }
 
-// §16.12.17: "several properties can be mutually recursive" — each property in
-// the cycle reaches itself through the other.
+// §16.12.17: properties may recurse through one another — each property in the
+// cycle reaches itself through the other.
 TEST(RecursivePropertyDetection, MutuallyRecursivePropertiesAreRecursive) {
   PropertyRegistry reg;
   ModuleItem a;

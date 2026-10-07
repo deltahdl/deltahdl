@@ -56,7 +56,7 @@ TEST(FollowedByPropertyParsing, FollowedByInCoverProperty) {
 
 // §16.12.9: the antecedent of a followed-by is a full sequence_expr, so a
 // ranged-delay sequence ahead of the #=# operator is accepted at the property
-// level — the realistic "a sequence followed by a property" shape.
+// level — the realistic shape of a sequence with a property after it.
 TEST(FollowedByPropertyParsing, FollowedByWithRangedAntecedent) {
   auto r = Parse(
       "module m;\n"

@@ -417,12 +417,11 @@ TEST(AlwaysCombVsAlwaysStar, WaitOrderInAlwaysCombErrors) {
                             "9.2.2.2.2"));
 }
 
-// §9.2.2.2.2 forbids a statement that blocks, and §16.17 rules that "The expect
-// statement is a procedural blocking statement" which "causes the executing
-// process to block until the given property succeeds or fails". Its Syntax
-// 16-20 is expect ( property_spec ) action_block, and the property spec here
-// carries the clocking event of the §16.17 example; the action block is the
-// null one.
+// §9.2.2.2.2 forbids a statement that blocks, and §16.17 makes the expect
+// statement a procedural statement that blocks, holding the process that runs
+// it until its property has passed or failed. Its Syntax 16-20 is
+// expect ( property_spec ) action_block, and the property spec here carries the
+// clocking event of the §16.17 example; the action block is the null one.
 TEST(AlwaysCombVsAlwaysStar, ExpectInAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(

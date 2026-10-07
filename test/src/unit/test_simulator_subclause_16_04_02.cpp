@@ -117,15 +117,15 @@ TEST(DeferredFlushPoints, FlushOnEmptyQueueIsSafeNoOp) {
 
 // --- Real-source tests: the live deferred-report path and its flush points ---
 //
-// Every fail action below is a single subroutine call, because §16.4 says "the
-// pass and fail statements in a deferred assertion's action_block, if present,
-// shall each consist of a single subroutine call" -- an assignment is not one.
-// The observed (#0) forms call a void function that records the report in a
-// flag, which §16.4 schedules in the Reactive region. A final deferred
-// assertion cannot use that vehicle: §16.4 requires its subroutine to "be one
-// that may be legally called in the Postponed region", and §4.4.2.9 says of
-// that region that "it is illegal to write values to any net or variable", so
-// the final test reports through $error and observes it with LastSeverity().
+// Every fail action below is a single subroutine call, because §16.4 requires
+// each pass or fail statement present in a deferred assertion's action_block to
+// be a single subroutine call -- an assignment is not one. The observed (#0)
+// forms call a void function that records the report in a flag, which §16.4
+// schedules in the Reactive region. A final deferred assertion cannot use that
+// vehicle: §16.4 requires its subroutine to be one that is legal to call in the
+// Postponed region, and §4.4.2.9 says of that region that "it is illegal to
+// write values to any net or variable", so the final test reports through
+// $error and observes it with LastSeverity().
 
 // §16.4.2 (bullet 2): an always_comb procedure that queues a deferred report
 // and is then re-run by a dependent-signal transition in the same time step

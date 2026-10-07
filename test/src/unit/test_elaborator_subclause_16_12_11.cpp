@@ -14,8 +14,8 @@ TEST(AlwaysRange, BoundedNonNegativeRangeIsWellFormed) {
   EXPECT_TRUE(IsAlwaysRangeWellFormed(range, /*strong=*/false));
 }
 
-// §16.12.11: equal bounds satisfy the "less than or equal to" relation between
-// the minimum and the maximum.
+// §16.12.11: equal bounds meet the requirement that the minimum not exceed the
+// maximum.
 TEST(AlwaysRange, EqualBoundsAreWellFormed) {
   AlwaysRange range{MakeAlwaysBound(2), MakeAlwaysBound(2)};
   EXPECT_TRUE(IsAlwaysRangeWellFormed(range, /*strong=*/false));

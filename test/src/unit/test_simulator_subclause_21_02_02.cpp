@@ -142,7 +142,7 @@ TEST(IoStrobeSim, StrobeObservesNonBlockingUpdate) {
   EXPECT_EQ(out, "y=2a\n");
 }
 
-// §16.9.3 makes $sampled "the sampled value of its argument (see 16.5.1)", and
+// §16.9.3 makes $sampled give its argument's sampled value (§16.5.1), and
 // §16.5.1 makes that the value in the Preponed region of the time slot -- what
 // the slot began with, before anything in it wrote. The write to 8'h22 and the
 // strobe stand in the same slot at time 10, so what the strobe prints is the

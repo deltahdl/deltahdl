@@ -10,13 +10,13 @@
 // are observable on real source driven through the simulator, and each test
 // below observes one of them:
 //
-//   - the clock "can vary from one expression to another", so two assertions in
-//     one module are checked at the ticks of their own clocks and at no others;
+//   - the clock may differ between expressions, so two assertions in one
+//     module are checked at the ticks of their own clocks and at no others;
 //   - "clk iff gating_signal" represents a gated clock, so a tick whose gate is
 //     false starts no evaluation attempt;
 //   - "assert property(@$global_clock a);" under a "global clocking @clk;
-//     endclocking" declaration "is logically equivalent to
-//     assert property(@clk a);", so the assertion is checked at that
+//     endclocking" declaration means the same as
+//     "assert property(@clk a);", so the assertion is checked at that
 //     declaration's event.
 //
 // Each test counts the pass actions a static concurrent assertion runs
@@ -27,13 +27,13 @@ using namespace delta;
 
 namespace {
 
-// §16.5.2: the assertion clock "can vary from one expression to another". Two
-// assertions stand in one module on two different clocks, and the run drives
-// three posedges of the first and two of the second. Each counter reaches its
-// own clock's tally rather than the total of five, so neither assertion was
-// checked at the other's ticks. The two counts differ, so an implementation
-// that clocked both assertions off whichever edge occurred fails whichever
-// count it did not produce.
+// §16.5.2: the assertion clock may differ between expressions. Two assertions
+// stand in one module on two different clocks, and the run drives three
+// posedges of the first and two of the second. Each counter reaches its own
+// clock's tally rather than the total of five, so neither assertion was checked
+// at the other's ticks. The two counts differ, so an implementation that
+// clocked both assertions off whichever edge occurred fails whichever count it
+// did not produce.
 TEST(AssertionClockSim, ClockVariesFromOneAssertionToAnother) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -167,10 +167,9 @@ TEST(AssertionClockSim, GlobalClockFollowsTheDeclaredEdge) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// §16.5.2, on Figure 16-1: "The sampled value of variable req at clock tick 6
-// is low and remains low up to and including clock tick 9. Notice that the
-// simulation value transitions to high at clock tick 9. However, the sampled
-// value at clock tick 9 is low."
+// §16.5.2, on Figure 16-1: req samples low from clock tick 6 through clock tick
+// 9; its simulated value rises at tick 9, yet the value sampled at tick 9 is
+// still low.
 //
 // The run below is that time step. `req` is low, and the single posedge of
 // `clk` falls in the very time step that raises it. §16.5.2's rule gives the
@@ -205,11 +204,9 @@ TEST(AssertionClockSim, OperandRisingInTheTicksTimeStepIsStillSampledLow) {
   EXPECT_EQ(broken->value.ToUint64(), 1u);
 }
 
-// §16.5.2: "If a variable that appears in the expression for clock also appears
-// in an expression with an assertion, the values of the two usages of the
-// variable can be different. The current value of the variable is used in the
-// clock expression, while the sampled value of the variable is used within the
-// assertion."
+// §16.5.2: a variable written both in the clock expression and in an expression
+// within the assertion can give the two uses different values, since the clock
+// expression reads its current value and the assertion reads its sampled value.
 //
 // `clk` is that variable here: it is the whole of the clocking event and the
 // whole of the property. The tick happens, so the clock expression saw the

@@ -96,8 +96,8 @@ TEST(SvaEngine, NexttimeIndexOneMatchesNextTick) {
 }
 
 // §16.12.10: composing the two helpers reproduces the indexed-form semantics.
-// Indexed weak nexttime holds when the indexed tick is out of reach ("there are
-// not n clock ticks") and otherwise takes the inner verdict; indexed strong
+// Indexed weak nexttime holds when the indexed tick is out of reach (fewer than
+// n clock ticks remain) and otherwise takes the inner verdict; indexed strong
 // nexttime instead fails when the indexed tick is out of reach.
 TEST(SvaEngine, IndexedNexttimeComposesReachabilityWithStrength) {
   // Index 3 needs three further ticks but only one is available: out of reach.

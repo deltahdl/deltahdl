@@ -219,18 +219,18 @@ TEST(DeferredDisableOutermost, DoesNotAffectOtherProcessQueue) {
 // event-control procedure (§9.6.2 disable target), a named begin-end block, and
 // a task.
 //
-// Every fail action below is a single subroutine call, because §16.4 says "the
-// pass and fail statements in a deferred assertion's action_block, if present,
-// shall each consist of a single subroutine call" -- an assignment is not one.
-// The observed (#0) forms call a void function that records the report in a
-// flag, which §16.4 schedules in the Reactive region.
+// Every fail action below is a single subroutine call, because §16.4 requires
+// each pass or fail statement present in a deferred assertion's action_block to
+// be a single subroutine call -- an assignment is not one. The observed (#0)
+// forms call a void function that records the report in a flag, which §16.4
+// schedules in the Reactive region.
 //
 // A final deferred assertion cannot use that vehicle. §16.4 requires its
-// subroutine to "be one that may be legally called in the Postponed region",
-// and §4.4.2.9 says of that region that "it is illegal to write values to any
-// net or variable" -- so a function setting a flag is exactly what is ruled
-// out. The final tests report through $error, a system task §16.4 names among
-// the permitted subroutines, and observe it with LastSeverity() instead.
+// subroutine to be one that is legal to call in the Postponed region, and
+// §4.4.2.9 says of that region that "it is illegal to write values to any net
+// or variable" -- so a function setting a flag is exactly what is ruled out.
+// The final tests report through $error, a system task §16.4 names among the
+// permitted subroutines, and observe it with LastSeverity() instead.
 
 // §16.4.4 Claim B (outermost scope): a process (b3) that disables another
 // procedure's outermost scope (b2) flushes b2's pending deferred report. The

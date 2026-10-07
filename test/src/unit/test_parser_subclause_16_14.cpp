@@ -1,11 +1,11 @@
 // §16.14 concurrent assertions that deltahdl does not evaluate, and the report
-// that says so. The clause rules that "A property on its own is never
-// evaluated for checking an expression. It shall be used within an assertion
-// statement (see 16.2) for this to occur." A source that writes one of the
-// five concurrent assertion statements of Syntax 16-18 has written that
-// assertion statement, so every case here hands deltahdl a form it cannot
-// evaluate and reads back the warning naming the reason, plus one control that
-// hands it the form it can evaluate and reads back no warning at all.
+// that says so. The clause rules that a property alone is never evaluated to
+// check anything; only an assertion statement (§16.2) that uses it brings that
+// about. A source that writes one of the five concurrent assertion statements
+// of Syntax 16-18 has written that assertion statement, so every case here
+// hands deltahdl a form it cannot evaluate and reads back the warning naming
+// the reason, plus one control that hands it the form it can evaluate and reads
+// back no warning at all.
 //
 // The cases go with the warning: as each form gains an evaluation path under
 // #2923, #2924 and #2927, the case asserting it is unevaluated is replaced by

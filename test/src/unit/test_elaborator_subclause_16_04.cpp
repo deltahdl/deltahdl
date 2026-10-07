@@ -67,13 +67,12 @@ TEST(DeferredAssertionElaboration, OmittedActionsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §16.4: "The pass and fail statements in a deferred assertion's action_block,
-// if present, shall each consist of a single subroutine call. ... The
-// requirement of a single subroutine call implies that no begin-end block shall
-// surround the pass or fail statements, as begin is itself a statement that is
-// not a subroutine call." §1.5 defines shall as a mandatory requirement "from
-// which no deviation is permitted", so each of the forms below is illegal
-// source and elaboration rejects it rather than reporting it and carrying on.
+// §16.4: each pass or fail statement present in a deferred assertion's
+// action_block is required to be one subroutine call, and since begin is a
+// statement and no subroutine call, a begin-end block around either is ruled
+// out. §1.5 defines shall as a mandatory requirement "from which no deviation
+// is permitted", so each of the forms below is illegal source and elaboration
+// rejects it rather than reporting it and carrying on.
 TEST(DeferredAssertionElaboration, BeginEndPassBlockRejected) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -120,9 +119,9 @@ TEST(DeferredAssertionElaboration, AssignmentInPassActionRejected) {
                             4, "16.4"));
 }
 
-// §16.3 gives the opposite rule for a simple immediate assertion: "the fail
-// statement, like the pass statement, is any legal SystemVerilog procedural
-// statement". The same begin-end block that §16.4 rejects above is therefore
+// §16.3 gives the opposite rule for a simple immediate assertion: its fail
+// statement, as much as its pass statement, may be any legal procedural
+// statement. The same begin-end block that §16.4 rejects above is therefore
 // legal without the #0, and this pair pins that the rejection follows the
 // deferral rather than the block.
 TEST(DeferredAssertionElaboration, NonDeferredBeginEndAccepted) {

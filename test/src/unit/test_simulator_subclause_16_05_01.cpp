@@ -32,9 +32,8 @@ TEST(ConcurrentAssertionSampling, AutomaticVariableSamplesCurrentValue) {
 // §16.5.1 / §16.10: a local variable is one of the exceptions to the Preponed
 // sampling rule. Like an automatic variable, its sampled value is its current
 // value, not a value read from the Preponed region. §16.10 states the same rule
-// ("the sampled value of a local variable is the current value") and refers
-// back to §16.5.1; SampleLocalVariable is the production carrier for that
-// weave.
+// (a local variable samples as its current value) and refers back to §16.5.1;
+// SampleLocalVariable is the production carrier for that weave.
 TEST(ConcurrentAssertionSampling, LocalVariableSamplesCurrentValue) {
   SampledValue sv = SampleLocalVariable(0x2468);
   EXPECT_EQ(sv.value, 0x2468u);
@@ -176,11 +175,11 @@ std::string SourceWithTickStep(const std::string& tick_line) {
          "endmodule\n";
 }
 
-// §16.5.1: "The sampled value of a variable in a time slot corresponding to
-// time greater than 0 is the value of this variable in the Preponed region of
-// this time slot." The Preponed value of a time slot is settled before the slot
-// begins, so nothing a process writes during the slot can change it and the
-// order of the writes within the slot cannot change the verdict either.
+// §16.5.1: in a time slot after time 0, a variable's sampled value is the value
+// it holds in that slot's Preponed region. The Preponed value of a time slot is
+// settled before the slot begins, so nothing a process writes during the slot
+// can change it and the order of the writes within the slot cannot change the
+// verdict either.
 //
 // Both runs below drive one clock tick at time 5 and raise `a` in that same
 // time step, one before the assignment to `clk` and one after. §16.5.1 gives
@@ -212,11 +211,10 @@ TEST(ConcurrentAssertionSampling, VerdictDoesNotDependOnWriteOrderInTheTick) {
   EXPECT_EQ(first_misses->value.ToUint64(), 1u);
 }
 
-// §16.5.1: "The sampled value of a variable in a time slot corresponding to
-// time 0 is its default sampled value", and the default sampled value of a
-// static variable is "the value assigned in its declaration, or, in the absence
-// of such an assignment, ... the default (or uninitialized) value of the
-// corresponding type". `a` is declared `logic` and its declaration assigns
+// §16.5.1: in the time slot at time 0 a variable's sampled value is its default
+// sampled value, and for a static variable that is the value its declaration
+// assigns or, when the declaration assigns none, its type's default
+// (uninitialized) value. `a` is declared `logic` and its declaration assigns
 // nothing, so its default sampled value is 1'bx however early the initial
 // procedure raises it.
 //
@@ -337,13 +335,12 @@ TEST(ConcurrentAssertionSampling, LikeNamedOperandsAreSampledPerInstance) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §16.5.1: "The sampled value of a const cast expression is defined as the
-// current value of its argument", where the variable beside it reads its
-// Preponed value. `a` is written 1 in the tick's own time step, before the
-// clock, so the property's `a` samples the 0 the step began with and
-// `const'(a)` reads the 1 standing at the tick: the two differ and the pass
-// statement counts. A const cast read through the sampling reads 0 as well
-// and the fail statement counts instead.
+// §16.5.1: a const cast expression samples as its argument's current value,
+// where the variable beside it reads its Preponed value. `a` is written 1 in
+// the tick's own time step, before the clock, so the property's `a` samples the
+// 0 the step began with and `const'(a)` reads the 1 standing at the tick: the
+// two differ and the pass statement counts. A const cast read through the
+// sampling reads 0 as well and the fail statement counts instead.
 TEST(ConcurrentAssertionSampling, ConstCastReadsTheCurrentValueAtTheTick) {
   SimFixture f;
   auto* hits = RunAndFindVar(

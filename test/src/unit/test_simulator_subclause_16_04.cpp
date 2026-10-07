@@ -126,16 +126,16 @@ TEST(SvaEngine, FlushClearsQueue) {
   EXPECT_EQ(f.engine.DeferredQueueSize(), 0u);
 }
 
-// Every deferred action below is a single subroutine call, because §16.4 says
-// "the pass and fail statements in a deferred assertion's action_block, if
-// present, shall each consist of a single subroutine call" -- an assignment is
-// not one. An observed (#0) action calls a void function that writes the
-// variable under test, which is legal because §16.4 schedules that call in the
-// Reactive region. A final action cannot use that vehicle: §16.4 requires its
-// subroutine to "be one that may be legally called in the Postponed region",
-// and §4.4.2.9 says of that region that "it is illegal to write values to any
-// net or variable", so the final test reports through a severity system task
-// instead and observes it with LastSeverity().
+// Every deferred action below is a single subroutine call, because §16.4
+// requires each pass or fail statement present in a deferred assertion's
+// action_block to be a single subroutine call -- an assignment is not one. An
+// observed (#0) action calls a void function that writes the variable under
+// test, which is legal because §16.4 schedules that call in the Reactive
+// region. A final action cannot use that vehicle: §16.4 requires its subroutine
+// to be one that is legal to call in the Postponed region, and §4.4.2.9 says of
+// that region that "it is illegal to write values to any net or variable", so
+// the final test reports through a severity system task instead and observes it
+// with LastSeverity().
 
 TEST(AssertionStatementSim, ObservedDeferredActionFiresAfterFollowingStmt) {
   SimFixture f;
@@ -158,11 +158,10 @@ TEST(AssertionStatementSim, ObservedDeferredActionFiresAfterFollowingStmt) {
 // runs after the statement that follows the assertion -- but it is read off the
 // severity rather than a variable, and the subroutine is a user task rather
 // than a system task, which §16.4 lists first among the permitted forms. The
-// task's body only reports, so it is one that "may be legally called in the
-// Postponed region". The inline $error runs in the Active region where the
-// process reaches it and the deferred report runs later in the Postponed
-// region, so the last message is the deferred one; run inline, "inline" would
-// be last.
+// task's body only reports, so it is one that is legal to call in the Postponed
+// region. The inline $error runs in the Active region where the process reaches
+// it and the deferred report runs later in the Postponed region, so the last
+// message is the deferred one; run inline, "inline" would be last.
 TEST(AssertionStatementSim, FinalDeferredActionFiresAfterFollowingStmt) {
   SimFixture f;
   auto* design = ElaborateSrc(

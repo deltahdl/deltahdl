@@ -38,8 +38,8 @@ TEST(PropertyDisjunction, BothOperandsFail) {
             PropertyResult::kFail);
 }
 
-// A vacuous pass counts as the operand holding, so it satisfies the
-// "at least one holds" condition on its own.
+// A vacuous pass counts as the operand holding, so it satisfies the condition
+// that at least one operand holds on its own.
 TEST(PropertyDisjunction, VacuousLeftStillHolds) {
   EXPECT_EQ(EvalPropertyOr(PropertyResult::kVacuousPass, PropertyResult::kFail),
             PropertyResult::kPass);

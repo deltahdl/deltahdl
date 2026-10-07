@@ -279,10 +279,10 @@ TEST(AlwaysCombMultiDriver, FunctionCalledFromAnAssignmentPatternKeyIsADriver) {
 // reach it. Each case below names one position, and says which of the two
 // answers the position gives.
 
-// §16.3 has the pass statement of an action block "executed if the expression
-// evaluates to true", so a variable assigned only there is left holding its
-// previous value whenever the assertion fails. It is assigned somewhere and on
-// no path, which is the latch.
+// §16.3 runs the pass statement of an action block only when the expression is
+// true, so a variable assigned only there is left holding its previous value
+// whenever the assertion fails. It is assigned somewhere and on no path, which
+// is the latch.
 TEST(AlwaysCombLatchWarning, AssertionPassStatementAssignmentInfersLatch) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -298,8 +298,7 @@ TEST(AlwaysCombLatchWarning, AssertionPassStatementAssignmentInfersLatch) {
 }
 
 // The fail statement is the other arm of the same action block, kept in a
-// different member of Stmt, and §16.3 has it "executed if the expression
-// evaluates to false".
+// different member of Stmt, and §16.3 runs it when the expression is false.
 TEST(AlwaysCombLatchWarning, AssertionFailStatementAssignmentInfersLatch) {
   ElabFixture f;
   auto* design = ElaborateSrc(

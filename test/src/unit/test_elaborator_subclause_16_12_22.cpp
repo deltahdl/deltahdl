@@ -183,9 +183,9 @@ TEST(Nondegeneracy, MixedEmptyAndNonemptyIsNondegenerateButAdmitsEmpty) {
 TEST(Nondegeneracy, RuleARejectsNondegenerateThatAdmitsEmpty) {
   // §16.12.22(a): a property sequence shall be nondegenerate AND shall not
   // admit any empty match. The mixed class (e.g. a[*0:2]) is nondegenerate but
-  // admits an empty match, so it is illegal as a property — the "shall not
-  // admit any empty match" half of the rule, which nondegeneracy alone does
-  // not cover.
+  // admits an empty match, so it is illegal as a property — the half of the
+  // rule that forbids any empty match, which nondegeneracy alone does not
+  // cover.
   EXPECT_FALSE(
       IsSequenceUsageLegal(SequenceUsageContext::kAsProperty,
                            SequenceMatchClass::kAdmitsBothEmptyAndNonempty));

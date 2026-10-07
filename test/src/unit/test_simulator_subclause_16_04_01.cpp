@@ -18,16 +18,16 @@ using namespace delta;
 
 namespace {
 
-// Every deferred action below is a single subroutine call, because §16.4 says
-// "the pass and fail statements in a deferred assertion's action_block, if
-// present, shall each consist of a single subroutine call" -- an assignment is
-// not one. An observed (#0) action calls a void function that writes the
-// variable under test, which is legal because §16.4 schedules that call in the
-// Reactive region. A final action cannot use that vehicle: §16.4 requires its
-// subroutine to "be one that may be legally called in the Postponed region",
-// and §4.4.2.9 says of that region that "it is illegal to write values to any
-// net or variable", so the final tests report through a severity system task
-// and observe it with LastSeverity() and LastSeverityMsg().
+// Every deferred action below is a single subroutine call, because §16.4
+// requires each pass or fail statement present in a deferred assertion's
+// action_block to be a single subroutine call -- an assignment is not one. An
+// observed (#0) action calls a void function that writes the variable under
+// test, which is legal because §16.4 schedules that call in the Reactive
+// region. A final action cannot use that vehicle: §16.4 requires its subroutine
+// to be one that is legal to call in the Postponed region, and §4.4.2.9 says of
+// that region that "it is illegal to write values to any net or variable", so
+// the final tests report through a severity system task and observe it with
+// LastSeverity() and LastSeverityMsg().
 
 // §16.4.1: a passing observed (#0) deferred assertion's pass action is a
 // pending report -- deferred, not run inline -- so its effect still lands by

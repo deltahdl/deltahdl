@@ -208,11 +208,11 @@ TEST(Assertion, FirstEvaluationHasNoPriorSample) {
   EXPECT_EQ(monitor.Evaluate("p_first", 5), AssertionResult::kVacuousPass);
 }
 
-// §16.9.3: "$sampled returns the sampled value of its argument (see 16.5.1)",
-// and §16.5.1 makes that "the value of this variable in the Preponed region of
-// this time slot" -- the value it held before anything in this slot wrote it.
-// The function returned EvalExpr of its argument, which is the live value, so
-// the two coincided only where nothing had changed and $sampled was an identity
+// §16.9.3: $sampled gives the sampled value of its argument (§16.5.1), and
+// §16.5.1 makes that the value the variable holds in the slot's Preponed region
+// -- the value it held before anything in this slot wrote it. The function
+// returned EvalExpr of its argument, which is the live value, so the two
+// coincided only where nothing had changed and $sampled was an identity
 // everywhere else.
 //
 // The write and the read stand in one time slot here, which is the only shape
@@ -236,12 +236,12 @@ TEST(SampledValueSim, SampledReadsThePreponedValueOfItsArgument) {
   EXPECT_EQ(var->value.ToUint64(), 0x11u);
 }
 
-// §16.9.3: "$rose returns true (1'b1) if the LSB of the expression changed to
-// 1", compared against "the sampled value of the expression from the most
-// recent strictly prior time step in which the clocking event occurred" -- and
-// where no such step has occurred, against the default sampled value, which
-// §16.5.1 makes the value the declaration assigned. `req` is declared 0 and is
-// 1 at the first edge, so it rose and the property holds.
+// §16.9.3: $rose is true (1'b1) when the expression's LSB has become 1,
+// measured against the expression's sampled value at the latest earlier time
+// step where the clocking event occurred -- and where no such step has
+// occurred, against the default sampled value, which §16.5.1 makes the value
+// the declaration assigned. `req` is declared 0 and is 1 at the first edge, so
+// it rose and the property holds.
 //
 // $rose returned a constant zero, so this property was false at every tick and
 // an assertion written on it could not pass.
@@ -281,8 +281,8 @@ TEST(SampledValueSim, RoseFailsWhenTheLsbDoesNotRise) {
   EXPECT_EQ(f.ctx.LastSeverityMsg(), "Assertion failed.");
 }
 
-// §16.9.3 gives $past "the value of b sampled at the previous occurrence of
-// (posedge clk)", the default number_of_ticks being 1. It returned the current
+// §16.9.3 has $past return b as sampled at the prior occurrence of
+// (posedge clk), the default number_of_ticks being 1. It returned the current
 // value, so `x != $past(x)` was never true and a property watching for a change
 // could not fire.
 //

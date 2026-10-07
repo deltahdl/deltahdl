@@ -56,9 +56,9 @@ TEST(AssertionSampledArrayElement, SurvivesArrayMutationDuringEvaluationScope) {
 
 TEST(AssertionSampledArrayElement,
      SurvivesRepeatedMutationsUntilEvaluationCompletes) {
-  // §16.6 lists both "removed from the array" and "the array may get resized"
-  // as ways the underlying storage can change. The sampled copy must remain
-  // intact across any number of such mutations during evaluation scope.
+  // §16.6 lists both removal of an element from the array and resizing of the
+  // array as ways the underlying storage can change. The sampled copy must
+  // remain intact across any number of such mutations during evaluation scope.
   SampledArrayElement s = SampleArrayElementForAssertion(0x1234);
   for (int i = 0; i < 16; ++i) {
     s = ArrayElementAfterArrayMutation(s);

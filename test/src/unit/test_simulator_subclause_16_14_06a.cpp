@@ -140,8 +140,8 @@ TEST(ProceduralConcurrentAssertion, ClockInferenceRequiresAllThreeConditions) {
   EXPECT_FALSE(SatisfiesClockInferenceRequirements(false, false, false));
 }
 
-// §16.14.6 has a concurrent assertion embedded in procedural code "evaluated as
-// though it were a separate concurrent assertion". The property here carries no
+// §16.14.6 evaluates a concurrent assertion embedded in procedural code as it
+// would a standalone concurrent assertion. The property here carries no
 // clocking event of its own, so it takes the clocking of the procedure that
 // reaches it -- the posedge the always block waits on -- and `a` is false when
 // that edge arrives, so the assertion fails and §16.3's default report says so.
@@ -184,12 +184,11 @@ TEST(ProceduralConcurrentAssertionSim, TrueBooleanPropertyReportsNothing) {
   EXPECT_EQ(f.ctx.LastSeverityMsg(), "");
 }
 
-// §16.5: "Concurrent assertions ... are evaluated in the Observed region", and
-// §16.14.6 has an embedded one "evaluated as though it were a separate
-// concurrent assertion", so the region is the same wherever the statement is
-// written. §4.4 orders the Observed region after the whole active region set,
-// so a design that writes at the same clock edge has written by the time the
-// property is evaluated.
+// §16.5 evaluates concurrent assertions in the Observed region, and §16.14.6
+// evaluates an embedded one as it would a standalone one, so the region is the
+// same wherever the statement is written. §4.4 orders the Observed region after
+// the whole active region set, so a design that writes at the same clock edge
+// has written by the time the property is evaluated.
 //
 // `peek()` is what makes the region visible. §16.5.1's sampling covers the
 // variables a property names, and this one names none: a function call reads

@@ -70,8 +70,8 @@ TEST(StaticDeferredAssertion, EquivalentToExplicitAlwaysCombWrapping) {
 }
 
 // A nameless static deferred assertion is legal: the always_comb treatment
-// means it is not subject to the "must be named" rule of a concurrent
-// assertion / clocking item.
+// means it is not subject to the naming rule of a concurrent assertion /
+// clocking item.
 TEST(StaticDeferredAssertion, NamelessDeferredAssertElaboratesCleanly) {
   ElabFixture f;
   auto* design = ElaborateSrc(

@@ -13,10 +13,9 @@ namespace {
 
 // §16.9.11 describes composing a complex sequence from simpler subsequences.
 // One of its two methods is to detect the end point of another sequence with
-// the triggered method: "When method triggered is evaluated in an expression,
-// it tests whether its operand sequence has reached its end point at that
-// particular point in time. The result of triggered does not depend upon the
-// starting point of the match of its operand sequence."
+// the triggered method, which, evaluated in an expression, tells whether its
+// operand sequence has reached its end point at that moment, whatever point the
+// match started at.
 //
 // The production path exercised here is the live sequence monitor
 // (simulator/sequence_monitor.cpp), which fires a named sequence's end-point

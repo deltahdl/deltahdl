@@ -137,12 +137,11 @@ TEST(EmbeddedConcurrentAssertion,
   EXPECT_FALSE(found->is_procedural_concurrent);
 }
 
-// §16.14.6 has a concurrent assertion embedded in procedural code "evaluated as
-// though it were a separate concurrent assertion", and a property carrying no
-// clocking event of its own takes the clocking of the procedure that reaches
-// it -- here the posedge the always block is already waiting on. So the boolean
-// is the property, and the statement standing where it stands is the
-// evaluation.
+// §16.14.6 evaluates a concurrent assertion embedded in procedural code as it
+// would a standalone concurrent assertion, and a property carrying no clocking
+// event of its own takes the clocking of the procedure that reaches it -- here
+// the posedge the always block is already waiting on. So the boolean is the
+// property, and the statement standing where it stands is the evaluation.
 //
 // The parser threw the property away before reading it: assert_expr was set to
 // null and the spec skipped whatever it held, so `assert property (a)` inside a

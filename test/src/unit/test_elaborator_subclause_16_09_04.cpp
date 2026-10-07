@@ -143,7 +143,7 @@ TEST(GlobalClockingElab, FutureFunctionInProceduralCodeErrors) {
                             "16.9.4"));
 }
 
-// §16.9.4: "global clocking is defined" is resolved with the §14.14 scope
+// §16.9.4: whether global clocking is defined is resolved with the §14.14 scope
 // rules, so the declaration need not be in the same module. A child instance
 // that uses a past function but declares no global clocking of its own is
 // accepted when an enclosing instance supplies one (§14.14 lookup rule b).
@@ -164,14 +164,14 @@ TEST(GlobalClockingElab, GclkFunctionResolvesGlobalClockingFromParentInstance) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §16.9.4 says the global clocking sampled value functions "may be used only
-// if global clocking is defined (see 14.14)" and states no condition on where
-// the call stands, so a $past_gclk written in any statement position of a
-// module that declares no global clocking and is instantiated under none is an
-// error. §16.9.4 also says "the global clocking past sampled value functions
-// are usable in general procedural code and action blocks", so every case below
-// breaks the requires-a-declaration rule alone and the placement rule the
-// future functions carry cannot account for the report.
+// §16.9.4 allows the global clocking sampled value functions only where global
+// clocking is defined (§14.14) and states no condition on where the call
+// stands, so a $past_gclk written in any statement position of a module that
+// declares no global clocking and is instantiated under none is an error.
+// §16.9.4 also lets the global clocking past sampled value functions appear in
+// ordinary procedural code and in action blocks, so every case below breaks the
+// requires-a-declaration rule alone and the placement rule the future functions
+// carry cannot account for the report.
 //
 // The seven cases each put the call in one statement position, and each is a
 // position Elaborator::ValidateGclkRequiresGlobalClocking reached only once
@@ -322,14 +322,14 @@ TEST(GlobalClockingElab,
       "16.9.4"));
 }
 
-// §16.9.4 says the global clocking sampled value functions "may be used only
-// if global clocking is defined (see 14.14)" and states no condition on where
-// the call stands, so a $past_gclk written in any expression position of a
-// module that declares no global clocking and is instantiated under none is an
-// error. §16.9.4 also says "the global clocking past sampled value functions
-// are usable in general procedural code and action blocks", so every case below
-// breaks the requires-a-declaration rule alone and the placement rule the
-// future functions carry cannot account for the report.
+// §16.9.4 allows the global clocking sampled value functions only where global
+// clocking is defined (§14.14) and states no condition on where the call
+// stands, so a $past_gclk written in any expression position of a module that
+// declares no global clocking and is instantiated under none is an error.
+// §16.9.4 also lets the global clocking past sampled value functions appear in
+// ordinary procedural code and in action blocks, so every case below breaks the
+// requires-a-declaration rule alone and the placement rule the future functions
+// carry cannot account for the report.
 //
 // Each case puts the call in one expression position of a Stmt, and each is a
 // position Elaborator::ValidateGclkRequiresGlobalClocking reached only once
@@ -676,9 +676,9 @@ TEST(GlobalClockingElab,
 }
 
 // A.6.5: `event_expression ::= [ edge_identifier ] expression [ iff expression
-// ]`, so an event control carries two expressions, and §16.9.4's "may be used
-// only if global clocking is defined (see 14.14)" states no condition on which
-// of them the call is written in.
+// ]`, so an event control carries two expressions, and §16.9.4's requirement
+// that global clocking be defined (§14.14) states no condition on which of them
+// the call is written in.
 //
 // An always procedure keeps its event list in ModuleItem::sensitivity rather
 // than in a Stmt, and the walk over that list read the signal alone. The
@@ -701,11 +701,11 @@ TEST(GlobalClockingElab,
       "16.9.4"));
 }
 
-// §16.9.4 also places the future functions -- "$future_gclk, $rising_gclk,
-// $falling_gclk, $steady_gclk and $changing_gclk ... may be used only in a
-// property or sequence expression" -- and ValidateFutureGclkPlacement reads the
-// same walk, so the field has to be read for that report too. A case over
-// $past_gclk alone leaves the placement half unstated.
+// §16.9.4 also places the future functions, confining $future_gclk,
+// $rising_gclk, $falling_gclk, $steady_gclk and $changing_gclk to property and
+// sequence expressions, and ValidateFutureGclkPlacement reads the same walk,
+// so the field has to be read for that report too. A case over $past_gclk alone
+// leaves the placement half unstated.
 TEST(GlobalClockingElab, FutureGclkFunctionInAnAlwaysIffConditionErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -720,8 +720,8 @@ TEST(GlobalClockingElab, FutureGclkFunctionInAnAlwaysIffConditionErrors) {
                             "16.9.4"));
 }
 
-// §16.9.4 admits the future functions in a property_expr -- they "may be
-// invoked only in property_expr or in sequence_expr" -- and the parser gives a
+// §16.9.4 admits the future functions in a property_expr -- no call of one may
+// stand outside a property_expr or a sequence_expr -- and the parser gives a
 // concurrent assertion's property the shape of an immediate assert statement,
 // so the placement rule has to tell that statement apart from the procedural
 // code it otherwise resembles. Without the distinction the accepted use below
@@ -741,10 +741,10 @@ TEST(GlobalClockingElab,
 }
 
 // §16.9.4: the same statement's action block is not the property, and the
-// clause bars these functions there outright -- "this implies that they shall
-// not be used in assertion action blocks". The action block is a statement of
-// the assertion rather than its property expression, so it stays inside the
-// placement rule while the property is passed over.
+// clause bars these functions there outright, excluding them from assertion
+// action blocks. The action block is a statement of the assertion rather than
+// its property expression, so it stays inside the placement rule while the
+// property is passed over.
 TEST(GlobalClockingElab, FutureFunctionInAnAssertionActionBlockErrors) {
   ElabFixture f;
   ElaborateSrc(
