@@ -432,13 +432,13 @@ TEST(ProtectKeyMethodDescription, AnEnvelopeStatingNoneIsReadBackToo) {
 
 // -- The cipher a region asks for its own keys -------------------------------
 
-// §34.5.24.2's ENCRYPTION INPUT has the identifier indicate "the encryption
-// algorithm that shall be used to encrypt the keys used to encrypt the
-// data_block", so a region naming des-cbc has stated what its own key block is
-// to be sealed with. §34.5.24.2 gives this keyword no table of its own and
-// sends the reader to §34.5.11's, which marks des-cbc Required of every
-// implementation, so the block is sealed under FIPS 46-3's cipher and the
-// envelope states that identifier rather than this implementation's own.
+// §34.5.24.2's ENCRYPTION INPUT has the identifier name the algorithm the keys
+// that encrypt the data_block are themselves to be encrypted with, so a region
+// naming des-cbc has stated what its own key block is to be sealed with.
+// §34.5.24.2 gives this keyword no table of its own and sends the reader to
+// §34.5.11's, which marks des-cbc Required of every implementation, so the
+// block is sealed under FIPS 46-3's cipher and the envelope states that
+// identifier rather than this implementation's own.
 //
 // The design is sealed and nothing is reported, and the identifier the envelope
 // states is read as well: a tool that sealed under its own cipher and said so

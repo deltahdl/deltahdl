@@ -156,15 +156,14 @@ TEST(ProtectDataDecryptKeyDescription, WithoutTheBlocksKeyTheDataStaysShut) {
       << read;
 }
 
-// §34.5.14.2 (printed page 959): "the decrypting tool shall decrypt the
-// key_block to find the data_decrypt_key and data_method that in turn can be
-// used to decrypt the data_block". A region naming its data's key under the
-// same entity its key block is under writes that name into the block beside
-// the key, and a reader holding only the block's key -- a list for that entity
-// without the data's name in it -- takes the key from the block rather than
-// being told the name is not in its list: §34.5.12.2 makes that an error of
-// the encryption input, and the reader was stopped at the block written to let
-// it in.
+// §34.5.14.2 (printed page 959): the decrypting tool decrypts the key_block to
+// recover the data_decrypt_key and data_method, which then decrypt the
+// data_block. A region naming its data's key under the same entity its key
+// block is under writes that name into the block beside the key, and a reader
+// holding only the block's key -- a list for that entity without the data's
+// name in it -- takes the key from the block rather than being told the name is
+// not in its list: §34.5.12.2 makes that an error of the encryption input, and
+// the reader was stopped at the block written to let it in.
 TEST(ProtectDataDecryptKeyDescription,
      TheNameInsideTheBlockNeedsNoKeyOfItsOwn) {
   std::string region = "`pragma protect begin\n";

@@ -22,10 +22,10 @@
 // .TheSameExpressionOutsideTheEnvelopeIsNotEncrypted in
 // test_preprocessor_subclause_34_03_01a.cpp write a runtime_license inside a
 // region and outside one, and hold the recovered block to equalling the
-// expression and the design exactly -- which is what "unchanged except for the
-// encryption" asks, said more precisely than a search of the text could say it.
-// Restating them here under this subclause's name would add a second copy of a
-// claim already made and nothing else.
+// expression and the design exactly -- which is what an output changed by
+// nothing but its encryption asks, said more precisely than a search of the
+// text could say it. Restating them here under this subclause's name would add
+// a second copy of a claim already made and nothing else.
 //
 // What those two leave open is the first case below. They show the expression
 // treated one way inside a region and another way outside it, which is

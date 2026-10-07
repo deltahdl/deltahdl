@@ -341,8 +341,8 @@ TEST(ProtectDigestBlockDecryptionInput, ADigestOfTheBlockItFollowsAgrees) {
   EXPECT_EQ(run.DigestCheck(), ProtectDigestCheck::kMatched);
 }
 
-// §34.5.22.2 has the digest "written on the line following the digest_block
-// expression" and says nothing about where it ends, so a digest block another
+// §34.5.22.2 has the digest written on the line after the digest_block
+// expression and says nothing about where it ends, so a digest block another
 // tool wrote over several lines -- which §34.5.9.2's line-oriented schemes
 // produce by construction -- is one this reader has to take, and it still
 // agrees with the block it follows. The envelope is the one above with its

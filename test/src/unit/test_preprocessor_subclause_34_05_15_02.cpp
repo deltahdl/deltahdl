@@ -20,12 +20,12 @@
 // declaration does not.
 //
 // Where the block stands is settled by the same subclause, in the sentence its
-// expression is defined by: the expression indicates "that a data block begins
-// on the next line in the file". So the resultant text carries the keyword
-// alone on its directive, as §34.5.15.1 spells it, and the encoded characters
-// on the line beneath. Issue #3272 records what this tool wrote before: the
-// block stood against the keyword as its pragma_value, which put it on the
-// directive rather than on the next line.
+// expression is defined by: the expression says that a data block starts on the
+// file's next line. So the resultant text carries the keyword alone on its
+// directive, as §34.5.15.1 spells it, and the encoded characters on the line
+// beneath. Issue #3272 records what this tool wrote before: the block stood
+// against the keyword as its pragma_value, which put it on the directive rather
+// than on the next line.
 //
 // §34.5.9 defines the encoding expression and which schemes an implementation
 // provides; what is written here is what the block does with the one in effect.

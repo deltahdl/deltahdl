@@ -30,17 +30,17 @@
 //
 // ENCRYPTION OUTPUT, continued: what the envelope has to state is what stood in
 // effect where the region closed, rather than what the region restated between
-// its own delimiters. §34.5.1.2 asks for it outright -- "protected envelopes
-// should be completely self-contained to avoid any undesired interaction when
-// multiple encrypted models exist in the decryption input stream". §34.4 makes
-// the scope of a protect pragma keyword lexical, so a value written ahead of a
-// region is that region's as much as one written inside it, and §34.5.31's
-// reset, which src/preprocessor/protect_envelope_output.cpp writes at the end
-// of every envelope, puts the keywords back to their defaults. A text stating a
-// value once ahead of two regions would therefore leave the second envelope
-// with nothing to be read under, were that envelope to rely on the text ahead
-// of it. Issue #3275 is the envelope that did. The cases below state a value
-// once ahead of two regions and read both envelopes for it.
+// its own delimiters. §34.5.1.2 asks for it outright -- each protected envelope
+// should stand on its own, so that several encrypted models in one decryption
+// input cannot interfere with one another. §34.4 makes the scope of a protect
+// pragma keyword lexical, so a value written ahead of a region is that region's
+// as much as one written inside it, and §34.5.31's reset, which
+// src/preprocessor/protect_envelope_output.cpp writes at the end of every
+// envelope, puts the keywords back to their defaults. A text stating a value
+// once ahead of two regions would therefore leave the second envelope with
+// nothing to be read under, were that envelope to rely on the text ahead of it.
+// Issue #3275 is the envelope that did. The cases below state a value once
+// ahead of two regions and read both envelopes for it.
 //
 // Three expressions are excepted, and the fourth case holds the rule to them:
 // §34.5.5's author, §34.5.6's author_info and §34.5.30's comment. §34.5.5.2 has

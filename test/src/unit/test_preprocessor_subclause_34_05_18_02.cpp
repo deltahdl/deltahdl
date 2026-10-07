@@ -404,10 +404,9 @@ constexpr std::string_view kKeyBlockLine = "`pragma protect key_block\n";
 
 // The region the excepted cases below encrypt. It names a key for its digests,
 // names an entity and a key for its data, and designates a provider for its
-// own keys, and §34.5.25.2 (printed page 964) has "the key that shall be used
-// for encrypting the data encryption keys" be the one a key_keyname names, so
-// wherever the tool holds that provider's key the region's data key travels in
-// a key block.
+// own keys, and §34.5.25.2 (printed page 964) has the key a key_keyname names
+// be the one the data encryption keys are encrypted with, so wherever the tool
+// holds that provider's key the region's data key travels in a key block.
 std::string RegionNamingBothProviders() {
   std::string described = Designates(kProvider, kProviderName);
   described += Written("data_keyowner", kDataParty);

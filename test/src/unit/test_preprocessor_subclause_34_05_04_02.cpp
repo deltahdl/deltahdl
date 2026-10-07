@@ -45,12 +45,12 @@
 // putting the block on the next line in the file, which issue #3272 records
 // this tool writing as a pragma_value against the keyword instead -- and
 // §34.5.11's data_method is the identifier an envelope states for the cipher
-// its block is under -- which is what "the current method" names. §34.5.10's
-// data_keyowner and §34.5.12's data_keyname are the values whose gathering the
-// word restarts, §34.5.13's and §34.5.14's keywords are the ones that speak for
-// the line beneath them and so the ones the word can find still waiting,
-// §34.5.9's encoding decides what a line beneath one of those says, and
-// §34.5.1.1 and §34.5.2.1 delimit the larger model a sealed one is resealed
+// its block is under -- which is what the subclause's current method names.
+// §34.5.10's data_keyowner and §34.5.12's data_keyname are the values whose
+// gathering the word restarts, §34.5.13's and §34.5.14's keywords are the ones
+// that speak for the line beneath them and so the ones the word can find still
+// waiting, §34.5.9's encoding decides what a line beneath one of those says,
+// and §34.5.1.1 and §34.5.2.1 delimit the larger model a sealed one is resealed
 // inside of. Every text below is written as directive syntax and driven through
 // the encrypting half, the preprocessor, or both in turn, rather than handed to
 // the envelope state by hand.
@@ -114,7 +114,7 @@ constexpr std::string_view kSealedBlockMarker = "SEALEDMODELBLOCKMARKER";
 
 // The identifier this implementation states for the blocks it writes, which is
 // the method the current encryption is running under. §34.5.11 defines the
-// keyword; what it is doing here is standing for "the current method" the
+// keyword; what it is doing here is standing for the current method the
 // subclause has the word encrypted under, so a text stating it is a text an
 // envelope was really written for.
 constexpr std::string_view kCurrentMethod = "x-deltahdl-stream";
@@ -217,9 +217,9 @@ std::string RegionNamingItsKeyPastTheWord(std::string_view closing) {
 // and spent on the region opened after it.
 //
 // This is the other position the subclause's own words put the rule in: what is
-// gathered after the word is gathered "for the next envelope", so a value
-// written between one model's ending and the next region's opening describes
-// the envelope that region becomes.
+// gathered after the word is gathered for the envelope that comes next, so a
+// value written between one model's ending and the next region's opening
+// describes the envelope that region becomes.
 std::string NextRegionNamingItsKeyPastTheWord(std::string_view closing) {
   std::string text = SealedModel(closing);
   text.append(CurrentKeyNames());
@@ -677,12 +677,12 @@ TEST(ProtectEndProtectedDescription, TheWordComesBackOutOfTheBlockAndEnds) {
   EXPECT_EQ(run.OpenDecryptionEnvelopes(), 0U);
 }
 
-// "The corresponding begin_protected", read where two of them stand. Both
-// closing words are inside the one block, so the produced envelope spells the
-// word once where the source wrote it twice, and the name written between them
-// -- still inside the outer model -- describes no envelope. The name past the
-// outer word does, which is what says the outer opening expression was paired
-// with the outer closing one rather than with the inner.
+// The begin_protected a closing word pairs with, read where two of them stand.
+// Both closing words are inside the one block, so the produced envelope spells
+// the word once where the source wrote it twice, and the name written between
+// them -- still inside the outer model -- describes no envelope. The name past
+// the outer word does, which is what says the outer opening expression was
+// paired with the outer closing one rather than with the inner.
 TEST(ProtectEndProtectedDescription, TheWordOfEachNestedModelGoesIntoOneBlock) {
   std::string src = RegionAroundNestedSealedModels();
   ASSERT_EQ(TimesWritten(src, "end_protected"), 2U);
@@ -703,10 +703,11 @@ TEST(ProtectEndProtectedDescription, ARegionWithNoKeyLeavesTheWordWhereItIs) {
   EXPECT_TRUE(Holds(run.text, kOuterStatement));
 }
 
-// "The current method", read off the identifier §34.5.11 defines a keyword for.
-// The sealed model names a cipher of its own, and that name is inside the block
-// the word completed, along with the word itself, so the envelope goes on
-// stating the identifier this encryption is really running under.
+// The subclause's current method, read off the identifier §34.5.11 defines a
+// keyword for. The sealed model names a cipher of its own, and that name is
+// inside the block the word completed, along with the word itself, so the
+// envelope goes on stating the identifier this encryption is really running
+// under.
 TEST(ProtectEndProtectedDescription,
      TheModelsMethodGoesIntoTheBlockWithTheWord) {
   std::string written =

@@ -266,7 +266,7 @@ TEST(ProtectKeyBlockDescription, TheBlockThisReaderCannotOpenCostsItNoReport) {
   EXPECT_TRUE(run.diag.Diagnostics().empty()) << run.text;
 }
 
-// §34.5.27.2 has the block "read in the encoded form" and §34.5.27.1's keyword
+// §34.5.27.2 has the block read in its encoded form and §34.5.27.1's keyword
 // begins it on the line beneath, neither saying where it ends. So a key block
 // another tool wrote over several lines -- which §34.5.9.2's line-oriented
 // schemes produce by construction -- is one this reader has to take, and the

@@ -355,14 +355,14 @@ TEST(ProtectKeyKeynameDescription, AStringAsksForTheOneKeyBlock) {
   EXPECT_EQ(TimesWritten(envelope, kKeyBlockExpression), 1U) << envelope;
 }
 
-// §34.5.25.2 (printed page 964): "When a key_keyname is provided in the
-// input, it indicates the key that shall be used for encrypting the data
-// encryption keys", whatever else the region named. A region naming a key the
-// tool holds for its data and one for its keys therefore has the key its data
-// are under carried in a key block under the second, with the key_method it
-// named standing beside it (§34.5.24.2: "unchanged in the output file").
-// Encrypted under the data key alone, it carried no key block and dropped the
-// key_method, the key designation standing in the envelope for nothing.
+// §34.5.25.2 (printed page 964): a key_keyname given in the input names the key
+// the data encryption keys are to be encrypted with, whatever else the region
+// named. A region naming a key the tool holds for its data and one for its keys
+// therefore has the key its data are under carried in a key block under the
+// second, with the key_method it named standing beside it, §34.5.24.2 passing
+// that unchanged to the output. Encrypted under the data key alone, it carried
+// no key block and dropped the key_method, the key designation standing in the
+// envelope for nothing.
 TEST(ProtectKeyKeynameDescription, AHeldDataKeyTravelsInTheNamedKeysBlock) {
   std::string region = Writes("data_keyowner", kOtherEntity) +
                        Writes("data_keyname", kOtherEntitysKeyName) +

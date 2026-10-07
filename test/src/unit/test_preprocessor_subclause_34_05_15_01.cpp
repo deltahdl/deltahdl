@@ -3,12 +3,12 @@
 // `data_block`, with no pragma_value written against it.
 //
 // What the spelling settles is where the block stands. §34.5.15.2 has the
-// expression indicate "that a data block begins on the next line in the file",
-// so the word standing alone is what speaks for the line beneath the directive:
-// that line is the block rather than text of the design, and a tool that wrote
-// the block against the keyword instead produces an envelope no reading of this
-// subclause opens. That divergence was issue #3272, and the cases below are
-// what hold the two halves to the one spelling.
+// expression say that a data block starts on the file's next line, so the word
+// standing alone is what speaks for the line beneath the directive: that line
+// is the block rather than text of the design, and a tool that wrote the block
+// against the keyword instead produces an envelope no reading of this subclause
+// opens. That divergence was issue #3272, and the cases below are what hold the
+// two halves to the one spelling.
 //
 // Protect pragmas are processed at the preprocessor stage, where the generic
 // `pragma` handler recognizes the keyword and consumes the directive line.

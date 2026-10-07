@@ -120,12 +120,12 @@ std::string SealedModelDocumenting(std::string_view notice) {
 // The characters of `written` standing between the end of the directive
 // carrying `notice` and the beginning of §34.5.15's expression.
 //
-// This is how "immediately prior to the data_block" is read: not as the comment
-// standing somewhere earlier in the envelope, but as nothing of the envelope's
-// description standing between the two beyond the count §34.5.9 owes the block.
-// A text the directive was not found in comes back whole, so a test asking what
-// separates the two fails on the envelope that never carried the comment at
-// all.
+// This is how standing directly before the data_block is read: not as the
+// comment standing somewhere earlier in the envelope, but as nothing of the
+// envelope's description standing between the two beyond the count §34.5.9 owes
+// the block. A text the directive was not found in comes back whole, so a test
+// asking what separates the two fails on the envelope that never carried the
+// comment at all.
 std::string BetweenTheCommentAndTheBlock(const std::string& written,
                                          std::string_view notice) {
   std::string documenting = Documents(notice);
@@ -207,12 +207,12 @@ TEST(ProtectCommentDescription, AnEmptyStringAgainstTheKeywordIsOutput) {
   EXPECT_TRUE(Holds(written, Documents("")));
 }
 
-// The verbatim half of "the entire comment". §22.5.1 gives a pragma_value more
-// than one spelling, and §22.11 makes a bare value a legal identifier or number
-// rather than anything a hyphen may sit in. A notice written as an identifier
-// is output as that identifier: rewriting it in quotation marks would output a
-// different pragma_value from the one the input file wrote, and the subclause
-// asks for the comment the input held.
+// The verbatim half of carrying the whole comment. §22.5.1 gives a pragma_value
+// more than one spelling, and §22.11 makes a bare value a legal identifier or
+// number rather than anything a hyphen may sit in. A notice written as an
+// identifier is output as that identifier: rewriting it in quotation marks
+// would output a different pragma_value from the one the input file wrote, and
+// the subclause asks for the comment the input held.
 TEST(ProtectCommentDescription, ANoticeWrittenBareIsOutputBare) {
   std::string bare = "`pragma protect comment=copyright_acme_2026\n";
   std::string written = Encrypted(RegionWriting(bare));

@@ -36,13 +36,13 @@
 //
 // One thing the identifier decides is what happens where this implementation
 // has no algorithm for it. §34.5.22.2 has the encrypting tool generate the
-// message digest "using the algorithm specified by the digest_method pragma
-// expression", so a region asking for a digest under such an identifier asked
-// for a value this tool cannot produce. ProtectDigestBlockDirectives writes no
-// block there, which is the right answer where it stands -- a digest is the
-// value the named algorithm produces or it is nothing -- and issue #3276 is the
-// defect: it was the whole answer, so the author was handed an envelope with
-// nothing in it to detect tampering with and nothing said about the absence.
+// message digest with the algorithm the digest_method expression names, so a
+// region asking for a digest under such an identifier asked for a value this
+// tool cannot produce. ProtectDigestBlockDirectives writes no block there,
+// which is the right answer where it stands -- a digest is the value the named
+// algorithm produces or it is nothing -- and issue #3276 is the defect: it was
+// the whole answer, so the author was handed an envelope with nothing in it to
+// detect tampering with and nothing said about the absence.
 // ReportUnavailableDigestMethod in src/preprocessor/protect_processing.cpp is
 // the report, and the cases below it hold it to §34.5.22.2's request rather
 // than to the keyword: a region that named such an identifier without writing a

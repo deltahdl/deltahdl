@@ -305,11 +305,11 @@ TEST(ProtectViewportDescription, AnExpressionInNoEnvelopeIsNotAnsweredTwice) {
                                "34.5.32.2"));
 }
 
-// §34.2 permits the nesting -- "Decryption envelopes may contain other
-// envelopes within their enclosed data block" -- and §34.5.32.2 gives a
-// viewport to "the current protected envelope", so which envelope is current
-// changes as one opens inside another and the outer is current again when the
-// inner has closed. It is still described by what it wrote.
+// §34.2 permits the nesting -- a decryption envelope's data block may hold
+// other envelopes -- and §34.5.32.2 gives a viewport to the protected envelope
+// currently open, so which envelope is current changes as one opens inside
+// another and the outer is current again when the inner has closed. It is still
+// described by what it wrote.
 //
 // The viewports were held in one flat list cleared at every envelope boundary,
 // so the inner envelope's opening wiped the outer's before its closing could,
@@ -324,7 +324,7 @@ TEST(ProtectViewportDescription, AnInnerEnvelopeDoesNotWipeTheOuters) {
 }
 
 // The inner envelope is described by its own and by nothing of the outer's,
-// which is the other half of "the current protected envelope": while the inner
+// which is the other half of the envelope currently open: while the inner
 // stands it is current, and the outer's viewport describes an object of the
 // outer.
 TEST(ProtectViewportDescription, AnInnerEnvelopeIsDescribedByItsOwnAlone) {

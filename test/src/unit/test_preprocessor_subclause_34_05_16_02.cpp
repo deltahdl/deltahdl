@@ -1,28 +1,26 @@
 // §34.5.16.2 digest_keyowner, ENCRYPTION OUTPUT.
 //
-// The paragraph says one thing: "The digest_keyowner shall be unchanged in the
-// output file, except where a digital signature is used, in which case it is
-// encrypted with the digest_key_method and placed in a digest_key_block."
+// The paragraph says one thing: the digest_keyowner passes to the output file
+// unchanged, save that under a digital signature it is encrypted with the
+// digest_key_method and put in a digest_key_block.
 //
-// The standard defines no digest_key_block. §34.4 states that "this standard
-// defines the pragma keyword names listed in Table 34-1 for use with the
-// `protect` pragma. These pragma keywords are defined in 34.5 with a
-// specification of how each participates in the encryption and decryption
-// processing modes." Table 34-1 lists 32 keywords; key_block is among them and
-// digest_key_block is not. §34.5 runs from §34.5.1 to §34.5.32 without a
-// subclause for one, so the construct has neither a Syntax nor a Description.
-// §34.5.1.2 enumerates the blocks an envelope carries as "the data_block and
-// key_block pragma expressions introduce the encrypted data or keys and will
-// always be found within a begin_protected-end_protected envelope", and names
-// no third.
+// The standard defines no digest_key_block. §34.4 makes Table 34-1 the list of
+// pragma keyword names the `protect` pragma takes, each defined in §34.5 with
+// its part in encryption and in decryption. Table 34-1 lists 32 keywords;
+// key_block is among them and digest_key_block is not. §34.5 runs from §34.5.1
+// to §34.5.32 without a subclause for one, so the construct has neither a
+// Syntax nor a Description. §34.5.1.2 enumerates the blocks an envelope
+// carries: the data_block and key_block expressions, which bring in the
+// encrypted data or keys and always stand inside a
+// begin_protected-end_protected envelope, and names no third.
 //
 // The neighbouring subclauses send their values to the key_block instead, which
 // is what leaves this one alone in naming a destination nothing defines.
-// §34.5.17.2 has the digest_key_method "encrypted with the key_method
-// algorithm" and using "the key found in the key_block". §34.5.18.2 has the
-// digest_keyname "encrypted using key_method and key_keyname/key_public_key and
-// encoded in the key_block". §34.5.16.2 alone names a digest_key_method cipher
-// and a digest_key_block destination.
+// §34.5.17.2 has the digest_key_method encrypted under the key_method algorithm
+// with the key the key_block holds. §34.5.18.2 has the digest_keyname encrypted
+// with key_method and key_keyname or key_public_key and encoded into the
+// key_block. §34.5.16.2 alone names a digest_key_method cipher and a
+// digest_key_block destination.
 //
 // So the exception has no destination, and the main clause is the whole of what
 // a conforming tool can act on: the entity a region named for the key its
@@ -158,10 +156,9 @@ std::string RegionAskingForADigestWith(const std::string& key_provider) {
 }
 
 // The region the signed cases below encrypt, which also designates a provider
-// for its own keys. §34.5.25.2 (printed page 964) has "the key that shall be
-// used for encrypting the data encryption keys" be the one a key_keyname
-// names, so wherever the tool holds that provider's key the region's data key
-// travels in a key block.
+// for its own keys. §34.5.25.2 (printed page 964) has the key a key_keyname
+// names be the one the data encryption keys are encrypted with, so wherever the
+// tool holds that provider's key the region's data key travels in a key block.
 std::string RegionAskingForADigest() {
   return RegionAskingForADigestWith(Writes("key_keyowner", kSignatureProvider) +
                                     Writes("key_keyname", kSignatureName));

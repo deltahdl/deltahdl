@@ -585,14 +585,13 @@ TEST(ProtectDigestKeyownerEncryptionOutput, ARegionThatNamedNoneGetsNone) {
 //
 // Both are needed and neither is the other. The copy outside is §34.5.16.2
 // asking for the name unchanged in the output file, the reading having taken it
-// where the author wrote it. The copy inside is §34.5.1.2 asking that
-// "protected envelopes should be completely self-contained to avoid any
-// undesired interaction when multiple encrypted models exist in the decryption
-// input stream": §34.5.31 has the reset each envelope ends with put the
-// keywords back to their defaults, so an envelope leaning on the copy outside
-// would be read under it once and every envelope after it under nothing.
-// Issue #3275 is the defect that left, and this case asserted the state it left
-// behind.
+// where the author wrote it. The copy inside is §34.5.1.2 asking that each
+// protected envelope stand on its own, so that several encrypted models in one
+// decryption input cannot interfere with one another: §34.5.31 has the reset
+// each envelope ends with put the keywords back to their defaults, so an
+// envelope leaning on the copy outside would be read under it once and every
+// envelope after it under nothing. Issue #3275 is the defect that left, and
+// this case asserted the state it left behind.
 TEST(ProtectDigestKeyownerEncryptionOutput, ANameAheadOfTheRegionStandsTwice) {
   std::string named = Writes("digest_keyowner", kDigestOwner);
   std::string encrypted =

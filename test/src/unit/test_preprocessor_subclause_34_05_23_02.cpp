@@ -27,9 +27,9 @@
 // in, and the block a reader opens with it.
 //
 // §34.5.10.2 states the constraint this subclause borrows: the values
-// designating a key "shall be unique for the specified" entity. The data have
-// three such names and this family has two, §34.4 tabulating no session key for
-// it, so where CheckDataKeyDesignationValue in
+// designating a key may not repeat for one entity. The data have three such
+// names and this family has two, §34.4 tabulating no session key for it, so
+// where CheckDataKeyDesignationValue in
 // src/preprocessor/preprocessor_protect_keynames.cpp reports two of three,
 // Preprocessor::CheckKeyBlockDesignation in
 // src/preprocessor/preprocessor_protect_keys.cpp reports both of two, and it

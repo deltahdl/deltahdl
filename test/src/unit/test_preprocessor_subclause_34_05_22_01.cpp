@@ -63,7 +63,7 @@ TEST_F(ProtectDigestBlockSyntaxTest,
 // produces it announces that the digest stands on the line beneath it.
 //
 // The spelling decides the second and not the first. §34.5.22.2 makes a
-// digest_block "found in an input file" the request, which is a rule about the
+// digest_block met in an input file the request, which is a rule about the
 // keyword being written rather than about what it carries -- the reading
 // §34.5.15.2 gets for the data block, and the one NamesKeyword in
 // src/preprocessor/protect_pragma_line.h is for. What the keyword announces is
@@ -190,8 +190,8 @@ TEST(ProtectDigestBlockSyntax, ARegionAskingForNoDigestGetsNone) {
 }
 
 // Where the spelling stops. §34.5.22.2 makes the request out of a digest_block
-// "found in an input file", which is the wording §34.5.15.2 uses for the data
-// block and is a rule about the keyword being written rather than about what it
+// met in an input file, which is the wording §34.5.15.2 uses for the data block
+// and is a rule about the keyword being written rather than about what it
 // carries. So the value that leaves the keyword announcing no line still leaves
 // it asking for a digest, and the envelope carries one.
 TEST(ProtectDigestBlockSyntax,

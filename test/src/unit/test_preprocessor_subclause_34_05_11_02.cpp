@@ -35,32 +35,31 @@
 //
 // The third of those is covered here as well, and it is the one an envelope
 // carrying key blocks answers differently. §34.5.11.2 excepts a single case
-// from the identifier standing unchanged: "except where a digital signature is
-// used, in which case it is encrypted with the key_method and placed in a
-// key_block". §34.5.27.2 has an encrypting tool form a key block when it is
-// requested to use a digital signature, so an envelope carrying one is the
-// excepted case, and the identifier is absent from everything a reader holding
-// no key can read. The envelope of a region whose data name reached a key the
-// tool holds carries no key block, and states the identifier in the clear. The
-// last case reads the excepted envelope back, so the identifier is shown
-// relocated rather than dropped. Issue #3428 is the defect: the identifier
-// stood in the clear whether the envelope carried key blocks or not.
+// from the identifier standing unchanged: under a digital signature it is
+// encrypted with the key_method and put in a key_block instead. §34.5.27.2 has
+// an encrypting tool form a key block when it is requested to use a digital
+// signature, so an envelope carrying one is the excepted case, and the
+// identifier is absent from everything a reader holding no key can read. The
+// envelope of a region whose data name reached a key the tool holds carries no
+// key block, and states the identifier in the clear. The last case reads the
+// excepted envelope back, so the identifier is shown relocated rather than
+// dropped. Issue #3428 is the defect: the identifier stood in the clear whether
+// the envelope carried key blocks or not.
 //
 // The first and second of those are what the file closes with, read from the
 // side that writes an envelope rather than the side that reads one.
-// §34.5.11.2's ENCRYPTION INPUT states that the identifier "specifies the
-// encryption algorithm that shall be used to encrypt subsequent begin-end
-// blocks", so a region naming one has stated what its own block is to be
-// produced with. A region naming either identifier this tool encrypts under is
-// sealed under it and told nothing; a region naming any of the other fifteen
-// has asked for a block this tool cannot produce, and it is told so. Table 34-3
-// decides the second half of that report: des-cbc is the one identifier the
-// table marks Required and this implementation now provides it, so what reaches
-// that half is an optional cipher spelled as the table spells it. Issue #3270
-// is the defect: the encrypting half read the keyword nowhere, so a region
-// asking for des-cbc was sealed under this tool's stream cipher and its
-// envelope claimed x-deltahdl-stream as though that was what had been asked
-// for.
+// §34.5.11.2's ENCRYPTION INPUT states that the identifier names the algorithm
+// the following begin-end blocks are to be encrypted with, so a region naming
+// one has stated what its own block is to be produced with. A region naming
+// either identifier this tool encrypts under is sealed under it and told
+// nothing; a region naming any of the other fifteen has asked for a block this
+// tool cannot produce, and it is told so. Table 34-3 decides the second half of
+// that report: des-cbc is the one identifier the table marks Required and this
+// implementation now provides it, so what reaches that half is an optional
+// cipher spelled as the table spells it. Issue #3270 is the defect: the
+// encrypting half read the keyword nowhere, so a region asking for des-cbc was
+// sealed under this tool's stream cipher and its envelope claimed
+// x-deltahdl-stream as though that was what had been asked for.
 //
 // Table 34-3 itself is modelled in src/preprocessor/protect_key_method.h, which
 // §34.5.24 shares, so the identifiers written below are the tabulated spellings
@@ -265,9 +264,9 @@ std::string StatesTheCipherWeProvide() {
 
 // The region the excepted cases below encrypt. It names an entity and a key
 // for its data and designates a provider for its own keys, and §34.5.25.2
-// (printed page 964) has "the key that shall be used for encrypting the data
-// encryption keys" be the one a key_keyname names, so wherever the tool holds
-// that provider's key the region's data key travels in a key block.
+// (printed page 964) has the key a key_keyname names be the one the data
+// encryption keys are encrypted with, so wherever the tool holds that
+// provider's key the region's data key travels in a key block.
 std::string RegionNamingBothProviders() {
   std::string text = "`pragma protect begin\n";
   text.append(Writes("data_keyowner", kDataProvider));
@@ -421,14 +420,14 @@ struct SealingRun {
   }
 };
 
-// §34.5.11.2: the identifier states "the encryption algorithm that shall be
-// used to encrypt subsequent begin-end blocks", so a region naming des-cbc has
-// stated what its own block is to be produced with, and Table 34-3 marks that
-// one Required of every implementation. So the region is sealed under it, the
-// envelope states it, and nothing is reported. Issue #3270 is the defect the
-// case was written for: the encrypting half read the keyword nowhere, so this
-// region was sealed under the tool's own cipher and its envelope claimed
-// x-deltahdl-stream as though that was what the author had asked for.
+// §34.5.11.2: the identifier names the algorithm the following begin-end blocks
+// are to be encrypted with, so a region naming des-cbc has stated what its own
+// block is to be produced with, and Table 34-3 marks that one Required of every
+// implementation. So the region is sealed under it, the envelope states it, and
+// nothing is reported. Issue #3270 is the defect the case was written for: the
+// encrypting half read the keyword nowhere, so this region was sealed under the
+// tool's own cipher and its envelope claimed x-deltahdl-stream as though that
+// was what the author had asked for.
 //
 // The identifier the envelope states is asserted as well as the silence: a tool
 // that sealed under its own cipher and said so would be one that refused

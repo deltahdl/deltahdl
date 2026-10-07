@@ -574,9 +574,9 @@ TEST(ProtectEncodingEncryptionOutput, TheBlockHoldsOnlyWhatASourceLineCarries) {
 }
 
 // What the tool states is what the tool did, which is the point of stating it.
-// §34.5.9.2 defines the length as "the maximum number of characters (after any
-// encoding) in a single line of the data_block", so a region asking for one has
-// its block broken at it and the envelope states the length it broke at.
+// §34.5.9.2 defines the length as the most characters, counted after encoding,
+// that one line of the data_block may hold, so a region asking for one has its
+// block broken at it and the envelope states the length it broke at.
 //
 // The first line of the block is measured against the length asked for, and the
 // whole of the block is measured against it too: a writing that dropped the

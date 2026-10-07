@@ -167,7 +167,7 @@ TEST(ProtectDecryptLicenseDescription, TheLicenceIsNowhereInTheClear) {
 
 // The other side of the same rule: it went into the block rather than being
 // dropped. The block recovers to the expression and the design together, which
-// is what "output unchanged except for the encryption and encoding" means.
+// is what an output changed by nothing but its encryption and encoding means.
 //
 // What is opened here is the block rather than the envelope, because a reading
 // that opens an envelope goes on to read what came out of it: the recovered
