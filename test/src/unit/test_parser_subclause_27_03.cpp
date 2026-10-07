@@ -16,8 +16,10 @@ TEST(GenerateRegion, DirectRegionNestingRejected) {
       "    endgenerate\n"
       "  endgenerate\n"
       "endmodule\n");
-  EXPECT_TRUE(
-      ReportedError(r.diags, "generate regions shall not nest", 3, "27.3"));
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "this generate region opens inside another one, which is not allowed", 3,
+      "27.3"));
 }
 
 TEST(GenerateRegion, RegionNestedInGenerateIfBodyRejected) {
@@ -30,8 +32,10 @@ TEST(GenerateRegion, RegionNestedInGenerateIfBodyRejected) {
       "    end\n"
       "  endgenerate\n"
       "endmodule\n");
-  EXPECT_TRUE(
-      ReportedError(r.diags, "generate regions shall not nest", 4, "27.3"));
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "this generate region opens inside another one, which is not allowed", 4,
+      "27.3"));
 }
 
 TEST(GenerateRegion, GenerateRegionAtModuleScopeAllowedOncePerSibling) {

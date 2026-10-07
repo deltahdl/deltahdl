@@ -151,7 +151,10 @@ void Parser::ParseGenerateRegion(std::vector<ModuleItem*>& items) {
   Expect(TokenKind::kKwGenerate, Subclause("27.3"));
 
   if (in_generate_region_) {
-    diag_.Error(loc, "generate regions shall not nest", Subclause("27.3"));
+    diag_.Error(
+        loc,
+        "this generate region opens inside another one, which is not allowed",
+        Subclause("27.3"));
   }
   bool saved = in_generate_region_;
   in_generate_region_ = true;
