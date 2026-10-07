@@ -8,10 +8,10 @@
 using namespace delta;
 namespace {
 
-// §30.4: "A module path shall be defined inside a specify block as a connection
-// between a source signal and a destination signal." A simple path written
-// inside a specify block yields a path declaration whose source and destination
-// terminals are the paired signals.
+// §30.4: a module path is defined in a specify block, connecting a source
+// signal to a destination signal. A simple path written inside a specify block
+// yields a path declaration whose source and destination terminals are the
+// paired signals.
 TEST(ModulePathDeclParsing, PathInsideSpecifyPairsSourceAndDestination) {
   auto r = Parse(
       "module m;\n"
@@ -32,9 +32,9 @@ TEST(ModulePathDeclParsing, PathInsideSpecifyPairsSourceAndDestination) {
   EXPECT_EQ(si->path.dst_ports[0].name, "b");
 }
 
-// §30.4: the module path "shall be defined inside a specify block." A path
-// declaration written directly as a module item, with no enclosing specify
-// block, is not a valid module_or_generate_item and must be rejected.
+// §30.4: a module path must be defined in a specify block. A path declaration
+// written directly as a module item, with no enclosing specify block, is not a
+// valid module_or_generate_item and must be rejected.
 TEST(ModulePathDeclParsing, PathOutsideSpecifyBlockRejected) {
   auto r = Parse(
       "module m;\n"
@@ -46,10 +46,9 @@ TEST(ModulePathDeclParsing, PathOutsideSpecifyBlockRejected) {
       ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
 }
 
-// §30.4: "A module path may be described as a simple path, an edge-sensitive
-// path, or a state-dependent path." All three forms parse as path declarations
-// within one specify block, distinguished by their edge and enabling-condition
-// attributes.
+// §30.4: a module path may be written as a simple, an edge-sensitive or a
+// state-dependent path. All three forms parse as path declarations within one
+// specify block, distinguished by their edge and enabling-condition attributes.
 TEST(ModulePathDeclParsing, SimpleEdgeAndStateDependentPathsRecognized) {
   auto r = Parse(
       "module m;\n"

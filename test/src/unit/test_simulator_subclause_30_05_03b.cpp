@@ -2,12 +2,10 @@
 // design carrying the subclause's own Example 1 is driven, and the time `y`
 // moved is read off what the run printed.
 //
-// §30.5.3 chooses in two steps. A simulator "shall do this by first determining
-// which specify paths to the output are active. Active specify paths are those
-// whose input has transitioned most recently in time", and only then "a delay
-// shall be selected from among them ... by comparing the correct delay for the
-// specific transition being scheduled from each specify path and choosing the
-// smallest". The first step is the one
+// §30.5.3 chooses in two steps. A simulator first finds which specify paths to
+// the output are active, those whose input changed most recently, and only then
+// picks among them, comparing each path's delay for the transition being
+// scheduled and taking the smallest. The first step is the one
 // test/src/unit/test_simulator_subclause_30_05_03a.cpp cannot make fail: that
 // file calls SelectPathDelay from src/simulator/specify_path_delay.h itself and
 // hands it the transition times as arguments, so it proves the arithmetic and
@@ -21,13 +19,10 @@
 //     (A => Y) = (6, 9);
 //     (B => Y) = (5, 11);
 //
-// and the clause's prose about it is what the four cases assert. "For a Y
-// transition from 0 to 1, if A transitioned more recently than B, a delay of 6
-// will be chosen. But if B transitioned more recently than A, a delay of 5 will
-// be chosen. And if, the last time they transitioned, A and B did so
-// simultaneously, then the smallest of the two rise delays would be chosen,
-// which is the rise delay from B of 5. The fall delay from A of 9 would be
-// chosen if Y was instead to transition from 1 to 0."
+// and the clause's prose about it is what the four cases assert. When Y rises,
+// A having changed after B picks 6, B having changed after A picks 5, and A and
+// B having last changed together picks the smaller rise delay, B's 5; were Y to
+// fall instead, A's fall delay of 9 would be the one picked.
 //
 // The delays are the standard's own and no two quantities a case tells apart
 // share a value. 6 and 5 are the rise delays the first two cases tell apart;
@@ -121,13 +116,13 @@ std::string Example1Source(const Example1Case& tc) {
   return src;
 }
 
-// §30.5.3: "if A transitioned more recently than B, a delay of 6 will be
-// chosen". `b` rises at t=20 and `a` at t=50, and `a & b` holds `y` at 0 until
-// the second of the two arrives, so the rise of `y` is caused by the input that
-// transitioned most recently. Only the path from `a` is active, and its rise
-// delay of 6 places `y` at 1 at t=56 -- not at the 55 that `b`'s rise delay of
-// 5 would give, which is a whole time unit away and so the difference the
-// printed transition time exists to state.
+// §30.5.3: with A the later of the two to change, the delay is 6. `b` rises at
+// t=20 and `a` at t=50, and `a & b` holds `y` at 0 until the second of the two
+// arrives, so the rise of `y` is caused by the input that transitioned most
+// recently. Only the path from `a` is active, and its rise delay of 6 places
+// `y` at 1 at t=56 -- not at the 55 that `b`'s rise delay of 5 would give,
+// which is a whole time unit away and so the difference the printed transition
+// time exists to state.
 TEST(ActiveModulePathSelection, RiseTakesTheRiseDelayOfTheLaterInputA) {
   SimFixture f;
   std::string out = RunCapture(Example1Source({"a & b",
@@ -141,13 +136,13 @@ TEST(ActiveModulePathSelection, RiseTakesTheRiseDelayOfTheLaterInputA) {
   EXPECT_EQ(out, "s54=0\ny=1@56\ns58=1\n");
 }
 
-// §30.5.3: "But if B transitioned more recently than A, a delay of 5 will be
-// chosen". The same design and the same two transitions with their order
-// exchanged -- `a` rises at t=20 and `b` at t=50 -- so what differs between
-// this case and the one above is which input moved last and nothing else. The
-// path from `b` is the active one and its rise delay of 5 places `y` at 1 at
-// t=55. The pair is what says the delay follows the input that moved rather
-// than sitting at either value.
+// §30.5.3: with B the later of the two to change, the delay is 5. The same
+// design and the same two transitions with their order exchanged -- `a` rises
+// at t=20 and `b` at t=50 -- so what differs between this case and the one
+// above is which input moved last and nothing else. The path from `b` is the
+// active one and its rise delay of 5 places `y` at 1 at t=55. The pair is what
+// says the delay follows the input that moved rather than sitting at either
+// value.
 TEST(ActiveModulePathSelection, RiseTakesTheRiseDelayOfTheLaterInputB) {
   SimFixture f;
   std::string out = RunCapture(Example1Source({"a & b",
@@ -161,11 +156,10 @@ TEST(ActiveModulePathSelection, RiseTakesTheRiseDelayOfTheLaterInputB) {
   EXPECT_EQ(out, "s54=0\ny=1@55\ns58=1\n");
 }
 
-// §30.5.3: "if, the last time they transitioned, A and B did so
-// simultaneously, then the smallest of the two rise delays would be chosen,
-// which is the rise delay from B of 5". Both inputs rise at t=50, which leaves
-// both paths active, so the comparison of the two rise delays is what settles
-// the answer and `y` reaches 1 at t=55.
+// §30.5.3: with A and B having last changed together, the smaller rise delay,
+// B's 5, is picked. Both inputs rise at t=50, which leaves both paths active,
+// so the comparison of the two rise delays is what settles the answer and `y`
+// reaches 1 at t=55.
 TEST(ActiveModulePathSelection, SimultaneousInputsRiseOnTheSmallerDelay) {
   SimFixture f;
   std::string out = RunCapture(Example1Source({"a & b",
@@ -179,8 +173,7 @@ TEST(ActiveModulePathSelection, SimultaneousInputsRiseOnTheSmallerDelay) {
   EXPECT_EQ(out, "s54=0\ny=1@55\ns58=1\n");
 }
 
-// §30.5.3: "The fall delay from A of 9 would be chosen if Y was instead to
-// transition from 1 to 0."
+// §30.5.3: were Y to fall instead, A's fall delay of 9 would be picked.
 //
 // Both inputs start at 1 and `a | b` holds `y` at 1 while either of them is
 // still 1, which is what lets `b` fall at t=50 without moving `y` at all: the
@@ -253,11 +246,11 @@ TEST(ActivePathSelectionRun, EachTransitionTakesItsOwnSmallestDelay) {
             "t=40 q=1\nt=65 q=0\n");
 }
 
-// §30.5.3 (printed page 885): "if, the last time they transitioned, A and B did
-// so simultaneously, then the smallest of the two rise delays would be chosen",
-// so a and b rising in one time step raise y after min(6, 5) and falling in
-// one after min(9, 11). The second source's move, a step behind the first's
-// in the same time, was never counted, and y never rose at all.
+// §30.5.3 (printed page 885): with A and B having last changed together, the
+// smaller of the two rise delays is picked, so a and b rising in one time step
+// raise y after min(6, 5) and falling in one after min(9, 11). The second
+// source's move, a step behind the first's in the same time, was never counted,
+// and y never rose at all.
 TEST(ActiveModulePathSelection,
      SimultaneousInputsInOneStepTakeTheSmallerDelay) {
   SimFixture f;

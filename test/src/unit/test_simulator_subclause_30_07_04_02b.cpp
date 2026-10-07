@@ -4,12 +4,12 @@
 //
 // §30.7.4.2 rules that when unequal delays schedule a pulse's trailing edge
 // earlier than its leading edge the pulse has a negative width, and that under
-// normal operation the leading edge is cancelled, "leaving no indication a
-// schedule was ever present". The showcancelled style of behavior instead
-// schedules the leading edge to x and the trailing edge from x, and §30.7.4.1's
-// pulse style decides when that x begins: on-event replaces the leading edge
-// schedule, on-detect makes the schedule to x "immediately upon detection of
-// the negative pulse". Every case below drives that source through the full
+// normal operation the leading edge is cancelled, leaving no trace that it was
+// ever scheduled. The showcancelled style of behavior instead schedules the
+// leading edge to x and the trailing edge from x, and §30.7.4.1's pulse style
+// decides when that x begins: on-event replaces the leading edge schedule,
+// on-detect makes the schedule to x the moment the negative pulse is detected.
+// Every case below drives that source through the full
 // parse/elaborate/lower/run pipeline and asserts on the three lines the run
 // printed. That is the one arrangement
 // test_simulator_subclause_30_07_04_02a.cpp cannot make fail: that file hands
@@ -89,9 +89,9 @@ std::string NegativePulseDesign(std::string_view extra_specify_item) {
 
 // §30.7.4.2: under normal operation the leading edge of a negative pulse is
 // cancelled, and because the initial and final states of the pulse are the
-// same no transition takes place, "leaving no indication a schedule was ever
-// present". `out` settles at 1 before t=20 and reads 1 at all three samples,
-// which is Figure 30-7's own out (default) waveform.
+// same no transition takes place, leaving no trace that anything was scheduled.
+// `out` settles at 1 before t=20 and reads 1 at all three samples, which is
+// Figure 30-7's own out (default) waveform.
 TEST(NegativePulseAtOutput, DefaultModeShowsNothingOfTheNegativePulse) {
   SimFixture f;
   std::string out = RunCapture(NegativePulseDesign(""), f);
@@ -110,10 +110,10 @@ TEST(NegativePulseAtOutput, ExplicitNoshowcancelledShowsNothingEither) {
 }
 
 // §30.7.4.2: showcancelled schedules the leading edge of a negative pulse to x
-// and the trailing edge from x, and with the default on-event pulse style "the
-// schedule to X replaces the leading edge schedule". The leading edge stood at
-// t=30 and the trailing at t=32, so `out` is x across 30..32: 1 at t=25, which
-// is before the x begins, x at t=31, and 1 again at t=40. This is Figure
+// and the trailing edge from x, and with the default on-event pulse style the
+// schedule to X takes the leading edge schedule's place. The leading edge stood
+// at t=30 and the trailing at t=32, so `out` is x across 30..32: 1 at t=25,
+// which is before the x begins, x at t=31, and 1 again at t=40. This is Figure
 // 30-7's out (showcancelled with on-event) waveform at doubled times.
 TEST(NegativePulseAtOutput, ShowcancelledOnEventDrivesXFromLeadingSchedule) {
   SimFixture f;
@@ -122,14 +122,14 @@ TEST(NegativePulseAtOutput, ShowcancelledOnEventDrivesXFromLeadingSchedule) {
   EXPECT_EQ(out, "at25=1\nat31=x\nat40=1\n");
 }
 
-// §30.7.4.2: with the on-detect pulse style "the schedule to X is made
-// immediately upon detection of the negative pulse". The pulse is detected at
-// t=22, when the rising input schedules the trailing edge earlier than the
-// leading one, so `out` is x across 22..32 and reads x at t=25 as well as at
-// t=31. This case and ShowcancelledOnEventDrivesXFromLeadingSchedule differ in
-// the pulsestyle_ondetect declaration alone, so what the t=25 sample tells
-// apart is the pulse style rather than the delays or the stimulus. This is
-// Figure 30-7's out (showcancelled with on-detect) waveform at doubled times.
+// §30.7.4.2: with the on-detect pulse style the schedule to X is made the
+// moment the negative pulse is detected. The pulse is detected at t=22, when
+// the rising input schedules the trailing edge earlier than the leading one, so
+// `out` is x across 22..32 and reads x at t=25 as well as at t=31. This case
+// and ShowcancelledOnEventDrivesXFromLeadingSchedule differ in the
+// pulsestyle_ondetect declaration alone, so what the t=25 sample tells apart is
+// the pulse style rather than the delays or the stimulus. This is Figure 30-7's
+// out (showcancelled with on-detect) waveform at doubled times.
 TEST(NegativePulseAtOutput, ShowcancelledOnDetectDrivesXFromDetection) {
   SimFixture f;
   std::string out =

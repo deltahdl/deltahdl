@@ -16,11 +16,11 @@ using namespace delta;
 
 namespace {
 
-// §30.4.6 (printed page 880): `(a, b, c *> q1, q2) = 10;` "is equivalent to
-// the following six individual module path assignments", one from each source
-// to each destination, so `(a, b *> y1, y2) = 4` delays b's change of y2 by 4
-// as it delays a's change of y1. Only the paths to the first destination were
-// registered, and y2 followed b at once.
+// §30.4.6 (printed page 880): `(a, b, c *> q1, q2) = 10;` means the same as six
+// separate module path assignments, one from each source to each destination,
+// so `(a, b *> y1, y2) = 4` delays b's change of y2 by 4 as it delays a's
+// change of y1. Only the paths to the first destination were registered, and y2
+// followed b at once.
 TEST(MultiplePathStatementRun, EveryDestinationTakesTheDelay) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module mypair(input a, input b, output y1, output "
@@ -63,8 +63,8 @@ bool HasPath(const SpecifyManager& mgr, std::string_view src,
 
 // Each of the four paths is registered in its own right, and §30.7.1 (printed
 // page 888) gives the PATHPULSE$ named for the statement's first input and
-// first output terminal to "all other paths in the multiple path
-// declaration", so all four take its reject limit of 1.
+// first output terminal to every other path the multiple path declaration
+// makes, so all four take its reject limit of 1.
 TEST(MultiplePathStatementRun, FirstTerminalsPulseLimitsReachEveryPath) {
   SimFixture f;
   auto* design = ElaborateSrc(

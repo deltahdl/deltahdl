@@ -138,14 +138,13 @@ size_t ErrorCount(const std::vector<Diagnostic>& diags) {
       [](const Diagnostic& d) { return d.severity == DiagSeverity::kError; }));
 }
 
-// §30.7.1 (printed page 887): a PATHPULSE$ specparam's terminals "shall
-// conform to the rules for module path inputs and outputs, with the following
-// restriction: the terminals may not be a bit-select or part-select of a
-// vector." Syntax 30-7 builds the name out of two terminal descriptors, each
-// admitting a range, so `PATHPULSE$a[0]$b` is that syntax with the select the
-// restriction forbids, and it is reported under it, once, at the select. Read
-// as an identifier ended by the bracket, it drew four parse errors under
-// §6.20.5, §11.2 and §30.3, none naming the rule.
+// §30.7.1 (printed page 887): a PATHPULSE$ specparam's terminals follow the
+// rules for module path inputs and outputs, except that neither may select a
+// bit or a part of a vector. Syntax 30-7 builds the name out of two terminal
+// descriptors, each admitting a range, so `PATHPULSE$a[0]$b` is that syntax
+// with the select the restriction forbids, and it is reported under it, once,
+// at the select. Read as an identifier ended by the bracket, it drew four parse
+// errors under §6.20.5, §11.2 and §30.3, none naming the rule.
 TEST(PulseControlSpecparamParsing, TerminalCannotBeBitOrPartSelect) {
   auto r = Parse(
       "module m;\n"
@@ -215,9 +214,9 @@ TEST(PulseControlSpecparamParsing, StandardExampleUnparenthesizedLimitParses) {
   EXPECT_TRUE(specparams[0]->is_pathpulse);
   EXPECT_TRUE(specparams[1]->is_pathpulse);
   EXPECT_TRUE(specparams[2]->is_pathpulse);
-  // The unparenthesized limit is a reject limit alone. §30.7.1: "If only the
-  // reject limit value is specified, it shall apply to both the reject limit
-  // and the error limit", which the null error limit is what carries.
+  // The unparenthesized limit is a reject limit alone. §30.7.1: a reject limit
+  // given alone serves as the error limit too, which the null error limit is
+  // what carries.
   EXPECT_NE(specparams[2]->pathpulse_reject, nullptr);
   EXPECT_EQ(specparams[2]->pathpulse_error, nullptr);
 }

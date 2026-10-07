@@ -174,8 +174,8 @@ TEST(SpecifyTerminalElaboration, VariableAsSourceErrors) {
 }
 
 // §30.4.1: the report that refuses a variable module path source names the
-// subclause stating the rule ("The module path source shall be a net that is
-// connected to a module input port or inout port").
+// subclause stating the rule, that a module path's source must be a net
+// connected to a module input or inout port.
 TEST(SpecifyTerminalElaboration, VariableSourceNames30_4_1) {
   ElabFixture f;
   ElaborateSrc(

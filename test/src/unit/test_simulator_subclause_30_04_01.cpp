@@ -30,11 +30,10 @@ std::string BufferDesign(const std::string& mybuf_decl) {
          "endmodule\n";
 }
 
-// §30.4.1 (printed page 872): "The module path destination shall be a net or
-// variable that is connected to a module output port or inout port", so an
-// `output reg` written by `always @*` takes its path delay of 5. The delay
-// reached only an output a continuous assignment drove, and y followed a at
-// once.
+// §30.4.1 (printed page 872): a module path's destination must be a net or
+// variable connected to a module output or inout port, so an `output reg`
+// written by `always @*` takes its path delay of 5. The delay reached only an
+// output a continuous assignment drove, and y followed a at once.
 TEST(ModulePathDestinationRun, ProcedureDrivenOutputTakesThePathDelay) {
   SimFixture f;
   EXPECT_EQ(RunCapture(BufferDesign("module mybuf(input a, output reg y);\n"

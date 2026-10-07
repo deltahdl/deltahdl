@@ -245,9 +245,9 @@ TEST(ProgramGenerateItem, ElaborationSeveritySystemTask) {
 // ---
 // A.1.4's non_port_module_item lists specify_block and
 // { attribute_instance } specparam_declaration; non_port_program_item lists
-// neither, and §30.3 has the specify block "defined within a module" while
-// §6.20.5 has a specparam "declared inside a module or specify block". Each
-// was accepted in a program body silently and recorded as an item of it.
+// neither, and §30.3 places the specify block inside a module while §6.20.5 has
+// a specparam "declared inside a module or specify block". Each was accepted in
+// a program body silently and recorded as an item of it.
 
 TEST(NonPortProgramItem, ErrorSpecifyBlockInProgramIsRejected) {
   auto r = Parse(

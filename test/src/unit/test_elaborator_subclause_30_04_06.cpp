@@ -28,9 +28,9 @@ TEST(MultiplePathDeclarationElaboration, MixedWidthsInBothLists) {
 // second listed destination is an input port; if only the first endpoint were
 // checked the error would be missed, so this observes the cross-product
 // expansion being applied across the whole list. §30.4.6 states the expansion
-// and no endpoint rule of its own; the rule that rejects y is §30.4.1's "The
-// module path destination shall be a net or variable that is connected to a
-// module output port or inout port", so the report carries §30.4.1.
+// and no endpoint rule of its own; the rule that rejects y is §30.4.1's, that a
+// module path's destination must be a net or variable connected to a module
+// output or inout port, so the report carries §30.4.1.
 TEST(MultiplePathDeclarationElaboration, EveryDestinationInListIsAnEndpoint) {
   ElabFixture f;
   ElaborateSrc(
@@ -52,9 +52,9 @@ TEST(MultiplePathDeclarationElaboration, EveryDestinationInListIsAnEndpoint) {
 // loop, so this exercises that path: the second listed source is an output
 // port, which is not a legal path source. A first-element-only check would miss
 // it, so the error confirms every source in the list participates in the
-// cross-product. As above, the rule that rejects b is §30.4.1's "The module
-// path source shall be a net that is connected to a module input port or inout
-// port", so the report carries §30.4.1.
+// cross-product. As above, the rule that rejects b is §30.4.1's, that a module
+// path's source must be a net connected to a module input or inout port, so the
+// report carries §30.4.1.
 TEST(MultiplePathDeclarationElaboration, EverySourceInListIsAnEndpoint) {
   ElabFixture f;
   ElaborateSrc(
@@ -91,10 +91,10 @@ TEST(MultiplePathDeclarationElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.6: the "any size" allowance is symmetric in width direction. Input
-// form: vector sources paired with narrower scalar destinations. A parallel
-// connection would reject the width difference; the multi-path '*>' list
-// accepts it.
+// §30.4.6: the allowance for vectors of any width is symmetric in width
+// direction. Input form: vector sources paired with narrower scalar
+// destinations. A parallel connection would reject the width difference; the
+// multi-path '*>' list accepts it.
 TEST(MultiplePathDeclarationElaboration,
      VectorSourceToScalarDestinationAccepted) {
   ElabFixture f;
@@ -109,10 +109,10 @@ TEST(MultiplePathDeclarationElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.6: "of any size" means listed vectors need bear no width relationship
-// to each other or across the two lists. Input form: every terminal is a vector
-// and no two share a width. The multi-path '*>' list accepts all cross-product
-// pairs.
+// §30.4.6: letting the listed vectors be of any width means they need bear no
+// width relationship to each other or across the two lists. Input form: every
+// terminal is a vector and no two share a width. The multi-path '*>' list
+// accepts all cross-product pairs.
 TEST(MultiplePathDeclarationElaboration,
      UnequalVectorWidthsAcrossListsAccepted) {
   ElabFixture f;

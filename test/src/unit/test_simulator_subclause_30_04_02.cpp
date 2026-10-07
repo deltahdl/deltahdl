@@ -25,12 +25,11 @@ TEST(SpecifyPathSim, SimpleParallelPathSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §30.4 defines a module path as "a connection between a source signal and a
-// destination signal", and §30.4.1 makes the destination "a net or variable
-// that is connected to a module output port or inout port". The destination is
-// therefore a net, and §10.3.2 lets a continuous assignment drive one by naming
-// a select of it, so the path delay applies to that driver as much as to one
-// written on the whole name.
+// §30.4 defines a module path as connecting a source signal to a destination
+// signal, and §30.4.1 makes the destination a net or variable connected to a
+// module output or inout port. The destination is therefore a net, and §10.3.2
+// lets a continuous assignment drive one by naming a select of it, so the path
+// delay applies to that driver as much as to one written on the whole name.
 //
 // The design below declares one path and drives one bit of its destination.
 // `y[1]` rises six time units after `a[1]` does, so it still reads 0 at t=24

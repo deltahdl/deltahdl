@@ -26,10 +26,9 @@ TEST(PulseControlTerminalElaboration, CorrectDirectionTerminalsAccepted) {
 
 // §30.4.1 applied to the PATHPULSE$ input terminal: a source must be an input
 // or inout port, so naming an output port as the input terminal is rejected.
-// §30.7.1 states no direction rule of its own and defers -- "The module path
-// input terminals and output terminals shall conform to the rules for module
-// path inputs and outputs" -- so the report carries §30.4.1, where those rules
-// are stated.
+// §30.7.1 states no direction rule of its own and defers -- its input and
+// output terminals follow the rules for module path inputs and outputs -- so
+// the report carries §30.4.1, where those rules are stated.
 TEST(PulseControlTerminalElaboration, InputTerminalMayNotBeOutputPort) {
   ElabFixture f;
   auto* design = ElaborateSrc(

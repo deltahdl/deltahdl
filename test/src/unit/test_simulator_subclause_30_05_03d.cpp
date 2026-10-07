@@ -1,16 +1,15 @@
 // The order §30.5.3 applies its two activity tests in, which decides whether an
 // output that is plainly transitioning takes a module path delay at all.
 //
-// §30.5.3 states both tests in one sentence: "Active specify paths are those
-// whose input has transitioned most recently in time, and either they have no
-// condition or their conditions are true." Taking the transition time first
-// lets a path whose condition is false set the most recent time and drop every
-// path with a true condition standing at an earlier one, so nothing is selected
-// and the output takes no module path delay while a live path stood ready to
-// govern it. Taking the condition first leaves the most recent time to be taken
-// among the paths that are eligible at all, and the live path governs. Issue
-// #3393 is that gap. The three cases below are about that order and about
-// nothing else.
+// §30.5.3 states both tests in one sentence: an active specify path is one
+// whose input changed most recently and that has either no condition or a true
+// one. Taking the transition time first lets a path whose condition is false
+// set the most recent time and drop every path with a true condition standing
+// at an earlier one, so nothing is selected and the output takes no module path
+// delay while a live path stood ready to govern it. Taking the condition first
+// leaves the most recent time to be taken among the paths that are eligible at
+// all, and the live path governs. Issue #3393 is that gap. The three cases
+// below are about that order and about nothing else.
 //
 // No file beside this one can ask the question.
 // test/src/unit/test_simulator_subclause_30_05_03a.cpp calls SelectPathDelay
@@ -168,13 +167,13 @@ endmodule
   return src;
 }
 
-// §30.5.3 asks for the paths "whose input has transitioned most recently in
-// time, and either they have no condition or their conditions are true", and
-// the candidate at t=50 answers the first half while failing the second. The
-// path whose condition holds transitioned at t=20, so it is the most recent
-// among the candidates that are eligible at all and it is what governs. Taking
-// the time over every candidate first makes t=50 the mark, drops the candidate
-// at t=20 for not standing at it, and returns no path.
+// §30.5.3 asks for the paths whose input changed most recently and that have
+// either no condition or a true one, and the candidate at t=50 answers the
+// first half while failing the second. The path whose condition holds
+// transitioned at t=20, so it is the most recent among the candidates that are
+// eligible at all and it is what governs. Taking the time over every candidate
+// first makes t=50 the mark, drops the candidate at t=20 for not standing at
+// it, and returns no path.
 TEST(ModulePathActivityOrder,
      AnInactiveLaterPathLeavesTheEarlierLiveOneActive) {
   PathDelay disabled = OneDelayPath("a", 6);
@@ -208,12 +207,11 @@ TEST(ModulePathActivityOrder, AnEnabledLastInputTakesItsOwnPathDelay) {
   EXPECT_EQ(out, "at 48 y=0\ny=1 t=56\nat 60 y=1\n");
 }
 
-// §30.5.3 (printed page 885) selects the paths "whose input has transitioned
-// most recently in time", and the input of `(a[1] => y)` is the bit a[1], not
-// the vector a. So a rise of a[1] at t=20 reaches y over a[1]'s 9, its fall at
-// t=40 likewise, and a rise of a[0] at t=60 over a[0]'s 3. Timed by the vector,
-// both paths moved at every change and the smaller delay, 3, governed all
-// three.
+// §30.5.3 (printed page 885) selects the paths whose input changed most
+// recently, and the input of `(a[1] => y)` is the bit a[1], not the vector a.
+// So a rise of a[1] at t=20 reaches y over a[1]'s 9, its fall at t=40 likewise,
+// and a rise of a[0] at t=60 over a[0]'s 3. Timed by the vector, both paths
+// moved at every change and the smaller delay, 3, governed all three.
 TEST(ModulePathActivityOrder, APathFromABitIsTimedByThatBit) {
   SimFixture f;
   std::string out = RunCapture(R"(module dut(input [1:0] a, output y);

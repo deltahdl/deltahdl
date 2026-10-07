@@ -31,8 +31,8 @@
 // value. The rise delay 7 and the fall delay 9 differ from each other, from the
 // pulse width 2 they produce, and from the limit 3 that a case sets to reject
 // that width. The pulse width 2 meets the reject limit 2 exactly where §30.7's
-// "greater than or equal to the reject limit" boundary is the claim being made.
-// The pair PulseAtErrorLimitPropagatesToOutput and
+// boundary, at a width equal to the reject limit or more, is the claim being
+// made. The pair PulseAtErrorLimitPropagatesToOutput and
 // SamePulseIsRejectedByNarrowerLimit differ in one PATHPULSE$ value and in
 // nothing else, so what they tell apart is the limits rather than the delays.
 //
@@ -76,15 +76,15 @@ constexpr std::string_view kNoPulseStimulus =
 // case asserts on rather than something the reader has to count.
 //
 // `a` is an input port and `s` the variable the stimulus writes, because
-// §30.4.1 rules that a module path source "shall be a net" connected to an
-// input or inout port, and CheckSpecifyPathTerminal in
+// §30.4.1 rules that a module path source must be a net connected to an input
+// or inout port, and CheckSpecifyPathTerminal in
 // src/elaborator/elaborator_validate_specify.cpp rejects a path source that is
 // a local signal. An input port has no driver in a top module, so `assign a =
 // s;` supplies one: §23.3.3.3 admits a continuous assignment onto a net input
 // port, and ValidateInputPortAssignments in
-// src/elaborator/elaborator_validate_matches.cpp passes it for that reason.
-// The extra assignment costs a delta cycle and no simulation time, so every
-// time below is the time `s` moved.
+// src/elaborator/elaborator_validate_matches.cpp passes it for that reason. The
+// extra assignment costs a delta cycle and no simulation time, so every time
+// below is the time `s` moved.
 std::string PulseDesign(std::string_view extra_specify_item,
                         std::string_view stimulus, int first_sample,
                         int second_sample) {

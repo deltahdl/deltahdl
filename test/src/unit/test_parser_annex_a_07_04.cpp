@@ -148,10 +148,10 @@ TEST(SpecifyPathDelayGrammar, MinTypMaxPathDelayExpression) {
 }
 
 // path_delay_value ::= list_of_path_delay_expressions, the bare alternative,
-// admits every list form the parenthesized one does: §30.5 has "one or more
-// delay values" on the right-hand side and "the delay values may be optionally
-// enclosed in a pair of parentheses". A rise and fall pair written without the
-// parentheses is read as two delays.
+// admits every list form the parenthesized one does: §30.5 puts one delay value
+// or more on the right-hand side and lets them stand inside parentheses or
+// without them. A rise and fall pair written without the parentheses is read as
+// two delays.
 TEST(SpecifyPathDelayGrammar, RiseFallTwoValuesUnparenthesized) {
   auto r = Parse(
       "module m;\n"

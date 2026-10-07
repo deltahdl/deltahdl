@@ -338,10 +338,10 @@ TEST(ExternTfDeclaration, ExternMethodPrototypeInInterfaceGenerateBlock) {
 // specparam_declaration ---
 // A.1.4's non_port_module_item lists specify_block and
 // { attribute_instance } specparam_declaration; non_port_interface_item lists
-// neither. §30.3 has the specify block "defined within a module" and §25.6
-// keeps it there when an interface's signals are its terminals, and §6.20.5
-// has a specparam "declared inside a module or specify block". Each was
-// accepted in an interface body silently and recorded as an item of it.
+// neither. §30.3 places the specify block inside a module and §25.6 keeps it
+// there when an interface's signals are its terminals, and §6.20.5 has a
+// specparam "declared inside a module or specify block". Each was accepted in
+// an interface body silently and recorded as an item of it.
 
 TEST(NonPortInterfaceItem, ErrorSpecifyBlockInInterfaceIsRejected) {
   auto r = Parse(

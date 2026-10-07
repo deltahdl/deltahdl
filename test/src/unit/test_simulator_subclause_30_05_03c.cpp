@@ -3,12 +3,11 @@
 // per value of MODE, and the time `y` moved says which of the five
 // state-dependent paths were active when the delay was chosen.
 //
-// §30.5.3 makes the condition half of what active means. "Active specify paths
-// are those whose input has transitioned most recently in time, and either
-// they have no condition or their conditions are true." Only the
-// transition-time half was applied, so a state-dependent path was active
-// whatever its condition said and the smallest delay of all five always won.
-// Issue #3389 is that gap.
+// §30.5.3 makes the condition half of what active means: an active specify path
+// is one whose input changed most recently and that has either no condition or
+// a true one. Only the transition-time half was applied, so a state-dependent
+// path was active whatever its condition said and the smallest delay of all
+// five always won. Issue #3389 is that gap.
 //
 // Neither file beside this one can fail on it.
 // test/src/unit/test_simulator_subclause_30_05_03a.cpp calls SelectPathDelay
@@ -29,10 +28,9 @@
 //     if (MODE < 1) (A => Y) = (7, 7);
 //
 // and the clause's prose about it is what the first two cases assert.
-// "Anywhere from zero to five of these specify paths might be active depending
-// upon the value of MODE. For instance, when MODE is 2, the first three
-// specify paths are active. A rise transition would select a delay of 4
-// because that is the smallest rise delay among the first three."
+// Depending on MODE, none to all five of these specify paths may be active; at
+// MODE 2 the first three are, and a rise picks 4, the smallest rise delay among
+// them.
 //
 // The conditions below are written `act[4]` through `act[0]` rather than as
 // the example prints them, because `<` is not one of the operators §30.4.4.1
@@ -61,20 +59,20 @@
 //
 // At MODE 5 every condition is false and no specify path is active, which is
 // the third case. §30.6 rules that where a module path delay and a distributed
-// delay both reach an output "the larger of the two delays for each path shall
-// be used", and with no active path there is no module path delay to be the
-// larger: `assign y = a;` carries no delay of its own, so `y` follows `a` in
-// the same time slot and the transition prints at the time the stimulus was
-// written. That answer is 0 added time units, which is apart from all five of
-// 3, 4, 5, 6 and 7 rather than from one of them.
+// delay both reach an output each path takes the larger of its two delays, and
+// with no active path there is no module path delay to be the larger: `assign y
+// = a;` carries no delay of its own, so `y` follows `a` in the same time slot
+// and the transition prints at the time the stimulus was written. That answer
+// is 0 added time units, which is apart from all five of 3, 4, 5, 6 and 7
+// rather than from one of them.
 //
 // The fourth and fifth cases are §30.4.4.4's ifnone path beside one
-// conditional path. "The ifnone keyword is used to specify a default
-// state-dependent path delay when all other conditions for the path are
-// false", so the conditional delay governs while `C` holds and the ifnone
-// delay governs while it does not. Those are two claims and so two tests. The
-// delays 13 and 21 are used for nothing else in this file, so neither case's
-// answer is a value some other case could have produced.
+// conditional path. The ifnone keyword gives a path its default state-dependent
+// delay for when every other condition on the path is false, so the conditional
+// delay governs while `C` holds and the ifnone delay governs while it does not.
+// Those are two claims and so two tests. The delays 13 and 21 are used for
+// nothing else in this file, so neither case's answer is a value some other
+// case could have produced.
 //
 // The stimulus is one rise at t=50 in every case, and the largest delay any
 // case selects is 21, so `y` moves once and §30.7 has no second scheduled
@@ -91,10 +89,10 @@
 // written.
 //
 // `act` is a locally declared variable rather than a parameter because
-// §30.4.4.1's list of permitted operands names "Locally defined variables or
-// nets or their bit-selects or part-selects" first, and a bit-select is what
-// each condition is. Its bits are written at the head of the stimulus, well
-// before the edge under test, so what a case varies is one literal.
+// §30.4.4.1's list of permitted operands names a variable or net of the module,
+// or a bit-select or part-select of one, first, and a bit-select is what each
+// condition is. Its bits are written at the head of the stimulus, well before
+// the edge under test, so what a case varies is one literal.
 //
 // `armed` exists because `y` leaves its initial x somewhere in the first 21
 // time units, at a moment the delays §30.5.2 derives for the x and z slots
@@ -169,12 +167,11 @@ std::string PathSource(std::string_view setup, std::string_view paths) {
   return src;
 }
 
-// §30.5.3: "when MODE is 2, the first three specify paths are active. A rise
-// transition would select a delay of 4 because that is the smallest rise delay
-// among the first three." `MODE < 2` and `MODE < 1` are false, so the paths
-// carrying the rise delays 3 and 7 are not among the candidates the comparison
-// runs over, and `y` reaches 1 at t=54. A run that took every path reaching
-// `y` as active would answer 3 and place the edge at t=53.
+// §30.5.3: at MODE 2 the first three specify paths are active, and a rise picks
+// 4, the smallest rise delay among them. `MODE < 2` and `MODE < 1` are false,
+// so the paths carrying the rise delays 3 and 7 are not among the candidates
+// the comparison runs over, and `y` reaches 1 at t=54. A run that took every
+// path reaching `y` as active would answer 3 and place the edge at t=53.
 TEST(StateDependentPathActivity, FalseConditionsWithholdTheSmallerRiseDelay) {
   SimFixture f;
   std::string out =
@@ -182,12 +179,11 @@ TEST(StateDependentPathActivity, FalseConditionsWithholdTheSmallerRiseDelay) {
   EXPECT_EQ(out, "at 45 y=0\nedge 1 at 54\nat 80 y=1\n");
 }
 
-// §30.5.3 puts "anywhere from zero to five of these specify paths" in play, and
-// at MODE 0 all five conditions are true. Every path is active, so the
+// §30.5.3 puts anywhere from none to all five of these specify paths in play,
+// and at MODE 0 all five conditions are true. Every path is active, so the
 // comparison runs over the rise delays 5, 4, 6, 3 and 7 and settles on 3,
-// placing `y` at 1 at t=53. The design differs from the case above in the
-// value of MODE alone, so the two answers differing is the condition being
-// read.
+// placing `y` at 1 at t=53. The design differs from the case above in the value
+// of MODE alone, so the two answers differing is the condition being read.
 TEST(StateDependentPathActivity, EveryTrueConditionLeavesEveryPathActive) {
   SimFixture f;
   std::string out =
@@ -209,11 +205,10 @@ TEST(StateDependentPathActivity, NoTrueConditionLeavesNoPathActive) {
   EXPECT_EQ(out, "at 45 y=0\nedge 1 at 50\nat 80 y=1\n");
 }
 
-// §30.4.4.4: the ifnone path states "a default state-dependent path delay when
-// all other conditions for the path are false". With C at 1 the condition of
-// the companion path is true, so that path is the active one and its delay of
-// 13 places `y` at 1 at t=63. The ifnone delay of 21 would have placed it at
-// t=71.
+// §30.4.4.4: the ifnone path gives the default state-dependent delay for when
+// every other condition on the path is false. With C at 1 the condition of the
+// companion path is true, so that path is the active one and its delay of 13
+// places `y` at 1 at t=63. The ifnone delay of 21 would have placed it at t=71.
 TEST(StateDependentPathActivity, TrueConditionOutranksTheIfnonePath) {
   SimFixture f;
   std::string out =

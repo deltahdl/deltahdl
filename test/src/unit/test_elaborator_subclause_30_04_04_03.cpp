@@ -57,7 +57,7 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
                             5, "30.4.4.3"));
 }
 
-// Criterion 2 also distinguishes "entire port" as a reference style:
+// Criterion 2 also distinguishes naming the whole port as a reference style:
 // referencing the whole port in one declaration and a select in another for the
 // same path is likewise illegal (exercises the entire-port branch of the
 // consistency check).
@@ -140,10 +140,11 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
                             5, "30.4.4.3"));
 }
 
-// Criterion 1 input form: identity of the "same path" is decided by the exact
-// terminal, so two declarations that share edge and condition but address
-// different bits are distinct paths and both are accepted. Exercises the
-// literal bit-select index compared unequal (0 vs 1) in the path-identity test.
+// Criterion 1 input form: whether two declarations describe one path is decided
+// by the exact terminal, so two declarations that share edge and condition but
+// address different bits are distinct paths and both are accepted. Exercises
+// the literal bit-select index compared unequal (0 vs 1) in the path-identity
+// test.
 TEST(EdgeSensitiveStateDependentPathElaboration,
      DistinctBitSelectPathsElaborate) {
   ElabFixture f;

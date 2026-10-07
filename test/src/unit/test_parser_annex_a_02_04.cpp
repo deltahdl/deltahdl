@@ -342,9 +342,8 @@ TEST(DeclarationAssignmentParsing, DefparamMissingEqualsIsError) {
 // reads the value back off it, so the standard's grammar and its own example
 // disagree. A source written from the example has to parse; issue #3384 settled
 // that, and this case is where the annex records it. §30.7.1 says what a lone
-// limit means -- "If only the reject limit value is specified, it shall apply
-// to both the reject limit and the error limit" -- which is why no error limit
-// is expected here.
+// limit means -- a reject limit given alone serves as the error limit too --
+// which is why no error limit is expected here.
 TEST(DeclarationAssignmentParsing, PulseControlSpecparamNeedsNoParens) {
   auto r = Parse(
       "module m;\n"

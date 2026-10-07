@@ -54,8 +54,8 @@ TEST(SpecifyPathDelayElaboration, AcceptsLiteralPlusSpecparamExpression) {
 // §30.5: a path delay value shall be a constant expression containing literals
 // or specparams.  A module parameter is a constant expression under 11.2.1, but
 // it is neither a literal nor a specparam, so it is the closest constant form
-// the rule must still reject -- the restriction is narrower than "any
-// constant."
+// the rule must still reject -- the restriction is narrower than allowing any
+// constant.
 TEST(SpecifyPathDelayElaboration, RejectsModuleParameterOperand) {
   ElabFixture f;
   ElaborateSrc(

@@ -28,8 +28,8 @@ TEST(MixedPathDistributedDelay, DistributedSumLargerWinsLrmExample2) {
 }
 
 // Boundary between the two winning outcomes: when the module path delay and the
-// distributed sum are equal, "the larger of the two" resolves to that shared
-// value rather than doubling or otherwise combining them.
+// distributed sum are equal, taking the larger of the two resolves to that
+// shared value rather than doubling or otherwise combining them.
 TEST(MixedPathDistributedDelay, EqualDelaysYieldThatValue) {
   EXPECT_EQ(SelectEffectivePathDelay(22, 22), 22u);
 }
@@ -76,10 +76,10 @@ std::string Figure30Dash3Cell(const std::string& or_delay) {
          "endmodule\n";
 }
 
-// "a transition on Q caused by a transition on D will occur 22 time units after
-// the transition on D": the gates' 0 + 1 is the smaller of the two, so q
-// follows d by 22. The path delay reached only an output a continuous
-// assignment drove, and q followed d by the gates' 1 alone.
+// A change of D shows on Q 22 time units after it, the clause says: the gates'
+// 0 + 1 is the smaller of the two, so q follows d by 22. The path delay reached
+// only an output a continuous assignment drove, and q followed d by the gates'
+// 1 alone.
 TEST(MixedPathDistributedDelayRun, ModulePathLargerWinsOverGates) {
   SimFixture f;
   EXPECT_EQ(RunCapture(Figure30Dash3Cell("1"), f),

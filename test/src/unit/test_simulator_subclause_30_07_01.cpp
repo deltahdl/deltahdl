@@ -273,13 +273,13 @@ TEST(PulseControlResolution, UnmatchedPathSpecificIsIgnored) {
 
 // §30.7.1's worked example, run rather than inspected. Issue #3384 is that the
 // example's own last line, `PATHPULSE$ = 3;`, was rejected, and the prose above
-// the example reads the 3 back off exactly the path asserted here: "The path
-// (data=>q) is not explicitly defined in any of the PATHPULSE$ declarations;
-// therefore, it acquires reject and error limit of 3, as defined by the last
-// PATHPULSE$ declaration." A parse test alone would pass against a parser that
-// accepted the unparenthesized form and dropped the value, so this is the case
-// that says the 3 arrived; both limits are asserted because §30.7.1 mirrors a
-// lone reject limit onto the error limit.
+// the example reads the 3 back off exactly the path asserted here: no
+// PATHPULSE$ declaration names the path (data=>q), so it takes the reject and
+// error limit of 3 the last PATHPULSE$ declaration sets. A parse test alone
+// would pass against a parser that accepted the unparenthesized form and
+// dropped the value, so this is the case that says the 3 arrived; both limits
+// are asserted because §30.7.1 mirrors a lone reject limit onto the error
+// limit.
 //
 // Nothing of the specify block is trimmed -- all three module path
 // declarations and all three specparams are the example's, verbatim. What is
@@ -376,10 +376,10 @@ TEST(PulseControlRun, PulseBetweenTheLimitsIsFilteredToX) {
             "t=7 y=1\nt=19 y=x\nt=21 y=1\n");
 }
 
-// §30.7.1 (printed page 887): where both forms appear "the path-specific
-// specparams shall take precedence for the specified paths", so a's path
-// propagates its pulse under (0, 0) while b's, under the nonspecific 3, rejects
-// its own: y stays 1 through b's pulse.
+// §30.7.1 (printed page 887): where both forms appear, a path's own specparams
+// win over the general one for that path, so a's path propagates its pulse
+// under (0, 0) while b's, under the nonspecific 3, rejects its own: y stays 1
+// through b's pulse.
 TEST(PulseControlRun, PathSpecificLimitsTakePrecedence) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module myand(input a, input b, output y);\n"

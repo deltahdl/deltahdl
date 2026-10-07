@@ -64,9 +64,9 @@ std::string EdgePathDesign(const std::string& clk_decl, const std::string& body,
          "endmodule\n";
 }
 
-// §30.4.3 (printed page 874): an edge-sensitive path models "input-to-output
-// delays, which only occur when a specified edge occurs at the source signal",
-// so beside `(negedge clk => (y : d)) = (1, 2)` a rising clk takes the posedge
+// §30.4.3 (printed page 874): an edge-sensitive path models input-to-output
+// delays that happen only when the named edge appears on the source signal, so
+// beside `(negedge clk => (y : d)) = (1, 2)` a rising clk takes the posedge
 // path's rise 3 and a falling one the negedge path's fall 2. The negedge path's
 // rise 1 was taken at the rising edge.
 TEST(EdgeSensitivePathRun, EachEdgeTakesItsOwnPath) {
@@ -98,10 +98,10 @@ TEST(EdgeSensitivePathRun, InvertingLogicTakesThePathOfTheEdgeThatOccurred) {
       "t=14 y=1\nt=22 y=0\n");
 }
 
-// §30.4.3: "If a vector port is specified as the input terminal descriptor, the
-// edge transition shall be detected on the LSB." 2'b10 to 2'b11 is a posedge
-// of the LSB (rise 5), 2'b01 to 2'b00 a negedge (fall 2), and the changes of
-// the other bit are edges of neither.
+// §30.4.3: when the input terminal descriptor names a vector port, the edge is
+// detected on its LSB. 2'b10 to 2'b11 is a posedge of the LSB (rise 5), 2'b01
+// to 2'b00 a negedge (fall 2), and the changes of the other bit are edges of
+// neither.
 TEST(EdgeSensitivePathRun, VectorSourceEdgeIsDetectedOnItsLsb) {
   SimFixture f;
   EXPECT_EQ(

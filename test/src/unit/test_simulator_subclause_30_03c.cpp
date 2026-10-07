@@ -8,10 +8,10 @@
 // RtlirModule::specify_blocks for the top and for no instance, so an
 // instantiated module's specify block was parsed, elaborated and then dropped.
 // §30.2 makes that the ordinary case rather than a corner of one -- module path
-// delays are there to "describe delays for structural models such as ASIC
-// cells", and a cell is a thing a design instantiates. §30.3 puts the specify
-// block inside a module declaration, which is why two instances of one cell
-// declare paths whose src_port and dst_port are the same two strings;
+// delays exist to give the delays of structural models, ASIC cells among them,
+// and a cell is a thing a design instantiates. §30.3 puts the specify block
+// inside a module declaration, which is why two instances of one cell declare
+// paths whose src_port and dst_port are the same two strings;
 // PathDelay::inst_prefix in src/simulator/specify_path_delay.h is what tells
 // those apart, and every case here reads it.
 //
