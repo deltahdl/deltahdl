@@ -17,9 +17,9 @@ void Parser::AdoptTypeNames(const ScopeTypeNames& names) {
   known_udps_.insert(names.udps.begin(), names.udps.end());
 }
 
-// Applies §26.3's rule that an import declaration "allows identifiers declared
-// within packages to be visible within the current scope without a package name
-// qualifier" to what the parser reads as a type name. A wildcard item hands
+// Applies to what the parser reads as a type name §26.3's rule that an import
+// declaration lets the current scope see identifiers a package declares
+// without a qualifying package name. A wildcard item hands
 // over every type name the package declared; an explicit item hands over the
 // one it names, and only when that name is a type, because §26.3's own example
 // imports the enumeration type teeth_t without importing the literal FALSE.
@@ -28,8 +28,8 @@ void Parser::AdoptTypeNames(const ScopeTypeNames& names) {
 // the design element holding the import is what takes them away again at its
 // closing keyword, and that is what keeps the import from reaching the module
 // after it. A package declared later in the file is absent from package_types_
-// and hands over nothing, which §26.3 admits: "The compilation of a package
-// shall precede the compilation of scopes in which the package is imported."
+// and hands over nothing, which §26.3 admits: a package is compiled before
+// any scope that imports it.
 void Parser::ApplyImportedTypeNames(const ImportItem& item) {
   auto it = package_types_.find(item.package_name);
   if (it == package_types_.end()) return;

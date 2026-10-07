@@ -73,9 +73,9 @@ void Parser::RejectInProgramBody(SourceLoc loc, const char* msg) {
 // a class_declaration, an interface_class_declaration, a
 // class_constructor_declaration, a local_parameter_declaration, a
 // parameter_declaration, a covergroup_declaration, an
-// assertion_item_declaration or ';'. §26.2 has the same in prose: "items
-// within packages are generally type definitions, tasks, and functions", with
-// "parameters, variables, and nets" beside them. The parser reads a package
+// assertion_item_declaration or ';'. §26.2 has the same in prose: a package
+// mostly holds type definitions, tasks and functions, and may hold parameters,
+// variables and nets as well. The parser reads a package
 // body through the dispatch every body shares, so an item A.1.4's module
 // body reaches beyond that list is reported here under A.1.11. Two are
 // reported where they are read, because neither reaches the items a package
@@ -90,12 +90,12 @@ void Parser::RejectInPackageBody(const char* msg) {
 
 // The report FilterPackageItems makes on an item of this kind, or nullptr
 // where A.1.11 admits the kind. The three structured procedures are left out:
-// the elaborator reports those under §26.2, "variable declaration assignments
-// within the package shall occur before any initial or always procedures are
-// started", and reads them to do so. A clocking block, a specparam and an
-// extern prototype are reported under §14.7, §6.20.5 and A.1.6 where each is
-// read. A checker_declaration is the one design element the list admits, and
-// a genvar_declaration is recorded as a variable it does not.
+// the elaborator reports those under §26.2, which has every variable
+// declaration assignment in a package take place before any initial or always
+// procedure starts, and reads them to do so. A clocking block, a specparam and
+// an extern prototype are reported under §14.7, §6.20.5 and A.1.6 where each
+// is read. A checker_declaration is the one design element the list admits,
+// and a genvar_declaration is recorded as a variable it does not.
 static const char* PackageItemRejection(const ModuleItem& item) {
   switch (item.kind) {
     case ModuleItemKind::kContAssign:

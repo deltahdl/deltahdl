@@ -50,11 +50,10 @@ struct ScopeTypeNames {
 // a later file parses on its own: `byte_t b;` reads as an instantiation of a
 // module called byte_t until byte_t is known to be a type. `packages` and
 // `classes` are what those names can be put back by -- §26.3's import
-// declaration "allows identifiers declared within packages to be visible within
-// the current scope without a package name qualifier", and §8.13's extends
-// clause gives a derived class the type names of its base -- so a file
-// importing a package another file declared needs the package's entry to have
-// crossed with it.
+// declaration lets the current scope see identifiers a package declares
+// without a qualifying package name, and §8.13's extends clause gives a
+// derived class the type names of its base -- so a file importing a package
+// another file declared needs the package's entry to have crossed with it.
 //
 // The three travel together because a caller that carries one and not the
 // others has a compilation unit that is partly shared, which is not a state
@@ -68,8 +67,8 @@ struct CompilationUnitScopeNames {
 // Adds everything `src` holds to `target`, for a caller accumulating the scope
 // across a command line. A name already in `target` stays as it is: the file
 // that declared it first is the one a later file's reference resolves to, which
-// is the order §26.3 states -- "The compilation of a package shall precede the
-// compilation of scopes in which the package is imported."
+// is the order §26.3 states, a package being compiled before any scope that
+// imports it.
 inline void MergeCompilationUnitScope(CompilationUnitScopeNames& target,
                                       const CompilationUnitScopeNames& src) {
   target.own.types.insert(src.own.types.begin(), src.own.types.end());
