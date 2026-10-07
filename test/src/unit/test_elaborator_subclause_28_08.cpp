@@ -128,8 +128,8 @@ TEST(BidirectionalSwitchTerminals, RtranRejectsWholeVector) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "resistive bidirectional pass switch terminal must "
-                            "be a scalar net or a bit-select of a vector net",
+                            "a resistive bidirectional pass switch terminal "
+                            "connects to a single bit",
                             4, "28.8"));
 }
 
@@ -143,8 +143,8 @@ TEST(BidirectionalSwitchTerminals, RtranRejectsPartSelect) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "resistive bidirectional pass switch terminal must "
-                            "be a scalar net or a bit-select of a vector net",
+                            "a resistive bidirectional pass switch terminal "
+                            "connects to a single bit",
                             4, "28.8"));
 }
 
@@ -158,8 +158,8 @@ TEST(BidirectionalSwitchTerminals, Rtranif0RejectsWholeVector) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "resistive bidirectional pass switch terminal must "
-                            "be a scalar net or a bit-select of a vector net",
+                            "a resistive bidirectional pass switch terminal "
+                            "connects to a single bit",
                             4, "28.8"));
 }
 
@@ -173,8 +173,8 @@ TEST(BidirectionalSwitchTerminals, Rtranif1RejectsPartSelect) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "resistive bidirectional pass switch terminal must "
-                            "be a scalar net or a bit-select of a vector net",
+                            "a resistive bidirectional pass switch terminal "
+                            "connects to a single bit",
                             4, "28.8"));
 }
 

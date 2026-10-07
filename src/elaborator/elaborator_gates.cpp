@@ -126,8 +126,9 @@ static void CheckResistiveBidirTerminals(const ModuleItem* item,
     }
     if (!IsScalarNetOrBitSelect(terms[i], mod)) {
       diag.Error(item->loc,
-                 "resistive bidirectional pass switch terminal must be a "
-                 "scalar net or a bit-select of a vector net",
+                 "a resistive bidirectional pass switch terminal connects to a "
+                 "single bit: a scalar net or one bit selected from a vector "
+                 "net",
                  Subclause("28.8"));
     }
   }
