@@ -22,7 +22,8 @@ TEST(ThisElaboration, ThisInModuleInitialBlockError) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "'this' shall only be used within non-static class methods", 2, "8.11"));
+      "'this' has no object to refer to outside a non-static class method", 2,
+      "8.11"));
 }
 
 TEST(ThisElaboration, ThisInModuleAlwaysBlockError) {
@@ -38,7 +39,8 @@ TEST(ThisElaboration, ThisInModuleAlwaysBlockError) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "'this' shall only be used within non-static class methods", 3, "8.11"));
+      "'this' has no object to refer to outside a non-static class method", 3,
+      "8.11"));
 }
 
 // §8.11 holds for every procedural block a module can contain, not just
@@ -57,7 +59,8 @@ TEST(ThisElaboration, ThisInModuleAlwaysCombBlockError) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "'this' shall only be used within non-static class methods", 3, "8.11"));
+      "'this' has no object to refer to outside a non-static class method", 3,
+      "8.11"));
 }
 
 TEST(ThisElaboration, ThisInModuleFunctionError) {
@@ -71,7 +74,8 @@ TEST(ThisElaboration, ThisInModuleFunctionError) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "'this' shall only be used within non-static class methods", 2, "8.11"));
+      "'this' has no object to refer to outside a non-static class method", 2,
+      "8.11"));
 }
 
 TEST(ThisElaboration, ThisInNonStaticClassMethodOk) {
@@ -122,7 +126,8 @@ TEST(ThisElaboration, ThisInModuleTaskError) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "'this' shall only be used within non-static class methods", 2, "8.11"));
+      "'this' has no object to refer to outside a non-static class method", 2,
+      "8.11"));
 }
 
 TEST(ThisElaboration, ThisInClassTaskOk) {
@@ -150,7 +155,8 @@ TEST(ThisElaboration, BareThisInModuleInitialError) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "'this' shall only be used within non-static class methods", 2, "8.11"));
+      "'this' has no object to refer to outside a non-static class method", 2,
+      "8.11"));
 }
 
 TEST(ThisElaboration, BareThisInClassMethodOk) {

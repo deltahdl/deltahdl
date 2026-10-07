@@ -50,10 +50,9 @@ TEST(ClassConstraintElaboration, WeakReferenceNonClassTypeError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "weak_reference type parameter shall be a class "
-                            "type",
-                            3, "8.30.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "weak_reference needs a class type as its type parameter", 3, "8.30.1"));
 }
 
 TEST(ClassConstraintElaboration, WeakReferenceAsFunctionArgOk) {
@@ -79,10 +78,9 @@ TEST(ClassConstraintElaboration, WeakReferenceNonClassMemberError) {
       "module m;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "weak_reference type parameter shall be a class "
-                            "type",
-                            2, "8.30.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "weak_reference needs a class type as its type parameter", 2, "8.30.1"));
 }
 
 // The class-type restriction applies wherever weak_reference#(T) is declared,
@@ -96,10 +94,9 @@ TEST(ClassConstraintElaboration, WeakReferenceNonClassFunctionArgError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "weak_reference type parameter shall be a class "
-                            "type",
-                            2, "8.30.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "weak_reference needs a class type as its type parameter", 2, "8.30.1"));
 }
 
 // A weak_reference declared directly as a module item (not inside a procedural
@@ -125,10 +122,9 @@ TEST(ClassConstraintElaboration, WeakReferenceModuleItemNonClassError) {
       "  weak_reference #(int) wr;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "weak_reference type parameter shall be a class "
-                            "type",
-                            2, "8.30.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "weak_reference needs a class type as its type parameter", 2, "8.30.1"));
 }
 
 // The Overview's own example forward-declares the referent class with
@@ -180,10 +176,9 @@ TEST(ClassConstraintElaboration, WeakReferenceTypedefNonClassError) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "weak_reference type parameter shall be a class "
-                            "type",
-                            4, "8.30.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "weak_reference needs a class type as its type parameter", 4, "8.30.1"));
 }
 
 // §8.30.1 requires the parameter type T to be a class type and makes any other
@@ -209,7 +204,7 @@ void ExpectNonClassWeakRefIn(const std::string& stmt) {
   ElaborateSrc(src, f);
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(),
-                    "weak_reference type parameter shall be a class type",
+                    "weak_reference needs a class type as its type parameter",
                     LineHolding(src, "weak_reference #(int) wr;"), "8.30.1"));
 }
 
@@ -287,10 +282,9 @@ TEST(ClassConstraintElaboration, WeakReferenceStdScopedIsTheBuiltinClass) {
       "  std::weak_reference#(int) wref1;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "weak_reference type parameter shall be a class "
-                            "type",
-                            2, "8.30.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "weak_reference needs a class type as its type parameter", 2, "8.30.1"));
 }
 
 }  // namespace

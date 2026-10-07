@@ -42,7 +42,8 @@ TEST(SuperElaboration, SuperInModuleBlockError) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "'this' shall only be used within non-static class methods", 2, "8.11"));
+      "'this' has no object to refer to outside a non-static class method", 2,
+      "8.11"));
 }
 
 // Derived does extend Base, so §8.15 has nothing to say about this super; what
@@ -147,10 +148,10 @@ TEST(SuperElaboration, SuperNewMustBeFirstStatementError) {
       "  Derived d;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "super.new() shall be the first executable statement in the constructor",
-      9, "8.17"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "super.new() does not open the constructor, and no "
+                            "executable statement may come before it",
+                            9, "8.17"));
 }
 
 // The same constructor is legal when super.new leads the body, confirming the
@@ -198,10 +199,10 @@ TEST(SuperElaboration, SuperNewInsideConditionalError) {
       "  Derived d;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "super.new() shall be the first executable statement in the constructor",
-      8, "8.17"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "super.new() does not open the constructor, and no "
+                            "executable statement may come before it",
+                            8, "8.17"));
 }
 
 // §8.15 states that an expression reaching a base class value parameter

@@ -126,9 +126,8 @@ TEST(StructuredProcedureElaboration,
   // Rejected under §8.20, which is the clause the emission site names.
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(),
-                    "dynamic_override_specifiers shall only be legal on "
-                    "method declarations inside a non-interface class "
-                    "scope",
+                    "dynamic_override_specifiers belong on a class method "
+                    "declaration, and an interface class takes none",
                     2, "8.20"));
 }
 
@@ -142,9 +141,8 @@ TEST(StructuredProcedureElaboration, DynamicOverrideRejectedOnModuleLevelTask) {
   // Rejected under §8.20, which is the clause the emission site names.
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(),
-                    "dynamic_override_specifiers shall only be legal on "
-                    "method declarations inside a non-interface class "
-                    "scope",
+                    "dynamic_override_specifiers belong on a class method "
+                    "declaration, and an interface class takes none",
                     2, "8.20"));
 }
 
@@ -159,14 +157,13 @@ TEST(StructuredProcedureElaboration,
   // Rejected under §8.20, which is the clause the emission site names.
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(),
-                    "dynamic_override_specifiers shall only be legal on "
-                    "method declarations inside a non-interface class "
-                    "scope",
+                    "dynamic_override_specifiers belong on a class method "
+                    "declaration, and an interface class takes none",
                     2, "8.20"));
 }
 
 // Footnote 25 accepting path: the override specifier IS legal when the method
-// is declared inside a non-interface class scope. This anchors the three
+// is declared in a class that is not an interface class. This anchors the three
 // module-level rejections above -- without it, a rule that flagged any override
 // specifier regardless of scope would still pass those negatives.
 TEST(StructuredProcedureElaboration,

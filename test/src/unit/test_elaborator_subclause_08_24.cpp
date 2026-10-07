@@ -401,7 +401,7 @@ TEST(OutOfBlockDeclElaboration, DefaultArgSameValueDifferentSyntaxError) {
                             "8.24"));
 }
 
-// §8.24: an out-of-block declaration shall follow the class declaration.
+// §8.24 places an out-of-block declaration after the declaration of its class.
 TEST(OutOfBlockDeclElaboration, OutOfBlockBeforeClassError) {
   ElabFixture f;
   ElabOk(
@@ -415,7 +415,7 @@ TEST(OutOfBlockDeclElaboration, OutOfBlockBeforeClassError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "shall follow the declaration of class", 1,
+                            "comes before the declaration of class", 1,
                             "8.24"));
 }
 

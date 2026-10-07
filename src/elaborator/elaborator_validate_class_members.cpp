@@ -67,7 +67,8 @@ void ElaboratorClassRules::ValidateWeakReferenceMembers() {
     if (m->data_type.type_params.empty()) return;
     const auto& tp = m->data_type.type_params[0];
     if (!WeakRefTypeParamNamesClass(tp, typedefs_, class_names_)) {
-      diag_.Error(m->loc, "weak_reference type parameter shall be a class type",
+      diag_.Error(m->loc,
+                  "weak_reference needs a class type as its type parameter",
                   Subclause("8.30.1"));
     }
   };
@@ -182,8 +183,8 @@ static bool ReportSequentialSuperNew(const ModuleItem* method,
     if (!IsSuperNewCall(stmts[i])) continue;
     if (i != 0) {
       diag.Error(stmts[i]->range.start,
-                 "super.new() shall be the first executable statement "
-                 "in the constructor",
+                 "super.new() does not open the constructor, and no "
+                 "executable statement may come before it",
                  Subclause("8.17"));
     }
     return true;
@@ -197,8 +198,8 @@ static void ReportGuardedSuperNew(const ModuleItem* method, DiagEngine& diag) {
   for (const auto* s : method->func_body_stmts) {
     if (ConstructorHasGuardedSuperNew(s)) {
       diag.Error(s->range.start,
-                 "super.new() shall be the first executable statement "
-                 "in the constructor",
+                 "super.new() does not open the constructor, and no "
+                 "executable statement may come before it",
                  Subclause("8.17"));
       return;
     }
@@ -214,8 +215,9 @@ void ElaboratorClassRules::ValidateOneClassChainingCtor(const ClassDecl* cls) {
   if (has_super_new &&
       (!cls->extends_args.empty() || cls->extends_has_default)) {
     diag_.Error(ctor->method->loc,
-                "constructor shall not contain super.new() when extends "
-                "specifier has arguments",
+                "constructor calls super.new() although the extends "
+                "specifier already supplies the superclass constructor's "
+                "arguments",
                 Subclause("8.17"));
   }
 }
@@ -732,8 +734,8 @@ static void CheckDefaultCtorArgNameConflicts(const ModuleItem* ctor,
   }
 }
 
-// §8.17: 'default' shall not be used when a superclass constructor argument's
-// default value refers to a local member of the superclass.
+// §8.17: 'default' is off limits once the default value of a superclass
+// constructor argument names a local member of that superclass.
 static void CheckDefaultCtorArgRefsBaseLocal(const ClassDecl* base,
                                              const ModuleItem* ctor,
                                              const ModuleItem* base_ctor,
@@ -746,8 +748,8 @@ static void CheckDefaultCtorArgRefsBaseLocal(const ClassDecl* base,
   for (const auto& a : base_ctor->func_args) {
     if (a.default_value && ExprRefsAnyName(a.default_value, base_locals)) {
       diag.Error(ctor->loc,
-                 "'default' shall not be used when a superclass constructor "
-                 "argument default value refers to a local member",
+                 "'default' is unavailable because a superclass constructor "
+                 "argument's default value refers to a local member",
                  Subclause("8.17"));
       break;
     }
@@ -772,12 +774,12 @@ void ElaboratorClassRules::ValidateOneClassDefaultKeyword(
   }
 
   // §8.17: when the extends specifier uses 'default' and the subclass also
-  // defines its own constructor, that constructor's argument list shall repeat
-  // the 'default' keyword.
+  // defines its own constructor, that constructor lists 'default' among its
+  // arguments as well.
   if (cls->extends_has_default && ctor && !ctor_has_default) {
     diag_.Error(ctor->loc,
-                "constructor argument list shall contain 'default' when the "
-                "extends specifier uses the 'default' keyword",
+                "the extends specifier uses 'default', so the constructor's "
+                "argument list has to repeat 'default'",
                 Subclause("8.17"));
   }
 

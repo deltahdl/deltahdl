@@ -27,10 +27,11 @@ TEST(ChainedConstructorElaboration, ExtendsArgsAndSuperNewError) {
       "  Child c;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "constructor shall not contain super.new() when "
-                            "extends specifier has arguments",
-                            6, "8.17"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constructor calls super.new() although the extends specifier already "
+      "supplies the superclass constructor's arguments",
+      6, "8.17"));
 }
 
 TEST(ChainedConstructorElaboration, ExtendsArgsNoSuperNewOk) {
@@ -82,10 +83,10 @@ TEST(ChainedConstructorElaboration, SuperNewNotFirstStatementError) {
       "  Child c;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "super.new() shall be the first executable statement in the constructor",
-      9, "8.17"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "super.new() does not open the constructor, and no "
+                            "executable statement may come before it",
+                            9, "8.17"));
 }
 
 TEST(ChainedConstructorElaboration, ImplicitSuperNewOk) {
@@ -139,10 +140,10 @@ TEST(ChainedConstructorElaboration, SuperNewInsideIfBlockError) {
       "  Child c;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "super.new() shall be the first executable statement in the constructor",
-      8, "8.17"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "super.new() does not open the constructor, and no "
+                            "executable statement may come before it",
+                            8, "8.17"));
 }
 
 TEST(ChainedConstructorElaboration, ExtendsDefaultAndSuperNewError) {
@@ -161,10 +162,11 @@ TEST(ChainedConstructorElaboration, ExtendsDefaultAndSuperNewError) {
       "  Child c;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "constructor shall not contain super.new() when "
-                            "extends specifier has arguments",
-                            6, "8.17"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constructor calls super.new() although the extends specifier already "
+      "supplies the superclass constructor's arguments",
+      6, "8.17"));
 }
 
 TEST(ChainedConstructorElaboration, ExtendsDefaultNoSuperNewOk) {
@@ -241,10 +243,11 @@ TEST(ChainedConstructorElaboration, DefaultArgNoNameCollisionOk) {
              "endmodule\n"));
 }
 
-// §8.17: 'default' shall not be used when a superclass constructor argument's
-// default value refers to a local member of the superclass. The report stands
-// at the subclass constructor, which is the declaration that used 'default',
-// rather than at the superclass argument whose default value it names.
+// §8.17: 'default' is off limits once the default value of a superclass
+// constructor argument names a local member of that superclass. The report
+// stands at the subclass constructor, which is the declaration that used
+// 'default', rather than at the superclass argument whose default value it
+// names.
 TEST(ChainedConstructorElaboration, DefaultArgRefersToSuperLocalError) {
   ElabFixture f;
   ElabOk(
@@ -262,7 +265,7 @@ TEST(ChainedConstructorElaboration, DefaultArgRefersToSuperLocalError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "argument default value refers to a local member",
+                            "argument's default value refers to a local member",
                             7, "8.17"));
 }
 
@@ -327,17 +330,17 @@ TEST(ChainedConstructorElaboration, ExtendsDefaultUserCtorMissingDefaultError) {
       "  Child c;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "constructor argument list shall contain 'default' "
-                            "when the extends specifier uses the 'default' "
-                            "keyword",
-                            6, "8.17"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "the extends specifier uses 'default', so the "
+                    "constructor's argument list has to repeat 'default'",
+                    6, "8.17"));
 }
 
-// §8.17: super.new() shall be the first executable statement. A call reached
-// only through a loop body is conditional on the loop running, so it can never
-// be the unconditional first statement -- rejected. (Distinct control-flow
-// position from the if-branch case.)
+// §8.17: nothing executable may run in a constructor before super.new(). A
+// call reached only through a loop body is conditional on the loop running, so
+// it can never be the unconditional first statement -- rejected. (Distinct
+// control-flow position from the if-branch case.)
 TEST(ChainedConstructorElaboration, SuperNewInLoopBodyError) {
   ElabFixture f;
   ElabOk(
@@ -354,10 +357,10 @@ TEST(ChainedConstructorElaboration, SuperNewInLoopBodyError) {
       "  Child c;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "super.new() shall be the first executable statement in the constructor",
-      7, "8.17"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "super.new() does not open the constructor, and no "
+                            "executable statement may come before it",
+                            7, "8.17"));
 }
 
 // §8.17: a super.new() reached only through a case-item body is likewise
@@ -382,10 +385,10 @@ TEST(ChainedConstructorElaboration, SuperNewInCaseItemError) {
       "  Child c;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "super.new() shall be the first executable statement in the constructor",
-      7, "8.17"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "super.new() does not open the constructor, and no "
+                            "executable statement may come before it",
+                            7, "8.17"));
 }
 
 // The cases below cover the seven links Stmt carries that
@@ -436,10 +439,10 @@ TEST(ChainedConstructorElaboration, SuperNewInAForkArmError) {
       "  Child c;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "super.new() shall be the first executable statement in the constructor",
-      7, "8.17"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "super.new() does not open the constructor, and no "
+                            "executable statement may come before it",
+                            7, "8.17"));
 }
 
 // A.6.8 admits a function_subroutine_call as a for_step_assignment, so the
@@ -461,10 +464,10 @@ TEST(ChainedConstructorElaboration, SuperNewInAForStepError) {
       "  Child c;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "super.new() shall be the first executable statement in the constructor",
-      7, "8.17"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "super.new() does not open the constructor, and no "
+                            "executable statement may come before it",
+                            7, "8.17"));
 }
 
 // §16.3 gives `action_block ::= statement_or_null | [ statement ] else
@@ -486,10 +489,10 @@ TEST(ChainedConstructorElaboration, SuperNewInAnAssertionPassStmtError) {
       "  Child c;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "super.new() shall be the first executable statement in the constructor",
-      7, "8.17"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "super.new() does not open the constructor, and no "
+                            "executable statement may come before it",
+                            7, "8.17"));
 }
 TEST(ChainedConstructorElaboration, SuperNewInAnAssertionFailStmtError) {
   ElabFixture f;
@@ -507,10 +510,10 @@ TEST(ChainedConstructorElaboration, SuperNewInAnAssertionFailStmtError) {
       "  Child c;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "super.new() shall be the first executable statement in the constructor",
-      7, "8.17"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "super.new() does not open the constructor, and no "
+                            "executable statement may come before it",
+                            7, "8.17"));
 }
 
 // §18.16 gives `randcase_item ::= expression : statement_or_null`. The report
@@ -533,10 +536,10 @@ TEST(ChainedConstructorElaboration, SuperNewInARandcaseItemError) {
       "  Child c;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "super.new() shall be the first executable statement in the constructor",
-      7, "8.17"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "super.new() does not open the constructor, and no "
+                            "executable statement may come before it",
+                            7, "8.17"));
 }
 
 // A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
@@ -560,10 +563,10 @@ TEST(ChainedConstructorElaboration, SuperNewInARandsequenceCodeBlockError) {
       "  Child c;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "super.new() shall be the first executable statement in the constructor",
-      7, "8.17"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "super.new() does not open the constructor, and no "
+                            "executable statement may come before it",
+                            7, "8.17"));
 }
 
 // The six cases below write the same constructs under an `if`, so the guarding
@@ -589,10 +592,10 @@ TEST(ChainedConstructorElaboration, SuperNewInAForkArmUnderAnIfError) {
       "  Child c;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "super.new() shall be the first executable statement in the constructor",
-      7, "8.17"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "super.new() does not open the constructor, and no "
+                            "executable statement may come before it",
+                            7, "8.17"));
 }
 TEST(ChainedConstructorElaboration, SuperNewInAForStepUnderAnIfError) {
   ElabFixture f;
@@ -611,10 +614,10 @@ TEST(ChainedConstructorElaboration, SuperNewInAForStepUnderAnIfError) {
       "  Child c;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "super.new() shall be the first executable statement in the constructor",
-      7, "8.17"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "super.new() does not open the constructor, and no "
+                            "executable statement may come before it",
+                            7, "8.17"));
 }
 TEST(ChainedConstructorElaboration,
      SuperNewInAnAssertionPassStmtUnderAnIfError) {
@@ -634,10 +637,10 @@ TEST(ChainedConstructorElaboration,
       "  Child c;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "super.new() shall be the first executable statement in the constructor",
-      7, "8.17"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "super.new() does not open the constructor, and no "
+                            "executable statement may come before it",
+                            7, "8.17"));
 }
 TEST(ChainedConstructorElaboration,
      SuperNewInAnAssertionFailStmtUnderAnIfError) {
@@ -657,10 +660,10 @@ TEST(ChainedConstructorElaboration,
       "  Child c;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "super.new() shall be the first executable statement in the constructor",
-      7, "8.17"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "super.new() does not open the constructor, and no "
+                            "executable statement may come before it",
+                            7, "8.17"));
 }
 TEST(ChainedConstructorElaboration, SuperNewInARandcaseItemUnderAnIfError) {
   ElabFixture f;
@@ -681,10 +684,10 @@ TEST(ChainedConstructorElaboration, SuperNewInARandcaseItemUnderAnIfError) {
       "  Child c;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "super.new() shall be the first executable statement in the constructor",
-      7, "8.17"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "super.new() does not open the constructor, and no "
+                            "executable statement may come before it",
+                            7, "8.17"));
 }
 TEST(ChainedConstructorElaboration,
      SuperNewInARandsequenceCodeBlockUnderAnIfError) {
@@ -706,10 +709,10 @@ TEST(ChainedConstructorElaboration,
       "  Child c;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "super.new() shall be the first executable statement in the constructor",
-      7, "8.17"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "super.new() does not open the constructor, and no "
+                            "executable statement may come before it",
+                            7, "8.17"));
 }
 
 // Stmt::stmts is the one link ConstructorHasGuardedSuperNew does not treat as

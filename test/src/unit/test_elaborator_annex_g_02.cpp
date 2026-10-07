@@ -109,7 +109,7 @@ TEST(StdPackageOverview, ARejectedUseOfAStdTypeCitesTheDefiningSubclause) {
       weak_fixture);
   EXPECT_TRUE(ReportedError(
       weak_fixture.diag.Diagnostics(),
-      "weak_reference type parameter shall be a class type", 3, "8.30.1"));
+      "weak_reference needs a class type as its type parameter", 3, "8.30.1"));
   EXPECT_TRUE(
       StdPackageDefinesSemanticsIn(StdPackageMember::kWeakReference, "8.30.1"));
 

@@ -429,7 +429,8 @@ void ElaboratorClassRules::ValidateThisInItem(const ModuleItem* item) {
   bool is_proc = IsProceduralItemKind(item->kind);
   if (is_proc && item->body && StmtRefsThisOrSuper(item->body)) {
     diag_.Error(item->loc,
-                "'this' shall only be used within non-static class methods",
+                "'this' has no object to refer to outside a non-static class "
+                "method",
                 Subclause("8.11"));
     return;
   }
@@ -446,8 +447,8 @@ void ElaboratorClassRules::ValidateThisInItem(const ModuleItem* item) {
   for (const auto* s : item->func_body_stmts) {
     if (StmtRefsThisOrSuper(s)) {
       diag_.Error(item->loc,
-                  "'this' shall only be used within non-static "
-                  "class methods",
+                  "'this' has no object to refer to outside a non-static "
+                  "class method",
                   Subclause("8.11"));
       return;
     }

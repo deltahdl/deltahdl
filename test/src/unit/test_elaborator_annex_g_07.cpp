@@ -60,10 +60,9 @@ TEST(WeakReferenceStdPackageElaborator, TypeParameterRejectsNonClassType) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "weak_reference type parameter shall be a class "
-                            "type",
-                            3, "8.30.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "weak_reference needs a class type as its type parameter", 3, "8.30.1"));
 }
 
 // Edge of the same `type class T` restriction: a named type that is not a class
@@ -79,10 +78,9 @@ TEST(WeakReferenceStdPackageElaborator, TypeParameterRejectsNamedNonClassType) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "weak_reference type parameter shall be a class "
-                            "type",
-                            4, "8.30.1"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "weak_reference needs a class type as its type parameter", 4, "8.30.1"));
 }
 
 // The prototype constructor new(T referent), get(), and clear() elaborate at

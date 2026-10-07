@@ -43,7 +43,8 @@ TEST(InterfaceClassTypeUsageRestrictions, ClassImplementsTypeParamError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "shall not implement type parameter", 4, "8.26.4"));
+                            "where only an interface class can be implemented",
+                            4, "8.26.4"));
 }
 
 TEST(InterfaceClassTypeUsageRestrictions,
@@ -60,7 +61,8 @@ TEST(InterfaceClassTypeUsageRestrictions,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "shall not implement type parameter", 4, "8.26.4"));
+                            "where only an interface class can be implemented",
+                            4, "8.26.4"));
 }
 
 TEST(InterfaceClassTypeUsageRestrictions,
@@ -83,7 +85,8 @@ TEST(InterfaceClassTypeUsageRestrictions,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "shall not implement type parameter", 7, "8.26.4"));
+                            "where only an interface class can be implemented",
+                            7, "8.26.4"));
 }
 
 TEST(InterfaceClassTypeUsageRestrictions, InterfaceExtendsTypeParamError) {
@@ -99,7 +102,8 @@ TEST(InterfaceClassTypeUsageRestrictions, InterfaceExtendsTypeParamError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "shall not extend type parameter", 4, "8.26.4"));
+                            "where only an interface class can be extended", 4,
+                            "8.26.4"));
 }
 
 TEST(InterfaceClassTypeUsageRestrictions,
@@ -119,7 +123,8 @@ TEST(InterfaceClassTypeUsageRestrictions,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "shall not extend type parameter", 7, "8.26.4"));
+                            "where only an interface class can be extended", 7,
+                            "8.26.4"));
 }
 
 // §8.1 lets a class be declared wherever a data declaration may appear, so the
@@ -143,7 +148,8 @@ TEST(InterfaceClassTypeUsageRestrictions,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "shall not implement type parameter", 5, "8.26.4"));
+                            "where only an interface class can be implemented",
+                            5, "8.26.4"));
 }
 
 TEST(InterfaceClassTypeUsageRestrictions,
@@ -162,8 +168,9 @@ TEST(InterfaceClassTypeUsageRestrictions,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "shall not implement forward typedef", 3,
-                            "8.26.4"));
+                            "but the interface class's full declaration has to "
+                            "precede every class that implements it",
+                            3, "8.26.4"));
 }
 
 // The control the two above need: the same placement with the interface
@@ -206,7 +213,8 @@ TEST(InterfaceClassTypeUsageRestrictions,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "shall not implement type parameter", 5, "8.26.4"));
+                            "where only an interface class can be implemented",
+                            5, "8.26.4"));
 }
 
 TEST(InterfaceClassTypeUsageRestrictions,
@@ -226,7 +234,8 @@ TEST(InterfaceClassTypeUsageRestrictions,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "shall not implement type parameter", 5, "8.26.4"));
+                            "where only an interface class can be implemented",
+                            5, "8.26.4"));
 }
 
 TEST(InterfaceClassTypeUsageRestrictions,
@@ -246,7 +255,8 @@ TEST(InterfaceClassTypeUsageRestrictions,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "shall not implement type parameter", 5, "8.26.4"));
+                            "where only an interface class can be implemented",
+                            5, "8.26.4"));
 }
 
 TEST(InterfaceClassTypeUsageRestrictions,
@@ -266,7 +276,8 @@ TEST(InterfaceClassTypeUsageRestrictions,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "shall not implement type parameter", 5, "8.26.4"));
+                            "where only an interface class can be implemented",
+                            5, "8.26.4"));
 }
 
 // The control the four above need: the same nesting with an ordinary
@@ -304,8 +315,9 @@ TEST(InterfaceClassTypeUsageRestrictions, ClassImplementsForwardTypedefError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "shall not implement forward typedef", 2,
-                            "8.26.4"));
+                            "but the interface class's full declaration has to "
+                            "precede every class that implements it",
+                            2, "8.26.4"));
 }
 
 // The literal §8.26.4 example: the forward typedef is referenced through a
@@ -328,8 +340,9 @@ TEST(InterfaceClassTypeUsageRestrictions,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "shall not implement forward typedef", 2,
-                            "8.26.4"));
+                            "but the interface class's full declaration has to "
+                            "precede every class that implements it",
+                            2, "8.26.4"));
 }
 
 TEST(InterfaceClassTypeUsageRestrictions,
@@ -347,8 +360,9 @@ TEST(InterfaceClassTypeUsageRestrictions,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "shall not implement forward typedef", 2,
-                            "8.26.4"));
+                            "but the interface class's full declaration has to "
+                            "precede every class that implements it",
+                            2, "8.26.4"));
 }
 
 TEST(InterfaceClassTypeUsageRestrictions, InterfaceExtendsForwardTypedefError) {
@@ -364,8 +378,11 @@ TEST(InterfaceClassTypeUsageRestrictions, InterfaceExtendsForwardTypedefError) {
       "module m;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "shall not extend forward typedef", 2, "8.26.4"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "but the interface class's full declaration has to precede every "
+      "interface class that extends it",
+      2, "8.26.4"));
 }
 
 TEST(InterfaceClassTypeUsageRestrictions,
@@ -382,9 +399,8 @@ TEST(InterfaceClassTypeUsageRestrictions,
       "module m;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "' must be declared before it is implemented by '",
-                            1, "8.26.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "', which implements it", 1,
+                            "8.26.4"));
 }
 
 TEST(InterfaceClassTypeUsageRestrictions,
@@ -400,9 +416,8 @@ TEST(InterfaceClassTypeUsageRestrictions,
       "module m;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "' must be declared before it is extended by '", 1,
-                            "8.26.4"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "', which extends it", 1, "8.26.4"));
 }
 
 TEST(InterfaceClassTypeUsageRestrictions,

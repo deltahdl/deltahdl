@@ -553,7 +553,7 @@ TEST(ParameterOverride,
       f, "top");
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "weak_reference type parameter shall be a class type", 2, "8.30.1"));
+      "weak_reference needs a class type as its type parameter", 2, "8.30.1"));
 }
 
 // The specialization carries a named argument rather than the ordered one the

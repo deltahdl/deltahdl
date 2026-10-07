@@ -166,11 +166,11 @@ TEST(BnfClarificationElaboration, DynamicOverrideOutsideClassError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "dynamic_override_specifiers shall only be legal "
-                            "on method declarations inside a non-interface "
-                            "class scope",
-                            2, "8.20"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "dynamic_override_specifiers belong on a class method "
+                    "declaration, and an interface class takes none",
+                    2, "8.20"));
 }
 
 // §A.10 item 41: every argument of a constant_function_call must itself be a
@@ -322,7 +322,8 @@ TEST(BnfClarificationElaboration, ThisInModuleInitialError) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "'this' shall only be used within non-static class methods", 3, "8.11"));
+      "'this' has no object to refer to outside a non-static class method", 3,
+      "8.11"));
 }
 
 // §A.10 item 43: in a scope randomize_call (one that is not a method on a

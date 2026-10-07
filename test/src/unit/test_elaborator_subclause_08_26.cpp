@@ -31,7 +31,7 @@ TEST(InterfaceClassAllowedContent, InterfaceClassNonPureVirtualError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "shall only contain pure virtual methods", 2,
+                            "has a method that is not pure virtual", 2,
                             "8.26"));
 }
 

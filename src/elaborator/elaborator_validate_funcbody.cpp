@@ -599,7 +599,7 @@ static void ValidateFunctionArgDecls(
       const auto& tp = arg.data_type.type_params[0];
       if (!WeakRefTypeParamNamesClass(tp, typedefs, class_names)) {
         diag.Error(item->loc,
-                   "weak_reference type parameter shall be a class type",
+                   "weak_reference needs a class type as its type parameter",
                    Subclause("8.30.1"));
       }
     }

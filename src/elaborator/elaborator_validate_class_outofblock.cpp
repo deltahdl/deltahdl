@@ -236,12 +236,13 @@ static void ValidateClassOutOfBlockBody(const ClassDecl* cls, ModuleItem* item,
                Subclause("8.24"));
     return;
   }
-  // §8.24: an out-of-block declaration shall follow the class declaration, so
-  // a body that appears ahead of its class in source order is illegal.
+  // §8.24 places an out-of-block declaration after the declaration of its
+  // class, so a body that appears ahead of its class in source order is
+  // illegal.
   if (LocPrecedes(item->loc, cls->range.start)) {
     diag.Error(
         item->loc,
-        std::format("out-of-block declaration for '{}::{}' shall follow the "
+        std::format("out-of-block declaration for '{}::{}' comes before the "
                     "declaration of class '{}'",
                     item->method_class, item->name, item->method_class),
         Subclause("8.24"));

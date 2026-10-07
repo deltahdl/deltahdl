@@ -235,8 +235,8 @@ static void CheckInterfaceClassMemberKind(const ClassDecl* cls,
   }
   if (m->kind == ClassMemberKind::kMethod && !m->is_pure_virtual) {
     diag.Error(m->method ? m->method->loc : cls->range.start,
-               std::format("interface class '{}' shall only contain "
-                           "pure virtual methods",
+               std::format("interface class '{}' has a method that is not "
+                           "pure virtual",
                            cls->name),
                Subclause("8.26"));
   } else if (m->kind == ClassMemberKind::kProperty && !m->is_param) {
@@ -371,17 +371,19 @@ bool ValidateInheritedInterfaceName(const ClassDecl* cls, std::string_view name,
                                     const InheritanceWording& wording) {
   if (cls->type_param_names.count(name) > 0) {
     diag.Error(cls->range.start,
-               std::format("{} '{}' shall not {} type parameter '{}'",
-                           wording.self_label, cls->name, wording.verb, name),
+               std::format("{} '{}' names type parameter '{}' where only an "
+                           "interface class can be {}",
+                           wording.self_label, cls->name, name, wording.noun),
                Subclause("8.26.4"));
     return true;
   }
   if (IsForwardTypedefOnly(name, cls, scope)) {
     diag.Error(cls->range.start,
-               std::format("{} '{}' shall not {} forward typedef '{}'; the "
-                           "interface class must be declared before it is {}",
-                           wording.self_label, cls->name, wording.verb, name,
-                           wording.noun),
+               std::format("{} '{}' reaches '{}' only through a forward "
+                           "typedef, but the interface class's full "
+                           "declaration has to precede every {} that {}s it",
+                           wording.self_label, cls->name, name,
+                           wording.self_label, wording.verb),
                Subclause("8.26.4"));
     return true;
   }
@@ -389,9 +391,9 @@ bool ValidateInheritedInterfaceName(const ClassDecl* cls, std::string_view name,
     const auto* target = FindClassDecl(name, scope.unit);
     if (target && target->is_interface) {
       diag.Error(cls->range.start,
-                 std::format("interface class '{}' must be declared before it "
-                             "is {} by '{}'",
-                             name, wording.noun, cls->name),
+                 std::format("interface class '{}' has to be declared ahead "
+                             "of '{}', which {}s it",
+                             name, cls->name, wording.verb),
                  Subclause("8.26.4"));
       return true;
     }

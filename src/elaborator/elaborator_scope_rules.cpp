@@ -219,7 +219,7 @@ void ValidateLocalWeakRefDecls(
     const auto& tp = s->var_decl_type.type_params[0];
     if (!WeakRefTypeParamNamesClass(tp, typedefs, class_names)) {
       diag.Error(s->range.start,
-                 "weak_reference type parameter shall be a class type",
+                 "weak_reference needs a class type as its type parameter",
                  Subclause("8.30.1"));
     }
   }
