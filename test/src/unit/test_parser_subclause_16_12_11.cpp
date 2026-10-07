@@ -89,7 +89,7 @@ TEST(AlwaysRangeParsing, NegativeWeakAlwaysMaximumIsRejected) {
                             3, "16.12.11"));
 }
 
-// §16.12.11: the range for a strong always shall be bounded, so `s_always` with
+// §16.12.11: a strong always needs a finite range, so `s_always` with
 // a `$` maximum is rejected even though the same range is legal for a weak
 // always. This also exercises the separate operator-group code path that
 // consumes the `s_always` keyword.
@@ -101,8 +101,8 @@ TEST(AlwaysRangeParsing, StrongAlwaysUnboundedMaximumIsRejected) {
       "  endproperty\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedError(
-      r.diags, "s_always range shall be bounded; a `$` maximum is not allowed",
-      3, "16.12.11"));
+      r.diags, "s_always needs a finite range, so its maximum cannot be `$`", 3,
+      "16.12.11"));
 }
 
 // §16.12.11: a bounded non-negative range remains legal for a strong always.

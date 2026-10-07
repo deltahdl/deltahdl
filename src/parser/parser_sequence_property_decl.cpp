@@ -608,9 +608,9 @@ static bool CheckLiteralRangeBounds(const LiteralRangeBounds& r,
 }
 
 // §16.12.11: validate the bracketed range of a ranged always property. Beyond
-// the bounds rules every property range shares, the range for a strong always
-// shall be bounded, so a `$` maximum is illegal for `s_always` while it is
-// allowed for a weak always. Called with the current token positioned on the
+// the bounds rules every property range shares, a strong always needs a
+// finite range, so a `$` maximum is illegal for `s_always` while it is allowed
+// for a weak always. Called with the current token positioned on the
 // opening '['.
 static void ValidateLiteralAlwaysRange(Lexer& lexer, DiagEngine& diag,
                                        bool strong) {
@@ -619,7 +619,7 @@ static void ValidateLiteralAlwaysRange(Lexer& lexer, DiagEngine& diag,
     return;
   if (strong && r.max_is_dollar) {
     diag.Error(r.loc,
-               "s_always range shall be bounded; a `$` maximum is not allowed",
+               "s_always needs a finite range, so its maximum cannot be `$`",
                Subclause("16.12.11"));
   }
 }
@@ -628,8 +628,8 @@ static void ValidateLiteralAlwaysRange(Lexer& lexer, DiagEngine& diag,
 // weak form carries a constant_range and the strong form a
 // cycle_delay_const_range_expression, but both share the literal shape. Beyond
 // the bounds rules every property range shares, the polarity of the
-// boundedness rule is the reverse of §16.12.11: the range for a weak
-// `eventually` shall be bounded, so a `$` maximum is illegal there (the
+// boundedness rule is the reverse of §16.12.11: a weak `eventually` needs a
+// finite range, so a `$` maximum is illegal there (the
 // `eventually [2:$]` form is illegal), while the range for a strong
 // `s_eventually` may be unbounded. Called with the current token positioned on
 // the opening '['.
@@ -639,10 +639,10 @@ static void ValidateLiteralEventuallyRange(Lexer& lexer, DiagEngine& diag,
   if (!CheckLiteralRangeBounds(r, diag, "eventually", Subclause("16.12.13")))
     return;
   if (!strong && r.max_is_dollar) {
-    diag.Error(r.loc,
-               "eventually range shall be bounded; a `$` maximum is not "
-               "allowed for weak eventually",
-               Subclause("16.12.13"));
+    diag.Error(
+        r.loc,
+        "weak eventually needs a finite range, so its maximum cannot be `$`",
+        Subclause("16.12.13"));
   }
 }
 
@@ -702,7 +702,7 @@ static bool ScanOperatorToken(Lexer& lexer, DiagEngine& diag,
     return true;
   }
   // §16.12.13: the weak `eventually` prefix admits only a ranged form, and that
-  // range shall be bounded (a `$` maximum is illegal). Like weak `always`, it
+  // range has to be finite (a `$` maximum is illegal). Like weak `always`, it
   // is neither a negation nor a time-advancing operator for §16.12.17, so it is
   // consumed here solely to validate the range literal. Resetting the
   // pending-negation flag mirrors the generic token handling `eventually`

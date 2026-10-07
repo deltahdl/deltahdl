@@ -24,8 +24,8 @@ struct AlwaysRange {
 // restrictions for the given operator strength. The minimum shall be a
 // non-negative integer constant expression; the maximum shall be a non-negative
 // integer constant expression or `$`; when both bounds are integer constant
-// expressions the minimum shall not exceed the maximum. The range for a strong
-// always (`s_always`) shall be bounded, so a `$` maximum is rejected there
+// expressions the minimum shall not exceed the maximum. A strong always
+// (`s_always`) needs a finite range, so a `$` maximum is rejected there
 // while it is allowed for a weak always.
 bool IsAlwaysRangeWellFormed(const AlwaysRange& range, bool strong);
 

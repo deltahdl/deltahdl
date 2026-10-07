@@ -25,7 +25,7 @@ TEST(EventuallyRangeParsing, WeakRangedEventuallyWithBoundedRangeParses) {
   ASSERT_NE(item, nullptr);
 }
 
-// §16.12.13: the range for a weak `eventually` shall be bounded, so a `$`
+// §16.12.13: a weak `eventually` needs a finite range, so a `$`
 // maximum is illegal — the `eventually [2:$]` form is the LRM's explicit
 // illegal example (p6).
 TEST(EventuallyRangeParsing, WeakUnboundedEventuallyDollarMaximumIsRejected) {
@@ -35,10 +35,10 @@ TEST(EventuallyRangeParsing, WeakUnboundedEventuallyDollarMaximumIsRejected) {
       "    eventually[2:$] a;\n"
       "  endproperty\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedError(r.diags,
-                            "eventually range shall be bounded; a `$` maximum "
-                            "is not allowed for weak eventually",
-                            3, "16.12.13"));
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "weak eventually needs a finite range, so its maximum cannot be `$`", 3,
+      "16.12.13"));
 }
 
 // §16.12.13: the range for a strong `s_eventually` may be unbounded, so a `$`

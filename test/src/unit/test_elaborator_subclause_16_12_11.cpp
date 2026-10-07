@@ -28,7 +28,7 @@ TEST(AlwaysRange, WeakAlwaysAllowsUnboundedMaximum) {
   EXPECT_TRUE(IsAlwaysRangeWellFormed(range, /*strong=*/false));
 }
 
-// §16.12.11: the range for a strong always shall be bounded, so a `$` maximum
+// §16.12.11: a strong always needs a finite range, so a `$` maximum
 // is rejected for `s_always` even though the same range is legal for a weak
 // always.
 TEST(AlwaysRange, StrongAlwaysRejectsUnboundedMaximum) {

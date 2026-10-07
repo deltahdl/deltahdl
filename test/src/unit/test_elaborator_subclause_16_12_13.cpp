@@ -12,7 +12,7 @@ TEST(EventuallyRange, WeakEventuallyAllowsBoundedRange) {
       IsEventuallyRangeWellFormed(MakeEventuallyBound(5), /*strong=*/false));
 }
 
-// §16.12.13: the range for a weak eventually shall be bounded, so a `$` upper
+// §16.12.13: a weak eventually needs a finite range, so a `$` upper
 // bound is rejected for `eventually` (the `eventually [2:$]` form is illegal).
 TEST(EventuallyRange, WeakEventuallyRejectsUnboundedMaximum) {
   EXPECT_FALSE(

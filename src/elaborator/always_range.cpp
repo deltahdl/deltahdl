@@ -17,7 +17,7 @@ bool IsNonNegativeIntegerConstant(const AlwaysRangeBound& bound) {
 // §16.12.11: enforce the range restrictions. The minimum is always a
 // non-negative integer constant expression. The maximum is either `$` or a
 // non-negative integer constant expression; `$` is permitted only for the weak
-// form because a strong always range shall be bounded. When both bounds are
+// form because a strong always needs a finite range. When both bounds are
 // integer constants the minimum shall be less than or equal to the maximum.
 bool IsAlwaysRangeWellFormed(const AlwaysRange& range, bool strong) {
   if (!IsNonNegativeIntegerConstant(range.min)) {
