@@ -871,8 +871,8 @@ static void DecodePathpulseName(SpecifyItem& sp) {
 bool Parser::RefusePathpulseTerminalSelect() {
   if (!Check(TokenKind::kLBracket)) return false;
   diag_.Error(CurrentLoc(),
-              "a PATHPULSE$ specparam's terminals may not be a bit-select or "
-              "part-select of a vector",
+              "a PATHPULSE$ specparam names each terminal whole, without "
+              "selecting a bit or a part of it",
               Subclause("30.7.1"));
   while (!AtEnd() && !Check(TokenKind::kEq) && !Check(TokenKind::kSemicolon)) {
     Consume();

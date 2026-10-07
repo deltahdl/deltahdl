@@ -153,8 +153,8 @@ TEST(PulseControlSpecparamParsing, TerminalCannotBeBitOrPartSelect) {
       "  endspecify\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedError(r.diags,
-                            "a PATHPULSE$ specparam's terminals may not be a "
-                            "bit-select or part-select of a vector",
+                            "a PATHPULSE$ specparam names each terminal whole, "
+                            "without selecting a bit or a part of it",
                             3, "30.7.1"));
   EXPECT_EQ(ErrorCount(r.diags), 1U);
 }
@@ -171,12 +171,12 @@ TEST(PulseControlSpecparamParsing, TerminalCannotBePartSelect) {
       "  endspecify\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedError(r.diags,
-                            "a PATHPULSE$ specparam's terminals may not be a "
-                            "bit-select or part-select of a vector",
+                            "a PATHPULSE$ specparam names each terminal whole, "
+                            "without selecting a bit or a part of it",
                             3, "30.7.1"));
   EXPECT_TRUE(ReportedError(r.diags,
-                            "a PATHPULSE$ specparam's terminals may not be a "
-                            "bit-select or part-select of a vector",
+                            "a PATHPULSE$ specparam names each terminal whole, "
+                            "without selecting a bit or a part of it",
                             4, "30.7.1"));
   EXPECT_EQ(ErrorCount(r.diags), 2U);
 }
