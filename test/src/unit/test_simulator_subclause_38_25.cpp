@@ -97,12 +97,12 @@ TEST_F(VpiMcdFlushSim, FlushingDescriptorWithNoPendingOutputSucceeds) {
   EXPECT_EQ(vpi_ctx_.McdChannelBuffer(mcd), "");
 }
 
-// §38.25 flushes "the output buffers for the file(s) specified by the
-// multichannel descriptor", and §38.28's vpi_mcd_printf() is what fills them -
-// the Related routines name it. The tests above write the buffers through the
-// context, which leaves the routine observed flushing text no VPI call had put
-// there; a print puts it there here, and what the flush commits is what the
-// print left pending.
+// §38.25 flushes the output buffers of every file the multichannel descriptor
+// names, and §38.28's vpi_mcd_printf() is what fills them - the Related
+// routines name it. The tests above write the buffers through the context,
+// which leaves the routine observed flushing text no VPI call had put there; a
+// print puts it there here, and what the flush commits is what the print left
+// pending.
 TEST_F(VpiMcdFlushSim, WhatAPrintLeftOnAChannelIsWhatTheFlushCommits) {
   char name[] = "printed.log";
   PLI_UINT32 mcd = vpi_mcd_open(name);
@@ -118,12 +118,11 @@ TEST_F(VpiMcdFlushSim, WhatAPrintLeftOnAChannelIsWhatTheFlushCommits) {
   EXPECT_EQ(vpi_ctx_.McdChannelFlushed(mcd), "count=3\n");
 }
 
-// §38.27: "The channel descriptor 1 (LSB) is reserved for representing the
-// output channel of the tool that invoked the PLI application and the log
-// file", so an mcd naming channel 1 names those, and flushing it flushes the
-// buffers §38.5's vpi_flush() commits. Channel 1 had a buffer of its own, so
-// what a print put on it was flushed to somewhere the tool's own output never
-// reached.
+// §38.27: channel 1, the LSB, stands for the output channel of the tool that
+// started the PLI application together with its log file, so an mcd naming
+// channel 1 names those, and flushing it flushes the buffers §38.5's
+// vpi_flush() commits. Channel 1 had a buffer of its own, so what a print put
+// on it was flushed to somewhere the tool's own output never reached.
 TEST_F(VpiMcdFlushSim, FlushingChannelOneCommitsTheToolsOutputChannelAndLog) {
   char format[] = "through-channel-one\n";
   ASSERT_EQ(vpi_mcd_printf(1, format), 20);

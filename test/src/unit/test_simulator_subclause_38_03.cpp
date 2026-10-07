@@ -83,7 +83,7 @@ TEST_F(VpiCompareObjectsSim, ExpressionHandleTracksResolvedElement) {
 
 // §38.3, Example 3: obj1 represents c.a and obj2 represents d.a. While both c
 // and d are null neither object exists, so the comparison is FALSE - the result
-// holds only "provided that the simulation object exists".
+// holds only while the simulation object exists.
 TEST_F(VpiCompareObjectsSim, AbsentObjectsCompareUnequal) {
   auto* c_a = vpi_ctx_.CreateParameter("c_a", 0);
   auto* d_a = vpi_ctx_.CreateParameter("d_a", 0);
@@ -149,8 +149,8 @@ TEST_F(VpiCompareObjectsSim, NullHandleNeverCompareEqual) {
   EXPECT_EQ(vpi_compare_objects(nullptr, nullptr), 0);
 }
 
-// §38.3: the question is whether two handles "refer to the same underlying
-// simulation object". For a variable that object is the storage the run keeps
+// §38.3: the question is whether two handles name one and the same simulation
+// object underneath. For a variable that object is the storage the run keeps
 // for it, and two objects of the model can name one piece of that storage at
 // once - which the comparison read as two different objects, having compared
 // only the representatives.

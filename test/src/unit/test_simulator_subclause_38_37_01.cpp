@@ -44,7 +44,7 @@ TEST(VpiSystfCallbacksSim, NameRuleAcceptsWellFormedNames) {
 }
 
 TEST(VpiSystfCallbacksSim, NameRuleRejectsMissingOrBareDollar) {
-  // "one or more" characters must follow the '$': a null pointer, the empty
+  // At least one character must follow the '$': a null pointer, the empty
   // string, a bare "$", and a name with no leading '$' all fail.
   EXPECT_FALSE(VpiSystfNameIsValid(nullptr));
   EXPECT_FALSE(VpiSystfNameIsValid(""));
@@ -89,9 +89,9 @@ TEST_F(VpiSystfCallbacksRegistration, RejectsIllegalCharacterName) {
 }
 
 TEST_F(VpiSystfCallbacksRegistration, RejectsNullName) {
-  // A registration carrying no tfname has no "$ + one or more characters" name
-  // at all, so the registration is refused (no callback object, nothing
-  // stored).
+  // A registration carrying no tfname has no name of a '$' and at least one
+  // character after it at all, so the registration is refused (no callback
+  // object, nothing stored).
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
   data.tfname = nullptr;
@@ -110,10 +110,10 @@ TEST_F(VpiSystfCallbacksRegistration, AcceptsWellFormedName) {
   EXPECT_STREQ(vpi_ctx_.RegisteredSystfs()[0].tfname, "$good_name");
 }
 
-// §38.37.1: "The maximum name length shall be the same as for SystemVerilog
-// identifiers." §5.6 sets that for an identifier -- an implementation may cap
-// it, "but the limit shall be at least 1024 characters" -- and this tool's cap
-// is kMaxIdentifierLength, the one src/lexer/lexer.cpp measures an identifier
+// §38.37.1: a name may be as long as a SystemVerilog identifier may and no
+// longer. §5.6 sets that for an identifier -- an implementation may cap it,
+// "but the limit shall be at least 1024 characters" -- and this tool's cap is
+// kMaxIdentifierLength, the one src/lexer/lexer.cpp measures an identifier
 // against. A name of exactly that length is the longest the rule admits, so the
 // registration stands.
 TEST_F(VpiSystfCallbacksRegistration, AcceptsANameAtTheIdentifierMaximum) {

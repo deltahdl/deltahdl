@@ -308,12 +308,11 @@ TEST_F(VpiActionFeatureCallbacks, RemovedCallbackIsNotDispatched) {
 
 // -----------------------------------------------------------------------------
 // §38.36.3 separates the two kinds of reason it defines by whether they happen:
-// "actions are differentiated from features in that actions shall occur in all
-// VPI-compliant tools, whereas features might not exist in all VPI-compliant
-// tools." Three of the action reasons are the tool's own lifetime --
-// cbEndOfCompile, cbStartOfSimulation and cbEndOfSimulation -- and no run
-// delivered any of them. They could be registered, as the cases above show,
-// and then the tool compiled a design, ran it and finished without one
+// every VPI-compliant tool must deliver an action, while a feature may be
+// missing from some of them. Three of the action reasons are the tool's own
+// lifetime -- cbEndOfCompile, cbStartOfSimulation and cbEndOfSimulation -- and
+// no run delivered any of them. They could be registered, as the cases above
+// show, and then the tool compiled a design, ran it and finished without one
 // occurring.
 //
 // The cases below run a design and read back what arrived.
@@ -402,9 +401,9 @@ TEST_F(VpiLifetimeCallbacksInARun, TheEndOfSimulationActionOccursAfterAFinish) {
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
 
-  // §38.36.3 gives cbEndOfSimulation two ways of being reached, "because no
-  // more events remain in the event queue or a $finish system task executed",
-  // and the case above is the first of them. This is the second.
+  // §38.36.3 gives cbEndOfSimulation two ways of being reached, the event queue
+  // running empty or a $finish system task executing, and the case above is the
+  // first of them. This is the second.
   ASSERT_FALSE(g_action_order.empty());
   EXPECT_EQ(g_action_order.back(), cbEndOfSimulation);
 }

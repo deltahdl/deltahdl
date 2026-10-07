@@ -103,7 +103,7 @@ TEST_F(VpiGetPropertySim, ProtectedObjectQueryReturnsVpiUndefined) {
   EXPECT_NE(info.level, 0);
 }
 
-// §38.6: the protected-object rule holds only "unless otherwise specified".
+// §38.6: the protected-object rule gives way wherever another rule says so.
 // vpiIsProtected is one of the properties otherwise specified to stay
 // accessible, so querying it on a protected object is NOT an error -- and being
 // a Boolean property it reports 1 for TRUE (the §38.6 Boolean rule) rather than

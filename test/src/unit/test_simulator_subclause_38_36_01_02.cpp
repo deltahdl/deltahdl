@@ -107,7 +107,7 @@ TEST_F(VpiStmtCallbackByType, EveryTable38_6ObjectQualifies) {
 
 // §38.36.1.2: the objects that qualify are the ones the statement class groups,
 // which is what Table 38-6 lists in full, and §38.36.1.1 points the obj field
-// at that table for "the allowable objects". So a handle to an object of
+// at that table for the objects it may name. So a handle to an object of
 // another kind - here a reg, which is a variable and no kind of statement -
 // names nothing this callback could be called before executing, and the
 // registration is refused with a null handle and a recorded error rather than

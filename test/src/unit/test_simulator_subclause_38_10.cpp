@@ -17,9 +17,10 @@ namespace {
 
 using VpiGetDelaysSim = VpiDelaysSimBase;
 
-// §38.10 shall #1 + the "same order" rule: vpi_get_delays() places the object's
-// delays into the caller-allocated da array, one entry per delay (mtm and
-// pulsere both off), in the order they occur in the source.
+// §38.10 shall #1 + the rule that the delays keep their source order:
+// vpi_get_delays() places the object's delays into the caller-allocated da
+// array, one entry per delay (mtm and pulsere both off), in the order they
+// occur in the source.
 TEST_F(VpiGetDelaysSim, RetrievesDelaysInSourceOrder) {
   VpiDelayInfo d0;
   d0.delay = 11.0;
@@ -327,9 +328,8 @@ TEST_F(VpiGetDelaysSim, NullArgumentsAreSafe) {
 }
 
 // -----------------------------------------------------------------------------
-// §38.10: "The VPI routine vpi_get_delays() shall retrieve the delays or pulse
-// limits of an object and place them in an s_vpi_delay structure that has been
-// allocated by the application."
+// §38.10: vpi_get_delays() reads an object's delays or pulse limits into an
+// s_vpi_delay structure the application has allocated.
 //
 // Every case above hands the routine an object it filled in itself, so what
 // they observe is the retrieval and never the delays -- and no object a run
@@ -354,8 +354,8 @@ PLI_INT32 DisplayPathDelaysCalltf(PLI_BYTE8*) {
        path = vpi_scan(paths)) {
     ++g_paths_seen;
     // The structure is the application's, which is what §38.10 says of it, and
-    // one delay is a legal count for a path delay object: "for path delay
-    // objects, the no_of_delays value shall be 1, 2, 3, 6, or 12".
+    // one delay is a legal count for a path delay object, whose no_of_delays
+    // must be 1, 2, 3, 6 or 12.
     s_vpi_time da[1] = {};
     s_vpi_delay delays = {};
     delays.da = da;

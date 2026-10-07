@@ -122,7 +122,7 @@ TEST_F(InstantiatedDesignAccess, EachInstanceIsReachedUnderItsOwnName) {
   EXPECT_TRUE(g_m1_found);
   EXPECT_TRUE(g_m2_found);
   // §38.3: 1 when the two handles refer to the same underlying object. These
-  // are "two distinct objects", so 0 is the answer the clause asks for.
+  // are two separate objects, so 0 is the answer the clause asks for.
   EXPECT_EQ(g_same_object, 0);
 }
 

@@ -90,7 +90,8 @@ TEST_F(VpiHandleByNameSim, HierarchicalThroughProtectedScopeIsError) {
 // §38.21 (negative of H1/H4): a well-formed name that matches no object is a
 // not-found result, not an error. The routine hands back a null handle and -
 // unlike the protected-scope cases above - records no error, distinguishing the
-// ordinary "no such name" outcome from the protected-access error outcome.
+// ordinary outcome of a name that matches nothing from the protected-access
+// error outcome.
 TEST_F(VpiHandleByNameSim, NameMatchingNoObjectReturnsNull) {
   vpi_ctx_.CreateModule("present", "present");
 

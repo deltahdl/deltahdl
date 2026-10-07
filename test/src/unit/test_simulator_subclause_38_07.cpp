@@ -55,12 +55,12 @@ TEST_F(VpiGet64Sim, ProtectedObjectQueryReturnsVpiUndefined) {
   EXPECT_NE(info.level, 0);
 }
 
-// §38.7: "Unless otherwise specified, calling vpi_get64() for a protected
-// object shall be an error." The exceptions are the ones §37.3.6 and §37.59
-// specify for reading a protected object at all - vpiType and vpiIsProtected,
-// permitted for every object, and vpiSize on a protected expression - so the
-// 64-bit reader lets those through as the 32-bit one does rather than refusing
-// every property alike.
+// §38.7: vpi_get64() on a protected object is an error unless a rule says
+// otherwise. The exceptions are the ones §37.3.6 and §37.59 specify for reading
+// a protected object at all - vpiType and vpiIsProtected, permitted for every
+// object, and vpiSize on a protected expression - so the 64-bit reader lets
+// those through as the 32-bit one does rather than refusing every property
+// alike.
 TEST_F(VpiGet64Sim, TheProtectedRuleKeepsTheExceptionsSpecifiedElsewhere) {
   VpiObject locked;
   locked.type = vpiClassObj;
@@ -78,9 +78,9 @@ TEST_F(VpiGet64Sim, TheProtectedRuleKeepsTheExceptionsSpecifiedElsewhere) {
   EXPECT_EQ(vpi_get64(vpiSize, VpiHandleOf(&locked_expr)), 16);
 }
 
-// §38.6: "For object property vpiTimeUnit or vpiTimePrecision, if the object is
-// NULL, then the simulation time unit shall be returned", and §38.9 answers a
-// null handle asked for the save/restart id with the run's. Those say something
+// §38.6: asked for vpiTimeUnit or vpiTimePrecision with a NULL object, the
+// routine answers with the simulation time unit, and §38.9 answers a null
+// handle asked for the save/restart id with the run's. Those say something
 // about the run rather than about an object, so the width of the reader asking
 // does not change them - vpi_get64() answered 0 for both where vpi_get()
 // answered the run's.

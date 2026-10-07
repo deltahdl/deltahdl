@@ -320,14 +320,13 @@ TEST_F(VpiGetValueArraySim, TimeValReturnsTimeWordsPerElement) {
   EXPECT_EQ(av.value.times[0].low, 5u);
 }
 
-// §38.16: "formats requested that are inconsistent with the data type of the
-// array elements (except where explicitly allowed) shall be considered an
-// error." The clause says what each of these three suits - vpiShortIntVal
-// "only for arrays of vpiShortIntVar or vpiByteVar elements", vpiLongIntVal
-// for those or vpiLongIntVar, vpiShortRealVal "only for arrays of
-// vpiShortRealVar elements" - so an array of regs asked for any of them is the
-// inconsistent request, and the routine reports the error and nulls the value
-// arm rather than answering with shorts, longs or floats it invented.
+// §38.16: asking for a format that does not fit the elements' data type is an
+// error, save where the clause allows it. The clause says what each of these
+// three suits - vpiShortIntVal arrays of vpiShortIntVar or vpiByteVar elements
+// alone, vpiLongIntVal those or vpiLongIntVar, vpiShortRealVal arrays of
+// vpiShortRealVar elements alone - so an array of regs asked for any of them is
+// the inconsistent request, and the routine reports the error and nulls the
+// value arm rather than answering with shorts, longs or floats it invented.
 TEST_F(VpiGetValueArraySim, AFormatTheElementTypeDoesNotSupportIsAnError) {
   for (int format : {vpiShortIntVal, vpiLongIntVal, vpiShortRealVal}) {
     VpiHandle arr = MakeArray("w", {{0, 1}}, 2, 32);  // elements are regs
@@ -347,11 +346,11 @@ TEST_F(VpiGetValueArraySim, AFormatTheElementTypeDoesNotSupportIsAnError) {
   }
 }
 
-// §38.16's "except where explicitly allowed": the raw and vector formats are
-// drawn for 4-state arrays and "can also be requested of a 2-state array type",
-// and vpiRawTwoStateVal "can be requested for a 4-state array type". So none of
-// them is inconsistent with any element data type, and a request for one is
-// answered rather than refused whatever the elements are.
+// §38.16's allowed exceptions: the raw and vector formats are drawn for 4-state
+// arrays and may be asked of a 2-state array as well, and vpiRawTwoStateVal may
+// be asked of a 4-state array. So none of them is inconsistent with any element
+// data type, and a request for one is answered rather than refused whatever the
+// elements are.
 TEST_F(VpiGetValueArraySim, TheRawAndVectorFormatsSuitEveryElementType) {
   for (int format : {vpiRawFourStateVal, vpiRawTwoStateVal, vpiVectorVal}) {
     VpiHandle arr = MakeArray("a", {{0}}, 1, 8);  // elements are regs

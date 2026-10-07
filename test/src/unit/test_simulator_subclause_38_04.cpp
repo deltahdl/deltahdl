@@ -67,7 +67,7 @@ TEST_F(VpiSimControlSim, ControlResetCarriesThreeArguments) {
 // scope to the supplied vpiScope handle, and retargets to a *new* scope each
 // time it is invoked, so a later call replaces the scope an earlier call
 // established rather than being ignored once a scope is set. This subsumes the
-// base "set from the initial state" case in its first retarget.
+// base case, setting the scope for the first time, in its first retarget.
 TEST_F(VpiSimControlSim, ControlSetInteractiveScopeReplacesPriorScope) {
   EXPECT_EQ(vpi_ctx_.InteractiveScope(), nullptr);
   VpiHandle first = vpi_ctx_.CreateModule("top", "top");

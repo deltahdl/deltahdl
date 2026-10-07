@@ -80,13 +80,12 @@ TEST_F(VpiVprintfSim, EmptyFormatStringWritesNothingAndReturnsZero) {
   EXPECT_TRUE(vpi_ctx_.LogFileBuffer().empty());
 }
 
-// §38.41: "This routine performs the same function as vpi_printf(), except
-// that varargs have already been started." The exception is where the arguments
-// come from and nothing else, so the same format and the same arguments reach
-// the same two destinations with the same text and the same count, whichever of
-// the two routines a PLI application called. Each call is given a context of
-// its own so that what one wrote is what is compared, rather than one buffer
-// holding both.
+// §38.41: the routine does what vpi_printf() does, but is handed varargs that
+// have already been started. The exception is where the arguments come from and
+// nothing else, so the same format and the same arguments reach the same two
+// destinations with the same text and the same count, whichever of the two
+// routines a PLI application called. Each call is given a context of its own so
+// that what one wrote is what is compared, rather than one buffer holding both.
 TEST_F(VpiVprintfSim, PerformsTheSameFunctionAsVpiPrintf) {
   PLI_INT32 by_vprintf = CallWithStartedVarargs("count=%d of %s", 7, "ten");
   const std::string kChannelByVprintf = vpi_ctx_.OutputChannelBuffer();
@@ -103,7 +102,7 @@ TEST_F(VpiVprintfSim, PerformsTheSameFunctionAsVpiPrintf) {
   EXPECT_EQ(kLogByVprintf, printf_ctx.LogFileBuffer());
 }
 
-// §38.41 Returns: "the number of characters written" - the characters that
+// §38.41 Returns: how many characters were written - the characters that
 // reached the destinations, which is the expansion rather than the format that
 // produced it. Here the argument is wider than the conversion that carries it,
 // so the two lengths differ and only the expansion's answers.

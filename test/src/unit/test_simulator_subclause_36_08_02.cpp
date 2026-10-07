@@ -156,8 +156,8 @@ TEST_F(CompiletfApplicationRoutine,
 // SystemVerilog source code." §36.4 leaves an application no way to those
 // arguments other than the call handle vpi_handle(vpiSysTfCall, NULL) answers
 // with -- "the task/function arguments are not passed to the PLI application"
-// and §38.37.1 makes user_data "the only argument passed to the compiletf,
-// sizetf, and calltf routines" -- so a compiletf run with no call standing is a
+// and §38.37.1 makes user_data the one argument the compiletf, sizetf and
+// calltf routines receive -- so a compiletf run with no call standing is a
 // compiletf that can check nothing at all. The cases below run a real design
 // and let the application look.
 // -----------------------------------------------------------------------------

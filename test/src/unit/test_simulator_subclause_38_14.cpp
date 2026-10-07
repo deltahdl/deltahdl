@@ -65,7 +65,7 @@ TEST_F(VpiGetUserDataSim, ReturnsValueAssociatedByPut) {
 
 // §38.14 (the second 'shall'): when no user data has ever been associated with
 // the object, the return value is NULL. The call handle is valid, so this is
-// the "no user data" case rather than a failure.
+// case of an object with no user data rather than a failure.
 TEST_F(VpiGetUserDataSim, ReturnsNullWhenNothingAssociated) {
   VpiHandle call = MakeCall(vpiSysTaskCall);
 
@@ -118,11 +118,11 @@ TEST_F(VpiGetUserDataSim, ReturnsNullAfterReset) {
   EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), nullptr);
 }
 
-// §38.14's last sentence: "The user-data field can be set up again during or
-// after callbacks of type cbEndOfRestart or cbEndOfReset." That puts the clear
-// before those callbacks rather than after them, which only a read from inside
-// one can tell: a routine delivered during the reset finds the field already
-// null, and what it puts there is what a later read finds.
+// §38.14's last sentence: the user-data field may be filled in again during or
+// after a cbEndOfRestart or cbEndOfReset callback. That puts the clear before
+// those callbacks rather than after them, which only a read from inside one can
+// tell: a routine delivered during the reset finds the field already null, and
+// what it puts there is what a later read finds.
 TEST_F(VpiGetUserDataSim, AReadDuringEndOfResetStartsFromNullAndCanBeSetAgain) {
   VpiHandle call = MakeCall(vpiSysTaskCall);
   int before_reset = 0;

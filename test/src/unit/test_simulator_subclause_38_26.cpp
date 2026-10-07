@@ -94,8 +94,8 @@ TEST_F(VpiMcdNameSim, OverwritesReturnedValueOnSubsequentCalls) {
   EXPECT_EQ(retained, "alpha.log");
 }
 
-// §38.26 returns "the name of a file represented by a single-channel descriptor
-// cd". A descriptor naming several channels names several files, so there is no
+// §38.26 returns the name of the file a descriptor cd naming one channel stands
+// for. A descriptor naming several channels names several files, so there is no
 // one name to return and the routine takes its error return. Both of the files
 // named are open and each answers on its own descriptor, so the null is the
 // rule at work rather than the files being absent.

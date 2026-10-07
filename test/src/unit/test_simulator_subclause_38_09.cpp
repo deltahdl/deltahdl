@@ -191,7 +191,7 @@ TEST_F(VpiGetDataSim, ReadingPastEndOfSavedDataWarnsAndZeroFills) {
 }
 
 // §38.9 names where the first of vpi_get_data()'s three arguments comes from:
-// the id is "a save/restart ID returned from vpi_get(vpiSaveRestartID, NULL)".
+// the id is the save/restart ID that vpi_get(vpiSaveRestartID, NULL) returns.
 // That query answered with the 0 an unknown property gets, which is the one
 // value vpi_get_data() and vpi_put_data() refuse, so an application following
 // the clause could not obtain an id to save under at all -- every case above
@@ -200,10 +200,10 @@ TEST_F(VpiGetDataSim, TheIdIsTheOneTheToolHandsBack) {
   int id = vpi_get(vpiSaveRestartID, nullptr);
   ASSERT_NE(id, 0);
 
-  // §38.9: "the first call for a given id will retrieve the data starting at
-  // what was placed into the save/restart location with the first call to
-  // vpi_put_data() for a given id." So the data goes in under that id and comes
-  // back out under it, which is the whole of the clause's own flow.
+  // §38.9: the first read under an id begins with the data the first
+  // vpi_put_data() under that id put in the save/restart location. So the data
+  // goes in under that id and comes back out under it, which is the whole of
+  // the clause's own flow.
   char saved[] = {'i', 'd'};
   SingleWrite write;
   write.id = id;

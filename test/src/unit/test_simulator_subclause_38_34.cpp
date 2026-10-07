@@ -447,8 +447,8 @@ TEST_F(VpiPutValueSim, SequentialUdpRejectsDelayMode) {
 
 // §38.34 (input form): the sequential-UDP delay restriction covers every
 // scheduled delay mode, not just vpiTransportDelay. Putting with
-// vpiPureTransportDelay - another of the "other delay modes" - is likewise an
-// error, and the UDP is left unchanged.
+// vpiPureTransportDelay - another of the delay modes the clause names - is
+// likewise an error, and the UDP is left unchanged.
 TEST_F(VpiPutValueSim, SequentialUdpRejectsPureTransportDelay) {
   auto* var = sim_ctx_.CreateVariable("uq", 1);
   var->value = MakeLogic4VecVal(arena_, 1, 0);

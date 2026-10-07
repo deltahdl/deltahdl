@@ -106,15 +106,14 @@ TEST_F(VpiMcdVprintfSim, EmptyFormatStringWritesNothingAndReturnsZero) {
   EXPECT_EQ(vpi_ctx_.McdChannelBuffer(mcd), "");
 }
 
-// §38.29: the routine "performs the same function as vpi_mcd_printf()", and
-// what §38.28 says of that function is that it "shall not write to a file
-// represented by an fd file descriptor returned from $fopen (indicated by the
-// MSB being set)". An fd is one whole value rather than a set of discrete
-// channel bits, so the bits below the mark are part of that value: an fd whose
-// index bits happen to cover the bit naming channel 1 and the bit naming an
-// open mcd names neither of them. However the caller's started varargs would
-// have expanded, nothing reaches the tool's output channel, the log file or
-// the open file, and the count of characters written is zero.
+// §38.29: the routine does what vpi_mcd_printf() does, and §38.28 bars that
+// function from writing to a file that an fd from $fopen stands for, which the
+// set MSB marks. An fd is one whole value rather than a set of discrete channel
+// bits, so the bits below the mark are part of that value: an fd whose index
+// bits happen to cover the bit naming channel 1 and the bit naming an open mcd
+// names neither of them. However the caller's started varargs would have
+// expanded, nothing reaches the tool's output channel, the log file or the open
+// file, and the count of characters written is zero.
 TEST_F(VpiMcdVprintfSim, WritesNothingWhereTheDescriptorIsAnFdFromFopen) {
   char opened[] = "vfd.log";
   PLI_UINT32 covered = vpi_mcd_open(opened);

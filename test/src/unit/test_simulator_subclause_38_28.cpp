@@ -72,10 +72,10 @@ TEST_F(VpiMcdPrintfSim, ReturnsEofWhenFormatStringIsMissing) {
   EXPECT_EQ(vpi_ctx_.McdChannelBuffer(mcd), "");
 }
 
-// §38.28: the routine "shall not write to a file represented by an fd file
-// descriptor returned from $fopen (indicated by the MSB being set)". A
-// descriptor carrying that bit is withheld from this routine entirely, so
-// nothing is written and the count of characters written is zero.
+// §38.28: the routine must not write to a file that an fd from $fopen stands
+// for, which the set MSB marks. A descriptor carrying that bit is withheld from
+// this routine entirely, so nothing is written and the count of characters
+// written is zero.
 TEST_F(VpiMcdPrintfSim, WritesNothingToAFileNamedByAnFdDescriptor) {
   PLI_UINT32 fd = PLI_UINT32{1} << 31;
 
@@ -86,13 +86,13 @@ TEST_F(VpiMcdPrintfSim, WritesNothingToAFileNamedByAnFdDescriptor) {
   EXPECT_EQ(vpi_ctx_.McdChannelBuffer(fd), "");
 }
 
-// §38.28: the MSB says the descriptor "is actually a file descriptor instead of
-// an mcd", and an fd is one whole value rather than a set of discrete channel
-// bits, so the bits below the MSB are part of that value rather than channels
-// to write. $fopen hands back fds whose low bits are an index, so an fd such as
-// this one overlaps the bit naming channel 1 and the bit naming an open mcd
-// channel; reading those as channels would put the text on the tool's output
-// channel and in another file's buffer, which is what the clause withholds.
+// §38.28: the MSB says the descriptor is an fd rather than an mcd, and an fd is
+// one whole value rather than a set of discrete channel bits, so the bits below
+// the MSB are part of that value rather than channels to write. $fopen hands
+// back fds whose low bits are an index, so an fd such as this one overlaps the
+// bit naming channel 1 and the bit naming an open mcd channel; reading those as
+// channels would put the text on the tool's output channel and in another
+// file's buffer, which is what the clause withholds.
 TEST_F(VpiMcdPrintfSim, AnFdWritesNoneOfTheChannelsItsLowerBitsWouldName) {
   char name[] = "overlap.log";
   PLI_UINT32 mcd = vpi_mcd_open(name);

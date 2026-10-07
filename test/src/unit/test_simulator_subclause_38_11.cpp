@@ -148,10 +148,9 @@ TEST_F(VpiGetStringSim, ProtectedObjectIsAnError) {
 // module it instantiates are named apart by construction.
 // -----------------------------------------------------------------------------
 
-// What the application read. §38.11 is the reason each is copied at once: "the
-// string shall be placed in a temporary buffer that shall be used by every call
-// to this routine. If the string is to be used after a subsequent call, the
-// string should be copied to another location."
+// What the application read. §38.11 is the reason each is copied at once: the
+// routine returns its string in one temporary buffer that every call reuses, so
+// a string needed past the next call has to be copied elsewhere first.
 std::string g_instance_name;
 std::string g_definition_name;
 

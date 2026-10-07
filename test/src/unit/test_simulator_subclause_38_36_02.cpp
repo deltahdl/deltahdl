@@ -284,14 +284,13 @@ TEST_F(VpiSimTimeCallbacks, RealDelayCountsAsNonZeroForAtStartOfSimTime) {
   EXPECT_NE(vpi_register_cb(&cb), nullptr);
 }
 
-// §38.36.2: "When a simulation time callback occurs, the application callback
-// routine shall be passed a single argument, which is a pointer to an s_cb_data
-// structure [this is not a pointer to the same structure that was passed to
-// vpi_register_cb()]. The time structure shall contain the current simulation
-// time. The user_data field shall be equivalent to the user_data field passed
-// to vpi_register_cb()." The routine was handed the time the registration asked
-// the callback to fire at - a delay, or a moment still ahead - rather than the
-// time the simulation had reached when it fired.
+// §38.36.2: a simulation time callback hands its routine one argument, a
+// pointer to an s_cb_data structure other than the one vpi_register_cb() was
+// given, whose time structure holds the current simulation time and whose
+// user_data matches the user_data the registration passed. The routine was
+// handed the time the registration asked the callback to fire at - a delay, or
+// a moment still ahead - rather than the time the simulation had reached when
+// it fired.
 TEST_F(VpiSimTimeCallbacks, RoutineIsPassedTheCurrentTimeAndItsOwnStructure) {
   AdvanceTo(40);
 
@@ -319,11 +318,10 @@ TEST_F(VpiSimTimeCallbacks, RoutineIsPassedTheCurrentTimeAndItsOwnStructure) {
   EXPECT_EQ(requested.low, 5u);
 }
 
-// §38.36.2: "The value fields are ignored for all reasons with simulation time
-// callbacks", so a routine sees no value however the registration was written,
-// and this holds for each reason due in the slot it was registered in, which
-// is every one but cbNextSimTime (NextSimTimeIgnoresTheTimeItWasRegisteredWith
-// covers that one).
+// §38.36.2: no simulation time reason reads the value fields, so a routine sees
+// no value however the registration was written, and this holds for each reason
+// due in the slot it was registered in, which is every one but cbNextSimTime
+// (NextSimTimeIgnoresTheTimeItWasRegisteredWith covers that one).
 TEST_F(VpiSimTimeCallbacks, EveryReasonDeliversTheCurrentTimeAndNoValue) {
   AdvanceTo(12);
 
@@ -350,10 +348,10 @@ TEST_F(VpiSimTimeCallbacks, EveryReasonDeliversTheCurrentTimeAndNoValue) {
   }
 }
 
-// §38.36.2: "When the cb_data_p->time->type is set to vpiScaledRealTime, the
-// cb_data_p->obj field shall be used as the object for determining the time
-// scaling." The form the registration asked for is kept, so the current time
-// reaches the routine as a real scaled to that object's time unit.
+// §38.36.2: with cb_data_p->time->type set to vpiScaledRealTime, the object in
+// cb_data_p->obj is what the time is scaled by. The form the registration asked
+// for is kept, so the current time reaches the routine as a real scaled to that
+// object's time unit.
 TEST_F(VpiSimTimeCallbacks, ScaledRealTimeIsScaledToTheObjFieldsTimeUnit) {
   vpi_ctx_.SetSimTimeUnit(-12);  // the run counts in picoseconds
   AdvanceTo(3000);
@@ -377,11 +375,11 @@ TEST_F(VpiSimTimeCallbacks, ScaledRealTimeIsScaledToTheObjFieldsTimeUnit) {
   EXPECT_DOUBLE_EQ(g_delivered.time_real, 3.0);  // 3000 ps read as 3 ns
 }
 
-// §38.36.2: "For reason cbNextSimTime, the time field in the time structure is
-// ignored." The type is still required - it selects the form the routine is
-// given - but the requested time itself decides nothing, so a registration
-// carrying any value at all is accepted and the routine is handed, before the
-// next time slot's events, that slot's time and no value, like every other
+// §38.36.2: cbNextSimTime does not read the time field of the time structure.
+// The type is still required - it selects the form the routine is given - but
+// the requested time itself decides nothing, so a registration carrying any
+// value at all is accepted and the routine is handed, before the next time
+// slot's events, that slot's time and no value, like every other
 // simulation-time reason.
 TEST_F(VpiSimTimeCallbacks, NextSimTimeIgnoresTheTimeItWasRegisteredWith) {
   AdvanceTo(8);

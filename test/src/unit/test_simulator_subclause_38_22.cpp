@@ -38,7 +38,7 @@ class VpiHandleMultiSim : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.22 Returns: "vpiHandle -- Handle to an object." The one object of a
+// §38.22 Returns: a vpiHandle, the handle of an object. The one object of a
 // many-to-one relationship is what comes back, not a container the application
 // has to open: the Related routines row leaves the one-to-many traversal to
 // vpi_iterate() and vpi_scan().
@@ -85,10 +85,10 @@ TEST_F(VpiHandleMultiSim, TheReturnedHandleIsTheObjectItself) {
   EXPECT_DOUBLE_EQ(out[1].real, 6.0);
 }
 
-// §38.22 Synopsis: "Obtain a handle for an object in a many-to-one
-// relationship." An object only one of the references reaches stands in a
-// relationship with that one alone, so it is not what this routine answers
-// with.
+// §38.22 Synopsis: the routine gets the handle of the object at the one end of
+// a many-to-one relationship. An object only one of the references reaches
+// stands in a relationship with that one alone, so it is not what this routine
+// answers with.
 TEST_F(VpiHandleMultiSim, NoHandleForAnObjectOnlyOneReferenceReaches) {
   auto* mod1 = vpi_ctx_.CreateModule("m1", "m1");
   vpi_ctx_.CreatePort("p1", kVpiInput, mod1);

@@ -8,20 +8,19 @@ namespace {
 
 // §38.1 General: the conventions the definitions of clause 38 are written in -
 // the Synopsis, Syntax, Returns, Arguments and Related routines headings - and
-// one rule about what those definitions mean: "All arguments shall be
-// considered mandatory unless specifically noted in the definition of the PLI
-// routine."
+// one rule about what those definitions mean: every argument is required unless
+// the routine's definition says otherwise.
 //
 // So the clause is read against the routines rather than against any object of
 // the model: a routine whose definition notes nothing about an argument has to
 // be given it, and a call that omits one reports failure rather than acting on
 // some default the caller never wrote. §38.2 is where the exception the
-// sentence allows for is actually written - "If the error information is not
-// needed, a NULL can be passed to the routine" - and §37.4.3 writes another,
-// the relationships a data model diagram draws from a circle, which are
-// traversed with NULL for the reference object. These tests observe both sides
-// of the rule through the public entry points: routines that were given no
-// argument, and the routines whose own definitions say that is allowed.
+// sentence allows for is actually written - a caller that does not want the
+// error information may pass NULL for it - and §37.4.3 writes another, the
+// relationships a data model diagram draws from a circle, which are traversed
+// with NULL for the reference object. These tests observe both sides of the
+// rule through the public entry points: routines that were given no argument,
+// and the routines whose own definitions say that is allowed.
 
 using VpiArgumentConventions = VpiErrorRaisingFixture;
 
@@ -46,11 +45,11 @@ TEST_F(VpiArgumentConventions, AnOmittedMandatoryArgumentMakesTheCallFail) {
   EXPECT_EQ(vpi_compare_objects(nullptr, nullptr), 0);
 }
 
-// The exception, written in §38.2: "If the error information is not needed, a
-// NULL can be passed to the routine." So vpi_chk_error() still reports the
-// severity level of the pending error when given no structure to describe it
-// in - the argument the definition notes is the one that may be left out, and
-// the routine's answer does not depend on it.
+// The exception, written in §38.2: a caller that does not want the error
+// information may pass NULL for it. So vpi_chk_error() still reports the
+// severity level of the pending error when given no structure to describe it in
+// - the argument the definition notes is the one that may be left out, and the
+// routine's answer does not depend on it.
 TEST_F(VpiArgumentConventions, TheExceptionSection38_2NotesIsHonoured) {
   RaiseError();
 
@@ -58,16 +57,16 @@ TEST_F(VpiArgumentConventions, TheExceptionSection38_2NotesIsHonoured) {
   int with_structure = vpi_chk_error(&info);
   ASSERT_EQ(with_structure, vpiError);
 
-  // §38.2: "Calling vpi_chk_error() shall have no effect on the error status",
-  // so the same error is still pending and the null form reports it too.
+  // §38.2: a call to vpi_chk_error() leaves the error status as it was, so the
+  // same error is still pending and the null form reports it too.
   EXPECT_EQ(vpi_chk_error(nullptr), vpiError);
 }
 
 // The other exception, written in §37.4.3: a relationship a data model diagram
-// draws from a circle "is traversed using NULL for the ref_h". §37.42 detail 3
-// draws one to the system task or function call that invoked the application,
-// and §37.80 detail 2 draws one to the callbacks no object reaches - so for
-// those the reference object is the argument a definition notes may be NULL.
+// draws from a circle is followed with NULL as the ref_h. §37.42 detail 3 draws
+// one to the system task or function call that invoked the application, and
+// §37.80 detail 2 draws one to the callbacks no object reaches - so for those
+// the reference object is the argument a definition notes may be NULL.
 TEST_F(VpiArgumentConventions,
        AReferenceObjectMayBeOmittedWhereADiagramSaysSo) {
   s_cb_data cb = {};

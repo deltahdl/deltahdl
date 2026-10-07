@@ -109,10 +109,10 @@ int g_level_seen_in_callback = 0;
 
 int CountingPliErrorCb(s_cb_data*) {
   ++g_pli_error_calls;
-  // §38.36.3: "On a cbError callback, the routine vpi_chk_error() can be called
-  // to retrieve error information." vpi_chk_error() is the one routine that
-  // leaves the error status alone (§38.2), so the error is still standing when
-  // the callback asks about it.
+  // §38.36.3: a cbError callback may call vpi_chk_error() to learn about the
+  // error. vpi_chk_error() is the one routine that leaves the error status
+  // alone (§38.2), so the error is still standing when the callback asks about
+  // it.
   g_level_seen_in_callback = vpi_chk_error(nullptr);
   return 0;
 }
@@ -144,7 +144,7 @@ TEST_F(VpiErrorHandling, TheErrorCallbackOccursWhenTheErrorDoes) {
   CallVpiRoutineThatErrors();
 
   // §38.36.3 separates the two reasons by where the error arose: cbPLIError is
-  // a "simulation run-time error occurred in a PLI function call" and this one
+  // an error raised at run time inside a call to a PLI function, and this one
   // arose inside vpi_register_systf(), which is one.
   EXPECT_EQ(g_pli_error_calls, 1);
   EXPECT_EQ(g_error_calls, 0);

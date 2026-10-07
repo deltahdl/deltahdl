@@ -190,13 +190,13 @@ TEST_F(VpiStmtCallback, SuppressTimeNullsDispatchedTimePointer) {
 
 // §38.36.1.1: the NULL-time rule is specific to vpiSuppressTime. When a real
 // time type (here vpiSimTime) is requested, the routine receives a time pointer
-// rather than NULL, and what it points at "will contain the current simulation
-// time, of the type ... indicated in the call to vpi_register_cb()". At
-// registration "only the type is used", so the low word the application left in
-// its own structure says nothing about when the statement ran: the time the
-// routine reads is the one the simulation had reached as the statement was
-// about to execute. The structure it reads is the dispatch's own, the
-// registration's being left as the application wrote it.
+// rather than NULL, and what it points at holds the current simulation time in
+// the type the vpi_register_cb() call asked for. At registration only the type
+// is read, so the low word the application left in its own structure says
+// nothing about when the statement ran: the time the routine reads is the one
+// the simulation had reached as the statement was about to execute. The
+// structure it reads is the dispatch's own, the registration's being left as
+// the application wrote it.
 TEST_F(VpiStmtCallback, DispatchedTimeCarriesTheCurrentSimulationTime) {
   AdvanceTo(37);
 

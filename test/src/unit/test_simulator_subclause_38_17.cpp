@@ -82,16 +82,14 @@ TEST_F(VpiVlogInfoSim, GetVlogInfoReportsToolNameWhenNoOptions) {
   EXPECT_STREQ(info.argv[0], "delta-sim");
 }
 
-// §38.17: "The vendor tool may provide a command-line option to pass a file
-// containing a set of options. In that case, the argument strings returned by
-// vpi_get_vlog_info() shall contain the vendor option string name followed by a
-// pointer to a NULL-terminated array of pointers to characters. This new array
-// shall contain the parsed contents of the file. The value in entry zero shall
-// contain the name of the file. The remaining entries shall contain pointers to
-// NULL-terminated character arrays containing the different options in the
-// file. The last entry in this array shall be NULL." deltahdl provides that
-// option as -f, which src/driver/cli_options.cpp reads, so the report takes
-// that shape rather than naming the file and stopping there.
+// §38.17: a tool may offer a command-line option that names a file of further
+// options. When it does, vpi_get_vlog_info() reports that option by its string
+// and then a pointer to a NULL-terminated array of character pointers holding
+// the file's parsed contents: entry zero is the file's name, each later entry
+// points to one of the file's options as a NULL-terminated string, and the
+// array ends with a NULL entry. deltahdl provides that option as -f, which
+// src/driver/cli_options.cpp reads, so the report takes that shape rather than
+// naming the file and stopping there.
 TEST_F(VpiVlogInfoSim, AnOptionsFileIsReportedAsAnArrayOfItsParsedContents) {
   std::string options = "/tmp/deltahdl_3817_options.f";
   SeedFile(options, "--top dut  # the rest of this line is a comment\n-Wall\n");
@@ -119,8 +117,8 @@ TEST_F(VpiVlogInfoSim, AnOptionsFileIsReportedAsAnArrayOfItsParsedContents) {
   EXPECT_EQ(file[4], nullptr);     // the last entry
 }
 
-// §38.17: "If one of the options is the vendor file option, then the next
-// pointer shall behave the same as previously described." A file that names
+// §38.17: a vendor file option met among those options is reported the same
+// way, its next pointer leading to an array of its own. A file that names
 // another is reported with an array of its own inside the first one's.
 TEST_F(VpiVlogInfoSim, AnOptionsFileThatNamesAnotherNestsTheSameWay) {
   std::string inner = "/tmp/deltahdl_3817_inner.f";

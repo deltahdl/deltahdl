@@ -93,10 +93,10 @@ TEST_F(VpiScanSim, FreshIteratorScansIndependently) {
   EXPECT_EQ(second_count, 2);
 }
 
-// §38.40 Arguments: the handle vpi_scan() takes is a "handle to an iterator
-// object returned from vpi_iterate()". A design object is not one, so it
-// directs no traversal and the routine reports the error rather than handing
-// back the objects hanging off it.
+// §38.40 Arguments: the handle vpi_scan() takes is that of an iterator
+// vpi_iterate() returned. A design object is not one, so it directs no
+// traversal and the routine reports the error rather than handing back the
+// objects hanging off it.
 TEST_F(VpiScanSim, ScanRefusesAHandleThatIsNotAnIterator) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpi_ctx_.CreatePort("p0", kVpiInput, mod);

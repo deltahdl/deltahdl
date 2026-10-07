@@ -165,11 +165,11 @@ TEST_F(VpiPutValueArraySim, FanoutsOfTheWrittenElementsAreToldValuesChanged) {
   EXPECT_EQ(notified[2], 0);
 }
 
-// §38.35: vpiPropagateOff "inhibits notification of the fanouts of the array
-// that one or more values have changed", which is how it reduces the cost of
-// updating large numbers of elements. The values are written as they would be
-// without the flag; what the flag withholds is the notification, and it is
-// withheld from every element of the section rather than some of them.
+// §38.35: vpiPropagateOff keeps the array's fanouts from being told that any of
+// its values changed, which is how it reduces the cost of updating large
+// numbers of elements. The values are written as they would be without the
+// flag; what the flag withholds is the notification, and it is withheld from
+// every element of the section rather than some of them.
 TEST_F(VpiPutValueArraySim, PropagateOffWithholdsThatNotificationFromThem) {
   VpiHandle arr = MakeArray("q", {{0, 1, 2}}, 3, 32);
   int notified = 0;

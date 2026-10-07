@@ -46,10 +46,10 @@ TEST_F(VpiIterateSim, IterateModuleChildPorts) {
   EXPECT_EQ(count, 2);
 }
 
-// §38.23: the iterator walks "all objects of type type associated with object
-// ref", so the regs of a run are reached by asking the scope that holds them.
-// §37.4.3 gives a NULL reference only to a relationship the diagrams draw from
-// a circle, and a scope's regs are drawn from the scope.
+// §38.23: the iterator walks every object of the given type that the reference
+// object is related to, so the regs of a run are reached by asking the scope
+// that holds them. §37.4.3 gives a NULL reference only to a relationship the
+// diagrams draw from a circle, and a scope's regs are drawn from the scope.
 TEST_F(VpiIterateSim, IterateRegsOfAScopeAfterAttach) {
   sim_ctx_.CreateVariable("m1.v1", 8);
   sim_ctx_.CreateVariable("m1.v2", 16);
@@ -115,10 +115,8 @@ TEST_F(VpiIterateSim, IterateNoMatchingObjectsReturnsNull) {
 
 // -----------------------------------------------------------------------------
 // §38.23's own worked example. The clause ends with an application that walks
-// a module's nets -- "the following example application uses vpi_iterate() and
-// vpi_scan() to display each net (including the size for vectors) declared in
-// the module" -- built out of vpi_iterate(vpiNet, mod), vpi_scan, vpiName and
-// vpiSize.
+// a module's nets, printing each net the module declares and, for a vector, its
+// size -- built out of vpi_iterate(vpiNet, mod), vpi_scan, vpiName and vpiSize.
 //
 // Every case above hands vpi_iterate objects it made itself, which says what
 // the routine does with an object and nothing about a design having one. These
@@ -194,9 +192,9 @@ TEST_F(VpiIterateInARun, TheIterationWalksEveryNetTheModuleDeclares) {
   SimFixture f;
   RunAModuleOfTwoNets(f);
 
-  // §38.23: "vpi_iterate() shall be used to traverse one-to-many
-  // relationships", and a module to its nets is one of them. Both of the
-  // module's nets are walked, and each answers to the name the source gave it.
+  // §38.23: vpi_iterate() is the routine for one-to-many relationships, and a
+  // module to its nets is one of them. Both of the module's nets are walked,
+  // and each answers to the name the source gave it.
   EXPECT_EQ(g_nets_seen, 2);
   EXPECT_TRUE(g_first_net_name == "w" || g_second_net_name == "w");
   EXPECT_TRUE(g_first_net_name == "bus" || g_second_net_name == "bus");
@@ -208,7 +206,7 @@ TEST_F(VpiIterateInARun, TheExamplesVectorNetReportsItsSize) {
   SimFixture f;
   RunAModuleOfTwoNets(f);
 
-  // The example displays "the size for vectors", read off each net the
+  // The example displays the size of each vector net, read off each net the
   // iteration handed back. The wider of the two is the eight-bit bus, which is
   // a size only the net object the design built carries -- one made by hand
   // carries whatever the case put in it.

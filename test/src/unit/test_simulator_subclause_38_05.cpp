@@ -109,10 +109,10 @@ TEST_F(VpiFlushSim, WhatAPrintLeftPendingIsWhatTheFlushCommits) {
   EXPECT_EQ(vpi_ctx_.LogFileFlushed(), "count=3\n");
 }
 
-// §38.2: "The error status shall be reset by any VPI routine call except
-// vpi_chk_error()." vpi_flush() takes no arguments, so the one thing it has in
-// common with every other routine of the clause is that call, and a flush after
-// an error leaves no error pending behind it.
+// §38.2: every VPI routine but vpi_chk_error() clears the error status when
+// called. vpi_flush() takes no arguments, so the one thing it has in common
+// with every other routine of the clause is that call, and a flush after an
+// error leaves no error pending behind it.
 TEST_F(VpiFlushSim, AFlushResetsThePendingErrorStatus) {
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;

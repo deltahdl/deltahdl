@@ -122,11 +122,11 @@ TEST_F(VpiPutUserDataSim, ResetClearsUserData) {
   EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), nullptr);
 }
 
-// §38.33's last sentence: "The user-data field can be set up again during or
-// after callbacks of type cbEndOfRestart or cbEndOfReset." A restart clears the
-// field before those callbacks run, so a routine that sets it while one is
-// being delivered leaves it set afterwards rather than having its write dropped
-// by the clear.
+// §38.33's last sentence: the user-data field may be filled in again during or
+// after a cbEndOfRestart or cbEndOfReset callback. A restart clears the field
+// before those callbacks run, so a routine that sets it while one is being
+// delivered leaves it set afterwards rather than having its write dropped by
+// the clear.
 TEST_F(VpiPutUserDataSim, TheFieldCanBeSetUpAgainFromAnEndOfRestartCallback) {
   VpiHandle call = MakeCall(vpiSysTaskCall);
   int before_restart = 0;

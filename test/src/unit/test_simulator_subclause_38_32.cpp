@@ -14,9 +14,10 @@ namespace {
 
 using VpiPutDelaysSim = VpiDelaysSimBase;
 
-// §38.32 shall #1 + the "same order" rule: vpi_put_delays() sets the object's
-// delays from the caller-allocated da array, one source value per delay (mtm
-// and pulsere both off), in the order they occur in the source.
+// §38.32 shall #1 + the rule that the delays keep their source order:
+// vpi_put_delays() sets the object's delays from the caller-allocated da array,
+// one source value per delay (mtm and pulsere both off), in the order they
+// occur in the source.
 TEST_F(VpiPutDelaysSim, SetsDelaysInSourceOrder) {
   VpiHandle prim = MakeDelayObject(
       vpiPrimitive, {VpiDelayInfo{}, VpiDelayInfo{}, VpiDelayInfo{}});
@@ -338,9 +339,9 @@ TEST_F(VpiPutDelaysSim, IntermodulePathAcceptsTwoOrThree) {
 //      vpi_put_delays(path, delay_p);
 //   }
 //
-// It "accepts a module path handle ... and replaces the delays of the indicated
-// path", and every case above hands the routine an object it made itself. A
-// module path a design declared is the object the example is written for.
+// It takes a module path's handle and replaces that path's delays, and every
+// case above hands the routine an object it made itself. A module path a design
+// declared is the object the example is written for.
 // -----------------------------------------------------------------------------
 
 // What the application read back after writing.
@@ -368,9 +369,9 @@ PLI_INT32 SetPathRiseFallDelaysCalltf(PLI_BYTE8*) {
   vpi_put_delays(path, &delay_s);
   g_path_written = true;
 
-  // §38.32: "the same ordering of delays shall be used as described in the
-  // vpi_get_delays() function", so reading the path back is what says the two
-  // routines agree about which delay is which.
+  // §38.32: the delays are ordered as vpi_get_delays() orders them, so reading
+  // the path back is what says the two routines agree about which delay is
+  // which.
   s_vpi_time read_da[2] = {};
   s_vpi_delay read_s = {};
   read_s.da = read_da;

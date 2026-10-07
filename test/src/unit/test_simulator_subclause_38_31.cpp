@@ -142,8 +142,8 @@ TEST_F(VpiPutDataSim, RejectedOutsideSaveCallback) {
 // §38.31 C6 edge: the allowed reasons are specifically the save reasons. A
 // callback IS active here, but it is a restart reason (the reason that makes
 // the companion reader vpi_get_data() legal, §38.9). The writer must still
-// reject it, distinguishing "a save callback is running" from merely "some
-// callback is running". Per C3 the rejection returns zero.
+// reject it, telling a running save callback apart from a running callback of
+// any other reason. Per C3 the rejection returns zero.
 TEST_F(VpiPutDataSim, RejectedInsideNonSaveCallback) {
   const char kPayload[] = {'w', 'x', 'y', 'z'};
   SingleWrite w;
@@ -255,14 +255,13 @@ TEST_F(VpiPutDataSim, MultipleWritesReadBackInDifferentChunkSizes) {
   EXPECT_EQ(0, std::memcmp(r.buf2, "CDEF", 4));
 }
 
-// §38.31 names one more thing an application does from a save routine: "an
-// application can get the path to the implementation's save/restart location by
-// calling vpi_get_str(vpiSaveRestartLocation, NULL) from an application
-// callback routine that has been called for reason cbStartOfSave or
-// cbEndOfSave." That query answered null under every run, and not because the
-// tool had no location to report: vpi_get_str() refused a null handle before
-// reaching any property at all, and this is the one string property drawn on no
-// object.
+// §38.31 names one more thing an application does from a save routine: a
+// callback routine called for cbStartOfSave or cbEndOfSave may ask
+// vpi_get_str(vpiSaveRestartLocation, NULL) for the path to the tool's
+// save/restart location. That query answered null under every run, and not
+// because the tool had no location to report: vpi_get_str() refused a null
+// handle before reaching any property at all, and this is the one string
+// property drawn on no object.
 
 // What the application read.
 std::string g_location_in_save;

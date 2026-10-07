@@ -159,8 +159,8 @@ TEST_F(VpiModuleWideCallback, NestedModuleInstanceIsNotReached) {
   EXPECT_FALSE(Fired(sub_stmt));
 }
 
-// §38.36.1.3: "every statement that can have a callback" is the empty set when
-// a module instance holds no eligible statements. Registration still yields a
+// §38.36.1.3: the statements that can carry a callback are none at all when a
+// module instance holds no eligible statements. Registration still yields a
 // single callback object, but dispatching cbStmt fires nothing - the
 // module-wide record is consumed by the fan-out and never delivers a callback
 // on the module itself.

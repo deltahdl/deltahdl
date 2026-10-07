@@ -136,13 +136,12 @@ TEST_F(VpiMcdOpenSim, ExhaustedChannelsReturnZero) {
   EXPECT_EQ(vpi_mcd_open(overflow), 0u);
 }
 
-// §38.27: "If the MSB of the return value from $fopen is set, then the value is
-// an fd file descriptor, which is not compatible with the mcd descriptor
-// returned by vpi_mcd_open()", and channel 32 - that MSB - "is reserved to
-// represent a file descriptor (fd) returned from the SystemVerilog $fopen
-// system function". So a file $fopen opened in its fd form is not one this
-// routine has open: it opens a channel of its own for it rather than handing
-// back a value its own descriptors are not compatible with.
+// §38.27: a value from $fopen with its MSB set is an fd file descriptor, which
+// does not mix with the mcd descriptors vpi_mcd_open() returns, and channel 32
+// - that MSB - is set aside to mark such an fd. So a file $fopen opened in its
+// fd form is not one this routine has open: it opens a channel of its own for
+// it rather than handing back a value its own descriptors are not compatible
+// with.
 TEST_F(VpiMcdOpenSim, AnFdFromFopenIsNotADescriptorThisRoutineHandsBack) {
   PLI_UINT32 fopen_fd = 0x80000005u;  // the MSB set: an fd, not an mcd
   vpi_ctx_.RegisterFopenMcdFile("opened_as_fd.log", fopen_fd);

@@ -139,9 +139,9 @@ PLI_INT32 PutThroughTheCallCalltf(PLI_BYTE8*) {
 
 // §36.5: a task "does not return any value", so the call it is running under
 // has no return value for a write to land in, and §38.34's list of what
-// vpi_put_value() "can be applied to" names system function calls with no
-// system task call beside them. The write is refused and the error is
-// recorded, which vpi_chk_error() reports to the application that made it.
+// vpi_put_value() may write to names system function calls with no system task
+// call beside them. The write is refused and the error is recorded, which
+// vpi_chk_error() reports to the application that made it.
 //
 // The function form of the same write is asserted in §36.8.1's file, where a
 // design reads back the value a calltf put through its call: a put refused
