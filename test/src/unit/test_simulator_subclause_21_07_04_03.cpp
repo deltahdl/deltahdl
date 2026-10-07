@@ -3,9 +3,12 @@
 #include <string>
 #include <vector>
 
+#include "common/types.h"
 #include "fixture_vcd_dump_from_source.h"
 #include "fixture_vcd_dump_run.h"
 #include "helpers_text_lines.h"
+#include "simulator/variable.h"
+#include "simulator/vcd_writer.h"
 
 namespace delta {
 namespace {
@@ -188,6 +191,33 @@ TEST_F(ExtendedVcdValueChangeSim, PortIdentifierCodeIsMultiDigitInteger) {
       << content;
   // ... and its value change carries that same two-digit integer code.
   EXPECT_NE(content.find("p166 <10"), std::string::npos) << content;
+}
+
+// §21.7.4.3 (port_value, writer side): a port_value is the state of the port,
+// so a port the writer was handed with no variable behind it has no state to
+// report. The $dumpports checkpoint then carries no value change for it, while
+// the port beside it that holds a value is still recorded under its own code.
+TEST_F(ExtendedVcdValueChangeSim, PortWithNoVariableHasNoValueChange) {
+  {
+    VcdWriter vcd(tmp_path_);
+    vcd.SetExtended();
+    vcd.SetExtendedPortNodes();
+    vcd.WriteHeader("1ns");
+    vcd.BeginScope("t");
+    vcd.RegisterSignal("bare", 1, nullptr);
+    auto* held = arena_.Create<Variable>();
+    held->value = MakeLogic4VecVal(arena_, 1, 1);
+    vcd.RegisterSignal("held", 1, held);
+    vcd.EndScope();
+    vcd.EndDefinitions();
+    vcd.DumpAllValues();
+  }
+  auto content = ReadVcd();
+  EXPECT_NE(content.find("$var port 1 <0 bare $end"), std::string::npos)
+      << content;
+  EXPECT_NE(content.find("$dumpports\np166 <1\n$end"), std::string::npos)
+      << content;
+  EXPECT_EQ(content.find(" <0\n"), std::string::npos) << content;
 }
 
 // §21.7.4.3 again, on the two strength components rather than on the p
