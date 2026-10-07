@@ -5,7 +5,7 @@ metadata:
   type: feedback
 ---
 
-# The LRM's text is copyrighted
+# The standard's wording belongs to IEEE
 
 Do not put the LRM's text verbatim in comments. IEEE 1800-2023 is copyrighted, and its sentences do not belong in this repository — not in a source comment, a test comment, a commit message or a memory. Cite the clause by number and state its rule in your own words.
 

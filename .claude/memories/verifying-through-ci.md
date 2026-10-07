@@ -1,6 +1,6 @@
 ---
 name: verifying-through-ci
-description: "Run locally only what cannot be run in CI; everything else, a build or a probe of a defect included, is pushed and read from the run."
+description: "Keep local work to what CI has no way to perform; everything else, a build or a probe of a defect included, is pushed and read from the run."
 metadata:
   node_type: memory
   type: feedback
@@ -10,7 +10,7 @@ metadata:
 
 # Verifying through CI, not locally
 
-The only thing run locally is something that cannot be run in CI. Everything that CI can run is pushed and read from the run.
+Local work is confined to the steps CI has no way to perform. Whatever a CI job is able to do is pushed and read from the run instead.
 
 **Why:** CI runs on GitHub's compute for free, while running locally costs tokens and session time. The run's own jobs already cover a great deal, all in `.github/workflows/deltahdl.yml` and `.github/workflows/scripts.yml`:
 
@@ -32,4 +32,4 @@ What a run does not do yet can still be made to run there: a test written for it
 - "Run the new test to see it pass, or to see it fail first." That is the unit test job.
 - "A pre-push regression script." Rebuilding the unit tests, running every binary, collecting coverage and replaying the e2e sources are the CI jobs under another name.
 
-What cannot be run in CI includes [clang-format-style-flag](clang-format-style-flag.md), which rewrites the files and so is how the committed bytes come to exist. It also includes reading the LRM, which is copyrighted and kept only on this machine, as in [zooming-on-a-formula](zooming-on-a-formula.md).
+One step CI has no way to perform is [clang-format-style-flag](clang-format-style-flag.md), which rewrites the files and so is how the committed bytes come to exist. Another is reading the LRM, which is copyrighted and kept only on this machine, as in [zooming-on-a-formula](zooming-on-a-formula.md).

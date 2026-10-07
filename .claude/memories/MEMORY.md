@@ -32,6 +32,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [Include what you use](include-what-you-use.md) — name the header that declares each symbol used and none that is unused; no umbrella headers, `vpi_user.h` is Annex K.2's one C file, and an include finding fails the job.
 - [Markdown opens with a heading](markdown-top-level-heading.md) — MD041 runs over every Markdown file in the checkout with `--dot`, so the notes are linted too.
 - [Accuracy over fitting a column](prose-length-over-column-fitting.md) — never buy a shorter line with a less accurate word; move the text instead.
+- [The user's words are restated, never copied](user-words-are-never-recorded-verbatim.md) — memories, issues, commits, comments, tasks and feedback drafts carry the user's point in fresh words, never their sentences quoted or copied.
 
 ## The LRM
 
@@ -41,7 +42,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [The 2017 edition](the-2017-edition.md) — `~/IEEE 1800-2017.pdf`, read only to judge an sv-tests tag in its own edition.
 - [No local paths in code or workflows](no-local-paths-in-code-or-workflows.md) — code, tests, scripts and workflows say `IEEE 1800-2023`; the path `~/IEEE 1800-2023.pdf` is written only under .claude/.
 - [A library is not a standard](a-library-is-not-a-standard.md) — a construct the UVM library or sv-tests writes against 1800-2023 is reported, checked in 1800-2023 and 1800.2-2020, never held for a person.
-- [The LRM's text is copyrighted](lrm-text-is-copyrighted.md) — cite the clause number and paraphrase; never quote the standard's sentences verbatim.
+- [The standard's wording belongs to IEEE](lrm-text-is-copyrighted.md) — cite the clause number and paraphrase; never quote the standard's sentences verbatim.
 - [The standard guides structure](lrm-guides-structure.md) — mirror the entities the clause defines when grouping parameters into a struct.
 - [One LRM page per call](reading-the-lrm-one-page-per-call.md) — one `Read` page per tool call, waiting for each; batching blocks every result in the turn.
 - [Never convert the LRM to text](not-converting-the-lrm-to-text.md) — `extract_text()` spends the same budget, and `pdftotext` loses the structure.
@@ -66,7 +67,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 ## Verification
 
-- [Verifying through CI](verifying-through-ci.md) — run locally only what cannot be run in CI; a build, a test binary or a probe of a defect is pushed and read from the run.
+- [Verifying through CI](verifying-through-ci.md) — keep local work to what CI has no way to perform; a build, a test binary or a probe of a defect is pushed and read from the run.
 - [Reading a CI run](reading-a-ci-run.md) — `gh run list --limit 1` before pushing, `gh run view --log-failed` after.
 - [gh run list --commit takes a full SHA](gh-run-list-commit-takes-a-full-sha.md) — pass `$(git rev-parse HEAD)`; a short SHA lists no run, and a watcher waiting on it never ends.
 - [Watching a run in the background](watching-a-run-in-the-background.md) — a background shell or a Monitor, never a foreground `gh run watch`.
