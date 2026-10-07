@@ -7,8 +7,7 @@ using namespace delta;
 
 namespace {
 
-// 18.3: 4-state operators (===, !==) are illegal in a constraint and shall
-// result in an error.
+// 18.3: a constraint that uses a 4-state operator (===, !==) is an error.
 TEST(ConstraintFourState, TripleEqualOperatorRejected) {
   auto r = Parse(
       "class C;\n"

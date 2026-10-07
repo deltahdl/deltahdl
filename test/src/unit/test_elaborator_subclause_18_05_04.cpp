@@ -117,9 +117,9 @@ TEST(UniqueMemberForms, QualifiedMemberReferenceAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.5.4: a member shall be of integral or real type. A string variable is
-// plainly neither, so a group naming one is rejected even though the string
-// does denote a variable.
+// 18.5.4: each member of a uniqueness group has an integral or real type. A
+// string variable is plainly neither, so a group naming one is rejected even
+// though the string does denote a variable.
 TEST(UniqueMemberForms, NonIntegralNonRealMemberRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -136,7 +136,7 @@ TEST(UniqueMemberForms, NonIntegralNonRealMemberRejected) {
                             4, "18.5.4"));
 }
 
-// 18.5.4: no randc variable shall appear in the group, so a group naming a
+// 18.5.4: a uniqueness group admits no randc variable, so a group naming a
 // randc variable beside a rand one is rejected at the randc member.
 TEST(UniqueMemberForms, RandcMemberRejected) {
   ElabFixture f;

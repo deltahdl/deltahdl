@@ -28,7 +28,7 @@ TEST(CaseProductionParsing, SingleDefaultIsLegal) {
   EXPECT_EQ(stmt->kind, StmtKind::kRandsequence);
 }
 
-// 18.17.3: multiple default items in one case production shall be illegal.
+// 18.17.3: a case production with more than one default item is illegal.
 TEST(CaseProductionParsing, MultipleDefaultsAreIllegal) {
   auto r = Parse(
       "module m;\n"

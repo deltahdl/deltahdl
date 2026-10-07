@@ -185,7 +185,8 @@ TEST(RandomVariableTypes, UnpackedStructMemberRandAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.4: members of packed structures shall not have a rand or randc modifier.
+// 18.4: a member of a packed structure takes neither the rand nor the randc
+// modifier.
 // The same member declaration accepted when the structure is unpacked is
 // rejected when it is packed, isolating the rule to the packed shape.
 // What rejects the member is §7.2's restriction of the random qualifiers to
@@ -201,8 +202,8 @@ TEST(RandomVariableTypes, PackedStructMemberRandRejected) {
       "random qualifier is only allowed in unpacked structures", 1, "7.2"));
 }
 
-// 18.4: members of packed untagged unions shall not have a rand or randc
-// modifier.
+// 18.4: a member of a packed untagged union takes neither the rand nor the
+// randc modifier.
 // As above, the clause reported is §7.2, which allows a random qualifier only
 // on a member of an unpacked structure.
 TEST(RandomVariableTypes, PackedUnionMemberRandRejected) {

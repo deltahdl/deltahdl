@@ -46,12 +46,11 @@ void FoldEnumMemberValues(const std::vector<EnumMember>& members,
   }
 }
 
-// 18.3: for an active random variable of enum type, the solver shall select a
-// value only from the set of named constants of that enum, and shall never
-// assign a value that lies outside that set even when the value would cast
-// cleanly to the enumerated type. Resolve the member's enum type to its named
-// constants and record them as the solver domain; a non-enum member is left
-// unrestricted. The enum type may be written inline on the declaration
+// 18.3: the solver draws an active random enum variable's value from that
+// enum's named constants alone, never from values outside them, even ones that
+// would cast cleanly to the enum type. Resolve the member's enum type to its
+// named constants and record them as the solver domain; a non-enum member is
+// left unrestricted. The enum type may be written inline on the declaration
 // (`rand enum {...} x;`) or named through a typedef declared on the class or an
 // ancestor (`rand col_e x;` as in the 18.3 MyBus example's atype), and a
 // package- or module-scope enum typedef is found through the enum registry, so
@@ -435,8 +434,8 @@ static void AddInlineConstraintBlock(const InlineRandomizeCall& call,
   AddConstraintMember(call.inline_block, listed_rands, rc, solver);
 }
 
-// 18.4.2: a randc variable shall not repeat a value until its permutation is
-// exhausted, and that no-repeat property spans successive randomize() calls.
+// 18.4.2: a randc variable repeats no value before its permutation runs out,
+// and that no-repeat property spans successive randomize() calls.
 // Because the solver is rebuilt for every call, hand it a persistent
 // permutation history to advance in place so the cycle continues across calls
 // instead of restarting each time. A nonstatic randc uses this object's own

@@ -55,8 +55,8 @@ TEST(RandModeBuiltin, NonOverridingClassAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.8: a compiler error shall be issued if the variable named in a rand_mode()
-// call does not exist within the object's class hierarchy.
+// 18.8: a rand_mode() call naming a variable that the object's class hierarchy
+// lacks is a compile-time error.
 TEST(RandModeNamedVariable, MissingVariableRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -77,9 +77,9 @@ TEST(RandModeNamedVariable, MissingVariableRejected) {
                             8, "18.8"));
 }
 
-// 18.8: a compiler error shall be issued if the named variable exists but is
-// not declared rand or randc. A plain (non-random) data member cannot be the
-// subject of rand_mode().
+// 18.8: a rand_mode() call naming a variable that exists but is neither rand
+// nor randc is a compile-time error as well. A plain (non-random) data member
+// cannot be the subject of rand_mode().
 TEST(RandModeNamedVariable, NonRandVariableRejected) {
   ElabFixture f;
   EXPECT_FALSE(

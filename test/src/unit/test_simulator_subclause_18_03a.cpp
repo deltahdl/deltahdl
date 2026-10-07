@@ -14,14 +14,14 @@ namespace {
 // rather than a hand-built solver state. 18.4 supplies the rand data-member
 // declarations the rules operate on and 18.6.1 supplies randomize() itself.
 
-// 18.3: for an active random variable of enum type, the solver shall select a
-// value only from the set of named constants of that enum. The named set here
-// is {1, 4, 9}, leaving 0, 2, 3, 5..8, 10..15 as castable-but-unnamed values in
-// the 4-bit declared range. Over many draws every value read back is one of the
-// three named constants -- an unrestricted 4-bit draw would land outside the
-// set on most iterations, so an all-in-set result demonstrates the enum-domain
-// restriction is applied through the real randomize() path (the type is a named
-// typedef declared on the class, matching the 18.3 MyBus atype form).
+// 18.3: the solver draws an active random enum variable's value from that
+// enum's named constants alone. The named set here is {1, 4, 9}, leaving 0, 2,
+// 3, 5..8, 10..15 as castable-but-unnamed values in the 4-bit declared range.
+// Over many draws every value read back is one of the three named constants --
+// an unrestricted 4-bit draw would land outside the set on most iterations, so
+// an all-in-set result demonstrates the enum-domain restriction is applied
+// through the real randomize() path (the type is a named typedef declared on
+// the class, matching the 18.3 MyBus atype form).
 TEST(EnumRandomVariable, SelectsOnlyNamedConstants) {
   const char* src =
       "class Pkt;\n"
@@ -79,9 +79,9 @@ TEST(EnumRandomVariable, RandcEnumSelectsOnlyNamedConstants) {
   EXPECT_EQ(RunAndGet(src, "all_in_set"), 1u);
 }
 
-// 18.3: the set of random values chosen shall satisfy all of the constraints. A
-// single named constraint block bounds x to [400, 410]; every solved value read
-// back over many draws lands inside that range.
+// 18.3: every value the solver chooses obeys every constraint. A single named
+// constraint block bounds x to [400, 410]; every solved value read back over
+// many draws lands inside that range.
 TEST(ConstraintProperties, ChosenValuesSatisfyConstraints) {
   const char* src =
       "class C;\n"
@@ -106,10 +106,10 @@ TEST(ConstraintProperties, ChosenValuesSatisfyConstraints) {
   EXPECT_EQ(RunAndGet(src, "all_ok"), 1u);
 }
 
-// 18.3: the constraint solver shall find a solution whenever one exists, and
-// can fail only when the problem is over-constrained. Two contradictory
-// equalities (x == 5 and x == 6) leave no satisfying value, so randomize()
-// reports failure (returns 0) rather than producing an out-of-constraint value.
+// 18.3: the solver fails only on an over-constrained problem; whenever a
+// solution exists it finds one. Two contradictory equalities (x == 5 and x ==
+// 6) leave no satisfying value, so randomize() reports failure (returns 0)
+// rather than producing an out-of-constraint value.
 TEST(ConstraintProperties, OverConstrainedProblemFails) {
   const char* src =
       "class C;\n"

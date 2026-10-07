@@ -123,9 +123,9 @@ TEST(ConstraintUnique, InlineRandGroupThroughMethodHandleSolves) {
   EXPECT_EQ(RunAndGet(src, "ok"), 1u);
 }
 
-// 18.5.4: all members of the group shall be of equivalent type. A byte and an
-// int differ in width and so are not of equivalent type; the group is illegal
-// and randomization fails.
+// 18.5.4: a uniqueness group's members must all have equivalent types. A byte
+// and an int differ in width and so are not of equivalent type; the group is
+// illegal and randomization fails.
 TEST(ConstraintUnique, InequivalentTypeMembersFail) {
   const char* src =
       "class C;\n"

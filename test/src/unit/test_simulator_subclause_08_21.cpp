@@ -125,7 +125,7 @@ TEST(AbstractClassSimulation, AbstractBaseConstructorRunsViaChaining) {
             7u);
 }
 
-// 8.21: an object of an abstract class shall not be constructed directly.
+// 8.21: an abstract class may not be instantiated directly.
 // Constructing the abstract base with 'new' is a runtime error even though
 // the declaration of the handle elaborates cleanly.
 TEST(AbstractClassSimulation, ConstructAbstractClassDirectlyError) {

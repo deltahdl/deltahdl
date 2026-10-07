@@ -25,7 +25,7 @@ TEST(RealDistRange, DivideOperatorWithWeightAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.5.3: a real-valued range shall not use the := operator (which spreads a
+// 18.5.3: a real-valued range cannot take the := operator (which spreads a
 // weight per element — meaningful only for an integral range), so a := range on
 // a real variable is rejected.
 TEST(RealDistRange, AssignOperatorRejected) {
@@ -45,7 +45,7 @@ TEST(RealDistRange, AssignOperatorRejected) {
                             3, "18.5.3"));
 }
 
-// 18.5.3: a real-valued range shall specify a weight; a bare range (which
+// 18.5.3: a real-valued range needs an explicit weight; a bare range (which
 // defaults to := 1) omits the required weight and is rejected.
 TEST(RealDistRange, MissingWeightRejected) {
   ElabFixture f;
@@ -95,10 +95,10 @@ TEST(RealDistRange, InheritedRealTargetChecked) {
                             5, "18.5.3"));
 }
 
-// 18.5.3: a dist operation shall not be applied to a randc variable. The
-// qualifier and the distribution are both declarations, so the class is
-// rejected as declared, before any randomize() call; the report stands at the
-// distributed variable, on line 3 with the constraint.
+// 18.5.3: a randc variable cannot be the subject of a dist. The qualifier and
+// the distribution are both declarations, so the class is rejected as declared,
+// before any randomize() call; the report stands at the distributed variable,
+// on line 3 with the constraint.
 TEST(DistOnRandc, RandcTargetRejected) {
   ElabFixture f;
   EXPECT_FALSE(

@@ -75,9 +75,9 @@ TEST(StaticConstraint, StaticWithFinalRejected) {
       "18.5.10"));
 }
 
-// 18.5.10: the 'static' keyword shall appear on both a constraint prototype and
-// its completing external block, or on neither. A static prototype with a
-// non-static external block is an error.
+// 18.5.10: a constraint prototype and the external block completing it either
+// both carry 'static' or both omit it. A static prototype with a non-static
+// external block is an error.
 TEST(StaticConstraint, StaticPrototypeNonStaticExternalRejected) {
   ElabFixture f;
   EXPECT_FALSE(

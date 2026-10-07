@@ -240,8 +240,8 @@ TEST(PrePostRandomizeFromSource, PreRandomizeRunsOnRandObjectMember) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.6.2: an overridden pre_randomize()/post_randomize() shall call its
-// associated base-class method to keep the base's processing step; when it does
+// 18.6.2: an override of pre_randomize() or post_randomize() keeps the base's
+// processing step only by calling the base-class method itself; when it does
 // (through super), both the base and the derived processing run. A derived
 // post_randomize() that first calls super.post_randomize() causes the base
 // post_randomize() to leave its marker (base_ran) as well as the derived one

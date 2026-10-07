@@ -73,11 +73,10 @@ TEST(PrePostRandomizeRun, PreRunsBeforeTheValuesAndPostAfterOnTheTree) {
   EXPECT_EQ(out, "1 1 200 2 1 1 1\n");
 }
 
-// 18.6.2: a derived class overriding the methods shall call the base's, or
-// the base's steps are skipped: a Skips not calling super runs its own
-// methods alone, and through a Base handle as well, the methods behaving
-// as virtual under the virtual randomize(); a Chains calling super runs
-// both.
+// 18.6.2: a derived class that overrides the methods has to call the base's, or
+// the base's steps are skipped: a Skips not calling super runs its own methods
+// alone, and through a Base handle as well, the methods behaving as virtual
+// under the virtual randomize(); a Chains calling super runs both.
 TEST(PrePostRandomizeRun, AnOverrideRunsTheBasesStepsThroughSuperAlone) {
   SimFixture f;
   std::string out =

@@ -490,9 +490,8 @@ static void CollectInheritedPureConstraints(
   }
 }
 
-// 18.5.2: a non-abstract class shall provide an implementation for every pure
-// constraint it inherits, and a pure constraint shall not be declared in a
-// non-abstract class.
+// 18.5.2: a class that is not abstract implements every pure constraint it
+// inherits and declares none of its own.
 void ClassConstraintValidator::ValidateNonAbstractPureConstraints(
     const ClassDecl* cls) {
   if (cls->is_virtual) return;
@@ -536,8 +535,8 @@ void ClassConstraintValidator::ValidateConstraintSpecifierParity(
                       cls->name, m->name),
           Subclause("18.5.2"));
     }
-    // 18.5.10: the 'static' keyword shall be applied to both the constraint
-    // prototype and the external constraint block, or to neither.
+    // 18.5.10: a constraint prototype and its external constraint block either
+    // both carry 'static' or both omit it.
     if (m->is_static != ext.is_static) {
       diag_.Error(
           ext.loc,
@@ -549,10 +548,9 @@ void ClassConstraintValidator::ValidateConstraintSpecifierParity(
   }
 }
 
-// 18.5.2: a class that declares a pure constraint shall not also complete a
-// constraint of the same name with an external constraint block, nor declare a
-// same-name non-pure constraint block or constraint prototype in the same class
-// body.
+// 18.5.2: a class declaring a pure constraint may not also give that name to an
+// external constraint block, a non-pure constraint block or a constraint
+// prototype of its own.
 static void ValidatePureConstraintConflicts(const ClassDecl* cls,
                                             const ClassMember* m,
                                             const CompilationUnit* unit,

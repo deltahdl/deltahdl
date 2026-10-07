@@ -328,8 +328,8 @@ TEST(VirtualMethodElaboration, OverrideCovariantReturnTypeOk) {
              "endmodule\n"));
 }
 
-// 8.20: an override shall match the prototype's argument list, so a differing
-// argument count is rejected.
+// 8.20: an override takes the same argument list as its prototype, so a
+// differing argument count is rejected.
 TEST(VirtualMethodElaboration, OverrideMismatchedArgCountError) {
   ElabFixture f;
   ElabOk(

@@ -75,8 +75,8 @@ TEST(SolveBeforeOrdering, RandcVariableInAfterListRejected) {
                             4, "18.5.9"));
 }
 
-// 18.5.9: the ordered variables shall be integral or real. A real rand variable
-// is allowed as an ordering variable.
+// 18.5.9: a variable named in a solve...before ordering is integral or real. A
+// real rand variable is allowed as an ordering variable.
 TEST(SolveBeforeOrdering, RealVariableAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -87,8 +87,8 @@ TEST(SolveBeforeOrdering, RealVariableAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.5.9: the ordered variables shall be integral or real. A rand object handle
-// is neither, so ordering it is an error.
+// 18.5.9: a variable named in a solve...before ordering is integral or real. A
+// rand object handle is neither, so ordering it is an error.
 TEST(SolveBeforeOrdering, ObjectHandleRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -120,7 +120,7 @@ TEST(SolveBeforeOrdering, ArraySizeMethodAcceptedElaborates) {
              "module m; endmodule\n"));
 }
 
-// 18.5.9: there shall be no circular dependency in the ordering. 'solve a
+// 18.5.9: the orderings may not depend on one another in a circle. 'solve a
 // before b' combined with 'solve b before a' forms a cycle and is an error.
 TEST(SolveBeforeOrdering, CircularDependencyRejected) {
   ElabFixture f;

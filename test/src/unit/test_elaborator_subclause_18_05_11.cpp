@@ -128,7 +128,8 @@ TEST(FunctionsInConstraints, ConstraintFunctionCallingRandModeRejected) {
                     5, "18.5.11"));
 }
 
-// 18.5.11: likewise a constraint function shall not call constraint_mode().
+// 18.5.11: likewise a function used in a constraint may not call
+// constraint_mode().
 TEST(FunctionsInConstraints, ConstraintFunctionCallingConstraintModeRejected) {
   ElabFixture f;
   EXPECT_FALSE(

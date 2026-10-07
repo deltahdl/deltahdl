@@ -206,9 +206,8 @@ TEST(CastOperatorElaboration, SizeCastPositiveWidthOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// 6.24.1: the expression inside a signing cast shall be an integral value. A
-// real variable driven through signed'() has no bit representation and is
-// rejected.
+// 6.24.1: a signing cast accepts only an integral expression. A real variable
+// driven through signed'() has no bit representation and is rejected.
 TEST(CastOperatorElaboration, RealVarInSignedCastError) {
   ElabFixture f;
   ElaborateSrc(

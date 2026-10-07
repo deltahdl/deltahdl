@@ -292,8 +292,8 @@ TEST(ConstraintInheritance, PrototypeAndExternalSpecifierMatchAccepted) {
              "endmodule\n"));
 }
 
-// 18.5.2: a class that declares a pure constraint shall not also complete a
-// constraint of the same name through an external constraint block.
+// 18.5.2: a class declaring a pure constraint may not complete a same-name
+// constraint through an external constraint block as well.
 TEST(ConstraintInheritance, PureConstraintWithExternalBlockRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -311,8 +311,8 @@ TEST(ConstraintInheritance, PureConstraintWithExternalBlockRejected) {
                             5, "18.5.2"));
 }
 
-// 18.5.2: a class that declares a pure constraint shall not also declare a
-// same-name constraint block in the same class body.
+// 18.5.2: a class declaring a pure constraint may not add a same-name
+// constraint block to the same class body.
 TEST(ConstraintInheritance, PureConstraintWithSameClassBlockRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -332,8 +332,8 @@ TEST(ConstraintInheritance, PureConstraintWithSameClassBlockRejected) {
                             4, "18.5.2"));
 }
 
-// 18.5.2: a class that declares a pure constraint shall not also declare a
-// same-name constraint prototype in the same class body.
+// 18.5.2: a class declaring a pure constraint may not add a same-name
+// constraint prototype to the same class body.
 TEST(ConstraintInheritance, PureConstraintWithSameClassPrototypeRejected) {
   ElabFixture f;
   EXPECT_FALSE(

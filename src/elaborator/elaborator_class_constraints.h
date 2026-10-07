@@ -29,7 +29,7 @@ class ClassConstraintValidator {
   void ValidateRandomVariableTypes();
   void ValidateOneClassRandomVariables(const ClassDecl* cls);
 
-  // 18.5: constraint block names shall be unique within a class.
+  // 18.5: no two constraint blocks of one class may share a name.
   void ValidateConstraintBlockNames();
   void ValidateOneClassConstraintNames(const ClassDecl* cls);
 
@@ -38,13 +38,13 @@ class ClassConstraintValidator {
   void ValidateForeachConstraintDims();
   void ValidateOneClassForeachConstraintDims(const ClassDecl* cls);
 
-  // 18.5.3: a real-valued range in a distribution shall use the :/ operator and
-  // shall specify a weight.
+  // 18.5.3: a real-valued range in a distribution needs an explicit weight,
+  // given with the :/ operator.
   void ValidateDistConstraints();
   void ValidateOneClassDistConstraints(const ClassDecl* cls);
 
-  // 18.5.4: the range_list of a uniqueness constraint shall contain only
-  // expressions that denote singular or array variables.
+  // 18.5.4: each expression in a uniqueness constraint's range_list denotes a
+  // singular or array variable.
   void ValidateUniqueConstraints();
   void ValidateOneClassUniqueConstraints(const ClassDecl* cls);
 
@@ -58,8 +58,8 @@ class ClassConstraintValidator {
   void ValidateSoftConstraintVariables();
   void ValidateOneClassSoftConstraintVariables(const ClassDecl* cls);
 
-  // 18.5.11: a function called from a constraint expression shall not have
-  // output, inout, or non-const ref arguments (const ref is allowed).
+  // 18.5.11: a function called from a constraint expression takes only input
+  // and const ref arguments.
   void ValidateConstraintFunctionArgs();
   void ValidateOneClassConstraintFunctionArgs(const ClassDecl* cls);
 

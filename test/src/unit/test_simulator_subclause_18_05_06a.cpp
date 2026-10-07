@@ -23,10 +23,10 @@ namespace {
 // Pins are written as inequality bounds so the selected value is deterministic:
 // a bit variable bounded ">= 1" is fixed to 1, and "<= 0" fixes it to 0.
 
-// 18.5.6: when the if condition is true, every constraint in the then set shall
-// be satisfied and the else set imposes nothing. With mode bounded to 1 the
-// condition (mode == 1) holds, so data must obey the then branch (data > 10)
-// rather than the else branch (data < 5).
+// 18.5.6: a true if condition binds the solver to every constraint of the then
+// set and to nothing of the else set. With mode bounded to 1 the condition
+// (mode == 1) holds, so data must obey the then branch (data > 10) rather than
+// the else branch (data < 5).
 TEST(ConstraintIfElse, ThenBranchAppliedWhenConditionTrue) {
   const char* src =
       "class C;\n"
@@ -285,11 +285,11 @@ TEST(ConstraintIfElse, UnsatisfiableThenSetUnderForcedConditionFails) {
   EXPECT_EQ(RunAndGet(src, "ok"), 0u);
 }
 
-// 18.5.6: symmetrically, when the condition is forced false the else set shall
-// be satisfied, so an unsatisfiable else set makes randomize() fail. mode is
-// bounded to 0 (condition false), and the else set (data > 100) is impossible
-// for a 4-bit variable; the condition cannot be made true to escape it, so no
-// assignment obeys the constraint.
+// 18.5.6: symmetrically, a condition forced false binds the solver to the else
+// set, so an unsatisfiable else set makes randomize() fail. mode is bounded to
+// 0 (condition false), and the else set (data > 100) is impossible for a 4-bit
+// variable; the condition cannot be made true to escape it, so no assignment
+// obeys the constraint.
 TEST(ConstraintIfElse, UnsatisfiableElseSetUnderForcedConditionFails) {
   const char* src =
       "class C;\n"

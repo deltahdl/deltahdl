@@ -92,10 +92,10 @@ TEST(ConstraintSoft, ConflictingSoftDiscardedAndTreatedAsTrue) {
   EXPECT_NE(RunAndGet(src, "rx"), 50u);
 }
 
-// 18.5.13: hard constraints differ from soft ones in that the solver shall
-// always satisfy them; when they cannot all hold, randomize() fails outright
-// rather than relaxing any of them. The two mutually exclusive hard equalities
-// x == 10 and x == 20 can never both hold, so randomize() returns 0.
+// 18.5.13: unlike a soft constraint, a hard one is never relaxed by the solver;
+// when they cannot all hold, randomize() fails outright rather than relaxing
+// any of them. The two mutually exclusive hard equalities x == 10 and x == 20
+// can never both hold, so randomize() returns 0.
 TEST(ConstraintSoft, UnsatisfiableHardConstraintsFailSolve) {
   const char* src =
       "class C;\n"

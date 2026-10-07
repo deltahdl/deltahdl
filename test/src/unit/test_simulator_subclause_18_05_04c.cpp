@@ -36,9 +36,9 @@ ConstraintSolver UniqueSolver(RandQualifier b_qualifier) {
   return solver;
 }
 
-// 18.5.4: no randc variable shall appear in the group, so a group naming one
-// is illegal and the solve fails; the same group with b rand solves, with a
-// and b distinct.
+// 18.5.4: a uniqueness group admits no randc variable, so a group naming one is
+// illegal and the solve fails; the same group with b rand solves, with a and b
+// distinct.
 TEST(ConstraintUniqueSolver, RandcMemberFailsTheSolve) {
   ConstraintSolver with_randc = UniqueSolver(RandQualifier::kRandc);
   EXPECT_FALSE(with_randc.Solve());

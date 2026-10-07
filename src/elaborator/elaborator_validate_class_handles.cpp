@@ -297,12 +297,12 @@ static const Expr* MatchNamedConstraintModePrefix(const Stmt* s) {
   return prefix;
 }
 
-// 18.9: the constraint named in a constraint_mode() call shall be a constraint
-// block that exists in the object's class hierarchy; naming one that does not
-// exist is a compile-time error. This applies only to the named form
-// obj.constraint_id.constraint_mode(...). The check resolves the object handle
-// to its class type; when the type cannot be resolved it stays silent, so the
-// error is reported only when the absence of the block is certain.
+// 18.9: a constraint_mode() call names a constraint block declared in the
+// object's class hierarchy, and naming any other is a compile-time error. This
+// applies only to the named form obj.constraint_id.constraint_mode(...). The
+// check resolves the object handle to its class type; when the type cannot be
+// resolved it stays silent, so the error is reported only when the absence of
+// the block is certain.
 static void CheckNamedConstraintModeExists(
     const Stmt* s,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
@@ -375,14 +375,13 @@ static const Expr* MatchNamedRandModePrefix(const Stmt* s) {
   return prefix;
 }
 
-// 18.8: a compiler error shall be issued if the variable named in a rand_mode()
-// call does not exist within the object's class hierarchy, or exists but is not
-// declared rand or randc. This applies to the named form
-// obj.random_variable.rand_mode(...); the no-name form (which applies to every
-// random variable) names nothing to validate. The check resolves the object
-// handle to its class type and stays silent when that type is unknown, so the
-// error is reported only when the variable's absence (or non-random status) is
-// certain.
+// 18.8: a rand_mode() call is a compile-time error when the variable it names
+// is missing from the object's class hierarchy, or is there but neither rand
+// nor randc. This applies to the named form obj.random_variable.rand_mode(...);
+// the no-name form (which applies to every random variable) names nothing to
+// validate. The check resolves the object handle to its class type and stays
+// silent when that type is unknown, so the error is reported only when the
+// variable's absence (or non-random status) is certain.
 static void CheckNamedRandModeVariableExists(
     const Stmt* s,
     const std::unordered_map<std::string_view, std::string_view>& var_types,

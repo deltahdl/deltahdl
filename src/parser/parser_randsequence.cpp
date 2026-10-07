@@ -123,8 +123,8 @@ void Parser::ParseRsProdCase(RsProd& prod) {
   prod.case_expr = ParseExpr();
   Expect(TokenKind::kRParen, Subclause("18.17.3"));
   bool seen_default = false;
-  // 18.17.3: a case production statement shall contain at most one default
-  // item; flag any additional default as illegal.
+  // 18.17.3: a case production statement holds one default item at most; flag
+  // any additional default as illegal.
   while (!Check(TokenKind::kKwEndcase) && !AtEnd()) {
     auto item_loc = CurrentLoc();
     bool is_default_here = Check(TokenKind::kKwDefault);

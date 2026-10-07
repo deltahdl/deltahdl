@@ -16,9 +16,9 @@
 
 namespace delta {
 
-// 18.4: a real variable shall not be declared randc. The randc cyclic
-// semantics are defined only over an integral declared range, so a real
-// property may carry rand but never randc.
+// 18.4: a real variable may be rand, never randc. The randc cyclic semantics
+// are defined only over an integral declared range, so a real property may
+// carry rand but never randc.
 static bool IsRealDataType(DataTypeKind kind) {
   return kind == DataTypeKind::kReal || kind == DataTypeKind::kShortreal ||
          kind == DataTypeKind::kRealtime;
@@ -129,7 +129,7 @@ void ClassConstraintValidator::ValidateRandomVariableTypes() {
     ValidateOneClassRandomVariables(cls);
 }
 
-// 18.5: constraint block names shall be unique within a class.
+// 18.5: no two constraint blocks of one class may share a name.
 void ClassConstraintValidator::ValidateOneClassConstraintNames(
     const ClassDecl* cls) {
   std::unordered_set<std::string_view> seen;

@@ -54,8 +54,7 @@ TEST(ForeachIterativeConstraint, TrailingCommasOmittedAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5.7.1: it shall be an error for any loop variable to have the same
-// identifier as the array it iterates over.
+// 18.5.7.1: a loop variable named the same as the array it walks is an error.
 TEST(ForeachIterativeConstraint, LoopVariableNameClashRejected) {
   auto r = Parse(
       "class C;\n"
@@ -108,11 +107,11 @@ TEST(ForeachIterativeConstraint, PredicatedForeachAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5.7.1: it shall be an error to include a function call as an implicit
-// variable declaration in the foreach argument (see 13.4.1). The argument must
-// be a plain array identifier; a call standing in its place — 'f()[i]' rather
-// than 'arr[i]' — cannot serve as the implicit loop-variable declaration the
-// header introduces, and is rejected.
+// 18.5.7.1: a function call cannot stand in the foreach argument as an implicit
+// variable declaration (see 13.4.1); doing so is an error. The argument must be
+// a plain array identifier; a call standing in its place — 'f()[i]' rather than
+// 'arr[i]' — cannot serve as the implicit loop-variable declaration the header
+// introduces, and is rejected.
 TEST(ForeachIterativeConstraint, FunctionCallArrayIdentifierRejected) {
   auto r = Parse(
       "class C;\n"

@@ -7,7 +7,7 @@ using namespace delta;
 
 namespace {
 
-// 18.5: constraint block names shall be unique within a class.
+// 18.5: no two constraint blocks of one class may share a name.
 TEST(ConstraintBlockNames, DuplicateNameRejected) {
   ElabFixture f;
   EXPECT_FALSE(

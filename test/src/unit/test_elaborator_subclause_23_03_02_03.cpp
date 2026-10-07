@@ -220,11 +220,11 @@ TEST(ImplicitNamedPortConnectionElaboration,
   EXPECT_NE(bindings[0].connection, nullptr);
 }
 
-// 23.3.2.3: the name of an implicit .name connection shall be declared in the
-// instantiating scope, and an interface instance is one such declaration for
-// an interface port (§25.3.2). This is the control for that acceptance: with
-// no instance and no signal of the name `iface` in top -- the only `iface`
-// being the port of `sub` -- the connection is still reported, on line 7.
+// 23.3.2.3: an implicit .name connection needs its name declared in the
+// instantiating scope, and an interface instance is one such declaration for an
+// interface port (§25.3.2). This is the control for that acceptance: with no
+// instance and no signal of the name `iface` in top -- the only `iface` being
+// the port of `sub` -- the connection is still reported, on line 7.
 TEST(ImplicitNamedPortConnectionElaboration,
      ErrorWhenInterfaceInstanceNotDeclared) {
   ElabFixture f;

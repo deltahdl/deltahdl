@@ -353,9 +353,9 @@ struct RandVariable {
   // it sees a fixed operand rather than a random one.
   int64_t value = 0;
 
-  // 18.3: for an active random variable of enum type, the solver shall select
-  // a value only from the set of named constants of that enum. When non-empty,
-  // enum_values is that named-constant set and confines the chosen value.
+  // 18.3: the solver draws an active random enum variable's value from that
+  // enum's named constants alone. When non-empty, enum_values is that
+  // named-constant set and confines the chosen value.
   std::vector<int64_t> enum_values;
 
   // 18.4: an enum member of a packed structure or packed untagged union that
@@ -554,14 +554,14 @@ class ConstraintSolver {
   // qualifier).
   bool DistLacksRandVariable() const;
 
-  // 18.5.4: no randc variable shall appear in the group of a uniqueness
-  // constraint. True if any enabled unique constraint names a variable that is
-  // declared randc, in which case randomization fails outright.
+  // 18.5.4: a uniqueness constraint's group admits no randc variable. True if
+  // any enabled unique constraint names a variable that is declared randc, in
+  // which case randomization fails outright.
   bool HasRandcInUnique() const;
 
-  // 18.5.4: all members of a uniqueness constraint group shall be of equivalent
-  // type. The solver characterizes a member's type by whether it is real and by
-  // its bit width, so members that disagree on either are not of equivalent
+  // 18.5.4: a uniqueness constraint group's members must all have equivalent
+  // types. The solver characterizes a member's type by whether it is real and
+  // by its bit width, so members that disagree on either are not of equivalent
   // type. True if any enabled unique constraint mixes such members, which is an
   // illegal group and makes randomization fail.
   bool UniqueMembersNotEquivalentType() const;

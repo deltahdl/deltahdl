@@ -67,12 +67,12 @@ TEST(ScopeRandomizeRuntime, BareCallInsideFunctionUsesCurrentScope) {
   EXPECT_EQ(RunAndGet(src, "okv"), 1u);
 }
 
-// 18.12: called with no argument, the scope randomize shall not change the
-// value of any variable but instead check its constraints. With no with
-// constraint block there is no constraint expression that can evaluate to
-// false, so it takes the "otherwise" branch and returns 1 -- and it leaves the
-// pre-existing value of the scope variable exactly as it was, confirming the
-// no-argument form is a checker rather than a generator.
+// 18.12: with no argument, scope randomize leaves every variable's value alone
+// and only checks its constraints. With no with constraint block there is no
+// constraint expression that can evaluate to false, so it takes the "otherwise"
+// branch and returns 1 -- and it leaves the pre-existing value of the scope
+// variable exactly as it was, confirming the no-argument form is a checker
+// rather than a generator.
 TEST(ScopeRandomizeRuntime, NoArgumentCheckerReturnsOneAndChangesNothing) {
   const char* src =
       "module stim;\n"

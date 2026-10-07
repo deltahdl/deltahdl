@@ -50,8 +50,8 @@ TEST(ConstraintDistParsing, DefaultWithDivideWeightAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5.3: the default specification shall always use the :/ operator; using the
-// := operator is an error.
+// 18.5.3: a distribution's default specification takes the :/ operator only, so
+// writing := there is an error.
 TEST(ConstraintDistParsing, DefaultWithAssignWeightRejected) {
   auto r = Parse(
       "class C;\n"
@@ -63,8 +63,7 @@ TEST(ConstraintDistParsing, DefaultWithAssignWeightRejected) {
       3, "18.5.3"));
 }
 
-// 18.5.3: it shall be an error if the :/ operator is omitted from a default
-// specification.
+// 18.5.3: a default specification written without its :/ operator is an error.
 TEST(ConstraintDistParsing, DefaultWithoutWeightOperatorRejected) {
   auto r = Parse(
       "class C;\n"
@@ -76,7 +75,7 @@ TEST(ConstraintDistParsing, DefaultWithoutWeightOperatorRejected) {
       3, "18.5.3"));
 }
 
-// 18.5.3: there shall be at most one default specification in a distribution.
+// 18.5.3: a distribution may hold one default specification, never two.
 TEST(ConstraintDistParsing, MultipleDefaultsRejected) {
   auto r = Parse(
       "class C;\n"

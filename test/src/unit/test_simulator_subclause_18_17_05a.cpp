@@ -212,7 +212,7 @@ TEST(RandsequenceSim, RandJoinDefaultWeightIsHalf) {
   EXPECT_LT(diff, 40);
 }
 
-// 18.17.5: the weight shall be a real number in [0.0, 1.0]. A value below the
+// 18.17.5: the weight lies between 0.0 and 1.0 inclusive. A value below the
 // range is clamped to 0.0, so it produces the same bias as an explicit 0.0
 // rather than an ever stronger preference for the short sequence.
 TEST(RandsequenceSim, RandJoinWeightClampedToRange) {
@@ -260,7 +260,7 @@ TEST(RandsequenceSim, RandJoinWeightClampedToRange) {
   EXPECT_LT(diff, 50);
 }
 
-// 18.17.5: the weight shall be a real number in [0.0, 1.0]. A value above the
+// 18.17.5: the weight lies between 0.0 and 1.0 inclusive. A value above the
 // range is clamped to 1.0, so it produces the same long-sequence preference as
 // an explicit 1.0 instead of a runaway exaggeration of it. Lengths 2 and 3 keep
 // the clamped bias well clear of zero so the clamp is observable: without it a
@@ -384,13 +384,13 @@ TEST(RandsequenceSim, RandJoinInterleavesToDepthOne) {
   EXPECT_GT(mid, 0u);
 }
 
-// 18.17.5: the weight shall be a real number in [0.0, 1.0]. The expression is
-// not restricted to a literal; it may be any real-valued constant form of
-// 11.2.1. Here it is a real `parameter`, resolved through the parameter-lookup
-// path in expression evaluation rather than a literal, and applied as the
-// length bias all the same. With the parameter valued 0.0 the short operand is
-// favored, so its single production leads on most runs, pinning the parameter
-// value as the applied weight.
+// 18.17.5: the weight lies between 0.0 and 1.0 inclusive. The expression is not
+// restricted to a literal; it may be any real-valued constant form of 11.2.1.
+// Here it is a real `parameter`, resolved through the parameter-lookup path in
+// expression evaluation rather than a literal, and applied as the length bias
+// all the same. With the parameter valued 0.0 the short operand is favored, so
+// its single production leads on most runs, pinning the parameter value as the
+// applied weight.
 TEST(RandsequenceSim, RandJoinWeightFromParameter) {
   uint64_t af0 = RunAndRead(
       "module t;\n"

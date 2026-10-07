@@ -126,10 +126,10 @@ void SeedInactiveVariables(
 
 namespace {
 
-// 18.4.2: the cyclic (randc) variables shall be solved before the noncyclical
-// rand variables. Draw every still-uncommitted active randc value here so the
-// rand variables that follow are solved with the cyclic values already fixed
-// for this attempt.
+// 18.4.2: the solver settles the cyclic (randc) variables first and the other
+// rand variables after them. Draw every still-uncommitted active randc value
+// here so the rand variables that follow are solved with the cyclic values
+// already fixed for this attempt.
 void DrawRandcVariables(
     std::unordered_map<std::string, RandVariable>& variables,
     std::unordered_map<std::string, int64_t>& values,
@@ -297,7 +297,7 @@ bool ConstraintSolver::SolveWith(
   // of the priority resolution among the soft constraints that remain.
   ComputeDisabledSoft(inline_constraints);
 
-  // 18.5.13: hard constraints shall always be satisfied or randomization fails.
+  // 18.5.13: randomization fails unless every hard constraint holds.
   // First try to satisfy them together with the full soft set. With no soft
   // constraint discarded this is the original 18.5.13 path, kept intact for the
   // common case where every soft constraint can be honored.

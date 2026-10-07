@@ -11,8 +11,8 @@ using namespace delta;
 
 namespace {
 
-// 18.5.1: the explicit prototype form ('extern constraint name;') shall have a
-// corresponding external constraint block; absent one it is an error.
+// 18.5.1: the explicit prototype form ('extern constraint name;') needs an
+// external constraint block to complete it, and is an error without one.
 TEST(ExternalConstraintBlocks, ExplicitPrototypeWithoutBlockRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -70,9 +70,9 @@ TEST(ExternalConstraintBlocks, BlockBeforeClassRejected) {
                             1, "18.5.1"));
 }
 
-// 18.5.1: the block shall follow its class in the scope that declares both,
-// a package included, so a block placed ahead of its class inside a package is
-// an error there too.
+// 18.5.1: the block comes after its class in the scope that declares both, a
+// package included, so a block placed ahead of its class inside a package is an
+// error there too.
 TEST(ExternalConstraintBlocks, BlockBeforeClassInPackageRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -92,8 +92,8 @@ TEST(ExternalConstraintBlocks, BlockBeforeClassInPackageRejected) {
                             2, "18.5.1"));
 }
 
-// 18.5.1: the block shall appear in the scope of its class declaration, so a
-// block naming a class that its scope never declares is an error.
+// 18.5.1: the block belongs to the scope that declares its class, so a block
+// naming a class that its scope never declares is an error.
 TEST(ExternalConstraintBlocks, BlockForUndeclaredClassRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -130,7 +130,7 @@ TEST(ExternalConstraintBlocks, BlockForOtherPackagesClassRejected) {
                             8, "18.5.1"));
 }
 
-// 18.5.1: inside a module the block shall follow its class there too.
+// 18.5.1: inside a module the block likewise comes after its class.
 TEST(ExternalConstraintBlocks, BlockBeforeClassInModuleRejected) {
   ElabFixture f;
   EXPECT_FALSE(

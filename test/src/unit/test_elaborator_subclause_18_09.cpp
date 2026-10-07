@@ -60,8 +60,8 @@ TEST(ConstraintModeBuiltin, NonOverridingClassAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.9: the constraint named in a constraint_mode() call shall exist in the
-// object's class hierarchy. Naming a constraint block that does not exist is a
+// 18.9: a constraint_mode() call names a constraint that the object's class
+// hierarchy declares. Naming a constraint block that does not exist is a
 // compile-time error.
 TEST(ConstraintModeNamedBlock, MissingConstraintRejected) {
   ElabFixture f;

@@ -401,8 +401,8 @@ bool UniqueGroupHasInequivalentTypes(
 
 }  // namespace
 
-// 18.5.4: no randc variable shall appear in the group of a uniqueness
-// constraint. Scan every enabled unique constraint and report a randc member.
+// 18.5.4: a uniqueness constraint's group admits no randc variable. Scan every
+// enabled unique constraint and report a randc member.
 bool ConstraintSolver::HasRandcInUnique() const {
   for (const auto& block : blocks_) {
     if (!block.enabled) continue;
@@ -414,11 +414,11 @@ bool ConstraintSolver::HasRandcInUnique() const {
   return false;
 }
 
-// 18.5.4: all members of a uniqueness constraint group shall be of equivalent
-// type. Compare the known members of each enabled unique constraint against the
-// first known member: a difference in real-ness or bit width means the group
-// mixes inequivalent types. Members the solver does not know are left out of
-// the comparison, mirroring the lenient treatment elsewhere in the solver.
+// 18.5.4: a uniqueness constraint group's members must all have equivalent
+// types. Compare the known members of each enabled unique constraint against
+// the first known member: a difference in real-ness or bit width means the
+// group mixes inequivalent types. Members the solver does not know are left out
+// of the comparison, mirroring the lenient treatment elsewhere in the solver.
 bool ConstraintSolver::UniqueMembersNotEquivalentType() const {
   for (const auto& block : blocks_) {
     if (!block.enabled) continue;
