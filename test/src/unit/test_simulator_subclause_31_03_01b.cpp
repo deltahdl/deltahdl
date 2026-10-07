@@ -339,9 +339,9 @@ TEST(DesignTimingCheckEvaluation,
 
 // §31.3.1 with the check's two events in one time step: `d` rises at time 52
 // and `clk` rises at time 52, against a limit of 29, and nothing is reported.
-// "(end of time window) = (timecheck time)", "The end points of the time window
-// are not part of the violation region", and Table 31-1 makes the data_event
-// the timestamp event, so a data transition standing on the reference edge is
+// "(end of time window) = (timecheck time)", the window's end points lie
+// outside the violation region, and Table 31-1 makes the data_event the
+// timestamp event, so a data transition standing on the reference edge is
 // outside the window. §31.3.2 includes the end point its window opens on and
 // §31.3.1 excludes both of its own, which is why this stimulus shape is a
 // violation for the two $hold cases above and is none here.

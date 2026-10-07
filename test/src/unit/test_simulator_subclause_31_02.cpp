@@ -168,8 +168,8 @@ TEST(RegisteredDesignTimingChecks,
   EXPECT_FALSE(second->data_signal.empty());
 }
 
-// §31.2: "timing check limit values are constant expressions that can include
-// specparams". The specparam is declared inside the specify block, which is
+// §31.2: a timing check's limit is a constant expression and may use
+// specparams. The specparam is declared inside the specify block, which is
 // where Syntax 30-1 puts a specparam_declaration beside the system_timing_check
 // that reads it, and which RegisterSpecparams binds under the instance prefix
 // before any other pass of RegisterSpecifyBlocks runs. §6.20.5 admits the
@@ -323,11 +323,11 @@ TEST(RegisteredDesignTimingChecks, BitSelectReferenceFollowsItsBit) {
             "1\n");
 }
 
-// §31.2 (printed page 897): "Every timing check can include an optional
-// notifier that toggles whenever the timing check detects a violation", and
-// nothing in Clause 31 makes two checks on the same signals one. Three $setup
-// checks differing only in their notifier each toggle theirs; the checks were
-// merged into the last, whose notifier alone moved.
+// §31.2 (printed page 897): any timing check may carry a notifier, which
+// toggles each time that check finds a violation, and nothing in Clause 31
+// makes two checks on the same signals one. Three $setup checks differing only
+// in their notifier each toggle theirs; the checks were merged into the last,
+// whose notifier alone moved.
 TEST(RegisteredDesignTimingChecks, ChecksOnTheSameSignalsAreEachEvaluated) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top(output reg clk = 0, output reg d = 0);\n"

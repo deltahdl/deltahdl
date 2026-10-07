@@ -48,13 +48,11 @@
 //
 // The last two cases share a second design, and in both of them the reference
 // event and the data event fall at one simulation time. §31.3.6 states the
-// verdict for that outright: "The $recrem check shall report a timing violation
-// when the reference and data events occur simultaneously". Nothing tested that
-// sentence before, and the two cases pin it from both of the orders the clause
-// says the verdict must not depend on: "when both the removal limit and the
-// recovery limit are positive, either the reference event or the data event can
-// be the timecheck event. It shall depend upon which occurs first in the
-// simulation".
+// verdict for that outright: $recrem reports a violation when its reference and
+// data events fall at the same time. Nothing tested that sentence before, and
+// the two cases pin it from both of the orders the clause says the verdict must
+// not depend on: with both limits positive, either event may be the timecheck
+// event, whichever the simulation meets first.
 //
 // Neither case is regression coverage for issue #3415, and neither would have
 // failed under the driver that issue names. A $recrem is evaluated at whichever
@@ -221,11 +219,11 @@ TEST(DrivenTimingCheckEvaluation, RecremSatisfiedInARunReportsNothing) {
   EXPECT_EQ(FindDiag(f, "$recrem violation: data signal"), nullptr);
 }
 
-// §31.3.6: "The $recrem check shall report a timing violation when the
-// reference and data events occur simultaneously." The reference event and the
-// data event both stand at time 466, the reference signal `clr` being assigned
-// first, and the two limits are the 45 and the 27 the clause requires to be
-// positive for the sentence to apply.
+// §31.3.6: $recrem reports a violation when its reference and data events fall
+// at the same time. The reference event and the data event both stand at time
+// 466, the reference signal `clr` being assigned first, and the two limits are
+// the 45 and the 27 the clause requires to be positive for the sentence to
+// apply.
 TEST(DrivenTimingCheckEvaluation,
      RecremSimultaneousEventsWithReferenceAssignedFirstAreReported) {
   SimFixture f;

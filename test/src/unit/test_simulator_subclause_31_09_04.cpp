@@ -651,10 +651,10 @@ TEST(NegativeTimingCheckOptionFromSource,
 // value written as a specparam elaborates cleanly and is gated as usual, which
 // is the contrast this test pins down.
 //
-// The rejection enforces §31.2 -- "timing check limit values are constant
-// expressions that can include specparams" -- so the report names §31.2 and
-// not §31.9.4, and it stands on the $setuphold line rather than on the
-// parameter declaration.
+// The rejection enforces §31.2 -- a timing check's limit is a constant
+// expression and may use specparams -- so the report names §31.2 and not
+// §31.9.4, and it stands on the $setuphold line rather than on the parameter
+// declaration.
 TEST(NegativeTimingCheckOptionFromSource, NonSpecparamNegativeLimitIsRejected) {
   SimFixture f;
   auto from_parameter = ElaborateTimingCheck(
@@ -717,11 +717,11 @@ TEST(NegativeTimingCheckOptionFromSource, AllChecksOffSuppressesPositiveCheck) {
 }
 
 // §31.9.4 (printed page 923): without the option that enables negative timing
-// checks "the delayed reference and data signals become copies of the original
-// reference and data signals". dclk and dd, named by the check and declared
-// nowhere else, follow clk and d: `@(posedge dclk)` fires when clk rises at 20
-// and dd reads the 1 d took at 10. They were never created -- dd was an
-// unresolved identifier or read 0, and dclk's edge never came.
+// checks the delayed reference and data signals simply copy the originals. dclk
+// and dd, named by the check and declared nowhere else, follow clk and d:
+// `@(posedge dclk)` fires when clk rises at 20 and dd reads the 1 d took at 10.
+// They were never created -- dd was an unresolved identifier or read 0, and
+// dclk's edge never came.
 TEST(DelayedSignalCopies, UndeclaredDelayedSignalsCopyTheirOriginals) {
   SimFixture f;
   EXPECT_EQ(
@@ -764,10 +764,10 @@ TEST(DelayedSignalCopies, VectorAndDeclaredDelayedSignalsCopyWhole) {
       "1010 1\n");
 }
 
-// §31.9.1 Example 3: "If a given signal has a delayed signal in some timing
-// checks but not in others, the delayed signal shall be used in both cases",
-// one delayed signal per original, so del_CLK named by one of two checks on
-// CLK is created once and follows CLK.
+// §31.9.1 Example 3: a signal delayed in some of its timing checks and not in
+// others is used in its delayed form in all of them, one delayed signal per
+// original, so del_CLK named by one of two checks on CLK is created once and
+// follows CLK.
 TEST(DelayedSignalCopies, DelayedSignalNamedByOneOfTwoChecksIsShared) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top(\n"

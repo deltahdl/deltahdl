@@ -7,12 +7,12 @@ using namespace delta;
 
 namespace {
 
-// §31.2: "Like expressions for module path delays, timing check limit values
-// are constant expressions that can include specparams." The following tests
-// drive real $setup source through parse + elaborate and observe the
-// elaborator's constant-operand rule accepting the permitted limit forms and
-// rejecting a non-constant one. The dependency machinery (§30.4.2 terminals,
-// §30.5 specparam-constant delay expressions) supplies the terminals and the
+// §31.2: a timing check's limit, like a module path delay, is a constant
+// expression and may use specparams. The following tests drive real $setup
+// source through parse + elaborate and observe the elaborator's
+// constant-operand rule accepting the permitted limit forms and rejecting a
+// non-constant one. The dependency machinery (§30.4.2 terminals, §30.5
+// specparam-constant delay expressions) supplies the terminals and the
 // specparam declarations the limit is built from.
 
 // A literal is a constant expression, so it is a valid limit.
@@ -29,8 +29,8 @@ TEST(TimingCheckLimitConstness, LiteralLimitElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The "can include specparams" clause: a specparam declared in the same
-// specify block is an accepted limit operand.
+// The specparam half of that rule: a specparam declared in the same specify
+// block is an accepted limit operand.
 TEST(TimingCheckLimitConstness, SpecparamLimitElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

@@ -11,9 +11,9 @@
 // it: every case there drives a design whose timing check names a vector and
 // reads §31.8's answer back off what the run reported.
 //
-// TimingCheckVectorMode::kPerBit is the option §31.8 says "simulators may
-// provide" and deltahdl does not, so the counts below state what that option
-// would create rather than what any registered check does.
+// TimingCheckVectorMode::kPerBit is the option §31.8 lets a simulator offer and
+// deltahdl does not, so the counts below state what that option would create
+// rather than what any registered check does.
 
 #include <gtest/gtest.h>
 
@@ -120,10 +120,9 @@ TEST(VectorSignalsInTimingChecks, ScalarInvocationsYieldOneCheckInBothModes) {
 // the runtime treats that as a single transition of the vector -- one event fed
 // to the $setup machinery -- so the check reports exactly one violation rather
 // than one per changed bit. This drives the real §31.3.1 setup-violation path
-// (CheckSetupViolation) that the "shall still only report a single timing
-// violation" statement governs, using the LRM's own numbers: DAT transitions at
-// time 100, CLK at 105, limit 10, so the data change lands strictly inside the
-// (95,105) setup window.
+// (CheckSetupViolation) that the rule of one report per check governs, using
+// the LRM's own numbers: DAT transitions at time 100, CLK at 105, limit 10, so
+// the data change lands strictly inside the (95,105) setup window.
 TEST(VectorSignalsInTimingChecks, VectorTransitionReportsSingleSetupViolation) {
   SpecifyManager mgr;
   TimingCheckEntry tc;
@@ -175,13 +174,13 @@ TEST(VectorSignalsInTimingChecks, VectorTransitionViolationCountEdges) {
   EXPECT_EQ(VectorTransitionViolationCount(0, 1, 1), 1u);
 }
 
-// §31.8, D4: "If there is a notifier, all the timing checks trigger that
-// notifier." Under per-bit expansion the expanded checks share the one notifier
-// declared in the check; each per-bit violation drives it through the §31.6
-// toggle. Applying that shared toggle once per transitioned bit shows every
-// expanded violation funnels into the single notifier -- six toggles for the
-// LRM example (net parity even, back to its starting value), and an odd count
-// leaves it flipped, proving the toggles are not lost.
+// §31.8, D4: where there is a notifier, every one of the expanded checks
+// triggers it. Under per-bit expansion the expanded checks share the one
+// notifier declared in the check; each per-bit violation drives it through the
+// §31.6 toggle. Applying that shared toggle once per transitioned bit shows
+// every expanded violation funnels into the single notifier -- six toggles for
+// the LRM example (net parity even, back to its starting value), and an odd
+// count leaves it flipped, proving the toggles are not lost.
 TEST(VectorSignalsInTimingChecks, AllPerBitViolationsToggleSharedNotifier) {
   uint32_t six = VectorTransitionViolationCount(0b00101110, 0b01010011, 8);
   ASSERT_EQ(six, 6u);

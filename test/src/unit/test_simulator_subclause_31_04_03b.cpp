@@ -28,10 +28,9 @@
 //
 // §31.4.3 is §31.4.2's check with the two signals allowed to transition in
 // either order. Which is the timestamp is decided by which moved first, and
-// which limit applies follows from that: "the first limit is the maximum time
-// by which the data event should follow the reference event. The second limit
-// is the maximum time by which the reference event should follow the data
-// event." The check reports when
+// which limit applies follows from that: the first limit bounds how long the
+// data event may trail the reference event, and the second how long the
+// reference event may trail the data event. The check reports when
 //
 //   (timecheck time) - (timestamp time) > limit
 //
@@ -45,27 +44,27 @@
 //
 // The third and fourth cases share a second design, and in both of them the
 // reference event and the data event fall at one simulation time. §31.4.3
-// settles that outright: "Simultaneous transitions on the reference and data
-// signals shall not cause $fullskew to report a timing violation, even when the
-// skew limit value is zero." Each of the two asserts that nothing was reported,
-// and the two differ in the order their two assignments are written in and in
-// nothing else, so together they claim the verdict does not follow that order.
+// settles that outright: reference and data transitions at the same time never
+// make $fullskew report, even with a zero limit. Each of the two asserts that
+// nothing was reported, and the two differ in the order their two assignments
+// are written in and in nothing else, so together they claim the verdict does
+// not follow that order.
 //
 // Neither of those two cases fails today, and neither is regression coverage
 // for issue #3421. $fullskew is the one of §31.4's three skew checks that is
 // symmetric in its two events. OnFullskewEvent
 // (src/simulator/timing_check_skew.cpp) makes whichever event arrives while a
 // window opened by the other signal is open the timecheck event, and §31.4.3
-// rules that such an event, "occurring within the time limit after a preceding
-// timestamp event", "turns the timing check dormant". Both commit orders
-// therefore reached a dormant check before the change issue #3421 asks for, and
-// both reach one after it. What the two cases guard is that the arming shape
-// that change introduces keeps $fullskew symmetric: each watcher records that
-// its event happened and asks for one deferred pass, ApplySlotEvents in that
-// same file applies the reference event before the data event once the slot's
-// active and reactive region sets are drained, and
-// ScheduleTimingCheckEvaluation (src/simulator/timing_check_driver_internal.h)
-// is what defers that pass to Region::kPrePostponed. The $hold pair in
+// rules that such an event, arriving within the limit after an earlier
+// timestamp event, sends the check dormant. Both commit orders therefore
+// reached a dormant check before the change issue #3421 asks for, and both
+// reach one after it. What the two cases guard is that the arming shape that
+// change introduces keeps $fullskew symmetric: each watcher records that its
+// event happened and asks for one deferred pass, ApplySlotEvents in that same
+// file applies the reference event before the data event once the slot's active
+// and reactive region sets are drained, and ScheduleTimingCheckEvaluation
+// (src/simulator/timing_check_driver_internal.h) is what defers that pass to
+// Region::kPrePostponed. The $hold pair in
 // test_simulator_subclause_31_03_01b.cpp is what catches the defect issue #3421
 // names, $hold being evaluated at one of its two events alone.
 //
@@ -153,14 +152,12 @@
 // declaration wrote.
 //
 // The first two of them are §31.4.3's rule for a suppressed reference event,
-// which the clause states for $fullskew in its own words: "unless the second
-// timestamp event has an associated condition whose value is false. In such a
-// case, the behavior of $fullskew depends on the remain_active_flag. If the
-// flag is set, then the second timestamp event is simply ignored. If the flag
-// is not set and if the timing check is active, then the timing check turns
-// dormant." §31.4.2 states the same rule for $timeskew separately, so a fix
-// keyed to TimingCheckKind::kTimeskew alone would leave both of these cases
-// failing.
+// which the clause states for $fullskew separately: a second timestamp event
+// whose condition is false hands the outcome to the remain_active_flag, which
+// when set has that event ignored and when clear, with the check active, sends
+// the check dormant. §31.4.2 states the same rule for $timeskew separately, so
+// a fix keyed to TimingCheckKind::kTimeskew alone would leave both of these
+// cases failing.
 //
 // Those two share one stimulus and one set of literals and differ in the
 // declaration alone, one writing no flag and the other writing
@@ -169,11 +166,10 @@
 // reference event the `&&& en` condition §31.7 writes, with `en` held at 0 for
 // the whole run, so every reference edge is suppressed and only `data_sig` can
 // open a window. §31.4.3 admits that outright, its two events being symmetric:
-// "The data event is the timestamp event, and the reference event is the
-// timecheck event when the data event precedes the reference event." A window
-// opened by the data signal is measured against limit2, WindowLimit
-// (src/simulator/timing_check_skew.cpp) returning TimingCheckEntry::limit2 for
-// it.
+// when the data event comes first, it is the timestamp event and the reference
+// event is the timecheck event. A window opened by the data signal is measured
+// against limit2, WindowLimit (src/simulator/timing_check_skew.cpp) returning
+// TimingCheckEntry::limit2 for it.
 //
 // Their limits are 31 (limit1) and 47 (limit2), `data_sig` rises at time 214
 // and `ref_sig` at time 255, and the run then stands open to time 317. The
@@ -186,14 +182,12 @@
 // closes at 255 and the timer with it; set, the event is ignored and the timer
 // fires at 261.
 //
-// The last two cases are §31.4.3's event_based_flag: "In this mode, $fullskew
-// is similar to $skew in that a violation is reported not upon elapse of the
-// time limit after the timestamp event (as in timer-based mode), but rather if
-// a timecheck event occurs after the time limit. Such an event ends the first
-// timing window and immediately begins a new timing window, where it acts as
-// the timestamp event of the new window. A timecheck event within the time
-// limit ends the timing window and turns the timing check dormant, and no
-// violation is reported."
+// The last two cases are §31.4.3's event_based_flag. In that mode $fullskew
+// works as $skew does: a violation comes not from the limit running out after
+// the timestamp event, as in timer-based mode, but from a timecheck event
+// arriving past the limit, which closes the window and at once opens a new one
+// with itself as the new timestamp event; a timecheck event inside the limit
+// closes the window, sends the check dormant and reports nothing.
 //
 // They share one design, whose limits are 73 (limit1) and 96 (limit2) and whose
 // `ref_sig` rises at time 412, and differ in when `data_sig` rises. The
@@ -209,17 +203,16 @@
 //
 // Neither of those two states that the window continued after the report, and
 // the last case of the file is what does. §31.4.3's event-based sentence does
-// not stop at reporting: such a timecheck event "ends the first timing window
-// and immediately begins a new timing window, where it acts as the timestamp
-// event of the new window". Nothing in a single report shows that, so the case
-// drives two timecheck events, each beyond the limit measured from the
-// timestamp the one before it became, and asserts that both were reported. An
-// implementation that closed the window after reporting makes one report and
-// the case fails, and that is the live mistake: OnTimeskewDataEvent
-// (src/simulator/timing_check_skew.cpp) closes the window after an event-based
-// report where §31.4.2 gives $timeskew a clear remain_active_flag, and
-// §31.4.3's event-based mode continues the check whatever its
-// remain_active_flag says.
+// not stop at reporting: such a timecheck event closes the window and at once
+// opens a new one, standing as that window's timestamp event. Nothing in a
+// single report shows that, so the case drives two timecheck events, each
+// beyond the limit measured from the timestamp the one before it became, and
+// asserts that both were reported. An implementation that closed the window
+// after reporting makes one report and the case fails, and that is the live
+// mistake: OnTimeskewDataEvent (src/simulator/timing_check_skew.cpp) closes the
+// window after an event-based report where §31.4.2 gives $timeskew a clear
+// remain_active_flag, and §31.4.3's event-based mode continues the check
+// whatever its remain_active_flag says.
 //
 // The number of reports is the claim there, where
 // .claude/memories/naming-the-report-in-a-rejection-test.md otherwise has a
@@ -407,12 +400,11 @@ TEST(DrivenTimingCheckEvaluation, FullskewSatisfiedInARunReportsNothing) {
   EXPECT_EQ(FindDiag(f, "$fullskew violation: signals"), nullptr);
 }
 
-// §31.4.3: "Simultaneous transitions on the reference and data signals shall
-// not cause $fullskew to report a timing violation, even when the skew limit
-// value is zero." `ref_sig` and `data_sig` both rise at time 778, the reference
-// signal being assigned first, and the run then stands open to time 869, past
-// the 836 a timer measured against the 58 limit1 would fire at and past the 861
-// one measured against the 83 limit2 would.
+// §31.4.3: reference and data transitions at the same time never make $fullskew
+// report, even with a zero limit. `ref_sig` and `data_sig` both rise at time
+// 778, the reference signal being assigned first, and the run then stands open
+// to time 869, past the 836 a timer measured against the 58 limit1 would fire
+// at and past the 861 one measured against the 83 limit2 would.
 //
 // Absence is the claim here as it is in
 // FullskewSatisfiedInARunReportsNothing above, and it is asserted the same way
@@ -445,14 +437,14 @@ TEST(DrivenTimingCheckEvaluation,
   EXPECT_EQ(FindDiag(f, "$fullskew violation: signals"), nullptr);
 }
 
-// §31.4.3: "If the flag is not set and if the timing check is active, then the
-// timing check turns dormant." `data_sig` rises at time 214 and opens a window
-// measured against the 47 limit2 allows, so its timer is due at 261. `ref_sig`
-// rises at time 255 with `en` at 0, which §31.7 makes no occurrence of the
-// check, and the remain_active_flag is not written, so the window closes at 255
-// and the timer is cancelled. The run then stands open to time 317, past the
-// 261 the timer was due at and past the 245 a timer measured against the 31
-// limit1 would have been due at.
+// §31.4.3: with the flag clear and the check active, the check goes dormant.
+// `data_sig` rises at time 214 and opens a window measured against the 47
+// limit2 allows, so its timer is due at 261. `ref_sig` rises at time 255 with
+// `en` at 0, which §31.7 makes no occurrence of the check, and the
+// remain_active_flag is not written, so the window closes at 255 and the timer
+// is cancelled. The run then stands open to time 317, past the 261 the timer
+// was due at and past the 245 a timer measured against the 31 limit1 would have
+// been due at.
 //
 // §31.4.2 states this rule for $timeskew in a sentence of its own, so a fix
 // keyed to TimingCheckKind::kTimeskew alone leaves this case failing.
@@ -468,8 +460,8 @@ TEST(DrivenTimingCheckEvaluation,
   EXPECT_EQ(FindDiag(f, "$fullskew violation: signals"), nullptr);
 }
 
-// §31.4.3: "If the flag is set, then the second timestamp event is simply
-// ignored." This case runs the stimulus
+// §31.4.3: with the flag set, the second timestamp event is just ignored. This
+// case runs the stimulus
 // FullskewSuppressedRefEventWithoutRemainActiveFlagTurnsCheckDormant above runs
 // and changes the declaration alone, writing Syntax 31-11's remain_active_flag
 // as 1. The suppressed reference edge at time 255 therefore leaves the window
@@ -488,12 +480,11 @@ TEST(DrivenTimingCheckEvaluation,
                               "31.4.3"));
 }
 
-// §31.4.3, event-based: "a violation is reported ... if a timecheck event
-// occurs after the time limit." `ref_sig` rises at time 412 and is the
-// timestamp event, so the window is measured against the 73 limit1 allows.
-// `data_sig` rises at time 500, 88 time units later and so beyond that limit
-// and inside the 96 limit2 allows, and it is the timecheck event of that
-// window. The run then stands open to time 544.
+// §31.4.3, event-based: a timecheck event arriving past the limit is reported.
+// `ref_sig` rises at time 412 and is the timestamp event, so the window is
+// measured against the 73 limit1 allows. `data_sig` rises at time 500, 88 time
+// units later and so beyond that limit and inside the 96 limit2 allows, and it
+// is the timecheck event of that window. The run then stands open to time 544.
 //
 // The event_based_flag arms no timer, so the report this case reads back can
 // only have come from the timecheck event. What it claims is that the
@@ -516,9 +507,8 @@ TEST(DrivenTimingCheckEvaluation,
       "31.4.3"));
 }
 
-// §31.4.3, event-based: "A timecheck event within the time limit ends the
-// timing window and turns the timing check dormant, and no violation is
-// reported." This case runs the design
+// §31.4.3, event-based: a timecheck event inside the limit closes the window,
+// sends the check dormant and reports nothing. This case runs the design
 // FullskewEventBasedTimecheckBeyondLimitIsReported above runs and moves its
 // data edge alone. `ref_sig` rises at time 412 and `data_sig` at time 467, 55
 // time units later and so inside the 73 limit1 allows, and the run then stands
@@ -538,11 +528,10 @@ TEST(DrivenTimingCheckEvaluation,
   EXPECT_EQ(FindDiag(f, "$fullskew violation: signals"), nullptr);
 }
 
-// §31.4.3, event-based: such a timecheck event "ends the first timing window
-// and immediately begins a new timing window, where it acts as the timestamp
-// event of the new window". Two timecheck events run here, each beyond the
-// limit measured from the timestamp the one before it became, and both are
-// reported.
+// §31.4.3, event-based: such a timecheck event closes the window and at once
+// opens a new one, standing as that window's timestamp event. Two timecheck
+// events run here, each beyond the limit measured from the timestamp the one
+// before it became, and both are reported.
 //
 // `ref_sig` rises at time 130 and opens a window measured against the 73 limit1
 // allows, the reference signal being the timestamp. `data_sig` rises at time

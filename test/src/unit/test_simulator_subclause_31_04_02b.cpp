@@ -31,15 +31,15 @@
 //
 //   (timecheck time) - (timestamp time) > limit
 //
-// The default behavior is timer-based: "a violation shall be reported
-// immediately upon an elapse of time after the reference event equal to the
-// limit", whether or not a data event ever arrives, and the check is dormant
-// afterwards. A data event within the limit reports nothing and turns the check
-// dormant at once. That default is what the four cases written before issue
-// #3420 are written on, and it is what separates §31.4.2 from §31.4.1's $skew,
-// which is event-based and reports nothing when no data event ever comes. The
-// four cases written for issue #3420 each write a flag, and each names below
-// which of the two it writes.
+// The default behavior is timer-based: the violation is reported the moment the
+// limit's worth of time has passed since the reference event, whether or not a
+// data event ever arrives, and the check is dormant afterwards. A data event
+// within the limit reports nothing and turns the check dormant at once. That
+// default is what the four cases written before issue #3420 are written on, and
+// it is what separates §31.4.2 from §31.4.1's $skew, which is event-based and
+// reports nothing when no data event ever comes. The four cases written for
+// issue #3420 each write a flag, and each names below which of the two it
+// writes.
 //
 // The first two cases share one design and differ in their stimulus alone.
 // That is what shows a check being run rather than one answer being handed to
@@ -60,11 +60,11 @@
 //
 // The two simultaneous cases share a second design, and in both of them the
 // reference event and the data event fall at one simulation time. §31.4.2
-// decides that case within the timer-based default: "if a data event occurs
-// within the limit, then a violation shall not be reported, and the check shall
-// become dormant immediately". A data event no time at all after the reference
-// event is one that occurs within the limit, so the check ends dormant and
-// reports nothing. Both cases claim that, and neither tolerates a report.
+// decides that case within the timer-based default: a data event inside the
+// limit means no violation, and the check goes dormant at once. A data event no
+// time at all after the reference event is one that occurs within the limit, so
+// the check ends dormant and reports nothing. Both cases claim that, and
+// neither tolerates a report.
 //
 // Issue #3421 is the defect the pair covers. A watcher runs as part of the
 // commit that woke it, so a $timeskew whose two signals transitioned in one
@@ -131,35 +131,33 @@
 // whatever the driver does with the two fields: it reads them back off the
 // check the run registered on SimContext::GetSpecifyManager. It runs two
 // designs, one writing both flags and one writing neither, because §31.4.2
-// makes the clear pair the default -- "The default behavior for $timeskew is
-// timer-based" -- and a build that set every flag would pass the written half
-// on its own.
+// makes the clear pair the default -- $timeskew is timer-based unless told
+// otherwise -- and a build that set every flag would pass the written half on
+// its own.
 //
 // TimeskewSuppressedReferenceEventTurnsTheCheckDormant and
 // TimeskewSuppressedReferenceEventWithRemainActiveFlagStillReports are the
-// pair for §31.4.2's sentence "This check shall also become dormant if it
-// detects a conditioned reference event when its condition is false and the
-// remain_active_flag is not set". Their two designs differ in one literal, the
+// pair for §31.4.2's rule that the check also goes dormant when it meets a
+// conditioned reference event whose condition is false while the
+// remain_active_flag is clear. Their two designs differ in one literal, the
 // remain_active_flag written 0 in the first and 11 in the second, and they run
-// one stimulus: a first reference edge opens a window and arms the timer, and
-// a second reference edge arrives with the conditioning signal `en` at 0 while
+// one stimulus: a first reference edge opens a window and arms the timer, and a
+// second reference edge arrives with the conditioning signal `en` at 0 while
 // that window is still open. The first case claims the window was closed and
 // nothing reported, and the second claims it stood and its timer reported at
 // the expiry. One answer given to both would fail one of them.
 //
-// TimeskewEventBasedFlagReportsOnALateDataEvent is the other flag: "The
-// $timeskew check's default timer-based behavior can be altered to event-based
-// using the event_based_flag", and event-based "behaves like the $skew check
-// when only the event_based_flag is set, except that it becomes dormant after
-// reporting the first violation". Its stimulus sends two data events at one
-// reference event, the first inside the limit and the second beyond it. That
-// is what makes the case fail under a timer-based reading of the same
-// declaration: the first data event is one that "occurs within the limit", so
-// timer-based turns the check dormant there and reports nothing ever, and only
-// the event-based mode is still watching when the second arrives. §31.4.1,
-// whose behaviour the flag selects, is what keeps the window open across the
-// first -- "after a reference event, the $skew timing check shall never stop
-// checking data events for a timing violation".
+// TimeskewEventBasedFlagReportsOnALateDataEvent is the other flag: the
+// event_based_flag switches $timeskew from its timer-based default to
+// event-based, and with that flag alone set it acts as $skew does but goes
+// dormant after its first violation. Its stimulus sends two data events at one
+// reference event, the first inside the limit and the second beyond it. That is
+// what makes the case fail under a timer-based reading of the same declaration:
+// the first data event falls inside the limit, so timer-based turns the check
+// dormant there and reports nothing ever, and only the event-based mode is
+// still watching when the second arrives. §31.4.1, whose behaviour the flag
+// selects, is what keeps the window open across the first -- once a reference
+// event has come, $skew keeps checking every data event for a violation.
 //
 // Those four cases carry limits and times of their own, none of them a limit
 // or a time of the two designs above. kFlagDesignBeforeStimulus carries a
@@ -308,8 +306,7 @@ constexpr const char* kRemainActiveDesignBeforeStimulus =
 
 // The design TimeskewEventBasedFlagReportsOnALateDataEvent runs. It writes the
 // event_based_flag and no remain_active_flag, which is the mode §31.4.2 makes
-// "like the $skew check ... except that it becomes dormant after reporting the
-// first violation".
+// act as $skew does, save that it goes dormant after its first violation.
 constexpr const char* kEventBasedDesignBeforeStimulus =
     "module top(\n"
     "    output logic ref_sig,\n"
@@ -382,12 +379,12 @@ TEST(DrivenTimingCheckEvaluation, TimeskewSatisfiedInARunReportsNothing) {
   EXPECT_EQ(FindDiag(f, "$timeskew violation: data signal"), nullptr);
 }
 
-// §31.4.2: "if a data event occurs within the limit, then a violation shall not
-// be reported, and the check shall become dormant immediately". `ref_sig` and
-// `data_sig` both rise at time 667, the reference signal being assigned first,
-// and the data event is therefore one that occurs within the 58 the limit
-// allows. `tail_sig` rises at time 761, which carries the run past the time 725
-// a timer armed at the reference event would report at.
+// §31.4.2: a data event inside the limit means no violation, and the check goes
+// dormant at once. `ref_sig` and `data_sig` both rise at time 667, the
+// reference signal being assigned first, and the data event is therefore one
+// that occurs within the 58 the limit allows. `tail_sig` rises at time 761,
+// which carries the run past the time 725 a timer armed at the reference event
+// would report at.
 //
 // Absence is the claim, as it is in TimeskewSatisfiedInARunReportsNothing
 // above, and a null FindDiag is the form for it.
@@ -430,8 +427,8 @@ TEST(DrivenTimingCheckEvaluation,
 //
 // The written half alone would pass under a build that set every flag, and the
 // default half alone would pass under one that set none. §31.4.2 states the
-// default the second half claims: "The default behavior for $timeskew is
-// timer-based."
+// default the second half claims: $timeskew is timer-based unless told
+// otherwise.
 TEST(DrivenTimingCheckEvaluation, TimeskewFlagsAreRegisteredAsWritten) {
   SimFixture flagged;
   ASSERT_TRUE(RanWithStimulus(kFlagDesignBeforeStimulus, "", flagged));
@@ -448,12 +445,12 @@ TEST(DrivenTimingCheckEvaluation, TimeskewFlagsAreRegisteredAsWritten) {
   EXPECT_FALSE(defaulted->remain_active_flag);
 }
 
-// §31.4.2: "This check shall also become dormant if it detects a conditioned
-// reference event when its condition is false and the remain_active_flag is not
-// set". `ref_sig` rises at time 915 with `en` at 1, which opens the window and
-// arms the timer at 915 + 74 = 989. `en` stands at 0 by the time `ref_sig`
-// rises again at 953, so that second reference edge is the conditioned event
-// the condition ruled out, and it stands 36 time units before the expiry.
+// §31.4.2: the check also goes dormant when it meets a conditioned reference
+// event whose condition is false while the remain_active_flag is clear.
+// `ref_sig` rises at time 915 with `en` at 1, which opens the window and arms
+// the timer at 915 + 74 = 989. `en` stands at 0 by the time `ref_sig` rises
+// again at 953, so that second reference edge is the conditioned event the
+// condition ruled out, and it stands 36 time units before the expiry.
 // `tail_sig` rises at 1032, which carries the run past 989 whether or not
 // anything is left armed to reach it.
 //
@@ -478,11 +475,11 @@ TEST(DrivenTimingCheckEvaluation,
 
 // §31.4.2's dormancy sentence again, with the remain_active_flag set: the
 // clause makes the check dormant on a false-conditioned reference event only
-// where the flag "is not set", so the window opened at 915 stands and the timer
-// it armed reports at 989. This case and
+// where the flag is clear, so the window opened at 915 stands and the timer it
+// armed reports at 989. This case and
 // TimeskewSuppressedReferenceEventTurnsTheCheckDormant above run one stimulus
-// against two designs differing in that flag alone, which is what makes the
-// two of them say the flag was read rather than one answer handed to both.
+// against two designs differing in that flag alone, which is what makes the two
+// of them say the flag was read rather than one answer handed to both.
 //
 // The message substring stops before the signal name the report goes on to
 // spell, for the reason TimeskewViolationInARunIsReported gives.
@@ -511,12 +508,11 @@ TEST(DrivenTimingCheckEvaluation,
 // the second and the violation is reported there.
 //
 // The first data event is what makes this case fail under the timer-based
-// default. §31.4.2 rules that "if a data event occurs within the limit, then a
-// violation shall not be reported, and the check shall become dormant
-// immediately", so timer-based turns the check dormant at 986 and reports
-// nothing at all; event-based keeps the window, §31.4.1 ruling that "after a
-// reference event, the $skew timing check shall never stop checking data events
-// for a timing violation".
+// default. §31.4.2 rules that a data event inside the limit means no violation
+// and a check dormant at once, so timer-based turns the check dormant at 986
+// and reports nothing at all; event-based keeps the window, §31.4.1 ruling that
+// once a reference event has come, $skew keeps checking every data event for a
+// violation.
 //
 // The fall of `data_sig` at 1000 is a negedge, which §31.5 makes no occurrence
 // of a posedge data event; it is there so that 1025 is a second rise.

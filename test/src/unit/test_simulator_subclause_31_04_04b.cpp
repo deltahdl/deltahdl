@@ -32,8 +32,8 @@
 // the design gains or loses a line above the $width.
 //
 // §31.4.4 bounds its window with two edges of ONE signal, which no other driven
-// case reaches. Table 31-10 makes the data event implicit -- "the data event
-// and the reference event ... are triggered by opposite transitions" -- so a
+// case reaches. Table 31-10 makes the data event implicit -- it and the
+// reference event come from opposite transitions of the one signal -- so a
 // posedge reference makes the following negedge the timecheck, and the check
 // reports when
 //
@@ -50,9 +50,8 @@
 //
 // Four cases turn on the threshold that violation condition names. A pulse no
 // wider than the threshold is no violation however far it falls below the
-// limit, §31.4.4 stating that "the pulse width has to be greater than or equal
-// to limit in order to avoid a timing violation, but no violation is reported
-// for glitches smaller than the threshold".
+// limit, §31.4.4 stating that a pulse escapes a violation only by lasting at
+// least the limit, while a glitch shorter than the threshold draws no report.
 // WidthThresholdReachesTheRegisteredEntry claims that the threshold a design
 // declares is the value TimingCheckEntry::threshold holds, and reads
 // TimingCheckEntry::limit beside it so that one field read in place of the
@@ -60,10 +59,9 @@
 // WidthPulseAboveTheThresholdIsReported drive one design with a pulse on either
 // side of its threshold, so the pair claims the declared value reached the
 // verdict and not merely the entry. WidthWithoutAThresholdRegistersZero claims
-// the default §31.4.4 states: "The threshold argument shall be included if the
-// notifier argument is required. It is permissible to not specify both the
-// threshold and notifier arguments, making the default value for the threshold
-// zero."
+// the default §31.4.4 states: a check that needs the notifier must also give
+// the threshold, but a check may leave both out, and the threshold is then
+// zero.
 //
 // Issue #3418 is that a declared threshold reached neither the entry nor the
 // verdict. Parser::ParseTimingCheckTrailingArgs in
@@ -207,8 +205,8 @@ TEST(DrivenTimingCheckEvaluation, WidthViolationInARunIsReported) {
 
 // §31.4.4 again, and the same design: only the stimulus changes. `clk` rises at
 // time 840 and falls at time 847, holding its level for 7 time units against
-// the same limit of 5, which §31.4.4 states as the pulse width being "greater
-// than or equal to limit in order to avoid a timing violation".
+// the same limit of 5, which §31.4.4 states as a pulse escaping a violation by
+// lasting at least the limit.
 //
 // Absence is the claim, and ReportedWarning cannot state it: it answers that
 // some diagnostic matched a message, a line and a subclause, and there is no
@@ -242,8 +240,9 @@ TEST(DrivenTimingCheckEvaluation, WidthThresholdReachesTheRegisteredEntry) {
 // §31.4.4: `clk` rises at time 902 and falls at time 908, holding its level for
 // 6 time units against a threshold of 8. The clause reports a violation for
 // "threshold < (timecheck time) - (timestamp time) < limit", and 6 is not
-// greater than 8, so the pulse is one of the "glitches smaller than the
-// threshold" the clause excludes even though it is far below the limit of 21.
+// greater than 8, so the pulse is one of the glitches shorter than the
+// threshold that the clause excludes even though it is far below the limit of
+// 21.
 TEST(DrivenTimingCheckEvaluation, WidthGlitchBelowTheThresholdReportsNothing) {
   SimFixture f;
   ASSERT_TRUE(RanWithDesignAndStimulus(kThresholdDesignBeforeStimulus,
@@ -270,13 +269,12 @@ TEST(DrivenTimingCheckEvaluation, WidthPulseAboveTheThresholdIsReported) {
 }
 
 // §31.4.4: `$width(posedge clk, 34)` declares no threshold, and the clause
-// makes "the default value for the threshold zero", so
-// TimingCheckEntry::threshold is 0. TimingCheckEntry::limit2 is 0 as well,
-// §31.4.4 giving $width no second limit for a build to write one into. The
-// limit is read beside them because it is the one non-zero value the
-// declaration carries, so a case reading an entry no declaration reached would
-// fail on it. The design drives no pulse, the registration being the whole
-// claim.
+// makes the threshold zero when none is given, so TimingCheckEntry::threshold
+// is 0. TimingCheckEntry::limit2 is 0 as well, §31.4.4 giving $width no second
+// limit for a build to write one into. The limit is read beside them because it
+// is the one non-zero value the declaration carries, so a case reading an entry
+// no declaration reached would fail on it. The design drives no pulse, the
+// registration being the whole claim.
 TEST(DrivenTimingCheckEvaluation, WidthWithoutAThresholdRegistersZero) {
   SimFixture f;
   ASSERT_TRUE(

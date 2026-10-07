@@ -33,19 +33,17 @@
 // §31.5 gives six edge_descriptors and no more: Syntax 31-15 writes
 // `edge_descriptor ::= 01 | 10 | z_or_x zero_or_one | zero_or_one z_or_x`, and
 // the clause spells the six out as 01, 0x, 10, 1x, x0 and x1. It also states
-// that "edge transitions involving z are treated the same way as edge
-// transitions involving x", which is why the `edge[z1]` case expects the same
-// answer an `edge[x1]` case would get.
+// that an edge transition involving z is treated as one involving x, which is
+// why the `edge[z1]` case expects the same answer an `edge[x1]` case would get.
 //
 // §31.5 makes the two shorthands lists of those descriptors rather than a
-// second kind of edge: `posedge clr` "is equivalent to" `edge[01, 0x, x1] clr`,
-// and `negedge clr` "is the same as" `edge[10, x0, 1x] clr`. The three
-// `edge[01, 0x, x1]` cases are that equivalence read one descriptor at a time,
-// so the general form and the shorthand agree on all three transitions a
-// posedge admits. The `edge[01]` and `edge[1x]` cases are the other half of
-// §31.5, that "edge-control specifiers offer the flexibility to declare edge
-// transitions other than posedge and negedge": each names one descriptor of a
-// shorthand's list and is answered by that descriptor alone.
+// second kind of edge: `posedge clr` means `edge[01, 0x, x1] clr`, and `negedge
+// clr` means `edge[10, x0, 1x] clr`. The three `edge[01, 0x, x1]` cases are
+// that equivalence read one descriptor at a time, so the general form and the
+// shorthand agree on all three transitions a posedge admits. The `edge[01]` and
+// `edge[1x]` cases are the other half of §31.5, that edge-control specifiers
+// can name edge transitions besides posedge and negedge: each names one
+// descriptor of a shorthand's list and is answered by that descriptor alone.
 //
 // The first two cases share one design, one limit and one stimulus, and differ
 // in the value the clock arrives at. That is what shows the descriptor list
@@ -309,11 +307,11 @@ TEST(EdgeControlSpecifierEvaluation, SetupEdge1xIgnoresAOneToZeroTransition) {
   EXPECT_EQ(FindDiag(f, "$setup violation: data signal"), nullptr);
 }
 
-// §31.5: "Edge transitions involving z are treated the same way as edge
-// transitions involving x", so `edge[z1]` is answered by a transition from x to
-// 1. `clk` is assigned 1'bx at time 0, which changes no value and is no
-// transition, and reaches 1 at time 198. `d` rises at time 181, leaving 17 time
-// units of setup against a limit of 59.
+// §31.5: an edge transition involving z is treated as one involving x, so
+// `edge[z1]` is answered by a transition from x to 1. `clk` is assigned 1'bx at
+// time 0, which changes no value and is no transition, and reaches 1 at time
+// 198. `d` rises at time 181, leaving 17 time units of setup against a limit of
+// 59.
 TEST(EdgeControlSpecifierEvaluation, SetupEdgeZ1AnswersToAnXToOneTransition) {
   SimFixture f;
   const std::string kDesign =
@@ -338,9 +336,9 @@ TEST(EdgeControlSpecifierEvaluation, SetupEdgeZ1AnswersToAnXToOneTransition) {
 
 // §31.4.4 with a reference event written in §31.5's general form: `edge[01]`
 // opens the pulse and its reverse `edge[10]` closes it, the clause deriving the
-// data event as "reference event signal with opposite edge". `clk` rises at
-// time 191 and falls at time 194, holding its level for 3 time units against a
-// limit of 71. The x-to-0 assignment at time 0 is an `x0`, which is neither
+// data event as the reference event's signal on the opposite edge. `clk` rises
+// at time 191 and falls at time 194, holding its level for 3 time units against
+// a limit of 71. The x-to-0 assignment at time 0 is an `x0`, which is neither
 // `01` nor `10`, so it neither opens a pulse nor closes one.
 TEST(EdgeControlSpecifierEvaluation, WidthEdge01ClosesOnAOneToZeroTransition) {
   SimFixture f;

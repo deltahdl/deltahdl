@@ -13,11 +13,11 @@ using namespace delta;
 
 namespace {
 
-// §31.9 (printed page 919): "Both the $setuphold and $recrem timing checks can
-// accept negative values when the negative timing check option is enabled",
-// and §31.9.4 (printed page 923) names "an invocation option turning off all
-// timing checks" beside it. The command line had neither, so every run was the
-// option-not-enabled case and a negative limit was read as 0.
+// §31.9 (printed page 919): with the negative timing check option on,
+// $setuphold and $recrem may take negative values, and §31.9.4 (printed page
+// 923) names beside it an invocation option that turns every timing check off.
+// The command line had neither, so every run was the option-not-enabled case
+// and a negative limit was read as 0.
 TEST(NegativeTimingCheckSwitches, BothSwitchesAreRecognized) {
   CliOptions opts;
   EXPECT_TRUE(ParseCommandLine(
@@ -93,10 +93,10 @@ TEST(NegativeTimingCheckSwitches, NegativeHoldShiftsTheWindowBeforeTheEdge) {
             "1\n1\n1\n");
 }
 
-// §31.9.1 (printed page 922): "The setup time of -7 (the larger in absolute
-// value) creates a delay of 7 for dCLK", so under the option dclk rises 7
-// after clk and samples through dd the d that changed 2 after clk. Without the
-// option the two are copies and dclk rises with clk.
+// §31.9.1 (printed page 922): the setup time of -7, the larger in magnitude,
+// gives dCLK a delay of 7, so under the option dclk rises 7 after clk and
+// samples through dd the d that changed 2 after clk. Without the option the two
+// are copies and dclk rises with clk.
 TEST(NegativeTimingCheckSwitches,
      DelayedReferenceLagsByTheLargestNegativeSetup) {
   const std::string kDesign =

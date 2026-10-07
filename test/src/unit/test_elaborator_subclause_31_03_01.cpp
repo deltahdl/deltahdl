@@ -23,9 +23,8 @@ TEST(SetupTimingCheckElaboration, ZeroLimitElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A negative literal limit is refused. §31.9 (printed page 919) lets "Both the
-// $setuphold and $recrem timing checks" accept negative values, and $setup is
-// neither.
+// A negative literal limit is refused. §31.9 (printed page 919) lets only
+// $setuphold and $recrem accept negative values, and $setup is neither.
 TEST(SetupTimingCheckElaboration, NegativeLiteralLimitRejected) {
   ElabFixture f;
   ElaborateSrc(

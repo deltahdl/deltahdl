@@ -36,13 +36,13 @@
 // would report in neither.
 //
 // The x cases are the pair §31.7 divides by the operator written in the
-// condition. "When comparisons are deterministic, an x value on the
-// conditioning signal shall not enable the timing check", and the clause lists
-// the bare `expression` form -- no operation -- among the deterministic ones,
-// so the plain `&&& en` case reports nothing with `en` at x. "For
-// nondeterministic comparisons, an x on the conditioning signal shall enable
-// the timing check", and `==` is one of the two nondeterministic forms, so the
-// `&&& (en == 1'b1)` case reports with the same x standing on the same signal.
+// condition. Under a deterministic comparison an x on the conditioning signal
+// leaves the check disabled, and the clause lists the bare `expression` form --
+// no operation -- among the deterministic ones, so the plain `&&& en` case
+// reports nothing with `en` at x. Under a nondeterministic comparison an x on
+// the conditioning signal enables the check, and `==` is one of the two
+// nondeterministic forms, so the `&&& (en == 1'b1)` case reports with the same
+// x standing on the same signal.
 //
 // The `~en` case is where a fix that evaluated the whole condition expression
 // would go wrong. §31.7 states its rule over the value of the conditioning
@@ -186,12 +186,12 @@ TEST(ConditionedTimingCheckEvaluation, SetupWithTrueConditionIsReported) {
       LineHolding(kDesign, "$setup(d, posedge clk &&& en"), "31.3.1"));
 }
 
-// §31.7: "When comparisons are deterministic, an x value on the conditioning
-// signal shall not enable the timing check", and the bare `expression` form --
-// the clause's "no operation" -- is deterministic, so `en` at x leaves the
-// check disabled. `d` rises at time 22 and `clk` rises at time 30, leaving 8
-// time units of setup against a limit of 37, which §31.3.1 would report were
-// the check enabled at all.
+// §31.7: under a deterministic comparison an x on the conditioning signal
+// leaves the check disabled, and the bare `expression` form -- the one with no
+// operation -- is deterministic, so `en` at x leaves the check disabled. `d`
+// rises at time 22 and `clk` rises at time 30, leaving 8 time units of setup
+// against a limit of 37, which §31.3.1 would report were the check enabled at
+// all.
 TEST(ConditionedTimingCheckEvaluation, PlainConditionAtXReportsNothing) {
   SimFixture f;
   const std::string kDesign =
@@ -214,11 +214,11 @@ TEST(ConditionedTimingCheckEvaluation, PlainConditionAtXReportsNothing) {
   EXPECT_EQ(FindDiag(f, "$setup violation: data signal"), nullptr);
 }
 
-// §31.7: "For nondeterministic comparisons, an x on the conditioning signal
-// shall enable the timing check", and `==` is one of the two nondeterministic
-// forms, so the same x that disables the plain form above enables this one. `d`
-// rises at time 44 and `clk` rises at time 55, leaving 11 time units of setup
-// against a limit of 41.
+// §31.7: under a nondeterministic comparison an x on the conditioning signal
+// enables the check, and `==` is one of the two nondeterministic forms, so the
+// same x that disables the plain form above enables this one. `d` rises at time
+// 44 and `clk` rises at time 55, leaving 11 time units of setup against a limit
+// of 41.
 TEST(ConditionedTimingCheckEvaluation, EqualityConditionAtXIsReported) {
   SimFixture f;
   const std::string kDesign =

@@ -20,16 +20,14 @@
 // transition the edge names.
 //
 // §31.8 states the default and states the option separately, and the default is
-// what a run implements. "Either or both signals in a timing check can be a
-// vector. This shall be interpreted as a single timing check where the
-// transition of one or more bits of a vector is considered a single transition
-// of that vector." The clause then allows that "simulators may provide an
-// option causing vectors in timing checks to result in the creation of multiple
-// single-bit timing checks", under which a $width over a vector of width N
-// becomes N checks and a $setup over signals of widths M and N becomes M*N.
-// deltahdl provides no such option, so every case below expects the single
-// check and the single report of the default, and no case below expects a
-// per-bit count.
+// what a run implements. Either signal of a timing check, or both, may be a
+// vector, and the check stays one check, a change in any of a vector's bits
+// counting as one transition of the vector. The clause then lets a simulator
+// offer an option that splits a check over vectors into many single-bit checks,
+// under which a $width over a vector of width N becomes N checks and a $setup
+// over signals of widths M and N becomes M*N. deltahdl provides no such option,
+// so every case below expects the single check and the single report of the
+// default, and no case below expects a per-bit count.
 //
 // A timing violation is reported as a warning and not as an error. The design
 // is legal and the run reaches a state the design said it should not, so
@@ -47,15 +45,14 @@
 //
 // Two cases count reports rather than name one, which is what §31.8 states
 // outright for them. Of a $setup whose 8-bit data signal changes in six bits at
-// one moment the clause says the check "shall still only report a single timing
-// violation", so the number of reports is the rule here rather than a stand-in
-// for it, and a case that only found one report would pass with a run that made
-// six. Each of the two states the claim in two steps: ReportedWarning names the
-// message, the line and the subclause of the report that was made, and
-// FindDiagFrom (lib/cpp/test_fixtures/fixture_simulator.h) started one past
-// that report's position says there is no second one. The first step is what
-// keeps the second honest, a run that reported nothing at all having no second
-// report either.
+// one moment the clause says the check still reports one violation and no more,
+// so the number of reports is the rule here rather than a stand-in for it, and
+// a case that only found one report would pass with a run that made six. Each
+// of the two states the claim in two steps: ReportedWarning names the message,
+// the line and the subclause of the report that was made, and FindDiagFrom
+// (lib/cpp/test_fixtures/fixture_simulator.h) started one past that report's
+// position says there is no second one. The first step is what keeps the second
+// honest, a run that reported nothing at all having no second report either.
 //
 // The first three cases share one design and differ in the value driven onto
 // the two-bit reference signal alone. That is what shows every bit being
@@ -211,14 +208,14 @@ std::string VectorDataDesign(const std::string& stimulus) {
          "endmodule\n";
 }
 
-// §31.8: "the transition of one or more bits of a vector is considered a single
-// transition of that vector", so the upper bit of `clk` rising is `clk` rising
-// and the posedge reference event of the $setup occurs. `d` rises at time 223
-// and `clk` takes the value 2'b10 at time 234, leaving 11 time units of setup
-// against a limit of 73, which §31.3.1 reports. The lower bit of `clk` holds
-// the 0 it was driven to at time 0 throughout, so a driver reading that bit
-// alone finds no reference event at all and reports nothing. That is the defect
-// issue #3412 names.
+// §31.8: a change in any of a vector's bits counts as one transition of the
+// vector, so the upper bit of `clk` rising is `clk` rising and the posedge
+// reference event of the $setup occurs. `d` rises at time 223 and `clk` takes
+// the value 2'b10 at time 234, leaving 11 time units of setup against a limit
+// of 73, which §31.3.1 reports. The lower bit of `clk` holds the 0 it was
+// driven to at time 0 throughout, so a driver reading that bit alone finds no
+// reference event at all and reports nothing. That is the defect issue #3412
+// names.
 TEST(VectorSignalsInTimingChecksDriven,
      VectorReferenceUpperBitRisingAloneIsReported) {
   SimFixture f;
@@ -250,13 +247,12 @@ TEST(VectorSignalsInTimingChecksDriven,
                               "31.3.1"));
 }
 
-// §31.8: "This shall be interpreted as a single timing check where the
-// transition of one or more bits of a vector is considered a single transition
-// of that vector", and of its own example the clause says the check "shall
-// still only report a single timing violation". Both bits of `clk` rise in the
-// one assignment at time 250, and the $setup reports once. `d` rises at time
-// 233, leaving 17 time units of setup against the same limit of 73 the two
-// cases above use.
+// §31.8: the check over vectors stays one check, a change in any of a vector's
+// bits counting as one transition of the vector, and of its own example the
+// clause says the check still reports one violation and no more. Both bits of
+// `clk` rise in the one assignment at time 250, and the $setup reports once.
+// `d` rises at time 233, leaving 17 time units of setup against the same limit
+// of 73 the two cases above use.
 //
 // The number of reports is the claim here, which
 // .claude/memories/naming-the-report-in-a-rejection-test.md otherwise warns
@@ -308,12 +304,11 @@ TEST(VectorSignalsInTimingChecksDriven,
 
 // §31.8's own example in miniature. The clause's is a `module DFF` with `input
 // CLK; input [7:0] DAT;` and `$setup (DAT, posedge CLK, 10);`, of which it says
-// that if DAT "transitions from 'b00101110 to 'b01010011 at time 100 and if CLK
-// transitions from 0 to 1 at time 105, then the $setup timing check shall still
-// only report a single timing violation". Here `d` takes the value 4'b1110 at
-// time 241, so three of its four bits transition in one assignment, and `clk`
-// rises at time 270, leaving 29 time units of setup against the same limit of
-// 79 the case above uses. The $setup reports once.
+// that DAT moving from 'b00101110 to 'b01010011 at time 100 and CLK rising at
+// time 105 still draws one report from the $setup and no more. Here `d` takes
+// the value 4'b1110 at time 241, so three of its four bits transition in one
+// assignment, and `clk` rises at time 270, leaving 29 time units of setup
+// against the same limit of 79 the case above uses. The $setup reports once.
 //
 // The number of reports is the claim, for the reason the both-bits case above
 // gives: §31.8 states the number, so a run creating one check per transitioned
@@ -336,12 +331,12 @@ TEST(VectorSignalsInTimingChecksDriven,
 
 // §31.8 applied to §31.4.4's $width, whose one signal is the two-bit vector
 // `clk` declared [3:2]. §31.4.4 leaves the data event implicit, it and the
-// reference event being "triggered by opposite transitions", so the pulse opens
-// on the posedge and closes on the negedge of the same signal, and both are
-// found across every bit. `clk` takes the value 2'b10 at time 251 and returns
-// to 2'b00 at time 282, holding its level for 31 time units against a limit
-// of 89. The lower bit holds the 0 it was driven to at time 0 through both, so
-// a driver reading that bit alone finds neither edge, measures no pulse and
+// reference event coming from opposite transitions, so the pulse opens on the
+// posedge and closes on the negedge of the same signal, and both are found
+// across every bit. `clk` takes the value 2'b10 at time 251 and returns to
+// 2'b00 at time 282, holding its level for 31 time units against a limit of 89.
+// The lower bit holds the 0 it was driven to at time 0 through both, so a
+// driver reading that bit alone finds neither edge, measures no pulse and
 // reports nothing.
 TEST(VectorSignalsInTimingChecksDriven,
      VectorWidthPulseOnUpperBitAloneIsReported) {

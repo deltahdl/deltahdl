@@ -7,10 +7,10 @@ using namespace delta;
 
 namespace {
 
-// §31.6 (printed page 915): "The notifier is a variable, declared in the
-// module where timing check tasks are invoked", and Syntax 31-2 writes
-// `notifier ::= variable_identifier`. A net of the module is no variable, so
-// naming one as the notifier is refused.
+// §31.6 (printed page 915): the notifier is a variable of the module that
+// invokes the timing checks, and Syntax 31-2 writes `notifier ::=
+// variable_identifier`. A net of the module is no variable, so naming one as
+// the notifier is refused.
 TEST(TimingCheckNotifierElaboration, LocalNetNotifierRejected) {
   ElabFixture f;
   ElaborateSrc(

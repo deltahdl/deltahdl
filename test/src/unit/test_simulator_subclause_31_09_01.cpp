@@ -88,9 +88,8 @@ TEST(AdjustNegativeTimingCheckLimit, ZeroClampsAndWarns) {
 }
 
 TEST(AdjustNegativeTimingCheckLimit, StrictlyNegativeClampsAndWarns) {
-  // The clamp rule is "less than or equal to zero": a strictly negative
-  // adjusted limit takes the "less than" branch, distinct from the zero
-  // boundary above.
+  // The clamp rule covers zero and below: a strictly negative adjusted limit
+  // takes the branch below zero, distinct from the zero boundary above.
   const auto kResult = AdjustNegativeTimingCheckLimit(-3);
   EXPECT_EQ(kResult.limit, 0u);
   EXPECT_TRUE(kResult.warn);

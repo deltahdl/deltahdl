@@ -29,22 +29,21 @@
 // ran rather than writing a number, so the case cannot drift when the design
 // gains or loses a line above the $nochange.
 //
-// §31.4.6 "reports a timing violation if the data event occurs during the
-// specified level of the control signal (the reference event)", so both edges
-// of the reference bound the window where §31.3's stability windows use one
-// edge of the reference and one of the data signal. The reference here is a
-// posedge, and §31.4.6 says of that case that "the duration is the period
-// during which the reference signal is high".
+// §31.4.6 reports a violation when the data event falls while the control
+// signal, the reference event, holds the level named, so both edges of the
+// reference bound the window where §31.3's stability windows use one edge of
+// the reference and one of the data signal. The reference here is a posedge,
+// and §31.4.6 says of that case that the window lasts while the reference
+// signal is high.
 //
 // §31.4.6 moves each end of that window by an offset the declaration writes:
 // "(beginning of time window) = (leading reference edge time) -
 // start_edge_offset" and "(end of time window) = (trailing reference edge time)
-// + end_edge_offset". The clause "reports a timing violation in the following
-// case: (beginning of time window) < (data event time) < (end of time window)".
-// "The end points of the time window are not included." A positive offset
-// extends the region and a negative one shrinks it, §31.4.6 saying of a
-// negative end edge offset that it "shrinks the region by ending it earlier".
-// "If both the offsets are zero, the size of the region shall not change."
+// + end_edge_offset". The clause reports a violation when "(beginning of time
+// window) < (data event time) < (end of time window)", the window's end points
+// left out. A positive offset extends the region and a negative one shrinks it,
+// §31.4.6 saying of a negative end edge offset that it makes the region end
+// sooner. Two zero offsets leave the region's size as it is.
 //
 // Two designs are run below. kDesignBeforeStimulus writes both offsets as 0 and
 // neither case over it turns on them. kOffsetDesignBeforeStimulus writes 27 as
@@ -396,9 +395,9 @@ TEST(DrivenTimingCheckEvaluation,
 
 // §31.4.6 and the same design: only the stimulus changes. `d` rises at time
 // 1604, `ctl` rises at time 1631 and falls at time 1677. The beginning of the
-// window is 1631 - 27 = 1604, which is the data event time, and §31.4.6 says
-// "the end points of the time window are not included", so the transition is
-// outside the window and nothing is reported.
+// window is 1631 - 27 = 1604, which is the data event time, and §31.4.6 leaves
+// the window's end points out, so the transition is outside the window and
+// nothing is reported.
 //
 // The 27 between the data transition and the leading reference edge is the
 // start edge offset written a second time, which is what stands the transition
@@ -481,12 +480,11 @@ TEST(DrivenTimingCheckEvaluation,
   EXPECT_EQ(FindDiag(f, "$nochange violation: data signal"), nullptr);
 }
 
-// §31.4.6: "A violation results if the data event occurs anytime within the
-// time window", so each data transition inside one window is its own
-// violation and toggles the notifier (§31.6) at its own time. Two changes of d
-// while clk is high toggle it twice, at 13 and 16, before the trailing edge
-// at 20; answering both there toggled it twice in one time step, which an
-// `always @(n)` saw once.
+// §31.4.6: a data event at any point inside the window is a violation, so each
+// data transition inside one window is its own violation and toggles the
+// notifier (§31.6) at its own time. Two changes of d while clk is high toggle
+// it twice, at 13 and 16, before the trailing edge at 20; answering both there
+// toggled it twice in one time step, which an `always @(n)` saw once.
 TEST(DrivenTimingCheckEvaluation, NochangeTogglesTheNotifierAtEachDataEvent) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top(\n"

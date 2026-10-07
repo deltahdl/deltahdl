@@ -37,12 +37,11 @@
 // windows carry, and a driver written for §31.3's shape does not reach this
 // rule.
 //
-// §31.4.1 is event-based: "it is evaluated only after a data event. If there is
-// never a data event ..., the $skew timing check shall never be evaluated, and
-// no timing violation shall ever be reported." That is what
-// SkewReferenceWithNoDataEventInARunReportsNothing below drives, and it is what
-// separates $skew from §31.4.2's $timeskew, whose timer-based default reports
-// once the limit elapses with no data event at all.
+// §31.4.1 is event-based: the check is evaluated only once a data event comes,
+// so a run with no data event never evaluates $skew and never reports a
+// violation. That is what SkewReferenceWithNoDataEventInARunReportsNothing
+// below drives, and it is what separates $skew from §31.4.2's $timeskew, whose
+// timer-based default reports once the limit elapses with no data event at all.
 //
 // The first three cases share one design and differ in their stimulus alone.
 // That is what shows a check being run rather than one answer being handed to
@@ -52,12 +51,12 @@
 // The last two cases share a second design. In both of them a reference event
 // stands at an earlier time and both signals then transition at one later
 // simulation time, and neither case reports anything. §31.4.1 settles that
-// twice over. "A new reference event shall cancel the old wait for the data
-// event and begin a new one", so the reference event standing at the later time
-// has cancelled the wait the data event of that same time would otherwise be
-// judged against. "Simultaneous transitions on the reference and data signals
-// shall not cause $skew to report a timing violation, even when the skew limit
-// value is zero" states the verdict outright.
+// twice over. A new reference event drops the wait already running for a data
+// event and starts a fresh one, so the reference event standing at the later
+// time has cancelled the wait the data event of that same time would otherwise
+// be judged against. And §31.4.1 states the verdict outright: reference and
+// data transitions at the same time never make $skew report, even with a zero
+// limit.
 //
 // The two cases differ in which of the two signals the design assigns first at
 // that later time, and the pair is what says the answer follows the times the

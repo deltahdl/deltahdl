@@ -18,15 +18,12 @@
 //
 // Table 31-13 states the whole of what a violation does to a notifier. Its
 // BEFORE and AFTER columns are x and "Either 0 or 1", 0 and 1, 1 and 0, and z
-// and z. §31.6 says of the variable itself that "the notifier is a variable,
-// declared in the module where timing check tasks are invoked, that is passed
-// as the last argument to a system timing check", and that "whenever a timing
-// violation occurs, the timing check updates the value of the notifier". The
-// clause gives the notifier its purpose in the same terms: "timing check
-// notifiers detect timing check violations behaviorally and, therefore, take an
-// action as soon as a violation occurs. Such notifiers can be used to print an
-// informative error message describing the violation or to propagate an x value
-// at the output of the device that reported the violation." A design reading
+// and z. §31.6 says of the variable itself that it belongs to the module
+// invoking the timing checks and is a system timing check's last argument, and
+// that each violation has the check update it. The clause gives the notifier
+// its purpose in the same terms: a notifier catches violations behaviorally and
+// so acts the moment one happens, whether to print a message describing it or
+// to put an x on the output of the device that reported it. A design reading
 // its own notifier is what those two uses need, so the value the run leaves in
 // the variable is what each case below asserts.
 //
@@ -241,11 +238,11 @@ TEST(NotifierUpdateDriven, OneNotifierBecomesZeroAfterADrivenViolation) {
   EXPECT_EQ(notifier->value.words[0].bval & 1u, 0u);
 }
 
-// §31.6 updates the notifier "whenever a timing violation occurs" and at no
-// other time, so a satisfied window leaves it where the design put it. `d`
-// rises at time 127 and `clk` rises at time 158, leaving 31 time units of setup
-// against a limit of 29, so the window closes with nothing inside it and the
-// notifier still holds the 0 the initial block wrote.
+// §31.6 updates the notifier on each violation and at no other time, so a
+// satisfied window leaves it where the design put it. `d` rises at time 127 and
+// `clk` rises at time 158, leaving 31 time units of setup against a limit of
+// 29, so the window closes with nothing inside it and the notifier still holds
+// the 0 the initial block wrote.
 //
 // Without this case a run that toggled the notifier on every reference edge
 // would pass the 0-to-1 and 1-to-0 cases above, each of which drives exactly
@@ -265,13 +262,13 @@ TEST(NotifierUpdateDriven, SatisfiedWindowLeavesTheDrivenNotifierAtZero) {
   EXPECT_EQ(notifier->value.words[0].bval & 1u, 0u);
 }
 
-// §31.6 Example 2 (printed pages 916-917) whole, a model that "uses a
-// notifier to set the D flip-flop output to x when a timing violation occurs in
-// an edge-sensitive UDP". The rising clock at 40 with data 1 is legal, so q
-// rises 6 later, tPLHc's typical value, and qbar falls 8 later, tPHLc's. Data
-// falling at 62 is 8 units before the clock rises at 70, inside tSU = 10, so
-// the $setup toggles the notifier, the UDP's `? ? ? ? *` row drives its output
-// to x, and the x reaches qbar at 76 and q at 78 through the clock's paths.
+// §31.6 Example 2 (printed pages 916-917) whole, a model whose notifier drives
+// an edge-sensitive UDP's D flip-flop output to x on a timing violation. The
+// rising clock at 40 with data 1 is legal, so q rises 6 later, tPLHc's typical
+// value, and qbar falls 8 later, tPHLc's. Data falling at 62 is 8 units before
+// the clock rises at 70, inside tSU = 10, so the $setup toggles the notifier,
+// the UDP's `? ? ? ? *` row drives its output to x, and the x reaches qbar at
+// 76 and q at 78 through the clock's paths.
 TEST(NotifierUpdateDriven, SubclauseExample2FlipFlopGoesToXOnASetupViolation) {
   SimFixture f;
   const std::string kDesign =
