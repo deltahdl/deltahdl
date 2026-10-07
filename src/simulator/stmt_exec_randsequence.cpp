@@ -314,9 +314,9 @@ static bool WeightIsNegative(const Logic4Vec& v) {
   return ((v.words[top / 64].aval >> (top % 64)) & 1ULL) != 0;
 }
 
-// §18.17.1: an rs_weight_specification has to yield a non-negative integral
-// value. Returns the weight to draw against, reporting a value that is not one
-// and counting it as zero.
+// §18.17.1: an rs_weight_specification has to come out as an integral value of
+// zero or more. Returns the weight to draw against, reporting a value that is
+// not one and counting it as zero.
 //
 // Zero is what a reported weight counts as, because it is the one value that
 // cannot decide the draw. A negative weight read through ToUint64 arrived as
@@ -334,17 +334,17 @@ static uint64_t WeightOrReport(const Logic4Vec& val, const Expr* weight,
                                SimContext& ctx) {
   if (!val.IsKnown()) {
     ctx.GetDiag().Error(weight->range.start,
-                        "randsequence rule weight shall evaluate to an "
-                        "integral non-negative value, and this one has unknown "
-                        "bits",
+                        "randsequence rule weight has unknown bits; a weight "
+                        "needs a known integral value of zero or more",
                         Subclause("18.17.1"));
     return 0;
   }
   if (WeightIsNegative(val)) {
-    ctx.GetDiag().Error(weight->range.start,
-                        "randsequence rule weight shall evaluate to an "
-                        "integral non-negative value, and this one is negative",
-                        Subclause("18.17.1"));
+    ctx.GetDiag().Error(
+        weight->range.start,
+        "randsequence rule weight is negative; a weight needs a "
+        "known integral value of zero or more",
+        Subclause("18.17.1"));
     return 0;
   }
   return val.ToUint64();

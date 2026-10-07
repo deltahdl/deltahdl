@@ -347,11 +347,11 @@ void RunWeightOnce(SimFixture& f, std::string_view main_rule) {
   f.scheduler.Run();
 }
 
-// §18.17.1: an rs_weight_specification must evaluate to a non-negative integral
-// value. A negative one was read through ToUint64 as its two's-complement
-// value, so this rule carried a weight of 18446744073709551615, `b` could not
-// be reached, and the total then wrapped to zero and the first rule was
-// returned outright. Nothing said so.
+// §18.17.1: an rs_weight_specification has to come out as an integral value of
+// zero or more. A negative one was read through ToUint64 as its
+// two's-complement value, so this rule carried a weight of
+// 18446744073709551615, `b` could not be reached, and the total then wrapped to
+// zero and the first rule was returned outright. Nothing said so.
 //
 // The weight is parenthesized because Syntax 18-14 writes
 // `rs_weight_specification ::= integral_number | ps_identifier | ( expression
@@ -361,8 +361,8 @@ TEST(RandsequenceSim, NegativeWeightIsReported) {
   SimFixture f;
   RunWeightOnce(f, "a := (-1) | b := 1");
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "randsequence rule weight shall evaluate to an "
-                            "integral non-negative value",
+                            "a weight needs a known integral value of zero or "
+                            "more",
                             6, "18.17.1"));
 }
 
@@ -375,8 +375,8 @@ TEST(RandsequenceSim, UnknownWeightIsReported) {
   SimFixture f;
   RunWeightOnce(f, "a := 1'bx | b := 1");
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "randsequence rule weight shall evaluate to an "
-                            "integral non-negative value",
+                            "a weight needs a known integral value of zero or "
+                            "more",
                             6, "18.17.1"));
 }
 
