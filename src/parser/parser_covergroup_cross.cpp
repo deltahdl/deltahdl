@@ -174,11 +174,10 @@ void Parser::ValidateCrossItemList(std::vector<CrossItem>& items) {
     Consume();
   }
   if (expr_item) {
-    diag_.Error(
-        start,
-        "a cross item shall be a coverage point or variable identifier; "
-        "an expression cannot be used directly in a cross",
-        Subclause("19.6"));
+    diag_.Error(start,
+                "a cross item names a coverage point or a variable; to cross "
+                "an expression, give it a coverage point first",
+                Subclause("19.6"));
   } else if (items.size() < 2) {
     diag_.Error(start, "a cross shall list at least two coverage points",
                 Subclause("19.6"));

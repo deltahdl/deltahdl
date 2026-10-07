@@ -41,8 +41,9 @@ TEST_F(VerifyParseTest, SingleItemCrossIsError) {
                             5, "19.6"));
 }
 
-// §19.6: expressions cannot be used directly in a cross; a coverage point must
-// be defined first, so `cross a + b, c;` is rejected.
+// §19.6: a cross names coverage points or variables, so an expression has to
+// become a coverage point before it can be crossed, and `cross a + b, c;` is
+// rejected.
 TEST_F(VerifyParseTest, ExpressionCrossItemIsError) {
   Parse(R"(
     module m;
@@ -54,11 +55,11 @@ TEST_F(VerifyParseTest, ExpressionCrossItemIsError) {
       endgroup
     endmodule
   )");
-  EXPECT_TRUE(ReportedError(
-      diag_.Diagnostics(),
-      "a cross item shall be a coverage point or variable identifier; "
-      "an expression cannot be used directly in a cross",
-      7, "19.6"));
+  EXPECT_TRUE(
+      ReportedError(diag_.Diagnostics(),
+                    "a cross item names a coverage point or a variable; to "
+                    "cross an expression, give it a coverage point first",
+                    7, "19.6"));
 }
 
 // §19.6: the cross label is optional and, when present, precedes the
