@@ -549,16 +549,16 @@ static std::optional<int64_t> EvalDefparamOverride(
   }
   auto val = FoldParamValue(*ovr.param, ovr.val_expr, ovr.scope);
   if (!val) {
-    // §23.10.1 states that the expression on the right-hand side of a defparam
-    // assignment shall be a constant expression involving only numbers and
-    // references to parameters. A right-hand side that is no constant
-    // expression breaks that rule, so the source is illegal and the report is
-    // an error. Folding can also fail on a right-hand side that is a constant
-    // expression, which breaks no rule and stays the warning it was.
+    // §23.10.1 requires a defparam assignment's right-hand side to be a
+    // constant expression built from nothing but numbers and parameters. A
+    // right-hand side that is no constant expression breaks that rule, so the
+    // source is illegal and the report is an error. Folding can also fail on a
+    // right-hand side that is a constant expression, which breaks no rule and
+    // stays the warning it was.
     if (!IsConstantExpr(ovr.val_expr, ovr.scope)) {
       diag.Error(ovr.loc,
-                 "defparam right-hand side shall be a constant expression "
-                 "involving only numbers and references to parameters",
+                 "defparam right-hand side must be a constant expression "
+                 "built from numbers and parameters",
                  Subclause("23.10.1"));
     } else {
       diag.Warning(ovr.loc, "defparam value is not constant",
@@ -818,8 +818,8 @@ void Elaborator::ReportUnresolvedDefparamSite(RtlirModule* mod,
                             ResolveDefparamFromTop(path, any) != nullptr);
     if (reaches) {
       diag_.Error(site.item->loc,
-                  "defparam in a generate block shall not change a parameter "
-                  "value outside that block",
+                  "defparam inside a generate block reaches a parameter "
+                  "outside that block",
                   Subclause("23.10.1"));
       continue;
     }

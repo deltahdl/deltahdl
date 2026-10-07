@@ -293,8 +293,8 @@ TEST(DefparamElaboration, WidensAnInstanceOverrideGivenInThePortList) {
 ::testing::AssertionResult EscapeReportedAt(const ElabFixture& f,
                                             uint32_t line) {
   return ReportedError(f.diag.Diagnostics(),
-                       "defparam in a generate block shall not change a "
-                       "parameter value outside that block",
+                       "defparam inside a generate block reaches a parameter "
+                       "outside that block",
                        line, "23.10.1");
 }
 

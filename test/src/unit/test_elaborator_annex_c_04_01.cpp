@@ -170,10 +170,11 @@ TEST(DefparamSupport, DefparamInGenerateBlockCannotReachOutThroughTheTop) {
       "  end\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "defparam in a generate block shall not change a "
-                            "parameter value outside that block",
-                            5, "23.10.1"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "defparam inside a generate block reaches a parameter "
+                    "outside that block",
+                    5, "23.10.1"));
 }
 
 }  // namespace

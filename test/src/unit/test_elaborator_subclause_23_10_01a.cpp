@@ -141,11 +141,11 @@ TEST(DefparamElaboration, RhsRejectsNonConstantExpression) {
       "  defparam u.P = data;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "defparam right-hand side shall be a constant "
-                            "expression involving only numbers and references "
-                            "to parameters",
-                            6, "23.10.1"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "defparam right-hand side must be a constant expression "
+                    "built from numbers and parameters",
+                    6, "23.10.1"));
 }
 
 // §23.10.1: a defparam statement in or under a generate block instance (Clause
@@ -170,10 +170,11 @@ TEST(DefparamElaboration, DefparamInGenerateBlockCannotEscapeScope) {
   ASSERT_NE(u, nullptr);
   EXPECT_EQ(u->params[0].resolved_value, 5);
   EXPECT_TRUE(u->params[0].is_resolved);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "defparam in a generate block shall not change a "
-                            "parameter value outside that block",
-                            6, "23.10.1"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "defparam inside a generate block reaches a parameter "
+                    "outside that block",
+                    6, "23.10.1"));
 }
 
 TEST(DefparamElaboration, RhsRejectsHierarchicalReference) {
@@ -222,10 +223,11 @@ TEST(DefparamElaboration, DefparamInGenerateCannotTargetSiblingScope) {
   auto* u = ChildInstantiatedAs(design->top_modules[0], "g1_u");
   ASSERT_NE(u, nullptr);
   EXPECT_EQ(u->params[0].resolved_value, 5);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "defparam in a generate block shall not change a "
-                            "parameter value outside that block",
-                            8, "23.10.1"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "defparam inside a generate block reaches a parameter "
+                    "outside that block",
+                    8, "23.10.1"));
 }
 
 // §23.10.1 bars a defparam in a generate block from changing a parameter
