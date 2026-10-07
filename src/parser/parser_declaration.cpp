@@ -370,8 +370,8 @@ bool Parser::TryParseDefaultArgSentinel(std::vector<FunctionArg>& args,
   }
   if (scan.seen_default) {
     diag_.Error(CurrentLoc(),
-                "'default' keyword shall appear at most once "
-                "in a class constructor argument list",
+                "'default' already appears earlier in this class constructor "
+                "argument list",
                 Subclause("8.17"));
   }
   scan.seen_default = true;

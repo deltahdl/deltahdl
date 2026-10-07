@@ -151,8 +151,8 @@ TEST(BnfClarificationParsing, ClassParameterIsLocalparamSynonym) {
               "endclass\n"));
 }
 
-// §A.10 item 9: the `default` keyword may appear at most once in a class
-// constructor argument list.
+// §A.10 item 9: a class constructor argument list takes `default` once and no
+// more.
 TEST(BnfClarificationParsing, ErrorDuplicateDefaultInConstructorArgs) {
   auto r = Parse(
       "class C extends Base;\n"
@@ -161,8 +161,8 @@ TEST(BnfClarificationParsing, ErrorDuplicateDefaultInConstructorArgs) {
       "endclass\n");
   // §8.17 owns the `default` sentinel rule.
   EXPECT_TRUE(ReportedError(r.diags,
-                            "'default' keyword shall appear at most once in a "
-                            "class constructor argument list",
+                            "'default' already appears earlier in this class "
+                            "constructor argument list",
                             2, "8.17"));
 }
 

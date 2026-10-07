@@ -143,8 +143,8 @@ TEST(ChainedConstructorParsing, ErrorDuplicateDefaultInConstructorArgs) {
       "  endfunction\n"
       "endclass\n");
   EXPECT_TRUE(ReportedError(r.diags,
-                            "'default' keyword shall appear at most once in a "
-                            "class constructor argument list",
+                            "'default' already appears earlier in this class "
+                            "constructor argument list",
                             2, "8.17"));
 }
 

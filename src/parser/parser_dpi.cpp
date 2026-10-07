@@ -111,11 +111,11 @@ struct ParserDpiHelpers {
         !item->is_method_final) {
       return;
     }
-    p.diag_.Error(loc,
-                  "a DPI import declaration cannot carry "
-                  "dynamic_override_specifiers, which are legal only on a "
-                  "method declaration inside a non-interface class scope",
-                  Subclause("35.5.4"));
+    p.diag_.Error(
+        loc,
+        "a DPI import declaration cannot carry dynamic_override_specifiers; "
+        "they belong on class method declarations outside interface classes",
+        Subclause("35.5.4"));
   }
 };
 

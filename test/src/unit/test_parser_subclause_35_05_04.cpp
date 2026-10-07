@@ -591,8 +591,8 @@ TEST(FunctionDeclParsing, DpiImportExplicitCIdentifierLeavesSvNameFree) {
   EXPECT_EQ(item->name, "foo$bar");
 }
 
-// Footnote 25 of Syntax 35-1 in §35.5.4: dynamic_override_specifiers are legal
-// only on a method declaration in a class scope that is not an interface class.
+// Footnote 25 of Syntax 35-1 in §35.5.4 keeps dynamic_override_specifiers to
+// the methods a class declares, and to no interface class.
 // An import declaration declares no class method, so `:initial` on one is
 // illegal wherever the import is written.
 TEST(FunctionDeclParsing, DpiImportFunctionDynamicOverrideSpecifierIsError) {
@@ -600,12 +600,11 @@ TEST(FunctionDeclParsing, DpiImportFunctionDynamicOverrideSpecifierIsError) {
       "module m;\n"
       "  import \"DPI-C\" function :initial void f();\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedError(r.diags,
-                            "a DPI import declaration cannot carry "
-                            "dynamic_override_specifiers, which are legal only "
-                            "on a method declaration inside a non-interface "
-                            "class scope",
-                            2, "35.5.4"));
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "a DPI import declaration cannot carry dynamic_override_specifiers; they "
+      "belong on class method declarations outside interface classes",
+      2, "35.5.4"));
 }
 
 // Footnote 25 of Syntax 35-1 in §35.5.4 governs the task form as well:
@@ -617,12 +616,11 @@ TEST(FunctionDeclParsing, DpiImportTaskDynamicOverrideSpecifierIsError) {
       "module m;\n"
       "  import \"DPI-C\" task :final t();\n"
       "endmodule\n");
-  EXPECT_TRUE(ReportedError(r.diags,
-                            "a DPI import declaration cannot carry "
-                            "dynamic_override_specifiers, which are legal only "
-                            "on a method declaration inside a non-interface "
-                            "class scope",
-                            2, "35.5.4"));
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "a DPI import declaration cannot carry dynamic_override_specifiers; they "
+      "belong on class method declarations outside interface classes",
+      2, "35.5.4"));
 }
 
 // §35.5.4: a formal needs no name unless a call binds arguments by name.

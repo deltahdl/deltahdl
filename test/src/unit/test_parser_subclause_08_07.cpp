@@ -52,8 +52,9 @@ TEST(ClassConstructorParsing, ConstructorStaticError) {
       "  static function new();\n"
       "  endfunction\n"
       "endclass\n");
-  EXPECT_TRUE(ReportedError(r.diags, "constructor shall not be declared static",
-                            2, "8.7"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "'new' is declared static here, which a constructor never is", 2,
+      "8.7"));
 }
 
 TEST(ClassConstructorParsing, ConstructorVirtualError) {
@@ -63,7 +64,8 @@ TEST(ClassConstructorParsing, ConstructorVirtualError) {
       "  endfunction\n"
       "endclass\n");
   EXPECT_TRUE(ReportedError(
-      r.diags, "constructor shall not be declared virtual", 2, "8.7"));
+      r.diags, "'new' is declared virtual here, which a constructor never is",
+      2, "8.7"));
 }
 
 TEST(ClassConstructorParsing, ConstructorNoReturnType) {

@@ -28,8 +28,8 @@ void Parser::ParseModportPrototypeSpecifiers(ModuleItem* item) {
   if (item->is_method_initial || item->is_method_extends ||
       item->is_method_final) {
     diag_.Error(item->loc,
-                "dynamic_override_specifiers shall only be legal on method "
-                "declarations inside a non-interface class scope",
+                "dynamic_override_specifiers belong on a class method "
+                "declaration, and an interface class takes none",
                 Subclause("8.20"));
   }
 }

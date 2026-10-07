@@ -437,7 +437,8 @@ void Parser::ValidateClassMethod(ClassMember* member) {
   if (member->is_static && member->is_virtual &&
       member->method->name != "new") {
     diag_.Error(member->method->loc,
-                "static method shall not be declared virtual",
+                "this method is declared both static and virtual, which no "
+                "method can be",
                 Subclause("8.10"));
   }
   // §8.10 (printed page 187): the qualifier is the method's static-ness, not
@@ -450,12 +451,14 @@ void Parser::ValidateClassMethod(ClassMember* member) {
 void Parser::ValidateConstructorQualifiers(ClassMember* member) {
   if (member->method->name != "new") return;
   if (member->is_static) {
-    diag_.Error(member->method->loc, "constructor shall not be declared static",
+    diag_.Error(member->method->loc,
+                "'new' is declared static here, which a constructor never is",
                 Subclause("8.7"));
   }
   if (member->is_virtual) {
     diag_.Error(member->method->loc,
-                "constructor shall not be declared virtual", Subclause("8.7"));
+                "'new' is declared virtual here, which a constructor never is",
+                Subclause("8.7"));
   }
 }
 

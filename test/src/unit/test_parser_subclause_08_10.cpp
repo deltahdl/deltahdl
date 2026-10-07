@@ -72,7 +72,9 @@ TEST(StaticMethodParsing, StaticVirtualFunctionError) {
       "  endfunction\n"
       "endclass\n");
   EXPECT_TRUE(ReportedError(
-      r.diags, "static method shall not be declared virtual", 2, "8.10"));
+      r.diags,
+      "this method is declared both static and virtual, which no method can be",
+      2, "8.10"));
 }
 
 TEST(StaticMethodParsing, StaticVirtualTaskError) {
@@ -82,7 +84,9 @@ TEST(StaticMethodParsing, StaticVirtualTaskError) {
       "  endtask\n"
       "endclass\n");
   EXPECT_TRUE(ReportedError(
-      r.diags, "static method shall not be declared virtual", 2, "8.10"));
+      r.diags,
+      "this method is declared both static and virtual, which no method can be",
+      2, "8.10"));
 }
 
 // §8.10 (printed page 187): the qualifier before `function` makes the method
