@@ -477,8 +477,7 @@ void ElaboratorOperationRules::CheckReplicateLvalue(const Expr* lhs) {
   if (!lhs) return;
   if (ExprContainsReplicate(lhs)) {
     diag_.Error(lhs->range.start,
-                "replication shall not appear on the left-hand side "
-                "of an assignment",
+                "an assignment target cannot contain a replication",
                 Subclause("11.4.12.1"));
   }
 }
@@ -590,8 +589,8 @@ static void CheckZeroReplicateInConcat(const Expr* concat,
                                        DiagEngine& diag) {
   if (ConcatIsAllZeroReplicate(concat, scope)) {
     diag.Error(concat->range.start,
-               "zero replication shall appear only within a concatenation "
-               "in which at least one operand has a positive size",
+               "a zero replication needs a positive-size operand beside it "
+               "in the same concatenation",
                Subclause("11.4.12.1"));
   }
   for (const auto* elem : concat->elements) {
@@ -607,8 +606,8 @@ static void CheckZeroReplicateStandalone(const Expr* expr,
   if (!expr) return;
   if (IsZeroReplicate(expr, scope)) {
     diag.Error(expr->range.start,
-               "zero replication shall appear only within a concatenation "
-               "in which at least one operand has a positive size",
+               "a zero replication needs a positive-size operand beside it "
+               "in the same concatenation",
                Subclause("11.4.12.1"));
   }
   if (expr->kind == ExprKind::kConcatenation) {

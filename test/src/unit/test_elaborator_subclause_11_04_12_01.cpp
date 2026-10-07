@@ -53,8 +53,7 @@ TEST(ReplicationElaboration, ReplicationOnLhsOfBlockingAssign) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "replication shall not appear on the left-hand "
-                            "side of an assignment",
+                            "an assignment target cannot contain a replication",
                             3, "11.4.12.1"));
 }
 
@@ -67,8 +66,7 @@ TEST(ReplicationElaboration, ReplicationOnLhsOfNonblockingAssign) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "replication shall not appear on the left-hand "
-                            "side of an assignment",
+                            "an assignment target cannot contain a replication",
                             3, "11.4.12.1"));
 }
 
@@ -81,8 +79,7 @@ TEST(ReplicationElaboration, ReplicationOnLhsOfContAssign) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "replication shall not appear on the left-hand "
-                            "side of an assignment",
+                            "an assignment target cannot contain a replication",
                             3, "11.4.12.1"));
 }
 
@@ -96,8 +93,7 @@ TEST(ReplicationElaboration, ReplicationInsideLhsConcat) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "replication shall not appear on the left-hand "
-                            "side of an assignment",
+                            "an assignment target cannot contain a replication",
                             4, "11.4.12.1"));
 }
 
@@ -183,11 +179,10 @@ TEST(ReplicationElaboration, ZeroReplicationStandaloneRejected) {
       "  initial result = {0{a}};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(),
-                    "zero replication shall appear only within a concatenation "
-                    "in which at least one operand has a positive size",
-                    4, "11.4.12.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a zero replication needs a positive-size operand "
+                            "beside it in the same concatenation",
+                            4, "11.4.12.1"));
 }
 
 TEST(ReplicationElaboration, ZeroReplicationInsideConcatOk) {
@@ -215,11 +210,10 @@ TEST(ReplicationElaboration, ZeroReplicationConcatAllZeroRejected) {
       "  initial result = {{0{a}}, {0{b}}};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(),
-                    "zero replication shall appear only within a concatenation "
-                    "in which at least one operand has a positive size",
-                    4, "11.4.12.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a zero replication needs a positive-size operand "
+                            "beside it in the same concatenation",
+                            4, "11.4.12.1"));
 }
 
 TEST(ReplicationElaboration, NegativeMultiplierRejected) {
@@ -250,11 +244,10 @@ TEST(ReplicationElaboration, ParameterZeroMultiplierStandaloneRejected) {
       "  initial result = {Z{a}};\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(),
-                    "zero replication shall appear only within a concatenation "
-                    "in which at least one operand has a positive size",
-                    5, "11.4.12.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a zero replication needs a positive-size operand "
+                            "beside it in the same concatenation",
+                            5, "11.4.12.1"));
 }
 
 // §11.4.12.1: a negative multiplier is illegal even when it comes from a
@@ -300,8 +293,8 @@ TEST(ReplicationElaboration, ReplicationOnLvalueInAForkArmNames11_4_12_1) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "replication shall not appear on the left-hand", 5,
-                            "11.4.12.1"));
+                            "an assignment target cannot contain a replication",
+                            5, "11.4.12.1"));
 }
 
 // §16.3 gives `action_block ::= statement_or_null | [ statement ] else
@@ -319,8 +312,8 @@ TEST(ReplicationElaboration,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "replication shall not appear on the left-hand", 4,
-                            "11.4.12.1"));
+                            "an assignment target cannot contain a replication",
+                            4, "11.4.12.1"));
 }
 
 TEST(ReplicationElaboration,
@@ -334,8 +327,8 @@ TEST(ReplicationElaboration,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "replication shall not appear on the left-hand", 4,
-                            "11.4.12.1"));
+                            "an assignment target cannot contain a replication",
+                            4, "11.4.12.1"));
 }
 
 // §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
@@ -351,8 +344,8 @@ TEST(ReplicationElaboration, ReplicationOnLvalueInARandcaseItemNames11_4_12_1) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "replication shall not appear on the left-hand", 3,
-                            "11.4.12.1"));
+                            "an assignment target cannot contain a replication",
+                            3, "11.4.12.1"));
 }
 
 // A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
@@ -373,8 +366,8 @@ TEST(ReplicationElaboration,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "replication shall not appear on the left-hand", 5,
-                            "11.4.12.1"));
+                            "an assignment target cannot contain a replication",
+                            5, "11.4.12.1"));
 }
 
 // A.6.8 gives `for_initialization ::= list_of_variable_assignments |
@@ -396,8 +389,8 @@ TEST(ReplicationElaboration,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "replication shall not appear on the left-hand", 4,
-                            "11.4.12.1"));
+                            "an assignment target cannot contain a replication",
+                            4, "11.4.12.1"));
 }
 
 TEST(ReplicationElaboration, ReplicationOnLvalueInAForLoopStepNames11_4_12_1) {
@@ -410,13 +403,13 @@ TEST(ReplicationElaboration, ReplicationOnLvalueInAForLoopStepNames11_4_12_1) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "replication shall not appear on the left-hand", 4,
-                            "11.4.12.1"));
+                            "an assignment target cannot contain a replication",
+                            4, "11.4.12.1"));
 }
 
-// §11.4.12.1 allows a zero replication only inside a concatenation in which at
-// least one operand has a positive size, and says nothing about the statement
-// the replication is written in.
+// §11.4.12.1 lets a zero replication stand only beside an operand of positive
+// size in the same concatenation, and says nothing about the statement the
+// replication is written in.
 //
 // WalkStmtsForZeroReplicateStandalone in
 // src/elaborator/elaborator_validate_operations_arrays.cpp reached six of the
@@ -443,8 +436,9 @@ TEST(ReplicationElaboration,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "zero replication shall appear only within a", 6,
-                            "11.4.12.1"));
+                            "a zero replication needs a positive-size operand "
+                            "beside it in the same concatenation",
+                            6, "11.4.12.1"));
 }
 
 // §16.3 gives `action_block ::= statement_or_null | [ statement ] else
@@ -463,8 +457,9 @@ TEST(ReplicationElaboration,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "zero replication shall appear only within a", 5,
-                            "11.4.12.1"));
+                            "a zero replication needs a positive-size operand "
+                            "beside it in the same concatenation",
+                            5, "11.4.12.1"));
 }
 
 TEST(ReplicationElaboration,
@@ -479,8 +474,9 @@ TEST(ReplicationElaboration,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "zero replication shall appear only within a", 5,
-                            "11.4.12.1"));
+                            "a zero replication needs a positive-size operand "
+                            "beside it in the same concatenation",
+                            5, "11.4.12.1"));
 }
 
 // §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
@@ -498,8 +494,9 @@ TEST(ReplicationElaboration,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "zero replication shall appear only within a", 4,
-                            "11.4.12.1"));
+                            "a zero replication needs a positive-size operand "
+                            "beside it in the same concatenation",
+                            4, "11.4.12.1"));
 }
 
 // A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
@@ -521,8 +518,9 @@ TEST(ReplicationElaboration,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "zero replication shall appear only within a", 6,
-                            "11.4.12.1"));
+                            "a zero replication needs a positive-size operand "
+                            "beside it in the same concatenation",
+                            6, "11.4.12.1"));
 }
 
 // A.6.8 gives `for_initialization ::= list_of_variable_assignments |
@@ -545,8 +543,9 @@ TEST(ReplicationElaboration,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "zero replication shall appear only within a", 5,
-                            "11.4.12.1"));
+                            "a zero replication needs a positive-size operand "
+                            "beside it in the same concatenation",
+                            5, "11.4.12.1"));
 }
 
 TEST(ReplicationElaboration,
@@ -561,8 +560,9 @@ TEST(ReplicationElaboration,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "zero replication shall appear only within a", 5,
-                            "11.4.12.1"));
+                            "a zero replication needs a positive-size operand "
+                            "beside it in the same concatenation",
+                            5, "11.4.12.1"));
 }
 
 // §11.4.12.1 requires a replication multiplier to be a constant expression that
