@@ -37,8 +37,8 @@ TEST(PlaAscendingOrder, DescendingMemoryWidthIsRejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "the memory of a PLA modeling system task shall be "
-                            "declared in ascending order",
+                            "the memory of a PLA modeling system task has a "
+                            "descending range; give it an ascending one",
                             5, "20.16.3"));
 }
 
@@ -55,8 +55,8 @@ TEST(PlaAscendingOrder, DescendingMemoryDepthIsRejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "the memory of a PLA modeling system task shall be "
-                            "declared in ascending order",
+                            "the memory of a PLA modeling system task has a "
+                            "descending range; give it an ascending one",
                             5, "20.16.3"));
 }
 
@@ -146,8 +146,8 @@ TEST(PlaAscendingOrder, DescendingMemoryWidthViaParameterIsRejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "the memory of a PLA modeling system task shall be "
-                            "declared in ascending order",
+                            "the memory of a PLA modeling system task has a "
+                            "descending range; give it an ascending one",
                             6, "20.16.3"));
 }
 
@@ -182,8 +182,8 @@ TEST(PlaAscendingOrder, DescendingMemoryDepthViaLocalparamIsRejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "the memory of a PLA modeling system task shall be "
-                            "declared in ascending order",
+                            "the memory of a PLA modeling system task has a "
+                            "descending range; give it an ascending one",
                             6, "20.16.3"));
 }
 
@@ -237,8 +237,8 @@ TEST(PlaAscendingOrder, DescendingMemoryInAnAssertionPassStatementIsRejected) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "the memory of a PLA modeling system task shall be "
-                            "declared in ascending order",
+                            "the memory of a PLA modeling system task has a "
+                            "descending range; give it an ascending one",
                             6, "20.16.3"));
 }
 
@@ -308,8 +308,8 @@ TEST(PlaAscendingOrder,
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "the memory of a PLA modeling system task shall be "
-                            "declared in ascending order",
+                            "the memory of a PLA modeling system task has a "
+                            "descending range; give it an ascending one",
                             7, "20.16.3"));
 }
 

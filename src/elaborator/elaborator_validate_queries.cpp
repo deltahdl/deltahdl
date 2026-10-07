@@ -405,11 +405,10 @@ void CheckPlaAscendingExpr(const Expr* e, const PlaRangeMap& ranges,
   if (!e) return;
   if (e->kind == ExprKind::kSystemCall && IsPlaSystemTask(e->callee)) {
     if (e->args.size() >= 1)
-      CheckPlaArgAscending(
-          e->args[0], ranges, /*check_unpacked=*/true,
-          "the memory of a PLA modeling system task shall be declared in "
-          "ascending order",
-          diag);
+      CheckPlaArgAscending(e->args[0], ranges, /*check_unpacked=*/true,
+                           "the memory of a PLA modeling system task has a "
+                           "descending range; give it an ascending one",
+                           diag);
     if (e->args.size() >= 2)
       CheckPlaArgAscending(e->args[1], ranges, /*check_unpacked=*/false,
                            "the input terms of a PLA modeling system task have "
