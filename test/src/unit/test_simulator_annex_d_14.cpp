@@ -223,4 +223,26 @@ TEST(OptionalSreadmemSim, ACallWithoutAStringIsReportedUnderD14) {
                             4, "D.14"));
 }
 
+// Annex D.14: $sreadmemb takes the same arguments as $sreadmemh, so a call
+// stopping after the start address is reported under D.14 too, and the
+// report names $sreadmemb, the task the source called.
+TEST(OptionalSreadmemSim, AShortSreadmembCallIsReportedUnderItsOwnName) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg [7:0] mem [0:3];\n"
+      "  initial begin\n"
+      "    $sreadmemb(mem, 1);\n"
+      "    $display(\"%h %h\", mem[0], mem[1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "xx xx\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$sreadmemb takes a memory name, a start address, "
+                            "a finish address, and one or more strings, and "
+                            "this call has fewer",
+                            4, "D.14"));
+}
+
 }  // namespace
