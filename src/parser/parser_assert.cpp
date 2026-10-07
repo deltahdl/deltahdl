@@ -49,10 +49,10 @@ struct ParserAssertHelpers {
   // A.6.10's deferred_immediate_assertion_item, the alternative of A.1.4's
   // assertion_item that A.1.7's non_port_program_item leaves out, admitting a
   // concurrent_assertion_item alone: §16.4.3 has a deferred assertion outside
-  // procedural code "treated as if it were contained in an always_comb
-  // procedure", and §24.3 keeps every always procedure out of a program. One
-  // in a program body is reported and still read, from the assert and assume
-  // path and from the cover path alike.
+  // procedural code behave as though an always_comb procedure held it, and
+  // §24.3 keeps every always procedure out of a program. One in a program body
+  // is reported and still read, from the assert and assume path and from the
+  // cover path alike.
   static void RejectDeferredInProgram(Parser& p, SourceLoc loc) {
     p.RejectInProgramBody(loc,
                           "a deferred immediate assertion is not an item of a "
@@ -335,13 +335,12 @@ bool Parser::BodyHasTemporalOperator() {
 // Reports that a concurrent assertion statement the source wrote will not be
 // evaluated, naming which of the reasons below applies.
 //
-// §16.14 states the rule the report rests on: "A property on its own is never
-// evaluated for checking an expression. It shall be used within an assertion
-// statement (see 16.2) for this to occur." A source that writes one of the
-// five concurrent assertion statements of Syntax 16-18 has asked for that
-// evaluation. Every property_spec that cannot take the clocked-boolean path
-// is handed to SkipPropertySpec and never lowered to a process, so
-// Elaborator::ElaborateAssertPropertyItem in
+// §16.14 states the rule the report rests on: a property is checked only when
+// an assertion statement (§16.2) uses it, and never by itself. A source that
+// writes one of the five concurrent assertion statements of Syntax 16-18 has
+// asked for that evaluation. Every property_spec that cannot take the
+// clocked-boolean path is handed to SkipPropertySpec and never lowered to a
+// process, so Elaborator::ElaborateAssertPropertyItem in
 // src/elaborator/elaborator_items_assertions.cpp finds no body and builds
 // nothing. Without this report a design whose assertions were all discarded
 // compiles exactly like one whose assertions all hold, and no line says which

@@ -302,9 +302,9 @@ struct SequencePortScan {
   bool expect_formal_name = true;
 
   bool item_saw_local = false;
-  // §16.8.2 distinguishes "local was set by a keyword in this port item"
-  // from "local was carried over via the inheritance rule." Only the
-  // explicit-here case triggers the explicit-type-required check.
+  // §16.8.2 tells a formal whose own port item writes `local` apart from one
+  // that takes `local` over from the formal before it. Only the first
+  // triggers the explicit-type-required check.
   bool item_local_explicit_here = false;
   // §16.8.2: a local formal must have its type specified explicitly in
   // the same port item. We mark `explicit type seen` when we consume a
