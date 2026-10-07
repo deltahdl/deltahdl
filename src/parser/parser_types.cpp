@@ -288,8 +288,8 @@ void Parser::ParseNetStrength(DataType& dtype) {
     if (dtype.charge_strength != 0) return;
   } else {
     if (!dtype.is_net || !Check(TokenKind::kLParen)) return;
-    // §6.3.2.1: the charge strength specification shall be used only with
-    // trireg nets. Read the specification here and report the rule it breaks,
+    // §6.3.2.1: a charge strength belongs to trireg nets and no other net
+    // type. Read the specification here and report the rule it breaks,
     // so the declarator list parses on and the report names the rule rather
     // than the identifier the list did not find. The strength is not recorded
     // on the type, because a net that may not carry one has none.
