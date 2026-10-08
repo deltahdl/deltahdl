@@ -528,6 +528,16 @@ static void FoldBodyParamsIntoPortScope(const ModuleDecl* decl,
   }
 }
 
+// Whether the module's body declares `name` as a net or a variable of its own.
+static bool BodyDeclaresObject(const ModuleDecl* decl, std::string_view name) {
+  return std::any_of(decl->items.begin(), decl->items.end(),
+                     [&](const ModuleItem* item) {
+                       return (item->kind == ModuleItemKind::kNetDecl ||
+                               item->kind == ModuleItemKind::kVarDecl) &&
+                              item->name == name;
+                     });
+}
+
 // §6.6.8: an interconnect port is a typeless/generic net, exactly like a
 // local interconnect declaration. Register its name so the assignment- and
 // expression-use checks -- which reject procedural/continuous/expression uses
@@ -542,30 +552,19 @@ static void FoldBodyParamsIntoPortScope(const ModuleDecl* decl,
 // side be a variable first. Left out of net_names_, `b <= a` in an always_ff
 // on such a port was accepted, the suite's
 // 14.3--clocking-block-signals-error.sv with it, while the same write to a
-// declared `wire w` was reported. A non-ANSI port registers through its body
-// net declaration in ElaborateNetDecl; a checker's formal is §17.2's and no
-// net.
+// declared `wire w` was reported. A non-ANSI port the body declares again is
+// that declaration's object (§23.2.2.1), which registers itself if it is a
+// net, so only a non-ANSI port the body leaves undeclared registers here; a
+// checker's formal is §17.2's and no net.
 static void RegisterPortNetNames(
     const ModuleDecl* decl, const PortDecl& port, const RtlirPort& rp,
     std::unordered_set<std::string_view>& interconnect_names,
     std::unordered_set<std::string_view>& net_names) {
   if (port.name.empty()) return;
   if (port.data_type.is_interconnect) interconnect_names.insert(port.name);
-  if (decl->is_non_ansi_ports || decl->decl_kind == ModuleDeclKind::kChecker ||
-      rp.is_var) {
-    return;
-  }
+  if (decl->decl_kind == ModuleDeclKind::kChecker || rp.is_var) return;
+  if (decl->is_non_ansi_ports && BodyDeclaresObject(decl, port.name)) return;
   net_names.insert(port.name);
-}
-
-// Whether the module's body declares `name` as a net or a variable of its own.
-static bool BodyDeclaresObject(const ModuleDecl* decl, std::string_view name) {
-  return std::any_of(decl->items.begin(), decl->items.end(),
-                     [&](const ModuleItem* item) {
-                       return (item->kind == ModuleItemKind::kNetDecl ||
-                               item->kind == ModuleItemKind::kVarDecl) &&
-                              item->name == name;
-                     });
 }
 
 // §23.2.2.1 (printed page 733), Example 5: `renamed_concat(.a({b, c}), f,

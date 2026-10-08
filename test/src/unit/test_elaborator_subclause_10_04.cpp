@@ -92,4 +92,38 @@ TEST(ProceduralAssignmentElaboration, ConcatenationContainingNetIsError) {
                             5, "10.4"));
 }
 
+// §10.4 with §23.2.2.1 (printed pages 731 and 732): a non-ANSI port declared
+// with no net or variable type, which the body never declares again, is a net,
+// so a procedural assignment to it is reported as one to a declared net is.
+TEST(ProceduralAssignmentElaboration, AssignToUndeclaredNonAnsiPortIsError) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t(q);\n"
+      "  output q;\n"
+      "  initial begin\n"
+      "    q = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot be the target of a procedural assignment",
+                            4, "10.4"));
+}
+
+// §23.2.2.1: the body declaring that port again as a variable makes it one, and
+// a variable takes the procedural assignment.
+TEST(ProceduralAssignmentElaboration, AssignToNonAnsiPortDeclaredAVariable) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t(q);\n"
+      "  output q;\n"
+      "  reg q;\n"
+      "  initial begin\n"
+      "    q = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
