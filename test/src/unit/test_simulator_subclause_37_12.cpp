@@ -847,5 +847,28 @@ TEST(ScopeModel, OnlyAnArrayOfVifsIsAVifArray) {
   EXPECT_FALSE(VpiIsVirtualInterfaceArray(&array));
 }
 
+// §37.12 (figure): vpiInternalScope reaches every kind the scope class groups
+// -- a task among the tasks and functions, the instances, the four block
+// kinds, class defns, typespecs and objects, clocking blocks, gen scopes, and
+// for and foreach statements.
+TEST(ScopeModel, EveryKindTheScopeClassGroupsIsAnInternalScope) {
+  for (int type :
+       {vpiTask, vpiInterface, vpiProgram, vpiPackage, vpiBegin, vpiNamedFork,
+        vpiFork, vpiClassDefn, vpiClassTypespec, vpiClassObj, vpiClockingBlock,
+        vpiGenScope, vpiFor, vpiForeachStmt}) {
+    EXPECT_TRUE(VpiIsInternalScopeType(type)) << type;
+  }
+}
+
+// §37.12 (figure): the block kinds reach their statements through vpiStmt;
+// asked of an object that is no block, the relation is not this one's.
+TEST(ScopeModel, AStatementIterationOfANonBlockIsNoNestedWalk) {
+  VpiObject module;
+  module.type = vpiModule;
+  VpiObject iter;
+  EXPECT_FALSE(VpiCollectNestedObjects(vpiStmt, &module, &iter));
+  EXPECT_TRUE(iter.children.empty());
+}
+
 }  // namespace
 }  // namespace delta

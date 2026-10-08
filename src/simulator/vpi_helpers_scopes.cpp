@@ -29,8 +29,7 @@ namespace {
 
 // Whether `obj` is a statement, or a case item (§37.72), which holds one.
 bool VpiIsStmtOrCaseItem(VpiHandle obj) {
-  return obj != nullptr &&
-         (VpiIsScopeBodyStmtObject(obj) || obj->type == vpiCaseItem);
+  return VpiIsScopeBodyStmtObject(obj) || obj->type == vpiCaseItem;
 }
 
 // Whether `obj` is a statement that is no scope: an unnamed begin or fork
@@ -48,7 +47,6 @@ bool VpiIsStmtThatIsNoScope(VpiHandle obj) {
 // own.
 void CollectInternalScopes(VpiHandle scope, VpiHandle iter) {
   for (VpiObject* child : scope->children) {
-    if (child == nullptr) continue;
     if (VpiIsScopeObject(child)) {
       iter->children.push_back(child);
     } else if (VpiIsStmtThatIsNoScope(child)) {
@@ -143,9 +141,7 @@ bool VpiCollectNestedObjects(int type, VpiHandle ref, VpiHandle iter) {
   // order written, and none of the block's variables.
   if (type != vpiStmt || !VpiIsBlockType(ref->type)) return false;
   for (VpiObject* child : ref->children) {
-    if (child != nullptr && VpiIsScopeBodyStmtObject(child)) {
-      iter->children.push_back(child);
-    }
+    if (VpiIsScopeBodyStmtObject(child)) iter->children.push_back(child);
   }
   return true;
 }
@@ -159,8 +155,7 @@ VpiHandle VpiNestedScopeNamed(VpiHandle parent, std::string_view name) {
         (VpiIsStmtOrCaseItem(child) && child->name.empty());
     if (!kNamesNoLevel) continue;
     for (VpiObject* nested : child->children) {
-      if (nested != nullptr && nested->name == name &&
-          VpiIsScopeObject(nested)) {
+      if (nested->name == name && VpiIsScopeObject(nested)) {
         return nested;
       }
     }
