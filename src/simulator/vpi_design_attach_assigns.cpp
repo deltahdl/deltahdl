@@ -3,10 +3,10 @@
 #include <functional>
 #include <initializer_list>
 #include <memory>
+#include <set>
 #include <string>
 #include <string_view>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -772,32 +772,35 @@ void VpiContext::AttachContinuousAssignments(
     return;
   }
   const std::string kFirstTop(design->top_modules.front()->name);
-  WalkInstancePaths(design, [&](const RtlirModule* mod,
-                                const std::string& prefix) {
-    VpiHandle scope =
-        FindObjectForFlatName(object_map_, prefix.empty() ? kFirstTop : prefix);
-    if (scope == nullptr) return;
-    // The elaborator splits one statement into an assignment per element of
-    // a concatenation it writes; the statement is one object.
-    std::unordered_set<const ModuleItem*> made;
-    for (const RtlirContAssign& ca : mod->assigns) {
-      if (ca.source_item == nullptr || !made.insert(ca.source_item).second) {
-        continue;
-      }
-      AssignBuild build{
-          [this] { return AllocObject(); }, sim_ctx_,
-          AssignNames{object_map_, prefix, ca.gen_block_prefixes, nullptr,
-                      ca.gen_block_consts},
-          VpiCalleesAt({*design, *mod, prefix,
-                        CalleeScope(*mod, ca.gen_block_prefixes, scope),
-                        subroutines}),
-          [this](std::string name) {
-            name_pool_.push_back(std::move(name));
-            return std::string_view(name_pool_.back());
-          }};
-      MakeContinuousAssignment(ca, scope, build);
-    }
-  });
+  WalkInstancePaths(
+      design, [&](const RtlirModule* mod, const std::string& prefix) {
+        VpiHandle scope = FindObjectForFlatName(
+            object_map_, prefix.empty() ? kFirstTop : prefix);
+        if (scope == nullptr) return;
+        // The elaborator splits one statement into an assignment per element of
+        // a concatenation it writes, and each instance of a loop generate
+        // block holds its own instance of the statement (§27.4): the statement
+        // is one object per generate block instance it stands in.
+        std::set<std::pair<const ModuleItem*, GenBlockPrefixes>> made;
+        for (const RtlirContAssign& ca : mod->assigns) {
+          if (ca.source_item == nullptr ||
+              !made.emplace(ca.source_item, ca.gen_block_prefixes).second) {
+            continue;
+          }
+          AssignBuild build{
+              [this] { return AllocObject(); }, sim_ctx_,
+              AssignNames{object_map_, prefix, ca.gen_block_prefixes, nullptr,
+                          ca.gen_block_consts},
+              VpiCalleesAt({*design, *mod, prefix,
+                            CalleeScope(*mod, ca.gen_block_prefixes, scope),
+                            subroutines}),
+              [this](std::string name) {
+                name_pool_.push_back(std::move(name));
+                return std::string_view(name_pool_.back());
+              }};
+          MakeContinuousAssignment(ca, scope, build);
+        }
+      });
 }
 
 }  // namespace delta

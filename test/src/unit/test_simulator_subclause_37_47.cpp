@@ -313,5 +313,25 @@ TEST_F(ContinuousAssignmentsOfARun, AnInstanceReachesItsOwnAssignments) {
       CountOf(vpiContAssign, vpi_handle_by_name(VpiText("top.u"), nullptr)), 1);
 }
 
+// §27.4 with §37.47 and §37.46: a loop generate block makes an instance of
+// itself per iteration, each holding its own instance of the continuous
+// assignment the block writes, so a two-iteration loop makes two, each the
+// driver of its own block instance's net. They were one, made for the first
+// block instance alone, every instance's assignment coming from the one
+// statement a split concatenation's elements do.
+TEST_F(ContinuousAssignmentsOfARun,
+       EachGenerateBlockInstanceHoldsItsAssignment) {
+  Run("module top; wire [1:0] a;\n"
+      "  for (genvar g = 0; g < 2; g++) begin : gb\n"
+      "    wire y; assign y = a[g];\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(CountOf(vpiContAssign, vpi_handle_by_name(VpiText("top"), nullptr)),
+            2);
+  EXPECT_EQ(
+      CountOf(vpiDriver, vpi_handle_by_name(VpiText("top.gb[1].y"), nullptr)),
+      1);
+}
+
 }  // namespace
 }  // namespace delta
