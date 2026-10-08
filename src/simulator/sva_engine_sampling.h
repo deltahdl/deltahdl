@@ -359,9 +359,7 @@ class AssertionSampleStore {
   struct SiteKey {
     const Expr* site;
     uint64_t variant;
-    bool operator==(const SiteKey& other) const {
-      return site == other.site && variant == other.variant;
-    }
+    bool operator==(const SiteKey&) const = default;
   };
   struct SiteKeyHash {
     size_t operator()(const SiteKey& key) const {
