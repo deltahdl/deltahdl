@@ -885,11 +885,8 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   ValidatePackedDimRange(item->data_type, item->loc);
   SetVariableKindFlags(item, var, typedefs_);
   var.is_signed = IsSignedType(item->data_type, typedefs_);
-  if (non_ansi_partial_ports_.count(item->name)) {
-    var.is_signed =
-        ReconcilePartialPortSignedness(item->name, var.is_signed, mod);
-    GivePartialPortItsKind(item->name, NetType::kNone, mod);
-  }
+  var.is_signed =
+      ReconcilePartialPort(item->name, var.is_signed, NetType::kNone, mod);
   var.elem_type_kind = item->data_type.kind;
   var.init_expr = item->init_expr;
   var.gen_block_consts = gen_loop_consts_;

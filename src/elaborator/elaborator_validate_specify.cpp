@@ -199,16 +199,15 @@ bool CheckPathTerminalPort(const PortDecl* p, const SpecifyTerminal& t,
 // §23.2.2.3 (printed page 735): an implicit data type declaration means a net
 // unless var is written, so a non-ANSI `input a;` is a net -- the standard's
 // own specify examples declare their ports that way -- unless the body declares
-// it again as a variable (§23.2.2.1) or it was written with `var`. The ANSI
-// header marks its implicit ports as nets; a non-ANSI declaration leaves its
-// data type implicit instead, which read as a variable refused `(a => q)` as a
-// path from no net.
+// it again as a variable (§23.2.2.1) or it was written with `var`. Both styles
+// mark such a port a net, so the body's declaration is read before that mark,
+// which would otherwise hide `input a; reg a;` as a path source of no net.
 bool PortIsVariable(const PortDecl& p, const ModuleSignals& signals) {
-  if (p.data_type.is_net || p.data_type.is_interconnect) return false;
+  if (p.data_type.is_interconnect) return false;
   if (p.data_type.kind == DataTypeKind::kImplicit && !p.has_explicit_var) {
     return signals.variable_ports.contains(p.name);
   }
-  return true;
+  return !p.data_type.is_net;
 }
 
 // Validates one terminal of a module path: it must name a port whose direction

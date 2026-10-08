@@ -485,18 +485,18 @@ static bool NonAnsiPortIsVariable(const ModuleDecl* decl,
 // only variable input ports may not be assigned. A net input port driven from
 // inside the module falls under the net rules (§23.3.3.3) instead.
 //
-// A non-ANSI direction declaration that named no type leaves is_net unset,
-// because the net inference the ANSI path applies has no counterpart there.
-// Reading it as a variable would put an ordinary `input a;` under the variable
-// rule and reject the continuous assignment that §23.3.3.1 asks be met with
-// coercion to inout and a warning.
+// A non-ANSI direction declaration that named no type is marked a net, as
+// §23.2.2.1 makes it until the body declares it again, so the body is read
+// before that mark: `input a; reg a;` is a variable the rule covers, while an
+// ordinary `input a;` stays a net whose continuous assignment §23.3.3.1 meets
+// with coercion to inout and a warning.
 static bool InputPortIsVariable(const ModuleDecl* decl, const PortDecl& port) {
-  if (port.data_type.is_net || port.data_type.is_interconnect) return false;
+  if (port.data_type.is_interconnect) return false;
   if (decl->is_non_ansi_ports &&
       port.data_type.kind == DataTypeKind::kImplicit) {
     return NonAnsiPortIsVariable(decl, port.name);
   }
-  return true;
+  return !port.data_type.is_net;
 }
 
 void Elaborator::ValidateInputPortAssignments(const ModuleDecl* decl) {

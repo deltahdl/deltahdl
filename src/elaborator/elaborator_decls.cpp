@@ -780,11 +780,8 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   net.has_declared_packed_dim = item->data_type.packed_dim_left != nullptr &&
                                 item->data_type.kind != DataTypeKind::kEnum;
   net.is_signed = IsSignedType(item->data_type, typedefs_);
-  if (non_ansi_partial_ports_.count(item->name)) {
-    net.is_signed =
-        ReconcilePartialPortSignedness(item->name, net.is_signed, mod);
-    GivePartialPortItsKind(item->name, net.net_type, mod);
-  }
+  net.is_signed =
+      ReconcilePartialPort(item->name, net.is_signed, net.net_type, mod);
   ValidatePackedDimRange(item->data_type, item->loc);
 
   ValidateNetDeclDataType(item, nettype_names_, typedefs_, diag_);

@@ -238,11 +238,12 @@ class Elaborator : public ElaboratorClassRules {
   bool ElaborateUserNettypeNet(ModuleItem* item, RtlirModule* mod);
 
   void ElaborateVarDecl(ModuleItem* item, RtlirModule* mod);
-  // §23.2.2.1: reconciles the signedness of a non-ANSI port with its separate
-  // net or variable declaration -- `signed` on either side makes both signed.
-  // Returns the reconciled signedness for the net/variable declaration.
-  bool ReconcilePartialPortSignedness(std::string_view name, bool decl_signed,
-                                      RtlirModule* mod);
+  // §23.2.2.1: a non-ANSI port declared with no net or variable type takes the
+  // kind of its body declaration (a variable where `net_type` is kNone), and
+  // `signed` on either makes both signed. Returns the declaration's
+  // signedness, `decl_signed` where `name` is no such port.
+  bool ReconcilePartialPort(std::string_view name, bool decl_signed,
+                            NetType net_type, RtlirModule* mod);
   void SetVariableTypeInfo(const ModuleItem* item, RtlirVariable& var);
   void ElaborateContAssign(ModuleItem* item, RtlirModule* mod);
   void ValidateContAssignIdentLhs(ModuleItem* item, RtlirModule* mod);

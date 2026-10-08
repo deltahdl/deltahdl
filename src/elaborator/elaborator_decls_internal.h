@@ -8,7 +8,6 @@
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
-#include "common/types.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/rtlir.h"
@@ -99,13 +98,6 @@ void SetPackedTypedefTypeInfo(const ModuleItem* item, RtlirVariable& var,
 void CheckDeclRedeclaration(const ModuleItem* item,
                             const DeclTypeRef& decl_type, DeclNameTables tables,
                             std::string_view kind_word, DiagEngine& diag);
-
-// §23.2.2.1: make the port a non-ANSI port declaration left without a net or
-// variable type the net of `net_type`, or a variable where it is kNone, as the
-// body's declaration of the same name makes it; see
-// elaborator_decls_redecl.cpp.
-void GivePartialPortItsKind(std::string_view name, NetType net_type,
-                            RtlirModule* mod);
 
 // §28.16: give every driver of a net the net delay the net was declared with,
 // since a net delay is the time from any driver of the net changing value to
