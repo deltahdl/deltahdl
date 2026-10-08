@@ -269,100 +269,113 @@ static const char* VpiTypeConstantName(int type) {
 
 // §37.3.2: an operation's vpiOpType is one of the additional type properties;
 // its integer value names an operator constant in the vpiOpType return-value
-// namespace (Annex K). This maps that value onto the spelling of its constant
-// so vpi_get_str(vpiOpType, ...) can hand the name back. A value outside the
-// modelled operator set yields no name (null).
+// namespace, Annex K's and the ones Annex M adds, each listed here with its
+// spelling so vpi_get_str(vpiOpType, ...) can hand the name back. Listing
+// Annex K's alone left a cast, an `inside` or a wildcard equality nameless.
+struct VpiOpTypeName {
+  int op_type;
+  const char* name;
+};
+
+constexpr VpiOpTypeName kVpiOpTypeNames[] = {
+    {vpiMinusOp, "vpiMinusOp"},
+    {vpiPlusOp, "vpiPlusOp"},
+    {vpiNotOp, "vpiNotOp"},
+    {vpiBitNegOp, "vpiBitNegOp"},
+    {vpiUnaryAndOp, "vpiUnaryAndOp"},
+    {vpiUnaryNandOp, "vpiUnaryNandOp"},
+    {vpiUnaryOrOp, "vpiUnaryOrOp"},
+    {vpiUnaryNorOp, "vpiUnaryNorOp"},
+    {vpiUnaryXorOp, "vpiUnaryXorOp"},
+    {vpiUnaryXNorOp, "vpiUnaryXNorOp"},
+    {vpiSubOp, "vpiSubOp"},
+    {vpiDivOp, "vpiDivOp"},
+    {vpiModOp, "vpiModOp"},
+    {vpiEqOp, "vpiEqOp"},
+    {vpiNeqOp, "vpiNeqOp"},
+    {vpiCaseEqOp, "vpiCaseEqOp"},
+    {vpiCaseNeqOp, "vpiCaseNeqOp"},
+    {vpiGtOp, "vpiGtOp"},
+    {vpiGeOp, "vpiGeOp"},
+    {vpiLtOp, "vpiLtOp"},
+    {vpiLeOp, "vpiLeOp"},
+    {vpiLShiftOp, "vpiLShiftOp"},
+    {vpiRShiftOp, "vpiRShiftOp"},
+    {vpiAddOp, "vpiAddOp"},
+    {vpiMultOp, "vpiMultOp"},
+    {vpiLogAndOp, "vpiLogAndOp"},
+    {vpiLogOrOp, "vpiLogOrOp"},
+    {vpiBitAndOp, "vpiBitAndOp"},
+    {vpiBitOrOp, "vpiBitOrOp"},
+    {vpiBitXorOp, "vpiBitXorOp"},
+    {vpiBitXNorOp, "vpiBitXNorOp"},
+    {vpiConditionOp, "vpiConditionOp"},
+    {vpiConcatOp, "vpiConcatOp"},
+    {vpiMultiConcatOp, "vpiMultiConcatOp"},
+    {vpiEventOrOp, "vpiEventOrOp"},
+    {vpiNullOp, "vpiNullOp"},
+    {vpiListOp, "vpiListOp"},
+    {vpiMinTypMaxOp, "vpiMinTypMaxOp"},
+    {vpiPosedgeOp, "vpiPosedgeOp"},
+    {vpiNegedgeOp, "vpiNegedgeOp"},
+    {vpiArithLShiftOp, "vpiArithLShiftOp"},
+    {vpiArithRShiftOp, "vpiArithRShiftOp"},
+    {vpiPowerOp, "vpiPowerOp"},
+    {vpiImplyOp, "vpiImplyOp"},
+    {vpiNonOverlapImplyOp, "vpiNonOverlapImplyOp"},
+    {vpiOverlapImplyOp, "vpiOverlapImplyOp"},
+    {vpiUnaryCycleDelayOp, "vpiUnaryCycleDelayOp"},
+    {vpiCycleDelayOp, "vpiCycleDelayOp"},
+    {vpiIntersectOp, "vpiIntersectOp"},
+    {vpiFirstMatchOp, "vpiFirstMatchOp"},
+    {vpiThroughoutOp, "vpiThroughoutOp"},
+    {vpiWithinOp, "vpiWithinOp"},
+    {vpiRepeatOp, "vpiRepeatOp"},
+    {vpiConsecutiveRepeatOp, "vpiConsecutiveRepeatOp"},
+    {vpiGotoRepeatOp, "vpiGotoRepeatOp"},
+    {vpiPostIncOp, "vpiPostIncOp"},
+    {vpiPreIncOp, "vpiPreIncOp"},
+    {vpiPostDecOp, "vpiPostDecOp"},
+    {vpiPreDecOp, "vpiPreDecOp"},
+    {vpiMatchOp, "vpiMatchOp"},
+    {vpiCastOp, "vpiCastOp"},
+    {vpiIffOp, "vpiIffOp"},
+    {vpiWildEqOp, "vpiWildEqOp"},
+    {vpiWildNeqOp, "vpiWildNeqOp"},
+    {vpiStreamLROp, "vpiStreamLROp"},
+    {vpiStreamRLOp, "vpiStreamRLOp"},
+    {vpiMatchedOp, "vpiMatchedOp"},
+    {vpiTriggeredOp, "vpiTriggeredOp"},
+    {vpiAssignmentPatternOp, "vpiAssignmentPatternOp"},
+    {vpiMultiAssignmentPatternOp, "vpiMultiAssignmentPatternOp"},
+    {vpiIfOp, "vpiIfOp"},
+    {vpiIfElseOp, "vpiIfElseOp"},
+    {vpiCompAndOp, "vpiCompAndOp"},
+    {vpiCompOrOp, "vpiCompOrOp"},
+    {vpiTypeOp, "vpiTypeOp"},
+    {vpiAssignmentOp, "vpiAssignmentOp"},
+    {vpiAcceptOnOp, "vpiAcceptOnOp"},
+    {vpiRejectOnOp, "vpiRejectOnOp"},
+    {vpiSyncAcceptOnOp, "vpiSyncAcceptOnOp"},
+    {vpiSyncRejectOnOp, "vpiSyncRejectOnOp"},
+    {vpiOverlapFollowedByOp, "vpiOverlapFollowedByOp"},
+    {vpiNonOverlapFollowedByOp, "vpiNonOverlapFollowedByOp"},
+    {vpiNexttimeOp, "vpiNexttimeOp"},
+    {vpiAlwaysOp, "vpiAlwaysOp"},
+    {vpiEventuallyOp, "vpiEventuallyOp"},
+    {vpiUntilOp, "vpiUntilOp"},
+    {vpiUntilWithOp, "vpiUntilWithOp"},
+    {vpiImpliesOp, "vpiImpliesOp"},
+    {vpiInsideOp, "vpiInsideOp"},
+};
+
+// The spelling of the operator constant `op_type`, or null for a value neither
+// annex defines.
 static const char* VpiOpTypeConstantName(int op_type) {
-  switch (op_type) {
-    case vpiMinusOp:
-      return "vpiMinusOp";
-    case vpiPlusOp:
-      return "vpiPlusOp";
-    case vpiNotOp:
-      return "vpiNotOp";
-    case vpiBitNegOp:
-      return "vpiBitNegOp";
-    case vpiUnaryAndOp:
-      return "vpiUnaryAndOp";
-    case vpiUnaryNandOp:
-      return "vpiUnaryNandOp";
-    case vpiUnaryOrOp:
-      return "vpiUnaryOrOp";
-    case vpiUnaryNorOp:
-      return "vpiUnaryNorOp";
-    case vpiUnaryXorOp:
-      return "vpiUnaryXorOp";
-    case vpiUnaryXNorOp:
-      return "vpiUnaryXNorOp";
-    case vpiSubOp:
-      return "vpiSubOp";
-    case vpiDivOp:
-      return "vpiDivOp";
-    case vpiModOp:
-      return "vpiModOp";
-    case vpiEqOp:
-      return "vpiEqOp";
-    case vpiNeqOp:
-      return "vpiNeqOp";
-    case vpiCaseEqOp:
-      return "vpiCaseEqOp";
-    case vpiCaseNeqOp:
-      return "vpiCaseNeqOp";
-    case vpiGtOp:
-      return "vpiGtOp";
-    case vpiGeOp:
-      return "vpiGeOp";
-    case vpiLtOp:
-      return "vpiLtOp";
-    case vpiLeOp:
-      return "vpiLeOp";
-    case vpiLShiftOp:
-      return "vpiLShiftOp";
-    case vpiRShiftOp:
-      return "vpiRShiftOp";
-    case vpiAddOp:
-      return "vpiAddOp";
-    case vpiMultOp:
-      return "vpiMultOp";
-    case vpiLogAndOp:
-      return "vpiLogAndOp";
-    case vpiLogOrOp:
-      return "vpiLogOrOp";
-    case vpiBitAndOp:
-      return "vpiBitAndOp";
-    case vpiBitOrOp:
-      return "vpiBitOrOp";
-    case vpiBitXorOp:
-      return "vpiBitXorOp";
-    case vpiBitXNorOp:
-      return "vpiBitXNorOp";
-    case vpiConditionOp:
-      return "vpiConditionOp";
-    case vpiConcatOp:
-      return "vpiConcatOp";
-    case vpiMultiConcatOp:
-      return "vpiMultiConcatOp";
-    case vpiEventOrOp:
-      return "vpiEventOrOp";
-    case vpiNullOp:
-      return "vpiNullOp";
-    case vpiListOp:
-      return "vpiListOp";
-    case vpiMinTypMaxOp:
-      return "vpiMinTypMaxOp";
-    case vpiPosedgeOp:
-      return "vpiPosedgeOp";
-    case vpiNegedgeOp:
-      return "vpiNegedgeOp";
-    case vpiArithLShiftOp:
-      return "vpiArithLShiftOp";
-    case vpiArithRShiftOp:
-      return "vpiArithRShiftOp";
-    case vpiPowerOp:
-      return "vpiPowerOp";
-    default:
-      return nullptr;
+  for (const VpiOpTypeName& entry : kVpiOpTypeNames) {
+    if (entry.op_type == op_type) return entry.name;
   }
+  return nullptr;
 }
 
 // §37.3.2: besides vpiType, some objects carry an additional type property

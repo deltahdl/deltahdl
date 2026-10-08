@@ -192,5 +192,28 @@ TEST_F(VpiObjectTypeProperty,
   EXPECT_EQ(vpi_get_str(vpiOpType, VpiHandleOf(&op)), nullptr);
 }
 
+// §37.3.2: the operator constants are Annex K's and those Annex M adds, and
+// vpi_get_str(vpiOpType) names each one, from the first of all, vpiMinusOp, to
+// the last, vpiInsideOp, a cast and a wildcard equality among them. The Annex
+// M constants had no name.
+TEST_F(VpiObjectTypeProperty, GetStrNamesTheOperatorsAnnexMAdds) {
+  const struct {
+    int op_type;
+    const char* name;
+  } kOperators[] = {{vpiMinusOp, "vpiMinusOp"},
+                    {vpiCastOp, "vpiCastOp"},
+                    {vpiWildEqOp, "vpiWildEqOp"},
+                    {vpiStreamLROp, "vpiStreamLROp"},
+                    {vpiInsideOp, "vpiInsideOp"}};
+  for (const auto& op : kOperators) {
+    VpiObject obj;
+    obj.type = vpiOperation;
+    obj.op_type = op.op_type;
+    const char* name = vpi_get_str(vpiOpType, VpiHandleOf(&obj));
+    ASSERT_NE(name, nullptr) << op.name;
+    EXPECT_EQ(std::string(name), op.name);
+  }
+}
+
 }  // namespace
 }  // namespace delta
