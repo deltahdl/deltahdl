@@ -711,5 +711,32 @@ TEST_F(ArgumentsOfARun, ARunTimeArgumentIsTheKindOfExprItsActualIs) {
                               vpiSysFuncCall}));
 }
 
+// §37.59 and §37.52: no object and an object that is no operation have no
+// operands; an operation's operands include a property expr and leave out a
+// child that is no expression.
+TEST(ExpressionModel, OperandsAreTheOperationsExpressionChildren) {
+  EXPECT_TRUE(VpiOperationOperands(nullptr).empty());
+  VpiObject constant;
+  constant.type = vpiConstant;
+  EXPECT_TRUE(VpiOperationOperands(&constant).empty());
+  VpiObject inst;
+  inst.type = vpiPropertyInst;
+  VpiObject attribute;
+  attribute.type = vpiAttribute;
+  VpiObject operation;
+  operation.type = vpiOperation;
+  operation.children = {&inst, &attribute};
+  EXPECT_EQ(VpiOperationOperands(&operation), (std::vector<VpiHandle>{&inst}));
+}
+
+// §37.59 detail 10: blank text has no parent expression, and an unbalanced
+// trailing selection takes everything with it; a selection with an index
+// leaves the name it selects from.
+TEST(ExpressionModel, PartSelectParentOfBlankUnbalancedAndIndexedText) {
+  EXPECT_EQ(VpiPartSelectParentExpr("  "), "");
+  EXPECT_EQ(VpiPartSelectParentExpr("a]"), "");
+  EXPECT_EQ(VpiPartSelectParentExpr("a[1]"), "a");
+}
+
 }  // namespace
 }  // namespace delta

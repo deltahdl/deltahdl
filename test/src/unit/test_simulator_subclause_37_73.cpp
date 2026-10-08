@@ -6,6 +6,7 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -216,6 +217,15 @@ TEST_F(ExpectsOfARun, AnExpectStatementReachesItsPropertySpec) {
   EXPECT_EQ(NameReached(vpiDisableCondition, spec), "rst");
   EXPECT_EQ(NameReached(vpiPropertyExpr, spec), "a");
   EXPECT_NE(vpi_handle(vpiClockingEvent, spec), nullptr);
+}
+
+// The expect statement's else is drawn from an expect statement alone: no
+// object and an object of another kind have none.
+TEST(ExpectModel, OnlyAnExpectStatementHasAnElse) {
+  EXPECT_EQ(VpiExpectElseStmt(nullptr), nullptr);
+  VpiObject wait;
+  wait.type = vpiWait;
+  EXPECT_EQ(VpiExpectElseStmt(&wait), nullptr);
 }
 
 }  // namespace

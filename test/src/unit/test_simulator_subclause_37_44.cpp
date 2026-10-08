@@ -242,5 +242,18 @@ TEST_F(ThreadModelInARun, AForkBranchReachesTheThreadThatSpawnedIt) {
   EXPECT_EQ(g_spawned_total, 2);
 }
 
+// §37.44 (vpiOrigin -> stmt): a thread's origin is its first statement child,
+// past children of other kinds.
+TEST(ThreadModel, AThreadsOriginPassesOverOtherChildren) {
+  VpiObject frame;
+  frame.type = vpiFrame;
+  VpiObject stmt;
+  stmt.type = vpiStmt;
+  VpiObject thread;
+  thread.type = vpiThread;
+  thread.children = {&frame, &stmt};
+  EXPECT_EQ(VpiThreadOrigin(&thread), &stmt);
+}
+
 }  // namespace
 }  // namespace delta

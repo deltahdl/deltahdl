@@ -510,5 +510,28 @@ TEST_F(FrameModelInARun, EachTaskEnableStartsAndEndsAFrame) {
   EXPECT_EQ(g_frames_ended, 3);
 }
 
+// §37.43 details 4 to 6 and the frame--thread edge: a frame's origin,
+// statement and thread are its first children of those kinds, passing over
+// children of other kinds; a frame whose chain of frames ends below no thread
+// has none.
+TEST(FrameModel, AFramesRelationsPassOverOtherChildren) {
+  VpiObject stmt;
+  stmt.type = vpiStmt;
+  VpiObject call;
+  call.type = vpiTaskCall;
+  VpiObject module;
+  module.type = vpiModule;
+  VpiObject frame;
+  frame.type = vpiFrame;
+  frame.parent = &module;
+  frame.children = {&stmt, &call};
+  EXPECT_EQ(VpiFrameOrigin(&frame), &call);
+  VpiObject frame2;
+  frame2.type = vpiFrame;
+  frame2.children = {&call, &stmt};
+  EXPECT_EQ(VpiFrameStmt(&frame2), &stmt);
+  EXPECT_EQ(VpiFrameThread(&frame), nullptr);
+}
+
 }  // namespace
 }  // namespace delta

@@ -360,5 +360,10 @@ TEST_F(IfStatementsOfARun, AUnique0IfReportsTheUniqueQualifier) {
   EXPECT_EQ(vpi_get(vpiQualifier, kBodies[1]), vpiUniqueQualifier);
 }
 
+// §37.71: no if statement has no condition.
+TEST(IfModel, NoObjectHasNoCondition) {
+  EXPECT_EQ(VpiIfConditionExpr(nullptr), nullptr);
+}
+
 }  // namespace
 }  // namespace delta

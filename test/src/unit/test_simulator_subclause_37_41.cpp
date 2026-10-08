@@ -511,5 +511,10 @@ TEST(TaskFuncModel, MethodAndSignOfLooseObjects) {
   }
 }
 
+// §37.41: no task or function has no statement.
+TEST(TaskFuncModel, NoObjectHasNoStatement) {
+  EXPECT_EQ(VpiTaskFuncStmt(nullptr), nullptr);
+}
+
 }  // namespace
 }  // namespace delta

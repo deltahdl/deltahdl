@@ -7,6 +7,7 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
@@ -816,6 +817,34 @@ TEST(ScopeModel, VirtualInterfaceVarsAreOnlyTheVifsAndTheirArrays) {
   scope.children = {&plain, &array};
   EXPECT_EQ(VpiScopeVirtualInterfaceVars(&scope),
             (std::vector<VpiHandle>{&element}));
+}
+
+// §37.12 detail 1: every variable kind and array var is a block item
+// declaration; details 2 and 3: a typedef and a parameter, though block item
+// declarations, are no loop control variables.
+TEST(ScopeModel, BlockItemDeclarationAndLoopVariableKinds) {
+  for (int type : {vpiIntegerVar, vpiRealVar, vpiShortRealVar, vpiTimeVar,
+                   vpiByteVar, vpiShortIntVar, vpiLongIntVar, vpiBitVar,
+                   vpiEnumVar, vpiUnionVar, vpiStringVar, vpiClassVar,
+                   vpiChandleVar, vpiPackedArrayVar, vpiArrayVar}) {
+    EXPECT_TRUE(VpiIsBlockItemDeclType(type)) << type;
+  }
+  EXPECT_FALSE(VpiIsLoopControlVarType(vpiTypedef));
+  EXPECT_FALSE(VpiIsLoopControlVarType(vpiParameter));
+}
+
+// §37.12 detail 7: an array of virtual interfaces is an array var with a
+// virtual interface var element; no object, a non-array, and an array of
+// other elements are none.
+TEST(ScopeModel, OnlyAnArrayOfVifsIsAVifArray) {
+  EXPECT_FALSE(VpiIsVirtualInterfaceArray(nullptr));
+  VpiObject plain;
+  plain.type = vpiIntVar;
+  EXPECT_FALSE(VpiIsVirtualInterfaceArray(&plain));
+  VpiObject array;
+  array.type = vpiArrayVar;
+  array.children = {&plain};
+  EXPECT_FALSE(VpiIsVirtualInterfaceArray(&array));
 }
 
 }  // namespace

@@ -355,5 +355,21 @@ TEST_F(CaseStatementsOfARun, AUnique0CaseReportsTheUniqueQualifier) {
             vpiUniqueQualifier | vpiInsideQualifier);
 }
 
+// §37.72: no object reaches no pattern, no case condition and no match
+// expressions; and a condition-kind child written as a statement is the
+// item's statement, not one of its conditions (detail 1).
+TEST(CaseModel, NoObjectAndStatementChildrenReachNoConditions) {
+  EXPECT_EQ(VpiPatternOf(nullptr), nullptr);
+  EXPECT_EQ(VpiCaseConditionExpr(nullptr), nullptr);
+  EXPECT_TRUE(VpiCaseItemMatchExprs(nullptr).empty());
+  VpiObject stmt;
+  stmt.type = vpiOperation;
+  stmt.written_as_stmt = true;
+  VpiObject item;
+  item.type = vpiCaseItem;
+  item.children = {&stmt};
+  EXPECT_TRUE(VpiCaseItemMatchExprs(&item).empty());
+}
+
 }  // namespace
 }  // namespace delta

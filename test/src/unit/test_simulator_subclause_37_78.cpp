@@ -3,6 +3,7 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -100,6 +101,11 @@ TEST_F(ReturnStatement, ReturnConditionRelationIsScopedToReturnStatements) {
   not_a_return.children = {&expr};
 
   EXPECT_EQ(vpi_handle(vpiCondition, VpiHandleOf(&not_a_return)), nullptr);
+}
+
+// No return statement has no condition expression.
+TEST(ReturnModel, NoObjectHasNoReturnExpression) {
+  EXPECT_EQ(VpiReturnConditionExpr(nullptr), nullptr);
 }
 
 }  // namespace

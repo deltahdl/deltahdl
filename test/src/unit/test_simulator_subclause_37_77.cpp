@@ -251,5 +251,10 @@ TEST_F(DisablesOfARun, ADisableForkReachesNothing) {
   EXPECT_EQ(vpi_handle(vpiExpr, vpi_scan(it)), nullptr);
 }
 
+// No disable statement has no expression it disables.
+TEST(DisableModel, NoObjectHasNoDisableExpression) {
+  EXPECT_EQ(VpiDisableExpr(nullptr), nullptr);
+}
+
 }  // namespace
 }  // namespace delta
