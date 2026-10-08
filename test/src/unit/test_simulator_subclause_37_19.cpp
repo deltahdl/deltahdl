@@ -234,5 +234,59 @@ TEST_F(VarSelectsOfARun, AVarSelectWhoseIndexHoldsXReadsX) {
   EXPECT_EQ(BinOf(Select()), "x");
 }
 
+// The design whose g selects m[i][`inner`] of a two-dimensional array, i set
+// to `outer` once m[1][0] holds 1.
+std::string TwoDimensional(const std::string& inner, int outer) {
+  return "module top; logic m [2][2]; int i, j; wire y; logic c;\n"
+         "  and g(y, m[i][" +
+         inner +
+         "], c);\n"
+         "  initial begin m[0][0] = 0; m[1][0] = 1; j = 5; i = " +
+         std::to_string(outer) + "; end\nendmodule\n";
+}
+
+// §37.19: a select through a var select of a subarray is a var select whose
+// vpiParent is that var select, and no constant select (detail 1). It reads
+// the element both indices name. It reached nothing.
+TEST_F(VarSelectsOfARun, ASelectThroughAVarSelectIsAVarSelect) {
+  Run(TwoDimensional("0", 1));
+  vpiHandle select = Select();
+  ASSERT_NE(select, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, select), vpiVarSelect);
+  vpiHandle outer = vpi_handle(vpiParent, select);
+  ASSERT_NE(outer, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, outer), vpiVarSelect);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, outer)),
+            VpiObjectOf(By("top.m")));
+  EXPECT_EQ(vpi_get(vpiConstantSelect, select), 0);
+  EXPECT_EQ(BinOf(select), "1");
+}
+
+// §11.5.1: an outer index outside the array leaves the select no element, and
+// it reads x...
+TEST_F(VarSelectsOfARun, ASelectThroughAnOutOfRangeVarSelectReadsX) {
+  Run(TwoDimensional("0", 5));
+  EXPECT_EQ(BinOf(Select()), "x");
+}
+
+// ...and so does an inner index outside the subarray.
+TEST_F(VarSelectsOfARun, AnOutOfRangeSelectThroughAVarSelectReadsX) {
+  Run(TwoDimensional("j", 1));
+  EXPECT_EQ(BinOf(Select()), "x");
+}
+
+// A var select of an element that is a vector selects no subarray, so a
+// further index selects a bit of the element, not a var select; the gate
+// still has a prim term per terminal.
+TEST_F(VarSelectsOfARun, ABitOfAVarSelectedElementKeepsTheGatesTerminals) {
+  Run("module top; logic [3:0] p [2]; int i; wire y; logic c;\n"
+      "  and g(y, p[i][2], c);\n"
+      "endmodule\n");
+  vpiHandle it = vpi_iterate(vpiPrimTerm, Named(vpiPrimitive, By("top"), "g"));
+  int terms = 0;
+  while (it != nullptr && vpi_scan(it) != nullptr) ++terms;
+  EXPECT_EQ(terms, 3);
+}
+
 }  // namespace
 }  // namespace delta

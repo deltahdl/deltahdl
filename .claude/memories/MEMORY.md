@@ -56,7 +56,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [Test-driven development](test-driven-development.md) — tests first, in the same commit; `pytest --cov-fail-under=100` enforces it.
 - [Inputs that discriminate](discriminating-test-inputs.md) — choose values where incorrect code gives a different answer from correct code.
 - [Naming the report in a rejection test](naming-the-report-in-a-rejection-test.md) — use `ReportedError` with message, line and exact `Subclause("…")`; never a bare "did it fail".
-- [Naming a const local](const-local-naming.md) — `kCamelCase`, or drop the `const`; the clang-tidy shards are what say so.
+- [Naming a const local](const-local-naming.md) — `kCamelCase`, or drop the `const`; a `const` reference is a plain `lower_case` variable; the clang-tidy shards are what say so.
 - [One declaration per test name](unique-test-names.md) — each `Suite.Name` in one file only; a CI job fails on duplicates.
 - [Rename rather than delete a duplicate](renaming-rather-than-deleting-a-duplicate-test.md) — keep both files covering one rule and qualify the names.
 - [Letter suffixes on split test files](test-file-letter-suffixes.md) — every file in a split family ends with a letter; the bare name means one file.

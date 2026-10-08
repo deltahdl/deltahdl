@@ -415,15 +415,32 @@ static void GetVaryingSelectValue(VpiHandle obj, const PackedRange& dim,
   DispatchUnselected(kWidth, whole.is_4state, value, pools);
 }
 
-// §37.19: the element of its array var that a var select's index names now;
-// null where the index holds an x or z bit or lies outside the array (§11.5.1).
+// §37.19: the member a var select's index names now -- an element of its array
+// var, or of the subarray a var select it selects through names; null where an
+// index on the way holds an x or z bit or lies outside its array (§11.5.1).
 static VpiHandle VarSelectElement(const VpiObject& select, SimContext* sim) {
+  const VpiObject* from = select.parent->type == vpiVarSelect
+                              ? VarSelectElement(*select.parent, sim)
+                              : select.parent;
   const std::optional<int64_t> kIndex = VaryingIndex(select, sim);
-  if (!kIndex) return nullptr;
-  for (VpiObject* child : select.parent->children) {
+  if (from == nullptr || !kIndex) return nullptr;
+  for (VpiObject* child : from->children) {
     if (child->array_member && child->index == *kIndex) return child;
   }
   return nullptr;
+}
+
+// An element of the array var a var select selects from, at the bottom of its
+// subarrays; every element is one width and kind (§7.4).
+static const VpiObject& AnyElement(const VpiObject& select) {
+  const VpiObject* member = select.parent;
+  while (member->type == vpiVarSelect) member = member->parent;
+  while (member->type == vpiArrayVar) {
+    member = *std::ranges::find_if(
+        member->children,
+        [](const VpiObject* child) { return child->array_member; });
+  }
+  return *member;
 }
 
 // §37.12: binds the object of a variable a named block declares to the storage
@@ -458,16 +475,15 @@ void VpiContext::GetValue(VpiHandle obj, s_vpi_value* value) {
   }
   if (GetValueIsRefused(obj, value, last_error_)) return;
   // §37.19 with §11.5.1: a var select reads the element its index names now,
-  // and the default of its elements' type where the index names none. Every
-  // element of the array is one width and kind (§7.4), so the first speaks
-  // for them all.
+  // and the default of its elements' type where the index names none.
   if (obj->type == vpiVarSelect) {
     if (VpiHandle element = VarSelectElement(*obj, sim_ctx_)) {
       GetValue(element, value);
       return;
     }
-    const VpiObject& first = *obj->parent->children.front();
-    DispatchUnselected(first.size, first.var->is_4state, value, value_pools_);
+    const VpiObject& element = AnyElement(*obj);
+    DispatchUnselected(element.size, element.var->is_4state, value,
+                       value_pools_);
     return;
   }
   VpiRefreshElementCopy(*obj);

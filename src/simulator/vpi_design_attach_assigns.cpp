@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
@@ -297,6 +298,21 @@ VpiObject* VarSelectObject(VpiObject* base, const Expr* index,
   return select;
 }
 
+// §37.19: a select through the var select `outer`: a var select of its own
+// where `outer` selects a subarray -- the chain of var selects down from the
+// array var indexes fewer of its unpacked dimensions than it has -- and null
+// where `outer` selects an element, whose bits a further index selects.
+VpiObject* SelectThroughVarSelect(VpiObject* outer, const Expr* index,
+                                  const AssignBuild& build) {
+  const VpiObject* array = outer;
+  std::size_t depth = 0;
+  for (; array->type == vpiVarSelect; array = array->parent) ++depth;
+  if (depth < array->array_dim_indices.size()) {
+    return VarSelectObject(outer, index, build);
+  }
+  return nullptr;
+}
+
 // §37.16 detail 31, §37.17 detail 26: the kind a select out of `root` that
 // leaves packed dimensions unindexed is, a vector of the kind `root` is: a
 // logic var or a bit var as the variable is four- or two-state, or the net
@@ -389,6 +405,9 @@ VpiObject* BitSelectObject(const Expr* expr, const AssignBuild& build) {
     return PackedSelectObject(base, expr->index, build);
   }
   if (expr->index == nullptr) return nullptr;
+  if (base->type == vpiVarSelect) {
+    return SelectThroughVarSelect(base, expr->index, build);
+  }
   // A varying bit of a vector was made above (PackedSelectObject), so what a
   // varying index selects from here is an element, a var select of an array
   // var's (§37.19). An array net's has no object.
