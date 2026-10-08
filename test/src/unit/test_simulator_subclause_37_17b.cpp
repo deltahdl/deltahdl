@@ -2,10 +2,15 @@
 
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
+#include "common/types.h"
+#include "elaborator/rtlir.h"
 #include "fixture_vpi_run.h"
+#include "parser/ast_type.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -807,6 +812,55 @@ TEST_F(VariablesOfARun, AGenerateBlockVariableIsNamedUnderItsGenScope) {
   EXPECT_EQ(IntOf(v), 8);
   EXPECT_EQ(Named(vpiVariables, Var("top.g[1]"), "v"), v);
   EXPECT_EQ(CountOf(vpiVariables, Var("top")), 0);
+}
+
+// §36.12.1 Table 36-10 with §37.17 (figure): the variable an ANSI variable port
+// declares is the kind its data type makes it, as one its module's body
+// declares is.
+TEST_F(VariablesOfARun, AnAnsiVariablePortsVariableIsTheKindOfItsType) {
+  Run("module sub(output integer i, output int j, output logic [3:0] l,\n"
+      "           output real r);\n"
+      "endmodule\n"
+      "module top; integer a; int b; logic [3:0] c; real d;\n"
+      "  sub u(.i(a), .j(b), .l(c), .r(d));\n"
+      "endmodule\n");
+  EXPECT_EQ(vpi_get(vpiType, By("top.u.i")), vpiIntegerVar);
+  EXPECT_EQ(vpi_get(vpiType, By("top.u.j")), vpiIntVar);
+  EXPECT_EQ(vpi_get(vpiType, By("top.u.l")), vpiReg);
+  EXPECT_EQ(vpi_get(vpiType, By("top.u.r")), vpiRealVar);
+}
+
+// §37.17 (figure): a module's variables are those its body declares and those
+// its ANSI variable ports declare, a structure port's counted once as the body
+// list already holds it; a net port and an interface port declare none. A port
+// variable carries its type's flags as a body declaration does.
+TEST(VariableKindModel, AModulesVariablesAreItsBodysAndItsVariablePorts) {
+  RtlirModule mod;
+  RtlirVariable body;
+  body.name = "s";
+  mod.variables.push_back(body);
+  const std::vector<std::pair<std::string_view, DataTypeKind>> kPorts = {
+      {"s", DataTypeKind::kStruct},
+      {"t", DataTypeKind::kRealtime},
+      {"u", DataTypeKind::kString},
+      {"n", DataTypeKind::kLogic},
+      {"f", DataTypeKind::kNamed}};
+  for (const auto& [name, kind] : kPorts) {
+    RtlirPort& port = mod.ports.emplace_back();
+    port.name = name;
+    port.data_kind = kind;
+  }
+  mod.ports[3].net_type = NetType::kWire;
+  mod.ports[4].is_interface_port = true;
+  const std::vector<RtlirVariable> kVars = VpiDeclaredVariables(mod);
+  ASSERT_EQ(kVars.size(), 3U);
+  EXPECT_EQ(kVars[0].name, "s");
+  EXPECT_EQ(kVars[1].name, "t");
+  EXPECT_TRUE(kVars[1].is_real);
+  EXPECT_FALSE(kVars[1].is_string);
+  EXPECT_EQ(kVars[2].name, "u");
+  EXPECT_TRUE(kVars[2].is_string);
+  EXPECT_FALSE(kVars[2].is_real);
 }
 
 }  // namespace

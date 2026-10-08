@@ -512,5 +512,16 @@ TEST(PortModel, PortBitsAreMadeFromTheLowConnsBits) {
   EXPECT_EQ(port.children[0]->direction, vpiInput);
 }
 
+// §37.14 (figure) with §37.17 detail 12: the variable an ANSI variable port
+// declares has a var bit per bit, so the port holds a port bit per bit of it.
+TEST_F(PortsOfARun, AVariablePortHoldsAPortBitPerBit) {
+  Run("module sub(output logic [1:0] o); endmodule\n"
+      "module top; wire [1:0] x; sub u(.o(x)); endmodule\n");
+  EXPECT_EQ(KindsOf(vpiBit, By("top.u.o")), std::vector<int>(2, vpiRegBit));
+  vpiHandle o = PortOfU("o");
+  ASSERT_NE(o, nullptr);
+  EXPECT_EQ(KindsOf(vpiBit, o), std::vector<int>(2, vpiPortBit));
+}
+
 }  // namespace
 }  // namespace delta

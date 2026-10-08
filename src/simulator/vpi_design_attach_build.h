@@ -32,6 +32,7 @@ struct RtlirDesign;
 struct RtlirModule;
 struct RtlirNet;
 struct RtlirPort;
+struct RtlirVariable;
 struct Stmt;
 struct UdpDecl;
 struct VpiObject;
@@ -113,6 +114,12 @@ std::optional<PackedRange> WrittenUnpackedDim(const Expr* dim, SimContext& ctx);
 // its ANSI ports declare, which stand in no list of the body's - each as a
 // declaration of its name, data type and dimensions.
 std::vector<RtlirNet> VpiDeclaredNets(const RtlirModule& mod);
+
+// §37.17 (figure): the variables `mod` declares - those its body declares, and
+// those its ANSI variable ports declare, which stand in no list of the body's
+// unless their type is a structure or union - each as a declaration of its
+// name, data type and dimensions.
+std::vector<RtlirVariable> VpiDeclaredVariables(const RtlirModule& mod);
 
 // §37.16 (figure): the flat keys of the nets the declaration `net` makes in
 // the instance at `prefix`, each a net holding a value: the net itself, or of

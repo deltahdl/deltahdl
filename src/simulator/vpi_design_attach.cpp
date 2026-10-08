@@ -373,7 +373,8 @@ int VpiVariableObjectKind(const RtlirVariable& var) {
 // kind of variable it is. VpiContext::Attach stamps every one of them vpiReg,
 // which rows 3, 4 and 7 rule out: a design's array variables were vpiRegArray
 // objects to nothing, so a vpiRegArray iteration reached none of them, and an
-// integer, time or real variable answered that it was a reg.
+// integer, time or real variable answered that it was a reg. The variable an
+// ANSI variable port declares is told as the body's are (VpiDeclaredVariables).
 void RecordVariableObjectKinds(
     const RtlirDesign* design,
     const std::unordered_map<std::string_view, VpiObject*>& objects) {
@@ -381,7 +382,7 @@ void RecordVariableObjectKinds(
 
   WalkInstancePaths(
       design, [&](const RtlirModule* mod, const std::string& prefix) {
-        for (const RtlirVariable& var : mod->variables) {
+        for (const RtlirVariable& var : VpiDeclaredVariables(*mod)) {
           VpiHandle obj =
               FindObjectForFlatName(objects, VpiFlatName(prefix, var.name));
           if (obj != nullptr) obj->type = VpiVariableObjectKind(var);

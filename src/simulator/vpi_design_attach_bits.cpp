@@ -46,6 +46,30 @@ std::vector<RtlirNet> VpiDeclaredNets(const RtlirModule& mod) {
   return nets;
 }
 
+std::vector<RtlirVariable> VpiDeclaredVariables(const RtlirModule& mod) {
+  std::vector<RtlirVariable> vars = mod.variables;
+  for (const RtlirPort& port : mod.ports) {
+    // A net port declares a net, and an interface port (§25.3) no variable.
+    if (port.net_type != NetType::kNone || port.is_interface_port) continue;
+    // A structure or union port already declares its variable (§7.2.1).
+    const bool kDeclared = std::ranges::any_of(
+        mod.variables,
+        [&](const RtlirVariable& var) { return var.name == port.name; });
+    if (kDeclared) continue;
+    RtlirVariable& var = vars.emplace_back();
+    var.name = port.name;
+    var.width = port.width;
+    var.dtype = port.dtype;
+    var.decl_kind = port.data_kind;
+    var.is_real = port.data_kind == DataTypeKind::kReal ||
+                  port.data_kind == DataTypeKind::kRealtime;
+    var.is_string = port.data_kind == DataTypeKind::kString;
+    var.num_unpacked_dims = port.num_unpacked_dims;
+    var.unpacked_dims = port.unpacked_dims;
+  }
+  return vars;
+}
+
 std::vector<std::string> VpiDeclaredNetKeys(const RtlirNet& net,
                                             const std::string& prefix) {
   const std::string kKey = VpiFlatName(prefix, net.name);
@@ -118,7 +142,7 @@ std::vector<BitTarget> BitTargets(const RtlirModule* mod,
                                prefix.empty() ? "" : prefix + ".");
   std::vector<BitTarget> targets;
   AddNetBitTargets(mod, prefix, objects, ctx, targets);
-  for (const RtlirVariable& var : mod->variables) {
+  for (const RtlirVariable& var : VpiDeclaredVariables(*mod)) {
     VpiHandle obj =
         FindObjectForFlatName(objects, VpiFlatName(prefix, var.name));
     if (obj == nullptr || !HasVarBits(*obj)) continue;

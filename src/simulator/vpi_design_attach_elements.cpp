@@ -161,7 +161,7 @@ void AttachArrayElements(const RtlirDesign* design, const VpiObjectMap& objects,
   if (design == nullptr) return;
   WalkInstancePaths(
       design, [&](const RtlirModule* mod, const std::string& prefix) {
-        for (const RtlirVariable& var : mod->variables) {
+        for (const RtlirVariable& var : VpiDeclaredVariables(*mod)) {
           if (!HasFixedElements(var)) continue;
           const std::string kKey = VpiFlatName(prefix, var.name);
           VpiObject* array = FindObjectForFlatName(objects, kKey);
