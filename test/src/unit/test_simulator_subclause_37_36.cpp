@@ -9,7 +9,6 @@
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "elaborator/rtlir.h"
-#include "elaborator/rtlir_primitives.h"
 #include "fixture_simulator.h"
 #include "parser/ast_specify.h"
 #include "simulator/net.h"
