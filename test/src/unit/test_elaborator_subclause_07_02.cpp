@@ -1,8 +1,11 @@
 #include <gtest/gtest.h>
 
+#include "common/arena.h"
+#include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 
@@ -263,6 +266,26 @@ TEST(StructDeclarationValidation,
   const auto* v = FindVar(design, "t", "v");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->width, 96u);
+}
+
+// §7.2 with §6.18: the layout a member select uses comes from the structure a
+// type names. A chain of typedef names that never ends names no structure, nor
+// does a structure with no members, so neither gives a layout.
+TEST(StructDeclarationValidation,
+     NoLayoutForAnEndlessChainOrAMemberlessStruct) {
+  Arena arena;
+  DataType to_b;
+  to_b.kind = DataTypeKind::kNamed;
+  to_b.type_name = "b_t";
+  DataType to_a;
+  to_a.kind = DataTypeKind::kNamed;
+  to_a.type_name = "a_t";
+  const TypedefMap kCycle{{"a_t", to_b}, {"b_t", to_a}};
+  EXPECT_EQ(ResolvedAggregateType(to_a, kCycle, arena), nullptr);
+
+  DataType memberless;
+  memberless.kind = DataTypeKind::kStruct;
+  EXPECT_EQ(ResolvedAggregateType(memberless, kCycle, arena), nullptr);
 }
 
 }  // namespace
