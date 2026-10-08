@@ -294,8 +294,11 @@ Logic4Vec EvalWideArith(TokenKind op, const Logic4Vec& lhs,
       // handing over no other. §11.4.4: with an integer base and a negative
       // exponent the result is 0, except that a base of 1 gives 1 and a base of
       // -1 gives 1 or -1 by the exponent's parity. The squaring below reads the
-      // exponent's bits as a magnitude, which a negative exponent is not.
+      // exponent's bits as a magnitude, which a negative exponent is not. A
+      // zero base under a negative exponent is x in every bit (§11.4.3, Table
+      // 11-4), as a division by zero is.
       if (spec.is_signed && IsNegative(b, spec.width)) {
+        if (IsZero(a)) return MakeAllX(arena, spec.width);
         result = NegativeExponentResult(a, b, spec.width);
         break;
       }

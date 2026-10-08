@@ -805,6 +805,24 @@ TEST(EvalOp, WideSignedPowerTakesANegativeExponentByItsSign) {
   EXPECT_EQ(out, "1 1 1 1 1\n");
 }
 
+// §11.4.3 and Table 11-4 above one word: a zero base under a negative exponent
+// is x in every bit, as `0 ** -1` is in Table 11-5. The bases other than 1 and
+// -1 were all given 0, zero among them.
+TEST(EvalOp, WideZeroBaseUnderANegativeExponentIsX) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  logic signed [127:0] z, r;\n"
+      "  initial begin\n"
+      "    z = 0;\n"
+      "    r = z ** -1;\n"
+      "    $display(\"%0d\", r === {128{1'bx}});\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1\n");
+}
+
 // §11.4.3's Table 11-5 gives `2.0 ** -3'sb1` the value 0.5, and §11.3.1 has
 // an integral operand of a real operator converted to real by its value, which
 // for the signed 3'sb111 is -1. Converted as the unsigned 7, the exponent made
