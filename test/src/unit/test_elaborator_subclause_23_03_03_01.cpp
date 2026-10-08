@@ -178,4 +178,24 @@ TEST(PortCoercionElaboration,
                             4, "23.3.3.2"));
 }
 
+// §23.3.3.2 with §23.2.2.1: a non-ANSI input declared with `var` is a variable
+// by its own declaration, so assigning it inside the module is an error too.
+TEST(PortCoercionElaboration, NonAnsiVarInputPortDrivenErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child(a);\n"
+      "  input var a;\n"
+      "  initial a = 1'b1;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire x;\n"
+      "  child u(.a(x));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "is declared as an input port and cannot be the "
+                            "target of an assignment",
+                            3, "23.3.3.2"));
+}
+
 }  // namespace

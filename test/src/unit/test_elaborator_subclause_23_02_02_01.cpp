@@ -516,4 +516,28 @@ TEST(NonAnsiStylePortDeclarations, ABodyDeclarationGivesAPortItsKind) {
   EXPECT_EQ(ports[2].net_type, delta::NetType::kNone);
 }
 
+// §23.2.2.1 (printed page 731): a port declaration written with `var` holds a
+// variable type, so its port is a variable, and it declares the port
+// completely, leaving no room for a second declaration in the body.
+TEST(NonAnsiStylePortDeclarations, AVarDeclaredPortIsACompleteVariable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(a, b);\n"
+      "  input var [1:0] a;\n"
+      "  output var b;\n"
+      "  wire b;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  const auto& ports = design->top_modules[0]->ports;
+  ASSERT_EQ(ports.size(), 2u);
+  EXPECT_TRUE(ports[0].is_var);
+  EXPECT_EQ(ports[0].net_type, delta::NetType::kNone);
+  EXPECT_EQ(ports[0].width, 2u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "redeclaration of port 'b' that has a complete "
+                            "port declaration",
+                            4, "23.2.2.1"));
+}
+
 }  // namespace

@@ -346,7 +346,9 @@ static void TrackNonAnsiPortType(const ModuleDecl* decl, const PortDecl& port,
       port.direction == Direction::kNone) {
     return;
   }
-  if (port.data_type.kind != DataTypeKind::kImplicit) {
+  // §23.2.2.1: a declaration holding a variable type, `var` with an implicit
+  // type among them, declares the port completely.
+  if (port.data_type.kind != DataTypeKind::kImplicit || port.has_explicit_var) {
     ctx.complete_ports.insert(port.name);
   } else {
     ctx.partial_ports[port.name] =

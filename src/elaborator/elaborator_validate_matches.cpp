@@ -489,10 +489,12 @@ static bool NonAnsiPortIsVariable(const ModuleDecl* decl,
 // §23.2.2.1 makes it until the body declares it again, so the body is read
 // before that mark: `input a; reg a;` is a variable the rule covers, while an
 // ordinary `input a;` stays a net whose continuous assignment §23.3.3.1 meets
-// with coercion to inout and a warning.
+// with coercion to inout and a warning. `input var a;` is a variable by its
+// own declaration.
 static bool InputPortIsVariable(const ModuleDecl* decl, const PortDecl& port) {
   if (decl->is_non_ansi_ports &&
-      port.data_type.kind == DataTypeKind::kImplicit) {
+      port.data_type.kind == DataTypeKind::kImplicit &&
+      !port.has_explicit_var) {
     return NonAnsiPortIsVariable(decl, port.name);
   }
   return !port.data_type.is_net;

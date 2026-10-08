@@ -406,4 +406,27 @@ TEST(NonAnsiStylePortDeclarations, AnImplicitlyTypedInputOrOutputIsANet) {
   EXPECT_FALSE(mod->ports[2].data_type.is_net);
 }
 
+// Syntax 23-3 (§23.2.2.1, printed page 731) gives an input, output and ref
+// declaration a variable_port_type, which A.2.2.1 lets open with `var`; such a
+// port holds a variable type and is no net, an implicit one after `var` too.
+TEST(NonAnsiStylePortDeclarations, AVarDeclaredPortIsAVariable) {
+  auto r = Parse(
+      "module m(a, b, c);\n"
+      "  input var [1:0] a;\n"
+      "  output var int b;\n"
+      "  ref var logic c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->ports.size(), 3);
+  EXPECT_TRUE(mod->ports[0].has_explicit_var);
+  EXPECT_FALSE(mod->ports[0].data_type.is_net);
+  EXPECT_NE(mod->ports[0].data_type.packed_dim_left, nullptr);
+  EXPECT_TRUE(mod->ports[1].has_explicit_var);
+  EXPECT_EQ(mod->ports[1].data_type.kind, DataTypeKind::kInt);
+  EXPECT_TRUE(mod->ports[2].has_explicit_var);
+  EXPECT_EQ(mod->ports[2].direction, Direction::kRef);
+}
+
 }  // namespace

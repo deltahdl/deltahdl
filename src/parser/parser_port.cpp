@@ -23,8 +23,9 @@ static void ResolvePortDefaults(PortDecl& port, const PortDecl* prev,
 struct ParserPortHelpers {
   // Apply one non-ANSI body port declaration (a single name + dims) to the
   // matching already-declared port(s), reporting a duplicate-direction error.
+  // `has_var` says the declaration was written with `var`.
   static void ApplyNonAnsiPortDecl(Parser& p, ModuleDecl& mod, Direction dir,
-                                   const DataType& dtype) {
+                                   const DataType& dtype, bool has_var) {
     auto loc = p.CurrentLoc();
     auto name = p.Expect(TokenKind::kIdentifier, Subclause("23.2.2.1")).text;
     std::vector<Expr*> dims;
@@ -41,6 +42,7 @@ struct ParserPortHelpers {
       found = true;
       port.direction = dir;
       port.data_type = dtype;
+      port.has_explicit_var = has_var;
       port.unpacked_dims = dims;
     }
     // §23.5: with a `.*` module header the port names come from the module's
@@ -52,6 +54,7 @@ struct ParserPortHelpers {
     np.name = name;
     np.direction = dir;
     np.data_type = dtype;
+    np.has_explicit_var = has_var;
     np.unpacked_dims = dims;
     np.loc = loc;
     // §23.2.2.1 (printed page 733), Example 5: in `renamed_concat(.a({b, c}),
@@ -788,6 +791,23 @@ void Parser::ParseModuleBody(ModuleDecl& mod) {
   current_module_ = prev_module;
 }
 
+// Whether a non-ANSI port declaration with direction `dir` and data type
+// `dtype` declares a net that its data type does not already say is one.
+// §23.2.2.3 (printed page 735) makes an inout declared with no port kind a net
+// of the default net type, and mh4 there makes an inout `var` an error, which
+// the elaborator reports. An input or output whose data type is implicit holds
+// no net or variable type either, and §23.2.2.1 (printed pages 731 and 732)
+// makes it a net unless the body declares it again as a variable, which the
+// elaborator then reads. A declaration written with `var` holds a variable
+// type and is never a net.
+static bool NonAnsiPortDeclIsNet(Direction dir, const DataType& dtype,
+                                 bool has_var) {
+  if (has_var) return false;
+  if (dir == Direction::kInout) return true;
+  return (dir == Direction::kInput || dir == Direction::kOutput) &&
+         dtype.kind == DataTypeKind::kImplicit;
+}
+
 void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod) {
   Direction dir = Direction::kNone;
   auto tk = CurrentToken().kind;
@@ -814,17 +834,12 @@ void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod) {
     return;
   }
 
+  // Syntax 23-3 (§23.2.2.1, printed page 731): an input, output or ref
+  // declaration may hold a variable_port_type, which A.2.2.1 lets open with
+  // `var` and an optional data type after it.
+  bool has_var = Match(TokenKind::kKwVar);
   auto dtype = ParseDataType();
-  // §23.2.2.3 (printed page 735): an inout declared with no port kind is a net
-  // of the default net type, and mh4 there makes an inout `var` an error. An
-  // input or output whose data type is implicit holds no net or variable type
-  // either, and §23.2.2.1 (printed pages 731 and 732) makes it a net unless the
-  // body declares it again as a variable, which the elaborator then reads.
-  if (dir == Direction::kInout ||
-      ((dir == Direction::kInput || dir == Direction::kOutput) &&
-       dtype.kind == DataTypeKind::kImplicit)) {
-    dtype.is_net = true;
-  }
+  if (NonAnsiPortDeclIsNet(dir, dtype, has_var)) dtype.is_net = true;
 
   if (dtype.kind == DataTypeKind::kImplicit && Check(TokenKind::kLBracket)) {
     Consume();
@@ -835,7 +850,7 @@ void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod) {
   }
 
   do {
-    ParserPortHelpers::ApplyNonAnsiPortDecl(*this, mod, dir, dtype);
+    ParserPortHelpers::ApplyNonAnsiPortDecl(*this, mod, dir, dtype, has_var);
   } while (Match(TokenKind::kComma));
   Expect(TokenKind::kSemicolon, Subclause("23.2.2.1"));
 }
