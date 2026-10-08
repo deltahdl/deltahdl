@@ -284,5 +284,21 @@ TEST_F(GeneratesOfARun, AConditionalBlockInstanceIsAGenScope) {
   EXPECT_EQ(vpi_handle(vpiIndex, block), nullptr);
 }
 
+// §37.85 detail 5: vpiTypedef reaches the typespecs of a scope's typedefs; a
+// type parameter is a typespec but no typedef, and is passed over.
+TEST_F(Generates, TheTypedefIterationPassesOverATypeParameter) {
+  VpiObject type_param;
+  type_param.type = vpiTypeParameter;
+  VpiObject typedef_spec;
+  typedef_spec.type = vpiIntTypespec;
+  VpiObject scope;
+  scope.type = vpiGenScope;
+  scope.children = {&type_param, &typedef_spec};
+  vpiHandle it = vpi_iterate(vpiTypedef, VpiHandleOf(&scope));
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &typedef_spec);
+  EXPECT_EQ(vpi_scan(it), nullptr);
+}
+
 }  // namespace
 }  // namespace delta

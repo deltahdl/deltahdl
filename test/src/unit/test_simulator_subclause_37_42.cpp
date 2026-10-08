@@ -922,5 +922,19 @@ TEST_F(CallStatementsOfARun, AnArgumentNamesTheBlocksDeclaration) {
   EXPECT_EQ(VpiObjectOf(vpi_scan(it)), VpiObjectOf(By("top.b.x")));
 }
 
+// Detail 6: the vpiUserSystf iteration passes over every object of the run
+// that is no registered systf, a module among them.
+TEST_F(TaskFuncCall, TheUserSystfIterationPassesOverOtherObjects) {
+  ctx_.CreateModule("m", "m");
+  s_vpi_systf_data task = {};
+  task.type = vpiSysTask;
+  task.tfname = VpiText("$only_task");
+  vpiHandle task_h = vpi_register_systf(&task);
+  vpiHandle it = vpi_iterate(vpiUserSystf, nullptr);
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(vpi_scan(it), task_h);
+  EXPECT_EQ(vpi_scan(it), nullptr);
+}
+
 }  // namespace
 }  // namespace delta

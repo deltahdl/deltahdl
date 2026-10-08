@@ -235,5 +235,36 @@ TEST_F(LetExprIteration, TheLetExpressionReachesTheDeclarationItInstantiates) {
   EXPECT_EQ(vpi_iterate(vpiArgument, VpiHandleOf(&let_expr)), nullptr);
 }
 
+// §37.57 detail 1: an operation the instantiation wrote is an argument like
+// any other expression; a child of the let expression that is neither its
+// declaration nor an expression is none; and a formal left empty with no
+// default has no argument object, so the iteration hands back the rest.
+TEST_F(LetExprIteration, OnlyWrittenAndDefaultedArgumentsComeBack) {
+  VpiObject formal0;
+  formal0.type = vpiSeqFormalDecl;
+  VpiObject formal1;
+  formal1.type = vpiSeqFormalDecl;
+  VpiObject decl;
+  decl.type = vpiLetDecl;
+  decl.children = {&formal0, &formal1};
+
+  VpiObject sum;
+  sum.type = vpiOperation;
+  sum.op_type = vpiAddOp;
+  VpiObject attribute;
+  attribute.type = vpiAttribute;
+  VpiObject omitted;
+  VpiMakeEmptyArgument(&omitted);
+
+  VpiObject let_expr;
+  let_expr.type = vpiLetExpr;
+  let_expr.children = {&decl, &sum, &attribute, &omitted};
+
+  std::vector<vpiHandle> args =
+      ScanAll(vpi_iterate(vpiArgument, VpiHandleOf(&let_expr)));
+  ASSERT_EQ(args.size(), 1u);
+  EXPECT_EQ(VpiObjectOf(args[0]), &sum);
+}
+
 }  // namespace
 }  // namespace delta

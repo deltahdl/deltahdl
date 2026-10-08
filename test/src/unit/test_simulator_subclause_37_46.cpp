@@ -329,5 +329,43 @@ TEST(NetDriversAndLoads, LoadIterationReachesAPortBitWithAComplexExpression) {
   EXPECT_EQ(ctx.Handle(vpiHighConn, loads[0]), &expr);
 }
 
+// §37.46 (figure): the loads of a net are the kinds the figure lists, so a
+// net's own bits, which it holds beside its loads, are none of them.
+TEST(NetDriversAndLoads, ALoadIterationPassesOverTheNetsBits) {
+  VpiContext ctx;
+  VpiObject bit;
+  bit.type = vpiNetBit;
+  VpiObject cont_assign;
+  cont_assign.type = vpiContAssign;
+  VpiObject net;
+  net.type = vpiNet;
+  net.children = {&bit, &cont_assign};
+  std::vector<VpiHandle> loads =
+      CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &net));
+  ASSERT_EQ(loads.size(), 1u);
+  EXPECT_EQ(loads[0], &cont_assign);
+}
+
+// §37.46 (figure): the net bit is one of the nets the driver and load edges
+// are drawn from, so it reaches the net drivers and net loads it holds.
+TEST(NetDriversAndLoads, ANetBitReachesItsNetDriversAndLoads) {
+  VpiContext ctx;
+  VpiObject force;
+  force.type = vpiForce;
+  VpiObject assign_stmt;
+  assign_stmt.type = vpiAssignStmt;
+  VpiObject bit;
+  bit.type = vpiNetBit;
+  bit.children = {&force, &assign_stmt};
+  std::vector<VpiHandle> drivers =
+      CollectVpiIteration(ctx, ctx.Iterate(vpiDriver, &bit));
+  ASSERT_EQ(drivers.size(), 1u);
+  EXPECT_EQ(drivers[0], &force);
+  std::vector<VpiHandle> loads =
+      CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &bit));
+  ASSERT_EQ(loads.size(), 2u);
+  EXPECT_TRUE(VpiIterationContains(loads, &assign_stmt));
+}
+
 }  // namespace
 }  // namespace delta

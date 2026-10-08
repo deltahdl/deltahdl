@@ -637,13 +637,13 @@ bool VpiIsNetDriverType(int type);
 // complex-expression rule of detail 1, so it is not part of this set.
 bool VpiIsNetLoadType(int type);
 
-// §37.46 detail 1: whether an input port carries a complex expression that
-// loads the nets it reads, making the port itself a load. The connection on the
-// port (its vpiHighConn) must be a complex expression - an operation rather
-// than a simple reference - and must not be a concatenation, whose operands
-// connect their nets individually. Only an input port loads this way; the
-// complex expression itself is reached through vpi_handle(vpiHighConn, port)
-// (§37.14).
+// §37.46 detail 1: whether `port`, which is a port, carries a complex
+// expression that loads the nets it reads, making the port itself a load. The
+// connection on the port (its vpiHighConn) must be a complex expression - an
+// operation rather than a simple reference - and must not be a concatenation,
+// whose operands connect their nets individually. Only an input port loads this
+// way; the complex expression itself is reached through vpi_handle(vpiHighConn,
+// port) (§37.14).
 bool VpiPortIsComplexExpressionLoad(VpiHandle port);
 
 // §37.26 (figure): the four object kinds the Structures-and-unions figure

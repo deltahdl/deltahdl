@@ -72,12 +72,12 @@ bool VpiIsNetLoadType(int type) {
 
 namespace {
 
-// §37.46 detail 1: a concatenation operation. The operand connections it groups
-// drive/load their nets individually, so a concatenation on a port does not
-// make the whole port a complex-expression load.
-bool VpiIsConcatenationExpression(VpiObject* expr) {
-  return expr->type == vpiOperation &&
-         (expr->op_type == vpiConcatOp || expr->op_type == vpiMultiConcatOp);
+// §37.46 detail 1: whether the operation `expr` is a concatenation. The
+// operand connections it groups drive/load their nets individually, so a
+// concatenation on a port does not make the whole port a complex-expression
+// load.
+bool VpiIsConcatenationExpression(const VpiObject* expr) {
+  return expr->op_type == vpiConcatOp || expr->op_type == vpiMultiConcatOp;
 }
 
 }  // namespace
@@ -90,7 +90,6 @@ bool VpiPortIsComplexExpressionLoad(VpiHandle port) {
   // concatenation's operands connect their nets individually, and only an input
   // port loads this way. The complex expression itself is reached through
   // vpiHighConn (§37.14).
-  if (!port || !VpiIsPortsType(port->type)) return false;
   if (port->direction != vpiInput) return false;
   VpiObject* expr = port->high_conn;
   if (!expr || expr->type != vpiOperation) return false;
@@ -626,8 +625,9 @@ bool VpiIsNullReferenceRelation(int type) {
   // well, and a package is the instance no module encloses, so the design's
   // packages are reached the same way; and §37.31 draws the class defn so, the
   // compilation unit's classes being those no instance or package declares.
-  return type == kVpiModule || type == vpiCallback || type == vpiAssertion ||
-         type == vpiUdpDefn || type == vpiPackage || type == vpiClassDefn;
+  // A vpiCallback iteration is taken before this, whatever its reference.
+  return type == kVpiModule || type == vpiAssertion || type == vpiUdpDefn ||
+         type == vpiPackage || type == vpiClassDefn;
 }
 
 // §37.57 detail 1: whether the instantiation left this argument position empty.
@@ -635,8 +635,7 @@ bool VpiIsNullReferenceRelation(int type) {
 // operation whose vpiOpType is the null operation - and a let instantiation
 // that writes nothing for a port leaves the same hole.
 bool VpiLetArgumentIsOmitted(VpiHandle actual) {
-  return actual != nullptr && actual->type == vpiOperation &&
-         actual->op_type == vpiNullOp;
+  return actual->type == vpiOperation && actual->op_type == vpiNullOp;
 }
 
 // §37.57 (figure) + detail 1: collect a let expression's arguments. The formals

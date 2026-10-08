@@ -64,6 +64,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [A VpiDesignRun SetUp calls the base first](vpi-design-run-setup.md) — an override of `SetUp` that skips `VpiDesignRun::SetUp()` builds no VPI model, and its cases read another case's leftovers.
 - [No empty test files](no-empty-test-files.md) — a file with no `TEST` fails a job; a new lettered file lands with its first test.
 - [Sweeping a citation change](sweeping-a-citation-change.md) — grep the message the diagnostic prints, across the whole tree; the files named after the old subclause are not the set.
+- [A braced case's closing brace is a line](braced-case-closing-brace-is-a-line.md) — `case X: { …; break; }` leaves a `}` llvm-cov counts and nothing runs; move the work into a helper.
 
 ## Verification
 

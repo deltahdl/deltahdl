@@ -8,6 +8,7 @@
 #include "fixture_simulator.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -211,6 +212,43 @@ TEST_F(VpiIterateInARun, TheExamplesVectorNetReportsItsSize) {
   // a size only the net object the design built carries -- one made by hand
   // carries whatever the case put in it.
   EXPECT_EQ(g_widest_net_size, 8);
+}
+
+// §38.23: a relation no special rule names walks the reference's children of
+// the asked type, whatever kind the reference is -- including the kinds whose
+// other relations do have rules of their own.
+TEST(VpiIterateRelations, AnUnnamedRelationWalksChildrenOfItsType) {
+  VpiContext ctx;
+  SetGlobalVpiContext(&ctx);
+  for (int kind : {vpiLetExpr, vpiInterconnectArray, vpiExtends, vpiTchk,
+                   vpiForeachStmt, vpiFor, vpiModPath, vpiCaseItem}) {
+    VpiObject event;
+    event.type = vpiNamedEvent;
+    VpiObject ref;
+    ref.type = kind;
+    ref.children = {&event};
+    vpiHandle it = vpi_iterate(vpiNamedEvent, VpiHandleOf(&ref));
+    ASSERT_NE(it, nullptr) << kind;
+    EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &event) << kind;
+    EXPECT_EQ(vpi_scan(it), nullptr) << kind;
+  }
+  SetGlobalVpiContext(nullptr);
+}
+
+// §37.17 detail 18 draws the vpiIndex iteration of an array element from a
+// variable; an element of a gate array is no variable, and the iteration
+// walks no index expressions of it.
+TEST(VpiIterateRelations, AGateArrayElementHasNoIndexIteration) {
+  VpiContext ctx;
+  SetGlobalVpiContext(&ctx);
+  VpiObject index;
+  index.type = vpiConstant;
+  VpiObject gate;
+  gate.type = vpiGate;
+  gate.array_member = true;
+  gate.children = {&index};
+  EXPECT_EQ(vpi_iterate(vpiIndex, VpiHandleOf(&gate)), nullptr);
+  SetGlobalVpiContext(nullptr);
 }
 
 }  // namespace
