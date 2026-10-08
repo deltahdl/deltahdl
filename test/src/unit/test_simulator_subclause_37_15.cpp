@@ -254,8 +254,8 @@ TEST_F(RefObjContext, EveryNetAndVariableActualExposesTheTypespec) {
   VpiObject typespec;
   typespec.type = vpiTypespec;
   for (int kind : {vpiStructNet, vpiUnionNet, vpiEnumNet, vpiIntegerNet,
-                   vpiTimeNet, vpiBitNet, vpiPackedArrayNet, vpiIntegerVar,
-                   vpiRealVar, vpiIntVar, vpiBitVar}) {
+                   vpiTimeNet, vpiBitNet, vpiPackedArrayNet, vpiReg,
+                   vpiIntegerVar, vpiRealVar, vpiIntVar, vpiBitVar}) {
     VpiObject actual;
     actual.type = kind;
     VpiObject ref_obj;
