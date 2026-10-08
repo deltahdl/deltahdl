@@ -36,34 +36,24 @@ int TimeExponent(TimeUnit unit, int magnitude) {
 // precision it was elaborated under, and the file and line the definition was
 // written on, restated where it came from (detail 8 lets `line move it).
 void RecordInstanceDefinition(VpiObject* obj, const RtlirModule* mod,
-                              const SourceManager* sources) {
+                              const SourceManager& sources) {
   obj->time_unit = TimeExponent(mod->timescale.unit, mod->timescale.magnitude);
   obj->time_precision =
       TimeExponent(mod->timescale.precision, mod->timescale.prec_magnitude);
-  if (sources == nullptr || !mod->loc.IsValid()) return;
-  const SourceLoc kWritten = sources->ResolveToOrigin(mod->loc);
+  const SourceLoc kWritten = sources.ResolveToOrigin(mod->loc);
   obj->def_line_no = static_cast<int>(kWritten.line);
-  obj->def_file = std::string(sources->FilePath(kWritten.file_id));
-}
-
-// §37.10 detail 5: the full names of a package's members begin with the
-// package's name followed by "::", where the simulator's keys put a '.'.
-void UsePackageSeparator(VpiObject* obj, std::string_view dotted,
-                         const std::string& colons) {
-  if (obj->full_name.starts_with(dotted)) {
-    obj->full_name = colons + obj->full_name.substr(dotted.size());
-  }
-  for (auto* child : obj->children) UsePackageSeparator(child, dotted, colons);
+  obj->def_file = std::string(sources.FilePath(kWritten.file_id));
 }
 
 // §37.10: `obj`, the scope the walk made for the package or compilation unit
-// named `name`, given the package's type and names.
+// named `name`, given the package's type and names. Detail 5 begins each
+// member's full name with the package's name followed by "::", where the
+// simulator's keys, "pkg.name" (lowerer_package_data.cpp), put a '.'.
 void MakePackageScope(VpiObject* obj, std::string_view name) {
   obj->type = vpiPackage;
   const std::string kColons = std::string(name) + "::";
-  const std::string kDotted = std::string(name) + ".";
   for (auto* member : obj->children) {
-    UsePackageSeparator(member, kDotted, kColons);
+    member->full_name = kColons + std::string(member->name);
   }
   obj->full_name = kColons;
 }
@@ -110,7 +100,7 @@ VpiObject* ModportPortExpr(const ModportScope& scope, VpiObject* io_decl,
   }
   VpiObject* item = FindObjectForFlatName(scope.objects,
                                           VpiFlatName(scope.prefix, port.name));
-  if (port.direction != Direction::kRef || item == nullptr) return item;
+  if (port.direction != Direction::kRef) return item;
   VpiObject* ref_obj = scope.build.alloc();
   ref_obj->type = vpiRefObj;
   ref_obj->parent = io_decl;
@@ -172,13 +162,12 @@ void VpiContext::AttachPackages(const RtlirDesign* design) {
   // the package stands as, and it is given the package's type and names.
   if (design == nullptr) return;
   for (const PackageDecl* pkg : design->packages) {
-    if (pkg == nullptr) continue;
     MakePackageScope(DesignObjectForFlatName(pkg->name), pkg->name);
   }
   // The compilation unit's data is keyed the same way, under "$unit". It is
   // part of no module either, and detail 5 names its objects "$unit::name".
   auto unit = object_map_.find(kUnitScope);
-  if (unit == object_map_.end() || unit->second == nullptr) return;
+  if (unit == object_map_.end()) return;
   MakePackageScope(unit->second, kUnitScope);
   MarkInCompilationUnit(unit->second);
 }
@@ -187,7 +176,7 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
   AttachInstanceDefinitions(design);
   AttachVariableFacts(design);
   VpiSubroutineObjects subroutines;
-  if (design != nullptr && sim_ctx_ != nullptr) {
+  if (design != nullptr) {
     const VpiAttachBuild kBuild{[this] { return AllocObject(); },
                                 [this](std::string name) {
                                   name_pool_.push_back(std::move(name));
@@ -241,10 +230,8 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     AttachProcedures(design, object_map_, kCalls, kBuild);
     AttachPrimitives(
         design, object_map_,
-        [this](const UdpDecl* decl) {
-          auto it = run_objects_.find(decl);
-          return it != run_objects_.end() ? it->second : nullptr;
-        },
+        // Attach made a udp defn for every UDP declaration of the design.
+        [this](const UdpDecl* decl) { return run_objects_.at(decl); },
         *sim_ctx_, kBuild);
   }
   AttachContinuousAssignments(design, subroutines);
@@ -256,42 +243,24 @@ void AttachModports(const RtlirDesign* design, const VpiObjectMap& objects,
   // §37.7: an interface instance has a modport per modport its interface
   // declares, in the order they were written; none was made, so
   // vpi_iterate(vpiModport, interface) reached nothing.
-  if (design == nullptr || design->top_modules.empty() ||
-      design->top_modules.front() == nullptr) {
-    return;
-  }
-  // The first top carries the empty prefix and is keyed under its own name.
-  const std::string kFirstTop(design->top_modules.front()->name);
-  WalkInstancePaths(
-      design, [&](const RtlirModule* mod, const std::string& prefix) {
-        if (mod->modports.empty()) return;
-        VpiObject* iface =
-            FindObjectForFlatName(objects, prefix.empty() ? kFirstTop : prefix);
-        if (iface == nullptr) return;
+  WalkInstanceObjects(
+      design, objects,
+      [&](const RtlirModule* mod, const std::string& prefix, VpiObject* iface) {
         const ModportScope kScope{iface, objects, prefix, ctx, build};
         for (const ModportDecl* decl : mod->modports) {
-          if (decl != nullptr) MakeModport(kScope, *decl);
+          MakeModport(kScope, *decl);
         }
       });
 }
 
 void VpiContext::AttachInstanceDefinitions(const RtlirDesign* design) {
-  if (design == nullptr || design->top_modules.empty() ||
-      design->top_modules.front() == nullptr) {
-    return;
-  }
-  const SourceManager* sources =
-      sim_ctx_ == nullptr ? nullptr : &sim_ctx_->GetDiag().Sources();
-  // The first top carries the empty prefix and is keyed under its own name
-  // once AttachTopModules has made it.
-  const std::string kFirstTop(design->top_modules.front()->name);
-  WalkInstancePaths(design,
-                    [&](const RtlirModule* mod, const std::string& prefix) {
-                      VpiHandle obj = FindObjectForFlatName(
-                          object_map_, prefix.empty() ? kFirstTop : prefix);
-                      if (obj != nullptr)
-                        RecordInstanceDefinition(obj, mod, sources);
-                    });
+  const SourceManager& sources = sim_ctx_->GetDiag().Sources();
+  // The first top is keyed under its own name once AttachTopModules has made
+  // it.
+  WalkInstanceObjects(
+      design, object_map_,
+      [&](const RtlirModule* mod, const std::string& /*prefix*/,
+          VpiObject* obj) { RecordInstanceDefinition(obj, mod, sources); });
 }
 
 void VpiContext::AttachModuleDefNames(SimContext& sim_ctx) {
@@ -305,12 +274,10 @@ void VpiContext::AttachModuleDefNames(SimContext& sim_ctx) {
   // type against the instance path, which is the same string the module object
   // carries as its vpiFullName.
   for (auto* obj : all_objects_) {
-    // Every kind of instance names its definition (§37.10), a package aside,
-    // which is no instantiation of anything.
-    if (!VpiIsInstanceType(obj->type) || obj->type == vpiPackage ||
-        obj->full_name.empty()) {
-      continue;
-    }
+    // Every kind of instance names its definition (§37.10). A package is no
+    // instantiation of anything: AttachPackages types it only after this, and
+    // the run records no instance type under its name.
+    if (!VpiIsInstanceType(obj->type)) continue;
     std::string_view type = sim_ctx.FindInstanceType(obj->full_name);
     if (!type.empty()) obj->def_name = std::string(type);
   }

@@ -227,6 +227,30 @@ TEST_F(ModportsOfARun, AnIoDeclOfARefPortReportsVpiRef) {
   EXPECT_EQ(vpi_get(vpiDirection, Named(vpiIODecl, mr, "a")), vpiRef);
 }
 
+// §37.13 detail 1 with §37.7: an io decl of a modport's inout port reports
+// vpiInout.
+TEST_F(ModportsOfARun, AnIoDeclOfAnInoutPortReportsVpiInout) {
+  Run("interface ifc; wire w; modport mb(inout w); endinterface\n"
+      "module top; ifc i0(); endmodule\n");
+  vpiHandle mb = Named(vpiModport, Instance(), "mb");
+  EXPECT_EQ(vpi_get(vpiDirection, Named(vpiIODecl, mb, "w")), vpiInout);
+}
+
+// §37.7: a modport's io decls are its data ports alone; a task it imports or
+// exports (§25.7) and a clocking block it names (§25.5.5) are none.
+TEST_F(ModportsOfARun, AModportsImportsExportsAndClockingAreNoIoDecls) {
+  Run("interface ifc; logic a;\n"
+      "  extern task put();\n"
+      "  task get(); endtask\n"
+      "  clocking cb @(posedge a); endclocking\n"
+      "  modport mp(input a, import get, export put, clocking cb);\n"
+      "endinterface\n"
+      "module tgt(ifc.mp b); task b.put(); endtask endmodule\n"
+      "module top; ifc i0(); tgt t(i0.mp); endmodule\n");
+  EXPECT_EQ(ScannedNames(vpiIODecl, Named(vpiModport, Instance(), "mp")),
+            (std::vector<std::string>{"a"}));
+}
+
 // §37.7: an io decl of a modport reaches back the modport it belongs to.
 TEST_F(ModportsOfARun, AnIoDeclReachesItsModport) {
   Run(kTwoModports);
