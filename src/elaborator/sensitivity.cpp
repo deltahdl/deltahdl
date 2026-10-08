@@ -14,9 +14,13 @@
 
 namespace delta {
 
+// The prefix is spelled as the simulator names what it reads, an element by
+// its index's 32 bits (LongestStaticStorageName): `p[-1]` of `p [-1:0]` is
+// held as p[4294967295], and spelled p[-1] it named no variable, so a
+// continuous assignment reading it ran once and never again.
 static void CollectSelectReads(const Expr* expr,
                                std::unordered_set<std::string>& out) {
-  out.insert(LongestStaticPrefix(expr));
+  out.insert(LongestStaticStorageName(expr));
 
   const Expr* cur = expr;
   while (cur && cur->kind == ExprKind::kSelect) {

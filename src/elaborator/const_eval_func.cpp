@@ -813,8 +813,19 @@ struct StaticPrefixResult {
   bool is_static;
 };
 
+// How a folded index is spelled: as the integer it is, which the §9.2.2
+// checks compare, or by its 32 bits, the name the simulator holds an element
+// under (ArrayElementKey in src/simulator/lowerer_var.cpp), so `p[-1]` of
+// `p [-1:0]` is "p[4294967295]".
+enum class PrefixIndexSpelling { kValue, kStorage };
+
+struct StaticPrefixSpec {
+  const ScopeMap& scope;
+  PrefixIndexSpelling spelling;
+};
+
 static StaticPrefixResult BuildStaticPrefix(const Expr* expr,
-                                            const ScopeMap& scope);
+                                            const StaticPrefixSpec& spec);
 
 static StaticPrefixResult BuildIdentifierPrefix(const Expr* expr) {
   std::string result;
@@ -823,26 +834,29 @@ static StaticPrefixResult BuildIdentifierPrefix(const Expr* expr) {
   return {result, true};
 }
 
-static StaticPrefixResult BuildMemberAccessPrefix(const Expr* expr,
-                                                  const ScopeMap& scope) {
+static StaticPrefixResult BuildMemberAccessPrefix(
+    const Expr* expr, const StaticPrefixSpec& spec) {
   if (!expr->lhs || !expr->rhs) return {"", false};
-  auto base = BuildStaticPrefix(expr->lhs, scope);
+  auto base = BuildStaticPrefix(expr->lhs, spec);
   if (!base.is_static) return {base.text, false};
   return {base.text + "." + std::string(expr->rhs->text), true};
 }
 
 static StaticPrefixResult BuildSelectPrefix(const Expr* expr,
-                                            const ScopeMap& scope) {
-  auto base = BuildStaticPrefix(expr->base, scope);
+                                            const StaticPrefixSpec& spec) {
+  auto base = BuildStaticPrefix(expr->base, spec);
   if (base.text.empty()) return {"", false};
   if (!base.is_static) return {base.text, false};
-  auto idx = ConstEvalInt(expr->index, scope);
+  auto idx = ConstEvalInt(expr->index, spec.scope);
   if (!idx) return {base.text, false};
-  return {base.text + "[" + std::to_string(*idx) + "]", true};
+  std::string index = spec.spelling == PrefixIndexSpelling::kStorage
+                          ? std::to_string(static_cast<uint32_t>(*idx))
+                          : std::to_string(*idx);
+  return {base.text + "[" + index + "]", true};
 }
 
 static StaticPrefixResult BuildStaticPrefix(const Expr* expr,
-                                            const ScopeMap& scope) {
+                                            const StaticPrefixSpec& spec) {
   if (!expr) return {"", false};
 
   if (expr->kind == ExprKind::kIdentifier) {
@@ -850,11 +864,11 @@ static StaticPrefixResult BuildStaticPrefix(const Expr* expr,
   }
 
   if (expr->kind == ExprKind::kMemberAccess) {
-    return BuildMemberAccessPrefix(expr, scope);
+    return BuildMemberAccessPrefix(expr, spec);
   }
 
   if (expr->kind == ExprKind::kSelect && expr->base) {
-    return BuildSelectPrefix(expr, scope);
+    return BuildSelectPrefix(expr, spec);
   }
 
   return {"", false};
@@ -862,7 +876,13 @@ static StaticPrefixResult BuildStaticPrefix(const Expr* expr,
 
 std::string LongestStaticPrefix(const Expr* expr, const ScopeMap& scope) {
   if (!expr) return "";
-  return BuildStaticPrefix(expr, scope).text;
+  return BuildStaticPrefix(expr, {scope, PrefixIndexSpelling::kValue}).text;
+}
+
+std::string LongestStaticStorageName(const Expr* expr) {
+  static const ScopeMap kEmptyScope;
+  return BuildStaticPrefix(expr, {kEmptyScope, PrefixIndexSpelling::kStorage})
+      .text;
 }
 
 }  // namespace delta

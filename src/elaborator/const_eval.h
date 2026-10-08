@@ -253,4 +253,8 @@ bool IsConstantSysFunc(std::string_view name);
 
 std::string LongestStaticPrefix(const Expr* expr, const ScopeMap& scope = {});
 
+// The longest static prefix of `expr` as the simulator names the object it
+// stands for: each folded index by its 32 bits, so `p[-1]` is "p[4294967295]".
+std::string LongestStaticStorageName(const Expr* expr);
+
 }  // namespace delta
