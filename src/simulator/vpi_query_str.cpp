@@ -15,6 +15,7 @@
 // VpiHasLocationProperties, the one name the two share, is declared in
 // simulator/vpi_model_helpers3.h and defined in simulator/vpi_helpers_nets.cpp.
 
+#include <cstddef>
 #include <string>
 
 #include "simulator/sv_vpi_user.h"
@@ -28,6 +29,24 @@
 
 namespace delta {
 
+// A constant of one of the sets §37.3.2 names through vpi_get_str(), with its
+// spelling.
+struct VpiConstantName {
+  int value;
+  const char* name;
+};
+
+// The spelling `table` gives the constant `value`, or null for a value it does
+// not list.
+template <std::size_t N>
+static const char* VpiConstantNameIn(const VpiConstantName (&table)[N],
+                                     int value) {
+  for (const VpiConstantName& entry : table) {
+    if (entry.value == value) return entry.name;
+  }
+  return nullptr;
+}
+
 // §37.3.2: vpi_get_str(vpiType, ...) hands back the name of the type constant,
 // and that name is derived from the object's name in the data model diagram
 // (§37.3) - i.e. it is the very identifier of the type constant. These are the
@@ -37,12 +56,7 @@ namespace delta {
 // details 27 and 29), vpiLogicVar and vpiReg, vpiVarBit and vpiRegBit,
 // vpiArrayVar and vpiRegArray (§37.17 detail 19) - the clause lets either be
 // reported, and the IEEE 1364 spelling Annex K defines is.
-struct VpiTypeName {
-  int type;
-  const char* name;
-};
-
-constexpr VpiTypeName kVpiTypeNames[] = {
+constexpr VpiConstantName kVpiTypeNames[] = {
     {vpiAlways, "vpiAlways"},
     {vpiAssignStmt, "vpiAssignStmt"},
     {vpiAssignment, "vpiAssignment"},
@@ -261,10 +275,7 @@ constexpr VpiTypeName kVpiTypeNames[] = {
 // The spelling of `type`, or null for a value neither annex defines as an
 // object type.
 static const char* VpiTypeConstantName(int type) {
-  for (const VpiTypeName& entry : kVpiTypeNames) {
-    if (entry.type == type) return entry.name;
-  }
-  return nullptr;
+  return VpiConstantNameIn(kVpiTypeNames, type);
 }
 
 // §37.3.2: an operation's vpiOpType is one of the additional type properties;
@@ -272,12 +283,7 @@ static const char* VpiTypeConstantName(int type) {
 // namespace, Annex K's and the ones Annex M adds, each listed here with its
 // spelling so vpi_get_str(vpiOpType, ...) can hand the name back. Listing
 // Annex K's alone left a cast, an `inside` or a wildcard equality nameless.
-struct VpiOpTypeName {
-  int op_type;
-  const char* name;
-};
-
-constexpr VpiOpTypeName kVpiOpTypeNames[] = {
+constexpr VpiConstantName kVpiOpTypeNames[] = {
     {vpiMinusOp, "vpiMinusOp"},
     {vpiPlusOp, "vpiPlusOp"},
     {vpiNotOp, "vpiNotOp"},
@@ -369,14 +375,39 @@ constexpr VpiOpTypeName kVpiOpTypeNames[] = {
     {vpiInsideOp, "vpiInsideOp"},
 };
 
-// The spelling of the operator constant `op_type`, or null for a value neither
-// annex defines.
-static const char* VpiOpTypeConstantName(int op_type) {
-  for (const VpiOpTypeName& entry : kVpiOpTypeNames) {
-    if (entry.op_type == op_type) return entry.name;
-  }
-  return nullptr;
-}
+// §37.3.2 with Annex K: the primitive, delay and timing check constants
+// vpiPrimType, vpiDelayType and vpiTchkType report, each with its spelling.
+constexpr VpiConstantName kVpiPrimTypeNames[] = {
+    {vpiAndPrim, "vpiAndPrim"},           {vpiNandPrim, "vpiNandPrim"},
+    {vpiNorPrim, "vpiNorPrim"},           {vpiOrPrim, "vpiOrPrim"},
+    {vpiXorPrim, "vpiXorPrim"},           {vpiXnorPrim, "vpiXnorPrim"},
+    {vpiBufPrim, "vpiBufPrim"},           {vpiNotPrim, "vpiNotPrim"},
+    {vpiBufif0Prim, "vpiBufif0Prim"},     {vpiBufif1Prim, "vpiBufif1Prim"},
+    {vpiNotif0Prim, "vpiNotif0Prim"},     {vpiNotif1Prim, "vpiNotif1Prim"},
+    {vpiNmosPrim, "vpiNmosPrim"},         {vpiPmosPrim, "vpiPmosPrim"},
+    {vpiCmosPrim, "vpiCmosPrim"},         {vpiRnmosPrim, "vpiRnmosPrim"},
+    {vpiRpmosPrim, "vpiRpmosPrim"},       {vpiRcmosPrim, "vpiRcmosPrim"},
+    {vpiRtranPrim, "vpiRtranPrim"},       {vpiRtranif0Prim, "vpiRtranif0Prim"},
+    {vpiRtranif1Prim, "vpiRtranif1Prim"}, {vpiTranPrim, "vpiTranPrim"},
+    {vpiTranif0Prim, "vpiTranif0Prim"},   {vpiTranif1Prim, "vpiTranif1Prim"},
+    {vpiPullupPrim, "vpiPullupPrim"},     {vpiPulldownPrim, "vpiPulldownPrim"},
+    {vpiSeqPrim, "vpiSeqPrim"},           {vpiCombPrim, "vpiCombPrim"},
+};
+
+constexpr VpiConstantName kVpiDelayTypeNames[] = {
+    {vpiModPathDelay, "vpiModPathDelay"},
+    {vpiInterModPathDelay, "vpiInterModPathDelay"},
+    {vpiMIPDelay, "vpiMIPDelay"},
+};
+
+constexpr VpiConstantName kVpiTchkTypeNames[] = {
+    {vpiSetup, "vpiSetup"},       {vpiHold, "vpiHold"},
+    {vpiPeriod, "vpiPeriod"},     {vpiWidth, "vpiWidth"},
+    {vpiSkew, "vpiSkew"},         {vpiRecovery, "vpiRecovery"},
+    {vpiNoChange, "vpiNoChange"}, {vpiSetupHold, "vpiSetupHold"},
+    {vpiFullskew, "vpiFullskew"}, {vpiRecrem, "vpiRecrem"},
+    {vpiRemoval, "vpiRemoval"},   {vpiTimeskew, "vpiTimeskew"},
+};
 
 // §37.3.2: besides vpiType, some objects carry an additional type property
 // shown in the data model diagrams - vpiDelayType, vpiNetType, vpiOpType,
@@ -392,9 +423,15 @@ static const char* VpiOpTypeConstantName(int op_type) {
 static const char* VpiAdditionalTypeConstantName(int property, VpiHandle obj) {
   switch (property) {
     case vpiOpType:
-      return VpiOpTypeConstantName(obj->op_type);
+      return VpiConstantNameIn(kVpiOpTypeNames, obj->op_type);
     case vpiNetType:
       return VpiNetTypeConstantName(VpiNetTypeOf(obj));
+    case vpiPrimType:
+      return VpiConstantNameIn(kVpiPrimTypeNames, obj->prim_type);
+    case vpiDelayType:
+      return VpiConstantNameIn(kVpiDelayTypeNames, obj->delay_type);
+    case vpiTchkType:
+      return VpiConstantNameIn(kVpiTchkTypeNames, obj->tchk_type);
     default:
       return nullptr;
   }

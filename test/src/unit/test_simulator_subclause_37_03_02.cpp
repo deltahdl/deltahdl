@@ -215,5 +215,44 @@ TEST_F(VpiObjectTypeProperty, GetStrNamesTheOperatorsAnnexMAdds) {
   }
 }
 
+// §37.3.2: vpiPrimType, vpiDelayType and vpiTchkType are additional type
+// properties too, and vpi_get_str names the constant each reports, from the
+// first to the last of its set in Annex K; a value outside the set has no
+// name. None of the three had a name.
+TEST_F(VpiObjectTypeProperty, GetStrNamesThePrimitiveDelayAndCheckTypes) {
+  VpiObject prim;
+  prim.type = vpiPrimitive;
+  VpiObject path;
+  path.type = vpiModPath;
+  VpiObject check;
+  check.type = vpiTchk;
+  const struct {
+    VpiObject* obj;
+    int property;
+    int* field;
+    int value;
+    const char* name;
+  } kCases[] = {
+      {&prim, vpiPrimType, &prim.prim_type, vpiAndPrim, "vpiAndPrim"},
+      {&prim, vpiPrimType, &prim.prim_type, vpiCombPrim, "vpiCombPrim"},
+      {&path, vpiDelayType, &path.delay_type, vpiModPathDelay,
+       "vpiModPathDelay"},
+      {&path, vpiDelayType, &path.delay_type, vpiMIPDelay, "vpiMIPDelay"},
+      {&check, vpiTchkType, &check.tchk_type, vpiSetup, "vpiSetup"},
+      {&check, vpiTchkType, &check.tchk_type, vpiTimeskew, "vpiTimeskew"},
+      {&prim, vpiPrimType, &prim.prim_type, 0, nullptr},
+  };
+  for (const auto& c : kCases) {
+    *c.field = c.value;
+    const char* name = vpi_get_str(c.property, VpiHandleOf(c.obj));
+    if (c.name == nullptr) {
+      EXPECT_EQ(name, nullptr);
+      continue;
+    }
+    ASSERT_NE(name, nullptr) << c.name;
+    EXPECT_EQ(std::string(name), c.name);
+  }
+}
+
 }  // namespace
 }  // namespace delta
