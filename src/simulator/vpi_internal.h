@@ -62,6 +62,9 @@ VpiHandle VpiNestedScopeNamed(VpiHandle parent, std::string_view name);
 // §37.12/§37.63: a statement's vpiScope, the nearest scope around it. Defined
 // in vpi_helpers_scopes.cpp, used by vpi_handle.cpp.
 bool TryResolveStmtScopeRelation(int type, VpiHandle ref, VpiHandle& out);
+// §37.17 (figure) with §37.12 details 2 and 3: a variable's vpiScope, the
+// nearest object around it that is a scope.
+bool TryResolveVariableScopeRelation(int type, VpiHandle ref, VpiHandle& out);
 
 // §37.63/§37.66/§37.67/§37.70: the kinds that reach a body statement through
 // the object model's untagged arrow to `stmt`. Defined in

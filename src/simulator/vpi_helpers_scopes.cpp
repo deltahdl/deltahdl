@@ -93,19 +93,32 @@ bool VpiIsInternalScopeType(int type) {
   }
 }
 
+// The nearest object around `obj` that is a scope (§37.12), null where none is.
+static VpiHandle NearestScopeAround(VpiHandle obj) {
+  for (VpiObject* scope = obj->parent; scope != nullptr;
+       scope = scope->parent) {
+    if (VpiIsScopeObject(scope)) return scope;
+  }
+  return nullptr;
+}
+
 bool TryResolveStmtScopeRelation(int type, VpiHandle ref, VpiHandle& out) {
   // §37.12 and §37.63 (figures): a statement reaches the scope it stands in
   // through the untagged arrow to `scope`, the nearest object around it that
   // is one; a block that is no scope is passed over.
   if (type != vpiScope || !VpiIsScopeBodyStmtObject(ref)) return false;
-  out = nullptr;
-  for (VpiObject* scope = ref->parent; scope != nullptr;
-       scope = scope->parent) {
-    if (VpiIsScopeObject(scope)) {
-      out = scope;
-      break;
-    }
-  }
+  out = NearestScopeAround(ref);
+  return true;
+}
+
+bool TryResolveVariableScopeRelation(int type, VpiHandle ref, VpiHandle& out) {
+  // The §37.17 figure draws an arrow from variables to the scope they are
+  // declared in, the nearest object around a variable that is one. For a loop
+  // control variable that is its foreach statement, or its for statement where
+  // the for declares its loop variables (§37.12 details 2 and 3); a for that
+  // does not is no scope and is passed over.
+  if (type != vpiScope || !VpiIsLoopControlVarType(ref->type)) return false;
+  out = NearestScopeAround(ref);
   return true;
 }
 

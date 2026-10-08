@@ -678,24 +678,6 @@ bool TryResolveElseExprStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
   return false;
 }
 
-// §37.12: the enclosing scope of a loop control variable - the foreach
-// statement that owns it, or the for statement when it declares its own loop
-// variables.
-bool TryResolveLoopControlScopeRelation(int type, VpiHandle ref,
-                                        VpiHandle& out) {
-  if (type == vpiScope && ref->parent && VpiIsLoopControlVarType(ref->type)) {
-    if (ref->parent->type == vpiForeachStmt) {
-      out = ref->parent;
-      return true;
-    }
-    if (ref->parent->type == vpiFor && ref->parent->local_var_decls) {
-      out = ref->parent;
-      return true;
-    }
-  }
-  return false;
-}
-
 // §37.79/§37.76/§37.71/§37.69/§37.77/§37.12: the lhs/rhs of the procedural
 // continuous assignment family and alias statements, an if-else's else branch,
 // repeat-control and disable expressions, a task/func body, and a loop control
@@ -703,7 +685,7 @@ bool TryResolveLoopControlScopeRelation(int type, VpiHandle ref,
 bool TryResolveAssignAndStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
   return TryResolveAssignLhsRhsRelation(type, ref, out) ||
          TryResolveElseExprStmtRelation(type, ref, out) ||
-         TryResolveLoopControlScopeRelation(type, ref, out) ||
+         TryResolveVariableScopeRelation(type, ref, out) ||
          TryResolveStmtScopeRelation(type, ref, out);
 }
 

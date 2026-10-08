@@ -195,6 +195,16 @@ TEST(ScopePublic, LoopControlVariableScopeIsItsLoopStatement) {
   shared_for.children.push_back(&shared_for_var);
   EXPECT_NE(ctx.Handle(vpiScope, &shared_for_var), &shared_for);
 
+  // A variable of a block that is no loop statement takes that block as its
+  // scope, the block being one by declaring the variable (detail 1).
+  VpiObject block_var;
+  block_var.type = vpiIntVar;
+  VpiObject block;
+  block.type = vpiBegin;
+  block_var.parent = &block;
+  block.children.push_back(&block_var);
+  EXPECT_EQ(ctx.Handle(vpiScope, &block_var), &block);
+
   SetGlobalVpiContext(nullptr);
 }
 
@@ -889,6 +899,19 @@ TEST(ScopeModel, AVariableInsideAStatementIsNoNestedScope) {
   block.name = "inner";
   stmt.children = {&var, &block};
   EXPECT_EQ(VpiNestedScopeNamed(&module, "inner"), &block);
+}
+
+// The §37.17 figure: a variable reaches the scope it is declared in through
+// vpiScope, a module's variable the module and a named block's the block.
+TEST_F(BlockScopesOfARun, AVariableReachesTheScopeItIsDeclaredIn) {
+  Run("module top;\n"
+      "  int a;\n"
+      "  initial begin : b int x; x = 1; end\n"
+      "endmodule\n");
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiScope, By("top.a"))),
+            VpiObjectOf(By("top")));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiScope, By("top.b.x"))),
+            VpiObjectOf(By("top.b")));
 }
 
 }  // namespace
