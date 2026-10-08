@@ -46,7 +46,9 @@ char UnknownGroupChar(uint8_t a_bits, uint8_t b_bits, uint8_t mask) {
     bool all_x = unknown == mask && (a_bits & mask) == mask;
     return all_x ? 'x' : 'X';
   }
-  bool all_z = unknown == mask && (a_bits & mask) == 0;
+  // No unknown bit is x here, so every valid bit is z exactly when every one
+  // is unknown.
+  bool all_z = unknown == mask;
   return all_z ? 'z' : 'Z';
 }
 

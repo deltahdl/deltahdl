@@ -48,21 +48,18 @@ static void GetValueVector(const Logic4Vec& v, s_vpi_value* value,
                            std::vector<std::vector<s_vpi_vecval>>& pool) {
   int width = static_cast<int>(v.width);
   // §38.15: the vector value occupies an array of s_vpi_vecval whose size is
-  // ((vector_size - 1) / 32 + 1), one element per 32 bits of the vector.
-  int array_size = width > 0 ? ((width - 1) / 32 + 1) : 1;
-  std::vector<s_vpi_vecval> vec(static_cast<size_t>(array_size));
-  for (int i = 0; i < array_size; ++i) {
+  // ((vector_size - 1) / 32 + 1), one element per 32 bits of the vector; a
+  // value of no bits is handed back as one element of 0.
+  const int kGroups = (width + 31) / 32;
+  std::vector<s_vpi_vecval> vec(static_cast<size_t>(std::max(kGroups, 1)));
+  for (int i = 0; i < kGroups; ++i) {
     // Internal four-state words are 64 bits wide, so two vecval elements map
     // onto each word: the LSB of the vector lands in element 0, bit 33 in the
     // LSB of element 1, and so on.
-    int word_idx = i / 2;
+    const Logic4Word& word = v.words[i / 2];
     int shift = (i % 2) * 32;
-    uint64_t aval =
-        word_idx < static_cast<int>(v.nwords) ? v.words[word_idx].aval : 0;
-    uint64_t bval =
-        word_idx < static_cast<int>(v.nwords) ? v.words[word_idx].bval : 0;
-    auto a32 = static_cast<uint32_t>((aval >> shift) & 0xFFFFFFFFu);
-    auto b32 = static_cast<uint32_t>((bval >> shift) & 0xFFFFFFFFu);
+    auto a32 = static_cast<uint32_t>((word.aval >> shift) & 0xFFFFFFFFu);
+    auto b32 = static_cast<uint32_t>((word.bval >> shift) & 0xFFFFFFFFu);
     // §38.15 / Figure 38-8: the returned encoding is ab 00=0, 10=1, 11=X,
     // 01=Z. The internal word now uses this same canonical encoding (X=a1/b1,
     // Z=a0/b1), so the boundary value is a direct copy with no conversion.
@@ -77,22 +74,18 @@ static void GetValueStrength(
     const Logic4Vec& v, s_vpi_value* value,
     std::vector<std::vector<s_vpi_strengthval>>& pool) {
   int width = static_cast<int>(v.width);
-  if (width < 1) width = 1;
-  // §38.15: the strength arm holds one descriptor per bit of the vector.
-  std::vector<s_vpi_strengthval> arr(static_cast<size_t>(width));
+  // §38.15: the strength arm holds one descriptor per bit of the vector, a
+  // value of no bits one of 0. A reg or variable is always reported at strong
+  // strength, so both the 0 and 1 drive components carry the strong-drive
+  // code.
+  std::vector<s_vpi_strengthval> arr(
+      static_cast<size_t>(std::max(width, 1)),
+      s_vpi_strengthval{kVpi0, vpiStrongDrive, vpiStrongDrive});
   for (int i = 0; i < width; ++i) {
-    int word_idx = i / 64;
-    int bit = i % 64;
-    uint64_t aval =
-        word_idx < static_cast<int>(v.nwords) ? v.words[word_idx].aval : 0;
-    uint64_t bval =
-        word_idx < static_cast<int>(v.nwords) ? v.words[word_idx].bval : 0;
+    const Logic4Word& word = v.words[i / 64];
+    const int kBit = i % 64;
     arr[static_cast<size_t>(i)].logic =
-        ScalarFromBits((aval >> bit) & 1, (bval >> bit) & 1);
-    // §38.15: a reg or variable is always reported at strong strength, so both
-    // the 0 and 1 drive components carry the strong-drive code.
-    arr[static_cast<size_t>(i)].s0 = vpiStrongDrive;
-    arr[static_cast<size_t>(i)].s1 = vpiStrongDrive;
+        ScalarFromBits((word.aval >> kBit) & 1, (word.bval >> kBit) & 1);
   }
   pool.push_back(std::move(arr));
   value->value.strength = pool.back().data();
@@ -243,10 +236,11 @@ static void DispatchIntegerFormat(const Logic4Vec& v, s_vpi_value* value,
 }
 
 // §37.16, §37.17: the one bit at `offset` of `whole`, as a value of its own.
+// Every bit and select stands inside its vector, so the bit is one `whole`
+// holds.
 static Logic4Word BitOfValue(const Logic4Vec& whole, int offset) {
   const auto kWord = static_cast<uint32_t>(offset) / 64;
   const uint32_t kShift = static_cast<uint32_t>(offset) % 64;
-  if (kWord >= whole.nwords) return Logic4Word{0, 1};
   return Logic4Word{(whole.words[kWord].aval >> kShift) & 1,
                     (whole.words[kWord].bval >> kShift) & 1};
 }
@@ -326,102 +320,75 @@ static void DispatchValueByFormat(const Logic4Vec& v, s_vpi_value* value,
   DispatchIntegerFormat(v, value, pools);
 }
 
-// §37.16, §37.17: a net bit or var bit selected by an index that is not a
-// constant, which has no bit of its parent's storage of its own.
-static bool IsVaryingBit(const VpiObject& obj) {
-  return (obj.type == vpiNetBit || obj.type == vpiRegBit ||
-          obj.select_dim.has_value()) &&
-         obj.bit_offset < 0 && obj.parent != nullptr &&
-         obj.index_expr != nullptr;
+// §37.16 detail 31, §37.17 detail 26: a select out of a vector whose index is
+// not a constant, which holds no bits of its parent's storage of its own and
+// stands for those its index names when its value is read or written.
+// PackedSelectObject records the dimension every such select indexes, each
+// vector with bits recording its packed dimensions (MakeVectorBits); one whose
+// index expression the model could not build is no varying select.
+static bool IsVaryingSelect(const VpiObject& obj) {
+  return obj.select_dim.has_value() && obj.index_expr != nullptr;
 }
 
-// The index a varying select's index expression now holds; none where it
-// holds an x or z bit (§11.5.1).
-// §37.3.5 with §38.15: the value of an object that holds no storage but
-// stands for an expression, an operation, held in `out`: the expression
-// evaluated where the source wrote it, by a stand-in process of the instance
-// and generate blocks it stands in, as a process running there would read its
-// names. False for an object that stands for no expression.
-static bool EvaluateExpressionObject(const VpiObject& obj, SimContext* sim,
-                                     Logic4Vec& out) {
-  if (obj.expr_scope == nullptr) return false;
+// §37.3.5 with §38.15: the value of `obj`, which holds no storage but stands
+// for an expression, an operation or a call (ExpressionObject records its
+// scope): the expression evaluated where the source wrote it, by a stand-in
+// process of the instance and generate blocks it stands in, as a process
+// running there would read its names.
+static Logic4Vec EvaluateExpressionObject(const VpiObject& obj,
+                                          SimContext& sim) {
   const VpiExprScope& scope = *obj.expr_scope;
   Process stand_in;
   stand_in.stand_in = true;
   stand_in.inst_prefix = scope.inst_prefix;
   stand_in.gen_prefixes = scope.gen_prefixes;
-  const CallerStandIn kStandIn(&stand_in, *sim);
-  out = EvalExpr(scope.expr, *sim, sim->GetArena());
-  return true;
+  const CallerStandIn kStandIn(&stand_in, sim);
+  return EvalExpr(scope.expr, sim, sim.GetArena());
 }
 
-static std::optional<int64_t> VaryingIndex(VpiHandle obj, SimContext* sim) {
-  VpiHandle index = obj->index_expr;
+// The index a varying select's index expression now holds: the value of the
+// variable or net it names, or of the expression it is, an index holding no
+// storage being one; none where it holds an x or z bit (§11.5.1).
+static std::optional<int64_t> VaryingIndex(const VpiObject& obj,
+                                           SimContext* sim) {
+  VpiObject& index = *obj.index_expr;
   Logic4Vec held;
-  if (index->var != nullptr) {
-    VpiRefreshElementCopy(*index);
-    held = index->var->value;
-  } else if (!EvaluateExpressionObject(*index, sim, held)) {
-    return std::nullopt;
+  if (index.var != nullptr) {
+    VpiRefreshElementCopy(index);
+    held = index.var->value;
+  } else {
+    held = EvaluateExpressionObject(index, *sim);
   }
-  if (held.width == 0 || held.is_real || !held.IsKnown()) return std::nullopt;
+  if (!held.IsKnown()) return std::nullopt;
   return SelectBoundValue(held);
 }
 
 // §37.16 detail 31, §37.17 detail 26: the offset in its parent's storage of
-// the bits a varying select that records the dimension it indexes now
-// stands for; none where its index names no element of the dimension.
-static std::optional<int64_t> VaryingOffset(VpiHandle obj, SimContext* sim) {
-  const std::optional<PackedRange>& dim = obj->select_dim;
+// the bits a varying select now stands for; none where its index names no
+// element of the dimension it indexes.
+static std::optional<int64_t> VaryingOffset(const VpiObject& obj,
+                                            SimContext* sim) {
+  const PackedRange& dim = *obj.select_dim;
   const std::optional<int64_t> kIndex = VaryingIndex(obj, sim);
-  if (!dim || !kIndex || !dim->Contains(*kIndex)) return std::nullopt;
-  return obj->select_base_offset +
-         (dim->OffsetOf(*kIndex) * std::max(obj->size, 1));
-}
-
-// The bit of its vector a varying bit stands for when a value is read or
-// written: the vector's bit at the index its index expression then holds. An
-// index with an x or z bit, or one naming no bit of the vector, selects none
-// (§11.5.1).
-static VpiHandle VaryingBitTarget(VpiHandle obj, SimContext* sim) {
-  if (obj->select_dim && obj->size > 1) return nullptr;
-  const std::optional<int64_t> kIndex = VaryingIndex(obj, sim);
-  const std::optional<int64_t> kOffset =
-      obj->select_dim ? VaryingOffset(obj, sim) : std::nullopt;
-  if (!kIndex || (obj->select_dim && !kOffset)) return nullptr;
-  for (VpiHandle bit : obj->parent->children) {
-    const bool kSelected =
-        kOffset ? bit->bit_offset == *kOffset : bit->index == *kIndex;
-    if (bit != obj && bit->type == obj->type && bit->bit_offset >= 0 &&
-        kSelected) {
-      return bit;
-    }
-  }
-  return nullptr;
+  if (!kIndex || !dim.Contains(*kIndex)) return std::nullopt;
+  return obj.select_base_offset +
+         (dim.OffsetOf(*kIndex) * std::max(obj.size, 1));
 }
 
 // §38.15 for a varying select: the value of the bits its index selects, or,
 // when it selects none, x of a 4-state vector and 0 of a 2-state one in each
-// of its bits (§11.5.1).
-static void GetVaryingBitValue(VpiHandle obj, s_vpi_value* value,
-                               VpiValuePools& pools, SimContext* sim) {
-  const Variable* whole = obj->parent->var;
+// of its bits (§11.5.1). Its storage is its vector's (SliceObject).
+static void GetVaryingSelectValue(VpiHandle obj, s_vpi_value* value,
+                                  VpiValuePools& pools, SimContext* sim) {
+  const Variable& whole = *obj->var;
   const int kWidth = std::max(obj->size, 1);
   std::vector<Logic4Word> words;
-  if (obj->select_dim) {
-    const std::optional<int64_t> kOffset = VaryingOffset(obj, sim);
-    if (kOffset && whole != nullptr) {
-      DispatchIntegerFormat(SliceOfValue(whole->value, *kOffset, kWidth, words),
-                            value, pools);
-      return;
-    }
-  } else if (VpiHandle target = VaryingBitTarget(obj, sim);
-             target != nullptr && target->var != nullptr) {
-    DispatchGetValueByFormat(target, value, pools);
+  if (const std::optional<int64_t> kOffset = VaryingOffset(*obj, sim)) {
+    DispatchIntegerFormat(SliceOfValue(whole.value, *kOffset, kWidth, words),
+                          value, pools);
     return;
   }
-  const bool kTwoState = whole != nullptr && !whole->is_4state;
-  const uint64_t kFill = kTwoState ? 0 : ~uint64_t{0};
+  const uint64_t kFill = whole.is_4state ? ~uint64_t{0} : 0;
   words.assign((static_cast<std::size_t>(kWidth) + 63) / 64,
                Logic4Word{kFill, kFill});
   if (kWidth % 64 != 0) {
@@ -440,7 +407,9 @@ static void GetVaryingBitValue(VpiHandle obj, s_vpi_value* value,
 // the run made for it when the block ran, after the model was built, once that
 // storage exists.
 static void BindRunStorage(VpiObject& obj, SimContext* sim) {
-  if (obj.var == nullptr && !obj.run_key.empty() && sim != nullptr) {
+  // An object carries a run key only where a run built it, so the run is
+  // there to look it up in.
+  if (obj.var == nullptr && !obj.run_key.empty()) {
     obj.var = sim->FindVariable(obj.run_key);
   }
 }
@@ -465,20 +434,20 @@ void VpiContext::GetValue(VpiHandle obj, s_vpi_value* value) {
     ++obj->side_effect_count;
   }
   if (GetValueIsRefused(obj, value, last_error_)) return;
-  if (IsVaryingBit(*obj)) {
-    GetVaryingBitValue(obj, value, value_pools_, sim_ctx_);
-    return;
-  }
   VpiRefreshElementCopy(*obj);
   BindRunStorage(*obj, sim_ctx_);
   if (!obj->var) {
-    // §37.3.5 with §38.15: an operation holds no storage; its value is its
-    // expression's, evaluated now. Any other object without storage gives
-    // none, and the caller's buffer is left as it was.
-    Logic4Vec held;
-    if (EvaluateExpressionObject(*obj, sim_ctx_, held)) {
-      DispatchValueByFormat(held, value, value_pools_);
+    // §37.3.5 with §38.15: an operation or a call holds no storage; its value
+    // is its expression's, evaluated now. Any other object without storage
+    // gives none, and the caller's buffer is left as it was.
+    if (obj->expr_scope != nullptr) {
+      DispatchValueByFormat(EvaluateExpressionObject(*obj, *sim_ctx_), value,
+                            value_pools_);
     }
+    return;
+  }
+  if (IsVaryingSelect(*obj)) {
+    GetVaryingSelectValue(obj, value, value_pools_, sim_ctx_);
     return;
   }
   DispatchGetValueByFormat(obj, value, value_pools_);
@@ -688,18 +657,15 @@ static bool PutValueIsSealed(const VpiObject& obj, s_vpi_error_info& error) {
 }
 
 // The object a value put to `obj` is written to: `obj` itself, or for a
-// varying bit (§37.16, §37.17) the bit its index selects, and for a varying
-// select leaving packed dimensions unindexed a slice, made through `alloc`, of
-// the bits its index names; null when it names none and nothing is written
-// (§11.5.1).
+// varying select (§37.16, §37.17) a slice, made through `alloc`, of the bits
+// its index names; null when it names none and nothing is written (§11.5.1).
 static VpiHandle PutValueTargetOf(VpiHandle obj,
                                   const std::function<VpiObject*()>& alloc,
                                   SimContext* sim) {
-  if (!IsVaryingBit(*obj)) return obj;
-  if (!obj->select_dim || obj->size <= 1) return VaryingBitTarget(obj, sim);
-  // A varying select leaving packed dimensions unindexed stands for the bits
-  // its index names when the value is put, made a slice of them here.
-  const std::optional<int64_t> kOffset = VaryingOffset(obj, sim);
+  if (!IsVaryingSelect(*obj)) return obj;
+  // A varying select stands for the bits its index names when the value is
+  // put, made a slice of them here, one bit wide for a select of one bit.
+  const std::optional<int64_t> kOffset = VaryingOffset(*obj, sim);
   if (!kOffset) return nullptr;
   VpiObject* slice = alloc();
   slice->type = obj->type;
@@ -718,9 +684,8 @@ static VpiHandle PutValueTargetOf(VpiHandle obj,
 // property, on the class's.
 static void NotifyPropertyWrite(const VpiObject& obj, SimContext& ctx) {
   const ClassObject& owner = *obj.property_of;
-  const ClassTypeInfo* declarer =
-      owner.type != nullptr ? owner.type->StaticPropertyDeclarer(obj.name)
-                            : nullptr;
+  // A class object is an instance of its class, which it always names.
+  const ClassTypeInfo* declarer = owner.type->StaticPropertyDeclarer(obj.name);
   if (declarer != nullptr) {
     declarer->NotifyStaticWatchers();
     return;
@@ -789,7 +754,8 @@ static VpiHandle PutValueWrite(VpiObject* obj, s_vpi_value* value,
 
   PutValueApplyWriteAndForce(obj, value, kMode, run.scheduler);
   if (!kHasDelay) VpiStoreElementCopy(*obj);
-  if (obj->property_of != nullptr && run.sim != nullptr) {
+  // A class property's object is made by a run, which is there to wake.
+  if (obj->property_of != nullptr) {
     NotifyPropertyWrite(*obj, *run.sim);
   }
 

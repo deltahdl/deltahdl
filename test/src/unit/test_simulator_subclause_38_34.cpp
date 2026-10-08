@@ -750,5 +750,105 @@ TEST_F(PutsOfARun, AReleasedNetTakesItsDriversValue) {
   EXPECT_EQ(IntOf("top.w"), 1);
 }
 
+// §38.34: with a null handle there is nothing to write, and a put of no
+// value to a variable, which needs one, writes nothing; neither hands back a
+// handle.
+TEST_F(VpiPutValueSim, ANullHandleOrValueWritesNothing) {
+  auto* var = sim_ctx_.CreateVariable("nh", 8);
+  var->value = MakeLogic4VecVal(arena_, 8, 3);
+  vpi_ctx_.Attach(sim_ctx_);
+  vpiHandle h = vpi_handle_by_name(VpiText("nh"), nullptr);
+  ASSERT_NE(h, nullptr);
+
+  s_vpi_value val = {};
+  val.format = vpiIntVal;
+  val.value.integer = 9;
+  EXPECT_EQ(vpi_put_value(nullptr, &val, nullptr, vpiNoDelay), nullptr);
+  EXPECT_EQ(vpi_put_value(h, nullptr, nullptr, vpiNoDelay), nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 3u);
+}
+
+// §38.34: outside a run, with no scheduler to note it in, a put to a net
+// with no storage of its own and a put triggering a named event write
+// nothing and stamp no trigger time.
+TEST_F(VpiPutValueSim, APutWithNoSchedulerNotesNothing) {
+  Net bare;
+  vpiHandle net = VpiHandleOf(vpi_ctx_.CreateNetObj("bare", &bare, 8));
+  auto* event = sim_ctx_.CreateVariable("ev", 1);
+  event->is_event = true;
+  vpi_ctx_.Attach(sim_ctx_);
+  vpiHandle ev = vpi_handle_by_name(VpiText("ev"), nullptr);
+  ASSERT_NE(ev, nullptr);
+
+  s_vpi_value val = {};
+  val.format = vpiIntVal;
+  val.value.integer = 1;
+  EXPECT_EQ(vpi_put_value(net, &val, nullptr, vpiNoDelay), nullptr);
+  EXPECT_EQ(vpi_put_value(ev, nullptr, nullptr, vpiNoDelay), nullptr);
+  EXPECT_EQ(event->triggered_ticks, UINT64_MAX);
+}
+
+// §38.34: a delay mode takes its delay from time_p, a delay being present
+// when the time is nonzero in its high word, its low word or its real value,
+// and absent when no time is given, the write then made at once. A present
+// delay with vpiReturnEvent hands back the scheduled event's handle.
+TEST_F(VpiPutValueSim, ADelayIsPresentWhereAnyPartOfTheTimeIsNonzero) {
+  auto* var = sim_ctx_.CreateVariable("dl", 8);
+  var->value = MakeLogic4VecVal(arena_, 8, 0);
+  vpi_ctx_.Attach(sim_ctx_);
+  vpiHandle h = vpi_handle_by_name(VpiText("dl"), nullptr);
+  ASSERT_NE(h, nullptr);
+  s_vpi_value val = {};
+  val.format = vpiIntVal;
+  val.value.integer = 4;
+  const int kFlags = vpiInertialDelay | vpiReturnEvent;
+
+  EXPECT_EQ(vpi_put_value(h, &val, nullptr, kFlags), nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 4u);
+  s_vpi_time high = {};
+  high.type = vpiSimTime;
+  high.high = 1;
+  EXPECT_NE(vpi_put_value(h, &val, &high, kFlags), nullptr);
+  s_vpi_time real = {};
+  real.type = vpiScaledRealTime;
+  real.real = 2.0;
+  EXPECT_NE(vpi_put_value(h, &val, &real, kFlags), nullptr);
+}
+
+// §38.36.2 with §4.4.2.9: a cbReadOnlySynch routine writes no value, but a
+// cancel writes none, so a cancel made then is no error.
+TEST_F(VpiPutValueSim, ACancelFromAReadOnlySynchCallbackIsNoError) {
+  auto* var = sim_ctx_.CreateVariable("cn", 8);
+  var->value = MakeLogic4VecVal(arena_, 8, 1);
+  vpi_ctx_.Attach(sim_ctx_);
+  vpi_ctx_.SetAtReadOnlySynchTime(true);
+  vpiHandle h = vpi_handle_by_name(VpiText("cn"), nullptr);
+  ASSERT_NE(h, nullptr);
+
+  EXPECT_EQ(vpi_put_value(h, nullptr, nullptr, vpiCancelEvent), nullptr);
+  s_vpi_error_info info = {};
+  EXPECT_EQ(vpi_chk_error(&info), 0);
+}
+
+// §38.34: vpiReleaseFlag outside a run, with no net solver to hand the release
+// to, clears the forced state the force set.
+TEST_F(VpiPutValueSim, ReleaseOutsideARunClearsTheForce) {
+  auto* var = sim_ctx_.CreateVariable("rr0", 8);
+  var->value = MakeLogic4VecVal(arena_, 8, 0);
+  VpiHandle arr = vpi_ctx_.CreateRegArray("rr", vpiStaticArray, {{0}}, {var});
+  vpiHandle h = VpiHandleOf(arr->children[0]);
+
+  s_vpi_value forced = {};
+  forced.format = vpiIntVal;
+  forced.value.integer = 6;
+  vpi_put_value(h, &forced, nullptr, vpiForceFlag);
+  ASSERT_TRUE(var->is_forced);
+  s_vpi_value out = {};
+  out.format = vpiIntVal;
+  vpi_put_value(h, &out, nullptr, vpiReleaseFlag);
+  EXPECT_FALSE(var->is_forced);
+  EXPECT_EQ(out.value.integer, 6);
+}
+
 }  // namespace
 }  // namespace delta

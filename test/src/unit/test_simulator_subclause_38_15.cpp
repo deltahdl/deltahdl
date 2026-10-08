@@ -846,5 +846,73 @@ TEST_F(ExpressionValuesOfARun, ACallReadsAsItsCallEvaluates) {
   EXPECT_EQ(IntOf(select), 0x33);
 }
 
+// §38.15, Table 38-3: a hex digit some of whose bits are x and the rest z is
+// written `X`, an x and a z both being unknown but the digit not all x.
+TEST_F(VpiGetValueSim, HexDigitOfMixedXAndZBitsIsUppercaseX) {
+  auto* var = sim_ctx_.CreateVariable("xz", 4);
+  var->value.words[0] = {0xA, 0xF};  // bits 3:0 x, z, x, z
+  vpi_ctx_.Attach(sim_ctx_);
+
+  vpiHandle h = vpi_handle_by_name(VpiText("xz"), nullptr);
+  ASSERT_NE(h, nullptr);
+  s_vpi_value val = {};
+  val.format = vpiHexStrVal;
+  vpi_get_value(h, &val);
+  EXPECT_STREQ(val.value.str, "X");
+}
+
+// §38.15: with a null handle there is nothing to read, and with a null value
+// structure nowhere to read into, so the routine returns leaving the buffer
+// it was given as it was.
+TEST_F(VpiGetValueSim, ANullHandleOrValueReadsNothing) {
+  auto* var = sim_ctx_.CreateVariable("nv", 8);
+  var->value = MakeLogic4VecVal(arena_, 8, 1);
+  vpi_ctx_.Attach(sim_ctx_);
+  vpiHandle h = vpi_handle_by_name(VpiText("nv"), nullptr);
+  ASSERT_NE(h, nullptr);
+
+  s_vpi_value val = {};
+  val.format = vpiIntVal;
+  val.value.integer = 77;
+  vpi_get_value(nullptr, &val);
+  vpi_get_value(h, nullptr);
+  EXPECT_EQ(val.value.integer, 77);
+}
+
+// §11.5.1 with §37.17 detail 26: a select whose index holds x, or names no
+// element of the dimension it indexes, selects nothing, and reads x in each of
+// its bits out of a 4-state vector and 0 out of a 2-state one, all 64 of them
+// for an element as wide as a word; a value put to it is written nowhere.
+TEST_F(ExpressionValuesOfARun, ASelectNamingNoElementReadsItsVectorsDefault) {
+  Run("module top; logic [3:0][7:0] m = 32'h44332211; integer i = 'x;\n"
+      "  bit [3:0][7:0] b = 32'h44332211; integer j = 9;\n"
+      "  logic [1:0][63:0] w = 0; integer k = 5;\n"
+      "  wire [7:0] y, z; wire [63:0] v;\n"
+      "  assign y = m[i]; assign z = b[j]; assign v = w[k];\n"
+      "endmodule\n");
+  vpiHandle it = vpi_iterate(vpiContAssign, By("top"));
+  ASSERT_NE(it, nullptr);
+  vpiHandle x_index = vpi_handle(vpiRhs, vpi_scan(it));
+  vpiHandle two_state = vpi_handle(vpiRhs, vpi_scan(it));
+  vpiHandle wide = vpi_handle(vpiRhs, vpi_scan(it));
+  ASSERT_NE(x_index, nullptr);
+  ASSERT_NE(two_state, nullptr);
+  ASSERT_NE(wide, nullptr);
+  s_vpi_value value = {};
+  value.format = vpiBinStrVal;
+  vpi_get_value(x_index, &value);
+  EXPECT_STREQ(value.value.str, "xxxxxxxx");
+  vpi_get_value(two_state, &value);
+  EXPECT_STREQ(value.value.str, "00000000");
+  vpi_get_value(wide, &value);
+  EXPECT_EQ(std::string(value.value.str), std::string(64, 'x'));
+
+  s_vpi_value put = {};
+  put.format = vpiIntVal;
+  put.value.integer = 0x55;
+  EXPECT_EQ(vpi_put_value(x_index, &put, nullptr, vpiNoDelay), nullptr);
+  EXPECT_EQ(IntOf(By("top.m")), 0x44332211);
+}
+
 }  // namespace
 }  // namespace delta
