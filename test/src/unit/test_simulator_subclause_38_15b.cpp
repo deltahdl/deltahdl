@@ -1,8 +1,16 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
+#include <utility>
+#include <vector>
 
+#include "common/arena.h"
+#include "common/types.h"
 #include "fixture_vpi_run.h"
+#include "simulator/variable.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -145,6 +153,134 @@ TEST_F(ExpressionValuesOfARun, AGenvarIndexedSelectNamesItsBlocksElement) {
   vpiHandle select = RhsIn("top");
   ASSERT_NE(select, nullptr);
   EXPECT_EQ(IntOf(select), 0x33);
+}
+
+// Whether VpiPutValueBits takes a value of `format` whose text is `text` at
+// `width`, the words it decodes it into left in `words`.
+bool DecodesText(int format, std::string text, uint32_t width,
+                 std::vector<Logic4Word>& words) {
+  s_vpi_value value = {};
+  value.format = format;
+  value.value.str = text.data();
+  return VpiPutValueBits(value, width, words);
+}
+
+// Whether VpiPutValueBits refuses a value of `format` whose text is `text`.
+bool RefusesText(int format, std::string text) {
+  std::vector<Logic4Word> words;
+  return !DecodesText(format, std::move(text), 8, words);
+}
+
+// The low word a value of `format` whose text is `text` decodes into at
+// `width`; all ones where it is refused.
+uint64_t LowWordOfText(int format, std::string text, uint32_t width) {
+  std::vector<Logic4Word> words;
+  return DecodesText(format, std::move(text), width, words) ? words[0].aval
+                                                            : ~uint64_t{0};
+}
+
+// Table 38-3 (vpiDecStrVal): a minus sign makes the number negative in two's
+// complement across every word, the carry crossing into the next word where a
+// word's negation is 0.
+TEST(PutValueDecoding, ADecimalNegationCarriesAcrossWords) {
+  std::vector<Logic4Word> words;
+  ASSERT_TRUE(DecodesText(vpiDecStrVal, "-1", 128, words));
+  EXPECT_EQ(words[0].aval, ~uint64_t{0});
+  EXPECT_EQ(words[1].aval, ~uint64_t{0});
+  ASSERT_TRUE(DecodesText(vpiDecStrVal, "-18446744073709551616", 128, words));
+  EXPECT_EQ(words[0].aval, 0u);
+  EXPECT_EQ(words[1].aval, ~uint64_t{0});
+}
+
+// Table 38-3 (vpiIntVal): a non-negative integer leaves the words above its
+// own 0.
+TEST(PutValueDecoding, APositiveIntegerLeavesTheHighWordsClear) {
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  value.value.integer = 5;
+  std::vector<Logic4Word> words;
+  ASSERT_TRUE(VpiPutValueBits(value, 128, words));
+  EXPECT_EQ(words[0].aval, 5u);
+  EXPECT_EQ(words[1].aval, 0u);
+}
+
+// Table 38-3: a character that is no digit of the format's base is refused,
+// whether it is a digit of a larger base or no digit at all; and a decimal
+// string must hold at least one digit.
+TEST(PutValueDecoding, ACharacterOutsideTheBaseIsRefused) {
+  EXPECT_TRUE(RefusesText(vpiBinStrVal, "2"));
+  EXPECT_TRUE(RefusesText(vpiHexStrVal, "#"));
+  EXPECT_TRUE(RefusesText(vpiHexStrVal, ":"));
+  EXPECT_TRUE(RefusesText(vpiHexStrVal, "g"));
+  EXPECT_TRUE(RefusesText(vpiDecStrVal, ""));
+  EXPECT_TRUE(RefusesText(vpiDecStrVal, "-"));
+  EXPECT_TRUE(RefusesText(vpiDecStrVal, "1#"));
+  EXPECT_TRUE(RefusesText(vpiDecStrVal, "1a"));
+}
+
+// Table 38-3: digits and characters are taken from the right, and those past
+// the object's width are dropped, a digit or character cut where the width
+// ends inside it.
+TEST(PutValueDecoding, TextPastTheWidthIsDropped) {
+  EXPECT_EQ(LowWordOfText(vpiBinStrVal, "101", 2), 1u);
+  EXPECT_EQ(LowWordOfText(vpiHexStrVal, "F", 2), 3u);
+  EXPECT_EQ(LowWordOfText(vpiStringVal, "AB", 8), 0x42u);
+  EXPECT_EQ(LowWordOfText(vpiStringVal, "A", 4), 0x1u);
+}
+
+// Figure 38-8: a scalar or a strength's logic value in bit 0 -- 0 as (0, 0),
+// x as (1, 1) and z as (0, 1).
+TEST(PutValueDecoding, ScalarAndStrengthLogicTakeTheirEncoding) {
+  const struct {
+    int scalar;
+    uint64_t aval;
+    uint64_t bval;
+  } kCases[] = {{vpi0, 0, 0}, {vpiX, 1, 1}, {vpiZ, 0, 1}};
+  std::vector<Logic4Word> words;
+  for (const auto& c : kCases) {
+    s_vpi_value value = {};
+    value.format = vpiScalarVal;
+    value.value.scalar = c.scalar;
+    ASSERT_TRUE(VpiPutValueBits(value, 1, words)) << c.scalar;
+    EXPECT_EQ(words[0].aval, c.aval) << c.scalar;
+    EXPECT_EQ(words[0].bval, c.bval) << c.scalar;
+  }
+  s_vpi_strengthval strength = {};
+  strength.logic = vpiZ;
+  s_vpi_value value = {};
+  value.format = vpiStrengthVal;
+  value.value.strength = &strength;
+  ASSERT_TRUE(VpiPutValueBits(value, 1, words));
+  EXPECT_EQ(words[0].bval, 1u);
+}
+
+// A value whose pointer member is null, a zero width, and a format no put
+// takes are refused.
+TEST(PutValueDecoding, NullPointersZeroWidthAndOtherFormatsAreRefused) {
+  std::vector<Logic4Word> words;
+  for (int format : {vpiBinStrVal, vpiTimeVal, vpiVectorVal, vpiStrengthVal}) {
+    s_vpi_value value = {};
+    value.format = format;
+    EXPECT_FALSE(VpiPutValueBits(value, 8, words)) << format;
+  }
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  EXPECT_FALSE(VpiPutValueBits(value, 0, words));
+  value.format = vpiObjTypeVal;
+  EXPECT_FALSE(VpiPutValueBits(value, 8, words));
+}
+
+// A write that runs past the object's storage stops at its end.
+TEST(PutValueDecoding, AWritePastTheStorageStopsAtItsEnd) {
+  Arena arena;
+  Variable storage;
+  storage.value = MakeLogic4Vec(arena, 64);
+  VpiObject obj;
+  obj.var = &storage;
+  obj.bit_offset = 60;
+  const std::vector<Logic4Word> kOnes = {{0xFF, 0}};
+  VpiWriteDecodedBits(obj, kOnes, 8);
+  EXPECT_EQ(storage.value.words[0].aval, uint64_t{0xF} << 60);
 }
 
 }  // namespace
