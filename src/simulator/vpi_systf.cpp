@@ -128,7 +128,8 @@ const s_vpi_systf_data* VpiContext::ResolveSystf(const char* name) const {
   // the most recently registered one wins - a later user application overrides
   // an earlier registration (including a built-in registered ahead of it).
   for (auto it = systfs_.rbegin(); it != systfs_.rend(); ++it) {
-    if (it->tfname != nullptr && std::string_view(it->tfname) == name) {
+    // A registration is refused without a name (RegisterSystf).
+    if (std::string_view(it->tfname) == name) {
       return &*it;
     }
   }
@@ -190,12 +191,11 @@ void VpiContext::GetSystfInfo(VpiHandle obj, s_vpi_systf_data* systf_data_p) {
   // §38.12: obj must name a system task or system function callback. Other
   // objects (including simulation callbacks) carry no s_vpi_systf_data record.
   if (obj->type != kVpiCallback || !obj->is_systf) return;
-  int idx = obj->index;
-  if (idx < 0 || idx >= static_cast<int>(systfs_.size())) return;
 
   // §38.12: copy the stored registration into the application-owned structure.
-  // The routine never allocates that memory; it only writes the fields.
-  *systf_data_p = systfs_[idx];
+  // The routine never allocates that memory; it only writes the fields. A
+  // systf object is made only by RegisterSystf, at its registration's position.
+  *systf_data_p = systfs_[static_cast<std::size_t>(obj->index)];
 }
 
 void VpiContext::GetCbInfo(VpiHandle obj, s_cb_data* cb_data_p) {
@@ -208,12 +208,15 @@ void VpiContext::GetCbInfo(VpiHandle obj, s_cb_data* cb_data_p) {
   // callback carries an s_vpi_systf_data record instead (read it through
   // vpi_get_systf_info), so it is not a valid argument here.
   if (obj->type != kVpiCallback || obj->is_systf) return;
-  int idx = obj->index;
-  if (idx < 0 || idx >= static_cast<int>(callbacks_.size())) return;
+  // §39.4.2: a placed assertion callback stands for no row of the table
+  // (CreateAssertionCallbackObject gives it -1), so it has no s_cb_data to
+  // report; every other callback object stands for the row its registration
+  // made.
+  if (obj->index < 0) return;
 
   // §38.8: report the callback's information by writing the stored s_cb_data
   // fields into the caller's structure.
-  *cb_data_p = callbacks_[idx];
+  *cb_data_p = callbacks_[static_cast<std::size_t>(obj->index)];
 }
 
 void VpiContext::NoteTimeFormatCall() {
@@ -405,7 +408,7 @@ void VpiWriteDelayRun(DelayCursor& cur, bool mtm, bool pulsere,
   } else if (mtm && !pulsere) {
     // min:typ:max only: three entries, min then typ then max delay.
     VpiWriteMtmTriple(cur, d.min_delay, d.typ_delay, d.max_delay);
-  } else if (!mtm && pulsere) {
+  } else if (!mtm) {
     // Pulse limits only: delay, reject limit, error limit.
     VpiWriteDelayValue(&cur.delay_p->da[cur.k++], cur.time_type, d.delay);
     VpiWriteDelayValue(&cur.delay_p->da[cur.k++], cur.time_type, d.reject);
@@ -447,7 +450,7 @@ void VpiReadDelayRun(DelayCursor& cur, bool mtm, bool pulsere,
   } else if (mtm && !pulsere) {
     // min:typ:max only: three entries, min then typ then max delay.
     VpiReadMtmTriple(cur, d.min_delay, d.typ_delay, d.max_delay);
-  } else if (!mtm && pulsere) {
+  } else if (!mtm) {
     // Pulse limits only: delay, reject limit, error limit.
     d.delay = VpiReadDelayValue(cur.delay_p->da[cur.k++], cur.time_type);
     d.reject = VpiReadDelayValue(cur.delay_p->da[cur.k++], cur.time_type);
@@ -582,8 +585,8 @@ void VpiContext::PutDelays(VpiHandle obj, s_vpi_delay* delay_p) {
   }
   // §38.32 with §37.3.4: a continuous assignment's new delays are those its
   // next transitions take.
-  if (obj->type == vpiContAssign && sim_ctx_ != nullptr &&
-      !obj->run_key.empty()) {
+  // A run key is set only by a run, which is there to file the delays with.
+  if (obj->type == vpiContAssign && !obj->run_key.empty()) {
     AnnotateContAssignDelays(*obj, *sim_ctx_);
   }
 }

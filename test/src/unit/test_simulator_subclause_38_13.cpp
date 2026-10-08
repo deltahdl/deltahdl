@@ -131,6 +131,20 @@ TEST_F(VpiGetTimeSim, TimeQueueReportsNextFutureEvent) {
   EXPECT_EQ(future.low, 50u);
 }
 
+// §38.13: a time queue with no scheduler behind it, outside any run, has no
+// event to come, and reads time 0.
+TEST_F(VpiGetTimeSim, ATimeQueueWithNoSchedulerReadsZero) {
+  VpiContext bare;
+  SetGlobalVpiContext(&bare);
+  VpiHandle tq = bare.CreateTimeQueue();
+  s_vpi_time future = {};
+  future.type = vpiSimTime;
+  future.low = 9;
+  vpi_get_time(VpiHandleOf(tq), &future);
+  SetGlobalVpiContext(&vpi_ctx_);
+  EXPECT_EQ(future.low, 0u);
+}
+
 // §38.13 D2: a time queue object is read in the simulation time unit, so its
 // scaled-real result is not scaled by any object timescale.
 TEST_F(VpiGetTimeSim, TimeQueueUsesSimulationTimeUnit) {

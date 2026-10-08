@@ -220,5 +220,26 @@ TEST_F(VpiGetDataSim, TheIdIsTheOneTheToolHandsBack) {
   EXPECT_EQ(0, std::memcmp(probe.buf, saved, 2));
 }
 
+// §38.9: seeding no bytes, from a null buffer or of no length, saves nothing,
+// so the id stays unsaved and a read of it fails; and a request for no bytes
+// of a saved id is a failure as well, returning 0.
+TEST_F(VpiGetDataSim, NoBytesAreSavedOrRead) {
+  const char kSaved[] = {'x', 'y'};
+  vpi_ctx_.SeedSaveData(5, nullptr, 2);
+  vpi_ctx_.SeedSaveData(5, kSaved, 0);
+  SingleRead unsaved;
+  unsaved.id = 5;
+  unsaved.request = 1;
+  DispatchWith(cbStartOfRestart, ReadOnceCb, &unsaved);
+  EXPECT_EQ(unsaved.returned, 0);
+
+  vpi_ctx_.SeedSaveData(6, kSaved, 2);
+  SingleRead nothing;
+  nothing.id = 6;
+  nothing.request = 0;
+  DispatchWith(cbStartOfRestart, ReadOnceCb, &nothing);
+  EXPECT_EQ(nothing.returned, 0);
+}
+
 }  // namespace
 }  // namespace delta

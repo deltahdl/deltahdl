@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "fixture_vpi_run.h"
 #include "helpers_vpi_delays_fixture.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
@@ -441,6 +442,114 @@ TEST_F(ContAssignDelaysOfARun, PutDelaysAreTheOnesTheAssignmentTakes) {
   vpi_get_value(By("top.rose"), &value);
   EXPECT_EQ(value.value.integer, 15);
   vpi_get_value(By("top.fell"), &value);
+  EXPECT_EQ(value.value.integer, 26);
+}
+
+// §38.32: a time_type of vpiSuppressTime carries no time in the source
+// entries, so the delays it sets are zero whatever the entries hold.
+TEST_F(VpiPutDelaysSim, SuppressTimeSetsNoTimeValue) {
+  VpiDelayInfo d;
+  d.delay = 7.0;
+  VpiHandle prim = MakeDelayObject(vpiPrimitive, {d, d});
+  s_vpi_time da[2] = {};
+  da[0].real = 3.0;
+  da[1].low = 4;
+  s_vpi_delay delay = {};
+  delay.da = da;
+  delay.no_of_delays = 2;
+  delay.time_type = vpiSuppressTime;
+  vpi_put_delays(VpiHandleOf(prim), &delay);
+  EXPECT_DOUBLE_EQ(prim->delays[0].delay, 0.0);
+  EXPECT_DOUBLE_EQ(prim->delays[1].delay, 0.0);
+}
+
+// §37.14 detail 2 with §38.32: the delay routines do not apply to an interface
+// port, so a put to one is refused outright; a port of any other kind is
+// judged by its category, which bears no delays, so a put of two to it is the
+// error that rule gives. Neither stores a delay.
+TEST_F(VpiPutDelaysSim, APortIsRefusedAsItsKindSays) {
+  s_vpi_time da[2] = {};
+  s_vpi_delay delay = {};
+  delay.da = da;
+  delay.no_of_delays = 2;
+  delay.time_type = vpiScaledRealTime;
+
+  VpiHandle interface_port = MakeDelayObject(vpiPort, {});
+  interface_port->port_type = vpiInterfacePort;
+  vpi_put_delays(VpiHandleOf(interface_port), &delay);
+  EXPECT_STREQ(vpi_ctx_.LastError().message,
+               "vpi_put_delays(): delays are not applicable to an interface "
+               "port");
+  EXPECT_TRUE(interface_port->delays.empty());
+
+  VpiHandle port = MakeDelayObject(vpiPort, {});
+  port->port_type = vpiPort;
+  vpi_put_delays(VpiHandleOf(port), &delay);
+  EXPECT_STREQ(vpi_ctx_.LastError().message,
+               "vpi_put_delays(): the requested number of delays is not legal "
+               "for this object");
+  EXPECT_TRUE(port->delays.empty());
+}
+
+// §38.32: a continuous assignment no run made, which names no net to file
+// its delays under, keeps the delays it is given all the same.
+TEST_F(VpiPutDelaysSim, AnAssignmentNoRunMadeKeepsItsDelays) {
+  VpiHandle assign = MakeDelayObject(vpiContAssign, {});
+  s_vpi_time da[2] = {};
+  da[0].real = 2.0;
+  da[1].real = 3.0;
+  s_vpi_delay delay = {};
+  delay.da = da;
+  delay.no_of_delays = 2;
+  delay.time_type = vpiScaledRealTime;
+  vpi_put_delays(VpiHandleOf(assign), &delay);
+  ASSERT_EQ(assign->delays.size(), 2u);
+  EXPECT_DOUBLE_EQ(assign->delays[0].delay, 2.0);
+  EXPECT_DOUBLE_EQ(assign->delays[1].delay, 3.0);
+}
+
+// Puts a rise of 5 and a fall of 6 to the continuous assignment of `top.u`.
+PLI_INT32 PutChildAssignmentDelays(PLI_BYTE8* /*user_data*/) {
+  vpiHandle it =
+      vpi_iterate(vpiContAssign, vpi_handle_by_name(VpiText("top.u"), nullptr));
+  vpiHandle ca = it != nullptr ? vpi_scan(it) : nullptr;
+  if (it != nullptr) vpi_release_handle(it);
+  s_vpi_time times[2] = {};
+  times[0].low = 5;
+  times[1].low = 6;
+  s_vpi_delay delay = {};
+  delay.da = times;
+  delay.no_of_delays = 2;
+  delay.time_type = vpiSimTime;
+  vpi_put_delays(ca, &delay);
+  return 0;
+}
+
+class ChildAssignmentDelaysOfARun : public VpiDesignRun {};
+
+// §38.32 with §37.3.4: an assignment written with no delay in an instance takes
+// the rise and fall vpi_put_delays gives it, under the instance it stands in,
+// a turn-off not given being the smaller of the two: the child's net rises 5
+// after its operand at 10 and falls 6 after it at 20.
+TEST_F(ChildAssignmentDelaysOfARun, AnInstancesAssignmentTakesThePutDelays) {
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = VpiText("$child_delays");
+  data.calltf = &PutChildAssignmentDelays;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+  Run("module child(input logic a); timeunit 1ns; timeprecision 1ns;\n"
+      "  wire y; int rose, fell; assign y = a;\n"
+      "  always @(y) if (y === 1'b1) rose = $time; else fell = $time;\n"
+      "endmodule\n"
+      "module top; timeunit 1ns; timeprecision 1ns; logic a = 0;\n"
+      "  child u(.a(a));\n"
+      "  initial begin #1 $child_delays; #9 a = 1; #10 a = 0; #10; end\n"
+      "endmodule\n");
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  vpi_get_value(By("top.u.rose"), &value);
+  EXPECT_EQ(value.value.integer, 15);
+  vpi_get_value(By("top.u.fell"), &value);
   EXPECT_EQ(value.value.integer, 26);
 }
 

@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 #include "fixture_simulator.h"
@@ -325,6 +327,73 @@ TEST_F(VpiGetDelaysSim, NullArgumentsAreSafe) {
   vpi_get_delays(nullptr, &delay);  // null handle
 
   SUCCEED();
+}
+
+// The vpi_get_delays() suite with a question of its own: whether the routine
+// accepts `n` delays of an object of `type` carrying `delays`, recording no
+// error.
+class VpiDelayCountSim : public VpiDelaysSimBase {
+ protected:
+  bool AcceptsDelays(int type, int n, std::vector<VpiDelayInfo> delays) {
+    VpiHandle obj = MakeDelayObject(type, std::move(delays));
+    std::vector<s_vpi_time> da(static_cast<size_t>(n));
+    s_vpi_delay delay = {};
+    delay.da = da.data();
+    delay.no_of_delays = n;
+    delay.time_type = vpiScaledRealTime;
+    vpi_get_delays(VpiHandleOf(obj), &delay);
+    s_vpi_error_info info = {};
+    return vpi_chk_error(&info) == 0;
+  }
+};
+
+// §38.10: the number of delays a request may name is fixed by the object's
+// category -- 1, 2, 3, 6 or 12 for a module path, 2 or 3 for an intermodule
+// path and for a continuous assignment (§37.47 with §10.3.3), and none for an
+// object that bears no delays, a net among them.
+TEST_F(VpiDelayCountSim, EachCategoryAcceptsItsOwnDelayCounts) {
+  const VpiDelayInfo kD;
+  EXPECT_TRUE(AcceptsDelays(vpiModPath, 3, {kD, kD, kD}));
+  EXPECT_TRUE(AcceptsDelays(vpiModPath, 12, {}));
+  EXPECT_TRUE(AcceptsDelays(vpiInterModPath, 3, {kD, kD, kD}));
+  EXPECT_FALSE(AcceptsDelays(vpiInterModPath, 4, {}));
+  EXPECT_TRUE(AcceptsDelays(vpiContAssign, 3, {kD, kD, kD}));
+  EXPECT_FALSE(AcceptsDelays(vpiContAssign, 4, {}));
+  EXPECT_FALSE(AcceptsDelays(vpiNet, 2, {kD, kD}));
+}
+
+// §37.14 detail 2 with §38.10: a port other than an interface port is no
+// object the delay routines refuse outright, and it is then judged as any
+// other object is -- it bears no delays, so a request for two is the error.
+TEST_F(VpiGetDelaysSim, APortThatIsNoInterfacePortIsJudgedByItsCategory) {
+  VpiHandle port = MakeDelayObject(vpiPort, {});
+  port->port_type = vpiPort;
+  s_vpi_time da[2] = {};
+  s_vpi_delay delay = {};
+  delay.da = da;
+  delay.no_of_delays = 2;
+  delay.time_type = vpiScaledRealTime;
+  vpi_get_delays(VpiHandleOf(port), &delay);
+  EXPECT_STREQ(vpi_ctx_.LastError().message,
+               "vpi_get_delays(): the requested number of delays is not legal "
+               "for this object");
+}
+
+// §38.10: a request for more delays than the object stores reads the ones it
+// does not store as zero, a primitive of two asked for three.
+TEST_F(VpiGetDelaysSim, ADelayTheObjectDoesNotStoreReadsAsZero) {
+  VpiDelayInfo d;
+  d.delay = 4.0;
+  VpiHandle prim = MakeDelayObject(vpiPrimitive, {d, d});
+  s_vpi_time da[3] = {};
+  da[2].real = -1.0;
+  s_vpi_delay delay = {};
+  delay.da = da;
+  delay.no_of_delays = 3;
+  delay.time_type = vpiScaledRealTime;
+  vpi_get_delays(VpiHandleOf(prim), &delay);
+  EXPECT_DOUBLE_EQ(da[1].real, 4.0);
+  EXPECT_DOUBLE_EQ(da[2].real, 0.0);
 }
 
 // -----------------------------------------------------------------------------

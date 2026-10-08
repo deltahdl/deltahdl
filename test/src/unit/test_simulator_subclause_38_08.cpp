@@ -9,6 +9,7 @@
 #include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -172,6 +173,17 @@ TEST_F(VpiGetCbInfoSim, ReportsTheRegistrationAfterTheCallbackHasFired) {
   EXPECT_EQ(out.time, &cb_time);
   EXPECT_EQ(out.user_data, reinterpret_cast<PLI_BYTE8*>(&marker));
   EXPECT_EQ(cb_time.low, 15u);
+}
+
+// §38.8 with §39.4.2: a callback placed on an assertion is a callback object
+// that stands for no simulation-related registration, so there is no s_cb_data
+// to report for it and the caller's structure is left as it was.
+TEST_F(VpiGetCbInfoSim, AnAssertionCallbackHasNoSimulationRecordToReport) {
+  VpiHandle placed = vpi_ctx_.CreateAssertionCallbackObject(7);
+  s_cb_data out = {};
+  out.reason = cbAtEndOfSimTime;
+  vpi_get_cb_info(VpiHandleOf(placed), &out);
+  EXPECT_EQ(out.reason, cbAtEndOfSimTime);
 }
 
 }  // namespace
