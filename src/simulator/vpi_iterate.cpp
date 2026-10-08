@@ -180,8 +180,8 @@ struct VpiIterateModes {
   // §37.57 detail 1: a let expression's vpiArgument iteration, which reads the
   // let declaration's formals rather than the expression's own children.
   bool let_argument = false;
-  // §37.39: one of a module path's three path-term relations.
-  bool mod_path_terms = false;
+  // §37.39 and §37.16: a module path's path-term and a net's port relations.
+  bool terms_and_ports = false;
   // §37.26: a structure or union's vpiMember relation.
   bool struct_union_members = false;
   // §36.10.3: an operation's vpiOperand relation.
@@ -277,13 +277,12 @@ void ComputeDriverLoadModes(int type, VpiHandle ref, VpiIterateModes& m) {
   // ones. A delay terminal was named by neither line, so both relations fell to
   // the variable arm below and gathered the kinds that drive a variable - which
   // a delay terminal connects to none of.
-  const bool kDelayTerm = ref && ref->type == vpiDelayTerm;
-  m.net_driver =
-      ref && (ref->type == vpiNet || ref->type == vpiNetBit || kDelayTerm) &&
-      type == vpiDriver;
-  m.net_load = ref &&
-               (ref->type == vpiNet || ref->type == vpiNetBit || kDelayTerm) &&
-               type == vpiLoad;
+  // §37.16 (figure): the two relations are drawn from the `nets` class, so a
+  // net of every kind it groups reaches them, not a logic net alone.
+  const bool kNetSide =
+      ref && (VpiIsNetsType(ref->type) || ref->type == vpiDelayTerm);
+  m.net_driver = kNetSide && type == vpiDriver;
+  m.net_load = kNetSide && type == vpiLoad;
   m.variable_driver = ref && type == vpiDriver && !m.net_driver;
   m.variable_load = ref && type == vpiLoad && !m.net_load;
 }
@@ -357,10 +356,9 @@ void ComputeConstraintAndCallbackModes(int type, VpiHandle ref,
   m.struct_union_members =
       ref && type == vpiMember && VpiIsStructOrUnionType(ref->type);
   // §37.39: a module path's three path-term relations, which reach terms whose
-  // own type is vpiPathTerm rather than the relation tag.
-  m.mod_path_terms = ref && ref->type == vpiModPath &&
-                     (type == vpiModPathIn || type == vpiModPathOut ||
-                      type == vpiModDataPathIn);
+  // own type is vpiPathTerm rather than the relation tag, and §37.16 details 6
+  // and 7: a net's vpiPorts and vpiPortInst, which reach ports and port bits.
+  m.terms_and_ports = ref && VpiIsTermOrPortRelation(type, ref);
 }
 
 // Classify a (type, ref) iteration into its special modes. The detailed §37.x
@@ -456,10 +454,10 @@ bool VpiIterateMatchesEdgeMode(VpiHandle obj, int type, VpiHandle ref,
     *matched = VpiIsCaseItemConditionType(obj->type) && !obj->written_as_stmt;
     return true;
   }
-  // §37.16, §37.17 detail 12: vpiBit reaches a net's net bits and a
-  // variable's var bits; no object's own type is the relation's.
+  // §37.14, §37.16, §37.17 detail 12: vpiBit reaches a port's, a net's and a
+  // variable's bits; no object's own type is the relation's.
   if (type == vpiBit) {
-    *matched = obj->type == vpiNetBit || obj->type == vpiRegBit;
+    *matched = VpiIsBitObjectType(obj->type);
     return true;
   }
   if (type == vpiConstraintItem) {
@@ -757,8 +755,8 @@ bool DispatchListedMode(int type, VpiHandle ref, const VpiIterateModes& modes,
     listed = VpiOperationOperands(ref);
   } else if (modes.struct_union_members) {
     listed = VpiStructUnionMembers(ref);
-  } else if (modes.mod_path_terms) {
-    listed = VpiModPathTerms(type, ref);
+  } else if (modes.terms_and_ports) {
+    listed = VpiTermOrPortObjects(type, ref);
   } else {
     return false;
   }

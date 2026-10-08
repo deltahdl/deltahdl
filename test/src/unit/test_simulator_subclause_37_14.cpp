@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <vector>
 
 #include "fixture_simulator.h"
 #include "fixture_vpi_run.h"
@@ -438,6 +439,33 @@ TEST(PortModel, NoPortSatisfiesTheInterfaceLowConnRule) {
 TEST(PortModel, AnEmptyExplicitNameFallsBackToTheInferredName) {
   EXPECT_STREQ(VpiPortName(/*explicitly_named=*/true, "", "inf"), "inf");
   EXPECT_EQ(VpiPortName(/*explicitly_named=*/true, "", ""), nullptr);
+}
+
+constexpr const char* kVectorPort =
+    "module sub(input wire [3:0] a, input wire s); endmodule\n"
+    "module top; wire [3:0] w; wire v; sub u(.a(w), .s(v)); endmodule\n";
+
+// §37.14 (figure): a vector port holds a port bit per bit, in the order of the
+// instance's own net, whose bits are their lowConns.
+TEST_F(PortsOfARun, AVectorPortHoldsAPortBitPerBit) {
+  Run(kVectorPort);
+  vpiHandle a = PortOfU("a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(KindsOf(vpiBit, a), std::vector<int>(4, vpiPortBit));
+  vpiHandle it = vpi_iterate(vpiBit, a);
+  ASSERT_NE(it, nullptr);
+  vpiHandle first = vpi_scan(it);
+  EXPECT_EQ(vpi_get(vpiDirection, first), vpiInput);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLowConn, first)),
+            VpiObjectOf(vpi_handle_by_index(By("top.u.a"), 3)));
+}
+
+// §37.14 (figure): a scalar port has no bits to hold.
+TEST_F(PortsOfARun, AScalarPortHoldsNoPortBits) {
+  Run(kVectorPort);
+  vpiHandle s = PortOfU("s");
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(vpi_iterate(vpiBit, s), nullptr);
 }
 
 }  // namespace

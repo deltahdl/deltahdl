@@ -789,6 +789,12 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   // the same scope the variable declaration beside it folds against.
   net.width = EvalTypeWidth(item->data_type, typedefs_, BuildParamScope(mod));
   net.dtype = NetDeclaredType(item, typedefs_, arena_);
+  net.data_kind = ResolvedTypeKind(item->data_type, typedefs_);
+  // An inline enum holds its base type's range where a dimension written over
+  // a named type or a struct or union is held, so only those two say the
+  // declaration wrote one.
+  net.has_declared_packed_dim = item->data_type.packed_dim_left != nullptr &&
+                                item->data_type.kind != DataTypeKind::kEnum;
   net.is_signed = IsSignedType(item->data_type, typedefs_);
   if (non_ansi_partial_ports_.count(item->name)) {
     net.is_signed =

@@ -3,10 +3,12 @@
 #include <string>
 #include <vector>
 
+#include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 
@@ -109,6 +111,45 @@ bool HasFixedElements(const RtlirVariable& var) {
          !var.is_assoc && var.unpacked_dims.size() == var.num_unpacked_dims;
 }
 
+// The members of the array the object keyed `key` stands for, hung from it
+// one unpacked dimension of `dims` at a time.
+void AttachArray(VpiObject& array, const std::string& key,
+                 const std::vector<RtlirUnpackedDim>& dims,
+                 const VpiObjectMap& objects, const VpiAttachBuild& build) {
+  const ArrayAttach kAttach{dims, array, objects, build};
+  AttachLevel({&array, key, {}}, 0, kAttach);
+  RecordDimensionIndices(array, dims);
+}
+
+// §37.16 details 1, 2 and 24: a net declared with an unpacked dimension is an
+// array net, each net in it is an array member whose vpiParent is the array
+// net, and the array net's vpiSize is the number of nets it holds. The run
+// keys each element net under `n[i]` beside the array, as it does an array
+// var's elements, so the array net stood as a net of its own and its elements
+// as its siblings. §37.24 details 1 and 2 make a generic interconnect so
+// declared an interconnect array instead, whose vpiSize is the number of
+// elements of its first dimension, each a further interconnect array down to
+// the interconnect nets of the last.
+void AttachNetArray(const RtlirNet& net, const std::string& prefix,
+                    const VpiObjectMap& objects, const VpiAttachBuild& build) {
+  if (net.num_unpacked_dims == 0 || net.refers_outward ||
+      net.unpacked_dims.size() != net.num_unpacked_dims) {
+    return;
+  }
+  const std::string kKey = VpiFlatName(prefix, net.name);
+  VpiObject* array = FindObjectForFlatName(objects, kKey);
+  if (array == nullptr) return;
+  const bool kInterconnect = net.net_type == NetType::kInterconnect;
+  array->type = kInterconnect ? vpiInterconnectArray : vpiNetArray;
+  int count = 1;
+  for (const RtlirUnpackedDim& dim : net.unpacked_dims) {
+    count *= static_cast<int>(dim.Size());
+  }
+  array->size =
+      kInterconnect ? static_cast<int>(net.unpacked_dims[0].Size()) : count;
+  AttachArray(*array, kKey, net.unpacked_dims, objects, build);
+}
+
 }  // namespace
 
 void AttachArrayElements(const RtlirDesign* design, const VpiObjectMap& objects,
@@ -116,7 +157,8 @@ void AttachArrayElements(const RtlirDesign* design, const VpiObjectMap& objects,
   // §37.17 details 2, 18 and 26: each element of an array var is a member of
   // the array, and a multidimensional array's subarrays are array vars of their
   // own. The run keyed each element under `arr[i]` beside the array, so it
-  // stood in the scope as the array's sibling and no index reached it.
+  // stood in the scope as the array's sibling and no index reached it. An
+  // array net's nets are hung from it the same way (§37.16 detail 2).
   if (design == nullptr) return;
   WalkInstancePaths(
       design, [&](const RtlirModule* mod, const std::string& prefix) {
@@ -125,9 +167,10 @@ void AttachArrayElements(const RtlirDesign* design, const VpiObjectMap& objects,
           const std::string kKey = VpiFlatName(prefix, var.name);
           VpiObject* array = FindObjectForFlatName(objects, kKey);
           if (array == nullptr) continue;
-          const ArrayAttach kAttach{var.unpacked_dims, *array, objects, build};
-          AttachLevel({array, kKey, {}}, 0, kAttach);
-          RecordDimensionIndices(*array, var.unpacked_dims);
+          AttachArray(*array, kKey, var.unpacked_dims, objects, build);
+        }
+        for (const RtlirNet& net : VpiDeclaredNets(*mod)) {
+          AttachNetArray(net, prefix, objects, build);
         }
       });
 }

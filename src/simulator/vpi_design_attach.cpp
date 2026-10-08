@@ -444,29 +444,32 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
   // itself.
   if (design == nullptr) return;
 
-  WalkInstancePaths(design, [this](const RtlirModule* mod,
-                                   const std::string& prefix) {
-    // A top module has no module object over it to hang ports from, the
-    // same boundary the module paths meet.
-    if (prefix.empty()) return;
-    VpiHandle module = DesignObjectForFlatName(prefix);
-    if (module == nullptr) return;
+  WalkInstancePaths(
+      design, [this](const RtlirModule* mod, const std::string& prefix) {
+        // A top module has no module object over it to hang ports from, the
+        // same boundary the module paths meet.
+        if (prefix.empty()) return;
+        VpiHandle module = DesignObjectForFlatName(prefix);
+        if (module == nullptr) return;
 
-    module->children.reserve(module->children.size() + mod->ports.size());
-    int index = 0;
-    const SourceManager* sources = SourcesOf(sim_ctx_);
-    for (const auto& port : mod->ports) {
-      auto* obj = AllocObject();
-      FillPortObject(obj, port, index++, module, name_pool_);
-      // §37.3.3: a port is written in the source text, so its object stands
-      // where the declaration does and reports it.
-      RecordSourceLocation(obj, port.loc, sources);
-      RecordProtection(obj, port.loc, sources);
-      if (port.is_interconnect) {
-        FillInterconnectNetObject(AllocObject(), port, obj, module, name_pool_);
-      }
-    }
-  });
+        module->children.reserve(module->children.size() + mod->ports.size());
+        int index = 0;
+        const SourceManager* sources = SourcesOf(sim_ctx_);
+        for (const auto& port : mod->ports) {
+          auto* obj = AllocObject();
+          FillPortObject(obj, port, index++, module, name_pool_);
+          // §37.3.3: a port is written in the source text, so its object stands
+          // where the declaration does and reports it.
+          RecordSourceLocation(obj, port.loc, sources);
+          RecordProtection(obj, port.loc, sources);
+          if (port.is_interconnect) {
+            VpiObject* net = AllocObject();
+            FillInterconnectNetObject(net, port, obj, module, name_pool_);
+            VpiMakeInterconnectArray(
+                net, port, [this] { return AllocObject(); }, name_pool_);
+          }
+        }
+      });
   if (sim_ctx_ == nullptr) return;
   AttachPortConnections(design, object_map_, *sim_ctx_,
                         {[this] { return AllocObject(); },

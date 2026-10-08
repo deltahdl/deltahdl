@@ -110,6 +110,12 @@ uint32_t TaggedUnionTagBitOffset(const DataType& dtype);
 const DataType* FindNamedType(const DataType& dtype,
                               const TypedefMap& typedefs);
 
+// The kind of the type `dtype` stands for, following each typedef or
+// user-defined nettype name (§6.18, §6.6.7) to the type it was declared with;
+// the kind as written for a type no name stands for.
+DataTypeKind ResolvedTypeKind(const DataType& dtype,
+                              const TypedefMap& typedefs);
+
 // The same for a structure or union member's named type (§7.2.1): a member
 // written behind a qualifier, `q::pair_t Add`, was looked up by `pair_t`
 // alone, resolving to whatever a wildcard import made the bare name stand

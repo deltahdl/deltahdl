@@ -1,6 +1,7 @@
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -19,11 +20,10 @@ bool VpiObjectCarriesSourceDelay(int type) {
   // §37.3.4: the object kinds that can carry a delay written within the
   // SystemVerilog source - nets, primitives, module paths, timing checks, and
   // continuous assignments. A primitive here covers the gate, switch, and udp
-  // forms
-  // as well as the primitive supertype. Other delays (module input port delays,
-  // inter-module path delays) do not appear in the source and so are excluded.
+  // forms as well as the primitive supertype, and a net every kind the `nets`
+  // class groups (§37.16). Other delays (module input port delays, inter-module
+  // path delays) do not appear in the source and so are excluded.
   switch (type) {
-    case vpiNet:
     case vpiPrimitive:
     case vpiGate:
     case vpiSwitch:
@@ -37,7 +37,7 @@ bool VpiObjectCarriesSourceDelay(int type) {
     case vpiContAssignBit:
       return true;
     default:
-      return false;
+      return VpiIsNetsType(type);
   }
 }
 

@@ -843,12 +843,13 @@ TEST(NetModel, NoHandleHasPackedArrayElements) {
 }
 
 // §37.16 (figure): the `nets` class groups the net bit, the interconnect array,
-// the array net and every concrete net kind.
+// the array net and every concrete net kind, a user-defined net's among them.
 TEST(NetModel, EveryKindTheNetsClassGroupsIsANet) {
   for (int kind :
        {vpiNet, vpiNetBit, vpiNetArray, vpiStructNet, vpiUnionNet, vpiEnumNet,
-        vpiIntegerNet, vpiTimeNet, vpiBitNet, vpiPackedArrayNet,
-        vpiInterconnectNet, vpiInterconnectArray}) {
+        vpiIntegerNet, vpiTimeNet, vpiBitNet, vpiByteNet, vpiShortIntNet,
+        vpiIntNet, vpiLongIntNet, vpiRealNet, vpiShortRealNet,
+        vpiPackedArrayNet, vpiInterconnectNet, vpiInterconnectArray}) {
     EXPECT_TRUE(VpiIsNetsType(kind)) << kind;
   }
   EXPECT_FALSE(VpiIsNetsType(vpiReg));

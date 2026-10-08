@@ -76,6 +76,7 @@ struct RtlirPort {
   std::string_view name;
   Direction direction;
   DataTypeKind type_kind;
+  DataTypeKind data_kind = DataTypeKind::kImplicit;  // As RtlirNet's.
   uint32_t width = 1;
   bool is_signed = false;
 
@@ -171,6 +172,10 @@ struct RtlirNet {
 
   bool is_signed = false;
   std::vector<uint32_t> driver_indices;
+  // §37.16 and detail 1: the type written, through any typedef or nettype name,
+  // and whether a packed dimension was, which pick the kind of net object.
+  DataTypeKind data_kind = DataTypeKind::kImplicit;
+  bool has_declared_packed_dim = false;
 
   Strength charge_strength = Strength::kMedium;
   uint32_t trireg_capacitance = 0;

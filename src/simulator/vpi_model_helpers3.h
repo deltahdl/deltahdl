@@ -353,6 +353,25 @@ VpiPortGranularity VpiPortInstReferenceGranularity(
 // size mismatch) does not qualify as a member of that iteration.
 bool VpiPortInstReferenceQualifies(bool connected_to_any_port_bit);
 
+// §37.16 detail 6: what a vpiPorts iteration of `net` reaches - each port of
+// the instance it stands in whose lowConn it is, or, of a net bit, the port
+// bits whose lowConn the bit is.
+std::vector<VpiHandle> VpiNetPorts(VpiHandle net);
+
+// §37.16 details 7 and 8: what a vpiPortInst iteration of `net` reaches - each
+// port of an instance whose highConn holds it, for a whole net or array net,
+// and for a net bit or scalar net the port bit (or scalar port) it is connected
+// to, the whole port where the highConn's bit index cannot be told; a port none
+// of whose bits it reaches is left out.
+std::vector<VpiHandle> VpiNetPortInsts(VpiHandle net);
+
+// §37.39 (figure) and §37.16 details 6 and 7: whether `type` asked of `ref` is
+// one of a module path's three path-term relations or a net's two port
+// relations, whose objects are terms and ports rather than children whose own
+// type is the relation's; and the objects it reaches.
+bool VpiIsTermOrPortRelation(int type, VpiHandle ref);
+std::vector<VpiHandle> VpiTermOrPortObjects(int type, VpiHandle ref);
+
 // §37.16 detail 9: vpiLineNo of a net. An implicit net reports 0; an explicitly
 // declared net reports the line it was declared on.
 int VpiNetLineNo(bool implicit, int declared_line);
@@ -378,6 +397,11 @@ VpiHandle VpiScopeDefaultDisableIff(VpiHandle scope);
 // grouping inside it. §37.4.1 makes a dotted enclosure a grouping rather than
 // an object, so these are the kinds an object drawn as a net carries.
 bool VpiIsNetsType(int type);
+
+// §37.14, §37.16 and §37.17 (figures): the kinds the vpiBit relation reaches,
+// one per bit of what holds them - a port's port bits, a net's net bits and a
+// variable's var bits.
+bool VpiIsBitObjectType(int type);
 
 // §37.16: a net's vpiNetType -- the Annex K constant of the kind it was
 // declared, vpiNettypeNet for a user-defined nettype's -- and 0 for an object

@@ -1,8 +1,9 @@
 // Named-type and member-type resolution: FindNamedType, MemberNamedType,
-// NestedAggregateSource and ResolveNestedAggregateTypes. Moved out of
+// NestedAggregateSource and ResolveNestedAggregateTypes, moved out of
 // type_eval.cpp verbatim, for room, once that file reached the source-size
-// gate.
+// gate; and ResolvedTypeKind, which follows a chain of names to its type.
 
+#include <cstddef>
 #include <string>
 
 #include "common/arena.h"
@@ -34,6 +35,19 @@ const DataType* FindNamedType(const DataType& dtype,
   }
   auto it = typedefs.find(dtype.type_name);
   return (it != typedefs.end()) ? &it->second : nullptr;
+}
+
+DataTypeKind ResolvedTypeKind(const DataType& dtype,
+                              const TypedefMap& typedefs) {
+  // Each step follows one name, and a chain longer than the table has names
+  // runs through one of them twice, so the walk is bounded by the table.
+  const DataType* type = &dtype;
+  for (std::size_t steps = 0; steps <= typedefs.size(); ++steps) {
+    const DataType* named = FindNamedType(*type, typedefs);
+    if (named == nullptr) break;
+    type = named;
+  }
+  return type->kind;
 }
 
 // The same for a structure or union member's named type (§7.2.1): a member

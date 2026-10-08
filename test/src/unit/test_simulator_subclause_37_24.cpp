@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -279,6 +280,43 @@ TEST(GenericInterconnectModel, PackedArraysAndUnionsSelectTheirRelation) {
   EXPECT_TRUE(VpiIsInterconnectStructDataTypespec(vpiStructTypespec));
   EXPECT_TRUE(VpiIsInterconnectStructDataTypespec(vpiUnionTypespec));
   EXPECT_FALSE(VpiIsInterconnectStructDataTypespec(vpiArrayTypespec));
+}
+
+// A design run with a PLI application registered, its generic interconnects
+// read back once the run is over.
+class InterconnectsOfARun : public VpiDesignRun {};
+
+// §37.24 (figure): a generic interconnect a module's body declares is an
+// interconnect net, and one with an unpacked dimension an interconnect array
+// whose vpiElement iteration reaches an interconnect net per index (detail 2),
+// and whose vpiSize is that number.
+TEST_F(InterconnectsOfARun, ABodyInterconnectIsANetOrAnArray) {
+  Run("module top; interconnect ic; interconnect ia [0:1]; endmodule\n");
+  EXPECT_EQ(vpi_get(vpiType, By("top.ic")), vpiInterconnectNet);
+  vpiHandle array = By("top.ia");
+  EXPECT_EQ(vpi_get(vpiType, array), vpiInterconnectArray);
+  EXPECT_EQ(vpi_get(vpiSize, array), 2);
+  EXPECT_EQ(KindsOf(vpiElement, array),
+            (std::vector<int>{vpiInterconnectNet, vpiInterconnectNet}));
+}
+
+// §37.24 details 1 and 2: an interconnect port with unpacked dimensions stands
+// for an interconnect array, whose vpiElement iteration reaches one dimension
+// at a time.
+TEST_F(InterconnectsOfARun, AnInterconnectPortArrayReachesOneDimensionAtATime) {
+  Run("module m(interconnect ip [0:1][0:2]); endmodule\n"
+      "module top; m u(); endmodule\n");
+  vpiHandle port = Named(vpiPort, By("top.u"), "ip");
+  ASSERT_NE(port, nullptr);
+  vpiHandle array = vpi_handle(vpiLowConn, port);
+  ASSERT_NE(array, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, array), vpiInterconnectArray);
+  EXPECT_EQ(KindsOf(vpiElement, array),
+            (std::vector<int>{vpiInterconnectArray, vpiInterconnectArray}));
+  vpiHandle it = vpi_iterate(vpiElement, array);
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(KindsOf(vpiElement, vpi_scan(it)),
+            std::vector<int>(3, vpiInterconnectNet));
 }
 
 }  // namespace

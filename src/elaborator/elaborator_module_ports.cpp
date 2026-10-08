@@ -459,6 +459,7 @@ static RtlirPort ElaborateOnePort(const ModuleDecl* decl, const PortDecl& port,
   uint32_t width = EvalTypeWidth(port.data_type, ctx.typedefs, ctx.param_scope);
   RtlirPort rp =
       BuildRtlirPortBase(port, port_is_var, width, ctx.param_scope, ctx.diag);
+  rp.data_kind = ResolvedTypeKind(port.data_type, ctx.typedefs);
   // §23.2.2.3: a port whose port kind is omitted defaults to a net of the
   // default net type, the one in force where the module is defined (§22.8). A
   // module under `default_nettype none has no default net type to give, so its

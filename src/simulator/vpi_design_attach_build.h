@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <map>
 #include <optional>
@@ -29,6 +30,8 @@ struct RtlirAssertion;
 struct RtlirPropertyDecl;
 struct RtlirDesign;
 struct RtlirModule;
+struct RtlirNet;
+struct RtlirPort;
 struct Stmt;
 struct UdpDecl;
 struct VpiObject;
@@ -60,6 +63,16 @@ int VpiTypespecKind(DataTypeKind kind);
 // A module's variables, a block's and a struct's members take their kinds
 // from it alike.
 int VpiDataTypeVariableKind(DataTypeKind kind);
+
+// §37.16 (figure) and detail 1: the object kind of a net the declaration `net`
+// makes, by the data type it was declared with -- a logic net for a type the
+// figure draws no box of its own for.
+int VpiNetObjectKind(const RtlirNet& net);
+
+// §37.16 (figure): tell each net of the design the kind its data type makes
+// it, and each net of an array net the kind of its element type.
+void RecordNetObjectKinds(const RtlirDesign* design,
+                          const VpiObjectMap& objects);
 
 // §6.18 with §8.3: the object kind of a variable an instance of `mod` declares
 // with a type standing for `name`: a class var for a class the module or the
@@ -95,13 +108,26 @@ PackedDims WrittenPackedDims(const DataType* type, SimContext& ctx);
 // and for a size that is not positive.
 std::optional<PackedRange> WrittenUnpackedDim(const Expr* dim, SimContext& ctx);
 
+// §37.16 (figure): the nets `mod` declares - those its body declares, and those
+// its ANSI ports declare, which stand in no list of the body's - each as a
+// declaration of its name, data type and dimensions.
+std::vector<RtlirNet> VpiDeclaredNets(const RtlirModule& mod);
+
+// §37.16 (figure): the flat keys of the nets the declaration `net` makes in
+// the instance at `prefix`, each a net holding a value: the net itself, or of
+// an array net the nets it holds, which the run keys under `n[i]` for a
+// one-dimensional array and makes for no other.
+std::vector<std::string> VpiDeclaredNetKeys(const RtlirNet& net,
+                                            const std::string& prefix);
+
 // §37.16, §37.17: give each vector net its net bits and each packed variable
 // its var bits.
 void AttachVectorBits(const RtlirDesign* design, const VpiObjectMap& objects,
                       SimContext& ctx, const VpiAttachBuild& build);
 
 // §37.17 details 2, 18 and 26: hang each element of a fixed array var from
-// the array, through a subarray per outer index of a multidimensional one.
+// the array, through a subarray per outer index of a multidimensional one,
+// and (§37.16 details 1 and 2) each net of an array net from the array net.
 void AttachArrayElements(const RtlirDesign* design, const VpiObjectMap& objects,
                          const VpiAttachBuild& build);
 
@@ -520,6 +546,14 @@ void AttachGenBlockStorage(const RtlirDesign* design,
 // connection, the expression the instantiation wrote for it, and its lower
 // one, the instance's own net or variable of the port. The ports are those
 // VpiContext::AttachDesignPorts made.
+// §37.24 details 1 and 2: turn `net`, the interconnect net an interconnect
+// port stands for, into an interconnect array where the port declares an
+// unpacked dimension - one element per index of its first dimension, each a
+// further interconnect array down to the interconnect nets of the last.
+void VpiMakeInterconnectArray(VpiObject* net, const RtlirPort& port,
+                              const std::function<VpiObject*()>& alloc,
+                              std::deque<std::string>& names);
+
 void AttachPortConnections(const RtlirDesign* design,
                            const VpiObjectMap& objects, SimContext& ctx,
                            const VpiAttachBuild& build);

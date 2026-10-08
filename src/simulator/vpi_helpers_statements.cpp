@@ -804,7 +804,8 @@ bool VpiIsFrameOriginType(int type) {
   // point it was activated from. The diagram draws that as a scope, a task or
   // function call (including the system and method forms), or a net or net
   // array - the last covering a frame activated for a nettype's user-defined
-  // resolution function.
+  // resolution function, whose net is of whichever kind the `nets` class of
+  // §37.16 groups the nettype's data type makes it.
   switch (type) {
     case vpiScope:
     case vpiTaskCall:
@@ -813,11 +814,9 @@ bool VpiIsFrameOriginType(int type) {
     case vpiSysFuncCall:
     case vpiMethodTaskCall:
     case vpiMethodFuncCall:
-    case vpiNet:
-    case vpiNetArray:
       return true;
     default:
-      return false;
+      return VpiIsNetsType(type);
   }
 }
 

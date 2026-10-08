@@ -184,6 +184,65 @@ void AttachNetMembers(const MemberSite& site) {
 
 }  // namespace
 
+int VpiNetObjectKind(const RtlirNet& net) {
+  // §37.24 (figure): a generic interconnect is an interconnect net, which has
+  // no data type of its own.
+  if (net.net_type == NetType::kInterconnect) return vpiInterconnectNet;
+  switch (net.data_kind) {
+    // §37.16 detail 1: a packed struct, union or enum net with a packed
+    // dimension of its own is a packed array net.
+    case DataTypeKind::kStruct:
+      return net.has_declared_packed_dim ? vpiPackedArrayNet : vpiStructNet;
+    case DataTypeKind::kUnion:
+      return net.has_declared_packed_dim ? vpiPackedArrayNet : vpiUnionNet;
+    case DataTypeKind::kEnum:
+      return net.has_declared_packed_dim ? vpiPackedArrayNet : vpiEnumNet;
+    case DataTypeKind::kInteger:
+      return vpiIntegerNet;
+    case DataTypeKind::kTime:
+      return vpiTimeNet;
+    // §6.7.1 keeps a 2-state or real type off a built-in net type, so these
+    // arise through a user-defined nettype (§6.6.7), the figure's user
+    // defined net.
+    case DataTypeKind::kBit:
+      return vpiBitNet;
+    case DataTypeKind::kByte:
+      return vpiByteNet;
+    case DataTypeKind::kShortint:
+      return vpiShortIntNet;
+    case DataTypeKind::kInt:
+      return vpiIntNet;
+    case DataTypeKind::kLongint:
+      return vpiLongIntNet;
+    case DataTypeKind::kReal:
+    case DataTypeKind::kRealtime:
+      return vpiRealNet;
+    case DataTypeKind::kShortreal:
+      return vpiShortRealNet;
+    default:
+      return kVpiNet;
+  }
+}
+
+void RecordNetObjectKinds(const RtlirDesign* design,
+                          const VpiObjectMap& objects) {
+  // §37.16 (figure): a net is drawn as the kind its data type makes it. The run
+  // made every net a logic net, and only a struct or union net with a layout
+  // of its own was told otherwise (AttachNetMembers), so no design had an enum
+  // net, an integer net or a packed array net.
+  if (design == nullptr) return;
+  WalkInstancePaths(
+      design, [&](const RtlirModule* mod, const std::string& prefix) {
+        for (const RtlirNet& net : VpiDeclaredNets(*mod)) {
+          const int kKind = VpiNetObjectKind(net);
+          for (const std::string& key : VpiDeclaredNetKeys(net, prefix)) {
+            VpiObject* obj = FindObjectForFlatName(objects, key);
+            if (obj != nullptr && obj->type == kVpiNet) obj->type = kKind;
+          }
+        }
+      });
+}
+
 void AttachStructMembers(const RtlirDesign* design, const VpiObjectMap& objects,
                          SimContext& ctx, const VpiAttachBuild& build) {
   if (design == nullptr) return;

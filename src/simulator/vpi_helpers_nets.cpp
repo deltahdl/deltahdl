@@ -133,7 +133,7 @@ bool VpiIsClockingIODeclExprType(int type) {
   // the variable arm is every kind that class groups. Naming vpiVariables
   // itself admitted a kind no object has while leaving out every variable that
   // is not a logic var.
-  return type == vpiRefObj || type == kVpiNet || VpiIsVariablesType(type);
+  return type == vpiRefObj || VpiIsNetsType(type) || VpiIsVariablesType(type);
 }
 
 VpiHandle VpiClockingIODeclExpr(VpiHandle io_decl) {
@@ -174,7 +174,8 @@ bool VpiIsIoDeclExprType(int type) {
   // named ref obj / interface tf decl / virtual interface var target boxes plus
   // the nets and variables groupings (a logic var shares vpiReg's code).
   return type == vpiRefObj || type == vpiInterfaceTfDecl ||
-         type == vpiVirtualInterfaceVar || type == kVpiNet || type == kVpiReg;
+         type == vpiVirtualInterfaceVar || VpiIsNetsType(type) ||
+         type == kVpiReg;
 }
 
 int VpiIoDeclExprType(bool passed_by_reference, bool is_interface_or_modport,
@@ -805,8 +806,9 @@ bool VpiIsNetsType(int type) {
   // net, and the `net` grouping of the concrete net kinds. §37.4.1 makes such
   // an enclosure a grouping rather than an object, so vpiNet's own spelling
   // names one of the kinds inside it and these are what an object drawn as a
-  // net actually carries. vpiLogicNet and vpiArrayNet share values with vpiNet
-  // and vpiNetArray (§37.16 details 27 and 29), so each value is written once.
+  // net actually carries, the kinds a user-defined net may be among them.
+  // vpiLogicNet and vpiArrayNet share values with vpiNet and vpiNetArray
+  // (§37.16 details 27 and 29), so each value is written once.
   switch (type) {
     case kVpiNet:
     case vpiNetBit:
@@ -817,6 +819,12 @@ bool VpiIsNetsType(int type) {
     case vpiIntegerNet:
     case vpiTimeNet:
     case vpiBitNet:
+    case vpiByteNet:
+    case vpiShortIntNet:
+    case vpiIntNet:
+    case vpiLongIntNet:
+    case vpiRealNet:
+    case vpiShortRealNet:
     case vpiPackedArrayNet:
     case vpiInterconnectNet:
     case vpiInterconnectArray:
@@ -824,6 +832,10 @@ bool VpiIsNetsType(int type) {
     default:
       return false;
   }
+}
+
+bool VpiIsBitObjectType(int type) {
+  return type == vpiPortBit || type == vpiNetBit || type == vpiRegBit;
 }
 
 // §37.39 (figure): which of a module path's three term relations reaches this

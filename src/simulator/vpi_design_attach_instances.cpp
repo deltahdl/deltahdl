@@ -193,6 +193,9 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     AttachVectorBits(design, object_map_, *sim_ctx_, kBuild);
     AttachArrayElements(design, object_map_, kBuild);
     AttachStructMembers(design, object_map_, *sim_ctx_, kBuild);
+    // A net's bits and members are made while it is still a logic net, the
+    // kind both passes above look for, so its own kind comes after them.
+    RecordNetObjectKinds(design, object_map_);
     const VpiObjectMap kUnitTypespecs =
         AttachTypespecs(design, object_map_, kBuild);
     AttachParameters(design, object_map_, kUnitTypespecs, kBuild);

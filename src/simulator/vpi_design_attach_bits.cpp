@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -6,7 +7,9 @@
 #include <vector>
 
 #include "common/packed_range.h"
+#include "common/types.h"
 #include "elaborator/rtlir.h"
+#include "parser/ast_type.h"
 #include "simulator/instance_prefix_override.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
@@ -17,6 +20,44 @@
 #include "simulator/vpi_user.h"
 
 namespace delta {
+
+std::vector<RtlirNet> VpiDeclaredNets(const RtlirModule& mod) {
+  std::vector<RtlirNet> nets = mod.nets;
+  for (const RtlirPort& port : mod.ports) {
+    // A variable port, an interface port among them, declares no net, and an
+    // interconnect port's net is made apart (FillInterconnectNetObject).
+    if (port.net_type == NetType::kNone || port.is_interconnect) continue;
+    const bool kDeclared = std::ranges::any_of(
+        mod.nets, [&](const RtlirNet& net) { return net.name == port.name; });
+    if (kDeclared) continue;
+    RtlirNet& net = nets.emplace_back();
+    net.name = port.name;
+    net.width = port.width;
+    net.dtype = port.dtype;
+    net.data_kind = port.data_kind;
+    // An inline enum holds its base type's range where a dimension written over
+    // a named type or a struct or union is held (§37.16 detail 1).
+    net.has_declared_packed_dim = port.dtype != nullptr &&
+                                  port.dtype->packed_dim_left != nullptr &&
+                                  port.dtype->kind != DataTypeKind::kEnum;
+    net.num_unpacked_dims = port.num_unpacked_dims;
+    net.unpacked_dims = port.unpacked_dims;
+  }
+  return nets;
+}
+
+std::vector<std::string> VpiDeclaredNetKeys(const RtlirNet& net,
+                                            const std::string& prefix) {
+  const std::string kKey = VpiFlatName(prefix, net.name);
+  if (net.num_unpacked_dims == 0) return {kKey};
+  std::vector<std::string> keys;
+  if (net.unpacked_dims.size() != 1) return keys;
+  const RtlirUnpackedDim& dim = net.unpacked_dims.front();
+  for (int64_t i = dim.Low(); i < dim.Low() + dim.Size(); ++i) {
+    keys.push_back(kKey + "[" + std::to_string(i) + "]");
+  }
+  return keys;
+}
 
 namespace {
 
@@ -61,12 +102,14 @@ std::vector<BitTarget> BitTargets(const RtlirModule* mod,
   InstancePrefixOverride scope(ctx.InstancePrefixOverride(),
                                prefix.empty() ? "" : prefix + ".");
   std::vector<BitTarget> targets;
-  for (const RtlirNet& net : mod->nets) {
-    VpiHandle obj =
-        FindObjectForFlatName(objects, VpiFlatName(prefix, net.name));
-    if (obj == nullptr || obj->type != kVpiNet) continue;
+  for (const RtlirNet& net : VpiDeclaredNets(*mod)) {
     auto dims = DeclaredPackedDims(net.dtype, net.width, ctx);
-    if (dims) targets.push_back({obj, vpiNetBit, std::move(*dims)});
+    if (!dims) continue;
+    for (const std::string& key : VpiDeclaredNetKeys(net, prefix)) {
+      VpiHandle obj = FindObjectForFlatName(objects, key);
+      if (obj == nullptr || obj->type != kVpiNet) continue;
+      targets.push_back({obj, vpiNetBit, *dims});
+    }
   }
   for (const RtlirVariable& var : mod->variables) {
     VpiHandle obj =
