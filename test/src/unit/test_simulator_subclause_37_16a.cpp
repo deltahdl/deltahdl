@@ -923,5 +923,21 @@ TEST(NetModel, EveryKindTheNetsClassGroupsIsANet) {
   EXPECT_FALSE(VpiIsNetsType(vpiReg));
 }
 
+// §37.16 detail 31: a constant select of an outer packed dimension of a net
+// reaches the net it selects from through vpiParent; a select standing over
+// no net reaches nothing.
+TEST_F(NetContext, AConstantPackedSelectReachesItsNet) {
+  VpiObject net;
+  net.type = vpiNet;
+  VpiObject slice;
+  slice.type = vpiNet;
+  slice.bit_offset = 8;
+  slice.parent = &net;
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, VpiHandleOf(&slice))), &net);
+  VpiObject orphan;
+  orphan.type = vpiNet;
+  orphan.bit_offset = 8;
+  EXPECT_EQ(vpi_handle(vpiParent, VpiHandleOf(&orphan)), nullptr);
+}
 }  // namespace
 }  // namespace delta

@@ -5,6 +5,7 @@
 #include "common/source_mgr.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -76,5 +77,19 @@ TEST_F(VpiHandleSim, HandleProtectedObjectIsAnError) {
   EXPECT_EQ(info.level, vpiError);
 }
 
+// §38.18: vpi_handle() returns NULL where the reference object has no object of
+// the type asked for. A net draws none of these relations, and an immediate
+// assertion draws no typespec.
+TEST_F(VpiHandleSim, ARelationTheReferenceDoesNotDrawIsNull) {
+  VpiObject net;
+  net.type = vpiNet;
+  for (int type : {vpiClassObj, vpiActual, vpiUdpDefn, vpiPattern, vpiIndex,
+                   vpiFunction, vpiTchkNotifier, vpiNetTypedefAlias, vpiWith}) {
+    EXPECT_EQ(vpi_handle(type, VpiHandleOf(&net)), nullptr) << type;
+  }
+  VpiObject assertion;
+  assertion.type = vpiImmediateAssert;
+  EXPECT_EQ(vpi_handle(vpiTypespec, VpiHandleOf(&assertion)), nullptr);
+}
 }  // namespace
 }  // namespace delta

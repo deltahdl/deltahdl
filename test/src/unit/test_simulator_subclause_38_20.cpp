@@ -152,5 +152,11 @@ TEST_F(VpiHandleByMultiIndexSim, NetReferenceResolvesElementThenBitSelect) {
       bit1);
 }
 
+// §38.20: num_index counts the indices index_array holds, so a null array
+// names no subobject whatever the count.
+TEST_F(VpiHandleByMultiIndexSim, ANullIndexArrayNamesNothing) {
+  auto* mod = vpi_ctx_.CreateModule("top", "top");
+  EXPECT_EQ(vpi_handle_by_multi_index(VpiHandleOf(mod), 1, nullptr), nullptr);
+}
 }  // namespace
 }  // namespace delta

@@ -5,6 +5,7 @@
 #include "common/source_mgr.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
@@ -128,5 +129,14 @@ TEST_F(VpiHandleByIndexSim, HandleByIndexSelectsNetBit) {
   EXPECT_EQ(vpi_handle_by_index(VpiHandleOf(&net), 4), nullptr);
 }
 
+// §38.19 with §37.17: an element of a queue lives in the run's store of the
+// queue and is made when first selected, so with no run there is none.
+TEST_F(VpiHandleByIndexSim, AQueueElementNeedsARun) {
+  QueueObject queue;
+  VpiObject array;
+  array.type = vpiRegArray;
+  array.queue = &queue;
+  EXPECT_EQ(vpi_handle_by_index(VpiHandleOf(&array), 0), nullptr);
+}
 }  // namespace
 }  // namespace delta

@@ -86,8 +86,9 @@ VpiHandle ResolveNamePathComponent(
 // §38.21: a name passing through a protected scope is an error - a protected
 // component is not descended into - unless what it reaches is an object a
 // viewport opened (§34.5.32.2), reached through the scopes sealing it.
+// `path` holds at least the component the walk stopped at, null where it named
+// nothing.
 bool PassesThroughSealedScope(const std::vector<VpiHandle>& path) {
-  if (path.empty()) return false;
   const VpiHandle kReached = path.back();
   if (kReached != nullptr &&
       kReached->viewport_access != ViewportAccess::kNone) {
@@ -383,18 +384,12 @@ static bool TryResolveParentRelation(int type, VpiHandle ref, VpiHandle& out) {
   }
   // §37.16 detail 31, §37.17 detail 26: a select of a packed vector that
   // leaves dimensions unindexed, or whose index varies, reaches the vector it
-  // selects from, the largest packed array containing it.
-  const bool kPackedSelect = ref->select_dim.has_value() ||
-                             (ref->bit_offset >= 0 && ref->type != vpiNetBit &&
-                              ref->type != vpiRegBit);
+  // selects from, the largest packed array containing it. A bit select, a net
+  // bit and a var bit carry an offset too, but TryResolveSelectRelation
+  // answers their vpiParent first (§37.58, §37.16, §37.17).
+  const bool kPackedSelect =
+      ref->select_dim.has_value() || ref->bit_offset >= 0;
   if (kPackedSelect && ref->parent != nullptr) {
-    out = ref->parent;
-    return true;
-  }
-  // §37.58 (figure): a bit select reaches the vector it selects into through
-  // vpiParent. The relation is a tag no object's type is, so the traversal this
-  // falls through to reached the vector from none of its bit-selects.
-  if (ref->type == vpiBitSelect) {
     out = ref->parent;
     return true;
   }

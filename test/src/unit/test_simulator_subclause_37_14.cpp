@@ -523,5 +523,15 @@ TEST_F(PortsOfARun, AVariablePortHoldsAPortBitPerBit) {
   EXPECT_EQ(KindsOf(vpiBit, o), std::vector<int>(2, vpiPortBit));
 }
 
+// §37.14 (figure): a port bit reaches the port it is a bit of through
+// vpiParent.
+TEST_F(PortContext, APortBitReachesItsPortThroughParent) {
+  VpiObject port;
+  port.type = vpiPort;
+  VpiObject bit;
+  bit.type = vpiPortBit;
+  bit.parent = &port;
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, VpiHandleOf(&bit))), &port);
+}
 }  // namespace
 }  // namespace delta

@@ -195,6 +195,16 @@ TEST(ScopePublic, LoopControlVariableScopeIsItsLoopStatement) {
   shared_for.children.push_back(&shared_for_var);
   EXPECT_NE(ctx.Handle(vpiScope, &shared_for_var), &shared_for);
 
+  // A variable of a block that is no loop statement takes its scope from that
+  // block, the loop-statement routing not applying either.
+  VpiObject block_var;
+  block_var.type = vpiIntVar;
+  VpiObject block;
+  block.type = vpiBegin;
+  block_var.parent = &block;
+  block.children.push_back(&block_var);
+  EXPECT_EQ(ctx.Handle(vpiScope, &block_var), &block);
+
   SetGlobalVpiContext(nullptr);
 }
 

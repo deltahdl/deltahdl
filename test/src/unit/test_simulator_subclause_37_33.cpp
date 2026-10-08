@@ -581,5 +581,16 @@ TEST_F(ClassObjectsOfARun, AClassObjReachesTheDefnOfItsOwnInstance) {
   }
 }
 
+// §37.33 detail 9: a full name passes through a class variable to a member of
+// the object it references; a variable referencing no object has no member to
+// reach.
+TEST_F(ClassObjectsOfARun, ANameThroughANullClassVariableReachesNothing) {
+  Run("module top;\n"
+      "  class C; int x; endclass\n"
+      "  C c;\n"
+      "endmodule\n");
+  ASSERT_NE(vpi_handle_by_name(VpiText("top.c"), nullptr), nullptr);
+  EXPECT_EQ(vpi_handle_by_name(VpiText("top.c.x"), nullptr), nullptr);
+}
 }  // namespace
 }  // namespace delta

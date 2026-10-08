@@ -556,5 +556,18 @@ TEST_F(PrimitivesOfARun, TerminalsSelectingNoModelledElementAreKept) {
   }
 }
 
+// §37.35 (figure): vpiPrimitive reaches the primitive an object belongs to,
+// its parent where that is one, and otherwise a primitive it holds.
+TEST_F(PrimitivePrimTerm, PrimitiveIsTheParentOrElseAHeldPrimitive) {
+  VpiObject module;
+  module.type = vpiModule;
+  VpiObject gate;
+  gate.type = vpiGate;
+  VpiObject holder;
+  holder.type = vpiPrimTerm;
+  holder.parent = &module;
+  holder.children = {&gate};
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrimitive, VpiHandleOf(&holder))), &gate);
+}
 }  // namespace
 }  // namespace delta
