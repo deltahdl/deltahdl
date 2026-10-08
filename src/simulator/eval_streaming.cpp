@@ -585,20 +585,24 @@ std::optional<Logic4Vec> EvalPackedArrayPattern(const Expr* pattern,
 }
 
 // §10.9.2: `val` placed as the member `f` of the structure `result` holds,
-// a string member (§7.2 with §6.16) as a handle to the string.
+// a string member (§7.2 with §6.16) as a handle to the string; `base` is the
+// offset within `result` of the substructure `f` belongs to.
 static void PlaceFieldValue(Logic4Vec& result, const StructFieldInfo& f,
-                            const Logic4Vec& val, Arena& arena) {
+                            const Logic4Vec& val, Arena& arena,
+                            uint32_t base = 0) {
   Logic4Vec bits = f.type_kind == DataTypeKind::kString
                        ? StringMemberHandle(val, arena)
                        : MemberBits(val, f.width, arena);
-  DepositBitField(result, f.bit_offset, bits, f.width);
+  DepositBitField(result, base + f.bit_offset, bits, f.width);
 }
 
 // §10.9.2: when the default: key falls on an unmatched member that is itself a
 // structure, the value is applied recursively to each member of the
 // substructure rather than written flatly across the whole substructure field.
 // `base` accumulates the enclosing fields' offsets so a leaf member lands at
-// its absolute bit position within the packed result.
+// its absolute bit position within the packed result. A leaf takes the value
+// as an assignment to it would, so a string leaf takes it through its handle,
+// as PlaceFieldValue places one.
 static void PlaceDefaultValue(Logic4Vec& result, const StructFieldInfo& f,
                               uint32_t base, const Logic4Vec& val,
                               Arena& arena) {
@@ -607,8 +611,7 @@ static void PlaceDefaultValue(Logic4Vec& result, const StructFieldInfo& f,
       PlaceDefaultValue(result, sub, base + f.bit_offset, val, arena);
     return;
   }
-  DepositBitField(result, base + f.bit_offset, MemberBits(val, f.width, arena),
-                  f.width);
+  PlaceFieldValue(result, f, val, arena, base);
 }
 
 static DataTypeKind TypeKeyToKind(std::string_view key) {

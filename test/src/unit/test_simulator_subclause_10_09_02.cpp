@@ -443,4 +443,31 @@ TEST(StructAssignmentPatternRun, AnItemFillsADynamicArrayMember) {
   EXPECT_EQ(out, "3 3 9 | 4 2 6\n");
 }
 
+// §10.9.2 with §6.16: the default: key's value is evaluated as an assignment
+// to each member it reaches, so a string member it reaches holds the string,
+// at the top level and inside a nested structure alike, while an int member
+// beside it takes the literal's bits. The string "first" is written before the
+// patterns, so a member left holding the value's bits as its handle would read
+// some other text, or none, rather than its own.
+TEST(StructPatternSimulation, DefaultKeyGivesAStringMemberTheString) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef struct {int n; string s;} pair_t;\n"
+      "  typedef struct {string t;} in_t;\n"
+      "  typedef struct {int n; in_t in;} out_t;\n"
+      "  pair_t first, p;\n"
+      "  out_t o;\n"
+      "  initial begin\n"
+      "    first.s = \"first\";\n"
+      "    p = '{default: \"hi\"};\n"
+      "    o = '{n: 4, default: \"ok\"};\n"
+      "    $display(\"%0d [%s] %0d [%s]\", p.n, p.s, o.n, o.in.t);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "26729 [hi] 4 [ok]\n");
+}
+
 }  // namespace
