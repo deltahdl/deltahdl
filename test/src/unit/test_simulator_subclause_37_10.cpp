@@ -490,5 +490,17 @@ TEST_F(InstanceObjectsOfARun, AnInstanceHasItsDefinitionsFile) {
       "<test>");
 }
 
+// §37.10: vpiTimeUnit and vpiTimePrecision are drawn on an instance, and a
+// net reports vpiUndefined for both.
+TEST(InstanceModel, ANonInstanceHasNoTimeUnitOrPrecision) {
+  VpiContext ctx;
+  SetGlobalVpiContext(&ctx);
+  VpiObject net;
+  net.type = vpiNet;
+  EXPECT_EQ(vpi_get(vpiTimeUnit, VpiHandleOf(&net)), vpiUndefined);
+  EXPECT_EQ(vpi_get(vpiTimePrecision, VpiHandleOf(&net)), vpiUndefined);
+  SetGlobalVpiContext(nullptr);
+}
+
 }  // namespace
 }  // namespace delta

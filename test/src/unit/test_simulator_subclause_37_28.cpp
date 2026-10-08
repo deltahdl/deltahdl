@@ -439,5 +439,21 @@ TEST_F(ParametersOfARun, APackagesTypeParameterIsATypeParameter) {
   EXPECT_EQ(vpi_get(vpiType, TypespecOf("pkg", "T")), vpiLogicTypespec);
 }
 
+// §27.4: in a loop generate block a genvar reference stands as a localparam,
+// and nothing else the block holds does -- not a variable, and not a ref obj
+// bound to nothing -- so both report vpiLocalParam FALSE.
+TEST_F(Parameter, OnlyAGenvarReferenceInAGenScopeIsALocalParam) {
+  VpiObject scope;
+  scope.type = vpiGenScope;
+  VpiObject var;
+  var.type = vpiIntVar;
+  var.parent = &scope;
+  EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&var)), 0);
+  VpiObject unbound;
+  unbound.type = vpiRefObj;
+  unbound.parent = &scope;
+  EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&unbound)), 0);
+}
+
 }  // namespace
 }  // namespace delta

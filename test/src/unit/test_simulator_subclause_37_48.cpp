@@ -365,5 +365,17 @@ TEST_F(ClockingBlocksOfARun, AGenerateBlocksClockingBlockIsItsGenScopes) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, a)), VpiObjectOf(By("top.a")));
 }
 
+// §37.48 detail 1: vpiInputEdge and vpiOutputEdge are drawn on a clocking
+// block and a clocking io decl, and a net reports vpiUndefined for both.
+TEST(ClockingBlockModel, ANetHasNoClockingEdges) {
+  VpiContext ctx;
+  SetGlobalVpiContext(&ctx);
+  VpiObject net;
+  net.type = vpiNet;
+  EXPECT_EQ(vpi_get(vpiInputEdge, VpiHandleOf(&net)), vpiUndefined);
+  EXPECT_EQ(vpi_get(vpiOutputEdge, VpiHandleOf(&net)), vpiUndefined);
+  SetGlobalVpiContext(nullptr);
+}
+
 }  // namespace
 }  // namespace delta

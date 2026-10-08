@@ -3,6 +3,8 @@
 #include <vector>
 
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_globals.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -589,6 +591,36 @@ TEST(VariableModel, NameFormsIncludeOwnIndexSuffix) {
   EXPECT_EQ(VpiVariableName(vec), "vec[5]");
   EXPECT_EQ(VpiVariableDecompile(vec), "str1.vec[5]");
   EXPECT_EQ(VpiVariableFullName(vec), "top.str1.vec[5]");
+}
+
+// §37.17 detail 20: a var bit is a scalar and no vector; a variable reports
+// what its declaration made it, FALSE where it made it neither; and an object
+// the two properties are not drawn on reports FALSE to both.
+TEST(VariableModel, ScalarAndVectorOfABitAVariableAndAnotherKind) {
+  VpiContext ctx;
+  SetGlobalVpiContext(&ctx);
+  VpiObject bit;
+  bit.type = vpiRegBit;
+  EXPECT_EQ(vpi_get(vpiScalar, VpiHandleOf(&bit)), 1);
+  EXPECT_EQ(vpi_get(vpiVector, VpiHandleOf(&bit)), 0);
+  VpiObject var;
+  var.type = vpiIntVar;
+  EXPECT_EQ(vpi_get(vpiScalar, VpiHandleOf(&var)), 0);
+  VpiObject scope;
+  scope.type = vpiModule;
+  EXPECT_EQ(vpi_get(vpiVector, VpiHandleOf(&scope)), 0);
+  SetGlobalVpiContext(nullptr);
+}
+
+// §37.17 detail 9: a string var's size is its current number of characters,
+// and one holding no storage holds none.
+TEST(VariableModel, AStringVarWithNoStorageHasNoCharacters) {
+  VpiContext ctx;
+  SetGlobalVpiContext(&ctx);
+  VpiObject str;
+  str.type = vpiStringVar;
+  EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(&str)), 0);
+  SetGlobalVpiContext(nullptr);
 }
 
 }  // namespace

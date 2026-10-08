@@ -100,5 +100,15 @@ TEST_F(VpiGet64Sim, ANullHandleReadsTheSameRunWideAnswersVpiGetReads) {
   EXPECT_EQ(vpi_get64(vpiObjId, nullptr), 0);
 }
 
+// §37.59 detail 8 lets vpiSize through only for a protected expression, so a
+// protected object of any other kind refuses it like every other property.
+TEST_F(VpiGet64Sim, AProtectedNonExpressionRefusesItsSize) {
+  VpiObject locked;
+  locked.type = vpiClassObj;
+  locked.is_protected = true;
+  locked.size = 16;
+  EXPECT_EQ(vpi_get64(vpiSize, VpiHandleOf(&locked)), vpiUndefined);
+}
+
 }  // namespace
 }  // namespace delta

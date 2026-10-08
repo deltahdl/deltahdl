@@ -260,6 +260,13 @@ int VpiGetScalarOrVector(int property, VpiHandle obj) {
                                                                          : 0;
 }
 
+// §37.3.3: vpiLineNo reports the source line of an object that corresponds to
+// source text; the kinds §37.3.3 excepts, which have no single source line,
+// report vpiUndefined.
+int VpiGetLineNo(VpiHandle obj) {
+  return VpiHasLocationProperties(obj->type) ? obj->line_no : vpiUndefined;
+}
+
 // §37.83 and §37.10: the line of an attribute's or an instance's definition.
 int VpiGetDefLineNo(VpiHandle obj) {
   if (obj->type != vpiAttribute && !VpiIsInstanceType(obj->type)) {
@@ -336,16 +343,21 @@ int VpiGetTypeRestricted(int property, VpiHandle obj, bool& handled) {
       return VpiGetInstanceTime(property, obj);
     case vpiHasActual:
       return VpiGetHasActual(obj);
+    // §37.55: an immediate assertion reports whether it is a deferred and
+    // whether it is a final assertion; any other kind reports vpiUndefined.
     case vpiIsDeferred:
       return VpiGetIsDeferred(obj);
     case vpiIsFinal:
       return VpiGetIsFinal(obj);
+    // §37.16 detail 21: vpiExpanded on a net bit reports the parent net's
+    // value; otherwise it reports the object's own expansion (a scalared net,
+    // and the default, is expanded; a vectored net is not).
     case vpiExpanded:
       return VpiGetExpanded(obj);
-    // §37.3.3: vpiLineNo applies only to objects with location properties; the
-    // excepted kinds report vpiUndefined.
     case vpiLineNo:
-      return !VpiHasLocationProperties(obj->type) ? vpiUndefined : obj->line_no;
+      return VpiGetLineNo(obj);
+    // §37.41 detail 9: vpiDPICStr reports vpiDPIC for a "DPI-C" task or
+    // function and vpiDPI for a "DPI" one, and zero for one that is no DPI tf.
     case vpiDPICStr:
       return VpiGetDpicStr(obj);
     default:
@@ -370,12 +382,6 @@ int VpiGetAlwaysType(VpiHandle obj) {
 // vpiJoin/vpiJoinNone/vpiJoinAny; any other stored value collapses to vpiJoin.
 int VpiGetJoinType(VpiHandle obj) {
   return VpiIsJoinType(obj->join_type) ? obj->join_type : vpiJoin;
-}
-
-// §37.3.3: vpiLineNo reports the source line of an object that corresponds to
-// source text; the §37.3.3-excepted kinds report vpiUndefined.
-int VpiGetLineNo(VpiHandle obj) {
-  return VpiHasLocationProperties(obj->type) ? obj->line_no : vpiUndefined;
 }
 
 // §37.48 detail 1: the edge of a clocking block's default input or output skew,
@@ -548,30 +554,16 @@ int VpiGetSimplePropertyA(int property, VpiHandle obj, bool& handled) {
 int VpiGetSimplePropertyB(int property, VpiHandle obj, bool& handled) {
   handled = true;
   switch (property) {
-    // §37.55: an immediate assertion (immediate assert/assume/cover) reports
-    // whether it is a deferred assertion and whether it is a final assertion as
-    // Boolean properties. Both are drawn only on the immediate-assertion kinds,
-    // so asking any other object kind is not a valid query and yields
-    // vpiUndefined.
-    case vpiIsDeferred:
-      return VpiGetIsDeferred(obj);
-    case vpiIsFinal:
-      return VpiGetIsFinal(obj);
     // §6.9.2: the advisory vector-net accessibility keywords, reported as
     // Boolean properties. vpiExplicitScalared/vpiExplicitVectored each report
     // whether that keyword was written on the declaration. vpiExpanded reports
-    // whether the PLI treats the net as expanded: a scalared net shall be
-    // expanded, while a vectored net is reported unexpanded; a net declared
-    // with neither keyword defaults to expanded.
+    // whether the PLI treats the net as expanded (VpiGetTypeRestricted): a
+    // scalared net shall be expanded, while a vectored net is reported
+    // unexpanded; a net declared with neither keyword defaults to expanded.
     case vpiExplicitScalared:
       return VpiBool(obj->is_scalared);
     case vpiExplicitVectored:
       return VpiBool(obj->is_vectored);
-    // §37.16 detail 21: vpiExpanded on a net bit reports the parent net's
-    // value; otherwise it reports the object's own expansion (a scalared net,
-    // and the default, is expanded; a vectored net is not).
-    case vpiExpanded:
-      return VpiGetExpanded(obj);
     // §37.16 detail 9: whether a net was created by implicit declaration.
     case vpiImplicitDecl:
       return VpiBool(obj->implicit_decl);
@@ -584,12 +576,6 @@ int VpiGetSimplePropertyB(int property, VpiHandle obj, bool& handled) {
       return obj->end_line;
     case vpiEndColumn:
       return obj->end_column;
-    // §37.3.3: vpiLineNo reports the source line an object occupies. It applies
-    // to every object that corresponds to source text; for the object kinds
-    // §37.3.3 excepts (which have no single source line) it is not a valid
-    // query and yields vpiUndefined.
-    case vpiLineNo:
-      return VpiGetLineNo(obj);
     // §37.47 detail 3: a cont assign bit reports its bit offset from the least
     // significant bit through vpiOffset. The offset is measured from the LSB,
     // so the LSB shall report zero - exactly the default this field holds.
@@ -623,12 +609,6 @@ int VpiGetSimplePropertyB(int property, VpiHandle obj, bool& handled) {
     // or function and FALSE otherwise.
     case vpiDPIContext:
       return VpiBool(obj->dpi_context);
-    // §37.41 detail 9: vpiDPICStr reports vpiDPIC for a "DPI-C" task or
-    // function and vpiDPI for a "DPI" task or function. A task or function that
-    // is not a DPI tf carries no such flavor, so the property is meaningful
-    // only when is_dpi is set; report zero (none) otherwise.
-    case vpiDPICStr:
-      return VpiGetDpicStr(obj);
     // §37.41 (figure): the two Booleans the task and function declaration
     // diagram carries that nothing answered - whether the task or function is a
     // class method, and whether the function is signed. §37.4.2 reads a Boolean

@@ -221,5 +221,17 @@ TEST_F(RefObjContext, TypespecExposedForVariableActual) {
             &typespec);
 }
 
+// D5: vpiGeneric is drawn on the ref obj alone, and a ref obj bound to nothing
+// refers to no interface, so both a net and an unbound ref obj report
+// vpiUndefined.
+TEST_F(RefObjContext, GenericPropertyOffABoundRefObjIsUndefined) {
+  VpiObject net;
+  net.type = vpiNet;
+  EXPECT_EQ(vpi_get(vpiGeneric, VpiHandleOf(&net)), vpiUndefined);
+  VpiObject unbound;
+  unbound.type = vpiRefObj;
+  EXPECT_EQ(vpi_get(vpiGeneric, VpiHandleOf(&unbound)), vpiUndefined);
+}
+
 }  // namespace
 }  // namespace delta
