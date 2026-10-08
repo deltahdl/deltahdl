@@ -386,6 +386,12 @@ bool VpiIsNetsType(int type);
 int VpiNetTypeOf(VpiHandle obj);
 const char* VpiNetTypeConstantName(int net_type);
 
+// §37.3.2 with §23.3.3.7: a net's vpiResolvedNetType, its type once the nets
+// a port joins are resolved. An interconnect net takes the type of the net a
+// port connects it to (§23.3.3.7.1); any other net keeps its own, the run
+// merging no other nets across a port.
+int VpiResolvedNetTypeOf(VpiHandle obj);
+
 // §37.39 (figure): the path terms one of a module path's three term relations
 // reaches - vpiModPathOut the output terms, and of the input terms
 // vpiModDataPathIn the data source of an edge-sensitive path and vpiModPathIn

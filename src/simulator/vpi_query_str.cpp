@@ -433,7 +433,9 @@ static const char* VpiAdditionalTypeConstantName(int property, VpiHandle obj) {
     case vpiTchkType:
       return VpiConstantNameIn(kVpiTchkTypeNames, obj->tchk_type);
     default:
-      return nullptr;
+      // vpiResolvedNetType, the last of the six VpiGetStrRawProperty routes
+      // here, which names the same constants vpiNetType does.
+      return VpiNetTypeConstantName(VpiResolvedNetTypeOf(obj));
   }
 }
 

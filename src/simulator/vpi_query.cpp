@@ -306,6 +306,10 @@ int VpiGetTypeRestricted(int property, VpiHandle obj, bool& handled) {
     // §37.16: the kind of net a net was declared.
     case vpiNetType:
       return VpiNetTypeOf(obj);
+    // §37.3.2 with §23.3.3.7: the kind of net a net is once a port's nets are
+    // resolved.
+    case vpiResolvedNetType:
+      return VpiResolvedNetTypeOf(obj);
     case vpiConstantSelect:
       return VpiGetConstantSelect(obj);
     // §37.14 details 7 and 9: the port index gives port order; it does not

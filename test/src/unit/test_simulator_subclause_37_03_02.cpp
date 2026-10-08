@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -252,6 +253,63 @@ TEST_F(VpiObjectTypeProperty, GetStrNamesThePrimitiveDelayAndCheckTypes) {
     ASSERT_NE(name, nullptr) << c.name;
     EXPECT_EQ(std::string(name), c.name);
   }
+}
+
+// §37.3.2 with §23.3.3.7.1: an interconnect net whose ports connect it to no
+// net keeps its interconnect type -- a port of its instance it stands for with
+// no higher connection, and a port of an instance it holds with no lower one.
+TEST_F(VpiObjectTypeProperty, AnUnresolvedInterconnectNetStaysInterconnect) {
+  VpiObject module;
+  module.type = vpiModule;
+  VpiObject net;
+  net.type = vpiInterconnectNet;
+  net.parent = &module;
+  VpiObject own_port;
+  own_port.type = vpiPort;
+  own_port.low_conn = &net;
+  VpiObject inner;
+  inner.type = vpiModule;
+  VpiObject inner_port;
+  inner_port.type = vpiPort;
+  inner_port.high_conn = &net;
+  inner.children.push_back(&inner_port);
+  module.children = {&own_port, &inner};
+
+  EXPECT_EQ(vpi_get(vpiResolvedNetType, VpiHandleOf(&net)), vpiInterconnect);
+  const char* name = vpi_get_str(vpiResolvedNetType, VpiHandleOf(&net));
+  ASSERT_NE(name, nullptr);
+  EXPECT_EQ(std::string(name), "vpiInterconnect");
+}
+
+class ResolvedNetTypesOfARun : public VpiDesignRun {
+ protected:
+  // The resolved net type of `net`, in the integer and the string form.
+  static std::string Resolved(vpiHandle net) {
+    const char* name = vpi_get_str(vpiResolvedNetType, net);
+    return std::to_string(vpi_get(vpiResolvedNetType, net)) + " " +
+           (name != nullptr ? name : "(none)");
+  }
+};
+
+// §37.3.2 with §23.3.3.7.1: vpiResolvedNetType is a net's type once the nets a
+// port joins are resolved. A wand net, which no port joins to another type,
+// keeps its own; an interconnect port's net takes the type of the wor net the
+// instantiation connects to it, and an interconnect net connected to a wor
+// port of an instance takes that port's net's type. Neither form answered.
+TEST_F(ResolvedNetTypesOfARun, AnInterconnectNetTakesTheTypeItIsConnectedTo) {
+  Run("module leaf(interconnect p); endmodule\n"
+      "module sink(inout wor q); endmodule\n"
+      "module top; wand a; wor b; interconnect c;\n"
+      "  leaf u1(b); sink u2(c);\n"
+      "endmodule\n");
+  const std::string kWor = std::to_string(vpiWor) + " vpiWor";
+  EXPECT_EQ(Resolved(By("top.a")), std::to_string(vpiWand) + " vpiWand");
+  EXPECT_EQ(Resolved(By("top.c")), kWor);
+  vpiHandle ports = vpi_iterate(vpiPort, By("top.u1"));
+  ASSERT_NE(ports, nullptr);
+  vpiHandle port = vpi_scan(ports);
+  ASSERT_NE(port, nullptr);
+  EXPECT_EQ(Resolved(vpi_handle(vpiLowConn, port)), kWor);
 }
 
 }  // namespace
