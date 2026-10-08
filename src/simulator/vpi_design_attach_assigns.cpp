@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -27,6 +28,7 @@
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_expr_decompile.h"
+#include "simulator/vpi_expr_scope.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
@@ -535,6 +537,15 @@ VpiObject* ModelledExpression(const Expr* expr, const AssignBuild& build) {
 VpiObject* ExpressionObject(const Expr* expr, const AssignBuild& build) {
   if (expr == nullptr) return nullptr;
   VpiObject* obj = ModelledExpression(expr, build);
+  // §37.3.5 with §38.15: an operation holds no storage, so its value is its
+  // expression evaluated where the source wrote it, in the instance and the
+  // generate blocks the expression stands in.
+  if (obj != nullptr && obj->type == vpiOperation) {
+    obj->expr_scope = std::make_shared<const VpiExprScope>(
+        VpiExprScope{expr, VpiFlatName(build.names.prefix, ""),
+                     std::vector<std::string>(build.names.gen.begin(),
+                                              build.names.gen.end())});
+  }
   // §37.59 detail 2: an expression object made for what the source wrote
   // decompiles to it. A name stands for the net or variable it resolves to,
   // which is no object of this expression's own.

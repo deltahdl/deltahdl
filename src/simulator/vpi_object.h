@@ -441,6 +441,9 @@ struct VpiObject {
   // it is held as a designated pointer rather than found by the generic child
   // walk.
   VpiObject* index_expr = nullptr;
+  // §37.3.5 with §38.15: an operation's expression and the scope it is
+  // evaluated in, which gives it its value; null for every other object.
+  std::shared_ptr<const struct VpiExprScope> expr_scope;
 
   // §37.17 detail 21 / §38.35: the array kind this object reports through
   // vpi_get(vpiArrayType) - vpiStaticArray, vpiDynamicArray, vpiAssocArray, or

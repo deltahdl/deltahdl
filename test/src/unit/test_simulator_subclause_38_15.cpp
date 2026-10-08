@@ -758,5 +758,63 @@ TEST_F(VpiGetValueSim, StringValReadsEveryCharacterOfAWideValue) {
   EXPECT_STREQ(val.value.str, "abcdefghij");
 }
 
+class ExpressionValuesOfARun : public VpiDesignRun {
+ protected:
+  // The right side of the continuous assignment `scope` holds.
+  static vpiHandle RhsIn(const char* scope) {
+    vpiHandle it = vpi_iterate(vpiContAssign, By(scope));
+    if (it == nullptr) return nullptr;
+    return vpi_handle(vpiRhs, vpi_scan(it));
+  }
+
+  // The integer value of an object, or -1 where the routine fills none.
+  static int IntOf(vpiHandle obj) {
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    value.value.integer = -1;
+    vpi_get_value(obj, &value);
+    return value.value.integer;
+  }
+};
+
+// §38.15 with §37.3.5: an operation is an expression vpi_get_value can read,
+// its value the expression evaluated, its names read where the source wrote
+// them -- in the top, and in a child instance whose port names the same as a
+// variable of the top. The operation held no storage and gave no value.
+TEST_F(ExpressionValuesOfARun, AnOperationReadsAsItsExpressionEvaluates) {
+  Run("module child(input logic [7:0] a); logic [7:0] b = 30;\n"
+      "  wire [7:0] y; assign y = a + b;\n"
+      "endmodule\n"
+      "module top; logic [7:0] a = 5, b = 7; wire [7:0] y;\n"
+      "  assign y = a + b; child u(.a(8'd1));\n"
+      "endmodule\n");
+  vpiHandle top = RhsIn("top");
+  vpiHandle child = RhsIn("top.u");
+  ASSERT_NE(top, nullptr);
+  ASSERT_NE(child, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, top), vpiOperation);
+  EXPECT_EQ(IntOf(top), 12);
+  EXPECT_EQ(IntOf(child), 31);
+}
+
+// §37.17 detail 26 with §37.3.5: a select whose index is an operation stands
+// for the element the operation's value names, m[2] for `m[i + 1]` with i 1,
+// read and written alike. The index's value was taken from storage the
+// operation does not have, so the select named no element: it read x and a
+// put to it wrote nothing.
+TEST_F(ExpressionValuesOfARun, ASelectIndexedByAnOperationNamesItsElement) {
+  Run("module top; logic [3:0][7:0] m = 32'h44332211; integer i = 1;\n"
+      "  wire [7:0] y; assign y = m[i + 1];\n"
+      "endmodule\n");
+  vpiHandle select = RhsIn("top");
+  ASSERT_NE(select, nullptr);
+  EXPECT_EQ(IntOf(select), 0x33);
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  value.value.integer = 0x55;
+  vpi_put_value(select, &value, nullptr, vpiNoDelay);
+  EXPECT_EQ(IntOf(By("top.m")), 0x44552211);
+}
+
 }  // namespace
 }  // namespace delta

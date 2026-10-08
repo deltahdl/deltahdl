@@ -14,8 +14,10 @@
 #include "common/packed_range.h"
 #include "common/types.h"
 #include "simulator/class_object.h"
+#include "simulator/deferred_caller.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
+#include "simulator/process.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
@@ -27,6 +29,7 @@
 #include "simulator/vpi_collection_elements.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_expr_scope.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
@@ -265,6 +268,9 @@ static Logic4Vec SliceOfValue(const Logic4Vec& whole, int64_t offset, int width,
   return view;
 }
 
+static void DispatchValueByFormat(const Logic4Vec& v, s_vpi_value* value,
+                                  VpiValuePools& pools);
+
 static void DispatchGetValueByFormat(VpiHandle obj, s_vpi_value* value,
                                      VpiValuePools& pools) {
   // A net bit or var bit reads its own bit of its parent's storage, and a
@@ -276,7 +282,13 @@ static void DispatchGetValueByFormat(VpiHandle obj, s_vpi_value* value,
     DispatchIntegerFormat(kSlice, value, pools);
     return;
   }
-  const Logic4Vec& v = obj->var->value;
+  DispatchValueByFormat(obj->var->value, value, pools);
+}
+
+// §38.15: `v` in the format `value` asks for, a real value read as a real in
+// the formats that take one and as its rounded integer in the others.
+static void DispatchValueByFormat(const Logic4Vec& v, s_vpi_value* value,
+                                  VpiValuePools& pools) {
   if (v.is_real) {
     // §38.15: a real object is read as its floating-point value only in the
     // vpiRealVal and vpiStringVal formats. vpiObjTypeVal reduces to vpiRealVal
@@ -325,11 +337,32 @@ static bool IsVaryingBit(const VpiObject& obj) {
 
 // The index a varying select's index expression now holds; none where it
 // holds an x or z bit (§11.5.1).
-static std::optional<int64_t> VaryingIndex(VpiHandle obj) {
+// §37.3.5 with §38.15: the value of an object that holds no storage but
+// stands for an expression, an operation, held in `out`: the expression
+// evaluated where the source wrote it, by a stand-in process of the instance
+// and generate blocks it stands in, as a process running there would read its
+// names. False for an object that stands for no expression.
+static bool EvaluateExpressionObject(const VpiObject& obj, SimContext* sim,
+                                     Logic4Vec& out) {
+  if (obj.expr_scope == nullptr) return false;
+  Process stand_in;
+  stand_in.stand_in = true;
+  stand_in.inst_prefix = obj.expr_scope->inst_prefix;
+  stand_in.gen_prefixes = obj.expr_scope->gen_prefixes;
+  const CallerStandIn kScope(&stand_in, *sim);
+  out = EvalExpr(obj.expr_scope->expr, *sim, sim->GetArena());
+  return true;
+}
+
+static std::optional<int64_t> VaryingIndex(VpiHandle obj, SimContext* sim) {
   VpiHandle index = obj->index_expr;
-  if (index->var == nullptr) return std::nullopt;
-  VpiRefreshElementCopy(*index);
-  const Logic4Vec& held = index->var->value;
+  Logic4Vec held;
+  if (index->var != nullptr) {
+    VpiRefreshElementCopy(*index);
+    held = index->var->value;
+  } else if (!EvaluateExpressionObject(*index, sim, held)) {
+    return std::nullopt;
+  }
   if (held.width == 0 || held.is_real || !held.IsKnown()) return std::nullopt;
   return SelectBoundValue(held);
 }
@@ -337,9 +370,9 @@ static std::optional<int64_t> VaryingIndex(VpiHandle obj) {
 // §37.16 detail 31, §37.17 detail 26: the offset in its parent's storage of
 // the bits a varying select that records the dimension it indexes now
 // stands for; none where its index names no element of the dimension.
-static std::optional<int64_t> VaryingOffset(VpiHandle obj) {
+static std::optional<int64_t> VaryingOffset(VpiHandle obj, SimContext* sim) {
   const std::optional<PackedRange>& dim = obj->select_dim;
-  const std::optional<int64_t> kIndex = VaryingIndex(obj);
+  const std::optional<int64_t> kIndex = VaryingIndex(obj, sim);
   if (!dim || !kIndex || !dim->Contains(*kIndex)) return std::nullopt;
   return obj->select_base_offset +
          (dim->OffsetOf(*kIndex) * std::max(obj->size, 1));
@@ -349,11 +382,11 @@ static std::optional<int64_t> VaryingOffset(VpiHandle obj) {
 // written: the vector's bit at the index its index expression then holds. An
 // index with an x or z bit, or one naming no bit of the vector, selects none
 // (§11.5.1).
-static VpiHandle VaryingBitTarget(VpiHandle obj) {
+static VpiHandle VaryingBitTarget(VpiHandle obj, SimContext* sim) {
   if (obj->select_dim && obj->size > 1) return nullptr;
-  const std::optional<int64_t> kIndex = VaryingIndex(obj);
+  const std::optional<int64_t> kIndex = VaryingIndex(obj, sim);
   const std::optional<int64_t> kOffset =
-      obj->select_dim ? VaryingOffset(obj) : std::nullopt;
+      obj->select_dim ? VaryingOffset(obj, sim) : std::nullopt;
   if (!kIndex || (obj->select_dim && !kOffset)) return nullptr;
   for (VpiHandle bit : obj->parent->children) {
     const bool kSelected =
@@ -370,18 +403,18 @@ static VpiHandle VaryingBitTarget(VpiHandle obj) {
 // when it selects none, x of a 4-state vector and 0 of a 2-state one in each
 // of its bits (§11.5.1).
 static void GetVaryingBitValue(VpiHandle obj, s_vpi_value* value,
-                               VpiValuePools& pools) {
+                               VpiValuePools& pools, SimContext* sim) {
   const Variable* whole = obj->parent->var;
   const int kWidth = std::max(obj->size, 1);
   std::vector<Logic4Word> words;
   if (obj->select_dim) {
-    const std::optional<int64_t> kOffset = VaryingOffset(obj);
+    const std::optional<int64_t> kOffset = VaryingOffset(obj, sim);
     if (kOffset && whole != nullptr) {
       DispatchIntegerFormat(SliceOfValue(whole->value, *kOffset, kWidth, words),
                             value, pools);
       return;
     }
-  } else if (VpiHandle target = VaryingBitTarget(obj);
+  } else if (VpiHandle target = VaryingBitTarget(obj, sim);
              target != nullptr && target->var != nullptr) {
     DispatchGetValueByFormat(target, value, pools);
     return;
@@ -432,12 +465,21 @@ void VpiContext::GetValue(VpiHandle obj, s_vpi_value* value) {
   }
   if (GetValueIsRefused(obj, value, last_error_)) return;
   if (IsVaryingBit(*obj)) {
-    GetVaryingBitValue(obj, value, value_pools_);
+    GetVaryingBitValue(obj, value, value_pools_, sim_ctx_);
     return;
   }
   VpiRefreshElementCopy(*obj);
   BindRunStorage(*obj, sim_ctx_);
-  if (!obj->var) return;
+  if (!obj->var) {
+    // §37.3.5 with §38.15: an operation holds no storage; its value is its
+    // expression's, evaluated now. Any other object without storage gives
+    // none, and the caller's buffer is left as it was.
+    Logic4Vec held;
+    if (EvaluateExpressionObject(*obj, sim_ctx_, held)) {
+      DispatchValueByFormat(held, value, value_pools_);
+    }
+    return;
+  }
   DispatchGetValueByFormat(obj, value, value_pools_);
 }
 
@@ -650,12 +692,13 @@ static bool PutValueIsSealed(const VpiObject& obj, s_vpi_error_info& error) {
 // the bits its index names; null when it names none and nothing is written
 // (§11.5.1).
 static VpiHandle PutValueTargetOf(VpiHandle obj,
-                                  const std::function<VpiObject*()>& alloc) {
+                                  const std::function<VpiObject*()>& alloc,
+                                  SimContext* sim) {
   if (!IsVaryingBit(*obj)) return obj;
-  if (!obj->select_dim || obj->size <= 1) return VaryingBitTarget(obj);
+  if (!obj->select_dim || obj->size <= 1) return VaryingBitTarget(obj, sim);
   // A varying select leaving packed dimensions unindexed stands for the bits
   // its index names when the value is put, made a slice of them here.
-  const std::optional<int64_t> kOffset = VaryingOffset(obj);
+  const std::optional<int64_t> kOffset = VaryingOffset(obj, sim);
   if (!kOffset) return nullptr;
   VpiObject* slice = alloc();
   slice->type = obj->type;
@@ -785,7 +828,7 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, s_vpi_value* value,
     return nullptr;
   }
 
-  obj = PutValueTargetOf(obj, [this] { return AllocObject(); });
+  obj = PutValueTargetOf(obj, [this] { return AllocObject(); }, sim_ctx_);
   if (obj == nullptr) return nullptr;
 
   bool has_delay = PutValueHasDelay(mode, time);
