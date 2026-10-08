@@ -288,5 +288,19 @@ TEST_F(VarSelectsOfARun, ABitOfAVarSelectedElementKeepsTheGatesTerminals) {
   EXPECT_EQ(terms, 3);
 }
 
+// Detail 1: no object is no constant select, and neither is a select with no
+// parent; a driver among the select's children is no index of it.
+TEST(VariableSelectModel, ASelectWithNoParentIsNoConstantSelect) {
+  EXPECT_FALSE(VpiVarSelectConstantSelectOf(nullptr));
+  VpiObject index;
+  index.type = vpiConstant;
+  VpiObject driver;
+  driver.type = vpiForce;
+  VpiObject select;
+  select.type = vpiVarSelect;
+  select.children = {&driver, &index};
+  EXPECT_FALSE(VpiVarSelectConstantSelectOf(&select));
+}
+
 }  // namespace
 }  // namespace delta

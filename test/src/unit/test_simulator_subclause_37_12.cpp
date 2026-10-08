@@ -8,6 +8,7 @@
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -793,6 +794,28 @@ TEST_F(BlockScopesOfARun, ALabelOnAScopedLoopCreatesNoNamedBegin) {
     EXPECT_TRUE(loop == nullptr || vpi_get(vpiType, loop) != vpiNamedBegin)
         << name;
   }
+}
+
+// §37.12 detail 7: no scope holds no virtual interface vars and no variables,
+// and of a scope's children only a virtual interface var, or an array of
+// them expanded into its elements, is one.
+TEST(ScopeModel, VirtualInterfaceVarsAreOnlyTheVifsAndTheirArrays) {
+  EXPECT_TRUE(VpiScopeVirtualInterfaceVars(nullptr).empty());
+  EXPECT_TRUE(VpiScopeVariables(nullptr).empty());
+  VpiObject element;
+  element.type = vpiVirtualInterfaceVar;
+  VpiObject range;
+  range.type = vpiRange;
+  VpiObject array;
+  array.type = vpiArrayVar;
+  array.children = {&element, &range};
+  VpiObject plain;
+  plain.type = vpiIntVar;
+  VpiObject scope;
+  scope.type = vpiModule;
+  scope.children = {&plain, &array};
+  EXPECT_EQ(VpiScopeVirtualInterfaceVars(&scope),
+            (std::vector<VpiHandle>{&element}));
 }
 
 }  // namespace

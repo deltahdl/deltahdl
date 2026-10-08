@@ -26,11 +26,9 @@ bool VpiDimensionRangeIsEmpty(VpiDimensionKind kind) {
     case VpiDimensionKind::kQueue:
     case VpiDimensionKind::kAssoc:
       return true;
-    case VpiDimensionKind::kPacked:
-    case VpiDimensionKind::kFixedUnpacked:
+    default:  // kPacked and kFixedUnpacked, whose bounds are fixed.
       return false;
   }
-  return false;
 }
 
 int VpiRangeSize(const VpiRangeDesc& range) {
@@ -85,13 +83,15 @@ bool VpiIsVariablesType(int type) {
 }
 
 bool VpiIsLogicVarType(int type) {
-  // §37.17 detail 19: a logic var and a reg are the same object kind.
-  return type == vpiLogicVar || type == kVpiReg;
+  // §37.17 detail 19: a logic var and a reg are the same object kind, and
+  // sv_vpi_user.h defines vpiLogicVar as vpiReg.
+  return type == vpiLogicVar;
 }
 
 bool VpiIsArrayVarType(int type) {
-  // §37.17 detail 19: an array var and a reg array are the same object kind.
-  return type == vpiArrayVar || type == vpiRegArray;
+  // §37.17 detail 19: an array var and a reg array are the same object kind,
+  // and sv_vpi_user.h defines vpiArrayVar as vpiRegArray.
+  return type == vpiArrayVar;
 }
 
 bool VpiIsArrayVar(int unpacked_range_count) {

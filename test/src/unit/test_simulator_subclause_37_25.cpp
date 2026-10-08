@@ -318,5 +318,23 @@ TEST(Typespec, UnresolvedTypeParameterActsAsTypespec) {
   EXPECT_EQ(VpiTypespecForTypeParameter(&type_parameter, &resolved), &resolved);
 }
 
+// §37.25 details 9 and 10: an implicit element range is no declared dimension
+// of the typespec, so the ranges and the leftmost range pass over it.
+TEST(TypespecModel, AnImplicitElementRangeIsNoDeclaredDimension) {
+  VpiObject left;
+  left.type = vpiConstant;
+  VpiArrayDimension implicit;
+  implicit.implicit_element_range = true;
+  VpiArrayDimension declared;
+  declared.kind = VpiDimensionKind::kPacked;
+  declared.left_expr = &left;
+  declared.size = 4;
+  const std::vector<VpiArrayDimension> kDims = {implicit, declared};
+  const std::vector<VpiRangeDesc> kRanges = VpiTypespecRanges(kDims);
+  ASSERT_EQ(kRanges.size(), 1u);
+  EXPECT_EQ(kRanges[0].size, 4);
+  EXPECT_EQ(VpiTypespecLeftRange(kDims), &left);
+}
+
 }  // namespace
 }  // namespace delta

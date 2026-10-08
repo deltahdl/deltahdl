@@ -455,5 +455,15 @@ TEST_F(Parameter, OnlyAGenvarReferenceInAGenScopeIsALocalParam) {
   EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&unbound)), 0);
 }
 
+// Details 4 and 5: no param assign has no lhs, and no parameter -- nor an
+// object of another kind -- has a left or right range.
+TEST_F(Parameter, NoObjectOrAnotherKindHasNoLhsOrRange) {
+  EXPECT_EQ(VpiParamAssignLhs(nullptr), nullptr);
+  EXPECT_EQ(VpiParameterLeftRange(nullptr), nullptr);
+  VpiObject constant;
+  constant.type = vpiConstant;
+  EXPECT_EQ(VpiParameterRightRange(&constant), nullptr);
+}
+
 }  // namespace
 }  // namespace delta

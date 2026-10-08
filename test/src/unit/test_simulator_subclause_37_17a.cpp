@@ -623,5 +623,56 @@ TEST(VariableModel, AStringVarWithNoStorageHasNoCharacters) {
   SetGlobalVpiContext(nullptr);
 }
 
+// §37.17 (figure): every kind the variables class draws is a variable,
+// including the real, short int, long int, packed array, union, enum and
+// chandle var kinds no other test named.
+TEST(VariableModel, EveryDrawnKindIsAVariable) {
+  for (int type : {vpiShortRealVar, vpiRealVar, vpiShortIntVar, vpiLongIntVar,
+                   vpiPackedArrayVar, vpiUnionVar, vpiEnumVar, vpiChandleVar}) {
+    EXPECT_TRUE(VpiIsVariablesType(type)) << type;
+  }
+}
+
+// §37.21 detail 1: a bit select and an indexed part select are among the
+// selects whose drivers and loads count toward an aggregate variable.
+TEST(VariableModel, BitAndIndexedPartSelectsAreVariableSelects) {
+  EXPECT_TRUE(VpiIsVariableSelectType(vpiBitSelect));
+  EXPECT_TRUE(VpiIsVariableSelectType(vpiIndexedPartSelect));
+}
+
+// §37.17 detail 24: a variable with no parent, or one whose parent is no class
+// defn, is public; an object that is neither a variable nor a class method has
+// no visibility.
+TEST(VariableModel, VisibilityOutsideAClassAndOfOtherKinds) {
+  VpiObject loose;
+  loose.type = vpiIntVar;
+  EXPECT_EQ(VpiObjectVisibility(&loose), vpiPublicVis);
+  VpiObject module;
+  module.type = vpiModule;
+  VpiObject member;
+  member.type = vpiIntVar;
+  member.parent = &module;
+  EXPECT_EQ(VpiObjectVisibility(&member), vpiPublicVis);
+  EXPECT_EQ(VpiObjectVisibility(&module), vpiUndefined);
+}
+
+// §37.17 detail 27: without static lifetime, a variable is a constant select
+// when its indices are all constant and its elements all static members.
+TEST(VariableModel, AnAutomaticConstantSelectRestsOnItsIndices) {
+  VpiConstantSelectQuery query;
+  query.all_indices_constant = true;
+  query.all_elements_static_members = true;
+  EXPECT_TRUE(VpiConstantSelect(query));
+}
+
+// §37.17 detail 28: with no top-level scope, the full name is the decompiled
+// form alone.
+TEST(VariableModel, AFullNameWithNoTopScopeIsTheDecompiledForm) {
+  VpiVariableNameParts parts;
+  parts.member = "m";
+  parts.index_suffix = "[1]";
+  EXPECT_EQ(VpiVariableFullName(parts), "m[1]");
+}
+
 }  // namespace
 }  // namespace delta

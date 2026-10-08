@@ -492,5 +492,24 @@ TEST_F(TaskFuncsOfARun, AGenerateBlockTaskIsATaskOfTheBlock) {
   EXPECT_NE(VpiObjectOf(t0), VpiObjectOf(t1));
 }
 
+// §37.41 detail 4 and (figure): no object is no method, nor is a function with
+// no parent; and a function returning a byte, short int, long int or integer
+// is signed (§6.11), where no object is not.
+TEST(TaskFuncModel, MethodAndSignOfLooseObjects) {
+  EXPECT_FALSE(VpiTaskFuncIsMethod(nullptr));
+  VpiObject loose;
+  loose.type = vpiFunction;
+  EXPECT_FALSE(VpiTaskFuncIsMethod(&loose));
+  EXPECT_FALSE(VpiFunctionIsSigned(nullptr));
+  for (int type : {vpiByteVar, vpiShortIntVar, vpiLongIntVar, vpiIntegerVar}) {
+    VpiObject ret;
+    ret.type = type;
+    VpiObject function;
+    function.type = vpiFunction;
+    function.return_var = &ret;
+    EXPECT_TRUE(VpiFunctionIsSigned(&function)) << type;
+  }
+}
+
 }  // namespace
 }  // namespace delta

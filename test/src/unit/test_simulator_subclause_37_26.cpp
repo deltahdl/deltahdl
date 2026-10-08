@@ -8,6 +8,7 @@
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -313,6 +314,35 @@ TEST_F(StructuresOfARun, AStructNetHasAMemberNetPerField) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, a)), VpiObjectOf(By("top.n")));
   EXPECT_EQ(IntOf(a), 1);
   EXPECT_EQ(IntOf(By("top.n.b")), 0);
+}
+
+// §37.26: no aggregate has no members; a child whose vpiParent is another
+// object is none of this aggregate's; a struct var's child that is no
+// variable, and a struct net's that is no net or is a net bit, are none.
+TEST(StructuresAndUnionsModel, OnlyChildrenOfTheMemberKindAreMembers) {
+  EXPECT_TRUE(VpiStructUnionMembers(nullptr).empty());
+  VpiObject other;
+  other.type = vpiStructVar;
+  VpiObject var;
+  var.type = vpiStructVar;
+  VpiObject adopted;
+  adopted.type = vpiIntVar;
+  adopted.parent = &other;
+  VpiObject typespec;
+  typespec.type = vpiStructTypespec;
+  typespec.parent = &var;
+  var.children = {&adopted, &typespec};
+  EXPECT_TRUE(VpiStructUnionMembers(&var).empty());
+  VpiObject net;
+  net.type = vpiStructNet;
+  VpiObject bit;
+  bit.type = vpiNetBit;
+  bit.parent = &net;
+  VpiObject net_typespec;
+  net_typespec.type = vpiStructTypespec;
+  net_typespec.parent = &net;
+  net.children = {&bit, &net_typespec};
+  EXPECT_TRUE(VpiStructUnionMembers(&net).empty());
 }
 
 }  // namespace
