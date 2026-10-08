@@ -555,6 +555,13 @@ void VpiMakeInterconnectArray(VpiObject* net, const RtlirPort& port,
                               const std::function<VpiObject*()>& alloc,
                               std::deque<std::string>& names);
 
+// §37.14 (figure): hang from `port` a port bit per bit of the net or variable
+// it stands for inside the instance, its lowConn, in that object's order and
+// each carrying its index and its place in the port's value; the bit is the
+// port bit's lowConn. A port with no lowConn, or one whose lowConn has no bits,
+// a scalar one among them, has none.
+void VpiMakePortBits(VpiObject* port, const VpiAttachBuild& build);
+
 void AttachPortConnections(const RtlirDesign* design,
                            const VpiObjectMap& objects, SimContext& ctx,
                            const VpiAttachBuild& build);

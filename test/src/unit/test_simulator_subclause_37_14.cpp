@@ -1,12 +1,17 @@
 #include <gtest/gtest.h>
 
+#include <deque>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
+#include "common/arena.h"
 #include "fixture_simulator.h"
 #include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers3.h"
@@ -468,15 +473,43 @@ TEST_F(PortsOfARun, AScalarPortHoldsNoPortBits) {
   EXPECT_EQ(vpi_iterate(vpiBit, s), nullptr);
 }
 
-// §37.14 (figure): a port named apart from the objects its expression joins,
-// §23.2.2.1's `.a({b, c})`, stands for no one object of its own, so it has no
-// lowConn of its name to take bits from.
-TEST_F(PortsOfARun, APortOfAConcatenationHoldsNoPortBits) {
-  Run("module rc(.a({b, c})); input [1:0] b, c; endmodule\n"
-      "module top; wire [3:0] w; rc u(.a(w)); endmodule\n");
-  vpiHandle a = PortOfU("a");
-  ASSERT_NE(a, nullptr);
-  EXPECT_EQ(vpi_iterate(vpiBit, a), nullptr);
+// §37.14 (figure): a port makes its port bits from the bits of its lowConn,
+// passing over any other child the lowConn holds; a port with no lowConn has
+// none.
+TEST(PortModel, PortBitsAreMadeFromTheLowConnsBits) {
+  std::deque<VpiObject> made;
+  std::deque<std::string> kept;
+  Arena arena;
+  const VpiAttachBuild kBuild{[&made] { return &made.emplace_back(); },
+                              [&kept](std::string name) {
+                                kept.push_back(std::move(name));
+                                return std::string_view(kept.back());
+                              },
+                              arena};
+  VpiObject unconnected;
+  unconnected.type = vpiPort;
+  VpiMakePortBits(&unconnected, kBuild);
+  EXPECT_TRUE(unconnected.children.empty());
+
+  VpiObject index;
+  index.type = vpiConstant;
+  VpiObject bit;
+  bit.type = vpiNetBit;
+  bit.index = 1;
+  bit.bit_offset = 1;
+  VpiObject net;
+  net.type = vpiNet;
+  net.children = {&index, &bit};
+  VpiObject port;
+  port.type = vpiPort;
+  port.direction = vpiInput;
+  port.low_conn = &net;
+  VpiMakePortBits(&port, kBuild);
+  ASSERT_EQ(port.children.size(), 1U);
+  EXPECT_EQ(port.children[0]->type, vpiPortBit);
+  EXPECT_EQ(port.children[0]->low_conn, &bit);
+  EXPECT_EQ(port.children[0]->index, 1);
+  EXPECT_EQ(port.children[0]->direction, vpiInput);
 }
 
 }  // namespace

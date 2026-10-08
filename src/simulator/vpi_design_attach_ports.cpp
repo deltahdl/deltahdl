@@ -17,22 +17,7 @@
 
 namespace delta {
 
-namespace {
-
-// The port object `module` holds under `name`, null for none.
-VpiObject* PortNamed(VpiHandle module, std::string_view name) {
-  for (VpiObject* child : module->children) {
-    if (child->type == kVpiPort && child->name == name) return child;
-  }
-  return nullptr;
-}
-
-// §37.14 (figure): the port bits of `port`, one per bit of the net or variable
-// it stands for inside the instance, in that object's order and each carrying
-// its index and its place in the port's value; the bit is the port bit's
-// lowConn. A port whose lower connection has no bits, a scalar one among them,
-// has none.
-void MakePortBits(VpiObject* port, const VpiAttachBuild& build) {
+void VpiMakePortBits(VpiObject* port, const VpiAttachBuild& build) {
   if (port->low_conn == nullptr) return;
   for (VpiObject* bit : port->low_conn->children) {
     if (!VpiIsBitObjectType(bit->type)) continue;
@@ -47,6 +32,16 @@ void MakePortBits(VpiObject* port, const VpiAttachBuild& build) {
     port_bit->low_conn = bit;
     port->children.push_back(port_bit);
   }
+}
+
+namespace {
+
+// The port object `module` holds under `name`, null for none.
+VpiObject* PortNamed(VpiHandle module, std::string_view name) {
+  for (VpiObject* child : module->children) {
+    if (child->type == kVpiPort && child->name == name) return child;
+  }
+  return nullptr;
 }
 
 // §37.14 details 3, 4 and 10: the ports of the instance `inst` of the module
@@ -79,7 +74,7 @@ void ConnectPorts(const RtlirModuleInst& inst, const std::string& prefix,
     }
     port->low_conn =
         FindObjectForFlatName(objects, VpiFlatName(kInstance, port->name));
-    MakePortBits(port, build);
+    VpiMakePortBits(port, build);
   }
 }
 
