@@ -6,8 +6,10 @@
 
 #include "common/packed_range.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_primitives.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_specify.h"
 #include "simulator/instance_prefix_override.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi_constants.h"
@@ -20,14 +22,16 @@ namespace delta {
 
 namespace {
 
-// §28.2 to §28.6 with §37.35: what a gate or switch keyword makes a
-// primitive - its vpiPrimType, whether it is a switch rather than a gate, and
-// how its terminals run: `outputs` leading ones that are outputs (-1 for all
-// but the last, the buf and not gates' form), and `inouts` for a switch whose
-// leading two are bidirectional.
+// §28.2 to §28.6, §29.8 and §37.35: what a primitive is - the definition it is
+// an instance of (a gate or switch keyword, or a UDP's name), its vpiPrimType,
+// its object type (a gate, a switch or a udp), and how its terminals run:
+// `outputs` leading ones that are outputs (-1 for all but the last, the buf and
+// not gates' form), and `inouts` for a switch whose leading two are
+// bidirectional.
 struct PrimShape {
+  std::string_view definition;
   int prim_type = 0;
-  bool is_switch = false;
+  int type = vpiGate;
   int outputs = 1;
   bool inouts = false;
 };
@@ -35,57 +39,57 @@ struct PrimShape {
 PrimShape ShapeOf(GateKind kind) {
   switch (kind) {
     case GateKind::kAnd:
-      return {vpiAndPrim};
+      return {"and", vpiAndPrim};
     case GateKind::kNand:
-      return {vpiNandPrim};
+      return {"nand", vpiNandPrim};
     case GateKind::kOr:
-      return {vpiOrPrim};
+      return {"or", vpiOrPrim};
     case GateKind::kNor:
-      return {vpiNorPrim};
+      return {"nor", vpiNorPrim};
     case GateKind::kXor:
-      return {vpiXorPrim};
+      return {"xor", vpiXorPrim};
     case GateKind::kXnor:
-      return {vpiXnorPrim};
+      return {"xnor", vpiXnorPrim};
     case GateKind::kBuf:
-      return {vpiBufPrim, false, -1};
+      return {"buf", vpiBufPrim, vpiGate, -1};
     case GateKind::kNot:
-      return {vpiNotPrim, false, -1};
+      return {"not", vpiNotPrim, vpiGate, -1};
     case GateKind::kBufif0:
-      return {vpiBufif0Prim};
+      return {"bufif0", vpiBufif0Prim};
     case GateKind::kBufif1:
-      return {vpiBufif1Prim};
+      return {"bufif1", vpiBufif1Prim};
     case GateKind::kNotif0:
-      return {vpiNotif0Prim};
+      return {"notif0", vpiNotif0Prim};
     case GateKind::kNotif1:
-      return {vpiNotif1Prim};
+      return {"notif1", vpiNotif1Prim};
     case GateKind::kTran:
-      return {vpiTranPrim, true, 0, true};
+      return {"tran", vpiTranPrim, vpiSwitch, 0, true};
     case GateKind::kRtran:
-      return {vpiRtranPrim, true, 0, true};
+      return {"rtran", vpiRtranPrim, vpiSwitch, 0, true};
     case GateKind::kTranif0:
-      return {vpiTranif0Prim, true, 0, true};
+      return {"tranif0", vpiTranif0Prim, vpiSwitch, 0, true};
     case GateKind::kTranif1:
-      return {vpiTranif1Prim, true, 0, true};
+      return {"tranif1", vpiTranif1Prim, vpiSwitch, 0, true};
     case GateKind::kRtranif0:
-      return {vpiRtranif0Prim, true, 0, true};
+      return {"rtranif0", vpiRtranif0Prim, vpiSwitch, 0, true};
     case GateKind::kRtranif1:
-      return {vpiRtranif1Prim, true, 0, true};
+      return {"rtranif1", vpiRtranif1Prim, vpiSwitch, 0, true};
     case GateKind::kNmos:
-      return {vpiNmosPrim, true};
+      return {"nmos", vpiNmosPrim, vpiSwitch};
     case GateKind::kPmos:
-      return {vpiPmosPrim, true};
+      return {"pmos", vpiPmosPrim, vpiSwitch};
     case GateKind::kRnmos:
-      return {vpiRnmosPrim, true};
+      return {"rnmos", vpiRnmosPrim, vpiSwitch};
     case GateKind::kRpmos:
-      return {vpiRpmosPrim, true};
+      return {"rpmos", vpiRpmosPrim, vpiSwitch};
     case GateKind::kCmos:
-      return {vpiCmosPrim, true};
+      return {"cmos", vpiCmosPrim, vpiSwitch};
     case GateKind::kRcmos:
-      return {vpiRcmosPrim, true};
+      return {"rcmos", vpiRcmosPrim, vpiSwitch};
     case GateKind::kPullup:
-      return {vpiPullupPrim};
+      return {"pullup", vpiPullupPrim};
     case GateKind::kPulldown:
-      return {vpiPulldownPrim};
+      return {"pulldown", vpiPulldownPrim};
   }
   return {};
 }
@@ -113,19 +117,19 @@ struct PrimSite {
   const VpiObjectMap& objects;
 };
 
-// §37.35: a gate or switch of `kind` hung from `instance`, named `name`,
-// reporting its primitive type and as its size the number of its inputs
-// (detail 1), with a prim term per terminal in the order written - its
+// §37.35: a primitive of `shape` hung from `instance`, named `name`, reporting
+// its definition name, its primitive type and as its size the number of its
+// inputs (detail 1), with a prim term per terminal in the order written - its
 // direction, its index from zero (detail 3) and the expression it connects,
 // `terminals` giving each in turn.
-VpiObject* MakePrimitiveObject(GateKind kind, std::string_view name,
+VpiObject* MakePrimitiveObject(const PrimShape& shape, std::string_view name,
                                const std::vector<VpiObject*>& terminals,
                                VpiObject* instance,
                                const VpiAttachBuild& build) {
-  const PrimShape kShape = ShapeOf(kind);
   VpiObject* prim = build.alloc();
-  prim->type = kShape.is_switch ? vpiSwitch : vpiGate;
-  prim->prim_type = kShape.prim_type;
+  prim->type = shape.type;
+  prim->def_name = std::string(shape.definition);
+  prim->prim_type = shape.prim_type;
   prim->parent = instance;
   if (!name.empty()) {
     prim->name = build.keep(std::string(name));
@@ -139,7 +143,7 @@ VpiObject* MakePrimitiveObject(GateKind kind, std::string_view name,
     term->type = vpiPrimTerm;
     term->parent = prim;
     term->index = static_cast<int>(i);
-    term->direction = TerminalDirection(kShape, i, kCount);
+    term->direction = TerminalDirection(shape, i, kCount);
     if (term->direction == kVpiInput) ++inputs;
     if (terminals[i] != nullptr) term->children.push_back(terminals[i]);
     prim->children.push_back(term);
@@ -189,7 +193,7 @@ void MakePrimitiveArray(const ModuleItem& item, const PrimSite& site,
   const int64_t kLength = kRange.HighIndex() - kRange.LowIndex() + 1;
   VpiObject* array = VpiMakeInstanceArray(
       site.instance,
-      ShapeOf(item.gate_kind).is_switch ? vpiSwitchArray : vpiGateArray,
+      ShapeOf(item.gate_kind).type == vpiSwitch ? vpiSwitchArray : vpiGateArray,
       item.gate_inst_name, kRange, build);
   const std::vector<VpiObject*> kWhole =
       TerminalObjects(item, site, ctx, build);
@@ -204,19 +208,42 @@ void MakePrimitiveArray(const ModuleItem& item, const PrimSite& site,
     const std::string kName =
         std::string(item.gate_inst_name) + "[" + std::to_string(index) + "]";
     VpiAddArrayElement(array,
-                       MakePrimitiveObject(item.gate_kind, kName, terminals,
-                                           site.instance, build),
+                       MakePrimitiveObject(ShapeOf(item.gate_kind), kName,
+                                           terminals, site.instance, build),
                        index, build);
   }
+}
+
+// §29.8 with §37.35: the udp the instantiation `inst` of a UDP makes at `site`,
+// its output terminal first and its inputs after it as §29.8 writes them, and
+// reaching the udp defn `defn` of the UDP it instantiates.
+void MakeUdpObject(const RtlirUdpInst& inst, const PrimSite& site,
+                   VpiObject* defn, SimContext& ctx,
+                   const VpiAttachBuild& build) {
+  std::vector<VpiObject*> terminals;
+  terminals.reserve(inst.inputs.size() + 1);
+  terminals.push_back(VpiInstanceExpression(inst.output, site.objects,
+                                            site.prefix, ctx, build));
+  for (const Expr* input : inst.inputs) {
+    terminals.push_back(
+        VpiInstanceExpression(input, site.objects, site.prefix, ctx, build));
+  }
+  const PrimShape kShape{inst.decl->name,
+                         inst.decl->is_sequential ? vpiSeqPrim : vpiCombPrim,
+                         vpiUdp};
+  MakePrimitiveObject(kShape, inst.name, terminals, site.instance, build)
+      ->udp_defn = defn;
 }
 
 }  // namespace
 
 void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
-                      SimContext& ctx, const VpiAttachBuild& build) {
-  // §37.35: an instance reaches the gates and switches it instantiates, each
-  // with its terminals. RtlirModule::gate_insts kept each instantiation, and
-  // no pass read it, so vpiPrimitive reached nothing for any design.
+                      const VpiUdpDefnOf& udp_defn_of, SimContext& ctx,
+                      const VpiAttachBuild& build) {
+  // §37.35: an instance reaches the gates, switches and udps it instantiates,
+  // each with its terminals. RtlirModule::gate_insts kept each gate and switch
+  // instantiation and udp_insts each UDP one, and no pass read either, so
+  // vpiPrimitive reached nothing for any design.
   WalkInstanceObjects(design, objects,
                       [&](const RtlirModule* mod, const std::string& prefix,
                           VpiObject* instance) {
@@ -231,9 +258,14 @@ void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
                             continue;
                           }
                           MakePrimitiveObject(
-                              item->gate_kind, item->gate_inst_name,
+                              ShapeOf(item->gate_kind), item->gate_inst_name,
                               TerminalObjects(*item, kSite, ctx, build),
                               instance, build);
+                        }
+                        for (const RtlirUdpInst& inst : mod->udp_insts) {
+                          if (inst.decl == nullptr) continue;
+                          MakeUdpObject(inst, {instance, prefix, objects},
+                                        udp_defn_of(inst.decl), ctx, build);
                         }
                       });
 }

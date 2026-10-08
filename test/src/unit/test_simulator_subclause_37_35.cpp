@@ -305,5 +305,65 @@ TEST_F(PrimitivesOfARun, ASwitchAndAPullupHaveTheirShapes) {
   EXPECT_EQ(vpi_get(vpiDirection, kTerms[0]), vpiOutput);
 }
 
+// §37.35 with §38.11: a primitive's definition name is what it is an instance
+// of - a gate's or a switch's built-in primitive, named by its keyword. Every
+// primitive answered null.
+TEST_F(PrimitivesOfARun, AGateOrSwitchIsAnInstanceOfItsKeyword) {
+  Run(kPrimitives);
+  const struct {
+    const char* name;
+    const char* def_name;
+  } kCases[] = {{"g1", "and"}, {"m1", "nmos"}, {"pu", "pullup"}};
+  for (const auto& c : kCases) {
+    vpiHandle prim = Named(vpiPrimitive, By("top"), c.name);
+    ASSERT_NE(prim, nullptr) << c.name;
+    const char* def_name = vpi_get_str(vpiDefName, prim);
+    ASSERT_NE(def_name, nullptr) << c.name;
+    EXPECT_STREQ(def_name, c.def_name);
+  }
+}
+
+// §37.35 with §29.8: an instance of a UDP is a udp of the instance holding it,
+// the third kind the primitive class groups. It reports its UDP's primitive
+// type, its number of inputs and its UDP's name as its definition name, its
+// output terminal first and its inputs after, and reaches the udp defn of its
+// UDP (§37.36). No UDP instance had an object, so none of this answered.
+TEST_F(PrimitivesOfARun, AUdpInstanceIsAUdpOfTheRun) {
+  Run("primitive mux_udp(y, s, a, b);\n"
+      "  output y;\n"
+      "  input s, a, b;\n"
+      "  table\n"
+      "    0 0 ? : 0;\n"
+      "    0 1 ? : 1;\n"
+      "    1 ? 0 : 0;\n"
+      "    1 ? 1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module top; wire y; logic s, a, b;\n"
+      "  mux_udp u1(y, s, a, b);\n"
+      "endmodule\n");
+  vpiHandle u1 = Named(vpiPrimitive, By("top"), "u1");
+  ASSERT_NE(u1, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, u1), vpiUdp);
+  EXPECT_EQ(vpi_get(vpiPrimType, u1), vpiCombPrim);
+  EXPECT_EQ(vpi_get(vpiSize, u1), 3);
+  const char* def_name = vpi_get_str(vpiDefName, u1);
+  ASSERT_NE(def_name, nullptr);
+  EXPECT_STREQ(def_name, "mux_udp");
+  const std::vector<vpiHandle> kTerms = TermsOf(u1);
+  ASSERT_EQ(kTerms.size(), 4U);
+  EXPECT_EQ(vpi_get(vpiDirection, kTerms[0]), vpiOutput);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, kTerms[0])),
+            VpiObjectOf(By("top.y")));
+  EXPECT_EQ(vpi_get(vpiDirection, kTerms[3]), vpiInput);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, kTerms[3])),
+            VpiObjectOf(By("top.b")));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrimitive, kTerms[1])), VpiObjectOf(u1));
+  vpiHandle defn = vpi_handle(vpiUdpDefn, u1);
+  ASSERT_NE(defn, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, defn), vpiUdpDefn);
+  EXPECT_STREQ(vpi_get_str(vpiDefName, defn), "mux_udp");
+}
+
 }  // namespace
 }  // namespace delta

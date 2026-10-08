@@ -439,10 +439,11 @@ static const char* VpiAdditionalTypeConstantName(int property, VpiHandle obj) {
   }
 }
 
-// §37.41 detail 10 / §37.15 / §37.30 / §37.36: resolves vpiDefName, whose value
-// depends on the object kind - a module/UDP defn reports its own name, a ref
-// obj reports its actual interface/modport name, an interface typespec reports
-// its modport/interface identifier, and any other kind has no definition name.
+// §37.41 detail 10 / §37.15 / §37.30 / §37.35 / §37.36: resolves vpiDefName,
+// whose value depends on the object kind - a module/UDP defn reports its own
+// name, a ref obj reports its actual interface/modport name, an interface
+// typespec reports its modport/interface identifier, a primitive what it is an
+// instance of, and any other kind has no definition name.
 static const char* VpiDefNameStr(VpiHandle obj) {
   // §38.11: an instance reports what it is an instance of, which the design
   // recorded against its path; a module object standing for a definition rather
@@ -464,6 +465,9 @@ static const char* VpiDefNameStr(VpiHandle obj) {
   // §37.36: a udp defn reports its definition name - the UDP declaration's
   // identifier - through vpiDefName.
   if (obj->type == vpiUdpDefn) return obj->name.data();
+  // §37.35 with §38.11: a primitive is an instance of a built-in gate or switch
+  // primitive, named by its keyword, or of a UDP, named by its identifier.
+  if (VpiIsPrimitiveType(obj->type)) return obj->def_name.c_str();
   return nullptr;
 }
 

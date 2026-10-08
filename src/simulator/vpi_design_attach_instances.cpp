@@ -8,6 +8,7 @@
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_module.h"
+#include "parser/ast_specify.h"
 #include "parser/ast_type.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
@@ -238,7 +239,13 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
         subroutines,
         kUnitTypespecs};
     AttachProcedures(design, object_map_, kCalls, kBuild);
-    AttachPrimitives(design, object_map_, *sim_ctx_, kBuild);
+    AttachPrimitives(
+        design, object_map_,
+        [this](const UdpDecl* decl) {
+          auto it = run_objects_.find(decl);
+          return it != run_objects_.end() ? it->second : nullptr;
+        },
+        *sim_ctx_, kBuild);
   }
   AttachContinuousAssignments(design, subroutines);
   AttachGenBlockStorage(design, object_map_);

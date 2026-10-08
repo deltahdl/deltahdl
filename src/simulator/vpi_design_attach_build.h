@@ -30,6 +30,7 @@ struct RtlirPropertyDecl;
 struct RtlirDesign;
 struct RtlirModule;
 struct Stmt;
+struct UdpDecl;
 struct VpiObject;
 
 // What an attach step that adds objects to the VPI model builds with:
@@ -487,11 +488,16 @@ void AttachInstanceArrays(const RtlirDesign* design,
                           const VpiObjectMap& objects,
                           const VpiAttachBuild& build);
 
-// §37.35: give each instance a gate or switch per primitive it instantiates,
-// each with a prim term per terminal, and §37.11: a gate or switch array per
+// §37.36: the udp defn object made for a UDP declaration.
+using VpiUdpDefnOf = std::function<VpiObject*(const UdpDecl*)>;
+
+// §37.35: give each instance a gate, switch or udp per primitive it
+// instantiates, each with a prim term per terminal and a udp reaching the udp
+// defn `udp_defn_of` gives for its UDP, and §37.11: a gate or switch array per
 // instance array of them, over a primitive per element.
 void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
-                      SimContext& ctx, const VpiAttachBuild& build);
+                      const VpiUdpDefnOf& udp_defn_of, SimContext& ctx,
+                      const VpiAttachBuild& build);
 
 // §37.85: make each generate block instance of each instance the gen scope it
 // is, and each iteration of a loop generate an element, reached by its index,

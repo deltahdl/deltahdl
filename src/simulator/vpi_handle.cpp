@@ -83,11 +83,9 @@ VpiHandle ResolveNamePathComponent(
   return ChildNamed(search, step.part);
 }
 
-// §38.21: a hierarchical name that passes through a protected scope is an
-// error - an intermediate component naming a protected object cannot be
-// descended into to reach a deeper object - unless what the name reaches is an
-// object a viewport opened (§34.5.32.2), which is reached through the scopes
-// sealing it.
+// §38.21: a name passing through a protected scope is an error - a protected
+// component is not descended into - unless what it reaches is an object a
+// viewport opened (§34.5.32.2), reached through the scopes sealing it.
 bool PassesThroughSealedScope(const std::vector<VpiHandle>& path) {
   if (path.empty()) return false;
   const VpiHandle kReached = path.back();
@@ -150,8 +148,7 @@ VpiHandle VpiContext::HandleByIndex(int index, VpiHandle parent) {
   if (!parent) return nullptr;
 
   // §38.19: unless otherwise specified, calling vpi_handle_by_index() for a
-  // protected reference object is an error. Record it (§38.2) and hand back a
-  // null handle.
+  // protected reference object is an error; record it (§38.2) and answer null.
   if (VpiReadSealed(*parent)) {
     SetVpiHandleError(
         last_error_, "vpi_handle_by_index() on a protected object is an error");
@@ -201,9 +198,8 @@ VpiHandle VpiContext::HandleByMultiIndex(int num_index, const int* index_array,
   // same property vpi_handle_by_index() requires of its reference object.
   if (!VpiHasAccessByIndex(parent->type)) return nullptr;
 
-  // §38.20: num_index gives how many indices index_array carries. With no
-  // indices there is no index select expression to construct, so no subobject
-  // is named.
+  // §38.20: num_index counts index_array's indices; with none there is no
+  // index select expression to construct, so no subobject is named.
   if (num_index <= 0 || index_array == nullptr) return nullptr;
 
   // §38.20: apply the indices in the order provided - leftmost first -
@@ -328,9 +324,8 @@ static bool TryResolveClockingRelation(int type, VpiHandle ref,
   // §37.5/§37.6/§37.9 (figure): a module, interface or program reaches the one
   // clocking block it named default and the one it named global, and the
   // expression its default disable iff was written with. All three are relation
-  // tags, so the traversal these fell through to -- which looks for a child
-  // whose own type is the type asked for -- reached none of them from any
-  // scope.
+  // tags, so the traversal looking for a child of the type asked for reached
+  // none of them from any scope.
   if (type == vpiDefaultClocking || type == vpiGlobalClocking) {
     out = VpiScopeNamedClockingBlock(ref, type == vpiGlobalClocking);
     return true;
@@ -537,8 +532,13 @@ bool TryResolveConditionRelation(int type, VpiHandle ref, VpiHandle& out) {
 // each other, the primitive end being the `primitive` class. §37.4.1 makes that
 // enclosure a grouping, so the object the edge reaches is a gate, a switch or a
 // UDP - never one whose own type is vpiPrimitive, which the generic traversal
-// was left looking for.
+// was left looking for. A udp reaches the udp defn it instantiates, which no
+// scope holds.
 bool TryResolvePrimitiveRelation(int type, VpiHandle ref, VpiHandle& out) {
+  if (type == vpiUdpDefn && ref->type == vpiUdp) {
+    out = ref->udp_defn;
+    return true;
+  }
   if (type != vpiPrimitive) return false;
   if (ref->parent != nullptr && VpiIsPrimitiveType(ref->parent->type)) {
     out = ref->parent;

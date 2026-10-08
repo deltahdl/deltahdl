@@ -80,10 +80,9 @@ struct VpiObject {
   bool data_path_term = false;
 
   // §37.36 detail 2: the primitive type a UDP reports through
-  // vpi_get(vpiPrimType)
-  // - vpiSeqPrim for a sequential UDP, vpiCombPrim for a combinational one. The
-  // same property labels a primitive in §37.35; both read it from here. Zero
-  // when the object reports no primitive type.
+  // vpi_get(vpiPrimType) - vpiSeqPrim for a sequential UDP, vpiCombPrim for a
+  // combinational one. The same property labels a primitive in §37.35; both
+  // read it from here. Zero when the object reports no primitive type.
   int prim_type = 0;
 
   // §6.9.2: the advisory accessibility keyword a vector net was declared with.
@@ -94,9 +93,8 @@ struct VpiObject {
   bool is_vectored = false;
   bool is_scalared = false;
 
-  // §37.3.7: declared lifetime. False means the object is static; true means it
-  // is non-static (an automatic variable or a dynamic object). Static is the
-  // default.
+  // §37.3.7: declared lifetime, static (the default) when false and non-static
+  // (an automatic variable or a dynamic object) when true.
   bool automatic = false;
 
   // §37.3.7: how this object's storage was obtained. Defaulting to
@@ -124,10 +122,10 @@ struct VpiObject {
   // §39.4.2: whether this callback object stands in for an assertion callback
   // placed with vpi_register_assertion_cb(). A successful placement answers a
   // handle to the callback, which vpi_remove_cb() removes it by, and the
-  // removal has to reach the
-  // assertion model rather than the simulation-callback table, so the two kinds
-  // of callback object are told apart here. `assertion_cb_handle` is what the
-  // placement answered with, which is what the removal names.
+  // removal has to reach the assertion model rather than the
+  // simulation-callback table, so the two kinds of callback object are told
+  // apart here. `assertion_cb_handle` is what the placement answered with,
+  // which is what the removal names.
   bool is_assertion_cb = false;
   std::uint64_t assertion_cb_handle = 0;
 
@@ -521,6 +519,8 @@ struct VpiObject {
   VpiObject* tf_decl = nullptr;
   // §37.51: for a property inst, the property decl it instantiates.
   VpiObject* property_decl = nullptr;
+  // §37.35: for a udp, the udp defn of the primitive it instantiates.
+  VpiObject* udp_defn = nullptr;
 
   // §37.77 (figure): for a disable a run built, the task, function, named
   // begin or named fork it names, which vpiExpr reaches. It is held apart
