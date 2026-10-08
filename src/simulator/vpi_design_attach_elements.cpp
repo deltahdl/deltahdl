@@ -5,6 +5,7 @@
 
 #include "common/types.h"
 #include "elaborator/rtlir.h"
+#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_object.h"

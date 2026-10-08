@@ -92,6 +92,21 @@ struct BitTarget {
   PackedDims dims;
 };
 
+// The nets the instance at `prefix` declares that have bits, its vector nets.
+void AddNetBitTargets(const RtlirModule* mod, const std::string& prefix,
+                      const VpiObjectMap& objects, SimContext& ctx,
+                      std::vector<BitTarget>& targets) {
+  for (const RtlirNet& net : VpiDeclaredNets(*mod)) {
+    auto dims = DeclaredPackedDims(net.dtype, net.width, ctx);
+    if (!dims) continue;
+    for (const std::string& key : VpiDeclaredNetKeys(net, prefix)) {
+      VpiHandle obj = FindObjectForFlatName(objects, key);
+      if (obj == nullptr || obj->type != kVpiNet) continue;
+      targets.push_back({obj, vpiNetBit, *dims});
+    }
+  }
+}
+
 // The objects of the instance at `prefix` that have bits: its vector nets and
 // its packed logic and bit variables. The ranges are the declarations', read in
 // the instance's own scope, where its parameters have their instance's values.
@@ -102,15 +117,7 @@ std::vector<BitTarget> BitTargets(const RtlirModule* mod,
   InstancePrefixOverride scope(ctx.InstancePrefixOverride(),
                                prefix.empty() ? "" : prefix + ".");
   std::vector<BitTarget> targets;
-  for (const RtlirNet& net : VpiDeclaredNets(*mod)) {
-    auto dims = DeclaredPackedDims(net.dtype, net.width, ctx);
-    if (!dims) continue;
-    for (const std::string& key : VpiDeclaredNetKeys(net, prefix)) {
-      VpiHandle obj = FindObjectForFlatName(objects, key);
-      if (obj == nullptr || obj->type != kVpiNet) continue;
-      targets.push_back({obj, vpiNetBit, *dims});
-    }
-  }
+  AddNetBitTargets(mod, prefix, objects, ctx, targets);
   for (const RtlirVariable& var : mod->variables) {
     VpiHandle obj =
         FindObjectForFlatName(objects, VpiFlatName(prefix, var.name));

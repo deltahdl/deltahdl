@@ -29,11 +29,6 @@ static const DataType& ResolvedType(const DataType& dtype,
   return *cur;
 }
 
-static DataTypeKind ResolvedTypeKind(const DataType& dtype,
-                                     const TypedefMap& typedefs) {
-  return ResolvedType(dtype, typedefs).kind;
-}
-
 // §11.5.1 has the bit an index addresses decided in part by the declaration,
 // and §6.18 makes a typedef name's declaration the type it stands for: this is
 // the packed range a name stands for, read off the type at the end of its
