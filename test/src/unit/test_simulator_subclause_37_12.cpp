@@ -870,5 +870,26 @@ TEST(ScopeModel, AStatementIterationOfANonBlockIsNoNestedWalk) {
   EXPECT_TRUE(iter.children.empty());
 }
 
+// §37.12 (figure): a name written inside a statement that is no scope names a
+// scope only when the object bearing it is one; a variable of that name inside
+// an if statement is no nested scope.
+TEST(ScopeModel, AVariableInsideAStatementIsNoNestedScope) {
+  VpiObject module;
+  module.type = vpiModule;
+  VpiObject stmt;
+  stmt.type = vpiIf;
+  VpiObject var;
+  var.type = vpiReg;
+  var.name = "inner";
+  stmt.children = {&var};
+  module.children = {&stmt};
+  EXPECT_EQ(VpiNestedScopeNamed(&module, "inner"), nullptr);
+  VpiObject block;
+  block.type = vpiNamedBegin;
+  block.name = "inner";
+  stmt.children = {&var, &block};
+  EXPECT_EQ(VpiNestedScopeNamed(&module, "inner"), &block);
+}
+
 }  // namespace
 }  // namespace delta

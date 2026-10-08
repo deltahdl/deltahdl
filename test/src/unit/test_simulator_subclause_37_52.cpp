@@ -6,6 +6,7 @@
 #include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -572,6 +573,20 @@ TEST_F(ClockedAndCasePropertiesOfARun, ACasePropertyReachesItsItems) {
   ASSERT_NE(second, nullptr);
   EXPECT_STREQ(vpi_get_str(vpiName, first), "a");
   EXPECT_STREQ(vpi_get_str(vpiName, second), "b");
+}
+
+// Detail 4: only a case property item groups conditions; a vpiExpr iteration
+// of the case property itself is not that relation, so the nested walk leaves
+// it to the general one and collects nothing.
+TEST(PropertySpecModel, AnExprIterationOfANonItemIsNoConditionWalk) {
+  VpiObject case_prop;
+  case_prop.type = vpiCaseProperty;
+  VpiObject selector;
+  selector.type = vpiExpr;
+  case_prop.children = {&selector};
+  VpiObject iter;
+  EXPECT_FALSE(VpiCollectNestedObjects(vpiExpr, &case_prop, &iter));
+  EXPECT_TRUE(iter.children.empty());
 }
 
 }  // namespace
