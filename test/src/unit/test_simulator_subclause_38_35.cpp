@@ -521,5 +521,71 @@ TEST_F(VpiPutValueArraySim, VectorValOnATwoStateArrayDropsTheBvalBits) {
   EXPECT_EQ(elems_[0]->value.words[0].bval, 0u);
 }
 
+// §38.35: in the raw formats an element occupies ngroups = (elemBits + 7)/8
+// bytes per group, so a 72-bit element takes nine, the ninth holding bits 64
+// to 71 in the element's second storage word. Only the first eight were read
+// and only the first word written, so the ninth byte was lost and bits 64 to
+// 71 kept the x they held.
+TEST_F(VpiPutValueArraySim, RawFormatsCarryAnElementWiderThan64Bits) {
+  PLI_BYTE8 four[18] = {1, 2, 3, 4, 5, 6, 7, 8, 9,
+                        0, 0, 0, 0, 0, 0, 0, 0, static_cast<PLI_BYTE8>(0x80)};
+  s_vpi_arrayvalue av = {};
+  av.format = vpiRawFourStateVal;
+  av.value.rawvals = four;
+  PLI_INT32 index[1] = {0};
+  VpiHandle arr = MakeArray("w4", {{0}}, 1, 72);
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 1);
+  EXPECT_EQ(elems_[0]->value.words[0].aval, 0x0807060504030201u);
+  EXPECT_EQ(elems_[0]->value.words[0].bval, 0u);
+  EXPECT_EQ(elems_[0]->value.words[1].aval, 0x09u);
+  EXPECT_EQ(elems_[0]->value.words[1].bval, 0x80u);
+
+  PLI_BYTE8 two[9] = {1, 2, 3, 4, 5, 6, 7, 8, 0x0A};
+  av.format = vpiRawTwoStateVal;
+  av.value.rawvals = two;
+  arr = MakeArray("w2", {{0}}, 1, 72);
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 1);
+  EXPECT_EQ(elems_[0]->value.words[1].aval, 0x0Au);
+  EXPECT_EQ(elems_[0]->value.words[1].bval, 0u);
+}
+
+// §38.35 takes vpiVectorVal over from vpi_put_value() (§38.34), whose
+// s_vpi_vecval repeats as often as the value needs: a 40-bit element is two
+// vecvals, so element 1 starts at vectors[2]. One vecval was read per element,
+// element 1 from vectors[1], which holds element 0's upper bits.
+TEST_F(VpiPutValueArraySim, VectorValCarriesAnElementWiderThan32Bits) {
+  VpiHandle arr = MakeArray("v40", {{0, 1}}, 2, 40);
+  s_vpi_vecval vecs[4] = {
+      {0x11111111, 0}, {0xAB, 0x01}, {0x22222222, 0}, {0xCD, 0}};
+  s_vpi_arrayvalue av = {};
+  av.format = vpiVectorVal;
+  av.value.vectors = vecs;
+  PLI_INT32 index[1] = {0};
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 2);
+
+  EXPECT_EQ(elems_[0]->value.words[0].aval, 0xAB11111111u);
+  EXPECT_EQ(elems_[0]->value.words[0].bval, 0x0100000000u);
+  EXPECT_EQ(elems_[1]->value.words[0].aval, 0xCD22222222u);
+  EXPECT_EQ(elems_[1]->value.words[0].bval, 0u);
+}
+
+// §38.35: the arrays the routine modifies hold no dynamic element, a string
+// variable being the standard's example, so an array of strings is refused,
+// the error recorded and no element written.
+TEST_F(VpiPutValueArraySim, AnArrayOfStringsIsRefused) {
+  VpiHandle arr = MakeArray("st", {{0, 1}}, 2, 8);
+  elems_[0]->is_string = true;
+  PLI_INT32 ints[2] = {1, 2};
+  s_vpi_arrayvalue av = {};
+  av.format = vpiIntVal;
+  av.value.integers = ints;
+  PLI_INT32 index[1] = {0};
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 2);
+
+  s_vpi_error_info info = {};
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
+  EXPECT_EQ(elems_[1]->value.words[0].bval, 0xFFu);  // still x
+}
+
 }  // namespace
 }  // namespace delta

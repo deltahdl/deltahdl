@@ -37,30 +37,6 @@ static bool VpiArrayPutFormatSupported(int format) {
   }
 }
 
-// §38.35: read up to eight little-endian bytes of one raw aval (or bval) group
-// into a 64-bit word. ngroups is (elemBits + 7)/8; the LSB of byte 0 is bit 0
-// of the element, the significance order the standard fixes for the avalbits
-// and bvalbits arrays.
-static uint64_t VpiReadRawGroup(const char* base, int ngroups) {
-  uint64_t v = 0;
-  for (int b = 0; b < ngroups && b < 8; ++b) {
-    v |= static_cast<uint64_t>(static_cast<unsigned char>(base[b])) << (8 * b);
-  }
-  return v;
-}
-
-// §38.16: store the low ngroups bytes of a 64-bit word into one raw aval (or
-// bval) group, least-significant byte first - the inverse of VpiReadRawGroup
-// and the same byte significance order the standard fixes for
-// vpi_put_value_array (§38.35). Any group bytes beyond the eight a word can
-// supply are left zero.
-static void VpiWriteRawGroup(char* base, int ngroups, uint64_t v) {
-  for (int b = 0; b < ngroups; ++b) {
-    base[b] = (b < 8) ? static_cast<char>((v >> (8 * b)) & 0xFF)
-                      : static_cast<char>(0);
-  }
-}
-
 // §38.16/§38.35: turn a starting coordinate into the flat ordinal of the first
 // element, with the rightmost dimension varying fastest - a mixed-radix value
 // over each dimension's declared index order (dims[d] lists the declared
@@ -90,15 +66,32 @@ static bool ComputeStartOrdinal(const std::vector<std::vector<int>>& dims,
 
 namespace {
 
-// §38.16/§38.35: one array element's decoded value - the aval/bval word pair
-// plus whether the element keeps unknown bits (is_4state). The put path
-// (§38.35) treats is_4state as an input set by the caller and fills aval/bval;
-// the get path (§38.16) supplies aval/bval/is_4state for the encoder to lay
-// out. Bundling these mirrors the single element value the standard moves into
-// or out of one source/destination position.
-struct ElementValue {
-  uint64_t aval = 0;
-  uint64_t bval = 0;
+// §38.16 and §38.35: the raw formats lay an element out as byte groups and
+// vpiVectorVal as 32-bit words, each least significant first -- byte 0 and
+// word 0 holding bit 0 of the element -- over as many of either as the
+// element's width needs. These read and write piece `piece`, `bits` (8 or 32)
+// bits wide, of the 64-bit words a value is stored in, which a piece never
+// straddles.
+uint64_t PieceOf(const Logic4Word* words, bool bval, uint32_t piece,
+                 uint32_t bits) {
+  const uint32_t kBit = piece * bits;
+  const Logic4Word& word = words[kBit / 64];
+  return ((bval ? word.bval : word.aval) >> (kBit % 64)) &
+         ((uint64_t{1} << bits) - 1);
+}
+
+void SetPiece(Logic4Word* words, bool bval, uint32_t piece, uint32_t bits,
+              uint64_t v) {
+  const uint32_t kBit = piece * bits;
+  Logic4Word& word = words[kBit / 64];
+  (bval ? word.bval : word.aval) |= (v & ((uint64_t{1} << bits) - 1))
+                                    << (kBit % 64);
+}
+
+// One element's value as the get side encodes it: the words it is stored in,
+// and whether it keeps unknown bits.
+struct ElementWords {
+  const Logic4Word* words = nullptr;
   bool is_4state = false;
 };
 
@@ -110,6 +103,8 @@ bool RecordArrayError(s_vpi_error_info* err, const char* msg) {
   err->message = VpiText(msg);
   return false;
 }
+
+bool HoldsDynamicElements(const VpiObject& obj);
 
 // §38.35: validate the target handle, flags, format, and starting coordinate
 // for vpi_put_value_array(). On any rejected precondition the error is recorded
@@ -133,6 +128,12 @@ bool ValidatePutValueArrayRequest(VpiHandle obj, s_vpi_arrayvalue* arrayvalue_p,
   if (!is_unpacked_array || obj->array_type != vpiStaticArray) {
     return RecordArrayError(
         err, "vpi_put_value_array() requires a static unpacked array object");
+  }
+  if (HoldsDynamicElements(*obj)) {
+    return RecordArrayError(
+        err,
+        "vpi_put_value_array() does not take an array of dynamic elements such "
+        "as strings");
   }
 
   // §38.35: vpiNoDelay is the only scheduling mode allowed here - the delay and
@@ -207,67 +208,65 @@ uint64_t DecodePutTimeAval(const s_vpi_arrayvalue* arrayvalue_p,
   return (static_cast<uint64_t>(t.high) << 32) | t.low;
 }
 
-// §38.35: decode one supplied source value from the vpiVectorVal arm into the
-// element's aval/bval words. A 2-state element ignores the supplied bval bits.
+// §38.35: decode one supplied source value from the vpiVectorVal arm into
+// the element's words, (width + 31) / 32 vecvals per element, least
+// significant first. A 2-state element ignores the supplied bval bits.
 void DecodePutVectorValue(const s_vpi_arrayvalue* arrayvalue_p,
-                          unsigned int src, ElementValue* out) {
-  const s_vpi_vecval& vv = arrayvalue_p->value.vectors[src];
-  out->aval = vv.aval;
-  out->bval = out->is_4state ? vv.bval : 0;
+                          unsigned int src, Logic4Vec& ev, bool is_4state) {
+  const uint32_t kWords = (ev.width + 31) / 32;
+  const s_vpi_vecval* vecs =
+      arrayvalue_p->value.vectors + static_cast<size_t>(src) * kWords;
+  for (uint32_t w = 0; w < kWords; ++w) {
+    SetPiece(ev.words, false, w, 32, vecs[w].aval);
+    if (is_4state) SetPiece(ev.words, true, w, 32, vecs[w].bval);
+  }
 }
 
-// §38.35: decode one supplied source value from the vpiRawFourStateVal arm into
-// the element's aval/bval words. Each element occupies ngroups*2 bytes - an
-// aval group followed by a bval group - read least-significant byte first. When
-// this 4-state format is used for a 2-state array, the bvalbits group is
-// ignored.
-void DecodePutRawFourState(const s_vpi_arrayvalue* arrayvalue_p,
-                           unsigned int src, uint32_t width,
-                           ElementValue* out) {
-  int ngroups = (static_cast<int>(width) + 7) / 8;
+// §38.35: decode one supplied source value from a raw arm into the element's
+// words, ngroups bytes per group read least significant byte first. In
+// vpiRawFourStateVal each element occupies ngroups*2 bytes -- an aval group
+// followed by a bval group -- and the bval group is ignored for a 2-state
+// array; vpiRawTwoStateVal carries no bval group, so each element occupies
+// ngroups bytes and a 4-state element's bval bits are 0.
+void DecodePutRaw(const s_vpi_arrayvalue* arrayvalue_p, unsigned int src,
+                  Logic4Vec& ev, bool is_4state) {
+  const bool kFourStateFormat =
+      static_cast<int>(arrayvalue_p->format) == kVpiRawFourStateVal;
+  const uint32_t kGroups = (ev.width + 7) / 8;
   const char* abase =
-      arrayvalue_p->value.rawvals + static_cast<size_t>(src) * ngroups * 2;
-  out->aval = VpiReadRawGroup(abase, ngroups);
-  out->bval = out->is_4state ? VpiReadRawGroup(abase + ngroups, ngroups) : 0;
-}
-
-// §38.35: decode one supplied source value from the vpiRawTwoStateVal arm into
-// a 64-bit aval. This 2-state format carries no bvalbits group, so each element
-// occupies just ngroups bytes; for a 4-state array the bval bits are taken to
-// be 0 (handled by the caller's zero default).
-uint64_t DecodePutRawTwoState(const s_vpi_arrayvalue* arrayvalue_p,
-                              unsigned int src, uint32_t width) {
-  int ngroups = (static_cast<int>(width) + 7) / 8;
-  const char* abase =
-      arrayvalue_p->value.rawvals + static_cast<size_t>(src) * ngroups;
-  return VpiReadRawGroup(abase, ngroups);
+      arrayvalue_p->value.rawvals +
+      static_cast<size_t>(src) * kGroups * (kFourStateFormat ? 2 : 1);
+  for (uint32_t b = 0; b < kGroups; ++b) {
+    SetPiece(ev.words, false, b, 8, static_cast<unsigned char>(abase[b]));
+    if (kFourStateFormat && is_4state) {
+      SetPiece(ev.words, true, b, 8,
+               static_cast<unsigned char>(abase[kGroups + b]));
+    }
+  }
 }
 
 // §38.35: decode one supplied source value (at source position src in the
-// arrayvalue arm the format selects) into the element's aval/bval words. width
-// is the destination element's bit width; elem_4state says whether the element
-// keeps unknown bits. The byte/word group layouts follow the standard's
-// per-format descriptions.
+// arrayvalue arm the format selects) into the words of `ev`, which hold 0.
+// The byte and word group layouts follow the standard's per-format
+// descriptions; a time or scalar value fills the low word.
 void DecodePutSourceValue(const s_vpi_arrayvalue* arrayvalue_p,
-                          unsigned int src, uint32_t width, ElementValue* out) {
+                          unsigned int src, Logic4Vec& ev, bool is_4state) {
   int fmt = static_cast<int>(arrayvalue_p->format);
   switch (fmt) {
     case kVpiTimeVal:
-      out->aval = DecodePutTimeAval(arrayvalue_p, src);
+      ev.words[0].aval = DecodePutTimeAval(arrayvalue_p, src);
       break;
     case kVpiVectorVal:
-      DecodePutVectorValue(arrayvalue_p, src, out);
+      DecodePutVectorValue(arrayvalue_p, src, ev, is_4state);
       break;
     case kVpiRawFourStateVal:
-      DecodePutRawFourState(arrayvalue_p, src, width, out);
-      break;
     case kVpiRawTwoStateVal:
-      out->aval = DecodePutRawTwoState(arrayvalue_p, src, width);
+      DecodePutRaw(arrayvalue_p, src, ev, is_4state);
       break;
     default:
       // The scalar formats, the rest of what VpiArrayPutFormatSupported
       // admitted before any value is decoded.
-      out->aval = DecodePutScalarAval(arrayvalue_p, src, fmt);
+      ev.words[0].aval = DecodePutScalarAval(arrayvalue_p, src, fmt);
       break;
   }
 }
@@ -303,6 +302,18 @@ std::vector<VpiObject*> ElementsInOrder(const VpiObject& obj) {
   return elements;
 }
 
+// §38.16 and §38.35: whether an element of `obj` is of a dynamic kind, which
+// the arrays the routines take do not hold; a string variable is the
+// standard's example, its storage as long as its text. An array of strings is
+// a fixed unpacked array all the same, and vpiStaticArray to vpiArrayType, so
+// the routines read and wrote its elements' text as integers.
+bool HoldsDynamicElements(const VpiObject& obj) {
+  for (const VpiObject* element : ElementsInOrder(obj)) {
+    if (element->var != nullptr && element->var->is_string) return true;
+  }
+  return false;
+}
+
 // §38.35: the element at flat ordinal `ordinal` among `elements`, or nullptr
 // where the section runs past the array's end.
 VpiObject* ElementAtOrdinal(const std::vector<VpiObject*>& elements,
@@ -316,25 +327,23 @@ VpiObject* ElementAtOrdinal(const std::vector<VpiObject*>& elements,
 // §38.35: write one supplied source value (at source position src) into
 // `element`, the array's at the flat ordinal being filled. A missing element or
 // one without a backing variable is skipped silently, exactly as the
-// consecutive fill loop requires. The decoded aval/bval are masked to the
-// element's width before they replace word 0 of its value. The variable written
-// is handed back so the caller can notify what fans out of it, or nullptr where
-// nothing was written.
+// consecutive fill loop requires. The value replaces every word of the
+// element's, the bits above its width cleared. The variable written is handed
+// back so the caller can notify what fans out of it, or nullptr where nothing
+// was written.
 Variable* PutValueArrayElement(VpiObject* element,
                                const s_vpi_arrayvalue* arrayvalue_p,
                                unsigned int src) {
   if (!element || !element->var) return nullptr;
 
   Logic4Vec& ev = element->var->value;
-  uint32_t width = ev.width;
-  uint64_t mask = (width >= 64) ? ~uint64_t{0} : ((uint64_t{1} << width) - 1);
-  ElementValue value;
-  value.is_4state = element->var->is_4state;
-  DecodePutSourceValue(arrayvalue_p, src, width, &value);
-
-  if (ev.nwords > 0) {
-    ev.words[0].aval = value.aval & mask;
-    ev.words[0].bval = value.bval & mask;
+  for (uint32_t i = 0; i < ev.nwords; ++i) ev.words[i] = Logic4Word{};
+  DecodePutSourceValue(arrayvalue_p, src, ev, element->var->is_4state);
+  const uint32_t kTopBits = ev.width % 64;
+  if (kTopBits != 0) {
+    const uint64_t kMask = (uint64_t{1} << kTopBits) - 1;
+    ev.words[ev.nwords - 1].aval &= kMask;
+    ev.words[ev.nwords - 1].bval &= kMask;
   }
   return element->var;
 }
@@ -383,6 +392,12 @@ bool ValidateGetValueArrayRequest(VpiHandle obj, s_vpi_arrayvalue* arrayvalue_p,
   if (!is_unpacked_array || obj->array_type != vpiStaticArray) {
     *out_err_msg =
         "vpi_get_value_array() requires a static unpacked array object";
+    return false;
+  }
+  if (HoldsDynamicElements(*obj)) {
+    *out_err_msg =
+        "vpi_get_value_array() does not take an array of dynamic elements such "
+        "as strings";
     return false;
   }
 
@@ -481,24 +496,6 @@ size_t ComputeGetValueArrayBytes(int fmt, int ngroups, int words_per_elem,
   return bytes;
 }
 
-// §38.16: read an element's current value into aval/bval words and report
-// whether it keeps unknown bits. A missing element, one without a backing
-// variable, or one with no value words leaves the outputs at their zero
-// defaults.
-void ReadGetElementValue(VpiObject* element, ElementValue* out) {
-  out->aval = 0;
-  out->bval = 0;
-  out->is_4state = false;
-  if (element && element->var) {
-    const Logic4Vec& ev = element->var->value;
-    if (ev.nwords > 0) {
-      out->aval = ev.words[0].aval;
-      out->bval = ev.words[0].bval;
-    }
-    out->is_4state = element->var->is_4state;
-  }
-}
-
 // §38.16: encode one element's value into position k of a scalar arm (the
 // integer, short-int, long-int, real, or short-real format), widening or
 // narrowing the element's aval into the arm's C scalar type.
@@ -531,59 +528,68 @@ void EncodeGetTimeValue(s_vpi_arrayvalue* arrayvalue_p, unsigned int k,
   arrayvalue_p->value.times[k].low = static_cast<uint32_t>(aval & 0xFFFFFFFFu);
 }
 
-// §38.16: encode one element's value into position k of the vpiVectorVal arm.
-// bvalbits carry the unknown/high-impedance state for a 4-state element; a
-// 2-state element reports a known (bval 0) value.
+// §38.16: encode one element's value into position k of the vpiVectorVal arm,
+// (width + 31) / 32 vecvals per element, least significant first. bvalbits
+// carry the unknown/high-impedance state for a 4-state element; a 2-state
+// element reports a known (bval 0) value.
 void EncodeGetVectorValue(s_vpi_arrayvalue* arrayvalue_p, unsigned int k,
-                          const ElementValue& value) {
-  arrayvalue_p->value.vectors[k].aval = static_cast<uint32_t>(value.aval);
-  arrayvalue_p->value.vectors[k].bval =
-      value.is_4state ? static_cast<uint32_t>(value.bval) : 0;
+                          uint32_t width, const ElementWords& value) {
+  const uint32_t kWords = (width + 31) / 32;
+  s_vpi_vecval* vecs =
+      arrayvalue_p->value.vectors + static_cast<size_t>(k) * kWords;
+  for (uint32_t w = 0; w < kWords; ++w) {
+    vecs[w].aval = static_cast<uint32_t>(PieceOf(value.words, false, w, 32));
+    vecs[w].bval =
+        value.is_4state
+            ? static_cast<uint32_t>(PieceOf(value.words, true, w, 32))
+            : 0;
+  }
 }
 
-// §38.16: encode one element's value into position k of the vpiRawFourStateVal
-// arm. Each element occupies ngroups*2 bytes - an aval group followed by a bval
-// group - loaded least-significant byte first.
-void EncodeGetRawFourState(s_vpi_arrayvalue* arrayvalue_p, unsigned int k,
-                           int ngroups, const ElementValue& value) {
-  char* abase =
-      arrayvalue_p->value.rawvals + static_cast<size_t>(k) * ngroups * 2;
-  VpiWriteRawGroup(abase, ngroups, value.aval);
-  VpiWriteRawGroup(abase + ngroups, ngroups, value.is_4state ? value.bval : 0);
+// §38.16: encode one element's value into position k of a raw arm, ngroups
+// bytes per group loaded least significant byte first. In vpiRawFourStateVal
+// each element occupies ngroups*2 bytes -- an aval group followed by a bval
+// group, 0 for a 2-state element; vpiRawTwoStateVal omits the bval group, so
+// each element occupies ngroups bytes.
+void EncodeGetRaw(s_vpi_arrayvalue* arrayvalue_p, unsigned int k,
+                  uint32_t width, const ElementWords& value) {
+  const bool kFourStateFormat =
+      static_cast<int>(arrayvalue_p->format) == kVpiRawFourStateVal;
+  const uint32_t kGroups = (width + 7) / 8;
+  char* abase = arrayvalue_p->value.rawvals +
+                static_cast<size_t>(k) * kGroups * (kFourStateFormat ? 2 : 1);
+  for (uint32_t b = 0; b < kGroups; ++b) {
+    abase[b] = static_cast<char>(PieceOf(value.words, false, b, 8));
+    if (kFourStateFormat) {
+      abase[kGroups + b] =
+          value.is_4state ? static_cast<char>(PieceOf(value.words, true, b, 8))
+                          : static_cast<char>(0);
+    }
+  }
 }
 
-// §38.16: encode one element's value into position k of the vpiRawTwoStateVal
-// arm. The 2-state raw format omits the bval group, so each element occupies
-// just ngroups bytes.
-void EncodeGetRawTwoState(s_vpi_arrayvalue* arrayvalue_p, unsigned int k,
-                          int ngroups, uint64_t aval) {
-  char* abase = arrayvalue_p->value.rawvals + static_cast<size_t>(k) * ngroups;
-  VpiWriteRawGroup(abase, ngroups, aval);
-}
-
-// §38.16: encode one element's current value (aval/bval words, elem_4state)
-// into position k of the arm the format selects. The raw and vector formats lay
-// the element bits out per their byte/word group descriptions; the scalar arms
-// widen the element value into one C scalar.
+// §38.16: encode one element's current value into position k of the arm the
+// format selects. The raw and vector formats lay the element bits out per
+// their byte/word group descriptions; the time and scalar arms take the low
+// word.
 void EncodeGetElementValue(s_vpi_arrayvalue* arrayvalue_p, unsigned int k,
-                           int fmt, int ngroups, const ElementValue& value) {
+                           uint32_t width, const ElementWords& value) {
+  int fmt = static_cast<int>(arrayvalue_p->format);
   switch (fmt) {
     case kVpiTimeVal:
-      EncodeGetTimeValue(arrayvalue_p, k, value.aval);
+      EncodeGetTimeValue(arrayvalue_p, k, value.words[0].aval);
       break;
     case kVpiVectorVal:
-      EncodeGetVectorValue(arrayvalue_p, k, value);
+      EncodeGetVectorValue(arrayvalue_p, k, width, value);
       break;
     case kVpiRawFourStateVal:
-      EncodeGetRawFourState(arrayvalue_p, k, ngroups, value);
-      break;
     case kVpiRawTwoStateVal:
-      EncodeGetRawTwoState(arrayvalue_p, k, ngroups, value.aval);
+      EncodeGetRaw(arrayvalue_p, k, width, value);
       break;
     default:
       // The scalar formats, the rest of what VpiArrayPutFormatSupported
       // admitted before any value is read.
-      EncodeGetScalarValue(arrayvalue_p, k, fmt, value.aval);
+      EncodeGetScalarValue(arrayvalue_p, k, fmt, value.words[0].aval);
       break;
   }
 }
@@ -704,10 +710,17 @@ void VpiContext::GetValueArray(VpiHandle obj, s_vpi_arrayvalue* arrayvalue_p,
   // encoding each element's current value into the arm the format selects. The
   // raw and vector formats lay the element bits out per their byte/word group
   // descriptions; the scalar arms widen the element value into one C scalar.
+  // A position with nothing to read -- past the array's end, or an element
+  // holding no storage -- reads as words of zero, one more than the width
+  // needs so the time and scalar arms always have a low word to take.
+  const std::vector<Logic4Word> kZeros((width + 63) / 64 + 1);
   for (unsigned int k = 0; k < num; ++k) {
-    ElementValue value;
-    ReadGetElementValue(section[k], &value);
-    EncodeGetElementValue(arrayvalue_p, k, fmt, ngroups, value);
+    const VpiObject* element = section[k];
+    ElementWords value{kZeros.data(), false};
+    if (element != nullptr && element->var != nullptr) {
+      value = {element->var->value.words, element->var->is_4state};
+    }
+    EncodeGetElementValue(arrayvalue_p, k, width, value);
   }
 }
 

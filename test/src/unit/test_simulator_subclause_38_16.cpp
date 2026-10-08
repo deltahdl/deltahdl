@@ -509,6 +509,54 @@ TEST_F(VpiGetValueArraySim, TheShortAndLongFormatsSuitByteAndShortIntElements) {
   }
 }
 
+// §38.16: in the raw formats an element occupies ngroups = (elemBits + 7)/8
+// bytes per group, so a 72-bit element takes nine, the ninth holding bits 64
+// to 71 from the element's second storage word. Only the first word was read
+// and the bytes past the eighth written as 0.
+TEST_F(VpiGetValueArraySim, RawFormatsCarryAnElementWiderThan64Bits) {
+  VpiHandle arr = MakeArray("w", {{0}}, 1, 72);
+  SetElem(0, 0x0807060504030201u);
+  elems_[0]->value.words[1].aval = 0x09;
+  elems_[0]->value.words[1].bval = 0x80;
+  PLI_INT32 index[1] = {0};
+
+  s_vpi_arrayvalue four = {};
+  four.format = vpiRawFourStateVal;
+  vpi_get_value_array(VpiHandleOf(arr), &four, index, 1);
+  ASSERT_NE(four.value.rawvals, nullptr);
+  EXPECT_EQ(four.value.rawvals[0], 0x01);
+  EXPECT_EQ(four.value.rawvals[8], 0x09);
+  EXPECT_EQ(four.value.rawvals[9], 0x00);
+  EXPECT_EQ(four.value.rawvals[17], static_cast<PLI_BYTE8>(0x80));
+
+  s_vpi_arrayvalue two = {};
+  two.format = vpiRawTwoStateVal;
+  vpi_get_value_array(VpiHandleOf(arr), &two, index, 1);
+  ASSERT_NE(two.value.rawvals, nullptr);
+  EXPECT_EQ(two.value.rawvals[8], 0x09);
+}
+
+// §38.16 takes vpiVectorVal over from vpi_get_value() (§38.15), whose
+// s_vpi_vecval repeats as often as the value needs: a 40-bit element is two
+// vecvals, so element 1 starts at vectors[2]. One vecval was written per
+// element, element 1 into vectors[1], where element 0's upper bits belong.
+TEST_F(VpiGetValueArraySim, VectorValCarriesAnElementWiderThan32Bits) {
+  VpiHandle arr = MakeArray("v40", {{0, 1}}, 2, 40);
+  SetElem(0, 0xAB11111111u, 0x0100000000u);
+  SetElem(1, 0xCD22222222u);
+  s_vpi_arrayvalue av = {};
+  av.format = vpiVectorVal;
+  PLI_INT32 index[1] = {0};
+  vpi_get_value_array(VpiHandleOf(arr), &av, index, 2);
+
+  ASSERT_NE(av.value.vectors, nullptr);
+  EXPECT_EQ(av.value.vectors[0].aval, 0x11111111u);
+  EXPECT_EQ(av.value.vectors[1].aval, 0xABu);
+  EXPECT_EQ(av.value.vectors[1].bval, 0x01u);
+  EXPECT_EQ(av.value.vectors[2].aval, 0x22222222u);
+  EXPECT_EQ(av.value.vectors[3].aval, 0xCDu);
+}
+
 // What the case's calltf read out of `top.arr` with vpi_get_value_array.
 std::vector<PLI_INT32>& ArrayRead() {
   static std::vector<PLI_INT32> read;
@@ -588,6 +636,42 @@ TEST_F(ValueArraysOfARun, ARunsTwoDimensionalArrayIsReadAcrossItsSubarrays) {
       "  initial #1 $matrix_read;\n"
       "endmodule\n");
   EXPECT_EQ(MatrixRead(), (std::vector<PLI_INT32>{2, 3, 4, 5}));
+}
+
+// Whether the case's calltf found its read of `top.s` refused.
+bool& StringArrayRefused() {
+  static bool refused = false;
+  return refused;
+}
+
+PLI_INT32 ReadStringArray(PLI_BYTE8* /*user_data*/) {
+  vpiHandle s = vpi_handle_by_name(VpiText("top.s"), nullptr);
+  PLI_INT32 sentinel[2] = {0, 0};
+  PLI_INT32 index = 0;
+  s_vpi_arrayvalue av = {};
+  av.format = vpiIntVal;
+  av.value.integers = sentinel;
+  vpi_get_value_array(s, &av, &index, 2);
+  s_vpi_error_info info = {};
+  StringArrayRefused() =
+      vpi_chk_error(&info) == vpiError && av.value.integers == nullptr;
+  return 0;
+}
+
+// §38.16: the arrays the routine reads hold no dynamic element, a string
+// variable being the standard's example, so a run's array of strings, a fixed
+// unpacked array all the same, is refused with the value arm nulled. Its
+// elements' text was read out as integers.
+TEST_F(ValueArraysOfARun, ARunsArrayOfStringsIsRefused) {
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = VpiText("$string_array_read");
+  data.calltf = &ReadStringArray;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+  Run("module top; string s [2] = '{\"a\", \"bc\"};\n"
+      "  initial #1 $string_array_read;\n"
+      "endmodule\n");
+  EXPECT_TRUE(StringArrayRefused());
 }
 
 }  // namespace
