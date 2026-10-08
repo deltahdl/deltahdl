@@ -280,34 +280,6 @@ std::vector<const Expr*> Operands(const Expr* first,
   return operands;
 }
 
-// §37.16, §37.17 details 12 and 13: a bit of a vector net or packed variable
-// whose index is not a constant. It is a bit of the kind the vector's own bits
-// are, reaching the vector through vpiParent and the expression the source
-// wrote through vpiIndex; which of the vector's bits it stands for is not fixed
-// before the run, so it holds none of them, and its value is the one of the bit
-// its index selects when the value is read or written (vpi_value.cpp). Null
-// for a vector with no bits.
-VpiObject* VaryingBitObject(VpiObject* base, const Expr* index,
-                            const AssignBuild& build) {
-  int bit_type = 0;
-  for (const VpiObject* child : base->children) {
-    if (child->type == vpiNetBit || child->type == vpiRegBit) {
-      bit_type = child->type;
-      break;
-    }
-  }
-  if (bit_type == 0) return nullptr;
-  VpiObject* bit = build.alloc();
-  bit->type = bit_type;
-  bit->parent = base;
-  bit->size = 1;
-  bit->index_expr = ExpressionObject(index, build);
-  if (bit_type == vpiRegBit && bit->index_expr != nullptr) {
-    bit->children.push_back(bit->index_expr);
-  }
-  return bit;
-}
-
 // §37.19: a select of an element of the array var `base` whose index is not a
 // constant: a var select reaching the array through vpiParent and the
 // expression the source wrote through vpiIndex. Which element it stands for is
@@ -396,7 +368,8 @@ VpiObject* PackedSelectObject(VpiObject* base, const Expr* index,
 // bit (§37.16, §37.17), the one a constant index names, or one standing for
 // whichever bit a varying index selects. Of an unpacked array it is the
 // element or subarray a constant index names (§37.17 details 2 and 18), the
-// child vpi_handle_by_index reaches (§38.19).
+// child vpi_handle_by_index reaches (§38.19), and of an array var a varying
+// index makes it a var select (§37.19).
 VpiObject* BitSelectObject(const Expr* expr, const AssignBuild& build) {
   VpiObject* base = ExpressionObject(expr->base, build);
   if (base == nullptr) return nullptr;
@@ -416,10 +389,12 @@ VpiObject* BitSelectObject(const Expr* expr, const AssignBuild& build) {
     return PackedSelectObject(base, expr->index, build);
   }
   if (expr->index == nullptr) return nullptr;
+  // A varying bit of a vector was made above (PackedSelectObject), so what a
+  // varying index selects from here is an element, a var select of an array
+  // var's (§37.19). An array net's has no object.
   if (expr->index->kind != ExprKind::kIntegerLiteral) {
-    return base->type == vpiArrayVar
-               ? VarSelectObject(base, expr->index, build)
-               : VaryingBitObject(base, expr->index, build);
+    return base->type == vpiArrayVar ? VarSelectObject(base, expr->index, build)
+                                     : nullptr;
   }
   const auto kIndex = static_cast<int>(expr->index->int_val);
   for (VpiObject* child : base->children) {

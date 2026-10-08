@@ -524,5 +524,25 @@ TEST_F(PrimitivesOfARun, ATerminalSelectingAnArrayElementReachesTheElement) {
   EXPECT_EQ(VpiObjectOf(SecondTerminalExprOfG()), VpiObjectOf(element));
 }
 
+// A gate whose terminal selects an element the model has no object for -- of
+// an array net by a varying index, or of an unpacked array by a constant index
+// outside it, a read §11.5.1 makes legal -- still has a prim term per
+// terminal, and its other terminals reach what they connect.
+TEST_F(PrimitivesOfARun, TerminalsSelectingNoModelledElementAreKept) {
+  Run("module top; wire w [2]; logic u [2]; int i; wire y, z; logic c;\n"
+      "  and g(y, w[i], c);\n"
+      "  and h(z, u[5], c);\n"
+      "endmodule\n");
+  for (const char* name : {"g", "h"}) {
+    vpiHandle gate = Named(vpiPrimitive, By("top"), name);
+    ASSERT_NE(gate, nullptr) << name;
+    const std::vector<vpiHandle> kTerms = TermsOf(gate);
+    ASSERT_EQ(kTerms.size(), 3U) << name;
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, kTerms[2])),
+              VpiObjectOf(By("top.c")))
+        << name;
+  }
+}
+
 }  // namespace
 }  // namespace delta
