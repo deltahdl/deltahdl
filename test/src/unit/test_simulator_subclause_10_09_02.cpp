@@ -470,4 +470,49 @@ TEST(StructPatternSimulation, DefaultKeyGivesAStringMemberTheString) {
   EXPECT_EQ(out, "26729 [hi] 4 [ok]\n");
 }
 
+// §10.9.2 with §10.9.1 and §6.16: a member key's pattern for an array of
+// strings gives each element its item as an assignment to a string would, the
+// whole text. Each item's own bits were deposited, cut to the element's 64,
+// and the member's value then taken as one string under one handle, so
+// neither element read back its text; the ten characters of the first item
+// are more than its 64 bits could hold whole.
+TEST(StructPatternSimulation, MemberKeyPatternGivesEachStringElementItsText) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef struct {string v [2];} names_t;\n"
+      "  names_t m;\n"
+      "  initial begin\n"
+      "    m = '{v: '{\"abcdefghij\", \"xy\"}};\n"
+      "    $display(\"[%s] [%s]\", m.v[0], m.v[1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "[abcdefghij] [xy]\n");
+}
+
+// §10.9.2 with §10.9.1: a type key or the default: key reaches an unpacked
+// array member through the rules for arrays, so it gives each element the
+// value: string: puts "z" in both elements of v and default: puts 5 in both of
+// a. Placed across the member as one value, 5 widened over a's 64 bits landed
+// in a[1] alone, and "z" became one handle over v's 128 bits, which neither
+// element read.
+TEST(StructPatternSimulation,
+     TypeAndDefaultKeysFillEachElementOfAnArrayMember) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef struct {int a [2]; string v [2];} rec_t;\n"
+      "  rec_t r;\n"
+      "  initial begin\n"
+      "    r = '{default: 5, string: \"z\"};\n"
+      "    $display(\"%0d %0d [%s] [%s]\", r.a[0], r.a[1], r.v[0], r.v[1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "5 5 [z] [z]\n");
+}
+
 }  // namespace

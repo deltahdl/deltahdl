@@ -584,16 +584,46 @@ std::optional<Logic4Vec> EvalPackedArrayPattern(const Expr* pattern,
   return result;
 }
 
-// §10.9.2: `val` placed as the member `f` of the structure `result` holds,
-// a string member (§7.2 with §6.16) as a handle to the string; `base` is the
-// offset within `result` of the substructure `f` belongs to.
+// §10.9.2 with §6.16: the bits one element of `f`'s type holds for `val`, a
+// string (§7.2) as a handle to its text and any other value `width` bits of
+// it, for a member that is no array or an element of one that is.
+static Logic4Vec ElementBits(const StructFieldInfo& f, const Logic4Vec& val,
+                             uint32_t width, Arena& arena) {
+  return f.type_kind == DataTypeKind::kString ? StringMemberHandle(val, arena)
+                                              : MemberBits(val, width, arena);
+}
+
+// §10.9.2: `val`, the member's whole value, placed as the member `f` of the
+// structure `result` holds, a string member as a handle to the string; `base`
+// is the offset within `result` of the substructure `f` belongs to. An array
+// member's value already holds each element's bits, a string element's handle
+// among them (EvalArrayMemberPattern), and is placed as it stands; taken as one
+// string, an array of strings was one handle across every element.
 static void PlaceFieldValue(Logic4Vec& result, const StructFieldInfo& f,
                             const Logic4Vec& val, Arena& arena,
                             uint32_t base = 0) {
-  Logic4Vec bits = f.type_kind == DataTypeKind::kString
-                       ? StringMemberHandle(val, arena)
-                       : MemberBits(val, f.width, arena);
+  Logic4Vec bits = f.elem_count == 0 ? ElementBits(f, val, f.width, arena)
+                                     : MemberBits(val, f.width, arena);
   DepositBitField(result, base + f.bit_offset, bits, f.width);
+}
+
+// §10.9.2 (printed page 264): the value of a type key or the default: key
+// placed as the member `f`. For an unpacked array member the keys are applied
+// by the rules for arrays (§10.9.1), so each element takes the value as an
+// assignment to the element would; placed across the member as one value,
+// `int a [2]` held a scalar in a[1] alone and `string v [2]` one handle that
+// neither element read.
+static void PlaceKeyValue(Logic4Vec& result, const StructFieldInfo& f,
+                          const Logic4Vec& val, Arena& arena,
+                          uint32_t base = 0) {
+  if (f.elem_count == 0) {
+    PlaceFieldValue(result, f, val, arena, base);
+    return;
+  }
+  uint32_t ew = f.width / f.elem_count;
+  Logic4Vec bits = ElementBits(f, val, ew, arena);
+  for (uint32_t i = 0; i < f.elem_count; ++i)
+    DepositBitField(result, base + f.bit_offset + i * ew, bits, ew);
 }
 
 // §10.9.2: when the default: key falls on an unmatched member that is itself a
@@ -611,7 +641,7 @@ static void PlaceDefaultValue(Logic4Vec& result, const StructFieldInfo& f,
       PlaceDefaultValue(result, sub, base + f.bit_offset, val, arena);
     return;
   }
-  PlaceFieldValue(result, f, val, arena, base);
+  PlaceKeyValue(result, f, val, arena, base);
 }
 
 static DataTypeKind TypeKeyToKind(std::string_view key) {
@@ -680,19 +710,23 @@ static std::vector<const Expr*> ArrayPatternItems(const Expr* pattern,
 // the element's type, the leftmost element in the member's most significant
 // bits. Concatenated at their own widths, `'{2, 3, 4, 5}` for `byte
 // data[4]` left the four 32-bit values' low 32 bits, one byte of them 5.
-// Nothing where the pattern lists other than one item per element.
+// Nothing where the pattern lists other than one item per element. An element
+// of strings holds a handle to its item's whole text (§6.16), the item
+// evaluated at its own width; cut to the element's 64 bits, `"abcdefghij"`
+// lost its first two characters and named no text.
 static std::optional<Logic4Vec> EvalArrayMemberPattern(
     const Expr* pattern, const StructFieldInfo& field, SimContext& ctx,
     Arena& arena) {
   std::vector<const Expr*> items = ArrayPatternItems(pattern, ctx, arena);
   if (items.size() != field.elem_count) return std::nullopt;
   uint32_t ew = field.width / field.elem_count;
+  bool strings = field.type_kind == DataTypeKind::kString;
   Logic4Vec result = MakeLogic4Vec(arena, field.width);
   for (size_t i = 0; i < items.size(); ++i) {
-    Logic4Vec val = EvalExpr(items[i], ctx, arena, ew);
+    Logic4Vec val = EvalExpr(items[i], ctx, arena, strings ? 0 : ew);
     DepositBitField(result,
                     static_cast<uint32_t>(field.elem_count - 1 - i) * ew,
-                    MemberBits(val, ew, arena), ew);
+                    ElementBits(field, val, ew, arena), ew);
   }
   return result;
 }
@@ -753,7 +787,7 @@ static void ApplyTypeKeys(const Expr* expr, const StructTypeInfo* info,
     auto val = EvalExpr(expr->elements[i], s.ctx, s.arena);
     for (size_t fi = 0; fi < info->fields.size(); ++fi) {
       if (s.assigned[fi] || info->fields[fi].type_kind != kind) continue;
-      PlaceFieldValue(s.result, info->fields[fi], val, s.arena);
+      PlaceKeyValue(s.result, info->fields[fi], val, s.arena);
       s.assigned[fi] = true;
     }
   }
