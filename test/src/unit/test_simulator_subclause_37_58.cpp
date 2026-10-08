@@ -7,6 +7,7 @@
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
+#include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -289,6 +290,20 @@ TEST_F(BitSelectsOfARun, AVaryingBitOfANetHoldsTheBitItsIndexSelects) {
       "assign a = 8'b0000_0100;\n"
       "endmodule\n");
   EXPECT_EQ(IntOf(Rhs()), 1);
+}
+
+// §37.58 with §37.16: a bit reaches its index and the object it is a bit of,
+// and through the select relations no other: asked for an expression, a net
+// bit resolves to nothing there.
+TEST_F(BitSelectObject, ABitResolvesOnlyItsIndexAndParent) {
+  VpiObject net;
+  net.type = vpiNet;
+  VpiObject bit;
+  bit.type = vpiNetBit;
+  bit.parent = &net;
+  VpiHandle out = nullptr;
+  EXPECT_FALSE(TryResolveSelectRelation(vpiExpr, &bit, out));
+  EXPECT_EQ(out, nullptr);
 }
 
 }  // namespace

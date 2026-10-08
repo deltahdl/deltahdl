@@ -241,6 +241,18 @@ TEST_F(PrimitivePrimTerm, AnObjectWithNoPrimitiveReachesNone) {
   EXPECT_EQ(vpi_iterate(vpiPrimitive, VpiHandleOf(&mod)), nullptr);
 }
 
+// §37.35 (figure): a prim term reaches the expression its terminal connects
+// through vpiExpr. A child of no expression kind, an attribute here, is not
+// that expression, so a term holding no other reaches nothing.
+TEST_F(PrimitivePrimTerm, ExprPassesOverAChildOfNoExpressionKind) {
+  VpiObject attribute;
+  attribute.type = vpiAttribute;
+  VpiObject term;
+  term.type = vpiPrimTerm;
+  term.children = {&attribute};
+  EXPECT_EQ(vpi_handle(vpiExpr, VpiHandleOf(&term)), nullptr);
+}
+
 // The primitives of a run: those a design instantiates, built from the
 // elaborated design rather than by hand (#4957).
 class PrimitivesOfARun : public VpiDesignRun {
