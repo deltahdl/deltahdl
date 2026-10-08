@@ -325,9 +325,12 @@ static void DispatchValueByFormat(const Logic4Vec& v, s_vpi_value* value,
 // stands for those its index names when its value is read or written.
 // PackedSelectObject records the dimension every such select indexes, each
 // vector with bits recording its packed dimensions (MakeVectorBits); one whose
-// index expression the model could not build is no varying select.
-static bool IsVaryingSelect(const VpiObject& obj) {
-  return obj.select_dim.has_value() && obj.index_expr != nullptr;
+// index expression the model could not build is no varying select. The
+// dimension a varying select indexes, null for any other object.
+static const PackedRange* VaryingSelectDim(const VpiObject& obj) {
+  return obj.select_dim.has_value() && obj.index_expr != nullptr
+             ? &*obj.select_dim
+             : nullptr;
 }
 
 // §37.3.5 with §38.15: the value of `obj`, which holds no storage but stands
@@ -367,8 +370,8 @@ static std::optional<int64_t> VaryingIndex(const VpiObject& obj,
 // the bits a varying select now stands for; none where its index names no
 // element of the dimension it indexes.
 static std::optional<int64_t> VaryingOffset(const VpiObject& obj,
+                                            const PackedRange& dim,
                                             SimContext* sim) {
-  const PackedRange& dim = *obj.select_dim;
   const std::optional<int64_t> kIndex = VaryingIndex(obj, sim);
   if (!kIndex || !dim.Contains(*kIndex)) return std::nullopt;
   return obj.select_base_offset +
@@ -378,12 +381,13 @@ static std::optional<int64_t> VaryingOffset(const VpiObject& obj,
 // §38.15 for a varying select: the value of the bits its index selects, or,
 // when it selects none, x of a 4-state vector and 0 of a 2-state one in each
 // of its bits (§11.5.1). Its storage is its vector's (SliceObject).
-static void GetVaryingSelectValue(VpiHandle obj, s_vpi_value* value,
-                                  VpiValuePools& pools, SimContext* sim) {
+static void GetVaryingSelectValue(VpiHandle obj, const PackedRange& dim,
+                                  s_vpi_value* value, VpiValuePools& pools,
+                                  SimContext* sim) {
   const Variable& whole = *obj->var;
   const int kWidth = std::max(obj->size, 1);
   std::vector<Logic4Word> words;
-  if (const std::optional<int64_t> kOffset = VaryingOffset(*obj, sim)) {
+  if (const std::optional<int64_t> kOffset = VaryingOffset(*obj, dim, sim)) {
     DispatchIntegerFormat(SliceOfValue(whole.value, *kOffset, kWidth, words),
                           value, pools);
     return;
@@ -446,8 +450,8 @@ void VpiContext::GetValue(VpiHandle obj, s_vpi_value* value) {
     }
     return;
   }
-  if (IsVaryingSelect(*obj)) {
-    GetVaryingSelectValue(obj, value, value_pools_, sim_ctx_);
+  if (const PackedRange* dim = VaryingSelectDim(*obj)) {
+    GetVaryingSelectValue(obj, *dim, value, value_pools_, sim_ctx_);
     return;
   }
   DispatchGetValueByFormat(obj, value, value_pools_);
@@ -662,10 +666,11 @@ static bool PutValueIsSealed(const VpiObject& obj, s_vpi_error_info& error) {
 static VpiHandle PutValueTargetOf(VpiHandle obj,
                                   const std::function<VpiObject*()>& alloc,
                                   SimContext* sim) {
-  if (!IsVaryingSelect(*obj)) return obj;
+  const PackedRange* dim = VaryingSelectDim(*obj);
+  if (dim == nullptr) return obj;
   // A varying select stands for the bits its index names when the value is
   // put, made a slice of them here, one bit wide for a select of one bit.
-  const std::optional<int64_t> kOffset = VaryingOffset(*obj, sim);
+  const std::optional<int64_t> kOffset = VaryingOffset(*obj, *dim, sim);
   if (!kOffset) return nullptr;
   VpiObject* slice = alloc();
   slice->type = obj->type;
