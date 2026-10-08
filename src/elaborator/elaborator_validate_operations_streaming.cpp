@@ -377,9 +377,13 @@ uint32_t BitStreamTypeWidth(const DataType& type, const TypedefMap& typedefs,
                             int depth = 0);
 
 // One member's share of an unpacked structure's bit-stream size: its element
-// size times its unpacked element count, zero where either is not fixed.
+// size times its unpacked element count, zero where either is not fixed. A
+// string is a dynamic array of bytes to a bit-stream cast (printed page 143),
+// so its size is never fixed; the 64 bits EvalStructMemberWidth gives it are
+// the simulator's storage for the string's handle.
 uint32_t MemberBitStreamWidth(const StructMember& m, const TypedefMap& typedefs,
                               int depth) {
+  if (m.type_kind == DataTypeKind::kString) return 0;
   const DataType* member_type =
       m.nested_type != nullptr ? m.nested_type : MemberNamedType(m, typedefs);
   uint32_t element = member_type == nullptr

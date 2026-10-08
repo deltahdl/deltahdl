@@ -521,4 +521,20 @@ TEST(BitStreamCastElab, UnpackedStructOperandOfTheSameSizeAccepted) {
              "endmodule\n"));
 }
 
+// §6.24.3 (printed page 143): a bit-stream cast takes a string as a dynamic
+// array of bytes, so an unpacked structure holding one is not a fixed-size
+// type and its size is checked at run time rather than here. A string member
+// counted as a fixed 64 bits made this structure 96 bits and the cast to 48
+// bits an error.
+TEST(BitStreamCastElab, UnpackedStructOperandWithAStringIsNotSizedHere) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  typedef struct {int n; string s;} pair_t;\n"
+             "  typedef bit [47:0] b48_t;\n"
+             "  pair_t p;\n"
+             "  b48_t b;\n"
+             "  initial b = b48_t'(p);\n"
+             "endmodule\n"));
+}
+
 }  // namespace
