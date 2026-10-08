@@ -424,8 +424,13 @@ bool VpiIterateMatchesKindMode(int obj_type, const VpiIterateModes& modes,
     *matched = VpiIsPackedArrayVarElementType(obj_type);
     return true;
   }
-  if (modes.packed_array_var_index || modes.var_select_index) {
+  if (modes.packed_array_var_index) {
     *matched = VpiIsExprType(obj_type);
+    return true;
+  }
+  // §37.58's simple expr holds nets and variables too: `v[i]` indexes by i.
+  if (modes.var_select_index) {
+    *matched = VpiIsExprOperandType(obj_type);
     return true;
   }
   return false;

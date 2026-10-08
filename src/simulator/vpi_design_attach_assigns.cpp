@@ -308,6 +308,23 @@ VpiObject* VaryingBitObject(VpiObject* base, const Expr* index,
   return bit;
 }
 
+// §37.19: a select of an element of the array var `base` whose index is not a
+// constant: a var select reaching the array through vpiParent and the
+// expression the source wrote through vpiIndex. Which element it stands for is
+// not fixed before the run, so it holds none, and its value is the one of the
+// element its index selects when the value is read or written (vpi_value.cpp).
+VpiObject* VarSelectObject(VpiObject* base, const Expr* index,
+                           const AssignBuild& build) {
+  VpiObject* select = build.alloc();
+  select->type = vpiVarSelect;
+  select->parent = base;
+  select->index_expr = ExpressionObject(index, build);
+  if (select->index_expr != nullptr) {
+    select->children.push_back(select->index_expr);
+  }
+  return select;
+}
+
 // §37.16 detail 31, §37.17 detail 26: the kind a select out of `root` that
 // leaves packed dimensions unindexed is, a vector of the kind `root` is: a
 // logic var or a bit var as the variable is four- or two-state, or the net
@@ -400,7 +417,9 @@ VpiObject* BitSelectObject(const Expr* expr, const AssignBuild& build) {
   }
   if (expr->index == nullptr) return nullptr;
   if (expr->index->kind != ExprKind::kIntegerLiteral) {
-    return VaryingBitObject(base, expr->index, build);
+    return base->type == vpiArrayVar
+               ? VarSelectObject(base, expr->index, build)
+               : VaryingBitObject(base, expr->index, build);
   }
   const auto kIndex = static_cast<int>(expr->index->int_val);
   for (VpiObject* child : base->children) {

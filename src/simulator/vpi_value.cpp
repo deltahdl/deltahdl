@@ -379,6 +379,25 @@ static std::optional<int64_t> VaryingOffset(const VpiObject& obj,
          (dim.OffsetOf(*kIndex) * std::max(obj.size, 1));
 }
 
+// §11.5.1: the value a read that selects nothing gives, `width` bits of x in a
+// 4-state value and of 0 in a 2-state one.
+static void DispatchUnselected(int width, bool is_4state, s_vpi_value* value,
+                               VpiValuePools& pools) {
+  const uint64_t kFill = is_4state ? ~uint64_t{0} : 0;
+  std::vector<Logic4Word> words((static_cast<std::size_t>(width) + 63) / 64,
+                                Logic4Word{kFill, kFill});
+  if (width % 64 != 0) {
+    const uint64_t kMask = (uint64_t{1} << (width % 64)) - 1;
+    words.back().aval &= kMask;
+    words.back().bval &= kMask;
+  }
+  Logic4Vec fill;
+  fill.width = static_cast<uint32_t>(width);
+  fill.nwords = static_cast<uint32_t>(words.size());
+  fill.words = words.data();
+  DispatchIntegerFormat(fill, value, pools);
+}
+
 // §38.15 for a varying select: the value of the bits its index selects, or,
 // when it selects none, x of a 4-state vector and 0 of a 2-state one in each
 // of its bits (§11.5.1). Its storage is its vector's (SliceObject).
@@ -387,25 +406,24 @@ static void GetVaryingSelectValue(VpiHandle obj, const PackedRange& dim,
                                   SimContext* sim) {
   const Variable& whole = *obj->var;
   const int kWidth = std::max(obj->size, 1);
-  std::vector<Logic4Word> words;
   if (const std::optional<int64_t> kOffset = VaryingOffset(*obj, dim, sim)) {
+    std::vector<Logic4Word> words;
     DispatchIntegerFormat(SliceOfValue(whole.value, *kOffset, kWidth, words),
                           value, pools);
     return;
   }
-  const uint64_t kFill = whole.is_4state ? ~uint64_t{0} : 0;
-  words.assign((static_cast<std::size_t>(kWidth) + 63) / 64,
-               Logic4Word{kFill, kFill});
-  if (kWidth % 64 != 0) {
-    const uint64_t kMask = (uint64_t{1} << (kWidth % 64)) - 1;
-    words.back().aval &= kMask;
-    words.back().bval &= kMask;
+  DispatchUnselected(kWidth, whole.is_4state, value, pools);
+}
+
+// §37.19: the element of its array var that a var select's index names now;
+// null where the index holds an x or z bit or lies outside the array (§11.5.1).
+static VpiHandle VarSelectElement(const VpiObject& select, SimContext* sim) {
+  const std::optional<int64_t> kIndex = VaryingIndex(select, sim);
+  if (!kIndex) return nullptr;
+  for (VpiObject* child : select.parent->children) {
+    if (child->array_member && child->index == *kIndex) return child;
   }
-  Logic4Vec fill;
-  fill.width = static_cast<uint32_t>(kWidth);
-  fill.nwords = static_cast<uint32_t>(words.size());
-  fill.words = words.data();
-  DispatchIntegerFormat(fill, value, pools);
+  return nullptr;
 }
 
 // §37.12: binds the object of a variable a named block declares to the storage
@@ -439,6 +457,20 @@ void VpiContext::GetValue(VpiHandle obj, s_vpi_value* value) {
     ++obj->side_effect_count;
   }
   if (GetValueIsRefused(obj, value, last_error_)) return;
+  // §37.19 with §11.5.1: a var select reads the element its index names now,
+  // and the default of its elements' type where the index names none. Every
+  // element of the array is one width and kind (§7.4), so the first speaks
+  // for them all.
+  if (obj->type == vpiVarSelect) {
+    if (VpiHandle element = VarSelectElement(*obj, sim_ctx_)) {
+      GetValue(element, value);
+      return;
+    }
+    const VpiObject& kElement = *obj->parent->children.front();
+    DispatchUnselected(kElement.size, kElement.var->is_4state, value,
+                       value_pools_);
+    return;
+  }
   VpiRefreshElementCopy(*obj);
   BindRunStorage(*obj, sim_ctx_);
   if (!obj->var) {
@@ -667,6 +699,9 @@ static bool PutValueIsSealed(const VpiObject& obj, s_vpi_error_info& error) {
 static VpiHandle PutValueTargetOf(VpiHandle obj,
                                   const std::function<VpiObject*()>& alloc,
                                   SimContext* sim) {
+  // §37.19: a put to a var select writes the element its index names now, and
+  // nothing where it names none (§11.5.1).
+  if (obj->type == vpiVarSelect) return VarSelectElement(*obj, sim);
   const PackedRange* dim = VaryingSelectDim(*obj);
   if (dim == nullptr) return obj;
   // A varying select stands for the bits its index names when the value is

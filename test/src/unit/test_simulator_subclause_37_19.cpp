@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -150,6 +152,86 @@ TEST_F(VariableSelectObject,
   ASSERT_EQ(seen.size(), 2u);
   EXPECT_EQ(VpiObjectOf(seen[0]), &index_);
   EXPECT_EQ(VpiObjectOf(seen[1]), &second);
+}
+
+// The var selects of a run: the second terminal of the gate g of top, written
+// as an element of the array var v selected by an index that varies.
+class VarSelectsOfARun : public VpiDesignRun {
+ protected:
+  // The design whose g selects v[i], i declared by `decls` and set by
+  // `setup` once v holds 0 and 1.
+  static std::string Design(const std::string& decls,
+                            const std::string& setup) {
+    return "module top; logic v [2]; " + decls +
+           " wire y; logic c;\n"
+           "  and g(y, v[i], c);\n"
+           "  initial begin v[0] = 0; v[1] = 1; " +
+           setup + " end\nendmodule\n";
+  }
+
+  // What the second terminal of g reaches through vpiExpr.
+  static vpiHandle Select() {
+    vpiHandle it =
+        vpi_iterate(vpiPrimTerm, Named(vpiPrimitive, By("top"), "g"));
+    if (it == nullptr) return nullptr;
+    vpi_scan(it);
+    vpiHandle term = vpi_scan(it);
+    vpi_free_object(it);
+    return term == nullptr ? nullptr : vpi_handle(vpiExpr, term);
+  }
+
+  // The value of `obj` as a binary string.
+  static std::string BinOf(vpiHandle obj) {
+    s_vpi_value value = {};
+    value.format = vpiBinStrVal;
+    vpi_get_value(obj, &value);
+    return value.format == vpiBinStrVal && value.value.str != nullptr
+               ? std::string(value.value.str)
+               : std::string();
+  }
+};
+
+// §37.19: an element of an array var selected by an index that varies is a
+// var select, reaching the array through vpiParent and the index expression
+// through vpiIndex, and not a constant select (detail 1). It reached nothing.
+TEST_F(VarSelectsOfARun, AVaryingIndexIntoAnArrayVarIsAVarSelect) {
+  Run(Design("int i;", "i = 1;"));
+  vpiHandle select = Select();
+  ASSERT_NE(select, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, select), vpiVarSelect);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, select)),
+            VpiObjectOf(By("top.v")));
+  EXPECT_EQ(vpi_get(vpiConstantSelect, select), 0);
+  vpiHandle it = vpi_iterate(vpiIndex, select);
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), VpiObjectOf(By("top.i")));
+}
+
+// §37.19 with §38.15 and §38.34: a var select reads the element its index
+// names when read, and a put writes that element.
+TEST_F(VarSelectsOfARun, AVarSelectReadsAndWritesTheElementItsIndexNames) {
+  Run(Design("int i;", "i = 1;"));
+  vpiHandle select = Select();
+  ASSERT_NE(select, nullptr);
+  EXPECT_EQ(BinOf(select), "1");
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  value.value.integer = 0;
+  vpi_put_value(select, &value, nullptr, vpiNoDelay);
+  EXPECT_EQ(BinOf(By("top.v[1]")), "0");
+}
+
+// §11.5.1: a read through an index outside the array yields the default of a
+// 4-state element, x...
+TEST_F(VarSelectsOfARun, AVarSelectWhoseIndexIsOutOfRangeReadsX) {
+  Run(Design("int i;", "i = 5;"));
+  EXPECT_EQ(BinOf(Select()), "x");
+}
+
+// ...and so does a read through an index holding x.
+TEST_F(VarSelectsOfARun, AVarSelectWhoseIndexHoldsXReadsX) {
+  Run(Design("integer i;", ""));
+  EXPECT_EQ(BinOf(Select()), "x");
 }
 
 }  // namespace
