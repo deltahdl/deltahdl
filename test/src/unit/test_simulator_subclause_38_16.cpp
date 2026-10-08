@@ -557,6 +557,25 @@ TEST_F(VpiGetValueArraySim, VectorValCarriesAnElementWiderThan32Bits) {
   EXPECT_EQ(av.value.vectors[3].aval, 0xCDu);
 }
 
+// §38.16: the routine reads static unpacked net arrays as it reads variable
+// arrays, each element's resolved value in fastest-varying order.
+TEST_F(VpiGetValueArraySim, ANetArrayIsReadElementByElement) {
+  VpiHandle arr = MakeArray("na", {{0, 1}}, 2, 32);
+  arr->type = vpiNetArray;  // present the array as a net array
+  SetElem(0, 21);
+  SetElem(1, 22);
+  s_vpi_arrayvalue av = {};
+  av.format = vpiIntVal;
+  PLI_INT32 index[1] = {0};
+  vpi_get_value_array(VpiHandleOf(arr), &av, index, 2);
+
+  s_vpi_error_info info = {};
+  EXPECT_EQ(vpi_chk_error(&info), 0);
+  ASSERT_NE(av.value.integers, nullptr);
+  EXPECT_EQ(av.value.integers[0], 21);
+  EXPECT_EQ(av.value.integers[1], 22);
+}
+
 // What the case's calltf read out of `top.arr` with vpi_get_value_array.
 std::vector<PLI_INT32>& ArrayRead() {
   static std::vector<PLI_INT32> read;
