@@ -85,6 +85,12 @@ TEST(SvaEngine, ImpliesIffTreatVacuousPassAsHolding) {
   EXPECT_EQ(
       EvalPropertyIff(PropertyResult::kVacuousPass, PropertyResult::kFail),
       PropertyResult::kFail);
+  EXPECT_EQ(
+      EvalPropertyIff(PropertyResult::kPass, PropertyResult::kVacuousPass),
+      PropertyResult::kPass);
+  EXPECT_EQ(
+      EvalPropertyIff(PropertyResult::kFail, PropertyResult::kVacuousPass),
+      PropertyResult::kFail);
 }
 
 // --- Live cases: implies and iff over real source ---
