@@ -790,7 +790,8 @@ TEST_F(VpiPutValueSim, APutWithNoSchedulerNotesNothing) {
 
 // §38.34: a delay mode takes its delay from time_p, a delay being present
 // when the time is nonzero in its high word, its low word or its real value,
-// and absent when no time is given, the write then made at once. A present
+// and absent when no time is given or the time is zero throughout, the write
+// then made at once. A present
 // delay with vpiReturnEvent hands back the scheduled event's handle.
 TEST_F(VpiPutValueSim, ADelayIsPresentWhereAnyPartOfTheTimeIsNonzero) {
   auto* var = sim_ctx_.CreateVariable("dl", 8);
@@ -813,6 +814,9 @@ TEST_F(VpiPutValueSim, ADelayIsPresentWhereAnyPartOfTheTimeIsNonzero) {
   real.type = vpiScaledRealTime;
   real.real = 2.0;
   EXPECT_NE(vpi_put_value(h, &val, &real, kFlags), nullptr);
+  s_vpi_time zero = {};
+  zero.type = vpiSimTime;
+  EXPECT_EQ(vpi_put_value(h, &val, &zero, kFlags), nullptr);
 }
 
 // §38.36.2 with §4.4.2.9: a cbReadOnlySynch routine writes no value, but a
