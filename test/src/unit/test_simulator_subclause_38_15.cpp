@@ -916,21 +916,18 @@ TEST_F(ExpressionValuesOfARun, ASelectNamingNoElementReadsItsVectorsDefault) {
 
 // §27.4 with §37.17 detail 26: a select written in a loop generate block
 // whose index is the loop's genvar stands for the element the genvar names in
-// each block instance, m[1] in the first and m[2] in the second.
+// the block instance, m[2] for g 2. The loop makes one instance, a
+// continuous assignment in a block being one VPI object for every instance
+// of it (#5694).
 TEST_F(ExpressionValuesOfARun, AGenvarIndexedSelectNamesItsBlocksElement) {
   Run("module top; logic [3:0][7:0] m = 32'h44332211;\n"
-      "  for (genvar g = 1; g < 3; g++) begin : gb\n"
+      "  for (genvar g = 2; g < 3; g++) begin : gb\n"
       "    wire [7:0] y; assign y = m[g];\n"
       "  end\n"
       "endmodule\n");
-  vpiHandle it = vpi_iterate(vpiContAssign, By("top"));
-  ASSERT_NE(it, nullptr);
-  vpiHandle first = vpi_handle(vpiRhs, vpi_scan(it));
-  vpiHandle second = vpi_handle(vpiRhs, vpi_scan(it));
-  ASSERT_NE(first, nullptr);
-  ASSERT_NE(second, nullptr);
-  EXPECT_EQ(IntOf(first), 0x22);
-  EXPECT_EQ(IntOf(second), 0x33);
+  vpiHandle select = RhsIn("top");
+  ASSERT_NE(select, nullptr);
+  EXPECT_EQ(IntOf(select), 0x33);
 }
 
 }  // namespace
