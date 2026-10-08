@@ -95,18 +95,23 @@ int VpiNamedTypeVariableKind(const RtlirDesign& design, const RtlirModule& mod,
 
 namespace {
 
-// §37.26: the member variable of `holder` the field `field` lays out: its
-// vpiParent is the struct or union var, it is named after the field, its kind
-// is the one a variable of the field's type has (§37.17), and its value is the
-// field's bits of the holder's value, a copy that a read refreshes and a write
-// is copied back from, read as a real where the field is one.
+// §37.26: the member of `holder` the field `field` lays out: its vpiParent is
+// the struct or union var or net, it is named after the field, its kind is a
+// net for a net's member and otherwise the one a variable of the field's type
+// has (§37.17), and its value is the field's bits of the holder's value, a
+// copy that a read refreshes and a write is copied back from, read as a real
+// where the field is one.
 void MakeMember(VpiObject* holder, const StructFieldInfo& field,
                 const RtlirDesign& design, const RtlirModule& mod,
                 const VpiAttachBuild& build) {
   VpiObject* member = build.alloc();
-  member->type = field.type_kind == DataTypeKind::kNamed
-                     ? VpiNamedTypeVariableKind(design, mod, field.type_name)
-                     : VpiDataTypeVariableKind(field.type_kind);
+  if (holder->type == vpiStructNet || holder->type == vpiUnionNet) {
+    member->type = kVpiNet;
+  } else if (field.type_kind == DataTypeKind::kNamed) {
+    member->type = VpiNamedTypeVariableKind(design, mod, field.type_name);
+  } else {
+    member->type = VpiDataTypeVariableKind(field.type_kind);
+  }
   member->parent = holder;
   member->name = build.keep(std::string(field.name));
   member->full_name = holder->full_name + "." + std::string(field.name);
@@ -127,10 +132,12 @@ void MakeMember(VpiObject* holder, const StructFieldInfo& field,
 
 void AttachStructMembers(const RtlirDesign* design, const VpiObjectMap& objects,
                          SimContext& ctx, const VpiAttachBuild& build) {
-  // §37.17 details 3, 17 and 26: an unpacked struct or union var has a member
-  // variable per field, the struct as its vpiParent and the field's value as
-  // its own. The run keeps the whole struct as one variable, and no member
-  // object was made, so vpiMember reached nothing and no name reached a field.
+  // §37.17 details 3, 17 and 26: a struct or union var, packed or not, has a
+  // member variable per field, the struct as its vpiParent and the field's
+  // value as its own. The run keeps the whole struct as one variable, and no
+  // member object was made, so vpiMember reached nothing and no name reached a
+  // field; a packed one was passed over after that, though §37.26 makes
+  // vpiPacked only a property of the struct var.
   if (design == nullptr) return;
   WalkInstancePaths(
       design, [&](const RtlirModule* mod, const std::string& prefix) {
@@ -142,7 +149,22 @@ void AttachStructMembers(const RtlirDesign* design, const VpiObjectMap& objects,
             continue;
           }
           const StructTypeInfo* info = ctx.GetVariableStructType(kKey);
-          if (info == nullptr || info->is_packed) continue;
+          if (info == nullptr) continue;
+          for (const StructFieldInfo& field : info->fields) {
+            MakeMember(holder, field, *design, *mod, build);
+          }
+        }
+        // §37.26: a net of a structure or union type is a struct net or a
+        // union net, with a member net per field. Every net of the run is an
+        // object (VpiContext::Attach), and the run registers the layout of
+        // each one of an aggregate type under the same key
+        // (RegisterAggregateLayout); each reported vpiNet and held no member.
+        for (const RtlirNet& net : mod->nets) {
+          const std::string kKey = VpiFlatName(prefix, net.name);
+          const StructTypeInfo* info = ctx.GetVariableStructType(kKey);
+          if (info == nullptr) continue;
+          VpiObject* holder = FindObjectForFlatName(objects, kKey);
+          holder->type = info->is_union ? vpiUnionNet : vpiStructNet;
           for (const StructFieldInfo& field : info->fields) {
             MakeMember(holder, field, *design, *mod, build);
           }

@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <vector>
+
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
@@ -249,6 +253,66 @@ TEST_F(StructuresAndUnions, AnAggregateWithNoMembersReachesNone) {
   child.parent = &plain;
   plain.children = {&child};
   EXPECT_EQ(vpi_iterate(vpiMember, VpiHandleOf(&plain)), nullptr);
+}
+
+// The structures and unions of a run, built from the elaborated design rather
+// than by hand.
+class StructuresOfARun : public VpiDesignRun {
+ protected:
+  // The integer value of an object.
+  static int IntOf(vpiHandle obj) {
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(obj, &value);
+    return value.value.integer;
+  }
+};
+
+// §37.26 with §37.17 detail 3: a packed struct var has a member variable per
+// field, as an unpacked one does -- vpiPacked is a property of the struct var,
+// not a limit on its members -- each a child of the struct var holding its
+// field's bits. None was made for a packed struct.
+TEST_F(StructuresOfARun, APackedStructVarHasAMemberPerField) {
+  Run("module top; struct packed {logic a; logic [1:0] b;} s = 3'b110;\n"
+      "endmodule\n");
+  EXPECT_EQ(NamesOf(vpiMember, By("top.s")),
+            (std::vector<std::string>{"a", "b"}));
+  vpiHandle b = By("top.s.b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(vpi_get(vpiSize, b), 2);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, b)), VpiObjectOf(By("top.s")));
+  EXPECT_EQ(IntOf(b), 2);
+  EXPECT_EQ(IntOf(By("top.s.a")), 1);
+}
+
+// §37.26: a net of a structure type is a struct net, and one of a union type
+// a union net. Both reported vpiNet.
+TEST_F(StructuresOfARun, AStructOrUnionNetHasItsOwnKind) {
+  Run("module top;\n"
+      "  typedef struct packed {logic a; logic b;} pair_t;\n"
+      "  typedef union packed {logic [1:0] x; logic [1:0] y;} both_t;\n"
+      "  wire pair_t n;\n"
+      "  wire both_t u;\n"
+      "endmodule\n");
+  EXPECT_EQ(vpi_get(vpiType, By("top.n")), vpiStructNet);
+  EXPECT_EQ(vpi_get(vpiType, By("top.u")), vpiUnionNet);
+}
+
+// §37.26: a struct net has a member net per field, its vpiParent the struct
+// net and its value that field's bits of the net's.
+TEST_F(StructuresOfARun, AStructNetHasAMemberNetPerField) {
+  Run("module top;\n"
+      "  typedef struct packed {logic a; logic b;} pair_t;\n"
+      "  wire pair_t n;\n"
+      "  assign n = 2'b10;\n"
+      "endmodule\n");
+  EXPECT_EQ(NamesOf(vpiMember, By("top.n")),
+            (std::vector<std::string>{"a", "b"}));
+  vpiHandle a = By("top.n.a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, a)), VpiObjectOf(By("top.n")));
+  EXPECT_EQ(IntOf(a), 1);
+  EXPECT_EQ(IntOf(By("top.n.b")), 0);
 }
 
 }  // namespace
