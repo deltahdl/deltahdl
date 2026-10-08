@@ -305,5 +305,29 @@ TEST_F(VpiPutDataSim, TheSaveRestartLocationIsNotReadableElsewhere) {
   EXPECT_FALSE(g_location_read_outside);
 }
 
+// §38.31: the location is as readable from a cbEndOfSave routine as from a
+// cbStartOfSave one.
+TEST_F(VpiPutDataSim, TheSaveRestartLocationIsReadableAtTheEndOfASave) {
+  g_location_in_save.clear();
+  g_location_read_in_save = false;
+  vpi_ctx_.SetSaveRestartLocation("end.save");
+
+  DispatchWith(cbEndOfSave, ReadLocationCb, nullptr);
+
+  ASSERT_TRUE(g_location_read_in_save);
+  EXPECT_EQ(g_location_in_save, "end.save");
+}
+
+// §38.31: the query hands back the path to a location; a tool that has been
+// given none has no path to hand back, and the query answers null rather than
+// an empty string.
+TEST_F(VpiPutDataSim, NoSaveRestartLocationIsReadAsNull) {
+  g_location_read_in_save = true;
+
+  DispatchWith(cbStartOfSave, ReadLocationCb, nullptr);
+
+  EXPECT_FALSE(g_location_read_in_save);
+}
+
 }  // namespace
 }  // namespace delta

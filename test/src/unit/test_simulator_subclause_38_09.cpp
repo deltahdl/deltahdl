@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstring>
+#include <string>
 
 #include "helpers_vpi_save_restore_probe.h"
 #include "simulator/vpi_constants.h"
@@ -239,6 +240,26 @@ TEST_F(VpiGetDataSim, NoBytesAreSavedOrRead) {
   nothing.request = 0;
   DispatchWith(cbStartOfRestart, ReadOnceCb, &nothing);
   EXPECT_EQ(nothing.returned, 0);
+}
+
+// The save/restart location a routine read, "(none)" where it read null.
+int ReadRestartLocationCb(s_cb_data* cb) {
+  const char* path = vpi_get_str(vpiSaveRestartLocation, nullptr);
+  *reinterpret_cast<std::string*>(cb->user_data) =
+      path != nullptr ? path : "(none)";
+  return 0;
+}
+
+// §38.9: a routine running for cbStartOfRestart or cbEndOfRestart may read the
+// path to the save/restart location with vpi_get_str(vpiSaveRestartLocation,
+// NULL), as a save routine may (§38.31).
+TEST_F(VpiGetDataSim, TheSaveRestartLocationIsReadableFromARestartRoutine) {
+  vpi_ctx_.SetSaveRestartLocation("run.save");
+  for (int reason : {cbStartOfRestart, cbEndOfRestart}) {
+    std::string location;
+    DispatchWith(reason, ReadRestartLocationCb, &location);
+    EXPECT_EQ(location, "run.save") << reason;
+  }
 }
 
 }  // namespace

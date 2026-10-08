@@ -206,5 +206,14 @@ TEST_F(VpiGetStringInARun, AnInstanceReportsWhatItIsAnInstanceOf) {
   EXPECT_EQ(g_definition_name, "m");
 }
 
+// §38.11: vpiDefName names what an object is an instance or definition of; a
+// net is neither, so it has no definition name and the query answers null.
+TEST_F(VpiGetStringSim, ANetHasNoDefinitionName) {
+  VpiObject net;
+  net.type = vpiNet;
+  net.name = "w";
+  EXPECT_EQ(vpi_get_str(vpiDefName, VpiHandleOf(&net)), nullptr);
+}
+
 }  // namespace
 }  // namespace delta

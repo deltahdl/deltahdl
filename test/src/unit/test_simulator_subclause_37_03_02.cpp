@@ -218,7 +218,7 @@ TEST_F(VpiObjectTypeProperty, GetStrNamesTheOperatorsAnnexMAdds) {
 
 // §37.3.2: vpiPrimType, vpiDelayType and vpiTchkType are additional type
 // properties too, and vpi_get_str names the constant each reports, from the
-// first to the last of its set in Annex K; a value outside the set has no
+// first to the last of its set in Annex K; a value outside its set has no
 // name. None of the three had a name.
 TEST_F(VpiObjectTypeProperty, GetStrNamesThePrimitiveDelayAndCheckTypes) {
   VpiObject prim;
@@ -242,6 +242,8 @@ TEST_F(VpiObjectTypeProperty, GetStrNamesThePrimitiveDelayAndCheckTypes) {
       {&check, vpiTchkType, &check.tchk_type, vpiSetup, "vpiSetup"},
       {&check, vpiTchkType, &check.tchk_type, vpiTimeskew, "vpiTimeskew"},
       {&prim, vpiPrimType, &prim.prim_type, 0, nullptr},
+      {&path, vpiDelayType, &path.delay_type, 0, nullptr},
+      {&check, vpiTchkType, &check.tchk_type, 0, nullptr},
   };
   for (const auto& c : kCases) {
     *c.field = c.value;
