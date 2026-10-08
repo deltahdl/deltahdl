@@ -322,13 +322,13 @@ int CountOf(int type, vpiHandle ref) {
 // declaring it, a top module among them, so the top reaches its own path and
 // check while the instance it holds reaches the instance's.
 TEST_F(TimingChecksOfARun, ATopModulesSpecifyBlockHangsFromTheTop) {
-  Run("module cell(input c, output e);\n"
+  Run("module leaf(input c, output e);\n"
       "  assign e = c;\n"
       "  specify (c => e) = 1; $width(posedge c, 1); endspecify\n"
       "endmodule\n"
       "module top(input a, output b);\n"
       "  assign b = a;\n"
-      "  cell u(.c(a), .e());\n"
+      "  leaf u(.c(a), .e());\n"
       "  specify (a => b) = 2; $width(negedge a, 2); endspecify\n"
       "endmodule\n");
   EXPECT_EQ(CountOf(vpiModPath, By("top")), 1);

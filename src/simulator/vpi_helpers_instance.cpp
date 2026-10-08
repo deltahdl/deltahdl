@@ -12,7 +12,6 @@
 #include "elaborator/rtlir_primitives.h"
 #include "parser/ast_specify.h"
 #include "simulator/sim_context.h"
-#include "simulator/sim_context_name_tables.h"
 #include "simulator/specify.h"
 #include "simulator/specify_path_delay.h"
 #include "simulator/specify_timing_check.h"
