@@ -500,6 +500,13 @@ struct ArrayPortAlias {
   UnpackedDimShape conn_shape;
 };
 
+// "name[address]", an element named by its address's 32 bits, as
+// ArrayElementKey made it and every select names it, so `[-1:0]` holds
+// [4294967295] and [0] whether a bound arrived signed or as its 32 bits.
+static std::string ArrayElementName(const std::string& name, int64_t address) {
+  return name + "[" + std::to_string(static_cast<uint32_t>(address)) + "]";
+}
+
 // §23.3.3.3 and §23.3.3.2 make an inout or a ref port one object with its
 // connection, as LowerPortBindings aliases a scalar one; an array port is so
 // element by element.
@@ -507,9 +514,8 @@ static void AliasArrayPortElements(const ArrayPortAlias& a, SimContext& ctx,
                                    Arena& arena) {
   for (uint32_t p = 0; p < a.port_shape.size; ++p) {
     const std::string& local_key = *arena.Create<std::string>(
-        a.local + "[" + std::to_string(a.port_shape.AddressAt(p)) + "]");
-    std::string target =
-        a.target + "[" + std::to_string(a.conn_shape.AddressAt(p)) + "]";
+        ArrayElementName(a.local, a.port_shape.AddressAt(p)));
+    std::string target = ArrayElementName(a.target, a.conn_shape.AddressAt(p));
     ctx.AliasVariable(local_key, target);
     ctx.AliasNet(local_key, target);
   }

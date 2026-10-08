@@ -213,6 +213,31 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
             "3 7 3 7\n");
 }
 
+// §23.3.3.2 makes a ref port one variable with its connection, and an array
+// port is so element by element, whatever its bounds: §7.4.2 lets them be
+// negative. The child writes p[-1] and the parent a[0], and each is seen from
+// both sides. The elements were aliased by their signed addresses, p[-1] to
+// a[4294967295] and p[0] to a[4294967296], none of which is an element, so
+// neither write crossed the port.
+TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
+     RefArrayPortWithANegativeBoundIsItsArrayElementByElement) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module child(ref logic [7:0] p [-1:0]);\n"
+                       "  initial p[-1] = 8'h5a;\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  logic [7:0] a [-1:0];\n"
+                       "  child u(a);\n"
+                       "  initial begin\n"
+                       "    a[0] = 8'h3c;\n"
+                       "    #1 $display(\"%h %h %h %h\", a[-1], a[0], "
+                       "u.p[-1], u.p[0]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "5a 3c 5a 3c\n");
+}
+
 // §10.7 gives an element the value of its declared type, and §6.11.3 its
 // signedness by the declaration: `logic [3:0] d [2]` written 4'sd9, by a
 // statement or a continuous assignment, reads 9, as a scalar of that type
