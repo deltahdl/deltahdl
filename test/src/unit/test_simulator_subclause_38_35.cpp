@@ -3,7 +3,10 @@
 #include <cstdint>
 
 #include "helpers_vpi_value_array.h"
+#include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/variable.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -387,6 +390,135 @@ TEST_F(VpiPutValueArraySim, VectorValWritesVecvalGroupsToElements) {
 
   EXPECT_EQ(elems_[0]->value.words[0].aval, 0xABCDu);
   EXPECT_EQ(elems_[0]->value.words[0].bval, 0x00F0u);
+}
+
+// §38.35 with §38.2: the routine is handed nothing to write with a null array
+// handle or a null value structure, and returns without touching the array or
+// recording an error.
+TEST_F(VpiPutValueArraySim, ANullHandleOrValueWritesNothing) {
+  VpiHandle arr = MakeArray("nh", {{0}}, 1, 32);
+  PLI_INT32 ints[1] = {7};
+  s_vpi_arrayvalue av = {};
+  av.format = vpiIntVal;
+  av.value.integers = ints;
+  PLI_INT32 index[1] = {0};
+  vpi_put_value_array(nullptr, &av, index, 1);
+  vpi_put_value_array(VpiHandleOf(arr), nullptr, index, 1);
+
+  s_vpi_error_info info = {};
+  EXPECT_EQ(vpi_chk_error(&info), 0);
+  EXPECT_EQ(elems_[0]->value.words[0].bval, 0xFFFFFFFFu);  // still x
+}
+
+// §38.36.2 with §4.4.2.9: no value is written while a cbReadOnlySynch routine
+// runs, so the call is refused, the error recorded and the array unchanged.
+TEST_F(VpiPutValueArraySim, NoValueIsWrittenFromAReadOnlySynchCallback) {
+  VpiHandle arr = MakeArray("ro", {{0}}, 1, 32);
+  vpi_ctx_.SetAtReadOnlySynchTime(true);
+  PLI_INT32 ints[1] = {7};
+  s_vpi_arrayvalue av = {};
+  av.format = vpiIntVal;
+  av.value.integers = ints;
+  PLI_INT32 index[1] = {0};
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 1);
+
+  s_vpi_error_info info = {};
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
+  EXPECT_EQ(elems_[0]->value.words[0].bval, 0xFFFFFFFFu);  // still x
+}
+
+// §38.35: the routine modifies unpacked arrays alone, so a handle to a reg,
+// which is no array, is refused and the error recorded.
+TEST_F(VpiPutValueArraySim, AHandleToNoArrayIsError) {
+  VpiHandle arr = MakeArray("na", {{0}}, 1, 32);
+  arr->type = vpiReg;  // present the object as a reg rather than an array
+  PLI_INT32 ints[1] = {7};
+  s_vpi_arrayvalue av = {};
+  av.format = vpiIntVal;
+  av.value.integers = ints;
+  PLI_INT32 index[1] = {0};
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 1);
+
+  s_vpi_error_info info = {};
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
+  EXPECT_EQ(elems_[0]->value.words[0].bval, 0xFFFFFFFFu);  // still x
+}
+
+// §38.35: index_p gives one starting index per unpacked dimension, so a call
+// with no index array, or on an array that records no dimension to index, has
+// no element to start from and is refused.
+TEST_F(VpiPutValueArraySim, NoStartingIndexIsError) {
+  PLI_INT32 ints[1] = {7};
+  s_vpi_arrayvalue av = {};
+  av.format = vpiIntVal;
+  av.value.integers = ints;
+  s_vpi_error_info info = {};
+
+  VpiHandle arr = MakeArray("mi", {{0}}, 1, 32);
+  vpi_put_value_array(VpiHandleOf(arr), &av, /*index_p=*/nullptr, 1);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
+
+  VpiHandle undimensioned = MakeArray("ud", {}, 1, 32);
+  PLI_INT32 index[1] = {0};
+  vpi_put_value_array(VpiHandleOf(undimensioned), &av, index, 1);
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
+  EXPECT_EQ(elems_[0]->value.words[0].bval, 0xFFFFFFFFu);  // still x
+}
+
+// §38.35: a starting coordinate must name a declared element, so index 5 of
+// an array declared [0:1] is refused and nothing is written.
+TEST_F(VpiPutValueArraySim, OutOfRangeStartingIndexIsError) {
+  VpiHandle arr = MakeArray("oo", {{0, 1}}, 2, 32);
+  PLI_INT32 ints[1] = {7};
+  s_vpi_arrayvalue av = {};
+  av.format = vpiIntVal;
+  av.value.integers = ints;
+  PLI_INT32 index[1] = {5};
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 1);
+
+  s_vpi_error_info info = {};
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
+  EXPECT_EQ(elems_[0]->value.words[0].bval, 0xFFFFFFFFu);  // still x
+  EXPECT_EQ(elems_[1]->value.words[0].bval, 0xFFFFFFFFu);
+}
+
+// §38.35: the section is filled element by element from the start, and a
+// position with nothing to write is passed over: an element holding no
+// storage, and a position past the array's last element, where the section
+// runs off its end. The element between them is written all the same.
+TEST_F(VpiPutValueArraySim, PositionsWithNothingToWriteArePassedOver) {
+  Variable* stored = sim_ctx_.CreateVariable("ps1", 32);
+  VpiHandle arr = vpi_ctx_.CreateRegArray("ps", vpiStaticArray, {{0, 1, 2}},
+                                          {nullptr, stored});
+  PLI_INT32 ints[3] = {5, 6, 7};
+  s_vpi_arrayvalue av = {};
+  av.format = vpiIntVal;
+  av.value.integers = ints;
+  PLI_INT32 index[1] = {0};
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 3);
+
+  s_vpi_error_info info = {};
+  EXPECT_EQ(vpi_chk_error(&info), 0);
+  EXPECT_EQ(stored->value.words[0].aval, 6u);
+  EXPECT_EQ(stored->value.words[0].bval, 0u);
+}
+
+// §38.35: the vpiVectorVal format on a 2-state array keeps the aval bits and
+// drops the bval bits, a 2-state element holding no unknown.
+TEST_F(VpiPutValueArraySim, VectorValOnATwoStateArrayDropsTheBvalBits) {
+  VpiHandle arr =
+      MakeArray("v2", {{0}}, 1, 16, {vpiStaticArray, /*four_state=*/false});
+  s_vpi_vecval vecs[1] = {};
+  vecs[0].aval = 0x1234;
+  vecs[0].bval = 0x00FF;
+  s_vpi_arrayvalue av = {};
+  av.format = vpiVectorVal;
+  av.value.vectors = vecs;
+  PLI_INT32 index[1] = {0};
+  vpi_put_value_array(VpiHandleOf(arr), &av, index, 1);
+
+  EXPECT_EQ(elems_[0]->value.words[0].aval, 0x1234u);
+  EXPECT_EQ(elems_[0]->value.words[0].bval, 0u);
 }
 
 }  // namespace

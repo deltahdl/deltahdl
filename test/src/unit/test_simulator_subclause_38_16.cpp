@@ -5,7 +5,10 @@
 
 #include "fixture_vpi_run.h"
 #include "helpers_vpi_value_array.h"
+#include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/variable.h"
+#include "simulator/vpi_context.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -372,6 +375,140 @@ TEST_F(VpiGetValueArraySim, TheRawAndVectorFormatsSuitEveryElementType) {
   }
 }
 
+// §38.16 with §38.2: with a null array handle there is nothing to read, and
+// with a null value structure nowhere to read into, so the routine returns
+// without recording an error or touching the value arm it was given.
+TEST_F(VpiGetValueArraySim, ANullHandleOrValueReadsNothing) {
+  VpiHandle arr = MakeArray("nh", {{0}}, 1, 32);
+  SetElem(0, 3);
+  PLI_INT32 sentinel[1] = {0};
+  s_vpi_arrayvalue av = {};
+  av.format = vpiIntVal;
+  av.value.integers = sentinel;
+  PLI_INT32 index[1] = {0};
+  vpi_get_value_array(nullptr, &av, index, 1);
+  vpi_get_value_array(VpiHandleOf(arr), nullptr, index, 1);
+
+  s_vpi_error_info info = {};
+  EXPECT_EQ(vpi_chk_error(&info), 0);
+  EXPECT_EQ(av.value.integers, sentinel);
+  EXPECT_EQ(sentinel[0], 0);
+}
+
+// §38.16: the routine reads unpacked arrays alone, so a handle to a reg, which
+// is no array, is refused, the error recorded and the value arm nulled.
+TEST_F(VpiGetValueArraySim, AHandleToNoArrayIsError) {
+  VpiHandle arr = MakeArray("na", {{0}}, 1, 32);
+  arr->type = vpiReg;  // present the object as a reg rather than an array
+  PLI_INT32 sentinel[1] = {0};
+  s_vpi_arrayvalue av = {};
+  av.format = vpiIntVal;
+  av.value.integers = sentinel;
+  PLI_INT32 index[1] = {0};
+  vpi_get_value_array(VpiHandleOf(arr), &av, index, 1);
+
+  s_vpi_error_info info = {};
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
+  EXPECT_EQ(av.value.integers, nullptr);
+}
+
+// §38.16: index_p gives one starting index per unpacked dimension, so an array
+// that records no dimension has no element a coordinate could name.
+TEST_F(VpiGetValueArraySim, AnArrayWithNoDimensionToIndexIsError) {
+  VpiHandle arr = MakeArray("ud", {}, 1, 32);
+  PLI_INT32 sentinel[1] = {0};
+  s_vpi_arrayvalue av = {};
+  av.format = vpiIntVal;
+  av.value.integers = sentinel;
+  PLI_INT32 index[1] = {0};
+  vpi_get_value_array(VpiHandleOf(arr), &av, index, 1);
+
+  s_vpi_error_info info = {};
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
+  EXPECT_EQ(av.value.integers, nullptr);
+}
+
+// §38.16: the section is read element by element from the start, and a
+// position with nothing to read reads 0: an element holding no storage, and a
+// position past the array's last element, where the section runs off its end.
+// The element between them is read all the same, and gives the section its
+// width.
+TEST_F(VpiGetValueArraySim, PositionsWithNothingToReadReadZero) {
+  Variable* stored = sim_ctx_.CreateVariable("ps1", 32);
+  stored->value.words[0].aval = 9;
+  stored->value.words[0].bval = 0;
+  VpiHandle arr = vpi_ctx_.CreateRegArray("ps", vpiStaticArray, {{0, 1, 2}},
+                                          {nullptr, stored});
+  PLI_INT32 buf[3] = {-1, -1, -1};
+  s_vpi_arrayvalue av = {};
+  av.format = vpiIntVal;
+  av.flags = vpiUserAllocFlag;
+  av.value.integers = buf;
+  PLI_INT32 index[1] = {0};
+  vpi_get_value_array(VpiHandleOf(arr), &av, index, 3);
+
+  s_vpi_error_info info = {};
+  EXPECT_EQ(vpi_chk_error(&info), 0);
+  EXPECT_EQ(buf[0], 0);
+  EXPECT_EQ(buf[1], 9);
+  EXPECT_EQ(buf[2], 0);
+}
+
+// §38.16: a section none of whose positions holds storage has no element to
+// take a width from, and reads 0 throughout.
+TEST_F(VpiGetValueArraySim, ASectionHoldingNoStorageReadsZero) {
+  VpiHandle arr =
+      vpi_ctx_.CreateRegArray("nn", vpiStaticArray, {{0, 1}}, {nullptr});
+  PLI_INT32 buf[2] = {-1, -1};
+  s_vpi_arrayvalue av = {};
+  av.format = vpiIntVal;
+  av.flags = vpiUserAllocFlag;
+  av.value.integers = buf;
+  PLI_INT32 index[1] = {0};
+  vpi_get_value_array(VpiHandleOf(arr), &av, index, 2);
+
+  EXPECT_EQ(buf[0], 0);
+  EXPECT_EQ(buf[1], 0);
+}
+
+// §38.16: the vpiVectorVal format reports a 2-state element as known, its bval
+// bits 0 whatever its storage's bval word holds.
+TEST_F(VpiGetValueArraySim, VectorValOfATwoStateArrayReportsKnownBits) {
+  VpiHandle arr =
+      MakeArray("v2", {{0}}, 1, 16, {vpiStaticArray, /*four_state=*/false});
+  SetElem(0, 0x1234, 0x00FF);
+  s_vpi_arrayvalue av = {};
+  av.format = vpiVectorVal;
+  PLI_INT32 index[1] = {0};
+  vpi_get_value_array(VpiHandleOf(arr), &av, index, 1);
+
+  ASSERT_NE(av.value.vectors, nullptr);
+  EXPECT_EQ(av.value.vectors[0].aval, 0x1234u);
+  EXPECT_EQ(av.value.vectors[0].bval, 0u);
+}
+
+// §38.16 names the element kinds the narrow integer formats suit: shorts for
+// vpiShortIntVar and vpiByteVar elements, longs for those and vpiLongIntVar.
+// Each pairing below is one it allows, so each is answered without error.
+TEST_F(VpiGetValueArraySim, TheShortAndLongFormatsSuitByteAndShortIntElements) {
+  const int kPairs[3][2] = {{vpiShortIntVal, vpiByteVar},
+                            {vpiLongIntVal, vpiShortIntVar},
+                            {vpiLongIntVal, vpiByteVar}};
+  for (const auto& pair : kPairs) {
+    VpiHandle arr = MakeArray("p", {{0}}, 1, 8);
+    arr->children[0]->type = pair[1];
+    SetElem(0, 5);
+    s_vpi_arrayvalue av = {};
+    av.format = static_cast<PLI_UINT32>(pair[0]);
+    PLI_INT32 index[1] = {0};
+    vpi_get_value_array(VpiHandleOf(arr), &av, index, 1);
+
+    s_vpi_error_info info = {};
+    EXPECT_EQ(vpi_chk_error(&info), 0) << "format " << pair[0];
+    EXPECT_NE(av.value.rawvals, nullptr) << "format " << pair[0];
+  }
+}
+
 // What the case's calltf read out of `top.arr` with vpi_get_value_array.
 std::vector<PLI_INT32>& ArrayRead() {
   static std::vector<PLI_INT32> read;
@@ -414,6 +551,43 @@ TEST_F(ValueArraysOfARun, ARunsArrayIsReadAndWrittenWhole) {
   value.format = vpiIntVal;
   vpi_get_value(By("top.seen"), &value);
   EXPECT_EQ(value.value.integer, 52);
+}
+
+// What the case's calltf read out of `top.m` with vpi_get_value_array.
+std::vector<PLI_INT32>& MatrixRead() {
+  static std::vector<PLI_INT32> read;
+  return read;
+}
+
+PLI_INT32 ReadMatrix(PLI_BYTE8* /*user_data*/) {
+  vpiHandle m = vpi_handle_by_name(VpiText("top.m"), nullptr);
+  PLI_INT32 buf[4] = {0, 0, 0, 0};
+  PLI_INT32 index[2] = {0, 1};
+  s_vpi_arrayvalue av = {};
+  av.format = vpiIntVal;
+  av.flags = vpiUserAllocFlag;
+  av.value.integers = buf;
+  vpi_get_value_array(m, &av, index, 4);
+  MatrixRead().assign(buf, buf + 4);
+  return 0;
+}
+
+// §38.16 with §37.17 detail 26: a run's two-dimensional array is made of
+// subarrays, each holding its own elements and the indices that select it, and
+// an array declared with a typedef holds that typespec too. The read takes the
+// elements in fastest-varying order across the subarrays, m[0][1] to m[1][1],
+// and passes over every member that is no element.
+TEST_F(ValueArraysOfARun, ARunsTwoDimensionalArrayIsReadAcrossItsSubarrays) {
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = VpiText("$matrix_read");
+  data.calltf = &ReadMatrix;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+  Run("module top; typedef logic [7:0] b_t;\n"
+      "  b_t m [0:1][0:2] = '{'{1, 2, 3}, '{4, 5, 6}};\n"
+      "  initial #1 $matrix_read;\n"
+      "endmodule\n");
+  EXPECT_EQ(MatrixRead(), (std::vector<PLI_INT32>{2, 3, 4, 5}));
 }
 
 }  // namespace

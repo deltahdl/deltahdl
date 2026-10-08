@@ -192,8 +192,7 @@ uint64_t DecodePutScalarAval(const s_vpi_arrayvalue* arrayvalue_p,
       return static_cast<uint64_t>(arrayvalue_p->value.reals[src]);
     case kVpiShortRealVal:
       return static_cast<uint64_t>(arrayvalue_p->value.shortreals[src]);
-    case kVpiIntVal:
-    default:
+    default:  // kVpiIntVal, the one scalar format left
       return static_cast<uint64_t>(
           static_cast<uint32_t>(arrayvalue_p->value.integers[src]));
   }
@@ -265,14 +264,10 @@ void DecodePutSourceValue(const s_vpi_arrayvalue* arrayvalue_p,
     case kVpiRawTwoStateVal:
       out->aval = DecodePutRawTwoState(arrayvalue_p, src, width);
       break;
-    case kVpiIntVal:
-    case kVpiShortIntVal:
-    case kVpiLongIntVal:
-    case kVpiRealVal:
-    case kVpiShortRealVal:
-      out->aval = DecodePutScalarAval(arrayvalue_p, src, fmt);
-      break;
     default:
+      // The scalar formats, the rest of what VpiArrayPutFormatSupported
+      // admitted before any value is decoded.
+      out->aval = DecodePutScalarAval(arrayvalue_p, src, fmt);
       break;
   }
 }
@@ -308,19 +303,13 @@ std::vector<VpiObject*> ElementsInOrder(const VpiObject& obj) {
   return elements;
 }
 
-// The first element of the array `obj`, null where it holds none.
-const VpiObject* FirstElement(const VpiObject& obj) {
-  const std::vector<VpiObject*> kElements = ElementsInOrder(obj);
-  return kElements.empty() ? nullptr : kElements.front();
-}
-
 // §38.35: the element at flat ordinal `ordinal` among `elements`, or nullptr
 // where the section runs past the array's end.
 VpiObject* ElementAtOrdinal(const std::vector<VpiObject*>& elements,
                             long long ordinal) {
-  if (ordinal < 0 || ordinal >= static_cast<long long>(elements.size())) {
-    return nullptr;
-  }
+  // The start is a declared element's ordinal and the section counts up from
+  // it, so no ordinal here is negative.
+  if (ordinal >= static_cast<long long>(elements.size())) return nullptr;
   return elements[static_cast<std::size_t>(ordinal)];
 }
 
@@ -408,18 +397,17 @@ bool ValidateGetValueArrayRequest(VpiHandle obj, s_vpi_arrayvalue* arrayvalue_p,
 
   // §38.16: a format that does not fit the data type of the array's elements,
   // where the clause does not expressly allow it, is an error. The data type in
-  // question is the elements' own, so it is read off them; an array holding
-  // none has no data type for a format to disagree with. Only the format's
-  // being one the routine knows was checked, so a request for shorts of an
-  // array of anything at all was answered with shorts.
-  const VpiObject* first = FirstElement(*obj);
-  if (first != nullptr &&
-      !VpiArrayFormatSuitsElementType(static_cast<int>(arrayvalue_p->format),
-                                      first->type)) {
-    *out_err_msg =
-        "vpi_get_value_array() was given a format the array's element data "
-        "type does not support";
-    return false;
+  // question is the elements' own, so it is read off each of them. Only the
+  // format's being one the routine knows was checked, so a request for shorts
+  // of an array of anything at all was answered with shorts.
+  for (const VpiObject* element : ElementsInOrder(*obj)) {
+    if (!VpiArrayFormatSuitsElementType(static_cast<int>(arrayvalue_p->format),
+                                        element->type)) {
+      *out_err_msg =
+          "vpi_get_value_array() was given a format the array's element data "
+          "type does not support";
+      return false;
+    }
   }
 
   // §38.16: index_p carries the starting element's coordinate, one entry per
@@ -486,8 +474,7 @@ size_t ComputeGetValueArrayBytes(int fmt, int ngroups, int words_per_elem,
     case kVpiVectorVal:
       bytes = sizeof(s_vpi_vecval) * static_cast<size_t>(words_per_elem) * num;
       break;
-    case kVpiIntVal:
-    default:
+    default:  // kVpiIntVal, the one supported format left
       bytes = sizeof(int32_t) * num;
       break;
   }
@@ -530,8 +517,7 @@ void EncodeGetScalarValue(s_vpi_arrayvalue* arrayvalue_p, unsigned int k,
     case kVpiShortRealVal:
       arrayvalue_p->value.shortreals[k] = static_cast<float>(aval);
       break;
-    case kVpiIntVal:
-    default:
+    default:  // kVpiIntVal, the one scalar format left
       arrayvalue_p->value.integers[k] = static_cast<int32_t>(aval);
       break;
   }
@@ -594,14 +580,10 @@ void EncodeGetElementValue(s_vpi_arrayvalue* arrayvalue_p, unsigned int k,
     case kVpiRawTwoStateVal:
       EncodeGetRawTwoState(arrayvalue_p, k, ngroups, value.aval);
       break;
-    case kVpiIntVal:
-    case kVpiShortIntVal:
-    case kVpiLongIntVal:
-    case kVpiRealVal:
-    case kVpiShortRealVal:
-      EncodeGetScalarValue(arrayvalue_p, k, fmt, value.aval);
-      break;
     default:
+      // The scalar formats, the rest of what VpiArrayPutFormatSupported
+      // admitted before any value is read.
+      EncodeGetScalarValue(arrayvalue_p, k, fmt, value.aval);
       break;
   }
 }
