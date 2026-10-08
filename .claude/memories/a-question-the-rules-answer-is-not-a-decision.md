@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 51a015a3-4652-42ac-8c15-ce1bc6f6ae12
-  modified: 2026-10-04T22:25:00.315Z
+  modified: 2026-10-08T11:41:11.502Z
 ---
 
 # A question the rules answer is not a decision
@@ -58,5 +58,11 @@ one defined value whose meaning holds for it, and a value outside the
 normative header is never an option. Annex M gives vpiQualifier no unique0
 bit, yet §12.4.2 makes unique0 assert the same no-overlap check as unique,
 so it reports vpiUniqueQualifier; vpiNoQualifier would deny a check it makes.
+A rule stated over "items" applies again to every nested item that fits its
+terms. Before calling a nested shape open, apply the rule at each level. §6.24.3's
+greedy rule (the first dynamically sized item takes the remainder, and the later
+ones stay empty) applies again inside a dynamic array of strings, because each
+string is a dynamically sized item. That fixes the shape at one element holding
+every remaining byte.
 Once the answer stands,
 state it per [[issues-state-conclusions-not-the-trail]] and remove the label.
