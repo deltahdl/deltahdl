@@ -177,6 +177,11 @@ TEST_F(DecompileByHand, PartsARunSeldomWrites) {
                                  Operation(ExprKind::kBinary, TokenKind::kPlus,
                                            Name("a"), Name("b")))),
       "(a + b)'(x)");
+  EXPECT_EQ(
+      VpiExprDecompile(Operation(
+          ExprKind::kCast, TokenKind::kEof, Name("x"),
+          Operation(ExprKind::kUnary, TokenKind::kMinus, Name("W"), nullptr))),
+      "(- W)'(x)");
 
   Expr* about = Select(nullptr, Name("c"), Name("t"));
   about->op = TokenKind::kPlusSlashMinus;
@@ -197,13 +202,23 @@ TEST_F(DecompileByHand, PartsARunSeldomWrites) {
   EXPECT_EQ(VpiExprDecompile(with_call), "find() with x");
 }
 
+// An operator kind whose name is no quoted spelling, as a token's kind that is
+// no operator is, writes as nothing in the streaming operator's place.
+TEST_F(DecompileByHand, AKindWithNoSpellingWritesNothing) {
+  for (TokenKind op : {TokenKind::kApostrophe, TokenKind::kEof}) {
+    Expr* stream = WithElements(ExprKind::kStreamingConcat, {Name("a")});
+    stream->op = op;
+    EXPECT_EQ(VpiExprDecompile(stream), "{{a}}");
+  }
+}
+
 // §18.7 with §18.5: a randomize() call's inline constraint block is written
 // back item by item, each kind of constraint item as the source writes it.
 TEST_F(DecompileByHand, AnInlineConstraintBlockIsWrittenBack) {
   ConstraintItem* dist = Item(ConstraintItemKind::kExpression, Name("x"));
   dist->soft = true;
   dist->has_dist = true;
-  dist->dist.resize(3);
+  dist->dist.resize(4);
   dist->dist[0].is_default = true;
   dist->dist[0].weight = Make(ExprKind::kIntegerLiteral, "1");
   dist->dist[0].per_element = true;
@@ -212,6 +227,9 @@ TEST_F(DecompileByHand, AnInlineConstraintBlockIsWrittenBack) {
   dist->dist[1].tolerance = Name("t");
   dist->dist[1].tolerance_relative = true;
   dist->dist[2].value = Make(ExprKind::kIntegerLiteral, "5");
+  dist->dist[3].is_range = true;
+  dist->dist[3].lo = Name("d");
+  dist->dist[3].tolerance = Name("u");
 
   ConstraintItem* unique = Item(ConstraintItemKind::kUnique, nullptr);
   unique->exprs = {Name("a"), Name("b")};
@@ -237,8 +255,8 @@ TEST_F(DecompileByHand, AnInlineConstraintBlockIsWrittenBack) {
   call->with_has_parens = true;
   EXPECT_EQ(VpiExprDecompile(call),
             "randomize() with (a, b) {soft x dist {default := 1, [c+%-t], "
-            "5}; unique {a, b}; disable soft a; solve a before b; c -> {a;} "
-            "if (c) {a;} else {b;} foreach (arr[i, j]) {a;}}");
+            "5, [d+/-u]}; unique {a, b}; disable soft a; solve a before b; "
+            "c -> {a;} if (c) {a;} else {b;} foreach (arr[i, j]) {a;}}");
 }
 
 // An inline constraint block one of whose items cannot be written back, or
