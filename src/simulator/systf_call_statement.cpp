@@ -27,7 +27,7 @@ static const s_vpi_systf_data* ResolveSystfTask(const Expr* expr) {
 }
 
 bool TryExecSystemCallTask(const Expr* expr, SimContext& ctx, Arena& arena) {
-  if (!expr || expr->kind != ExprKind::kSystemCall) return false;
+  if (expr->kind != ExprKind::kSystemCall) return false;
 
   // $cast invoked as a task: the evaluation performs the assignment when the
   // cast is valid and leaves the destination untouched otherwise. Unlike the
