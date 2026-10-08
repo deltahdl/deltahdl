@@ -468,5 +468,16 @@ TEST_F(PortsOfARun, AScalarPortHoldsNoPortBits) {
   EXPECT_EQ(vpi_iterate(vpiBit, s), nullptr);
 }
 
+// §37.14 (figure): a port named apart from the objects its expression joins,
+// §23.2.2.1's `.a({b, c})`, stands for no one object of its own, so it has no
+// lowConn of its name to take bits from.
+TEST_F(PortsOfARun, APortOfAConcatenationHoldsNoPortBits) {
+  Run("module rc(.a({b, c})); input [1:0] b, c; endmodule\n"
+      "module top; wire [3:0] w; rc u(.a(w)); endmodule\n");
+  vpiHandle a = PortOfU("a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(vpi_iterate(vpiBit, a), nullptr);
+}
+
 }  // namespace
 }  // namespace delta

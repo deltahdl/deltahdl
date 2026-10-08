@@ -133,12 +133,10 @@ void AttachArray(VpiObject& array, const std::string& key,
 // the interconnect nets of the last.
 void AttachNetArray(const RtlirNet& net, const std::string& prefix,
                     const VpiObjectMap& objects, const VpiAttachBuild& build) {
-  if (net.num_unpacked_dims == 0 || net.refers_outward ||
-      net.unpacked_dims.size() != net.num_unpacked_dims) {
-    return;
-  }
+  if (net.unpacked_dims.empty()) return;
   const std::string kKey = VpiFlatName(prefix, net.name);
   VpiObject* array = FindObjectForFlatName(objects, kKey);
+  // A net standing for an enclosing module's (§23.4) has no object here.
   if (array == nullptr) return;
   const bool kInterconnect = net.net_type == NetType::kInterconnect;
   array->type = kInterconnect ? vpiInterconnectArray : vpiNetArray;

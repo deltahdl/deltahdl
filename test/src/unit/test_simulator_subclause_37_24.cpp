@@ -302,9 +302,9 @@ TEST_F(InterconnectsOfARun, ABodyInterconnectIsANetOrAnArray) {
 
 // §37.24 details 1 and 2: an interconnect port with unpacked dimensions stands
 // for an interconnect array, whose vpiElement iteration reaches one dimension
-// at a time.
+// at a time, a descending dimension as an ascending one.
 TEST_F(InterconnectsOfARun, AnInterconnectPortArrayReachesOneDimensionAtATime) {
-  Run("module m(interconnect ip [0:1][0:2]); endmodule\n"
+  Run("module m(interconnect ip [1:0][0:2]); endmodule\n"
       "module top; m u(); endmodule\n");
   vpiHandle port = Named(vpiPort, By("top.u"), "ip");
   ASSERT_NE(port, nullptr);

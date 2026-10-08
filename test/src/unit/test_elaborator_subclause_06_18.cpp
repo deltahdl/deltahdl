@@ -3,8 +3,10 @@
 #include <cstdint>
 #include <string_view>
 
+#include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 
@@ -901,6 +903,31 @@ TEST(UserDefinedTypeElaboration,
       f.diag.Diagnostics(),
       "typedef 'pair_t' does not conform to its forward declaration as struct",
       7, "6.18"));
+}
+
+// §6.18: a name declared by a typedef stands for the type it was declared with,
+// so a chain of names is followed to the type at its end. A chain that comes
+// round to a name again has no end, and the walk stops on a name.
+TEST(UserDefinedTypeElaboration, ResolvedTypeKindFollowsAChainOfNames) {
+  DataType integer;
+  integer.kind = DataTypeKind::kInteger;
+  DataType to_integer;
+  to_integer.kind = DataTypeKind::kNamed;
+  to_integer.type_name = "int_t";
+  const TypedefMap kChain{{"int_t", integer}, {"alias_t", to_integer}};
+  DataType written;
+  written.kind = DataTypeKind::kNamed;
+  written.type_name = "alias_t";
+  EXPECT_EQ(ResolvedTypeKind(written, kChain), DataTypeKind::kInteger);
+
+  DataType to_b;
+  to_b.kind = DataTypeKind::kNamed;
+  to_b.type_name = "b_t";
+  DataType to_a;
+  to_a.kind = DataTypeKind::kNamed;
+  to_a.type_name = "a_t";
+  const TypedefMap kCycle{{"a_t", to_b}, {"b_t", to_a}};
+  EXPECT_EQ(ResolvedTypeKind(to_a, kCycle), DataTypeKind::kNamed);
 }
 
 }  // namespace

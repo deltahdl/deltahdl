@@ -230,7 +230,6 @@ void RecordNetObjectKinds(const RtlirDesign* design,
   // made every net a logic net, and only a struct or union net with a layout
   // of its own was told otherwise (AttachNetMembers), so no design had an enum
   // net, an integer net or a packed array net.
-  if (design == nullptr) return;
   WalkInstancePaths(
       design, [&](const RtlirModule* mod, const std::string& prefix) {
         for (const RtlirNet& net : VpiDeclaredNets(*mod)) {

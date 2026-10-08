@@ -11,6 +11,7 @@
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
+#include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -34,7 +35,7 @@ VpiObject* PortNamed(VpiHandle module, std::string_view name) {
 void MakePortBits(VpiObject* port, const VpiAttachBuild& build) {
   if (port->low_conn == nullptr) return;
   for (VpiObject* bit : port->low_conn->children) {
-    if (bit->type != vpiNetBit && bit->type != vpiRegBit) continue;
+    if (!VpiIsBitObjectType(bit->type)) continue;
     VpiObject* port_bit = build.alloc();
     port_bit->type = vpiPortBit;
     port_bit->parent = port;
@@ -114,10 +115,7 @@ void FillInterconnectLevel(VpiObject* holder,
 void VpiMakeInterconnectArray(VpiObject* net, const RtlirPort& port,
                               const std::function<VpiObject*()>& alloc,
                               std::deque<std::string>& names) {
-  if (port.num_unpacked_dims == 0 ||
-      port.unpacked_dims.size() != port.num_unpacked_dims) {
-    return;
-  }
+  if (port.unpacked_dims.empty()) return;
   net->type = vpiInterconnectArray;
   FillInterconnectLevel(net, port.unpacked_dims, 0, alloc, names);
 }

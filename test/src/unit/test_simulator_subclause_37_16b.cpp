@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -206,14 +207,15 @@ class NetPortsOfARun : public VpiDesignRun {
 constexpr const char* kNetPorts =
     "module sub(input wire [3:0] a, input wire s, input wire [1:0] c,\n"
     "           input wire [1:0] d, input wire [1:0] e, input wire n,\n"
-    "           input wire [1:0] g, input wire h [0:1]);\n"
+    "           input wire [1:0] g, input wire h [0:1], input wire s2);\n"
     "endmodule\n"
     "module leaf(input wire z); endmodule\n"
     "module top;\n"
     "  wire [3:0] w; wire v; wire [1:0] p; wire q;\n"
     "  wire [1:0] x, y, m, k; wire [3:0] r; wire arr [0:1]; wire t, t2;\n"
+    "  wire [3:0] w3;\n"
     "  sub u(.a(w), .s(v), .c({p[0], q}), .d({x, y}), .e(m & k), .n(),\n"
-    "        .g(r[2:1]), .h(arr));\n"
+    "        .g(r[2:1]), .h(arr), .s2(w3[2]));\n"
     "  if (1) begin : gb leaf l(.z(t)); end\n"
     "  for (genvar i = 0; i < 1; i++) begin : ga leaf l(.z(t2)); end\n"
     "endmodule\n";
@@ -336,10 +338,77 @@ TEST(NetPortModel, ANetNoInstanceHoldsReachesNoPort) {
   VpiObject orphan_bit;
   orphan_bit.type = vpiNetBit;
   bit.parent = &net;
-  for (VpiObject* ref : {&net, &bit, &orphan_bit}) {
+  VpiObject scope;
+  scope.type = vpiGenScope;
+  VpiObject scoped;
+  scoped.type = vpiNet;
+  scoped.parent = &scope;
+  for (VpiObject* ref : {&net, &bit, &orphan_bit, &scoped}) {
     EXPECT_TRUE(VpiNetPorts(ref).empty());
     EXPECT_TRUE(VpiNetPortInsts(ref).empty());
   }
+}
+
+// §37.16 details 7 and 8: a bit select puts the selected bit at the port's
+// least significant end, so a bit of the net below it reaches none of the
+// port's bits, while the selected bit and the whole net reach the port.
+TEST_F(NetPortsOfARun, ABitBelowASelectReachesNoPort) {
+  Run(kNetPorts);
+  EXPECT_TRUE(NamesOf(vpiPortInst, BitOf("top.w3", 0)).empty());
+  EXPECT_EQ(NamesOf(vpiPortInst, BitOf("top.w3", 2)),
+            std::vector<std::string>{"s2"});
+  EXPECT_EQ(NamesOf(vpiPortInst, By("top.w3")), std::vector<std::string>{"s2"});
+}
+
+// §37.16 (figure): a module's nets are those its body declares and those its
+// ANSI ports declare, a port declaring a net the body declares again counted
+// once; a variable port and an interconnect port declare none of them. A
+// packed dimension is one the port itself wrote, not one of the aggregate its
+// type resolves to.
+TEST(NetKindModel, AModulesNetsAreItsBodysAndItsNetPorts) {
+  RtlirModule mod;
+  RtlirNet body;
+  body.name = "a";
+  mod.nets.push_back(body);
+  DataType aggregate;
+  aggregate.kind = DataTypeKind::kStruct;
+  const std::vector<std::pair<std::string_view, NetType>> kPorts = {
+      {"a", NetType::kWire},
+      {"p", NetType::kWire},
+      {"v", NetType::kNone},
+      {"ic", NetType::kInterconnect}};
+  for (const auto& [name, net_type] : kPorts) {
+    RtlirPort& port = mod.ports.emplace_back();
+    port.name = name;
+    port.net_type = net_type;
+    port.is_interconnect = net_type == NetType::kInterconnect;
+  }
+  mod.ports[1].dtype = &aggregate;
+  mod.ports[1].data_kind = DataTypeKind::kStruct;
+  const std::vector<RtlirNet> kNets = VpiDeclaredNets(mod);
+  ASSERT_EQ(kNets.size(), 2u);
+  EXPECT_EQ(kNets[0].name, "a");
+  EXPECT_EQ(kNets[1].name, "p");
+  EXPECT_FALSE(kNets[1].has_declared_packed_dim);
+  EXPECT_EQ(VpiNetObjectKind(kNets[1]), vpiStructNet);
+}
+
+// §37.16 (figure): the run makes the nets of a one-dimensional array net
+// alone, so a net array of more dimensions has no net keys to name.
+TEST(NetKindModel, AMultidimensionalNetArrayHasNoNetKeys) {
+  RtlirNet net;
+  net.name = "n";
+  net.num_unpacked_dims = 2;
+  net.unpacked_dims = {{0, 1}, {0, 2}};
+  EXPECT_TRUE(VpiDeclaredNetKeys(net, "top").empty());
+}
+
+// §37.16 detail 1: a net array whose bounds run below zero is an array net all
+// the same, though the run makes none of its nets.
+TEST_F(ArrayNetsOfARun, ANetArrayBelowZeroIsAnArrayNet) {
+  Run("module top; wire n [-1:0]; endmodule\n");
+  EXPECT_EQ(vpi_get(vpiType, Array()), vpiNetArray);
+  EXPECT_TRUE(NamesOf(vpiNet, Array()).empty());
 }
 
 }  // namespace

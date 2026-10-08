@@ -69,8 +69,9 @@ int VpiDataTypeVariableKind(DataTypeKind kind);
 // figure draws no box of its own for.
 int VpiNetObjectKind(const RtlirNet& net);
 
-// §37.16 (figure): tell each net of the design the kind its data type makes
-// it, and each net of an array net the kind of its element type.
+// §37.16 (figure): tell each net of `design`, which is not null, the kind its
+// data type makes it, and each net of an array net the kind of its element
+// type.
 void RecordNetObjectKinds(const RtlirDesign* design,
                           const VpiObjectMap& objects);
 
