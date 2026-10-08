@@ -480,10 +480,14 @@ static bool ConnectionDimShape(const Expr* conn, SimContext& ctx, Arena& arena,
   return true;
 }
 
+// The select of the element at `address`, whose index is the address's 32
+// bits, as every element is named, so `[-1:0]` selects [4294967295] and [0].
+// The literal is sized by its value, so -1 cast whole named
+// [18446744073709551615] and a bound held as its 32 bits plus one [4294967296].
 static Expr* MakeElementSelect(Expr* base, int64_t address, Arena& arena) {
   auto* index = arena.Create<Expr>();
   index->kind = ExprKind::kIntegerLiteral;
-  index->int_val = static_cast<uint64_t>(address);
+  index->int_val = static_cast<uint32_t>(address);
   auto* select = arena.Create<Expr>();
   select->kind = ExprKind::kSelect;
   select->base = base;

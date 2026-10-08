@@ -238,6 +238,35 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
             "5a 3c 5a 3c\n");
 }
 
+// §23.3.3.5 pairs an input or output array port's elements with the
+// connection's whatever their bounds, §7.4.2 letting them be negative: p[-1]
+// reads a[-1] and q[0] drives b[0]. Each pair was an assignment between
+// selects whose index literal took the width of its value, -1 sixty-four bits
+// of ones and a[0]'s address 4294967296 thirty-three bits, so no select named
+// an element and the child read x where the parent read x back.
+TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
+     InputAndOutputArrayPortsWithANegativeBoundConnectElementByElement) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module child(input logic [7:0] p [-1:0],\n"
+                       "             output logic [7:0] q [-1:0]);\n"
+                       "  assign q[-1] = p[-1] + 8'h1;\n"
+                       "  assign q[0] = p[0] + 8'h2;\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  logic [7:0] a [-1:0];\n"
+                       "  logic [7:0] b [-1:0];\n"
+                       "  child u(a, b);\n"
+                       "  initial begin\n"
+                       "    a[-1] = 8'h10;\n"
+                       "    a[0] = 8'h20;\n"
+                       "    #1 $display(\"%h %h %h %h\", u.p[-1], u.p[0], "
+                       "b[-1], b[0]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "10 20 11 22\n");
+}
+
 // §10.7 gives an element the value of its declared type, and §6.11.3 its
 // signedness by the declaration: `logic [3:0] d [2]` written 4'sd9, by a
 // statement or a continuous assignment, reads 9, as a scalar of that type
