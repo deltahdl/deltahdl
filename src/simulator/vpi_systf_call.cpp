@@ -4,7 +4,6 @@
 #include <map>
 #include <string>
 #include <string_view>
-#include <vector>
 
 #include "common/arena.h"
 #include "common/source_loc.h"
@@ -135,20 +134,16 @@ Variable* DynamicPrefixBaseVar(const Expr* actual, SimContext& ctx) {
   if (actual == nullptr || actual->kind != ExprKind::kMemberAccess) {
     return nullptr;
   }
-  if (actual->lhs == nullptr || actual->lhs->kind != ExprKind::kIdentifier) {
-    return nullptr;
-  }
+  if (actual->lhs->kind != ExprKind::kIdentifier) return nullptr;
   Variable* base = ctx.FindVariable(actual->lhs->text);
   return ctx.IsVirtualInterfaceVar(base) ? base : nullptr;
 }
 
-// §25.9: the interface member a prefixed argument names, which is the right
-// side of the member access when that is a plain name and the access's own text
-// otherwise -- the shape the expression evaluator reads such a reference in.
+// §25.9: the interface member a prefixed argument names, the right side of the
+// member access, which the parser makes a plain name -- the shape the
+// expression evaluator reads such a reference in.
 std::string_view DynamicPrefixFieldName(const Expr* actual) {
-  return (actual->rhs != nullptr && actual->rhs->kind == ExprKind::kIdentifier)
-             ? actual->rhs->text
-             : actual->text;
+  return actual->rhs->text;
 }
 
 // §37.61: what a dynamically prefixed argument is made from. `base` is the
@@ -252,8 +247,7 @@ void AppendSystfCallArguments(VpiObject* call, const Expr& call_site,
 // the call. A run names an instance with a dot after it and the model without.
 VpiObject* CallSiteObject(const VpiCallSiteObjects& sites,
                           const Expr* call_site, std::string prefix) {
-  if (call_site == nullptr) return nullptr;
-  if (!prefix.empty() && prefix.back() == '.') prefix.pop_back();
+  if (!prefix.empty()) prefix.pop_back();
   auto exact = sites.find({call_site, prefix});
   if (exact != sites.end()) return exact->second;
   auto first = sites.lower_bound({call_site, std::string()});
@@ -263,24 +257,7 @@ VpiObject* CallSiteObject(const VpiCallSiteObjects& sites,
   return nullptr;
 }
 
-// The position of the registration `data` among `systfs`, -1 for a record
-// that is none of them.
-int RegistrationIndex(const std::vector<s_vpi_systf_data>& systfs,
-                      const s_vpi_systf_data& data) {
-  for (std::size_t i = 0; i < systfs.size(); ++i) {
-    if (&systfs[i] == &data) return static_cast<int>(i);
-  }
-  return -1;
-}
-
 }  // namespace
-
-VpiObject* VpiSystfObjectAt(const std::vector<VpiObject*>& objects, int index) {
-  for (VpiObject* obj : objects) {
-    if (obj->is_systf && obj->index == index) return obj;
-  }
-  return nullptr;
-}
 
 // §37.42: the object standing for one system task or system function call,
 // carrying the arguments the call site wrote and, where the registration is a
@@ -304,22 +281,21 @@ VpiHandle VpiContext::MakeSystfCallObject(const s_vpi_systf_data& data,
       CallSiteObject(call_site_objects_, call_site, ctx.ActiveInstancePrefix());
   if (call == nullptr) {
     call = AllocObject();
-    call->name = data.tfname != nullptr ? std::string_view(data.tfname)
-                                        : std::string_view();
+    // A registration is refused without a name (RegisterSystf).
+    call->name = std::string_view(data.tfname);
     // §37.3.3: the call stands for the text its call site was written as.
-    if (call_site != nullptr) {
-      VpiRecordWrittenLocation(call, call_site->range.start, ctx);
-    }
+    VpiRecordWrittenLocation(call, call_site->range.start, ctx);
   }
   call->type = (data.type == vpiSysFunc) ? vpiSysFuncCall : vpiSysTaskCall;
   // §37.42 detail 9: the call decompiles to the one the source wrote.
-  if (call_site != nullptr) call->decompile = VpiExprDecompile(call_site);
+  call->decompile = VpiExprDecompile(call_site);
   // §37.42 detail 5: every call built here is of a registration an
   // application made, so it is user-defined, and the figure's arrow reaches
   // the systf object that registration returned.
   call->user_defined = true;
+  // `data` is a registration ResolveSystf found, one of systfs_.
   call->user_systf =
-      VpiSystfObjectAt(all_objects_, RegistrationIndex(systfs_, data));
+      systf_objects_[static_cast<std::size_t>(&data - systfs_.data())];
   call->arguments.clear();
 
   // It is also where a system function's return value is put: vpi_put_value
@@ -343,13 +319,13 @@ VpiHandle VpiContext::MakeSystfCallObject(const s_vpi_systf_data& data,
   call->size = static_cast<int>(width);
 
   // §36.4: the arguments the call site wrote. They are attached before the
-  // routine runs, because the application reads them from inside it.
-  if (call_site != nullptr) {
-    AppendSystfCallArguments(
-        call, *call_site,
-        SystfArgumentBuild{*this, ctx, arena, evaluate_args,
-                           [this] { return AllocObject(); }});
-  }
+  // routine runs, because the application reads them from inside it. Every
+  // caller hands the call expression it is running (CallRegisteredSystf,
+  // CallCompiletfForSourceCall).
+  AppendSystfCallArguments(
+      call, *call_site,
+      SystfArgumentBuild{*this, ctx, arena, evaluate_args,
+                         [this] { return AllocObject(); }});
   return call;
 }
 

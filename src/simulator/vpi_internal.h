@@ -183,10 +183,4 @@ std::vector<std::string_view> VpiNamePathComponents(std::string_view name);
 // vpi_systf.cpp.
 std::vector<std::string_view> VpiHandleNameComponents(std::string_view name);
 
-// §37.42: the systf object vpi_register_systf returned for the registration at
-// `index` among those the context holds, found among the context's `objects`
-// by the mark and position it was made with; null where none is. Defined in
-// vpi_systf_call.cpp, used by vpi_design_attach_instances.cpp.
-VpiObject* VpiSystfObjectAt(const std::vector<VpiObject*>& objects, int index);
-
 }  // namespace delta

@@ -109,6 +109,7 @@ VpiHandle VpiContext::RegisterSystf(s_vpi_systf_data* data) {
   // vpi_get_systf_info() can tell it apart from a simulation callback and read
   // back its record.
   systf_obj->is_systf = true;
+  systf_objects_.push_back(systf_obj);
   return systf_obj;
 }
 

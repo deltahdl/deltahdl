@@ -807,6 +807,8 @@ class VpiContext {
   void ReleaseHandleSubtree(VpiObject* root);
 
   std::vector<s_vpi_systf_data> systfs_;
+  // §38.37: the systf object each registration returned, at its position.
+  std::vector<VpiObject*> systf_objects_;
   // §36.8.1: what each registration's sizetf returned, keyed by its position in
   // systfs_, which is stable because registrations are appended and never
   // removed. Absent until the first ask, which is the run the clause allows.

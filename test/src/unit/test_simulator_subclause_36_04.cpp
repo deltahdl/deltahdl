@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "fixture_simulator.h"
 #include "simulator/variable.h"
@@ -155,6 +156,124 @@ TEST_F(SystfCallArguments, TheApplicationsParameterIsItsOwnUserData) {
 
   ASSERT_TRUE(g_user_data_was_read);
   EXPECT_STREQ(g_user_data_seen, "vector-reader");
+}
+
+// What $kinds found of each argument: its type, its constant type or operator,
+// and its value.
+struct ArgumentSeen {
+  int type;
+  int kind;
+  int value;
+};
+std::vector<ArgumentSeen>& KindsSeen() {
+  static std::vector<ArgumentSeen> seen;
+  return seen;
+}
+
+PLI_INT32 KindsCalltf(PLI_BYTE8*) {
+  vpiHandle args = vpi_iterate(vpiArgument, vpi_handle(vpiSysTfCall, nullptr));
+  for (vpiHandle arg = vpi_scan(args); arg != nullptr; arg = vpi_scan(args)) {
+    const int kType = vpi_get(vpiType, arg);
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(arg, &value);
+    KindsSeen().push_back({kType,
+                           kType == vpiConstant ? vpi_get(vpiConstType, arg)
+                                                : vpi_get(vpiOpType, arg),
+                           value.value.integer});
+  }
+  return 0;
+}
+
+// §36.4 with §37.42 and §37.58: each argument the call site wrote reaches the
+// application as what it is -- an unbased unsized literal an integer constant,
+// a real literal a real constant, an omitted argument an operation of the null
+// operator (§37.42 detail 8) -- and a member of a structure, through a name or
+// through an element of an array, as an expression holding the member's value.
+TEST_F(SystfCallArguments, EachArgumentKindReachesTheApplication) {
+  KindsSeen().clear();
+  s_vpi_systf_data task = {};
+  task.type = vpiSysTask;
+  task.tfname = VpiText("$kinds");
+  task.calltf = KindsCalltf;
+  ASSERT_NE(vpi_register_systf(&task), nullptr);
+  SimFixture f;
+  RunAndFindVar(
+      "module top;\n"
+      "  typedef struct packed {logic [7:0] f;} s_t;\n"
+      "  s_t s = 8'h21; s_t sa [2];\n"
+      "  initial begin sa[0] = 8'h43; $kinds('1, 2.5, , s.f, sa[0].f); end\n"
+      "endmodule\n",
+      f, "s");
+  ASSERT_EQ(KindsSeen().size(), 5u);
+  EXPECT_EQ(KindsSeen()[0].type, vpiConstant);
+  EXPECT_EQ(KindsSeen()[0].kind, vpiIntConst);
+  EXPECT_EQ(KindsSeen()[1].type, vpiConstant);
+  EXPECT_EQ(KindsSeen()[1].kind, vpiRealConst);
+  EXPECT_EQ(KindsSeen()[2].type, vpiOperation);
+  EXPECT_EQ(KindsSeen()[2].kind, vpiNullOp);
+  EXPECT_EQ(KindsSeen()[3].value, 0x21);
+  EXPECT_EQ(KindsSeen()[4].value, 0x43);
+}
+
+PLI_INT32 ZeroSizetf(PLI_BYTE8*) { return 0; }
+
+PLI_INT32 AllOnesCalltf(PLI_BYTE8*) {
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  value.value.integer = -1;
+  vpi_put_value(vpi_handle(vpiSysTfCall, nullptr), &value, nullptr, vpiNoDelay);
+  return 0;
+}
+
+// §36.8.1 with §38.37.1: a sizetf answering with no bits describes no value,
+// so a sized system function returns the default 32 bits: all ones written
+// through the call reads back as 32 ones, zero-extended into a 64-bit
+// variable.
+TEST_F(SystfCallArguments, ASizetfOfNoBitsLeavesTheDefaultWidth) {
+  s_vpi_systf_data func = {};
+  func.type = vpiSysFunc;
+  func.sysfunctype = vpiSizedFunc;
+  func.tfname = VpiText("$zero_wide");
+  func.calltf = AllOnesCalltf;
+  func.sizetf = ZeroSizetf;
+  ASSERT_NE(vpi_register_systf(&func), nullptr);
+  SimFixture f;
+  auto* r = RunAndFindVar(
+      "module top; logic [63:0] r; initial r = $zero_wide(); endmodule\n", f,
+      "r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 0xFFFFFFFFu);
+}
+
+int g_elsewhere_calls = 0;
+
+PLI_INT32 CountCalltf(PLI_BYTE8*) {
+  if (vpi_handle(vpiSysTfCall, nullptr) != nullptr) ++g_elsewhere_calls;
+  return 0;
+}
+
+// §36.4 with §37.42 detail 3: a call written in a package function and one
+// written in a task of an instance reached by a hierarchical call each reach
+// the application with a call object, whichever instance the call runs from.
+TEST_F(SystfCallArguments, ACallWrittenOutsideTheRunningInstanceIsReached) {
+  g_elsewhere_calls = 0;
+  s_vpi_systf_data task = {};
+  task.type = vpiSysTask;
+  task.tfname = VpiText("$elsewhere");
+  task.calltf = CountCalltf;
+  ASSERT_NE(vpi_register_systf(&task), nullptr);
+  SimFixture f;
+  RunAndFindVar(
+      "package p;\n"
+      "  function automatic int f(); $elsewhere; return 1; endfunction\n"
+      "endpackage\n"
+      "module sub; task t(); $elsewhere; endtask endmodule\n"
+      "module top; int x; sub u();\n"
+      "  initial begin x = p::f(); u.t(); end\n"
+      "endmodule\n",
+      f, "x");
+  EXPECT_EQ(g_elsewhere_calls, 2);
 }
 
 }  // namespace

@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -220,23 +221,23 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     AttachModports(design, object_map_, *sim_ctx_, kBuild);
     // §37.42: a system call finds the registration its name resolves to, and
     // with it the systf object that registration returned.
-    const VpiCallBuild kCalls{*sim_ctx_,
-                              [this](std::string_view name) {
-                                VpiRegisteredSystf found;
-                                const s_vpi_systf_data* data =
-                                    ResolveSystf(std::string(name).c_str());
-                                if (data == nullptr) return found;
-                                found.type = data->type;
-                                found.object = VpiSystfObjectAt(
-                                    all_objects_,
-                                    static_cast<int>(data - systfs_.data()));
-                                return found;
-                              },
-                              call_site_objects_,
-                              stmt_objects_,
-                              kClasses,
-                              subroutines,
-                              kUnitTypespecs};
+    const VpiCallBuild kCalls{
+        *sim_ctx_,
+        [this](std::string_view name) {
+          VpiRegisteredSystf found;
+          const s_vpi_systf_data* data =
+              ResolveSystf(std::string(name).c_str());
+          if (data == nullptr) return found;
+          found.type = data->type;
+          found.object =
+              systf_objects_[static_cast<std::size_t>(data - systfs_.data())];
+          return found;
+        },
+        call_site_objects_,
+        stmt_objects_,
+        kClasses,
+        subroutines,
+        kUnitTypespecs};
     AttachProcedures(design, object_map_, kCalls, kBuild);
     AttachPrimitives(design, object_map_, *sim_ctx_, kBuild);
   }
