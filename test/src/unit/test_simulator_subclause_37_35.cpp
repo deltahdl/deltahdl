@@ -254,6 +254,14 @@ class PrimitivesOfARun : public VpiDesignRun {
     }
     return terms;
   }
+
+  // What the second terminal of top's gate g reaches through vpiExpr; null
+  // where top has no such gate.
+  static vpiHandle SecondTerminalExprOfG() {
+    vpiHandle g = Named(vpiPrimitive, By("top"), "g");
+    const std::vector<vpiHandle> kTerms = TermsOf(g);
+    return kTerms.size() < 2 ? nullptr : vpi_handle(vpiExpr, kTerms[1]);
+  }
 };
 
 constexpr const char* kPrimitives =
@@ -489,6 +497,31 @@ TEST_F(PrimitivesOfARun, ASequentialUdpInstanceReportsVpiSeqPrim) {
   vpiHandle u1 = Named(vpiPrimitive, By("top"), "u1");
   ASSERT_NE(u1, nullptr);
   EXPECT_EQ(vpi_get(vpiPrimType, u1), vpiSeqPrim);
+}
+
+// §37.35 with §37.17 details 3 and 26: a terminal written as a member of an
+// unpacked structure, `s.a`, reaches that member variable. The member access
+// was taken for a hierarchical name, and its first name resolving in the
+// scope gave no object at all.
+TEST_F(PrimitivesOfARun, ATerminalSelectingAStructMemberReachesTheMember) {
+  Run("module top; struct {logic a; logic b;} s; wire y; logic c;\n"
+      "  and g(y, s.a, c);\n"
+      "endmodule\n");
+  vpiHandle member = By("top.s.a");
+  ASSERT_NE(member, nullptr);
+  EXPECT_EQ(VpiObjectOf(SecondTerminalExprOfG()), VpiObjectOf(member));
+}
+
+// §37.35 with §37.17 details 2 and 26: a terminal written as an element of an
+// unpacked array, `v[1]`, reaches that element. The select looked for a bit
+// of the array, which has none, and gave no object.
+TEST_F(PrimitivesOfARun, ATerminalSelectingAnArrayElementReachesTheElement) {
+  Run("module top; logic v [2]; wire y; logic c;\n"
+      "  and g(y, v[1], c);\n"
+      "endmodule\n");
+  vpiHandle element = By("top.v[1]");
+  ASSERT_NE(element, nullptr);
+  EXPECT_EQ(VpiObjectOf(SecondTerminalExprOfG()), VpiObjectOf(element));
 }
 
 }  // namespace

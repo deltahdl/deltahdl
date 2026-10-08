@@ -377,7 +377,9 @@ VpiObject* PackedSelectObject(VpiObject* base, const Expr* index,
 // is a bit select reaching the object through vpiParent and its index through
 // vpiIndex; of a vector net or a logic or bit variable it is that object's own
 // bit (§37.16, §37.17), the one a constant index names, or one standing for
-// whichever bit a varying index selects.
+// whichever bit a varying index selects. Of an unpacked array it is the
+// element or subarray a constant index names (§37.17 details 2 and 18), the
+// child vpi_handle_by_index reaches (§38.19).
 VpiObject* BitSelectObject(const Expr* expr, const AssignBuild& build) {
   VpiObject* base = ExpressionObject(expr->base, build);
   if (base == nullptr) return nullptr;
@@ -402,10 +404,7 @@ VpiObject* BitSelectObject(const Expr* expr, const AssignBuild& build) {
   }
   const auto kIndex = static_cast<int>(expr->index->int_val);
   for (VpiObject* child : base->children) {
-    if ((child->type == vpiNetBit || child->type == vpiRegBit) &&
-        child->index == kIndex) {
-      return child;
-    }
+    if (VpiIndexSelects(*child, kIndex)) return child;
   }
   return nullptr;
 }
@@ -491,14 +490,18 @@ bool DottedName(const Expr* expr, std::string& out) {
 
 // §23.6: the net or variable a hierarchical name reaches, whose first name
 // is no declaration the scope sees, an instance's: below the instance writing
-// it first, and then from the top of the design. Null where it is no such
-// name, a member of a structure among them.
+// it first, and then from the top of the design. A first name the scope does
+// declare is a structure variable, and the name selects its members (§37.17
+// details 3 and 26), each a child of the one before it, as a flat name's
+// components are. Null where it names nothing.
 VpiObject* HierarchicalObject(const Expr* expr, const AssignBuild& build) {
   std::string dotted;
   if (!DottedName(expr, dotted)) return nullptr;
   const std::string_view kFirst =
       std::string_view(dotted).substr(0, dotted.find('.'));
-  if (Resolve(build.names, kFirst) != nullptr) return nullptr;
+  if (VpiObject* holder = Resolve(build.names, kFirst)) {
+    return FindObjectForFlatName(VpiObjectMap{{kFirst, holder}}, dotted);
+  }
   VpiObject* below = FindObjectForFlatName(
       build.names.objects, VpiFlatName(build.names.prefix, dotted));
   return below != nullptr ? below
