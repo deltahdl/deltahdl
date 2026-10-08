@@ -6,6 +6,8 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -299,6 +301,19 @@ TEST_F(ForLoopsOfARun, AForLoopDeclaringItsVariableIsAScope) {
   ASSERT_NE(loop, nullptr);
   EXPECT_EQ(vpi_get(vpiLocalVarDecls, loop), 1);
   EXPECT_EQ(KindsOf(vpiInternalScope, By("top")), std::vector<int>{vpiFor});
+}
+
+// §37.74: a null handle has no for condition and no header statement, and an
+// object that is no for statement has no header statement either.
+TEST_F(For, NoConditionOrHeaderStatementWithoutAForStatement) {
+  EXPECT_EQ(VpiForConditionExpr(nullptr), nullptr);
+  EXPECT_EQ(VpiForHeaderStmt(vpiForInitStmt, nullptr), nullptr);
+  VpiObject init;
+  init.type = vpiAssignment;
+  VpiObject while_stmt;
+  while_stmt.type = vpiWhile;
+  while_stmt.for_init_stmts = {&init};
+  EXPECT_EQ(VpiForHeaderStmt(vpiForInitStmt, &while_stmt), nullptr);
 }
 
 }  // namespace

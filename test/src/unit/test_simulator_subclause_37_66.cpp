@@ -93,6 +93,14 @@ TEST_F(WhileRepeat, ConditionIsNullWhenAbsentOrHandleNull) {
   bare_loop.type = vpiWhile;
   bare_loop.children = {&body};  // only a body, no condition expression
   EXPECT_EQ(VpiLoopConditionExpr(&bare_loop), nullptr);
+
+  // A statement of no looping kind has no loop condition, whatever it holds.
+  VpiObject condition;
+  condition.type = vpiOperation;
+  VpiObject if_stmt;
+  if_stmt.type = vpiIf;
+  if_stmt.children = {&condition};
+  EXPECT_EQ(VpiLoopConditionExpr(&if_stmt), nullptr);
 }
 
 // vpiCondition edge is scoped to the loop statements: asking a non-loop

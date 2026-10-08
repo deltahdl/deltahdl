@@ -6,6 +6,7 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -410,6 +411,11 @@ TEST_F(DoWhileAndForeachLoopsOfARun, AnIndexVariableIsOfItsArraysIndexType) {
   }
   EXPECT_EQ(kinds, (std::vector<int>{vpiStringVar, vpiIntegerVar, vpiEnumVar,
                                      vpiIntVar, vpiByteVar}));
+}
+
+// §37.75: a null handle has no do-while condition.
+TEST_F(DoWhileForeach, DoWhileConditionOfANullHandleIsNull) {
+  EXPECT_EQ(VpiDoWhileConditionExpr(nullptr), nullptr);
 }
 
 }  // namespace
