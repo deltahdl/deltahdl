@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <deque>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "lexer/token.h"
