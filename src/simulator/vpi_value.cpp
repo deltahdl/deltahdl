@@ -466,9 +466,8 @@ void VpiContext::GetValue(VpiHandle obj, s_vpi_value* value) {
       GetValue(element, value);
       return;
     }
-    const VpiObject& kElement = *obj->parent->children.front();
-    DispatchUnselected(kElement.size, kElement.var->is_4state, value,
-                       value_pools_);
+    const VpiObject& first = *obj->parent->children.front();
+    DispatchUnselected(first.size, first.var->is_4state, value, value_pools_);
     return;
   }
   VpiRefreshElementCopy(*obj);
