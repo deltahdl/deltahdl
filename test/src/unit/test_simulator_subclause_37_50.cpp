@@ -449,9 +449,13 @@ TEST_F(ConcurrentAssertionsOfARun, AProceduralGlobalClockIsTheDeclaredEvent) {
   EXPECT_EQ(vpi_get(vpiIsClockInferred, p1), 0);
 }
 
-// §37.50: a null handle has no pass action statement.
-TEST(ConcurrentAssertionStmt, ANullHandleHasNoPassStatement) {
+// §37.50: a null handle has no pass action statement, and detail 2 gives a
+// restrict none either.
+TEST(ConcurrentAssertionStmt, ANullHandleOrARestrictHasNoPassStatement) {
   EXPECT_EQ(VpiConcurrentAssertionStmt(nullptr), nullptr);
+  VpiObject restrict_property;
+  restrict_property.type = vpiRestrict;
+  EXPECT_EQ(VpiConcurrentAssertionStmt(&restrict_property), nullptr);
 }
 }  // namespace
 }  // namespace delta
