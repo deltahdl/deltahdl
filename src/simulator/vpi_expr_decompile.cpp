@@ -190,6 +190,15 @@ std::optional<std::string> RenderForeachHead(const ConstraintItem& item) {
   return VpiDecompileJoin({"foreach", VpiDecompileParenthesize(text + "]")});
 }
 
+// §18.5 (A.1.10): a solve-before ordering, its two lists of variables either
+// side of `before`.
+std::optional<std::string> RenderSolveBefore(const ConstraintItem& item) {
+  const std::optional<std::string> kBefore = RenderList(item.exprs, {});
+  const std::optional<std::string> kAfter = RenderList(item.after, {});
+  if (!kBefore || !kAfter) return std::nullopt;
+  return VpiDecompileJoin({"solve", *kBefore, "before", *kAfter});
+}
+
 // §18.5 (A.1.10): an item the source ends with a semicolon, an
 // expression_or_dist, a uniqueness constraint, a disable soft or a
 // solve-before.
@@ -208,14 +217,9 @@ std::optional<std::string> RenderTerminatedItem(const ConstraintItem& item) {
       text = RenderText(item.expr);
       if (text) text = VpiDecompileJoin({"disable", "soft", *text});
       break;
-    default: {
-      const std::optional<std::string> kBefore = RenderList(item.exprs, {});
-      const std::optional<std::string> kAfter = RenderList(item.after, {});
-      if (kBefore && kAfter) {
-        text = VpiDecompileJoin({"solve", *kBefore, "before", *kAfter});
-      }
+    default:
+      text = RenderSolveBefore(item);
       break;
-    }
   }
   if (!text) return std::nullopt;
   return *text + ";";
