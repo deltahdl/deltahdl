@@ -616,5 +616,29 @@ TEST(PropertySpecificationModel, ConditionsAndPropertyExpressionLookups) {
   spec.children = {&attribute};
   EXPECT_EQ(VpiPropertyExprChild(&spec), nullptr);
 }
+
+// §37.52: a property spec's property expression is its first child of the
+// property expr class, a sequence instance among the kinds that class groups
+// (§37.54); a spec holding none reaches nothing, and asked for a relation it
+// does not draw it resolves nothing here.
+TEST(PropertySpecModel, PropertyExprOfASpecAndTagsItDoesNotDraw) {
+  VpiObject attribute;
+  attribute.type = vpiAttribute;
+  VpiObject seq_inst;
+  seq_inst.type = vpiSequenceInst;
+  VpiObject spec;
+  spec.type = vpiPropertySpec;
+  spec.children = {&attribute, &seq_inst};
+  VpiHandle out = nullptr;
+  EXPECT_TRUE(TryResolveProcessAndStmtRelation(vpiPropertyExpr, &spec, out));
+  EXPECT_EQ(out, &seq_inst);
+
+  VpiObject bare;
+  bare.type = vpiPropertySpec;
+  bare.children = {&attribute};
+  EXPECT_TRUE(TryResolveProcessAndStmtRelation(vpiPropertyExpr, &bare, out));
+  EXPECT_EQ(out, nullptr);
+  EXPECT_FALSE(TryResolveProcessAndStmtRelation(vpiTypespec, &spec, out));
+}
 }  // namespace
 }  // namespace delta

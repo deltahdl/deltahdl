@@ -33,5 +33,14 @@ TEST(TaskFuncCallModel, AMissingArgumentIsNoneOfTheCalls) {
   EXPECT_EQ(iter.children[0], &arg);
 }
 
+// §37.42 (figure): only a system task or function call reaches a user systf;
+// any other object asked for one resolves nothing here.
+TEST(TaskFuncCallModel, OnlyASystemCallReachesAUserSystf) {
+  VpiObject module;
+  module.type = vpiModule;
+  VpiHandle out = nullptr;
+  EXPECT_FALSE(TryResolveProcessAndStmtRelation(vpiUserSystf, &module, out));
+  EXPECT_EQ(out, nullptr);
+}
 }  // namespace
 }  // namespace delta

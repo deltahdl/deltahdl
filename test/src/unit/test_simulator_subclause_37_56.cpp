@@ -7,6 +7,7 @@
 #include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -388,5 +389,21 @@ TEST_F(MulticlockSequencesOfARun, AConsequentTakesTheAntecedentsEndClock) {
   EXPECT_EQ(ClocksOf(kOperands[1]), (std::vector<std::string>{"clk1", "clk2"}));
 }
 
+// §37.56: a clocked seq's tagless edge is read with the type of the sequence
+// expr it reaches, so a clocked seq holding none, or one of another type,
+// resolves nothing for the type asked.
+TEST(MulticlockSequenceExprModel, ClockedSeqEdgeNeedsAnExprOfTheTypeAsked) {
+  VpiObject empty;
+  empty.type = vpiClockedSeq;
+  VpiHandle out = nullptr;
+  EXPECT_FALSE(TryResolveProcessAndStmtRelation(vpiOperation, &empty, out));
+  VpiObject seq_inst;
+  seq_inst.type = vpiSequenceInst;
+  VpiObject clocked;
+  clocked.type = vpiClockedSeq;
+  clocked.children = {&seq_inst};
+  EXPECT_FALSE(TryResolveProcessAndStmtRelation(vpiOperation, &clocked, out));
+  EXPECT_EQ(out, nullptr);
+}
 }  // namespace
 }  // namespace delta

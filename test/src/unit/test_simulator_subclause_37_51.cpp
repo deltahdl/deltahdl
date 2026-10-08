@@ -6,6 +6,7 @@
 #include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -430,6 +431,23 @@ TEST(PropertyFormal, TypespecFoundPastOtherChildrenAndNullHasNoInit) {
   formal.children = {&attribute, &typespec};
   EXPECT_EQ(VpiPropFormalTypespec(&formal), &typespec);
   EXPECT_EQ(VpiPropFormalInitExpr(nullptr), nullptr);
+}
+
+// §37.51 (figure): a property inst reaches its disable condition, and asked for
+// a relation it does not draw it resolves nothing here.
+TEST(PropertyDeclModel, AnInstReachesItsDisableConditionAndNoOtherTag) {
+  VpiObject condition;
+  condition.type = vpiOperation;
+  VpiObject inst;
+  inst.type = vpiPropertyInst;
+  inst.disable_condition = &condition;
+  VpiHandle out = nullptr;
+  EXPECT_TRUE(
+      TryResolveProcessAndStmtRelation(vpiDisableCondition, &inst, out));
+  EXPECT_EQ(out, &condition);
+  out = nullptr;
+  EXPECT_FALSE(TryResolveProcessAndStmtRelation(vpiTypespec, &inst, out));
+  EXPECT_EQ(out, nullptr);
 }
 }  // namespace
 }  // namespace delta
