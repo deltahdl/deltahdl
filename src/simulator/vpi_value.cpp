@@ -345,12 +345,13 @@ static bool IsVaryingBit(const VpiObject& obj) {
 static bool EvaluateExpressionObject(const VpiObject& obj, SimContext* sim,
                                      Logic4Vec& out) {
   if (obj.expr_scope == nullptr) return false;
+  const VpiExprScope& scope = *obj.expr_scope;
   Process stand_in;
   stand_in.stand_in = true;
-  stand_in.inst_prefix = obj.expr_scope->inst_prefix;
-  stand_in.gen_prefixes = obj.expr_scope->gen_prefixes;
-  const CallerStandIn kScope(&stand_in, *sim);
-  out = EvalExpr(obj.expr_scope->expr, *sim, sim->GetArena());
+  stand_in.inst_prefix = scope.inst_prefix;
+  stand_in.gen_prefixes = scope.gen_prefixes;
+  const CallerStandIn kStandIn(&stand_in, *sim);
+  out = EvalExpr(scope.expr, *sim, sim->GetArena());
   return true;
 }
 
