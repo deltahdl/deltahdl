@@ -300,9 +300,10 @@ void FillPortObject(VpiObject* obj, const RtlirPort& port, int index,
 // application walking in from the port reaches. A port declaring an unpacked
 // dimension stands for an interconnect array instead (§37.24 details 1 and 2).
 void FillInterconnectNetObject(VpiObject* obj, const RtlirPort& port,
-                               VpiObject* port_obj, VpiHandle module,
+                               VpiObject* port_obj,
                                std::deque<std::string>& names,
                                const std::function<VpiObject*()>& alloc) {
+  VpiHandle module = port_obj->parent;
   obj->type = vpiInterconnectNet;
   names.emplace_back(port.name);
   obj->name = names.back();
@@ -448,8 +449,9 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
   // itself.
   if (design == nullptr) return;
 
-  WalkInstancePaths(design, [this](const RtlirModule* mod,
-                                   const std::string& prefix) {
+  const std::function<VpiObject*()> kAlloc = [this] { return AllocObject(); };
+  WalkInstancePaths(design, [this, &kAlloc](const RtlirModule* mod,
+                                            const std::string& prefix) {
     // A top module has no module object over it to hang ports from, the
     // same boundary the module paths meet.
     if (prefix.empty()) return;
@@ -467,8 +469,7 @@ void VpiContext::AttachDesignPorts(const RtlirDesign* design) {
       RecordSourceLocation(obj, port.loc, sources);
       RecordProtection(obj, port.loc, sources);
       if (port.is_interconnect) {
-        FillInterconnectNetObject(AllocObject(), port, obj, module, name_pool_,
-                                  [this] { return AllocObject(); });
+        FillInterconnectNetObject(AllocObject(), port, obj, name_pool_, kAlloc);
       }
     }
   });

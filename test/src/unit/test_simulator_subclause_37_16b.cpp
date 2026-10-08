@@ -287,7 +287,7 @@ constexpr const char* kPortNets =
     "           input wire enum logic [1:0] {A, B} e, input wire s_t [1:0] p,\n"
     "           output logic o);\n"
     "endmodule\n"
-    "module body(b); input b; wire [1:0] b; endmodule\n"
+    "module body(b); input [1:0] b; wire [1:0] b; endmodule\n"
     "module top;\n"
     "  wire [3:0] w; wire integer j; wire [3:0] q; logic r;\n"
     "  wire [1:0] c;\n"
