@@ -731,11 +731,13 @@ TEST(ExpressionModel, OperandsAreTheOperationsExpressionChildren) {
 
 // §37.59 detail 10: blank text has no parent expression, and an unbalanced
 // trailing selection takes everything with it; a selection with an index
-// leaves the name it selects from.
+// leaves the name it selects from, an index holding a selection of its own
+// among it.
 TEST(ExpressionModel, PartSelectParentOfBlankUnbalancedAndIndexedText) {
   EXPECT_EQ(VpiPartSelectParentExpr("  "), "");
   EXPECT_EQ(VpiPartSelectParentExpr("a]"), "");
   EXPECT_EQ(VpiPartSelectParentExpr("a[1]"), "a");
+  EXPECT_EQ(VpiPartSelectParentExpr("a[b[1]]"), "a");
 }
 
 }  // namespace
