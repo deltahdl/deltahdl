@@ -48,6 +48,13 @@ void FillPattern(std::vector<Logic4Word>& words, uint64_t pattern,
   }
 }
 
+// §6.12.1: `real` converted to an integral value, rounded to the nearest
+// integer, ties away from zero.
+void FillRounded(std::vector<Logic4Word>& words, double real) {
+  const int64_t kRounded = std::llround(real);
+  FillPattern(words, static_cast<uint64_t>(kRounded), kRounded < 0);
+}
+
 // The value of the digit `c`, lowercase, in base 16 or below; -1 for a
 // character that is no digit.
 int DigitValue(char c) {
@@ -206,13 +213,9 @@ bool VpiPutValueBits(const s_vpi_value& value, uint32_t width,
       FillPattern(words, static_cast<uint64_t>(int64_t{value.value.integer}),
                   value.value.integer < 0);
       break;
-    case kVpiRealVal: {
-      // §6.12.1: a real is converted to an integral value by rounding to the
-      // nearest integer, ties away from zero.
-      const int64_t kRounded = std::llround(value.value.real);
-      FillPattern(words, static_cast<uint64_t>(kRounded), kRounded < 0);
+    case kVpiRealVal:
+      FillRounded(words, value.value.real);
       break;
-    }
     case kVpiScalarVal:
       ScalarBit(value.value.scalar, words);
       break;
