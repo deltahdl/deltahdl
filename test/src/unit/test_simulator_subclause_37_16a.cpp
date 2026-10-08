@@ -751,6 +751,44 @@ TEST_F(NetTypesOfARun, AUserNettypeNetIsANettypeNet) {
   EXPECT_EQ(NetTypeOf("top.n"), vpiNettypeNet);
 }
 
+// §37.16: every kind a net can be declared is reported as its own constant,
+// in the integer form and, by §37.3.2, in the string form naming it.
+TEST_F(NetTypesOfARun, EveryNetKindReportsItsConstantAndItsName) {
+  Run("module top;\n"
+      "  nettype logic mynet;\n"
+      "  wire w; tri t; tri0 t0; tri1 t1; trireg tr; triand ta; trior to;\n"
+      "  wand wa; wor wo; supply0 s0; supply1 s1; uwire u; mynet n;\n"
+      "endmodule\n");
+  struct Kind {
+    const char* net;
+    int type;
+    const char* name;
+  };
+  const Kind kKinds[] = {
+      {"top.w", vpiWire, "vpiWire"},
+      {"top.t", vpiTri, "vpiTri"},
+      {"top.t0", vpiTri0, "vpiTri0"},
+      {"top.t1", vpiTri1, "vpiTri1"},
+      {"top.tr", vpiTriReg, "vpiTriReg"},
+      {"top.ta", vpiTriAnd, "vpiTriAnd"},
+      {"top.to", vpiTriOr, "vpiTriOr"},
+      {"top.wa", vpiWand, "vpiWand"},
+      {"top.wo", vpiWor, "vpiWor"},
+      {"top.s0", vpiSupply0, "vpiSupply0"},
+      {"top.s1", vpiSupply1, "vpiSupply1"},
+      {"top.u", vpiUwire, "vpiUwire"},
+      {"top.n", vpiNettypeNet, "vpiNettypeNet"},
+  };
+  for (const Kind& k : kKinds) {
+    vpiHandle net = vpi_handle_by_name(VpiText(k.net), nullptr);
+    ASSERT_NE(net, nullptr) << k.net;
+    EXPECT_EQ(vpi_get(vpiNetType, net), k.type) << k.net;
+    const char* name = vpi_get_str(vpiNetType, net);
+    ASSERT_NE(name, nullptr) << k.net;
+    EXPECT_EQ(std::string(name), k.name);
+  }
+}
+
 // §37.3.2: the string form names the constant the integer form reports.
 TEST_F(NetTypesOfARun, TheNetTypesNameIsItsConstant) {
   Run(kNetKinds);

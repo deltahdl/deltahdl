@@ -2,7 +2,9 @@
 
 #include <string>
 
+#include "common/types.h"
 #include "fixture_vpi_run.h"
+#include "simulator/net.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -281,6 +283,68 @@ TEST_F(VpiObjectTypeProperty, AnUnresolvedInterconnectNetStaysInterconnect) {
   const char* name = vpi_get_str(vpiResolvedNetType, VpiHandleOf(&net));
   ASSERT_NE(name, nullptr);
   EXPECT_EQ(std::string(name), "vpiInterconnect");
+}
+
+// §37.3.2 with §23.3.3.7.1: an interconnect net that a port of an instance it
+// holds joins to a wand net takes the wand type. The search passes the
+// module's own port joining another net, a child of the instance that is no
+// port, and a port of the instance joining another net.
+TEST_F(VpiObjectTypeProperty, AnInterconnectNetTakesItsInstancePortsNetType) {
+  VpiObject module;
+  module.type = vpiModule;
+  VpiObject net;
+  net.type = vpiInterconnectNet;
+  net.parent = &module;
+  VpiObject other;
+  other.type = vpiNet;
+  VpiObject own_port;
+  own_port.type = vpiPort;
+  own_port.low_conn = &other;
+  Net wand;
+  wand.type = NetType::kWand;
+  VpiObject inner_net;
+  inner_net.type = vpiNet;
+  inner_net.net = &wand;
+  VpiObject other_port;
+  other_port.type = vpiPort;
+  other_port.high_conn = &other;
+  VpiObject inner_port;
+  inner_port.type = vpiPort;
+  inner_port.high_conn = &net;
+  inner_port.low_conn = &inner_net;
+  VpiObject inner;
+  inner.type = vpiModule;
+  inner.children = {&inner_net, &other_port, &inner_port};
+  module.children = {&own_port, &inner};
+
+  EXPECT_EQ(vpi_get(vpiResolvedNetType, VpiHandleOf(&net)), vpiWand);
+}
+
+// §37.16: vpiNetType is the kind of net an object stands for. A net object
+// standing for no net has none to report, in either form; a net of no type is
+// vpiNone, and an interconnect net vpiInterconnect.
+TEST_F(VpiObjectTypeProperty, ANetTypeComesFromTheNetAnObjectStandsFor) {
+  VpiObject bare;
+  bare.type = vpiNet;
+  EXPECT_EQ(vpi_get(vpiNetType, VpiHandleOf(&bare)), 0);
+  EXPECT_EQ(vpi_get_str(vpiNetType, VpiHandleOf(&bare)), nullptr);
+
+  Net none;
+  none.type = NetType::kNone;
+  VpiObject typeless;
+  typeless.type = vpiNet;
+  typeless.net = &none;
+  EXPECT_EQ(vpi_get(vpiNetType, VpiHandleOf(&typeless)), vpiNone);
+  const char* name = vpi_get_str(vpiNetType, VpiHandleOf(&typeless));
+  ASSERT_NE(name, nullptr);
+  EXPECT_EQ(std::string(name), "vpiNone");
+
+  Net interconnect;
+  interconnect.type = NetType::kInterconnect;
+  VpiObject generic;
+  generic.type = vpiNet;
+  generic.net = &interconnect;
+  EXPECT_EQ(vpi_get(vpiNetType, VpiHandleOf(&generic)), vpiInterconnect);
 }
 
 class ResolvedNetTypesOfARun : public VpiDesignRun {

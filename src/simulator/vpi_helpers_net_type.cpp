@@ -38,12 +38,12 @@ int NetTypeConstant(NetType type) {
       return vpiTriReg;
     case NetType::kUwire:
       return vpiUwire;
-    case NetType::kNone:
-      return vpiNone;
     case NetType::kInterconnect:
       return vpiInterconnect;
+    default:
+      // NetType::kNone, the one value left: no net type.
+      return vpiNone;
   }
-  return 0;
 }
 
 }  // namespace
