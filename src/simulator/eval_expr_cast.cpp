@@ -16,6 +16,7 @@
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/clocking.h"
+#include "simulator/dyn_struct_member.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_member_path.h"
@@ -530,102 +531,184 @@ static bool TryTypedPatternCast(const Expr* expr, SimContext& ctx, Arena& arena,
 
 // §6.24.3 (printed page 143): a member of an unpacked structure as a
 // bit-stream cast streams it -- where its bits stand among the structure's
-// stored bits, and whether it is a string, which streams as its bytes rather
-// than as the handle those bits hold (§7.2 with §6.16).
+// stored bits, and whether it is dynamically sized: a string, which streams
+// as its bytes rather than as the handle those bits hold (§7.2 with §6.16),
+// or a dynamic array, which streams as its elements rather than as the handle
+// those bits hold to them (§7.2 with §7.5).
 struct StreamedMember {
   uint32_t offset = 0;
   uint32_t width = 0;
   bool is_string = false;
+  // The dynamic array member these bits are; null for any other member.
+  const StructFieldInfo* dynamic = nullptr;
+  bool IsDynamicallySized() const { return is_string || dynamic != nullptr; }
+  // The width of one of the elements such a member streams: a string's byte
+  // or a dynamic array's element.
+  uint32_t ElementWidth() const {
+    return is_string ? 8 : dynamic->dyn_elem_width;
+  }
 };
 
 // The members of `layout`, held from bit `base` of the stored bits, in the
 // order a bit-stream cast streams them: declaration order, a nested unpacked
-// structure's own members in its place.
+// structure's own members in its place and an unpacked array of strings' own
+// elements in its, leftmost first, each held in the more significant bits.
 static void AppendStreamedMembers(const StructTypeInfo& layout, uint32_t base,
                                   std::vector<StreamedMember>& out) {
   for (const StructFieldInfo& f : layout.fields) {
+    uint32_t offset = base + f.bit_offset;
     if (f.nested != nullptr && !f.nested->is_packed && f.elem_count == 0) {
-      AppendStreamedMembers(*f.nested, base + f.bit_offset, out);
-      continue;
+      AppendStreamedMembers(*f.nested, offset, out);
+    } else if (f.is_dynamic) {
+      out.push_back({offset, f.width, false, &f});
+    } else if (f.type_kind == DataTypeKind::kString && f.elem_count > 0) {
+      uint32_t elem_width = f.width / f.elem_count;
+      for (uint32_t k = f.elem_count; k-- > 0;) {
+        out.push_back({offset + (k * elem_width), elem_width, true});
+      }
+    } else {
+      out.push_back({offset, f.width, f.type_kind == DataTypeKind::kString});
     }
-    bool is_string = f.type_kind == DataTypeKind::kString && f.elem_count == 0;
-    out.push_back({base + f.bit_offset, f.width, is_string});
   }
 }
 
 // The members `layout` streams where it is an unpacked structure holding a
-// string member, the one member whose stored bits are not the bits it
-// streams; empty for any other layout, whose stored bits are its stream.
-static std::vector<StreamedMember> StringStructMembers(
+// dynamically sized member, the one kind of member whose stored bits are not
+// the bits it streams; empty for any other layout, whose stored bits are its
+// stream.
+static std::vector<StreamedMember> DynamicStructMembers(
     const StructTypeInfo* layout) {
   if (layout == nullptr) return {};
   std::vector<StreamedMember> members;
   AppendStreamedMembers(*layout, 0, members);
   for (const StreamedMember& m : members) {
-    if (m.is_string) return members;
+    if (m.IsDynamicallySized()) return members;
   }
   return {};
 }
 
-// §6.24.3 (printed page 142): the generic packed value the stored bits
-// `stored` of a structure whose members are `members` stream to: each
-// member's bits in declaration order, a string member's bytes in its place.
-static Logic4Vec StreamStringStruct(const Logic4Vec& stored,
-                                    const std::vector<StreamedMember>& members,
-                                    Arena& arena) {
-  std::vector<Logic4Vec> parts;
+// §6.24.3 (printed page 143): appends to `parts` the elements `q` holds of the
+// dynamic array member `field`, in index order, and returns how many bits they
+// are. A string element streams as its bytes, a string being a dynamic array
+// of bytes to the cast, and an empty one as nothing.
+static uint32_t AppendDynamicElements(const QueueObject& q,
+                                      const StructFieldInfo& field,
+                                      std::vector<Logic4Vec>& parts,
+                                      Arena& arena) {
   uint32_t width = 0;
-  for (const StreamedMember& m : members) {
-    Logic4Vec bits = ExtractBitField(arena, stored, m.offset, m.width);
-    if (m.is_string) {
-      std::string text = Logic4VecToString(StringMemberText(bits, arena));
+  for (const Logic4Vec& e : q.elements) {
+    Logic4Vec bits = ResizeToWidth(e, field.dyn_elem_width, arena);
+    if (field.type_kind == DataTypeKind::kString) {
+      std::string text = Logic4VecToString(e);
       if (text.empty()) continue;
       bits = StringToLogic4Vec(arena, text);
     }
     width += bits.width;
     parts.push_back(bits);
   }
+  return width;
+}
+
+// §6.24.3 (printed page 142): appends to `parts` what the member `m`, whose
+// stored bits are `bits`, streams as -- its bits, a string's bytes or a
+// dynamic array's elements in index order -- and returns how many bits that
+// is.
+static uint32_t AppendStreamedBits(const Logic4Vec& bits,
+                                   const StreamedMember& m,
+                                   std::vector<Logic4Vec>& parts,
+                                   Arena& arena) {
+  if (m.dynamic != nullptr) {
+    const QueueObject* q = DynMemberQueue(bits);
+    return q != nullptr ? AppendDynamicElements(*q, *m.dynamic, parts, arena)
+                        : 0;
+  }
+  if (!m.is_string) {
+    parts.push_back(bits);
+    return bits.width;
+  }
+  std::string text = Logic4VecToString(StringMemberText(bits, arena));
+  if (text.empty()) return 0;
+  parts.push_back(StringToLogic4Vec(arena, text));
+  return parts.back().width;
+}
+
+// §6.24.3 (printed page 142): the generic packed value the stored bits
+// `stored` of a structure whose members are `members` stream to: each
+// member's bits in declaration order, a string member's bytes and a dynamic
+// array member's elements in their places.
+static Logic4Vec StreamDynamicStruct(const Logic4Vec& stored,
+                                     const std::vector<StreamedMember>& members,
+                                     Arena& arena) {
+  std::vector<Logic4Vec> parts;
+  uint32_t width = 0;
+  for (const StreamedMember& m : members) {
+    width += AppendStreamedBits(
+        ExtractBitField(arena, stored, m.offset, m.width), m, parts, arena);
+  }
   return AssembleConcatParts(parts, width, arena);
+}
+
+// §6.24.3 (printed page 143): the handle of a new array of the dynamic member
+// `field` whose elements are the bits `bits`, the leftmost element first.
+static Logic4Vec DynMemberOfStream(const Logic4Vec& bits,
+                                   const StructFieldInfo& field, Arena& arena) {
+  Logic4Vec handle;
+  QueueObject* q = NewDynMember(field, handle, arena);
+  uint32_t elem_width = field.dyn_elem_width;
+  for (uint32_t at = bits.width; at > 0; at -= elem_width) {
+    q->elements.push_back(
+        ExtractBitField(arena, bits, at - elem_width, elem_width));
+  }
+  q->AssignFreshIds();
+  return handle;
 }
 
 // §6.24.3 (printed page 143): the stored bits, `stored_width` of them, of a
 // structure whose members are `members` that the stream `stream` is cast
-// into. The members take the stream's bits left to right, the first string
-// member the `remainder` bits the fixed-size members leave and a later one
-// none, each string member holding its bytes through a handle.
-static Logic4Vec UnstreamStringStruct(
+// into. The members take the stream's bits left to right, the first
+// dynamically sized member the `remainder` bits the fixed-size members leave
+// and a later one none, a string member holding its bytes through a handle
+// and a dynamic array member its elements through one.
+static Logic4Vec UnstreamDynamicStruct(
     const Logic4Vec& stream, const std::vector<StreamedMember>& members,
     uint32_t stored_width, uint32_t remainder, Arena& arena) {
   Logic4Vec result = MakeLogic4Vec(arena, stored_width);
   uint32_t pos = stream.width;
   for (const StreamedMember& m : members) {
-    uint32_t width = m.is_string ? remainder : m.width;
-    if (m.is_string) remainder = 0;
+    uint32_t width = m.IsDynamicallySized() ? remainder : m.width;
+    if (m.IsDynamicallySized()) remainder = 0;
     if (width == 0) continue;
     pos -= width;
     Logic4Vec bits = ExtractBitField(arena, stream, pos, width);
     if (m.is_string) bits = StringMemberHandle(bits, arena);
+    if (m.dynamic != nullptr) bits = DynMemberOfStream(bits, *m.dynamic, arena);
     DepositBitField(result, m.offset, bits, m.width);
   }
   return result;
 }
 
 // §6.24.3 (printed page 143): a bit-stream cast of the stream `stream` into
-// an unpacked structure holding a string member, which takes its size from
-// the stream, as UnstreamStringStruct. A stream narrower than the fixed-size
-// members, or leaving the string members no whole number of bytes, is the
-// size mismatch the cast meets only at run time, an error then, and the cast
-// gives the structure's default value. False for a cast into any other type.
-static bool TryCastIntoStringStruct(const Expr* expr, const Logic4Vec& stream,
-                                    SimContext& ctx, Arena& arena,
-                                    Logic4Vec& out) {
+// an unpacked structure holding a dynamically sized member, which takes its
+// size from the stream, as UnstreamDynamicStruct. A stream narrower than the
+// fixed-size members, or leaving the first dynamically sized member no whole
+// number of its elements, is the size mismatch the cast meets only at run
+// time, an error then, and the cast gives the structure's default value.
+// False for a cast into any other type.
+static bool TryCastIntoDynamicStruct(const Expr* expr, const Logic4Vec& stream,
+                                     SimContext& ctx, Arena& arena,
+                                     Logic4Vec& out) {
   std::string key = CastTypeKey(expr, ctx);
   const StructTypeInfo* layout = ctx.FindStructType(key);
-  std::vector<StreamedMember> members = StringStructMembers(layout);
+  std::vector<StreamedMember> members = DynamicStructMembers(layout);
   if (members.empty()) return false;
   uint32_t fixed = 0;
+  uint32_t elem_width = 0;
   for (const StreamedMember& m : members) {
-    if (!m.is_string) fixed += m.width;
+    if (!m.IsDynamicallySized()) {
+      fixed += m.width;
+    } else if (elem_width == 0) {
+      elem_width = m.ElementWidth();
+    }
   }
   out = MakeLogic4Vec(arena, layout->total_width);
   if (stream.width < fixed) {
@@ -638,18 +721,18 @@ static bool TryCastIntoStringStruct(const Expr* expr, const Logic4Vec& stream,
     return true;
   }
   uint32_t remainder = stream.width - fixed;
-  if (remainder % 8 != 0) {
+  if (remainder % elem_width != 0) {
     ctx.GetDiag().Error(
         expr->range.start,
         std::format("bit-stream cast to '{}': the {}-bit source leaves its "
-                    "string members {} bits, which are no whole number of "
-                    "bytes",
-                    key, stream.width, remainder),
+                    "first dynamically sized member {} bits, which are no "
+                    "whole number of its {}-bit elements",
+                    key, stream.width, remainder, elem_width),
         Subclause("6.24.3"));
     return true;
   }
-  out = UnstreamStringStruct(stream, members, layout->total_width, remainder,
-                             arena);
+  out = UnstreamDynamicStruct(stream, members, layout->total_width, remainder,
+                              arena);
   return true;
 }
 
@@ -667,13 +750,13 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
 
   Logic4Vec kw_out;
   if (TryKeywordCast(type_name, inner, arena, kw_out)) return kw_out;
-  // §6.24.3: an unpacked structure holding a string streams as its members
-  // do, not as the handles among its stored bits.
+  // §6.24.3: an unpacked structure holding a dynamically sized member streams
+  // as its members do, not as the handles among its stored bits.
   std::vector<StreamedMember> streamed =
-      StringStructMembers(StructLayoutOfOperand(expr->lhs, ctx));
-  if (!streamed.empty()) inner = StreamStringStruct(inner, streamed, arena);
+      DynamicStructMembers(StructLayoutOfOperand(expr->lhs, ctx));
+  if (!streamed.empty()) inner = StreamDynamicStruct(inner, streamed, arena);
   Logic4Vec struct_out;
-  if (TryCastIntoStringStruct(expr, inner, ctx, arena, struct_out))
+  if (TryCastIntoDynamicStruct(expr, inner, ctx, arena, struct_out))
     return struct_out;
 
   CastTarget target;

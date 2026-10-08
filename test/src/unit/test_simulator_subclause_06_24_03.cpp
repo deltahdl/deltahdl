@@ -351,8 +351,9 @@ TEST(BitStreamCastSim, CastIntoAStructWithAStringOfNoWholeBytesIsAnError) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-stream cast to 'pair_t': the 44-bit source "
-                            "leaves its string members 12 bits, which are no "
-                            "whole number of bytes",
+                            "leaves its first dynamically sized member 12 "
+                            "bits, which are no whole number of its 8-bit "
+                            "elements",
                             7, "6.24.3"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-stream cast to 'pair_t': the 16-bit source "
@@ -401,6 +402,120 @@ TEST(BitStreamCastSim, CastFromAStructOfAnotherStreamedSizeIsAnError) {
                             "bit-stream cast to 'b40_t': the source streams "
                             "48 bits, where the type holds 40",
                             6, "6.24.3"));
+}
+
+// §6.24.3 (printed pages 142 and 143): a dynamic array member is a dynamically
+// sized item, all of whose elements the cast from its structure streams, so
+// {8'h41, {8'h42, 8'h43}} in {byte b; byte d[];} is 24'h414243, and the
+// structure whose d was never written streams b alone. Cut from the stored
+// bits, the cast packed d's 64-bit handle in place of its two bytes.
+TEST(BitStreamCastSim, CastFromAStructStreamsItsDynamicArrayMemberElements) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef struct {byte b; byte d[];} dyn_t;\n"
+                       "  typedef bit [23:0] b24_t;\n"
+                       "  typedef bit [7:0] b8_t;\n"
+                       "  dyn_t s, e;\n"
+                       "  initial begin\n"
+                       "    s.b = 8'h41; e.b = 8'h44;\n"
+                       "    s.d = new[2];\n"
+                       "    s.d[0] = 8'h42; s.d[1] = 8'h43;\n"
+                       "    $display(\"%h %h\", b24_t'(s), b8_t'(e));\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "414243 44\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §6.24.3 (printed page 143): in a cast into a structure, its first dynamic
+// array member takes the bits the fixed-size members leave as a new array of
+// its elements, so 24'h414243 into {byte b; byte d[];} gives b = 8'h41 and d
+// the two elements 8'h42 and 8'h43. Laid over the stored bits, the source
+// filled d's handle and b read 0.
+TEST(BitStreamCastSim, CastIntoAStructGivesItsDynamicArrayMemberTheRemainder) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef struct {byte b; byte d[];} dyn_t;\n"
+                       "  dyn_t s;\n"
+                       "  bit [23:0] v = 24'h414243;\n"
+                       "  initial begin\n"
+                       "    s = dyn_t'(v);\n"
+                       "    $display(\"%h %0d %h %h\", s.b, s.d.size(), "
+                       "s.d[0], s.d[1]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "41 2 42 43\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §6.24.3 (printed page 143): a size mismatch the cast meets only at run time
+// is an error then. A 56-bit source leaves the int elements of
+// {byte b; int d[];} 48 bits, whole bytes but no whole number of ints.
+TEST(BitStreamCastSim, CastIntoAStructOfNoWholeDynamicElementsIsAnError) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  typedef struct {byte b; int d[];} ints_t;\n"
+      "  ints_t s;\n"
+      "  bit [55:0] v = 56'h1;\n"
+      "  initial s = ints_t'(v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-stream cast to 'ints_t': the 56-bit source "
+                            "leaves its first dynamically sized member 48 "
+                            "bits, which are no whole number of its 32-bit "
+                            "elements",
+                            5, "6.24.3"));
+}
+
+// §6.24.3 (printed pages 142 and 143): each element of an unpacked array of
+// strings is a string, a dynamic array of bytes, so {8'h41, {"B", "CD"}} in
+// {byte b; string v [2];} streams as 32'h41424344, and 24'h414243 cast into it
+// gives the first element, v[0], "BC" and v[1] nothing. Taken as one
+// fixed-size member, the array streamed its elements' handles.
+TEST(BitStreamCastSim, AStringArrayMemberStreamsEachElementAsBytes) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef struct {byte b; string v [2];} names_t;\n"
+                       "  typedef bit [31:0] b32_t;\n"
+                       "  names_t m, n;\n"
+                       "  bit [23:0] u = 24'h414243;\n"
+                       "  initial begin\n"
+                       "    m.b = 8'h41; m.v[0] = \"B\"; m.v[1] = \"CD\";\n"
+                       "    n = names_t'(u);\n"
+                       "    $display(\"%h %h [%s] [%s] %0d\", b32_t'(m), n.b, "
+                       "n.v[0], n.v[1], n.v[0].len());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "41424344 41 [BC] [] 2\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §6.24.3 (printed pages 142 and 143): each element of a dynamic array of
+// strings is a dynamic array of bytes, so the cast from {byte b; string d[];}
+// streams b and then every element's bytes, an empty element none:
+// {8'h41, {"B", "", "CD"}} is 32'h41424344. Resized to the 64 bits the
+// structure stores a string handle in, each element streamed as eight bytes.
+TEST(BitStreamCastSim, CastFromAStructStreamsItsDynamicStringElementsAsBytes) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef struct {byte b; string d[];} names_t;\n"
+                       "  typedef bit [31:0] b32_t;\n"
+                       "  names_t m;\n"
+                       "  initial begin\n"
+                       "    m.b = 8'h41;\n"
+                       "    m.d = new[3];\n"
+                       "    m.d[0] = \"B\"; m.d[2] = \"CD\";\n"
+                       "    $display(\"%h\", b32_t'(m));\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "41424344\n");
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace
