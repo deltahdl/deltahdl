@@ -123,6 +123,9 @@ void CollectVariableDriversOrLoads(VpiObject* node, bool want_driver,
 // expression on an input (detail 1).
 void CollectNetDriversOrLoads(VpiObject* node, bool want_driver,
                               VpiObject* iter) {
+  // §37.16 detail 11: a part of a nettype net has no driver iteration.
+  if (want_driver && !VpiNetDriverIterationSupported(VpiNetTypeOf(node)))
+    return;
   for (auto* child : node->children) {
     if (want_driver) {
       if (VpiIsNetDriverType(child->type)) iter->children.push_back(child);

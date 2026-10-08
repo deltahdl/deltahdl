@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "fixture_vpi_run.h"
+#include "simulator/net.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -214,6 +215,35 @@ TEST(NetModel, NettypeValueAndDriverIterationGate) {
 
   EXPECT_TRUE(VpiNetDriverIterationSupported(vpiNettypeNet));
   EXPECT_FALSE(VpiNetDriverIterationSupported(vpiNettypeNetSelect));
+}
+
+// §37.16 detail 11: a net declared with a nettype is a nettype net, and any
+// part of it -- a net bit, whose parent stands for the same net -- a nettype
+// net select, in both forms. Neither vpiDriver nor vpiLocalDriver is iterated
+// on such a part, while the whole net keeps its drivers.
+TEST_F(NetContext, APartOfANettypeNetIsANettypeNetSelect) {
+  Net user;
+  user.is_user_nettype = true;
+  VpiObject driver;
+  driver.type = vpiContAssign;
+  VpiObject net;
+  net.type = vpiNet;
+  net.net = &user;
+  net.children.push_back(&driver);
+  VpiObject bit;
+  bit.type = vpiNetBit;
+  bit.parent = &net;
+  bit.net = &user;
+  bit.children.push_back(&driver);
+
+  EXPECT_EQ(vpi_get(vpiNetType, VpiHandleOf(&net)), vpiNettypeNet);
+  EXPECT_EQ(vpi_get(vpiNetType, VpiHandleOf(&bit)), vpiNettypeNetSelect);
+  const char* name = vpi_get_str(vpiNetType, VpiHandleOf(&bit));
+  ASSERT_NE(name, nullptr);
+  EXPECT_EQ(std::string(name), "vpiNettypeNetSelect");
+  EXPECT_EQ(vpi_iterate(vpiDriver, VpiHandleOf(&bit)), nullptr);
+  EXPECT_EQ(vpi_iterate(vpiLocalDriver, VpiHandleOf(&bit)), nullptr);
+  EXPECT_NE(vpi_iterate(vpiDriver, VpiHandleOf(&net)), nullptr);
 }
 
 // D12: vpiNetType for an interconnect net is vpiInterconnect;

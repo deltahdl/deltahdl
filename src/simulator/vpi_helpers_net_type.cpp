@@ -50,8 +50,13 @@ int NetTypeConstant(NetType type) {
 
 int VpiNetTypeOf(VpiHandle obj) {
   if (obj->net == nullptr) return 0;
-  // A net declared with a user-defined nettype (§6.6.7) is a nettype net.
-  if (obj->net->is_user_nettype) return vpiNettypeNet;
+  // §37.16 detail 11: a net declared with a user-defined nettype (§6.6.7) is a
+  // nettype net, and any part of one -- an object whose parent stands for the
+  // same net, as a net bit or a select does -- a nettype net select.
+  if (obj->net->is_user_nettype) {
+    return VpiNetNettypeValue(obj->parent != nullptr &&
+                              obj->parent->net == obj->net);
+  }
   return NetTypeConstant(obj->net->type);
 }
 
