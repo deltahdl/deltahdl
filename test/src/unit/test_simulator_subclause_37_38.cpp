@@ -10,6 +10,7 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -332,5 +333,17 @@ TEST_F(ConstraintExpression, ElseConstIsScopedToTheIfElse) {
   EXPECT_TRUE(itr == nullptr || vpi_scan(itr) == nullptr);
 }
 
+// §37.38 (figure): a guarded constraint reaches its condition through
+// vpiCondition. A null handle has none, nor does an implication holding no
+// expression child, a typespec among its children not being one.
+TEST(ConstraintCondition, NoConditionWithoutAnExpressionChild) {
+  EXPECT_EQ(VpiConstraintConditionExpr(nullptr), nullptr);
+  VpiObject typespec;
+  typespec.type = vpiTypespec;
+  VpiObject implication;
+  implication.type = vpiImplication;
+  implication.children = {&typespec};
+  EXPECT_EQ(VpiConstraintConditionExpr(&implication), nullptr);
+}
 }  // namespace
 }  // namespace delta

@@ -164,5 +164,17 @@ TEST(SequenceDeclModel, SequenceDeclAndFormalReportTheirNames) {
   EXPECT_STREQ(ctx.GetStr(vpiFullName, &formal), "win");
 }
 
+// §37.53 detail 2: a formal's typespec is its typespec child, found past a
+// child of another kind.
+TEST(SequenceFormal, TypespecFoundPastOtherChildren) {
+  VpiObject attribute;
+  attribute.type = vpiAttribute;
+  VpiObject typespec;
+  typespec.type = vpiTypespec;
+  VpiObject formal;
+  formal.type = vpiSeqFormalDecl;
+  formal.children = {&attribute, &typespec};
+  EXPECT_EQ(VpiSeqFormalTypespec(&formal), &typespec);
+}
 }  // namespace
 }  // namespace delta

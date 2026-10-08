@@ -266,5 +266,18 @@ TEST_F(LetExprIteration, OnlyWrittenAndDefaultedArgumentsComeBack) {
   EXPECT_EQ(VpiObjectOf(args[0]), &sum);
 }
 
+// §37.57 detail 1: a null formal has no default, and a formal's default is its
+// first expression child, its typespec not being one.
+TEST(LetFormalDefault, NullHasNoneAndTheTypespecIsPassedOver) {
+  EXPECT_EQ(VpiLetFormalDefault(nullptr), nullptr);
+  VpiObject typespec;
+  typespec.type = vpiTypespec;
+  VpiObject value;
+  value.type = vpiConstant;
+  VpiObject formal;
+  formal.type = vpiSeqFormalDecl;
+  formal.children = {&typespec, &value};
+  EXPECT_EQ(VpiLetFormalDefault(&formal), &value);
+}
 }  // namespace
 }  // namespace delta

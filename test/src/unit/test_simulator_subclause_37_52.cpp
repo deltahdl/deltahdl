@@ -589,5 +589,32 @@ TEST(PropertySpecModel, AnExprIterationOfANonItemIsNoConditionWalk) {
   EXPECT_TRUE(iter.children.empty());
 }
 
+// §37.52: a null case item groups no condition; a case property's condition
+// is its first expression child, past a child of another kind and past its
+// items; a constant and a reference are disable conditions; and a property
+// expression is found among an object's children or not at all.
+TEST(PropertySpecificationModel, ConditionsAndPropertyExpressionLookups) {
+  EXPECT_TRUE(VpiCaseItemConditions(nullptr).empty());
+
+  VpiObject attribute;
+  attribute.type = vpiAttribute;
+  VpiObject item;
+  item.type = vpiCasePropertyItem;
+  VpiObject operation;
+  operation.type = vpiOperation;
+  VpiObject case_property;
+  case_property.type = vpiCaseProperty;
+  case_property.children = {&attribute, &item, &operation};
+  EXPECT_EQ(VpiCasePropertyConditionExpr(&case_property), &operation);
+
+  EXPECT_TRUE(VpiIsDisableConditionType(vpiConstant));
+  EXPECT_TRUE(VpiIsDisableConditionType(vpiRefObj));
+
+  EXPECT_EQ(VpiPropertyExprChild(nullptr), nullptr);
+  VpiObject spec;
+  spec.type = vpiPropertySpec;
+  spec.children = {&attribute};
+  EXPECT_EQ(VpiPropertyExprChild(&spec), nullptr);
+}
 }  // namespace
 }  // namespace delta

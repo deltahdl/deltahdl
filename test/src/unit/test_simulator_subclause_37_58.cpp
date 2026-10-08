@@ -306,5 +306,45 @@ TEST_F(BitSelectObject, ABitResolvesOnlyItsIndexAndParent) {
   EXPECT_EQ(out, nullptr);
 }
 
+// §37.58 detail 3 read off the object: a null handle and an object that is no
+// bit-select are no constant select; a bit-select with no parent is not one
+// whatever its indices, children of no expression kind not being indices; and
+// a bit-select of a bit-select or of a var select follows its parent's answer.
+TEST(BitSelectConstantSelect, ReadOffTheSelectAndItsParent) {
+  EXPECT_FALSE(VpiBitSelectConstantSelectOf(nullptr));
+  VpiObject ref;
+  ref.type = vpiRefObj;
+  EXPECT_FALSE(VpiBitSelectConstantSelectOf(&ref));
+
+  VpiObject attribute;
+  attribute.type = vpiAttribute;
+  VpiObject index;
+  index.type = vpiConstant;
+  VpiObject orphan;
+  orphan.type = vpiBitSelect;
+  orphan.children = {&attribute, &index};
+  EXPECT_FALSE(VpiBitSelectConstantSelectOf(&orphan));
+
+  VpiObject var;
+  var.type = vpiIntegerVar;
+  VpiObject inner;
+  inner.type = vpiBitSelect;
+  inner.parent = &var;
+  inner.children = {&index};
+  VpiObject outer;
+  outer.type = vpiBitSelect;
+  outer.parent = &inner;
+  outer.children = {&index};
+  EXPECT_TRUE(VpiBitSelectConstantSelectOf(&outer));
+
+  VpiObject var_select;
+  var_select.type = vpiVarSelect;
+  VpiObject of_var_select;
+  of_var_select.type = vpiBitSelect;
+  of_var_select.parent = &var_select;
+  of_var_select.children = {&index};
+  EXPECT_EQ(VpiBitSelectConstantSelectOf(&of_var_select),
+            VpiVarSelectConstantSelectOf(&var_select));
+}
 }  // namespace
 }  // namespace delta

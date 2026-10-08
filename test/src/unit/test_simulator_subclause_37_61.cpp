@@ -329,5 +329,11 @@ TEST_F(DynamicPrefixingOfADesign, UnboundPrefixHasNoActual) {
   EXPECT_EQ(g_arg_has_actual, 0);
 }
 
+// §37.61 detail 3: a provenance outside the ones that pin the answer tracks
+// whether the object has an actual at the current time.
+TEST(DynamicPrefixHasActual, AnUnlistedOriginTracksTheCurrentActual) {
+  EXPECT_TRUE(VpiObjectHasActual(999, true));
+  EXPECT_FALSE(VpiObjectHasActual(999, false));
+}
 }  // namespace
 }  // namespace delta

@@ -9,6 +9,7 @@
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -445,5 +446,10 @@ TEST_F(ClassDefinitionsOfARun, AVirtualMethodReportsVpiVirtual) {
   EXPECT_EQ(vpi_get(vpiVirtual, Named(vpiMethods, defn, "id")), 0);
 }
 
+// §37.31 detail 2: a named event array a class defn hands back is one of the
+// value-bearing objects the value-access restriction is about.
+TEST(ClassDefnValueAccess, ANamedEventArrayIsValueBearing) {
+  EXPECT_TRUE(VpiIsClassMemberValueType(vpiNamedEventArray));
+}
 }  // namespace
 }  // namespace delta

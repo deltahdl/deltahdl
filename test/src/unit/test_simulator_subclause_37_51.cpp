@@ -417,5 +417,19 @@ TEST_F(PropertyDeclsOfARun, AFormalOfAWrittenTypeReachesItsTypespec) {
   EXPECT_STREQ(vpi_get_str(vpiName, w), "byte_t");
 }
 
+// §37.51 details 3 and 4: a formal's typespec is its typespec child, found
+// past a child of another kind, and a null formal has no initialization
+// expression.
+TEST(PropertyFormal, TypespecFoundPastOtherChildrenAndNullHasNoInit) {
+  VpiObject attribute;
+  attribute.type = vpiAttribute;
+  VpiObject typespec;
+  typespec.type = vpiTypespec;
+  VpiObject formal;
+  formal.type = vpiPropFormalDecl;
+  formal.children = {&attribute, &typespec};
+  EXPECT_EQ(VpiPropFormalTypespec(&formal), &typespec);
+  EXPECT_EQ(VpiPropFormalInitExpr(nullptr), nullptr);
+}
 }  // namespace
 }  // namespace delta
