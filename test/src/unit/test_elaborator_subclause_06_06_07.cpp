@@ -1,10 +1,14 @@
 #include <gtest/gtest.h>
 
+#include "common/arena.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 
@@ -595,6 +599,55 @@ TEST(NettypeElaboration, ANetOfACompilationUnitNettypeCarriesIt) {
   }
   ASSERT_NE(net, nullptr);
   EXPECT_EQ(net->nettype_name, "mynet");
+}
+
+// §6.6.7 with §6.18: a nettype or typedef name stands for the type it was
+// declared with, so a chain of names is followed to the packed vector type at
+// its end, whose range a net of the first name takes. A name the table does
+// not hold, a name for an enumeration or for a type with no packed dimension,
+// and a chain with no end stand for none.
+TEST(NettypeElaboration, NamedPackedVectorTypeFollowsAChainOfNames) {
+  Arena arena;
+  Expr left;
+  Expr right;
+  DataType vector;
+  vector.kind = DataTypeKind::kLogic;
+  vector.packed_dim_left = &left;
+  vector.packed_dim_right = &right;
+  DataType to_vector;
+  to_vector.kind = DataTypeKind::kNamed;
+  to_vector.type_name = "vec_net";
+  DataType integer;
+  integer.kind = DataTypeKind::kInteger;
+  DataType enumeration;
+  enumeration.kind = DataTypeKind::kEnum;
+  enumeration.packed_dim_left = &left;
+  enumeration.packed_dim_right = &right;
+  DataType to_b;
+  to_b.kind = DataTypeKind::kNamed;
+  to_b.type_name = "b_t";
+  DataType to_a;
+  to_a.kind = DataTypeKind::kNamed;
+  to_a.type_name = "a_t";
+  const TypedefMap kTable{{"vec_net", vector},  {"alias_t", to_vector},
+                          {"int_net", integer}, {"enum_t", enumeration},
+                          {"a_t", to_b},        {"b_t", to_a}};
+
+  DataType written;
+  written.kind = DataTypeKind::kNamed;
+  written.type_name = "alias_t";
+  const DataType* found = NamedPackedVectorType(written, kTable, arena);
+  ASSERT_NE(found, nullptr);
+  EXPECT_EQ(found->packed_dim_left, &left);
+  EXPECT_EQ(found->packed_dim_right, &right);
+
+  written.type_name = "int_net";
+  EXPECT_EQ(NamedPackedVectorType(written, kTable, arena), nullptr);
+  written.type_name = "enum_t";
+  EXPECT_EQ(NamedPackedVectorType(written, kTable, arena), nullptr);
+  written.type_name = "missing_t";
+  EXPECT_EQ(NamedPackedVectorType(written, kTable, arena), nullptr);
+  EXPECT_EQ(NamedPackedVectorType(to_a, kTable, arena), nullptr);
 }
 
 }  // namespace

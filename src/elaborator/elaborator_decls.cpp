@@ -721,7 +721,10 @@ static const DataType* NetDeclaredType(const ModuleItem* item,
     return &item->data_type;
   }
   if (!item->unpacked_dims.empty()) return nullptr;
-  return ResolvedAggregateType(item->data_type, typedefs, arena);
+  const DataType* aggregate =
+      ResolvedAggregateType(item->data_type, typedefs, arena);
+  if (aggregate != nullptr) return aggregate;
+  return NamedPackedVectorType(item->data_type, typedefs, arena);
 }
 
 void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {

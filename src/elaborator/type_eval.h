@@ -35,6 +35,15 @@ void ResolveNestedAggregateTypes(DataType& dt, const TypedefMap& typedefs,
 const DataType* ResolvedAggregateType(const DataType& dtype,
                                       const TypedefMap& typedefs, Arena& arena);
 
+// §6.18 and §6.6.7: the packed vector type `dtype`, a typedef or nettype name,
+// stands for through a chain of names, as an arena copy; null where the name
+// stands for an enumeration, a type with no packed dimension, or nothing the
+// table holds. An enumeration's range is its base type's, not its own. A
+// net of such a name takes the range the type declares, as a variable does
+// (§37.16 detail 3). Defined in src/elaborator/type_eval_aggregate.cpp.
+const DataType* NamedPackedVectorType(const DataType& dtype,
+                                      const TypedefMap& typedefs, Arena& arena);
+
 // §7.4.4: the element count of the packed dimensions a declaration writes --
 // the leading range times each further one -- which is what a use-site
 // dimension multiplies the width of the type it is written on by. Zero where

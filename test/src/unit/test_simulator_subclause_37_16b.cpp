@@ -98,6 +98,36 @@ constexpr const char* kNetDataTypes =
     "  int_net n; bit_net b;\n"
     "endmodule\n";
 
+// §37.16 detail 3: a logic net has its net bits, a net of a named vector type
+// among them, indexed by the range the type declares. Detail 11: each bit of a
+// net of a nettype is a nettype net select, which vpiDriver is not iterated on.
+TEST_F(NetKindsOfARun, ANamedVectorTypesNetHasItsBits) {
+  Run("module top;\n"
+      "  typedef logic [3:0] t;\n"
+      "  nettype logic [7:4] n4;\n"
+      "  wire t x;\n"
+      "  n4 n;\n"
+      "endmodule\n");
+  auto names_of_bits = [](vpiHandle net) {
+    std::vector<std::string> names;
+    vpiHandle it = vpi_iterate(vpiBit, net);
+    if (it == nullptr) return names;
+    while (vpiHandle bit = vpi_scan(it))
+      names.emplace_back(vpi_get_str(vpiName, bit));
+    return names;
+  };
+  EXPECT_EQ(names_of_bits(By("top.x")),
+            (std::vector<std::string>{"x[3]", "x[2]", "x[1]", "x[0]"}));
+  EXPECT_EQ(names_of_bits(By("top.n")),
+            (std::vector<std::string>{"n[7]", "n[6]", "n[5]", "n[4]"}));
+  vpiHandle bits = vpi_iterate(vpiBit, By("top.n"));
+  ASSERT_NE(bits, nullptr);
+  vpiHandle bit = vpi_scan(bits);
+  ASSERT_NE(bit, nullptr);
+  EXPECT_EQ(vpi_get(vpiNetType, bit), vpiNettypeNetSelect);
+  EXPECT_EQ(vpi_iterate(vpiDriver, bit), nullptr);
+}
+
 // §37.16 (figure): a net with no data type of its own, or of logic, is a logic
 // net.
 TEST_F(NetKindsOfARun, ALogicTypedNetIsALogicNet) {
