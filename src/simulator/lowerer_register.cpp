@@ -258,12 +258,14 @@ bool PortDefaultsToZero(const RtlirPort& port) {
 // CreateArrayElements in lowerer_var.cpp) under the array's registered shape,
 // each starting at the port's default (§23.3.3.2). Held as one value of an
 // element's width, `input var int i[3]` read bits of that value for i[0] to
-// i[2]. False, creating nothing, for a port that is no such array.
+// i[2]. §7.4.2 lets a bound be negative, and each address is then held by its
+// 32 bits, as every select names it, so `[-1:0]` holds [4294967295] and [0];
+// such a port was held as one value, which no select of an element reached.
+// False, creating nothing, for a port that is no such array.
 static bool CreatePortArrayElements(std::string_view name,
                                     const RtlirPort& port, SimContext& ctx,
                                     Arena& arena) {
-  if (port.num_unpacked_dims != 1 || port.unpacked_dims.size() != 1 ||
-      port.unpacked_dims.front().Low() < 0) {
+  if (port.num_unpacked_dims != 1 || port.unpacked_dims.size() != 1) {
     return false;
   }
   const RtlirUnpackedDim& dim = port.unpacked_dims.front();
