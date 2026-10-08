@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -298,6 +299,108 @@ TEST(BitStreamCastSim, CastIntoAStructWithAnUnpackedArrayMember) {
                  "endmodule\n",
                  f),
       "fffe a 11 22 fffea1122\n");
+}
+
+// §6.24.3 (printed page 143): to a bit-stream cast a string is a dynamic array
+// of bytes, so a cast into an unpacked structure holding one gives its first
+// string member every bit the fixed-size members leave, and a later string
+// member none, a nested structure's members streaming in its place. 48 bits
+// into {int n; string s;} are n = 7 and s = "hi"; 24 bits into
+// {byte b; in_t i;}, in_t being {string s; string t;}, are b = 8'h41,
+// i.s = "BC" and an empty i.t. Laid over the structure's stored bits, 7 and
+// "hi" fell into the place of s's handle and n read 0.
+TEST(BitStreamCastSim, CastIntoAStructGivesItsStringMemberTheRemainingBytes) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef struct {int n; string s;} pair_t;\n"
+                       "  typedef struct {string s; string t;} in_t;\n"
+                       "  typedef struct {byte b; in_t i;} two_t;\n"
+                       "  pair_t p;\n"
+                       "  two_t w;\n"
+                       "  bit [47:0] v = {32'd7, \"hi\"};\n"
+                       "  bit [23:0] u = 24'h414243;\n"
+                       "  initial begin\n"
+                       "    p = pair_t'(v);\n"
+                       "    w = two_t'(u);\n"
+                       "    $display(\"%0d [%s] %h [%s] [%s]\", p.n, p.s, w.b, "
+                       "w.i.s, w.i.t);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "7 [hi] 41 [BC] []\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §6.24.3 (printed page 143): a size mismatch the cast meets only at run time
+// is an error then. A 44-bit source leaves the string member of
+// {int n; string s;} 12 bits, which are no whole number of bytes, and a 16-bit
+// source is narrower than the 32 bits of n alone.
+TEST(BitStreamCastSim, CastIntoAStructWithAStringOfNoWholeBytesIsAnError) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  typedef struct {int n; string s;} pair_t;\n"
+      "  pair_t p, q;\n"
+      "  bit [43:0] v = 44'h1;\n"
+      "  bit [15:0] h = 16'h1;\n"
+      "  initial begin\n"
+      "    p = pair_t'(v);\n"
+      "    q = pair_t'(h);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-stream cast to 'pair_t': the 44-bit source "
+                            "leaves its string members 12 bits, which are no "
+                            "whole number of bytes",
+                            7, "6.24.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-stream cast to 'pair_t': the 16-bit source "
+                            "is narrower than the 32 bits of its fixed-size "
+                            "members",
+                            8, "6.24.3"));
+}
+
+// §6.24.3 (printed pages 142 and 143): the cast from an unpacked structure
+// first streams it, a string member as its bytes, so {7, "hi"} in
+// {int n; string s;} is the 48 bits 48'h0000_0007_6869, and
+// {8'h41, {"BC", ""}} in {byte b; in_t i;}, in_t being {string s; string t;},
+// the 24 bits 24'h414243. Cut from the structure's stored bits, the cast
+// packed s's handle and lost n.
+TEST(BitStreamCastSim, CastFromAStructStreamsItsStringMemberAsBytes) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef struct {int n; string s;} pair_t;\n"
+                       "  typedef struct {string s; string t;} in_t;\n"
+                       "  typedef struct {byte b; in_t i;} two_t;\n"
+                       "  typedef bit [47:0] b48_t;\n"
+                       "  typedef bit [23:0] b24_t;\n"
+                       "  pair_t p = '{7, \"hi\"};\n"
+                       "  two_t w = '{8'h41, '{\"BC\", \"\"}};\n"
+                       "  initial $display(\"%h %h\", b48_t'(p), b24_t'(w));\n"
+                       "endmodule\n",
+                       f),
+            "000000076869 414243\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §6.24.3 (printed page 143): the 48 bits {7, "hi"} streams to are an error
+// at run time to a cast to a 40-bit type.
+TEST(BitStreamCastSim, CastFromAStructOfAnotherStreamedSizeIsAnError) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  typedef struct {int n; string s;} pair_t;\n"
+      "  typedef bit [39:0] b40_t;\n"
+      "  pair_t p = '{7, \"hi\"};\n"
+      "  b40_t b;\n"
+      "  initial b = b40_t'(p);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-stream cast to 'b40_t': the source streams "
+                            "48 bits, where the type holds 40",
+                            6, "6.24.3"));
 }
 
 }  // namespace

@@ -2,12 +2,14 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <format>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "common/types.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
@@ -16,12 +18,14 @@
 #include "simulator/clocking.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_expr_internal.h"
+#include "simulator/eval_member_path.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/struct_string_member.h"
 #include "simulator/sva_engine_sampling.h"
 #include "simulator/variable.h"
 
@@ -524,6 +528,131 @@ static bool TryTypedPatternCast(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
+// §6.24.3 (printed page 143): a member of an unpacked structure as a
+// bit-stream cast streams it -- where its bits stand among the structure's
+// stored bits, and whether it is a string, which streams as its bytes rather
+// than as the handle those bits hold (§7.2 with §6.16).
+struct StreamedMember {
+  uint32_t offset = 0;
+  uint32_t width = 0;
+  bool is_string = false;
+};
+
+// The members of `layout`, held from bit `base` of the stored bits, in the
+// order a bit-stream cast streams them: declaration order, a nested unpacked
+// structure's own members in its place.
+static void AppendStreamedMembers(const StructTypeInfo& layout, uint32_t base,
+                                  std::vector<StreamedMember>& out) {
+  for (const StructFieldInfo& f : layout.fields) {
+    if (f.nested != nullptr && !f.nested->is_packed && f.elem_count == 0) {
+      AppendStreamedMembers(*f.nested, base + f.bit_offset, out);
+      continue;
+    }
+    bool is_string = f.type_kind == DataTypeKind::kString && f.elem_count == 0;
+    out.push_back({base + f.bit_offset, f.width, is_string});
+  }
+}
+
+// The members `layout` streams where it is an unpacked structure holding a
+// string member, the one member whose stored bits are not the bits it
+// streams; empty for any other layout, whose stored bits are its stream.
+static std::vector<StreamedMember> StringStructMembers(
+    const StructTypeInfo* layout) {
+  if (layout == nullptr) return {};
+  std::vector<StreamedMember> members;
+  AppendStreamedMembers(*layout, 0, members);
+  for (const StreamedMember& m : members) {
+    if (m.is_string) return members;
+  }
+  return {};
+}
+
+// §6.24.3 (printed page 142): the generic packed value the stored bits
+// `stored` of a structure whose members are `members` stream to: each
+// member's bits in declaration order, a string member's bytes in its place.
+static Logic4Vec StreamStringStruct(const Logic4Vec& stored,
+                                    const std::vector<StreamedMember>& members,
+                                    Arena& arena) {
+  std::vector<Logic4Vec> parts;
+  uint32_t width = 0;
+  for (const StreamedMember& m : members) {
+    Logic4Vec bits = ExtractBitField(arena, stored, m.offset, m.width);
+    if (m.is_string) {
+      std::string text = Logic4VecToString(StringMemberText(bits, arena));
+      if (text.empty()) continue;
+      bits = StringToLogic4Vec(arena, text);
+    }
+    width += bits.width;
+    parts.push_back(bits);
+  }
+  return AssembleConcatParts(parts, width, arena);
+}
+
+// §6.24.3 (printed page 143): the stored bits, `stored_width` of them, of a
+// structure whose members are `members` that the stream `stream` is cast
+// into. The members take the stream's bits left to right, the first string
+// member the `remainder` bits the fixed-size members leave and a later one
+// none, each string member holding its bytes through a handle.
+static Logic4Vec UnstreamStringStruct(
+    const Logic4Vec& stream, const std::vector<StreamedMember>& members,
+    uint32_t stored_width, uint32_t remainder, Arena& arena) {
+  Logic4Vec result = MakeLogic4Vec(arena, stored_width);
+  uint32_t pos = stream.width;
+  for (const StreamedMember& m : members) {
+    uint32_t width = m.is_string ? remainder : m.width;
+    if (m.is_string) remainder = 0;
+    if (width == 0) continue;
+    pos -= width;
+    Logic4Vec bits = ExtractBitField(arena, stream, pos, width);
+    if (m.is_string) bits = StringMemberHandle(bits, arena);
+    DepositBitField(result, m.offset, bits, m.width);
+  }
+  return result;
+}
+
+// §6.24.3 (printed page 143): a bit-stream cast of the stream `stream` into
+// an unpacked structure holding a string member, which takes its size from
+// the stream, as UnstreamStringStruct. A stream narrower than the fixed-size
+// members, or leaving the string members no whole number of bytes, is the
+// size mismatch the cast meets only at run time, an error then, and the cast
+// gives the structure's default value. False for a cast into any other type.
+static bool TryCastIntoStringStruct(const Expr* expr, const Logic4Vec& stream,
+                                    SimContext& ctx, Arena& arena,
+                                    Logic4Vec& out) {
+  std::string key = CastTypeKey(expr, ctx);
+  const StructTypeInfo* layout = ctx.FindStructType(key);
+  std::vector<StreamedMember> members = StringStructMembers(layout);
+  if (members.empty()) return false;
+  uint32_t fixed = 0;
+  for (const StreamedMember& m : members) {
+    if (!m.is_string) fixed += m.width;
+  }
+  out = MakeLogic4Vec(arena, layout->total_width);
+  if (stream.width < fixed) {
+    ctx.GetDiag().Error(
+        expr->range.start,
+        std::format("bit-stream cast to '{}': the {}-bit source is narrower "
+                    "than the {} bits of its fixed-size members",
+                    key, stream.width, fixed),
+        Subclause("6.24.3"));
+    return true;
+  }
+  uint32_t remainder = stream.width - fixed;
+  if (remainder % 8 != 0) {
+    ctx.GetDiag().Error(
+        expr->range.start,
+        std::format("bit-stream cast to '{}': the {}-bit source leaves its "
+                    "string members {} bits, which are no whole number of "
+                    "bytes",
+                    key, stream.width, remainder),
+        Subclause("6.24.3"));
+    return true;
+  }
+  out = UnstreamStringStruct(stream, members, layout->total_width, remainder,
+                             arena);
+  return true;
+}
+
 Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec stream_out;
   if (TryArrayBitStreamCast(expr, ctx, arena, stream_out)) return stream_out;
@@ -538,11 +667,30 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
 
   Logic4Vec kw_out;
   if (TryKeywordCast(type_name, inner, arena, kw_out)) return kw_out;
+  // §6.24.3: an unpacked structure holding a string streams as its members
+  // do, not as the handles among its stored bits.
+  std::vector<StreamedMember> streamed =
+      StringStructMembers(StructLayoutOfOperand(expr->lhs, ctx));
+  if (!streamed.empty()) inner = StreamStringStruct(inner, streamed, arena);
+  Logic4Vec struct_out;
+  if (TryCastIntoStringStruct(expr, inner, ctx, arena, struct_out))
+    return struct_out;
 
   CastTarget target;
   if (!TypeRefCastTarget(expr->rhs, ctx, target))
     target = ResolveCastTarget(CastTypeKey(expr, ctx), ctx);
   uint32_t target_width = target.width;
+  // §6.24.3 (printed page 143): such a structure's stream is sized only at
+  // run time, where a stream of other than the casting type's size is an
+  // error.
+  if (!streamed.empty() && inner.width != target_width) {
+    ctx.GetDiag().Error(
+        expr->range.start,
+        std::format("bit-stream cast to '{}': the source streams {} bits, "
+                    "where the type holds {}",
+                    CastTypeKey(expr, ctx), inner.width, target_width),
+        Subclause("6.24.3"));
+  }
 
   if (inner.is_real != IsRealCastTarget(type_name)) {
     return CastRealConversion(inner, type_name, target_width, arena);
