@@ -38,10 +38,10 @@ Logic4Vec StringMemberHandle(const Logic4Vec& text, Arena& arena) {
 }
 
 Logic4Vec StringMemberText(const Logic4Vec& handle, Arena& arena) {
-  const StringMemberTable& table = Table();
+  // §11.9: a structure a read inconsistent with a tagged union's tag gave all
+  // x holds an x handle, which names the empty string.
   uint64_t index = handle.IsKnown() ? handle.ToUint64() : 0;
-  Logic4Vec text = StringToLogic4Vec(
-      arena, index < table.texts.size() ? table.texts[index] : "");
+  Logic4Vec text = StringToLogic4Vec(arena, Table().texts[index]);
   text.is_string = true;
   return text;
 }

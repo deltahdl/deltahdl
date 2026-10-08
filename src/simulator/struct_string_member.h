@@ -18,8 +18,9 @@ class Arena;
 // The handle naming `text`, a string value.
 Logic4Vec StringMemberHandle(const Logic4Vec& text, Arena& arena);
 
-// The string value the handle `handle` names; the empty string for the zero
-// handle, which a member never written holds, and for one with an unknown bit.
+// The string value the handle `handle` names: the text StringMemberHandle
+// gave it for, and the empty string for the zero handle, which a member never
+// written holds, and for one with an unknown bit (§11.9).
 Logic4Vec StringMemberText(const Logic4Vec& handle, Arena& arena);
 
 // The bits a member of the declared type `kind` holds for the value `val`
