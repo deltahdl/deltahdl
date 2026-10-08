@@ -461,5 +461,21 @@ TEST_F(InstanceArraysOfARun, ASwitchInstanceArrayIsASwitchArray) {
   EXPECT_EQ(vpi_get(vpiType, vpi_handle_by_index(array, 0)), vpiSwitch);
 }
 
+// §11.5.1 makes a read outside a vector's bounds legal, yielding x. A gate
+// array whose terminal is such a select still gives each element a prim term
+// per terminal, whatever the model has for the select itself, and the other
+// terminals reach what they connect.
+TEST_F(InstanceArraysOfARun, AnElementKeepsEveryTerminalOfAnOutOfRangeSelect) {
+  Run("module top; wire [1:0] y; logic [1:0] v; logic c;\n"
+      "  and g[1:0] (y, v[5], c);\n"
+      "endmodule\n");
+  vpiHandle array = OnlyPrimitiveArray(By("top"));
+  ASSERT_NE(array, nullptr);
+  const std::vector<vpiHandle> kTerms = TermsOf(vpi_handle_by_index(array, 0));
+  ASSERT_EQ(kTerms.size(), 3U);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, kTerms[2])),
+            VpiObjectOf(By("top.c")));
+}
+
 }  // namespace
 }  // namespace delta
