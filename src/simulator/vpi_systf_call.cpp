@@ -240,20 +240,16 @@ void AppendSystfCallArguments(VpiObject* call, const Expr& call_site,
   }
 }
 
-// §37.42 detail 3: the model's object for the call statement `call_site`,
-// written in the instance `prefix` names, or in any instance writing it where
-// `prefix` names none of them; null where the model holds no statement making
-// the call. A run names an instance with a dot after it and the model without.
+// §37.42 detail 3: the model's object for the call statement `call_site`
+// written in the instance `prefix` names; null where the model holds no
+// statement making the call there, the call then standing up an object of its
+// own. Another instance's statement is that instance's call, not this one. A
+// run names an instance with a dot after it and the model without.
 VpiObject* CallSiteObject(const VpiCallSiteObjects& sites,
                           const Expr* call_site, std::string prefix) {
   if (!prefix.empty()) prefix.pop_back();
   auto exact = sites.find({call_site, prefix});
-  if (exact != sites.end()) return exact->second;
-  auto first = sites.lower_bound({call_site, std::string()});
-  if (first != sites.end() && first->first.first == call_site) {
-    return first->second;
-  }
-  return nullptr;
+  return exact != sites.end() ? exact->second : nullptr;
 }
 
 }  // namespace
