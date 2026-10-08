@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <string>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -703,6 +704,58 @@ TEST_F(BlockVariableValuesOfARun, ABlockVariableReadsWhatTheBlockLeft) {
     vpi_get_value(v, &val);
     EXPECT_EQ(val.value.integer, kValues[i]) << kNames[i];
   }
+}
+
+// §38.15, Table 38-3: the binary, octal and hex string formats give every
+// digit of the value, the ones above bit 63 among them, read from the second
+// storage word. Each digit was read from the first word shifted by its bit
+// position, which held nothing of bits 64 to 71.
+TEST_F(VpiGetValueSim, DigitStringsReadEveryWordOfAWideValue) {
+  auto* var = sim_ctx_.CreateVariable("w", 72);
+  var->value.words[0] = {0x1, 0};
+  var->value.words[1] = {0xAB, 0};
+  auto* xz = sim_ctx_.CreateVariable("xz", 72);
+  xz->value.words[0] = {0x1, 0};
+  xz->value.words[1] = {0xF0, 0xFF};  // bits 71:68 x, bits 67:64 z
+  vpi_ctx_.Attach(sim_ctx_);
+
+  vpiHandle h = vpi_handle_by_name(VpiText("w"), nullptr);
+  ASSERT_NE(h, nullptr);
+  s_vpi_value val = {};
+  val.format = vpiHexStrVal;
+  vpi_get_value(h, &val);
+  EXPECT_STREQ(val.value.str, "ab0000000000000001");
+  val.format = vpiBinStrVal;
+  vpi_get_value(h, &val);
+  EXPECT_EQ(std::string(val.value.str),
+            "10101011" + std::string(63, '0') + "1");
+  val.format = vpiOctStrVal;
+  vpi_get_value(h, &val);
+  EXPECT_STREQ(val.value.str, "526000000000000000000001");
+
+  h = vpi_handle_by_name(VpiText("xz"), nullptr);
+  ASSERT_NE(h, nullptr);
+  val.format = vpiHexStrVal;
+  vpi_get_value(h, &val);
+  EXPECT_STREQ(val.value.str, "xz0000000000000001");
+}
+
+// §38.15, Table 38-3: vpiStringVal reads each eight bits of the value as one
+// character, so an 80-bit value holds ten. The value was read through its first
+// word alone, which holds the last eight.
+TEST_F(VpiGetValueSim, StringValReadsEveryCharacterOfAWideValue) {
+  auto* var = sim_ctx_.CreateVariable("s", 80);
+  var->value.words[0] = {0x636465666768696Aull, 0};  // "cdefghij"
+  var->value.words[1] = {0x6162, 0};                 // "ab"
+  vpi_ctx_.Attach(sim_ctx_);
+
+  vpiHandle h = vpi_handle_by_name(VpiText("s"), nullptr);
+  ASSERT_NE(h, nullptr);
+  s_vpi_value val = {};
+  val.format = vpiStringVal;
+  vpi_get_value(h, &val);
+  ASSERT_NE(val.value.str, nullptr);
+  EXPECT_STREQ(val.value.str, "abcdefghij");
 }
 
 }  // namespace

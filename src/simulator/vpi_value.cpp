@@ -37,16 +37,27 @@
 
 namespace delta {
 
+// The `count` bits of `v` from bit `lo` up, of its bval words where `bval`
+// says so and its aval words otherwise, each read from the 64-bit word that
+// holds it, so a value wider than one word gives every bit it has.
+static uint8_t GroupBits(const Logic4Vec& v, bool bval, int lo, int count) {
+  uint8_t bits = 0;
+  for (int k = 0; k < count; ++k) {
+    const Logic4Word& word = v.words[(lo + k) / 64];
+    const uint64_t kHeld = bval ? word.bval : word.aval;
+    bits |= static_cast<uint8_t>(((kHeld >> ((lo + k) % 64)) & 1) << k);
+  }
+  return bits;
+}
+
 static void GetValueBinStr(const Logic4Vec& v, s_vpi_value* value,
                            std::vector<std::string>& pool) {
-  uint64_t aval = v.words[0].aval;
-  uint64_t bval = v.words[0].bval;
   int width = static_cast<int>(v.width);
   std::string result;
   result.reserve(width);
   for (int i = width - 1; i >= 0; --i) {
-    bool a_bit = (aval >> i) & 1;
-    bool b_bit = (bval >> i) & 1;
+    bool a_bit = GroupBits(v, false, i, 1) != 0;
+    bool b_bit = GroupBits(v, true, i, 1) != 0;
     if (!b_bit) {
       result += (a_bit ? '1' : '0');
     } else {
@@ -82,17 +93,15 @@ static char UnknownGroupChar(uint8_t a_bits, uint8_t b_bits, uint8_t mask) {
 
 static void GetValueHexStr(const Logic4Vec& v, s_vpi_value* value,
                            std::vector<std::string>& pool) {
-  uint64_t aval = v.words[0].aval;
-  uint64_t bval = v.words[0].bval;
   int width = static_cast<int>(v.width);
   int hex_digits = (width + 3) / 4;
   std::string result;
   result.reserve(hex_digits);
   for (int i = hex_digits - 1; i >= 0; --i) {
-    uint8_t a_nibble = (aval >> (i * 4)) & 0xF;
-    uint8_t b_nibble = (bval >> (i * 4)) & 0xF;
+    int valid = std::min(4, width - i * 4);
+    uint8_t a_nibble = GroupBits(v, false, i * 4, valid);
+    uint8_t b_nibble = GroupBits(v, true, i * 4, valid);
     if (b_nibble != 0) {
-      int valid = std::min(4, width - i * 4);
       result += UnknownGroupChar(a_nibble, b_nibble,
                                  static_cast<uint8_t>((1u << valid) - 1));
     } else {
@@ -105,17 +114,15 @@ static void GetValueHexStr(const Logic4Vec& v, s_vpi_value* value,
 
 static void GetValueOctStr(const Logic4Vec& v, s_vpi_value* value,
                            std::vector<std::string>& pool) {
-  uint64_t aval = v.words[0].aval;
-  uint64_t bval = v.words[0].bval;
   int width = static_cast<int>(v.width);
   int oct_digits = (width + 2) / 3;
   std::string result;
   result.reserve(oct_digits);
   for (int i = oct_digits - 1; i >= 0; --i) {
-    uint8_t a_bits = (aval >> (i * 3)) & 0x7;
-    uint8_t b_bits = (bval >> (i * 3)) & 0x7;
+    int valid = std::min(3, width - i * 3);
+    uint8_t a_bits = GroupBits(v, false, i * 3, valid);
+    uint8_t b_bits = GroupBits(v, true, i * 3, valid);
     if (b_bits != 0) {
-      int valid = std::min(3, width - i * 3);
       result += UnknownGroupChar(a_bits, b_bits,
                                  static_cast<uint8_t>((1u << valid) - 1));
     } else {
@@ -185,12 +192,18 @@ static void GetValueStrength(
   value->value.strength = pool.back().data();
 }
 
+// §38.15, Table 38-3 (vpiStringVal row): each eight bits of the value, from
+// its top down, as one character, a null byte left out; an unknown bit reads
+// as 0. Every word is read, so a value wider than 64 bits gives every
+// character it holds rather than the last eight.
 static void GetValueStringVal(const Logic4Vec& v, s_vpi_value* value,
                               std::vector<std::string>& pool) {
-  uint64_t val = v.ToUint64();
+  const int kWidth = static_cast<int>(v.width);
   std::string s;
-  for (int i = 56; i >= 0; i -= 8) {
-    auto ch = static_cast<char>((val >> i) & 0xFF);
+  for (int byte = (kWidth + 7) / 8 - 1; byte >= 0; --byte) {
+    const int kBits = std::min(8, kWidth - byte * 8);
+    auto ch = static_cast<char>(GroupBits(v, false, byte * 8, kBits) &
+                                ~GroupBits(v, true, byte * 8, kBits));
     if (ch != 0) s += ch;
   }
   pool.push_back(std::move(s));
