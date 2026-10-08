@@ -427,5 +427,18 @@ TEST_F(PortsOfARun, AConnectionInAGenerateBlockNamesItsVariable) {
   EXPECT_STREQ(vpi_get_str(vpiName, high), "v");
 }
 
+// D5: the rule constrains an interface port, so asked of no port at all it has
+// nothing to reject.
+TEST(PortModel, NoPortSatisfiesTheInterfaceLowConnRule) {
+  EXPECT_TRUE(VpiPortLowConnSatisfiesInterfaceRule(nullptr));
+}
+
+// D8: a port marked explicitly named whose explicit name is empty has none to
+// report, so its inferred name is returned instead.
+TEST(PortModel, AnEmptyExplicitNameFallsBackToTheInferredName) {
+  EXPECT_STREQ(VpiPortName(/*explicitly_named=*/true, "", "inf"), "inf");
+  EXPECT_EQ(VpiPortName(/*explicitly_named=*/true, "", ""), nullptr);
+}
+
 }  // namespace
 }  // namespace delta

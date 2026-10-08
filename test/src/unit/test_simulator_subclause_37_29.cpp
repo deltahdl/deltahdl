@@ -291,5 +291,20 @@ TEST_F(VirtualInterface, IsModPortTrueForModportQualifiedVar) {
   EXPECT_EQ(vpi_get(vpiIsModPort, VpiHandleOf(&vif)), 1);
 }
 
+// D1: the assignment is the first child of an interface-expr kind, so a child
+// of another kind written before it is passed over rather than handed back.
+TEST_F(VirtualInterface, ExprPassesOverAChildOfAnotherKind) {
+  VpiObject typespec;
+  typespec.type = vpiInterfaceTypespec;
+  VpiObject iface;
+  iface.type = vpiInterface;
+
+  VpiObject vif;
+  vif.type = vpiVirtualInterfaceVar;
+  vif.children = {&typespec, &iface};
+
+  EXPECT_EQ(VpiVirtualInterfaceExpr(&vif), &iface);
+}
+
 }  // namespace
 }  // namespace delta

@@ -233,5 +233,57 @@ TEST_F(RefObjContext, GenericPropertyOffABoundRefObjIsUndefined) {
   EXPECT_EQ(vpi_get(vpiGeneric, VpiHandleOf(&unbound)), vpiUndefined);
 }
 
+// D6 and D7: a ref obj bound to nothing has no actual to take a definition
+// name or a typespec from, so both are NULL even with a typespec child.
+TEST_F(RefObjContext, AnUnboundRefObjHasNoDefNameOrTypespec) {
+  VpiObject typespec;
+  typespec.type = vpiTypespec;
+  VpiObject ref_obj;
+  ref_obj.type = vpiRefObj;
+  ref_obj.children.push_back(&typespec);
+
+  EXPECT_EQ(VpiRefObjDefName(&ref_obj), nullptr);
+  EXPECT_EQ(VpiRefObjTypespec(&ref_obj), nullptr);
+  EXPECT_EQ(vpi_get_str(vpiDefName, VpiHandleOf(&ref_obj)), nullptr);
+  EXPECT_EQ(vpi_handle(vpiTypespec, VpiHandleOf(&ref_obj)), nullptr);
+}
+
+// D7: every net and variable kind carries a typespec, so a ref obj bound to
+// any of them reaches its own typespec child.
+TEST_F(RefObjContext, EveryNetAndVariableActualExposesTheTypespec) {
+  VpiObject typespec;
+  typespec.type = vpiTypespec;
+  for (int kind : {vpiStructNet, vpiUnionNet, vpiEnumNet, vpiIntegerNet,
+                   vpiTimeNet, vpiBitNet, vpiPackedArrayNet, vpiIntegerVar,
+                   vpiRealVar, vpiIntVar, vpiBitVar}) {
+    VpiObject actual;
+    actual.type = kind;
+    VpiObject ref_obj;
+    ref_obj.type = vpiRefObj;
+    ref_obj.actual = &actual;
+    ref_obj.children.push_back(&typespec);
+    EXPECT_EQ(VpiRefObjTypespec(&ref_obj), &typespec) << kind;
+  }
+}
+
+// D7: the typespec reached is the ref obj's typespec child, found past any
+// child of another kind; a ref obj holding none reaches NULL.
+TEST_F(RefObjContext, TheTypespecIsFoundAmongOtherChildren) {
+  VpiObject net;
+  net.type = vpiNet;
+  VpiObject index;
+  index.type = vpiConstant;
+  VpiObject typespec;
+  typespec.type = vpiTypespec;
+  VpiObject ref_obj;
+  ref_obj.type = vpiRefObj;
+  ref_obj.actual = &net;
+  ref_obj.children = {&index, &typespec};
+  EXPECT_EQ(VpiRefObjTypespec(&ref_obj), &typespec);
+
+  ref_obj.children = {&index};
+  EXPECT_EQ(VpiRefObjTypespec(&ref_obj), nullptr);
+}
+
 }  // namespace
 }  // namespace delta

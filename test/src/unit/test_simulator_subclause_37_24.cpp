@@ -8,6 +8,7 @@
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -267,6 +268,17 @@ TEST(GenericInterconnectDesign, AnInterconnectPortStandsUpAnInterconnectNet) {
   EXPECT_EQ(g_interconnect_nets, 1);
   EXPECT_EQ(g_interconnect_net_name, "ic");
   EXPECT_TRUE(g_reached_from_the_port);
+}
+
+// D1: a packed array is an array data type as an unpacked one is, and a union
+// bears members as a struct does.
+TEST(GenericInterconnectModel, PackedArraysAndUnionsSelectTheirRelation) {
+  EXPECT_TRUE(VpiIsInterconnectArrayDataTypespec(vpiArrayTypespec));
+  EXPECT_TRUE(VpiIsInterconnectArrayDataTypespec(vpiPackedArrayTypespec));
+  EXPECT_FALSE(VpiIsInterconnectArrayDataTypespec(vpiStructTypespec));
+  EXPECT_TRUE(VpiIsInterconnectStructDataTypespec(vpiStructTypespec));
+  EXPECT_TRUE(VpiIsInterconnectStructDataTypespec(vpiUnionTypespec));
+  EXPECT_FALSE(VpiIsInterconnectStructDataTypespec(vpiArrayTypespec));
 }
 
 }  // namespace

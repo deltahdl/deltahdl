@@ -259,16 +259,13 @@ bool VpiPortDelaysApplicable(int port_type) {
 
 VpiHandle VpiHighConn(VpiHandle obj) {
   // §37.14 details 3 and 10 (shared with §37.15): the higher connection, or
-  // NULL when the instance has no connection to the port. A null pointer
-  // already says there is none, so it is handed straight back.
-  if (!obj) return nullptr;
+  // NULL when the instance has no connection to the port.
   return obj->high_conn;
 }
 
 VpiHandle VpiLowConn(VpiHandle obj) {
   // §37.14 details 4 and 10 (shared with §37.15): the lower connection. A null
   // port carries no low connection, so its stored pointer is NULL.
-  if (!obj) return nullptr;
   if (obj->null_port) return nullptr;
   return obj->low_conn;
 }
@@ -333,7 +330,7 @@ static bool VpiRefObjActualIsInterfaceOrModport(int actual_type) {
 const char* VpiRefObjDefName(VpiHandle ref_obj) {
   // §37.15 detail 6: when the ref obj's actual is an interface or modport, its
   // definition name (or the modport name) is reported; otherwise there is none.
-  if (!ref_obj || !ref_obj->actual) return nullptr;
+  if (!ref_obj->actual) return nullptr;
   if (!VpiRefObjActualIsInterfaceOrModport(ref_obj->actual->type)) {
     return nullptr;
   }
@@ -368,7 +365,7 @@ static bool VpiRefObjActualHasTypespec(int actual_type) {
 VpiHandle VpiRefObjTypespec(VpiHandle ref_obj) {
   // §37.15 detail 7: NULL unless the ref obj's actual is a net, variable, or
   // part select; in that case the ref obj's own typespec child is returned.
-  if (!ref_obj || !ref_obj->actual) return nullptr;
+  if (!ref_obj->actual) return nullptr;
   if (!VpiRefObjActualHasTypespec(ref_obj->actual->type)) return nullptr;
   for (auto* child : ref_obj->children) {
     if (child->type == vpiTypespec) return child;
@@ -551,7 +548,7 @@ VpiHandle VpiNetTypespec(VpiHandle net) {
 bool VpiNetBitExpanded(VpiHandle net_bit) {
   // §37.16 detail 21: vpiExpanded on a net bit reports the parent net's value.
   // A scalared net (and the default) is expanded; a vectored net is not.
-  if (!net_bit || !net_bit->parent) return true;
+  if (!net_bit->parent) return true;
   return !net_bit->parent->is_vectored;
 }
 
@@ -712,7 +709,7 @@ bool VpiNetStructUnionMember(VpiHandle net) {
   // §37.16 detail 33: TRUE for a net or array net whose vpiParent is a struct
   // or union net; not defined for a net bit (whose vpiParent is a net),
   // reported FALSE.
-  if (!net || net->type == vpiNetBit || !net->parent) return false;
+  if (net->type == vpiNetBit || !net->parent) return false;
   return net->parent->type == vpiStructNet || net->parent->type == vpiUnionNet;
 }
 
@@ -778,7 +775,6 @@ int VpiInterconnectNetTypespecType(VpiHandle interconnect_net) {
   // or nets it connects to (§37.16 detail 13 hands it back). Its data-type kind
   // selects whether vpiElement or vpiMember reaches the net's subobjects, so
   // report the kind of the net's typespec child; zero when it has none.
-  if (!interconnect_net) return 0;
   for (auto* child : interconnect_net->children) {
     if (VpiIsTypespecType(child->type)) return child->type;
   }
@@ -849,7 +845,6 @@ std::vector<VpiHandle> VpiModPathTerms(int type, VpiHandle path) {
   // child walk - which compares a child's type to the type asked for - reached
   // a module path's terms through none of the three.
   std::vector<VpiHandle> terms;
-  if (!path) return terms;
   for (auto* child : path->children) {
     if (child->type != vpiPathTerm) continue;
     if (VpiModPathTermMatches(type, child)) terms.push_back(child);

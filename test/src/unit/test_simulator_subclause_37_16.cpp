@@ -782,5 +782,77 @@ TEST_F(NetBitsOfARun, AnOuterPackedSelectOfANetIsANetVector) {
   EXPECT_EQ(IntOf(rhs), 0x22);
 }
 
+// D2: a packed member is one whose vpiParent is a packed array net, so a struct
+// net with no parent at all is none.
+TEST(NetModel, AStructNetWithNoParentIsNoPackedArrayMember) {
+  VpiObject orphan;
+  orphan.type = vpiStructNet;
+  EXPECT_FALSE(VpiNetIsPackedArrayMember(&orphan));
+}
+
+// D7: a reference that is neither a bit or scalar nor an entire net or array
+// net selects the whole port.
+TEST(NetModel, AnyOtherReferenceSelectsTheWholePort) {
+  EXPECT_EQ(VpiPortInstReferenceGranularity(false, false, false),
+            VpiPortGranularity::kEntirePort);
+}
+
+// D13: the typespec reached is the net's typespec child, found past any child
+// of another kind; a net holding none, or no net at all, reaches NULL.
+TEST(NetModel, TheNetTypespecIsFoundAmongOtherChildren) {
+  VpiObject bit;
+  bit.type = vpiNetBit;
+  VpiObject typespec;
+  typespec.type = vpiTypespec;
+  VpiObject net;
+  net.type = vpiNet;
+  net.children = {&bit, &typespec};
+  EXPECT_EQ(VpiNetTypespec(&net), &typespec);
+
+  net.children = {&bit};
+  EXPECT_EQ(VpiNetTypespec(&net), nullptr);
+  EXPECT_EQ(VpiNetTypespec(nullptr), nullptr);
+}
+
+// D21: a net bit reports its parent net's vpiExpanded, and one with no parent
+// has the default, expanded.
+TEST_F(NetContext, ANetBitWithNoParentIsExpanded) {
+  VpiObject bit;
+  bit.type = vpiNetBit;
+  EXPECT_EQ(vpi_get(vpiExpanded, VpiHandleOf(&bit)), 1);
+}
+
+// D24 and D28: every integral-typed net kind reports its size in bits and is a
+// vector.
+TEST(NetModel, EveryIntegralTypedNetIsAVectorSizedInBits) {
+  for (int kind : {vpiIntegerNet, vpiTimeNet, vpiByteNet, vpiShortIntNet,
+                   vpiIntNet, vpiLongIntNet, vpiPackedArrayNet}) {
+    VpiNetSizeQuery size;
+    size.net_type = kind;
+    size.bit_width = 13;
+    EXPECT_EQ(VpiNetSize(size), 13) << kind;
+    VpiNetScalarVectorQuery shape;
+    shape.net_type = kind;
+    EXPECT_TRUE(VpiNetVector(shape)) << kind;
+  }
+}
+
+// D32: no handle has subelements.
+TEST(NetModel, NoHandleHasPackedArrayElements) {
+  EXPECT_TRUE(VpiPackedArrayNetElements(nullptr).empty());
+}
+
+// §37.16 (figure): the `nets` class groups the net bit, the interconnect array,
+// the array net and every concrete net kind.
+TEST(NetModel, EveryKindTheNetsClassGroupsIsANet) {
+  for (int kind :
+       {vpiNet, vpiNetBit, vpiNetArray, vpiStructNet, vpiUnionNet, vpiEnumNet,
+        vpiIntegerNet, vpiTimeNet, vpiBitNet, vpiPackedArrayNet,
+        vpiInterconnectNet, vpiInterconnectArray}) {
+    EXPECT_TRUE(VpiIsNetsType(kind)) << kind;
+  }
+  EXPECT_FALSE(VpiIsNetsType(vpiReg));
+}
+
 }  // namespace
 }  // namespace delta
