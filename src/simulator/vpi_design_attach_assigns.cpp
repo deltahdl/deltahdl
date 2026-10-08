@@ -143,6 +143,15 @@ struct AssignNames {
   const std::string& prefix;
   const GenBlockPrefixes& gen;
   const VpiObject* scope = nullptr;
+  // §27.4: the genvars of the loop generate blocks a continuous assignment
+  // stands in, each with the value it holds in the block instance; none for
+  // any other expression.
+  const GenBlockConsts& genvars = NoGenvars();
+
+  static const GenBlockConsts& NoGenvars() {
+    static const GenBlockConsts kNone;
+    return kNone;
+  }
 };
 
 // §23.9 and §12.7.3: the variable or named event `scope` itself declares
@@ -238,6 +247,28 @@ VpiObject* ConstantObject(const Expr* expr, const AssignBuild& build) {
   storage->value = EvalExpr(expr, *build.sim, arena);
   constant->var = storage;
   constant->size = static_cast<int>(storage->value.width);
+  return constant;
+}
+
+// §27.4: a loop generate block's genvar named in a continuous assignment the
+// block holds, as a constant of the value it holds in the block instance; the
+// run holds no storage for a genvar, so no name resolves to one. Null where
+// `name` is no such genvar.
+VpiObject* GenvarConstant(std::string_view name, const AssignBuild& build) {
+  const auto kGenvar = std::ranges::find_if(
+      build.names.genvars,
+      [name](const auto& genvar) { return genvar.first == name; });
+  if (kGenvar == build.names.genvars.end()) return nullptr;
+  Arena& arena = build.sim->GetArena();
+  auto* storage = arena.Create<Variable>();
+  storage->value =
+      MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(kGenvar->second));
+  storage->value.is_signed = true;
+  VpiObject* constant = build.alloc();
+  constant->type = vpiConstant;
+  constant->const_type = vpiIntConst;
+  constant->var = storage;
+  constant->size = 32;
   return constant;
 }
 
@@ -492,8 +523,10 @@ VpiObject* HierarchicalObject(const Expr* expr, const AssignBuild& build) {
 // null.
 VpiObject* ModelledExpression(const Expr* expr, const AssignBuild& build) {
   switch (expr->kind) {
-    case ExprKind::kIdentifier:
-      return Resolve(build.names, expr->text);
+    case ExprKind::kIdentifier: {
+      VpiObject* named = Resolve(build.names, expr->text);
+      return named != nullptr ? named : GenvarConstant(expr->text, build);
+    }
     case ExprKind::kIntegerLiteral:
     case ExprKind::kUnbasedUnsizedLiteral:
     case ExprKind::kRealLiteral:
@@ -753,7 +786,8 @@ void VpiContext::AttachContinuousAssignments(
       }
       AssignBuild build{
           [this] { return AllocObject(); }, sim_ctx_,
-          AssignNames{object_map_, prefix, ca.gen_block_prefixes},
+          AssignNames{object_map_, prefix, ca.gen_block_prefixes, nullptr,
+                      ca.gen_block_consts},
           VpiCalleesAt({*design, *mod, prefix,
                         CalleeScope(*mod, ca.gen_block_prefixes, scope),
                         subroutines}),
