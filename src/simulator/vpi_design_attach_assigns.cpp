@@ -317,18 +317,6 @@ int SliceKind(const VpiObject& root) {
   return root.var != nullptr && !root.var->is_4state ? vpiBitVar : kVpiReg;
 }
 
-// The bit of `root` at `offset` above the least significant end of its
-// storage; null where it has none.
-VpiObject* BitAtOffset(const VpiObject& root, int64_t offset) {
-  for (VpiObject* child : root.children) {
-    if ((child->type == vpiNetBit || child->type == vpiRegBit) &&
-        child->bit_offset == offset) {
-      return child;
-    }
-  }
-  return nullptr;
-}
-
 // A select the run builds an object of its own for out of the vector `root`,
 // `width` bits wide, the packed dimensions it leaves unindexed `rest`: a bit
 // of `root` where it leaves none, and otherwise a vector of `root`'s kind.
@@ -376,7 +364,7 @@ VpiObject* PackedSelectObject(VpiObject* base, const Expr* index,
   const auto kIndex = static_cast<int64_t>(index->int_val);
   if (!kDim.Contains(kIndex)) return nullptr;
   const int64_t kOffset = kBaseOffset + (kDim.OffsetOf(kIndex) * kWidth);
-  if (rest.empty()) return BitAtOffset(*root, kOffset);
+  if (rest.empty()) return VpiBitAtOffset(*root, kOffset);
   VpiObject* slice = SliceObject(root, std::move(rest), kWidth, build);
   slice->bit_offset = static_cast<int>(kOffset);
   const std::string kSuffix = "[" + std::to_string(kIndex) + "]";
@@ -725,6 +713,16 @@ const VpiObject* CalleeScope(const RtlirModule& mod,
 }
 
 }  // namespace
+
+VpiObject* VpiBitAtOffset(const VpiObject& root, int64_t offset) {
+  for (VpiObject* child : root.children) {
+    if ((child->type == vpiNetBit || child->type == vpiRegBit) &&
+        child->bit_offset == offset) {
+      return child;
+    }
+  }
+  return nullptr;
+}
 
 VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
                                  const std::string& prefix, SimContext& ctx,

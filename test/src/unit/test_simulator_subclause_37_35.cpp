@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
 #include "common/arena.h"
@@ -363,6 +364,131 @@ TEST_F(PrimitivesOfARun, AUdpInstanceIsAUdpOfTheRun) {
   ASSERT_NE(defn, nullptr);
   EXPECT_EQ(vpi_get(vpiType, defn), vpiUdpDefn);
   EXPECT_STREQ(vpi_get_str(vpiDefName, defn), "mux_udp");
+}
+
+// §37.35 with Table 28-1 (§28.3): every gate and switch keyword makes a
+// primitive of its own kind -- a gate or a switch, with that keyword's
+// primitive type and the keyword as its definition name. Only and, nmos and
+// pullup were tested, so a wrong entry for any other keyword went unseen.
+TEST_F(PrimitivesOfARun, EveryGateAndSwitchKeywordHasItsShape) {
+  Run("module top; wire w, v; logic a, b, c;\n"
+      "  and g_and(w, a, b); nand g_nand(w, a, b);\n"
+      "  or g_or(w, a, b); nor g_nor(w, a, b);\n"
+      "  xor g_xor(w, a, b); xnor g_xnor(w, a, b);\n"
+      "  buf g_buf(w, a); not g_not(w, a);\n"
+      "  bufif0 g_bufif0(w, a, c); bufif1 g_bufif1(w, a, c);\n"
+      "  notif0 g_notif0(w, a, c); notif1 g_notif1(w, a, c);\n"
+      "  tran g_tran(w, v); rtran g_rtran(w, v);\n"
+      "  tranif0 g_tranif0(w, v, c); tranif1 g_tranif1(w, v, c);\n"
+      "  rtranif0 g_rtranif0(w, v, c); rtranif1 g_rtranif1(w, v, c);\n"
+      "  nmos g_nmos(w, a, c); pmos g_pmos(w, a, c);\n"
+      "  rnmos g_rnmos(w, a, c); rpmos g_rpmos(w, a, c);\n"
+      "  cmos g_cmos(w, a, b, c); rcmos g_rcmos(w, a, b, c);\n"
+      "  pullup g_pullup(w); pulldown g_pulldown(v);\n"
+      "endmodule\n");
+  const struct {
+    const char* keyword;
+    int type;
+    int prim_type;
+  } kCases[] = {{"and", vpiGate, vpiAndPrim},
+                {"nand", vpiGate, vpiNandPrim},
+                {"or", vpiGate, vpiOrPrim},
+                {"nor", vpiGate, vpiNorPrim},
+                {"xor", vpiGate, vpiXorPrim},
+                {"xnor", vpiGate, vpiXnorPrim},
+                {"buf", vpiGate, vpiBufPrim},
+                {"not", vpiGate, vpiNotPrim},
+                {"bufif0", vpiGate, vpiBufif0Prim},
+                {"bufif1", vpiGate, vpiBufif1Prim},
+                {"notif0", vpiGate, vpiNotif0Prim},
+                {"notif1", vpiGate, vpiNotif1Prim},
+                {"tran", vpiSwitch, vpiTranPrim},
+                {"rtran", vpiSwitch, vpiRtranPrim},
+                {"tranif0", vpiSwitch, vpiTranif0Prim},
+                {"tranif1", vpiSwitch, vpiTranif1Prim},
+                {"rtranif0", vpiSwitch, vpiRtranif0Prim},
+                {"rtranif1", vpiSwitch, vpiRtranif1Prim},
+                {"nmos", vpiSwitch, vpiNmosPrim},
+                {"pmos", vpiSwitch, vpiPmosPrim},
+                {"rnmos", vpiSwitch, vpiRnmosPrim},
+                {"rpmos", vpiSwitch, vpiRpmosPrim},
+                {"cmos", vpiSwitch, vpiCmosPrim},
+                {"rcmos", vpiSwitch, vpiRcmosPrim},
+                {"pullup", vpiGate, vpiPullupPrim},
+                {"pulldown", vpiGate, vpiPulldownPrim}};
+  for (const auto& c : kCases) {
+    const std::string kName = std::string("g_") + c.keyword;
+    vpiHandle prim = Named(vpiPrimitive, By("top"), kName.c_str());
+    ASSERT_NE(prim, nullptr) << c.keyword;
+    EXPECT_EQ(vpi_get(vpiType, prim), c.type) << c.keyword;
+    EXPECT_EQ(vpi_get(vpiPrimType, prim), c.prim_type) << c.keyword;
+    const char* def_name = vpi_get_str(vpiDefName, prim);
+    ASSERT_NE(def_name, nullptr) << c.keyword;
+    EXPECT_STREQ(def_name, c.keyword);
+  }
+}
+
+// §37.13 detail 1 read on §37.35's prim terms: a bidirectional switch's two
+// channel terminals are inout and its control an input (§28.8); a buf gate
+// drives every terminal but its last (§28.5); a pulldown drives its one
+// terminal (§28.10). The size counts the inputs (detail 1).
+TEST_F(PrimitivesOfARun, TerminalsRunAsTheirPrimitiveDrivesThem) {
+  Run("module top; wire w, v, x; logic a, c;\n"
+      "  tranif1 t(w, v, c);\n"
+      "  buf b2(w, x, a);\n"
+      "  pulldown pd(v);\n"
+      "endmodule\n");
+  const struct {
+    const char* name;
+    std::vector<int> directions;
+    int inputs;
+  } kCases[] = {{"t", {vpiInout, vpiInout, vpiInput}, 1},
+                {"b2", {vpiOutput, vpiOutput, vpiInput}, 1},
+                {"pd", {vpiOutput}, 0}};
+  for (const auto& c : kCases) {
+    vpiHandle prim = Named(vpiPrimitive, By("top"), c.name);
+    ASSERT_NE(prim, nullptr) << c.name;
+    std::vector<int> directions;
+    for (vpiHandle term : TermsOf(prim)) {
+      directions.push_back(vpi_get(vpiDirection, term));
+    }
+    EXPECT_EQ(directions, c.directions) << c.name;
+    EXPECT_EQ(vpi_get(vpiSize, prim), c.inputs) << c.name;
+  }
+}
+
+// §28.3.4 makes a gate's instance name optional, and an instantiation written
+// without one is still a primitive of the instance, of its keyword's type.
+TEST_F(PrimitivesOfARun, AnUnnamedGateIsAPrimitiveOfTheInstance) {
+  Run("module top; wire y; logic a, b;\n"
+      "  or (y, a, b);\n"
+      "endmodule\n");
+  vpiHandle it = vpi_iterate(vpiPrimitive, By("top"));
+  ASSERT_NE(it, nullptr);
+  vpiHandle prim = vpi_scan(it);
+  ASSERT_NE(prim, nullptr);
+  EXPECT_EQ(vpi_get(vpiPrimType, prim), vpiOrPrim);
+  EXPECT_EQ(TermsOf(prim).size(), 3U);
+}
+
+// §37.35 with §29.5: an instance of a sequential UDP reports vpiSeqPrim, where
+// a combinational one reports vpiCombPrim.
+TEST_F(PrimitivesOfARun, ASequentialUdpInstanceReportsVpiSeqPrim) {
+  Run("primitive latch_udp(q, d, en);\n"
+      "  output reg q;\n"
+      "  input d, en;\n"
+      "  table\n"
+      "    0 1 : ? : 0;\n"
+      "    1 1 : ? : 1;\n"
+      "    ? 0 : ? : -;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module top; wire q; logic d, en;\n"
+      "  latch_udp u1(q, d, en);\n"
+      "endmodule\n");
+  vpiHandle u1 = Named(vpiPrimitive, By("top"), "u1");
+  ASSERT_NE(u1, nullptr);
+  EXPECT_EQ(vpi_get(vpiPrimType, u1), vpiSeqPrim);
 }
 
 }  // namespace

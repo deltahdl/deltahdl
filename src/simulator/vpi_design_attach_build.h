@@ -229,6 +229,10 @@ void AttachDeclaredRanges(VpiObject* obj, const DataType& type,
                           const std::vector<Expr*>& unpacked_dims,
                           SimContext& ctx, const VpiAttachBuild& build);
 
+// §37.16, §37.17: the net bit or var bit of `root` at `offset` above the least
+// significant end of its storage; null where it has none.
+VpiObject* VpiBitAtOffset(const VpiObject& root, int64_t offset);
+
 // §37.58, §37.59: the expression object `expr` stands for, written in the
 // instance whose objects `objects` keys under `prefix`; null for a kind of
 // expression not modelled.

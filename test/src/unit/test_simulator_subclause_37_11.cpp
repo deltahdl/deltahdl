@@ -381,5 +381,85 @@ TEST_F(InstanceArraysOfARun, AGateArrayIsAnObjectOverItsGates) {
             VpiObjectOf(vpi_handle_by_index(By("top.y"), 2)));
 }
 
+// The terminals of `prim`, in the order written.
+std::vector<vpiHandle> TermsOf(vpiHandle prim) {
+  std::vector<vpiHandle> terms;
+  vpiHandle it = vpi_iterate(vpiPrimTerm, prim);
+  while (vpiHandle term = it == nullptr ? nullptr : vpi_scan(it)) {
+    terms.push_back(term);
+  }
+  return terms;
+}
+
+// The one primitive array `scope` declares.
+vpiHandle OnlyPrimitiveArray(vpiHandle scope) {
+  vpiHandle it = vpi_iterate(vpiPrimitiveArray, scope);
+  return it == nullptr ? nullptr : vpi_scan(it);
+}
+
+// §28.3.6: only a terminal as wide as the array is split among its elements.
+// A scalar terminal connects to every element whole, and so does an
+// expression of the array's width that holds no bits of its own -- a
+// constant, for which no object stands for one bit.
+TEST_F(InstanceArraysOfARun, AGateArraysScalarAndConstantTerminalsAreWhole) {
+  Run("module top; wire [1:0] y; logic c;\n"
+      "  and g[1:0] (y, 2'b01, c);\n"
+      "endmodule\n");
+  vpiHandle array = OnlyPrimitiveArray(By("top"));
+  ASSERT_NE(array, nullptr);
+  const std::vector<vpiHandle> kTerms0 = TermsOf(vpi_handle_by_index(array, 0));
+  const std::vector<vpiHandle> kTerms1 = TermsOf(vpi_handle_by_index(array, 1));
+  ASSERT_EQ(kTerms0.size(), 3U);
+  ASSERT_EQ(kTerms1.size(), 3U);
+  vpiHandle constant = vpi_handle(vpiExpr, kTerms0[1]);
+  EXPECT_EQ(vpi_get(vpiType, constant), vpiConstant);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, kTerms1[1])),
+            VpiObjectOf(constant));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, kTerms0[2])),
+            VpiObjectOf(By("top.c")));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, kTerms1[2])),
+            VpiObjectOf(By("top.c")));
+}
+
+// §28.3.5: a range whose two bounds are equal declares one instance, and its
+// one-bit terminals connect to it whole.
+TEST_F(InstanceArraysOfARun, AOneElementGateArrayTakesItsTerminalsWhole) {
+  Run("module top; wire y; logic a, b;\n"
+      "  and g[0:0] (y, a, b);\n"
+      "endmodule\n");
+  vpiHandle array = OnlyPrimitiveArray(By("top"));
+  ASSERT_NE(array, nullptr);
+  EXPECT_EQ(vpi_get(vpiSize, array), 1);
+  vpiHandle out = FirstTerm(vpi_handle_by_index(array, 0));
+  ASSERT_NE(out, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, out)), VpiObjectOf(By("top.y")));
+}
+
+// A gate array an instance below the top declares connects each element to
+// the bit of that instance's own vector.
+TEST_F(InstanceArraysOfARun, AGateArrayBelowTheTopTakesItsInstancesBits) {
+  Run("module sub; wire [1:0] y; logic [1:0] a, b;\n"
+      "  and g[1:0] (y, a, b);\n"
+      "endmodule\n"
+      "module top; sub s(); endmodule\n");
+  vpiHandle array = OnlyPrimitiveArray(By("top.s"));
+  ASSERT_NE(array, nullptr);
+  vpiHandle out = FirstTerm(vpi_handle_by_index(array, 1));
+  ASSERT_NE(out, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, out)),
+            VpiObjectOf(vpi_handle_by_index(By("top.s.y"), 1)));
+}
+
+// §37.11: an instance array of switches is a switch array over switches.
+TEST_F(InstanceArraysOfARun, ASwitchInstanceArrayIsASwitchArray) {
+  Run("module top; wire [1:0] o; logic [1:0] i; logic c;\n"
+      "  nmos m[1:0] (o, i, c);\n"
+      "endmodule\n");
+  vpiHandle array = OnlyPrimitiveArray(By("top"));
+  ASSERT_NE(array, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, array), vpiSwitchArray);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle_by_index(array, 0)), vpiSwitch);
+}
+
 }  // namespace
 }  // namespace delta

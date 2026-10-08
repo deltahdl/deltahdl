@@ -88,10 +88,9 @@ PrimShape ShapeOf(GateKind kind) {
       return {"rcmos", vpiRcmosPrim, vpiSwitch};
     case GateKind::kPullup:
       return {"pullup", vpiPullupPrim};
-    case GateKind::kPulldown:
+    default:  // GateKind::kPulldown, the one kind left.
       return {"pulldown", vpiPulldownPrim};
   }
-  return {};
 }
 
 // The direction of terminal `index` of `count` a primitive of `shape` has:
@@ -171,13 +170,8 @@ std::vector<VpiObject*> TerminalObjects(const ModuleItem& item,
 // other width whole.
 VpiObject* ElementTerminal(VpiObject* whole, int64_t offset, int64_t length) {
   if (whole == nullptr || whole->size != length || length <= 1) return whole;
-  for (VpiObject* bit : whole->children) {
-    if ((bit->type == vpiNetBit || bit->type == vpiRegBit) &&
-        bit->bit_offset == offset) {
-      return bit;
-    }
-  }
-  return whole;
+  VpiObject* bit = VpiBitAtOffset(*whole, offset);
+  return bit != nullptr ? bit : whole;
 }
 
 // §37.11 with §28.3.6: the instance array of gates or switches `item`
@@ -248,12 +242,10 @@ void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
                       [&](const RtlirModule* mod, const std::string& prefix,
                           VpiObject* instance) {
                         for (const ModuleItem* item : mod->gate_insts) {
-                          if (item == nullptr) continue;
                           const PrimSite kSite{instance, prefix, objects};
                           // §28.3.6: an instantiation declaring a range is an
                           // instance array.
-                          if (item->inst_range_left != nullptr &&
-                              item->inst_range_right != nullptr) {
+                          if (item->inst_range_left != nullptr) {
                             MakePrimitiveArray(*item, kSite, ctx, build);
                             continue;
                           }
@@ -263,7 +255,6 @@ void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
                               instance, build);
                         }
                         for (const RtlirUdpInst& inst : mod->udp_insts) {
-                          if (inst.decl == nullptr) continue;
                           MakeUdpObject(inst, {instance, prefix, objects},
                                         udp_defn_of(inst.decl), ctx, build);
                         }
