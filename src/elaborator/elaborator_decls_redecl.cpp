@@ -3,7 +3,10 @@
 #include <string_view>
 
 #include "common/diagnostic.h"
+#include "common/types.h"
+#include "elaborator/elaborator.h"
 #include "elaborator/elaborator_decls_internal.h"
+#include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_module.h"
 
@@ -74,6 +77,36 @@ void CheckDeclRedeclaration(const ModuleItem* item,
                             std::string_view kind_word, DiagEngine& diag) {
   CheckPortNameRedeclaration(item, tables, diag);
   CheckPartialPortOrNameRedeclaration(item, decl_type, tables, kind_word, diag);
+}
+
+bool Elaborator::ReconcilePartialPortSignedness(std::string_view name,
+                                                bool decl_signed,
+                                                RtlirModule* mod) {
+  // §23.2.2.1: the signed attribute may sit on the port direction declaration,
+  // on the corresponding net/variable declaration, or on both; if either is
+  // signed, the other is considered signed too.
+  bool effective = decl_signed || non_ansi_signed_ports_.count(name) != 0;
+  if (effective) {
+    non_ansi_signed_ports_.insert(name);
+    for (auto& p : mod->ports) {
+      if (p.name == name) p.is_signed = true;
+    }
+  }
+  return effective;
+}
+
+// §23.2.2.1: a net or variable declaration naming a port whose port declaration
+// held no net or variable type declares that port's own object, so the port is
+// of the declaration's kind -- a net of the net type it was declared with, or
+// a variable where that net type is NetType::kNone. So `output f; logic f;`
+// makes f a variable port, and `input a; wand a;` makes a a wand net port.
+void GivePartialPortItsKind(std::string_view name, NetType net_type,
+                            RtlirModule* mod) {
+  for (auto& p : mod->ports) {
+    if (p.name != name) continue;
+    p.is_var = net_type == NetType::kNone;
+    p.net_type = net_type;
+  }
 }
 
 }  // namespace delta

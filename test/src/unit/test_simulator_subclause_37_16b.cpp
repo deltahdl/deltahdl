@@ -303,6 +303,14 @@ TEST_F(NetKindsOfARun, AnAnsiPortsNetHasItsBits) {
   EXPECT_EQ(KindsOf(vpiBit, By("top.u.a")), std::vector<int>(4, vpiNetBit));
 }
 
+// §37.16 (figure) with §23.2.2.1: the net a non-ANSI port's body declares is
+// the port's own, and it has a net bit per bit.
+TEST_F(NetKindsOfARun, ANonAnsiPortsBodyNetHasItsBits) {
+  Run(kPortNets);
+  EXPECT_EQ(KindOf("top.v.b"), vpiNet);
+  EXPECT_EQ(KindsOf(vpiBit, By("top.v.b")), std::vector<int>(2, vpiNetBit));
+}
+
 // §37.16 (figure) and detail 1: the net an ANSI port declares is the kind its
 // data type makes it.
 TEST_F(NetKindsOfARun, AnAnsiPortsNetIsTheKindOfItsDataType) {

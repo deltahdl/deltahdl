@@ -388,4 +388,22 @@ TEST(NonAnsiStylePortDeclarations, PortSelectStartsAtItsPortName) {
   EXPECT_EQ(sel->base->range.start.column, 10u);
 }
 
+// §23.2.2.1 (printed pages 731 and 732): an input or output port declaration
+// whose data type is implicit holds no net or variable type, and such a port is
+// a net until the body declares it again; `output reg` holds a variable type.
+TEST(NonAnsiStylePortDeclarations, AnImplicitlyTypedInputOrOutputIsANet) {
+  auto r = Parse(
+      "module m(a, b, c);\n"
+      "  input [1:0] a;\n"
+      "  output signed b;\n"
+      "  output reg c;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->ports.size(), 3);
+  EXPECT_TRUE(mod->ports[0].data_type.is_net);
+  EXPECT_TRUE(mod->ports[1].data_type.is_net);
+  EXPECT_FALSE(mod->ports[2].data_type.is_net);
+}
+
 }  // namespace

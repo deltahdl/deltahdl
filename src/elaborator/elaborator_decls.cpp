@@ -240,22 +240,6 @@ void ComputeUnpackedDims(const std::vector<Expr*>& dims, RtlirVariable& var,
   ApplyConstSizedUnpackedDim(dim, var, ctx.diag, ctx.loc, ctx.scope);
 }
 
-bool Elaborator::ReconcilePartialPortSignedness(std::string_view name,
-                                                bool decl_signed,
-                                                RtlirModule* mod) {
-  // §23.2.2.1: the signed attribute may sit on the port direction declaration,
-  // on the corresponding net/variable declaration, or on both; if either is
-  // signed, the other is considered signed too.
-  bool effective = decl_signed || non_ansi_signed_ports_.count(name) != 0;
-  if (effective) {
-    non_ansi_signed_ports_.insert(name);
-    for (auto& p : mod->ports) {
-      if (p.name == name) p.is_signed = true;
-    }
-  }
-  return effective;
-}
-
 // §6.7.1 item a / §6.11.1: a packed structure or union is an integral type,
 // but per §7.2.1 it is treated as a 2-state vector when every one of its
 // members is 2-state. Report such an aggregate as conclusively 2-state. A
@@ -799,6 +783,7 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   if (non_ansi_partial_ports_.count(item->name)) {
     net.is_signed =
         ReconcilePartialPortSignedness(item->name, net.is_signed, mod);
+    GivePartialPortItsKind(item->name, net.net_type, mod);
   }
   ValidatePackedDimRange(item->data_type, item->loc);
 

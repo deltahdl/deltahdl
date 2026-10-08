@@ -816,8 +816,15 @@ void Parser::ParseNonAnsiPortDecls(ModuleDecl& mod) {
 
   auto dtype = ParseDataType();
   // §23.2.2.3 (printed page 735): an inout declared with no port kind is a net
-  // of the default net type, and mh4 there makes an inout `var` an error.
-  if (dir == Direction::kInout) dtype.is_net = true;
+  // of the default net type, and mh4 there makes an inout `var` an error. An
+  // input or output whose data type is implicit holds no net or variable type
+  // either, and §23.2.2.1 (printed pages 731 and 732) makes it a net unless the
+  // body declares it again as a variable, which the elaborator then reads.
+  if (dir == Direction::kInout ||
+      ((dir == Direction::kInput || dir == Direction::kOutput) &&
+       dtype.kind == DataTypeKind::kImplicit)) {
+    dtype.is_net = true;
+  }
 
   if (dtype.kind == DataTypeKind::kImplicit && Check(TokenKind::kLBracket)) {
     Consume();

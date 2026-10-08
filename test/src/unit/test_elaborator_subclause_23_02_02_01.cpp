@@ -491,4 +491,29 @@ TEST(NonAnsiStylePortDeclarations, PortWithoutADirectionNames23_2_2_1) {
                             "has no direction declaration", 1, "23.2.2.1"));
 }
 
+// §23.2.2.1 (printed pages 731 and 732): a port declaration with no net or
+// variable type makes its port a net of the default net type, and a net or
+// variable declaration of the same name in the body makes the port that object
+// instead: a wand net for b, a variable for f.
+TEST(NonAnsiStylePortDeclarations, ABodyDeclarationGivesAPortItsKind) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(a, b, f);\n"
+      "  input a;\n"
+      "  input [1:0] b; wand [1:0] b;\n"
+      "  output [7:0] f; logic [7:0] f;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto& ports = design->top_modules[0]->ports;
+  ASSERT_EQ(ports.size(), 3u);
+  EXPECT_FALSE(ports[0].is_var);
+  EXPECT_EQ(ports[0].net_type, delta::NetType::kWire);
+  EXPECT_FALSE(ports[1].is_var);
+  EXPECT_EQ(ports[1].net_type, delta::NetType::kWand);
+  EXPECT_TRUE(ports[2].is_var);
+  EXPECT_EQ(ports[2].net_type, delta::NetType::kNone);
+}
+
 }  // namespace
