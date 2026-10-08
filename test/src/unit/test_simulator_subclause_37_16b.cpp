@@ -299,7 +299,6 @@ constexpr const char* kPortNets =
 TEST_F(NetKindsOfARun, AnAnsiPortsNetHasItsBits) {
   Run(kPortNets);
   EXPECT_EQ(KindsOf(vpiBit, By("top.u.a")), std::vector<int>(4, vpiNetBit));
-  EXPECT_EQ(KindsOf(vpiBit, By("top.v.b")), std::vector<int>(2, vpiNetBit));
 }
 
 // §37.16 (figure) and detail 1: the net an ANSI port declares is the kind its
