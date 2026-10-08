@@ -6,6 +6,9 @@
 
 #include "fixture_simulator.h"
 #include "fixture_vpi_run.h"
+#include "simulator/specify.h"
+#include "simulator/specify_path_delay.h"
+#include "simulator/specify_timing_check.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
@@ -304,6 +307,49 @@ TEST_F(TimingChecksOfARun, EveryCheckKindReportsItsTchkType) {
   vpiHandle ref = vpi_handle(vpiTchkRefTerm, width);
   ASSERT_NE(ref, nullptr);
   EXPECT_EQ(vpi_get(vpiEdge, ref), vpiNegedge);
+}
+
+// The objects of `type` `ref` reaches, counted.
+int CountOf(int type, vpiHandle ref) {
+  int count = 0;
+  vpiHandle it = vpi_iterate(type, ref);
+  if (it == nullptr) return 0;
+  while (vpi_scan(it) != nullptr) ++count;
+  return count;
+}
+
+// §37.39 and §37.40 with §30.3 and §31.1: a specify block belongs to the module
+// declaring it, a top module among them, so the top reaches its own path and
+// check while the instance it holds reaches the instance's.
+TEST_F(TimingChecksOfARun, ATopModulesSpecifyBlockHangsFromTheTop) {
+  Run("module cell(input c, output e);\n"
+      "  assign e = c;\n"
+      "  specify (c => e) = 1; $width(posedge c, 1); endspecify\n"
+      "endmodule\n"
+      "module top(input a, output b);\n"
+      "  assign b = a;\n"
+      "  cell u(.c(a), .e());\n"
+      "  specify (a => b) = 2; $width(negedge a, 2); endspecify\n"
+      "endmodule\n");
+  EXPECT_EQ(CountOf(vpiModPath, By("top")), 1);
+  EXPECT_EQ(CountOf(vpiTchk, By("top")), 1);
+  EXPECT_EQ(CountOf(vpiModPath, By("top.u")), 1);
+  EXPECT_EQ(CountOf(vpiTchk, By("top.u")), 1);
+}
+
+// A path or check filed under the empty prefix belongs to the first top the
+// run lowered; with no top lowered there is no module for it to hang from.
+TEST(TimingCheckDesign, AnEntryOfNoLoweredTopHangsFromNothing) {
+  VpiContext vpi_ctx;
+  SetGlobalVpiContext(&vpi_ctx);
+  SimFixture f;
+  SpecifyManager specify;
+  specify.AddPathDelay(PathDelay{});
+  specify.AddTimingCheck(TimingCheckEntry{});
+  f.ctx.SetSpecifyManager(&specify);
+  vpi_ctx.Attach(f.ctx);
+  EXPECT_EQ(vpi_iterate(vpiModule, nullptr), nullptr);
+  SetGlobalVpiContext(nullptr);
 }
 
 }  // namespace

@@ -711,10 +711,6 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   }
   AttachInstanceObjects(design);
   AttachModuleDefNames(sim_ctx);
-  AttachModulePathDelays(sim_ctx);
-  // §37.40: the checks a specify block declares, made from the same run's
-  // SpecifyManager as the paths above.
-  AttachTimingChecks(sim_ctx);
   for (auto& [name, net] : sim_ctx.GetNets()) {
     VpiHandle obj = DesignObjectForFlatName(name);
     if (obj == nullptr || net == nullptr) continue;
@@ -733,6 +729,11 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   RecordDeclarationSourceLocations(design, object_map_, SourcesOf(sim_ctx_));
   AttachPackages(design);
   AttachTopModules(design);
+  // §37.39 and §37.40: the paths and checks a specify block declares, made from
+  // the run's SpecifyManager once the tops have objects, since the first top's
+  // own hang from it.
+  AttachModulePathDelays(sim_ctx);
+  AttachTimingChecks(sim_ctx);
   // §37.36 (figure): the UDP definitions of the design. A udp defn is drawn
   // from a circle, so it belongs to no scope and is reached with a NULL
   // reference object; nothing built one, so every property and relation the

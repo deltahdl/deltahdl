@@ -12,6 +12,7 @@
 #include "elaborator/rtlir_primitives.h"
 #include "parser/ast_specify.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_name_tables.h"
 #include "simulator/specify.h"
 #include "simulator/specify_path_delay.h"
 #include "simulator/specify_timing_check.h"
@@ -253,6 +254,17 @@ void VpiFillUdpTableEntryObject(VpiObject* obj, const UdpTableRow& row,
 // reaches the simulation.
 // ===========================================================================
 
+// The flat name of the module a specify entry belongs to: its instance prefix
+// without the separator it ends in, or, for the empty prefix the first top
+// module lowers under, that top's name. Empty where no top was
+// lowered, which leaves the entry no module object to stand under.
+static std::string_view SpecifyEntryScope(std::string_view inst_prefix,
+                                          std::string_view first_top) {
+  if (inst_prefix.empty()) return first_top;
+  inst_prefix.remove_suffix(1);
+  return inst_prefix;
+}
+
 void VpiContext::AttachModulePathDelays(SimContext& sim_ctx) {
   // §38.10: vpi_get_delays() retrieves an object's delays or pulse limits. A
   // module path is one of the four kinds of
@@ -266,12 +278,11 @@ void VpiContext::AttachModulePathDelays(SimContext& sim_ctx) {
 
   for (const PathDelay& path : specify->GetPathDelays()) {
     // §30.3 puts a specify block inside a module declaration, so the paths it
-    // declares belong to the instance that declared them. A path of a module
-    // elaborated as a top carries the empty prefix and has no module object
-    // over it to hang from.
-    if (path.inst_prefix.empty()) continue;
-    std::string_view scope = path.inst_prefix;
-    scope.remove_suffix(1);  // the prefix ends in the separator
+    // declares belong to the instance that declared them, or to the first top
+    // module where the prefix is empty.
+    std::string_view scope =
+        SpecifyEntryScope(path.inst_prefix, sim_ctx.FirstTopModule());
+    if (scope.empty()) continue;
     // The walk makes any scope it has not met, so a prefix always has one.
     VpiHandle module = DesignObjectForFlatName(scope);
 
@@ -375,13 +386,11 @@ void VpiContext::AttachTimingChecks(SimContext& sim_ctx) {
 
   for (const TimingCheckEntry& check : specify->GetTimingChecks()) {
     // §31.1 puts a timing check inside a specify block inside a module
-    // declaration, so the check belongs to the instance that declared it. A
-    // check of a module elaborated as a top carries the empty prefix and has
-    // no module object over it to hang from, the same boundary the module
-    // paths meet.
-    if (check.inst_prefix.empty()) continue;
-    std::string_view scope = check.inst_prefix;
-    scope.remove_suffix(1);  // the prefix ends in the separator
+    // declaration, so the check belongs to the instance that declared it, or
+    // to the first top module where the prefix is empty.
+    std::string_view scope =
+        SpecifyEntryScope(check.inst_prefix, sim_ctx.FirstTopModule());
+    if (scope.empty()) continue;
     // The walk makes any scope it has not met, so a prefix always has one.
     VpiHandle module = DesignObjectForFlatName(scope);
 
