@@ -871,7 +871,8 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
     RefreshContAssignDriverBits(drv, params.lhs, ctx, arena);
 
     bool committed = false;
-    if (params.delays.rise || path_mgr != nullptr) {
+    if (ContAssignDelays filed; params.delays.rise || path_mgr != nullptr ||
+                                AnnotatedGateDelays(params, ctx, filed)) {
       ContAssignWait wait{params,   ctx,         arena, read_vars,
                           path_mgr, path_output, commit};
       co_await RunContAssignWait(wait, drv, val, &committed);
