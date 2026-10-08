@@ -189,23 +189,24 @@ TEST(TaggedUnionSim, ANestedTaggedExpressionKeepsItsStructsFirstMember) {
 // §11.9 (printed page 304): a member read inconsistent with the tag is a
 // run-time error, and the read gives all x. A structure so read, stored and
 // then read for its string member, gives the empty string: the member's x
-// handle names no text.
+// handle names no text. The logic member keeps the structure's storage 4-state
+// (§6.8), so the x reaches the string member's bits; it reads as x itself.
 TEST(TaggedUnionEval, AStringMemberOfAStructureReadAgainstTheTagIsEmpty) {
   SimFixture f;
   std::string out = RunCapture(
       "module t;\n"
-      "  typedef struct {int n; string s;} pair_t;\n"
+      "  typedef struct {logic [3:0] n; string s;} pair_t;\n"
       "  typedef union tagged {int i; pair_t p;} u_t;\n"
       "  u_t u;\n"
       "  pair_t q;\n"
       "  initial begin\n"
       "    u = tagged i 5;\n"
       "    q = u.p;\n"
-      "    $display(\"[%s]\", q.s);\n"
+      "    $display(\"%h [%s]\", q.n, q.s);\n"
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_EQ(out, "[]\n");
+  EXPECT_EQ(out, "x []\n");
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "accessing member 'p' of tagged union 'u' which "
                             "currently has tag 'i'",
