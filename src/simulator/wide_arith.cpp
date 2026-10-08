@@ -27,37 +27,35 @@ uint64_t TopLimbMask(uint32_t width) {
   return bits == 0 ? ~uint64_t{0} : (uint64_t{1} << bits) - 1;
 }
 
-void MaskToWidth(Limbs& v, uint32_t width) {
-  if (v.empty()) return;
-  v.back() &= TopLimbMask(width);
-}
+// Every operand and result here is wider than one limb, EvalBinaryArith
+// handing over no narrower operation, so no sequence of limbs below is empty.
+void MaskToWidth(Limbs& v, uint32_t width) { v.back() &= TopLimbMask(width); }
 
-// The known bits of a value as limbs, its own width's worth and no more. A
-// value whose storage was never masked above its declared width cannot leak
-// into the extension below.
+// The known bits of a value as limbs, its own width's worth and no more: the
+// top limb of its storage is cut to its width, so a value whose storage was
+// never masked above its declared width cannot leak into the extension below.
+// The limbs above a narrower value's, the power operator's self-determined
+// exponent, stay clear.
 Limbs KnownLimbs(const Logic4Vec& v, uint32_t width) {
   Limbs out(LimbCount(width), 0);
   for (uint32_t i = 0; i < out.size() && i < v.nwords; ++i) {
-    out[i] = v.words[i].aval & ~v.words[i].bval;
+    uint64_t own = (i + 1 == v.nwords) ? TopLimbMask(v.width) : ~uint64_t{0};
+    out[i] = v.words[i].aval & ~v.words[i].bval & own;
   }
-  if (v.width == 0 || v.width >= width) return out;
-  uint32_t top = (v.width - 1) / 64;
-  if (top >= out.size()) return out;
-  out[top] &= TopLimbMask(v.width);
-  for (uint32_t i = top + 1; i < out.size(); ++i) out[i] = 0;
   return out;
+}
+
+bool BitAt(const Limbs& v, uint32_t bit) {
+  return ((v[bit / 64] >> (bit % 64)) & 1) != 0;
 }
 
 // §11.6.1: a signed operand narrower than the result extends by its sign where
 // an unsigned one extends with zeros. The value's own width is where its sign
 // bit is, which is not where the result's is.
 void SignExtendLimbs(Limbs& v, uint32_t from_width, uint32_t width) {
-  if (from_width == 0 || from_width >= width) return;
-  uint32_t top = (from_width - 1) / 64;
-  if (top >= v.size()) return;
-  if (((v[top] >> ((from_width - 1) % 64)) & 1) == 0) return;
-  if (from_width % 64 != 0) v[top] |= ~TopLimbMask(from_width);
-  for (uint32_t i = top + 1; i < v.size(); ++i) v[i] = ~uint64_t{0};
+  if (from_width >= width || !BitAt(v, from_width - 1)) return;
+  for (uint32_t bit = from_width; bit < width; ++bit)
+    v[bit / 64] |= uint64_t{1} << (bit % 64);
 }
 
 // An operand as the limbs the result width asks for, extended into the bits it
@@ -72,19 +70,19 @@ Limbs ToLimbs(const Logic4Vec& v, uint32_t width, bool is_signed) {
 Logic4Vec FromLimbs(const Limbs& v, uint32_t width, Arena& arena) {
   Logic4Vec out = MakeLogic4Vec(arena, width);
   for (uint32_t i = 0; i < out.nwords; ++i) {
-    out.words[i].aval = (i < v.size()) ? v[i] : 0;
+    out.words[i].aval = v[i];
     out.words[i].bval = 0;
   }
   return out;
 }
 
 // The ripple carry §11.4.3's addition asks for, across limbs rather than
-// within one.
+// within one. Both operands are the result width's limbs, as every sequence
+// here is.
 void AddInto(Limbs& a, const Limbs& b) {
   uint64_t carry = 0;
   for (size_t i = 0; i < a.size(); ++i) {
-    uint64_t rhs = (i < b.size()) ? b[i] : 0;
-    uint64_t sum = a[i] + rhs;
+    uint64_t sum = a[i] + b[i];
     uint64_t next = (sum < a[i]) ? 1 : 0;
     sum += carry;
     if (carry == 1 && sum == 0) next = 1;
@@ -100,7 +98,7 @@ Limbs Negate(const Limbs& v) {
   Limbs out(v.size(), 0);
   for (size_t i = 0; i < v.size(); ++i) out[i] = ~v[i];
   Limbs one(v.size(), 0);
-  if (!one.empty()) one[0] = 1;
+  one[0] = 1;
   AddInto(out, one);
   return out;
 }
@@ -112,17 +110,13 @@ bool IsZero(const Limbs& v) {
   return true;
 }
 
-bool IsNegative(const Limbs& v, uint32_t width) {
-  if (width == 0 || v.empty()) return false;
-  return ((v[(width - 1) / 64] >> ((width - 1) % 64)) & 1) != 0;
-}
+bool IsNegative(const Limbs& v, uint32_t width) { return BitAt(v, width - 1); }
 
 // True when `a` is at least `b`, comparing from the most significant limb down,
 // which is the comparison the long division below steps on.
 bool AtLeast(const Limbs& a, const Limbs& b) {
   for (size_t i = a.size(); i-- > 0;) {
-    uint64_t rhs = (i < b.size()) ? b[i] : 0;
-    if (a[i] != rhs) return a[i] > rhs;
+    if (a[i] != b[i]) return a[i] > b[i];
   }
   return true;
 }
@@ -137,12 +131,6 @@ void ShiftLeftOne(Limbs& v) {
 }
 
 void SubInto(Limbs& a, const Limbs& b) { AddInto(a, Negate(b)); }
-
-bool BitAt(const Limbs& v, uint32_t bit) {
-  uint32_t limb = bit / 64;
-  if (limb >= v.size()) return false;
-  return ((v[limb] >> (bit % 64)) & 1) != 0;
-}
 
 // A 64-by-64 product as its two halves. The language has no 128-bit integer to
 // take it in, so each operand is split at 32 bits and the four partial products
@@ -178,8 +166,7 @@ Limbs Multiply(const Limbs& a, const Limbs& b) {
   for (size_t i = 0; i < a.size(); ++i) {
     uint64_t carry = 0;
     for (size_t j = 0; i + j < out.size(); ++j) {
-      uint64_t rhs = (j < b.size()) ? b[j] : 0;
-      Product64 p = Multiply64(a[i], rhs);
+      Product64 p = Multiply64(a[i], b[j]);
       uint64_t sum = out[i + j] + p.lo;
       uint64_t carry_lo = (sum < p.lo) ? 1 : 0;
       uint64_t sum_with_carry = sum + carry;
@@ -219,8 +206,7 @@ DivResult DivMod(const Limbs& dividend, const Limbs& divisor, uint32_t width) {
 // already truncated to the result width by Multiply.
 Limbs Power(const Limbs& base, const Limbs& exp, uint32_t width) {
   Limbs result(base.size(), 0);
-  if (!result.empty()) result[0] = 1;
-  MaskToWidth(result, width);
+  result[0] = 1;
   Limbs acc = base;
   for (uint32_t bit = 0; bit < width; ++bit) {
     if (BitAt(exp, bit)) {
@@ -267,8 +253,7 @@ Limbs ApplySign(const SignedDivision& d, uint32_t width) {
 Limbs NegativeExponentResult(const Limbs& base, const Limbs& exp,
                              uint32_t width) {
   Limbs one(base.size(), 0);
-  if (!one.empty()) one[0] = 1;
-  MaskToWidth(one, width);
+  one[0] = 1;
   Limbs minus_one = Negate(one);
   MaskToWidth(minus_one, width);
   if (base == one) return one;
@@ -304,18 +289,17 @@ Logic4Vec EvalWideArith(TokenKind op, const Logic4Vec& lhs,
       result = ApplySign(
           DivideMagnitudes(a, b, spec, op == TokenKind::kPercent), spec.width);
       break;
-    case TokenKind::kPower:
-      // §11.4.4: with an integer base and a negative exponent the result is 0,
-      // except that a base of 1 gives 1 and a base of -1 gives 1 or -1 by the
-      // exponent's parity. The squaring below reads the exponent's bits as a
-      // magnitude, which a negative exponent is not.
+    default:
+      // TokenKind::kPower, the one arithmetic operator left, EvalBinaryArith
+      // handing over no other. §11.4.4: with an integer base and a negative
+      // exponent the result is 0, except that a base of 1 gives 1 and a base of
+      // -1 gives 1 or -1 by the exponent's parity. The squaring below reads the
+      // exponent's bits as a magnitude, which a negative exponent is not.
       if (spec.is_signed && IsNegative(b, spec.width)) {
         result = NegativeExponentResult(a, b, spec.width);
         break;
       }
       result = Power(a, b, spec.width);
-      break;
-    default:
       break;
   }
   MaskToWidth(result, spec.width);

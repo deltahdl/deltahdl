@@ -688,6 +688,123 @@ TEST(EvalOp, WideUnaryMinusCarriesIntoTheHighWord) {
   EXPECT_EQ(r->value.words[1].aval, ~uint64_t{0});
 }
 
+// §11.4.3 above one word: the modulus is the remainder of the division, and a
+// division or modulus by zero is x in every bit. The divisor 2^64 has a clear
+// low word, so a zero test that read the low word alone would have taken it
+// for zero.
+TEST(EvalOp, WideModulusAndDivisionByZero) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  logic [127:0] a, b, z, m, q, r;\n"
+      "  initial begin\n"
+      "    a = 128'h1_0000_0000_0000_0005;\n"
+      "    b = 128'h1_0000_0000_0000_0000;\n"
+      "    z = 0;\n"
+      "    m = a % b;\n"
+      "    q = a / z;\n"
+      "    r = a % z;\n"
+      "    $display(\"%0d %0d %0d\", m == 5, q === {128{1'bx}},\n"
+      "             r === {128{1'bx}});\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1 1\n");
+}
+
+// §11.4.3 above one word on signed operands: the quotient truncates toward
+// zero and the remainder takes the first operand's sign, whichever operands
+// are negative. Read as unsigned, -7 is 2^128 - 7 and none of these holds.
+TEST(EvalOp, WideSignedDivisionAndModulusFollowTheOperandsSigns) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  logic signed [127:0] n7, p7, p2, n2, q1, m1, q2, m2, q3;\n"
+      "  initial begin\n"
+      "    n7 = -7;\n"
+      "    p7 = 7;\n"
+      "    p2 = 2;\n"
+      "    n2 = -2;\n"
+      "    q1 = n7 / p2;\n"
+      "    m1 = n7 % p2;\n"
+      "    q2 = p7 / n2;\n"
+      "    m2 = p7 % n2;\n"
+      "    q3 = n7 / n2;\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", q1 == -3, m1 == -1, q2 == -3,\n"
+      "             m2 == 1, q3 == 3);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1 1 1 1\n");
+}
+
+// §11.4.3's product above one word, truncated to the 128 bits §11.6.1 gives
+// it: all ones squared is 1, and all ones times 2^65 - 1 is its negation. The
+// partial products of the first overflow the word they are added into, and
+// those of the second overflow it again when the carry from below is added.
+TEST(EvalOp, WideMultiplicationCarriesOutOfEveryPartialSum) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  logic [127:0] a, b, p1, p2;\n"
+      "  initial begin\n"
+      "    a = '1;\n"
+      "    b = 128'h1_FFFF_FFFF_FFFF_FFFF;\n"
+      "    p1 = a * a;\n"
+      "    p2 = a * b;\n"
+      "    $display(\"%0d %0d\", p1 == 1,\n"
+      "             p2 == 128'hFFFF_FFFF_FFFF_FFFE_0000_0000_0000_0001);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1\n");
+}
+
+// §11.4.3 and §11.6.1: a power above one word is as wide as its base, the
+// exponent self-determined and narrower, so (2^32) ** 3 is 2^96.
+TEST(EvalOp, WidePowerRaisesTheBaseByANarrowerExponent) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  logic [127:0] a, r;\n"
+      "  initial begin\n"
+      "    a = 128'h1_0000_0000;\n"
+      "    r = a ** 3;\n"
+      "    $display(\"%0d\", r == 128'h1_0000_0000_0000_0000_0000_0000);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1\n");
+}
+
+// Table 11-4 above one word, a signed base under a signed exponent: a negative
+// exponent gives 1 for a base of 1, -1 or 1 for a base of -1 by the exponent's
+// parity, and 0 for a base of 3, while a positive one raises the base. Read as
+// the unsigned 2^128 - 1, the exponent -1 would raise 3 to an odd power, which
+// is no multiple of 2^128 and so no 0.
+TEST(EvalOp, WideSignedPowerTakesANegativeExponentByItsSign) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  logic signed [127:0] one, m1, two, three, r1, r2, r3, r4, r5;\n"
+      "  initial begin\n"
+      "    one = 1;\n"
+      "    m1 = -1;\n"
+      "    two = 2;\n"
+      "    three = 3;\n"
+      "    r1 = one ** -1;\n"
+      "    r2 = m1 ** -1;\n"
+      "    r3 = m1 ** -2;\n"
+      "    r4 = three ** -1;\n"
+      "    r5 = two ** 3;\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", r1 == 1, r2 == -1, r3 == 1,\n"
+      "             r4 == 0, r5 == 8);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1 1 1 1\n");
+}
+
 // §11.4.3's Table 11-5 gives `2.0 ** -3'sb1` the value 0.5, and §11.3.1 has
 // an integral operand of a real operator converted to real by its value, which
 // for the signed 3'sb111 is -1. Converted as the unsigned 7, the exponent made
