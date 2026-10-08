@@ -817,7 +817,7 @@ struct StaticPrefixResult {
 // checks compare, or by its 32 bits, the name the simulator holds an element
 // under (ArrayElementKey in src/simulator/lowerer_var.cpp), so `p[-1]` of
 // `p [-1:0]` is "p[4294967295]".
-enum class PrefixIndexSpelling { kValue, kStorage };
+enum class PrefixIndexSpelling : uint8_t { kValue, kStorage };
 
 struct StaticPrefixSpec {
   const ScopeMap& scope;
