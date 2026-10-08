@@ -203,7 +203,6 @@ bool CheckPathTerminalPort(const PortDecl* p, const SpecifyTerminal& t,
 // mark such a port a net, so the body's declaration is read before that mark,
 // which would otherwise hide `input a; reg a;` as a path source of no net.
 bool PortIsVariable(const PortDecl& p, const ModuleSignals& signals) {
-  if (p.data_type.is_interconnect) return false;
   if (p.data_type.kind == DataTypeKind::kImplicit && !p.has_explicit_var) {
     return signals.variable_ports.contains(p.name);
   }

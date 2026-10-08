@@ -491,7 +491,6 @@ static bool NonAnsiPortIsVariable(const ModuleDecl* decl,
 // ordinary `input a;` stays a net whose continuous assignment §23.3.3.1 meets
 // with coercion to inout and a warning.
 static bool InputPortIsVariable(const ModuleDecl* decl, const PortDecl& port) {
-  if (port.data_type.is_interconnect) return false;
   if (decl->is_non_ansi_ports &&
       port.data_type.kind == DataTypeKind::kImplicit) {
     return NonAnsiPortIsVariable(decl, port.name);
