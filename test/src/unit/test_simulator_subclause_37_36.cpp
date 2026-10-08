@@ -8,13 +8,17 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
+#include "elaborator/rtlir.h"
+#include "elaborator/rtlir_primitives.h"
 #include "fixture_simulator.h"
+#include "parser/ast_specify.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -312,6 +316,28 @@ TEST(UdpDesign, ADesignsUdpDeclarationIsAUdpDefnObject) {
   // Detail 2: a UDP with no state is combinational.
   EXPECT_EQ(g_udp_prim_type, vpiCombPrim);
   EXPECT_EQ(g_udp_table_entries, 3);
+}
+
+// §37.36: the UDP definitions of a design are the ones its UDP instances name,
+// each once, however many instances name it and however deep they stand. A
+// child instance with no module to stand for and a UDP instance naming no
+// definition add none.
+TEST(UdpDefinitionsOfADesign, EachDefinitionAnInstanceNamesOnce) {
+  UdpDecl decl;
+  decl.name = "u";
+  RtlirModule leaf;
+  leaf.udp_insts.resize(3);
+  leaf.udp_insts[0].decl = &decl;
+  leaf.udp_insts[1].decl = nullptr;
+  leaf.udp_insts[2].decl = &decl;
+  RtlirModule top;
+  top.children.resize(2);
+  top.children[0].resolved = &leaf;
+  top.children[1].resolved = nullptr;
+  RtlirDesign design;
+  design.top_modules = {&top};
+
+  EXPECT_EQ(VpiDesignUdpDecls(&design), (std::vector<const UdpDecl*>{&decl}));
 }
 
 }  // namespace

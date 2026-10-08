@@ -53,10 +53,10 @@ int VpiAllocSchemeFor(VpiAllocKind kind) {
       return kVpiAutomaticScheme;
     case VpiAllocKind::kDynamic:
       return kVpiDynamicScheme;
-    case VpiAllocKind::kOther:
+    default:
+      // VpiAllocKind::kOther, the one kind left.
       return kVpiOtherScheme;
   }
-  return kVpiOtherScheme;
 }
 
 // §37.10 details 1 and 10: keep only the entries that are user-defined and
@@ -97,7 +97,6 @@ void VpiCollectInstanceAssertions(VpiHandle scope, VpiHandle iter) {
   // procedure, inside a generate scope - so the walk descends through the
   // scopes the body holds rather than reading off its immediate children.
   for (VpiObject* child : scope->children) {
-    if (child == nullptr) continue;
     if (VpiIsAssertionType(child->type)) iter->children.push_back(child);
     // An assertion inside a nested instance is an assertion of that instance,
     // which is what its own handle would be passed to reach: the walk stops at
@@ -123,7 +122,6 @@ VpiHandle VpiScopeNamedClockingBlock(VpiHandle scope, bool global) {
   // the one it named global. §14.12 lets a scope name one of each among the
   // blocks it declares, so the block carries which it is and the edge reaches
   // the one so marked. Null where the scope named none.
-  if (!scope) return nullptr;
   for (auto* child : scope->children) {
     if (child->type != vpiClockingBlock) continue;
     if (global ? child->global_clocking : child->default_clocking) return child;
@@ -137,7 +135,6 @@ VpiHandle VpiScopeDefaultDisableIff(VpiHandle scope) {
   // makes such an enclosure a grouping of the objects in it. So what the edge
   // reaches is an expression or a distribution; a scope names at most one, so
   // it is the first child of either kind. Null where the scope wrote none.
-  if (!scope) return nullptr;
   for (auto* child : scope->children) {
     if (VpiIsExprObject(child) || child->type == vpiDistribution) {
       return child;
@@ -275,8 +272,8 @@ void VpiContext::AttachModulePathDelays(SimContext& sim_ctx) {
     if (path.inst_prefix.empty()) continue;
     std::string_view scope = path.inst_prefix;
     scope.remove_suffix(1);  // the prefix ends in the separator
+    // The walk makes any scope it has not met, so a prefix always has one.
     VpiHandle module = DesignObjectForFlatName(scope);
-    if (module == nullptr) continue;
 
     auto* obj = AllocObject();
     obj->type = vpiModPath;
@@ -332,10 +329,10 @@ static int VpiTchkTypeOf(TimingCheckKind kind) {
       return vpiNoChange;
     case TimingCheckKind::kTimeskew:
       return vpiTimeskew;
-    case TimingCheckKind::kFullskew:
+    default:
+      // TimingCheckKind::kFullskew, the one kind left.
       return vpiFullskew;
   }
-  return 0;
 }
 
 // §37.40 (figure): the vpiEdge an event term reports - the edge control its
@@ -385,8 +382,8 @@ void VpiContext::AttachTimingChecks(SimContext& sim_ctx) {
     if (check.inst_prefix.empty()) continue;
     std::string_view scope = check.inst_prefix;
     scope.remove_suffix(1);  // the prefix ends in the separator
+    // The walk makes any scope it has not met, so a prefix always has one.
     VpiHandle module = DesignObjectForFlatName(scope);
-    if (module == nullptr) continue;
 
     auto* obj = AllocObject();
     obj->type = vpiTchk;

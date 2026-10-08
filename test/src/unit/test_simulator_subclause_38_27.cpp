@@ -8,6 +8,8 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "elaborator/rtlir.h"
+#include "fixture_simulator.h"
 #include "fixture_vpi_run.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -190,6 +192,39 @@ TEST_F(McdFilesOfARun, TextPrintedOnAnMcdReachesItsFile) {
   std::stringstream text;
   text << file.rdbuf();
   EXPECT_EQ(text.str(), "line 1\nline 2\n");
+  std::remove(McdFilePath().c_str());
+}
+
+PLI_INT32 WriteThroughAnMcdLeftOpen(PLI_BYTE8* /*user_data*/) {
+  PLI_UINT32 mcd = vpi_mcd_open(VpiText(McdFilePath().c_str()));
+  vpi_mcd_printf(mcd, VpiText("left open\n"));
+  return 0;
+}
+
+// §38.27 with §38.24: a file vpi_mcd_open opened and no vpi_mcd_close closed is
+// closed with the tool, the text printed to it then in the file.
+TEST(McdFilesOfAContext, AFileLeftOpenIsClosedWithTheTool) {
+  McdFilePath() = ::testing::TempDir() + "mcd_left_open.txt";
+  std::remove(McdFilePath().c_str());
+  {
+    VpiContext vpi_ctx;
+    SetGlobalVpiContext(&vpi_ctx);
+    s_vpi_systf_data data = {};
+    data.type = vpiSysTask;
+    data.tfname = VpiText("$write_mcd_left_open");
+    data.calltf = &WriteThroughAnMcdLeftOpen;
+    ASSERT_NE(vpi_register_systf(&data), nullptr);
+    SimFixture f;
+    RtlirDesign* design = ElaborateSrc(
+        "module top; initial $write_mcd_left_open; endmodule\n", f);
+    ASSERT_NE(design, nullptr);
+    LowerAndRun(design, f);
+    SetGlobalVpiContext(nullptr);
+  }
+  std::ifstream file(McdFilePath());
+  std::stringstream text;
+  text << file.rdbuf();
+  EXPECT_EQ(text.str(), "left open\n");
   std::remove(McdFilePath().c_str());
 }
 

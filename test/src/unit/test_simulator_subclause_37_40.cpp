@@ -1,8 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <string>
+#include <vector>
 
 #include "fixture_simulator.h"
+#include "fixture_vpi_run.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
@@ -255,6 +258,52 @@ TEST(TimingCheckDesign, ADeclaredTimingCheckIsATchkObject) {
   EXPECT_EQ(g_notifier_name, "notifier");
   // The figure's "-> limit", retrieved with vpi_get_delays().
   EXPECT_EQ(g_limit, 5);
+}
+
+class TimingChecksOfARun : public VpiDesignRun {};
+
+// §37.40 (figure): a tchk reports which of §31.2's checks it is through
+// vpiTchkType, one constant per check. Detail 1: a check with no data event,
+// as $width has, reaches no data term, and its reference term carries the edge
+// it was written with. A check written without a notifier reaches none.
+TEST_F(TimingChecksOfARun, EveryCheckKindReportsItsTchkType) {
+  Run("module m(input clk, input d);\n"
+      "  specify\n"
+      "    $setup(d, posedge clk, 1);\n"
+      "    $hold(posedge clk, d, 1);\n"
+      "    $setuphold(posedge clk, d, 1, 1);\n"
+      "    $recovery(posedge clk, d, 1);\n"
+      "    $removal(posedge clk, d, 1);\n"
+      "    $recrem(posedge clk, d, 1, 1);\n"
+      "    $width(negedge clk, 2);\n"
+      "    $period(posedge clk, 4);\n"
+      "    $skew(posedge clk, d, 1);\n"
+      "    $nochange(posedge clk, d, 0, 0);\n"
+      "    $timeskew(posedge clk, d, 1);\n"
+      "    $fullskew(posedge clk, d, 1, 1);\n"
+      "  endspecify\n"
+      "endmodule\n"
+      "module top; reg clk, d; m m1(clk, d); endmodule\n");
+  std::vector<int> types;
+  vpiHandle width = nullptr;
+  vpiHandle it = vpi_iterate(vpiTchk, By("top.m1"));
+  ASSERT_NE(it, nullptr);
+  while (vpiHandle tchk = vpi_scan(it)) {
+    types.push_back(vpi_get(vpiTchkType, tchk));
+    if (types.back() == vpiWidth) width = tchk;
+    EXPECT_EQ(vpi_handle(vpiTchkNotifier, tchk), nullptr);
+  }
+  std::sort(types.begin(), types.end());
+  std::vector<int> expected = {
+      vpiSetup, vpiHold,   vpiSetupHold, vpiRecovery, vpiRemoval,  vpiRecrem,
+      vpiWidth, vpiPeriod, vpiSkew,      vpiNoChange, vpiTimeskew, vpiFullskew};
+  std::sort(expected.begin(), expected.end());
+  EXPECT_EQ(types, expected);
+  ASSERT_NE(width, nullptr);
+  EXPECT_EQ(vpi_handle(vpiTchkDataTerm, width), nullptr);
+  vpiHandle ref = vpi_handle(vpiTchkRefTerm, width);
+  ASSERT_NE(ref, nullptr);
+  EXPECT_EQ(vpi_get(vpiEdge, ref), vpiNegedge);
 }
 
 }  // namespace
