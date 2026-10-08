@@ -112,10 +112,12 @@ static void CreateBlockArrayLeaves(const BlockArrayLeaves& b, size_t d,
     if (!b.is_4state) leaf->value = MakeLogic4VecVal(b.arena, b.elem_width, 0);
     return;
   }
+  // An element is named by its index's 32 bits, as every select names it.
   int64_t low = b.dims[d].Low();
   for (int64_t i = 0; i < b.dims[d].Count(); ++i) {
-    CreateBlockArrayLeaves(b, d + 1,
-                           prefix + "[" + std::to_string(low + i) + "]");
+    CreateBlockArrayLeaves(
+        b, d + 1,
+        prefix + "[" + std::to_string(static_cast<uint32_t>(low + i)) + "]");
   }
 }
 

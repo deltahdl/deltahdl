@@ -30,6 +30,9 @@ struct StructArrayElementRef {
   uint32_t bit_offset = 0;
   uint32_t width = 0;
   bool is_signed = false;
+  // §7.2 with §6.16: the member is an array of strings, whose element bits are
+  // a handle to its text, as a scalar string member's are.
+  bool is_string = false;
   bool in_range = false;
 };
 

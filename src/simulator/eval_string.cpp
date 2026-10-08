@@ -20,6 +20,7 @@
 #include "simulator/class_object.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_function_args_scoped.h"
+#include "simulator/eval_member_path.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -674,6 +675,10 @@ static bool SelectsStringElement(const Expr* receiver, SimContext& ctx) {
     return DeclaredArrayHoldsStrings(base->text, ctx);
   }
   if (SelectsMultiDimStringLeaf(receiver, ctx)) return true;
+  // §7.2 with §6.16: `m.v[1]`, an element of a structure's array member, is a
+  // string where the member is an array of strings.
+  if (const StructFieldInfo* member = ResolveStructArrayMember(base, ctx))
+    return member->type_kind == DataTypeKind::kString;
   FieldTarget target;
   if (ResolveStringPropertyTarget(base, ctx, target, /*elements=*/true))
     return true;

@@ -360,8 +360,12 @@ static void CreateMultiDimLeaves(const MultiDimArray& m,
         pat ? SelectDimItem(pat, static_cast<uint32_t>(idx),
                             descending ? (sizes[d] - 1 - i) : i, m)
             : item;
-    CreateMultiDimLeaves(m, prefix + "[" + std::to_string(idx) + "]", d + 1,
-                         sub);
+    // An element is named by its index's 32 bits, as every select names it
+    // (TryArrayElementSelect, BuildCompoundName) and ArrayElementKey names a
+    // one-dimensional array's, so `[-1:0]` holds [4294967295] and [0].
+    CreateMultiDimLeaves(
+        m, prefix + "[" + std::to_string(static_cast<uint32_t>(idx)) + "]",
+        d + 1, sub);
   }
 }
 
@@ -386,11 +390,11 @@ static bool TryCreateMultiDimArray(std::string_view name,
   info.is_descending = var.is_descending;
   info.is_4state = var.is_4state;
   info.elem_type_kind = var.elem_type_kind;
-  // ArrayInfo::dim_los is uint32_t, so a negative bound does not survive the
-  // copy. §7.4.2 admits one; carrying it into the simulator is separate work.
-  // The direction beside it does survive: it is the comparison of the two
-  // int64_t bounds, made here before either is narrowed, so `[-1:-3]` records
-  // as descending however its low bound lands.
+  // ArrayInfo::dim_los is uint32_t, so a negative bound (§7.4.2) is held as
+  // its 32 bits, the bits CreateMultiDimLeaves names the leaves by. The
+  // direction beside it is the comparison of the two int64_t bounds, made here
+  // before either is narrowed, so `[-1:-3]` records as descending however its
+  // low bound lands.
   info.dim_los.reserve(var.unpacked_dims.size());
   info.dim_descending.reserve(var.unpacked_dims.size());
   for (const auto& dim : var.unpacked_dims) {

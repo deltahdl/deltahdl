@@ -106,7 +106,9 @@ static void WriteMemQueue(const WritememEval& eval, const QueueObject* q,
 // optional start_addr / finish_addr bound the range that is written; a finish
 // below start emits the words in descending address order. Every registration
 // of a one-dimensional array creates a variable for each address in
-// [arr_lo, arr_hi] under the key built here, so each lookup finds one.
+// [arr_lo, arr_hi] under the key built here, the address's 32 bits as
+// ArrayElementKey names it, so each lookup finds one, `[-1:0]`'s
+// 4294967296 included.
 template <class EmitFn>
 static void WriteMemArray(const WritememEval& eval, const std::string& mem_name,
                           const ArrayInfo* ai, EmitFn emit) {
@@ -118,7 +120,8 @@ static void WriteMemArray(const WritememEval& eval, const std::string& mem_name,
   SimContext& ctx = eval.ctx;
   WriteMemAddressRange(
       start_addr, finish_addr, arr_lo, arr_hi, [&](int64_t addr) {
-        std::string elem = mem_name + "[" + std::to_string(addr) + "]";
+        std::string elem =
+            mem_name + "[" + std::to_string(static_cast<uint32_t>(addr)) + "]";
         emit(ctx.FindVariable(elem)->value);
       });
 }
@@ -127,19 +130,19 @@ static void WriteMemArray(const WritememEval& eval, const std::string& mem_name,
 // multidimensional array, walking the remaining dimensions in row-major order —
 // each dimension's entries from low to high address, the lowest (rightmost-
 // declared) dimension varying most rapidly — so the dump mirrors the file
-// organization the matching $readmem load expects.
+// organization the matching $readmem load expects. Each index is named by its
+// 32 bits, as the leaves were made, so every leaf is found.
 template <class EmitFn>
 static void EmitMultiDimSubwords(SimContext& ctx, const std::string& prefix,
                                  const ArrayInfo* ai, size_t d, EmitFn& emit) {
   if (d == ai->dim_sizes.size()) {
-    if (auto* var = ctx.FindVariable(prefix)) emit(var->value);
+    emit(ctx.FindVariable(prefix)->value);
     return;
   }
-  auto lo = static_cast<int64_t>(ai->dim_los[d]);
+  uint32_t lo = ai->dim_los[d];
   for (uint32_t i = 0; i < ai->dim_sizes[d]; ++i) {
-    EmitMultiDimSubwords(
-        ctx, prefix + "[" + std::to_string(lo + static_cast<int64_t>(i)) + "]",
-        ai, d + 1, emit);
+    EmitMultiDimSubwords(ctx, prefix + "[" + std::to_string(lo + i) + "]", ai,
+                         d + 1, emit);
   }
 }
 
@@ -160,8 +163,10 @@ static void WriteMemMultiDim(const WritememEval& eval,
   SimContext& ctx = eval.ctx;
   WriteMemAddressRange(
       start_addr, finish_addr, arr_lo, arr_hi, [&](int64_t addr) {
-        EmitMultiDimSubwords(ctx, mem_name + "[" + std::to_string(addr) + "]",
-                             ai, 1, emit);
+        EmitMultiDimSubwords(
+            ctx,
+            mem_name + "[" + std::to_string(static_cast<uint32_t>(addr)) + "]",
+            ai, 1, emit);
       });
 }
 

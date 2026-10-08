@@ -252,6 +252,60 @@ TEST(WritememSim, StartWithoutFinishRunsToArrayEnd) {
   std::remove(path.c_str());
 }
 
+// §21.5 with §7.4.2: a bound may be negative, and every word of the memory
+// is dumped, here a one-dimensional memory whose bounds straddle zero. The walk
+// from its low address reached an address past the last element's name.
+TEST(WritememSim, AOneDimensionalMemoryStraddlingZeroIsDumpedWhole) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_t2105_neg_one.mem";
+  RunCapture(
+      "module t;\n"
+      "  logic [7:0] m [-1:0];\n"
+      "  initial begin\n"
+      "    m[-1] = 8'h11; m[0] = 8'h22;\n"
+      "    $writememh(\"" +
+          path +
+          "\", m);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(SlurpFile(path), "11\n22\n");
+  std::remove(path.c_str());
+}
+
+// §21.5 with §7.4.2 and §21.4.3: a multidimensional memory with a negative
+// bound is dumped in row-major order and reloaded through $readmemh word for
+// word, and a block's own such array holds what is written to it. Its leaves
+// were named apart from the indices every select and both tasks name, so the
+// writes were lost and the dump empty.
+TEST(WritememSim, AMultidimensionalMemoryWithANegativeBoundIsDumpedWhole) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_t2105_neg_multi.mem";
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic [7:0] m [0:1][-1:0];\n"
+      "  logic [7:0] r [0:1][-1:0];\n"
+      "  initial begin : blk\n"
+      "    logic [7:0] b [-1:0][0:1];\n"
+      "    m[0][-1] = 8'h11; m[0][0] = 8'h22;\n"
+      "    m[1][-1] = 8'h33; m[1][0] = 8'h44;\n"
+      "    b[-1][1] = 8'h55;\n"
+      "    $writememh(\"" +
+          path +
+          "\", m);\n"
+          "    $readmemh(\"" +
+          path +
+          "\", r);\n"
+          "    $display(\"%h %h %h %h %h\", r[0][-1], r[0][0], r[1][-1], "
+          "r[1][0], b[-1][1]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(SlurpFile(path), "11\n22\n33\n44\n");
+  EXPECT_EQ(out, "11 22 33 44 55\n");
+  std::remove(path.c_str());
+}
+
 // §21.5 (Syntax 21-13): the address operands are ordinary expressions — here a
 // parameter and a localparam supply the bounds.
 TEST(WritememSim, AddressBoundsFromParameterAndLocalparam) {

@@ -225,6 +225,27 @@ TEST(StructType, UnpackedArrayMemberHoldsEachElement) {
   EXPECT_EQ(out, "20 40 5 160 7 9 3\n");
 }
 
+// §7.2 with §6.16: an element of an unpacked array member of strings holds a
+// string of any length, so m.v[1] keeps all ten characters of "abcdefghij"
+// beside m.v[0]'s "xy", and §7.4.6 has a read past its end give the empty
+// string. Held as its own bits cut to the element's 64, it kept "cdefghij".
+TEST(StructType, AnArrayMemberOfStringsHoldsEachElementWhole) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef struct { string v [2]; } names_t;\n"
+      "  names_t m;\n"
+      "  int k = 5;\n"
+      "  initial begin\n"
+      "    m.v[1] = \"abcdefghij\"; m.v[0] = \"xy\";\n"
+      "    $display(\"[%s] %0d [%s] [%s]\", m.v[1], m.v[1].len(), m.v[0],\n"
+      "             m.v[k]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "[abcdefghij] 10 [xy] []\n");
+}
+
 // §7.2 with §7.4.4: a member declared with an unpacked-array typedef has the
 // typedef's dimensions, `a_t m1;` under `typedef bit a_t [3:0];` being four
 // bits as `bit m1 [3:0]` is, so the struct is 12 bits, m1[3] keeps the 1

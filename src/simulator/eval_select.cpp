@@ -24,6 +24,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/struct_string_member.h"
 #include "simulator/sva_engine_sampling.h"
 #include "simulator/variable.h"
 #include "simulator/virtual_interface.h"
@@ -824,16 +825,20 @@ static Logic4Vec SelectFromPackedValue(const Expr* expr,
 
 // §7.2 with §7.4.2: `m.v[1]` reads one element of an unpacked array member,
 // its window of the structure's bits; an index outside the member reads x.
-// Taken as a bit-select of the member's value, it read one bit.
+// Taken as a bit-select of the member's value, it read one bit. An element of
+// strings reads the text its handle names (§6.16), and one outside the member
+// reads the empty string (§7.4.6), which the x handle names.
 static bool TryStructArrayMemberSelect(const Expr* expr, SimContext& ctx,
                                        Arena& arena, Logic4Vec& out) {
   StructArrayElementRef ref;
   if (!ResolveStructArrayElement(expr, ctx, arena, ref)) return false;
-  if (!ref.in_range) {
-    out = MakeAllX(arena, ref.width);
+  out = ref.in_range
+            ? ExtractBitField(arena, *ref.value, ref.bit_offset, ref.width)
+            : MakeAllX(arena, ref.width);
+  if (ref.is_string) {
+    out = StringMemberText(out, arena);
     return true;
   }
-  out = ExtractBitField(arena, *ref.value, ref.bit_offset, ref.width);
   out.is_signed = ref.is_signed;
   return true;
 }

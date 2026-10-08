@@ -378,18 +378,20 @@ struct MultiDimGeom {
 // §21.4.3: maps a row-major global element position to its element name. A
 // sequential file fills element 0, 1, 2, ... regardless of how the dimensions
 // nest; the name carries one bracketed subscript per dimension
-// (mem[i0][i1]...), each running from its dimension's low address.
+// (mem[i0][i1]...), each running from its dimension's low address and named by
+// its 32 bits, as the leaves were made.
 static std::string MultiDimElementName(const MultiDimGeom& g, uint64_t global) {
   uint64_t top = global / g.inner;
   uint64_t flat = global % g.inner;
   std::string nm = g.mem_name + "[" +
-                   std::to_string(g.top_lo + static_cast<int64_t>(top)) + "]";
+                   std::to_string(static_cast<uint32_t>(
+                       g.top_lo + static_cast<int64_t>(top))) +
+                   "]";
   // Decompose the within-word position into per-dimension subscripts, innermost
   // first (it varies fastest), then emit them outer-to-inner.
-  std::vector<int64_t> subs(g.ndim - 1);
+  std::vector<uint32_t> subs(g.ndim - 1);
   for (size_t d = g.ndim - 1; d >= 1; --d) {
-    subs[d - 1] = static_cast<int64_t>(g.los[d]) +
-                  static_cast<int64_t>(flat % g.sizes[d]);
+    subs[d - 1] = g.los[d] + static_cast<uint32_t>(flat % g.sizes[d]);
     flat /= g.sizes[d];
   }
   for (size_t d = 1; d < g.ndim; ++d) {

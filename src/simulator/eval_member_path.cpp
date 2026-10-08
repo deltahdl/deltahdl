@@ -459,6 +459,7 @@ bool ResolveStructArrayElement(const Expr* select, SimContext& ctx,
   out.var = root.var;
   out.width = field->width / field->elem_count;
   out.is_signed = field->is_signed;
+  out.is_string = field->type_kind == DataTypeKind::kString;
   Logic4Vec idx = EvalExpr(select->index, ctx, arena);
   if (!idx.IsKnown()) return true;
   auto i = static_cast<int64_t>(idx.ToUint64());

@@ -332,7 +332,8 @@ std::vector<DpiArrayRange> DeclaredRanges(const ArrayInfo& info) {
 // §H.7.3: the elements of the array `name` names, row-major. A sized formal
 // lays each dimension out from its lower index (§H.7.6 c)) and an open one
 // from its left bound (§H.12.4), which `from_left` selects. Empty where `name`
-// names no fixed-size array.
+// names no fixed-size array. Each index is named by its 32 bits, as the
+// leaves were made and every select names them.
 UnpackedActual UnpackedActualOf(std::string_view name, bool from_left,
                                 SimContext& ctx) {
   UnpackedActual actual;
@@ -348,8 +349,9 @@ UnpackedActual UnpackedActualOf(std::string_view name, bool from_left,
     std::vector<std::string> next;
     for (const std::string& prefix : names) {
       for (int32_t j = 0; j < kCount; ++j) {
-        next.push_back(prefix + "[" + std::to_string(kFirst + (j * kStep)) +
-                       "]");
+        next.push_back(
+            prefix + "[" +
+            std::to_string(static_cast<uint32_t>(kFirst + (j * kStep))) + "]");
       }
     }
     names = std::move(next);

@@ -311,14 +311,16 @@ static bool TryWriteStringElementChar(const Expr* lhs, const Logic4Vec& rhs_val,
 
 // §7.2 with §7.4.2: `m.v[1] = 20` writes one element of an unpacked array
 // member, its window of the structure's bits, leaving the rest; an index
-// outside the member writes nothing.
+// outside the member writes nothing. An element of strings takes the handle to
+// its text (§6.16), as a scalar string member does.
 static bool TryStructArrayMemberWrite(const Expr* lhs, const Logic4Vec& rhs_val,
                                       SimContext& ctx, Arena& arena) {
   StructArrayElementRef ref;
   if (!ResolveStructArrayElement(lhs, ctx, arena, ref)) return false;
   if (!ref.in_range || (ref.var != nullptr && ref.var->is_forced)) return true;
-  DepositBitField(*ref.value, ref.bit_offset,
-                  ResizeToWidth(rhs_val, ref.width, arena), ref.width);
+  Logic4Vec bits = ref.is_string ? StringMemberHandle(rhs_val, arena)
+                                 : ResizeToWidth(rhs_val, ref.width, arena);
+  DepositBitField(*ref.value, ref.bit_offset, bits, ref.width);
   if (ref.var != nullptr) ref.var->NotifyWatchers();
   return true;
 }
