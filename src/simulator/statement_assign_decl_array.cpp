@@ -84,10 +84,12 @@ static std::optional<BlockDimBounds> EvalBlockDim(const Expr* dim,
                                                   SimContext& ctx,
                                                   Arena& arena) {
   if (!dim) return std::nullopt;
+  // §7.4.2: a range bound may be negative, so each is read as the signed
+  // value it was written as; `[-1:0]` is two elements, not a range from 0 up
+  // to the 32 bits of -1.
   if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
-    return BlockDimBounds{
-        static_cast<int64_t>(EvalExpr(dim->lhs, ctx, arena).ToUint64()),
-        static_cast<int64_t>(EvalExpr(dim->rhs, ctx, arena).ToUint64())};
+    return BlockDimBounds{SelectBoundValue(EvalExpr(dim->lhs, ctx, arena)),
+                          SelectBoundValue(EvalExpr(dim->rhs, ctx, arena))};
   }
   if (auto hi = BlockArraySizeFormUpperBound(dim, ctx, arena))
     return BlockDimBounds{0, *hi};

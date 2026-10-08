@@ -425,4 +425,21 @@ TEST(UnpackedArraySim, AStringMethodActsOnAPackageScopedElement) {
   EXPECT_EQ(out, "2 3 4\nQb Qbc Qbcd\n");
 }
 
+// §7.4.2: a range bound may be negative, and a block's declaration reads it as
+// the signed value it was written as, so `[-2:1]` is four elements from -2
+// rather than a range from 1 up to the bound's 32 bits.
+TEST(UnpackedArraySim, ANegativeBoundInAProceduralBlockIsSigned) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial begin\n"
+      "    int b [-2:1];\n"
+      "    b[-2] = 7; b[1] = 9;\n"
+      "    $display(\"%0d %0d %0d\", b[-2], b[1], $size(b));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "7 9 4\n");
+}
+
 }  // namespace
