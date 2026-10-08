@@ -34,9 +34,9 @@ TEST(LoopSyntaxParsing, ForCommaSeparatedUntypedInit) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 12.7.1: the variables used to control a for-loop can be declared prior to
-// the loop, leaving for_initialization omitted. The A.6.8 file carries the
-// bare production case.
+// 12.7.1: a for-loop may leave for_initialization empty and steer itself with
+// a variable that an earlier declaration introduced. The A.6.8 file carries
+// the bare production case.
 TEST(LoopSyntaxParsing, ForEmptyInitWithLoopVariableDeclaredPriorToLoop) {
   auto r = Parse(
       "module m;\n"

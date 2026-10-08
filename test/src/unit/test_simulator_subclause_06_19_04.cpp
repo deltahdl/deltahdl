@@ -7,8 +7,8 @@ using namespace delta;
 
 namespace {
 
-// 6.19.4: an enumeration element used in a numerical expression contributes
-// the numerical value associated with the enumerated value. The canonical
+// 6.19.4: wherever an enumeration element appears in arithmetic, it stands for
+// the number its declaration gave it. The canonical
 // example declares Colors {red..black}; blue has value 2, so blue*3 is 6 and
 // yellow(3) + green(1) is 4.
 TEST(EnumNumericalExpr, ElementValueUsedInArithmetic) {
@@ -36,8 +36,9 @@ TEST(EnumNumericalExpr, ElementValueUsedInArithmetic) {
   EXPECT_EQ(b->value.ToUint64(), 4u);
 }
 
-// 6.19.4: an enum variable used as part of an expression is automatically cast
-// to the base type of its enum (int by default). Two enum operands of distinct
+// 6.19.4: an operand of enum type takes part in an expression as a value of
+// its enum's base type (int by default), with no explicit cast. Two enum
+// operands of distinct
 // enum types may therefore be combined arithmetically into an integral result.
 TEST(EnumNumericalExpr, CrossEnumOperandsAutocastToInt) {
   SimFixture f;
@@ -64,8 +65,8 @@ TEST(EnumNumericalExpr, CrossEnumOperandsAutocastToInt) {
   EXPECT_EQ(i->value.ToUint64(), 5u);
 }
 
-// 6.19.4: a cast to an enum converts the expression to the enum's base type
-// without checking that the value names a member, so the out-of-range value
+// 6.19.4: casting to an enum type only reshapes the value into the base type;
+// nothing confirms that the result is one of the members, so the stray value
 // survives the cast at run time. Su belongs to Week (value 6); casting it into
 // the three-member Colors enum leaves Colors variable C holding 6, not a
 // clamped or rejected value.

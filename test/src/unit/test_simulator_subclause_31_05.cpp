@@ -59,19 +59,19 @@
 // list; Syntax 31-15 makes `10` and `1x` separate edge_descriptors, and naming
 // one names nothing about the other.
 //
-// The two $width cases turn on §31.4.4's derived data event: "data event =
-// reference event signal with opposite edge", Table 31-10 making the data event
-// implicit and Syntax 31-12 writing `$width(controlled_reference_event,
-// timing_check_limit, threshold [, [notifier]])` with no place to declare one.
-// §31.4.4 does not define the opposite of an arbitrary edge_control_specifier;
-// it names an opposite for posedge and negedge and says nothing about reversing
-// an edge_descriptor list. OppositeEdge in src/simulator/timing_check_pulse.cpp
-// reverses each descriptor of the list, and §31.5 is what makes that the right
-// reading: reversing every descriptor of `edge[01, 0x, x1]` gives
-// `edge[10, x0, 1x]`, which is exactly the pair of lists §31.5 gives for
-// posedge and negedge. So `edge[01]` opens the pulse and `edge[10]` closes it,
-// and the clock leaving the pulse by going 1 to x closes nothing, `1x` not
-// being the reverse of `01`.
+// The two $width cases turn on §31.4.4's derived data event: $width takes no
+// data event of its own and instead uses the reference signal's opposite edge,
+// Table 31-10 making the data event implicit and Syntax 31-12 writing
+// `$width(controlled_reference_event, timing_check_limit, threshold [,
+// [notifier]])` with no place to declare one. §31.4.4 does not define the
+// opposite of an arbitrary edge_control_specifier; it names an opposite for
+// posedge and negedge and says nothing about reversing an edge_descriptor list.
+// OppositeEdge in src/simulator/timing_check_pulse.cpp reverses each descriptor
+// of the list, and §31.5 is what makes that the right reading: reversing every
+// descriptor of `edge[01, 0x, x1]` gives `edge[10, x0, 1x]`, which is exactly
+// the pair of lists §31.5 gives for posedge and negedge. So `edge[01]` opens
+// the pulse and `edge[10]` closes it, and the clock leaving the pulse by going
+// 1 to x closes nothing, `1x` not being the reverse of `01`.
 //
 // The threshold is written as 0, the value §31.4.4 gives it when it is left
 // out, and no case here turns on it. Issue #3418 is why: a declared threshold

@@ -8,9 +8,9 @@
 using namespace delta;
 namespace {
 
-// 12.7.6: a forever loop should be used in conjunction with a timing control,
-// so the repeated statement here is delay-controlled. The A.6.8 file carries
-// the plain assignment body.
+// 12.7.6: without a timing control in its body, a forever loop would spin in
+// zero time, so the repeated statement here waits on a delay. The A.6.8 file
+// carries the plain assignment body.
 TEST(LoopSyntaxParsing, ForeverLoopWithTimingControlledBody) {
   auto r = Parse(
       "module m;\n"

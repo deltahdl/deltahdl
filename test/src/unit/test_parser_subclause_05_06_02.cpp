@@ -28,8 +28,8 @@ TEST(LexicalConventionParsing, UppercaseNotKeyword) {
       ReportedError(r.diags, "expected top-level declaration", 1, "3.12.1"));
 }
 
-// 5.6.2: a keyword preceded by an escape (backslash) character is not
-// interpreted as a keyword, so \begin does not open a sequential block. The
+// 5.6.2: putting a backslash in front of a keyword strips its reserved
+// meaning, so \begin does not open a sequential block. The
 // §5.6.1 file carries the complementary rule that it is instead treated as a
 // user-defined identifier.
 TEST(LexicalConventionParsing, EscapedKeywordNotInterpretedAsKeyword) {

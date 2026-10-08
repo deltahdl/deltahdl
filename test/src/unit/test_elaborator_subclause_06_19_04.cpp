@@ -221,9 +221,9 @@ TEST(EnumNumericalExpr, EnumAddTwoEnumsToInt_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// 6.19.4: a cast to an enum type converts the expression to the base type
-// without checking the value's validity, so casting an out-of-range value into
-// an enum is accepted. Here Su (a Week member, value 6) is cast into the
+// 6.19.4: casting to an enum type only reshapes the value into the base type
+// and never asks whether the result is one of the members, so a value naming
+// no member is accepted. Here Su (a Week member, value 6) is cast into the
 // three-member Colors enum; the cast is legal even though 6 names no Colors.
 TEST(EnumNumericalExpr, EnumCastOutOfRange_Ok) {
   ElabFixture f;

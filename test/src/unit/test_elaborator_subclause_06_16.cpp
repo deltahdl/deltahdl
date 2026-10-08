@@ -117,9 +117,9 @@ TEST(Elaboration, IndexingAScalarLogicVarIsStillRejected) {
 }
 
 // §6.16's Table 6-9 (printed page 114) gives concatenation over string
-// operands: "Each operand can be a string literal or an expression of string
-// type ... the result of the concatenation shall be of string type." §11.2.1
-// lists "parameters" among the operands a constant expression consists of, so
+// operands: string literals and expressions of string type may be mixed in
+// one concatenation, and what it yields has string type. §11.2.1 counts
+// parameters among the operands a constant expression may be built from, so
 // `{P, "c"}` is one and Q holds the joined characters.
 //
 // The characters are read back rather than Q's resolved_value, which §11.10
