@@ -542,10 +542,12 @@ struct StreamedMember {
   // The dynamic array member these bits are; null for any other member.
   const StructFieldInfo* dynamic = nullptr;
   bool IsDynamicallySized() const { return is_string || dynamic != nullptr; }
-  // The width of one of the elements such a member streams: a string's byte
-  // or a dynamic array's element.
+  // The width of one of the units such a member streams in: a string's byte,
+  // a dynamic array's element, or, for a dynamic array of strings, the byte
+  // its strings are made of, each a dynamic array of bytes to the cast.
   uint32_t ElementWidth() const {
-    return is_string ? 8 : dynamic->dyn_elem_width;
+    if (is_string || dynamic->type_kind == DataTypeKind::kString) return 8;
+    return dynamic->dyn_elem_width;
   }
 };
 
@@ -649,11 +651,21 @@ static Logic4Vec StreamDynamicStruct(const Logic4Vec& stored,
 }
 
 // §6.24.3 (printed page 143): the handle of a new array of the dynamic member
-// `field` whose elements are the bits `bits`, the leftmost element first.
+// `field` whose elements are the bits `bits`, the leftmost element first. The
+// elements of an array of strings are themselves dynamically sized, and the
+// cast is greedy among them too: the first takes every byte and no later one
+// is made, so the array holds one string.
 static Logic4Vec DynMemberOfStream(const Logic4Vec& bits,
                                    const StructFieldInfo& field, Arena& arena) {
   Logic4Vec handle;
   QueueObject* q = NewDynMember(field, handle, arena);
+  if (field.type_kind == DataTypeKind::kString) {
+    Logic4Vec text = StringToLogic4Vec(arena, Logic4VecToString(bits));
+    text.is_string = true;
+    q->elements.push_back(text);
+    q->AssignFreshIds();
+    return handle;
+  }
   uint32_t elem_width = field.dyn_elem_width;
   for (uint32_t at = bits.width; at > 0; at -= elem_width) {
     q->elements.push_back(

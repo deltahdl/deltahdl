@@ -518,4 +518,52 @@ TEST(BitStreamCastSim, CastFromAStructStreamsItsDynamicStringElementsAsBytes) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §6.24.3 (printed page 143): the conversion is greedy, the first dynamically
+// sized item taking every bit the fixed-size members leave and each later one
+// none, and that holds again inside a dynamic array of strings, each string
+// being a dynamic array of bytes: 32'h41424344 cast into
+// {byte b; string d[];} gives b = 8'h41 and d the one element "BCD", and an
+// 8-bit source leaves d no elements. Unpacked as 64-bit string handles, the 24
+// bits were no whole number of elements and the cast failed.
+TEST(BitStreamCastSim, CastIntoAStructGivesItsDynamicStringArrayOneString) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef struct {byte b; string d[];} names_t;\n"
+                       "  names_t m, e;\n"
+                       "  bit [31:0] v = 32'h41424344;\n"
+                       "  bit [7:0] h = 8'h45;\n"
+                       "  initial begin\n"
+                       "    m = names_t'(v);\n"
+                       "    e = names_t'(h);\n"
+                       "    $display(\"%h %0d [%s] %h %0d\", m.b, m.d.size(), "
+                       "m.d[0], e.b, e.d.size());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "41 1 [BCD] 45 0\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §6.24.3 (printed page 143): a size mismatch the cast meets only at run time
+// is an error then. A 28-bit source leaves the dynamic array of strings in
+// {byte b; string d[];} 20 bits, which are no whole number of the bytes its
+// strings are made of.
+TEST(BitStreamCastSim, CastIntoAStructOfNoWholeDynamicStringBytesIsAnError) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  typedef struct {byte b; string d[];} names_t;\n"
+      "  names_t m;\n"
+      "  bit [27:0] v = 28'h1;\n"
+      "  initial m = names_t'(v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-stream cast to 'names_t': the 28-bit source "
+                            "leaves its first dynamically sized member 20 "
+                            "bits, which are no whole number of its 8-bit "
+                            "elements",
+                            5, "6.24.3"));
+}
+
 }  // namespace
