@@ -816,5 +816,35 @@ TEST_F(ExpressionValuesOfARun, ASelectIndexedByAnOperationNamesItsElement) {
   EXPECT_EQ(IntOf(By("top.m")), 0x44552211);
 }
 
+// §38.15 with §37.3.5: a function call and a system function call are
+// expressions vpi_get_value reads by evaluating them, as is a select whose
+// index is a call: f(5) is 10, $clog2(5) is 3, and m[f(i)] with f(1) 2 is
+// m[2]. The calls held no storage and gave no value, and the select named no
+// element.
+TEST_F(ExpressionValuesOfARun, ACallReadsAsItsCallEvaluates) {
+  Run("module top; logic [7:0] a = 5; logic [3:0][7:0] m = 32'h44332211;\n"
+      "  integer i = 1; wire [7:0] y; wire [31:0] z; wire [7:0] w;\n"
+      "  function automatic logic [7:0] f(input logic [7:0] x);\n"
+      "    return x * 2;\n"
+      "  endfunction\n"
+      "  function automatic integer g(input integer x); return x + 1;\n"
+      "  endfunction\n"
+      "  assign y = f(a); assign z = $clog2(a); assign w = m[g(i)];\n"
+      "endmodule\n");
+  vpiHandle it = vpi_iterate(vpiContAssign, By("top"));
+  ASSERT_NE(it, nullptr);
+  vpiHandle call = vpi_handle(vpiRhs, vpi_scan(it));
+  vpiHandle system_call = vpi_handle(vpiRhs, vpi_scan(it));
+  vpiHandle select = vpi_handle(vpiRhs, vpi_scan(it));
+  ASSERT_NE(call, nullptr);
+  ASSERT_NE(system_call, nullptr);
+  ASSERT_NE(select, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, call), vpiFuncCall);
+  EXPECT_EQ(IntOf(call), 10);
+  EXPECT_EQ(vpi_get(vpiType, system_call), vpiSysFuncCall);
+  EXPECT_EQ(IntOf(system_call), 3);
+  EXPECT_EQ(IntOf(select), 0x33);
+}
+
 }  // namespace
 }  // namespace delta

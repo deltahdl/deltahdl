@@ -537,10 +537,13 @@ VpiObject* ModelledExpression(const Expr* expr, const AssignBuild& build) {
 VpiObject* ExpressionObject(const Expr* expr, const AssignBuild& build) {
   if (expr == nullptr) return nullptr;
   VpiObject* obj = ModelledExpression(expr, build);
-  // §37.3.5 with §38.15: an operation holds no storage, so its value is its
-  // expression evaluated where the source wrote it, in the instance and the
-  // generate blocks the expression stands in.
-  if (obj != nullptr && obj->type == vpiOperation) {
+  // §37.3.5 with §38.15: an operation and a function or system function call
+  // hold no storage, so the value of each is its expression evaluated where
+  // the source wrote it, in the instance and the generate blocks the
+  // expression stands in.
+  if (obj != nullptr &&
+      (obj->type == vpiOperation || obj->type == vpiFuncCall ||
+       obj->type == vpiSysFuncCall)) {
     obj->expr_scope = std::make_shared<const VpiExprScope>(
         VpiExprScope{expr, VpiFlatName(build.names.prefix, ""),
                      std::vector<std::string>(build.names.gen.begin(),
