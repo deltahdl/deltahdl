@@ -7,6 +7,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/packed_range.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "fixture_vpi_run.h"
@@ -15,6 +16,7 @@
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -789,6 +791,25 @@ TEST_F(VpiGetValueSim, ANullHandleOrValueReadsNothing) {
   vpi_get_value(nullptr, &val);
   vpi_get_value(h, nullptr);
   EXPECT_EQ(val.value.integer, 77);
+}
+
+// §37.17 detail 26 with §11.5.1: a select whose index is not a constant
+// stands for the element its index names, and one whose index expression the
+// model could not build names none, reading x in each of its bits as an index
+// holding x does. It read as the whole vector it was made of.
+TEST_F(VpiGetValueSim, ASelectWhoseIndexWasNotBuiltSelectsNothing) {
+  auto* var = sim_ctx_.CreateVariable("v16", 16);
+  var->value = MakeLogic4VecVal(arena_, 16, 0x1234);
+  VpiObject select;
+  select.type = vpiReg;
+  select.var = var;
+  select.size = 8;
+  select.select_dim = PackedRange{1, 0};
+
+  s_vpi_value val = {};
+  val.format = vpiBinStrVal;
+  vpi_get_value(VpiHandleOf(&select), &val);
+  EXPECT_STREQ(val.value.str, "xxxxxxxx");
 }
 
 }  // namespace

@@ -324,13 +324,10 @@ static void DispatchValueByFormat(const Logic4Vec& v, s_vpi_value* value,
 // not a constant, which holds no bits of its parent's storage of its own and
 // stands for those its index names when its value is read or written.
 // PackedSelectObject records the dimension every such select indexes, each
-// vector with bits recording its packed dimensions (MakeVectorBits); one whose
-// index expression the model could not build is no varying select. The
+// vector with bits recording its packed dimensions (MakeVectorBits). The
 // dimension a varying select indexes, null for any other object.
 static const PackedRange* VaryingSelectDim(const VpiObject& obj) {
-  return obj.select_dim.has_value() && obj.index_expr != nullptr
-             ? &*obj.select_dim
-             : nullptr;
+  return obj.select_dim.has_value() ? &*obj.select_dim : nullptr;
 }
 
 // §37.3.5 with §38.15: the value of `obj`, which holds no storage but stands
@@ -354,6 +351,10 @@ static Logic4Vec EvaluateExpressionObject(const VpiObject& obj,
 // storage being one; none where it holds an x or z bit (§11.5.1).
 static std::optional<int64_t> VaryingIndex(const VpiObject& obj,
                                            SimContext* sim) {
+  // An index expression the model could not build names no element, as an
+  // index holding x does; read as the vector the select was made of, such a
+  // select stood for all of it.
+  if (obj.index_expr == nullptr) return std::nullopt;
   VpiObject& index = *obj.index_expr;
   Logic4Vec held;
   if (index.var != nullptr) {
