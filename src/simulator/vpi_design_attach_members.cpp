@@ -128,47 +128,70 @@ void MakeMember(VpiObject* holder, const StructFieldInfo& field,
   holder->children.push_back(member);
 }
 
+// What the members of one instance are made from: its module, the objects
+// keyed under its name `prefix`, and what a run builds with.
+struct MemberSite {
+  const RtlirDesign& design;
+  const RtlirModule& mod;
+  const std::string& prefix;
+  const VpiObjectMap& objects;
+  SimContext& ctx;
+  const VpiAttachBuild& build;
+};
+
+// The member per field of the layout `info` gives `holder`.
+void MakeMembers(VpiObject* holder, const StructTypeInfo& info,
+                 const MemberSite& site) {
+  for (const StructFieldInfo& field : info.fields) {
+    MakeMember(holder, field, site.design, site.mod, site.build);
+  }
+}
+
+// §37.17 details 3, 17 and 26: a struct or union var, packed or not, has a
+// member variable per field, the struct as its vpiParent and the field's value
+// as its own. The run keeps the whole struct as one variable, and no member
+// object was made, so vpiMember reached nothing and no name reached a field; a
+// packed one was passed over after that, though §37.26 makes vpiPacked only a
+// property of the struct var.
+void AttachVariableMembers(const MemberSite& site) {
+  for (const RtlirVariable& var : site.mod.variables) {
+    const std::string kKey = VpiFlatName(site.prefix, var.name);
+    VpiObject* holder = FindObjectForFlatName(site.objects, kKey);
+    if (holder == nullptr || holder->var == nullptr ||
+        (holder->type != vpiStructVar && holder->type != vpiUnionVar)) {
+      continue;
+    }
+    const StructTypeInfo* info = site.ctx.GetVariableStructType(kKey);
+    if (info != nullptr) MakeMembers(holder, *info, site);
+  }
+}
+
+// §37.26: a net of a structure or union type is a struct net or a union net,
+// with a member net per field. Every net of the run is an object
+// (VpiContext::Attach), and the run registers the layout of each one of an
+// aggregate type under the same key (RegisterAggregateLayout); each reported
+// vpiNet and held no member.
+void AttachNetMembers(const MemberSite& site) {
+  for (const RtlirNet& net : site.mod.nets) {
+    const std::string kKey = VpiFlatName(site.prefix, net.name);
+    const StructTypeInfo* info = site.ctx.GetVariableStructType(kKey);
+    if (info == nullptr) continue;
+    VpiObject* holder = FindObjectForFlatName(site.objects, kKey);
+    holder->type = info->is_union ? vpiUnionNet : vpiStructNet;
+    MakeMembers(holder, *info, site);
+  }
+}
+
 }  // namespace
 
 void AttachStructMembers(const RtlirDesign* design, const VpiObjectMap& objects,
                          SimContext& ctx, const VpiAttachBuild& build) {
-  // §37.17 details 3, 17 and 26: a struct or union var, packed or not, has a
-  // member variable per field, the struct as its vpiParent and the field's
-  // value as its own. The run keeps the whole struct as one variable, and no
-  // member object was made, so vpiMember reached nothing and no name reached a
-  // field; a packed one was passed over after that, though §37.26 makes
-  // vpiPacked only a property of the struct var.
   if (design == nullptr) return;
   WalkInstancePaths(
       design, [&](const RtlirModule* mod, const std::string& prefix) {
-        for (const RtlirVariable& var : mod->variables) {
-          const std::string kKey = VpiFlatName(prefix, var.name);
-          VpiObject* holder = FindObjectForFlatName(objects, kKey);
-          if (holder == nullptr || holder->var == nullptr ||
-              (holder->type != vpiStructVar && holder->type != vpiUnionVar)) {
-            continue;
-          }
-          const StructTypeInfo* info = ctx.GetVariableStructType(kKey);
-          if (info == nullptr) continue;
-          for (const StructFieldInfo& field : info->fields) {
-            MakeMember(holder, field, *design, *mod, build);
-          }
-        }
-        // §37.26: a net of a structure or union type is a struct net or a
-        // union net, with a member net per field. Every net of the run is an
-        // object (VpiContext::Attach), and the run registers the layout of
-        // each one of an aggregate type under the same key
-        // (RegisterAggregateLayout); each reported vpiNet and held no member.
-        for (const RtlirNet& net : mod->nets) {
-          const std::string kKey = VpiFlatName(prefix, net.name);
-          const StructTypeInfo* info = ctx.GetVariableStructType(kKey);
-          if (info == nullptr) continue;
-          VpiObject* holder = FindObjectForFlatName(objects, kKey);
-          holder->type = info->is_union ? vpiUnionNet : vpiStructNet;
-          for (const StructFieldInfo& field : info->fields) {
-            MakeMember(holder, field, *design, *mod, build);
-          }
-        }
+        const MemberSite kSite{*design, *mod, prefix, objects, ctx, build};
+        AttachVariableMembers(kSite);
+        AttachNetMembers(kSite);
       });
 }
 

@@ -374,10 +374,12 @@ static bool TryResolveParentRelation(int type, VpiHandle ref, VpiHandle& out) {
   }
   // §37.18 (figure) and §37.17 detail 26: a subelement of a packed array
   // variable, an element of an array var and a member of a struct or union var
-  // reach what holds them through vpiParent. The relation is a tag no object's
-  // type is, so the traversal this fell through to reached none of them.
+  // reach what holds them through vpiParent, and §37.26 draws the same edge
+  // from a member net to its struct or union net. The relation is a tag no
+  // object's type is, so the traversal this fell through to reached none of
+  // them.
   if (VpiVariableIsPackedArrayMember(ref) || VpiVariableIsArrayMember(ref) ||
-      VpiVariableIsStructUnionMember(ref)) {
+      VpiVariableIsStructUnionMember(ref) || VpiNetStructUnionMember(ref)) {
     out = ref->parent;
     return true;
   }

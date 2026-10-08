@@ -108,8 +108,10 @@ bool VpiVariableIsArrayMember(VpiHandle var) {
 
 bool VpiVariableIsStructUnionMember(VpiHandle var) {
   // §37.17 detail 17: a variable is a struct/union member when its vpiParent
-  // prefix is a struct or union variable.
-  if (!var || !var->parent) return false;
+  // prefix is a struct or union variable. A var bit of a packed one is a bit
+  // of the vector (detail 12), no member, as §37.16 detail 33 says of a net
+  // bit; counted, vpiMember of a packed struct var reached its bits too.
+  if (!var || var->type == vpiRegBit || !var->parent) return false;
   return var->parent->type == vpiStructVar || var->parent->type == vpiUnionVar;
 }
 
