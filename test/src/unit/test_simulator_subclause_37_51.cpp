@@ -742,6 +742,37 @@ TEST_F(PropertyDeclsOfARun, AnEdgeAnOrAndAnIffEventActualOfOneProperty) {
   EXPECT_EQ(FirstArgumentOp("a3"), vpiIffOp);
 }
 
+// Two instances of one property with an event formal build the model of the
+// run, with nothing read back from it (#5765).
+TEST_F(PropertyDeclsOfARun, TwoEventActualInstancesBuildTheModel) {
+  Run(EventActualsSource({"p(posedge clk, a)", "p(posedge clk, a)"}));
+  EXPECT_FALSE(f_.has_errors);
+}
+
+// Two instances of one property with an event formal, each passing the same
+// edge, each reach it (#5765).
+TEST_F(PropertyDeclsOfARun, TwoInstancesPassingOneEdgeEachReachIt) {
+  Run(EventActualsSource({"p(posedge clk, a)", "p(posedge clk, a)"}));
+  EXPECT_EQ(FirstArgumentOp("a1"), vpiPosedgeOp);
+  EXPECT_EQ(FirstArgumentOp("a2"), vpiPosedgeOp);
+}
+
+// Two instances of one property of a written clock and an untyped formal
+// each reach their own argument (#5765).
+TEST_F(PropertyDeclsOfARun, TwoInstancesOfAnUntypedFormalEachReachTheirOwn) {
+  Run("module top; logic clk, a, b;\n"
+      "  property p(x); @(posedge clk) x; endproperty\n"
+      "  a1: assert property (p(a));\n"
+      "  a2: assert property (p(b));\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kFirst = ArgumentsOf("a1");
+  const std::vector<vpiHandle> kSecond = ArgumentsOf("a2");
+  ASSERT_EQ(kFirst.size(), 1U);
+  ASSERT_EQ(kSecond.size(), 1U);
+  EXPECT_STREQ(vpi_get_str(vpiName, kFirst[0]), "a");
+  EXPECT_STREQ(vpi_get_str(vpiName, kSecond[0]), "b");
+}
+
 // The edge keyword's event, which Annex K and Annex M give no operation, as
 // §37.65 notes of an event control, is no argument: the instance reaches the
 // argument of the formal after it alone.
