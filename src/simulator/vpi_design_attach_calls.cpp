@@ -627,7 +627,10 @@ bool ChainNames(const Expr& expr, std::vector<std::string_view>& names) {
   if (expr.kind != ExprKind::kMemberAccess || expr.is_scope_resolution) {
     return false;
   }
-  return ChainNames(*expr.lhs, names) && ChainNames(*expr.rhs, names);
+  // The right-hand side of a member access is always the member's name.
+  if (!ChainNames(*expr.lhs, names)) return false;
+  names.push_back(expr.rhs->text);
+  return true;
 }
 
 int ForeachIndexKind(const Expr* array, const BlockParent& parent,
