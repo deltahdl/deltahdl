@@ -768,10 +768,11 @@ class VpiContext {
   VpiHandle DesignObjectForFlatName(std::string_view flat_name);
 
   // §38.10: the design's module paths; §37.40: its timing checks; §38.11: each
-  // module's definition name.
+  // module's definition name; §37.36: its UDP definitions.
   void AttachModulePathDelays(SimContext& sim_ctx);
   void AttachTimingChecks(SimContext& sim_ctx);
   void AttachModuleDefNames(SimContext& sim_ctx);
+  void AttachUdpDefns(const RtlirDesign* design);
   // §37.10: every instance's object, each package's, and once the tops are
   // made what each instance holds (vpi_design_attach_instances.cpp): what it
   // takes from its definition, its variables' declared facts (§37.17,

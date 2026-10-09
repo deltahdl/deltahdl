@@ -682,6 +682,21 @@ void VpiContext::AttachSourceDelayExpressions(SimContext& sim_ctx,
       });
 }
 
+// §37.36 (figure): the UDP definitions of the design. A udp defn is drawn from
+// a circle, so it belongs to no scope and is reached with a NULL reference
+// object; nothing built one, so every property and relation the figure draws on
+// it answered for no design at all.
+void VpiContext::AttachUdpDefns(const RtlirDesign* design) {
+  for (const UdpDecl* decl : VpiDesignUdpDecls(design)) {
+    auto* defn = AllocObject();
+    VpiFillUdpDefnObject(defn, *decl, name_pool_);
+    run_objects_.try_emplace(decl, defn);
+    for (const UdpTableRow& row : decl->table) {
+      VpiFillUdpTableEntryObject(AllocObject(), row, defn);
+    }
+  }
+}
+
 void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   // §37.44: the run the thread objects are made against. They cannot all be
   // made here -- a fork branch begins while the design executes, long after
@@ -736,19 +751,9 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   // own hang from it.
   AttachModulePathDelays(sim_ctx);
   AttachTimingChecks(sim_ctx);
-  // §37.36 (figure): the UDP definitions of the design. A udp defn is drawn
-  // from a circle, so it belongs to no scope and is reached with a NULL
-  // reference object; nothing built one, so every property and relation the
-  // figure draws on it answered for no design at all. They are made ahead of
-  // the instances' contents, whose udps reach them (§37.35).
-  for (const UdpDecl* decl : VpiDesignUdpDecls(design)) {
-    auto* defn = AllocObject();
-    VpiFillUdpDefnObject(defn, *decl, name_pool_);
-    run_objects_.try_emplace(decl, defn);
-    for (const UdpTableRow& row : decl->table) {
-      VpiFillUdpTableEntryObject(AllocObject(), row, defn);
-    }
-  }
+  // §37.35: the UDP definitions are made ahead of the instances' contents,
+  // whose udps reach them.
+  AttachUdpDefns(design);
   AttachInstanceContents(design);
   RecordProtectedDeclarations(design, object_map_, SourcesOf(sim_ctx_));
   RecordViewportGrants(design, object_map_, SourcesOf(sim_ctx_));
