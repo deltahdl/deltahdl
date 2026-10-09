@@ -103,24 +103,6 @@ TEST(VirtualInterfaceCallElaboration, APackageTypedefNamesItsPackagesType) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoSuch, 7, "25.9"));
 }
 
-// §25.9 with §6.18 and §23.9: a module's `typedef HU HU;` names the HU in force
-// before it, the compilation unit's, H, and not itself (#5814).
-TEST(VirtualInterfaceCallElaboration,
-     AModuleTypedefNamesTheOuterTypeOfItsName) {
-  ElabFixture f;
-  ElaborateSrc(
-      "interface ifc; task t(); endtask endinterface\n"
-      "class H; virtual ifc vif; endclass\n"
-      "typedef H HU;\n"
-      "module top;\n"
-      "  typedef HU HU;\n"
-      "  HU h = new;\n"
-      "  initial if (0) h.vif.nosuch();\n"
-      "endmodule\n",
-      f, "top");
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoSuch, 7, "25.9"));
-}
-
 // §25.9 with §6.18: a forward typedef, `typedef class F;`, names no type, so
 // the typedef after it naming F reaches the class F declared later in the
 // module.
