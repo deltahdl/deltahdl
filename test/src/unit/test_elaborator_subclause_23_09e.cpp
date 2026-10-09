@@ -103,4 +103,32 @@ TEST(AssertionReads, NamesTheScopesDeclareAreAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §10.9.2: an assignment pattern's member keys name members of its type, not
+// objects of the scope, so a pattern passed as an actual reads none of them,
+// whether written first or after a comma, while the names it reads as
+// values, a ternary's and a concatenation's among them, still resolve
+// (#5762).
+TEST(AssertionReads, APatternsMemberKeysAreNoReads) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  logic clk; bit x, y, z;\n"
+      "  typedef struct packed { logic a, b, c; } trio_t;\n"
+      "  property p(trio_t s); @(posedge clk) s.a; endproperty\n"
+      "  assert property (p('{a: x, b: y ? z : x, c: {y}}));\n"
+      "  assert property (@(posedge clk) {x, y} == 2'b01);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(AssertionReads, AnUndeclaredValueInAPatternIsReported) {
+  ExpectReportedIn(
+      "  typedef struct packed { logic a, b; } pair_t;\n"
+      "  property p(pair_t s); @(posedge clk) s.a; endproperty\n"
+      "  assert property (p('{a: undeclared, default: 1'b0}));\n",
+      "assert property");
+}
+
 }  // namespace

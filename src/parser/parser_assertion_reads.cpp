@@ -24,9 +24,10 @@ struct OpenInstance {
 };
 
 // The token-level state of the scan: the tokens before the current one, the
-// parenthesis depth, the instances whose argument lists are open, and the
-// depth of the cycle delay or repetition bracket the scan stands in, zero
-// where it stands in none.
+// parenthesis depth, the instances whose argument lists are open, the depth
+// of the cycle delay or repetition bracket the scan stands in, zero where it
+// stands in none, and how many braces are open, with the depth at which each
+// open assignment pattern (§10.9) opened.
 struct AssertionTextScan {
   ModuleItem* item = nullptr;
   Token prev;
@@ -35,6 +36,8 @@ struct AssertionTextScan {
   int brackets = 0;
   int const_bracket = 0;
   std::vector<OpenInstance> open;
+  int braces = 0;
+  std::vector<int> patterns;
 
   void CountArgToken(const Token& t) {
     if (open.empty() || parens < open.back().depth) return;
@@ -60,8 +63,30 @@ struct AssertionTextScan {
            next.Is(TokenKind::kPlus);
   }
 
+  // §10.9.2: a member key of an assignment pattern, written first or after a
+  // comma and followed by its colon, names a member of the pattern's type,
+  // no object of the scope.
+  bool IsPatternKey(const Token& next) const {
+    return !patterns.empty() && next.Is(TokenKind::kColon) &&
+           (prev.Is(TokenKind::kApostropheLBrace) ||
+            prev.Is(TokenKind::kComma));
+  }
+
+  void Brace(const Token& t) {
+    if (t.Is(TokenKind::kRBrace)) {
+      if (!patterns.empty() && patterns.back() == braces) patterns.pop_back();
+      --braces;
+      return;
+    }
+    ++braces;
+    if (t.Is(TokenKind::kApostropheLBrace)) patterns.push_back(braces);
+  }
+
   void Identifier(const Token& t, const Token& next) {
-    if (prev.Is(TokenKind::kDot) || prev.Is(TokenKind::kColonColon)) return;
+    if (prev.Is(TokenKind::kDot) || prev.Is(TokenKind::kColonColon) ||
+        IsPatternKey(next)) {
+      return;
+    }
     // The count of a cycle delay, `x ##delay1 y`, is read whatever follows.
     if (prev.Is(TokenKind::kHashHash)) {
       item->assertion_const_names.push_back(t.text);
@@ -123,6 +148,9 @@ struct AssertionTextScan {
       --brackets;
     } else if (t.Is(TokenKind::kIdentifier)) {
       Identifier(t, next);
+    } else if (t.Is(TokenKind::kApostropheLBrace) || t.Is(TokenKind::kLBrace) ||
+               t.Is(TokenKind::kRBrace)) {
+      Brace(t);
     }
   }
 
