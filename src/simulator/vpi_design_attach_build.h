@@ -24,6 +24,7 @@ struct EventExpr;
 enum class DataTypeKind : uint8_t;
 struct Expr;
 struct ModuleItem;
+struct PackageDecl;
 struct PropertyExprNode;
 struct SeqLinearBody;
 struct RtlirAssertion;
@@ -83,6 +84,16 @@ void RecordNetObjectKinds(const RtlirDesign* design,
 // end of its chain; a logic var for a name nothing resolves.
 int VpiNamedTypeVariableKind(const RtlirDesign& design, const RtlirModule& mod,
                              std::string_view name);
+
+// §6.18 with §8.3 and §26.3: the same for a variable the package `package`
+// declares, or the compilation unit where `package` is null: a class var for a
+// class the package or the compilation unit declares, a built-in class or a
+// typedef whose chain of names ends in a class, and for any other typedef the
+// kind of the type at the end of its chain, a package's typedef found under
+// its qualified name `p::t`; a logic var for a name nothing resolves.
+int VpiPackageNamedTypeVariableKind(const RtlirDesign& design,
+                                    const PackageDecl* package,
+                                    std::string_view name);
 
 // The packed dimensions of a value, outermost first, each a declared range.
 using PackedDims = std::vector<PackedRange>;

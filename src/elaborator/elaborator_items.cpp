@@ -27,6 +27,7 @@
 #include "elaborator/procedural_concurrent_assertion.h"
 #include "elaborator/property_instance.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_checker_site.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_class.h"

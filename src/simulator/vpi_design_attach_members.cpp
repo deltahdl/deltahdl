@@ -7,6 +7,7 @@
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_class.h"
+#include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -64,11 +65,11 @@ int VpiDataTypeVariableKind(DataTypeKind kind) {
 
 namespace {
 
-// §8.3, §9.7, §15.3 and §15.4: whether `name` names a class an instance of
-// `mod` sees: one the module or the compilation unit declares, or one of the
-// built-in classes.
-bool NamesClass(const RtlirDesign& design, const RtlirModule& mod,
-                std::string_view name) {
+// §8.3, §9.7, §15.3 and §15.4: whether `name` names a class a scope sees:
+// one of `classes`, those the scope declares, one the compilation unit
+// declares, or one of the built-in classes.
+bool NamesClass(const RtlirDesign& design,
+                const std::vector<ClassDecl*>& classes, std::string_view name) {
   static constexpr std::string_view kBuiltIn[] = {"process", "semaphore",
                                                   "mailbox"};
   const auto kIsNamed = [name](std::string_view cls) { return cls == name; };
@@ -77,20 +78,42 @@ bool NamesClass(const RtlirDesign& design, const RtlirModule& mod,
       return decl != nullptr && kIsNamed(decl->name);
     });
   };
-  return kDeclares(mod.class_decls) || kDeclares(design.cu_class_decls) ||
+  return kDeclares(classes) || kDeclares(design.cu_class_decls) ||
          std::ranges::any_of(kBuiltIn, kIsNamed);
+}
+
+// §6.18 with §8.3: the object kind of a variable of a type that is a class
+// where `names_class`, and otherwise the one the typedef the design records
+// under `key` stands for, a class where its chain of names ends in one.
+int NamedTypeKind(const RtlirDesign& design, bool names_class,
+                  std::string_view key) {
+  if (names_class || design.type_targets.contains(key)) return vpiClassVar;
+  const auto kFound = design.type_kinds.find(key);
+  if (kFound == design.type_kinds.end()) return kVpiReg;
+  return VpiDataTypeVariableKind(kFound->second);
 }
 
 }  // namespace
 
 int VpiNamedTypeVariableKind(const RtlirDesign& design, const RtlirModule& mod,
                              std::string_view name) {
-  if (design.type_targets.contains(name) || NamesClass(design, mod, name)) {
-    return vpiClassVar;
+  return NamedTypeKind(design, NamesClass(design, mod.class_decls, name), name);
+}
+
+int VpiPackageNamedTypeVariableKind(const RtlirDesign& design,
+                                    const PackageDecl* package,
+                                    std::string_view name) {
+  if (package == nullptr) {
+    return NamedTypeKind(design, NamesClass(design, {}, name), name);
   }
-  const auto kFound = design.type_kinds.find(name);
-  if (kFound == design.type_kinds.end()) return kVpiReg;
-  return VpiDataTypeVariableKind(kFound->second);
+  std::vector<ClassDecl*> classes;
+  for (const ModuleItem* item : package->items) {
+    if (item->kind == ModuleItemKind::kClassDecl) {
+      classes.push_back(item->class_decl);
+    }
+  }
+  return NamedTypeKind(design, NamesClass(design, classes, name),
+                       std::string(package->name) + "::" + std::string(name));
 }
 
 namespace {

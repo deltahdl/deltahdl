@@ -29,14 +29,16 @@ namespace {
 // flat name the made objects are keyed under; whether the scope's default
 // lifetime is automatic (§13.3.1, §13.4.2); the module of an instance, among
 // whose declarations a named type resolves, null for a package or the
-// compilation unit; and the instance prefix a declared width's parameters are
-// read under.
+// compilation unit; the instance prefix a declared width's parameters are
+// read under; and the package, among whose declarations a named type
+// resolves, null for an instance or the compilation unit.
 struct SubroutineScope {
   VpiObject* scope;
   std::string key;
   bool automatic;
   const RtlirModule* mod = nullptr;
   std::string params;
+  const PackageDecl* package = nullptr;
 };
 
 // What every task and function is made with: the design, the run a declared
@@ -75,15 +77,25 @@ bool DeclaredInGenerateBlock(const RtlirModule& mod, const ModuleItem* item) {
       [item](const RtlirGenBlockSubroutine& sub) { return sub.decl == item; });
 }
 
+// §37.17 with §6.18: the object kind of a variable `where` declares with a
+// type standing for `name`, resolved among the declarations of the instance's
+// module, or of the package or the compilation unit (§26.3).
+int NamedVariableKind(std::string_view name, const SubroutineScope& where,
+                      const RtlirDesign& design) {
+  if (where.mod != nullptr) {
+    return VpiNamedTypeVariableKind(design, *where.mod, name);
+  }
+  return VpiPackageNamedTypeVariableKind(design, where.package, name);
+}
+
 // §37.17 with §37.27: the object kind of a variable `where` declares with
 // `type`, an array var or a named event array where `unpacked`.
 int DeclaredVariableKind(const DataType& type, bool unpacked,
                          const SubroutineScope& where,
                          const RtlirDesign& design) {
-  const int kKind =
-      type.kind == DataTypeKind::kNamed && where.mod != nullptr
-          ? VpiNamedTypeVariableKind(design, *where.mod, type.type_name)
-          : VpiDataTypeVariableKind(type.kind);
+  const int kKind = type.kind == DataTypeKind::kNamed
+                        ? NamedVariableKind(type.type_name, where, design)
+                        : VpiDataTypeVariableKind(type.kind);
   if (!unpacked) return kKind;
   return kKind == vpiNamedEvent ? vpiNamedEventArray : vpiArrayVar;
 }
@@ -290,7 +302,11 @@ void MakePackageSubroutines(const SubroutineBuild& sb,
   for (const PackageDecl* pkg : sb.design.packages) {
     const std::string kPackage(pkg->name);
     const SubroutineScope kWhere{FindObjectForFlatName(objects, kPackage),
-                                 kPackage, pkg->is_automatic, nullptr, ""};
+                                 kPackage,
+                                 pkg->is_automatic,
+                                 nullptr,
+                                 "",
+                                 pkg};
     for (const ModuleItem* item : pkg->items) {
       if (IsSubroutine(item)) MakeSubroutine(kWhere, item, sb);
     }

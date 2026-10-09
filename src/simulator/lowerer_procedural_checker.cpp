@@ -5,6 +5,7 @@
 
 #include "common/arena.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_checker_site.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 #include "parser/expr_substitute.h"

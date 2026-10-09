@@ -2,7 +2,6 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
-#include <unordered_set>
 #include <vector>
 
 #include "elaborator/rtlir.h"
@@ -51,11 +50,23 @@ void MakeArrayElement(VpiObject* block, VpiObject* array, int64_t index,
   array->children.push_back(block);
 }
 
+// §37.85: the block instance `scope` holds under `name`, made where the run
+// keyed nothing the block declares, whatever it declares.
+VpiObject* BlockNamed(VpiObject* scope, const std::string& name,
+                      const VpiAttachBuild& build) {
+  if (VpiObject* block = ChildNamed(scope, name)) return block;
+  VpiObject* block = build.alloc();
+  block->name = build.keep(name);
+  block->full_name = scope->full_name + "." + name;
+  block->parent = scope;
+  scope->children.push_back(block);
+  return block;
+}
+
 // §37.85: the generate block instances the path `path` names below
 // `instance`, outermost first, each made the gen scope it is, and each
-// iteration of a loop generate an element of its gen scope array. A step
-// with no object - an unnamed block, or one declaring nothing the run keys -
-// ends the walk.
+// iteration of a loop generate an element of its gen scope array. A step of
+// an unnamed block ends the walk (#5737).
 void MakeGenScopes(VpiObject* instance, const HierPath& path,
                    const VpiAttachBuild& build) {
   VpiObject* scope = instance;
@@ -63,8 +74,7 @@ void MakeGenScopes(VpiObject* instance, const HierPath& path,
     if (step.name.empty()) return;
     std::string name(step.name);
     if (step.has_index) name += "[" + std::to_string(step.index) + "]";
-    VpiObject* block = ChildNamed(scope, name);
-    if (block == nullptr) return;
+    VpiObject* block = BlockNamed(scope, name, build);
     block->type = vpiGenScope;
     if (step.has_index) {
       MakeArrayElement(block, GenScopeArrayOf(scope, step.name, build),
@@ -72,17 +82,6 @@ void MakeGenScopes(VpiObject* instance, const HierPath& path,
     }
     scope = block;
   }
-}
-
-// A key telling `path` from every other path, which a block holding several
-// members is walked once by.
-std::string PathKey(const HierPath& path) {
-  std::string key;
-  for (const HierStep& step : path) {
-    key += std::string(step.name) + "[" +
-           (step.has_index ? std::to_string(step.index) : "") + "].";
-  }
-  return key;
 }
 
 // §27.4 with §37.17: `flat`, the object of a declaration of a generate block
@@ -128,16 +127,13 @@ void AttachGenScopes(const RtlirDesign* design, const VpiObjectMap& objects,
                      const VpiAttachBuild& build) {
   // §37.85: a generate block instance is a gen scope, and the instances of a
   // loop generate's block are the elements of a gen scope array. The scopes
-  // the run's keys made for them were all modules, and no array was made.
+  // the run's keys made for them were all modules, no array was made, and a
+  // block declaring nothing the run keys had no object at all.
   WalkInstanceObjects(
       design, objects,
       [&](const RtlirModule* mod, const std::string&, VpiObject* instance) {
-        std::unordered_set<std::string> walked;
-        for (const RtlirGenBlockMember& member : mod->gen_block_members) {
-          if (!walked.insert(PathKey(member.gen_block_path)).second) {
-            continue;
-          }
-          MakeGenScopes(instance, member.gen_block_path, build);
+        for (const HierPath& path : mod->gen_block_instances) {
+          MakeGenScopes(instance, path, build);
         }
       });
 }

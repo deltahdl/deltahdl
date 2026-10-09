@@ -571,11 +571,41 @@ TEST_F(TaskFuncsOfARun, ABodysEventArrayIsANamedEventArray) {
   EXPECT_EQ(VariableKindOf(t, "P"), 0);
 }
 
+// §37.17 with §26.3: a package's function reaches variables of the kind a type
+// the package names has: its own typedef, which the design records under the
+// package's qualified name, and a class it declares (#5736)...
+TEST_F(TaskFuncsOfARun, APackageFunctionsNamedTypesHaveTheirKinds) {
+  Run("package p; typedef int t; class C; endclass\n"
+      "  function t f(t a); C h; return a; endfunction endpackage\n"
+      "module top; endmodule\n");
+  vpiHandle f = Named(vpiTaskFunc, By("p"), "f");
+  ASSERT_NE(f, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiReturn, f)), vpiIntVar);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiExpr, Named(vpiIODecl, f, "a"))),
+            vpiIntVar);
+  EXPECT_EQ(VariableKindOf(f, "h"), vpiClassVar);
+}
+
+// ...and a compilation unit's function those of the unit's typedefs and
+// classes.
+TEST_F(TaskFuncsOfARun, AUnitFunctionsNamedTypesHaveTheirKinds) {
+  Run("int n = 0; typedef enum {A, B} e_t; class K; endclass\n"
+      "function e_t g(e_t x); K k; return x; endfunction\n"
+      "module top; endmodule\n");
+  vpiHandle it = vpi_iterate(vpiPackage, nullptr);
+  ASSERT_NE(it, nullptr);
+  vpiHandle g = Named(vpiTaskFunc, vpi_scan(it), "g");
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiReturn, g)), vpiEnumVar);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiExpr, Named(vpiIODecl, g, "x"))),
+            vpiEnumVar);
+  EXPECT_EQ(VariableKindOf(g, "k"), vpiClassVar);
+}
+
 // Detail 11 with §13.3.1: a task a generate block of an automatic module
 // declares without a lifetime is automatic, and one declared static is not.
-// The block holds a variable, which is what gives it its object (#5738).
 TEST_F(TaskFuncsOfARun, AGenerateBlockTaskTakesItsModulesLifetime) {
-  Run("module automatic top; if (1) begin : g int v; task t(); endtask\n"
+  Run("module automatic top; if (1) begin : g task t(); endtask\n"
       "  task static s(); endtask end endmodule\n");
   vpiHandle t = Named(vpiTaskFunc, By("top.g"), "t");
   vpiHandle s = Named(vpiTaskFunc, By("top.g"), "s");

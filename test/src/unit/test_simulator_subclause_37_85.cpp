@@ -284,6 +284,24 @@ TEST_F(GeneratesOfARun, AConditionalBlockInstanceIsAGenScope) {
   EXPECT_EQ(vpi_handle(vpiIndex, block), nullptr);
 }
 
+// A named block instance is a gen scope whatever it declares: one declaring
+// only a task, one declaring nothing, and one holding only another block, a
+// gen scope full-named under it (#5738).
+TEST_F(GeneratesOfARun, ABlockDeclaringNoDataIsAGenScope) {
+  Run("module top;\n"
+      "  if (1) begin : t task run(); endtask end\n"
+      "  if (1) begin : e end\n"
+      "  if (1) begin : o if (1) begin : i end end\n"
+      "endmodule\n");
+  for (const char* name : {"top.t", "top.e", "top.o", "top.o.i"}) {
+    vpiHandle block = By(name);
+    ASSERT_NE(block, nullptr) << name;
+    EXPECT_EQ(vpi_get(vpiType, block), vpiGenScope) << name;
+    EXPECT_STREQ(vpi_get_str(vpiFullName, block), name);
+  }
+  EXPECT_NE(Named(vpiTaskFunc, By("top.t"), "run"), nullptr);
+}
+
 // §37.85 detail 5: vpiTypedef reaches the typespecs of a scope's typedefs; a
 // type parameter is a typespec but no typedef, and is passed over.
 TEST_F(Generates, TheTypedefIterationPassesOverATypeParameter) {

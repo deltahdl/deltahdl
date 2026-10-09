@@ -11,6 +11,7 @@
 #include "common/source_loc.h"
 #include "common/types.h"
 #include "elaborator/rtlir_attribute.h"
+#include "elaborator/rtlir_checker_site.h"
 #include "elaborator/rtlir_element_shape.h"
 #include "elaborator/rtlir_primitives.h"
 #include "elaborator/rtlir_scopes.h"
@@ -405,15 +406,6 @@ struct RtlirAlias {
   std::vector<Expr*> nets;
 };
 
-// §17.3: a checker instantiated in procedural code, a procedural checker
-// instance: the statement that instantiates it and the name its instance
-// carries in the module, the generate prefix included, as
-// RtlirModuleInst::inst_name has it.
-struct ProceduralCheckerSite {
-  const Stmt* stmt = nullptr;
-  std::string_view inst_name;
-};
-
 struct RtlirProcess {
   RtlirProcessKind kind = RtlirProcessKind::kInitial;
   // §16.4.3 and §16.14.5: true where this process carries a static assertion,
@@ -762,6 +754,10 @@ struct RtlirModule {
   // generate block instances, each with the path that names its instance;
   // see RtlirGenBlockMember.
   std::vector<RtlirGenBlockMember> gen_block_members;
+  // §27.4 and §37.85: the path of every generate block instance the module
+  // holds, outermost step first, whatever the block declares; a step of an
+  // unnamed block is empty as in every HierPath.
+  std::vector<HierPath> gen_block_instances;
   // §14.3 with §27.4: those of clocking_blocks declared in generate blocks;
   // see RtlirGenBlockClocking.
   std::vector<RtlirGenBlockClocking> gen_block_clocking;
