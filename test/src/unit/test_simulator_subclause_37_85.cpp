@@ -339,5 +339,26 @@ TEST_F(Generates, TheTypedefIterationPassesOverATypeParameter) {
   EXPECT_EQ(vpi_scan(it), nullptr);
 }
 
+// Detail 5: a gen scope's vpiTypedef iteration returns the typespecs of the
+// typedefs its generate block declares, and a property formal of one written
+// in the block reaches it (#5759).
+TEST_F(GeneratesOfARun, AGenScopeReachesTheTypedefsItsBlockDeclares) {
+  Run("module top; logic clk;\n"
+      "  if (1) begin : g\n"
+      "    typedef logic [3:0] nib_t;\n"
+      "    property p(nib_t v); @(posedge clk) v[0]; endproperty\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle g = By("top.g");
+  ASSERT_NE(g, nullptr);
+  vpiHandle nib = Named(vpiTypedef, g, "nib_t");
+  ASSERT_NE(nib, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, nib), vpiLogicTypespec);
+  vpiHandle decl = Named(vpiPropertyDecl, g, "p");
+  ASSERT_NE(decl, nullptr);
+  EXPECT_TRUE(vpi_compare_objects(
+      vpi_handle(vpiTypespec, Named(vpiPropFormalDecl, decl, "v")), nib));
+}
+
 }  // namespace
 }  // namespace delta

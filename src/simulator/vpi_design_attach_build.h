@@ -319,6 +319,13 @@ VpiObject* VpiCallSiteExpression(const Expr* expr, const VpiObjectMap& objects,
                                  const VpiCallSite& site, SimContext& ctx,
                                  const VpiAttachBuild& build);
 
+// §37.64 with §37.59 detail 6: VpiCallSiteExpression's object for `expr`
+// assigned to `target`, a keyed assignment pattern ordered by the members or
+// elements of `target`.
+VpiObject* VpiCallSiteAssignedExpression(
+    const Expr* expr, const VpiObject* target, const VpiObjectMap& objects,
+    const VpiCallSite& site, SimContext& ctx, const VpiAttachBuild& build);
+
 // §9.7, §15.3 and §15.4: the kind of tf call a call of the method `method` of
 // the built-in class `cls` is, vpiMethodTaskCall or vpiMethodFuncCall, zero
 // for none.
@@ -351,13 +358,16 @@ bool VpiIsBuiltInSystemFunction(std::string_view name);
 // expression object an expression the statement writes stands as, null for
 // one not modelled; and the object a statement it holds stands as, hung from
 // the object given and walked for the objects it holds in turn, null for one
-// the run builds no object for; and the kind of the first index variable of a
-// foreach loop over the array an expression names (§12.7.3).
+// the run builds no object for; the kind of the first index variable of a
+// foreach loop over the array an expression names (§12.7.3); and the
+// expression object of an expression assigned to the object given, whose
+// members or elements order a keyed pattern (§37.59 detail 6).
 struct VpiStmtBuild {
   const VpiAttachBuild& build;
   std::function<VpiObject*(const Expr*)> expression;
   std::function<VpiObject*(const Stmt*, VpiObject*)> statement;
   std::function<int(const Expr*)> index_kind;
+  std::function<VpiObject*(const Expr*, const VpiObject*)> assigned;
 };
 
 // §37.64 to §37.68, §37.70 to §37.72 and §37.74 to §37.79: the kind of object

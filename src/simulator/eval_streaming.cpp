@@ -644,7 +644,7 @@ static void PlaceDefaultValue(Logic4Vec& result, const StructFieldInfo& f,
   PlaceKeyValue(result, f, val, arena, base);
 }
 
-static DataTypeKind TypeKeyToKind(std::string_view key) {
+DataTypeKind PatternTypeKeyKind(std::string_view key) {
   if (key == "int") return DataTypeKind::kInt;
   if (key == "integer") return DataTypeKind::kInteger;
   if (key == "logic") return DataTypeKind::kLogic;
@@ -779,7 +779,7 @@ static void ApplyTypeKeys(const Expr* expr, const StructTypeInfo* info,
   bool seen[256] = {};
   for (size_t ri = n; ri > 0; --ri) {
     size_t i = ri - 1;
-    auto kind = TypeKeyToKind(expr->pattern_keys[i]->text);
+    auto kind = PatternTypeKeyKind(expr->pattern_keys[i]->text);
     if (kind == DataTypeKind::kImplicit) continue;
     auto u = static_cast<uint8_t>(kind);
     if (seen[u]) continue;

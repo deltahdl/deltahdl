@@ -347,5 +347,26 @@ TEST(BitSelectConstantSelect, ReadOffTheSelectAndItsParent) {
   EXPECT_EQ(VpiBitSelectConstantSelectOf(&of_var_select),
             VpiVarSelectConstantSelectOf(&var_select));
 }
+// A design run with a PLI application registered, its VPI model read back
+// once the run is over.
+class ConstantsOfARun : public VpiDesignRun {};
+
+// §37.58 with §5.8: a time literal is a constant of type vpiTimeConst holding
+// its value in the module's time unit (#5758).
+TEST_F(ConstantsOfARun, ATimeLiteralIsATimeConstant) {
+  Run("module top; timeunit 1ns; timeprecision 1ps;\n"
+      "  realtime r; assign r = 2.5ns; endmodule\n");
+  vpiHandle it = vpi_iterate(vpiContAssign, By("top"));
+  ASSERT_NE(it, nullptr);
+  vpiHandle literal = vpi_handle(vpiRhs, vpi_scan(it));
+  ASSERT_NE(literal, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, literal), vpiConstant);
+  EXPECT_EQ(vpi_get(vpiConstType, literal), vpiTimeConst);
+  s_vpi_value value = {};
+  value.format = vpiRealVal;
+  vpi_get_value(literal, &value);
+  EXPECT_DOUBLE_EQ(value.value.real, 2.5);
+}
+
 }  // namespace
 }  // namespace delta

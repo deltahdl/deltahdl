@@ -149,6 +149,15 @@ struct RtlirGenBlockMember {
   HierPath gen_block_path;
 };
 
+// §27.4 with §37.85 detail 5: a typedef declared in a generate block
+// instance, with the path that names the instance, whose gen scope the
+// typedef's typespec belongs to. The instances of a loop generate block share
+// one body, so the item alone says not which instance declared the entry.
+struct RtlirGenBlockTypedef {
+  ModuleItem* item = nullptr;
+  HierPath gen_block_path;
+};
+
 // §14.3 with §27.4: a clocking block declared in a generate block instance.
 // The run registers the block, so what is kept is what the registration needs
 // beyond the item: the prefixes a bare name written in the block resolves

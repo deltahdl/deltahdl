@@ -131,7 +131,8 @@ void FillAssignment(VpiObject* obj, const Stmt& stmt,
                     const VpiStmtBuild& with) {
   const bool kOperator = IsOperatorAssignment(stmt);
   obj->lhs = with.expression(stmt.lhs);
-  obj->rhs = with.expression(kOperator ? stmt.rhs->rhs : stmt.rhs);
+  obj->rhs = kOperator ? with.expression(stmt.rhs->rhs)
+                       : with.assigned(stmt.rhs, obj->lhs);
   obj->op_type = kOperator ? VpiAssignmentOpType(OperatorSpelling(stmt.rhs->op))
                            : vpiAssignmentOp;
   obj->blocking = stmt.kind == StmtKind::kBlockingAssign;

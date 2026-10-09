@@ -7,6 +7,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
@@ -205,6 +206,13 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
     if (decl == nullptr) return;
     const TypespecsByName kLocal = MakeTypespecs(
         decl->items, {scope, &mod->enum_types, build, answered, mod->imports});
+    // §37.85 detail 5: a generate block instance's typedefs are typespecs of
+    // its gen scope, which AttachGenScopes made.
+    for (const RtlirGenBlockTypedef& declared : mod->gen_block_typedefs) {
+      MakeTypespecs({declared.item},
+                    {VpiGenScopeOf(scope, declared.gen_block_path),
+                     &mod->enum_types, build, answered, mod->imports});
+    }
     for (const RtlirVariable& var : mod->variables) {
       VpiObject* typespec = DeclaredTypespec(var, kLocal, kUnit);
       VpiObject* obj =

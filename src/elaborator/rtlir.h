@@ -761,6 +761,8 @@ struct RtlirModule {
   // §14.3 with §27.4: those of clocking_blocks declared in generate blocks;
   // see RtlirGenBlockClocking.
   std::vector<RtlirGenBlockClocking> gen_block_clocking;
+  // §37.85 detail 5: the typedefs declared in generate blocks.
+  std::vector<RtlirGenBlockTypedef> gen_block_typedefs;
   std::vector<ModuleItem*> let_decls;
   // §35.5.4's imported subroutines, declared in this module. They are held
   // apart from let_decls because §11.12's let is a substitution of the

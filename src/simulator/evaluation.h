@@ -377,6 +377,9 @@ std::optional<Logic4Vec> EvalPackedArrayPattern(const Expr* pattern,
 
 Logic4Vec EvalStructPattern(const Expr* expr, const StructTypeInfo* info,
                             SimContext& ctx, Arena& arena);
+// §10.9.2: the built-in type a structure pattern's type key `key` names;
+// kImplicit for a key that names none of them.
+DataTypeKind PatternTypeKeyKind(std::string_view key);
 // §10.9.2: evaluate a structure assignment pattern (keyed or positional)
 // against a known struct layout, coercing each member expression to the
 // corresponding member's type/width. Falls back to width-summing concatenation

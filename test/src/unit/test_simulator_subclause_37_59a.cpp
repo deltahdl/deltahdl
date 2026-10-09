@@ -802,6 +802,58 @@ TEST_F(ExpressionsOfARun, AKeyedPatternNamingEveryMemberTakesTheirOrder) {
   ExpectPatternOverXThenY(Rhs());
 }
 
+// The integer values of the operands of the pattern `pattern`, in order.
+std::vector<int> OperandValues(vpiHandle pattern) {
+  std::vector<int> values;
+  vpiHandle it =
+      pattern == nullptr ? nullptr : vpi_iterate(vpiOperand, pattern);
+  if (it == nullptr) return values;
+  while (vpiHandle operand = vpi_scan(it)) {
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(operand, &value);
+    values.push_back(value.value.integer);
+  }
+  return values;
+}
+
+// Detail 6 with §10.9.2: a type key's expression stands in the place of every
+// member of that type no member key names, and the default's in the others
+// (#5755).
+TEST_F(ExpressionsOfARun, AKeyedPatternsTypeKeyFillsItsTypesMembers) {
+  Run("module top;\n"
+      "  typedef struct packed { int a; logic [3:0] b; int c; } mix_t;\n"
+      "  mix_t w; assign w = '{c: 9, int: 7, default: 4'b0}; endmodule\n");
+  EXPECT_EQ(OperandValues(Rhs()), (std::vector<int>{7, 0, 9}));
+}
+
+// Detail 6 with §10.9.1: a keyed pattern assigned to an unpacked array is an
+// assignment pattern operation over its elements, left first, an index key's
+// expression in its element's place and the default's in the others (#5756).
+TEST_F(ExpressionsOfARun, AKeyedPatternsIndexKeyFillsItsElement) {
+  Run("module top; logic [2:0] varr [0:3];\n"
+      "  assign varr = '{3: 3'b1, default: 3'b0}; endmodule\n");
+  EXPECT_EQ(OperandValues(Rhs()), (std::vector<int>{0, 0, 0, 1}));
+}
+
+// Detail 6 with §37.64: a keyed pattern a procedural assignment assigns is
+// ordered by its left side's members as a continuous assignment's is (#5757).
+TEST_F(ExpressionsOfARun, AProceduralKeyedPatternTakesItsMembersOrder) {
+  Run(std::string(kPairPrefix) +
+      "  initial w = '{b: x, default: 1'b0}; endmodule\n");
+  vpiHandle procs = vpi_iterate(vpiProcess, By("top"));
+  ASSERT_NE(procs, nullptr);
+  vpiHandle assignment = vpi_handle(vpiStmt, vpi_scan(procs));
+  ASSERT_NE(assignment, nullptr);
+  vpiHandle pattern = vpi_handle(vpiRhs, assignment);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(vpi_get(vpiOpType, pattern), vpiAssignmentPatternOp);
+  const std::vector<vpiHandle> kOperands = OperandsOf(pattern);
+  ASSERT_EQ(kOperands.size(), 2U);
+  EXPECT_EQ(vpi_get(vpiType, kOperands[0]), vpiConstant);
+  EXPECT_STREQ(vpi_get_str(vpiName, kOperands[1]), "x");
+}
+
 // A replication written as a pattern's one expression, on the pattern's line
 // or on the next, is that expression, a multi concat, and the pattern an
 // assignment pattern operation over it (#5752).

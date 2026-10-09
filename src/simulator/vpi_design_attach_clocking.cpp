@@ -173,7 +173,7 @@ void MakeClockingBlock(const ModuleItem& item, const ClockingBuild& with) {
   holder->children.push_back(block);
   const VpiStmtBuild kWith{
       with.build, [&](const Expr* expr) { return with.Expression(expr); },
-      nullptr, nullptr};
+      nullptr, nullptr, nullptr};
   VpiObject* event = with.build.alloc();
   event->type = vpiEventControl;
   event->parent = block;

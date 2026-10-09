@@ -19,6 +19,7 @@
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/stmt_exec_internal.h"
@@ -234,12 +235,14 @@ VpiObject* OperationObject(int op_type,
   return op;
 }
 
-// §37.58: a literal as a constant carrying the value it evaluates to.
+// §37.58: a literal as a constant carrying the value it evaluates to, a time
+// literal (§5.8) one of type vpiTimeConst.
 VpiObject* ConstantObject(const Expr* expr, const AssignBuild& build) {
   if (build.sim == nullptr) return nullptr;
   VpiObject* constant = build.alloc();
   constant->type = vpiConstant;
-  constant->const_type = expr->kind == ExprKind::kRealLiteral ? vpiRealConst
+  constant->const_type = expr->kind == ExprKind::kRealLiteral   ? vpiRealConst
+                         : expr->kind == ExprKind::kTimeLiteral ? vpiTimeConst
                          : expr->kind == ExprKind::kStringLiteral
                              ? vpiStringConst
                              : vpiIntConst;
@@ -506,38 +509,62 @@ VpiObject* PatternObject(const Expr* expr, const AssignBuild& build) {
       build);
 }
 
-// §37.59 detail 6 with §10.9.2: the keyed assignment pattern `pattern`
-// assigned to `target` as an assignment pattern operation over its
-// expressions in the order of `target`'s members (§37.17 detail 3), a member
-// key's expression in its member's place and the default's in every place no
-// key names. Null where `target` has no members or a key names none of them,
-// a type key (#5755) or a target of another kind (#5756) among them.
-VpiObject* KeyedPatternObject(const Expr* pattern, const VpiObject* target,
-                              const AssignBuild& build) {
-  std::vector<const VpiObject*> members;
-  for (const VpiObject* child : target->children) {
-    if (child->member_of == target) members.push_back(child);
-  }
-  if (members.empty()) return nullptr;
-  std::vector<const Expr*> placed(members.size(), nullptr);
+// §10.9.1 and §10.9.2: whether the key `key` of a pattern names the position
+// `slot` takes: a structure member by its name, an array element by the
+// index the key evaluates to.
+bool KeyNames(Expr* key, const VpiObject* slot, const AssignBuild& build) {
+  if (!slot->array_member) return key->text == slot->name;
+  return VpiEvaluatedRange(key, key, *build.sim).left == slot->index;
+}
+
+// §10.9.2: the expression the keys of `pattern` put in the place of `slot`:
+// the one its own key names, else the last a type key naming its type gives,
+// else the default's; null where none does.
+const Expr* KeyedValue(const Expr* pattern, const VpiObject* slot,
+                       const AssignBuild& build) {
+  const Expr* typed = nullptr;
   const Expr* fallback = nullptr;
   for (std::size_t i = 0; i < pattern->pattern_keys.size(); ++i) {
-    const std::string_view kKey = pattern->pattern_keys[i]->text;
-    if (kKey == "default") {
-      fallback = pattern->elements[i];
-      continue;
+    Expr* key = pattern->pattern_keys[i];
+    const Expr* value = pattern->elements[i];
+    const DataTypeKind kType = PatternTypeKeyKind(key->text);
+    if (key->text == "default") {
+      fallback = value;
+    } else if (kType != DataTypeKind::kImplicit) {
+      if (VpiDataTypeVariableKind(kType) == slot->type) typed = value;
+    } else if (KeyNames(key, slot, build)) {
+      return value;
     }
-    const auto kAt = std::ranges::find_if(
-        members,
-        [kKey](const VpiObject* member) { return member->name == kKey; });
-    if (kAt == members.end()) return nullptr;
-    placed[static_cast<std::size_t>(kAt - members.begin())] =
-        pattern->elements[i];
   }
-  for (const Expr*& expr : placed) {
-    if (expr == nullptr) expr = fallback;
+  return typed != nullptr ? typed : fallback;
+}
+
+// §37.59 detail 6: the keyed assignment pattern `pattern` assigned to
+// `target` as an assignment pattern operation over its expressions in the
+// positional order of `target`'s members or elements, left first (§37.17
+// details 3 and 18), each in the place its keys give it. Null where `target`
+// has neither.
+VpiObject* KeyedPatternObject(const Expr* pattern, const VpiObject* target,
+                              const AssignBuild& build) {
+  std::vector<const Expr*> placed;
+  for (const VpiObject* child : target->children) {
+    if (child->member_of == target || child->array_member) {
+      placed.push_back(KeyedValue(pattern, child, build));
+    }
   }
+  if (placed.empty()) return nullptr;
   return OperationObject(vpiAssignmentPatternOp, placed, build);
+}
+
+// The expression object `expr` stands for, assigned to `target`, whose
+// members or elements order a keyed pattern's expressions (§37.59 detail 6).
+VpiObject* AssignedExpressionObject(const Expr* expr, const VpiObject* target,
+                                    const AssignBuild& build) {
+  VpiObject* made = ExpressionObject(expr, build);
+  if (made != nullptr || expr->kind != ExprKind::kAssignmentPattern) {
+    return made;
+  }
+  return KeyedPatternObject(expr, target, build);
 }
 
 // §23.6: `expr` as the dotted name it writes, `u1.clk`, onto `out`; false
@@ -591,6 +618,7 @@ VpiObject* ModelledExpression(const Expr* expr, const AssignBuild& build) {
     case ExprKind::kIntegerLiteral:
     case ExprKind::kUnbasedUnsizedLiteral:
     case ExprKind::kRealLiteral:
+    case ExprKind::kTimeLiteral:
     case ExprKind::kStringLiteral:
       return ConstantObject(expr, build);
     case ExprKind::kUnary:
@@ -744,11 +772,7 @@ void MakeContinuousAssignment(const RtlirContAssign& ca, VpiObject* scope,
   obj->parent = scope;
   scope->children.push_back(obj);
   obj->lhs = ExpressionObject(lhs, build);
-  obj->rhs = ExpressionObject(rhs, build);
-  // §37.59 detail 6: a keyed pattern is ordered by its target, here at hand.
-  if (obj->rhs == nullptr && rhs->kind == ExprKind::kAssignmentPattern) {
-    obj->rhs = KeyedPatternObject(rhs, obj->lhs, build);
-  }
+  obj->rhs = AssignedExpressionObject(rhs, obj->lhs, build);
 
   if (ca.delay != nullptr && build.sim != nullptr) {
     FillContAssignDelays(obj, ca, *build.sim);
@@ -824,19 +848,34 @@ VpiObject* VpiGenBlockExpression(const Expr* expr, const VpiExprNames& names,
                   build.keep});
 }
 
-VpiObject* VpiCallSiteExpression(const Expr* expr, const VpiObjectMap& objects,
-                                 const VpiCallSite& site, SimContext& ctx,
-                                 const VpiAttachBuild& build) {
-  // Its names resolve in the blocks around the site, then in the generate
-  // blocks it stands in and in the instance, as VpiInstanceExpression's do;
-  // its callees resolve at the site.
+namespace {
+
+// What building an expression written at `site` needs: its names resolve in
+// the blocks around the site, then in the generate blocks it stands in and in
+// the instance, as VpiInstanceExpression's do, and its callees at the site.
+AssignBuild CallSiteBuild(const VpiObjectMap& objects, const VpiCallSite& site,
+                          SimContext& ctx, const VpiAttachBuild& build) {
   static const GenBlockPrefixes kNoGenBlocks;
   const GenBlockPrefixes& gen =
       site.gen_prefixes != nullptr ? *site.gen_prefixes : kNoGenBlocks;
-  return ExpressionObject(
-      expr, AssignBuild{build.alloc, &ctx,
-                        AssignNames{objects, site.prefix, gen, site.scope},
-                        VpiCalleesAt(site), build.keep});
+  return AssignBuild{build.alloc, &ctx,
+                     AssignNames{objects, site.prefix, gen, site.scope},
+                     VpiCalleesAt(site), build.keep};
+}
+
+}  // namespace
+
+VpiObject* VpiCallSiteExpression(const Expr* expr, const VpiObjectMap& objects,
+                                 const VpiCallSite& site, SimContext& ctx,
+                                 const VpiAttachBuild& build) {
+  return ExpressionObject(expr, CallSiteBuild(objects, site, ctx, build));
+}
+
+VpiObject* VpiCallSiteAssignedExpression(
+    const Expr* expr, const VpiObject* target, const VpiObjectMap& objects,
+    const VpiCallSite& site, SimContext& ctx, const VpiAttachBuild& build) {
+  return AssignedExpressionObject(expr, target,
+                                  CallSiteBuild(objects, site, ctx, build));
 }
 
 void VpiContext::AttachContinuousAssignments(

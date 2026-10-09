@@ -280,8 +280,8 @@ TEST_F(AtomicStatementsOfARun, ABreakAndAContinueAreObjectsOfTheRun) {
 // -----------------------------------------------------------------------------
 
 // Builds each object in `made_`. An identifier stands as an object of its
-// name, any other expression as none, as one the model leaves out would, and
-// a statement the filled one holds as none.
+// name, any other expression as none, as one the model leaves out would,
+// whatever it is assigned to, and a statement the filled one holds as none.
 class StatementFill : public ::testing::Test {
  protected:
   // `expr` made an identifier written `text`.
@@ -311,7 +311,10 @@ class StatementFill : public ::testing::Test {
         return made;
       },
       [](const Stmt*, VpiObject*) -> VpiObject* { return nullptr; },
-      [](const Expr*) { return vpiIntVar; }};
+      [](const Expr*) { return vpiIntVar; },
+      [this](const Expr* expr, const VpiObject*) {
+        return with_.expression(expr);
+      }};
 };
 
 // §37.64 detail 1: only an assignment whose right side is an operation over

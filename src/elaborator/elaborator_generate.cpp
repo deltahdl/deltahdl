@@ -242,6 +242,10 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
     mod->gen_block_subroutines.push_back(
         {item, gen_block_path_, gen_loop_consts_, gen_prefix_scopes_});
   }
+  // §37.85 detail 5: a typedef is a typespec of this instance's gen scope.
+  if (item->kind == ModuleItemKind::kTypedef) {
+    mod->gen_block_typedefs.push_back({item, gen_block_path_});
+  }
   StampGenBlockInstance(mod->processes, first_proc, gen_loop_consts_,
                         gen_prefix_scopes_);
   // §21.2.1.5: the block instances are levels of the name a process

@@ -718,6 +718,11 @@ VpiStmtBuild StmtBuildAt(const BlockParent& parent, const BodyWalk& walk) {
           },
           [&parent, &walk](const Expr* array) {
             return ForeachIndexKind(array, parent, walk);
+          },
+          [site = CallSiteOf(parent, walk), &walk](const Expr* expr,
+                                                   const VpiObject* target) {
+            return VpiCallSiteAssignedExpression(
+                expr, target, walk.objects, site, walk.calls.ctx, walk.build);
           }};
 }
 
