@@ -209,7 +209,7 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
       run_objects_.try_emplace(key.first, defn);
     }
     subroutines = AttachSubroutines(*design, object_map_, *sim_ctx_, kBuild);
-    AttachVariableRanges(design, object_map_, *sim_ctx_, kBuild);
+    AttachVariableRanges(*design, object_map_, *sim_ctx_, kBuild);
     AttachModports(design, object_map_, *sim_ctx_, kBuild);
     // §37.42: a system call finds the registration its name resolves to, and
     // with it the systf object that registration returned.

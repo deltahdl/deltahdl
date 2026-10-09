@@ -262,7 +262,7 @@ VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
 
 // §37.17 details 4 and 6, §37.22: give each variable of the design its range
 // objects and its leftmost bounds.
-void AttachVariableRanges(const RtlirDesign* design,
+void AttachVariableRanges(const RtlirDesign& design,
                           const VpiObjectMap& objects, SimContext& ctx,
                           const VpiAttachBuild& build);
 

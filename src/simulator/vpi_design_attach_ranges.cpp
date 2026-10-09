@@ -32,9 +32,6 @@ std::vector<DimBounds> UnpackedDims(const RtlirVariable& var) {
     dims.emplace_back(PackedRange{dim.left, dim.right});
   }
   while (dims.size() < var.num_unpacked_dims) dims.emplace_back();
-  if (var.num_unpacked_dims > 0 && dims.size() > var.num_unpacked_dims) {
-    dims.resize(var.num_unpacked_dims);
-  }
   return dims;
 }
 
@@ -101,16 +98,13 @@ void AttachDeclaredRanges(VpiObject* obj, const DataType& type,
   AttachRanges(obj, dims, build);
 }
 
-void AttachVariableRanges(const RtlirDesign* design,
+void AttachVariableRanges(const RtlirDesign& design,
                           const VpiObjectMap& objects, SimContext& ctx,
                           const VpiAttachBuild& build) {
   // §37.17 details 4 and 6: a variable's dimensions are reached as range
   // objects and its leftmost bounds through vpiLeftRange and vpiRightRange.
-  // No range object was made, so the iteration found none and both relations
-  // were null for every variable.
-  if (design == nullptr) return;
   WalkInstancePaths(
-      design, [&](const RtlirModule* mod, const std::string& prefix) {
+      &design, [&](const RtlirModule* mod, const std::string& prefix) {
         InstancePrefixOverride scope(ctx.InstancePrefixOverride(),
                                      prefix.empty() ? "" : prefix + ".");
         for (const RtlirVariable& var : mod->variables) {
