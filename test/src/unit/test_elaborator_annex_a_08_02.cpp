@@ -4,6 +4,8 @@
 #include <string>
 #include <utility>
 
+#include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -476,6 +478,48 @@ TEST(SubroutineCallElaborationSyntax,
   }
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), std::string("'l") + kMessage,
                              16, "A.6.9"));
+}
+
+// A.6.9: a call statement calls a task or a function, so one naming a
+// parameter, bare or with an argument list, is reported, and one naming
+// nothing the scope sees, with an argument list, is an undeclared identifier
+// (§23.9); a call of a task or a function the compilation unit declares, one
+// imported from a package by name or with a wildcard, a DPI import, a task of
+// the module and a scope randomize call are not reported (#5801).
+TEST(SubroutineCallElaborationSyntax, ACallStatementNamesASubroutine) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package q; int qv; task qt; endtask endpackage\n"
+      "package p; function void pf(); endfunction task pt; endtask\n"
+      "endpackage\n"
+      "import q::*;\n"
+      "function void uf(); endfunction\n"
+      "module m;\n"
+      "  import p::pf;\n"
+      "  parameter int P = 1;\n"
+      "  import \"DPI-C\" function void cf();\n"
+      "  task t; endtask\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    P;\n"
+      "    P();\n"
+      "    nosuch();\n"
+      "    if (0) begin uf(); pf(); qt; t; cf(); randomize(x); end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const char* const kMessage =
+      "' names no task or function, and a call statement calls one";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), std::string("'P") + kMessage,
+                            13, "A.6.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), std::string("'P") + kMessage,
+                            14, "A.6.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "undeclared identifier 'nosuch'", 15, "23.9"));
+  for (const Diagnostic& diag : f.diag.Diagnostics()) {
+    if (diag.severity != DiagSeverity::kError) continue;
+    EXPECT_NE(diag.loc.line, 16u) << diag.message;
+  }
 }
 
 }  // namespace
