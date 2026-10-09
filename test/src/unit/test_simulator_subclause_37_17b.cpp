@@ -288,6 +288,60 @@ TEST_F(VariablesOfARun, AStructTypedefVariablesSizeIsItsFieldCount) {
   EXPECT_EQ(vpi_get(vpiSize, Var("top.s")), 2);
 }
 
+constexpr const char* kDeclaredBases =
+    "module top;\n"
+    "  byte b;\n"
+    "  enum logic {L0, L1} el;\n"
+    "  enum logic [1:0] {V0, V1} ev;\n"
+    "  enum int {I0, I1} ei;\n"
+    "  int fixed_of_dynamic [2][];\n"
+    "  struct {int a;} structs [3];\n"
+    "endmodule\n";
+
+// §37.17 detail 20: a byte is one of the integer types, so a vector...
+TEST_F(VariablesOfARun, AByteIsAVector) {
+  Run(kDeclaredBases);
+  EXPECT_EQ(vpi_get(vpiVector, Var("top.b")), 1);
+}
+
+// ...and an enum var defers to the base type its declaration names: a logic
+// with no packed dimension is a scalar...
+TEST_F(VariablesOfARun, AnEnumOfAScalarLogicBaseIsAScalar) {
+  Run(kDeclaredBases);
+  EXPECT_EQ(vpi_get(vpiScalar, Var("top.el")), 1);
+  EXPECT_EQ(vpi_get(vpiVector, Var("top.el")), 0);
+}
+
+// ...a packed logic a vector...
+TEST_F(VariablesOfARun, AnEnumOfAPackedLogicBaseIsAVector) {
+  Run(kDeclaredBases);
+  EXPECT_EQ(vpi_get(vpiVector, Var("top.ev")), 1);
+  EXPECT_EQ(vpi_get(vpiScalar, Var("top.ev")), 0);
+}
+
+// ...and an int a vector.
+TEST_F(VariablesOfARun, AnEnumOfAnIntBaseIsAVector) {
+  Run(kDeclaredBases);
+  EXPECT_EQ(vpi_get(vpiVector, Var("top.ei")), 1);
+  EXPECT_EQ(vpi_get(vpiScalar, Var("top.ei")), 0);
+}
+
+// Detail 9: a fixed array's size is the number of variables along its
+// leftmost dimension, also where a later dimension is a dynamic one...
+TEST_F(VariablesOfARun, AFixedArrayOfDynamicArraysCountsItsLeftDimension) {
+  Run(kDeclaredBases);
+  EXPECT_EQ(vpi_get(vpiArrayType, Var("top.fixed_of_dynamic")), vpiStaticArray);
+  EXPECT_EQ(vpi_get(vpiSize, Var("top.fixed_of_dynamic")), 2);
+}
+
+// ...and an array of structs is an array var counting its structs, not a
+// struct var counting fields.
+TEST_F(VariablesOfARun, AnArrayOfStructsCountsItsElements) {
+  Run(kDeclaredBases);
+  EXPECT_EQ(vpi_get(vpiType, Var("top.structs")), vpiRegArray);
+  EXPECT_EQ(vpi_get(vpiSize, Var("top.structs")), 3);
+}
+
 constexpr const char* kPackedAggregates =
     "module top;\n"
     "  logic [1:0][3:0] m = 8'b0000_0100;\n"

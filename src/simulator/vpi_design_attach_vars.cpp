@@ -53,9 +53,8 @@ VpiScalarVectorQuery ScalarVectorQueryOf(int type, const RtlirVariable& var) {
       IsBitOrLogicKind(declared->enum_base_kind);
   query.base_is_scalar = kBaseIsBitOrLogic && !query.has_packed_dimension;
   query.base_is_vector = !query.base_is_scalar;
-  query.element_is_vector = query.has_packed_dimension ||
-                            IsIntegerKind(var.decl_kind) ||
-                            IsIntegerKind(var.elem_type_kind);
+  query.element_is_vector =
+      query.has_packed_dimension || IsIntegerKind(var.decl_kind);
   query.element_is_scalar =
       !query.element_is_vector && IsBitOrLogicKind(var.decl_kind);
   return query;
@@ -83,26 +82,24 @@ void RecordArrayFacts(VpiObject* obj, const RtlirVariable& var,
 // §37.17 and §37.26: a variable whose type is a struct or union named through
 // a typedef reports kNamed and was stamped a reg; the run's layout of it says
 // which of the two it is, and an unpacked one's size is its number of fields
-// (detail 9).
-void RecordAggregateFacts(VpiObject* obj, const RtlirVariable& var,
-                          const std::string& key, SimContext& ctx) {
+// (detail 9). Every struct or union var has that layout: the elaborator gives
+// an aggregate declaration its type and Lowerer::LowerVar registers the
+// layout under the variable's name (RegisterAggregateLayout).
+void RecordAggregateFacts(VpiObject* obj, const std::string& key,
+                          SimContext& ctx) {
   const StructTypeInfo* info = ctx.GetVariableStructType(key);
-  if (info != nullptr && obj->type == kVpiReg) {
+  if (info == nullptr) return;
+  if (obj->type == kVpiReg) {
     obj->type = info->is_union ? vpiUnionVar : vpiStructVar;
   }
   if (obj->type != vpiStructVar && obj->type != vpiUnionVar) return;
-  if (info != nullptr) {
-    if (!info->is_packed) obj->size = static_cast<int>(info->fields.size());
-  } else if (var.dtype != nullptr && !var.dtype->is_packed) {
-    // A struct the run kept no layout of is sized from its declaration.
-    obj->size = static_cast<int>(var.dtype->struct_members.size());
-  }
+  if (!info->is_packed) obj->size = static_cast<int>(info->fields.size());
 }
 
 // §37.17: the facts a variable's object answers from its declaration.
 void RecordVariableFacts(VpiObject* obj, const RtlirVariable& var,
                          const std::string& key, SimContext& ctx) {
-  RecordAggregateFacts(obj, var, key, ctx);
+  RecordAggregateFacts(obj, key, ctx);
   obj->decl_signed = var.is_signed;
   const VpiScalarVectorQuery kQuery = ScalarVectorQueryOf(obj->type, var);
   obj->decl_scalar = VpiVariableScalar(kQuery);
@@ -115,8 +112,9 @@ void RecordVariableFacts(VpiObject* obj, const RtlirVariable& var,
 void VpiContext::AttachVariableFacts(const RtlirDesign* design) {
   // §37.17: vpiSigned, vpiScalar, vpiVector, vpiArrayType and vpiSize are what
   // a variable's declaration makes of it. The object a run built carried none
-  // of them: each answered FALSE, 0 or the bit width of the storage.
-  if (design == nullptr || sim_ctx_ == nullptr) return;
+  // of them: each answered FALSE, 0 or the bit width of the storage. The pass
+  // runs from VpiContext::Attach, which has set the run it reads by then.
+  if (design == nullptr) return;
   SimContext& ctx = *sim_ctx_;
   WalkInstancePaths(
       design, [&](const RtlirModule* mod, const std::string& prefix) {
