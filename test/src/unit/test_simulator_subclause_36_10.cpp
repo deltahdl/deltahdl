@@ -1,11 +1,19 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <vector>
 
+#include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "fixture_simulator.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -152,6 +160,53 @@ TEST_F(InstantiatedDesignAccess, TheClausesOwnExampleObjectIsAWire) {
 
   EXPECT_TRUE(g_wire_found);
   EXPECT_EQ(g_wire_type, vpiNet);
+}
+
+// §36.10 with §27.4: a generate block path names a block instance below the
+// instance only while each step finds one; past a step that finds none it
+// names nothing.
+TEST(DesignWalk, AGenerateBlockPathStopsAtAStepThatFindsNothing) {
+  VpiObject instance;
+  instance.type = vpiModule;
+  const HierPath kPath = {HierStep{"g"}, HierStep{"h"}};
+  EXPECT_EQ(VpiGenScopeOf(&instance, kPath), nullptr);
+}
+
+// §36.10: a flat name with no component names no object.
+TEST(DesignWalk, AnEmptyFlatNameNamesNoObject) {
+  const std::unordered_map<std::string_view, VpiObject*> kObjects;
+  EXPECT_EQ(FindObjectForFlatName(kObjects, ""), nullptr);
+}
+
+// §36.10: the walk over a design's instances passes over a top that stands for
+// no module, visits nothing for a design with no top or a null first one, and
+// passes over an instance the run built no object for.
+TEST(DesignWalk, TopsAndInstancesWithNothingToVisitArePassedOver) {
+  RtlirModule real;
+  real.name = "real";
+  RtlirDesign with_null_top;
+  with_null_top.top_modules = {nullptr, &real};
+  std::vector<std::string> prefixes;
+  WalkInstancePaths(&with_null_top,
+                    [&](const RtlirModule*, const std::string& prefix) {
+                      prefixes.push_back(prefix);
+                    });
+  EXPECT_EQ(prefixes, std::vector<std::string>{"real"});
+
+  const std::unordered_map<std::string_view, VpiObject*> kNoObjects;
+  int visits = 0;
+  auto count = [&](const RtlirModule*, const std::string&, VpiObject*) {
+    ++visits;
+  };
+  RtlirDesign empty;
+  WalkInstanceObjects(&empty, kNoObjects, count);
+  RtlirDesign null_first;
+  null_first.top_modules = {nullptr};
+  WalkInstanceObjects(&null_first, kNoObjects, count);
+  RtlirDesign unbuilt;
+  unbuilt.top_modules = {&real};
+  WalkInstanceObjects(&unbuilt, kNoObjects, count);
+  EXPECT_EQ(visits, 0);
 }
 
 }  // namespace
