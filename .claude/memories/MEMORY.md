@@ -65,7 +65,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [No empty test files](no-empty-test-files.md) — a file with no `TEST` fails a job; a new lettered file lands with its first test.
 - [Sweeping a citation change](sweeping-a-citation-change.md) — grep the message the diagnostic prints, across the whole tree; the files named after the old subclause are not the set.
 - [A braced case's closing brace is a line](braced-case-closing-brace-is-a-line.md) — `case X: { …; break; }` leaves a `}` llvm-cov counts and nothing runs; move the work into a helper.
-- [Header templates are covered through the library](header-templates-are-covered-through-the-library.md) — a test instantiating a `src/` header template with its own lambda earns no coverage; drive the library function that instantiates it.
+- [Header templates are covered through the library](header-templates-are-covered-through-the-library.md) — a test instantiating a `src/` header template with its own lambda earns no coverage, and the summary credits only the best single instantiation; drive one library caller through every branch.
 
 ## Verification
 
