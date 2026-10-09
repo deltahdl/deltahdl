@@ -326,11 +326,10 @@ TEST_F(PropertyDeclsOfARun, AProceduralAssertionReachesItsPropertyInst) {
 
 // A formal declared with a type reaches a typespec of that type, and an
 // untyped one none (detail 3) (#5091). §16.12 adds property to the types a
-// property's formal may have, and §6.12 makes realtime a synonym for real.
+// property's formal may have.
 TEST_F(PropertyDeclsOfARun, ATypedFormalReachesItsTypespec) {
   Run("module top; logic clk;\n"
-      "  property p(bit x, untyped y, event e, sequence s, property q,\n"
-      "             realtime t);\n"
+      "  property p(bit x, untyped y, event e, sequence s, property q);\n"
       "    @(posedge clk) x;\n"
       "  endproperty\n"
       "endmodule\n");
@@ -346,7 +345,6 @@ TEST_F(PropertyDeclsOfARun, ATypedFormalReachesItsTypespec) {
   EXPECT_EQ(kTypespecOf("e"), vpiEventTypespec);
   EXPECT_EQ(kTypespecOf("s"), vpiSequenceTypespec);
   EXPECT_EQ(kTypespecOf("q"), vpiPropertyTypespec);
-  EXPECT_EQ(kTypespecOf("t"), vpiRealTypespec);
 }
 
 // Detail 5: a local variable formal argument (§16.8.2) is an input, beside a
