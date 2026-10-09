@@ -407,4 +407,30 @@ TEST(SubroutineCallElaborationSyntax, ACallOfATaskOrFunctionIsNotReported) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// A.8.2 with §23.9: a call naming a variable a block or a fork declares is
+// reported inside it, though the variable shadows a function of the module,
+// and a call of that function outside the block is not (#5799).
+TEST(SubroutineCallElaborationSyntax, ACallNamingABlocksVariableIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function int g(); return 1; endfunction\n"
+      "  int y;\n"
+      "  initial begin\n"
+      "    begin int g; g; end\n"
+      "    fork int z; z(); join\n"
+      "    y = g();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const char* const kMessage =
+      "' names a variable or a net, and a call names a task or a function";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), std::string("'g") + kMessage,
+                            5, "A.8.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), std::string("'z") + kMessage,
+                            6, "A.8.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), std::string("'g") + kMessage,
+                             7, "A.8.2"));
+}
+
 }  // namespace
