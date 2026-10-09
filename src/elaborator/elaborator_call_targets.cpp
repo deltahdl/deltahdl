@@ -23,10 +23,12 @@ namespace {
 using NamedCalls = std::vector<std::pair<std::string_view, SourceLoc>>;
 
 // Each call by a plain name `expr` holds, itself included, appended to `calls`.
+// A constructor call is no call by a name: its `lhs` is the object a shallow
+// copy copies, `new src` (§8.12).
 void CollectNamedCalls(const Expr* expr, NamedCalls& calls) {
   if (expr == nullptr) return;
   if (expr->kind == ExprKind::kCall && expr->lhs != nullptr &&
-      expr->lhs->kind == ExprKind::kIdentifier) {
+      expr->text != "new" && expr->lhs->kind == ExprKind::kIdentifier) {
     calls.emplace_back(expr->lhs->text, expr->range.start);
   }
   for (const Expr* sub :

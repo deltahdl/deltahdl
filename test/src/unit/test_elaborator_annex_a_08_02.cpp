@@ -384,7 +384,8 @@ TEST(SubroutineCallElaborationSyntax, ACallNamingAVariableOrANetIsReported) {
 }
 
 // A.8.2: a call of a task or a function the module declares, a call through a
-// class handle and a constructor call name no variable, so none is reported.
+// class handle, a constructor call and a shallow copy of a handle (§8.12) name
+// no variable as a call, so none is reported.
 TEST(SubroutineCallElaborationSyntax, ACallOfATaskOrFunctionIsNotReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -392,11 +393,12 @@ TEST(SubroutineCallElaborationSyntax, ACallOfATaskOrFunctionIsNotReported) {
       "module m;\n"
       "  task t; endtask\n"
       "  function int fn(); return 1; endfunction\n"
-      "  C c;\n"
+      "  C c, d;\n"
       "  int y;\n"
       "  initial begin\n"
       "    if (y == 0) t; else t();\n"
       "    c = new;\n"
+      "    d = new c;\n"
       "    c.g();\n"
       "    y = fn();\n"
       "  end\n"
