@@ -2,6 +2,7 @@
 
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
@@ -239,6 +240,86 @@ TEST(TaskFuncCallModel, ABlocksFunctionCalledOutsideItsBlockHasNoObject) {
       VpiNamedSubroutine({design, mod, kPrefix, nullptr, kMade}, "f");
   EXPECT_EQ(kCalled.decl, &function);
   EXPECT_EQ(kCalled.object, nullptr);
+}
+
+// The method func calls a scope's statements make, each as its method's name
+// and the name of the variable it is applied to, in the order written.
+class MethodCallStatementsOfARun : public VpiDesignRun {
+ protected:
+  static std::vector<std::pair<std::string, std::string>> MethodCallsOf(
+      vpiHandle scope) {
+    std::vector<std::pair<std::string, std::string>> calls;
+    vpiHandle it = vpi_iterate(vpiStmt, scope);
+    if (it == nullptr) return calls;
+    while (vpiHandle stmt = vpi_scan(it)) {
+      if (vpi_get(vpiType, stmt) != vpiMethodFuncCall) continue;
+      calls.emplace_back(vpi_get_str(vpiName, stmt),
+                         vpi_get_str(vpiName, vpi_handle(vpiPrefix, stmt)));
+    }
+    return calls;
+  }
+};
+
+// A block's queue (§7.10.2), its associative arrays indexed by a keyword, a
+// typedef name and a class (§7.8), its fixed-size array sized by a parameter
+// (§7.12.2), its string (§6.16) and its enum (§6.19.5) each take the built-in
+// methods of their kind, so a call of one as a statement is a method func call
+// applied to the block's variable. The kind each variable is read as decides
+// whether the method is one of its own: an associative array has no sort and a
+// fixed-size array no delete.
+TEST_F(MethodCallStatementsOfARun, ABlocksBuiltInValuesTakeTheirKindsMethods) {
+  Run("module top; typedef enum {A, B} e_t; class C; endclass\n"
+      "  localparam int N = 2;\n"
+      "  initial begin : b\n"
+      "    int q[$]; int s[string]; int t[e_t]; int c[C]; int p[N];\n"
+      "    string str; e_t e;\n"
+      "    q.push_back(1); s.delete(); t.delete(); c.delete(); p.sort();\n"
+      "    str.putc(0, \"c\"); e.next();\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(
+      MethodCallsOf(By("top.b")),
+      (std::vector<std::pair<std::string, std::string>>{{"push_back", "q"},
+                                                        {"delete", "s"},
+                                                        {"delete", "t"},
+                                                        {"delete", "c"},
+                                                        {"sort", "p"},
+                                                        {"putc", "str"},
+                                                        {"next", "e"}}));
+}
+
+// A module's dynamic array (§7.5), its fixed-size array (§7.12.2) and its enum
+// declared without a typedef (§6.19) take the built-in methods of their kind
+// as a block's do.
+TEST_F(MethodCallStatementsOfARun,
+       AModulesArraysAndAnonymousEnumTakeTheirMethods) {
+  Run("module top; int d[]; int f[2]; enum {X, Y} e;\n"
+      "  initial begin : b d.delete(); f.sort(); e.next(); end\n"
+      "endmodule\n");
+  EXPECT_EQ(MethodCallsOf(By("top.b")),
+            (std::vector<std::pair<std::string, std::string>>{
+                {"delete", "d"}, {"sort", "f"}, {"next", "e"}}));
+}
+
+// §8.4 with §37.42 detail 2: a call through a member chain, h.b.run(), finds
+// the chain's member among the class's members wherever the class declares
+// it, past a method and another property declared ahead of it, and is a
+// method task call of the class the member holds a handle of.
+TEST_F(MethodCallStatementsOfARun, AChainsMemberIsFoundPastTheMembersBeforeIt) {
+  Run("module top;\n"
+      "  class B; task run(); endtask endclass\n"
+      "  class H; function void f(); endfunction int n; B b = new; endclass\n"
+      "  H h = new;\n"
+      "  initial h.b.run();\n"
+      "endmodule\n");
+  vpiHandle procs = vpi_iterate(vpiProcess, By("top"));
+  ASSERT_NE(procs, nullptr);
+  vpiHandle call = vpi_handle(vpiStmt, vpi_scan(procs));
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, call), vpiMethodTaskCall);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, call)),
+            VpiObjectOf(
+                Named(vpiMethods, Named(vpiClassDefn, By("top"), "B"), "run")));
 }
 
 }  // namespace

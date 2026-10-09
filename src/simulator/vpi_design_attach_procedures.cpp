@@ -78,7 +78,8 @@ struct BodyWalk {
   const VpiAttachBuild& build;
   VpiObject* process = nullptr;
   // §27.4: the prefixes of the generate block instances the procedure stands
-  // in, innermost last, null for one of the instance itself.
+  // in, innermost last, empty for one of the instance itself; each walk of an
+  // item sets it before any statement is walked.
   const GenBlockPrefixes* gen_prefixes = nullptr;
 };
 
@@ -87,7 +88,7 @@ struct BodyWalk {
 // no declaration this walk can resolve against the design.
 std::string_view EventTriggerTargetName(const Stmt& stmt) {
   const Expr* target = stmt.expr;
-  if (target == nullptr || target->kind != ExprKind::kIdentifier) return {};
+  if (target->kind != ExprKind::kIdentifier) return {};
   return target->text;
 }
 
@@ -144,11 +145,10 @@ struct CallShape {
   VpiObject* called = nullptr;
 };
 
-// §13.3 and §13.4: the kind of tf call a call of `decl` is, `task` for a task
-// and `function` for a function, zero for an item that is neither.
+// §13.3 and §13.4: the kind of tf call a call of the subroutine `decl` is,
+// `task` for a task and `function` for a function.
 int CallKindOf(const ModuleItem& decl, int task, int function) {
-  if (decl.kind == ModuleItemKind::kTaskDecl) return task;
-  return decl.kind == ModuleItemKind::kFunctionDecl ? function : 0;
+  return decl.kind == ModuleItemKind::kTaskDecl ? task : function;
 }
 
 // §37.42: a task or function call named `name` of the subroutine `sub`
@@ -176,7 +176,7 @@ VpiCallSite CallSiteOf(const BlockParent& parent, const BodyWalk& walk) {
 const ClassDecl* ClassNamed(const std::vector<ClassDecl*>& decls,
                             std::string_view name) {
   for (const ClassDecl* decl : decls) {
-    if (decl != nullptr && decl->name == name) return decl;
+    if (decl->name == name) return decl;
   }
   return nullptr;
 }
@@ -223,10 +223,8 @@ std::string BlockVariableRunKey(std::string_view name, const Stmt& stmt,
     }
   }
   if (scopes.empty()) return {};
-  const bool kInGenBlock =
-      walk.gen_prefixes != nullptr && !walk.gen_prefixes->empty();
   const std::string kGen =
-      kInGenBlock ? std::string(walk.gen_prefixes->back()) : "";
+      walk.gen_prefixes->empty() ? "" : std::string(walk.gen_prefixes->back());
   return VpiFlatName(walk.prefix, kGen + scopes + std::string(name));
 }
 
@@ -237,10 +235,7 @@ void MakeBlockVariables(VpiObject* block, const Stmt& stmt,
                         const std::string& path, const BlockParent& parent,
                         const BodyWalk& walk) {
   for (const Stmt* item : BlockItems(stmt)) {
-    if (item == nullptr || item->kind != StmtKind::kVarDecl ||
-        item->var_is_param) {
-      continue;
-    }
+    if (item->kind != StmtKind::kVarDecl || item->var_is_param) continue;
     VpiObject* var = walk.build.alloc();
     var->type = BlockVariableKind(*item, walk);
     var->parent = block;
@@ -254,8 +249,8 @@ void MakeBlockVariables(VpiObject* block, const Stmt& stmt,
 // §8.3: the method `cls` declares under `name`, null for none.
 const ModuleItem* MethodNamed(const ClassDecl& cls, std::string_view name) {
   for (const ClassMember* member : cls.members) {
-    if (member != nullptr && member->kind == ClassMemberKind::kMethod &&
-        member->method != nullptr && member->method->name == name) {
+    if (member->kind == ClassMemberKind::kMethod &&
+        member->method->name == name) {
       return member->method;
     }
   }
@@ -273,12 +268,10 @@ struct MethodCall {
 
 // The method `method` of the class `cls`, found in the class or, by §8.13, in
 // the classes it extends. A class the design declares answers ahead of a
-// built-in one of its name, which §15.2 lets user code redefine. The bound
-// stops a chain of extensions that loops.
+// built-in one of its name, which §15.2 lets user code redefine.
 MethodCall ClassMethodCall(const BodyWalk& walk, std::string_view cls,
                            std::string_view method) {
-  constexpr int kMaxDepth = 64;
-  for (int depth = 0; depth < kMaxDepth && !cls.empty(); ++depth) {
+  while (!cls.empty()) {
     const ClassDecl* decl = FindClassDecl(walk, cls);
     if (decl == nullptr) return {VpiBuiltInClassCallKind(cls, method), false};
     const ModuleItem* found = MethodNamed(*decl, method);
@@ -368,8 +361,7 @@ const Stmt* BlockVarDecl(const BlockParent& parent, std::string_view name,
   for (const BlockParent* at = &parent; at != nullptr; at = at->outer) {
     if (at->block == nullptr) continue;
     for (const Stmt* item : BlockItems(*at->block)) {
-      if (item != nullptr && item->kind == StmtKind::kVarDecl &&
-          item->var_name == name) {
+      if (item->kind == StmtKind::kVarDecl && item->var_name == name) {
         where = at;
         return item;
       }
@@ -444,9 +436,7 @@ int ModuleIndexKind(std::string_view name, const BodyWalk& walk) {
 // statement declares is found first (§23.9).
 int ForeachIndexKind(const Expr* array, const BlockParent& parent,
                      const BodyWalk& walk) {
-  if (array == nullptr || array->kind != ExprKind::kIdentifier) {
-    return vpiIntVar;
-  }
+  if (array->kind != ExprKind::kIdentifier) return vpiIntVar;
   const BlockParent* where = nullptr;
   if (const Stmt* item = BlockVarDecl(parent, array->text, where)) {
     const Expr* dim = item->var_unpacked_dims.empty()
@@ -459,21 +449,21 @@ int ForeachIndexKind(const Expr* array, const BlockParent& parent,
 }
 
 // §37.42 with §37.31: the task or function the class defn made for `owner`
-// holds under `name`, the defn of the instance walked or else of the
-// compilation unit; null where none was made.
+// holds under `name`; null for no owner. FindClassDecl finds `owner` among
+// the classes of the instance walked or of the compilation unit, and a defn
+// is made for each of those under the instance's prefix or "$unit", holding a
+// method for each method the class declares.
 VpiObject* MethodObject(const BodyWalk& walk, const ClassDecl* owner,
                         std::string_view name) {
   if (owner == nullptr) return nullptr;
-  for (const std::string& scope : {walk.prefix, std::string("$unit")}) {
-    auto found = walk.calls.classes.find({owner, scope});
-    if (found == walk.calls.classes.end()) continue;
-    for (VpiObject* child : found->second->children) {
-      if (VpiIsClassMethodType(child->type) && child->name == name) {
-        return child;
-      }
-    }
+  auto found = walk.calls.classes.find({owner, walk.prefix});
+  if (found == walk.calls.classes.end()) {
+    found = walk.calls.classes.find({owner, std::string("$unit")});
   }
-  return nullptr;
+  return *std::ranges::find_if(
+      found->second->children, [name](const VpiObject* child) {
+        return VpiIsClassMethodType(child->type) && child->name == name;
+      });
 }
 
 // §37.42: a call of the method `name` that `call` resolves it to, applied to
@@ -508,16 +498,14 @@ CallShape MethodCallShape(const Expr& access, const BlockParent& parent,
 
 // §8.4 with §8.13: the class the property `name` of the class `cls`, or of a
 // class it extends, holds a handle of; empty where neither declares it with a
-// named type. The bound stops a chain of extensions that loops.
+// named type.
 std::string_view PropertyClass(const BodyWalk& walk, std::string_view cls,
                                std::string_view name) {
-  constexpr int kMaxDepth = 64;
-  for (int depth = 0; depth < kMaxDepth && !cls.empty(); ++depth) {
+  while (!cls.empty()) {
     const ClassDecl* decl = FindClassDecl(walk, cls);
     if (decl == nullptr) return {};
     for (const ClassMember* member : decl->members) {
-      if (member == nullptr || member->kind != ClassMemberKind::kProperty ||
-          member->name != name) {
+      if (member->kind != ClassMemberKind::kProperty || member->name != name) {
         continue;
       }
       const DataType& type = member->data_type;
@@ -536,8 +524,7 @@ bool ChainNames(const Expr& expr, std::vector<std::string_view>& names) {
     names.push_back(expr.text);
     return true;
   }
-  if (expr.kind != ExprKind::kMemberAccess || expr.is_scope_resolution ||
-      expr.lhs == nullptr || expr.rhs == nullptr) {
+  if (expr.kind != ExprKind::kMemberAccess || expr.is_scope_resolution) {
     return false;
   }
   return ChainNames(*expr.lhs, names) && ChainNames(*expr.rhs, names);
@@ -550,10 +537,7 @@ bool ChainNames(const Expr& expr, std::vector<std::string_view>& names) {
 CallShape MemberChainCallShape(const Expr& access, const BlockParent& parent,
                                const BodyWalk& walk) {
   std::vector<std::string_view> names;
-  if (access.rhs->kind != ExprKind::kIdentifier ||
-      !ChainNames(*access.lhs, names) || names.size() < 2) {
-    return {};
-  }
+  if (!ChainNames(*access.lhs, names)) return {};
   const PrefixVar kVar = FindPrefixVar(parent, names.front(), walk);
   if (kVar.holder != VpiBuiltInHolder::kNone) return {};
   std::string_view cls = kVar.cls;
@@ -566,14 +550,6 @@ CallShape MemberChainCallShape(const Expr& access, const BlockParent& parent,
     shape.prefix_members.assign(names.begin() + 1, names.end());
   }
   return shape;
-}
-
-// Whether the member access or scope resolution `access` joins two plain
-// names, `obj.run` or `p::t`, the one form of either this walk resolves.
-bool JoinsTwoNames(const Expr& access) {
-  return access.lhs != nullptr && access.rhs != nullptr &&
-         access.lhs->kind == ExprKind::kIdentifier &&
-         access.rhs->kind == ExprKind::kIdentifier;
 }
 
 // §37.42 with §37.60: what the expression statement `expr`, standing in the
@@ -591,11 +567,11 @@ CallShape CallShapeOf(const Expr& expr, const BlockParent& parent,
     return SubroutineCallShape(
         VpiCalleeSubroutine(CallSiteOf(parent, walk), *callee), callee->text);
   }
-  if (callee->kind != ExprKind::kMemberAccess || callee->lhs == nullptr ||
-      callee->rhs == nullptr) {
-    return {};
-  }
-  if (!JoinsTwoNames(*callee)) {
+  if (callee->kind != ExprKind::kMemberAccess) return {};
+  // The right-hand side is always the name called. A left-hand side other than
+  // a plain name is a chain of members, a.b.run(), resolved as one; a scope
+  // resolution behind anything but a package's name resolves to nothing.
+  if (callee->lhs->kind != ExprKind::kIdentifier) {
     return callee->is_scope_resolution
                ? CallShape{}
                : MemberChainCallShape(*callee, parent, walk);
@@ -642,7 +618,7 @@ void MakeCallArguments(VpiObject* call, const Expr& expr,
 // registered system task or function stands as (detail 3).
 VpiObject* MakeCallStatement(const Stmt& stmt, const BlockParent& parent,
                              const BodyWalk& walk) {
-  if (stmt.kind != StmtKind::kExprStmt || stmt.expr == nullptr) return nullptr;
+  if (stmt.kind != StmtKind::kExprStmt) return nullptr;
   const CallShape kShape = CallShapeOf(*stmt.expr, parent, walk);
   if (kShape.type == 0) return nullptr;
   VpiObject* call = MakeAtomicStatement(stmt, kShape.type, parent, walk);
@@ -818,32 +794,26 @@ VpiObject* WalkProcessBody(const RtlirProcess& proc, const BlockParent& parent,
   return MakeBuiltStmt(control, parent, walk);
 }
 
+// §37.63 detail 1: the always type of a procedure of `kind`, the keyword that
+// opened it, 0 for an initial or final procedure, which has none.
+int AlwaysTypeOf(RtlirProcessKind kind) {
+  if (kind == RtlirProcessKind::kInitial || kind == RtlirProcessKind::kFinal) {
+    return 0;
+  }
+  if (kind == RtlirProcessKind::kAlwaysComb) return vpiAlwaysComb;
+  if (kind == RtlirProcessKind::kAlwaysFF) return vpiAlwaysFF;
+  return kind == RtlirProcessKind::kAlwaysLatch ? vpiAlwaysLatch : vpiAlways;
+}
+
 // §37.63: the object a procedure stands as, one of the three kinds the
 // `process` class groups, with detail 1's always type for an always procedure.
 VpiObject* MakeProcess(const RtlirProcess& proc, VpiObject* scope,
                        const VpiAttachBuild& build) {
   VpiObject* process = build.alloc();
+  process->always_type = AlwaysTypeOf(proc.kind);
   process->type = vpiAlways;
-  switch (proc.kind) {
-    case RtlirProcessKind::kInitial:
-      process->type = vpiInitial;
-      break;
-    case RtlirProcessKind::kFinal:
-      process->type = vpiFinal;
-      break;
-    case RtlirProcessKind::kAlways:
-      process->always_type = vpiAlways;
-      break;
-    case RtlirProcessKind::kAlwaysComb:
-      process->always_type = vpiAlwaysComb;
-      break;
-    case RtlirProcessKind::kAlwaysFF:
-      process->always_type = vpiAlwaysFF;
-      break;
-    case RtlirProcessKind::kAlwaysLatch:
-      process->always_type = vpiAlwaysLatch;
-      break;
-  }
+  if (proc.kind == RtlirProcessKind::kInitial) process->type = vpiInitial;
+  if (proc.kind == RtlirProcessKind::kFinal) process->type = vpiFinal;
   process->parent = scope;
   scope->children.push_back(process);
   return process;
@@ -858,7 +828,6 @@ void AttachScopedItems(VpiObject* instance, const BodyWalk& instance_walk,
                        const std::vector<Scoped>& items, const Make& make) {
   for (const Scoped& entry : items) {
     VpiObject* scope = VpiGenScopeOf(instance, entry.gen_block_path);
-    if (scope == nullptr || entry.item == nullptr) continue;
     BodyWalk walk = instance_walk;
     walk.gen_prefixes = &entry.gen_block_prefixes;
     const BlockParent kParent{scope, scope->full_name};
@@ -898,14 +867,13 @@ void AttachInstanceProcedures(VpiObject* instance,
   for (const RtlirProcess& proc : instance_walk.mod.processes) {
     // A process stands in the generate block instance its path names.
     VpiObject* scope = VpiGenScopeOf(instance, proc.gen_block_path);
-    if (scope == nullptr) continue;
     BodyWalk walk = instance_walk;
     walk.gen_prefixes = &proc.gen_block_prefixes;
     const BlockParent kParent{scope, scope->full_name};
-    if (!proc.is_static_assertion && !proc.is_concurrent_clocked) {
+    if (!proc.is_static_assertion) {
       walk.process = MakeProcess(proc, scope, instance_walk.build);
       walk.process->body = WalkProcessBody(proc, kParent, walk);
-    } else if (proc.body != nullptr && proc.body->is_deferred) {
+    } else if (proc.body->is_deferred) {
       // §16.4.3: a deferred assertion item is the statement it runs (§37.55).
       MakeBuiltStmt(*proc.body, kParent, walk);
     }
@@ -923,8 +891,7 @@ void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,
   // is an event statement, §37.42: each call of a task, a method task or a
   // system task a call statement, and each statement VpiBuiltStmtKind names
   // an object of its kind, each hung from the block or statement it stands in.
-  if (design == nullptr || design->top_modules.empty() ||
-      design->top_modules.front() == nullptr) {
+  if (design->top_modules.empty() || design->top_modules.front() == nullptr) {
     return;
   }
   // The first top carries the empty prefix and is keyed under its own name.
@@ -934,12 +901,9 @@ void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,
   const auto kWalk = [&](void (*attach)(VpiObject*, const BodyWalk&)) {
     WalkInstancePaths(
         design, [&](const RtlirModule* mod, const std::string& prefix) {
-          VpiObject* instance = FindObjectForFlatName(
-              objects, prefix.empty() ? kFirstTop : prefix);
-          if (instance != nullptr) {
-            attach(instance,
-                   BodyWalk{*design, *mod, objects, prefix, calls, build});
-          }
+          attach(FindObjectForFlatName(objects,
+                                       prefix.empty() ? kFirstTop : prefix),
+                 BodyWalk{*design, *mod, objects, prefix, calls, build});
         });
   };
   kWalk(AttachInstanceProperties);

@@ -784,13 +784,32 @@ TEST_F(BlockScopesOfARun, ALabelOnAStatementCreatesANamedBegin) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, vpi_scan(it))), VpiObjectOf(trig));
 }
 
-// §9.3.5: a label on a for loop that declares no variable creates a named
-// begin around it like any other statement's.
+// §9.3.5: a label on a for loop that declares no variable, whether it assigns
+// its variable or initializes nothing, creates a named begin around it like
+// any other statement's.
 TEST_F(BlockScopesOfARun, ALabelOnAPlainForLoopCreatesANamedBegin) {
-  Run("module top; int j; initial ln: for (j = 0; j < 1; j++) ; endmodule\n");
-  vpiHandle ln = By("top.ln");
-  ASSERT_NE(ln, nullptr);
-  EXPECT_EQ(vpi_get(vpiType, ln), vpiNamedBegin);
+  Run("module top; int j;\n"
+      "  initial ln: for (j = 0; j < 1; j++) ;\n"
+      "  initial le: for (; j < 2; j++) ;\n"
+      "endmodule\n");
+  for (const std::string& name : std::vector<std::string>{"top.ln", "top.le"}) {
+    vpiHandle loop = By(name);
+    ASSERT_NE(loop, nullptr) << name;
+    EXPECT_EQ(vpi_get(vpiType, loop), vpiNamedBegin) << name;
+  }
+}
+
+// §37.12 (figure) with §27.4: a variable a named block declares in a procedure
+// of a generate block hangs from the block, full-named under the generate
+// block and the named block both.
+TEST_F(BlockScopesOfARun, AGeneratedBlocksVariableIsNamedUnderBothBlocks) {
+  Run("module top;\n"
+      "  if (1) begin : g initial begin : blk int v; v = 4; end end\n"
+      "endmodule\n");
+  vpiHandle v = By("top.g.blk.v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, v), vpiIntVar);
+  EXPECT_EQ(FullName(v), "top.g.blk.v");
 }
 
 // §9.3.5: a label on a foreach loop, or on a for loop declaring its variables,

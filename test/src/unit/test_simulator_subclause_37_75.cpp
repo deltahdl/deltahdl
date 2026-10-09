@@ -413,6 +413,56 @@ TEST_F(DoWhileAndForeachLoopsOfARun, AnIndexVariableIsOfItsArraysIndexType) {
                                      vpiIntVar, vpiByteVar}));
 }
 
+// §12.7.3 with §7.8: over a block's arrays the same holds. Its associative
+// arrays indexed by a typedef name and by a class give an enum and a class var,
+// while a fixed-size array, sized by a number or by a parameter, a dynamic
+// array and an array a typedef declares give an int var.
+TEST_F(DoWhileAndForeachLoopsOfARun, ABlocksArraysGiveTheirIndexTypes) {
+  Run("module top; typedef enum {A, B} e_t; class C; endclass\n"
+      "  typedef int arr_t [3]; localparam int N = 2;\n"
+      "  initial begin : b\n"
+      "    int f [2]; int d []; int t [e_t]; int c [C]; int p [N]; arr_t a;\n"
+      "    foreach (f[i]) begin end\n"
+      "    foreach (d[i]) begin end\n"
+      "    foreach (t[i]) begin end\n"
+      "    foreach (c[i]) begin end\n"
+      "    foreach (p[i]) begin end\n"
+      "    foreach (a[i]) begin end\n"
+      "  end\n"
+      "endmodule\n");
+  std::vector<int> kinds;
+  vpiHandle loops = vpi_iterate(vpiStmt, By("top.b"));
+  ASSERT_NE(loops, nullptr);
+  while (vpiHandle loop = vpi_scan(loops)) {
+    vpiHandle vars = vpi_iterate(vpiLoopVars, loop);
+    ASSERT_NE(vars, nullptr);
+    kinds.push_back(vpi_get(vpiType, vpi_scan(vars)));
+  }
+  EXPECT_EQ(kinds, (std::vector<int>{vpiIntVar, vpiIntVar, vpiEnumVar,
+                                     vpiClassVar, vpiIntVar, vpiIntVar}));
+}
+
+// §12.7.3 with §7.8: an index variable over a module's associative array
+// indexed by a class is a class var, and one over an array a class property
+// holds, which the loop names through the object, an int var.
+TEST_F(DoWhileAndForeachLoopsOfARun,
+       AClassIndexAndAPropertysArrayGiveTheirKinds) {
+  Run("module top; class C; int m [2]; endclass\n"
+      "  int c [C]; C o = new;\n"
+      "  initial foreach (c[i]) begin end\n"
+      "  initial foreach (o.m[i]) begin end\n"
+      "endmodule\n");
+  std::vector<int> kinds;
+  vpiHandle procs = vpi_iterate(vpiProcess, By("top"));
+  ASSERT_NE(procs, nullptr);
+  while (vpiHandle proc = vpi_scan(procs)) {
+    vpiHandle vars = vpi_iterate(vpiLoopVars, vpi_handle(vpiStmt, proc));
+    ASSERT_NE(vars, nullptr);
+    kinds.push_back(vpi_get(vpiType, vpi_scan(vars)));
+  }
+  EXPECT_EQ(kinds, (std::vector<int>{vpiClassVar, vpiIntVar}));
+}
+
 // §37.75: a null handle has no do-while condition.
 TEST_F(DoWhileForeach, DoWhileConditionOfANullHandleIsNull) {
   EXPECT_EQ(VpiDoWhileConditionExpr(nullptr), nullptr);

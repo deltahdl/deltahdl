@@ -1,9 +1,10 @@
 #include <gtest/gtest.h>
 
-#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -687,7 +688,22 @@ TEST_F(VpiGetValueSim, GetValueStringBufferDistinctFromGetStr) {
   EXPECT_STREQ(name, "nm");                   // the name buffer is left intact
 }
 
-class BlockVariableValuesOfARun : public VpiDesignRun {};
+// A design run whose block variables are read back by name once it is over.
+class BlockVariableValuesOfARun : public VpiDesignRun {
+ protected:
+  // Each variable named in `expected` reads the integer beside its name.
+  static void ExpectValues(
+      const std::vector<std::pair<const char*, int>>& expected) {
+    for (const auto& [name, value] : expected) {
+      vpiHandle v = vpi_handle_by_name(VpiText(name), nullptr);
+      ASSERT_NE(v, nullptr) << name;
+      s_vpi_value val = {};
+      val.format = vpiIntVal;
+      vpi_get_value(v, &val);
+      EXPECT_EQ(val.value.integer, value) << name;
+    }
+  }
+};
 
 // §38.15 with §37.12: the object of a variable a named block declares reads
 // the value the block left in it, in the top and in an instance below it
@@ -696,16 +712,16 @@ TEST_F(BlockVariableValuesOfARun, ABlockVariableReadsWhatTheBlockLeft) {
   Run("module m; initial begin : blk int v; v = 7; end endmodule\n"
       "module top; m i0(); initial begin : blk int v; v = 3; end\n"
       "endmodule\n");
-  const char* const kNames[] = {"top.blk.v", "top.i0.blk.v"};
-  const int kValues[] = {3, 7};
-  for (size_t i = 0; i < 2; ++i) {
-    vpiHandle v = vpi_handle_by_name(VpiText(kNames[i]), nullptr);
-    ASSERT_NE(v, nullptr) << kNames[i];
-    s_vpi_value val = {};
-    val.format = vpiIntVal;
-    vpi_get_value(v, &val);
-    EXPECT_EQ(val.value.integer, kValues[i]) << kNames[i];
-  }
+  ExpectValues({{"top.blk.v", 3}, {"top.i0.blk.v", 7}});
+}
+
+// The same holds for a variable of a named block another named block encloses,
+// keyed under both blocks' names.
+TEST_F(BlockVariableValuesOfARun, ANestedBlocksVariableReadsItsValue) {
+  Run("module top;\n"
+      "  initial begin : outer begin : inner int v; v = 5; end end\n"
+      "endmodule\n");
+  ExpectValues({{"top.outer.inner.v", 5}});
 }
 
 // §38.15, Table 38-3: the binary, octal and hex string formats give every

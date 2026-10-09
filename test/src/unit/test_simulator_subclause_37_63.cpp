@@ -286,5 +286,26 @@ TEST_F(ProcessesOfARun, AnEventStatementInsideANamedBlockHangsFromIt) {
   EXPECT_STREQ(vpi_get_str(vpiName, event), "e");
 }
 
+// §37.63 with §9.2.2.1: an always procedure opened by no event control reaches
+// the statement it runs as written, here a delay control, while one opened by
+// @* reaches the event control guarding its body even where the body reads
+// nothing for the control to wait on.
+TEST_F(ProcessesOfARun, AnAlwaysReachesTheControlItWasWrittenWith) {
+  Run("module top; bit c, d;\n"
+      "  always #5 c = ~c;\n"
+      "  always @* d = 1;\n"
+      "  initial #12 $finish;\n"
+      "endmodule\n");
+  std::vector<int> bodies;
+  vpiHandle procs = vpi_iterate(vpiProcess, By("top"));
+  ASSERT_NE(procs, nullptr);
+  while (vpiHandle proc = vpi_scan(procs)) {
+    vpiHandle body = vpi_handle(vpiStmt, proc);
+    bodies.push_back(body == nullptr ? 0 : vpi_get(vpiType, body));
+  }
+  EXPECT_EQ(bodies, (std::vector<int>{vpiDelayControl, vpiEventControl,
+                                      vpiDelayControl}));
+}
+
 }  // namespace
 }  // namespace delta
