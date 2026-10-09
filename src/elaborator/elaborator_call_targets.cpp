@@ -148,14 +148,11 @@ bool InterfaceDeclaresSubroutine(const CompilationUnit& unit,
   return declares;
 }
 
-// §25.9: a call `call` through a virtual interface variable of the module,
-// v.t(), naming no task or function the interface declares.
 // The interface a value declared with `type` refers to an instance of, where
-// it is a virtual interface (§25.9); empty for any other type and for none.
-std::string_view VifInterface(const DataType* type) {
-  return type != nullptr && type->kind == DataTypeKind::kVirtualInterface
-             ? type->type_name
-             : std::string_view();
+// it is a virtual interface (§25.9); empty for any other type.
+std::string_view VifInterface(const DataType& type) {
+  return type.kind == DataTypeKind::kVirtualInterface ? type.type_name
+                                                      : std::string_view();
 }
 
 // The name the item `item` declares, a class's being its declaration's.
@@ -331,7 +328,7 @@ std::string_view VifOf(const Expr& prefix, const DataScope& scope) {
   }
   if (root->kind == ExprKind::kIdentifier) {
     const DeclaredVar* var = scope.Declared(root->text);
-    return var != nullptr && var->dims == selects ? VifInterface(var->type)
+    return var != nullptr && var->dims == selects ? VifInterface(*var->type)
                                                   : std::string_view();
   }
   if (selects != 0 || prefix.kind != ExprKind::kMemberAccess ||
@@ -346,12 +343,14 @@ std::string_view VifOf(const Expr& prefix, const DataScope& scope) {
   for (const ClassMember* member : cls->members) {
     if (member->kind == ClassMemberKind::kProperty &&
         member->name == prefix.rhs->text) {
-      iface = VifInterface(&member->data_type);
+      iface = VifInterface(member->data_type);
     }
   }
   return iface;
 }
 
+// §25.9: a call `call` through a virtual interface, v.t(), naming no task or
+// function the interface declares.
 void ReportVifCall(const Expr& call, const DataScope& scope, DiagEngine& diag) {
   const Expr& callee = *call.lhs;
   if (callee.kind != ExprKind::kMemberAccess || callee.is_scope_resolution) {
