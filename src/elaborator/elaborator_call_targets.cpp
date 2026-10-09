@@ -3,12 +3,14 @@
 #include <algorithm>
 #include <cstddef>
 #include <format>
+#include <functional>
 #include <string_view>
 #include <unordered_set>
 #include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -21,12 +23,16 @@ namespace {
 
 // The names a walk of one module's procedures sees as variables or nets: the
 // module's own, and those each block around the statement walked declares,
-// the innermost last (§23.9); and the other names the module itself declares,
-// or imports as data, which a call statement cannot call.
+// the innermost last (§23.9); the other names the module itself declares, or
+// imports as data, which a call statement cannot call; the tasks and
+// functions the module declares; and, first, whether the scope or a module
+// enclosing it sees a name at all.
 struct DataScope {
-  std::unordered_set<std::string_view> module;
-  std::vector<std::string_view> blocks;
-  std::unordered_set<std::string_view> uncallable;
+  const std::function<bool(std::string_view)>& visible;
+  std::unordered_set<std::string_view> module = {};
+  std::vector<std::string_view> blocks = {};
+  std::unordered_set<std::string_view> uncallable = {};
+  std::unordered_set<std::string_view> subroutines = {};
 
   bool Names(std::string_view name) const {
     return module.contains(name) ||
@@ -59,8 +65,10 @@ const Expr* NamedCallee(const Expr& expr) {
 // A.6.9: a call statement, `x;` or `x(...);`, whose name the scope declares
 // as no task or function: a variable or a net (A.8.2), or anything else the
 // module declares or imports as data, such as a parameter, a let or a
-// sequence. A name the module does not declare may name a task or function of
-// an instance above it (§23.8), and is left alone.
+// sequence. A call with an argument list naming nothing the scope, the
+// compilation unit or a module enclosing an instance of the module sees
+// (§23.8) is an undeclared identifier (§23.9); a bare one is the scope rules'
+// report.
 void ReportStatementCall(const Stmt& stmt, const DataScope& scope,
                          DiagEngine& diag) {
   const bool kBare = stmt.expr->kind == ExprKind::kIdentifier;
@@ -72,12 +80,19 @@ void ReportStatementCall(const Stmt& stmt, const DataScope& scope,
     if (kBare) ReportIfData(kName, stmt.range.start, scope, diag);
     return;
   }
-  if (!scope.uncallable.contains(kName)) return;
-  diag.Error(stmt.range.start,
-             std::format("'{}' names no task or function, and a call "
-                         "statement calls one",
-                         kName),
-             Subclause("A.6.9"));
+  if (scope.uncallable.contains(kName)) {
+    diag.Error(stmt.range.start,
+               std::format("'{}' names no task or function, and a call "
+                           "statement calls one",
+                           kName),
+               Subclause("A.6.9"));
+    return;
+  }
+  if (kBare || scope.subroutines.contains(kName) || scope.visible(kName)) {
+    return;
+  }
+  diag.Error(stmt.range.start, std::format("undeclared identifier '{}'", kName),
+             Subclause("23.9"));
 }
 
 // Each call by a plain name `expr` holds, itself included.
@@ -142,10 +157,34 @@ void AddImportedData(const CompilationUnit& unit, const ImportItem& import,
 
 }  // namespace
 
-void ReportCallsOfDataNames(const ModuleDecl& decl, const CompilationUnit& unit,
-                            DiagEngine& diag) {
-  DataScope scope;
-  std::unordered_set<std::string_view> subroutines;
+std::unordered_set<std::string_view> EnclosingSubroutineNames(
+    const CompilationUnit& unit, std::string_view module) {
+  std::unordered_set<std::string_view> names;
+  std::unordered_set<std::string_view> reached{module};
+  std::vector<std::string_view> work{module};
+  while (!work.empty()) {
+    const std::string_view kChild = work.back();
+    work.pop_back();
+    for (const ModuleDecl* parent : unit.modules) {
+      std::unordered_set<std::string_view> children;
+      CollectInstantiatedNames(parent->items, children);
+      if (!children.contains(kChild) || !reached.insert(parent->name).second) {
+        continue;
+      }
+      for (const ModuleItem* item : parent->items) {
+        if (IsSubroutineItem(*item)) names.insert(item->name);
+      }
+      work.push_back(parent->name);
+    }
+  }
+  return names;
+}
+
+void ReportCallsOfDataNames(
+    const ModuleDecl& decl, const CompilationUnit& unit,
+    const std::function<bool(std::string_view)>& visible, DiagEngine& diag) {
+  DataScope scope{visible};
+  std::unordered_set<std::string_view>& subroutines = scope.subroutines;
   for (const ModuleItem* item : decl.items) {
     if (item->kind == ModuleItemKind::kVarDecl ||
         item->kind == ModuleItemKind::kNetDecl) {
@@ -162,6 +201,8 @@ void ReportCallsOfDataNames(const ModuleDecl& decl, const CompilationUnit& unit,
   // A name a DPI export gives a function the module also declares stays
   // callable whichever item the walk met first.
   for (std::string_view name : subroutines) scope.uncallable.erase(name);
+  // §18.12: a scope randomize call may be written without its std:: prefix.
+  subroutines.insert("randomize");
   for (const ModuleItem* item : decl.items) {
     if (IsProceduralItemKind(item->kind))
       CheckStmtCalls(item->body, scope, diag);

@@ -4,6 +4,7 @@
 
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_module.h"
 
 using namespace delta;
@@ -194,6 +195,34 @@ TEST(TaskAndFunctionNameResolutionElaboration,
   // items, so the unit-scope 'f' stays in the list even though a module
   // declares its own 'f' under the same name.
   EXPECT_TRUE(CuListHas(design, "f"));
+}
+
+// §23.8 with §13.3: a task enabled by its name alone that the module does not
+// declare is found in a module enclosing an instance of it, two levels up and
+// through either of two instance paths (#5804).
+TEST(TaskAndFunctionNameResolutionElaboration,
+     ABareEnableFindsAnEnclosingModulesTask) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module leaf; initial t; endmodule\n"
+      "module a; leaf l (); endmodule\n"
+      "module b; leaf l (); endmodule\n"
+      "module top; task t; endtask a ia (); b ib (); endmodule\n",
+      f, "top");
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §23.8 with §23.9: a call naming no task or function in the module or any
+// module enclosing an instance of it is an undeclared identifier (#5806).
+TEST(TaskAndFunctionNameResolutionElaboration,
+     ACallNamingNothingAnywhereIsUndeclared) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module leaf; initial nosuch(); endmodule\n"
+      "module top; task t; endtask leaf l (); endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "undeclared identifier 'nosuch'", 1, "23.9"));
 }
 
 }  // namespace
