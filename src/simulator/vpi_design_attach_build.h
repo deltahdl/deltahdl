@@ -97,6 +97,9 @@ int VpiPackageNamedTypeVariableKind(const RtlirDesign& design,
                                     const PackageDecl* package,
                                     std::string_view name);
 
+// §26.2: the classes the package `package` declares, in the order written.
+std::vector<ClassDecl*> VpiPackageClasses(const PackageDecl& package);
+
 // The packed dimensions of a value, outermost first, each a declared range.
 using PackedDims = std::vector<PackedRange>;
 

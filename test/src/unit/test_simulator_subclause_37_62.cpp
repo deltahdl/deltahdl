@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "fixture_vpi_run.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
@@ -195,6 +196,57 @@ TEST_F(EventStatementOfADesign, ATriggerNestedInABlockIsFound) {
   EXPECT_EQ(g_stmt_blocking[0], 1);
   ASSERT_EQ(g_triggered_event_names.size(), 1u);
   EXPECT_EQ(g_triggered_event_names[0], "e");
+}
+
+// The event statements of a run, read back from the model it built.
+class EventStatementsOfARun : public VpiDesignRun {
+ protected:
+  // The object of the named event the first event statement `scope` holds
+  // reaches, null for none.
+  static VpiObject* EventReachedFrom(vpiHandle scope) {
+    vpiHandle it = vpi_iterate(vpiEventStmt, scope);
+    vpiHandle stmt = it == nullptr ? nullptr : vpi_scan(it);
+    return stmt == nullptr ? nullptr
+                           : VpiObjectOf(vpi_handle(vpiNamedEvent, stmt));
+  }
+};
+
+// §23.6 and §23.8: a trigger naming its event hierarchically reaches the named
+// event the name resolves to, downward from the instance writing it or, by an
+// upward name, below an instance enclosing it (#5771).
+TEST_F(EventStatementsOfARun, AHierarchicalTriggerReachesItsEvent) {
+  Run("module leaf; initial begin : b -> m.e; end endmodule\n"
+      "module mid; event e; leaf s (); endmodule\n"
+      "module top; mid m (); initial begin : b -> m.e; end endmodule\n");
+  ASSERT_NE(By("top.m.e"), nullptr);
+  EXPECT_EQ(EventReachedFrom(By("top.b")), VpiObjectOf(By("top.m.e")));
+  EXPECT_EQ(EventReachedFrom(By("top.m.s.b")), VpiObjectOf(By("top.m.e")));
+}
+
+// §23.9: a trigger of an event a block around it declares reaches the block's
+// event, not the module's event of the same name (#5772).
+TEST_F(EventStatementsOfARun, ATriggerReachesTheEventItsBlockDeclares) {
+  Run("module top; event e; initial begin : b event e; -> e; end endmodule\n");
+  ASSERT_NE(By("top.b.e"), nullptr);
+  EXPECT_EQ(EventReachedFrom(By("top.b")), VpiObjectOf(By("top.b.e")));
+}
+
+// A trigger of an element of an array of events (§15.5.1) or of a class's
+// event property is an event statement all the same, its blocking property
+// telling the two trigger forms apart.
+TEST_F(EventStatementsOfARun,
+       ATriggerOfAnElementOrAPropertyIsAnEventStatement) {
+  Run("module top; class H; event ev; endclass\n"
+      "  event evs [2]; H h = new;\n"
+      "  initial begin : b -> evs[0]; ->> h.ev; end\n"
+      "endmodule\n");
+  std::vector<int> blocking;
+  vpiHandle it = vpi_iterate(vpiEventStmt, By("top.b"));
+  ASSERT_NE(it, nullptr);
+  while (vpiHandle stmt = vpi_scan(it)) {
+    blocking.push_back(vpi_get(vpiBlocking, stmt));
+  }
+  EXPECT_EQ(blocking, (std::vector<int>{1, 0}));
 }
 
 }  // namespace

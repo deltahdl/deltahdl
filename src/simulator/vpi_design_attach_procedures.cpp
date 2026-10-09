@@ -1,4 +1,3 @@
-#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -6,17 +5,15 @@
 
 #include "common/source_loc.h"
 #include "elaborator/elaborator_validate_internal.h"
-#include "elaborator/queue_dim.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "lexer/token.h"
-#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
-#include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_design_attach_build.h"
+#include "simulator/vpi_design_attach_procedures_internal.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_expr_decompile.h"
 #include "simulator/vpi_model_helpers1.h"
@@ -34,11 +31,6 @@ int JoinTypeOf(TokenKind keyword) {
   return vpiJoin;
 }
 
-// The items a begin or fork block holds, its declarations among them.
-const std::vector<Stmt*>& BlockItems(const Stmt& block) {
-  return block.kind == StmtKind::kFork ? block.fork_stmts : block.stmts;
-}
-
 // §37.12: the kind of block `stmt` is, 0 where it is none: a named begin or
 // fork where it has a label, and a begin or fork where it has none. Detail 1
 // makes the first always a scope and the second one only where it directly
@@ -49,47 +41,6 @@ int BlockKind(const Stmt& stmt) {
   bool is_fork = stmt.kind == StmtKind::kFork;
   if (!stmt.label.empty()) return is_fork ? vpiNamedFork : vpiNamedBegin;
   return is_fork ? vpiFork : vpiBegin;
-}
-
-// Where the objects a statement holds hang: the scope object around it, and
-// the path a named one among them is named under, which an unnamed scope
-// between them leaves as it was. A scope a block stands as also carries the
-// block, whose declarations a name the statement writes resolves to first
-// (§9.3, §23.9), and every scope carries the one around it, null at a
-// procedure's own scope.
-struct BlockParent {
-  VpiObject* scope;
-  const std::string& path;
-  const Stmt* block = nullptr;
-  const BlockParent* outer = nullptr;
-};
-
-// What a walk of one procedure body builds with: the design and the instance's
-// module, which a call's subroutine is found among; the objects the instance's
-// declarations stand as, keyed under its prefix; what a call statement is
-// built with; the build; and the process the body runs in (null for an
-// assertion the elaborator carries as a process).
-struct BodyWalk {
-  const RtlirDesign& design;
-  const RtlirModule& mod;
-  const VpiObjectMap& objects;
-  const std::string& prefix;
-  const VpiCallBuild& calls;
-  const VpiAttachBuild& build;
-  VpiObject* process = nullptr;
-  // §27.4: the prefixes of the generate block instances the procedure stands
-  // in, innermost last, empty for one of the instance itself; each walk of an
-  // item sets it before any statement is walked.
-  const GenBlockPrefixes* gen_prefixes = nullptr;
-};
-
-// §9.7: the name the trigger names its event by, which is an identifier in the
-// scope the statement stands in. A trigger written through anything else names
-// no declaration this walk can resolve against the design.
-std::string_view EventTriggerTargetName(const Stmt& stmt) {
-  const Expr* target = stmt.expr;
-  if (target->kind != ExprKind::kIdentifier) return {};
-  return target->text;
 }
 
 // §37.60: the object an atomic statement of `type` stands as, hung from the
@@ -108,93 +59,6 @@ VpiObject* MakeAtomicStatement(const Stmt& stmt, int type,
   walk.calls.stmts[{&stmt, walk.prefix}] = obj;
   parent.scope->children.push_back(obj);
   return obj;
-}
-
-// §37.62: the event statement a trigger stands as.
-VpiObject* MakeEventStatement(const Stmt& stmt, const BlockParent& parent,
-                              const BodyWalk& walk) {
-  VpiObject* obj = MakeAtomicStatement(stmt, vpiEventStmt, parent, walk);
-  // §9.7.2: "->" is the blocking event trigger and "->>" the nonblocking one,
-  // which is the whole of what the property distinguishes.
-  obj->blocking = stmt.kind == StmtKind::kEventTrigger;
-  // The figure's single arrow, which the generic one-to-one traversal walks by
-  // the kind of the child: the named event object the design already carries
-  // for the declaration, not a second one standing for the same event.
-  const std::string_view kTarget = EventTriggerTargetName(stmt);
-  if (kTarget.empty()) return obj;
-  VpiObject* event =
-      FindObjectForFlatName(walk.objects, VpiFlatName(walk.prefix, kTarget));
-  if (event != nullptr) obj->children.push_back(event);
-  return obj;
-}
-
-// §37.42: what a call statement stands as. `type` is the kind of tf call, zero
-// for a statement that calls nothing the walk resolves; `name` is the
-// subroutine it calls; `prefix` is the object a method is applied to (detail
-// 2), or the class var a chain of `prefix_members` starts from;
-// `user_defined` is the figure's vpiUserDefn; `systf` is the systf object
-// a call of a registered system task reaches; and `called` is the task or
-// function object of the declaration a task, function or method call calls.
-struct CallShape {
-  int type = 0;
-  std::string_view name;
-  VpiObject* prefix = nullptr;
-  std::vector<std::string_view> prefix_members = {};
-  bool user_defined = false;
-  VpiObject* systf = nullptr;
-  VpiObject* called = nullptr;
-};
-
-// §13.3 and §13.4: the kind of tf call a call of the subroutine `decl` is,
-// `task` for a task and `function` for a function.
-int CallKindOf(const ModuleItem& decl, int task, int function) {
-  return decl.kind == ModuleItemKind::kTaskDecl ? task : function;
-}
-
-// §37.42: a task or function call named `name` of the subroutine `sub`
-// resolves to, reaching the task or function object made for it.
-CallShape SubroutineCallShape(const VpiCalledSubroutine& sub,
-                              std::string_view name) {
-  if (sub.decl == nullptr) return {};
-  CallShape shape{CallKindOf(*sub.decl, vpiTaskCall, vpiFuncCall), name};
-  shape.called = sub.object;
-  return shape;
-}
-
-// Where a statement standing in `parent` is written, as a call it holds
-// resolves the subroutine it calls.
-VpiCallSite CallSiteOf(const BlockParent& parent, const BodyWalk& walk) {
-  return {walk.design,
-          walk.mod,
-          walk.prefix,
-          parent.scope,
-          walk.calls.subroutines,
-          walk.gen_prefixes};
-}
-
-// The class among `decls` named `name`, null for none.
-const ClassDecl* ClassNamed(const std::vector<ClassDecl*>& decls,
-                            std::string_view name) {
-  for (const ClassDecl* decl : decls) {
-    if (decl->name == name) return decl;
-  }
-  return nullptr;
-}
-
-// The class the design declares under `name`, in the instance's module or the
-// compilation unit; null for one it does not, a built-in class among them.
-const ClassDecl* FindClassDecl(const BodyWalk& walk, std::string_view name) {
-  const ClassDecl* decl = ClassNamed(walk.mod.class_decls, name);
-  return decl != nullptr ? decl : ClassNamed(walk.design.cu_class_decls, name);
-}
-
-// §37.17: the object kind of a variable declared with `type` in the instance,
-// leaving its unpacked dimensions aside.
-int TypeVariableKind(const DataType& type, const BodyWalk& walk) {
-  if (type.kind == DataTypeKind::kNamed) {
-    return VpiNamedTypeVariableKind(walk.design, walk.mod, type.type_name);
-  }
-  return VpiDataTypeVariableKind(type.kind);
 }
 
 // §37.17: the object kind of a variable a block declares, as a module's of its
@@ -246,344 +110,57 @@ void MakeBlockVariables(VpiObject* block, const Stmt& stmt,
   }
 }
 
-// §8.3: the method `cls` declares under `name`, null for none.
-const ModuleItem* MethodNamed(const ClassDecl& cls, std::string_view name) {
-  for (const ClassMember* member : cls.members) {
-    if (member->kind == ClassMemberKind::kMethod &&
-        member->method->name == name) {
-      return member->method;
-    }
-  }
-  return nullptr;
-}
-
-// §37.42: what a method call calls - the kind of tf call it is, zero for a
-// method the walk resolves to nothing, whether the design declares it, and if
-// it does the class declaring it.
-struct MethodCall {
-  int type = 0;
-  bool declared = false;
-  const ClassDecl* owner = nullptr;
-};
-
-// The method `method` of the class `cls`, found in the class or, by §8.13, in
-// the classes it extends. A class the design declares answers ahead of a
-// built-in one of its name, which §15.2 lets user code redefine.
-MethodCall ClassMethodCall(const BodyWalk& walk, std::string_view cls,
-                           std::string_view method) {
-  while (!cls.empty()) {
-    const ClassDecl* decl = FindClassDecl(walk, cls);
-    if (decl == nullptr) return {VpiBuiltInClassCallKind(cls, method), false};
-    const ModuleItem* found = MethodNamed(*decl, method);
-    if (found != nullptr) {
-      return {CallKindOf(*found, vpiMethodTaskCall, vpiMethodFuncCall), true,
-              decl};
-    }
-    cls = decl->base_class;
-  }
-  return {};
-}
-
-// §37.42: a system task or system function call, named after what it calls. A
-// system function stays a function where a statement calls it, and the
-// evaluator runs it as one (§36.5). A name an application registered is what
-// the registration made it, which the run calls it as; every other name is a
-// system task.
-CallShape SystemCallShape(const Expr& call, const BodyWalk& walk) {
-  const VpiRegisteredSystf kSystf = walk.calls.systf(call.callee);
-  const bool kFunction =
-      kSystf.type == vpiSysFunc ||
-      (kSystf.type == 0 && VpiIsBuiltInSystemFunction(call.callee));
-  CallShape shape{kFunction ? vpiSysFuncCall : vpiSysTaskCall, call.callee};
-  shape.user_defined = kSystf.type == vpiSysTask || kSystf.type == vpiSysFunc;
-  shape.systf = kSystf.object;
-  return shape;
-}
-
-// §7.8: whether the unpacked dimension `dim` gives an associative array its
-// index type: a data type keyword, the wildcard, or a name standing for a type
-// or a class.
-bool IsAssocDim(const Expr& dim, const BodyWalk& walk) {
-  static constexpr std::string_view kIndexTypes[] = {
-      "string", "int",   "integer", "byte", "shortint", "longint",
-      "bit",    "logic", "reg",     "time", "*"};
-  if (dim.kind != ExprKind::kIdentifier) return false;
-  return std::ranges::any_of(
-             kIndexTypes, [&](std::string_view t) { return t == dim.text; }) ||
-         walk.design.type_kinds.contains(dim.text) ||
-         FindClassDecl(walk, dim.text) != nullptr;
-}
-
-// The kind of built-in value a block declares with `decl`: an array of the kind
-// its first unpacked dimension makes, a dynamic array's `[]` being recorded as
-// no dimension and a queue's as `[$]`; else a string or an enum, written as
-// one or through a typedef.
-VpiBuiltInHolder BlockHolder(const Stmt& decl, const BodyWalk& walk) {
-  if (!decl.var_unpacked_dims.empty()) {
-    const Expr* dim = decl.var_unpacked_dims.front();
-    if (dim == nullptr) return VpiBuiltInHolder::kDynamicArray;
-    if (IsQueueDim(dim)) return VpiBuiltInHolder::kQueue;
-    return IsAssocDim(*dim, walk) ? VpiBuiltInHolder::kAssocArray
-                                  : VpiBuiltInHolder::kFixedArray;
-  }
-  const int kKind = TypeVariableKind(decl.var_decl_type, walk);
-  if (kKind == vpiStringVar) return VpiBuiltInHolder::kString;
-  return kKind == vpiEnumVar ? VpiBuiltInHolder::kEnum
-                             : VpiBuiltInHolder::kNone;
-}
-
-// The same, of a variable of the instance's module.
-VpiBuiltInHolder ModuleHolder(const RtlirVariable& var) {
-  if (var.is_queue) return VpiBuiltInHolder::kQueue;
-  if (var.is_dynamic) return VpiBuiltInHolder::kDynamicArray;
-  if (var.is_assoc) return VpiBuiltInHolder::kAssocArray;
-  if (var.num_unpacked_dims > 0) return VpiBuiltInHolder::kFixedArray;
-  if (var.is_string) return VpiBuiltInHolder::kString;
-  // An enum declared without a typedef is keyed by its declaration's name
-  // (SetEnumTypeInfo), so every enum variable names an enumeration.
-  return var.enum_type_name.empty() ? VpiBuiltInHolder::kNone
-                                    : VpiBuiltInHolder::kEnum;
-}
-
-// §8.4: the variable a call's prefix names, as the class it holds a handle of
-// (empty for a variable of no class type and for no variable), the kind of
-// built-in value it is, and the object standing for it.
-struct PrefixVar {
-  std::string_view cls;
-  VpiBuiltInHolder holder = VpiBuiltInHolder::kNone;
-  VpiObject* object = nullptr;
-};
-
-// §23.9: the declaration of the variable `name` a block around the statement
-// `parent` stands for declares, the innermost first, with `where` set to the
-// block's; null where no block declares one.
-const Stmt* BlockVarDecl(const BlockParent& parent, std::string_view name,
-                         const BlockParent*& where) {
-  for (const BlockParent* at = &parent; at != nullptr; at = at->outer) {
-    if (at->block == nullptr) continue;
-    for (const Stmt* item : BlockItems(*at->block)) {
-      if (item->kind == StmtKind::kVarDecl && item->var_name == name) {
-        where = at;
-        return item;
-      }
-    }
-  }
-  return nullptr;
-}
-
-// §23.9: the variable `name` names in the scope `parent` stands for: one a
-// block declares, the innermost around the statement first, or else one of the
-// instance's module.
-PrefixVar FindPrefixVar(const BlockParent& parent, std::string_view name,
-                        const BodyWalk& walk) {
-  const BlockParent* where = nullptr;
-  if (const Stmt* item = BlockVarDecl(parent, name, where)) {
-    const DataType& type = item->var_decl_type;
-    return {
-        type.kind == DataTypeKind::kNamed ? type.type_name : std::string_view(),
-        BlockHolder(*item, walk), ChildNamed(where->scope, name)};
-  }
-  PrefixVar var;
-  var.object =
-      FindObjectForFlatName(walk.objects, VpiFlatName(walk.prefix, name));
-  for (const RtlirVariable& decl : walk.mod.variables) {
-    if (decl.name != name) continue;
-    var.cls = decl.class_type_name;
-    var.holder = ModuleHolder(decl);
-    break;
-  }
-  return var;
-}
-
-// §12.7.3 with §7.8: the kind of variable an associative array's index type
-// written as `name` declares, which a foreach loop variable over the array is
-// of: a built-in keyword's, or the kind a class or typedef name gives (§6.18).
-// §7.8.1 bars a foreach over a wildcard index.
-int IndexTypeKind(std::string_view name, const BodyWalk& walk) {
-  static constexpr struct {
-    std::string_view keyword;
-    int kind;
-  } kKeywords[] = {
-      {"string", vpiStringVar},     {"int", vpiIntVar},
-      {"integer", vpiIntegerVar},   {"byte", vpiByteVar},
-      {"shortint", vpiShortIntVar}, {"longint", vpiLongIntVar},
-      {"bit", vpiBitVar},           {"logic", vpiLogicVar},
-      {"reg", vpiLogicVar},         {"time", vpiTimeVar},
-  };
-  for (const auto& entry : kKeywords) {
-    if (entry.keyword == name) return entry.kind;
-  }
-  return VpiNamedTypeVariableKind(walk.design, walk.mod, name);
-}
-
-// §12.7.3: the kind of the first index variable of a foreach loop over the
-// variable `name` of the instance's module: its index type's where the array
-// is associative, an int var otherwise.
-int ModuleIndexKind(std::string_view name, const BodyWalk& walk) {
-  for (const RtlirVariable& var : walk.mod.variables) {
-    if (var.name != name || !var.is_assoc) continue;
-    if (var.is_class_index) return vpiClassVar;
-    return IndexTypeKind(var.assoc_index_keyword.empty()
-                             ? var.assoc_index_type_name
-                             : var.assoc_index_keyword,
-                         walk);
-  }
-  return vpiIntVar;
-}
-
-// §12.7.3: the kind of the first index variable of a foreach loop over the
-// array `array` names, the index type's where the array's first dimension is
-// associative and an int var otherwise; an array a block around the
-// statement declares is found first (§23.9).
-int ForeachIndexKind(const Expr* array, const BlockParent& parent,
-                     const BodyWalk& walk) {
-  if (array->kind != ExprKind::kIdentifier) return vpiIntVar;
-  const BlockParent* where = nullptr;
-  if (const Stmt* item = BlockVarDecl(parent, array->text, where)) {
-    const Expr* dim = item->var_unpacked_dims.empty()
-                          ? nullptr
-                          : item->var_unpacked_dims.front();
-    const bool kAssoc = dim != nullptr && IsAssocDim(*dim, walk);
-    return kAssoc ? IndexTypeKind(dim->text, walk) : vpiIntVar;
-  }
-  return ModuleIndexKind(array->text, walk);
-}
-
-// §37.42 with §37.31: the task or function the class defn made for `owner`
-// holds under `name`; null for no owner. FindClassDecl finds `owner` among
-// the classes of the instance walked or of the compilation unit, and a defn
-// is made for each of those under the instance's prefix or "$unit", holding a
-// method for each method the class declares.
-VpiObject* MethodObject(const BodyWalk& walk, const ClassDecl* owner,
-                        std::string_view name) {
-  if (owner == nullptr) return nullptr;
-  auto found = walk.calls.classes.find({owner, walk.prefix});
-  if (found == walk.calls.classes.end()) {
-    found = walk.calls.classes.find({owner, std::string("$unit")});
-  }
-  return *std::ranges::find_if(
-      found->second->children, [name](const VpiObject* child) {
-        return VpiIsClassMethodType(child->type) && child->name == name;
-      });
-}
-
-// §37.42: a call of the method `name` that `call` resolves it to, applied to
-// `prefix`; nothing where it resolves to none.
-CallShape MethodShape(const MethodCall& call, std::string_view name,
-                      VpiObject* prefix, const BodyWalk& walk) {
-  if (call.type == 0) return {};
-  CallShape shape{call.type, name};
-  shape.prefix = prefix;
-  // Detail 11 tells a built-in method call apart from the rest, and the
-  // figure's vpiUserDefn is what says which a method call is.
-  shape.user_defined = call.declared;
-  shape.called = MethodObject(walk, call.owner, name);
-  return shape;
-}
-
-// §37.42: a method task or method function call, applied through `access`,
-// which joins two names, to a variable of the scope the call stands in: a
-// class var, whose class says what the method is, or a string, an enum or an
-// unpacked array, whose built-in methods are functions no design declares.
-CallShape MethodCallShape(const Expr& access, const BlockParent& parent,
-                          const BodyWalk& walk) {
-  const PrefixVar kVar = FindPrefixVar(parent, access.lhs->text, walk);
-  MethodCall call;
-  if (kVar.holder == VpiBuiltInHolder::kNone) {
-    call = ClassMethodCall(walk, kVar.cls, access.rhs->text);
-  } else if (VpiIsBuiltInMethod(kVar.holder, access.rhs->text)) {
-    call.type = vpiMethodFuncCall;
-  }
-  return MethodShape(call, access.rhs->text, kVar.object, walk);
-}
-
-// §8.4 with §8.13: the class the property `name` of the class `cls`, or of a
-// class it extends, holds a handle of; empty where neither declares it with a
-// named type.
-std::string_view PropertyClass(const BodyWalk& walk, std::string_view cls,
-                               std::string_view name) {
-  while (!cls.empty()) {
-    const ClassDecl* decl = FindClassDecl(walk, cls);
-    if (decl == nullptr) return {};
-    for (const ClassMember* member : decl->members) {
-      if (member->kind != ClassMemberKind::kProperty || member->name != name) {
-        continue;
-      }
-      const DataType& type = member->data_type;
-      return type.kind == DataTypeKind::kNamed ? type.type_name
-                                               : std::string_view();
-    }
-    cls = decl->base_class;
-  }
-  return {};
-}
-
-// The plain names a chain of member accesses joins, `a.b.c` as a, b and c,
-// appended to `names`; false where a link is anything else.
-bool ChainNames(const Expr& expr, std::vector<std::string_view>& names) {
-  if (expr.kind == ExprKind::kIdentifier) {
-    names.push_back(expr.text);
-    return true;
-  }
-  if (expr.kind != ExprKind::kMemberAccess || expr.is_scope_resolution) {
-    return false;
-  }
-  return ChainNames(*expr.lhs, names) && ChainNames(*expr.rhs, names);
-}
-
-// §37.42 detail 2 with §8.4: a method call applied through a chain of members
-// to a class var of the scope, a.b.run(). The class of the chain's last member
-// says what the method is, and the call is applied to that member in the
-// object the var references, which is read when the prefix is asked for.
-CallShape MemberChainCallShape(const Expr& access, const BlockParent& parent,
-                               const BodyWalk& walk) {
+// §15.5.1 with §23.6: the name a trigger names its event by as written, an
+// identifier or a hierarchical name of identifiers joined by periods, `m.e`;
+// empty for a target written through anything else, such as a select of an
+// array of events, which names no one declaration of the design.
+std::string EventTriggerTargetName(const Stmt& stmt) {
   std::vector<std::string_view> names;
-  if (!ChainNames(*access.lhs, names)) return {};
-  const PrefixVar kVar = FindPrefixVar(parent, names.front(), walk);
-  if (kVar.holder != VpiBuiltInHolder::kNone) return {};
-  std::string_view cls = kVar.cls;
+  if (!ChainNames(*stmt.expr, names)) return {};
+  std::string joined(names.front());
   for (std::size_t i = 1; i < names.size(); ++i) {
-    cls = PropertyClass(walk, cls, names[i]);
+    joined += "." + std::string(names[i]);
   }
-  CallShape shape = MethodShape(ClassMethodCall(walk, cls, access.rhs->text),
-                                access.rhs->text, kVar.object, walk);
-  if (shape.type != 0) {
-    shape.prefix_members.assign(names.begin() + 1, names.end());
-  }
-  return shape;
+  return joined;
 }
 
-// §37.42 with §37.60: what the expression statement `expr`, standing in the
-// scope `parent` stands for, calls. A task is enabled with or without an
-// argument list (§13.3), so the callee is the expression itself where no list
-// follows it.
-CallShape CallShapeOf(const Expr& expr, const BlockParent& parent,
-                      const BodyWalk& walk) {
-  if (expr.kind == ExprKind::kSystemCall) {
-    return SystemCallShape(expr, walk);
+// §23.9 with §23.8: the named event object `name`, written by a statement
+// standing in `parent`, resolves to: one a block around the statement
+// declares, the innermost first, or else one found below the instance or, by
+// an upward name, below an instance enclosing it, the nearest first. Null where
+// the name reaches no object the design built, such as a class's event
+// property, which each object of the class holds for itself.
+VpiObject* TriggeredEvent(const std::string& name, const BlockParent& parent,
+                          const BodyWalk& walk) {
+  const BlockParent* where = nullptr;
+  if (BlockVarDecl(parent, name, where) != nullptr) {
+    return ChildNamed(where->scope, name);
   }
-  const Expr* callee = expr.kind == ExprKind::kCall ? expr.lhs : &expr;
-  if (callee == nullptr) return {};
-  if (callee->kind == ExprKind::kIdentifier) {
-    return SubroutineCallShape(
-        VpiCalleeSubroutine(CallSiteOf(parent, walk), *callee), callee->text);
+  std::string scope = walk.prefix;
+  for (;;) {
+    VpiObject* found =
+        FindObjectForFlatName(walk.objects, VpiFlatName(scope, name));
+    if (found != nullptr || scope.empty()) return found;
+    const std::size_t kDot = scope.rfind('.');
+    scope.resize(kDot == std::string::npos ? 0 : kDot);
   }
-  if (callee->kind != ExprKind::kMemberAccess) return {};
-  // The right-hand side is always the name called. A left-hand side other than
-  // a plain name is a chain of members, a.b.run(), resolved as one; a scope
-  // resolution behind anything but a package's name resolves to nothing.
-  if (callee->lhs->kind != ExprKind::kIdentifier) {
-    return callee->is_scope_resolution
-               ? CallShape{}
-               : MemberChainCallShape(*callee, parent, walk);
-  }
-  // §26.3: a package's subroutine behind the package's name, `p::t`.
-  if (callee->is_scope_resolution) {
-    return SubroutineCallShape(
-        VpiCalleeSubroutine(CallSiteOf(parent, walk), *callee),
-        callee->rhs->text);
-  }
-  return MethodCallShape(*callee, parent, walk);
+}
+
+// §37.62: the event statement a trigger stands as.
+VpiObject* MakeEventStatement(const Stmt& stmt, const BlockParent& parent,
+                              const BodyWalk& walk) {
+  VpiObject* obj = MakeAtomicStatement(stmt, vpiEventStmt, parent, walk);
+  // §9.7.2: "->" is the blocking event trigger and "->>" the nonblocking one,
+  // which is the whole of what the property distinguishes.
+  obj->blocking = stmt.kind == StmtKind::kEventTrigger;
+  // The figure's single arrow, which the generic one-to-one traversal walks by
+  // the kind of the child: the named event object the design already carries
+  // for the declaration, not a second one standing for the same event.
+  const std::string kTarget = EventTriggerTargetName(stmt);
+  if (kTarget.empty()) return obj;
+  VpiObject* event = TriggeredEvent(kTarget, parent, walk);
+  if (event != nullptr) obj->children.push_back(event);
+  return obj;
 }
 
 // §37.42: the arguments `expr`, standing in `parent`, was written with, in
@@ -616,11 +193,15 @@ void MakeCallArguments(VpiObject* call, const Expr& expr,
 // standing as one from a function call standing as an expression. A system
 // task or function call decompiles to the call written (detail 9), and is
 // recorded as the call statement it is, which a run's invocation of a
-// registered system task or function stands as (detail 3).
+// registered system task or function stands as (detail 3). A function call
+// written in a void cast, void'(f()); (§13.4.1), is the call it wraps: the
+// parser records that statement as the cast, the one cast a statement can be.
 VpiObject* MakeCallStatement(const Stmt& stmt, const BlockParent& parent,
                              const BodyWalk& walk) {
   if (stmt.kind != StmtKind::kExprStmt) return nullptr;
-  const CallShape kShape = CallShapeOf(*stmt.expr, parent, walk);
+  const Expr* called =
+      stmt.expr->kind == ExprKind::kCast ? stmt.expr->lhs : stmt.expr;
+  const CallShape kShape = CallShapeOf(*called, parent, walk);
   if (kShape.type == 0) return nullptr;
   VpiObject* call = MakeAtomicStatement(stmt, kShape.type, parent, walk);
   call->name = walk.build.keep(std::string(kShape.name));
@@ -630,10 +211,10 @@ VpiObject* MakeCallStatement(const Stmt& stmt, const BlockParent& parent,
   call->user_defined = kShape.user_defined;
   call->user_systf = kShape.systf;
   call->written_as_stmt = true;
-  MakeCallArguments(call, *stmt.expr, parent, walk);
+  MakeCallArguments(call, *called, parent, walk);
   if (kShape.type == vpiSysTaskCall || kShape.type == vpiSysFuncCall) {
-    call->decompile = VpiExprDecompile(stmt.expr);
-    walk.calls.sites[{stmt.expr, walk.prefix}] = call;
+    call->decompile = VpiExprDecompile(called);
+    walk.calls.sites[{called, walk.prefix}] = call;
   }
   return call;
 }

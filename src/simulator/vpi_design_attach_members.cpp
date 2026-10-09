@@ -100,19 +100,24 @@ int VpiNamedTypeVariableKind(const RtlirDesign& design, const RtlirModule& mod,
   return NamedTypeKind(design, NamesClass(design, mod.class_decls, name), name);
 }
 
+std::vector<ClassDecl*> VpiPackageClasses(const PackageDecl& package) {
+  std::vector<ClassDecl*> classes;
+  for (const ModuleItem* item : package.items) {
+    if (item->kind == ModuleItemKind::kClassDecl) {
+      classes.push_back(item->class_decl);
+    }
+  }
+  return classes;
+}
+
 int VpiPackageNamedTypeVariableKind(const RtlirDesign& design,
                                     const PackageDecl* package,
                                     std::string_view name) {
   if (package == nullptr) {
     return NamedTypeKind(design, NamesClass(design, {}, name), name);
   }
-  std::vector<ClassDecl*> classes;
-  for (const ModuleItem* item : package->items) {
-    if (item->kind == ModuleItemKind::kClassDecl) {
-      classes.push_back(item->class_decl);
-    }
-  }
-  return NamedTypeKind(design, NamesClass(design, classes, name),
+  return NamedTypeKind(design,
+                       NamesClass(design, VpiPackageClasses(*package), name),
                        std::string(package->name) + "::" + std::string(name));
 }
 

@@ -326,6 +326,20 @@ class DoWhileAndForeachLoopsOfARun : public VpiDesignRun {
     vpiHandle it = vpi_iterate(vpiProcess, By("top"));
     return it ? vpi_handle(vpiStmt, vpi_scan(it)) : nullptr;
   }
+
+  // The kind of the first index variable of each foreach loop the block
+  // `scope` holds, in the order written.
+  static std::vector<int> FirstLoopVarKinds(vpiHandle scope) {
+    std::vector<int> kinds;
+    vpiHandle stmts = vpi_iterate(vpiStmt, scope);
+    if (stmts == nullptr) return kinds;
+    while (vpiHandle stmt = vpi_scan(stmts)) {
+      if (vpi_get(vpiType, stmt) != vpiForeachStmt) continue;
+      kinds.push_back(
+          vpi_get(vpiType, vpi_scan(vpi_iterate(vpiLoopVars, stmt))));
+    }
+    return kinds;
+  }
 };
 
 // A do-while loop reaches the condition it tests and the statement it runs.
@@ -433,15 +447,7 @@ TEST_F(DoWhileAndForeachLoopsOfARun, ABlocksArraysGiveTheirIndexTypes) {
       "    foreach (v[i]) begin end\n"
       "  end\n"
       "endmodule\n");
-  std::vector<int> kinds;
-  vpiHandle loops = vpi_iterate(vpiStmt, By("top.b"));
-  ASSERT_NE(loops, nullptr);
-  while (vpiHandle loop = vpi_scan(loops)) {
-    vpiHandle vars = vpi_iterate(vpiLoopVars, loop);
-    ASSERT_NE(vars, nullptr);
-    kinds.push_back(vpi_get(vpiType, vpi_scan(vars)));
-  }
-  EXPECT_EQ(kinds,
+  EXPECT_EQ(FirstLoopVarKinds(By("top.b")),
             (std::vector<int>{vpiIntVar, vpiIntVar, vpiEnumVar, vpiClassVar,
                               vpiIntVar, vpiIntVar, vpiIntVar}));
 }
@@ -465,6 +471,33 @@ TEST_F(DoWhileAndForeachLoopsOfARun,
     kinds.push_back(vpi_get(vpiType, vpi_scan(vars)));
   }
   EXPECT_EQ(kinds, (std::vector<int>{vpiClassVar, vpiIntVar}));
+}
+
+// §12.7.3 with §8.4: over an array a class property holds, named through the
+// object, or through a chain of objects, the index variable is of the
+// property's index type, a string var over a string-indexed array; an int var
+// over a fixed-size property and over one named through an element select
+// (#5773). Over a module's array named through its instance, the index
+// variable is of that array's index type, a string var over a string-indexed
+// one and an int var over a fixed-size one (#5787).
+TEST_F(DoWhileAndForeachLoopsOfARun, APropertysArrayGivesItsIndexType) {
+  Run("module sub; int g [2]; int aa [string]; endmodule\n"
+      "module top; sub u ();\n"
+      "  class H; int a [string]; endclass\n"
+      "  class C; int m [string]; int f [2]; H h = new; endclass\n"
+      "  C o = new; C objs [2];\n"
+      "  initial begin : b objs[0] = new;\n"
+      "    foreach (o.m[k]) begin end\n"
+      "    foreach (o.h.a[k]) begin end\n"
+      "    foreach (o.f[k]) begin end\n"
+      "    foreach (objs[0].f[k]) begin end\n"
+      "    foreach (u.g[k]) begin end\n"
+      "    foreach (u.aa[k]) begin end\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(FirstLoopVarKinds(By("top.b")),
+            (std::vector<int>{vpiStringVar, vpiStringVar, vpiIntVar, vpiIntVar,
+                              vpiIntVar, vpiStringVar}));
 }
 
 // §37.75: a null handle has no do-while condition.

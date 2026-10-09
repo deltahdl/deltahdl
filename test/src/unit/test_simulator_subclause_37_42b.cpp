@@ -244,7 +244,7 @@ TEST(TaskFuncCallModel, ABlocksFunctionCalledOutsideItsBlockHasNoObject) {
 
 // The method func calls a scope's statements make, each as its method's name
 // and the name of the variable it is applied to, in the order written.
-class MethodCallStatementsOfARun : public VpiDesignRun {
+class CallStatementsInAScope : public VpiDesignRun {
  protected:
   static std::vector<std::pair<std::string, std::string>> MethodCallsOf(
       vpiHandle scope) {
@@ -261,6 +261,19 @@ class MethodCallStatementsOfARun : public VpiDesignRun {
     }
     return calls;
   }
+
+  // That the method task call `method` the block top.b holds reaches the
+  // method of that name of the class defn `cls` that `scope` holds.
+  static void ExpectTaskCallReaches(const char* method, const char* scope,
+                                    const char* cls) {
+    vpiHandle call = Named(vpiMethodTaskCall, By("top.b"), method);
+    vpiHandle declared =
+        Named(vpiMethods, Named(vpiClassDefn, By(scope), cls), method);
+    ASSERT_NE(call, nullptr) << method;
+    ASSERT_NE(declared, nullptr) << method;
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, call)), VpiObjectOf(declared))
+        << method;
+  }
 };
 
 // A block's queue (§7.10.2), its associative arrays indexed by a keyword, a
@@ -270,7 +283,7 @@ class MethodCallStatementsOfARun : public VpiDesignRun {
 // applied to the block's variable. The kind each variable is read as decides
 // whether the method is one of its own: an associative array has no sort and a
 // fixed-size array no delete.
-TEST_F(MethodCallStatementsOfARun, ABlocksBuiltInValuesTakeTheirKindsMethods) {
+TEST_F(CallStatementsInAScope, ABlocksBuiltInValuesTakeTheirKindsMethods) {
   Run("module top; typedef enum {A, B} e_t; class C; endclass\n"
       "  localparam int N = 2;\n"
       "  initial begin : b\n"
@@ -294,8 +307,7 @@ TEST_F(MethodCallStatementsOfARun, ABlocksBuiltInValuesTakeTheirKindsMethods) {
 // A module's dynamic array (§7.5), its fixed-size array (§7.12.2) and its enum
 // declared without a typedef (§6.19) take the built-in methods of their kind
 // as a block's do.
-TEST_F(MethodCallStatementsOfARun,
-       AModulesArraysAndAnonymousEnumTakeTheirMethods) {
+TEST_F(CallStatementsInAScope, AModulesArraysAndAnonymousEnumTakeTheirMethods) {
   Run("module top; int d[]; int f[2]; enum {X, Y} e;\n"
       "  initial begin : b d.delete(); f.sort(); e.next(); end\n"
       "endmodule\n");
@@ -308,7 +320,7 @@ TEST_F(MethodCallStatementsOfARun,
 // the chain's member among the class's members wherever the class declares
 // it, past a method and another property declared ahead of it, and is a
 // method task call of the class the member holds a handle of.
-TEST_F(MethodCallStatementsOfARun, AChainsMemberIsFoundPastTheMembersBeforeIt) {
+TEST_F(CallStatementsInAScope, AChainsMemberIsFoundPastTheMembersBeforeIt) {
   Run("module top;\n"
       "  class B; task run(); endtask endclass\n"
       "  class H; function void f(); endfunction int n; B b = new; endclass\n"
@@ -323,6 +335,144 @@ TEST_F(MethodCallStatementsOfARun, AChainsMemberIsFoundPastTheMembersBeforeIt) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, call)),
             VpiObjectOf(
                 Named(vpiMethods, Named(vpiClassDefn, By("top"), "B"), "run")));
+}
+
+// §13.4.1 with §37.42: a function call written in a void cast is a func call
+// statement reaching the function it calls, with the arguments it was written
+// with, the cast discarding the value and adding nothing to the model (#5782).
+TEST_F(CallStatementsInAScope, AVoidCastCallIsTheFuncCallItWraps) {
+  Run("module top; function int f(int a); return a; endfunction\n"
+      "  initial begin : b void'(f(3)); end\n"
+      "endmodule\n");
+  vpiHandle call = Named(vpiFuncCall, By("top.b"), "f");
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, call)),
+            VpiObjectOf(Named(vpiTaskFunc, By("top"), "f")));
+  EXPECT_EQ(KindsOf(vpiArgument, call), std::vector<int>{vpiConstant});
+}
+
+// §8.10 with §8.23 and §37.42: a static method called through its class's
+// scope, C::f(), or through a package's class, p::D::g(), is a method func
+// call applied to no object, reaching the method of the class defn made where
+// the class is declared (#5775).
+TEST_F(CallStatementsInAScope, AStaticMethodCalledThroughItsScopeIsACall) {
+  Run("package q; endpackage\n"
+      "package p; localparam int K = 1;\n"
+      "  class D; static function void g(); endfunction endclass\n"
+      "endpackage\n"
+      "module top;\n"
+      "  class C; static function void f(); endfunction endclass\n"
+      "  initial begin : b C::f(); p::D::g(); end\n"
+      "endmodule\n");
+  vpiHandle f = Named(vpiMethodFuncCall, By("top.b"), "f");
+  vpiHandle g = Named(vpiMethodFuncCall, By("top.b"), "g");
+  vpiHandle c_f = Named(vpiMethods, Named(vpiClassDefn, By("top"), "C"), "f");
+  vpiHandle d_g = Named(vpiMethods, Named(vpiClassDefn, By("p"), "D"), "g");
+  ASSERT_NE(f, nullptr);
+  ASSERT_NE(g, nullptr);
+  ASSERT_NE(c_f, nullptr);
+  ASSERT_NE(d_g, nullptr);
+  EXPECT_EQ(vpi_handle(vpiPrefix, f), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, f)), VpiObjectOf(c_f));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, g)), VpiObjectOf(d_g));
+}
+
+// §6.18 with §37.42: a handle whose class a typedef names is a handle of that
+// class, so a call applied to it, or through a property of its class, is a
+// method task call reaching the class's method (#5778).
+TEST_F(CallStatementsInAScope, ACallOnATypedefsHandleReachesItsClassMethod) {
+  Run("module top;\n"
+      "  class C; task go(); endtask endclass\n"
+      "  class B; task run(); endtask C c = new; endclass\n"
+      "  typedef B B_t;\n"
+      "  initial begin : b B_t x; x = new; x.run(); x.c.go(); end\n"
+      "endmodule\n");
+  ExpectTaskCallReaches("run", "top", "B");
+  ExpectTaskCallReaches("go", "top", "C");
+}
+
+// §26.3 with §37.42: a handle of a class a package declares, imported by name
+// or with a wildcard, is a handle of that class, so a call applied to it is a
+// method task call reaching the method of the package's class defn (#5786).
+TEST_F(CallStatementsInAScope, ACallOnAnImportedClasssHandleReachesItsMethod) {
+  Run("package q; endpackage\n"
+      "package p; localparam int K = 1;\n"
+      "  class D; task run(); endtask endclass\n"
+      "  class E; task go(); endtask endclass\n"
+      "endpackage\n"
+      "module top; import q::*; import p::K; import p::D; import p::*;\n"
+      "  D d = new; E e = new;\n"
+      "  initial begin : b d.run(); e.go(); end\n"
+      "endmodule\n");
+  ExpectTaskCallReaches("run", "p", "D");
+  ExpectTaskCallReaches("go", "p", "E");
+}
+
+// §23.6 with §37.42 detail 2: a method called through a class var of an
+// instance below, u.h.run(), is a method task call applied to that instance's
+// variable, reaching the method of the class defn the instance holds (#5776).
+TEST_F(CallStatementsInAScope, AChainThroughAnInstanceReachesItsVariable) {
+  Run("module sub; class B; task run(); endtask endclass B h = new;\n"
+      "endmodule\n"
+      "module top; sub u (); initial begin : b u.h.run(); end endmodule\n");
+  ExpectTaskCallReaches("run", "top.u", "B");
+  vpiHandle call = Named(vpiMethodTaskCall, By("top.b"), "run");
+  ASSERT_NE(call, nullptr);
+  ASSERT_NE(By("top.u.h"), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, call)),
+            VpiObjectOf(By("top.u.h")));
+}
+
+// §37.42 detail 2: a method called through an expression's value, an
+// element of an array of handles, a property of an element, a function's
+// result or a package's variable, is a method task call reaching its class's
+// method, applied to the expression object the prefix stands as (#5777).
+TEST_F(CallStatementsInAScope, ACallThroughAnExpressionReachesItsMethod) {
+  Run("package q; endpackage\n"
+      "package p; class D; task go(); endtask endclass\n"
+      "  int n; D obj = new;\n"
+      "endpackage\n"
+      "module top;\n"
+      "  class B; task run(); endtask B h; endclass\n"
+      "  function automatic B make(); B b = new; return b; endfunction\n"
+      "  B objs [2];\n"
+      "  initial begin : b\n"
+      "    objs[0] = new; objs[0].h = new;\n"
+      "    objs[0].run(); objs[0].h.run(); make().run(); p::obj.go();\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle b_run =
+      Named(vpiMethods, Named(vpiClassDefn, By("top"), "B"), "run");
+  vpiHandle d_go = Named(vpiMethods, Named(vpiClassDefn, By("p"), "D"), "go");
+  ASSERT_NE(b_run, nullptr);
+  ASSERT_NE(d_go, nullptr);
+  std::vector<VpiObject*> reached;
+  vpiHandle it = vpi_iterate(vpiStmt, By("top.b"));
+  ASSERT_NE(it, nullptr);
+  while (vpiHandle stmt = vpi_scan(it)) {
+    if (vpi_get(vpiType, stmt) != vpiMethodTaskCall) continue;
+    EXPECT_NE(vpi_handle(vpiPrefix, stmt), nullptr);
+    reached.push_back(VpiObjectOf(vpi_handle(vpiTask, stmt)));
+  }
+  EXPECT_EQ(reached,
+            (std::vector<VpiObject*>{VpiObjectOf(b_run), VpiObjectOf(b_run),
+                                     VpiObjectOf(b_run), VpiObjectOf(d_go)}));
+}
+
+// §25.9 with §37.42: a call of an interface's task through a virtual
+// interface, a module's, a block's or a class property's, is a task call named
+// after the task (#5784).
+TEST_F(CallStatementsInAScope, ACallThroughAVirtualInterfaceIsATaskCall) {
+  Run("interface ifc; task t(); endtask endinterface\n"
+      "module top; ifc i ();\n"
+      "  class H; virtual ifc vif; endclass\n"
+      "  virtual ifc v = i; H h = new;\n"
+      "  initial begin : b virtual ifc w; w = i; h.vif = i;\n"
+      "    v.t(); h.vif.t(); w.t();\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(NamesOf(vpiTaskCall, By("top.b")),
+            (std::vector<std::string>{"t", "t", "t"}));
 }
 
 }  // namespace
