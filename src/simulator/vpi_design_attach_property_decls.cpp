@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstddef>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -46,18 +47,23 @@ constexpr KeywordType kKeywordTypes[] = {
     {TokenKind::kKwEvent, DataTypeKind::kEvent},
 };
 
-// The data type `keyword` names alone; kImplicit where it names none.
+// The data type `keyword` names alone. `keyword` is a formal's or a local
+// variable's type keyword other than sequence or property, which
+// kKeywordTypes holds every one of: the parser rejects chandle, the one other
+// keyword it reads there, as a formal's type (§16.8) and a local variable's
+// (§16.10).
 DataTypeKind KeywordDataType(TokenKind keyword) {
-  for (const KeywordType& entry : kKeywordTypes) {
-    if (entry.keyword == keyword) return entry.type;
-  }
-  return DataTypeKind::kImplicit;
+  return std::find_if(std::begin(kKeywordTypes), std::end(kKeywordTypes),
+                      [keyword](const KeywordType& entry) {
+                        return entry.keyword == keyword;
+                      })
+      ->type;
 }
 
 // §37.51 detail 3 with §37.25: the kind of typespec a property formal declared
-// with the type keyword `keyword` reaches, 0 for an untyped formal, which
-// reaches none. §16.12 adds sequence and property to the data types a formal
-// may be declared with; §6.12 makes realtime a synonym for real.
+// with the type keyword `keyword` reaches. §16.12 adds sequence and property
+// to the data types a formal may be declared with; §6.12 makes realtime a
+// synonym for real.
 int FormalTypespecKind(TokenKind keyword) {
   switch (keyword) {
     case TokenKind::kKwSequence:
@@ -68,10 +74,8 @@ int FormalTypespecKind(TokenKind keyword) {
       return vpiEventTypespec;
     case TokenKind::kKwRealtime:
       return vpiRealTypespec;
-    default: {
-      const DataTypeKind kType = KeywordDataType(keyword);
-      return kType == DataTypeKind::kImplicit ? 0 : VpiTypespecKind(kType);
-    }
+    default:
+      return VpiTypespecKind(KeywordDataType(keyword));
   }
 }
 
