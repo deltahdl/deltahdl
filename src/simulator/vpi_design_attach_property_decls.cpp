@@ -295,9 +295,11 @@ VpiObject* VpiImportedPropertyDecl(std::string_view name,
                                    const VpiObjectMap& objects) {
   for (const RtlirImport& imported : imports) {
     if (!imported.is_wildcard && imported.item_name != name) continue;
+    // §26.7: the std package every scope imports has no object of its own.
+    const VpiObject* pkg =
+        FindObjectForFlatName(objects, imported.package_name);
     VpiObject* decl =
-        ChildOfType(FindObjectForFlatName(objects, imported.package_name),
-                    vpiPropertyDecl, name);
+        pkg != nullptr ? ChildOfType(pkg, vpiPropertyDecl, name) : nullptr;
     if (decl != nullptr) return decl;
   }
   return nullptr;
