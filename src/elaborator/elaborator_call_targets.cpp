@@ -315,10 +315,10 @@ const ClassDecl* ClassNamed(const DataScope& scope, const DataType& type) {
 }
 
 // §25.9: the interface the virtual interface `prefix` names refers to an
-// instance of: a variable of the module or of a block around the call, v, an
-// element of an array of them, one select per unpacked dimension (§7.4),
-// va[0], or a property of the class a variable holds a handle of, h.vif;
-// empty for anything else.
+// instance of: a variable of the module or of a block around the call, v, or a
+// property of the class a variable holds a handle of, h.vif, or an element of
+// an array of either, one select per unpacked dimension (§7.4), va[0] or
+// h.vifs[0]; empty for anything else.
 std::string_view VifOf(const Expr& prefix, const DataScope& scope) {
   const Expr* root = &prefix;
   std::size_t selects = 0;
@@ -331,19 +331,21 @@ std::string_view VifOf(const Expr& prefix, const DataScope& scope) {
     return var != nullptr && var->dims == selects ? VifInterface(*var->type)
                                                   : std::string_view();
   }
-  if (selects != 0 || prefix.kind != ExprKind::kMemberAccess ||
-      prefix.is_scope_resolution || prefix.lhs->kind != ExprKind::kIdentifier) {
+  if (root->kind != ExprKind::kMemberAccess || root->is_scope_resolution ||
+      root->lhs->kind != ExprKind::kIdentifier) {
     return {};
   }
-  const DeclaredVar* holder = scope.Declared(prefix.lhs->text);
+  const DeclaredVar* holder = scope.Declared(root->lhs->text);
   const ClassDecl* cls =
       holder == nullptr ? nullptr : ClassNamed(scope, *holder->type);
   if (cls == nullptr) return {};
   std::string_view iface;
   for (const ClassMember* member : cls->members) {
     if (member->kind == ClassMemberKind::kProperty &&
-        member->name == prefix.rhs->text) {
-      iface = VifInterface(member->data_type);
+        member->name == root->rhs->text) {
+      iface = member->unpacked_dims.size() == selects
+                  ? VifInterface(member->data_type)
+                  : std::string_view();
     }
   }
   return iface;

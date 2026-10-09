@@ -66,32 +66,37 @@ TEST(VirtualInterfaceArrayElaboration, AnElementOfAnArrayIsSelected) {
 
 // §25.9 with §7.4: a call through an element of an array of virtual
 // interfaces, one select per unpacked dimension, names a task or a function of
-// the interface, and one naming nothing it declares is reported (#5819). A
-// call through an element of a class property's array of virtual interfaces
-// is not followed, nor one through an interface instance, and the valid ones
-// are not reported; v[0], a select of a single virtual interface, names none,
-// and is reported as the select it is.
+// the interface, and one naming nothing it declares is reported, whether the
+// array is a variable (#5819) or a class property (#5820). A call through an
+// interface instance is no virtual interface call, and the valid calls are not
+// reported; v[0], a select of a single virtual interface, names none, and is
+// reported as the select it is. h.vif[0] selects into a single property, no
+// element of an array, and its call is not followed.
 TEST(VirtualInterfaceCallElaboration, ACallThroughAnElementOfAnArray) {
   ElabFixture f;
   ElaborateSrc(
       "interface ifc; task t(); endtask endinterface\n"
-      "class H; virtual ifc vifs[2]; endclass\n"
+      "class H; virtual ifc vifs[2]; virtual ifc vif; endclass\n"
       "module top;\n"
       "  ifc i (); virtual ifc va[2]; virtual ifc vb[2][2]; virtual ifc v;\n"
       "  H h = new;\n"
       "  initial if (0) begin\n"
       "    va[0].nosuch();\n"
       "    vb[1][0].nosuch();\n"
-      "    va[1].t(); vb[0][1].t(); h.vifs[0].t(); i.t();\n"
+      "    h.vifs[0].nosuch();\n"
+      "    va[1].t(); vb[0][1].t(); h.vifs[1].t(); i.t();\n"
       "    v[0].t();\n"
+      "    h.vif[0].nosuch();\n"
       "  end\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoSuch, 7, "25.9"));
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoSuch, 8, "25.9"));
-  EXPECT_TRUE(NoErrorOnLine(f, 9));
+  for (const uint32_t kLine : {7u, 8u, 9u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoSuch, kLine, "25.9"))
+        << kLine;
+  }
+  EXPECT_TRUE(NoErrorOnLine(f, 10));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "bit-select on virtual interface is illegal", 10,
+                            "bit-select on virtual interface is illegal", 11,
                             "25.9"));
 }
 
