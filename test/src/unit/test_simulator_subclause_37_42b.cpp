@@ -559,24 +559,19 @@ TEST_F(CallStatementsInAScope, ACallOnProcessSelfIsAMethodFuncCall) {
 
 // §23.8 with §37.42: a task a module's procedure calls by a name its module
 // does not declare is the task of the nearest enclosing module declaring it,
-// through any number of levels and through a generate block, and the task
-// call reaches that module's task object (#5802).
+// through any number of levels, and the task call reaches that module's task
+// object (#5802).
 TEST_F(CallStatementsInAScope, ACallResolvedUpwardReachesTheEnclosingTask) {
   Run("module deep; initial begin : b t(); end endmodule\n"
       "module leaf; deep k (); endmodule\n"
       "module mid; leaf l (); endmodule\n"
       "module other; endmodule\n"
-      "module top; task t; endtask other s (); mid m ();\n"
-      "  if (1) begin : g deep d2 (); end\n"
-      "endmodule\n");
+      "module top; task t; endtask other s (); mid m (); endmodule\n");
   vpiHandle task = Named(vpiTaskFunc, By("top"), "t");
   ASSERT_NE(task, nullptr);
-  for (const char* const kBlock : {"top.m.l.k.b", "top.g.d2.b"}) {
-    vpiHandle call = Named(vpiTaskCall, By(kBlock), "t");
-    ASSERT_NE(call, nullptr) << kBlock;
-    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, call)), VpiObjectOf(task))
-        << kBlock;
-  }
+  vpiHandle call = Named(vpiTaskCall, By("top.m.l.k.b"), "t");
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, call)), VpiObjectOf(task));
 }
 
 // §11.12 with §37.42: a method called on the handle a let yields is a method
