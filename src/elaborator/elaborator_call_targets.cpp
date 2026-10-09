@@ -314,6 +314,22 @@ const ClassDecl* ClassNamed(const DataScope& scope, const DataType& type) {
   return ClassIn(unit, site, named->type_name);
 }
 
+// §25.9 with §7.4: the interface the property `name` of the class `cls`
+// refers to an instance of, reached through `selects` selects: a virtual
+// interface property with as many unpacked dimensions; empty for any other.
+std::string_view PropertyVif(const ClassDecl& cls, std::string_view name,
+                             std::size_t selects) {
+  std::string_view iface;
+  for (const ClassMember* member : cls.members) {
+    if (member->kind == ClassMemberKind::kProperty && member->name == name) {
+      iface = member->unpacked_dims.size() == selects
+                  ? VifInterface(member->data_type)
+                  : std::string_view();
+    }
+  }
+  return iface;
+}
+
 // §25.9: the interface the virtual interface `prefix` names refers to an
 // instance of: a variable of the module or of a block around the call, v, or a
 // property of the class a variable holds a handle of, h.vif, or an element of
@@ -338,17 +354,8 @@ std::string_view VifOf(const Expr& prefix, const DataScope& scope) {
   const DeclaredVar* holder = scope.Declared(root->lhs->text);
   const ClassDecl* cls =
       holder == nullptr ? nullptr : ClassNamed(scope, *holder->type);
-  if (cls == nullptr) return {};
-  std::string_view iface;
-  for (const ClassMember* member : cls->members) {
-    if (member->kind == ClassMemberKind::kProperty &&
-        member->name == root->rhs->text) {
-      iface = member->unpacked_dims.size() == selects
-                  ? VifInterface(member->data_type)
-                  : std::string_view();
-    }
-  }
-  return iface;
+  return cls == nullptr ? std::string_view()
+                        : PropertyVif(*cls, root->rhs->text, selects);
 }
 
 // §25.9: a call `call` through a virtual interface, v.t(), naming no task or
