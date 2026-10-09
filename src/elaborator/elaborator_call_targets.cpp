@@ -161,7 +161,7 @@ void ReportCallsOfDataNames(const ModuleDecl& decl, const CompilationUnit& unit,
   }
   // A name a DPI export gives a function the module also declares stays
   // callable whichever item the walk met first.
-  for (const std::string_view name : subroutines) scope.uncallable.erase(name);
+  for (std::string_view name : subroutines) scope.uncallable.erase(name);
   for (const ModuleItem* item : decl.items) {
     if (IsProceduralItemKind(item->kind))
       CheckStmtCalls(item->body, scope, diag);
