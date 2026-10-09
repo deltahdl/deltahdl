@@ -5,11 +5,13 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
+#include "parser/ast_design.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_internal.h"
@@ -85,6 +87,15 @@ inline VpiHandle ObjectNamedIn(
   if (scope != nullptr) return ChildNamed(scope, name);
   auto it = objects.find(name);
   return it == objects.end() ? nullptr : it->second;
+}
+
+// §5.6.1: the escaped identifiers of the design's compilation unit that hold a
+// period, which a flat name is not split at; none for a design that has no
+// unit to say.
+inline std::unordered_set<std::string_view> VpiDottedEscapedNames(
+    const RtlirDesign* design) {
+  if (design == nullptr || design->compilation_unit == nullptr) return {};
+  return design->compilation_unit->dotted_escaped_names;
 }
 
 // The object a flat design name already stands for, and null where the name

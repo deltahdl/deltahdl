@@ -15,7 +15,6 @@
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "elaborator/rtlir.h"
-#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_specify.h"
 #include "parser/ast_type.h"
@@ -688,11 +687,7 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   // made here -- a fork branch begins while the design executes, long after
   // this -- so what is kept is the run itself.
   sim_ctx_ = &sim_ctx;
-  // §5.6.1: the escaped names holding a period, which the split keeps whole.
-  dotted_escaped_names_.clear();
-  if (design != nullptr && design->compilation_unit != nullptr) {
-    dotted_escaped_names_ = design->compilation_unit->dotted_escaped_names;
-  }
+  dotted_escaped_names_ = VpiDottedEscapedNames(design);
 
   // §36.10: VPI routines reach the objects of an instantiated design, one in
   // which every instance of an object can be reached on its own. The clause's
