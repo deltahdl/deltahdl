@@ -561,6 +561,18 @@ std::string_view BuiltInResultClass(std::string_view cls,
 ExprClassName ExprClass(const Expr& expr, const BlockParent& parent,
                         const BodyWalk& walk);
 
+// §11.12: the class the expression the let `name` the instance's module
+// declares stands for is a handle of, cur() as the class of b where
+// `let cur() = b;`; empty where the module declares no let of the name.
+ExprClassName LetResultClass(std::string_view name, const BlockParent& parent,
+                             const BodyWalk& walk) {
+  ExprClassName cls;
+  for (const ModuleItem* item : walk.mod.let_decls) {
+    if (item->name == name) cls = ExprClass(*item->init_expr, parent, walk);
+  }
+  return cls;
+}
+
 // §13.4 with §8.6 and §8.10: the class the subroutine `callee` names returns
 // a handle of: a function's, f() or a package's p::f(), the class looked up in
 // that package; a static method's of the class a scope names, C::make(); or a
@@ -573,7 +585,9 @@ ExprClassName CallResultClass(const Expr& callee, const BlockParent& parent,
     return {function->return_type.type_name,
             callee.is_scope_resolution ? callee.lhs->text : std::string_view()};
   }
-  if (callee.kind != ExprKind::kMemberAccess) return {};
+  if (callee.kind != ExprKind::kMemberAccess) {
+    return LetResultClass(callee.text, parent, walk);
+  }
   const ExprClassName kOwner = callee.is_scope_resolution
                                    ? ExprClassName{callee.lhs->text, {}}
                                    : ExprClass(*callee.lhs, parent, walk);

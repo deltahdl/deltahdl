@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -410,6 +411,48 @@ VpiCalledSubroutine VpiPackageSubroutine(const RtlirDesign& design,
   return {};
 }
 
+namespace {
+
+// The module of the instance whose objects are keyed under `prefix`, reached
+// from the first top through the child each component names; null where a
+// component names no child, as a generate block's does.
+const RtlirModule* ModuleAtPrefix(const RtlirDesign& design,
+                                  std::string_view prefix) {
+  if (design.top_modules.empty()) return nullptr;
+  const RtlirModule* mod = design.top_modules.front();
+  for (std::size_t start = 0; mod != nullptr && start < prefix.size();) {
+    std::size_t end = prefix.find('.', start);
+    if (end == std::string_view::npos) end = prefix.size();
+    const std::string_view kName = prefix.substr(start, end - start);
+    const RtlirModule* next = nullptr;
+    for (const RtlirModuleInst& child : mod->children) {
+      if (child.inst_name == kName) next = child.resolved;
+    }
+    mod = next;
+    start = end + 1;
+  }
+  return mod;
+}
+
+// §23.8: the task or function `name` the module of an instance enclosing the
+// call's declares, the nearest first, up to the root of the hierarchy, with
+// the object made for it there; none where no enclosing module declares one.
+VpiCalledSubroutine EnclosingSubroutine(const VpiCallSite& site,
+                                        std::string_view name) {
+  std::string prefix = site.prefix;
+  while (!prefix.empty()) {
+    const std::size_t kDot = prefix.rfind('.');
+    prefix.resize(kDot == std::string::npos ? 0 : kDot);
+    const RtlirModule* mod = ModuleAtPrefix(site.design, prefix);
+    const ModuleItem* found =
+        mod == nullptr ? nullptr : InstanceSubroutine(*mod, name);
+    if (found != nullptr) return Called(found, prefix, site.made);
+  }
+  return {};
+}
+
+}  // namespace
+
 VpiCalledSubroutine VpiNamedSubroutine(const VpiCallSite& site,
                                        std::string_view name) {
   VpiCalledSubroutine called = GenerateBlockSubroutine(site, name);
@@ -431,8 +474,10 @@ VpiCalledSubroutine VpiNamedSubroutine(const VpiCallSite& site,
   // call declares it still says what kind of call names it, and so does a
   // task or function the module imports through DPI (§35.5), which no task or
   // function object stands for.
-  const ModuleItem* found = SubroutineNamed(site.mod.function_decls, name);
-  return {found != nullptr ? found : DpiImportNamed(site.mod, name), nullptr};
+  const ModuleItem* local = SubroutineNamed(site.mod.function_decls, name);
+  if (local == nullptr) local = DpiImportNamed(site.mod, name);
+  if (local != nullptr) return {local, nullptr};
+  return EnclosingSubroutine(site, name);
 }
 
 VpiCalledSubroutine VpiCalleeSubroutine(const VpiCallSite& site,

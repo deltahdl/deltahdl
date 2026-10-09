@@ -557,5 +557,44 @@ TEST_F(CallStatementsInAScope, ACallOnProcessSelfIsAMethodFuncCall) {
   EXPECT_EQ(vpi_get(vpiUserDefn, call), 0);
 }
 
+// §23.8 with §37.42: a task a module's procedure calls by a name its module
+// does not declare is the task of the nearest enclosing module declaring it,
+// through any number of levels and through a generate block, and the task
+// call reaches that module's task object (#5802).
+TEST_F(CallStatementsInAScope, ACallResolvedUpwardReachesTheEnclosingTask) {
+  Run("module deep; initial begin : b t(); end endmodule\n"
+      "module leaf; deep k (); endmodule\n"
+      "module mid; leaf l (); endmodule\n"
+      "module other; endmodule\n"
+      "module top; task t; endtask other s (); mid m ();\n"
+      "  if (1) begin : g deep d2 (); end\n"
+      "endmodule\n");
+  vpiHandle task = Named(vpiTaskFunc, By("top"), "t");
+  ASSERT_NE(task, nullptr);
+  for (const char* const kBlock : {"top.m.l.k.b", "top.g.d2.b"}) {
+    vpiHandle call = Named(vpiTaskCall, By(kBlock), "t");
+    ASSERT_NE(call, nullptr) << kBlock;
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, call)), VpiObjectOf(task))
+        << kBlock;
+  }
+}
+
+// §11.12 with §37.42: a method called on the handle a let yields is a method
+// task call of the class of the let's expression (#5803).
+TEST_F(CallStatementsInAScope, ACallOnALetsHandleReachesItsMethod) {
+  Run("module top;\n"
+      "  class B; task run(); endtask endclass\n"
+      "  B b = new;\n"
+      "  let other() = 1;\n"
+      "  let cur() = b;\n"
+      "  initial begin : b0 cur().run(); end\n"
+      "endmodule\n");
+  vpiHandle call = Named(vpiMethodTaskCall, By("top.b0"), "run");
+  vpiHandle run = Named(vpiMethods, Named(vpiClassDefn, By("top"), "B"), "run");
+  ASSERT_NE(call, nullptr);
+  ASSERT_NE(run, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, call)), VpiObjectOf(run));
+}
+
 }  // namespace
 }  // namespace delta
