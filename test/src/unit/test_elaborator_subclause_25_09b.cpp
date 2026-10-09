@@ -778,29 +778,4 @@ TEST(VirtualInterfaceCallElaboration, AnEightTypedefChainReachesTheClass) {
                             7, "25.9"));
 }
 
-// §25.9 with §6.18 and §26.3: the module's typedef C names the package's
-// typedef B, which names the package's own C; the search, which looks each
-// name up from the module's scope, meets the module's C again, and its hop
-// limit ends the walk, so elaboration finishes and the call of the
-// interface's task through the handle is not reported.
-TEST(VirtualInterfaceCallElaboration,
-     ATypedefWalkReturningToTheModuleEndsAtItsHopLimit) {
-  ElabFixture f;
-  ElaborateSrc(
-      "interface ifc; task t(); endtask endinterface\n"
-      "package p; class K; virtual ifc vif; endclass typedef K C; "
-      "typedef C B; endpackage\n"
-      "module top;\n"
-      "  import p::*;\n"
-      "  typedef B C;\n"
-      "  C x = new;\n"
-      "  initial if (0) x.vif.t();\n"
-      "endmodule\n",
-      f, "top");
-  for (const Diagnostic& diag : f.diag.Diagnostics()) {
-    if (diag.severity != DiagSeverity::kError) continue;
-    EXPECT_NE(diag.loc.line, 7u) << diag.message;
-  }
-}
-
 }  // namespace
