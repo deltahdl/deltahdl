@@ -578,17 +578,18 @@ VpiObject* AssignedExpressionObject(const Expr* expr, const VpiObject* target,
   return KeyedPatternObject(expr, target, build);
 }
 
-// §23.6: `expr` as the dotted name it writes, `u1.clk`, onto `out`; false
-// where it is not identifiers joined by dots alone.
+// §23.6: `expr` as the dotted name it writes, `u1.clk`, onto `out`, a
+// package's name before `::` (§26.3) joined as a scope like any other,
+// `p::obj` as `p.obj`, which is the flat name the package's objects are found
+// under; false where it is not identifiers joined so alone.
 bool DottedName(const Expr* expr, std::string& out) {
   if (expr == nullptr) return false;
   if (expr->kind == ExprKind::kIdentifier) {
     out += expr->text;
     return expr->scope_prefix.empty();
   }
-  if (expr->kind != ExprKind::kMemberAccess || expr->is_scope_resolution ||
-      expr->rhs == nullptr || expr->rhs->kind != ExprKind::kIdentifier ||
-      !DottedName(expr->lhs, out)) {
+  if (expr->kind != ExprKind::kMemberAccess || expr->rhs == nullptr ||
+      expr->rhs->kind != ExprKind::kIdentifier || !DottedName(expr->lhs, out)) {
     return false;
   }
   out += ".";

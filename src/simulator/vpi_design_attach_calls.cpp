@@ -8,6 +8,7 @@
 #include "elaborator/queue_dim.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_class.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -25,9 +26,11 @@ namespace delta {
 namespace {
 
 // §13.3 and §13.4: the kind of tf call a call of the subroutine `decl` is,
-// `task` for a task and `function` for a function.
+// `task` for a task, one a DPI import declares among them (§35.5), and
+// `function` for a function.
 int CallKindOf(const ModuleItem& decl, int task, int function) {
-  return decl.kind == ModuleItemKind::kTaskDecl ? task : function;
+  return decl.kind == ModuleItemKind::kTaskDecl || decl.dpi_is_task ? task
+                                                                    : function;
 }
 
 // §37.42: a task or function call named `name` of the subroutine `sub`
@@ -213,13 +216,15 @@ std::string_view VifInterface(const DataType* type) {
 
 // §8.4: the variable a call's prefix names, as the class it holds a handle of
 // (empty for a variable of no class type and for no variable), the kind of
-// built-in value it is, the object standing for it, and the interface it
-// refers to an instance of where it is a virtual interface.
+// built-in value it is, the object standing for it, the interface it refers
+// to an instance of where it is a virtual interface, and the type its
+// declaration wrote, null where the elaborator recorded none.
 struct PrefixVar {
   std::string_view cls;
   VpiBuiltInHolder holder = VpiBuiltInHolder::kNone;
   VpiObject* object = nullptr;
   std::string_view vif;
+  const DataType* type = nullptr;
 };
 
 // The variable `name` of the module `mod`, whose instance's objects are keyed
@@ -233,6 +238,7 @@ PrefixVar ModulePrefixVar(const RtlirModule& mod, const std::string& prefix,
     var.cls = decl.class_type_name;
     var.holder = ModuleHolder(decl);
     var.vif = VifInterface(decl.written_type);
+    var.type = decl.written_type;
     break;
   }
   return var;
@@ -249,7 +255,7 @@ PrefixVar FindPrefixVar(const BlockParent& parent, std::string_view name,
     return {
         type.kind == DataTypeKind::kNamed ? type.type_name : std::string_view(),
         BlockHolder(*item, walk), ChildNamed(where->scope, name),
-        VifInterface(&type)};
+        VifInterface(&type), &type};
   }
   return ModulePrefixVar(walk.mod, walk.prefix, name, walk);
 }
@@ -373,15 +379,20 @@ CallShape MethodShape(const MethodCall& call, std::string_view name,
 // function `name` the interface `iface` declares: a task or func call named
 // after it. Which instance of the interface the virtual interface refers to is
 // known only when the call runs, so the call reaches no one instance's task or
-// function object.
+// function object. The interface's declaration says which the subroutine is,
+// whether or not anything instantiates the interface.
 CallShape InterfaceCallShape(const BodyWalk& walk, std::string_view iface,
                              std::string_view name) {
-  const auto kFound = walk.design.all_modules.find(iface);
-  if (kFound == walk.design.all_modules.end()) return {};
-  const VpiCallSite kSite{walk.design, *kFound->second,        walk.prefix,
-                          nullptr,     walk.calls.subroutines, nullptr};
-  return SubroutineCallShape({VpiNamedSubroutine(kSite, name).decl, nullptr},
-                             name);
+  const ModuleItem* called = nullptr;
+  for (const ModuleDecl* decl : walk.design.compilation_unit->interfaces) {
+    if (decl->name != iface) continue;
+    for (const ModuleItem* item : decl->items) {
+      const bool kSubroutine = item->kind == ModuleItemKind::kTaskDecl ||
+                               item->kind == ModuleItemKind::kFunctionDecl;
+      if (kSubroutine && item->name == name) called = item;
+    }
+  }
+  return SubroutineCallShape({called, nullptr}, name);
 }
 
 // §37.42: a method task or method function call, applied through `access`,
@@ -491,11 +502,36 @@ std::string_view PackageVarClass(const RtlirDesign& design,
   return cls;
 }
 
+ExprClassName ExprClass(const Expr& expr, const BlockParent& parent,
+                        const BodyWalk& walk);
+
+// §13.4 with §8.6: the class the subroutine `callee` names returns a handle
+// of: a method's, of the class of the value it is applied through, a.self();
+// or a function's, f() or p::f().
+ExprClassName CallResultClass(const Expr& callee, const BlockParent& parent,
+                              const BodyWalk& walk) {
+  if (callee.kind == ExprKind::kMemberAccess && !callee.is_scope_resolution) {
+    const ExprClassName kOwner = ExprClass(*callee.lhs, parent, walk);
+    const std::string_view kMethod = callee.rhs->text;
+    const ClassDecl* decl =
+        ClassMethodCall(walk, kOwner.cls, kMethod, kOwner.package).owner.decl;
+    return {decl == nullptr
+                ? std::string_view()
+                : MethodNamed(*decl, kMethod)->return_type.type_name,
+            kOwner.package};
+  }
+  const ModuleItem* decl =
+      VpiCalleeSubroutine(CallSiteOf(parent, walk), callee).decl;
+  return {decl == nullptr ? std::string_view() : decl->return_type.type_name,
+          {}};
+}
+
 // §8.4: the class the value `expr` writes is a handle of: a variable's of the
 // scope; an element's of an array of handles, objs[0]; a property's of the
-// class of what it is selected from, a.h; a package's variable's, p::obj; and
-// the return type of the function a call calls, f(). Empty for any other
-// expression, such as a method call's result or a conditional.
+// class of what it is selected from, a.h; a package's variable's, p::obj; the
+// return type of what a call calls, f() or a.self(); and a conditional's, of
+// the operand it may answer with first (§11.4.11, which has both operands
+// share a class or one extend the other). Empty for any other expression.
 ExprClassName ExprClass(const Expr& expr, const BlockParent& parent,
                         const BodyWalk& walk) {
   if (expr.kind == ExprKind::kIdentifier) {
@@ -505,10 +541,10 @@ ExprClassName ExprClass(const Expr& expr, const BlockParent& parent,
     return ExprClass(*expr.base, parent, walk);
   }
   if (expr.kind == ExprKind::kCall) {
-    const ModuleItem* decl =
-        VpiCalleeSubroutine(CallSiteOf(parent, walk), *expr.lhs).decl;
-    return {decl == nullptr ? std::string_view() : decl->return_type.type_name,
-            {}};
+    return CallResultClass(*expr.lhs, parent, walk);
+  }
+  if (expr.kind == ExprKind::kTernary) {
+    return ExprClass(*expr.true_expr, parent, walk);
   }
   if (expr.kind != ExprKind::kMemberAccess) return {};
   if (expr.is_scope_resolution) {
@@ -521,18 +557,63 @@ ExprClassName ExprClass(const Expr& expr, const BlockParent& parent,
 }
 
 // §37.42 detail 2: a method call applied to the value of an expression other
-// than a chain of names, objs[0].run() or f().h.run(), whose class says what
-// the method is. The call is applied to the expression object the prefix
-// stands as (§37.58, §37.59).
+// than a chain of names, objs[0].run() or objs[0].h.run(), whose class says
+// what the method is. The call is applied to the expression object the
+// expression's base stands as (§37.58, §37.59), objs[0], and through the
+// members a chain of plain names selects after it, h, which are read in the
+// objects the base references when the prefix is asked for.
 CallShape ExprCallShape(const Expr& access, const BlockParent& parent,
                         const BodyWalk& walk) {
   const std::string_view kName = access.rhs->text;
   const ExprClassName kClass = ExprClass(*access.lhs, parent, walk);
-  return MethodShape(
+  std::vector<std::string_view> members;
+  const Expr* base = access.lhs;
+  while (base->kind == ExprKind::kMemberAccess && !base->is_scope_resolution) {
+    members.insert(members.begin(), base->rhs->text);
+    base = base->lhs;
+  }
+  CallShape shape = MethodShape(
       ClassMethodCall(walk, kClass.cls, kName, kClass.package), kName,
-      VpiCallSiteExpression(access.lhs, walk.objects, CallSiteOf(parent, walk),
+      VpiCallSiteExpression(base, walk.objects, CallSiteOf(parent, walk),
                             walk.calls.ctx, walk.build),
       walk);
+  shape.prefix_members = std::move(members);
+  return shape;
+}
+
+// §6.18: the type the typedef `name` the walked module declares stands for;
+// null where the module declares no typedef of that name.
+const DataType* ModuleTypedef(const BodyWalk& walk, std::string_view name) {
+  const DataType* found = nullptr;
+  for (const ModuleDecl* decl : walk.design.compilation_unit->modules) {
+    if (decl->name != walk.mod.name) continue;
+    for (const ModuleItem* item : decl->items) {
+      if (item->kind == ModuleItemKind::kTypedef && item->name == name) {
+        found = &item->typedef_type;
+      }
+    }
+  }
+  return found;
+}
+
+// §7.2: the unpacked or packed structure `type` declares, written as one or
+// through a typedef the walked module declares; null for any other type.
+const DataType* StructTypeOf(const BodyWalk& walk, const DataType* type) {
+  if (type != nullptr && type->kind == DataTypeKind::kNamed) {
+    type = ModuleTypedef(walk, type->type_name);
+  }
+  return type != nullptr && type->kind == DataTypeKind::kStruct ? type
+                                                                : nullptr;
+}
+
+// §7.2 with §8.4: the class the member `name` of the structure `aggregate`
+// holds a handle of, named as its declaration wrote it.
+HandleType StructMemberType(const DataType& aggregate, std::string_view name) {
+  HandleType type;
+  for (const StructMember& member : aggregate.struct_members) {
+    if (member.name == name) type.cls = member.type_name;
+  }
+  return type;
 }
 
 // §37.42 detail 2 with §8.4: a method call applied through a chain of members
@@ -551,7 +632,18 @@ CallShape MemberChainCallShape(const Expr& access, const BlockParent& parent,
   if (kHead.var.holder != VpiBuiltInHolder::kNone) return {};
   const BodyWalk kAt = kHead.WalkAt(walk);
   HandleType type{kHead.var.cls, kHead.var.vif};
-  for (std::size_t i = kHead.used; i < names.size(); ++i) {
+  VpiObject* prefix = kHead.var.object;
+  std::size_t first = kHead.used;
+  // §7.2: a structure's member is selected in the structure variable itself,
+  // whose member object stands for it, so the chain's class vars start there.
+  const DataType* aggregate =
+      first < names.size() ? StructTypeOf(kAt, kHead.var.type) : nullptr;
+  if (aggregate != nullptr) {
+    type = StructMemberType(*aggregate, names[first]);
+    prefix = ChildNamed(prefix, names[first]);
+    ++first;
+  }
+  for (std::size_t i = first; i < names.size(); ++i) {
     type = PropertyType(kAt, type.cls, names[i]);
   }
   if (!type.vif.empty()) {
@@ -559,10 +651,10 @@ CallShape MemberChainCallShape(const Expr& access, const BlockParent& parent,
   }
   CallShape shape =
       MethodShape(ClassMethodCall(kAt, type.cls, access.rhs->text),
-                  access.rhs->text, kHead.var.object, kAt);
+                  access.rhs->text, prefix, kAt);
   if (shape.type != 0) {
     shape.prefix_members.assign(
-        names.begin() + static_cast<std::ptrdiff_t>(kHead.used), names.end());
+        names.begin() + static_cast<std::ptrdiff_t>(first), names.end());
   }
   return shape;
 }

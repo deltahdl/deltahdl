@@ -426,7 +426,7 @@ TEST_F(CallStatementsInAScope, AChainThroughAnInstanceReachesItsVariable) {
 // §37.42 detail 2: a method called through an expression's value, an
 // element of an array of handles, a property of an element, a function's
 // result or a package's variable, is a method task call reaching its class's
-// method (#5777).
+// method (#5777), applied to an object it reaches through vpiPrefix (#5792).
 TEST_F(CallStatementsInAScope, ACallThroughAnExpressionReachesItsMethod) {
   Run("package q; endpackage\n"
       "package p; class D; task go(); endtask endclass\n"
@@ -451,6 +451,7 @@ TEST_F(CallStatementsInAScope, ACallThroughAnExpressionReachesItsMethod) {
   ASSERT_NE(it, nullptr);
   while (vpiHandle stmt = vpi_scan(it)) {
     if (vpi_get(vpiType, stmt) != vpiMethodTaskCall) continue;
+    EXPECT_NE(vpi_handle(vpiPrefix, stmt), nullptr);
     reached.push_back(VpiObjectOf(vpi_handle(vpiTask, stmt)));
   }
   EXPECT_EQ(reached,
@@ -460,18 +461,78 @@ TEST_F(CallStatementsInAScope, ACallThroughAnExpressionReachesItsMethod) {
 
 // §25.9 with §37.42: a call of an interface's task through a virtual
 // interface, a module's, a block's or a class property's, is a task call named
-// after the task (#5784).
+// after the task (#5784), and one of its function a func call. The
+// interface's declaration says which, so a call through a virtual interface
+// of an interface nothing instantiates is a task call too (#5791).
 TEST_F(CallStatementsInAScope, ACallThroughAVirtualInterfaceIsATaskCall) {
-  Run("interface ifc; task t(); endtask endinterface\n"
-      "module top; ifc i ();\n"
+  Run("interface other; endinterface\n"
+      "interface ifc; logic x; function void f(); endfunction\n"
+      "  task t(); endtask\n"
+      "endinterface\n"
+      "interface lone; task t(); endtask endinterface\n"
+      "module top; ifc i (); other o ();\n"
       "  class H; virtual ifc vif; endclass\n"
-      "  virtual ifc v = i; H h = new;\n"
-      "  initial begin : b virtual ifc w; w = i; h.vif = i;\n"
-      "    v.t(); h.vif.t(); w.t();\n"
+      "  virtual ifc v = i; virtual lone w; H h = new;\n"
+      "  initial begin : b virtual ifc u; u = i; h.vif = i;\n"
+      "    v.t(); h.vif.t(); u.t(); v.f();\n"
+      "    if (0) begin : g w.t(); end\n"
       "  end\n"
       "endmodule\n");
   EXPECT_EQ(NamesOf(vpiTaskCall, By("top.b")),
             (std::vector<std::string>{"t", "t", "t"}));
+  EXPECT_EQ(NamesOf(vpiFuncCall, By("top.b")), std::vector<std::string>{"f"});
+  EXPECT_EQ(NamesOf(vpiTaskCall, By("top.b.g")), std::vector<std::string>{"t"});
+}
+
+// §35.5 with §37.42: a call of a function imported through DPI is a func call
+// named after it, and a call of an imported task a task call, though no task
+// or function object stands for either (#5785). The calls never run, so the
+// run calls no foreign code.
+TEST_F(CallStatementsInAScope, ACallOfADpiImportIsACall) {
+  Run("module top;\n"
+      "  import \"DPI-C\" function int c_f(int a);\n"
+      "  import \"DPI-C\" task c_t();\n"
+      "  initial if (0) begin : b void'(c_f(1)); c_t(); end\n"
+      "endmodule\n");
+  EXPECT_EQ(NamesOf(vpiFuncCall, By("top.b")), std::vector<std::string>{"c_f"});
+  EXPECT_EQ(NamesOf(vpiTaskCall, By("top.b")), std::vector<std::string>{"c_t"});
+}
+
+// §8.6 and §11.4.11 with §37.42: a method called on the handle a method call
+// returns, a.self().run(), or on the one a conditional yields,
+// (s ? a : c).run(), is a method task call of the class that handle's type
+// names (#5789).
+TEST_F(CallStatementsInAScope, ACallOnAResultOrAConditionalReachesItsMethod) {
+  Run("module top;\n"
+      "  class B; task run(); endtask\n"
+      "    function B self(); return this; endfunction\n"
+      "  endclass\n"
+      "  B a = new, c = new; bit s;\n"
+      "  initial begin : b a.self().run(); (s ? a : c).run(); end\n"
+      "endmodule\n");
+  EXPECT_EQ(NamesOf(vpiMethodTaskCall, By("top.b")),
+            (std::vector<std::string>{"run", "run"}));
+  ExpectTaskCallReaches("run", "top", "B");
+}
+
+// §7.2 with §37.42 detail 2: a method called through a structure's member
+// that holds a class handle, the structure declared through a typedef or
+// written out, of the module or of a block, is a method task call of the
+// member's class (#5788).
+TEST_F(CallStatementsInAScope, ACallThroughAStructMemberReachesItsMethod) {
+  Run("module sub; endmodule\n"
+      "module top; sub u ();\n"
+      "  class B; task run(); endtask endclass\n"
+      "  typedef int other_t;\n"
+      "  typedef struct { int n; B h; } s_t;\n"
+      "  s_t s; struct { B h; } t;\n"
+      "  initial begin : b s_t r; s.h = new; t.h = new; r.h = new;\n"
+      "    s.h.run(); t.h.run(); r.h.run();\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(NamesOf(vpiMethodTaskCall, By("top.b")),
+            (std::vector<std::string>{"run", "run", "run"}));
+  ExpectTaskCallReaches("run", "top", "B");
 }
 
 }  // namespace

@@ -335,6 +335,16 @@ const ModuleItem* SubroutineNamed(const std::vector<ModuleItem*>& decls,
   return nullptr;
 }
 
+// §35.5: the task or function `mod` imports through DPI under `name`, null
+// for none.
+const ModuleItem* DpiImportNamed(const RtlirModule& mod,
+                                 std::string_view name) {
+  for (const ModuleItem* item : mod.dpi_import_decls) {
+    if (item->name == name) return item;
+  }
+  return nullptr;
+}
+
 // `decl` with the object made for it in the scope keyed `key`, null where
 // none was made there.
 VpiCalledSubroutine Called(const ModuleItem* decl, const std::string& key,
@@ -418,8 +428,11 @@ VpiCalledSubroutine VpiNamedSubroutine(const VpiCallSite& site,
     if (called.decl != nullptr) return called;
   }
   // A generate block's task or function written where no block enclosing the
-  // call declares it still says what kind of call names it.
-  return {SubroutineNamed(site.mod.function_decls, name), nullptr};
+  // call declares it still says what kind of call names it, and so does a
+  // task or function the module imports through DPI (§35.5), which no task or
+  // function object stands for.
+  const ModuleItem* found = SubroutineNamed(site.mod.function_decls, name);
+  return {found != nullptr ? found : DpiImportNamed(site.mod, name), nullptr};
 }
 
 VpiCalledSubroutine VpiCalleeSubroutine(const VpiCallSite& site,
