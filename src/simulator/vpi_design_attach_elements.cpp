@@ -117,15 +117,12 @@ bool HasFixedElements(const RtlirVariable& var) {
          !var.is_assoc && var.unpacked_dims.size() == var.num_unpacked_dims;
 }
 
-// The members of the array the object keyed `key` stands for, hung from it
-// one unpacked dimension of `dims` at a time.
+// The members of the array `array`, keyed `key`, hung from it one unpacked
+// dimension of `attach.dims` at a time.
 void AttachArray(VpiObject& array, const std::string& key,
-                 const std::vector<RtlirUnpackedDim>& dims,
-                 const VpiObjectMap& objects, const VpiAttachBuild& build,
-                 int element_type = 0) {
-  const ArrayAttach kAttach{dims, array, objects, build, element_type};
-  AttachLevel({&array, key, {}}, 0, kAttach);
-  RecordDimensionIndices(array, dims);
+                 const ArrayAttach& attach) {
+  AttachLevel({&array, key, {}}, 0, attach);
+  RecordDimensionIndices(array, attach.dims);
 }
 
 // §37.16 details 1, 2 and 24: a net declared with an unpacked dimension is an
@@ -152,7 +149,7 @@ void AttachNetArray(const RtlirNet& net, const std::string& prefix,
   }
   array->size =
       kInterconnect ? static_cast<int>(net.unpacked_dims[0].Size()) : count;
-  AttachArray(*array, kKey, net.unpacked_dims, objects, build);
+  AttachArray(*array, kKey, {net.unpacked_dims, *array, objects, build});
 }
 
 }  // namespace
@@ -174,8 +171,9 @@ void AttachArrayElements(const RtlirDesign* design, const VpiObjectMap& objects,
           if (array == nullptr) continue;
           // §37.17 with §37.33: an element of an array of class handles is a
           // class var, which the run made a reg like every element.
-          AttachArray(*array, kKey, var.unpacked_dims, objects, build,
-                      var.class_type_name.empty() ? 0 : vpiClassVar);
+          AttachArray(*array, kKey,
+                      {var.unpacked_dims, *array, objects, build,
+                       var.class_type_name.empty() ? 0 : vpiClassVar});
         }
         for (const RtlirNet& net : VpiDeclaredNets(*mod)) {
           AttachNetArray(net, prefix, objects, build);
