@@ -205,7 +205,7 @@ VpiObject* PropertyHolderNamed(const VpiObject* scope,
 VpiObject* PropertyDeclAround(const VpiObject* holder, std::string_view name) {
   const size_t kDot = name.find('.');
   for (VpiObject* scope = holder->parent; scope != nullptr;
-       scope = scope->parent) {
+       scope = VpiIsInstanceType(scope->type) ? nullptr : scope->parent) {
     VpiObject* found = kDot == std::string_view::npos
                            ? ChildOfType(scope, vpiPropertyDecl, name)
                            : PropertyHolderNamed(scope, name.substr(0, kDot));
@@ -213,7 +213,6 @@ VpiObject* PropertyDeclAround(const VpiObject* holder, std::string_view name) {
       return ChildOfType(found, vpiPropertyDecl, name.substr(kDot + 1));
     }
     if (found != nullptr) return found;
-    if (VpiIsInstanceType(scope->type)) break;
   }
   return nullptr;
 }
