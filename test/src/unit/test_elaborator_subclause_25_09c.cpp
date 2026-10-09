@@ -190,4 +190,67 @@ TEST(VirtualInterfaceCallElaboration, APackageTypedefOfAnImportedClass) {
   }
 }
 
+// §25.9 with §13.3: a call in a task the module declares, through the
+// module's virtual interface, a formal argument, an element of an array
+// argument or a variable the task declares, naming nothing the interface
+// declares, is reported as one in a procedural block is (#5822). The valid
+// calls and a call of a function declared after the task are not, and neither
+// is a call of a class's own method in the class's method defined out of its
+// body, which is the class's subroutine rather than the module's.
+TEST(VirtualInterfaceCallElaboration, ACallInAModulesTask) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc; task t(); endtask endinterface\n"
+      "module top;\n"
+      "  virtual ifc v;\n"
+      "  class C; extern function void run(); function void help(); "
+      "endfunction endclass\n"
+      "  function void C::run(); help(); endfunction\n"
+      "  task go(virtual ifc a, input virtual ifc arr[2]); virtual ifc w;\n"
+      "    v.nosuch();\n"
+      "    a.nosuch();\n"
+      "    w.nosuch();\n"
+      "    arr[1].nosuch();\n"
+      "    v.t(); a.t(); w.t(); arr[0].t(); later();\n"
+      "  endtask\n"
+      "  function void later(); endfunction\n"
+      "endmodule\n",
+      f, "top");
+  for (const uint32_t kLine : {7u, 8u, 9u, 10u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoSuch, kLine, "25.9"))
+        << kLine;
+  }
+  EXPECT_TRUE(NoErrorOnLine(f, 5));
+  EXPECT_TRUE(NoErrorOnLine(f, 11));
+}
+
+// §25.9 with §7.4: a select into a class property that is a single virtual
+// interface, h.vif[0], or past the last dimension of a property's array of
+// them, h.vifs[0][1], selects into a virtual interface and is reported
+// (#5821); a select of a logic array property, and a call through an element
+// of the array, are not.
+TEST(VirtualInterfaceArrayElaboration, ASelectIntoAPropertysVirtualInterface) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc; task t(); endtask endinterface\n"
+      "class H; virtual ifc vif; virtual ifc vifs[2]; logic arr[2]; "
+      "endclass\n"
+      "module top;\n"
+      "  H h = new; logic b;\n"
+      "  initial if (0) begin\n"
+      "    b = h.vif[0];\n"
+      "    b = h.vifs[0][1];\n"
+      "    b = h.arr[0]; h.vifs[1].t();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  for (const uint32_t kLine : {6u, 7u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "bit-select on virtual interface is illegal",
+                              kLine, "25.9"))
+        << kLine;
+  }
+  EXPECT_TRUE(NoErrorOnLine(f, 8));
+}
+
 }  // namespace

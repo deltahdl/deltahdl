@@ -314,20 +314,37 @@ const ClassDecl* ClassNamed(const DataScope& scope, const DataType& type) {
   return ClassIn(unit, site, named->type_name);
 }
 
-// §25.9 with §7.4: the interface the property `name` of the class `cls`
-// refers to an instance of, reached through `selects` selects: a virtual
-// interface property with as many unpacked dimensions; empty for any other.
-std::string_view PropertyVif(const ClassDecl& cls, std::string_view name,
-                             std::size_t selects) {
-  std::string_view iface;
-  for (const ClassMember* member : cls.members) {
-    if (member->kind == ClassMemberKind::kProperty && member->name == name) {
-      iface = member->unpacked_dims.size() == selects
-                  ? VifInterface(member->data_type)
-                  : std::string_view();
+// The expression the selects in front of `e` select from, the number of them
+// counted into `selects`: `va` of va[0][1], two.
+const Expr& SelectRoot(const Expr& e, std::size_t& selects) {
+  const Expr* root = &e;
+  while (root->kind == ExprKind::kSelect) {
+    ++selects;
+    root = root->base;
+  }
+  return *root;
+}
+
+// §8.4: the property of the class a variable of the scope holds a handle of
+// that the member access `access`, h.vif, names; null for any other
+// expression and for a name the class declares no property under.
+const ClassMember* HandleProperty(const Expr& access, const DataScope& scope) {
+  if (access.kind != ExprKind::kMemberAccess || access.is_scope_resolution ||
+      access.lhs->kind != ExprKind::kIdentifier) {
+    return nullptr;
+  }
+  const DeclaredVar* holder = scope.Declared(access.lhs->text);
+  const ClassDecl* cls =
+      holder == nullptr ? nullptr : ClassNamed(scope, *holder->type);
+  if (cls == nullptr) return nullptr;
+  const ClassMember* found = nullptr;
+  for (const ClassMember* member : cls->members) {
+    if (member->kind == ClassMemberKind::kProperty &&
+        member->name == access.rhs->text) {
+      found = member;
     }
   }
-  return iface;
+  return found;
 }
 
 // §25.9: the interface the virtual interface `prefix` names refers to an
@@ -336,26 +353,34 @@ std::string_view PropertyVif(const ClassDecl& cls, std::string_view name,
 // an array of either, one select per unpacked dimension (§7.4), va[0] or
 // h.vifs[0]; empty for anything else.
 std::string_view VifOf(const Expr& prefix, const DataScope& scope) {
-  const Expr* root = &prefix;
   std::size_t selects = 0;
-  while (root->kind == ExprKind::kSelect) {
-    ++selects;
-    root = root->base;
-  }
-  if (root->kind == ExprKind::kIdentifier) {
-    const DeclaredVar* var = scope.Declared(root->text);
+  const Expr& root = SelectRoot(prefix, selects);
+  if (root.kind == ExprKind::kIdentifier) {
+    const DeclaredVar* var = scope.Declared(root.text);
     return var != nullptr && var->dims == selects ? VifInterface(*var->type)
                                                   : std::string_view();
   }
-  if (root->kind != ExprKind::kMemberAccess || root->is_scope_resolution ||
-      root->lhs->kind != ExprKind::kIdentifier) {
-    return {};
+  const ClassMember* property = HandleProperty(root, scope);
+  return property != nullptr && property->unpacked_dims.size() == selects
+             ? VifInterface(property->data_type)
+             : std::string_view();
+}
+
+// §25.9 with §7.4: a select `select` into a class property that is a virtual
+// interface, past the property's unpacked dimensions, h.vif[0], which selects
+// into a virtual interface; reported once, at the first select past them.
+void ReportPropertyVifSelect(const Expr& select, const DataScope& scope,
+                             DiagEngine& diag) {
+  std::size_t selects = 0;
+  const ClassMember* property =
+      HandleProperty(SelectRoot(select, selects), scope);
+  if (property == nullptr ||
+      property->data_type.kind != DataTypeKind::kVirtualInterface ||
+      property->unpacked_dims.size() + 1 != selects) {
+    return;
   }
-  const DeclaredVar* holder = scope.Declared(root->lhs->text);
-  const ClassDecl* cls =
-      holder == nullptr ? nullptr : ClassNamed(scope, *holder->type);
-  return cls == nullptr ? std::string_view()
-                        : PropertyVif(*cls, root->rhs->text, selects);
+  diag.Error(select.range.start, "bit-select on virtual interface is illegal",
+             Subclause("25.9"));
 }
 
 // §25.9: a call `call` through a virtual interface, v.t(), naming no task or
@@ -376,8 +401,8 @@ void ReportVifCall(const Expr& call, const DataScope& scope, DiagEngine& diag) {
              Subclause("25.9"));
 }
 
-// Each call by a plain name `expr` holds, itself included, and each call
-// through a virtual interface.
+// Each call by a plain name `expr` holds, itself included, each call through a
+// virtual interface, and each select into a class property that is one.
 void CheckExprCalls(const Expr* expr, const DataScope& scope,
                     DiagEngine& diag) {
   if (expr == nullptr) return;
@@ -387,6 +412,8 @@ void CheckExprCalls(const Expr* expr, const DataScope& scope,
   if (expr->kind == ExprKind::kCall && expr->lhs != nullptr) {
     ReportVifCall(*expr, scope, diag);
   }
+  if (expr->kind == ExprKind::kSelect)
+    ReportPropertyVifSelect(*expr, scope, diag);
   ForEachExprChild(
       expr, [&](const Expr* child) { CheckExprCalls(child, scope, diag); });
 }
@@ -415,6 +442,31 @@ void CheckStmtCalls(const Stmt* stmt, DataScope& scope, DiagEngine& diag) {
       stmt, [&](const Expr* expr) { CheckExprCalls(expr, scope, diag); });
   ForEachChildStmt(stmt,
                    [&](Stmt* const& sub) { CheckStmtCalls(sub, scope, diag); });
+  scope.blocks.resize(kOuter);
+}
+
+// §13.3: each call the body of the task or function `item` writes, the
+// subroutine's formal arguments and the variables its body declares in scope
+// over its statements as a block's are (§23.9). A method of a class defined
+// out of its class's body (§8.24) is not the module's subroutine, its scope
+// being the class's, and is not walked.
+void CheckSubroutineCalls(const ModuleItem& item, DataScope& scope,
+                          DiagEngine& diag) {
+  const std::size_t kOuter = scope.blocks.size();
+  for (const FunctionArg& arg : item.func_args) {
+    scope.blocks.emplace_back(
+        arg.name, DeclaredVar{&arg.data_type, arg.unpacked_dims.size()});
+  }
+  for (const Stmt* stmt : item.func_body_stmts) {
+    if (stmt->kind == StmtKind::kVarDecl) {
+      scope.blocks.emplace_back(
+          stmt->var_name,
+          DeclaredVar{&stmt->var_decl_type, stmt->var_unpacked_dims.size()});
+    }
+  }
+  for (const Stmt* stmt : item.func_body_stmts) {
+    CheckStmtCalls(stmt, scope, diag);
+  }
   scope.blocks.resize(kOuter);
 }
 
@@ -487,8 +539,13 @@ void ReportCallsOfDataNames(
   // §18.12: a scope randomize call may be written without its std:: prefix.
   subroutines.insert("randomize");
   for (const ModuleItem* item : decl.items) {
-    if (IsProceduralItemKind(item->kind))
+    if (IsProceduralItemKind(item->kind)) {
       CheckStmtCalls(item->body, scope, diag);
+    } else if ((item->kind == ModuleItemKind::kTaskDecl ||
+                item->kind == ModuleItemKind::kFunctionDecl) &&
+               item->method_class.empty()) {
+      CheckSubroutineCalls(*item, scope, diag);
+    }
   }
 }
 
