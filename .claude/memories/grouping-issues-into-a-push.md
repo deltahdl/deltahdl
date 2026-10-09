@@ -12,7 +12,7 @@ metadata:
 
 A push solves a batch made of every open issue that shares one matter. The matter bounds the batch, never a count. Two issues share a matter when both of these hold:
 
-- **Clause.** They fall under the same clause of IEEE 1800-2023. That is the issue's `§N` or `Annex X` label, narrowed to the same subclause subtree where the titles name one. An sv-tests issue counts under the 2023 clause its design exercises, never under its 2017 tag.
+- **Clause.** They fall under the same clause of IEEE 1800-2023. That is the issue's `§N` or `Annex X` label, which it carries beside its `IEEE 1800-2023` label ([[issues-carry-a-standard-and-a-clause-label]]), narrowed to the same subclause subtree where the titles name one. An sv-tests issue counts under the 2023 clause its design exercises, never under its 2017 tag.
 - **Subsystem.** Their fixes land in the same directory under `src/`: `lexer`, `preprocessor`, `parser`, `elaborator`, `simulator`, `synthesizer`, `driver` or `common`. The unit test files that go with them are named after the same subsystem, as in `test_<subsystem>_subclause_…`.
 
 **Why:**

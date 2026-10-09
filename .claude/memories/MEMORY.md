@@ -96,6 +96,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [One indivisible problem per issue](one-indivisible-problem-per-issue.md) — one defect, one fix per issue; an issue found holding two is split there and then.
 - [Research lives in issues](research-lives-in-issues.md) — a plan that outlives the session, and each finding it yields, is filed as it arises; the task list and scratchpad are not durable.
 - [Issues have no fixed form](issues-have-no-fixed-form.md) — no house style; write each so a fresh session can act on it alone.
+- [Issues carry a standard label and a clause label](issues-carry-a-standard-and-a-clause-label.md) — label a standard's issue with `IEEE 1800-2023`, `IEEE 1800.2-2020` or `IEEE 1735-2023` and, for 1800-2023, its `§N` or `Annex X`; a coverage or harness issue carries neither.
 - [Issue sections take headings](issue-sections-take-headings.md) — open each section of an issue body with `## Heading`, never a bolded first sentence.
 - [Issues define their terms](issues-define-their-terms.md) — say what each file, term and cited clause is and why it is there; never a name the reader must already know.
 - [Issues state the conclusion](issues-state-conclusions-not-the-trail.md) — a finding that settles a question replaces the options it ruled out; never append round after round.
