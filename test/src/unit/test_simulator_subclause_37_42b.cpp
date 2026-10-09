@@ -253,7 +253,10 @@ class MethodCallStatementsOfARun : public VpiDesignRun {
     if (it == nullptr) return calls;
     while (vpiHandle stmt = vpi_scan(it)) {
       if (vpi_get(vpiType, stmt) != vpiMethodFuncCall) continue;
-      calls.emplace_back(vpi_get_str(vpiName, stmt),
+      // vpi_get_str answers in one buffer the next call overwrites, so the
+      // method's name is copied before the prefix's is read.
+      std::string method = vpi_get_str(vpiName, stmt);
+      calls.emplace_back(method,
                          vpi_get_str(vpiName, vpi_handle(vpiPrefix, stmt)));
     }
     return calls;
