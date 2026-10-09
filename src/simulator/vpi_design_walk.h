@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -76,24 +77,38 @@ inline bool VpiIndexSelects(const VpiObject& child, int index) {
          child.index == index;
 }
 
+// The object `name` names among the children of `scope`, or among `objects`,
+// the objects no scope holds, where `scope` is null.
+inline VpiHandle ObjectNamedIn(
+    const std::unordered_map<std::string_view, VpiObject*>& objects,
+    VpiHandle scope, std::string_view name) {
+  if (scope != nullptr) return ChildNamed(scope, name);
+  auto it = objects.find(name);
+  return it == objects.end() ? nullptr : it->second;
+}
+
 // The object a flat design name already stands for, and null where the name
 // reaches none. VpiContext::DesignObjectForFlatName makes the scopes it passes
 // through; this one makes nothing, which is what a reader that has something to
 // say about an object the run built wants: a declaration the run built no
-// object for is passed over rather than given an empty one.
+// object for is passed over rather than given an empty one. §5.6.1: a name
+// written as an escaped identifier may hold a period, so a period ending no
+// component that names an object is read past, into the component after it.
 inline VpiHandle FindObjectForFlatName(
     const std::unordered_map<std::string_view, VpiObject*>& objects,
     std::string_view flat_name) {
-  // The components hold at least one, the whole name where it has no dot.
-  std::vector<std::string_view> parts = VpiNamePathComponents(flat_name);
-  auto root = objects.find(parts.front());
-  if (root == objects.end()) return nullptr;
-
-  VpiHandle current = root->second;
-  for (std::size_t i = 1; i < parts.size() && current != nullptr; ++i) {
-    current = ChildNamed(current, parts[i]);
+  VpiHandle scope = nullptr;
+  std::size_t start = 0;
+  for (std::size_t end = 0;; ++end) {
+    end = std::min(flat_name.find('.', end), flat_name.size());
+    VpiHandle found =
+        ObjectNamedIn(objects, scope, flat_name.substr(start, end - start));
+    if (end == flat_name.size()) return found;
+    if (found != nullptr) {
+      scope = found;
+      start = end + 1;
+    }
   }
-  return current;
 }
 
 // The instances `mod` holds, pushed onto the walk under their own paths. An

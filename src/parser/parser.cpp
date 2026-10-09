@@ -270,6 +270,7 @@ CompilationUnit* Parser::Parse() {
   DefaultLibraryToWork(unit->packages);
   DefaultLibraryToWork(unit->configs);
   unit->triggered_names = std::move(triggered_names_);
+  unit->dotted_escaped_names = lexer_.DottedEscapedNames();
   BindFsmPragmas(lexer_, *unit);
   return unit;
 }

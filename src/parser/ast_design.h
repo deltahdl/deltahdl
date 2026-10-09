@@ -143,6 +143,9 @@ struct CompilationUnit {
   // §16.13.6: the names `triggered` or `matched` is applied to anywhere in the
   // unit, a named sequence's among them, by the last name of the path.
   std::unordered_set<std::string_view> triggered_names;
+  // §5.6.1: the escaped identifiers in the unit that hold a period, as
+  // Lexer::DottedEscapedNames records them.
+  std::unordered_set<std::string_view> dotted_escaped_names;
   std::vector<ExternalConstraintBlock> external_constraints;
   NetType default_nettype = NetType::kWire;
   NetType unconnected_drive = NetType::kWire;

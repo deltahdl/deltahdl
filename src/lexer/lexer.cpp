@@ -768,6 +768,9 @@ Token Lexer::LexEscapedIdentifier() {
   tok.kind = TokenKind::kEscapedIdentifier;
   tok.loc = loc;
   tok.text = source_.substr(start, pos_ - start);
+  if (tok.text.find('.') != std::string_view::npos) {
+    dotted_escaped_names_.insert(tok.text);
+  }
   if (tok.text.size() > kMaxIdentifierLength) {
     diag_.Error(loc, IdentifierTooLongMessage(), Subclause("5.6"));
   }

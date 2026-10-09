@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -911,13 +912,13 @@ class VpiContext {
 
   VpiValuePools value_pools_;
 
-  // §36.10: the names of the objects Attach makes. A design object is keyed in
-  // the simulator on a whole flat string, and the components this splits it
-  // into are not strings of their own; VpiObject::name has to be one, so each
-  // component is copied here. A deque because object_map_ and every
-  // VpiObject::name hold views into these, and appending to a deque leaves the
-  // elements already in it where they are.
+  // §36.10: the names of the objects Attach makes, copied here because the
+  // components of a flat name are not strings of their own; a deque, so the
+  // views object_map_ and each VpiObject::name hold stay put as it grows.
   std::deque<std::string> name_pool_;
+  // §5.6.1: the escaped identifiers of the design attached that hold a
+  // period, each kept as one component when a flat name is split.
+  std::unordered_set<std::string_view> dotted_escaped_names_;
 
   // §36.10.1: whether an error-callback pass is already running. A callback may
   // call VPI routines of its own and one of those may record an error in turn,
@@ -939,10 +940,8 @@ class VpiContext {
 
   std::string save_restart_location_;
 
-  // §38.16: by default vpi_get_value_array() returns the retrieved section in
-  // VPI-allocated, read-only storage. One reusable buffer backs the value arm;
-  // a subsequent call overwrites it, so the caller must copy out anything it
-  // needs to keep.
+  // §38.16: vpi_get_value_array() returns its section in VPI-allocated,
+  // read-only storage, one buffer that each later call overwrites.
   std::vector<unsigned char> value_array_storage_;
 };
 

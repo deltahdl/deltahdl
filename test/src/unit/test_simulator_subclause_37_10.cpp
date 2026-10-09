@@ -382,6 +382,31 @@ TEST_F(InstanceObjectsOfARun, ADeepInstanceDeclaringNothingHasItsParent) {
   EXPECT_STREQ(vpi_get_str(vpiFullName, vpi_handle(vpiModule, leaf)), "top.m2");
 }
 
+constexpr const char* kDottedEscapedNames =
+    "module sub; endmodule\n"
+    "module top; logic \\a.b ; sub \\u.1 (); endmodule\n";
+
+// §37.10 with §5.6.1: an escaped identifier may hold a period and is still one
+// name, so the variable and the instance written with one are one object each
+// under top, named with the period, and no scope is made for the text before
+// it.
+TEST_F(InstanceObjectsOfARun, AnEscapedNameHoldingAPeriodIsOneObject) {
+  Run(kDottedEscapedNames);
+  vpiHandle top = By("top");
+  EXPECT_EQ(NamesOf(vpiModule, nullptr), (std::vector<std::string>{"top"}));
+  EXPECT_EQ(NamesOf(vpiModule, top), (std::vector<std::string>{"u.1"}));
+  EXPECT_EQ(NamesOf(vpiVariables, top), (std::vector<std::string>{"a.b"}));
+  EXPECT_EQ(VpiObjectOf(By("top.\\a.b ")),
+            VpiObjectOf(Named(vpiVariables, top, "a.b")));
+}
+
+// The instance is found again by that one name where its definition is
+// recorded, so it reports the module it instantiates.
+TEST_F(InstanceObjectsOfARun, AnInstanceNamedWithAPeriodHasItsDefinition) {
+  Run(kDottedEscapedNames);
+  EXPECT_STREQ(vpi_get_str(vpiDefName, By("top.\\u.1 ")), "sub");
+}
+
 constexpr const char* kPackageBesideTop =
     "package pkg; int pv = 8; endpackage\n"
     "module top; int x = pkg::pv; endmodule\n";

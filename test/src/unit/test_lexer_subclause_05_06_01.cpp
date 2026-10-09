@@ -1,9 +1,14 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <string_view>
+#include <unordered_set>
 
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
 #include "fixture_lexer.h"
 #include "helpers_reported_error.h"
+#include "lexer/lexer.h"
 #include "lexer/token.h"
 
 using namespace delta;
@@ -235,6 +240,21 @@ TEST(LexicalConventionLexing, NonPrintableCharacterNames5_6_1) {
   EXPECT_TRUE(ReportedError(
       diags, "escaped identifier contains non-printable character", 1,
       "5.6.1"));
+}
+
+// §5.6.1: an escaped identifier may hold any printable character, a period
+// among them, so `\a.b ` is one name. The lexer records each such name it reads
+// and no other: neither an escaped name with no period nor a simple identifier
+// followed by a period and another.
+TEST(LexicalConventionLexing, RecordsTheEscapedIdentifiersHoldingAPeriod) {
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  auto fid = mgr.AddFile("<test>", "\\a.b \\cd x.y \\e.f.g ");
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  lexer.LexAll();
+  const std::unordered_set<std::string_view>& names =
+      lexer.DottedEscapedNames();
+  EXPECT_EQ(names, (std::unordered_set<std::string_view>{"a.b", "e.f.g"}));
 }
 
 TEST(LexicalConventionLexing, EscapedIdentifierBareBackslashAtEof) {

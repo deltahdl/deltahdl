@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 #include "common/types.h"
@@ -176,8 +177,10 @@ void VpiSchedulePut(VpiObject& obj, const s_vpi_value& value, int mode,
 uint64_t VpiPutDelayTicks(const VpiObject& obj, const s_vpi_time& time,
                           int sim_unit);
 
-// Defined in vpi_systf.cpp, used by vpi_handle.cpp.
-std::vector<std::string_view> VpiNamePathComponents(std::string_view name);
+// Defined in vpi_systf.cpp, used by vpi_design_attach.cpp.
+std::vector<std::string_view> VpiNamePathComponents(
+    std::string_view name,
+    const std::unordered_set<std::string_view>& whole_names);
 
 // §38.21 with §37.10 detail 5 and §37.17 detail 25: the components
 // vpi_handle_by_name() walks, those of VpiNamePathComponents with each split

@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 #include "common/arena.h"
@@ -745,17 +746,23 @@ void VpiContext::ClearUserDataForRestartOrReset() {
 
 // §38.21: split a possibly hierarchical name into its dot-separated path
 // components, outermost scope first. A simple name yields a single component.
-std::vector<std::string_view> VpiNamePathComponents(std::string_view name) {
+// §5.6.1: a name of `whole_names`, an escaped identifier holding a period, is
+// one component wherever it stands followed by a period or the end, the
+// longest such where several do.
+std::vector<std::string_view> VpiNamePathComponents(
+    std::string_view name,
+    const std::unordered_set<std::string_view>& whole_names) {
   std::vector<std::string_view> parts;
-  size_t start = 0;
+  std::size_t start = 0;
   for (;;) {
-    size_t dot = name.find('.', start);
-    if (dot == std::string_view::npos) {
-      parts.push_back(name.substr(start));
-      break;
+    std::size_t end = std::min(name.find('.', start), name.size());
+    for (std::size_t cut = end; cut < name.size();) {
+      cut = std::min(name.find('.', cut + 1), name.size());
+      if (whole_names.contains(name.substr(start, cut - start))) end = cut;
     }
-    parts.push_back(name.substr(start, dot - start));
-    start = dot + 1;
+    parts.push_back(name.substr(start, end - start));
+    if (end == name.size()) break;
+    start = end + 1;
   }
   return parts;
 }

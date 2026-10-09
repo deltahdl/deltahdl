@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -41,6 +42,13 @@ class Lexer {
   Token NextFilePathSpec();
 
   std::vector<Token> LexAll();
+
+  // §5.6.1: the escaped identifiers read so far that hold a period, each the
+  // text after its backslash. Such a name is one identifier, which a name built
+  // by joining scopes with periods cannot be split back into by its periods.
+  const std::unordered_set<std::string_view>& DottedEscapedNames() const {
+    return dotted_escaped_names_;
+  }
 
   // §40.4.1 — an FSM recognition "tool" pragma carried inside a block comment.
   // The current-state form names the vector signal that holds the FSM state and
@@ -211,6 +219,7 @@ class Lexer {
   std::vector<FsmStatePragma> fsm_state_pragmas_;
   std::vector<FsmPartSelectPragma> fsm_part_select_pragmas_;
   std::vector<FsmConcatPragma> fsm_concat_pragmas_;
+  std::unordered_set<std::string_view> dotted_escaped_names_;
   // The offset one past the start of the furthest comment body handed to
   // TryRecognizeFsmStatePragma, so a comment read again after RestorePos is
   // recognized once.
