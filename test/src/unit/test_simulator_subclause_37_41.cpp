@@ -573,11 +573,16 @@ TEST_F(TaskFuncsOfARun, ABodysEventArrayIsANamedEventArray) {
 
 // Detail 11 with §13.3.1: a task a generate block of an automatic module
 // declares without a lifetime is automatic, and one declared static is not.
+// The block holds a variable, which is what gives it its object (#5738).
 TEST_F(TaskFuncsOfARun, AGenerateBlockTaskTakesItsModulesLifetime) {
-  Run("module automatic top; if (1) begin : g task t(); endtask\n"
+  Run("module automatic top; if (1) begin : g int v; task t(); endtask\n"
       "  task static s(); endtask end endmodule\n");
-  EXPECT_EQ(vpi_get(vpiAutomatic, Named(vpiTaskFunc, By("top.g"), "t")), 1);
-  EXPECT_EQ(vpi_get(vpiAutomatic, Named(vpiTaskFunc, By("top.g"), "s")), 0);
+  vpiHandle t = Named(vpiTaskFunc, By("top.g"), "t");
+  vpiHandle s = Named(vpiTaskFunc, By("top.g"), "s");
+  ASSERT_NE(t, nullptr);
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(vpi_get(vpiAutomatic, t), 1);
+  EXPECT_EQ(vpi_get(vpiAutomatic, s), 0);
 }
 
 // §37.41 with §37.10 details 5 and 6: a function of the compilation unit is
