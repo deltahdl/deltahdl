@@ -887,7 +887,6 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
     gen_loop_consts_[const_depth].second = loop_scope[genvar_name];
     EnterLoopBlockInstance(mod, gen_block_path_, genvar_name,
                            loop_scope[genvar_name]);
-    mod->gen_block_instances.push_back(gen_block_path_);
     ElaborateGenerateItems(item->gen_body, mod, loop_scope);
 
     // Stop the loop when the genvar cannot advance, which

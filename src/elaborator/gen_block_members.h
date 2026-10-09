@@ -40,7 +40,8 @@ void RecordBlockItemMembers(RtlirModule* mod,
                             const GenBlockInstanceScope& scope,
                             const DeclarationCounts& before);
 
-// Retargets the loop block step ending `path` at the instance `index` and
+// Retargets the loop block step ending `path` at the instance `index`, records
+// the instance among the module's generate block instances (§37.85), and
 // records its implicit localparam `genvar_name` (§27.4).
 void EnterLoopBlockInstance(RtlirModule* mod, HierPath& path,
                             std::string_view genvar_name, int64_t index);

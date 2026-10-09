@@ -61,6 +61,7 @@ void RecordBlockItemMembers(RtlirModule* mod,
 void EnterLoopBlockInstance(RtlirModule* mod, HierPath& path,
                             std::string_view genvar_name, int64_t index) {
   path.back().index = index;
+  mod->gen_block_instances.push_back(path);
   RecordGenBlockMember(mod->gen_block_members, path,
                        {.kind = RtlirGenBlockMember::Kind::kIndex,
                         .name = genvar_name,
