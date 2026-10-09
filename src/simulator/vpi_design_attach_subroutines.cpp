@@ -279,7 +279,6 @@ void MakeScopeSubroutines(const SubroutineBuild& sb, const RtlirModule& mod,
   }
   for (const RtlirGenBlockSubroutine& sub : mod.gen_block_subroutines) {
     VpiObject* block = VpiGenScopeOf(scope, sub.gen_block_path);
-    if (block == nullptr) continue;
     MakeSubroutine({block, block->full_name, kAutomatic, &mod, kParams},
                    sub.decl, sb);
   }
@@ -418,8 +417,8 @@ VpiCalledSubroutine VpiNamedSubroutine(const VpiCallSite& site,
         VpiPackageSubroutine(site.design, entry.package_name, name, site.made);
     if (called.decl != nullptr) return called;
   }
-  // A generate block's task or function no block object holds, an unnamed
-  // block's, still says what kind of call names it.
+  // A generate block's task or function written where no block enclosing the
+  // call declares it still says what kind of call names it.
   return {SubroutineNamed(site.mod.function_decls, name), nullptr};
 }
 

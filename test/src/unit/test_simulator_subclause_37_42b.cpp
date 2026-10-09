@@ -108,6 +108,29 @@ TEST_F(CallsInAnAssignment, ACallReachesItsOwnBlocksFunctionOverASiblings) {
   EXPECT_EQ(VpiObjectOf(CalledFunction()), VpiObjectOf(f));
 }
 
+// §37.85 detail 2: a call in an unnamed block reaches the function of the
+// block's implicit scope (#5737).
+TEST_F(CallsInAnAssignment, ACallInAnUnnamedBlockReachesItsFunction) {
+  Run("module top; if (1) begin\n"
+      "  function int f(); return 1; endfunction\n"
+      "  wire [31:0] w; assign w = f(); end endmodule\n");
+  vpiHandle f = Named(vpiTaskFunc, By("top.genblk1"), "f");
+  ASSERT_NE(f, nullptr);
+  EXPECT_EQ(VpiObjectOf(CalledFunction()), VpiObjectOf(f));
+}
+
+// §23.9: a call the module writes outside every block reaches the module's
+// function, not that of a block declared ahead of it.
+TEST_F(CallsInAnAssignment, AModuleCallReachesTheModulesFunctionOverABlocks) {
+  Run("module top;\n"
+      "  if (1) begin : g function int f(); return 1; endfunction end\n"
+      "  function int f(); return 2; endfunction\n"
+      "  wire [31:0] y; assign y = f(); endmodule\n");
+  vpiHandle f = Named(vpiTaskFunc, By("top"), "f");
+  ASSERT_NE(f, nullptr);
+  EXPECT_EQ(VpiObjectOf(CalledFunction()), VpiObjectOf(f));
+}
+
 // §26.3: a call reaches the package function the module imports by its name,
 // passing over an import of another of the package's items...
 TEST_F(CallsInAnAssignment, ACallReachesAFunctionImportedByName) {
@@ -177,6 +200,23 @@ TEST(TaskFuncCallModel, OnlyAPackagesFunctionResolvesAScopedCallee) {
     partial.rhs = rhs;
     EXPECT_EQ(VpiCalleeSubroutine(kSite, partial).decl, nullptr);
   }
+}
+
+// §37.42: a name no generate block, module, compilation unit or imported
+// package declares resolves to no task or function and no object.
+TEST(TaskFuncCallModel, ANameNothingDeclaresResolvesToNone) {
+  RtlirDesign design;
+  RtlirModule mod;
+  RtlirImport wildcard;
+  wildcard.package_name = "p";
+  wildcard.is_wildcard = true;
+  mod.imports.push_back(wildcard);
+  const std::string kPrefix = "top";
+  const VpiSubroutineObjects kMade;
+  const VpiCalledSubroutine kCalled =
+      VpiNamedSubroutine({design, mod, kPrefix, nullptr, kMade}, "f");
+  EXPECT_EQ(kCalled.decl, nullptr);
+  EXPECT_EQ(kCalled.object, nullptr);
 }
 
 }  // namespace

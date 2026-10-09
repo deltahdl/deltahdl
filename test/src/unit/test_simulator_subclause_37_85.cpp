@@ -302,6 +302,27 @@ TEST_F(GeneratesOfARun, ABlockDeclaringNoDataIsAGenScope) {
   EXPECT_NE(Named(vpiTaskFunc, By("top.t"), "run"), nullptr);
 }
 
+// Detail 2 with §27.6: an unnamed block instance is an implicit gen scope
+// named genblk<n> after its construct's number, of a loop's array where the
+// construct is a loop, holding what the block declares; a named block's scope
+// is no implicit one (#5737).
+TEST_F(GeneratesOfARun, AnUnnamedBlockIsAnImplicitGenScope) {
+  Run("module top;\n"
+      "  if (1) begin task t(); endtask end\n"
+      "  for (genvar i = 0; i < 2; i++) begin end\n"
+      "  if (1) begin : named end\n"
+      "endmodule\n");
+  for (const char* name : {"top.genblk1", "top.genblk2[1]"}) {
+    vpiHandle block = By(name);
+    ASSERT_NE(block, nullptr) << name;
+    EXPECT_EQ(vpi_get(vpiType, block), vpiGenScope) << name;
+    EXPECT_EQ(vpi_get(vpiImplicitDecl, block), 1) << name;
+    EXPECT_STREQ(vpi_get_str(vpiFullName, block), name);
+  }
+  EXPECT_EQ(vpi_get(vpiImplicitDecl, By("top.named")), 0);
+  EXPECT_NE(Named(vpiTaskFunc, By("top.genblk1"), "t"), nullptr);
+}
+
 // §37.85 detail 5: vpiTypedef reaches the typespecs of a scope's typedefs; a
 // type parameter is a typespec but no typedef, and is passed over.
 TEST_F(Generates, TheTypedefIterationPassesOverATypeParameter) {

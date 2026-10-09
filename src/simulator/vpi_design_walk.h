@@ -57,14 +57,14 @@ inline VpiHandle ChildNamed(VpiHandle parent, std::string_view name) {
 }
 
 // §27.4 with §37.12: the generate block instance the block path `path` names
-// below `instance`, outermost first, each step named by its block's name and,
-// in a loop generate, its index; the instance itself for an empty path, and
-// null where a block on the path has no object.
+// below `instance`, outermost first, each step named by its block's external
+// name (§27.6) and, in a loop generate, its index; the instance itself for an
+// empty path, and null where a block on the path has no object.
 inline VpiHandle VpiGenScopeOf(VpiHandle instance, const HierPath& path) {
   VpiHandle scope = instance;
   for (const HierStep& step : path) {
     if (scope == nullptr) return nullptr;
-    std::string name(step.name);
+    std::string name(step.external_name);
     if (step.has_index) name += "[" + std::to_string(step.index) + "]";
     scope = ChildNamed(scope, name);
   }

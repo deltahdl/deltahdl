@@ -63,7 +63,8 @@ void Elaborator::ElaborateConditionalGenerateBlock(
   gen_prefix_ = std::format("{}{}_", saved_prefix, block.name);
   gen_prefix_scopes_.push_back(InternedGenPrefix());
   gen_block_path_.push_back(
-      {block.name_is_generated ? std::string_view{} : block.name, false, 0});
+      {block.name_is_generated ? std::string_view{} : block.name, false, 0,
+       block.name});
   mod->gen_block_instances.push_back(gen_block_path_);
   ElaborateGenerateItems(block.body, mod, scope);
   gen_block_path_.pop_back();

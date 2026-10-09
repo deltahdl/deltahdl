@@ -81,10 +81,16 @@ inline bool ParamVisibleFromScopes(std::string_view decl_prefix,
 // block the name genblk<n>, but §23.6 rules that what it declares is reachable
 // by hierarchical name only from inside the block, and no written identifier is
 // empty, so the step matches nothing a path outside can spell.
+//
+// `external_name` is the name §27.6 has external interfaces such as the VPI
+// (§37.85) know a generate block instance by: the name written, or genblk<n>
+// for an unnamed block. It is set on the steps of the paths the elaborator
+// records for generate block instances and empty on a path a source wrote.
 struct HierStep {
   std::string_view name;
   bool has_index = false;
   int64_t index = 0;
+  std::string_view external_name;
 };
 
 // §23.6: a hierarchical path name as a sequence of its steps. Two things are

@@ -64,20 +64,20 @@ VpiObject* BlockNamed(VpiObject* scope, const std::string& name,
 }
 
 // §37.85: the generate block instances the path `path` names below
-// `instance`, outermost first, each made the gen scope it is, and each
-// iteration of a loop generate an element of its gen scope array. A step of
-// an unnamed block ends the walk (#5737).
+// `instance`, outermost first, each made the gen scope it is, named by its
+// external name (§27.6), and each iteration of a loop generate an element of
+// its gen scope array. Detail 2: an unnamed block's is an implicit scope.
 void MakeGenScopes(VpiObject* instance, const HierPath& path,
                    const VpiAttachBuild& build) {
   VpiObject* scope = instance;
   for (const HierStep& step : path) {
-    if (step.name.empty()) return;
-    std::string name(step.name);
+    std::string name(step.external_name);
     if (step.has_index) name += "[" + std::to_string(step.index) + "]";
     VpiObject* block = BlockNamed(scope, name, build);
     block->type = vpiGenScope;
+    block->implicit_decl = step.name.empty();
     if (step.has_index) {
-      MakeArrayElement(block, GenScopeArrayOf(scope, step.name, build),
+      MakeArrayElement(block, GenScopeArrayOf(scope, step.external_name, build),
                        step.index, build);
     }
     scope = block;
