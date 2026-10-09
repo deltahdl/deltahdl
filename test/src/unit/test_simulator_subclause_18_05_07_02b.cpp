@@ -10,7 +10,7 @@ namespace {
 
 // A class C holding the members `decls`, randomized `draws` times by an
 // initial that counts the draws for which `holds` is true after `prepare`
-// has run, as the design test/src/e2e/array_reduction_constraints.sv does,
+// has run, as the designs test/src/e2e/array_reduction_constraints_*.sv do,
 // and displays the count and `after`, an expression read once the draws are
 // done.
 std::string Counting(const std::string& decls, int draws,
