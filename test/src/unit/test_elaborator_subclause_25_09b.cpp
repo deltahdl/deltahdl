@@ -45,6 +45,8 @@
 
 #include <gtest/gtest.h>
 
+#include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -590,6 +592,36 @@ TEST(VirtualInterfaceElaboration, NestedInterfaceInstanceIsAMember_Ok) {
                              "'in' is not a clocking block or member of "
                              "interface 'outer_if'",
                              11, "25.9"));
+}
+
+// §25.9: a call through a virtual interface names a task or a function of the
+// interface it refers to an instance of, so one naming nothing that interface
+// declares is reported, while a call of its task, a method call through a
+// class handle, a package's function behind its scope and a call through a
+// chain are not (#5808).
+TEST(VirtualInterfaceCallElaboration, ACallNamingNothingTheInterfaceDeclares) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p; function void pf(); endfunction endpackage\n"
+      "interface other; task nosuch(); endtask endinterface\n"
+      "interface ifc; logic x; task t(); endtask endinterface\n"
+      "module top;\n"
+      "  class C; function void g(); endfunction C h; endclass\n"
+      "  ifc i (); virtual ifc v = i; C c = new;\n"
+      "  initial if (0) begin\n"
+      "    v.nosuch();\n"
+      "    v.t(); c.g(); p::pf(); c.h.g();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'nosuch' names no task or function of interface "
+                            "'ifc'",
+                            8, "25.9"));
+  for (const Diagnostic& diag : f.diag.Diagnostics()) {
+    if (diag.severity != DiagSeverity::kError) continue;
+    EXPECT_NE(diag.loc.line, 9u) << diag.message;
+  }
 }
 
 }  // namespace

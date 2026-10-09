@@ -5,6 +5,7 @@
 #include <format>
 #include <functional>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -16,6 +17,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -29,6 +31,10 @@ namespace {
 // enclosing it sees a name at all.
 struct DataScope {
   const std::function<bool(std::string_view)>& visible;
+  const CompilationUnit& unit;
+  // §25.9: the interface each virtual interface variable of the module refers
+  // to an instance of.
+  std::unordered_map<std::string_view, std::string_view> vifs = {};
   std::unordered_set<std::string_view> module = {};
   std::vector<std::string_view> blocks = {};
   std::unordered_set<std::string_view> uncallable = {};
@@ -95,12 +101,59 @@ void ReportStatementCall(const Stmt& stmt, const DataScope& scope,
              Subclause("23.9"));
 }
 
-// Each call by a plain name `expr` holds, itself included.
+// Whether `item` declares a task or a function a call may call: one the
+// source writes, or one a DPI import or export names (§35.5).
+bool IsSubroutineItem(const ModuleItem& item) {
+  return item.kind == ModuleItemKind::kTaskDecl ||
+         item.kind == ModuleItemKind::kFunctionDecl ||
+         item.kind == ModuleItemKind::kDpiImport ||
+         item.kind == ModuleItemKind::kDpiExport;
+}
+
+// Whether the interface `unit` declares under `iface` declares a task or a
+// function `name`.
+bool InterfaceDeclaresSubroutine(const CompilationUnit& unit,
+                                 std::string_view iface,
+                                 std::string_view name) {
+  bool declares = false;
+  for (const ModuleDecl* decl : unit.interfaces) {
+    if (decl->name != iface) continue;
+    for (const ModuleItem* item : decl->items) {
+      if (IsSubroutineItem(*item) && item->name == name) declares = true;
+    }
+  }
+  return declares;
+}
+
+// §25.9: a call `call` through a virtual interface variable of the module,
+// v.t(), naming no task or function the interface declares.
+void ReportVifCall(const Expr& call, const DataScope& scope, DiagEngine& diag) {
+  const Expr& callee = *call.lhs;
+  if (callee.kind != ExprKind::kMemberAccess || callee.is_scope_resolution ||
+      callee.lhs->kind != ExprKind::kIdentifier) {
+    return;
+  }
+  const auto kVif = scope.vifs.find(callee.lhs->text);
+  if (kVif == scope.vifs.end() ||
+      InterfaceDeclaresSubroutine(scope.unit, kVif->second, callee.rhs->text)) {
+    return;
+  }
+  diag.Error(call.range.start,
+             std::format("'{}' names no task or function of interface '{}'",
+                         callee.rhs->text, kVif->second),
+             Subclause("25.9"));
+}
+
+// Each call by a plain name `expr` holds, itself included, and each call
+// through a virtual interface.
 void CheckExprCalls(const Expr* expr, const DataScope& scope,
                     DiagEngine& diag) {
   if (expr == nullptr) return;
   if (const Expr* callee = NamedCallee(*expr)) {
     ReportIfData(callee->text, expr->range.start, scope, diag);
+  }
+  if (expr->kind == ExprKind::kCall && expr->lhs != nullptr) {
+    ReportVifCall(*expr, scope, diag);
   }
   ForEachExprChild(
       expr, [&](const Expr* child) { CheckExprCalls(child, scope, diag); });
@@ -128,15 +181,6 @@ void CheckStmtCalls(const Stmt* stmt, DataScope& scope, DiagEngine& diag) {
   ForEachChildStmt(stmt,
                    [&](Stmt* const& sub) { CheckStmtCalls(sub, scope, diag); });
   scope.blocks.resize(kOuter);
-}
-
-// Whether `item` declares a task or a function a call may call: one the
-// source writes, or one a DPI import or export names (§35.5).
-bool IsSubroutineItem(const ModuleItem& item) {
-  return item.kind == ModuleItemKind::kTaskDecl ||
-         item.kind == ModuleItemKind::kFunctionDecl ||
-         item.kind == ModuleItemKind::kDpiImport ||
-         item.kind == ModuleItemKind::kDpiExport;
 }
 
 // §26.3: the variables and nets the package `import` names brings in, by its
@@ -183,9 +227,13 @@ std::unordered_set<std::string_view> EnclosingSubroutineNames(
 void ReportCallsOfDataNames(
     const ModuleDecl& decl, const CompilationUnit& unit,
     const std::function<bool(std::string_view)>& visible, DiagEngine& diag) {
-  DataScope scope{visible};
+  DataScope scope{visible, unit};
   std::unordered_set<std::string_view>& subroutines = scope.subroutines;
   for (const ModuleItem* item : decl.items) {
+    if (item->kind == ModuleItemKind::kVarDecl &&
+        item->data_type.kind == DataTypeKind::kVirtualInterface) {
+      scope.vifs[item->name] = item->data_type.type_name;
+    }
     if (item->kind == ModuleItemKind::kVarDecl ||
         item->kind == ModuleItemKind::kNetDecl) {
       scope.module.insert(item->name);
