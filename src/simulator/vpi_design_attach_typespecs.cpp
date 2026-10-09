@@ -25,14 +25,16 @@ using TypespecsByName = std::unordered_map<std::string_view, VpiObject*>;
 
 // What making one scope's typespecs reads: the scope object they hang from,
 // the enumerations the run resolved under each typedef name, the model to
-// build in, and the typespecs of the scope around it, the compilation unit's,
-// which a typedef of the scope may alias.
+// build in, and, for a typedef of the scope to alias, the typespecs answered
+// beyond it, the compilation unit's by name and the packages' as pkg::name,
+// and the scope's imports, through which a package's are visible (§26.3).
 struct ScopeTypespecs {
   VpiObject* scope;
   const std::unordered_map<std::string_view, std::vector<RtlirEnumMember>>*
       enums;
   const VpiAttachBuild& build;
   const TypespecsByName& outer;
+  const std::vector<RtlirImport>& imports;
 };
 
 // §37.25: an enum const of `typespec`, named after the member and holding its
@@ -62,14 +64,16 @@ void MakeTypespecMember(VpiObject* typespec, const StructMember& member,
 }
 
 // §37.25 detail 1: the typespec of the typedef `name` a typedef aliases,
-// among those its scope made before it, `made`, or else those of the scope
-// around it; null where neither holds one.
+// among those its scope made before it, `made`, or else the compilation
+// unit's, or else a package's an import of the scope makes visible; null
+// where none holds one.
 VpiObject* AliasedTypespec(std::string_view name, const TypespecsByName& made,
                            const ScopeTypespecs& at) {
   auto it = made.find(name);
   if (it != made.end()) return it->second;
   it = at.outer.find(name);
-  return it != at.outer.end() ? it->second : nullptr;
+  return it != at.outer.end() ? it->second
+                              : VpiImportedTypespec(name, at.imports, at.outer);
 }
 
 // §37.25 and §37.26: the typespec the typedef `item` declares, named after
@@ -150,6 +154,19 @@ VpiObject* DeclaredTypespec(const RtlirVariable& var,
 
 }  // namespace
 
+VpiObject* VpiImportedTypespec(std::string_view name,
+                               const std::vector<RtlirImport>& imports,
+                               const VpiObjectMap& answered) {
+  for (const RtlirImport& imported : imports) {
+    if (!imported.is_wildcard && imported.item_name != name) continue;
+    const std::string kKey =
+        std::string(imported.package_name) + "::" + std::string(name);
+    auto it = answered.find(kKey);
+    if (it != answered.end()) return it->second;
+  }
+  return nullptr;
+}
+
 VpiObjectMap AttachTypespecs(const RtlirDesign* design,
                              const VpiObjectMap& objects,
                              const VpiAttachBuild& build) {
@@ -162,40 +179,41 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
   const CompilationUnit& unit = *design->compilation_unit;
   auto unit_scope = objects.find("$unit");
   const TypespecsByName kNone;
+  const std::vector<RtlirImport> kNoImports;
   const TypespecsByName kUnit =
       MakeTypespecs(unit.cu_items,
                     {unit_scope == objects.end() ? nullptr : unit_scope->second,
-                     nullptr, build, kNone});
+                     nullptr, build, kNone, kNoImports});
   VpiObjectMap answered(kUnit.begin(), kUnit.end());
   // §37.10 detail 1: a package is an instance too, whose typedefs are its
   // typespecs, answered under the package's name and "::" for a scope that
   // imports them (§26.3) to reach.
   for (const PackageDecl* pkg : design->packages) {
-    const TypespecsByName kPackage = MakeTypespecs(
-        pkg->items,
-        {FindObjectForFlatName(objects, pkg->name), nullptr, build, kNone});
+    const TypespecsByName kPackage =
+        MakeTypespecs(pkg->items, {FindObjectForFlatName(objects, pkg->name),
+                                   nullptr, build, kNone, kNoImports});
     for (const auto& [name, typespec] : kPackage) {
       answered[build.keep(std::string(pkg->name) + "::" + std::string(name))] =
           typespec;
     }
   }
-  WalkInstancePaths(
-      design, [&](const RtlirModule* mod, const std::string& prefix) {
-        VpiObject* scope = FindObjectForFlatName(
-            objects, prefix.empty() ? std::string(mod->name) : prefix);
-        const ModuleDecl* decl = ElementNamed(unit, mod->name);
-        if (decl == nullptr) return;
-        const TypespecsByName kLocal =
-            MakeTypespecs(decl->items, {scope, &mod->enum_types, build, kUnit});
-        for (const RtlirVariable& var : mod->variables) {
-          VpiObject* typespec = DeclaredTypespec(var, kLocal, kUnit);
-          VpiObject* obj =
-              FindObjectForFlatName(objects, VpiFlatName(prefix, var.name));
-          if (typespec != nullptr && obj != nullptr) {
-            obj->children.push_back(typespec);
-          }
-        }
-      });
+  WalkInstancePaths(design, [&](const RtlirModule* mod,
+                                const std::string& prefix) {
+    VpiObject* scope = FindObjectForFlatName(
+        objects, prefix.empty() ? std::string(mod->name) : prefix);
+    const ModuleDecl* decl = ElementNamed(unit, mod->name);
+    if (decl == nullptr) return;
+    const TypespecsByName kLocal = MakeTypespecs(
+        decl->items, {scope, &mod->enum_types, build, answered, mod->imports});
+    for (const RtlirVariable& var : mod->variables) {
+      VpiObject* typespec = DeclaredTypespec(var, kLocal, kUnit);
+      VpiObject* obj =
+          FindObjectForFlatName(objects, VpiFlatName(prefix, var.name));
+      if (typespec != nullptr && obj != nullptr) {
+        obj->children.push_back(typespec);
+      }
+    }
+  });
   return answered;
 }
 

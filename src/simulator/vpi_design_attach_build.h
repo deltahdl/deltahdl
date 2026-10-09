@@ -166,6 +166,13 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
                              const VpiObjectMap& objects,
                              const VpiAttachBuild& build);
 
+// §26.3: the typespec of the typedef `name` a package declares that one of
+// `imports` makes visible, among those AttachTypespecs answered, `answered`,
+// under the package's name and "::"; null where no import reaches one.
+VpiObject* VpiImportedTypespec(std::string_view name,
+                               const std::vector<RtlirImport>& imports,
+                               const VpiObjectMap& answered);
+
 // §37.28 details 1 and 2: make each value parameter a vpiParameter and each
 // type parameter a vpiTypeParameter, each saying whether it is a localparam,
 // and relate a type parameter to the typespec of the type it has, a typedef's

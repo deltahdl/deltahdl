@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "common/packed_range.h"
-#include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
@@ -73,21 +72,6 @@ int FormalTypespecKind(TokenKind keyword) {
   }
 }
 
-// §26.3: the typespec of the typedef `name` a package declares that an
-// import of the module makes visible, among those `at` answers under the
-// package's name and "::"; null where no import reaches one.
-VpiObject* ImportedTypespec(std::string_view name,
-                            const VpiPropertyDeclSite& at) {
-  for (const RtlirImport& imported : at.imports) {
-    if (!imported.is_wildcard && imported.item_name != name) continue;
-    const std::string kKey =
-        std::string(imported.package_name) + "::" + std::string(name);
-    auto it = at.unit_typespecs.find(kKey);
-    if (it != at.unit_typespecs.end()) return it->second;
-  }
-  return nullptr;
-}
-
 // §37.25: the typespec the typedef `name` declares in the scopes from
 // `holder` out to the instance, or else among the compilation unit's, or else
 // in a package an import of the module makes it visible from; null where none
@@ -101,8 +85,9 @@ VpiObject* TypedefTypespec(const VpiObject* holder, std::string_view name,
     }
   }
   auto it = at.unit_typespecs.find(name);
-  return it != at.unit_typespecs.end() ? it->second
-                                       : ImportedTypespec(name, at);
+  return it != at.unit_typespecs.end()
+             ? it->second
+             : VpiImportedTypespec(name, at.imports, at.unit_typespecs);
 }
 
 // §37.51 detail 3 with §37.25: the typespec the formal `index` of `decl` is

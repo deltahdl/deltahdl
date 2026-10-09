@@ -483,6 +483,29 @@ VpiObject* ListOperationObject(const Expr* expr, const AssignBuild& build) {
   }
 }
 
+// §37.59 details 6 and 7: a positional assignment pattern is an assignment
+// pattern operation over its expressions, and a replicated one a multi
+// assignment pattern operation over its multiplier and its expressions. The
+// parser holds the replication as the pattern's one element, a replicate
+// starting where the pattern does, which tells it from a replicate written as
+// the pattern's one expression. A keyed pattern, whose positional order its
+// target's type decides, is not modelled.
+VpiObject* PatternObject(const Expr* expr, const AssignBuild& build) {
+  if (!expr->pattern_keys.empty()) return nullptr;
+  const Expr* first = expr->elements.front();
+  if (expr->elements.size() == 1 && first->kind == ExprKind::kReplicate &&
+      first->range.start.line == expr->range.start.line &&
+      first->range.start.column == expr->range.start.column) {
+    return OperationObject(vpiMultiAssignmentPatternOp,
+                           Operands(first->repeat_count, first->elements),
+                           build);
+  }
+  return OperationObject(
+      vpiAssignmentPatternOp,
+      std::vector<const Expr*>(expr->elements.begin(), expr->elements.end()),
+      build);
+}
+
 // §23.6: `expr` as the dotted name it writes, `u1.clk`, onto `out`; false
 // where it is not identifiers joined by dots alone.
 bool DottedName(const Expr* expr, std::string& out) {
@@ -554,6 +577,8 @@ VpiObject* ModelledExpression(const Expr* expr, const AssignBuild& build) {
     case ExprKind::kInside:
     case ExprKind::kStreamingConcat:
       return ListOperationObject(expr, build);
+    case ExprKind::kAssignmentPattern:
+      return PatternObject(expr, build);
     case ExprKind::kCast:
       return OperationObject(vpiCastOp, {expr->lhs}, build);
     case ExprKind::kMinTypMax:

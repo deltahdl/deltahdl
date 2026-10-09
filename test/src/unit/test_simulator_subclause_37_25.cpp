@@ -432,5 +432,23 @@ TEST_F(TypespecsOfARun, ATypedefOfATypedefReachesItThroughTypedefAlias) {
   EXPECT_STREQ(vpi_get_str(vpiName, word), "word_t");
 }
 
+// Detail 1: a module typedef aliasing a typedef a package declares, made
+// visible by an import (§26.3), is a typespec of the aliased one's kind that
+// reaches the package's typespec, past a wildcard import of a package
+// declaring no such typedef and an import of another of the package's
+// typedefs (#5751).
+TEST_F(TypespecsOfARun, ATypedefOfAnImportedTypedefReachesIt) {
+  Run("package pk; typedef logic [3:0] nib_t; typedef int word_t;\n"
+      "endpackage\n"
+      "package qk; typedef bit flag_t; endpackage\n"
+      "module top; import qk::*; import pk::word_t; import pk::nib_t;\n"
+      "  typedef nib_t half_t; endmodule\n");
+  vpiHandle half = Named(vpiTypedef, By("top"), "half_t");
+  ASSERT_NE(half, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, half), vpiLogicTypespec);
+  EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiTypedefAlias, half),
+                                  Named(vpiTypedef, By("pk"), "nib_t")));
+}
+
 }  // namespace
 }  // namespace delta
