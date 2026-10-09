@@ -521,12 +521,11 @@ static bool SelectsIntoVifElement(
   return kDims != array_dims.end() && selects > kDims->second;
 }
 
-static void CheckVirtualInterfaceExpr(const Expr* e, const ViExprTables& tables,
-                                      DiagEngine& diag) {
-  if (!e) return;
+// §25.9: the operations the node `e` itself applies to a virtual interface
+// that §25.9 forbids, each reported.
+static void ReportViOperation(const Expr* e, const ViExprTables& tables,
+                              DiagEngine& diag) {
   const TypeMap& types = tables.types;
-  const auto& vi_iface = tables.vi_iface;
-  const auto& interface_inst = tables.interface_inst;
   if (e->kind == ExprKind::kBinary) {
     bool lhs_vi = e->lhs && IsVirtualInterfaceVar(e->lhs, types);
     bool rhs_vi = e->rhs && IsVirtualInterfaceVar(e->rhs, types);
@@ -534,7 +533,8 @@ static void CheckVirtualInterfaceExpr(const Expr* e, const ViExprTables& tables,
       diag.Error(e->range.start, "operator is not allowed on virtual interface",
                  Subclause("25.9"));
     }
-    CheckViEqualityOperands(e, types, vi_iface, interface_inst, diag);
+    CheckViEqualityOperands(e, types, tables.vi_iface, tables.interface_inst,
+                            diag);
   }
   if (e->kind == ExprKind::kUnary && IsVirtualInterfaceVar(e->lhs, types)) {
     diag.Error(e->range.start, "operator is not allowed on virtual interface",
@@ -551,6 +551,14 @@ static void CheckVirtualInterfaceExpr(const Expr* e, const ViExprTables& tables,
     diag.Error(e->range.start, "bit-select on virtual interface is illegal",
                Subclause("25.9"));
   }
+}
+
+// §25.9: each forbidden operation on a virtual interface in `e` and in every
+// expression it holds.
+static void CheckVirtualInterfaceExpr(const Expr* e, const ViExprTables& tables,
+                                      DiagEngine& diag) {
+  if (!e) return;
+  ReportViOperation(e, tables, diag);
   const Expr* const kChildren[] = {e->lhs,       e->rhs,       e->base,
                                    e->index,     e->condition, e->true_expr,
                                    e->false_expr};
