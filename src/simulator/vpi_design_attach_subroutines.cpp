@@ -56,15 +56,15 @@ const ModuleDecl* ElementDeclNamed(const RtlirDesign& design,
   const CompilationUnit& unit = *design.compilation_unit;
   for (const auto* list : {&unit.modules, &unit.interfaces, &unit.programs}) {
     for (const ModuleDecl* decl : *list) {
-      if (decl != nullptr && decl->name == name) return decl;
+      if (decl->name == name) return decl;
     }
   }
   return nullptr;
 }
 
 bool IsSubroutine(const ModuleItem* item) {
-  return item != nullptr && (item->kind == ModuleItemKind::kTaskDecl ||
-                             item->kind == ModuleItemKind::kFunctionDecl);
+  return item->kind == ModuleItemKind::kTaskDecl ||
+         item->kind == ModuleItemKind::kFunctionDecl;
 }
 
 // Whether `item` is a task or function one of `mod`'s generate blocks
@@ -102,13 +102,11 @@ VpiObject* MakeVariable(VpiObject* tf, std::string_view name, int kind,
   return var;
 }
 
-// §37.13 detail 1: the vpiDirection of an argument declared `direction`, and
-// where it is written without one, that of the argument before it (§13.3),
-// `previous`.
-int ArgumentDirection(Direction direction, int previous) {
+// §37.13 detail 1: the vpiDirection of an argument declared `direction`. The
+// parser gives an argument written without one the direction of the argument
+// before it, and the first such argument an input (§13.3).
+int ArgumentDirection(Direction direction) {
   switch (direction) {
-    case Direction::kInput:
-      return vpiInput;
     case Direction::kOutput:
       return vpiOutput;
     case Direction::kInout:
@@ -116,19 +114,16 @@ int ArgumentDirection(Direction direction, int previous) {
     case Direction::kRef:
       return vpiRef;
     default:
-      return previous;
+      return vpiInput;
   }
 }
 
 // §37.41 (figure): an io decl per argument `item` declares, in order, each
 // reaching through vpiExpr (§37.13) the variable the argument declares in the
-// task's or function's scope. An argument written first without a direction
-// is an input (§13.3).
+// task's or function's scope.
 void MakeIoDecls(VpiObject* tf, const ModuleItem& item,
                  const SubroutineScope& where, const SubroutineBuild& sb) {
-  int direction = vpiInput;
   for (const FunctionArg& arg : item.func_args) {
-    direction = ArgumentDirection(arg.direction, direction);
     VpiObject* var = MakeVariable(
         tf, arg.name,
         DeclaredVariableKind(arg.data_type, !arg.unpacked_dims.empty(), where,
@@ -141,7 +136,7 @@ void MakeIoDecls(VpiObject* tf, const ModuleItem& item,
     io_decl->name = var->name;
     io_decl->full_name = var->full_name;
     io_decl->parent = tf;
-    io_decl->direction = direction;
+    io_decl->direction = ArgumentDirection(arg.direction);
     io_decl->io_expr = var;
     tf->children.push_back(io_decl);
   }
@@ -220,10 +215,7 @@ void MakeBodyVariables(VpiObject* tf, const ModuleItem& item,
                        const SubroutineScope& where,
                        const SubroutineBuild& sb) {
   for (const Stmt* stmt : item.func_body_stmts) {
-    if (stmt == nullptr || stmt->kind != StmtKind::kVarDecl ||
-        stmt->var_is_param) {
-      continue;
-    }
+    if (stmt->kind != StmtKind::kVarDecl || stmt->var_is_param) continue;
     const bool kAutomatic =
         stmt->var_is_automatic || (tf->automatic && !stmt->var_is_static);
     VpiObject* var =
@@ -241,11 +233,10 @@ void MakeBodyVariables(VpiObject* tf, const ModuleItem& item,
 // stands as in `where`, named after it, full-named under the scope (detail 5
 // for a package's), automatic where it is declared so or declared without a
 // lifetime in a scope whose default is automatic, and holding its io decls,
-// its return variable and the variables its body declares. An item that
-// declares neither a task nor a function makes nothing.
-void MakeSubroutine(const SubroutineScope& where, const ModuleItem* item,
-                    const SubroutineBuild& sb) {
-  if (!IsSubroutine(item)) return;
+// its return variable and the variables its body declares. Answers the object
+// made.
+VpiObject* MakeSubroutine(const SubroutineScope& where, const ModuleItem* item,
+                          const SubroutineBuild& sb) {
   VpiObject* tf = sb.build.alloc();
   tf->type = item->kind == ModuleItemKind::kTaskDecl ? vpiTask : vpiFunction;
   tf->name = sb.build.keep(std::string(item->name));
@@ -259,6 +250,7 @@ void MakeSubroutine(const SubroutineScope& where, const ModuleItem* item,
   MakeIoDecls(tf, *item, where, sb);
   MakeReturnVariable(tf, *item, where, sb);
   MakeBodyVariables(tf, *item, where, sb);
+  return tf;
 }
 
 // The tasks and functions the instance `scope` of `mod`, keyed under
@@ -288,22 +280,19 @@ void MakeInstanceSubroutines(const SubroutineBuild& sb,
       &sb.design, [&](const RtlirModule* mod, const std::string& prefix) {
         VpiObject* scope = FindObjectForFlatName(
             objects, prefix.empty() ? std::string(mod->name) : prefix);
-        if (scope != nullptr) MakeScopeSubroutines(sb, *mod, scope, prefix);
+        MakeScopeSubroutines(sb, *mod, scope, prefix);
       });
 }
 
-// The tasks and functions each package declares.
+// The tasks and functions each package declares, among its other items.
 void MakePackageSubroutines(const SubroutineBuild& sb,
                             const VpiObjectMap& objects) {
   for (const PackageDecl* pkg : sb.design.packages) {
-    if (pkg == nullptr) continue;
     const std::string kPackage(pkg->name);
-    VpiObject* scope = FindObjectForFlatName(objects, kPackage);
-    if (scope == nullptr) continue;
-    const SubroutineScope kWhere{scope, kPackage, pkg->is_automatic, nullptr,
-                                 ""};
+    const SubroutineScope kWhere{FindObjectForFlatName(objects, kPackage),
+                                 kPackage, pkg->is_automatic, nullptr, ""};
     for (const ModuleItem* item : pkg->items) {
-      MakeSubroutine(kWhere, item, sb);
+      if (IsSubroutine(item)) MakeSubroutine(kWhere, item, sb);
     }
   }
 }
@@ -317,9 +306,7 @@ void MakeUnitSubroutines(const SubroutineBuild& sb,
   const SubroutineScope kWhere{unit == objects.end() ? nullptr : unit->second,
                                "$unit", false, nullptr, ""};
   for (const ModuleItem* item : sb.design.cu_function_decls) {
-    MakeSubroutine(kWhere, item, sb);
-    auto found = sb.made.find({item, kWhere.key});
-    if (found != sb.made.end()) found->second->in_compilation_unit = true;
+    MakeSubroutine(kWhere, item, sb)->in_compilation_unit = true;
   }
 }
 
@@ -348,7 +335,7 @@ VpiCalledSubroutine GenerateBlockSubroutine(const VpiCallSite& site,
   for (const VpiObject* scope = site.scope; scope != nullptr;
        scope = scope->parent) {
     for (const RtlirGenBlockSubroutine& sub : site.mod.gen_block_subroutines) {
-      if (sub.decl == nullptr || sub.decl->name != name) continue;
+      if (sub.decl->name != name) continue;
       auto found = site.made.find({sub.decl, scope->full_name});
       if (found != site.made.end()) return {sub.decl, found->second};
     }
@@ -357,12 +344,12 @@ VpiCalledSubroutine GenerateBlockSubroutine(const VpiCallSite& site,
 }
 
 // The task or function `name` the instance's module declares outside every
-// generate block, null where it declares none.
+// generate block, null where it declares none. The module's function_decls
+// hold its tasks and functions alone.
 const ModuleItem* InstanceSubroutine(const RtlirModule& mod,
                                      std::string_view name) {
   for (const ModuleItem* decl : mod.function_decls) {
-    if (IsSubroutine(decl) && decl->name == name &&
-        !DeclaredInGenerateBlock(mod, decl)) {
+    if (decl->name == name && !DeclaredInGenerateBlock(mod, decl)) {
       return decl;
     }
   }
@@ -371,7 +358,7 @@ const ModuleItem* InstanceSubroutine(const RtlirModule& mod,
 
 }  // namespace
 
-VpiSubroutineObjects AttachSubroutines(const RtlirDesign* design,
+VpiSubroutineObjects AttachSubroutines(const RtlirDesign& design,
                                        const VpiObjectMap& objects,
                                        SimContext& ctx,
                                        const VpiAttachBuild& build) {
@@ -379,8 +366,7 @@ VpiSubroutineObjects AttachSubroutines(const RtlirDesign* design,
   // object of the instance, generate block or package declaring it. Nothing
   // made one, so vpiTaskFunc reached none and no call reached what it calls.
   VpiSubroutineObjects made;
-  if (design == nullptr) return made;
-  const SubroutineBuild kBuild{*design, ctx, build, made};
+  const SubroutineBuild kBuild{design, ctx, build, made};
   MakeInstanceSubroutines(kBuild, objects);
   MakePackageSubroutines(kBuild, objects);
   MakeUnitSubroutines(kBuild, objects);
@@ -392,7 +378,7 @@ VpiCalledSubroutine VpiPackageSubroutine(const RtlirDesign& design,
                                          std::string_view name,
                                          const VpiSubroutineObjects& made) {
   for (const PackageDecl* decl : design.packages) {
-    if (decl == nullptr || decl->name != package) continue;
+    if (decl->name != package) continue;
     const ModuleItem* found = SubroutineNamed(decl->items, name);
     if (found != nullptr) return Called(found, std::string(package), made);
   }

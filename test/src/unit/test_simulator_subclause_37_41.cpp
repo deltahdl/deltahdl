@@ -1,12 +1,14 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
@@ -490,6 +492,108 @@ TEST_F(TaskFuncsOfARun, AGenerateBlockTaskIsATaskOfTheBlock) {
   ASSERT_NE(t1, nullptr);
   EXPECT_STREQ(vpi_get_str(vpiFullName, t1), "top.g[1].t");
   EXPECT_NE(VpiObjectOf(t0), VpiObjectOf(t1));
+}
+
+// The figure's vpiFuncType for the remaining kinds of return: a real of
+// either precision returns a real, a vector or an integral atom a sized
+// value, signed where the type is (§6.11), and any other type another kind.
+TEST_F(TaskFuncsOfARun, EachKindOfReturnHasItsFuncType) {
+  Run("module top; function shortreal sr(); return 0; endfunction\n"
+      "  function realtime rt(); return 0; endfunction\n"
+      "  function [3:0] im(); return 0; endfunction\n"
+      "  function reg rg(); return 0; endfunction\n"
+      "  function bit bt(); return 0; endfunction\n"
+      "  function byte by(); return 0; endfunction\n"
+      "  function shortint si(); return 0; endfunction\n"
+      "  function longint li(); return 0; endfunction\n"
+      "  function string st(); return \"\"; endfunction endmodule\n");
+  const auto kFuncType = [](const char* name) {
+    return vpi_get(vpiFuncType, Named(vpiTaskFunc, By("top"), name));
+  };
+  EXPECT_EQ(kFuncType("sr"), vpiRealFunc);
+  EXPECT_EQ(kFuncType("rt"), vpiRealFunc);
+  EXPECT_EQ(kFuncType("im"), vpiSizedFunc);
+  EXPECT_EQ(kFuncType("rg"), vpiSizedFunc);
+  EXPECT_EQ(kFuncType("bt"), vpiSizedFunc);
+  EXPECT_EQ(kFuncType("by"), vpiSizedSignedFunc);
+  EXPECT_EQ(kFuncType("si"), vpiSizedSignedFunc);
+  EXPECT_EQ(kFuncType("li"), vpiSizedSignedFunc);
+  EXPECT_EQ(kFuncType("st"), vpiOtherFunc);
+}
+
+// §37.13 detail 1: an argument declared inout is an io decl of that
+// direction.
+TEST_F(TaskFuncsOfARun, AnInoutArgumentIsAnInoutIoDecl) {
+  Run("module top; task t(inout int x); endtask endmodule\n");
+  vpiHandle t = Named(vpiTaskFunc, By("top"), "t");
+  EXPECT_EQ(vpi_get(vpiDirection, Named(vpiIODecl, t, "x")), vpiInout);
+}
+
+// §37.17: a function returning, and an argument declared with, a type the
+// module names is a variable of the kind the named type has...
+TEST_F(TaskFuncsOfARun, AVariableOfANamedTypeHasTheTypesKind) {
+  Run("module top; typedef enum {A, B} e_t;\n"
+      "  function e_t f(e_t x); return x; endfunction endmodule\n");
+  vpiHandle f = Named(vpiTaskFunc, By("top"), "f");
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiReturn, f)), vpiEnumVar);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiExpr, Named(vpiIODecl, f, "x"))),
+            vpiEnumVar);
+}
+
+// ...and a function whose return type names an unpacked array returns
+// through an array var (§13.4.1).
+TEST_F(TaskFuncsOfARun, AFunctionOfAnArrayTypeReturnsThroughAnArrayVar) {
+  Run("module top; typedef int arr_t [2];\n"
+      "  function arr_t f(); return '{1, 2}; endfunction endmodule\n");
+  vpiHandle f = Named(vpiTaskFunc, By("top"), "f");
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiReturn, f)), vpiArrayVar);
+}
+
+// The kind of the object the task or function `tf` holds for its variable
+// `name`, 0 where it holds none.
+int VariableKindOf(vpiHandle tf, std::string_view name) {
+  for (const VpiObject* child : VpiObjectOf(tf)->children) {
+    if (child->name == name && child->type != vpiIODecl) return child->type;
+  }
+  return 0;
+}
+
+// §37.27 with §37.12: an unpacked array of events a body declares is a named
+// event array, beside an array var; a local parameter it declares is no
+// variable.
+TEST_F(TaskFuncsOfARun, ABodysEventArrayIsANamedEventArray) {
+  Run("module top; task t(); event e [2]; int n [2];\n"
+      "  localparam int P = 1; endtask endmodule\n");
+  vpiHandle t = Named(vpiTaskFunc, By("top"), "t");
+  ASSERT_NE(t, nullptr);
+  EXPECT_EQ(VariableKindOf(t, "e"), vpiNamedEventArray);
+  EXPECT_EQ(VariableKindOf(t, "n"), vpiArrayVar);
+  EXPECT_EQ(VariableKindOf(t, "P"), 0);
+}
+
+// Detail 11 with §13.3.1: a task a generate block of an automatic module
+// declares without a lifetime is automatic, and one declared static is not.
+TEST_F(TaskFuncsOfARun, AGenerateBlockTaskTakesItsModulesLifetime) {
+  Run("module automatic top; if (1) begin : g task t(); endtask\n"
+      "  task static s(); endtask end endmodule\n");
+  EXPECT_EQ(vpi_get(vpiAutomatic, Named(vpiTaskFunc, By("top.g"), "t")), 1);
+  EXPECT_EQ(vpi_get(vpiAutomatic, Named(vpiTaskFunc, By("top.g"), "s")), 0);
+}
+
+// §37.41 with §37.10 details 5 and 6: a function of the compilation unit is
+// one of the unit's, full-named through "$unit::" and reached by no name.
+TEST_F(TaskFuncsOfARun, ACompilationUnitFunctionIsTheUnits) {
+  Run("int g = 3;\n"
+      "function int f(); return g; endfunction\n"
+      "module top; endmodule\n");
+  vpiHandle it = vpi_iterate(vpiPackage, nullptr);
+  ASSERT_NE(it, nullptr);
+  vpiHandle unit = vpi_scan(it);
+  vpiHandle f = Named(vpiTaskFunc, unit, "f");
+  ASSERT_NE(f, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, f), "$unit::f");
+  EXPECT_TRUE(VpiObjectOf(f)->in_compilation_unit);
+  EXPECT_EQ(vpi_handle_by_name(VpiText("f"), unit), nullptr);
 }
 
 // §37.41 detail 4 and (figure): no object is no method, nor is a function with

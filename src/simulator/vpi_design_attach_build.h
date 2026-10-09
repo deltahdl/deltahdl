@@ -179,7 +179,7 @@ using VpiSubroutineObjects =
 // holding its io decls, its return variable and the variables its body
 // declares, a return variable's width read in the run `ctx`. Answers the
 // objects made.
-VpiSubroutineObjects AttachSubroutines(const RtlirDesign* design,
+VpiSubroutineObjects AttachSubroutines(const RtlirDesign& design,
                                        const VpiObjectMap& objects,
                                        SimContext& ctx,
                                        const VpiAttachBuild& build);
