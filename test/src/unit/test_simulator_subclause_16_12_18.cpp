@@ -94,6 +94,16 @@ TEST(TypedPropertyFormals, AnEventFormalTakesTheInstancesEvent) {
   EXPECT_EQ(counts.second, 1u);
 }
 
+// §16.12.18 with §9.4.2: an event actual joined by or, or guarded by iff, is
+// the clock the property is evaluated on, as the same event written there
+// is.
+TEST(TypedPropertyFormals, AnOrOrIffEventActualIsTheWrittenClock) {
+  EXPECT_EQ(CountsOfTyped("p_ev(negedge clk or posedge clk)"),
+            CountsOfTyped("@(negedge clk or posedge clk) v == 2 |-> w"));
+  EXPECT_EQ(CountsOfTyped("p_ev(posedge clk iff go)"),
+            CountsOfTyped("@(posedge clk iff go) v == 2 |-> w"));
+}
+
 // §16.12.18: a boolean may be passed to a formal of type property, being a
 // property_expr: go |-> b fails at 1 and 5.
 TEST(TypedPropertyFormals, ABooleanMayBePassedToAPropertyFormal) {

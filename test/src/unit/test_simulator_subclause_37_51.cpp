@@ -652,22 +652,37 @@ TEST_F(PropertyDeclsOfARun, AKeyedPatternActualTakesItsFormalsOrder) {
 }
 
 // An event expression passed for a formal of type event (§16.12.18) is the
-// argument the operation of its edge, its or or its iff stands as (§37.59)
-// (#5764).
-TEST_F(PropertyDeclsOfARun, AnEventActualIsItsEventOperation) {
+// argument the operation of its edge stands as (§37.59) (#5764)...
+TEST_F(PropertyDeclsOfARun, AnEdgeEventActualIsAnEdgeOperation) {
   Run("module top; logic clk, a;\n"
       "  property p(event e, x); @(e) x; endproperty\n"
       "  a1: assert property (p(posedge clk, a));\n"
-      "  a2: assert property (p(negedge clk or posedge clk, a));\n"
-      "  a3: assert property (p(posedge clk iff a, a));\n"
       "endmodule\n");
-  const auto kFirstOp = [](const char* assertion) {
-    const std::vector<vpiHandle> kArguments = ArgumentsOf(assertion);
-    return kArguments.size() == 2 ? vpi_get(vpiOpType, kArguments[0]) : 0;
-  };
-  EXPECT_EQ(kFirstOp("a1"), vpiPosedgeOp);
-  EXPECT_EQ(kFirstOp("a2"), vpiEventOrOp);
-  EXPECT_EQ(kFirstOp("a3"), vpiIffOp);
+  const std::vector<vpiHandle> kArguments = ArgumentsOf("a1");
+  ASSERT_EQ(kArguments.size(), 2U);
+  EXPECT_EQ(vpi_get(vpiOpType, kArguments[0]), vpiPosedgeOp);
+}
+
+// ...one joined by or the event or operation...
+TEST_F(PropertyDeclsOfARun, AnOrEventActualIsAnEventOrOperation) {
+  Run("module top; logic clk, a;\n"
+      "  property p(event e, x); @(e) x; endproperty\n"
+      "  a1: assert property (p(negedge clk or posedge clk, a));\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kArguments = ArgumentsOf("a1");
+  ASSERT_EQ(kArguments.size(), 2U);
+  EXPECT_EQ(vpi_get(vpiOpType, kArguments[0]), vpiEventOrOp);
+}
+
+// ...and one guarded by iff the iff operation (#5764).
+TEST_F(PropertyDeclsOfARun, AnIffEventActualIsAnIffOperation) {
+  Run("module top; logic clk, a;\n"
+      "  property p(event e, x); @(e) x; endproperty\n"
+      "  a1: assert property (p(posedge clk iff a, a));\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kArguments = ArgumentsOf("a1");
+  ASSERT_EQ(kArguments.size(), 2U);
+  EXPECT_EQ(vpi_get(vpiOpType, kArguments[0]), vpiIffOp);
 }
 
 // A property with no clock of its own, instantiated by an assertion the
