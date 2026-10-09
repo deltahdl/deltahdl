@@ -746,8 +746,7 @@ void MakeContinuousAssignment(const RtlirContAssign& ca, VpiObject* scope,
   obj->lhs = ExpressionObject(lhs, build);
   obj->rhs = ExpressionObject(rhs, build);
   // §37.59 detail 6: a keyed pattern is ordered by its target, here at hand.
-  if (obj->rhs == nullptr && obj->lhs != nullptr &&
-      rhs->kind == ExprKind::kAssignmentPattern) {
+  if (obj->rhs == nullptr && rhs->kind == ExprKind::kAssignmentPattern) {
     obj->rhs = KeyedPatternObject(rhs, obj->lhs, build);
   }
 
