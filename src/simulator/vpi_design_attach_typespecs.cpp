@@ -70,8 +70,9 @@ VpiObject* MakeTypespec(const ModuleItem& item, const ScopeTypespecs& at) {
   typespec->type = kKind;
   typespec->name = at.build.keep(std::string(item.name));
   typespec->parent = at.scope;
-  typespec->full_name = (at.scope != nullptr ? at.scope->full_name + "." : "") +
-                        std::string(item.name);
+  typespec->full_name = at.scope != nullptr
+                            ? VpiScopedFullName(at.scope, item.name)
+                            : std::string(item.name);
   if (type.kind == DataTypeKind::kEnum && at.enums != nullptr) {
     auto it = at.enums->find(item.name);
     if (it != at.enums->end()) {
@@ -144,6 +145,19 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
       MakeTypespecs(unit.cu_items,
                     {unit_scope == objects.end() ? nullptr : unit_scope->second,
                      nullptr, build});
+  VpiObjectMap answered(kUnit.begin(), kUnit.end());
+  // §37.10 detail 1: a package is an instance too, whose typedefs are its
+  // typespecs, answered under the package's name and "::" for a scope that
+  // imports them (§26.3) to reach.
+  for (const PackageDecl* pkg : design->packages) {
+    const TypespecsByName kPackage = MakeTypespecs(
+        pkg->items,
+        {FindObjectForFlatName(objects, pkg->name), nullptr, build});
+    for (const auto& [name, typespec] : kPackage) {
+      answered[build.keep(std::string(pkg->name) + "::" + std::string(name))] =
+          typespec;
+    }
+  }
   WalkInstancePaths(
       design, [&](const RtlirModule* mod, const std::string& prefix) {
         VpiObject* scope = FindObjectForFlatName(
@@ -161,7 +175,7 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
           }
         }
       });
-  return kUnit;
+  return answered;
 }
 
 }  // namespace delta

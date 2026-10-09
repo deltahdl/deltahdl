@@ -154,6 +154,12 @@ TEST(NamedEventModel, TheTypespecClassGroupsTheConcreteTypespecKinds) {
   EXPECT_TRUE(VpiIsTypespecType(vpiArrayTypespec));
   EXPECT_TRUE(VpiIsTypespecType(vpiStructTypespec));
   EXPECT_TRUE(VpiIsTypespecType(vpiTypeParameter));
+  // The chandle, integer, time and real typespecs are kinds of their own,
+  // whose values no other typespec kind shares (#5746).
+  for (int kind : {vpiChandleTypespec, vpiIntegerTypespec, vpiTimeTypespec,
+                   vpiRealTypespec}) {
+    EXPECT_TRUE(VpiIsTypespecType(kind));
+  }
 
   EXPECT_FALSE(VpiIsTypespecType(vpiNamedEvent));
   EXPECT_FALSE(VpiIsTypespecType(vpiThread));

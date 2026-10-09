@@ -30,6 +30,7 @@ struct SeqLinearBody;
 struct RtlirAssertion;
 struct RtlirPropertyDecl;
 struct RtlirDesign;
+struct RtlirImport;
 struct RtlirModule;
 struct RtlirNet;
 struct RtlirPort;
@@ -158,7 +159,8 @@ void AttachStructMembers(const RtlirDesign* design, const VpiObjectMap& objects,
 // §37.25, §37.26, §37.85 detail 5 and §37.17: give each scope a typespec per
 // typedef it declares, and link each variable declared with one to it. Answers
 // the compilation unit's typespecs by typedef name, since no scope object of
-// the model holds them.
+// the model holds them, and each package's by the package's name, "::" and
+// the typedef's name, for a scope importing them to reach.
 VpiObjectMap AttachTypespecs(const RtlirDesign* design,
                              const VpiObjectMap& objects,
                              const VpiAttachBuild& build);
@@ -425,13 +427,15 @@ VpiObject* VpiRangeObject(VpiObject* parent,
                           const VpiAttachBuild& build);
 
 // Where a property decl is built: `scope`, the instance or the generate block
-// instance declaring it; the typespecs of the compilation unit's typedefs,
-// which a formal's type may name; and the run its packed dimensions are
-// evaluated in.
+// instance declaring it; the typespecs AttachTypespecs answered, the
+// compilation unit's and the packages', which a formal's type may name; the
+// run its packed dimensions are evaluated in; and the imports of the module
+// declaring it, through which a formal's type may name a package's typedef.
 struct VpiPropertyDeclSite {
   VpiObject* scope;
   const VpiObjectMap& unit_typespecs;
   SimContext& ctx;
+  const std::vector<RtlirImport>& imports;
 };
 
 // §37.12 and §37.51: the property decl of the property `declared` stands

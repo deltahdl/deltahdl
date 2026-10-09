@@ -640,19 +640,21 @@ bool VpiIsTypespecType(int type) {
   // §37.25: every "... typespec" node of Figure 37.25 - the built-in scalar and
   // integer typespecs, the user-defined-type typespecs, the array/packed-array
   // typespecs, and (detail 11) an unresolved type parameter, which acts as a
-  // typespec. Each numeric value is listed once; some Annex M spellings (e.g.
-  // vpiChandleTypespec, vpiIntegerTypespec, vpiTimeTypespec, vpiRealTypespec)
-  // share a value with a name already covered here.
+  // typespec.
   switch (type) {
     case vpiTypespec:
     case vpiTypeParameter:
     case vpiLongIntTypespec:
     case vpiShortIntTypespec:
     case vpiIntTypespec:
+    case vpiIntegerTypespec:
+    case vpiTimeTypespec:
+    case vpiRealTypespec:
     case vpiShortRealTypespec:
     case vpiByteTypespec:
     case vpiClassTypespec:
     case vpiStringTypespec:
+    case vpiChandleTypespec:
     case vpiEnumTypespec:
     case vpiStructTypespec:
     case vpiUnionTypespec:

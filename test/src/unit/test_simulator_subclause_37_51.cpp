@@ -326,10 +326,12 @@ TEST_F(PropertyDeclsOfARun, AProceduralAssertionReachesItsPropertyInst) {
 
 // A formal declared with a type reaches a typespec of that type, and an
 // untyped one none (detail 3) (#5091). §16.12 adds property to the types a
-// property's formal may have.
+// property's formal may have, and §6.12 makes realtime a synonym for real
+// (#5746).
 TEST_F(PropertyDeclsOfARun, ATypedFormalReachesItsTypespec) {
   Run("module top; logic clk;\n"
-      "  property p(bit x, untyped y, event e, sequence s, property q);\n"
+      "  property p(bit x, untyped y, event e, sequence s, property q,\n"
+      "             realtime t);\n"
       "    @(posedge clk) x;\n"
       "  endproperty\n"
       "endmodule\n");
@@ -345,6 +347,7 @@ TEST_F(PropertyDeclsOfARun, ATypedFormalReachesItsTypespec) {
   EXPECT_EQ(kTypespecOf("e"), vpiEventTypespec);
   EXPECT_EQ(kTypespecOf("s"), vpiSequenceTypespec);
   EXPECT_EQ(kTypespecOf("q"), vpiPropertyTypespec);
+  EXPECT_EQ(kTypespecOf("t"), vpiRealTypespec);
 }
 
 // Detail 5: a local variable formal argument (§16.8.2) is an input, beside a
@@ -422,6 +425,25 @@ TEST_F(PropertyDeclsOfARun, AClockingBlockReachesThePropertyItDeclares) {
   EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiPropertyDecl, inst), decl));
 }
 
+// A property an interface declares is instantiated through an instance of the
+// interface, `i0.p` (§16.12 with §23.6), and the property inst reaches the
+// property decl of that instance (#5741).
+TEST_F(PropertyDeclsOfARun, AnInstThroughAnInterfaceReachesItsProperty) {
+  Run("interface ifc(input logic clk); logic a;\n"
+      "  property p; @(posedge clk) a; endproperty\n"
+      "endinterface\n"
+      "module top; logic clk; ifc i0(clk);\n"
+      "  a1: assert property (i0.p);\n"
+      "endmodule\n");
+  vpiHandle decl = Named(vpiPropertyDecl, By("top.i0"), "p");
+  ASSERT_NE(decl, nullptr);
+  vpiHandle a1 = Named(vpiAssertion, By("top"), "a1");
+  ASSERT_NE(a1, nullptr);
+  vpiHandle inst = vpi_handle(vpiProperty, a1);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiPropertyDecl, inst), decl));
+}
+
 // A formal of a packed type reaches a typespec of its keyword with the range
 // it was written with, and one of a user-defined type the typespec of the
 // typedef naming it, the module's or the compilation unit's (detail 3,
@@ -451,6 +473,49 @@ TEST_F(PropertyDeclsOfARun, AFormalOfAWrittenTypeReachesItsTypespec) {
   vpiHandle w = vpi_handle(vpiTypespec, Named(vpiPropFormalDecl, decl, "w"));
   ASSERT_NE(w, nullptr);
   EXPECT_STREQ(vpi_get_str(vpiName, w), "byte_t");
+}
+
+// The terminal `$`, an actual §16.8 admits, is the argument the unbounded
+// constant (§37.59 detail 4) in its formal's place, and an actual the
+// instance leaves out is the formal's default (detail 2) (#5744).
+TEST_F(PropertyDeclsOfARun, ADollarActualIsTheUnboundedConstant) {
+  Run("module top; logic clk, a, b;\n"
+      "  property p(x = b, y); @(posedge clk) x; endproperty\n"
+      "  a1: assert property (p(, $));\n"
+      "endmodule\n");
+  vpiHandle a1 = Named(vpiAssertion, By("top"), "a1");
+  ASSERT_NE(a1, nullptr);
+  vpiHandle inst = vpi_handle(vpiProperty, a1);
+  ASSERT_NE(inst, nullptr);
+  std::vector<vpiHandle> arguments;
+  vpiHandle it = vpi_iterate(vpiArgument, inst);
+  ASSERT_NE(it, nullptr);
+  for (vpiHandle h = vpi_scan(it); h != nullptr; h = vpi_scan(it)) {
+    arguments.push_back(h);
+  }
+  ASSERT_EQ(arguments.size(), 2U);
+  EXPECT_STREQ(vpi_get_str(vpiName, arguments[0]), "b");
+  EXPECT_EQ(vpi_get(vpiType, arguments[1]), vpiConstant);
+  EXPECT_EQ(vpi_get(vpiConstType, arguments[1]), vpiUnboundedConst);
+}
+
+// A formal of a typedef a package declares, made visible by an import
+// (§26.3), reaches the package's typespec for it (detail 3), past a wildcard
+// import of a package declaring no such typedef and an import of another of
+// the package's typedefs (#5743).
+TEST_F(PropertyDeclsOfARun, AFormalOfAnImportedTypedefReachesItsTypespec) {
+  Run("package pk; typedef logic [3:0] nib_t; typedef int word_t;\n"
+      "endpackage\n"
+      "package qk; typedef bit flag_t; endpackage\n"
+      "module top; import qk::*; import pk::word_t; import pk::nib_t;\n"
+      "  logic clk;\n"
+      "  property p(nib_t v); @(posedge clk) v[0]; endproperty\n"
+      "endmodule\n");
+  vpiHandle decl = Named(vpiPropertyDecl, By("top"), "p");
+  ASSERT_NE(decl, nullptr);
+  vpiHandle v = vpi_handle(vpiTypespec, Named(vpiPropFormalDecl, decl, "v"));
+  ASSERT_NE(v, nullptr);
+  EXPECT_TRUE(vpi_compare_objects(v, Named(vpiTypedef, By("pk"), "nib_t")));
 }
 
 // §37.51 details 3 and 4: a formal's typespec is its typespec child, found

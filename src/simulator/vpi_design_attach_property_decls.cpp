@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "common/packed_range.h"
+#include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
@@ -15,6 +16,7 @@
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 
@@ -72,19 +74,27 @@ int FormalTypespecKind(TokenKind keyword) {
 }
 
 // §37.25: the typespec the typedef `name` declares in the scopes from
-// `holder` out to the instance, or else among the compilation unit's,
-// `unit`; null where none of them declares one.
+// `holder` out to the instance, or else among the compilation unit's, or else
+// in a package an import of the module makes it visible from (§26.3); null
+// where none of them declares one.
 VpiObject* TypedefTypespec(const VpiObject* holder, std::string_view name,
-                           const VpiObjectMap& unit) {
+                           const VpiPropertyDeclSite& at) {
   for (const VpiObject* scope = holder; scope != nullptr;
-       scope = scope->parent) {
+       scope = VpiIsInstanceType(scope->type) ? nullptr : scope->parent) {
     for (VpiObject* child : scope->children) {
       if (VpiIsTypespecType(child->type) && child->name == name) return child;
     }
-    if (VpiIsInstanceType(scope->type)) break;
   }
-  auto it = unit.find(name);
-  return it == unit.end() ? nullptr : it->second;
+  auto it = at.unit_typespecs.find(name);
+  if (it != at.unit_typespecs.end()) return it->second;
+  for (const RtlirImport& imported : at.imports) {
+    if (!imported.is_wildcard && imported.item_name != name) continue;
+    const std::string kKey =
+        std::string(imported.package_name) + "::" + std::string(name);
+    it = at.unit_typespecs.find(kKey);
+    if (it != at.unit_typespecs.end()) return it->second;
+  }
+  return nullptr;
 }
 
 // §37.51 detail 3 with §37.25: the typespec the formal `index` of `decl` is
@@ -97,8 +107,7 @@ void MakeFormalTypespec(const ModuleItem& decl, size_t index, VpiObject* formal,
                         const VpiAttachBuild& build) {
   const DataType* type = decl.prop_formal_types[index];
   if (type != nullptr && type->kind == DataTypeKind::kNamed) {
-    VpiObject* named =
-        TypedefTypespec(formal->parent, type->type_name, at.unit_typespecs);
+    VpiObject* named = TypedefTypespec(formal->parent, type->type_name, at);
     if (named != nullptr) formal->children.push_back(named);
     return;
   }
@@ -160,18 +169,27 @@ VpiObject* ChildOfType(const VpiObject* scope, int type,
   return nullptr;
 }
 
+// The scope among the children of `scope` that the prefix `prefix` of a
+// property's name names: a clocking block, `cb.p` (§16.16 (b)), or an
+// interface instance, `i0.p` (§16.12 with §23.6); null where it names
+// neither.
+VpiObject* PropertyHolderNamed(const VpiObject* scope,
+                               std::string_view prefix) {
+  VpiObject* block = ChildOfType(scope, vpiClockingBlock, prefix);
+  return block != nullptr ? block : ChildOfType(scope, vpiInterface, prefix);
+}
+
 // §37.51: the property decl named `name` the scope standing around `holder`
 // declares, the nearest from a generate block instance out to the instance;
-// null where none was built. §16.16 (b): a name written through a clocking
-// block, `cb.p`, is the property that block declares.
+// null where none was built. A name written through a clocking block or an
+// interface instance is the property that block or instance declares.
 VpiObject* PropertyDeclAround(const VpiObject* holder, std::string_view name) {
   const size_t kDot = name.find('.');
   for (VpiObject* scope = holder->parent; scope != nullptr;
        scope = scope->parent) {
-    VpiObject* found =
-        kDot == std::string_view::npos
-            ? ChildOfType(scope, vpiPropertyDecl, name)
-            : ChildOfType(scope, vpiClockingBlock, name.substr(0, kDot));
+    VpiObject* found = kDot == std::string_view::npos
+                           ? ChildOfType(scope, vpiPropertyDecl, name)
+                           : PropertyHolderNamed(scope, name.substr(0, kDot));
     if (found != nullptr && kDot != std::string_view::npos) {
       return ChildOfType(found, vpiPropertyDecl, name.substr(kDot + 1));
     }
@@ -179,6 +197,17 @@ VpiObject* PropertyDeclAround(const VpiObject* holder, std::string_view name) {
     if (VpiIsInstanceType(scope->type)) break;
   }
   return nullptr;
+}
+
+// §37.51 detail 2: the argument the actual `actual` of a property inst
+// stands as, null for one the instance leaves out. §37.59 detail 4: the
+// terminal `$`, which §16.8 admits as an actual, is the unbounded constant.
+VpiObject* ActualArgument(const Expr* actual, const VpiStmtBuild& with) {
+  if (actual == nullptr || actual->text != "$") return with.expression(actual);
+  VpiObject* dollar = with.build.alloc();
+  dollar->type = vpiConstant;
+  dollar->const_type = vpiUnboundedConst;
+  return dollar;
 }
 
 }  // namespace
@@ -197,7 +226,7 @@ VpiObject* VpiMakePropertyInst(VpiObject* holder, const Expr& instance,
   std::vector<VpiHandle> provided;
   provided.reserve(instance.args.size());
   for (const Expr* actual : instance.args) {
-    provided.push_back(with.expression(actual));
+    provided.push_back(ActualArgument(actual, with));
   }
   std::vector<VpiPropertyFormal> formals;
   for (VpiHandle formal : VpiPropFormals(inst->property_decl)) {

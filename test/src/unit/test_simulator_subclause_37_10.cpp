@@ -547,6 +547,24 @@ TEST_F(InstanceObjectsOfARun, AnInstanceHasItsDefinitionsFile) {
       "<test>");
 }
 
+// Detail 1: a package is an instance, whose vpiTypedef iteration returns the
+// typespecs of the typedefs it declares, each named in the package with "::"
+// (detail 5) and of the kind its type is (§37.25) (#5742).
+TEST_F(InstanceObjectsOfARun, APackageReachesTheTypedefsItDeclares) {
+  Run("package pk; typedef logic [3:0] nib_t; typedef int word_t;\n"
+      "endpackage\n"
+      "module top; endmodule\n");
+  vpiHandle pk = By("pk");
+  ASSERT_NE(pk, nullptr);
+  EXPECT_EQ(NamesOf(vpiTypedef, pk),
+            (std::vector<std::string>{"nib_t", "word_t"}));
+  vpiHandle nib = Named(vpiTypedef, pk, "nib_t");
+  ASSERT_NE(nib, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, nib), vpiLogicTypespec);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, nib), "pk::nib_t");
+  EXPECT_EQ(vpi_get(vpiType, Named(vpiTypedef, pk, "word_t")), vpiIntTypespec);
+}
+
 // §37.10: vpiTimeUnit and vpiTimePrecision are drawn on an instance, and a
 // net reports vpiUndefined for both.
 TEST(InstanceModel, ANonInstanceHasNoTimeUnitOrPrecision) {
