@@ -260,34 +260,39 @@ struct ParserSeqLinearHelpers {
     return ParserPropertySpecHelpers::ParsePropertyActualArg(p, plain);
   }
 
+  // §6.11 and §7.4.1: the signing keyword and the packed dimensions a
+  // local's var_data_type writes after its type keyword, into `typed`, each
+  // dimension a left and a right bound in the order written.
+  static void ParseLocalTypeTail(Parser& p, SeqLocalDecl& typed) {
+    if (p.Check(TokenKind::kKwSigned) || p.Check(TokenKind::kKwUnsigned)) {
+      typed.signing = p.Consume().kind;
+    }
+    DataType packed;
+    p.ParsePackedDims(packed);
+    if (packed.packed_dim_left != nullptr) {
+      typed.packed_dims.emplace_back(packed.packed_dim_left,
+                                     packed.packed_dim_right);
+    }
+    typed.packed_dims.insert(typed.packed_dims.end(),
+                             packed.extra_packed_dims.begin(),
+                             packed.extra_packed_dims.end());
+  }
+
   // §16.10 Syntax 16-13: the assertion_variable_declarations a sequence body
   // opens with, each `type [signing] [packed dimensions] name [= init] {,
   // name [= init]} ;` over a data type keyword, its var_data_type taking the
   // signing keyword §6.11 and the packed dimensions §7.4.1 write after the
-  // keyword, recorded as the body's local variables. A declaration in any
-  // other shape ends the capture.
+  // keyword, recorded as the body's local variables, each declared name of
+  // the type written. A declaration in any other shape ends the capture.
   static bool ParseLinearSeqLocalDecls(Parser& p, SeqLinearBody& body) {
     while (IsBuiltinTypeKwForLocalVar(p.CurrentToken().kind)) {
-      TokenKind type_kw = p.Consume().kind;
-      TokenKind signing = TokenKind::kEof;
-      if (p.Check(TokenKind::kKwSigned) || p.Check(TokenKind::kKwUnsigned)) {
-        signing = p.Consume().kind;
-      }
-      DataType packed;
-      p.ParsePackedDims(packed);
-      std::vector<std::pair<Expr*, Expr*>> dims;
-      if (packed.packed_dim_left != nullptr) {
-        dims.emplace_back(packed.packed_dim_left, packed.packed_dim_right);
-      }
-      dims.insert(dims.end(), packed.extra_packed_dims.begin(),
-                  packed.extra_packed_dims.end());
+      SeqLocalDecl typed;
+      typed.type_kw = p.Consume().kind;
+      ParseLocalTypeTail(p, typed);
       do {
         if (!p.Check(TokenKind::kIdentifier)) return false;
-        SeqLocalDecl local;
+        SeqLocalDecl local = typed;
         local.name = p.Consume().text;
-        local.type_kw = type_kw;
-        local.signing = signing;
-        local.packed_dims = dims;
         if (p.Match(TokenKind::kEq)) local.init = p.ParseExpr();
         body.locals.push_back(local);
       } while (p.Match(TokenKind::kComma));
