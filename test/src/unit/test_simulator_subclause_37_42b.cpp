@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "fixture_vpi_run.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -216,6 +217,27 @@ TEST(TaskFuncCallModel, ANameNothingDeclaresResolvesToNone) {
   const VpiCalledSubroutine kCalled =
       VpiNamedSubroutine({design, mod, kPrefix, nullptr, kMade}, "f");
   EXPECT_EQ(kCalled.decl, nullptr);
+  EXPECT_EQ(kCalled.object, nullptr);
+}
+
+// §23.9 with §37.42: the module's own lookup passes over a function only a
+// generate block declares. A call no block encloses still resolves to that
+// declaration, which names the kind of call, but reaches no object.
+TEST(TaskFuncCallModel, ABlocksFunctionCalledOutsideItsBlockHasNoObject) {
+  ModuleItem function;
+  function.kind = ModuleItemKind::kFunctionDecl;
+  function.name = "f";
+  RtlirDesign design;
+  RtlirModule mod;
+  mod.function_decls = {&function};
+  RtlirGenBlockSubroutine sub;
+  sub.decl = &function;
+  mod.gen_block_subroutines.push_back(sub);
+  const std::string kPrefix = "top";
+  const VpiSubroutineObjects kMade;
+  const VpiCalledSubroutine kCalled =
+      VpiNamedSubroutine({design, mod, kPrefix, nullptr, kMade}, "f");
+  EXPECT_EQ(kCalled.decl, &function);
   EXPECT_EQ(kCalled.object, nullptr);
 }
 
