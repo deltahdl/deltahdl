@@ -46,7 +46,6 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
-#include <string>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
@@ -629,10 +628,10 @@ TEST(VirtualInterfaceCallElaboration, ACallNamingNothingTheInterfaceDeclares) {
 
 // §25.9: a call through a virtual interface a block declares, or through a
 // class property of virtual interface type, names a task or a function of
-// its interface too (#5809). The calls of line 13 name the interface's task
-// through a module's class, the compilation unit's, an array element, a static
-// property, a chain of handles, a hierarchical name and a package's class, and
-// none is reported.
+// its interface too (#5809). The calls of line 14 name the interface's task
+// through a module's class, the compilation unit's, a static property, a chain
+// of handles, a hierarchical name and a package's class, or call a method
+// through a function's result, and none is reported.
 TEST(VirtualInterfaceCallElaboration,
      ACallThroughABlocksOrAPropertysVirtualInterface) {
   ElabFixture f;
@@ -645,14 +644,15 @@ TEST(VirtualInterfaceCallElaboration,
       "module top;\n"
       "  import p::*;\n"
       "  class C; virtual ifc cv; endclass\n"
-      "  ifc i (); virtual ifc v = i; virtual ifc va[2]; H h = new; C c = new; "
+      "  function H mkh(); return null; endfunction\n"
+      "  ifc i (); virtual ifc v = i; H h = new; C c = new; "
       "K kk = new;\n"
       "  initial if (0) begin\n"
       "    virtual ifc w;\n"
       "    w = i;\n"
       "    w.nosuch();\n"
       "    h.vif.nosuch();\n"
-      "    w.t(); h.vif.t(); c.cv.t(); va[0].t(); H::sv.t(); h.k.vif.t(); "
+      "    w.t(); h.vif.t(); c.cv.t(); mkh().m(); H::sv.t(); h.k.vif.t(); "
       "top.v.t(); kk.f.t();\n"
       "  end\n"
       "endmodule\n",
@@ -660,14 +660,14 @@ TEST(VirtualInterfaceCallElaboration,
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "'nosuch' names no task or function of interface "
                             "'ifc'",
-                            11, "25.9"));
+                            12, "25.9"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "'nosuch' names no task or function of interface "
                             "'ifc'",
-                            12, "25.9"));
+                            13, "25.9"));
   for (const Diagnostic& diag : f.diag.Diagnostics()) {
     if (diag.severity != DiagSeverity::kError) continue;
-    EXPECT_NE(diag.loc.line, 13u) << diag.message;
+    EXPECT_NE(diag.loc.line, 14u) << diag.message;
   }
 }
 
@@ -757,24 +757,25 @@ TEST(VirtualInterfaceCallElaboration,
   }
 }
 
-// §25.9 with §6.18: a chain of typedefs that names itself again names no
-// class, so the search for one through it gives up and no call through a
-// handle of it is reported as a virtual interface call (#5811).
-TEST(VirtualInterfaceCallElaboration, ACyclicTypedefNamesNoClass) {
+// §25.9 with §6.18: a chain of eight typedefs, as many as the search follows,
+// still reaches the class, so a call through a handle of the last naming
+// nothing the interface declares is reported (#5811).
+TEST(VirtualInterfaceCallElaboration, AnEightTypedefChainReachesTheClass) {
   ElabFixture f;
   ElaborateSrc(
       "interface ifc; task t(); endtask endinterface\n"
+      "class H; virtual ifc vif; endclass\n"
       "module top;\n"
-      "  typedef A B; typedef B A;\n"
-      "  A g;\n"
+      "  typedef H T1; typedef T1 T2; typedef T2 T3; typedef T3 T4;\n"
+      "  typedef T4 T5; typedef T5 T6; typedef T6 T7; typedef T7 T8;\n"
+      "  T8 g = new;\n"
       "  initial if (0) g.vif.nosuch();\n"
       "endmodule\n",
       f, "top");
-  for (const Diagnostic& diag : f.diag.Diagnostics()) {
-    EXPECT_EQ(diag.message.find("names no task or function of interface"),
-              std::string::npos)
-        << diag.message;
-  }
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'nosuch' names no task or function of interface "
+                            "'ifc'",
+                            7, "25.9"));
 }
 
 }  // namespace
