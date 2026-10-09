@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -351,6 +353,56 @@ TEST(SubroutineCallExprElaboration,
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "'null' is not a legal argument to a scope randomize call", 5, "A.8.2"));
+}
+
+// A.8.2: a tf_call names a task or a function, so a bare call statement
+// naming a variable (#5796), and a call with an argument list naming a
+// variable or a net, as a statement or within an expression (#5798), are each
+// reported where they are written.
+TEST(SubroutineCallElaborationSyntax, ACallNamingAVariableOrANetIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int x;\n"
+      "  wire w;\n"
+      "  int y;\n"
+      "  initial begin\n"
+      "    x;\n"
+      "    y = x(1);\n"
+      "    w();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const char* const kMessage =
+      "' names a variable or a net, and a call names a task or a function";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), std::string("'x") + kMessage,
+                            6, "A.8.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), std::string("'x") + kMessage,
+                            7, "A.8.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), std::string("'w") + kMessage,
+                            8, "A.8.2"));
+}
+
+// A.8.2: a call of a task or a function the module declares, a call through a
+// class handle and a constructor call name no variable, so none is reported.
+TEST(SubroutineCallElaborationSyntax, ACallOfATaskOrFunctionIsNotReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; function void g(); endfunction endclass\n"
+      "module m;\n"
+      "  task t; endtask\n"
+      "  function int fn(); return 1; endfunction\n"
+      "  C c;\n"
+      "  int y;\n"
+      "  initial begin\n"
+      "    if (y == 0) t; else t();\n"
+      "    c = new;\n"
+      "    c.g();\n"
+      "    y = fn();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace

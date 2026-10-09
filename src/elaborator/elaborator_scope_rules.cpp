@@ -13,6 +13,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/assertion_name_rules.h"
+#include "elaborator/elaborator_call_targets.h"
 #include "elaborator/class_method_reads.h"
 #include "elaborator/covergroup_rules.h"
 #include "elaborator/covergroup_variables.h"
@@ -373,6 +374,7 @@ void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
         return target_visible(name) || UnitDeclaresSubroutine(unit_, name);
       },
       diag_);
+  ReportCallsOfDataNames(*decl, diag_);
 }
 
 namespace {
