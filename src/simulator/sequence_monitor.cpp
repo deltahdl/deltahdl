@@ -85,6 +85,7 @@ class AttemptLocalsScope {
       Variable* var =
           ctx_.CreateLocalVariable(decls[i].name, attempt.locals[i].width);
       var->is_4state = LocalIs4State(decls[i].type_kw);
+      var->is_signed = LocalIsSigned(decls[i].type_kw);
       var->value = attempt.locals[i];
       vars_.push_back(var);
     }

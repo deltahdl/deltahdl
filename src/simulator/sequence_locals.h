@@ -12,7 +12,7 @@
 
 namespace delta {
 
-// §16.10 and §6.8: the width of a local declared with a data type keyword,
+// §16.10 and §6.11: the width of a local declared with a data type keyword,
 // 1 for a bit type.
 uint32_t LocalWidth(TokenKind type_kw);
 
@@ -27,8 +27,8 @@ uint32_t LocalWidth(const SeqLocalDecl& decl, SimContext& ctx, Arena& arena);
 bool LocalIs4State(TokenKind type_kw);
 
 // §6.11, Table 6-8: whether a local declared with a data type keyword is
-// signed, as the integer atom types are and the vector types bit, logic and
-// reg are not.
+// signed, as the integer atom types other than time are and time and the
+// vector types bit, logic and reg are not.
 bool LocalIsSigned(TokenKind type_kw);
 
 // §16.10: the values a new attempt's copies of the locals `decls` begin with.

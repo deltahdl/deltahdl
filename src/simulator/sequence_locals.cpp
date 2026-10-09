@@ -30,6 +30,7 @@ uint32_t LocalWidth(TokenKind type_kw) {
     case TokenKind::kKwInteger:
       return 32;
     case TokenKind::kKwLongint:
+    case TokenKind::kKwTime:
       return 64;
     default:
       return 1;
@@ -49,11 +50,14 @@ uint32_t LocalWidth(const SeqLocalDecl& decl, SimContext& ctx, Arena& arena) {
 
 bool LocalIs4State(TokenKind type_kw) {
   return type_kw == TokenKind::kKwLogic || type_kw == TokenKind::kKwReg ||
-         type_kw == TokenKind::kKwInteger;
+         type_kw == TokenKind::kKwInteger || type_kw == TokenKind::kKwTime;
 }
 
-// The keywords LocalWidth sizes wider than a bit are the integer atom types.
-bool LocalIsSigned(TokenKind type_kw) { return LocalWidth(type_kw) > 1; }
+// The keywords LocalWidth sizes wider than a bit, time aside, are the integer
+// atom types Table 6-8 makes signed; time is unsigned.
+bool LocalIsSigned(TokenKind type_kw) {
+  return LocalWidth(type_kw) > 1 && type_kw != TokenKind::kKwTime;
+}
 
 // §16.10: the initialization assignments are performed in the order the
 // locals are declared, one's expression reading the locals declared before
@@ -76,6 +80,7 @@ std::vector<Logic4Vec> InitialLocals(const std::vector<SeqLocalDecl>& decls,
     }
     Variable* var = ctx.CreateLocalVariable(decl.name, value.width);
     var->is_4state = LocalIs4State(decl.type_kw);
+    var->is_signed = LocalIsSigned(decl.type_kw);
     var->value = value;
     values.push_back(value);
   }

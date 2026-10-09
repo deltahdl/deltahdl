@@ -37,19 +37,42 @@ TEST(SequenceLocals, InitializationAssignmentsRunInDeclarationOrder) {
   EXPECT_EQ(clear->value.ToUint64(), 0u);
 }
 
+// Expects the sequence `te2 ##1 last_operand`, its body declaring `locals`,
+// to end once, at 4, the tick at 35, with te2 high at 3 alone.
+void ExpectOneEndAfterTe2(const std::string& last_operand,
+                          const std::string& locals) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      SequenceTickSource("te2 ##1 " + last_operand,
+                         DriveTicks({{}, {3}, {}, {}, {}}), "", locals),
+      f, "hits");
+  ASSERT_NE(hits, nullptr) << last_operand;
+  EXPECT_EQ(hits->value.ToUint64(), 1u) << last_operand;
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 35u) << last_operand;
+}
+
 // §16.10 with §7.4.1: a sequence's local declared of a packed type, `logic
 // [3:0] x = 29`, holds the four bits 13 of its initialization, so with te2
 // at 3 `te2 ##1 (x == 13)` ends at 4, the tick at 35; a 32-bit x would hold
 // 29 and a 1-bit x 1 (#5745).
 TEST(SequenceLocals, APackedLocalHoldsItsDeclaredWidth) {
-  SimFixture f;
-  auto* hits = RunAndFindVar(
-      SequenceTickSource("te2 ##1 (x == 13)", DriveTicks({{}, {3}, {}, {}, {}}),
-                         "", "    logic [3:0] x = 29;\n"),
-      f, "hits");
-  ASSERT_NE(hits, nullptr);
-  EXPECT_EQ(hits->value.ToUint64(), 1u);
-  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 35u);
+  ExpectOneEndAfterTe2("(x == 13)", "    logic [3:0] x = 29;\n");
+}
+
+// §16.10 with §6.11 and §11.8.1: a sequence's int local is signed, so -1 is
+// below 0 where an operand reads it, and where a later local's
+// initialization does (#5770).
+TEST(SequenceLocals, AnIntLocalReadsAsSigned) {
+  ExpectOneEndAfterTe2("(x < 0)", "    int x = -1;\n");
+  ExpectOneEndAfterTe2("y", "    int x = -1;\n    bit y = x < 0;\n");
+}
+
+// §16.10 with §6.11: a sequence's time local is 64 bits, unsigned and
+// four-state: -1 is all 64 bits set, above any 32-bit value, and the local
+// is x until assigned (#5769).
+TEST(SequenceLocals, ATimeLocalIsSixtyFourUnsignedFourStateBits) {
+  ExpectOneEndAfterTe2("(t > 64'hFFFF_FFFF)", "    time t = -1;\n");
+  ExpectOneEndAfterTe2("$isunknown(t)", "    time t;\n");
 }
 
 // §16.10: the match items attached to a subsequence are performed at the end
@@ -216,6 +239,13 @@ TEST(PropertyLocals, APackedLocalHoldsItsDeclaredWidth) {
 // assigned value's signedness would be 4294967295 and fail them all.
 TEST(PropertyLocals, AnIntLocalIsSignedWhateverItIsAssigned) {
   ExpectPropertyCounts("(1, x = 32'hFFFF_FFFF) |-> ##1 (x < 0)", 9, 0);
+}
+
+// §16.10 with §6.11: a property's time local is 64 bits and unsigned, so -1
+// is above any 32-bit value at all nine attempts (#5769).
+TEST(PropertyLocals, ATimeLocalIsSixtyFourUnsignedBits) {
+  ExpectPropertyCounts("(1, x = -1) |-> ##1 (x > 64'hFFFF_FFFF)", 9, 0,
+                       "time x");
 }
 
 // §16.10 with §7.4.1: the copy of a property's packed local an attempt reads
