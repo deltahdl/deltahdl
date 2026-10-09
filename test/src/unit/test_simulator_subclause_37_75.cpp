@@ -416,18 +416,21 @@ TEST_F(DoWhileAndForeachLoopsOfARun, AnIndexVariableIsOfItsArraysIndexType) {
 // §12.7.3 with §7.8: over a block's arrays the same holds. Its associative
 // arrays indexed by a typedef name and by a class give an enum and a class var,
 // while a fixed-size array, sized by a number or by a parameter, a dynamic
-// array and an array a typedef declares give an int var.
+// array, an array a typedef declares and a packed array, which writes no
+// unpacked dimension, give an int var.
 TEST_F(DoWhileAndForeachLoopsOfARun, ABlocksArraysGiveTheirIndexTypes) {
   Run("module top; typedef enum {A, B} e_t; class C; endclass\n"
       "  typedef int arr_t [3]; localparam int N = 2;\n"
       "  initial begin : b\n"
       "    int f [2]; int d []; int t [e_t]; int c [C]; int p [N]; arr_t a;\n"
+      "    bit [3:0] v;\n"
       "    foreach (f[i]) begin end\n"
       "    foreach (d[i]) begin end\n"
       "    foreach (t[i]) begin end\n"
       "    foreach (c[i]) begin end\n"
       "    foreach (p[i]) begin end\n"
       "    foreach (a[i]) begin end\n"
+      "    foreach (v[i]) begin end\n"
       "  end\n"
       "endmodule\n");
   std::vector<int> kinds;
@@ -438,8 +441,9 @@ TEST_F(DoWhileAndForeachLoopsOfARun, ABlocksArraysGiveTheirIndexTypes) {
     ASSERT_NE(vars, nullptr);
     kinds.push_back(vpi_get(vpiType, vpi_scan(vars)));
   }
-  EXPECT_EQ(kinds, (std::vector<int>{vpiIntVar, vpiIntVar, vpiEnumVar,
-                                     vpiClassVar, vpiIntVar, vpiIntVar}));
+  EXPECT_EQ(kinds,
+            (std::vector<int>{vpiIntVar, vpiIntVar, vpiEnumVar, vpiClassVar,
+                              vpiIntVar, vpiIntVar, vpiIntVar}));
 }
 
 // §12.7.3 with §7.8: an index variable over a module's associative array

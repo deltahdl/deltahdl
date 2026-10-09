@@ -339,9 +339,10 @@ VpiBuiltInHolder ModuleHolder(const RtlirVariable& var) {
   if (var.is_assoc) return VpiBuiltInHolder::kAssocArray;
   if (var.num_unpacked_dims > 0) return VpiBuiltInHolder::kFixedArray;
   if (var.is_string) return VpiBuiltInHolder::kString;
-  const bool kEnum =
-      !var.enum_type_name.empty() || var.decl_kind == DataTypeKind::kEnum;
-  return kEnum ? VpiBuiltInHolder::kEnum : VpiBuiltInHolder::kNone;
+  // An enum declared without a typedef is keyed by its declaration's name
+  // (SetEnumTypeInfo), so every enum variable names an enumeration.
+  return var.enum_type_name.empty() ? VpiBuiltInHolder::kNone
+                                    : VpiBuiltInHolder::kEnum;
 }
 
 // §8.4: the variable a call's prefix names, as the class it holds a handle of
