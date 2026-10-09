@@ -46,24 +46,30 @@ class VpiDesignRun : public ::testing::Test {
     LowerAndRun(design, f_);
   }
 
-  // The names of the objects of `type` `ref` reaches, sorted.
+  // The names of the objects of `type` `ref` reaches, sorted. An object of no
+  // name, such as the property inst an assertion's spec holds, which a
+  // vpiAssertion iteration of an instance reaches as an assertion (§37.49,
+  // §39.3.1), contributes none.
   static std::vector<std::string> NamesOf(int type, vpiHandle ref) {
     std::vector<std::string> names;
     vpiHandle it = vpi_iterate(type, ref);
     if (it == nullptr) return names;
     while (vpiHandle obj = vpi_scan(it)) {
-      names.emplace_back(vpi_get_str(vpiName, obj));
+      const char* name = vpi_get_str(vpiName, obj);
+      if (name != nullptr) names.emplace_back(name);
     }
     std::ranges::sort(names);
     return names;
   }
 
-  // The object of `type` named `name` that `ref` reaches; null for none.
+  // The object of `type` named `name` that `ref` reaches, passing over those
+  // of no name; null for none.
   static vpiHandle Named(int type, vpiHandle ref, std::string_view name) {
     vpiHandle it = vpi_iterate(type, ref);
     if (it == nullptr) return nullptr;
     while (vpiHandle obj = vpi_scan(it)) {
-      if (name == vpi_get_str(vpiName, obj)) return obj;
+      const char* own = vpi_get_str(vpiName, obj);
+      if (own != nullptr && name == own) return obj;
     }
     return nullptr;
   }

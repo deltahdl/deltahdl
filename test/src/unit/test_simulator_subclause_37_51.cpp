@@ -742,11 +742,14 @@ TEST_F(PropertyDeclsOfARun, AnEdgeAnOrAndAnIffEventActualOfOneProperty) {
   EXPECT_EQ(FirstArgumentOp("a3"), vpiIffOp);
 }
 
-// Two instances of one property with an event formal build the model of the
-// run, with nothing read back from it (#5765).
-TEST_F(PropertyDeclsOfARun, TwoEventActualInstancesBuildTheModel) {
+// The assertions of an instance include the property inst each one's spec
+// holds (§37.49, §39.3.1), which has no name: the named ones are the two
+// assertions (#5765).
+TEST_F(PropertyDeclsOfARun,
+       TheNamedAssertionsOfAnInstancePassItsPropertyInsts) {
   Run(EventActualsSource({"p(posedge clk, a)", "p(posedge clk, a)"}));
-  EXPECT_FALSE(f_.has_errors);
+  EXPECT_EQ(VpiDesignRun::NamesOf(vpiAssertion, By("top")),
+            (std::vector<std::string>{"a1", "a2"}));
 }
 
 // Two instances of one property with an event formal, each passing the same
