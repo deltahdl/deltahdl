@@ -36,23 +36,62 @@ constexpr std::string_view kNoSuch =
 
 // §25.9 with §7.4: `virtual ifc va[2]` declares an array of virtual
 // interfaces, and va[0] selects one of them, through which the interface's task
-// is called; it is no select of a virtual interface (#5813). A select of a
-// single virtual interface, v[0], still is one.
+// is called; it is no select of a virtual interface (#5813). A select into the
+// element, va[0][1], or into an element of the two-dimensional vb, vb[0][1][0],
+// selects into a virtual interface, as v[0] does, and each is reported (#5817);
+// selects of a logic array and of an array net are not.
 TEST(VirtualInterfaceArrayElaboration, AnElementOfAnArrayIsSelected) {
   ElabFixture f;
   ElaborateSrc(
       "interface ifc; task t(); endtask endinterface\n"
       "module top;\n"
-      "  ifc i (); virtual ifc va[2]; virtual ifc v; logic b;\n"
+      "  ifc i (); virtual ifc va[2]; virtual ifc vb[2][2]; virtual ifc v;\n"
+      "  logic b; logic arr[2]; wire nw[2];\n"
       "  initial begin\n"
-      "    va[0] = i; va[0].t();\n"
+      "    va[0] = i; va[0].t(); vb[0][1] = i; b = arr[0] | nw[1];\n"
       "    b = v[0];\n"
+      "    b = va[0][1];\n"
+      "    b = vb[0][1][0];\n"
       "  end\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(NoErrorOnLine(f, 5));
+  EXPECT_TRUE(NoErrorOnLine(f, 6));
+  for (const uint32_t kLine : {7u, 8u, 9u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "bit-select on virtual interface is illegal",
+                              kLine, "25.9"))
+        << kLine;
+  }
+}
+
+// §25.9 with §7.4: a call through an element of an array of virtual
+// interfaces, one select per unpacked dimension, names a task or a function of
+// the interface, and one naming nothing it declares is reported (#5819). A
+// call through an element of a class property's array of virtual interfaces
+// is not followed, nor one through an interface instance, and the valid ones
+// are not reported; v[0], a select of a single virtual interface, names none,
+// and is reported as the select it is.
+TEST(VirtualInterfaceCallElaboration, ACallThroughAnElementOfAnArray) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc; task t(); endtask endinterface\n"
+      "class H; virtual ifc vifs[2]; endclass\n"
+      "module top;\n"
+      "  ifc i (); virtual ifc va[2]; virtual ifc vb[2][2]; virtual ifc v;\n"
+      "  H h = new;\n"
+      "  initial if (0) begin\n"
+      "    va[0].nosuch();\n"
+      "    vb[1][0].nosuch();\n"
+      "    va[1].t(); vb[0][1].t(); h.vifs[0].t(); i.t();\n"
+      "    v[0].t();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoSuch, 7, "25.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoSuch, 8, "25.9"));
+  EXPECT_TRUE(NoErrorOnLine(f, 9));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "bit-select on virtual interface is illegal", 6,
+                            "bit-select on virtual interface is illegal", 10,
                             "25.9"));
 }
 

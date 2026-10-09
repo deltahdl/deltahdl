@@ -394,6 +394,10 @@ class ElaboratorData {
   // virtual interface are not looked for on one; CheckVirtualInterfaceExpr
   // reads this.
   std::unordered_map<std::string_view, DataTypeKind> vi_expr_types_;
+  // §25.9 with §7.4: the number of unpacked dimensions of each array of
+  // virtual interfaces the module declares, a select past which selects into
+  // a virtual interface.
+  std::unordered_map<std::string_view, std::size_t> vi_array_dims_;
 
   // §25.9: explicit parameter value overrides, evaluated to constants, for
   // virtual interface variables and for interface instances. Used to verify

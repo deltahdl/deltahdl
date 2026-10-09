@@ -26,6 +26,13 @@ namespace delta {
 
 namespace {
 
+// A variable's declaration: the type it was declared with and the number of
+// unpacked dimensions it writes after its name (§7.4).
+struct DeclaredVar {
+  const DataType* type = nullptr;
+  std::size_t dims = 0;
+};
+
 // The names a walk of one module's procedures sees as variables or nets: the
 // module's own, and those each block around the statement walked declares,
 // the innermost last (§23.9); the other names the module itself declares, or
@@ -36,11 +43,11 @@ struct DataScope {
   const std::function<bool(std::string_view)>& visible;
   const CompilationUnit& unit;
   const std::vector<ModuleItem*>& items;
-  // The type each variable of the module and of a block around the statement
-  // walked was declared with.
-  std::unordered_map<std::string_view, const DataType*> module_types = {};
+  // The declaration of each variable of the module and of a block around the
+  // statement walked.
+  std::unordered_map<std::string_view, DeclaredVar> module_vars = {};
   std::unordered_set<std::string_view> module = {};
-  std::vector<std::pair<std::string_view, const DataType*>> blocks = {};
+  std::vector<std::pair<std::string_view, DeclaredVar>> blocks = {};
   std::unordered_set<std::string_view> uncallable = {};
   std::unordered_set<std::string_view> subroutines = {};
 
@@ -51,14 +58,14 @@ struct DataScope {
            });
   }
 
-  // The type the variable `name` names in the scope was declared with, the
-  // innermost block's first (§23.9); null for a name no variable bears.
-  const DataType* TypeOf(std::string_view name) const {
+  // The declaration of the variable `name` names in the scope, the innermost
+  // block's first (§23.9); null for a name no variable bears.
+  const DeclaredVar* Declared(std::string_view name) const {
     for (auto it = blocks.rbegin(); it != blocks.rend(); ++it) {
-      if (it->first == name) return it->second;
+      if (it->first == name) return &it->second;
     }
-    const auto kFound = module_types.find(name);
-    return kFound == module_types.end() ? nullptr : kFound->second;
+    const auto kFound = module_vars.find(name);
+    return kFound == module_vars.end() ? nullptr : &kFound->second;
   }
 };
 
@@ -311,20 +318,29 @@ const ClassDecl* ClassNamed(const DataScope& scope, const DataType& type) {
 }
 
 // §25.9: the interface the virtual interface `prefix` names refers to an
-// instance of: a variable of the module or of a block around the call, v, or
-// a property of the class a variable holds a handle of, h.vif; empty for
-// anything else.
+// instance of: a variable of the module or of a block around the call, v, an
+// element of an array of them, one select per unpacked dimension (§7.4),
+// va[0], or a property of the class a variable holds a handle of, h.vif;
+// empty for anything else.
 std::string_view VifOf(const Expr& prefix, const DataScope& scope) {
-  if (prefix.kind == ExprKind::kIdentifier) {
-    return VifInterface(scope.TypeOf(prefix.text));
+  const Expr* root = &prefix;
+  std::size_t selects = 0;
+  while (root->kind == ExprKind::kSelect) {
+    ++selects;
+    root = root->base;
   }
-  if (prefix.kind != ExprKind::kMemberAccess || prefix.is_scope_resolution ||
-      prefix.lhs->kind != ExprKind::kIdentifier) {
+  if (root->kind == ExprKind::kIdentifier) {
+    const DeclaredVar* var = scope.Declared(root->text);
+    return var != nullptr && var->dims == selects ? VifInterface(var->type)
+                                                  : std::string_view();
+  }
+  if (selects != 0 || prefix.kind != ExprKind::kMemberAccess ||
+      prefix.is_scope_resolution || prefix.lhs->kind != ExprKind::kIdentifier) {
     return {};
   }
-  const DataType* holder = scope.TypeOf(prefix.lhs->text);
+  const DeclaredVar* holder = scope.Declared(prefix.lhs->text);
   const ClassDecl* cls =
-      holder == nullptr ? nullptr : ClassNamed(scope, *holder);
+      holder == nullptr ? nullptr : ClassNamed(scope, *holder->type);
   if (cls == nullptr) return {};
   std::string_view iface;
   for (const ClassMember* member : cls->members) {
@@ -378,7 +394,9 @@ void CheckStmtCalls(const Stmt* stmt, DataScope& scope, DiagEngine& diag) {
         stmt->kind == StmtKind::kFork ? stmt->fork_stmts : stmt->stmts;
     for (const Stmt* item : items) {
       if (item->kind == StmtKind::kVarDecl) {
-        scope.blocks.emplace_back(item->var_name, &item->var_decl_type);
+        scope.blocks.emplace_back(
+            item->var_name,
+            DeclaredVar{&item->var_decl_type, item->var_unpacked_dims.size()});
       }
     }
   }
@@ -440,7 +458,8 @@ void ReportCallsOfDataNames(
   std::unordered_set<std::string_view>& subroutines = scope.subroutines;
   for (const ModuleItem* item : decl.items) {
     if (item->kind == ModuleItemKind::kVarDecl) {
-      scope.module_types[item->name] = &item->data_type;
+      scope.module_vars[item->name] =
+          DeclaredVar{&item->data_type, item->unpacked_dims.size()};
     }
     if (item->kind == ModuleItemKind::kVarDecl ||
         item->kind == ModuleItemKind::kNetDecl) {

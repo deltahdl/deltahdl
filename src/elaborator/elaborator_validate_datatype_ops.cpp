@@ -495,13 +495,38 @@ static void CheckViEqualityOperands(
   }
 }
 
-static void CheckVirtualInterfaceExpr(
-    const Expr* e, const TypeMap& types,
-    const std::unordered_map<std::string_view, std::string_view>& vi_iface,
-    const std::unordered_map<std::string_view, std::string_view>&
-        interface_inst,
-    DiagEngine& diag) {
+// The tables CheckVirtualInterfaceExpr reads: the kinds of the variables that
+// are single virtual interfaces, the interface each virtual interface variable
+// refers to an instance of, the interface of each interface instance, and the
+// number of unpacked dimensions of each array of virtual interfaces.
+struct ViExprTables {
+  const TypeMap& types;
+  const std::unordered_map<std::string_view, std::string_view>& vi_iface;
+  const std::unordered_map<std::string_view, std::string_view>& interface_inst;
+  const std::unordered_map<std::string_view, std::size_t>& array_dims;
+};
+
+// §25.9 with §7.4: whether the select `e` selects into an element of an array
+// of virtual interfaces, past the array's last unpacked dimension, va[0][1].
+static bool SelectsIntoVifElement(
+    const Expr* e,
+    const std::unordered_map<std::string_view, std::size_t>& array_dims) {
+  std::size_t selects = 0;
+  while (e->kind == ExprKind::kSelect) {
+    ++selects;
+    e = e->base;
+  }
+  if (e->kind != ExprKind::kIdentifier) return false;
+  const auto kDims = array_dims.find(e->text);
+  return kDims != array_dims.end() && selects > kDims->second;
+}
+
+static void CheckVirtualInterfaceExpr(const Expr* e, const ViExprTables& tables,
+                                      DiagEngine& diag) {
   if (!e) return;
+  const TypeMap& types = tables.types;
+  const auto& vi_iface = tables.vi_iface;
+  const auto& interface_inst = tables.interface_inst;
   if (e->kind == ExprKind::kBinary) {
     bool lhs_vi = e->lhs && IsVirtualInterfaceVar(e->lhs, types);
     bool rhs_vi = e->rhs && IsVirtualInterfaceVar(e->rhs, types);
@@ -521,22 +546,19 @@ static void CheckVirtualInterfaceExpr(
                Subclause("25.9"));
   }
   if (e->kind == ExprKind::kSelect && e->base &&
-      IsVirtualInterfaceVar(e->base, types)) {
+      (IsVirtualInterfaceVar(e->base, types) ||
+       SelectsIntoVifElement(e, tables.array_dims))) {
     diag.Error(e->range.start, "bit-select on virtual interface is illegal",
                Subclause("25.9"));
   }
-  CheckVirtualInterfaceExpr(e->lhs, types, vi_iface, interface_inst, diag);
-  CheckVirtualInterfaceExpr(e->rhs, types, vi_iface, interface_inst, diag);
-  CheckVirtualInterfaceExpr(e->base, types, vi_iface, interface_inst, diag);
-  CheckVirtualInterfaceExpr(e->index, types, vi_iface, interface_inst, diag);
-  CheckVirtualInterfaceExpr(e->condition, types, vi_iface, interface_inst,
-                            diag);
-  CheckVirtualInterfaceExpr(e->true_expr, types, vi_iface, interface_inst,
-                            diag);
-  CheckVirtualInterfaceExpr(e->false_expr, types, vi_iface, interface_inst,
-                            diag);
+  const Expr* const kChildren[] = {e->lhs,       e->rhs,       e->base,
+                                   e->index,     e->condition, e->true_expr,
+                                   e->false_expr};
+  for (const Expr* child : kChildren) {
+    CheckVirtualInterfaceExpr(child, tables, diag);
+  }
   for (const auto* elem : e->elements) {
-    CheckVirtualInterfaceExpr(elem, types, vi_iface, interface_inst, diag);
+    CheckVirtualInterfaceExpr(elem, tables, diag);
   }
 }
 
@@ -742,13 +764,11 @@ void Elaborator::WalkStmtsForVirtualInterfaceOps(const Stmt* s) {
                                vi_external_defparam_insts_};
     CheckVirtualInterfaceAssignStmt(s, kCtx, diag_);
   }
-  CheckVirtualInterfaceExpr(s->rhs, vi_expr_types_, vi_var_interface_types_,
-                            interface_inst_types_, diag_);
-  CheckVirtualInterfaceExpr(s->expr, vi_expr_types_, vi_var_interface_types_,
-                            interface_inst_types_, diag_);
-  CheckVirtualInterfaceExpr(s->condition, vi_expr_types_,
-                            vi_var_interface_types_, interface_inst_types_,
-                            diag_);
+  const ViExprTables kTables{vi_expr_types_, vi_var_interface_types_,
+                             interface_inst_types_, vi_array_dims_};
+  CheckVirtualInterfaceExpr(s->rhs, kTables, diag_);
+  CheckVirtualInterfaceExpr(s->expr, kTables, diag_);
+  CheckVirtualInterfaceExpr(s->condition, kTables, diag_);
   // §25.9 admits only ==, !=, === and !== on a virtual interface, and only
   // another virtual interface, an interface instance or null as the operand
   // opposite one. It names no statement those rules are suspended in, so this
@@ -791,8 +811,14 @@ void Elaborator::ValidateVirtualInterfaceOps(const ModuleDecl* decl) {
   CollectExternalDefparamInsts(decl, interface_inst_types_,
                                vi_external_defparam_insts_);
   vi_expr_types_ = var_types_;
+  vi_array_dims_.clear();
   for (const auto* item : decl->items) {
-    if (!item->unpacked_dims.empty()) vi_expr_types_.erase(item->name);
+    if (item->unpacked_dims.empty()) continue;
+    vi_expr_types_.erase(item->name);
+    if (item->kind == ModuleItemKind::kVarDecl &&
+        item->data_type.kind == DataTypeKind::kVirtualInterface) {
+      vi_array_dims_[item->name] = item->unpacked_dims.size();
+    }
   }
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
