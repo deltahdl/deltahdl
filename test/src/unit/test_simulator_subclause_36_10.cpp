@@ -164,7 +164,8 @@ TEST_F(InstantiatedDesignAccess, TheClausesOwnExampleObjectIsAWire) {
 TEST(DesignWalk, AGenerateBlockPathStopsAtAStepThatFindsNothing) {
   VpiObject instance;
   instance.type = vpiModule;
-  const HierPath kPath = {HierStep{"g"}, HierStep{"h"}};
+  const HierPath kPath = {HierStep{"g", false, 0, "g"},
+                          HierStep{"h", false, 0, "h"}};
   EXPECT_EQ(VpiGenScopeOf(&instance, kPath), nullptr);
 }
 
