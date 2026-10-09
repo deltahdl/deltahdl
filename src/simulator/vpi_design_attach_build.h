@@ -319,12 +319,21 @@ VpiObject* VpiCallSiteExpression(const Expr* expr, const VpiObjectMap& objects,
                                  const VpiCallSite& site, SimContext& ctx,
                                  const VpiAttachBuild& build);
 
-// §37.64 with §37.59 detail 6: VpiCallSiteExpression's object for `expr`
-// assigned to `target`, a keyed assignment pattern ordered by the members or
-// elements of `target`.
-VpiObject* VpiCallSiteAssignedExpression(
-    const Expr* expr, const VpiObject* target, const VpiObjectMap& objects,
-    const VpiCallSite& site, SimContext& ctx, const VpiAttachBuild& build);
+// §37.64: the right side of an assignment, `expr`, and the object its left
+// side stands as, `target`.
+struct VpiAssignedSide {
+  const Expr* expr;
+  const VpiObject* target;
+};
+
+// §37.64 with §37.59 detail 6: VpiCallSiteExpression's object for the right
+// side of `side`, a keyed assignment pattern ordered by the members or
+// elements of its target.
+VpiObject* VpiCallSiteAssignedExpression(const VpiAssignedSide& side,
+                                         const VpiObjectMap& objects,
+                                         const VpiCallSite& site,
+                                         SimContext& ctx,
+                                         const VpiAttachBuild& build);
 
 // §9.7, §15.3 and §15.4: the kind of tf call a call of the method `method` of
 // the built-in class `cls` is, vpiMethodTaskCall or vpiMethodFuncCall, zero

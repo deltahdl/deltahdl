@@ -871,10 +871,12 @@ VpiObject* VpiCallSiteExpression(const Expr* expr, const VpiObjectMap& objects,
   return ExpressionObject(expr, CallSiteBuild(objects, site, ctx, build));
 }
 
-VpiObject* VpiCallSiteAssignedExpression(
-    const Expr* expr, const VpiObject* target, const VpiObjectMap& objects,
-    const VpiCallSite& site, SimContext& ctx, const VpiAttachBuild& build) {
-  return AssignedExpressionObject(expr, target,
+VpiObject* VpiCallSiteAssignedExpression(const VpiAssignedSide& side,
+                                         const VpiObjectMap& objects,
+                                         const VpiCallSite& site,
+                                         SimContext& ctx,
+                                         const VpiAttachBuild& build) {
+  return AssignedExpressionObject(side.expr, side.target,
                                   CallSiteBuild(objects, site, ctx, build));
 }
 

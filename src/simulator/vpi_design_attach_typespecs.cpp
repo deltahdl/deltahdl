@@ -153,6 +153,36 @@ VpiObject* DeclaredTypespec(const RtlirVariable& var,
   return nullptr;
 }
 
+// §37.10 detail 1: a package is an instance too, whose typedefs are its
+// typespecs, answered in `answered` under the package's name and "::" for a
+// scope that imports them (§26.3) to reach.
+void AnswerPackageTypespecs(const PackageDecl& pkg, const VpiObjectMap& objects,
+                            const VpiAttachBuild& build,
+                            VpiObjectMap& answered) {
+  const TypespecsByName kNone;
+  const std::vector<RtlirImport> kNoImports;
+  const TypespecsByName kPackage =
+      MakeTypespecs(pkg.items, {FindObjectForFlatName(objects, pkg.name),
+                                nullptr, build, kNone, kNoImports});
+  for (const auto& [name, typespec] : kPackage) {
+    answered[build.keep(std::string(pkg.name) + "::" + std::string(name))] =
+        typespec;
+  }
+}
+
+// §37.85 detail 5: the typedefs a generate block instance of `mod`, whose
+// instance object is `instance`, declares are typespecs of the instance's gen
+// scope, which AttachGenScopes made.
+void MakeGenBlockTypespecs(const RtlirModule& mod, VpiObject* instance,
+                           const VpiAttachBuild& build,
+                           const VpiObjectMap& answered) {
+  for (const RtlirGenBlockTypedef& declared : mod.gen_block_typedefs) {
+    MakeTypespecs({declared.item},
+                  {VpiGenScopeOf(instance, declared.gen_block_path),
+                   &mod.enum_types, build, answered, mod.imports});
+  }
+}
+
 }  // namespace
 
 VpiObject* VpiImportedTypespec(std::string_view name,
@@ -186,17 +216,8 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
                     {unit_scope == objects.end() ? nullptr : unit_scope->second,
                      nullptr, build, kNone, kNoImports});
   VpiObjectMap answered(kUnit.begin(), kUnit.end());
-  // §37.10 detail 1: a package is an instance too, whose typedefs are its
-  // typespecs, answered under the package's name and "::" for a scope that
-  // imports them (§26.3) to reach.
   for (const PackageDecl* pkg : design->packages) {
-    const TypespecsByName kPackage =
-        MakeTypespecs(pkg->items, {FindObjectForFlatName(objects, pkg->name),
-                                   nullptr, build, kNone, kNoImports});
-    for (const auto& [name, typespec] : kPackage) {
-      answered[build.keep(std::string(pkg->name) + "::" + std::string(name))] =
-          typespec;
-    }
+    AnswerPackageTypespecs(*pkg, objects, build, answered);
   }
   WalkInstancePaths(design, [&](const RtlirModule* mod,
                                 const std::string& prefix) {
@@ -206,13 +227,7 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
     if (decl == nullptr) return;
     const TypespecsByName kLocal = MakeTypespecs(
         decl->items, {scope, &mod->enum_types, build, answered, mod->imports});
-    // §37.85 detail 5: a generate block instance's typedefs are typespecs of
-    // its gen scope, which AttachGenScopes made.
-    for (const RtlirGenBlockTypedef& declared : mod->gen_block_typedefs) {
-      MakeTypespecs({declared.item},
-                    {VpiGenScopeOf(scope, declared.gen_block_path),
-                     &mod->enum_types, build, answered, mod->imports});
-    }
+    MakeGenBlockTypespecs(*mod, scope, build, answered);
     for (const RtlirVariable& var : mod->variables) {
       VpiObject* typespec = DeclaredTypespec(var, kLocal, kUnit);
       VpiObject* obj =

@@ -722,7 +722,7 @@ VpiStmtBuild StmtBuildAt(const BlockParent& parent, const BodyWalk& walk) {
           [site = CallSiteOf(parent, walk), &walk](const Expr* expr,
                                                    const VpiObject* target) {
             return VpiCallSiteAssignedExpression(
-                expr, target, walk.objects, site, walk.calls.ctx, walk.build);
+                {expr, target}, walk.objects, site, walk.calls.ctx, walk.build);
           }};
 }
 
