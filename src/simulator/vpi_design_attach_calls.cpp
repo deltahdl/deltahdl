@@ -117,7 +117,7 @@ const ModuleItem* MethodNamed(const ClassDecl& cls, std::string_view name) {
 struct MethodCall {
   int type = 0;
   bool declared = false;
-  ScopedClass owner;
+  ScopedClass owner = {};
 };
 
 // The method `method` of the class `cls`, of the package `package` where one is
@@ -561,7 +561,8 @@ CallShape MemberChainCallShape(const Expr& access, const BlockParent& parent,
       MethodShape(ClassMethodCall(kAt, type.cls, access.rhs->text),
                   access.rhs->text, kHead.var.object, kAt);
   if (shape.type != 0) {
-    shape.prefix_members.assign(names.begin() + kHead.used, names.end());
+    shape.prefix_members.assign(
+        names.begin() + static_cast<std::ptrdiff_t>(kHead.used), names.end());
   }
   return shape;
 }
