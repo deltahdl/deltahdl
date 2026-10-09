@@ -219,7 +219,6 @@ struct ResolvedTimescale {
 // tags cells the same way instead of repeating the match.
 inline void MarkCellModules(CompilationUnit* cu,
                             const std::vector<std::string>& cell_module_names) {
-  if (cu == nullptr) return;
   for (auto* mod : cu->modules) {
     for (const auto& cell_name : cell_module_names) {
       if (mod->name == cell_name) {
