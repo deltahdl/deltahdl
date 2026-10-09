@@ -685,6 +685,19 @@ TEST_F(PropertyDeclsOfARun, AnIffEventActualIsAnIffOperation) {
   EXPECT_EQ(vpi_get(vpiOpType, kArguments[0]), vpiIffOp);
 }
 
+// The edge keyword's event, which Annex K and Annex M give no operation, as
+// §37.65 notes of an event control, is no argument: the instance reaches the
+// argument of the formal after it alone.
+TEST_F(PropertyDeclsOfARun, AnEdgeKeywordEventActualIsNoArgument) {
+  Run("module top; logic clk, a;\n"
+      "  property p(event e, x); @(e) x; endproperty\n"
+      "  a1: assert property (p(edge clk, a));\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kArguments = ArgumentsOf("a1");
+  ASSERT_EQ(kArguments.size(), 1U);
+  EXPECT_STREQ(vpi_get_str(vpiName, kArguments[0]), "a");
+}
+
 // A property with no clock of its own, instantiated by an assertion the
 // module's default clocking clocks (§14.12), reaches the module's property
 // decl.
