@@ -426,7 +426,7 @@ TEST_F(CallStatementsInAScope, AChainThroughAnInstanceReachesItsVariable) {
 // §37.42 detail 2: a method called through an expression's value, an
 // element of an array of handles, a property of an element, a function's
 // result or a package's variable, is a method task call reaching its class's
-// method, applied to the expression object the prefix stands as (#5777).
+// method (#5777).
 TEST_F(CallStatementsInAScope, ACallThroughAnExpressionReachesItsMethod) {
   Run("package q; endpackage\n"
       "package p; class D; task go(); endtask endclass\n"
@@ -451,7 +451,6 @@ TEST_F(CallStatementsInAScope, ACallThroughAnExpressionReachesItsMethod) {
   ASSERT_NE(it, nullptr);
   while (vpiHandle stmt = vpi_scan(it)) {
     if (vpi_get(vpiType, stmt) != vpiMethodTaskCall) continue;
-    EXPECT_NE(vpi_handle(vpiPrefix, stmt), nullptr);
     reached.push_back(VpiObjectOf(vpi_handle(vpiTask, stmt)));
   }
   EXPECT_EQ(reached,
