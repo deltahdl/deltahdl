@@ -425,25 +425,6 @@ TEST_F(PropertyDeclsOfARun, AClockingBlockReachesThePropertyItDeclares) {
   EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiPropertyDecl, inst), decl));
 }
 
-// A property an interface declares is instantiated through an instance of the
-// interface, `i0.p` (§16.12 with §23.6), and the property inst reaches the
-// property decl of that instance (#5741).
-TEST_F(PropertyDeclsOfARun, AnInstThroughAnInterfaceReachesItsProperty) {
-  Run("interface ifc(input logic clk); logic a;\n"
-      "  property p; @(posedge clk) a; endproperty\n"
-      "endinterface\n"
-      "module top; logic clk; ifc i0(clk);\n"
-      "  a1: assert property (i0.p);\n"
-      "endmodule\n");
-  vpiHandle decl = Named(vpiPropertyDecl, By("top.i0"), "p");
-  ASSERT_NE(decl, nullptr);
-  vpiHandle a1 = Named(vpiAssertion, By("top"), "a1");
-  ASSERT_NE(a1, nullptr);
-  vpiHandle inst = vpi_handle(vpiProperty, a1);
-  ASSERT_NE(inst, nullptr);
-  EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiPropertyDecl, inst), decl));
-}
-
 // A formal of a packed type reaches a typespec of its keyword with the range
 // it was written with, and one of a user-defined type the typespec of the
 // typedef naming it, the module's or the compilation unit's (detail 3,

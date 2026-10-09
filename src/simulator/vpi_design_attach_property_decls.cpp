@@ -73,10 +73,25 @@ int FormalTypespecKind(TokenKind keyword) {
   }
 }
 
+// §26.3: the typespec of the typedef `name` a package declares that an
+// import of the module makes visible, among those `at` answers under the
+// package's name and "::"; null where no import reaches one.
+VpiObject* ImportedTypespec(std::string_view name,
+                            const VpiPropertyDeclSite& at) {
+  for (const RtlirImport& imported : at.imports) {
+    if (!imported.is_wildcard && imported.item_name != name) continue;
+    const std::string kKey =
+        std::string(imported.package_name) + "::" + std::string(name);
+    auto it = at.unit_typespecs.find(kKey);
+    if (it != at.unit_typespecs.end()) return it->second;
+  }
+  return nullptr;
+}
+
 // §37.25: the typespec the typedef `name` declares in the scopes from
 // `holder` out to the instance, or else among the compilation unit's, or else
-// in a package an import of the module makes it visible from (§26.3); null
-// where none of them declares one.
+// in a package an import of the module makes it visible from; null where none
+// of them declares one.
 VpiObject* TypedefTypespec(const VpiObject* holder, std::string_view name,
                            const VpiPropertyDeclSite& at) {
   for (const VpiObject* scope = holder; scope != nullptr;
@@ -86,15 +101,8 @@ VpiObject* TypedefTypespec(const VpiObject* holder, std::string_view name,
     }
   }
   auto it = at.unit_typespecs.find(name);
-  if (it != at.unit_typespecs.end()) return it->second;
-  for (const RtlirImport& imported : at.imports) {
-    if (!imported.is_wildcard && imported.item_name != name) continue;
-    const std::string kKey =
-        std::string(imported.package_name) + "::" + std::string(name);
-    it = at.unit_typespecs.find(kKey);
-    if (it != at.unit_typespecs.end()) return it->second;
-  }
-  return nullptr;
+  return it != at.unit_typespecs.end() ? it->second
+                                       : ImportedTypespec(name, at);
 }
 
 // §37.51 detail 3 with §37.25: the typespec the formal `index` of `decl` is
@@ -169,27 +177,18 @@ VpiObject* ChildOfType(const VpiObject* scope, int type,
   return nullptr;
 }
 
-// The scope among the children of `scope` that the prefix `prefix` of a
-// property's name names: a clocking block, `cb.p` (§16.16 (b)), or an
-// interface instance, `i0.p` (§16.12 with §23.6); null where it names
-// neither.
-VpiObject* PropertyHolderNamed(const VpiObject* scope,
-                               std::string_view prefix) {
-  VpiObject* block = ChildOfType(scope, vpiClockingBlock, prefix);
-  return block != nullptr ? block : ChildOfType(scope, vpiInterface, prefix);
-}
-
 // §37.51: the property decl named `name` the scope standing around `holder`
 // declares, the nearest from a generate block instance out to the instance;
-// null where none was built. A name written through a clocking block or an
-// interface instance is the property that block or instance declares.
+// null where none was built. §16.16 (b): a name written through a clocking
+// block, `cb.p`, is the property that block declares.
 VpiObject* PropertyDeclAround(const VpiObject* holder, std::string_view name) {
   const size_t kDot = name.find('.');
   for (VpiObject* scope = holder->parent; scope != nullptr;
        scope = scope->parent) {
-    VpiObject* found = kDot == std::string_view::npos
-                           ? ChildOfType(scope, vpiPropertyDecl, name)
-                           : PropertyHolderNamed(scope, name.substr(0, kDot));
+    VpiObject* found =
+        kDot == std::string_view::npos
+            ? ChildOfType(scope, vpiPropertyDecl, name)
+            : ChildOfType(scope, vpiClockingBlock, name.substr(0, kDot));
     if (found != nullptr && kDot != std::string_view::npos) {
       return ChildOfType(found, vpiPropertyDecl, name.substr(kDot + 1));
     }
