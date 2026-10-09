@@ -45,6 +45,9 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "fixture_elaborator.h"
@@ -621,6 +624,156 @@ TEST(VirtualInterfaceCallElaboration, ACallNamingNothingTheInterfaceDeclares) {
   for (const Diagnostic& diag : f.diag.Diagnostics()) {
     if (diag.severity != DiagSeverity::kError) continue;
     EXPECT_NE(diag.loc.line, 9u) << diag.message;
+  }
+}
+
+// §25.9: a call through a virtual interface a block declares, or through a
+// class property of virtual interface type, names a task or a function of
+// its interface too (#5809). The calls of line 13 name the interface's task
+// through a module's class, the compilation unit's, an array element, a static
+// property, a chain of handles, a hierarchical name and a package's class, and
+// none is reported.
+TEST(VirtualInterfaceCallElaboration,
+     ACallThroughABlocksOrAPropertysVirtualInterface) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p; class K; K f; function void t(); endfunction endclass "
+      "endpackage\n"
+      "interface ifc; task t(); endtask endinterface\n"
+      "class H; virtual ifc vif; static virtual ifc sv; H k; "
+      "function void m(); endfunction endclass\n"
+      "module top;\n"
+      "  import p::*;\n"
+      "  class C; virtual ifc cv; endclass\n"
+      "  ifc i (); virtual ifc v = i; virtual ifc va[2]; H h = new; C c = new; "
+      "K kk = new;\n"
+      "  initial if (0) begin\n"
+      "    virtual ifc w;\n"
+      "    w = i;\n"
+      "    w.nosuch();\n"
+      "    h.vif.nosuch();\n"
+      "    w.t(); h.vif.t(); c.cv.t(); va[0].t(); H::sv.t(); h.k.vif.t(); "
+      "top.v.t(); kk.f.t();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'nosuch' names no task or function of interface "
+                            "'ifc'",
+                            11, "25.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'nosuch' names no task or function of interface "
+                            "'ifc'",
+                            12, "25.9"));
+  for (const Diagnostic& diag : f.diag.Diagnostics()) {
+    if (diag.severity != DiagSeverity::kError) continue;
+    EXPECT_NE(diag.loc.line, 13u) << diag.message;
+  }
+}
+
+// §25.9 with §26.3: the class holding a virtual interface property may be one
+// a package declares, brought in by an explicit import, written behind its
+// package's scope, or imported in the compilation unit, and a call through
+// the property naming nothing the interface declares is reported each way
+// (#5810). Line 14's calls, one through a struct whose type is no class, are
+// not.
+TEST(VirtualInterfaceCallElaboration,
+     ACallThroughAPackageClasssVirtualInterface) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc; task t(); endtask endinterface\n"
+      "package p; class K; virtual ifc vif; function void m(); endfunction "
+      "endclass class Q; virtual ifc vif; endclass endpackage\n"
+      "package r; class R; virtual ifc vif; endclass endpackage\n"
+      "package e; endpackage\n"
+      "import r::R;\n"
+      "module top;\n"
+      "  import p::K; import e::*; import p::Q;\n"
+      "  typedef struct { K h; } S;\n"
+      "  K k = new; p::Q q = new; R rr = new; S s;\n"
+      "  initial if (0) begin\n"
+      "    k.vif.nosuch();\n"
+      "    q.vif.nosuch();\n"
+      "    rr.vif.nosuch();\n"
+      "    k.vif.t(); s.h.m();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  for (const uint32_t kLine : {11u, 12u, 13u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "'nosuch' names no task or function of "
+                              "interface 'ifc'",
+                              kLine, "25.9"))
+        << kLine;
+  }
+  for (const Diagnostic& diag : f.diag.Diagnostics()) {
+    if (diag.severity != DiagSeverity::kError) continue;
+    EXPECT_NE(diag.loc.line, 14u) << diag.message;
+  }
+}
+
+// §25.9 with §6.18: a class handle declared through a typedef of the class
+// holds the class's virtual interface property all the same, through a chain
+// of the module's typedefs, the compilation unit's, one a wildcard import
+// brings in, one behind its package's scope and one the compilation unit's
+// import brings in, and a call through it naming nothing the interface
+// declares is reported each way (#5811).
+TEST(VirtualInterfaceCallElaboration,
+     ACallThroughATypedefdClassHandlesVirtualInterface) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc; task t(); endtask endinterface\n"
+      "class H; virtual ifc vif; endclass\n"
+      "package p; class K; virtual ifc vif; endclass typedef K KT; "
+      "typedef K KI; endpackage\n"
+      "package q; class QC; virtual ifc vif; endclass typedef QC QT; "
+      "endpackage\n"
+      "import q::*;\n"
+      "typedef H HU;\n"
+      "module top;\n"
+      "  import p::*;\n"
+      "  typedef H HT; typedef HT HT2;\n"
+      "  HT2 a = new; HU b = new; KI c = new; p::KT d = new; QT e = new;\n"
+      "  initial if (0) begin\n"
+      "    a.vif.nosuch();\n"
+      "    b.vif.nosuch();\n"
+      "    c.vif.nosuch();\n"
+      "    d.vif.nosuch();\n"
+      "    e.vif.nosuch();\n"
+      "    a.vif.t(); d.vif.t();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  for (const uint32_t kLine : {12u, 13u, 14u, 15u, 16u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "'nosuch' names no task or function of "
+                              "interface 'ifc'",
+                              kLine, "25.9"))
+        << kLine;
+  }
+  for (const Diagnostic& diag : f.diag.Diagnostics()) {
+    if (diag.severity != DiagSeverity::kError) continue;
+    EXPECT_NE(diag.loc.line, 17u) << diag.message;
+  }
+}
+
+// §25.9 with §6.18: a chain of typedefs that names itself again names no
+// class, so the search for one through it gives up and no call through a
+// handle of it is reported as a virtual interface call (#5811).
+TEST(VirtualInterfaceCallElaboration, ACyclicTypedefNamesNoClass) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc; task t(); endtask endinterface\n"
+      "module top;\n"
+      "  typedef A B; typedef B A;\n"
+      "  A g;\n"
+      "  initial if (0) g.vif.nosuch();\n"
+      "endmodule\n",
+      f, "top");
+  for (const Diagnostic& diag : f.diag.Diagnostics()) {
+    EXPECT_EQ(diag.message.find("names no task or function of interface"),
+              std::string::npos)
+        << diag.message;
   }
 }
 
