@@ -16,16 +16,12 @@ namespace delta {
 void RecordViewportGrants(
     const RtlirDesign* design,
     const std::unordered_map<std::string_view, VpiObject*>& objects,
-    const SourceManager* sources) {
-  if (design == nullptr || sources == nullptr ||
-      design->compilation_unit == nullptr) {
-    return;
-  }
-  for (const EnvelopeViewport& viewport : sources->Viewports()) {
+    const SourceManager& sources) {
+  if (design == nullptr || design->compilation_unit == nullptr) return;
+  for (const EnvelopeViewport& viewport : sources.Viewports()) {
     const ViewportAccess kAccess = ViewportAccessOf(viewport.access);
     if (kAccess == ViewportAccess::kNone) continue;
-    auto target =
-        ResolveViewport(*design->compilation_unit, viewport, *sources);
+    auto target = ResolveViewport(*design->compilation_unit, viewport, sources);
     if (!target) continue;
     // The name was resolved against the design element's declarations, so it
     // names the same object in each instance of the element.

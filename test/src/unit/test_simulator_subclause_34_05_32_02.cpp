@@ -3,8 +3,12 @@
 #include <string>
 #include <string_view>
 
+#include "common/envelope_viewport.h"
+#include "common/source_mgr.h"
+#include "elaborator/rtlir.h"
 #include "fixture_simulator.h"
 #include "helpers_sealed_design_run.h"
+#include "parser/ast_design.h"
 #include "preprocessor/protect_processing.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -198,6 +202,103 @@ TEST_F(ViewportGrantInABoundRun, AReadWriteObjectTakesAWrite) {
 // And the variable no viewport names stays sealed.
 TEST_F(ViewportGrantInABoundRun, AnObjectNoViewportNamesIsNotReached) {
   EXPECT_FALSE(g_seen.shut_reached);
+}
+
+// What a PLI application reaches of a sealed module instantiated twice: the
+// variable a viewport asking an access this tool does not define names, and
+// the variable of a generate block only the second instance generated, which
+// an "r" viewport names.
+struct PartialGrantSeen {
+  bool undefined_reached = true;
+  bool generated_reached = false;
+};
+
+PartialGrantSeen g_partial;
+
+PLI_INT32 ReadPartialGrantsCalltf(PLI_BYTE8* /*user_data*/) {
+  g_partial.undefined_reached =
+      vpi_handle_by_name(VpiText("u1.undefined"), nullptr) != nullptr;
+  g_partial.generated_reached =
+      vpi_handle_by_name(VpiText("u1.g.q"), nullptr) != nullptr;
+  return 0;
+}
+
+// The sealed module's generate block stands only in an instance whose P is
+// set, so the "r" viewport naming its variable names an object u1 holds and
+// u0 does not.
+std::string PartiallyGrantedSource() {
+  const std::string kAuthored =
+      "`pragma protect begin\n"
+      "`pragma protect viewport = (object = \"secret.undefined\", access = "
+      "\"x\")\n"
+      "`pragma protect viewport = (object = \"secret.g.q\", access = \"r\")\n"
+      "module secret #(parameter P = 0);\n"
+      "  logic [7:0] undefined;\n"
+      "  if (P) begin : g\n"
+      "    logic [7:0] q;\n"
+      "  end\n"
+      "endmodule\n"
+      "`pragma protect end\n"
+      "module t;\n"
+      "  secret #(.P(0)) u0();\n"
+      "  secret #(.P(1)) u1();\n"
+      "  initial $probe;\n"
+      "endmodule\n";
+  return EncryptEnvelopes(kAuthored, kKey);
+}
+
+class PartialViewportGrantInARun : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    SetGlobalVpiContext(&ctx_);
+    g_partial = PartialGrantSeen();
+    s_vpi_systf_data data = {};
+    data.type = vpiSysTask;
+    data.tfname = VpiText("$probe");
+    data.calltf = &ReadPartialGrantsCalltf;
+    ASSERT_NE(vpi_register_systf(&data), nullptr);
+    RunUnderKey(PartiallyGrantedSource(), kKey, f_);
+  }
+  void TearDown() override { SetGlobalVpiContext(nullptr); }
+
+  VpiContext ctx_;
+  SimFixture f_;
+};
+
+// An access value this tool does not define relaxes nothing, so the object
+// that viewport names stays sealed.
+TEST_F(PartialViewportGrantInARun, AnUndefinedAccessLeavesItsObjectSealed) {
+  EXPECT_FALSE(g_partial.undefined_reached);
+}
+
+// A viewport names its object in every instance of the element that holds
+// one, and an instance whose generate block was not generated holds none and
+// is passed over.
+TEST_F(PartialViewportGrantInARun, AnInstanceThatGeneratedTheObjectIsGranted) {
+  EXPECT_TRUE(g_partial.generated_reached);
+}
+
+// A viewport naming no declaration of the design's compilation unit is one
+// elaboration reports as an error, so no run reaches the VPI model holding one.
+// A context handed a design it did not elaborate passes such a viewport over
+// and grants nothing.
+TEST(ViewportGrantOutsideARun, AViewportNamingNothingGrantsNothing) {
+  VpiContext vpi_ctx;
+  SetGlobalVpiContext(&vpi_ctx);
+  SimFixture f;
+  EnvelopeViewport viewport;
+  viewport.object = "absent.q";
+  viewport.access = std::string(kViewportReadAccess);
+  f.mgr.AddViewport(viewport);
+  CompilationUnit unit;
+  RtlirModule top;
+  top.name = "t";
+  RtlirDesign design;
+  design.compilation_unit = &unit;
+  design.top_modules = {&top};
+  vpi_ctx.Attach(f.ctx, &design);
+  EXPECT_EQ(vpi_handle_by_name(VpiText("absent.q"), nullptr), nullptr);
+  SetGlobalVpiContext(nullptr);
 }
 
 }  // namespace

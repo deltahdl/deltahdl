@@ -756,7 +756,7 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   AttachUdpDefns(design);
   AttachInstanceContents(design);
   RecordProtectedDeclarations(design, object_map_, SourcesOf(sim_ctx_));
-  RecordViewportGrants(design, object_map_, SourcesOf(sim_ctx_));
+  RecordViewportGrants(design, object_map_, sim_ctx.GetDiag().Sources());
   // §37.23: the scope a nettype declaration hangs in is the one the top has
   // just adopted, so the declarations are made once those scopes are final.
   AttachNettypeDeclarations(design);
