@@ -546,5 +546,16 @@ TEST_F(CallStatementsInAScope, ACallThroughAStructMemberReachesItsMethod) {
   ExpectTaskCallReaches("run", "top", "B");
 }
 
+// §9.7 with §37.42: a method of process called on the handle process::self()
+// returns is a method func call of the built-in class, not user-defined
+// (#5797).
+TEST_F(CallStatementsInAScope, ACallOnProcessSelfIsAMethodFuncCall) {
+  Run("module top; initial begin : b process::self().srandom(1); end\n"
+      "endmodule\n");
+  vpiHandle call = Named(vpiMethodFuncCall, By("top.b"), "srandom");
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(vpi_get(vpiUserDefn, call), 0);
+}
+
 }  // namespace
 }  // namespace delta

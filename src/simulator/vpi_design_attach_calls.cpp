@@ -453,11 +453,48 @@ HandleType PropertyType(const BodyWalk& walk, std::string_view cls,
       VifInterface(&type)};
 }
 
-// §12.7.3 with §8.4 and §23.6: the same for an array named through members:
-// a variable of the module of an instance the leading names reach, u.m, or
-// else the first unpacked dimension of the property the chain's last name is,
-// of the class the rest of the chain holds a handle of, o.m or o.h.m. An int
-// var where the chain names neither, such as one through an element select.
+// §6.18: the type the typedef `name` the walked module declares stands for;
+// null where the module declares no typedef of that name.
+const DataType* ModuleTypedef(const BodyWalk& walk, std::string_view name) {
+  const DataType* found = nullptr;
+  for (const ModuleDecl* decl : walk.design.compilation_unit->modules) {
+    if (decl->name != walk.mod.name) continue;
+    for (const ModuleItem* item : decl->items) {
+      if (item->kind == ModuleItemKind::kTypedef && item->name == name) {
+        found = &item->typedef_type;
+      }
+    }
+  }
+  return found;
+}
+
+// §7.2: the unpacked or packed structure `type` declares, written as one or
+// through a typedef the walked module declares; null for any other type.
+const DataType* StructTypeOf(const BodyWalk& walk, const DataType* type) {
+  if (type != nullptr && type->kind == DataTypeKind::kNamed) {
+    type = ModuleTypedef(walk, type->type_name);
+  }
+  return type != nullptr && type->kind == DataTypeKind::kStruct ? type
+                                                                : nullptr;
+}
+
+// §7.2 with §8.4: the class the member `name` of the structure `aggregate`
+// holds a handle of, named as its declaration wrote it.
+HandleType StructMemberType(const DataType& aggregate, std::string_view name) {
+  HandleType type;
+  for (const StructMember& member : aggregate.struct_members) {
+    if (member.name == name) type.cls = member.type_name;
+  }
+  return type;
+}
+
+// §12.7.3 with §8.4, §7.2 and §23.6: the same for an array named through
+// members: a variable of the module of an instance the leading names reach,
+// u.m; a member of a structure variable, s.aa, or of a class the member holds
+// a handle of, s.h.m; or else the first unpacked dimension of the property
+// the chain's last name is, of the class the rest of the chain holds a handle
+// of, o.m or o.h.m. An int var where the chain names none of these, such as
+// one through an element select.
 int MemberIndexKind(const Expr& array, const BlockParent& parent,
                     const BodyWalk& walk) {
   std::vector<std::string_view> names;
@@ -468,12 +505,31 @@ int MemberIndexKind(const Expr& array, const BlockParent& parent,
     return ModuleIndexKind(*kHead.mod, names.back(), kAt);
   }
   std::string_view cls = kHead.var.cls;
-  for (std::size_t i = kHead.used; i + 1 < names.size(); ++i) {
+  std::size_t first = kHead.used;
+  if (const DataType* aggregate = StructTypeOf(kAt, kHead.var.type)) {
+    for (const StructMember& member : aggregate->struct_members) {
+      if (member.name != names[first]) continue;
+      if (first + 1 == names.size()) {
+        return FirstDimIndexKind(member.unpacked_dims, kAt);
+      }
+      cls = member.type_name;
+    }
+    ++first;
+  }
+  for (std::size_t i = first; i + 1 < names.size(); ++i) {
     cls = PropertyType(kAt, cls, names[i]).cls;
   }
   const ClassMember* member = PropertyNamed(kAt, cls, names.back());
   return member == nullptr ? vpiIntVar
                            : FirstDimIndexKind(member->unpacked_dims, kAt);
+}
+std::string_view cls = kHead.var.cls;
+for (std::size_t i = kHead.used; i + 1 < names.size(); ++i) {
+  cls = PropertyType(kAt, cls, names[i]).cls;
+}
+const ClassMember* member = PropertyNamed(kAt, cls, names.back());
+return member == nullptr ? vpiIntVar
+                         : FirstDimIndexKind(member->unpacked_dims, kAt);
 }
 
 // The class a value of an expression is a handle of, named as written, with
@@ -502,6 +558,14 @@ std::string_view PackageVarClass(const RtlirDesign& design,
   return cls;
 }
 
+// §9.7: the built-in class a method of the built-in class `cls` returns a
+// handle of: process::self(), the process it is called in. Empty for any
+// other method, which returns no handle.
+std::string_view BuiltInResultClass(std::string_view cls,
+                                    std::string_view method) {
+  return cls == "process" && method == "self" ? cls : std::string_view();
+}
+
 ExprClassName ExprClass(const Expr& expr, const BlockParent& parent,
                         const BodyWalk& walk);
 
@@ -524,7 +588,7 @@ ExprClassName CallResultClass(const Expr& callee, const BlockParent& parent,
   const std::string_view kMethod = callee.rhs->text;
   const ClassDecl* decl =
       ClassMethodCall(walk, kOwner.cls, kMethod, kOwner.package).owner.decl;
-  return {decl == nullptr ? std::string_view()
+  return {decl == nullptr ? BuiltInResultClass(kOwner.cls, kMethod)
                           : MethodNamed(*decl, kMethod)->return_type.type_name,
           kOwner.package};
 }
@@ -582,41 +646,6 @@ CallShape ExprCallShape(const Expr& access, const BlockParent& parent,
       walk);
   shape.prefix_members = std::move(members);
   return shape;
-}
-
-// §6.18: the type the typedef `name` the walked module declares stands for;
-// null where the module declares no typedef of that name.
-const DataType* ModuleTypedef(const BodyWalk& walk, std::string_view name) {
-  const DataType* found = nullptr;
-  for (const ModuleDecl* decl : walk.design.compilation_unit->modules) {
-    if (decl->name != walk.mod.name) continue;
-    for (const ModuleItem* item : decl->items) {
-      if (item->kind == ModuleItemKind::kTypedef && item->name == name) {
-        found = &item->typedef_type;
-      }
-    }
-  }
-  return found;
-}
-
-// §7.2: the unpacked or packed structure `type` declares, written as one or
-// through a typedef the walked module declares; null for any other type.
-const DataType* StructTypeOf(const BodyWalk& walk, const DataType* type) {
-  if (type != nullptr && type->kind == DataTypeKind::kNamed) {
-    type = ModuleTypedef(walk, type->type_name);
-  }
-  return type != nullptr && type->kind == DataTypeKind::kStruct ? type
-                                                                : nullptr;
-}
-
-// §7.2 with §8.4: the class the member `name` of the structure `aggregate`
-// holds a handle of, named as its declaration wrote it.
-HandleType StructMemberType(const DataType& aggregate, std::string_view name) {
-  HandleType type;
-  for (const StructMember& member : aggregate.struct_members) {
-    if (member.name == name) type.cls = member.type_name;
-  }
-  return type;
 }
 
 // §37.42 detail 2 with §8.4: a method call applied through a chain of members

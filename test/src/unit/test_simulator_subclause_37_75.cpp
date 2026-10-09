@@ -500,6 +500,23 @@ TEST_F(DoWhileAndForeachLoopsOfARun, APropertysArrayGivesItsIndexType) {
                               vpiIntVar, vpiStringVar}));
 }
 
+// §12.7.3 with §7.2: over an array a structure's member holds, or a property
+// of the class a member holds a handle of, the index variable is of that
+// array's index type, a string var over a string-indexed one (#5794).
+TEST_F(DoWhileAndForeachLoopsOfARun, AStructMembersArrayGivesItsIndexType) {
+  Run("module top;\n"
+      "  class H; int m [string]; endclass\n"
+      "  typedef struct { int n; int aa [string]; H h; } s_t;\n"
+      "  s_t s;\n"
+      "  initial begin : b s.h = new;\n"
+      "    foreach (s.aa[k]) begin end\n"
+      "    foreach (s.h.m[k]) begin end\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(FirstLoopVarKinds(By("top.b")),
+            (std::vector<int>{vpiStringVar, vpiStringVar}));
+}
+
 // §37.75: a null handle has no do-while condition.
 TEST_F(DoWhileForeach, DoWhileConditionOfANullHandleIsNull) {
   EXPECT_EQ(VpiDoWhileConditionExpr(nullptr), nullptr);
