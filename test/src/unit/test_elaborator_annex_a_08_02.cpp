@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
+#include <utility>
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -431,6 +433,49 @@ TEST(SubroutineCallElaborationSyntax, ACallNamingABlocksVariableIsReported) {
                             6, "A.8.2"));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), std::string("'g") + kMessage,
                              7, "A.8.2"));
+}
+
+// A.6.9: a call statement calls a task or a function, so one naming a let, a
+// sequence, a property, or a variable a package declares and the module
+// imports by name or with a wildcard, is reported, while the let named with an
+// argument list within an expression is not (#5800).
+TEST(SubroutineCallElaborationSyntax,
+     ACallStatementNamingNoSubroutineIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package q; int u; endpackage\n"
+      "package p; int v; int w; function void pf(); endfunction endpackage\n"
+      "module m;\n"
+      "  import p::v;\n"
+      "  import q::*;\n"
+      "  let l(a) = a;\n"
+      "  sequence s; 1; endsequence\n"
+      "  property pr; 1; endproperty\n"
+      "  int y;\n"
+      "  initial begin\n"
+      "    l(1);\n"
+      "    s;\n"
+      "    pr;\n"
+      "    v;\n"
+      "    u;\n"
+      "    y = l(2);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const char* const kMessage =
+      "' names no task or function, and a call statement calls one";
+  for (const auto& [name, line] : {std::pair<const char*, uint32_t>{"l", 11},
+                                   {"s", 12},
+                                   {"pr", 13},
+                                   {"v", 14},
+                                   {"u", 15}}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              std::string("'") + name + kMessage, line,
+                              "A.6.9"))
+        << name;
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), std::string("'l") + kMessage,
+                             16, "A.6.9"));
 }
 
 }  // namespace

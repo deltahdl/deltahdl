@@ -374,7 +374,7 @@ void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
         return target_visible(name) || UnitDeclaresSubroutine(unit_, name);
       },
       diag_);
-  ReportCallsOfDataNames(*decl, diag_);
+  ReportCallsOfDataNames(*decl, *unit_, diag_);
 }
 
 namespace {
