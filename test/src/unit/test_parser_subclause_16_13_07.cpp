@@ -35,6 +35,28 @@ TEST(PropertyLocalParsing, ALocalDeclaredAheadOfThePropertyIsCaptured) {
   EXPECT_EQ(item->prop_locals[0].init->text, "e");
 }
 
+// §16.10 with §7.4.1: a property's local declared of a packed type, `logic
+// [3:0] x`, is captured with the packed dimension written after its keyword
+// (#5745).
+TEST(PropertyLocalParsing, APackedLocalIsCapturedWithItsDimension) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p;\n"
+      "    logic [3:0] x;\n"
+      "    @(posedge clk) (1, x = v + 12) |-> ##1 (x < 12);\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* item = FindItemByKind(r, ModuleItemKind::kPropertyDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_NE(item->prop_body_tree, nullptr);
+  ASSERT_EQ(item->prop_locals.size(), 1u);
+  ASSERT_EQ(item->prop_locals[0].packed_dims.size(), 1u);
+  EXPECT_EQ(item->prop_locals[0].packed_dims[0].first->text, "3");
+  EXPECT_EQ(item->prop_locals[0].packed_dims[0].second->text, "0");
+}
+
 // §16.10: a local declared without an initialization is captured with
 // none, and a body without locals has none.
 TEST(PropertyLocalParsing, ALocalWithoutAnInitializationHasNone) {

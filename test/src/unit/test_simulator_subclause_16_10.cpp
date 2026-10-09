@@ -209,6 +209,13 @@ TEST(PropertyLocals, APackedLocalHoldsItsDeclaredWidth) {
                        "logic [3:0] x");
 }
 
+// §16.10 with §7.4.1: the copy of a property's packed local an attempt reads
+// is four bits wide, as $bits finds it (#5745).
+TEST(PropertyLocals, APackedLocalsCopyIsItsDeclaredWidth) {
+  ExpectPropertyCounts("(1, x = v) |-> ##1 ($bits(x) == 4)", 9, 0,
+                       "logic [3:0] x");
+}
+
 // The source the cases of a local flowing out of `triggered` share: clk rises
 // at 5, 15, ..., 95, and cnt counts its falls, so at the rise of 15 + 10k it is
 // k + 1. `decls` declares the sequences, and c1 and c2 count the attempts of
