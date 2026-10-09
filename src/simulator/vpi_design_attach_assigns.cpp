@@ -42,7 +42,8 @@ namespace delta {
 namespace {
 
 // §37.59: the vpiOpType of a binary operator, and 0 for one this table does
-// not hold.
+// not hold. An event expression passed as an actual (§16.12.18) joins its
+// events with `or` and guards one with `iff`, as §9.4.2 writes them.
 int BinaryOpType(TokenKind op) {
   switch (op) {
     case TokenKind::kPlus:
@@ -100,13 +101,18 @@ int BinaryOpType(TokenKind op) {
       return vpiArithRShiftOp;
     case TokenKind::kArrow:
       return vpiImplyOp;
+    case TokenKind::kKwOr:
+      return vpiEventOrOp;
+    case TokenKind::kKwIff:
+      return vpiIffOp;
     default:
       return 0;
   }
 }
 
 // §37.59: the vpiOpType of a prefix unary operator, and 0 for one this table
-// does not hold.
+// does not hold. An event expression passed as an actual (§16.12.18) writes
+// its edge as one.
 int UnaryOpType(TokenKind op) {
   switch (op) {
     case TokenKind::kMinus:
@@ -130,6 +136,10 @@ int UnaryOpType(TokenKind op) {
     case TokenKind::kTildeCaret:
     case TokenKind::kCaretTilde:
       return vpiUnaryXNorOp;
+    case TokenKind::kKwPosedge:
+      return vpiPosedgeOp;
+    case TokenKind::kKwNegedge:
+      return vpiNegedgeOp;
     default:
       return 0;
   }

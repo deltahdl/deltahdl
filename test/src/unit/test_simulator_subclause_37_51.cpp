@@ -651,6 +651,25 @@ TEST_F(PropertyDeclsOfARun, AKeyedPatternActualTakesItsFormalsOrder) {
   EXPECT_STREQ(vpi_get_str(vpiName, second), "x");
 }
 
+// An event expression passed for a formal of type event (§16.12.18) is the
+// argument the operation of its edge, its or or its iff stands as (§37.59)
+// (#5764).
+TEST_F(PropertyDeclsOfARun, AnEventActualIsItsEventOperation) {
+  Run("module top; logic clk, a;\n"
+      "  property p(event e, x); @(e) x; endproperty\n"
+      "  a1: assert property (p(posedge clk, a));\n"
+      "  a2: assert property (p(negedge clk or posedge clk, a));\n"
+      "  a3: assert property (p(posedge clk iff a, a));\n"
+      "endmodule\n");
+  const auto kFirstOp = [](const char* assertion) {
+    const std::vector<vpiHandle> kArguments = ArgumentsOf(assertion);
+    return kArguments.size() == 2 ? vpi_get(vpiOpType, kArguments[0]) : 0;
+  };
+  EXPECT_EQ(kFirstOp("a1"), vpiPosedgeOp);
+  EXPECT_EQ(kFirstOp("a2"), vpiEventOrOp);
+  EXPECT_EQ(kFirstOp("a3"), vpiIffOp);
+}
+
 // A property with no clock of its own, instantiated by an assertion the
 // module's default clocking clocks (§14.12), reaches the module's property
 // decl.
