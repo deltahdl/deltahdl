@@ -2,10 +2,16 @@
 
 #include <vector>
 
+#include "elaborator/rtlir.h"
+#include "fixture_simulator.h"
 #include "helpers_vpi_two_fixed_unpacked_dims.h"
+#include "parser/ast_design.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -334,6 +340,49 @@ TEST(TypespecModel, AnImplicitElementRangeIsNoDeclaredDimension) {
   ASSERT_EQ(kRanges.size(), 1u);
   EXPECT_EQ(kRanges[0].size, 4);
   EXPECT_EQ(VpiTypespecLeftRange(kDims), &left);
+}
+
+// §37.25 with §37.17: attaching a design makes a typespec for each typedef an
+// instance's declaration writes. An enumeration the elaborated module records
+// no constants for is a typespec with none, and a variable of the typedef that
+// the run built no object for is passed over rather than related to it.
+TEST(TypespecModel, AttachToleratesAnEnumWithoutConstantsAndAnUnbuiltVariable) {
+  VpiContext vpi_ctx;
+  SetGlobalVpiContext(&vpi_ctx);
+  SimFixture f;
+  ModuleItem typedef_item;
+  typedef_item.kind = ModuleItemKind::kTypedef;
+  typedef_item.name = "e_t";
+  typedef_item.typedef_type.kind = DataTypeKind::kEnum;
+  ModuleDecl decl;
+  decl.name = "m";
+  decl.items = {&typedef_item};
+  CompilationUnit unit;
+  unit.modules = {&decl};
+  DataType written;
+  written.kind = DataTypeKind::kNamed;
+  written.type_name = "e_t";
+  RtlirModule mod;
+  mod.name = "m";
+  mod.variables.resize(1);
+  mod.variables.front().name = "unbuilt";
+  mod.variables.front().written_type = &written;
+  RtlirDesign design;
+  design.top_modules = {&mod};
+  design.compilation_unit = &unit;
+  vpi_ctx.Attach(f.ctx, &design);
+  vpiHandle m = vpi_handle_by_name(VpiText("m"), nullptr);
+  ASSERT_NE(m, nullptr);
+  vpiHandle it = vpi_iterate(vpiTypedef, m);
+  ASSERT_NE(it, nullptr);
+  vpiHandle typespec = vpi_scan(it);
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, typespec), vpiEnumTypespec);
+  EXPECT_STREQ(vpi_get_str(vpiName, typespec), "e_t");
+  EXPECT_EQ(vpi_iterate(vpiEnumConst, typespec), nullptr);
+  EXPECT_EQ(vpi_scan(it), nullptr);
+  EXPECT_EQ(vpi_handle_by_name(VpiText("m.unbuilt"), nullptr), nullptr);
+  SetGlobalVpiContext(nullptr);
 }
 
 }  // namespace

@@ -92,7 +92,7 @@ TypespecsByName MakeTypespecs(const std::vector<ModuleItem*>& items,
                               const ScopeTypespecs& at) {
   TypespecsByName made;
   for (const ModuleItem* item : items) {
-    if (item == nullptr || item->kind != ModuleItemKind::kTypedef) continue;
+    if (item->kind != ModuleItemKind::kTypedef) continue;
     VpiObject* typespec = MakeTypespec(*item, at);
     if (typespec != nullptr) made[item->name] = typespec;
   }
@@ -104,7 +104,7 @@ const ModuleDecl* ElementNamed(const CompilationUnit& unit,
                                std::string_view name) {
   for (const auto* list : {&unit.modules, &unit.interfaces, &unit.programs}) {
     for (const ModuleDecl* decl : *list) {
-      if (decl != nullptr && decl->name == name) return decl;
+      if (decl->name == name) return decl;
     }
   }
   return nullptr;
@@ -137,7 +137,7 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
   // union's with its members; and §37.17 relates a variable declared with one
   // to it. No typespec of any kind was made, so vpiTypedef reached none and a
   // variable's vpiTypespec was null.
-  if (design == nullptr || design->compilation_unit == nullptr) return {};
+  if (design->compilation_unit == nullptr) return {};
   const CompilationUnit& unit = *design->compilation_unit;
   auto unit_scope = objects.find("$unit");
   const TypespecsByName kUnit =
@@ -149,7 +149,7 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
         VpiObject* scope = FindObjectForFlatName(
             objects, prefix.empty() ? std::string(mod->name) : prefix);
         const ModuleDecl* decl = ElementNamed(unit, mod->name);
-        if (scope == nullptr || decl == nullptr) return;
+        if (decl == nullptr) return;
         const TypespecsByName kLocal =
             MakeTypespecs(decl->items, {scope, &mod->enum_types, build});
         for (const RtlirVariable& var : mod->variables) {
