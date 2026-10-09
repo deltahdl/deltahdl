@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <format>
 #include <functional>
 #include <string_view>
@@ -156,94 +157,157 @@ std::string_view DeclaredName(const ModuleItem& item) {
                                                  : item.name;
 }
 
-// The item of kind `kind` among `items` declaring `name`; null where none
-// does.
-const ModuleItem* ItemNamed(const std::vector<ModuleItem*>& items,
-                            ModuleItemKind kind, std::string_view name) {
-  const ModuleItem* found = nullptr;
-  for (const ModuleItem* item : items) {
-    if (item->kind == kind && DeclaredName(*item) == name) found = item;
+// The kind of scope a type name is written in (§23.9): a module's, which the
+// compilation unit's scope surrounds, the compilation unit's own, or a
+// package's, which sees neither (§26.2).
+enum class SiteKind : std::uint8_t { kModule, kUnit, kPackage };
+
+// Where a type name is looked up: among the items of the scope it is written
+// in, those before `end` alone, as a typedef names only a type declared before
+// it (§6.18), then in the scopes around that one.
+struct TypeSite {
+  const std::vector<ModuleItem*>* items = nullptr;
+  std::size_t end = 0;
+  SiteKind kind = SiteKind::kModule;
+};
+
+// An item a lookup found, with the site the names its declaration writes are
+// looked up at: the items of its own scope before it.
+struct FoundItem {
+  const ModuleItem* item = nullptr;
+  TypeSite site = {};
+};
+
+// The last item of kind `kind` among the first `end` of `items` declaring
+// `name`, a forward typedef (§6.18), which names no type, excepted; `kind`
+// is the kind of scope `items` belong to.
+FoundItem ItemBefore(const std::vector<ModuleItem*>& items, std::size_t end,
+                     ModuleItemKind kind, std::string_view name,
+                     SiteKind scope) {
+  FoundItem found;
+  for (std::size_t i = 0; i < end; ++i) {
+    const ModuleItem& item = *items[i];
+    if (item.kind == kind && DeclaredName(item) == name &&
+        item.forward_type_kind == DataTypeKind::kImplicit) {
+      found = {&item, {&items, i, scope}};
+    }
   }
   return found;
 }
 
 // §26.2: the item of kind `kind` the package `package` of the compilation unit
-// declares under `name`; null where it declares none.
-const ModuleItem* PackageItem(const CompilationUnit& unit,
-                              std::string_view package, ModuleItemKind kind,
-                              std::string_view name) {
-  const ModuleItem* found = nullptr;
+// declares under `name`.
+FoundItem PackageItem(const CompilationUnit& unit, std::string_view package,
+                      ModuleItemKind kind, std::string_view name) {
+  FoundItem found;
   for (const PackageDecl* decl : unit.packages) {
-    if (decl->name == package) found = ItemNamed(decl->items, kind, name);
+    if (decl->name == package) {
+      found = ItemBefore(decl->items, decl->items.size(), kind, name,
+                         SiteKind::kPackage);
+    }
   }
   return found;
 }
 
-// §26.3: the item of kind `kind` named `name` an import among `items` brings
-// in, by its item name or with a wildcard; null where none does.
-const ModuleItem* ImportedItem(const CompilationUnit& unit,
-                               const std::vector<ModuleItem*>& items,
-                               ModuleItemKind kind, std::string_view name) {
-  const ModuleItem* found = nullptr;
-  for (const ModuleItem* item : items) {
-    if (item->kind != ModuleItemKind::kImportDecl) continue;
-    const ImportItem& import = item->import_item;
+// §26.3: the item of kind `kind` named `name` an import among the first `end`
+// of `items` brings in, by its item name or with a wildcard.
+FoundItem ImportedItem(const CompilationUnit& unit,
+                       const std::vector<ModuleItem*>& items, std::size_t end,
+                       ModuleItemKind kind, std::string_view name) {
+  FoundItem found;
+  for (std::size_t i = 0; i < end; ++i) {
+    if (items[i]->kind != ModuleItemKind::kImportDecl) continue;
+    const ImportItem& import = items[i]->import_item;
     if (!import.is_wildcard && import.item_name != name) continue;
-    const ModuleItem* hit = PackageItem(unit, import.package_name, kind, name);
-    if (hit != nullptr) found = hit;
+    const FoundItem kHit = PackageItem(unit, import.package_name, kind, name);
+    if (kHit.item != nullptr) found = kHit;
   }
   return found;
 }
 
-// §26.3: the item of kind `kind` named `name` the scope of the module sees
-// by that name: the module's own, else the compilation unit's, else one the
-// module's imports bring in, else one the compilation unit's do; null where
-// none is.
-const ModuleItem* VisibleItem(const DataScope& scope, ModuleItemKind kind,
-                              std::string_view name) {
-  const CompilationUnit& unit = scope.unit;
-  const ModuleItem* found = ItemNamed(scope.items, kind, name);
-  if (found == nullptr) found = ItemNamed(unit.cu_items, kind, name);
-  if (found == nullptr) found = ImportedItem(unit, scope.items, kind, name);
-  if (found == nullptr) found = ImportedItem(unit, unit.cu_items, kind, name);
+// §23.9 with §26.3: the item of kind `kind` named `name` the site `site` sees:
+// one its scope declares, else one an import of its scope brings in, else,
+// for a module, one the compilation unit declares or imports.
+FoundItem SiteItem(const CompilationUnit& unit, const TypeSite& site,
+                   ModuleItemKind kind, std::string_view name) {
+  FoundItem found = ItemBefore(*site.items, site.end, kind, name, site.kind);
+  if (found.item == nullptr) {
+    found = ImportedItem(unit, *site.items, site.end, kind, name);
+  }
+  if (found.item == nullptr && site.kind == SiteKind::kModule) {
+    const TypeSite kUnit{&unit.cu_items, unit.cu_items.size(), SiteKind::kUnit};
+    found = SiteItem(unit, kUnit, kind, name);
+  }
   return found;
 }
 
-// The class the class declaration item `item` declares; null for none.
-const ClassDecl* ClassOf(const ModuleItem* item) {
-  return item == nullptr ? nullptr : item->class_decl;
+// §8.3: the class named `name` the scope of `site` sees, wherever in that scope
+// its declaration stands, as a class may be referred to before it is declared
+// once a forward typedef names it (§6.18); null where none is. A module's or
+// the compilation unit's search reaches the compilation unit's classes.
+const ClassDecl* ClassIn(const CompilationUnit& unit, const TypeSite& site,
+                         std::string_view name) {
+  const TypeSite kWhole{site.items, site.items->size(), site.kind};
+  const FoundItem kFound =
+      SiteItem(unit, kWhole, ModuleItemKind::kClassDecl, name);
+  if (kFound.item != nullptr) return kFound.item->class_decl;
+  if (site.kind == SiteKind::kPackage) return nullptr;
+  for (const ClassDecl* decl : unit.classes) {
+    if (decl->name == name) return decl;
+  }
+  return nullptr;
 }
 
-// §8.3 with §6.18 and §26.3: the class declaration the type `type` names,
-// through each typedef it is written as: behind its package scope, p::K, or
-// else the module's own, the compilation unit's, then one an import brings
-// in; null where none is. The hop limit keeps a
-// cyclic typedef from looping.
+// §8.24 with §26.3: the class named `name` written behind the scope
+// `scope_name`, p::K or H::Inner: one the package of that name declares, else
+// one nested in the class of that name the site sees; null where neither is.
+const ClassDecl* ScopedClass(const CompilationUnit& unit, const TypeSite& site,
+                             std::string_view scope_name,
+                             std::string_view name) {
+  const FoundItem kInPackage =
+      PackageItem(unit, scope_name, ModuleItemKind::kClassDecl, name);
+  if (kInPackage.item != nullptr) return kInPackage.item->class_decl;
+  const ClassDecl* outer = ClassIn(unit, site, scope_name);
+  if (outer == nullptr) return nullptr;
+  for (const ClassMember* member : outer->members) {
+    if (member->nested_class != nullptr && member->nested_class->name == name) {
+      return member->nested_class;
+    }
+  }
+  return nullptr;
+}
+
+// §6.18: the typedef the named type `type`, written at `site`, names: behind
+// its package's scope, p::KT, or else the one the site sees.
+FoundItem TypedefOf(const CompilationUnit& unit, const TypeSite& site,
+                    const DataType& type) {
+  if (!type.scope_name.empty()) {
+    return PackageItem(unit, type.scope_name, ModuleItemKind::kTypedef,
+                       type.type_name);
+  }
+  return SiteItem(unit, site, ModuleItemKind::kTypedef, type.type_name);
+}
+
+// §8.3 with §6.18 and §26.3: the class declaration the type `type` of a
+// variable of the module names, through each typedef it is written as, each
+// typedef's own type looked up as the scope declaring that typedef sees it
+// before the typedef; null where none is. Each step reaches a declaration
+// before the last in its scope, or a scope around it or a package, which
+// leads to no module; a package reaches only one declared before it, a
+// typedef naming no type the parser has not yet read, so the walk ends.
 const ClassDecl* ClassNamed(const DataScope& scope, const DataType& type) {
   const CompilationUnit& unit = scope.unit;
+  TypeSite site{&scope.items, scope.items.size(), SiteKind::kModule};
   const DataType* named = &type;
-  for (int hops = 0; hops < 8; ++hops) {
-    const ModuleItem* def =
-        named->scope_name.empty()
-            ? VisibleItem(scope, ModuleItemKind::kTypedef, named->type_name)
-            : PackageItem(unit, named->scope_name, ModuleItemKind::kTypedef,
-                          named->type_name);
-    if (def == nullptr) break;
-    named = &def->typedef_type;
+  for (FoundItem def = TypedefOf(unit, site, *named); def.item != nullptr;
+       def = TypedefOf(unit, site, *named)) {
+    named = &def.item->typedef_type;
+    site = def.site;
   }
   if (!named->scope_name.empty()) {
-    return ClassOf(PackageItem(unit, named->scope_name,
-                               ModuleItemKind::kClassDecl, named->type_name));
+    return ScopedClass(unit, site, named->scope_name, named->type_name);
   }
-  if (const ClassDecl* own = ClassOf(ItemNamed(
-          scope.items, ModuleItemKind::kClassDecl, named->type_name))) {
-    return own;
-  }
-  for (const ClassDecl* decl : unit.classes) {
-    if (decl->name == named->type_name) return decl;
-  }
-  return ClassOf(
-      VisibleItem(scope, ModuleItemKind::kClassDecl, named->type_name));
+  return ClassIn(unit, site, named->type_name);
 }
 
 // §25.9: the interface the virtual interface `prefix` names refers to an

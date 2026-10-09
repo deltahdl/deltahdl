@@ -742,12 +742,13 @@ void Elaborator::WalkStmtsForVirtualInterfaceOps(const Stmt* s) {
                                vi_external_defparam_insts_};
     CheckVirtualInterfaceAssignStmt(s, kCtx, diag_);
   }
-  CheckVirtualInterfaceExpr(s->rhs, var_types_, vi_var_interface_types_,
+  CheckVirtualInterfaceExpr(s->rhs, vi_expr_types_, vi_var_interface_types_,
                             interface_inst_types_, diag_);
-  CheckVirtualInterfaceExpr(s->expr, var_types_, vi_var_interface_types_,
+  CheckVirtualInterfaceExpr(s->expr, vi_expr_types_, vi_var_interface_types_,
                             interface_inst_types_, diag_);
-  CheckVirtualInterfaceExpr(s->condition, var_types_, vi_var_interface_types_,
-                            interface_inst_types_, diag_);
+  CheckVirtualInterfaceExpr(s->condition, vi_expr_types_,
+                            vi_var_interface_types_, interface_inst_types_,
+                            diag_);
   // §25.9 admits only ==, !=, === and !== on a virtual interface, and only
   // another virtual interface, an interface instance or null as the operand
   // opposite one. It names no statement those rules are suspended in, so this
@@ -789,6 +790,10 @@ void Elaborator::ValidateVirtualInterfaceOps(const ModuleDecl* decl) {
   if (!ScopeHasVirtualInterfaceVar(var_types_)) return;
   CollectExternalDefparamInsts(decl, interface_inst_types_,
                                vi_external_defparam_insts_);
+  vi_expr_types_ = var_types_;
+  for (const auto* item : decl->items) {
+    if (!item->unpacked_dims.empty()) vi_expr_types_.erase(item->name);
+  }
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
