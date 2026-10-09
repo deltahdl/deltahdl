@@ -403,21 +403,25 @@ TEST_F(StatementFill, AnEventLeftOutLeavesTheControlNoCondition) {
   }
 }
 
-// §37.72: a casez reports vpiCaseZ, and a case matches (§12.6.1) the tagged
-// qualifier.
-TEST_F(StatementFill, ACasezMatchesIsTaggedCaseZ) {
+// §37.72: a casex reports vpiCaseX and a casez vpiCaseZ, and a case matches
+// (§12.6.1) the tagged qualifier.
+TEST_F(StatementFill, ACasexOrCasezMatchesIsTaggedOfItsType) {
   Expr sel;
   Name(sel, "sel");
-  Stmt stmt;
-  stmt.kind = StmtKind::kCase;
-  stmt.case_kind = TokenKind::kKwCasez;
-  stmt.case_matches = true;
-  stmt.condition = &sel;
-  VpiObject made;
-  made.type = vpiCase;
-  VpiFillStmt(&made, stmt, with_);
-  EXPECT_EQ(made.case_type, vpiCaseZ);
-  EXPECT_EQ(made.qualifier, vpiTaggedQualifier);
+  const std::vector<std::pair<TokenKind, int>> kKeywords = {
+      {TokenKind::kKwCasex, vpiCaseX}, {TokenKind::kKwCasez, vpiCaseZ}};
+  for (const auto& [keyword, type] : kKeywords) {
+    Stmt stmt;
+    stmt.kind = StmtKind::kCase;
+    stmt.case_kind = keyword;
+    stmt.case_matches = true;
+    stmt.condition = &sel;
+    VpiObject made;
+    made.type = vpiCase;
+    VpiFillStmt(&made, stmt, with_);
+    EXPECT_EQ(made.case_type, type);
+    EXPECT_EQ(made.qualifier, vpiTaggedQualifier);
+  }
 }
 
 // §37.74 with §37.12 detail 2: a for statement whose header initializes
