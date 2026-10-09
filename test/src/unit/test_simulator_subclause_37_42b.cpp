@@ -447,13 +447,15 @@ TEST_F(CallStatementsInAScope, ACallThroughAnExpressionReachesItsMethod) {
   ASSERT_NE(b_run, nullptr);
   ASSERT_NE(d_go, nullptr);
   std::vector<VpiObject*> reached;
+  std::vector<bool> prefixed;
   vpiHandle it = vpi_iterate(vpiStmt, By("top.b"));
   ASSERT_NE(it, nullptr);
   while (vpiHandle stmt = vpi_scan(it)) {
     if (vpi_get(vpiType, stmt) != vpiMethodTaskCall) continue;
-    EXPECT_NE(vpi_handle(vpiPrefix, stmt), nullptr);
+    prefixed.push_back(vpi_handle(vpiPrefix, stmt) != nullptr);
     reached.push_back(VpiObjectOf(vpi_handle(vpiTask, stmt)));
   }
+  EXPECT_EQ(prefixed, (std::vector<bool>{true, true, true, true}));
   EXPECT_EQ(reached,
             (std::vector<VpiObject*>{VpiObjectOf(b_run), VpiObjectOf(b_run),
                                      VpiObjectOf(b_run), VpiObjectOf(d_go)}));
