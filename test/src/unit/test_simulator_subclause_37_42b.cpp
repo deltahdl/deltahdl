@@ -96,6 +96,18 @@ TEST_F(CallsInAnAssignment, ACallReachesTheEnclosingBlocksFunction) {
   EXPECT_EQ(VpiObjectOf(CalledFunction()), VpiObjectOf(f));
 }
 
+// §23.9: a call in the second of two sibling blocks that each declare a
+// function of the name reaches its own block's, not the first block's.
+TEST_F(CallsInAnAssignment, ACallReachesItsOwnBlocksFunctionOverASiblings) {
+  Run("module top; if (1) begin : a\n"
+      "  function int f(); return 1; endfunction int u; end\n"
+      "  if (1) begin : b function int f(); return 2; endfunction\n"
+      "  wire [31:0] w; assign w = f(); end endmodule\n");
+  vpiHandle f = Named(vpiTaskFunc, By("top.b"), "f");
+  ASSERT_NE(f, nullptr);
+  EXPECT_EQ(VpiObjectOf(CalledFunction()), VpiObjectOf(f));
+}
+
 // §26.3: a call reaches the package function the module imports by its name,
 // passing over an import of another of the package's items...
 TEST_F(CallsInAnAssignment, ACallReachesAFunctionImportedByName) {
