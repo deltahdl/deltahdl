@@ -80,6 +80,14 @@ void ReportEventFormalReference(DiagEngine& diag, const ModuleItem* item,
 // §16.8.2 rejects `local event e` on exactly these grounds). These keywords are
 // recognised head-on so the diagnostic names the real problem (a disallowed
 // type) rather than being mistaken for a missing type.
+void ReportChandleFormal(DiagEngine& diag, const Token& type_tok) {
+  if (type_tok.kind != TokenKind::kKwChandle) return;
+  diag.Error(type_tok.loc,
+             "a sequence or property formal argument may not be of type "
+             "chandle",
+             Subclause("16.8"));
+}
+
 bool IsDisallowedLocalVarTypeKw(TokenKind k) {
   switch (k) {
     case TokenKind::kKwEvent:
@@ -274,6 +282,13 @@ void Parser::HarvestAssertionVariableDecl(ModuleItem* item) {
   // the comma-separated list of <identifier> [ = <expression> ] entries
   // until the closing semicolon. Each identifier names a distinct local
   // variable in the sequence/property body.
+  // §16.10 with §16.6: chandle is not among the types a local variable may
+  // be declared with.
+  if (Check(TokenKind::kKwChandle)) {
+    diag_.Error(CurrentLoc(),
+                "an assertion variable may not be declared of type chandle",
+                Subclause("16.10"));
+  }
   SkipAssertVarTypePrefix(lexer_);
   while (!Check(TokenKind::kSemicolon) && !AtEnd()) {
     if (Check(TokenKind::kIdentifier)) {
@@ -441,10 +456,10 @@ struct SequencePortScan {
   // is not local, `untyped` ending a type's reach; a `[` after a data type
   // keyword makes a type the keyword alone does not name. Returns true where
   // the token was one of these and was consumed.
-  bool HandleTypeKeyword(Lexer& lexer) {
+  bool HandleTypeKeyword(Lexer& lexer, DiagEngine& diag) {
     TokenKind kind = lexer.Peek().kind;
     if (IsBuiltinTypeKwForLocalVar(kind)) {
-      lexer.Next();
+      ReportChandleFormal(diag, lexer.Next());
       carry_type_kw =
           LexerCheck(lexer, TokenKind::kLBracket) ? TokenKind::kEof : kind;
       item_saw_explicit_type = true;
@@ -492,7 +507,7 @@ struct SequencePortScan {
                LexerCheck(lexer, TokenKind::kKwOutput) ||
                LexerCheck(lexer, TokenKind::kKwInout)) {
       HandleDirection(lexer, diag);
-    } else if (HandleTypeKeyword(lexer)) {
+    } else if (HandleTypeKeyword(lexer, diag)) {
       // The keyword was consumed and its type recorded for the formals after.
     } else if (item_saw_local &&
                IsDisallowedLocalVarTypeKw(lexer.Peek().kind)) {

@@ -515,4 +515,21 @@ TEST(SequenceDeclaration, AnEventDefaultStoppingShortIsReported) {
   }
 }
 
+// §16.8 with §16.6: a formal's type is one an assertion expression may
+// reference, which chandle is not, in a sequence's port list and, by §16.12's
+// sequence_formal_type, in a property's (#5739).
+TEST(SequenceDeclaration, AChandleFormalIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk;\n"
+      "  sequence s(int n, chandle h); @(posedge clk) 1; endsequence\n"
+      "  property p(chandle h, int n); @(posedge clk) 1; endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  const char* kMessage =
+      "a sequence or property formal argument may not be of type chandle";
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 3, "16.8"));
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 4, "16.8"));
+}
+
 }  // namespace

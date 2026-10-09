@@ -13,6 +13,11 @@ bool IsBuiltinTypeKwForLocalVar(TokenKind k);
 bool IsDisallowedLocalVarTypeKw(TokenKind k);
 bool LexerCheck(Lexer& lexer, TokenKind kind);
 
+// §16.8 with §16.6: reports a sequence's or a property's formal whose type
+// keyword, `type_tok`, is chandle, a type no assertion expression may
+// reference; reports nothing for any other keyword.
+void ReportChandleFormal(DiagEngine& diag, const Token& type_tok);
+
 // §16.10: whether `name` is a local variable of the sequence or property
 // declaration `item`, one its body declares or a local variable formal
 // argument of its port list (§16.8.2).

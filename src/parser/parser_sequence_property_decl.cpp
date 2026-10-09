@@ -264,7 +264,7 @@ struct PropertyPortScan {
   // depth==1 built-in type keyword: a built-in type keyword that does not
   // directly follow `local` or `input` starts a fresh formal item whose
   // qualifiers do not include `local`, so the local-variable run ends here.
-  void HandleBuiltinTypeKw(Lexer& lexer) {
+  void HandleBuiltinTypeKw(Lexer& lexer, DiagEngine& diag) {
     if (prev_kind != TokenKind::kKwLocal && prev_kind != TokenKind::kKwInput) {
       local_run = false;
     }
@@ -276,6 +276,7 @@ struct PropertyPortScan {
     // not be defaulted to $inferred_clock.
     clock_default_allowed = false;
     TokenKind kind = lexer.Peek().kind;
+    ReportChandleFormal(diag, lexer.Peek());
     carry_type = ParserPropertySpecHelpers::ParseFormalType(*parser);
     carry_type_kw =
         carry_type->packed_dim_left != nullptr ? TokenKind::kEof : kind;
@@ -363,7 +364,7 @@ struct PropertyPortScan {
       saw_local = true;
       local_run = true;
     } else if (IsBuiltinTypeKwForLocalVar(lexer.Peek().kind)) {
-      HandleBuiltinTypeKw(lexer);
+      HandleBuiltinTypeKw(lexer, diag);
     } else if (LexerCheck(lexer, TokenKind::kKwProperty)) {
       HandlePropertyTypeKw(lexer);
     } else if (LexerCheck(lexer, TokenKind::kKwSequence) ||

@@ -229,4 +229,20 @@ TEST(LocalVariableParsing, MultipleAssertionVariableDeclLinesAccumulate) {
   EXPECT_EQ(item->prop_seq_assert_vars[2], "z");
 }
 
+// §16.10 with §16.6: a local variable's type is one an assertion may use,
+// which chandle is not, in a sequence's body and in a property's (#5740).
+TEST(LocalVariableParsing, AChandleLocalVariableIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk, a;\n"
+      "  sequence s; int n; chandle h; @(posedge clk) a; endsequence\n"
+      "  property p; chandle h; @(posedge clk) a; endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  const char* kMessage =
+      "an assertion variable may not be declared of type chandle";
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 3, "16.10"));
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 4, "16.10"));
+}
+
 }  // namespace
