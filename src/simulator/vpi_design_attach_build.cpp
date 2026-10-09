@@ -85,11 +85,16 @@ int VpiTypespecKind(DataTypeKind kind) {
     case DataTypeKind::kTime:
       return vpiTimeTypespec;
     case DataTypeKind::kReal:
+    case DataTypeKind::kRealtime:
       return vpiRealTypespec;
     case DataTypeKind::kShortreal:
       return vpiShortRealTypespec;
     case DataTypeKind::kString:
       return vpiStringTypespec;
+    case DataTypeKind::kEvent:
+      return vpiEventTypespec;
+    case DataTypeKind::kChandle:
+      return vpiChandleTypespec;
     default:
       return 0;
   }

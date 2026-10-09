@@ -734,18 +734,25 @@ constexpr const char* kPairPrefix =
     "  typedef struct packed { logic [1:0] a; } one_t;\n"
     "  logic x, y; logic [1:0] z; pair_t w; one_t v;\n";
 
+// That `pattern` is an assignment pattern operation over x and then y.
+void ExpectPatternOverXThenY(vpiHandle pattern) {
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(vpi_get(vpiOpType, pattern), vpiAssignmentPatternOp);
+  std::vector<std::string> names;
+  vpiHandle it = vpi_iterate(vpiOperand, pattern);
+  ASSERT_NE(it, nullptr);
+  while (vpiHandle operand = vpi_scan(it)) {
+    names.emplace_back(vpi_get_str(vpiName, operand));
+  }
+  EXPECT_EQ(names, (std::vector<std::string>{"x", "y"}));
+}
+
 // Detail 6: a positional assignment pattern is an assignment pattern
 // operation over its expressions in the order written, one of one expression
 // as much as one of two (#5752).
 TEST_F(ExpressionsOfARun, APositionalPatternIsAnAssignmentPatternOperation) {
   Run(std::string(kPairPrefix) + "  assign w = '{x, y}; endmodule\n");
-  vpiHandle pattern = Rhs();
-  ASSERT_NE(pattern, nullptr);
-  EXPECT_EQ(vpi_get(vpiOpType, pattern), vpiAssignmentPatternOp);
-  const std::vector<vpiHandle> kOperands = OperandsOf(pattern);
-  ASSERT_EQ(kOperands.size(), 2U);
-  EXPECT_STREQ(vpi_get_str(vpiName, kOperands[0]), "x");
-  EXPECT_STREQ(vpi_get_str(vpiName, kOperands[1]), "y");
+  ExpectPatternOverXThenY(Rhs());
 }
 
 TEST_F(ExpressionsOfARun, AOneExpressionPatternIsAnAssignmentPatternOperation) {
@@ -771,6 +778,28 @@ TEST_F(ExpressionsOfARun,
   ASSERT_EQ(kOperands.size(), 2U);
   EXPECT_EQ(IntOf(kOperands[0]), 2);
   EXPECT_STREQ(vpi_get_str(vpiName, kOperands[1]), "y");
+}
+
+// Detail 6 with §10.9.2: a keyed pattern assigned to a struct is an
+// assignment pattern operation over its expressions in the struct's member
+// order, a member key's in its member's place and the default's in the rest,
+// whatever order the keys were written in (#5753).
+TEST_F(ExpressionsOfARun, AKeyedPatternTakesItsMembersOrder) {
+  Run(std::string(kPairPrefix) +
+      "  assign w = '{b: x, default: 1'b0};\n"
+      "endmodule\n");
+  vpiHandle pattern = Rhs();
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(vpi_get(vpiOpType, pattern), vpiAssignmentPatternOp);
+  const std::vector<vpiHandle> kOperands = OperandsOf(pattern);
+  ASSERT_EQ(kOperands.size(), 2U);
+  EXPECT_EQ(vpi_get(vpiType, kOperands[0]), vpiConstant);
+  EXPECT_STREQ(vpi_get_str(vpiName, kOperands[1]), "x");
+}
+
+TEST_F(ExpressionsOfARun, AKeyedPatternNamingEveryMemberTakesTheirOrder) {
+  Run(std::string(kPairPrefix) + "  assign w = '{b: y, a: x}; endmodule\n");
+  ExpectPatternOverXThenY(Rhs());
 }
 
 // A replication written as a pattern's one expression, on the pattern's line

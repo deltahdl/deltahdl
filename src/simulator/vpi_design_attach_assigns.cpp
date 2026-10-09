@@ -506,6 +506,40 @@ VpiObject* PatternObject(const Expr* expr, const AssignBuild& build) {
       build);
 }
 
+// §37.59 detail 6 with §10.9.2: the keyed assignment pattern `pattern`
+// assigned to `target` as an assignment pattern operation over its
+// expressions in the order of `target`'s members (§37.17 detail 3), a member
+// key's expression in its member's place and the default's in every place no
+// key names. Null where `target` has no members or a key names none of them,
+// a type key (#5755) or a target of another kind (#5756) among them.
+VpiObject* KeyedPatternObject(const Expr* pattern, const VpiObject* target,
+                              const AssignBuild& build) {
+  std::vector<const VpiObject*> members;
+  for (const VpiObject* child : target->children) {
+    if (child->member_of == target) members.push_back(child);
+  }
+  if (members.empty()) return nullptr;
+  std::vector<const Expr*> placed(members.size(), nullptr);
+  const Expr* fallback = nullptr;
+  for (std::size_t i = 0; i < pattern->pattern_keys.size(); ++i) {
+    const std::string_view kKey = pattern->pattern_keys[i]->text;
+    if (kKey == "default") {
+      fallback = pattern->elements[i];
+      continue;
+    }
+    const auto kAt = std::ranges::find_if(
+        members,
+        [kKey](const VpiObject* member) { return member->name == kKey; });
+    if (kAt == members.end()) return nullptr;
+    placed[static_cast<std::size_t>(kAt - members.begin())] =
+        pattern->elements[i];
+  }
+  for (const Expr*& expr : placed) {
+    if (expr == nullptr) expr = fallback;
+  }
+  return OperationObject(vpiAssignmentPatternOp, placed, build);
+}
+
 // §23.6: `expr` as the dotted name it writes, `u1.clk`, onto `out`; false
 // where it is not identifiers joined by dots alone.
 bool DottedName(const Expr* expr, std::string& out) {
@@ -711,6 +745,11 @@ void MakeContinuousAssignment(const RtlirContAssign& ca, VpiObject* scope,
   scope->children.push_back(obj);
   obj->lhs = ExpressionObject(lhs, build);
   obj->rhs = ExpressionObject(rhs, build);
+  // §37.59 detail 6: a keyed pattern is ordered by its target, here at hand.
+  if (obj->rhs == nullptr && obj->lhs != nullptr &&
+      rhs->kind == ExprKind::kAssignmentPattern) {
+    obj->rhs = KeyedPatternObject(rhs, obj->lhs, build);
+  }
 
   if (ca.delay != nullptr && build.sim != nullptr) {
     FillContAssignDelays(obj, ca, *build.sim);

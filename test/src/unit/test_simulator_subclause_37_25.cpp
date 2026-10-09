@@ -450,5 +450,26 @@ TEST_F(TypespecsOfARun, ATypedefOfAnImportedTypedefReachesIt) {
                                   Named(vpiTypedef, By("pk"), "nib_t")));
 }
 
+// §37.25: a typedef of realtime is a real typespec (§6.12), one of event an
+// event typespec and one of chandle a chandle typespec, each among the
+// module's typedefs; a property formal of the realtime one reaches it
+// (#5754).
+TEST_F(TypespecsOfARun, RealtimeEventAndChandleTypedefsAreTypespecs) {
+  Run("module top; logic clk;\n"
+      "  typedef realtime rt_t; typedef event ev_t; typedef chandle ch_t;\n"
+      "  property p(rt_t v); @(posedge clk) 1; endproperty\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  ASSERT_NE(top, nullptr);
+  EXPECT_EQ(KindsOf(vpiTypedef, top),
+            (std::vector<int>{vpiRealTypespec, vpiEventTypespec,
+                              vpiChandleTypespec}));
+  vpiHandle decl = Named(vpiPropertyDecl, top, "p");
+  ASSERT_NE(decl, nullptr);
+  vpiHandle v = vpi_handle(vpiTypespec, Named(vpiPropFormalDecl, decl, "v"));
+  ASSERT_NE(v, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, v), "rt_t");
+}
+
 }  // namespace
 }  // namespace delta
