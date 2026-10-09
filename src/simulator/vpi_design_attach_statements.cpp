@@ -451,6 +451,19 @@ int VpiBuiltStmtKind(const Stmt& stmt) {
   }
 }
 
+int VpiBareAtomicKind(StmtKind kind) {
+  switch (kind) {
+    case StmtKind::kBreak:
+      return vpiBreak;
+    case StmtKind::kContinue:
+      return vpiContinue;
+    case StmtKind::kNull:
+      return vpiNullStmt;
+    default:
+      return 0;
+  }
+}
+
 void VpiFillStmt(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
   switch (stmt.kind) {
     case StmtKind::kBlockingAssign:

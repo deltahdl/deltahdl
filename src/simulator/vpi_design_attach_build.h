@@ -22,6 +22,7 @@ struct ClassDecl;
 struct DataType;
 struct EventExpr;
 enum class DataTypeKind : uint8_t;
+enum class StmtKind : uint8_t;
 struct Expr;
 struct ModuleItem;
 struct PackageDecl;
@@ -360,6 +361,10 @@ struct VpiStmtBuild {
 // one, or a concurrent one embedded in procedural code (§37.50), or an expect
 // statement (§37.73); 0 for a statement of another kind.
 int VpiBuiltStmtKind(const Stmt& stmt);
+
+// §37.60: the kind of an atomic statement of `kind` that carries nothing but
+// its label, a break, a continue or a null statement; 0 for another kind.
+int VpiBareAtomicKind(StmtKind kind);
 
 // §37.65 with §9.4.2: the condition an event control written over `events` is
 // written over, the events joined by event or operations; null where an event

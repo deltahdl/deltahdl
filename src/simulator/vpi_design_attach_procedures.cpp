@@ -127,21 +127,6 @@ VpiObject* MakeEventStatement(const Stmt& stmt, const BlockParent& parent,
   return obj;
 }
 
-// §37.60: the kind of an atomic statement that carries nothing but its label,
-// 0 for a statement of another kind.
-int BareAtomicKind(StmtKind kind) {
-  switch (kind) {
-    case StmtKind::kBreak:
-      return vpiBreak;
-    case StmtKind::kContinue:
-      return vpiContinue;
-    case StmtKind::kNull:
-      return vpiNullStmt;
-    default:
-      return 0;
-  }
-}
-
 // §37.42: what a call statement stands as. `type` is the kind of tf call, zero
 // for a statement that calls nothing the walk resolves; `name` is the
 // subroutine it calls; `prefix` is the object a method is applied to (detail
@@ -777,7 +762,7 @@ VpiObject* WalkStmtItself(const Stmt& stmt, const BlockParent& parent,
       stmt.kind == StmtKind::kNbEventTrigger) {
     return MakeEventStatement(stmt, parent, walk);
   }
-  const int kAtomic = BareAtomicKind(stmt.kind);
+  const int kAtomic = VpiBareAtomicKind(stmt.kind);
   if (kAtomic != 0) return MakeAtomicStatement(stmt, kAtomic, parent, walk);
   VpiObject* call = MakeCallStatement(stmt, parent, walk);
   if (call != nullptr) return call;
@@ -873,14 +858,9 @@ void AttachScopedItems(VpiObject* instance, const BodyWalk& instance_walk,
   }
 }
 
-// The properties one instance declares and the assertions it writes as
-// items, each in the generate block instance writing it, and the procedures
-// it declares with the objects their bodies hold, walked with
-// `instance_walk`, whose process each procedure's own replaces. A property
-// is built ahead of the assertions instantiating it (§37.51). An assertion
-// the elaborator carries as a process is no procedure the source wrote, a
-// concurrent one being the item's (§37.50).
-void AttachInstanceProcedures(VpiObject* instance,
+// The properties one instance declares, each in the generate block instance
+// writing it, walked with `instance_walk`.
+void AttachInstanceProperties(VpiObject* instance,
                               const BodyWalk& instance_walk) {
   AttachScopedItems(
       instance, instance_walk, instance_walk.mod.declared_properties,
@@ -892,6 +872,15 @@ void AttachInstanceProcedures(VpiObject* instance,
             {scope, calls.unit_typespecs, calls.ctx, instance_walk.mod.imports},
             with);
       });
+}
+
+// The assertions one instance writes as items, each in the generate block
+// instance writing it, and the procedures it declares with the objects their
+// bodies hold, walked with `instance_walk`, whose process each procedure's
+// own replaces. An assertion the elaborator carries as a process is no
+// procedure the source wrote, a concurrent one being the item's (§37.50).
+void AttachInstanceProcedures(VpiObject* instance,
+                              const BodyWalk& instance_walk) {
   AttachScopedItems(
       instance, instance_walk, instance_walk.mod.assertions,
       [&instance_walk](const RtlirAssertion& assertion, VpiObject* scope,
@@ -931,16 +920,22 @@ void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,
     return;
   }
   // The first top carries the empty prefix and is keyed under its own name.
+  // §37.51: every instance's properties are built ahead of every assertion,
+  // which may instantiate one through an instance below its own (§23.6).
   const std::string kFirstTop(design->top_modules.front()->name);
-  WalkInstancePaths(
-      design, [&](const RtlirModule* mod, const std::string& prefix) {
-        VpiObject* instance =
-            FindObjectForFlatName(objects, prefix.empty() ? kFirstTop : prefix);
-        if (instance != nullptr) {
-          AttachInstanceProcedures(
-              instance, BodyWalk{*design, *mod, objects, prefix, calls, build});
-        }
-      });
+  const auto kWalk = [&](void (*attach)(VpiObject*, const BodyWalk&)) {
+    WalkInstancePaths(
+        design, [&](const RtlirModule* mod, const std::string& prefix) {
+          VpiObject* instance = FindObjectForFlatName(
+              objects, prefix.empty() ? kFirstTop : prefix);
+          if (instance != nullptr) {
+            attach(instance,
+                   BodyWalk{*design, *mod, objects, prefix, calls, build});
+          }
+        });
+  };
+  kWalk(AttachInstanceProperties);
+  kWalk(AttachInstanceProcedures);
 }
 
 }  // namespace delta

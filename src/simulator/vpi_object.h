@@ -892,11 +892,11 @@ struct VpiObject {
   // that is not an indexed select.
   std::vector<VpiObject*> index_expressions;
 
-  // §37.23 detail 2: for a nettype declaration (type vpiNettypeDecl) that is an
-  // alias of another nettype declaration, the aliased nettype it stands for.
-  // Reached through vpiNetTypedefAlias, which must report a non-null handle to
-  // that nettype. Null for a nettype that is not an alias.
-  VpiObject* nettype_alias = nullptr;
+  // §37.23 detail 2 and §37.25 detail 1: for a nettype declaration or a
+  // typespec whose declaration aliases another, the one it stands for, reached
+  // through vpiNetTypedefAlias from the nettype and vpiTypedefAlias from the
+  // typespec. Null for one that aliases nothing.
+  VpiObject* aliased = nullptr;
 
   // §37.23 detail 1: for a nettype declaration (type vpiNettypeDecl), the
   // resolution function associated with it, reached through vpiWith. A nettype

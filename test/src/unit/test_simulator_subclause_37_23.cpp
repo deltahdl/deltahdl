@@ -63,7 +63,7 @@ TEST(NettypeDeclarationModel, NetTypedefAliasReachesAliasedNettype) {
 
   VpiObject alias;
   alias.type = vpiNettypeDecl;
-  alias.nettype_alias = &base;
+  alias.aliased = &base;
 
   VpiHandle aliased = ctx.Handle(vpiNetTypedefAlias, &alias);
   EXPECT_NE(aliased, nullptr);

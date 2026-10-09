@@ -791,10 +791,15 @@ VpiHandle ResolveModPathOwningModule(VpiHandle ref) {
   return nullptr;
 }
 
-// §37.23: a nettype declaration's alias and resolution (with) function.
+// §37.23: a nettype declaration's alias and resolution (with) function, and
+// §37.25 detail 1: the typedef a typespec's typedef aliases.
 bool TryResolveNettypeRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type == vpiNetTypedefAlias && ref->type == vpiNettypeDecl) {
-    out = ref->nettype_alias;
+    out = ref->aliased;
+    return true;
+  }
+  if (type == vpiTypedefAlias && VpiIsTypespecType(ref->type)) {
+    out = VpiTypespecTypedefAlias(ref->aliased != nullptr, ref->aliased);
     return true;
   }
   if (type == vpiWith && ref->type == vpiNettypeDecl) {

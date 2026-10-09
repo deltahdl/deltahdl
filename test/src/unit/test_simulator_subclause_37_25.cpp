@@ -4,6 +4,7 @@
 
 #include "elaborator/rtlir.h"
 #include "fixture_simulator.h"
+#include "fixture_vpi_run.h"
 #include "helpers_vpi_two_fixed_unpacked_dims.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
@@ -383,6 +384,35 @@ TEST(TypespecModel, AttachToleratesAnEnumWithoutConstantsAndAnUnbuiltVariable) {
   EXPECT_EQ(vpi_scan(it), nullptr);
   EXPECT_EQ(vpi_handle_by_name(VpiText("m.unbuilt"), nullptr), nullptr);
   SetGlobalVpiContext(nullptr);
+}
+
+// A design run with a PLI application registered, its VPI model read back
+// once the run is over.
+class TypespecsOfARun : public VpiDesignRun {};
+
+// Detail 1: a typedef of another typedef is a typespec of the aliased one's
+// kind, reaching it through vpiTypedefAlias, whether the typedef it aliases
+// is the module's or the compilation unit's; a typedef of a type of its own
+// aliases none (#5748).
+TEST_F(TypespecsOfARun, ATypedefOfATypedefReachesItThroughTypedefAlias) {
+  Run("typedef int word_t;\n"
+      "module top; typedef logic [3:0] nib_t; typedef nib_t half_t;\n"
+      "  typedef word_t whole_t; endmodule\n");
+  vpiHandle top = By("top");
+  ASSERT_NE(top, nullptr);
+  vpiHandle nib = Named(vpiTypedef, top, "nib_t");
+  vpiHandle half = Named(vpiTypedef, top, "half_t");
+  ASSERT_NE(nib, nullptr);
+  ASSERT_NE(half, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, half), vpiLogicTypespec);
+  EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiTypedefAlias, half), nib));
+  EXPECT_EQ(vpi_handle(vpiTypedefAlias, nib), nullptr);
+  vpiHandle whole = Named(vpiTypedef, top, "whole_t");
+  ASSERT_NE(whole, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, whole), vpiIntTypespec);
+  vpiHandle word = vpi_handle(vpiTypedefAlias, whole);
+  ASSERT_NE(word, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, word), "word_t");
 }
 
 }  // namespace

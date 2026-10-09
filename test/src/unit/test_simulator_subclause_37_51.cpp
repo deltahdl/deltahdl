@@ -234,6 +234,20 @@ class PropertyDeclsOfARun : public VpiDesignRun {
     return reached == nullptr ? "" : vpi_get_str(vpiName, reached);
   }
 
+  // The arguments the property inst of `top`'s assertion `assertion`
+  // reaches, in the order reached; none where it reaches no property inst.
+  static std::vector<vpiHandle> ArgumentsOf(const char* assertion) {
+    std::vector<vpiHandle> arguments;
+    vpiHandle a = Named(vpiAssertion, By("top"), assertion);
+    vpiHandle inst = a == nullptr ? nullptr : vpi_handle(vpiProperty, a);
+    vpiHandle it = inst == nullptr ? nullptr : vpi_iterate(vpiArgument, inst);
+    if (it == nullptr) return arguments;
+    for (vpiHandle h = vpi_scan(it); h != nullptr; h = vpi_scan(it)) {
+      arguments.push_back(h);
+    }
+    return arguments;
+  }
+
   // The names of the objects of `relation` `ref` reaches, in the order
   // reached.
   static std::vector<std::string> NamesOf(int relation, vpiHandle ref) {
@@ -425,6 +439,26 @@ TEST_F(PropertyDeclsOfARun, AClockingBlockReachesThePropertyItDeclares) {
   EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiPropertyDecl, inst), decl));
 }
 
+// A property an interface declares is instantiated through an instance of the
+// interface, `i0.p` (§16.12 with §23.6), and the property inst reaches the
+// property decl of that instance, which is built though the module writing
+// the assertion is walked first (#5741).
+TEST_F(PropertyDeclsOfARun, AnInstThroughAnInterfaceReachesItsProperty) {
+  Run("interface ifc(input logic clk); logic a;\n"
+      "  property p; @(posedge clk) a; endproperty\n"
+      "endinterface\n"
+      "module top; logic clk; ifc i0(clk);\n"
+      "  a1: assert property (i0.p);\n"
+      "endmodule\n");
+  vpiHandle decl = Named(vpiPropertyDecl, By("top.i0"), "p");
+  ASSERT_NE(decl, nullptr);
+  vpiHandle a1 = Named(vpiAssertion, By("top"), "a1");
+  ASSERT_NE(a1, nullptr);
+  vpiHandle inst = vpi_handle(vpiProperty, a1);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiPropertyDecl, inst), decl));
+}
+
 // A formal of a packed type reaches a typespec of its keyword with the range
 // it was written with, and one of a user-defined type the typespec of the
 // typedef naming it, the module's or the compilation unit's (detail 3,
@@ -464,20 +498,25 @@ TEST_F(PropertyDeclsOfARun, ADollarActualIsTheUnboundedConstant) {
       "  property p(x = b, y); @(posedge clk) x; endproperty\n"
       "  a1: assert property (p(, $));\n"
       "endmodule\n");
-  vpiHandle a1 = Named(vpiAssertion, By("top"), "a1");
-  ASSERT_NE(a1, nullptr);
-  vpiHandle inst = vpi_handle(vpiProperty, a1);
-  ASSERT_NE(inst, nullptr);
-  std::vector<vpiHandle> arguments;
-  vpiHandle it = vpi_iterate(vpiArgument, inst);
-  ASSERT_NE(it, nullptr);
-  for (vpiHandle h = vpi_scan(it); h != nullptr; h = vpi_scan(it)) {
-    arguments.push_back(h);
-  }
-  ASSERT_EQ(arguments.size(), 2U);
-  EXPECT_STREQ(vpi_get_str(vpiName, arguments[0]), "b");
-  EXPECT_EQ(vpi_get(vpiType, arguments[1]), vpiConstant);
-  EXPECT_EQ(vpi_get(vpiConstType, arguments[1]), vpiUnboundedConst);
+  const std::vector<vpiHandle> kArguments = ArgumentsOf("a1");
+  ASSERT_EQ(kArguments.size(), 2U);
+  EXPECT_STREQ(vpi_get_str(vpiName, kArguments[0]), "b");
+  EXPECT_EQ(vpi_get(vpiType, kArguments[1]), vpiConstant);
+  EXPECT_EQ(vpi_get(vpiConstType, kArguments[1]), vpiUnboundedConst);
+}
+
+// A sequence an actual writes (§16.12) is the argument the property expr of
+// that sequence stands as, in its formal's place, ahead of the argument of
+// the formal after it (detail 2) (#5749).
+TEST_F(PropertyDeclsOfARun, ASequenceActualIsItsPropertyExpr) {
+  Run("module top; logic clk, a, b, c;\n"
+      "  property p(s, x); @(posedge clk) s |-> x; endproperty\n"
+      "  a1: assert property (p(a ##1 b, c));\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kArguments = ArgumentsOf("a1");
+  ASSERT_EQ(kArguments.size(), 2U);
+  EXPECT_EQ(vpi_get(vpiType, kArguments[0]), vpiOperation);
+  EXPECT_STREQ(vpi_get_str(vpiName, kArguments[1]), "c");
 }
 
 // A formal of a typedef a package declares, made visible by an import
@@ -497,6 +536,20 @@ TEST_F(PropertyDeclsOfARun, AFormalOfAnImportedTypedefReachesItsTypespec) {
   vpiHandle v = vpi_handle(vpiTypespec, Named(vpiPropFormalDecl, decl, "v"));
   ASSERT_NE(v, nullptr);
   EXPECT_TRUE(vpi_compare_objects(v, Named(vpiTypedef, By("pk"), "nib_t")));
+}
+
+// A formal of a typedef of another typedef reaches the typespec of the one it
+// names, which aliases the other (detail 3, §37.25 detail 1) (#5748).
+TEST_F(PropertyDeclsOfARun, AFormalOfAnAliasTypedefReachesItsTypespec) {
+  Run("module top; logic clk;\n"
+      "  typedef logic [3:0] nib_t; typedef nib_t half_t;\n"
+      "  property p(half_t v); @(posedge clk) v[0]; endproperty\n"
+      "endmodule\n");
+  vpiHandle decl = Named(vpiPropertyDecl, By("top"), "p");
+  ASSERT_NE(decl, nullptr);
+  vpiHandle v = vpi_handle(vpiTypespec, Named(vpiPropFormalDecl, decl, "v"));
+  ASSERT_NE(v, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, v), "half_t");
 }
 
 // §37.51 details 3 and 4: a formal's typespec is its typespec child, found

@@ -177,18 +177,27 @@ VpiObject* ChildOfType(const VpiObject* scope, int type,
   return nullptr;
 }
 
+// The scope among the children of `scope` that the prefix `prefix` of a
+// property's name names: a clocking block, `cb.p` (§16.16 (b)), or an
+// interface instance, `i0.p` (§16.12 with §23.6); null where it names
+// neither.
+VpiObject* PropertyHolderNamed(const VpiObject* scope,
+                               std::string_view prefix) {
+  VpiObject* block = ChildOfType(scope, vpiClockingBlock, prefix);
+  return block != nullptr ? block : ChildOfType(scope, vpiInterface, prefix);
+}
+
 // §37.51: the property decl named `name` the scope standing around `holder`
 // declares, the nearest from a generate block instance out to the instance;
-// null where none was built. §16.16 (b): a name written through a clocking
-// block, `cb.p`, is the property that block declares.
+// null where none was built. A name written through a clocking block or an
+// interface instance is the property that block or instance declares.
 VpiObject* PropertyDeclAround(const VpiObject* holder, std::string_view name) {
   const size_t kDot = name.find('.');
   for (VpiObject* scope = holder->parent; scope != nullptr;
        scope = scope->parent) {
-    VpiObject* found =
-        kDot == std::string_view::npos
-            ? ChildOfType(scope, vpiPropertyDecl, name)
-            : ChildOfType(scope, vpiClockingBlock, name.substr(0, kDot));
+    VpiObject* found = kDot == std::string_view::npos
+                           ? ChildOfType(scope, vpiPropertyDecl, name)
+                           : PropertyHolderNamed(scope, name.substr(0, kDot));
     if (found != nullptr && kDot != std::string_view::npos) {
       return ChildOfType(found, vpiPropertyDecl, name.substr(kDot + 1));
     }
@@ -199,9 +208,14 @@ VpiObject* PropertyDeclAround(const VpiObject* holder, std::string_view name) {
 }
 
 // §37.51 detail 2: the argument the actual `actual` of a property inst
-// stands as, null for one the instance leaves out. §37.59 detail 4: the
-// terminal `$`, which §16.8 admits as an actual, is the unbounded constant.
+// stands as, null for one the instance leaves out. A sequence or property
+// the actual writes (§16.12) is the property expr of the tree the parser
+// carries it as (§37.52), and §37.59 detail 4 makes the terminal `$`, which
+// §16.8 admits as an actual, the unbounded constant.
 VpiObject* ActualArgument(const Expr* actual, const VpiStmtBuild& with) {
+  if (actual != nullptr && actual->property_actual != nullptr) {
+    return VpiPropertyExprObject(actual->property_actual, with, nullptr);
+  }
   if (actual == nullptr || actual->text != "$") return with.expression(actual);
   VpiObject* dollar = with.build.alloc();
   dollar->type = vpiConstant;
