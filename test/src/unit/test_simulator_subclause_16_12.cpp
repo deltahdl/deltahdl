@@ -202,6 +202,27 @@ TEST(PropertyEvaluation, APackagePropertyIsInstantiatedByImportAndByScope) {
   EXPECT_EQ(out, "9 1 9 1 9 1\n");
 }
 
+// §16.12 with §26.3: an assertion whose whole property spec is an instance,
+// by its bare name, of a clocked property a wildcard import makes visible is
+// that property's assertion. a is high at the rises of 15 and 45 alone, so
+// the two attempts there hold and the other eight fail.
+TEST(PropertyEvaluation, ABareInstanceOfAnImportedPropertyIsTheAssertion) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "package pk; property p(c, x); @(posedge c) x; endproperty\n"
+      "endpackage\n"
+      "module t; import pk::*;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  bit [0:9] av = 10'b0100100000; bit a; assign a = av[0];\n"
+      "  always @(negedge clk) av <= av << 1;\n"
+      "  int p = 0, f = 0;\n"
+      "  a1: assert property (p(clk, a)) p++; else f++;\n"
+      "  initial #98 $display(\"p=%0d f=%0d\", p, f);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "p=2 f=8\n");
+}
+
 // Asserts `pk::<inst>` on posedge clk from a module that does not import pk,
 // whose declarations are `pkg`, with a high at the rises of 15 and 45 and b
 // at 25 alone, and prints the passes and the failures.
