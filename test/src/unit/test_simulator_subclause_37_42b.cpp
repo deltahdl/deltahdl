@@ -455,6 +455,7 @@ TEST_F(CallStatementsInAScope, ACallThroughAnExpressionReachesItsMethod) {
     prefixed.push_back(vpi_handle(vpiPrefix, stmt) != nullptr);
     reached.push_back(VpiObjectOf(vpi_handle(vpiTask, stmt)));
   }
+  // Whether each call, in the order written, reaches a prefix.
   EXPECT_EQ(prefixed, (std::vector<bool>{true, true, true, true}));
   EXPECT_EQ(reached,
             (std::vector<VpiObject*>{VpiObjectOf(b_run), VpiObjectOf(b_run),

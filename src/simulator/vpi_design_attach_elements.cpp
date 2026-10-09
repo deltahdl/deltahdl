@@ -32,6 +32,9 @@ struct ArrayAttach {
   const VpiObject& array;
   const VpiObjectMap& objects;
   const VpiAttachBuild& build;
+  // The kind each element stands as where the array's declaration says it,
+  // zero to leave the kind the run's object for the element has.
+  int element_type = 0;
 };
 
 // The indices of one dimension in the order it declares them, left first.
@@ -74,7 +77,9 @@ void AttachLevel(const ArrayLevel& level, std::size_t depth,
     const std::string kKey = level.key + kSuffix;
     if (kInnermost) {
       VpiObject* element = FindObjectForFlatName(attach.objects, kKey);
-      if (element != nullptr) Adopt(element, level, index, attach.build);
+      if (element == nullptr) continue;
+      Adopt(element, level, index, attach.build);
+      if (attach.element_type != 0) element->type = attach.element_type;
       continue;
     }
     VpiObject* subarray = attach.build.alloc();
@@ -116,8 +121,9 @@ bool HasFixedElements(const RtlirVariable& var) {
 // one unpacked dimension of `dims` at a time.
 void AttachArray(VpiObject& array, const std::string& key,
                  const std::vector<RtlirUnpackedDim>& dims,
-                 const VpiObjectMap& objects, const VpiAttachBuild& build) {
-  const ArrayAttach kAttach{dims, array, objects, build};
+                 const VpiObjectMap& objects, const VpiAttachBuild& build,
+                 int element_type = 0) {
+  const ArrayAttach kAttach{dims, array, objects, build, element_type};
   AttachLevel({&array, key, {}}, 0, kAttach);
   RecordDimensionIndices(array, dims);
 }
@@ -166,7 +172,10 @@ void AttachArrayElements(const RtlirDesign* design, const VpiObjectMap& objects,
           const std::string kKey = VpiFlatName(prefix, var.name);
           VpiObject* array = FindObjectForFlatName(objects, kKey);
           if (array == nullptr) continue;
-          AttachArray(*array, kKey, var.unpacked_dims, objects, build);
+          // §37.17 with §37.33: an element of an array of class handles is a
+          // class var, which the run made a reg like every element.
+          AttachArray(*array, kKey, var.unpacked_dims, objects, build,
+                      var.class_type_name.empty() ? 0 : vpiClassVar);
         }
         for (const RtlirNet& net : VpiDeclaredNets(*mod)) {
           AttachNetArray(net, prefix, objects, build);
