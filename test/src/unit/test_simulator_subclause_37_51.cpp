@@ -534,6 +534,24 @@ TEST_F(PropertyDeclsOfARun, ASequenceActualIsItsPropertyExpr) {
   EXPECT_STREQ(vpi_get_str(vpiName, kArguments[1]), "c");
 }
 
+// An import the compilation unit writes makes a package's property visible in
+// the unit's modules too (§3.12.1, §26.3), and an instance of it reaches the
+// package's property decl (#5763).
+TEST_F(PropertyDeclsOfARun, AnInstThroughAUnitImportReachesItsProperty) {
+  Run("package pk; property p(c, x); @(posedge c) x; endproperty\n"
+      "endpackage\n"
+      "import pk::*;\n"
+      "module top; logic clk, a;\n"
+      "  a1: assert property (p(clk, a));\n"
+      "endmodule\n");
+  vpiHandle a1 = Named(vpiAssertion, By("top"), "a1");
+  ASSERT_NE(a1, nullptr);
+  EXPECT_STREQ(
+      vpi_get_str(vpiFullName,
+                  vpi_handle(vpiPropertyDecl, vpi_handle(vpiProperty, a1))),
+      "pk::p");
+}
+
 // A formal of a typedef a package declares, made visible by an import
 // (§26.3), reaches the package's typespec for it (detail 3), past a wildcard
 // import of a package declaring no such typedef and an import of another of
@@ -611,6 +629,28 @@ TEST_F(PropertyDeclsOfARun, AnActualOfATypedFormalIsBuiltAgainstItsTypespec) {
   EXPECT_STREQ(vpi_get_str(vpiName, first), "x");
 }
 
+// A keyed pattern passed for a formal of a struct type is the assignment
+// pattern operation the formal's typespec orders, its typespec members giving
+// the places (§37.59 detail 6, §37.26) (#5760).
+TEST_F(PropertyDeclsOfARun, AKeyedPatternActualTakesItsFormalsOrder) {
+  Run("module top; logic clk, x;\n"
+      "  typedef struct packed { logic a, b; } pair_t;\n"
+      "  property p(pair_t s); @(posedge clk) 1; endproperty\n"
+      "  a1: assert property (p('{b: x, default: 1'b0}));\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kArguments = ArgumentsOf("a1");
+  ASSERT_EQ(kArguments.size(), 1U);
+  EXPECT_EQ(vpi_get(vpiOpType, kArguments[0]), vpiAssignmentPatternOp);
+  vpiHandle it = vpi_iterate(vpiOperand, kArguments[0]);
+  ASSERT_NE(it, nullptr);
+  vpiHandle first = vpi_scan(it);
+  ASSERT_NE(first, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, first), vpiConstant);
+  vpiHandle second = vpi_scan(it);
+  ASSERT_NE(second, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, second), "x");
+}
+
 // A property with no clock of its own, instantiated by an assertion the
 // module's default clocking clocks (§14.12), reaches the module's property
 // decl.
@@ -644,12 +684,13 @@ TEST_F(PropertyDeclsOfARun, AnInstOfAWildcardImportedPropertyReachesIt) {
 }
 
 // ...past a wildcard import of a package declaring no such property and an
-// import of another of the package's properties (#5750).
+// import of another of the package's properties, and whatever import follows
+// (#5750).
 TEST_F(PropertyDeclsOfARun, AnInstOfAnImportedPropertyPassesOtherImports) {
   Run("package pk; property p(c, x); @(posedge c) x; endproperty\n"
       "  property r(c); @(posedge c) 1; endproperty endpackage\n"
       "package qk; property q(c); @(posedge c) 1; endproperty endpackage\n"
-      "module top; import qk::*; import pk::r; import pk::p;\n"
+      "module top; import qk::*; import pk::r; import pk::p; import qk::q;\n"
       "  logic clk, a;\n"
       "  a1: assert property (p(clk, a));\n"
       "endmodule\n");

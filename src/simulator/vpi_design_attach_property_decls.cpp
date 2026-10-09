@@ -292,16 +292,20 @@ VpiObject* VpiMakePropertyInst(VpiObject* holder, const Expr& instance,
 VpiObject* VpiImportedPropertyDecl(std::string_view name,
                                    const std::vector<RtlirImport>& imports,
                                    const VpiObjectMap& objects) {
+  // The first import naming it, the module's own or, ahead of them, the
+  // compilation unit's (§3.12.1), gives the property. §26.7: the std package
+  // every scope imports has no object of its own.
+  VpiObject* found = nullptr;
   for (const RtlirImport& imported : imports) {
-    if (!imported.is_wildcard && imported.item_name != name) continue;
-    // §26.7: the std package every scope imports has no object of its own.
+    if (found != nullptr ||
+        (!imported.is_wildcard && imported.item_name != name)) {
+      continue;
+    }
     const VpiObject* pkg =
         FindObjectForFlatName(objects, imported.package_name);
-    VpiObject* decl =
-        pkg != nullptr ? ChildOfType(pkg, vpiPropertyDecl, name) : nullptr;
-    if (decl != nullptr) return decl;
+    found = pkg != nullptr ? ChildOfType(pkg, vpiPropertyDecl, name) : nullptr;
   }
-  return nullptr;
+  return found;
 }
 
 void AttachPackagePropertyDecls(const RtlirDesign& design,
