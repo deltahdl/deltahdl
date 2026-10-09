@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -261,6 +262,27 @@ class PropertyDeclsOfARun : public VpiDesignRun {
       arguments.push_back(h);
     }
     return arguments;
+  }
+
+  // A module `top` declaring a property p of an event formal e and an untyped
+  // formal x, clocked on e, instantiated by the assertions a1, a2 and so on,
+  // whose property specs are `specs` in that order.
+  static std::string EventActualsSource(const std::vector<std::string>& specs) {
+    std::string src =
+        "module top; logic clk, a;\n"
+        "  property p(event e, x); @(e) x; endproperty\n";
+    for (size_t i = 0; i < specs.size(); ++i) {
+      src += "  a" + std::to_string(i + 1) + ": assert property (" + specs[i] +
+             ");\n";
+    }
+    return src + "endmodule\n";
+  }
+
+  // The operator of the first argument the property inst of `top`'s
+  // assertion `assertion` reaches, 0 where it reaches other than two.
+  static int FirstArgumentOp(const char* assertion) {
+    const std::vector<vpiHandle> kArguments = ArgumentsOf(assertion);
+    return kArguments.size() == 2 ? vpi_get(vpiOpType, kArguments[0]) : 0;
   }
 
   // The names of the objects of `relation` `ref` reaches, in the order
@@ -683,6 +705,41 @@ TEST_F(PropertyDeclsOfARun, AnIffEventActualIsAnIffOperation) {
   const std::vector<vpiHandle> kArguments = ArgumentsOf("a1");
   ASSERT_EQ(kArguments.size(), 2U);
   EXPECT_EQ(vpi_get(vpiOpType, kArguments[0]), vpiIffOp);
+}
+
+// Instances of one property with an event formal, by assertions of one
+// module, each reach the operation of their own event actual: an edge and an
+// or (#5765)...
+TEST_F(PropertyDeclsOfARun, AnEdgeAndAnOrEventActualOfOneProperty) {
+  Run(EventActualsSource(
+      {"p(posedge clk, a)", "p(negedge clk or posedge clk, a)"}));
+  EXPECT_EQ(FirstArgumentOp("a1"), vpiPosedgeOp);
+  EXPECT_EQ(FirstArgumentOp("a2"), vpiEventOrOp);
+}
+
+// ...an or and an iff...
+TEST_F(PropertyDeclsOfARun, AnOrAndAnIffEventActualOfOneProperty) {
+  Run(EventActualsSource(
+      {"p(negedge clk or posedge clk, a)", "p(posedge clk iff a, a)"}));
+  EXPECT_EQ(FirstArgumentOp("a1"), vpiEventOrOp);
+  EXPECT_EQ(FirstArgumentOp("a2"), vpiIffOp);
+}
+
+// ...an edge and an iff...
+TEST_F(PropertyDeclsOfARun, AnEdgeAndAnIffEventActualOfOneProperty) {
+  Run(EventActualsSource({"p(posedge clk, a)", "p(posedge clk iff a, a)"}));
+  EXPECT_EQ(FirstArgumentOp("a1"), vpiPosedgeOp);
+  EXPECT_EQ(FirstArgumentOp("a2"), vpiIffOp);
+}
+
+// ...and all three (#5765).
+TEST_F(PropertyDeclsOfARun, AnEdgeAnOrAndAnIffEventActualOfOneProperty) {
+  Run(EventActualsSource({"p(posedge clk, a)",
+                          "p(negedge clk or posedge clk, a)",
+                          "p(posedge clk iff a, a)"}));
+  EXPECT_EQ(FirstArgumentOp("a1"), vpiPosedgeOp);
+  EXPECT_EQ(FirstArgumentOp("a2"), vpiEventOrOp);
+  EXPECT_EQ(FirstArgumentOp("a3"), vpiIffOp);
 }
 
 // The edge keyword's event, which Annex K and Annex M give no operation, as

@@ -104,6 +104,22 @@ TEST(TypedPropertyFormals, AnOrOrIffEventActualIsTheWrittenClock) {
             CountsOfTyped("@(posedge clk iff go) v == 2 |-> w"));
 }
 
+// §16.12.18: one property with an event formal, instantiated by three
+// assertions with an edge, an or and an iff actual, runs with no VPI model
+// built (#5765).
+TEST(TypedPropertyFormals, ThreeEventActualsOfOnePropertyRun) {
+  SimFixture f;
+  Variable* a = RunAndFindVar(
+      "module top; logic clk, a;\n"
+      "  property p(event e, x); @(e) x; endproperty\n"
+      "  a1: assert property (p(posedge clk, a));\n"
+      "  a2: assert property (p(negedge clk or posedge clk, a));\n"
+      "  a3: assert property (p(posedge clk iff a, a));\n"
+      "endmodule\n",
+      f, "a");
+  EXPECT_NE(a, nullptr);
+}
+
 // §16.12.18: a boolean may be passed to a formal of type property, being a
 // property_expr: go |-> b fails at 1 and 5.
 TEST(TypedPropertyFormals, ABooleanMayBePassedToAPropertyFormal) {
