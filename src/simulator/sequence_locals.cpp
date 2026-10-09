@@ -10,6 +10,8 @@
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
+#include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -38,8 +40,12 @@ uint32_t LocalWidth(TokenKind type_kw) {
 }
 
 uint32_t LocalWidth(const SeqLocalDecl& decl, SimContext& ctx, Arena& arena) {
-  if (decl.packed_dims.empty()) return LocalWidth(decl.type_kw);
   uint32_t width = 1;
+  if (decl.named_type.kind == DataTypeKind::kNamed) {
+    width = DeclaredTypeWidth(decl.named_type, ctx);
+  } else if (decl.packed_dims.empty()) {
+    return LocalWidth(decl.type_kw);
+  }
   for (const auto& [left, right] : decl.packed_dims) {
     const int64_t kLeft = SelectBoundValue(EvalExpr(left, ctx, arena));
     const int64_t kRight = SelectBoundValue(EvalExpr(right, ctx, arena));
@@ -59,9 +65,19 @@ bool LocalIsSigned(TokenKind type_kw) {
   return LocalWidth(type_kw) > 1 && type_kw != TokenKind::kKwTime;
 }
 
-bool LocalIsSigned(const SeqLocalDecl& decl) {
-  if (decl.signing == TokenKind::kEof) return LocalIsSigned(decl.type_kw);
-  return decl.signing == TokenKind::kKwSigned;
+bool LocalIs4State(const SeqLocalDecl& decl, const SimContext& ctx) {
+  return decl.named_type.kind == DataTypeKind::kNamed
+             ? DeclaredTypeIs4State(decl.named_type, ctx)
+             : LocalIs4State(decl.type_kw);
+}
+
+bool LocalIsSigned(const SeqLocalDecl& decl, const SimContext& ctx) {
+  if (decl.signing != TokenKind::kEof) {
+    return decl.signing == TokenKind::kKwSigned;
+  }
+  return decl.named_type.kind == DataTypeKind::kNamed
+             ? DeclaredTypeIsSigned(decl.named_type, ctx)
+             : LocalIsSigned(decl.type_kw);
 }
 
 // §16.10: the initialization assignments are performed in the order the
@@ -80,12 +96,12 @@ std::vector<Logic4Vec> InitialLocals(const std::vector<SeqLocalDecl>& decls,
     if (decl.init != nullptr) {
       value = ResizeToWidth(OwnRhsWords(EvalExpr(decl.init, ctx, arena), arena),
                             kWidth, arena);
-    } else if (LocalIs4State(decl.type_kw)) {
+    } else if (LocalIs4State(decl, ctx)) {
       FillWithX(value);
     }
     Variable* var = ctx.CreateLocalVariable(decl.name, value.width);
-    var->is_4state = LocalIs4State(decl.type_kw);
-    var->is_signed = LocalIsSigned(decl);
+    var->is_4state = LocalIs4State(decl, ctx);
+    var->is_signed = LocalIsSigned(decl, ctx);
     var->value = value;
     values.push_back(value);
   }

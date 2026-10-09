@@ -370,6 +370,9 @@ struct SeqLocalDecl {
   std::string_view name;
   TokenKind type_kw = TokenKind::kKwInt;
   TokenKind signing = TokenKind::kEof;
+  // §6.18: the type name written in the keyword's place, `nib_t` of `nib_t
+  // v`, as a type of kind kNamed; kImplicit where a keyword is written.
+  DataType named_type;
   std::vector<std::pair<Expr*, Expr*>> packed_dims;
   Expr* init = nullptr;
 };

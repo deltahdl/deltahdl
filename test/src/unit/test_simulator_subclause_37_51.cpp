@@ -470,6 +470,20 @@ TEST_F(PropertyDeclsOfARun, APropertyReachesAPackedLocalVariableAndItsSpec) {
   EXPECT_EQ(NameReached(vpiPropertyExpr, spec), "a");
 }
 
+// A property's local declared with a type name, `nib_t v` (§16.10 with
+// §6.18), is a variable of the kind the name stands for, a logic var for a
+// `logic [3:0]`, and the property reaches its spec (#5767).
+TEST_F(PropertyDeclsOfARun, APropertyReachesALocalOfATypeName) {
+  Run("module top; logic clk, a;\n"
+      "  typedef logic [3:0] nib_t;\n"
+      "  property p; nib_t v; @(posedge clk) a; endproperty\n"
+      "endmodule\n");
+  vpiHandle decl = Named(vpiPropertyDecl, By("top"), "p");
+  ASSERT_NE(decl, nullptr);
+  EXPECT_EQ(KindsOf(vpiVariables, decl), (std::vector<int>{vpiLogicVar}));
+  EXPECT_NE(vpi_handle(vpiPropertySpec, decl), nullptr);
+}
+
 // A property a clocking block declares is a property decl of that block
 // (§37.12, §14.3), and an assertion naming it through the block, `cb.p`
 // (§16.16 (b)), reaches it from its property inst (#5090).

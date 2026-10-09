@@ -928,7 +928,7 @@ ModuleItem* Parser::ParsePropertyDecl() {
   PropertyBodyScanState scan_state;
 
   while (!Check(TokenKind::kKwEndproperty) && !AtEnd()) {
-    if (in_decl_prefix && IsBuiltinTypeKwForLocalVar(CurrentToken().kind)) {
+    if (in_decl_prefix && AtAssertionVariableDecl(lexer_, known_types_)) {
       HarvestAssertionVariableDecl(item);
       continue;
     }

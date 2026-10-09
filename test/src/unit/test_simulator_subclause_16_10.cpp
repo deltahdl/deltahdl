@@ -37,14 +37,16 @@ TEST(SequenceLocals, InitializationAssignmentsRunInDeclarationOrder) {
   EXPECT_EQ(clear->value.ToUint64(), 0u);
 }
 
-// Expects the sequence `te2 ##1 last_operand`, its body declaring `locals`,
-// to end once, at 4, the tick at 35, with te2 high at 3 alone.
+// Expects the sequence `te2 ##1 last_operand`, its body declaring `locals`
+// and its module the items `prelude`, to end once, at 4, the tick at 35, with
+// te2 high at 3 alone.
 void ExpectOneEndAfterTe2(const std::string& last_operand,
-                          const std::string& locals) {
+                          const std::string& locals,
+                          const std::string& prelude = "") {
   SimFixture f;
   auto* hits = RunAndFindVar(
       SequenceTickSource("te2 ##1 " + last_operand,
-                         DriveTicks({{}, {3}, {}, {}, {}}), "", locals),
+                         DriveTicks({{}, {3}, {}, {}, {}}), prelude, locals),
       f, "hits");
   ASSERT_NE(hits, nullptr) << last_operand;
   EXPECT_EQ(hits->value.ToUint64(), 1u) << last_operand;
@@ -73,6 +75,26 @@ TEST(SequenceLocals, AnIntLocalReadsAsSigned) {
 TEST(SequenceLocals, ALocalTakesTheSignednessItsKeywordWrites) {
   ExpectOneEndAfterTe2("(x < 0)", "    logic signed [3:0] x = -1;\n");
   ExpectOneEndAfterTe2("(x > 0)", "    int unsigned x = -1;\n");
+}
+
+// The types the cases of a local declared with a type name use (§6.18).
+constexpr char kNibbleTypes[] =
+    "  typedef logic [3:0] nib_t;\n"
+    "  typedef logic signed [3:0] snib_t;\n"
+    "  typedef bit [3:0] bnib_t;\n";
+
+// §16.10 with §6.18: a sequence's local declared with a type name is of the
+// type the name stands for: nib_t is four 4-state unsigned bits, keeping 13
+// of 29 and x until assigned, snib_t four signed ones, below 0 at -1, bnib_t
+// four 2-state ones, 0 until assigned, and `nib_t [1:0]` two nib_t, eight
+// bits keeping 255 of 9'h1FF (#5767).
+TEST(SequenceLocals, ALocalOfATypeNameIsTheTypeTheNameStandsFor) {
+  ExpectOneEndAfterTe2("(x == 13)", "    nib_t x = 29;\n", kNibbleTypes);
+  ExpectOneEndAfterTe2("$isunknown(x)", "    nib_t x;\n", kNibbleTypes);
+  ExpectOneEndAfterTe2("(x < 0)", "    snib_t x = -1;\n", kNibbleTypes);
+  ExpectOneEndAfterTe2("(x == 0)", "    bnib_t x;\n", kNibbleTypes);
+  ExpectOneEndAfterTe2("(x == 255)", "    nib_t [1:0] x = 9'h1FF;\n",
+                       kNibbleTypes);
 }
 
 // §16.10 with §6.11: a sequence's time local is 64 bits, unsigned and
@@ -160,17 +182,20 @@ TEST(SequenceLocals, LocalPassedAsActualIsBoundToTheFormal) {
 }
 
 // A design whose property `pr` declares the local `decl`, `int x` unless
-// given, and is `@(posedge clk) body`, asserted with a pass and a fail count:
+// given, after the module items `items`, and is `@(posedge clk) body`,
+// asserted with a pass and a fail count:
 // clk rises at 5, 15 and so on to 95 and v counts its rising edges, so v
 // reads k at the k-th of them from 0, and the run ends at 100, between two
 // rising edges.
 std::string PropertyLocalSource(const std::string& body,
-                                const std::string& decl) {
+                                const std::string& decl,
+                                const std::string& items) {
   return "module t;\n"
          "  logic clk = 0;\n"
          "  int v = 0, p = 0, f = 0;\n"
          "  always #5 clk = ~clk;\n"
-         "  always @(posedge clk) v <= v + 1;\n"
+         "  always @(posedge clk) v <= v + 1;\n" +
+         items +
          "  property pr;\n"
          "    " +
          decl +
@@ -184,11 +209,13 @@ std::string PropertyLocalSource(const std::string& body,
          "endmodule\n";
 }
 
-// The pass and fail counts a run of PropertyLocalSource(body, decl) leaves.
+// The pass and fail counts a run of PropertyLocalSource(body, decl, items)
+// leaves.
 void ExpectPropertyCounts(const std::string& body, uint64_t passes,
-                          uint64_t fails, const std::string& decl = "int x") {
+                          uint64_t fails, const std::string& decl = "int x",
+                          const std::string& items = "") {
   SimFixture f;
-  auto* p = RunAndFindVar(PropertyLocalSource(body, decl), f, "p");
+  auto* p = RunAndFindVar(PropertyLocalSource(body, decl, items), f, "p");
   ASSERT_NE(p, nullptr) << body;
   EXPECT_EQ(p->value.ToUint64(), passes) << body;
   EXPECT_EQ(f.ctx.FindVariable("f")->value.ToUint64(), fails) << body;
@@ -254,6 +281,14 @@ TEST(PropertyLocals, AnIntLocalIsSignedWhateverItIsAssigned) {
 TEST(PropertyLocals, ASignedPackedLocalIsSigned) {
   ExpectPropertyCounts("(1, x = -1) |-> ##1 (x < 0)", 9, 0,
                        "logic signed [3:0] x");
+}
+
+// §16.10 with §6.18: a property's local declared with a type name standing
+// for four unsigned bits wraps as `logic [3:0]` does, x = k + 12 falling
+// below 12 for the attempts from the edges 4 to 8 alone (#5767).
+TEST(PropertyLocals, ALocalOfATypeNameIsTheTypeTheNameStandsFor) {
+  ExpectPropertyCounts("(1, x = v + 12) |-> ##1 (x < 12)", 5, 4, "nib_t x",
+                       "  typedef logic [3:0] nib_t;\n");
 }
 
 // §16.10 with §6.11: a property's time local is 64 bits and unsigned, so -1

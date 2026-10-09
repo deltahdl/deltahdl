@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string_view>
+#include <unordered_set>
 
 #include "common/diagnostic.h"
 #include "lexer/lexer.h"
@@ -10,6 +11,14 @@
 namespace delta {
 
 bool IsBuiltinTypeKwForLocalVar(TokenKind k);
+
+// §16.10 Syntax 16-13 with §6.18: whether the lexer stands at an
+// assertion_variable_declaration, its var_data_type a type keyword a local
+// may be declared with or a name among `known_types` that a variable's name
+// or a packed dimension follows; a type name opening a cast, `nib_t'(a)`,
+// starts no declaration. The lexer is left where it stood.
+bool AtAssertionVariableDecl(
+    Lexer& lexer, const std::unordered_set<std::string_view>& known_types);
 bool IsDisallowedLocalVarTypeKw(TokenKind k);
 bool LexerCheck(Lexer& lexer, TokenKind kind);
 

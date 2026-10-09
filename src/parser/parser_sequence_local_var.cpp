@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
@@ -230,6 +231,22 @@ void Parser::ValidateCycleDelayIntegerValue(SourceLoc range_loc) {
 
 // Consumes the var_data_type prefix of an assertion_variable_declaration: the
 // leading type keyword followed by any signing token and packed dimensions.
+bool AtAssertionVariableDecl(
+    Lexer& lexer, const std::unordered_set<std::string_view>& known_types) {
+  const Token kType = lexer.Peek();
+  if (IsBuiltinTypeKwForLocalVar(kType.kind)) return true;
+  if (kType.kind != TokenKind::kIdentifier ||
+      !known_types.contains(kType.text)) {
+    return false;
+  }
+  auto saved = lexer.SavePos();
+  lexer.Next();
+  const bool kDeclares = LexerCheck(lexer, TokenKind::kIdentifier) ||
+                         LexerCheck(lexer, TokenKind::kLBracket);
+  lexer.RestorePos(saved);
+  return kDeclares;
+}
+
 static void SkipAssertVarTypePrefix(Lexer& lexer) {
   lexer.Next();  // var_data_type's leading type keyword.
   while (LexerCheck(lexer, TokenKind::kKwSigned) ||
@@ -653,7 +670,7 @@ void Parser::ScanSequenceBody(ModuleItem* item) {
   // `::`, so an identifier after it names a member rather than a formal.
   bool after_select = false;
   while (!Check(TokenKind::kKwEndsequence) && !AtEnd()) {
-    if (in_decl_prefix && IsBuiltinTypeKwForLocalVar(CurrentToken().kind)) {
+    if (in_decl_prefix && AtAssertionVariableDecl(lexer_, known_types_)) {
       HarvestAssertionVariableDecl(item);
       continue;
     }

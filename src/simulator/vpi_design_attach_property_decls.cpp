@@ -13,6 +13,8 @@
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
+#include "simulator/evaluation.h"
+#include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
@@ -171,12 +173,16 @@ void MakePropFormal(const ModuleItem& decl, size_t index, VpiObject* property,
 
 // §37.51 with §16.10: the variable the local variable `local` a property
 // declares stands as, hung from the property decl `property` and named in
-// it, of the kind its type is (§37.17). §37.52 detail 1 gives its value no
-// access, so it holds none.
+// it, of the kind its type is (§37.17), the kind the type name it is
+// declared with stands for where it names one (§6.18), resolved in `ctx`.
+// §37.52 detail 1 gives its value no access, so it holds none.
 void MakePropertyVariable(const SeqLocalDecl& local, VpiObject* property,
-                          const VpiAttachBuild& build) {
+                          const SimContext& ctx, const VpiAttachBuild& build) {
   VpiObject* var = build.alloc();
-  var->type = VpiDataTypeVariableKind(KeywordDataType(local.type_kw));
+  var->type =
+      VpiDataTypeVariableKind(local.named_type.kind == DataTypeKind::kNamed
+                                  ? DeclaredTypeKind(local.named_type, ctx)
+                                  : KeywordDataType(local.type_kw));
   var->parent = property;
   var->name = build.keep(std::string(local.name));
   var->full_name = VpiScopedFullName(property, local.name);
@@ -367,7 +373,7 @@ VpiObject* VpiMakePropertyDecl(const RtlirPropertyDecl& declared,
     MakePropFormal(decl, i, obj, at, with);
   }
   for (const SeqLocalDecl& local : decl.prop_locals) {
-    MakePropertyVariable(local, obj, with.build);
+    MakePropertyVariable(local, obj, at.ctx, with.build);
   }
   // §37.52: the body the parser read, its clock, its disable condition and,
   // for a Boolean property, its expression; a body of another shape was not

@@ -16,9 +16,11 @@ namespace delta {
 // 1 for a bit type.
 uint32_t LocalWidth(TokenKind type_kw);
 
-// §16.10 with §7.4.1: the width of the local `decl`, its keyword's where no
-// packed dimension follows the keyword and otherwise the product of the
-// dimensions' spans, each bound read at the run.
+// §16.10 with §6.18 and §7.4.1: the width of the local `decl`: the width
+// the type name it is declared with stands for, or a bit where a keyword is
+// written, times the product of the packed dimensions' spans written after
+// it, each bound read at the run; its keyword's width where neither a name
+// nor a dimension is written.
 uint32_t LocalWidth(const SeqLocalDecl& decl, SimContext& ctx, Arena& arena);
 
 // §16.10 and §6.8: the state of a local declared with a data type keyword,
@@ -31,9 +33,14 @@ bool LocalIs4State(TokenKind type_kw);
 // vector types bit, logic and reg are not.
 bool LocalIsSigned(TokenKind type_kw);
 
-// §6.11: whether the local `decl` is signed, as its signing keyword writes
-// where it writes one and as its type keyword is otherwise.
-bool LocalIsSigned(const SeqLocalDecl& decl);
+// §6.18: whether the local `decl` is of a 4-state type, the type its type
+// name stands for or its keyword.
+bool LocalIs4State(const SeqLocalDecl& decl, const SimContext& ctx);
+
+// §6.11 and §6.18: whether the local `decl` is signed, as its signing keyword
+// writes where it writes one and otherwise as the type its type name stands
+// for or its keyword is.
+bool LocalIsSigned(const SeqLocalDecl& decl, const SimContext& ctx);
 
 // §16.10: the values a new attempt's copies of the locals `decls` begin with.
 std::vector<Logic4Vec> InitialLocals(const std::vector<SeqLocalDecl>& decls,

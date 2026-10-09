@@ -260,10 +260,18 @@ struct ParserSeqLinearHelpers {
     return ParserPropertySpecHelpers::ParsePropertyActualArg(p, plain);
   }
 
-  // §6.11 and §7.4.1: the signing keyword and the packed dimensions a
-  // local's var_data_type writes after its type keyword, into `typed`, each
+  // §16.10 with §6.18, §6.11 and §7.4.1: a local's var_data_type, into
+  // `typed`: its type keyword or the type name written in its place, then the
+  // signing keyword and the packed dimensions written after it, each
   // dimension a left and a right bound in the order written.
-  static void ParseLocalTypeTail(Parser& p, SeqLocalDecl& typed) {
+  static void ParseLocalType(Parser& p, SeqLocalDecl& typed) {
+    const Token kType = p.Consume();
+    if (kType.kind == TokenKind::kIdentifier) {
+      typed.named_type.kind = DataTypeKind::kNamed;
+      typed.named_type.type_name = kType.text;
+    } else {
+      typed.type_kw = kType.kind;
+    }
     if (p.Check(TokenKind::kKwSigned) || p.Check(TokenKind::kKwUnsigned)) {
       typed.signing = p.Consume().kind;
     }
@@ -282,13 +290,13 @@ struct ParserSeqLinearHelpers {
   // opens with, each `type [signing] [packed dimensions] name [= init] {,
   // name [= init]} ;` over a data type keyword, its var_data_type taking the
   // signing keyword §6.11 and the packed dimensions §7.4.1 write after the
-  // keyword, recorded as the body's local variables, each declared name of
-  // the type written. A declaration in any other shape ends the capture.
+  // keyword, or over a type name in the keyword's place (§6.18), recorded as
+  // the body's local variables, each declared name of the type written. A
+  // declaration in any other shape ends the capture.
   static bool ParseLinearSeqLocalDecls(Parser& p, SeqLinearBody& body) {
-    while (IsBuiltinTypeKwForLocalVar(p.CurrentToken().kind)) {
+    while (AtAssertionVariableDecl(p.lexer_, p.known_types_)) {
       SeqLocalDecl typed;
-      typed.type_kw = p.Consume().kind;
-      ParseLocalTypeTail(p, typed);
+      ParseLocalType(p, typed);
       do {
         if (!p.Check(TokenKind::kIdentifier)) return false;
         SeqLocalDecl local = typed;
