@@ -526,7 +526,7 @@ TEST(SequenceDeclaration, AChandleFormalIsReported) {
       "  property p(chandle h, int n); @(posedge clk) 1; endproperty\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  const char* kMessage =
+  constexpr char kMessage[] =
       "a sequence or property formal argument may not be of type chandle";
   EXPECT_TRUE(ReportedError(r.diags, kMessage, 3, "16.8"));
   EXPECT_TRUE(ReportedError(r.diags, kMessage, 4, "16.8"));

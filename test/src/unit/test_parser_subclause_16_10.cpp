@@ -239,7 +239,7 @@ TEST(LocalVariableParsing, AChandleLocalVariableIsReported) {
       "  property p; chandle h; @(posedge clk) a; endproperty\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  const char* kMessage =
+  constexpr char kMessage[] =
       "an assertion variable may not be declared of type chandle";
   EXPECT_TRUE(ReportedError(r.diags, kMessage, 3, "16.10"));
   EXPECT_TRUE(ReportedError(r.diags, kMessage, 4, "16.10"));
