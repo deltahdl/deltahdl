@@ -325,10 +325,12 @@ TEST_F(PropertyDeclsOfARun, AProceduralAssertionReachesItsPropertyInst) {
 }
 
 // A formal declared with a type reaches a typespec of that type, and an
-// untyped one none (detail 3) (#5091).
+// untyped one none (detail 3) (#5091). §16.12 adds property to the types a
+// property's formal may have, and §6.12 makes realtime a synonym for real.
 TEST_F(PropertyDeclsOfARun, ATypedFormalReachesItsTypespec) {
   Run("module top; logic clk;\n"
-      "  property p(bit x, untyped y, event e, sequence s);\n"
+      "  property p(bit x, untyped y, event e, sequence s, property q,\n"
+      "             realtime t);\n"
       "    @(posedge clk) x;\n"
       "  endproperty\n"
       "endmodule\n");
@@ -343,6 +345,41 @@ TEST_F(PropertyDeclsOfARun, ATypedFormalReachesItsTypespec) {
   EXPECT_EQ(kTypespecOf("y"), 0);
   EXPECT_EQ(kTypespecOf("e"), vpiEventTypespec);
   EXPECT_EQ(kTypespecOf("s"), vpiSequenceTypespec);
+  EXPECT_EQ(kTypespecOf("q"), vpiPropertyTypespec);
+  EXPECT_EQ(kTypespecOf("t"), vpiRealTypespec);
+}
+
+// Detail 5: a local variable formal argument (§16.8.2) is an input, beside a
+// formal of no direction written ahead of it.
+TEST_F(PropertyDeclsOfARun, ALocalVariableFormalIsAnInput) {
+  Run("module top; logic clk, a;\n"
+      "  property p(x, local input int n);\n"
+      "    @(posedge clk) x;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  vpiHandle decl = Named(vpiPropertyDecl, By("top"), "p");
+  ASSERT_NE(decl, nullptr);
+  vpiHandle n = Named(vpiPropFormalDecl, decl, "n");
+  ASSERT_NE(n, nullptr);
+  EXPECT_EQ(vpi_get(vpiDirection, n), vpiInput);
+  vpiHandle x = Named(vpiPropFormalDecl, decl, "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(vpi_get(vpiDirection, x), vpiNoDirection);
+}
+
+// An instance reaches the property of its own name, not another the module
+// declares ahead of it (#5632).
+TEST_F(PropertyDeclsOfARun, AnInstReachesItsPropertyPastAnother) {
+  Run("module top; logic clk, a, b;\n"
+      "  property p1; @(posedge clk) a; endproperty\n"
+      "  property p2; @(posedge clk) b; endproperty\n"
+      "  a2: assert property (p2);\n"
+      "endmodule\n");
+  vpiHandle a2 = Named(vpiAssertion, By("top"), "a2");
+  ASSERT_NE(a2, nullptr);
+  vpiHandle inst = vpi_handle(vpiProperty, a2);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(NameReached(vpiPropertyDecl, inst), "p2");
 }
 
 // A property reaches the local variables it declares (§16.10), each of the

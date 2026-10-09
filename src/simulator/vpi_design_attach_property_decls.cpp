@@ -95,18 +95,14 @@ VpiObject* TypedefTypespec(const VpiObject* holder, std::string_view name,
 void MakeFormalTypespec(const ModuleItem& decl, size_t index, VpiObject* formal,
                         const VpiPropertyDeclSite& at,
                         const VpiAttachBuild& build) {
-  const DataType* type = index < decl.prop_formal_types.size()
-                             ? decl.prop_formal_types[index]
-                             : nullptr;
+  const DataType* type = decl.prop_formal_types[index];
   if (type != nullptr && type->kind == DataTypeKind::kNamed) {
     VpiObject* named =
         TypedefTypespec(formal->parent, type->type_name, at.unit_typespecs);
     if (named != nullptr) formal->children.push_back(named);
     return;
   }
-  const TokenKind kKeyword = index < decl.prop_formal_type_kw.size()
-                                 ? decl.prop_formal_type_kw[index]
-                                 : TokenKind::kEof;
+  const TokenKind kKeyword = decl.prop_formal_type_kw[index];
   int kind = 0;
   if (kKeyword != TokenKind::kEof) {
     kind = FormalTypespecKind(kKeyword);
@@ -134,14 +130,10 @@ void MakePropFormal(const ModuleItem& decl, size_t index, VpiObject* property,
   formal->type = vpiPropFormalDecl;
   formal->parent = property;
   formal->name = with.build.keep(std::string(decl.prop_formals[index]));
-  formal->direction =
-      VpiPropFormalDirection(index < decl.prop_formal_is_local.size() &&
-                             decl.prop_formal_is_local[index]);
+  formal->direction = VpiPropFormalDirection(decl.prop_formal_is_local[index]);
   MakeFormalTypespec(decl, index, formal, at, with.build);
-  if (index < decl.prop_formal_defaults.size()) {
-    VpiObject* value = with.expression(decl.prop_formal_defaults[index]);
-    if (value != nullptr) formal->children.push_back(value);
-  }
+  VpiObject* value = with.expression(decl.prop_formal_defaults[index]);
+  if (value != nullptr) formal->children.push_back(value);
   property->children.push_back(formal);
 }
 
@@ -224,10 +216,11 @@ VpiObject* VpiMakePropertyDecl(const RtlirPropertyDecl& declared,
                                const VpiPropertyDeclSite& at,
                                const VpiStmtBuild& with) {
   VpiObject* scope = at.scope;
-  // §37.12 with §14.3: a property a clocking block declares is of that block.
+  // §37.12 with §14.3: a property a clocking block declares is of that block,
+  // which AttachClockingBlocks has made under the same scope, the generate
+  // block instance both are stamped with or the instance.
   if (declared.clocking_block != nullptr) {
     scope = ChildOfType(scope, vpiClockingBlock, declared.clocking_block->name);
-    if (scope == nullptr) return nullptr;
   }
   const ModuleItem& decl = *declared.item;
   VpiObject* obj = with.build.alloc();
