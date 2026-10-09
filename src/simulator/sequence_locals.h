@@ -16,6 +16,11 @@ namespace delta {
 // 1 for a bit type.
 uint32_t LocalWidth(TokenKind type_kw);
 
+// §16.10 with §7.4.1: the width of the local `decl`, its keyword's where no
+// packed dimension follows the keyword and otherwise the product of the
+// dimensions' spans, each bound read at the run.
+uint32_t LocalWidth(const SeqLocalDecl& decl, SimContext& ctx, Arena& arena);
+
 // §16.10 and §6.8: the state of a local declared with a data type keyword,
 // and the value it holds before any assignment, x for a 4-state type and 0
 // for a 2-state one.

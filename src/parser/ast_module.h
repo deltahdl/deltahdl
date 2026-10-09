@@ -361,11 +361,14 @@ struct SeqMatchAssign {
 
 // §16.10: a local variable of a sequence body, one an
 // assertion_variable_declaration declares or, in the flattened form, a local
-// variable formal argument of an instance, with the keyword of its type and
-// its declaration assignment where it has one.
+// variable formal argument of an instance, with the keyword of its type, the
+// packed dimensions written after it (§7.4.1), `[3:0]` of `logic [3:0] v`,
+// each a left and a right bound in the order written, and its declaration
+// assignment where it has one.
 struct SeqLocalDecl {
   std::string_view name;
   TokenKind type_kw = TokenKind::kKwInt;
+  std::vector<std::pair<Expr*, Expr*>> packed_dims;
   Expr* init = nullptr;
 };
 

@@ -11,7 +11,6 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "elaborator/sensitivity.h"
-#include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -37,13 +36,14 @@ namespace delta {
 // semantic leading clock of an instance's attempt: the node of the
 // expansion it is for, whose subtree reads `literal` in the local's place,
 // and the initialization assignment performed, into the literal, at the
-// first tick of that node's clock at or after the attempt begins.
+// first tick of that node's clock at or after the attempt begins, the value
+// cast to the local's width.
 struct LocalCopy {
   const PropertyExprNode* node;
   std::string_view name;
   Expr* literal;
   const Expr* init;
-  TokenKind type_kw;
+  uint32_t width;
 };
 
 struct PropertyTreeState {
@@ -342,15 +342,15 @@ void SubstituteNodeLocals(PropertyExprNode* node, const ActualsByFormal& locals,
 // the locals' names.
 ActualsByFormal NewLocalCopies(const PropertyExprNode* node,
                                const std::vector<SeqLocalDecl>& locals,
-                               PropertyTreeState& tree, Arena& arena) {
+                               StepContext& sc) {
   ActualsByFormal copies;
   for (const SeqLocalDecl& local : locals) {
-    Logic4Vec unassigned = MakeLogic4Vec(arena, LocalWidth(local.type_kw));
+    const uint32_t kWidth = LocalWidth(local, sc.ctx, sc.arena);
+    Logic4Vec unassigned = MakeLogic4Vec(sc.arena, kWidth);
     FillWithX(unassigned);
-    Expr* literal = LiteralOfValue(unassigned, arena);
-    const Expr* init = SubstituteFormals(local.init, copies, arena);
-    tree.local_copies.push_back(
-        {node, local.name, literal, init, local.type_kw});
+    Expr* literal = LiteralOfValue(unassigned, sc.arena);
+    const Expr* init = SubstituteFormals(local.init, copies, sc.arena);
+    sc.tree.local_copies.push_back({node, local.name, literal, init, kWidth});
     copies[local.name] = literal;
   }
   return copies;
@@ -373,16 +373,15 @@ bool NamesAClock(const PropertyExprNode* node) {
 // its node begins.
 void PlaceLocalCopies(PropertyExprNode* node,
                       const std::vector<SeqLocalDecl>& locals,
-                      const ActualsByFormal* in_force, PropertyTreeState& tree,
-                      Arena& arena) {
+                      const ActualsByFormal* in_force, StepContext& sc) {
   ActualsByFormal own;
   if (in_force == nullptr || NamesAClock(node)) {
-    own = NewLocalCopies(node, locals, tree, arena);
+    own = NewLocalCopies(node, locals, sc);
     in_force = &own;
   }
-  SubstituteNodeLocals(node, *in_force, arena);
+  SubstituteNodeLocals(node, *in_force, sc.arena);
   for (PropertyExprNode* operand : node->operands) {
-    PlaceLocalCopies(operand, locals, in_force, tree, arena);
+    PlaceLocalCopies(operand, locals, in_force, sc);
   }
 }
 
@@ -403,7 +402,7 @@ void InitializeLocalCopies(const PropertyExprNode* node, StepContext& sc) {
     if (copy.init == nullptr) continue;
     Logic4Vec value = ResizeToWidth(
         OwnRhsWords(EvalExpr(copy.init, sc.ctx, sc.arena), sc.arena),
-        LocalWidth(copy.type_kw), sc.arena);
+        copy.width, sc.arena);
     *copy.literal = *LiteralOfValue(value, sc.arena);
   }
   copies = std::move(waiting);
@@ -431,7 +430,7 @@ bool ExpandInstance(const PropertyExprNode* node, NodeState& state,
     body->clock = SubstituteClock(decl->prop_clock, actuals, sc.arena);
   }
   if (!decl->prop_locals.empty()) {
-    PlaceLocalCopies(body, decl->prop_locals, nullptr, sc.tree, sc.arena);
+    PlaceLocalCopies(body, decl->prop_locals, nullptr, sc);
   }
   Collection collection{sc.tree, sc.ctx, sc.arena, actuals, {}};
   if (!CollectSequences(body, collection, state.clock)) return false;

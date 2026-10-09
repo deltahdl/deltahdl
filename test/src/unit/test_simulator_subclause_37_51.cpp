@@ -453,6 +453,23 @@ TEST_F(PropertyDeclsOfARun, APropertyReachesItsLocalVariables) {
   EXPECT_STREQ(vpi_get_str(vpiFullName, n), "top.p.n");
 }
 
+// A property whose body declares a local of a packed type, `logic [3:0] v`
+// (§16.10's var_data_type with §7.4.1), reaches the variable, a logic var,
+// and its property spec, with the clock and the property expression (#5745).
+TEST_F(PropertyDeclsOfARun, APropertyReachesAPackedLocalVariableAndItsSpec) {
+  Run("module top; logic clk, a;\n"
+      "  property p; logic [3:0] v; @(posedge clk) a; endproperty\n"
+      "endmodule\n");
+  vpiHandle decl = Named(vpiPropertyDecl, By("top"), "p");
+  ASSERT_NE(decl, nullptr);
+  EXPECT_EQ(KindsOf(vpiVariables, decl), (std::vector<int>{vpiLogicVar}));
+  EXPECT_NE(Named(vpiVariables, decl, "v"), nullptr);
+  vpiHandle spec = vpi_handle(vpiPropertySpec, decl);
+  ASSERT_NE(spec, nullptr);
+  EXPECT_NE(vpi_handle(vpiClockingEvent, spec), nullptr);
+  EXPECT_EQ(NameReached(vpiPropertyExpr, spec), "a");
+}
+
 // A property a clocking block declares is a property decl of that block
 // (§37.12, §14.3), and an assertion naming it through the block, `cb.p`
 // (§16.16 (b)), reaches it from its property inst (#5090).

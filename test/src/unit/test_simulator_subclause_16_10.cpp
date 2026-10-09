@@ -37,6 +37,21 @@ TEST(SequenceLocals, InitializationAssignmentsRunInDeclarationOrder) {
   EXPECT_EQ(clear->value.ToUint64(), 0u);
 }
 
+// §16.10 with §7.4.1: a sequence's local declared of a packed type, `logic
+// [3:0] x = 29`, holds the four bits 13 of its initialization, so with te2
+// at 3 `te2 ##1 (x == 13)` ends at 4, the tick at 35; a 32-bit x would hold
+// 29 and a 1-bit x 1 (#5745).
+TEST(SequenceLocals, APackedLocalHoldsItsDeclaredWidth) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      SequenceTickSource("te2 ##1 (x == 13)", DriveTicks({{}, {3}, {}, {}, {}}),
+                         "", "    logic [3:0] x = 29;\n"),
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 35u);
+}
+
 // §16.10: the match items attached to a subsequence are performed at the end
 // of each nonempty match of it, in the order written, so `(te2[->1], x = 1,
 // y = x + 1)` leaves y 2; te1 at 1 and te2 at 3 end `te1 ##1 (te2[->1], x =
@@ -113,18 +128,22 @@ TEST(SequenceLocals, LocalPassedAsActualIsBoundToTheFormal) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 25u);
 }
 
-// A design whose property `pr` declares `int x` and is `@(posedge clk)
-// body`, asserted with a pass and a fail count: clk rises at 5, 15 and so on
-// to 95 and v counts its rising edges, so v reads k at the k-th of them from
-// 0, and the run ends at 100, between two rising edges.
-std::string PropertyLocalSource(const std::string& body) {
+// A design whose property `pr` declares the local `decl`, `int x` unless
+// given, and is `@(posedge clk) body`, asserted with a pass and a fail count:
+// clk rises at 5, 15 and so on to 95 and v counts its rising edges, so v
+// reads k at the k-th of them from 0, and the run ends at 100, between two
+// rising edges.
+std::string PropertyLocalSource(const std::string& body,
+                                const std::string& decl) {
   return "module t;\n"
          "  logic clk = 0;\n"
          "  int v = 0, p = 0, f = 0;\n"
          "  always #5 clk = ~clk;\n"
          "  always @(posedge clk) v <= v + 1;\n"
          "  property pr;\n"
-         "    int x;\n"
+         "    " +
+         decl +
+         ";\n"
          "    @(posedge clk) " +
          body +
          ";\n"
@@ -134,11 +153,11 @@ std::string PropertyLocalSource(const std::string& body) {
          "endmodule\n";
 }
 
-// The pass and fail counts a run of PropertyLocalSource(body) leaves.
+// The pass and fail counts a run of PropertyLocalSource(body, decl) leaves.
 void ExpectPropertyCounts(const std::string& body, uint64_t passes,
-                          uint64_t fails) {
+                          uint64_t fails, const std::string& decl = "int x") {
   SimFixture f;
-  auto* p = RunAndFindVar(PropertyLocalSource(body), f, "p");
+  auto* p = RunAndFindVar(PropertyLocalSource(body, decl), f, "p");
   ASSERT_NE(p, nullptr) << body;
   EXPECT_EQ(p->value.ToUint64(), passes) << body;
   EXPECT_EQ(f.ctx.FindVariable("f")->value.ToUint64(), fails) << body;
@@ -178,6 +197,16 @@ TEST(PropertyLocals, ConsequentReassignsTheLocal) {
 // attempts from the edges 0 to 7 all find v == x + 2.
 TEST(PropertyLocals, EachAttemptHoldsItsOwnCopy) {
   ExpectPropertyCounts("(1, x = v) |-> ##2 (v == x + 2)", 8, 0);
+}
+
+// §16.10 with §7.4.1: a property's local declared of a packed type, `logic
+// [3:0] x`, holds four bits. x = k + 12 wraps below 12 for the attempts from
+// the edges 4 to 8, which pass, and stays at 12 or above for those from 0 to
+// 3, which fail; a 32-bit x would fail all nine and a 1-bit x pass all nine
+// (#5745).
+TEST(PropertyLocals, APackedLocalHoldsItsDeclaredWidth) {
+  ExpectPropertyCounts("(1, x = v + 12) |-> ##1 (x < 12)", 5, 4,
+                       "logic [3:0] x");
 }
 
 // The source the cases of a local flowing out of `triggered` share: clk rises

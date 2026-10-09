@@ -1,6 +1,7 @@
 #include "simulator/sequence_locals.h"
 
 #include <cstdint>
+#include <cstdlib>
 #include <utility>
 #include <vector>
 
@@ -35,6 +36,17 @@ uint32_t LocalWidth(TokenKind type_kw) {
   }
 }
 
+uint32_t LocalWidth(const SeqLocalDecl& decl, SimContext& ctx, Arena& arena) {
+  if (decl.packed_dims.empty()) return LocalWidth(decl.type_kw);
+  uint32_t width = 1;
+  for (const auto& [left, right] : decl.packed_dims) {
+    const int64_t kLeft = SelectBoundValue(EvalExpr(left, ctx, arena));
+    const int64_t kRight = SelectBoundValue(EvalExpr(right, ctx, arena));
+    width *= static_cast<uint32_t>(std::abs(kLeft - kRight) + 1);
+  }
+  return width;
+}
+
 bool LocalIs4State(TokenKind type_kw) {
   return type_kw == TokenKind::kKwLogic || type_kw == TokenKind::kKwReg ||
          type_kw == TokenKind::kKwInteger;
@@ -51,10 +63,11 @@ std::vector<Logic4Vec> InitialLocals(const std::vector<SeqLocalDecl>& decls,
   values.reserve(decls.size());
   ctx.PushScope();
   for (const SeqLocalDecl& decl : decls) {
-    Logic4Vec value = MakeLogic4Vec(arena, LocalWidth(decl.type_kw));
+    const uint32_t kWidth = LocalWidth(decl, ctx, arena);
+    Logic4Vec value = MakeLogic4Vec(arena, kWidth);
     if (decl.init != nullptr) {
       value = ResizeToWidth(OwnRhsWords(EvalExpr(decl.init, ctx, arena), arena),
-                            LocalWidth(decl.type_kw), arena);
+                            kWidth, arena);
     } else if (LocalIs4State(decl.type_kw)) {
       FillWithX(value);
     }

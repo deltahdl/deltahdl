@@ -11,6 +11,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 #include "parser/parser.h"
 #include "parser/parser_property_spec_internal.h"
 #include "parser/parser_sequence_property_decl_internal.h"
@@ -260,18 +261,27 @@ struct ParserSeqLinearHelpers {
   }
 
   // §16.10 Syntax 16-13: the assertion_variable_declarations a sequence body
-  // opens with, each `type name [= init] {, name [= init]} ;` over a data type
-  // keyword, recorded as the body's local variables. A declaration in any other
-  // shape ends the capture.
+  // opens with, each `type [packed dimensions] name [= init] {, name [=
+  // init]} ;` over a data type keyword, its var_data_type taking the packed
+  // dimensions §7.4.1 writes after the keyword, recorded as the body's local
+  // variables. A declaration in any other shape ends the capture.
   static bool ParseLinearSeqLocalDecls(Parser& p, SeqLinearBody& body) {
     while (IsBuiltinTypeKwForLocalVar(p.CurrentToken().kind)) {
       TokenKind type_kw = p.Consume().kind;
-      if (p.Check(TokenKind::kLBracket)) return false;
+      DataType packed;
+      p.ParsePackedDims(packed);
+      std::vector<std::pair<Expr*, Expr*>> dims;
+      if (packed.packed_dim_left != nullptr) {
+        dims.emplace_back(packed.packed_dim_left, packed.packed_dim_right);
+      }
+      dims.insert(dims.end(), packed.extra_packed_dims.begin(),
+                  packed.extra_packed_dims.end());
       do {
         if (!p.Check(TokenKind::kIdentifier)) return false;
         SeqLocalDecl local;
         local.name = p.Consume().text;
         local.type_kw = type_kw;
+        local.packed_dims = dims;
         if (p.Match(TokenKind::kEq)) local.init = p.ParseExpr();
         body.locals.push_back(local);
       } while (p.Match(TokenKind::kComma));
