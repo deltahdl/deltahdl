@@ -368,15 +368,18 @@ bool VpiIsBuiltInSystemFunction(std::string_view name);
 // one not modelled; and the object a statement it holds stands as, hung from
 // the object given and walked for the objects it holds in turn, null for one
 // the run builds no object for; the kind of the first index variable of a
-// foreach loop over the array an expression names (§12.7.3); and the
-// expression object of an expression assigned to the object given, whose
-// members or elements order a keyed pattern (§37.59 detail 6).
+// foreach loop over the array an expression names (§12.7.3); the expression
+// object of an expression assigned to the object given, whose members or
+// elements order a keyed pattern (§37.59 detail 6); and the property decl a
+// package declares under a name an import of the scope makes visible (§26.3),
+// null for none.
 struct VpiStmtBuild {
   const VpiAttachBuild& build;
   std::function<VpiObject*(const Expr*)> expression;
   std::function<VpiObject*(const Stmt*, VpiObject*)> statement;
   std::function<int(const Expr*)> index_kind;
   std::function<VpiObject*(const Expr*, const VpiObject*)> assigned;
+  std::function<VpiObject*(std::string_view)> imported_property;
 };
 
 // §37.64 to §37.68, §37.70 to §37.72 and §37.74 to §37.79: the kind of object
@@ -443,6 +446,21 @@ VpiObject* VpiPropertyExprObject(const PropertyExprNode* node,
 VpiObject* VpiMakePropertySpecOf(VpiObject* holder,
                                  const VpiPropertySpecParts& parts,
                                  const VpiStmtBuild& with);
+
+// §26.3 with §37.51: the property decl named `name` a package declares that
+// one of `imports` makes visible, among the property decls of the package
+// objects `objects` keys; null where no import reaches one.
+VpiObject* VpiImportedPropertyDecl(std::string_view name,
+                                   const std::vector<RtlirImport>& imports,
+                                   const VpiObjectMap& objects);
+
+// §16.12 with §37.10 detail 1: give each package a property decl per property
+// it declares, as VpiMakePropertyDecl makes one, with `unit_typespecs`, the
+// typespecs AttachTypespecs answered, for its formals' types to name.
+void AttachPackagePropertyDecls(const RtlirDesign& design,
+                                const VpiObjectMap& objects,
+                                const VpiObjectMap& unit_typespecs,
+                                SimContext& ctx, const VpiAttachBuild& build);
 
 // §37.51: the property inst the spec `instance` writes, an instance of a
 // declared property, hung from the assertion `holder`, reaching the property

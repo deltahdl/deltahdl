@@ -230,6 +230,10 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
         kClasses,
         subroutines,
         kUnitTypespecs};
+    // §37.51: a package's properties are built ahead of the assertions
+    // instantiating them.
+    AttachPackagePropertyDecls(*design, object_map_, kUnitTypespecs, *sim_ctx_,
+                               kBuild);
     AttachProcedures(design, object_map_, kCalls, kBuild);
     AttachPrimitives(
         design, object_map_,

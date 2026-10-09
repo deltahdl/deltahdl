@@ -704,8 +704,7 @@ void WalkSubStmts(const Stmt& stmt, const BlockParent& parent,
                    [&](const Stmt* sub) { WalkStmt(sub, parent, walk); });
 }
 
-// What a statement written at `parent` builds the objects it reaches with,
-// used while `parent` and `walk` live.
+// What a statement at `parent` builds with, while `parent` and `walk` live.
 VpiStmtBuild StmtBuildAt(const BlockParent& parent, const BodyWalk& walk) {
   return {walk.build,
           [site = CallSiteOf(parent, walk), &walk](const Expr* expr) {
@@ -723,6 +722,10 @@ VpiStmtBuild StmtBuildAt(const BlockParent& parent, const BodyWalk& walk) {
                                                    const VpiObject* target) {
             return VpiCallSiteAssignedExpression(
                 {expr, target}, walk.objects, site, walk.calls.ctx, walk.build);
+          },
+          [&walk](std::string_view name) {
+            return VpiImportedPropertyDecl(name, walk.mod.imports,
+                                           walk.objects);
           }};
 }
 

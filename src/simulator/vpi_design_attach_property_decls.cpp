@@ -1,9 +1,11 @@
+#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "common/packed_range.h"
+#include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
@@ -12,6 +14,7 @@
 #include "parser/ast_type.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_design_attach_build.h"
+#include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
@@ -90,18 +93,41 @@ VpiObject* TypedefTypespec(const VpiObject* holder, std::string_view name,
              : VpiImportedTypespec(name, at.imports, at.unit_typespecs);
 }
 
+// §37.25 with §37.31: a class typespec of the class `name`, hung from
+// `formal`, reaching the class defn of that name a scope from the property out
+// to the instance declares, where one does.
+VpiObject* ClassTypespec(VpiObject* formal, std::string_view name,
+                         const VpiAttachBuild& build) {
+  VpiObject* typespec = build.alloc();
+  typespec->type = vpiClassTypespec;
+  typespec->name = build.keep(std::string(name));
+  typespec->parent = formal;
+  for (const VpiObject* scope = formal->parent; scope != nullptr;
+       scope = VpiIsInstanceType(scope->type) ? nullptr : scope->parent) {
+    for (VpiObject* child : scope->children) {
+      if (child->type == vpiClassDefn && child->name == name) {
+        typespec->children.push_back(child);
+        return typespec;
+      }
+    }
+  }
+  return typespec;
+}
+
 // §37.51 detail 3 with §37.25: the typespec the formal `index` of `decl` is
 // declared with, hung from `formal`: the one the typedef it names declares,
-// which other objects of that type share (§37.17), or one of the type's own,
-// reaching a range per packed dimension it was written with (§37.22); none
-// for an untyped formal.
+// which other objects of that type share (§37.17), a class typespec where it
+// names a class (§16.8), or one of the type's own, reaching a range per
+// packed dimension it was written with (§37.22); none for an untyped formal.
 void MakeFormalTypespec(const ModuleItem& decl, size_t index, VpiObject* formal,
                         const VpiPropertyDeclSite& at,
                         const VpiAttachBuild& build) {
   const DataType* type = decl.prop_formal_types[index];
   if (type != nullptr && type->kind == DataTypeKind::kNamed) {
     VpiObject* named = TypedefTypespec(formal->parent, type->type_name, at);
-    if (named != nullptr) formal->children.push_back(named);
+    formal->children.push_back(
+        named != nullptr ? named
+                         : ClassTypespec(formal, type->type_name, build));
     return;
   }
   const TokenKind kKeyword = decl.prop_formal_type_kw[index];
@@ -192,16 +218,31 @@ VpiObject* PropertyDeclAround(const VpiObject* holder, std::string_view name) {
   return nullptr;
 }
 
+// The typespec the formal `formal` was declared with, null for an untyped one.
+const VpiObject* TypespecOf(const VpiObject* formal) {
+  for (const VpiObject* child : formal->children) {
+    if (VpiIsTypespecType(child->type)) return child;
+  }
+  return nullptr;
+}
+
 // §37.51 detail 2: the argument the actual `actual` of a property inst
-// stands as, null for one the instance leaves out. A sequence or property
-// the actual writes (§16.12) is the property expr of the tree the parser
-// carries it as (§37.52), and §37.59 detail 4 makes the terminal `$`, which
-// §16.8 admits as an actual, the unbounded constant.
-VpiObject* ActualArgument(const Expr* actual, const VpiStmtBuild& with) {
-  if (actual != nullptr && actual->property_actual != nullptr) {
+// stands as, bound to a formal declared with the typespec `target`, null for
+// an untyped one; null for an actual the instance leaves out. A sequence or
+// property the actual writes (§16.12) is the property expr of the tree the
+// parser carries it as (§37.52); §37.59 detail 4 makes the terminal `$`,
+// which §16.8 admits as an actual, the unbounded constant; and a typed
+// formal's typespec orders a keyed pattern (detail 6).
+VpiObject* ActualArgument(const Expr* actual, const VpiObject* target,
+                          const VpiStmtBuild& with) {
+  if (actual == nullptr) return nullptr;
+  if (actual->property_actual != nullptr) {
     return VpiPropertyExprObject(actual->property_actual, with, nullptr);
   }
-  if (actual == nullptr || actual->text != "$") return with.expression(actual);
+  if (actual->text != "$") {
+    return target != nullptr ? with.assigned(actual, target)
+                             : with.expression(actual);
+  }
   VpiObject* dollar = with.build.alloc();
   dollar->type = vpiConstant;
   dollar->const_type = vpiUnboundedConst;
@@ -218,16 +259,25 @@ VpiObject* VpiMakePropertyInst(VpiObject* holder, const Expr& instance,
   const std::string_view kName =
       instance.kind == ExprKind::kCall ? instance.callee : instance.text;
   inst->property_decl = PropertyDeclAround(holder, kName);
+  // §26.3: a property a package declares, which an import makes visible.
+  if (inst->property_decl == nullptr) {
+    inst->property_decl = with.imported_property(kName);
+  }
   // §37.51 detail 2: an argument per formal, in the order declared, the
   // formal's default standing for an actual the instance leaves out; with no
   // declaration built, the actuals as written.
+  const std::vector<VpiHandle> kFormals = VpiPropFormals(inst->property_decl);
+  std::vector<const VpiObject*> targets(instance.args.size(), nullptr);
+  for (std::size_t i = 0; i < std::min(targets.size(), kFormals.size()); ++i) {
+    targets[i] = TypespecOf(kFormals[i]);
+  }
   std::vector<VpiHandle> provided;
   provided.reserve(instance.args.size());
-  for (const Expr* actual : instance.args) {
-    provided.push_back(ActualArgument(actual, with));
+  for (std::size_t i = 0; i < instance.args.size(); ++i) {
+    provided.push_back(ActualArgument(instance.args[i], targets[i], with));
   }
   std::vector<VpiPropertyFormal> formals;
-  for (VpiHandle formal : VpiPropFormals(inst->property_decl)) {
+  for (VpiHandle formal : kFormals) {
     formals.push_back(VpiPropertyFormal{VpiPropFormalInitExpr(formal)});
   }
   for (VpiHandle argument : formals.empty()
@@ -237,6 +287,47 @@ VpiObject* VpiMakePropertyInst(VpiObject* holder, const Expr& instance,
   }
   holder->children.push_back(inst);
   return inst;
+}
+
+VpiObject* VpiImportedPropertyDecl(std::string_view name,
+                                   const std::vector<RtlirImport>& imports,
+                                   const VpiObjectMap& objects) {
+  for (const RtlirImport& imported : imports) {
+    if (!imported.is_wildcard && imported.item_name != name) continue;
+    VpiObject* decl =
+        ChildOfType(FindObjectForFlatName(objects, imported.package_name),
+                    vpiPropertyDecl, name);
+    if (decl != nullptr) return decl;
+  }
+  return nullptr;
+}
+
+void AttachPackagePropertyDecls(const RtlirDesign& design,
+                                const VpiObjectMap& objects,
+                                const VpiObjectMap& unit_typespecs,
+                                SimContext& ctx, const VpiAttachBuild& build) {
+  // §16.12 with §37.10 detail 1: a property a package declares is a property
+  // decl of the package, its expressions resolving among the package's names.
+  const std::vector<RtlirImport> kNoImports;
+  for (const PackageDecl* pkg : design.packages) {
+    const std::string kPrefix(pkg->name);
+    const VpiStmtBuild kWith{build,
+                             [&](const Expr* expr) {
+                               return VpiInstanceExpression(
+                                   expr, objects, kPrefix, ctx, build);
+                             },
+                             nullptr,
+                             nullptr,
+                             nullptr,
+                             nullptr};
+    for (const ModuleItem* item : pkg->items) {
+      if (item->kind != ModuleItemKind::kPropertyDecl) continue;
+      VpiMakePropertyDecl(RtlirPropertyDecl{item, {}, {}, nullptr},
+                          {FindObjectForFlatName(objects, pkg->name),
+                           unit_typespecs, ctx, kNoImports},
+                          kWith);
+    }
+  }
 }
 
 VpiObject* VpiMakePropertyDecl(const RtlirPropertyDecl& declared,

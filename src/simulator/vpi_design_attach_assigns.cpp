@@ -542,13 +542,14 @@ const Expr* KeyedValue(const Expr* pattern, const VpiObject* slot,
 // §37.59 detail 6: the keyed assignment pattern `pattern` assigned to
 // `target` as an assignment pattern operation over its expressions in the
 // positional order of `target`'s members or elements, left first (§37.17
-// details 3 and 18), each in the place its keys give it. Null where `target`
-// has neither.
+// details 3 and 18), or of a struct typespec's typespec members (§37.26),
+// each in the place its keys give it. Null where `target` has none.
 VpiObject* KeyedPatternObject(const Expr* pattern, const VpiObject* target,
                               const AssignBuild& build) {
   std::vector<const Expr*> placed;
   for (const VpiObject* child : target->children) {
-    if (child->member_of == target || child->array_member) {
+    if (child->member_of == target || child->array_member ||
+        child->type == vpiTypespecMember) {
       placed.push_back(KeyedValue(pattern, child, build));
     }
   }

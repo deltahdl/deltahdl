@@ -234,6 +234,21 @@ class PropertyDeclsOfARun : public VpiDesignRun {
     return reached == nullptr ? "" : vpi_get_str(vpiName, reached);
   }
 
+  // The class typespec the formal h of `top`'s property p reaches, null where
+  // it reaches none of that kind or C is not the class it names.
+  static vpiHandle ClassTypespecOfH() {
+    vpiHandle decl = Named(vpiPropertyDecl, By("top"), "p");
+    vpiHandle h =
+        decl == nullptr
+            ? nullptr
+            : vpi_handle(vpiTypespec, Named(vpiPropFormalDecl, decl, "h"));
+    if (h == nullptr || vpi_get(vpiType, h) != vpiClassTypespec ||
+        std::string(vpi_get_str(vpiName, h)) != "C") {
+      return nullptr;
+    }
+    return h;
+  }
+
   // The arguments the property inst of `top`'s assertion `assertion`
   // reaches, in the order reached; none where it reaches no property inst.
   static std::vector<vpiHandle> ArgumentsOf(const char* assertion) {
@@ -550,6 +565,76 @@ TEST_F(PropertyDeclsOfARun, AFormalOfAnAliasTypedefReachesItsTypespec) {
   vpiHandle v = vpi_handle(vpiTypespec, Named(vpiPropFormalDecl, decl, "v"));
   ASSERT_NE(v, nullptr);
   EXPECT_STREQ(vpi_get_str(vpiName, v), "half_t");
+}
+
+// A formal of a class type reaches a class typespec of that class (detail 3,
+// §16.8), and the typespec the class defn the module declares, past another
+// class of it (#5761).
+TEST_F(PropertyDeclsOfARun, AFormalOfAModulesClassReachesItsClassTypespec) {
+  Run("module top; logic clk;\n"
+      "  class D; endclass\n"
+      "  class C; endclass\n"
+      "  property p(C h); @(posedge clk) 1; endproperty\n"
+      "endmodule\n");
+  vpiHandle h = ClassTypespecOfH();
+  ASSERT_NE(h, nullptr);
+  EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiClassDefn, h),
+                                  Named(vpiClassDefn, By("top"), "C")));
+}
+
+// ...and one of the compilation unit's class a class typespec naming it
+// (#5761).
+TEST_F(PropertyDeclsOfARun, AFormalOfAUnitsClassReachesItsClassTypespec) {
+  Run("class C; endclass\n"
+      "module top; logic clk;\n"
+      "  property p(C h); @(posedge clk) 1; endproperty\n"
+      "endmodule\n");
+  EXPECT_NE(ClassTypespecOfH(), nullptr);
+}
+
+// A keyed pattern passed for a formal of a struct type is the assignment
+// pattern operation the formal's typespec orders, its typespec members
+// giving the places (§37.59 detail 6, §37.26) (#5760).
+TEST_F(PropertyDeclsOfARun, AKeyedPatternActualTakesItsFormalsOrder) {
+  Run("module top; logic clk, x;\n"
+      "  typedef struct packed { logic a, b; } pair_t;\n"
+      "  property p(pair_t s); @(posedge clk) 1; endproperty\n"
+      "  a1: assert property (p('{b: x, default: 1'b0}));\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kArguments = ArgumentsOf("a1");
+  ASSERT_EQ(kArguments.size(), 1U);
+  EXPECT_EQ(vpi_get(vpiOpType, kArguments[0]), vpiAssignmentPatternOp);
+  vpiHandle it = vpi_iterate(vpiOperand, kArguments[0]);
+  ASSERT_NE(it, nullptr);
+  vpiHandle first = vpi_scan(it);
+  ASSERT_NE(first, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, first), vpiConstant);
+  vpiHandle second = vpi_scan(it);
+  ASSERT_NE(second, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, second), "x");
+}
+
+// A property a package declares is a property decl of the package, and an
+// instance of it by the bare name an import makes visible reaches it, past a
+// wildcard import of a package declaring no such property and an import of
+// another of the package's properties (§16.12, §26.3) (#5750).
+TEST_F(PropertyDeclsOfARun, AnInstOfAnImportedPropertyReachesItsPackages) {
+  Run("package pk; property p(x); x; endproperty\n"
+      "  property r; 1; endproperty endpackage\n"
+      "package qk; property q; 1; endproperty endpackage\n"
+      "module top; import qk::*; import pk::r; import pk::p;\n"
+      "  logic clk, a;\n"
+      "  default clocking cb @(posedge clk); endclocking\n"
+      "  a1: assert property (p(a));\n"
+      "endmodule\n");
+  vpiHandle decl = Named(vpiPropertyDecl, By("pk"), "p");
+  ASSERT_NE(decl, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, decl), "pk::p");
+  vpiHandle a1 = Named(vpiAssertion, By("top"), "a1");
+  ASSERT_NE(a1, nullptr);
+  vpiHandle inst = vpi_handle(vpiProperty, a1);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiPropertyDecl, inst), decl));
 }
 
 // §37.51 details 3 and 4: a formal's typespec is its typespec child, found

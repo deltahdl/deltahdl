@@ -131,8 +131,11 @@ void FillAssignment(VpiObject* obj, const Stmt& stmt,
                     const VpiStmtBuild& with) {
   const bool kOperator = IsOperatorAssignment(stmt);
   obj->lhs = with.expression(stmt.lhs);
-  obj->rhs = kOperator ? with.expression(stmt.rhs->rhs)
-                       : with.assigned(stmt.rhs, obj->lhs);
+  // §37.59 detail 6: the left side orders a keyed pattern, where it is an
+  // object the model made.
+  obj->rhs = kOperator             ? with.expression(stmt.rhs->rhs)
+             : obj->lhs != nullptr ? with.assigned(stmt.rhs, obj->lhs)
+                                   : with.expression(stmt.rhs);
   obj->op_type = kOperator ? VpiAssignmentOpType(OperatorSpelling(stmt.rhs->op))
                            : vpiAssignmentOp;
   obj->blocking = stmt.kind == StmtKind::kBlockingAssign;
