@@ -37,13 +37,14 @@ namespace delta {
 // expansion it is for, whose subtree reads `literal` in the local's place,
 // and the initialization assignment performed, into the literal, at the
 // first tick of that node's clock at or after the attempt begins, the value
-// cast to the local's width.
+// cast to the local's width and signedness.
 struct LocalCopy {
   const PropertyExprNode* node;
   std::string_view name;
   Expr* literal;
   const Expr* init;
   uint32_t width;
+  bool is_signed;
 };
 
 struct PropertyTreeState {
@@ -347,10 +348,12 @@ ActualsByFormal NewLocalCopies(const PropertyExprNode* node,
   for (const SeqLocalDecl& local : locals) {
     const uint32_t kWidth = LocalWidth(local, sc.ctx, sc.arena);
     Logic4Vec unassigned = MakeLogic4Vec(sc.arena, kWidth);
+    unassigned.is_signed = LocalIsSigned(local.type_kw);
     FillWithX(unassigned);
     Expr* literal = LiteralOfValue(unassigned, sc.arena);
     const Expr* init = SubstituteFormals(local.init, copies, sc.arena);
-    sc.tree.local_copies.push_back({node, local.name, literal, init, kWidth});
+    sc.tree.local_copies.push_back(
+        {node, local.name, literal, init, kWidth, unassigned.is_signed});
     copies[local.name] = literal;
   }
   return copies;
@@ -403,6 +406,7 @@ void InitializeLocalCopies(const PropertyExprNode* node, StepContext& sc) {
     Logic4Vec value = ResizeToWidth(
         OwnRhsWords(EvalExpr(copy.init, sc.ctx, sc.arena), sc.arena),
         copy.width, sc.arena);
+    value.is_signed = copy.is_signed;
     *copy.literal = *LiteralOfValue(value, sc.arena);
   }
   copies = std::move(waiting);

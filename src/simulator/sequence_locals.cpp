@@ -52,6 +52,9 @@ bool LocalIs4State(TokenKind type_kw) {
          type_kw == TokenKind::kKwInteger;
 }
 
+// The keywords LocalWidth sizes wider than a bit are the integer atom types.
+bool LocalIsSigned(TokenKind type_kw) { return LocalWidth(type_kw) > 1; }
+
 // §16.10: the initialization assignments are performed in the order the
 // locals are declared, one's expression reading the locals declared before
 // it as assigned, so each is stood up in a scope of its own as its value is

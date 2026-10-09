@@ -124,15 +124,17 @@ class AttemptLocalsScope {
   // §16.10 and §16.13.7: an item assigning a local of the named property the
   // sequence stands in, whose other expressions read the attempt's copy
   // through the same literal, so the literal is rewritten in place with the
-  // value at the local's width, as the copy's initialization writes it.
+  // value at the local's width and signedness, as the copy's initialization
+  // writes it.
   void AssignLocalCopy(const SeqMatchAssign& item, Arena& arena) {
     Logic4Vec held = EvalExpr(item.local_copy, ctx_, arena);
     Logic4Vec rhs = EvalExpr(item.rhs, ctx_, arena);
     if (item.op != TokenKind::kEq) {
       rhs = EvalBinaryOp(CompoundAssignBaseOp(item.op), held, rhs, arena);
     }
-    *item.local_copy = *LiteralOfValue(
-        ResizeToWidth(OwnRhsWords(rhs, arena), held.width, arena), arena);
+    Logic4Vec value = ResizeToWidth(OwnRhsWords(rhs, arena), held.width, arena);
+    value.is_signed = held.is_signed;
+    *item.local_copy = *LiteralOfValue(value, arena);
   }
 
   LinearAttempt& attempt_;

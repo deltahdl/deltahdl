@@ -200,13 +200,22 @@ TEST(PropertyLocals, EachAttemptHoldsItsOwnCopy) {
 }
 
 // §16.10 with §7.4.1: a property's local declared of a packed type, `logic
-// [3:0] x`, holds four bits. x = k + 12 wraps below 12 for the attempts from
-// the edges 4 to 8, which pass, and stays at 12 or above for those from 0 to
-// 3, which fail; a 32-bit x would fail all nine and a 1-bit x pass all nine
+// [3:0] x`, holds four unsigned bits. x = k + 12 wraps below 12 for the
+// attempts from the edges 4 to 8, which pass, and stays at 12 or above for
+// those from 0 to 3, which fail; a 32-bit x would fail all nine, and a 1-bit
+// x, or one read as signed as the int it is assigned from, pass all nine
 // (#5745).
 TEST(PropertyLocals, APackedLocalHoldsItsDeclaredWidth) {
   ExpectPropertyCounts("(1, x = v + 12) |-> ##1 (x < 12)", 5, 4,
                        "logic [3:0] x");
+}
+
+// §16.10 with §6.11: a property's local holds the signedness of its type,
+// whatever the expression assigned to it: an int assigned the unsigned
+// 32'hFFFF_FFFF is -1, below 0 at all nine attempts, where a copy taking the
+// assigned value's signedness would be 4294967295 and fail them all.
+TEST(PropertyLocals, AnIntLocalIsSignedWhateverItIsAssigned) {
+  ExpectPropertyCounts("(1, x = 32'hFFFF_FFFF) |-> ##1 (x < 0)", 9, 0);
 }
 
 // §16.10 with §7.4.1: the copy of a property's packed local an attempt reads

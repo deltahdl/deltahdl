@@ -26,6 +26,11 @@ uint32_t LocalWidth(const SeqLocalDecl& decl, SimContext& ctx, Arena& arena);
 // for a 2-state one.
 bool LocalIs4State(TokenKind type_kw);
 
+// §6.11, Table 6-8: whether a local declared with a data type keyword is
+// signed, as the integer atom types are and the vector types bit, logic and
+// reg are not.
+bool LocalIsSigned(TokenKind type_kw);
+
 // §16.10: the values a new attempt's copies of the locals `decls` begin with.
 std::vector<Logic4Vec> InitialLocals(const std::vector<SeqLocalDecl>& decls,
                                      SimContext& ctx, Arena& arena);
