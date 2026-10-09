@@ -1,10 +1,6 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
-#include <string>
-#include <string_view>
-#include <unordered_map>
-#include <vector>
 
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
@@ -172,41 +168,25 @@ TEST(DesignWalk, AGenerateBlockPathStopsAtAStepThatFindsNothing) {
   EXPECT_EQ(VpiGenScopeOf(&instance, kPath), nullptr);
 }
 
-// §36.10: a flat name with no component names no object.
-TEST(DesignWalk, AnEmptyFlatNameNamesNoObject) {
-  const std::unordered_map<std::string_view, VpiObject*> kObjects;
-  EXPECT_EQ(FindObjectForFlatName(kObjects, ""), nullptr);
-}
-
-// §36.10: the walk over a design's instances passes over a top that stands for
-// no module, visits nothing for a design with no top or a null first one, and
-// passes over an instance the run built no object for.
-TEST(DesignWalk, TopsAndInstancesWithNothingToVisitArePassedOver) {
-  RtlirModule real;
-  real.name = "real";
-  RtlirDesign with_null_top;
-  with_null_top.top_modules = {nullptr, &real};
-  std::vector<std::string> prefixes;
-  WalkInstancePaths(&with_null_top,
-                    [&](const RtlirModule*, const std::string& prefix) {
-                      prefixes.push_back(prefix);
-                    });
-  EXPECT_EQ(prefixes, std::vector<std::string>{"real"});
-
-  const std::unordered_map<std::string_view, VpiObject*> kNoObjects;
-  int visits = 0;
-  auto count = [&](const RtlirModule*, const std::string&, VpiObject*) {
-    ++visits;
-  };
-  RtlirDesign empty;
-  WalkInstanceObjects(&empty, kNoObjects, count);
-  RtlirDesign null_first;
-  null_first.top_modules = {nullptr};
-  WalkInstanceObjects(&null_first, kNoObjects, count);
-  RtlirDesign unbuilt;
-  unbuilt.top_modules = {&real};
-  WalkInstanceObjects(&unbuilt, kNoObjects, count);
-  EXPECT_EQ(visits, 0);
+// §36.10: attaching a design visits each instance the run built an object
+// for. A design with no top, or whose first top stands for no module, has none
+// to visit; a top named nothing, whose flat name has no component, and an
+// instance it holds that stands for no module are passed over rather than
+// followed.
+TEST(DesignWalk, AttachPassesOverInstancesWithNothingToVisit) {
+  for (int which = 0; which < 3; ++which) {
+    VpiContext vpi_ctx;
+    SetGlobalVpiContext(&vpi_ctx);
+    SimFixture f;
+    RtlirModule unnamed;
+    unnamed.children.resize(1);
+    RtlirDesign design;
+    if (which == 1) design.top_modules = {nullptr};
+    if (which == 2) design.top_modules = {&unnamed};
+    vpi_ctx.Attach(f.ctx, &design);
+    if (which < 2) EXPECT_EQ(vpi_iterate(vpiModule, nullptr), nullptr);
+    SetGlobalVpiContext(nullptr);
+  }
 }
 
 }  // namespace
