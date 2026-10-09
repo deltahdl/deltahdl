@@ -105,6 +105,23 @@ TEST(Typespec, TypedefAliasChain) {
   EXPECT_EQ(VpiTypespecTypedefAlias(/*is_alias=*/false, nullptr), nullptr);
 }
 
+// D1: vpiTypedefAlias is drawn on a typespec alone. A typespec reaches the
+// typedef its own aliases, and an object of another kind answers the
+// relation with nothing, whatever it holds (#5748).
+TEST(Typespec, OnlyATypespecReachesATypedefAlias) {
+  VpiContext ctx;
+  VpiObject aliased;
+  aliased.type = vpiLogicTypespec;
+  VpiObject typespec;
+  typespec.type = vpiLogicTypespec;
+  typespec.aliased = &aliased;
+  EXPECT_EQ(ctx.Handle(vpiTypedefAlias, &typespec), &aliased);
+  VpiObject net;
+  net.type = vpiNet;
+  net.aliased = &aliased;
+  EXPECT_EQ(ctx.Handle(vpiTypedefAlias, &net), nullptr);
+}
+
 // D6: a type defined as an alias of another type inherits the other type's
 // vpiType, so both the alias and the aliased typespec report the same type
 // code, observed through the existing vpi_get(vpiType). The alias of a time
