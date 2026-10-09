@@ -84,9 +84,8 @@ inline bool VpiIndexSelects(const VpiObject& child, int index) {
 inline VpiHandle FindObjectForFlatName(
     const std::unordered_map<std::string_view, VpiObject*>& objects,
     std::string_view flat_name) {
+  // The components hold at least one, the whole name where it has no dot.
   std::vector<std::string_view> parts = VpiNamePathComponents(flat_name);
-  if (parts.empty()) return nullptr;
-
   auto root = objects.find(parts.front());
   if (root == objects.end()) return nullptr;
 
