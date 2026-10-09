@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cstddef>
 #include <format>
-#include <functional>
 #include <string_view>
 #include <unordered_set>
 #include <vector>
@@ -22,13 +21,12 @@ namespace {
 
 // The names a walk of one module's procedures sees as variables or nets: the
 // module's own, and those each block around the statement walked declares,
-// the innermost last (§23.9); the tasks and functions a call statement may
-// call; and, first, whether the scope sees a name at all.
+// the innermost last (§23.9); and the other names the module itself declares,
+// or imports as data, which a call statement cannot call.
 struct DataScope {
-  const std::function<bool(std::string_view)>& visible;
-  std::unordered_set<std::string_view> module = {};
-  std::vector<std::string_view> blocks = {};
-  std::unordered_set<std::string_view> subroutines = {};
+  std::unordered_set<std::string_view> module;
+  std::vector<std::string_view> blocks;
+  std::unordered_set<std::string_view> uncallable;
 
   bool Names(std::string_view name) const {
     return module.contains(name) ||
@@ -58,34 +56,28 @@ const Expr* NamedCallee(const Expr& expr) {
   return kNamed ? expr.lhs : nullptr;
 }
 
-// A.6.9: a call statement, `x;` or `x(...);`, whose name is no task or
-// function it may call: a variable or a net (A.8.2); anything else the scope
-// sees, such as a parameter, a let or a sequence; or nothing the scope sees
-// (§23.9), which a bare call's walk in elaborator_scope_rules.cpp reports.
+// A.6.9: a call statement, `x;` or `x(...);`, whose name the scope declares
+// as no task or function: a variable or a net (A.8.2), or anything else the
+// module declares or imports as data, such as a parameter, a let or a
+// sequence. A name the module does not declare may name a task or function of
+// an instance above it (§23.8), and is left alone.
 void ReportStatementCall(const Stmt& stmt, const DataScope& scope,
                          DiagEngine& diag) {
   const bool kBare = stmt.expr->kind == ExprKind::kIdentifier;
   const Expr* callee = kBare ? stmt.expr : NamedCallee(*stmt.expr);
   if (callee == nullptr) return;
   const std::string_view kName = callee->text;
-  if (scope.subroutines.contains(kName)) return;
   if (scope.Names(kName)) {
     // A call with an argument list naming data is the expression walk's.
     if (kBare) ReportIfData(kName, stmt.range.start, scope, diag);
     return;
   }
-  const bool kVisible = scope.visible(kName);
-  if (kBare && !kVisible) return;
-  if (kVisible) {
-    diag.Error(stmt.range.start,
-               std::format("'{}' names no task or function, and a call "
-                           "statement calls one",
-                           kName),
-               Subclause("A.6.9"));
-    return;
-  }
-  diag.Error(stmt.range.start, std::format("undeclared identifier '{}'", kName),
-             Subclause("23.9"));
+  if (!scope.uncallable.contains(kName)) return;
+  diag.Error(stmt.range.start,
+             std::format("'{}' names no task or function, and a call "
+                         "statement calls one",
+                         kName),
+             Subclause("A.6.9"));
 }
 
 // Each call by a plain name `expr` holds, itself included.
@@ -124,30 +116,25 @@ void CheckStmtCalls(const Stmt* stmt, DataScope& scope, DiagEngine& diag) {
 }
 
 // Whether `item` declares a task or a function a call may call: one the
-// source writes, or one imported through DPI (§35.5).
+// source writes, or one a DPI import or export names (§35.5).
 bool IsSubroutineItem(const ModuleItem& item) {
   return item.kind == ModuleItemKind::kTaskDecl ||
          item.kind == ModuleItemKind::kFunctionDecl ||
-         item.kind == ModuleItemKind::kDpiImport;
+         item.kind == ModuleItemKind::kDpiImport ||
+         item.kind == ModuleItemKind::kDpiExport;
 }
 
-// §26.3: the tasks and functions `items` declare, and those an import among
-// them brings in from a package of `unit`, by its item name or with a
-// wildcard, added to `names`.
-void AddSubroutines(const std::vector<ModuleItem*>& items,
-                    const CompilationUnit& unit,
-                    std::unordered_set<std::string_view>& names) {
-  for (const ModuleItem* item : items) {
-    if (IsSubroutineItem(*item)) names.insert(item->name);
-    if (item->kind != ModuleItemKind::kImportDecl) continue;
-    const ImportItem& import = item->import_item;
-    for (const PackageDecl* package : unit.packages) {
-      if (package->name != import.package_name) continue;
-      for (const ModuleItem* declared : package->items) {
-        if (IsSubroutineItem(*declared) &&
-            (import.is_wildcard || declared->name == import.item_name)) {
-          names.insert(declared->name);
-        }
+// §26.3: the variables and nets the package `import` names brings in, by its
+// item name or with a wildcard, added to `names`.
+void AddImportedData(const CompilationUnit& unit, const ImportItem& import,
+                     std::unordered_set<std::string_view>& names) {
+  for (const PackageDecl* package : unit.packages) {
+    if (package->name != import.package_name) continue;
+    for (const ModuleItem* item : package->items) {
+      const bool kData = item->kind == ModuleItemKind::kVarDecl ||
+                         item->kind == ModuleItemKind::kNetDecl;
+      if (kData && (import.is_wildcard || item->name == import.item_name)) {
+        names.insert(item->name);
       }
     }
   }
@@ -155,20 +142,26 @@ void AddSubroutines(const std::vector<ModuleItem*>& items,
 
 }  // namespace
 
-void ReportCallsOfDataNames(
-    const ModuleDecl& decl, const CompilationUnit& unit,
-    const std::function<bool(std::string_view)>& visible, DiagEngine& diag) {
-  DataScope scope{visible};
+void ReportCallsOfDataNames(const ModuleDecl& decl, const CompilationUnit& unit,
+                            DiagEngine& diag) {
+  DataScope scope;
+  std::unordered_set<std::string_view> subroutines;
   for (const ModuleItem* item : decl.items) {
     if (item->kind == ModuleItemKind::kVarDecl ||
         item->kind == ModuleItemKind::kNetDecl) {
       scope.module.insert(item->name);
+    } else if (IsSubroutineItem(*item)) {
+      subroutines.insert(item->name);
+    } else if (!item->name.empty()) {
+      scope.uncallable.insert(item->name);
+    }
+    if (item->kind == ModuleItemKind::kImportDecl) {
+      AddImportedData(unit, item->import_item, scope.uncallable);
     }
   }
-  AddSubroutines(decl.items, unit, scope.subroutines);
-  AddSubroutines(unit.cu_items, unit, scope.subroutines);
-  // §18.12: a scope randomize call may be written without its std:: prefix.
-  scope.subroutines.insert("randomize");
+  // A name a DPI export gives a function the module also declares stays
+  // callable whichever item the walk met first.
+  for (const std::string_view name : subroutines) scope.uncallable.erase(name);
   for (const ModuleItem* item : decl.items) {
     if (IsProceduralItemKind(item->kind))
       CheckStmtCalls(item->body, scope, diag);

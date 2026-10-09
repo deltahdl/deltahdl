@@ -368,12 +368,13 @@ void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
   }
   // A bare call reaches every name an assignment target does, and the unit's
   // tasks and functions besides, which no assignment target may name.
-  const std::function<bool(std::string_view)> kCallVisible =
+  ReportBareCallsNamingNothing(
+      walk,
       [&](std::string_view name) {
         return target_visible(name) || UnitDeclaresSubroutine(unit_, name);
-      };
-  ReportBareCallsNamingNothing(walk, kCallVisible, diag_);
-  ReportCallsOfDataNames(*decl, *unit_, kCallVisible, diag_);
+      },
+      diag_);
+  ReportCallsOfDataNames(*decl, *unit_, diag_);
 }
 
 namespace {
