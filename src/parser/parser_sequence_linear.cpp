@@ -261,13 +261,18 @@ struct ParserSeqLinearHelpers {
   }
 
   // §16.10 Syntax 16-13: the assertion_variable_declarations a sequence body
-  // opens with, each `type [packed dimensions] name [= init] {, name [=
-  // init]} ;` over a data type keyword, its var_data_type taking the packed
-  // dimensions §7.4.1 writes after the keyword, recorded as the body's local
-  // variables. A declaration in any other shape ends the capture.
+  // opens with, each `type [signing] [packed dimensions] name [= init] {,
+  // name [= init]} ;` over a data type keyword, its var_data_type taking the
+  // signing keyword §6.11 and the packed dimensions §7.4.1 write after the
+  // keyword, recorded as the body's local variables. A declaration in any
+  // other shape ends the capture.
   static bool ParseLinearSeqLocalDecls(Parser& p, SeqLinearBody& body) {
     while (IsBuiltinTypeKwForLocalVar(p.CurrentToken().kind)) {
       TokenKind type_kw = p.Consume().kind;
+      TokenKind signing = TokenKind::kEof;
+      if (p.Check(TokenKind::kKwSigned) || p.Check(TokenKind::kKwUnsigned)) {
+        signing = p.Consume().kind;
+      }
       DataType packed;
       p.ParsePackedDims(packed);
       std::vector<std::pair<Expr*, Expr*>> dims;
@@ -281,6 +286,7 @@ struct ParserSeqLinearHelpers {
         SeqLocalDecl local;
         local.name = p.Consume().text;
         local.type_kw = type_kw;
+        local.signing = signing;
         local.packed_dims = dims;
         if (p.Match(TokenKind::kEq)) local.init = p.ParseExpr();
         body.locals.push_back(local);

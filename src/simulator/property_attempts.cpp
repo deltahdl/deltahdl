@@ -348,7 +348,7 @@ ActualsByFormal NewLocalCopies(const PropertyExprNode* node,
   for (const SeqLocalDecl& local : locals) {
     const uint32_t kWidth = LocalWidth(local, sc.ctx, sc.arena);
     Logic4Vec unassigned = MakeLogic4Vec(sc.arena, kWidth);
-    unassigned.is_signed = LocalIsSigned(local.type_kw);
+    unassigned.is_signed = LocalIsSigned(local);
     FillWithX(unassigned);
     Expr* literal = LiteralOfValue(unassigned, sc.arena);
     const Expr* init = SubstituteFormals(local.init, copies, sc.arena);

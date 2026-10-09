@@ -31,6 +31,10 @@ bool LocalIs4State(TokenKind type_kw);
 // vector types bit, logic and reg are not.
 bool LocalIsSigned(TokenKind type_kw);
 
+// §6.11: whether the local `decl` is signed, as its signing keyword writes
+// where it writes one and as its type keyword is otherwise.
+bool LocalIsSigned(const SeqLocalDecl& decl);
+
 // §16.10: the values a new attempt's copies of the locals `decls` begin with.
 std::vector<Logic4Vec> InitialLocals(const std::vector<SeqLocalDecl>& decls,
                                      SimContext& ctx, Arena& arena);

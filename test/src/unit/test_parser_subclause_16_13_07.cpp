@@ -57,6 +57,23 @@ TEST(PropertyLocalParsing, APackedLocalIsCapturedWithItsDimension) {
   EXPECT_EQ(item->prop_locals[0].packed_dims[0].second->text, "0");
 }
 
+// §16.10: a property whose local declaration is malformed, `int ;`, naming
+// no variable, has no body captured.
+TEST(PropertyLocalParsing, AMalformedLocalLeavesTheBodyUncaptured) {
+  auto r = Parse(
+      "module m;\n"
+      "  property p;\n"
+      "    int ;\n"
+      "    @(posedge clk) a;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* item = FindItemByKind(r, ModuleItemKind::kPropertyDecl);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->prop_body_tree, nullptr);
+  EXPECT_TRUE(item->prop_locals.empty());
+}
+
 // §16.10: a local declared without an initialization is captured with
 // none, and a body without locals has none.
 TEST(PropertyLocalParsing, ALocalWithoutAnInitializationHasNone) {

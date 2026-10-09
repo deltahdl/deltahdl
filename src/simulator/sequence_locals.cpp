@@ -59,6 +59,11 @@ bool LocalIsSigned(TokenKind type_kw) {
   return LocalWidth(type_kw) > 1 && type_kw != TokenKind::kKwTime;
 }
 
+bool LocalIsSigned(const SeqLocalDecl& decl) {
+  if (decl.signing == TokenKind::kEof) return LocalIsSigned(decl.type_kw);
+  return decl.signing == TokenKind::kKwSigned;
+}
+
 // §16.10: the initialization assignments are performed in the order the
 // locals are declared, one's expression reading the locals declared before
 // it as assigned, so each is stood up in a scope of its own as its value is
@@ -80,7 +85,7 @@ std::vector<Logic4Vec> InitialLocals(const std::vector<SeqLocalDecl>& decls,
     }
     Variable* var = ctx.CreateLocalVariable(decl.name, value.width);
     var->is_4state = LocalIs4State(decl.type_kw);
-    var->is_signed = LocalIsSigned(decl.type_kw);
+    var->is_signed = LocalIsSigned(decl);
     var->value = value;
     values.push_back(value);
   }

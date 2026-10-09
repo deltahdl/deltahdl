@@ -67,6 +67,14 @@ TEST(SequenceLocals, AnIntLocalReadsAsSigned) {
   ExpectOneEndAfterTe2("y", "    int x = -1;\n    bit y = x < 0;\n");
 }
 
+// §16.10 with §6.11: a sequence's local takes the signedness its signing
+// keyword writes: `logic signed [3:0]` holding -1 is below 0, and `int
+// unsigned` holding -1 above it (#5768).
+TEST(SequenceLocals, ALocalTakesTheSignednessItsKeywordWrites) {
+  ExpectOneEndAfterTe2("(x < 0)", "    logic signed [3:0] x = -1;\n");
+  ExpectOneEndAfterTe2("(x > 0)", "    int unsigned x = -1;\n");
+}
+
 // §16.10 with §6.11: a sequence's time local is 64 bits, unsigned and
 // four-state: -1 is all 64 bits set, above any 32-bit value, and the local
 // is x until assigned (#5769).
@@ -239,6 +247,13 @@ TEST(PropertyLocals, APackedLocalHoldsItsDeclaredWidth) {
 // assigned value's signedness would be 4294967295 and fail them all.
 TEST(PropertyLocals, AnIntLocalIsSignedWhateverItIsAssigned) {
   ExpectPropertyCounts("(1, x = 32'hFFFF_FFFF) |-> ##1 (x < 0)", 9, 0);
+}
+
+// §16.10 with §6.11: a property's local declared `logic signed [3:0]` is
+// signed, so -1 assigned to it is below 0 at all nine attempts (#5768).
+TEST(PropertyLocals, ASignedPackedLocalIsSigned) {
+  ExpectPropertyCounts("(1, x = -1) |-> ##1 (x < 0)", 9, 0,
+                       "logic signed [3:0] x");
 }
 
 // §16.10 with §6.11: a property's time local is 64 bits and unsigned, so -1
