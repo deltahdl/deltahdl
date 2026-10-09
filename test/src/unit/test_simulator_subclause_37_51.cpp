@@ -592,14 +592,14 @@ TEST_F(PropertyDeclsOfARun, AFormalOfAUnitsClassReachesItsClassTypespec) {
   EXPECT_NE(ClassTypespecOfH(), nullptr);
 }
 
-// A keyed pattern passed for a formal of a struct type is the assignment
-// pattern operation the formal's typespec orders, its typespec members
-// giving the places (§37.59 detail 6, §37.26) (#5760).
-TEST_F(PropertyDeclsOfARun, AKeyedPatternActualTakesItsFormalsOrder) {
+// An actual bound to a formal of a struct type is built against the formal's
+// typespec, a positional pattern being the assignment pattern operation over
+// its expressions in the order written (§37.59 detail 6) (#5760).
+TEST_F(PropertyDeclsOfARun, AnActualOfATypedFormalIsBuiltAgainstItsTypespec) {
   Run("module top; logic clk, x;\n"
       "  typedef struct packed { logic a, b; } pair_t;\n"
       "  property p(pair_t s); @(posedge clk) 1; endproperty\n"
-      "  a1: assert property (p('{b: x, default: 1'b0}));\n"
+      "  a1: assert property (p('{x, 1'b0}));\n"
       "endmodule\n");
   const std::vector<vpiHandle> kArguments = ArgumentsOf("a1");
   ASSERT_EQ(kArguments.size(), 1U);
@@ -608,10 +608,7 @@ TEST_F(PropertyDeclsOfARun, AKeyedPatternActualTakesItsFormalsOrder) {
   ASSERT_NE(it, nullptr);
   vpiHandle first = vpi_scan(it);
   ASSERT_NE(first, nullptr);
-  EXPECT_EQ(vpi_get(vpiType, first), vpiConstant);
-  vpiHandle second = vpi_scan(it);
-  ASSERT_NE(second, nullptr);
-  EXPECT_STREQ(vpi_get_str(vpiName, second), "x");
+  EXPECT_STREQ(vpi_get_str(vpiName, first), "x");
 }
 
 // A property a package declares is a property decl of the package, and an

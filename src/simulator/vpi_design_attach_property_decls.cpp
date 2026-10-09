@@ -277,6 +277,7 @@ VpiObject* VpiMakePropertyInst(VpiObject* holder, const Expr& instance,
     provided.push_back(ActualArgument(instance.args[i], targets[i], with));
   }
   std::vector<VpiPropertyFormal> formals;
+  formals.reserve(kFormals.size());
   for (VpiHandle formal : kFormals) {
     formals.push_back(VpiPropertyFormal{VpiPropFormalInitExpr(formal)});
   }
