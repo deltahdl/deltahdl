@@ -407,6 +407,18 @@ TEST_F(InstanceObjectsOfARun, AnInstanceNamedWithAPeriodHasItsDefinition) {
   EXPECT_STREQ(vpi_get_str(vpiDefName, By("top.\\u.1 ")), "sub");
 }
 
+// A sibling named by the text before the period does not take the instance's
+// place: u.1 is found again as itself, not as a child 1 of u that does not
+// exist, so both instances report their definition.
+TEST_F(InstanceObjectsOfARun, AnInstanceNamedWithAPeriodBesideItsPrefix) {
+  Run("module sub; endmodule\n"
+      "module top; sub u (); sub \\u.1 (); endmodule\n");
+  EXPECT_EQ(NamesOf(vpiModule, By("top")),
+            (std::vector<std::string>{"u", "u.1"}));
+  EXPECT_STREQ(vpi_get_str(vpiDefName, By("top.u")), "sub");
+  EXPECT_STREQ(vpi_get_str(vpiDefName, By("top.\\u.1 ")), "sub");
+}
+
 constexpr const char* kPackageBesideTop =
     "package pkg; int pv = 8; endpackage\n"
     "module top; int x = pkg::pv; endmodule\n";

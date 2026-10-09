@@ -171,9 +171,9 @@ TEST(DesignWalk, AGenerateBlockPathStopsAtAStepThatFindsNothing) {
 // §36.10: attaching a design visits each instance the run built an object
 // for. A design with no top, or whose first top stands for no module, has none
 // to visit. An instance that stands for no module is passed over rather than
-// followed, and so is a top whose name the flat-name walk cannot split back
-// to its object, one written with a dot, whether it is the first top or a
-// later one keyed under its own name.
+// followed, and a declaration the run built no object for is passed over too.
+// A top written with a dot is walked whether it is the first top or a later
+// one keyed under its own name.
 TEST(DesignWalk, AttachPassesOverInstancesWithNothingToVisit) {
   for (int which = 0; which < 4; ++which) {
     VpiContext vpi_ctx;
@@ -183,6 +183,8 @@ TEST(DesignWalk, AttachPassesOverInstancesWithNothingToVisit) {
     unnamed.children.resize(1);
     RtlirModule dotted;
     dotted.name = "x.y";
+    dotted.variables.resize(1);
+    dotted.variables.front().name = "unbuilt";
     RtlirDesign design;
     if (which == 1) design.top_modules = {nullptr};
     if (which == 2) design.top_modules = {&unnamed, &dotted};

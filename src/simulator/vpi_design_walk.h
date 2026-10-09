@@ -98,28 +98,33 @@ inline std::unordered_set<std::string_view> VpiDottedEscapedNames(
   return design->compilation_unit->dotted_escaped_names;
 }
 
+// The object `rest` names below `scope`, or among `objects` where `scope` is
+// null. §5.6.1: a name written as an escaped identifier may hold a period, so
+// the first component runs to whichever period leaves a rest that names an
+// object below it, the nearest tried first, and a component naming an object
+// under which the rest finds nothing gives way to a longer one.
+inline VpiHandle FindObjectBelow(
+    const std::unordered_map<std::string_view, VpiObject*>& objects,
+    VpiHandle scope, std::string_view rest) {
+  for (std::size_t end = 0;; ++end) {
+    end = std::min(rest.find('.', end), rest.size());
+    VpiHandle found = ObjectNamedIn(objects, scope, rest.substr(0, end));
+    if (end == rest.size()) return found;
+    if (found == nullptr) continue;
+    VpiHandle below = FindObjectBelow(objects, found, rest.substr(end + 1));
+    if (below != nullptr) return below;
+  }
+}
+
 // The object a flat design name already stands for, and null where the name
 // reaches none. VpiContext::DesignObjectForFlatName makes the scopes it passes
 // through; this one makes nothing, which is what a reader that has something to
 // say about an object the run built wants: a declaration the run built no
-// object for is passed over rather than given an empty one. §5.6.1: a name
-// written as an escaped identifier may hold a period, so a period ending no
-// component that names an object is read past, into the component after it.
+// object for is passed over rather than given an empty one.
 inline VpiHandle FindObjectForFlatName(
     const std::unordered_map<std::string_view, VpiObject*>& objects,
     std::string_view flat_name) {
-  VpiHandle scope = nullptr;
-  std::size_t start = 0;
-  for (std::size_t end = 0;; ++end) {
-    end = std::min(flat_name.find('.', end), flat_name.size());
-    VpiHandle found =
-        ObjectNamedIn(objects, scope, flat_name.substr(start, end - start));
-    if (end == flat_name.size()) return found;
-    if (found != nullptr) {
-      scope = found;
-      start = end + 1;
-    }
-  }
+  return FindObjectBelow(objects, nullptr, flat_name);
 }
 
 // The instances `mod` holds, pushed onto the walk under their own paths. An
@@ -179,7 +184,9 @@ void WalkInstancePaths(const RtlirDesign* design, Visit visit) {
 
 // The same walk, visiting each scope with the object the run built for its
 // instance among `objects`, which the first top is keyed under by its own
-// name; a scope with no object is passed over, as is a design with no top.
+// name; a design with no top is passed over. The walk runs once
+// VpiContext::AttachInstanceObjects and VpiContext::AttachTopModules have made
+// an object for every instance it visits.
 template <typename Visit>
 void WalkInstanceObjects(
     const RtlirDesign* design,
@@ -190,12 +197,11 @@ void WalkInstanceObjects(
     return;
   }
   const std::string kFirstTop(design->top_modules.front()->name);
-  WalkInstancePaths(
-      design, [&](const RtlirModule* mod, const std::string& prefix) {
-        VpiObject* instance =
-            FindObjectForFlatName(objects, prefix.empty() ? kFirstTop : prefix);
-        if (instance != nullptr) visit(mod, prefix, instance);
-      });
+  WalkInstancePaths(design, [&](const RtlirModule* mod,
+                                const std::string& prefix) {
+    visit(mod, prefix,
+          FindObjectForFlatName(objects, prefix.empty() ? kFirstTop : prefix));
+  });
 }
 
 }  // namespace delta
