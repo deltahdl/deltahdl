@@ -505,25 +505,32 @@ std::string_view PackageVarClass(const RtlirDesign& design,
 ExprClassName ExprClass(const Expr& expr, const BlockParent& parent,
                         const BodyWalk& walk);
 
-// §13.4 with §8.6: the class the subroutine `callee` names returns a handle
-// of: a method's, of the class of the value it is applied through, a.self();
-// or a function's, f() or p::f().
+// §13.4 with §8.6 and §8.10: the class the subroutine `callee` names returns
+// a handle of: a function's, f() or a package's p::f(), the class looked up in
+// that package; a static method's of the class a scope names, C::make(); or a
+// method's of the class of the value it is applied through, a.self().
 ExprClassName CallResultClass(const Expr& callee, const BlockParent& parent,
                               const BodyWalk& walk) {
-  if (callee.kind == ExprKind::kMemberAccess && !callee.is_scope_resolution) {
-    const ExprClassName kOwner = ExprClass(*callee.lhs, parent, walk);
-    const std::string_view kMethod = callee.rhs->text;
-    const ClassDecl* decl =
-        ClassMethodCall(walk, kOwner.cls, kMethod, kOwner.package).owner.decl;
-    return {decl == nullptr
-                ? std::string_view()
-                : MethodNamed(*decl, kMethod)->return_type.type_name,
-            kOwner.package};
-  }
-  const ModuleItem* decl =
+  const ModuleItem* function =
       VpiCalleeSubroutine(CallSiteOf(parent, walk), callee).decl;
-  return {decl == nullptr ? std::string_view() : decl->return_type.type_name,
-          {}};
+  if (function != nullptr) {
+    return {function->return_type.type_name,
+            callee.is_scope_resolution ? callee.lhs->text : std::string_view()};
+  }
+  if (callee.kind != ExprKind::kMemberAccess) return {};
+  const ExprClassName kOwner = callee.is_scope_resolution
+                                   ? ExprClassName{callee.lhs->text, {}}
+                                   : ExprClass(*callee.lhs, parent, walk);
+  const std::string_view kMethod = callee.rhs->text;
+  const ClassDecl* decl =
+      ClassMethodCall(walk, kOwner.cls, kMethod, kOwner.package).owner.decl;
+  return {decl == nullptr ? std::string_view()
+                          : MethodNamed(*decl, kMethod)->return_type.type_name,
+          kOwner.package};
+}
+const ModuleItem* decl =
+    VpiCalleeSubroutine(CallSiteOf(parent, walk), callee).decl;
+return {decl == nullptr ? std::string_view() : decl->return_type.type_name, {}};
 }
 
 // §8.4: the class the value `expr` writes is a handle of: a variable's of the

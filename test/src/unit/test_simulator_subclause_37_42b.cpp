@@ -501,21 +501,29 @@ TEST_F(CallStatementsInAScope, ACallOfADpiImportIsACall) {
   EXPECT_EQ(NamesOf(vpiTaskCall, By("top.b")), std::vector<std::string>{"c_t"});
 }
 
-// §8.6 and §11.4.11 with §37.42: a method called on the handle a method call
-// returns, a.self().run(), or on the one a conditional yields,
+// §8.6, §8.10 and §11.4.11 with §37.42: a method called on the handle a
+// method call returns, a.self().run(), a static method's, B::make().run(), a
+// package's function's, p::make_d().go(), or the one a conditional yields,
 // (s ? a : c).run(), is a method task call of the class that handle's type
 // names (#5789).
 TEST_F(CallStatementsInAScope, ACallOnAResultOrAConditionalReachesItsMethod) {
-  Run("module top;\n"
+  Run("package p; class D; task go(); endtask endclass\n"
+      "  function automatic D make_d(); D d = new; return d; endfunction\n"
+      "endpackage\n"
+      "module top;\n"
       "  class B; task run(); endtask\n"
       "    function B self(); return this; endfunction\n"
+      "    static function B make(); B b = new; return b; endfunction\n"
       "  endclass\n"
       "  B a = new, c = new; bit s;\n"
-      "  initial begin : b a.self().run(); (s ? a : c).run(); end\n"
+      "  initial begin : b a.self().run(); (s ? a : c).run();\n"
+      "    B::make().run(); p::make_d().go();\n"
+      "  end\n"
       "endmodule\n");
   EXPECT_EQ(NamesOf(vpiMethodTaskCall, By("top.b")),
-            (std::vector<std::string>{"run", "run"}));
+            (std::vector<std::string>{"go", "run", "run", "run"}));
   ExpectTaskCallReaches("run", "top", "B");
+  ExpectTaskCallReaches("go", "p", "D");
 }
 
 // §7.2 with §37.42 detail 2: a method called through a structure's member
