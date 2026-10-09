@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
@@ -223,6 +224,57 @@ TEST(PackageScopeReference, PackageQualifiedClassDeclaresAHandleWithoutImport) {
   auto* mod = design->top_modules[0];
   ASSERT_EQ(mod->variables.size(), 1u);
   EXPECT_EQ(mod->variables[0].class_type_name, "p::C");
+}
+
+// §26.2 with §6.18: a package's typedef names a type as the package sees it,
+// so B, declared `typedef C B;` in p, names p's C whatever a module importing
+// p declares under the name C. Here the module's own C names p's B, and the
+// elaborator, which looked B's type C up among the module's names, followed C
+// to B and B back to C until the stack ran out (#5815); x is now p's C, four
+// bits. A typedef of p already written behind a package's scope, q::T, keeps
+// it, and names the module's nine-bit T no more than before.
+TEST(PackageScopeReference, AnImportedTypedefNamesItsOwnPackagesTypedef) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package q; typedef logic [1:0] T; endpackage\n"
+      "package p;\n"
+      "  typedef logic [3:0] C; typedef C B; typedef q::T S;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import p::*;\n"
+      "  typedef B C;\n"
+      "  typedef logic [8:0] T;\n"
+      "  C x; S y;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const RtlirVariable* x = FindVar(design, "m", "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->width, 4u);
+  const RtlirVariable* y = FindVar(design, "m", "y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->width, 2u);
+}
+
+// §26.2 with §6.18: the same chain ending at a class of the package, whose
+// handle the module's C declares, elaborates (#5815). The class's name K is
+// no typedef of p, so B's C is p's typedef and C's K is left as written.
+TEST(PackageScopeReference, AnImportedTypedefChainEndingAtAPackageClass) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface ifc; task t(); endtask endinterface\n"
+      "package p; class K; virtual ifc vif; endclass typedef K C; "
+      "typedef C B; endpackage\n"
+      "module top;\n"
+      "  import p::*;\n"
+      "  typedef B C;\n"
+      "  C x = new;\n"
+      "  initial if (0) x.vif.t();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace

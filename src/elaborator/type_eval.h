@@ -12,6 +12,7 @@ namespace delta {
 struct DataType;
 enum class DataTypeKind : uint8_t;
 class Arena;
+struct PackageDecl;
 
 using TypedefMap = std::unordered_map<std::string_view, DataType>;
 
@@ -118,6 +119,13 @@ uint32_t TaggedUnionTagBitOffset(const DataType& dtype);
 // that would take the layout from a different type.
 const DataType* FindNamedType(const DataType& dtype,
                               const TypedefMap& typedefs);
+
+// §26.2 with §6.18: `type`, the type a typedef of the package `package` was
+// declared with, its name written behind the package's scope where it names a
+// typedef the package declares, so it is looked up under the package's
+// "package::name" key and never among the names of a scope importing the
+// package, which may declare one of its own under that name.
+DataType InPackageScope(const DataType& type, const PackageDecl& package);
 
 // The kind of the type `dtype` stands for, following each typedef or
 // user-defined nettype name (§6.18, §6.6.7) to the type it was declared with;

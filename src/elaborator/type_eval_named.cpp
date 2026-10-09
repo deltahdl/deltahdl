@@ -9,6 +9,7 @@
 #include "common/arena.h"
 #include "elaborator/std_package.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_module.h"
 #include "parser/ast_type.h"
 
 namespace delta {
@@ -35,6 +36,20 @@ const DataType* FindNamedType(const DataType& dtype,
   }
   auto it = typedefs.find(dtype.type_name);
   return (it != typedefs.end()) ? &it->second : nullptr;
+}
+
+DataType InPackageScope(const DataType& type, const PackageDecl& package) {
+  DataType scoped = type;
+  if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty()) {
+    return scoped;
+  }
+  for (const ModuleItem* item : package.items) {
+    if (item->kind == ModuleItemKind::kTypedef &&
+        item->name == type.type_name) {
+      scoped.scope_name = package.name;
+    }
+  }
+  return scoped;
 }
 
 DataTypeKind ResolvedTypeKind(const DataType& dtype,

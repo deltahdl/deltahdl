@@ -269,7 +269,8 @@ void RegisterPackageTypedefs(CompilationUnit* unit, TypedefMap& typedefs,
   for (auto* pkg : unit->packages) {
     for (auto* item : pkg->items) {
       if (item->kind != ModuleItemKind::kTypedef) continue;
-      RegisterScopedTypedef(pkg->name, item->name, item->typedef_type, typedefs,
+      RegisterScopedTypedef(pkg->name, item->name,
+                            InPackageScope(item->typedef_type, *pkg), typedefs,
                             arena);
     }
   }
