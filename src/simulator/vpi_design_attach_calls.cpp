@@ -528,10 +528,6 @@ ExprClassName CallResultClass(const Expr& callee, const BlockParent& parent,
                           : MethodNamed(*decl, kMethod)->return_type.type_name,
           kOwner.package};
 }
-const ModuleItem* decl =
-    VpiCalleeSubroutine(CallSiteOf(parent, walk), callee).decl;
-return {decl == nullptr ? std::string_view() : decl->return_type.type_name, {}};
-}
 
 // §8.4: the class the value `expr` writes is a handle of: a variable's of the
 // scope; an element's of an array of handles, objs[0]; a property's of the
