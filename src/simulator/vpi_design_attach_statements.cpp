@@ -28,13 +28,11 @@ bool IsOperatorAssignment(const Stmt& stmt) {
          stmt.lhs != nullptr && stmt.rhs->lhs == stmt.lhs;
 }
 
-// The spelling of the operator `op`, which TokenKindName gives between quotes.
+// The spelling of the assignment operator `op`, which TokenKindName gives
+// between quotes, as it gives every operator.
 std::string_view OperatorSpelling(TokenKind op) {
-  std::string_view name = TokenKindName(op);
-  if (name.size() >= 2 && name.front() == '\'' && name.back() == '\'') {
-    name = name.substr(1, name.size() - 2);
-  }
-  return name;
+  const std::string_view kName = TokenKindName(op);
+  return kName.substr(1, kName.size() - 2);
 }
 
 // §37.59: an operation of `op_type` over `operands`, in order; null where an

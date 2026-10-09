@@ -1,10 +1,20 @@
 #include <gtest/gtest.h>
 
+#include <deque>
+#include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
+#include "common/arena.h"
 #include "fixture_vpi_run.h"
+#include "lexer/token.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
@@ -262,6 +272,260 @@ TEST_F(AtomicStatementsOfARun, ABreakAndAContinueAreObjectsOfTheRun) {
   EXPECT_EQ(KindsOf(vpiBreak, lp), std::vector<int>{vpiBreak});
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiProcess, First(vpiBreak, lp))),
             VpiObjectOf(First(vpiProcess, By("top"))));
+}
+
+// -----------------------------------------------------------------------------
+// The objects a statement reaches, filled straight from the statement the
+// parser hands over, in shapes no source run builds.
+// -----------------------------------------------------------------------------
+
+// Builds each object in `made_`. An identifier stands as an object of its
+// name, any other expression as none, as one the model leaves out would, and
+// a statement the filled one holds as none.
+class StatementFill : public ::testing::Test {
+ protected:
+  // `expr` made an identifier written `text`.
+  static void Name(Expr& expr, std::string_view text) {
+    expr.kind = ExprKind::kIdentifier;
+    expr.text = text;
+  }
+
+  std::deque<VpiObject> made_;
+  std::deque<std::string> kept_;
+  Arena arena_;
+  VpiAttachBuild build_{[this] { return &made_.emplace_back(); },
+                        [this](std::string name) {
+                          kept_.push_back(std::move(name));
+                          return std::string_view(kept_.back());
+                        },
+                        arena_};
+  VpiStmtBuild with_{
+      build_,
+      [this](const Expr* expr) -> VpiObject* {
+        if (expr == nullptr || expr->kind != ExprKind::kIdentifier) {
+          return nullptr;
+        }
+        VpiObject* made = &made_.emplace_back();
+        made->type = vpiNet;
+        made->name = expr->text;
+        return made;
+      },
+      [](const Stmt*, VpiObject*) -> VpiObject* { return nullptr; },
+      [](const Expr*) { return vpiIntVar; }};
+};
+
+// §37.64 detail 1: only an assignment whose right side is an operation over
+// its own left side is an operator assignment. One missing its right side, or
+// missing its left side under an operation whose left operand is missing
+// too, is a plain one.
+TEST_F(StatementFill, AnAssignmentMissingASideIsAPlainAssignment) {
+  Expr a;
+  Name(a, "a");
+  Stmt no_rhs;
+  no_rhs.kind = StmtKind::kBlockingAssign;
+  no_rhs.lhs = &a;
+  VpiObject plain;
+  plain.type = vpiAssignment;
+  VpiFillStmt(&plain, no_rhs, with_);
+  EXPECT_EQ(plain.op_type, vpiAssignmentOp);
+  EXPECT_EQ(plain.rhs, nullptr);
+
+  Expr b;
+  Name(b, "b");
+  Expr sum;
+  sum.kind = ExprKind::kBinary;
+  sum.op = TokenKind::kPlusEq;
+  sum.rhs = &b;
+  Stmt no_lhs;
+  no_lhs.kind = StmtKind::kBlockingAssign;
+  no_lhs.rhs = &sum;
+  VpiObject whole;
+  whole.type = vpiAssignment;
+  VpiFillStmt(&whole, no_lhs, with_);
+  EXPECT_EQ(whole.op_type, vpiAssignmentOp);
+  EXPECT_EQ(whole.rhs, nullptr);
+}
+
+// §37.64 with §37.68: an intra-assignment delay the model leaves out still
+// gives the assignment its delay control, one reaching no delay.
+TEST_F(StatementFill, AnUnmodelledIntraAssignmentDelayReachesNoDelay) {
+  Expr a;
+  Name(a, "a");
+  Expr b;
+  Name(b, "b");
+  Expr two;
+  two.kind = ExprKind::kIntegerLiteral;
+  Stmt stmt;
+  stmt.kind = StmtKind::kNonblockingAssign;
+  stmt.lhs = &a;
+  stmt.rhs = &b;
+  stmt.delay = &two;
+  VpiObject assignment;
+  assignment.type = vpiAssignment;
+  VpiFillStmt(&assignment, stmt, with_);
+  ASSERT_EQ(assignment.children.size(), 1U);
+  EXPECT_EQ(assignment.children[0]->type, vpiDelayControl);
+  EXPECT_TRUE(assignment.children[0]->children.empty());
+}
+
+// §37.65: an event control whose list holds an event the model leaves out - a
+// sequence (§9.4.2.4), the edge keyword, or an edge or an iff over an
+// expression not modelled - reaches no condition, rather than one standing
+// for the other events alone.
+TEST_F(StatementFill, AnEventLeftOutLeavesTheControlNoCondition) {
+  Expr clk;
+  Name(clk, "clk");
+  Expr one;
+  one.kind = ExprKind::kIntegerLiteral;
+  EventExpr modelled;
+  modelled.signal = &clk;
+  EventExpr sequence;
+  sequence.signal = &clk;
+  sequence.is_sequence_event = true;
+  EventExpr edge;
+  edge.signal = &clk;
+  edge.edge = Edge::kEdge;
+  EventExpr posedge;
+  posedge.signal = &one;
+  posedge.edge = Edge::kPosedge;
+  EventExpr guarded;
+  guarded.signal = &clk;
+  guarded.iff_condition = &one;
+  const std::vector<EventExpr> kLeftOut = {sequence, edge, posedge, guarded};
+  for (const EventExpr& left_out : kLeftOut) {
+    Stmt stmt;
+    stmt.kind = StmtKind::kEventControl;
+    stmt.events = {modelled, left_out};
+    VpiObject control;
+    control.type = vpiEventControl;
+    VpiFillStmt(&control, stmt, with_);
+    EXPECT_TRUE(control.children.empty());
+  }
+}
+
+// §37.72: a casez reports vpiCaseZ, and a case matches (§12.6.1) the tagged
+// qualifier.
+TEST_F(StatementFill, ACasezMatchesIsTaggedCaseZ) {
+  Expr sel;
+  Name(sel, "sel");
+  Stmt stmt;
+  stmt.kind = StmtKind::kCase;
+  stmt.case_kind = TokenKind::kKwCasez;
+  stmt.case_matches = true;
+  stmt.condition = &sel;
+  VpiObject made;
+  made.type = vpiCase;
+  VpiFillStmt(&made, stmt, with_);
+  EXPECT_EQ(made.case_type, vpiCaseZ);
+  EXPECT_EQ(made.qualifier, vpiTaggedQualifier);
+}
+
+// §37.74 with §37.12 detail 2: a for statement whose header initializes
+// nothing declares no loop variable.
+TEST_F(StatementFill, AForInitializingNothingDeclaresNoVariable) {
+  Stmt stmt;
+  stmt.kind = StmtKind::kFor;
+  VpiObject loop;
+  loop.type = vpiFor;
+  loop.local_var_decls = true;
+  VpiFillStmt(&loop, stmt, with_);
+  EXPECT_FALSE(loop.local_var_decls);
+}
+
+// §37.77 with §9.6.2: a disable reaches no target where it writes no
+// hierarchical name - none, a literal, a member access missing its member,
+// or one off an expression that is no name - though the named block around it
+// answers to the name the expression ends in, nor where its name reaches only
+// an object no disable stops, such as a variable.
+TEST_F(StatementFill, ADisableOfNoBlockOrTaskHasNoTarget) {
+  VpiObject block;
+  block.type = vpiNamedBegin;
+  block.name = "b";
+  VpiObject var;
+  var.type = vpiIntVar;
+  var.name = "x";
+  var.parent = &block;
+  block.children = {&var};
+  Expr b;
+  Name(b, "b");
+  Expr x;
+  Name(x, "x");
+  Expr literal;
+  literal.kind = ExprKind::kIntegerLiteral;
+  literal.text = "b";
+  Expr no_member;
+  no_member.kind = ExprKind::kMemberAccess;
+  no_member.lhs = &b;
+  Expr off_literal;
+  off_literal.kind = ExprKind::kMemberAccess;
+  off_literal.lhs = &literal;
+  off_literal.rhs = &b;
+  const auto kTarget = [this, &block](Expr* name) {
+    Stmt stmt;
+    stmt.kind = StmtKind::kDisable;
+    stmt.expr = name;
+    VpiObject disable;
+    disable.type = vpiDisable;
+    disable.parent = &block;
+    VpiFillStmt(&disable, stmt, with_);
+    return disable.disable_target;
+  };
+  EXPECT_EQ(kTarget(&b), &block);
+  for (Expr* name :
+       std::vector<Expr*>{nullptr, &literal, &no_member, &off_literal, &x}) {
+    EXPECT_EQ(kTarget(name), nullptr);
+  }
+}
+
+// §37.50: a cover statement embedded in procedural code is a concurrent
+// cover; written otherwise it is an immediate one (§37.55).
+TEST(StatementKind, AProceduralConcurrentCoverIsACover) {
+  Stmt stmt;
+  stmt.kind = StmtKind::kCoverImmediate;
+  EXPECT_EQ(VpiBuiltStmtKind(stmt), vpiImmediateCover);
+  stmt.is_procedural_concurrent = true;
+  EXPECT_EQ(VpiBuiltStmtKind(stmt), vpiCover);
+}
+
+// §37.52: a spec is made wherever the parser read a property for it - a tree
+// of operators, a sequence or a Boolean - and none where it read none.
+TEST_F(StatementFill, APropertySpecIsMadeOnlyForAPropertyRead) {
+  Expr a;
+  Name(a, "a");
+  PropertyExprNode tree;
+  tree.boolean = &a;
+  ModuleItem sequence;
+  Stmt property;
+  property.kind = StmtKind::kAssertImmediate;
+  VpiObject holder;
+  holder.type = vpiAssert;
+  EXPECT_EQ(VpiMakePropertySpec(&holder, property, with_), nullptr);
+  EXPECT_TRUE(holder.children.empty());
+  property.assert_property = &tree;
+  EXPECT_NE(VpiMakePropertySpec(&holder, property, with_), nullptr);
+  property.assert_sequence = &sequence;
+  EXPECT_NE(VpiMakePropertySpec(&holder, property, with_), nullptr);
+  EXPECT_EQ(holder.children.size(), 2U);
+}
+
+// §37.52 with §16.12.3: the property expr of a negated Boolean property is
+// the not operation over the Boolean.
+TEST_F(StatementFill, ANegatedBooleanPropertyIsANotOperation) {
+  Expr a;
+  Name(a, "a");
+  Stmt property;
+  property.kind = StmtKind::kAssertImmediate;
+  property.assert_expr = &a;
+  property.assert_negated = true;
+  VpiObject holder;
+  holder.type = vpiAssert;
+  const VpiObject* spec = VpiMakePropertySpec(&holder, property, with_);
+  ASSERT_NE(spec, nullptr);
+  ASSERT_EQ(spec->children.size(), 1U);
+  const VpiObject* negation = spec->children[0];
+  EXPECT_EQ(negation->op_type, vpiNotOp);
+  ASSERT_EQ(negation->children.size(), 1U);
+  EXPECT_EQ(negation->children[0]->name, "a");
 }
 
 }  // namespace
