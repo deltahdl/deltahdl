@@ -331,6 +331,10 @@ inline void AppendCellDeclarations(CompilationUnit& target,
                          src.packages.end());
   target.configs.insert(target.configs.end(), src.configs.begin(),
                         src.configs.end());
+  // §5.6.1: the escaped names holding a period that these declarations were
+  // written with, which the flat names of their objects are not split at.
+  target.dotted_escaped_names.insert(src.dotted_escaped_names.begin(),
+                                     src.dotted_escaped_names.end());
 }
 
 // Everything a source description declared outside every design element, which

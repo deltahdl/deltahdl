@@ -4,7 +4,13 @@
 #include <string_view>
 #include <vector>
 
+#include "common/diagnostic.h"
+#include "elaborator/rtlir.h"
+#include "elaborator/separate_compilation_bind.h"
+#include "fixture_scratch_dir.h"
+#include "fixture_simulator.h"
 #include "fixture_vpi_run.h"
+#include "helpers_bound_from_library.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -405,6 +411,20 @@ TEST_F(InstanceObjectsOfARun, AnEscapedNameHoldingAPeriodIsOneObject) {
 TEST_F(InstanceObjectsOfARun, AnInstanceNamedWithAPeriodHasItsDefinition) {
   Run(kDottedEscapedNames);
   EXPECT_STREQ(vpi_get_str(vpiDefName, By("top.\\u.1 ")), "sub");
+}
+
+// A cell bound from a precompiled library keeps such a name whole too: its
+// record is parsed into a unit of its own and its declarations moved onto the
+// one the design is elaborated from, with the names that hold a period.
+TEST_F(InstanceObjectsOfARun, AnEscapedNameInALibraryCellIsOneObject) {
+  ScratchDir tmp;
+  SeparateCompilationBinder binder(f_.mgr, f_.arena, f_.diag);
+  RtlirDesign* design = BoundFromALibrary(
+      tmp, {"module t; logic \\a.b ; endmodule\n"}, "", binder);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(f_.diag.HasErrors());
+  LowerAndRun(design, f_);
+  EXPECT_EQ(NamesOf(vpiVariables, By("t")), (std::vector<std::string>{"a.b"}));
 }
 
 // A sibling named by the text before the period does not take the instance's
