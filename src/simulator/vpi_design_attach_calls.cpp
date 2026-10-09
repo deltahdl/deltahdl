@@ -523,14 +523,6 @@ int MemberIndexKind(const Expr& array, const BlockParent& parent,
   return member == nullptr ? vpiIntVar
                            : FirstDimIndexKind(member->unpacked_dims, kAt);
 }
-std::string_view cls = kHead.var.cls;
-for (std::size_t i = kHead.used; i + 1 < names.size(); ++i) {
-  cls = PropertyType(kAt, cls, names[i]).cls;
-}
-const ClassMember* member = PropertyNamed(kAt, cls, names.back());
-return member == nullptr ? vpiIntVar
-                         : FirstDimIndexKind(member->unpacked_dims, kAt);
-}
 
 // The class a value of an expression is a handle of, named as written, with
 // the package declaring it where it is a package's; empty for an expression
