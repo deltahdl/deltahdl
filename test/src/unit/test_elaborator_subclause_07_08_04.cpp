@@ -417,4 +417,27 @@ TEST(IntegralIndexAssocArrayElaboration, RealIndexInAForLoopStepIllegal) {
                             6, "7.8.4"));
 }
 
+// §7.8.4: an index of an integral index type is cast to it, but not from a
+// real, whatever form the index takes. An index whose kind its form does not
+// tell, and a `new` the parser reads in its place, are left alone.
+TEST(IntegralIndexAssocArrayElaboration, RealIndexExpressionRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int n [int];\n"
+      "  int a[2];\n"
+      "  real r;\n"
+      "  initial begin\n"
+      "    n[r + 1.0] = 1;\n"
+      "    n[a[0]] = 1;\n"
+      "    n[new] = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "real or shortreal index is not allowed on "
+                            "integral-indexed associative array 'n'",
+                            6, "7.8.4"));
+}
+
 }  // namespace

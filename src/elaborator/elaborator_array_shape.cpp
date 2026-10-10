@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "elaborator/const_eval.h"
+#include "elaborator/net_data_type.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
@@ -24,6 +25,13 @@ DataTypeKind ElementKindThroughTypedefs(const DataType& dtype,
     type = &td->second;
   }
   return type->kind == DataTypeKind::kEnum ? dtype.kind : type->kind;
+}
+
+std::string_view ElementTypeIdentity(const DataType& dtype,
+                                     const TypedefMap& typedefs) {
+  std::vector<std::string_view> names;
+  FollowTypedefs(dtype, typedefs, names);
+  return names.empty() ? std::string_view{} : names.back();
 }
 
 namespace {

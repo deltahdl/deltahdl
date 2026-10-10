@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -108,6 +110,51 @@ TEST(BuiltinMethodElaboration, ReductionOverSubarraysWithAClauseIsOk) {
              "  int y;\n"
              "  initial y = m.sum with (item.sum()) + a.sum();\n"
              "endmodule\n"));
+}
+
+// §7.12.3: a reduction applies its operation to the elements, or to a with
+// expression that is the element: sum and product need the arithmetic
+// operators, which a string has not, and the bitwise reductions need bitwise
+// operators, which a real has not either. A class handle, an unpacked
+// structure, a chandle and an event have neither.
+TEST(BuiltinMethodElaboration, ReductionOverAnElementWithoutItsOperation) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  class C; int v; endclass\n"
+      "  typedef struct { int a; } s_t;\n"
+      "  string s[3];\n"
+      "  C c[3];\n"
+      "  s_t t[3];\n"
+      "  real r[3];\n"
+      "  chandle h[2];\n"
+      "  event ev[2];\n"
+      "  int n;\n"
+      "  real x;\n"
+      "  initial begin\n"
+      "    n = s.sum;\n"
+      "    n = c.xor;\n"
+      "    n = t.and;\n"
+      "    n = t.sum with (item);\n"
+      "    n = t.sum with (item.a);\n"
+      "    n = r.xor;\n"
+      "    x = r.sum;\n"
+      "    n = h.or;\n"
+      "    n = ev.product;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  const char* const kReport =
+      "reduces values of a type its operation is not defined for";
+  const uint32_t kLines[] = {13, 14, 15, 16, 18, 20, 21};
+  for (uint32_t line : kLines) {
+    EXPECT_TRUE(ReportedError(diags, kReport, line, "7.12.3"));
+  }
+  for (const auto& d : diags) {
+    EXPECT_NE(d.loc.line, 17u) << d.message;
+    EXPECT_NE(d.loc.line, 19u) << d.message;
+  }
 }
 
 }  // namespace

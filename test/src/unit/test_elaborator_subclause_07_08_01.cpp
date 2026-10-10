@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -359,6 +361,32 @@ TEST(WildcardIndexType, ForeachOnWildcardInRandsequenceCodeBlockIsError) {
                             "wildcard associative array 'aa' may not be used "
                             "in a foreach loop",
                             5, "7.8.1"));
+}
+
+// §7.8.1: a wildcard index shall be integral, whatever form the index takes:
+// an arithmetic or unary operator over a real gives a real.
+TEST(WildcardIndexElaboration, RealIndexExpressionOfAnyFormRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int w [*];\n"
+      "  real r;\n"
+      "  initial begin\n"
+      "    w[r * 2] = 1;\n"
+      "    w[-r] = 1;\n"
+      "    w[2 * r] = 1;\n"
+      "    w[3 + 4] = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (uint32_t line = 5; line <= 7; ++line) {
+    EXPECT_TRUE(ReportedError(diags,
+                              "nonintegral index is not allowed on wildcard "
+                              "associative array 'w'",
+                              line, "7.8.1"));
+  }
+  for (const auto& d : diags) EXPECT_NE(d.loc.line, 8u) << d.message;
 }
 
 }  // namespace

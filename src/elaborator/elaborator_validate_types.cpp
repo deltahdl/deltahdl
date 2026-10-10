@@ -8,6 +8,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "elaborator/aggregate_shape.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_enum_constants.h"
@@ -399,10 +400,21 @@ void Elaborator::ValidateUnpackedDimRange(const std::vector<Expr*>& dims,
   }
 }
 
+// §7.4.4 (printed page 155): packed dimensions may be added in stages through
+// a typedef, so the element type of `t [3:0] x` is the type `t` stands for, and
+// §7.4.1's rules on it are judged through the name.
+static bool HasPredefinedWidthType(const DataType& dtype,
+                                   const TypedefMap& typedefs) {
+  if (const DataType* named = FindNamedType(dtype, typedefs)) {
+    return HasPredefinedWidthType(*named, typedefs);
+  }
+  return HasPredefinedWidth(dtype.kind);
+}
+
 void Elaborator::ValidatePackedDimOnPredefinedType(const DataType& dtype,
                                                    SourceLoc loc) {
-  if (!HasPredefinedWidth(dtype.kind)) return;
   if (!dtype.packed_dim_left) return;
+  if (!HasPredefinedWidthType(dtype, typedefs_)) return;
   diag_.Error(loc,
               "packed dimensions cannot be added to an integer type whose "
               "width is already fixed",
@@ -425,10 +437,25 @@ static bool IsAllowedPackedElementKind(DataTypeKind kind) {
   }
 }
 
+// A structure or union a typedef name stands for is a packed element only when
+// it is packed; one written in place with a packed dimension is judged by the
+// footnote 17 rule on the `packed` keyword instead.
+static bool IsDisallowedPackedElement(const DataType& dtype,
+                                      const TypedefMap& typedefs) {
+  if (const DataType* named = FindNamedType(dtype, typedefs)) {
+    return IsDisallowedPackedElement(*named, typedefs) ||
+           IsUnpackedAggregate(named);
+  }
+  return !IsAllowedPackedElementKind(dtype.kind);
+}
+
 void Elaborator::ValidatePackedDimOnDisallowedType(const DataType& dtype,
                                                    SourceLoc loc) {
   if (!dtype.packed_dim_left) return;
-  if (IsAllowedPackedElementKind(dtype.kind)) return;
+  // A class is no packed type (§8.4), and its name is in no typedef table.
+  bool names_class = dtype.kind == DataTypeKind::kNamed &&
+                     class_names_.count(dtype.type_name) != 0;
+  if (!names_class && !IsDisallowedPackedElement(dtype, typedefs_)) return;
   diag_.Error(loc,
               "packed array element type must be a single-bit type, "
               "enum, or packed aggregate",

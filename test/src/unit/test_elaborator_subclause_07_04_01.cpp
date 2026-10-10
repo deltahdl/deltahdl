@@ -414,4 +414,52 @@ TEST(PackedArrayValidation, PackedDimOnIntNames7_4_1) {
                             2, "7.4.1"));
 }
 
+// §7.4.4 lets packed dimensions be added in stages through a typedef, so the
+// element type of a packed dimension written after a typedef name is the type
+// the name stands for, followed through a chain of names, and §7.4.1 judges
+// that. A packed structure or soft union behind the name is a packed element; a
+// real, an unpacked structure or a class is not, and an int takes no packed
+// dimension at all.
+TEST(PackedArrayValidation, ElementTypeJudgedThroughTypedefNames) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef real r_t;\n"
+      "  typedef int i_t;\n"
+      "  typedef i_t ii_t;\n"
+      "  typedef struct { int a; } u_t;\n"
+      "  class C; endclass\n"
+      "  r_t [3:0] a;\n"
+      "  ii_t [1:0] b;\n"
+      "  u_t [1:0] c;\n"
+      "  C [1:0] h;\n"
+      "  typedef bit [1:5] bsix;\n"
+      "  typedef struct packed { bit x; } ps_t;\n"
+      "  typedef union soft { bit [1:0] p; bit q; } su_t;\n"
+      "  bsix [1:10] d;\n"
+      "  ps_t [1:0] e;\n"
+      "  su_t [1:0] g;\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "packed array element type must be a single-bit type", 7,
+      "7.4.1"));
+  EXPECT_TRUE(ReportedError(diags,
+                            "packed dimensions cannot be added to an integer "
+                            "type whose width is already fixed",
+                            8, "7.4.1"));
+  EXPECT_TRUE(ReportedError(
+      diags, "packed array element type must be a single-bit type", 9,
+      "7.4.1"));
+  EXPECT_TRUE(ReportedError(
+      diags, "packed array element type must be a single-bit type", 10,
+      "7.4.1"));
+  for (const auto& d : diags) {
+    EXPECT_NE(d.loc.line, 14u) << d.message;
+    EXPECT_NE(d.loc.line, 15u) << d.message;
+    EXPECT_NE(d.loc.line, 16u) << d.message;
+  }
+}
+
 }  // namespace

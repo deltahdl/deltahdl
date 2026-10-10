@@ -1,15 +1,23 @@
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <format>
+#include <optional>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
-#include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_array_shape.h"
 #include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/index_value_kind.h"
+#include "elaborator/net_data_type.h"
+#include "elaborator/queue_dim.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -145,10 +153,11 @@ bool ReportUnpackedDimCountMismatch(const ArrayAssignPair& p,
 // Reports an element-type mismatch between two tracked arrays. Returns true
 // (with a diagnostic emitted) when found.
 bool ReportElementTypeMismatch(const ArrayAssignPair& p, DiagEngine& diag) {
-  if (!ElementTypesEquivalent({p.l.elem_type, p.l.elem_width,
-                               p.l.elem_is_signed, p.l.elem_is_4state},
-                              {p.r.elem_type, p.r.elem_width,
-                               p.r.elem_is_signed, p.r.elem_is_4state})) {
+  if (!ElementTypesEquivalent(
+          {p.l.elem_type, p.l.elem_width, p.l.elem_is_signed,
+           p.l.elem_is_4state, p.l.elem_type_name},
+          {p.r.elem_type, p.r.elem_width, p.r.elem_is_signed,
+           p.r.elem_is_4state, p.r.elem_type_name})) {
     diag.Error(p.loc,
                std::format("array element type mismatch in assignment "
                            "('{}' vs '{}')",
@@ -187,62 +196,232 @@ bool ReportArrayShapeMismatch(const ArrayAssignPair& p, DiagEngine& diag) {
   return false;
 }
 
+using ArrayInfos =
+    std::unordered_map<std::string_view, Elaborator::VarArrayInfo>;
+
+// The arrays an assignment's operands may name: those a procedural block or a
+// subroutine declares, which hide the module's own, and the module's. A name
+// the block declares as no array hides a module array just the same.
+struct ArrayScope {
+  const ArrayInfos& module;
+  std::unordered_map<std::string_view, std::optional<Elaborator::VarArrayInfo>>
+      local = {};
+
+  [[nodiscard]] const Elaborator::VarArrayInfo* Find(
+      std::string_view name) const {
+    auto lit = local.find(name);
+    if (lit != local.end()) return lit->second ? &*lit->second : nullptr;
+    auto mit = module.find(name);
+    return mit != module.end() ? &mit->second : nullptr;
+  }
+};
+
+// What judging the assignments of a module reads besides the arrays in scope.
+struct ArrayAssignScan {
+  const std::unordered_set<std::string_view>& packed_array_vars;
+  const TypeShapeTables& tables;
+  const std::unordered_set<std::string_view>& aggregate_typedefs;
+  DiagEngine& diag;
+};
+
+// §7.4.5: the number of elements the slice `sel` takes, when its bounds or its
+// width are literals; nullopt otherwise.
+std::optional<uint32_t> ConstantSliceWidth(const Expr* sel) {
+  if (sel->is_part_select_plus || sel->is_part_select_minus) {
+    auto width = ConstEvalInt(sel->index_end);
+    if (!width) return std::nullopt;
+    return static_cast<uint32_t>(*width);
+  }
+  auto left = ConstEvalInt(sel->index);
+  auto right = ConstEvalInt(sel->index_end);
+  if (!left || !right) return std::nullopt;
+  return static_cast<uint32_t>(std::abs(*left - *right) + 1);
+}
+
+// §7.4.4 and §7.4.5: the array an operand of an assignment stands for. A
+// tracked array named alone is itself; one selected by index through some of
+// its dimensions is the subarray those leave, and one whose last select is a
+// slice is that slice, each described as the whole array is. A subarray or
+// slice is described only where every dimension it keeps has a fixed size the
+// declaration states and the slice's width is a literal; nullopt for anything
+// else, including an element or a select inside one. `root` is set to the
+// array's name.
+std::optional<Elaborator::VarArrayInfo> OperandArrayInfo(
+    const Expr* e, const ArrayScope& arrays, const Expr*& root) {
+  const Expr* last = e->kind == ExprKind::kSelect ? e : nullptr;
+  size_t selects = 0;
+  // A select standing as a side of an assignment always has a base; only a
+  // value range of `inside` is written as a select without one.
+  for (; e->kind == ExprKind::kSelect; e = e->base) ++selects;
+  if (e->kind != ExprKind::kIdentifier) return std::nullopt;
+  const Elaborator::VarArrayInfo* found = arrays.Find(e->text);
+  if (found == nullptr) return std::nullopt;
+  root = e;
+  const Elaborator::VarArrayInfo& whole = *found;
+  if (selects == 0) return whole;
+  const auto& shape = whole.unpacked_shape;
+  bool sliced = last->index_end != nullptr;
+  size_t kept = sliced ? selects - 1 : selects;
+  if (kept >= shape.size()) return std::nullopt;
+  std::vector<std::optional<uint32_t>> sizes(shape.begin() + kept, shape.end());
+  if (sliced) sizes.front() = ConstantSliceWidth(last);
+  Elaborator::VarArrayInfo part = whole;
+  part.dim_sizes.clear();
+  for (const std::optional<uint32_t>& size : sizes) {
+    if (!size) return std::nullopt;
+    part.dim_sizes.push_back(*size);
+  }
+  part.unpacked_size = part.dim_sizes.front();
+  part.num_unpacked_dims = static_cast<uint32_t>(part.dim_sizes.size());
+  part.is_dynamic = false;
+  part.is_assoc = false;
+  part.is_queue = false;
+  part.elements_are_queues = false;
+  part.declared_dims.clear();
+  part.unpacked_shape = sizes;
+  return part;
+}
+
 }  // namespace
 
-void Elaborator::CheckArrayAssignExprs(const Expr* lhs, const Expr* rhs,
-                                       SourceLoc loc) {
+namespace {
+
+void CheckArrayOperands(const Expr* lhs, const Expr* rhs, SourceLoc loc,
+                        const ArrayScope& arrays, const ArrayAssignScan& scan) {
   if (!lhs || !rhs) return;
-  if (lhs->kind != ExprKind::kIdentifier) return;
-  if (rhs->kind != ExprKind::kIdentifier) return;
-  auto lhs_it = var_array_info_.find(lhs->text);
-  auto rhs_it = var_array_info_.find(rhs->text);
-  if (lhs_it == var_array_info_.end() || rhs_it == var_array_info_.end()) {
-    if (lhs_it != var_array_info_.end() &&
-        packed_array_vars_.count(rhs->text)) {
-      diag_.Error(loc,
-                  std::format("packed array '{}' cannot be directly assigned "
-                              "to unpacked array '{}' without an explicit cast",
-                              rhs->text, lhs->text),
-                  Subclause("7.6"));
+  const Expr* lhs_root = nullptr;
+  const Expr* rhs_root = nullptr;
+  auto l = OperandArrayInfo(lhs, arrays, lhs_root);
+  auto r = OperandArrayInfo(rhs, arrays, rhs_root);
+  if (!l || !r) {
+    if (l && rhs->kind == ExprKind::kIdentifier &&
+        scan.packed_array_vars.count(rhs->text)) {
+      scan.diag.Error(
+          loc,
+          std::format("packed array '{}' cannot be directly assigned to "
+                      "unpacked array '{}' without an explicit cast",
+                      rhs->text, lhs_root->text),
+          Subclause("7.6"));
     }
     return;
   }
-  const ArrayAssignPair kPair{lhs_it->second, rhs_it->second, lhs, rhs, loc};
+  const ArrayAssignPair kPair{*l, *r, lhs_root, rhs_root, loc};
 
-  if (ReportArrayShapeMismatch(kPair, diag_)) return;
-  if (ReportFasterVaryingDimMismatch(kPair, diag_)) return;
-  if (ReportFasterVaryingDimMismatchVarOuter(kPair, diag_)) return;
+  if (ReportArrayShapeMismatch(kPair, scan.diag)) return;
+  if (ReportFasterVaryingDimMismatch(kPair, scan.diag)) return;
+  if (ReportFasterVaryingDimMismatchVarOuter(kPair, scan.diag)) return;
 }
 
-void Elaborator::ValidateOneArrayAssignment(const ModuleItem* item) {
-  if (!item->assign_lhs || !item->assign_rhs) return;
-  CheckArrayAssignExprs(item->assign_lhs, item->assign_rhs, item->loc);
+// A declaration assignment is an assignment to the variable declared, so
+// §7.6 judges its initializer as it would the same right-hand side.
+void CheckInitializer(std::string_view name, const Expr* init, SourceLoc loc,
+                      const ArrayScope& arrays, const ArrayAssignScan& scan) {
+  Expr target;
+  target.kind = ExprKind::kIdentifier;
+  target.text = name;
+  CheckArrayOperands(&target, init, loc, arrays, scan);
 }
 
-void Elaborator::WalkStmtsForArrayAssign(const Stmt* s) {
+// §7.4 to §7.10: an array a procedural block or a subroutine declares,
+// described as Elaborator::TrackVarArrayInfo describes a module's. Its sizes
+// are those its dimensions state as literals; one sized by a parameter is
+// left unsized, so that no count is compared for it.
+Elaborator::VarArrayInfo DeclaredArrayInfo(const DataType& type,
+                                           const std::vector<Expr*>& dims,
+                                           const ArrayAssignScan& scan) {
+  const TypedefMap& typedefs = scan.tables.typedefs;
+  Elaborator::VarArrayInfo info;
+  info.elem_type = ElementKindThroughTypedefs(type, typedefs);
+  info.elem_type_name = ElementTypeIdentity(type, typedefs);
+  info.elem_width = EvalTypeWidth(type, typedefs);
+  info.elem_is_signed = IsSignedType(type, typedefs);
+  info.elem_is_4state = Is4stateType(type, typedefs);
+  info.num_unpacked_dims = static_cast<uint32_t>(dims.size());
+  info.unpacked_shape =
+      UnpackedShapeOf(type, dims, scan.aggregate_typedefs, ScopeMap{});
+  const Expr* first = dims.front();
+  info.is_dynamic = first == nullptr;
+  info.is_queue = first != nullptr && IsQueueDim(first);
+  info.is_assoc = !info.is_dynamic && !info.is_queue &&
+                  !IsFixedSizeUnpackedDim(first, scan.tables);
+  info.unpacked_size = static_cast<uint32_t>(
+      info.is_dynamic ? 0 : ComputeDimSize(first).value_or(0));
+  for (const std::optional<uint32_t>& size : info.unpacked_shape) {
+    if (size) info.dim_sizes.push_back(*size);
+  }
+  return info;
+}
+
+// Records what a declaration makes of `name` in the block that declares it.
+void Declare(std::string_view name, const DataType& type,
+             const std::vector<Expr*>& dims, ArrayScope& arrays,
+             const ArrayAssignScan& scan) {
+  if (dims.empty()) {
+    arrays.local[name] = std::nullopt;
+  } else {
+    arrays.local[name] = DeclaredArrayInfo(type, dims, scan);
+  }
+}
+
+void WalkArrayAssignments(const Stmt* s, ArrayScope& arrays,
+                          const ArrayAssignScan& scan) {
   if (!s) return;
+  if (s->kind == StmtKind::kVarDecl) {
+    Declare(s->var_name, s->var_decl_type, s->var_unpacked_dims, arrays, scan);
+    if (s->var_init != nullptr) {
+      CheckInitializer(s->var_name, s->var_init, s->range.start, arrays, scan);
+    }
+  }
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign) {
-    CheckArrayAssignExprs(s->lhs, s->rhs, s->range.start);
+    CheckArrayOperands(s->lhs, s->rhs, s->range.start, arrays, scan);
   }
   // §7.6 states the shape and element-type compatibility an array assignment
   // requires and names no statement the requirement is suspended in, so this
   // descends every link ForEachChildStmt in elaborator_validate_internal.h
   // names and names no link itself. It wrote out six of the thirteen, so
-  // `fork a = b; join` and `assert (1) a = b;` reached CheckArrayAssignExprs
-  // in neither form while the same `a = b;` one level up was reported.
-  ForEachChildStmt(s,
-                   [this](Stmt* const& sub) { WalkStmtsForArrayAssign(sub); });
+  // `fork a = b; join` and `assert (1) a = b;` were judged in neither form
+  // while the same `a = b;` one level up was reported.
+  ForEachChildStmt(s, [&arrays, &scan](Stmt* const& sub) {
+    WalkArrayAssignments(sub, arrays, scan);
+  });
 }
 
+// A subroutine's arguments are declarations of its own, as its body's are.
+void WalkSubroutine(const ModuleItem* item, const ArrayInfos& module,
+                    const ArrayAssignScan& scan) {
+  ArrayScope arrays{module};
+  for (const FunctionArg& arg : item->func_args) {
+    Declare(arg.name, arg.data_type, arg.unpacked_dims, arrays, scan);
+  }
+  for (const Stmt* s : item->func_body_stmts) {
+    WalkArrayAssignments(s, arrays, scan);
+  }
+}
+
+}  // namespace
+
 void Elaborator::ValidateArrayAssignments(const ModuleDecl* decl) {
+  const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
+  const ArrayAssignScan kScan{packed_array_vars_, kShapeTables,
+                              aggregate_typedef_names_, diag_};
+  const ArrayScope kModuleScope{var_array_info_};
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
-      ValidateOneArrayAssignment(item);
+      CheckArrayOperands(item->assign_lhs, item->assign_rhs, item->loc,
+                         kModuleScope, kScan);
     }
-    bool is_proc = IsProceduralItemKind(item->kind);
-    if (is_proc && item->body) {
-      WalkStmtsForArrayAssign(item->body);
+    if (item->kind == ModuleItemKind::kVarDecl && item->init_expr != nullptr) {
+      CheckInitializer(item->name, item->init_expr, item->loc, kModuleScope,
+                       kScan);
+    }
+    if (IsProceduralItemKind(item->kind)) {
+      ArrayScope arrays{var_array_info_};
+      WalkArrayAssignments(item->body, arrays, kScan);
+    }
+    if (item->kind == ModuleItemKind::kFunctionDecl ||
+        item->kind == ModuleItemKind::kTaskDecl) {
+      WalkSubroutine(item, var_array_info_, kScan);
     }
   }
 }
@@ -338,17 +517,12 @@ static bool IsIndexReturningMethod(std::string_view name) {
 }
 
 // §7.8.1 — true when `idx` is a nonintegral index expression for a wildcard
-// associative array: a real literal, or an identifier of a real/shortreal/
-// realtime variable. (A string literal is not nonintegral here; it is cast to
+// associative array: one whose value is real, whatever its form
+// (KindOfIndexValue). (A string literal is not nonintegral here; it is cast to
 // an equivalent-width bit vector.)
 bool IsNonintegralIndex(const Expr* idx, const TypeMap& var_types) {
   if (!idx) return false;
-  if (idx->kind == ExprKind::kRealLiteral) return true;
-  if (idx->kind == ExprKind::kIdentifier) {
-    auto it = var_types.find(idx->text);
-    return it != var_types.end() && IsRealType(it->second);
-  }
-  return false;
+  return KindOfIndexValue(idx, var_types) == IndexValueKind::kReal;
 }
 
 static void CheckWildcardTraversalExpr(
@@ -619,163 +793,6 @@ void Elaborator::ValidateAssocTraversalArgType(const ModuleDecl* decl) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body)
       WalkStmtsForTraversalArgType(item->body, assoc_keys, var_types_, diag_);
-  }
-}
-
-// §7.12.2: the array ordering methods. reverse() and shuffle() take no with
-// clause, whereas sort() and rsort() accept an optional one.
-static bool IsArrayOrderingMethod(std::string_view name) {
-  return name == "sort" || name == "rsort" || name == "reverse" ||
-         name == "shuffle";
-}
-
-static bool OrderingMethodRejectsWith(std::string_view name) {
-  return name == "reverse" || name == "shuffle";
-}
-
-// §7.12.3: the array reduction methods.
-static bool IsArrayReductionMethod(std::string_view name) {
-  return name == "sum" || name == "product" || name == "and" || name == "or" ||
-         name == "xor";
-}
-
-// Recognize an array-method invocation, in either the call form `arr.m()` or
-// the property form `arr.m`. On success, `base` is the receiver expression,
-// `method` is the method name, and `has_with` records whether a with clause
-// was attached (the parser hangs it on the outermost expression in both
-// forms).
-struct ArrayMethodSite {
-  const Expr* base = nullptr;
-  std::string_view method;
-  bool has_with = false;
-};
-
-static bool MatchArrayMethodSite(const Expr* e, ArrayMethodSite& out) {
-  if (!e) return false;
-  const Expr* access = nullptr;
-  if (e->kind == ExprKind::kCall && e->lhs &&
-      e->lhs->kind == ExprKind::kMemberAccess) {
-    access = e->lhs;
-  } else if (e->kind == ExprKind::kMemberAccess) {
-    access = e;
-  } else {
-    return false;
-  }
-  if (!access->lhs || !access->rhs ||
-      access->rhs->kind != ExprKind::kIdentifier) {
-    return false;
-  }
-  if (!IsArrayOrderingMethod(access->rhs->text) &&
-      !IsArrayReductionMethod(access->rhs->text))
-    return false;
-  out.base = access->lhs;
-  out.method = access->rhs->text;
-  out.has_with = e->with_expr != nullptr;
-  return true;
-}
-
-// §7.12.2: ordering methods reorder any fixed or dynamically sized unpacked
-// array but are not defined on associative arrays, and reverse()/shuffle()
-// reject a with clause. §7.12.3: a reduction leaves its with clause off only
-// where the reduction is defined for the element type, which it is not for an
-// element that is itself an unpacked array, as each element of an array of
-// more than one unpacked dimension is. Each is reported as a compile-time
-// error. The receiver is only checked against the array tracking map when it
-// is a plain identifier, which is enough to recognize a declared array.
-// The errors the array method `site` names over the array `info` describes
-// owes at the call `e`: a reduction left without a with clause over an array
-// whose elements are arrays (§7.12.3), and an ordering method on an
-// associative array or one that rejects its with clause (§7.12.2).
-static void CheckArrayMethodSite(const Expr* e, const ArrayMethodSite& site,
-                                 const Elaborator::VarArrayInfo& info,
-                                 DiagEngine& diag) {
-  if (IsArrayReductionMethod(site.method)) {
-    if (!site.has_with && info.num_unpacked_dims >= 2) {
-      diag.Error(e->range.start,
-                 std::format("array reduction method '{}' requires a 'with' "
-                             "clause over an array whose elements are arrays",
-                             site.method),
-                 Subclause("7.12.3"));
-    }
-    return;
-  }
-  if (info.is_assoc) {
-    diag.Error(e->range.start,
-               std::format("array ordering method '{}' cannot be applied to "
-                           "associative array '{}'",
-                           site.method, site.base->text),
-               Subclause("7.12.2"));
-    return;
-  }
-  if (site.has_with && OrderingMethodRejectsWith(site.method)) {
-    diag.Error(e->range.start,
-               std::format("array ordering method '{}' does not accept a "
-                           "'with' clause",
-                           site.method),
-               Subclause("7.12.2"));
-  }
-}
-
-static void CheckArrayOrderingExpr(
-    const Expr* e,
-    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
-        var_array_info,
-    DiagEngine& diag) {
-  if (!e) return;
-  ArrayMethodSite site;
-  bool matched = MatchArrayMethodSite(e, site);
-  if (matched && site.base && site.base->kind == ExprKind::kIdentifier) {
-    auto it = var_array_info.find(site.base->text);
-    if (it != var_array_info.end())
-      CheckArrayMethodSite(e, site, it->second, diag);
-  }
-  // The method access under a call is the site itself, already checked, so
-  // only its receiver is walked below it.
-  CheckArrayOrderingExpr(
-      matched && e->kind == ExprKind::kCall ? site.base : e->lhs,
-      var_array_info, diag);
-  CheckArrayOrderingExpr(e->rhs, var_array_info, diag);
-  CheckArrayOrderingExpr(e->base, var_array_info, diag);
-  CheckArrayOrderingExpr(e->index, var_array_info, diag);
-  CheckArrayOrderingExpr(e->condition, var_array_info, diag);
-  CheckArrayOrderingExpr(e->true_expr, var_array_info, diag);
-  CheckArrayOrderingExpr(e->false_expr, var_array_info, diag);
-  for (const auto* a : e->args) CheckArrayOrderingExpr(a, var_array_info, diag);
-  for (const auto* elem : e->elements)
-    CheckArrayOrderingExpr(elem, var_array_info, diag);
-}
-
-static void WalkStmtsForArrayOrdering(
-    const Stmt* s,
-    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
-        var_array_info,
-    DiagEngine& diag) {
-  if (!s) return;
-  CheckArrayOrderingExpr(s->expr, var_array_info, diag);
-  CheckArrayOrderingExpr(s->lhs, var_array_info, diag);
-  CheckArrayOrderingExpr(s->rhs, var_array_info, diag);
-  CheckArrayOrderingExpr(s->condition, var_array_info, diag);
-  // §7.12.2 gives the array ordering methods no associative receiver and gives
-  // reverse() and shuffle() no with clause, and names no statement either rule
-  // is suspended in, so this descends every link ForEachChildStmt in
-  // elaborator_validate_internal.h names and names no link itself. It wrote out
-  // six of the thirteen, so `fork aa.sort(); join` and `assert (1) aa.sort();`
-  // reached CheckArrayOrderingExpr in neither form.
-  ForEachChildStmt(s, [&](Stmt* const& sub) {
-    WalkStmtsForArrayOrdering(sub, var_array_info, diag);
-  });
-}
-
-void Elaborator::ValidateArrayOrderingMethods(const ModuleDecl* decl) {
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kContAssign) {
-      CheckArrayOrderingExpr(item->assign_lhs, var_array_info_, diag_);
-      CheckArrayOrderingExpr(item->assign_rhs, var_array_info_, diag_);
-    }
-    bool is_proc = IsProceduralItemKind(item->kind);
-    if (is_proc && item->body) {
-      WalkStmtsForArrayOrdering(item->body, var_array_info_, diag_);
-    }
   }
 }
 

@@ -457,12 +457,26 @@ static bool Is4stateEnum(const DataType& dtype, const TypedefMap& typedefs) {
   return false;
 }
 
-static bool Is4statePackedAggregate(const DataType& dtype) {
+// §7.2.1 (printed page 147): a member is as 4-state as its own type, which for
+// a member written through a typedef name, or as a nested aggregate or
+// enumeration, is the type the name or the nesting stands for. Judged by the
+// kind written alone, `nib_t a` under `typedef logic [3:0] nib_t` was 2-state.
+static bool Is4stateMember(const StructMember& m, const TypedefMap& typedefs) {
+  if (m.nested_type != nullptr) return Is4stateType(*m.nested_type, typedefs);
+  DataType own;
+  own.kind = m.type_kind;
+  own.type_name = m.type_name;
+  own.scope_name = m.scope_name;
+  return Is4stateType(own, typedefs);
+}
+
+static bool Is4statePackedAggregate(const DataType& dtype,
+                                    const TypedefMap& typedefs) {
   if ((dtype.kind == DataTypeKind::kStruct ||
        dtype.kind == DataTypeKind::kUnion) &&
       (dtype.is_packed || dtype.is_soft)) {
     for (const auto& m : dtype.struct_members) {
-      if (Is4stateType(m.type_kind)) return true;
+      if (Is4stateMember(m, typedefs)) return true;
     }
   }
   return false;
@@ -480,11 +494,11 @@ bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
 
   if (dtype.kind == DataTypeKind::kEnum) return Is4stateEnum(dtype, typedefs);
   if (Is4stateType(dtype.kind)) return true;
-  if (Is4statePackedAggregate(dtype)) return true;
+  if (Is4statePackedAggregate(dtype, typedefs)) return true;
 
   if (dtype.kind == DataTypeKind::kUnion && !dtype.is_packed &&
       !dtype.is_soft && !dtype.struct_members.empty()) {
-    return Is4stateType(dtype.struct_members[0].type_kind);
+    return Is4stateMember(dtype.struct_members[0], typedefs);
   }
   return false;
 }

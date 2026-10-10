@@ -12,6 +12,8 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "elaborator/aggregate_shape.h"
+#include "elaborator/assoc_index_type.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_class_typedef_specialization.h"
@@ -262,26 +264,15 @@ void DeclareEnumType(const DataType& type, std::string_view key, uint32_t width,
 // packed-structure and union restrictions, and the rules on packed dimensions.
 //
 // `member_default_scope` is the parameter scope a struct member's default value
-// is resolved against, or null when there is none to resolve against. Only a
-// typedef inside a module has one, and the check is skipped without it rather
-// than run against an empty scope, which would report every parameter
-// reference as unresolvable.
+// is resolved against, or null when there is none to resolve against: the
+// module's parameters for a typedef inside a module, the compilation unit's for
+// one written there. The check is skipped without one rather than run against
+// an empty scope, which would report every parameter reference as
+// unresolvable.
 void Elaborator::ValidateTypedefShape(const DataType& dtype, SourceLoc loc,
                                       const ScopeMap* member_default_scope) {
-  if (dtype.kind == DataTypeKind::kStruct ||
-      dtype.kind == DataTypeKind::kUnion) {
-    ValidatePackedStructDefaults(dtype, loc);
-    ValidateUnpackedStructWithUnionDefaults(dtype, loc);
-    if (member_default_scope != nullptr)
-      ValidateStructMemberDefaultsConstant(dtype, loc, *member_default_scope);
-    ValidateVoidMembers(dtype, loc);
-    ValidateRandQualifiers(dtype, loc);
-    ValidatePackedDimRequiresPackedKeyword(dtype, loc);
-    ValidatePackedStructMemberTypes(dtype, loc);
-    ValidateChandleInUnion(dtype, loc);
-    ValidateVirtualInterfaceInUnion(dtype, loc);
-    ValidatePackedUnion(dtype, loc);
-  }
+  const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
+  CheckAggregateShape(dtype, loc, {kShapeTables, member_default_scope, diag_});
   ValidatePackedDimOnPredefinedType(dtype, loc);
   ValidatePackedDimOnDisallowedType(dtype, loc);
 }
@@ -298,8 +289,10 @@ void Elaborator::ValidateTypedefShape(const DataType& dtype, SourceLoc loc,
 void Elaborator::ValidateCuTypedefs() {
   for (auto* item : unit_->cu_items) {
     if (item->kind != ModuleItemKind::kTypedef) continue;
-    ValidateTypedefShape(item->typedef_type, item->loc,
-                         /*member_default_scope=*/nullptr);
+    // §7.2.2 holds a member default to a constant expression here as well,
+    // which may name the compilation unit's own parameters (§11.2.1).
+    ValidateTypedefShape(item->typedef_type, item->loc, &cu_param_scope_);
+    CheckRealAssocIndexTypes(item->unpacked_dims, item->loc, typedefs_, diag_);
   }
 }
 
@@ -470,6 +463,7 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   }
   ScopeMap scope = BuildParamScope(mod);
   ValidateTypedefShape(item->typedef_type, item->loc, &scope);
+  CheckRealAssocIndexTypes(item->unpacked_dims, item->loc, typedefs_, diag_);
   // §6.19 declares the constants in the scope holding the enumeration, whether
   // the typedef names the enumeration itself or a structure or union with an
   // enumeration written as a member's type (§7.2), which §23.9 makes no scope

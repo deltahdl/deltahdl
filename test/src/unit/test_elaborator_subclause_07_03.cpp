@@ -250,4 +250,36 @@ TEST(UnionDeclarationValidation, UnpackedUnionOfStructsSharingInitial_OK) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §7.3.2: a dynamic array, an associative array and a queue are dynamic types,
+// which an untagged union may not hold and a tagged one may. A member written
+// through a typedef name is judged by the type the name stands for, and a
+// fixed-size array member is no dynamic type.
+TEST(UnionDeclarationValidation, DynamicMembersOfAnUntaggedUnionRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef chandle h_t;\n"
+      "  union { int d[]; int i; } a;\n"
+      "  union { int q[$]; int i; } b;\n"
+      "  union { int m[string]; int i; } c;\n"
+      "  union tagged { int q[$]; int i; } t;\n"
+      "  union { h_t h; int i; } th;\n"
+      "  union { int f[2]; int i; } fixed;\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(diags, "member 'd' can only be used in tagged", 3,
+                            "7.3.2"));
+  EXPECT_TRUE(ReportedError(diags, "member 'q' can only be used in tagged", 4,
+                            "7.3.2"));
+  EXPECT_TRUE(ReportedError(diags, "member 'm' can only be used in tagged", 5,
+                            "7.3.2"));
+  EXPECT_TRUE(ReportedError(
+      diags, "chandle type can only be used in tagged unions", 7, "7.3.2"));
+  for (const auto& d : diags) {
+    EXPECT_NE(d.loc.line, 6u) << d.message;
+    EXPECT_NE(d.loc.line, 8u) << d.message;
+  }
+}
+
 }  // namespace

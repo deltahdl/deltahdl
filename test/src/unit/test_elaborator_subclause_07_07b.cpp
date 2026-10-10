@@ -181,4 +181,57 @@ TEST(ArraySubroutineArgValidation, ActualOfArrayTypedefElementsElaborates) {
              "endmodule\n"));
 }
 
+// §7.7: a dynamic array or queue may not be the actual of a DPI import's
+// open-array output formal, whichever way the call binds it, by position or
+// by name. A call that binds no actual to that formal has nothing to judge.
+TEST(ArraySubroutineArgValidation,
+     DpiOpenArrayOutputJudgedWhicheverWayItIsBound) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  import \"DPI-C\" function void f(output int o[]);\n"
+      "  import \"DPI-C\" function void g(input int a, output int o[]);\n"
+      "  int q[$];\n"
+      "  initial begin\n"
+      "    f(q);\n"
+      "    f(.o(q));\n"
+      "    g(1);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  const char* const kReport =
+      "a dynamic array or queue cannot be passed to the open-array output "
+      "argument of DPI import 'f'";
+  EXPECT_TRUE(ReportedError(diags, kReport, 6, "7.7"));
+  EXPECT_TRUE(ReportedError(diags, kReport, 7, "7.7"));
+}
+
+// §7.7 with §6.22.2: an actual whose elements are a different enumeration from
+// the formal's is not equivalent to it, however wide the two are; one whose
+// elements are a typedef renaming the formal's enumeration is.
+TEST(ArraySubroutineArgValidation, EnumElementTypesComparedByIdentity) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef enum {A, B} e1_t;\n"
+      "  typedef enum {C, D} e2_t;\n"
+      "  typedef e1_t e3_t;\n"
+      "  e2_t y[2];\n"
+      "  e3_t z[2];\n"
+      "  function void f(e1_t a[2]); endfunction\n"
+      "  initial begin\n"
+      "    f(y);\n"
+      "    f(z);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(diags,
+                            "element type of array argument 'y' is not "
+                            "equivalent to that of formal 'a'",
+                            9, "7.7"));
+  for (const auto& d : diags) EXPECT_NE(d.loc.line, 10u) << d.message;
+}
+
 }  // namespace

@@ -217,7 +217,7 @@ TEST(SemaphoreStdPackageElaborator, ACallWithMoreActualsThanFormalsIsRejected) {
   }
 }
 
-// §G.3 with §7.4 and §7.10: a declaration with an unpacked dimension is a
+// §G.3 with §7.5 and §7.10: a declaration with an unpacked dimension is a
 // container of semaphore handles and not a handle, so `q.push_back(t)` and
 // `a.size()` call the container's methods, which the semaphore prototype does
 // not govern, while `t.peek()` on the handle beside them is still rejected.
@@ -226,7 +226,7 @@ TEST(SemaphoreStdPackageElaborator, AContainerOfSemaphoresTakesItsOwnMethods) {
   ElabOk(
       "module m;\n"
       "  semaphore q[$];\n"
-      "  semaphore a[2];\n"
+      "  semaphore a[];\n"
       "  semaphore t;\n"
       "  initial begin\n"
       "    t = new(1);\n"

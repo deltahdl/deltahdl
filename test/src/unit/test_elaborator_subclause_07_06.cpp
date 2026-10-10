@@ -410,4 +410,162 @@ TEST(ArrayAssignmentValidation, ArrayAssignInRandsequenceCodeBlockRejected) {
                             5, "7.6"));
 }
 
+// §7.6 with §6.22.2: the element types of an array assignment are equivalent
+// only when they match, for an enumeration or a class, never because two of
+// them have the same width. A typedef renaming an enumeration matches it.
+TEST(ArrayAssignmentValidation, EnumAndClassElementTypesComparedByIdentity) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef enum {A, B} e1_t;\n"
+      "  typedef enum {C, D} e2_t;\n"
+      "  class K; endclass\n"
+      "  class M; endclass\n"
+      "  e1_t x[2];\n"
+      "  e2_t y[2];\n"
+      "  K kx[2];\n"
+      "  M my[2];\n"
+      "  typedef e1_t e3_t;\n"
+      "  e3_t z[2];\n"
+      "  initial begin\n"
+      "    x = y;\n"
+      "    kx = my;\n"
+      "    x = z;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "array element type mismatch in assignment ('x' vs 'y')", 13,
+      "7.6"));
+  EXPECT_TRUE(ReportedError(
+      diags, "array element type mismatch in assignment ('kx' vs 'my')", 14,
+      "7.6"));
+  for (const auto& d : diags) EXPECT_NE(d.loc.line, 15u) << d.message;
+}
+
+// §7.6: a subarray, an element of an array that is itself an array, and a
+// slice are assignment compatible with another array only when their element
+// types are equivalent and, the target being fixed-size or a slice, the counts
+// agree. A slice whose bounds or width are not literals, or a subarray whose
+// dimensions are not all of a fixed size, is not judged here.
+TEST(ArrayAssignmentValidation, SlicesAndSubarraysAreJudged) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  parameter int N = 2;\n"
+      "  int A[2][4];\n"
+      "  int B[10];\n"
+      "  int C[3];\n"
+      "  logic [7:0] L[4];\n"
+      "  int D[3][];\n"
+      "  int E[2][3][];\n"
+      "  int F[4];\n"
+      "  initial begin\n"
+      "    A[1] = C;\n"
+      "    B[0:3] = C;\n"
+      "    C = B[0:4];\n"
+      "    A[0] = L;\n"
+      "    C = B[2+:3];\n"
+      "    C = B[4-:3];\n"
+      "    C = B[0:N];\n"
+      "    C = B[N:4];\n"
+      "    C = B[1+:N];\n"
+      "    D[1] = C;\n"
+      "    E[1] = C;\n"
+      "    F = A[1];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "array size mismatch: 'A' has 4 elements but 'C' has 3", 11,
+      "7.6"));
+  EXPECT_TRUE(ReportedError(
+      diags, "array size mismatch: 'B' has 4 elements but 'C' has 3", 12,
+      "7.6"));
+  EXPECT_TRUE(ReportedError(
+      diags, "array size mismatch: 'C' has 3 elements but 'B' has 5", 13,
+      "7.6"));
+  EXPECT_TRUE(ReportedError(
+      diags, "array element type mismatch in assignment ('A' vs 'L')", 14,
+      "7.6"));
+  for (const auto& d : diags) {
+    EXPECT_FALSE(d.loc.line >= 15 && d.loc.line <= 22)
+        << d.loc.line << ": " << d.message;
+  }
+}
+
+// §7.6: a declaration assignment is an assignment to the variable declared,
+// so an array initialized from another array is judged as an assignment of
+// the same right-hand side would be.
+TEST(ArrayAssignmentValidation, DeclarationInitializersAreJudged) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int B[4];\n"
+      "  logic [7:0] L[3];\n"
+      "  int A[3] = B;\n"
+      "  int D[3] = L;\n"
+      "  int E[4] = B;\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "array size mismatch: 'A' has 3 elements but 'B' has 4", 4,
+      "7.6"));
+  EXPECT_TRUE(ReportedError(
+      diags, "array element type mismatch in assignment ('D' vs 'L')", 5,
+      "7.6"));
+  for (const auto& d : diags) EXPECT_NE(d.loc.line, 6u) << d.message;
+}
+
+// §7.6 holds for an array a procedural block or a subroutine declares as for
+// one among the module's items: in its declaration's initializer, in an
+// assignment, and with a subroutine's arguments among the arrays. A block's
+// declaration hides a module array of the same name.
+TEST(ArrayAssignmentValidation, ArraysOfBlocksAndSubroutinesAreJudged) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int x[5];\n"
+      "  initial begin\n"
+      "    int a[3];\n"
+      "    int b[4];\n"
+      "    logic [7:0] l[3];\n"
+      "    int c[3] = b;\n"
+      "    int x[3];\n"
+      "    int d[];\n"
+      "    int q[$];\n"
+      "    int m[string];\n"
+      "    int z;\n"
+      "    a = b;\n"
+      "    a = l;\n"
+      "    a = x;\n"
+      "    d = b;\n"
+      "    z = 1;\n"
+      "    m = m;\n"
+      "  end\n"
+      "  task t(input int p[2]); int r[3]; r = p; endtask\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "array size mismatch: 'c' has 3 elements but 'b' has 4", 7,
+      "7.6"));
+  EXPECT_TRUE(ReportedError(
+      diags, "array size mismatch: 'a' has 3 elements but 'b' has 4", 13,
+      "7.6"));
+  EXPECT_TRUE(ReportedError(
+      diags, "array element type mismatch in assignment ('a' vs 'l')", 14,
+      "7.6"));
+  EXPECT_TRUE(ReportedError(
+      diags, "array size mismatch: 'r' has 3 elements but 'p' has 2", 20,
+      "7.6"));
+  for (const auto& d : diags) {
+    EXPECT_FALSE(d.loc.line >= 15 && d.loc.line <= 18)
+        << d.loc.line << ": " << d.message;
+  }
+}
+
 }  // namespace

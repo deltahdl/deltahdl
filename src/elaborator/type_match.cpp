@@ -178,6 +178,12 @@ bool TypesEquivalent(const DataType& a, const DataType& b) {
 
 bool ElementTypesEquivalent(const ElementTypeInfo& a,
                             const ElementTypeInfo& b) {
+  // §6.22.2: an enumeration or a class is equivalent only to a type matching
+  // it, never to another of the same width, so an element type left as a name
+  // is judged by the name that identifies it.
+  if (a.kind == DataTypeKind::kNamed || b.kind == DataTypeKind::kNamed) {
+    return a.kind == b.kind && a.type_name == b.type_name;
+  }
   if (CanonKind(a.kind) == CanonKind(b.kind) && a.is_signed == b.is_signed &&
       a.width == b.width && a.is_4state == b.is_4state) {
     return true;

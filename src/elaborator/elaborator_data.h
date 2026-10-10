@@ -140,6 +140,13 @@ class ElaboratorData {
     // nullopt where it has none of its own, so that each dimension lines up
     // with the declaration's; empty where the shape is not known.
     std::vector<std::optional<uint32_t>> unpacked_shape = {};
+    // §6.22.2: the name identifying an element type written as a name
+    // (ElementTypeIdentity), which is what equivalence compares for an
+    // enumeration or a class.
+    std::string_view elem_type_name = {};
+    // §7.12: the element type is an unpacked structure or union, which has
+    // neither relational nor arithmetic operators.
+    bool elem_is_unpacked_aggregate = false;
   };
 
   // §23.9 (printed page 761) with §27.4 (printed 820): a module's

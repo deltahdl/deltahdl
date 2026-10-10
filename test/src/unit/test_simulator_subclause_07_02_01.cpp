@@ -590,4 +590,25 @@ TEST(PackedStructSimulation,
   EXPECT_EQ(y->value.words[0].aval, 200u);
 }
 
+// §7.2.1: a packed structure is 4-state when any member is, judged by the type
+// each member is written with. Here the only 4-state members are written
+// through a typedef name and as an enumeration, so a structure taken as 2-state
+// would drop the x written into them and print 0.
+TEST(PackedStructSimulation, NamedAndEnumMembersKeepTheStructFourState) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef logic [3:0] nib_t;\n"
+                       "  typedef enum logic [1:0] { A, B } e_t;\n"
+                       "  struct packed { nib_t a; bit b; } s;\n"
+                       "  struct packed { e_t e; bit b; } u;\n"
+                       "  initial begin\n"
+                       "    s.a = 'x;\n"
+                       "    u.e = e_t'('x);\n"
+                       "    $display(\"%b %b\", s.a, u.e);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "xxxx xx\n");
+}
+
 }  // namespace

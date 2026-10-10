@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -270,6 +272,39 @@ TEST(StringIndexAssocArrayElaboration, IntegerIndexInAForLoopStepIsError) {
                             "string-indexed associative array 'aa' shall be "
                             "indexed by a string or string literal",
                             5, "7.8.2"));
+}
+
+// §7.8.2: a string index shall be a string, whatever form the index takes: an
+// arithmetic operator gives an integral or real value and any other operator
+// an integral one, while a string method may give a string.
+TEST(StringIndexAssocArrayElaboration, NonStringIndexExpressionRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  parameter int P = 1;\n"
+      "  int s [string];\n"
+      "  int i;\n"
+      "  real r;\n"
+      "  string t;\n"
+      "  int a[2];\n"
+      "  initial begin\n"
+      "    s[i + 1] = 1;\n"
+      "    s[r * 2] = 1;\n"
+      "    s[i == 1] = 1;\n"
+      "    s[P + 1] = 1;\n"
+      "    s[t.substr(0, 1)] = 1;\n"
+      "    s[a[0]] = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (uint32_t line = 9; line <= 12; ++line) {
+    EXPECT_TRUE(ReportedError(diags,
+                              "string-indexed associative array 's' shall be "
+                              "indexed by a string or string literal",
+                              line, "7.8.2"));
+  }
+  for (const auto& d : diags) EXPECT_NE(d.loc.line, 13u) << d.message;
 }
 
 }  // namespace

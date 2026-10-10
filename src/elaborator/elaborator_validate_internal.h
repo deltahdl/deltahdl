@@ -8,6 +8,7 @@
 // only so that one translation unit can define a helper that another
 // references, keeping a single definition of each symbol.
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string_view>
@@ -398,6 +399,15 @@ void ForEachExprChild(const Expr* e, Fn&& fn) {
 
 // Defined in elaborator_validate.cpp.
 std::optional<int64_t> ComputeDimSize(const Expr* dim);
+
+// A.8.2 with §13.5.4: the index into `expr->args` of the actual that binds to
+// the formal at position `formal_index`, named `formal_name`, whether the call
+// binds it by position or by name; the first `positional_count` actuals are
+// the ordered ones. Returns -1 when no actual binds to the formal. Defined in
+// elaborator_validate_array_args.cpp.
+int ResolveActualArgIndex(const Expr* expr, size_t formal_index,
+                          std::string_view formal_name,
+                          size_t positional_count);
 
 // §11.3 and §11.4.13: the variables of a module an operator is asked to take
 // as a whole when it takes no aggregate -- those of an unpacked structure or

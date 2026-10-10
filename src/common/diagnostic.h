@@ -71,6 +71,10 @@ class DiagEngine {
   // subclause.
   void Warning(SourceLoc loc, std::string msg, Subclause subclause);
   void Error(SourceLoc loc, std::string msg, Subclause subclause);
+  // An error that a later stage may come upon again: reported unless the same
+  // message already stands on the same line, as when a check the elaborator
+  // makes of the source is made again as the design runs.
+  void ErrorOnce(SourceLoc loc, std::string msg, Subclause subclause);
 
   bool HasErrors() const { return error_count_ > 0; }
   // How many errors have been reported so far. A caller that runs one step of

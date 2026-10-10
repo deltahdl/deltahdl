@@ -16,9 +16,12 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "elaborator/aggregate_shape.h"
+#include "elaborator/declared_types.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/net_data_type.h"
 #include "elaborator/nettype_uses.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -173,6 +176,13 @@ void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
     if (pkg != nullptr) run_over(pkg->items);
   }
   CheckUnitNettypeUses(unit_, diag_);
+  // §7.2 to §7.3.2 and §7.8.5 for the same two scopes, whose parameters are
+  // not at hand to judge a member default's constancy against.
+  const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
+  const AggregateShapeCtx kShapeCtx{kShapeTables, nullptr, diag_};
+  ForEachUnitDeclaredType(unit_, [&kShapeCtx](const DeclaredType& declared) {
+    CheckDeclaredTypeRules(declared, kShapeCtx);
+  });
   // §23.9 for the same two scopes: their subroutines are in no module's item
   // list, so Elaborator::ValidateUnresolvedReferences never reads them.
   const UnitScopeNames kNames{cu_scope_names_, cu_param_scope_, typedefs_,

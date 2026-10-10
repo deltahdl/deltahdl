@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <format>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -11,6 +12,8 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/types.h"
+#include "elaborator/aggregate_shape.h"
+#include "elaborator/assoc_index_type.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/covergroup_variables.h"
 #include "elaborator/elaborator.h"
@@ -20,6 +23,7 @@
 #include "elaborator/elaborator_decls_internal.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
+#include "elaborator/net_data_type.h"
 #include "elaborator/nettype_uses.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
@@ -217,22 +221,12 @@ void Elaborator::ValidateVarDeclTypes(ModuleItem* item, const ScopeMap& scope) {
   if (item->data_type.kind == DataTypeKind::kEnum) {
     ValidateEnumDecl(item->data_type, item->loc, item->first_in_decl_list);
   }
-  if (item->data_type.kind == DataTypeKind::kStruct ||
-      item->data_type.kind == DataTypeKind::kUnion) {
-    ValidatePackedStructDefaults(item->data_type, item->loc);
-    ValidateUnpackedStructWithUnionDefaults(item->data_type, item->loc);
-    ValidateStructMemberDefaultsConstant(item->data_type, item->loc, scope);
-    ValidateVoidMembers(item->data_type, item->loc);
-    ValidateRandQualifiers(item->data_type, item->loc);
-    ValidatePackedDimRequiresPackedKeyword(item->data_type, item->loc);
-    ValidatePackedStructMemberTypes(item->data_type, item->loc);
-    ValidateChandleInUnion(item->data_type, item->loc);
-    ValidateVirtualInterfaceInUnion(item->data_type, item->loc);
-    ValidatePackedUnion(item->data_type, item->loc);
-  }
+  const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
+  CheckAggregateShape(item->data_type, item->loc,
+                      {kShapeTables, &scope, diag_});
   ValidatePackedDimOnPredefinedType(item->data_type, item->loc);
   ValidatePackedDimOnDisallowedType(item->data_type, item->loc);
-  ValidateAssocIndexType(item);
+  CheckRealAssocIndexTypes(item->unpacked_dims, item->loc, typedefs_, diag_);
 }
 
 static void CollectUnpackedDimSizes(
@@ -276,6 +270,10 @@ void Elaborator::TrackVarArrayInfo(
                     {}};
   info.is_queue = var.is_queue;
   info.elements_are_queues = var.elements_are_queues;
+  info.elem_type_name = ElementTypeIdentity(item->data_type, typedefs_);
+  std::vector<std::string_view> names;
+  info.elem_is_unpacked_aggregate =
+      IsUnpackedAggregate(FollowTypedefs(item->data_type, typedefs_, names));
   if (var.is_assoc && item->unpacked_dims[0] &&
       item->unpacked_dims[0]->kind == ExprKind::kIdentifier) {
     info.assoc_index_type = item->unpacked_dims[0]->text;

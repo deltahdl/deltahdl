@@ -5,14 +5,18 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "elaborator/aggregate_shape.h"
 #include "elaborator/class_property_cont_assign.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/declared_types.h"
 #include "elaborator/dollar_contexts.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/instance_local_types.h"
+#include "elaborator/net_data_type.h"
 #include "elaborator/nettype_uses.h"
+#include "elaborator/new_placement.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/unit_scope_switch.h"
 #include "parser/ast_design.h"
@@ -165,6 +169,12 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
   CheckContinuousPropertyWrites(decl, class_var_types_, unit_, diag_);
   CheckInstanceLocalTypeAssignments(decl, unit_, diag_);
   CheckNettypeUses(decl, nettype_names_, diag_);
+  CheckNewPlacement(decl, diag_);
+  const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
+  const AggregateShapeCtx kShapeCtx{kShapeTables, &scope, diag_};
+  ForEachInnerDeclaredType(decl, [&kShapeCtx](const DeclaredType& declared) {
+    CheckDeclaredTypeRules(declared, kShapeCtx);
+  });
 }
 
 namespace {

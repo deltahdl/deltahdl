@@ -25,6 +25,13 @@ struct Expr;
 DataTypeKind ElementKindThroughTypedefs(const DataType& dtype,
                                         const TypedefMap& typedefs);
 
+// §6.22.1 b) with §6.22.2: the name that identifies an element type written as
+// a name, the last in its chain of typedef names, which is the enumeration's
+// own typedef or the class; a typedef renaming another matches it, so both
+// give the same name. Empty for a type written as a keyword.
+std::string_view ElementTypeIdentity(const DataType& dtype,
+                                     const TypedefMap& typedefs);
+
 // §7.4.2 with §7.7: the shape of an unpacked array, one entry per unpacked
 // dimension in declaration order. An entry is the dimension's size where it is
 // written as a size or a range whose bounds fold in `scope`, and nullopt where

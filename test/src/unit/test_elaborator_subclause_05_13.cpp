@@ -9,7 +9,7 @@ namespace {
 TEST(BuiltinMethodElaboration, ArraySizeMethodElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  int arr [0:3];\n"
+             "  int arr [];\n"
              "  int s;\n"
              "  initial s = arr.size();\n"
              "endmodule\n"));
@@ -18,7 +18,7 @@ TEST(BuiltinMethodElaboration, ArraySizeMethodElaborates) {
 TEST(BuiltinMethodElaboration, ArraySizeNoParensElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  int arr [0:2];\n"
+             "  int arr [];\n"
              "  int s;\n"
              "  initial s = arr.size;\n"
              "endmodule\n"));
@@ -75,7 +75,7 @@ TEST(BuiltinMethodElaboration, MethodWithDefaultArgNoParensOk) {
 TEST(BuiltinMethodElaboration, MethodNoParensInExpressionOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  int arr [0:3];\n"
+             "  int arr [];\n"
              "  int r;\n"
              "  initial r = arr.size + 1;\n"
              "endmodule\n"));

@@ -8,6 +8,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/index_value_kind.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
@@ -93,11 +94,11 @@ static bool IsIllegalClassIndex(const Expr* idx, std::string_view index_class,
     // type (an integral, string, real, etc. value, kind != kNamed) is of any
     // other type and is therefore an illegal class index.
     auto gt = ctx.var_types.find(idx->text);
-    if (gt != ctx.var_types.end() && gt->second != DataTypeKind::kNamed) {
-      return true;
-    }
+    return gt != ctx.var_types.end() && gt->second != DataTypeKind::kNamed;
   }
-  return false;
+  // Any other expression whose value is integral, real or a string is no
+  // object of any class.
+  return KindOfIndexValue(idx, ctx.var_types) != IndexValueKind::kUnknown;
 }
 
 // Validates a single select node against the class-index rule, emitting a
@@ -215,8 +216,9 @@ void Elaborator::ValidateClassIndexSelect(const ModuleDecl* decl) {
 // literal and therefore valid.
 //
 // Returns true when the index of a string-indexed associative array select is
-// an illegal index (a non-string literal, or an identifier of a non-string
-// type). A string literal of any length, including "", is valid.
+// an illegal index (a non-string literal, an identifier of a non-string type,
+// or any other expression whose value is integral or real). A string literal
+// of any length, including "", is valid.
 static bool IsIllegalStringIndex(const Expr* idx, const TypeMap& var_types) {
   if (idx->kind == ExprKind::kStringLiteral) {
     // A string literal of any length, including "", is a valid index.
@@ -229,11 +231,10 @@ static bool IsIllegalStringIndex(const Expr* idx, const TypeMap& var_types) {
   }
   if (idx->kind == ExprKind::kIdentifier) {
     auto vt = var_types.find(idx->text);
-    if (vt != var_types.end() && vt->second != DataTypeKind::kString) {
-      return true;
-    }
+    return vt != var_types.end() && vt->second != DataTypeKind::kString;
   }
-  return false;
+  IndexValueKind kind = KindOfIndexValue(idx, var_types);
+  return kind == IndexValueKind::kIntegral || kind == IndexValueKind::kReal;
 }
 
 // Validates a single select node against the string-index rule, emitting a
@@ -426,73 +427,6 @@ void Elaborator::ValidateIntegralIndexSelect(const ModuleDecl* decl) {
       WalkStmtsForIntegralIndexSelect(item->body, integral_names, var_types_,
                                       diag_);
     }
-  }
-}
-
-static bool ContainsRealType(const DataType& dtype, const TypedefMap& tds,
-                             int depth = 0);
-
-// Whether one struct/union member is, or holds, a real type. A member written
-// through a typedef only reveals a real after the alias is resolved, so a named
-// member type is followed into the typedef table -- under its "q::name" key
-// where the member was written as `q::real_holder_t r`, since §26.3 (printed
-// page 808) reaches q's declaration through the qualifier and a bare lookup
-// found whatever an import of another package made `real_holder_t` stand for,
-// so q's real went unseen or another package's real-free structure was
-// reported; an inline nested struct/union member carries its full type in
-// nested_type instead, and a real buried in that inline aggregate counts the
-// same.
-static bool StructMemberContainsRealType(const StructMember& m,
-                                         const TypedefMap& tds, int depth) {
-  if (IsRealType(m.type_kind)) return true;
-  DataType named;
-  named.kind = m.type_kind;
-  named.type_name = m.type_name;
-  named.scope_name = m.scope_name;
-  const DataType* resolved = FindNamedType(named, tds);
-  if (resolved != nullptr && ContainsRealType(*resolved, tds, depth + 1))
-    return true;
-  return m.nested_type != nullptr &&
-         ContainsRealType(*m.nested_type, tds, depth + 1);
-}
-
-static bool ContainsRealType(const DataType& dtype, const TypedefMap& tds,
-                             int depth) {
-  // Guard against a pathological recursive typedef chain; a legitimate type
-  // nests only a handful of levels deep.
-  if (depth > 16) return false;
-  if (dtype.kind == DataTypeKind::kNamed) {
-    // A typedef of a qualified name, `typedef q::real_holder_t idx_t`, is
-    // followed under its qualifier for the same reason as a member.
-    const DataType* resolved = FindNamedType(dtype, tds);
-    return resolved != nullptr && ContainsRealType(*resolved, tds, depth + 1);
-  }
-  if (IsRealType(dtype.kind)) return true;
-  for (const auto& m : dtype.struct_members) {
-    if (StructMemberContainsRealType(m, tds, depth)) return true;
-  }
-  return false;
-}
-
-void Elaborator::ValidateAssocIndexType(const ModuleItem* item) {
-  if (item->unpacked_dims.empty()) return;
-  auto* dim = item->unpacked_dims[0];
-  if (!dim || dim->kind != ExprKind::kIdentifier) return;
-  auto t = dim->text;
-  if (t == "real" || t == "shortreal" || t == "realtime") {
-    diag_.Error(item->loc,
-                "real or shortreal type shall not be used as an "
-                "associative array index type",
-                Subclause("7.8.5"));
-    return;
-  }
-
-  auto it = typedefs_.find(t);
-  if (it != typedefs_.end() && ContainsRealType(it->second, typedefs_)) {
-    diag_.Error(item->loc,
-                "real or shortreal type shall not be used as an "
-                "associative array index type",
-                Subclause("7.8.5"));
   }
 }
 

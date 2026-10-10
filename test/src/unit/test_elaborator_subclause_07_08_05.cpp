@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -240,6 +241,54 @@ TEST(UserDefinedTypeAssocArrayElaboration,
       TwoPackagesRealHolderIndex("q", "typedef r::real_holder_t idx_t;"), f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §7.8.5: the ban on a real index type holds for every associative dimension
+// of a declaration, the second as much as the first, and through a typedef
+// name standing for a type that holds a real.
+TEST(AssocIndexTypeValidation, RealIndexTypeOnAnyDimensionRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef struct { real r; } rs_t;\n"
+      "  int a [real];\n"
+      "  int b [2][real];\n"
+      "  int c [int][rs_t];\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (uint32_t line = 3; line <= 5; ++line) {
+    EXPECT_TRUE(ReportedError(diags,
+                              "real or shortreal type shall not be used as an "
+                              "associative array index type",
+                              line, "7.8.5"));
+  }
+}
+
+// §7.8.5: the same ban wherever the array is declared: a typedef in the
+// compilation unit, a package variable, a class property, a subroutine's
+// argument and a variable of a procedural block.
+TEST(AssocIndexTypeValidation, RealIndexTypeRejectedInEveryScope) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef int t_real_idx [real];\n"
+      "package p; int pa [real]; endpackage\n"
+      "module top;\n"
+      "  class C; int ca [real]; endclass\n"
+      "  function void f(int fa [real]); endfunction\n"
+      "  initial begin\n"
+      "    int la [real];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  const uint32_t kLines[] = {1, 2, 4, 5, 7};
+  for (uint32_t line : kLines) {
+    EXPECT_TRUE(ReportedError(diags,
+                              "real or shortreal type shall not be used as an "
+                              "associative array index type",
+                              line, "7.8.5"));
+  }
 }
 
 }  // namespace

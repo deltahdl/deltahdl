@@ -533,26 +533,6 @@ class Elaborator : public ElaboratorClassRules {
   void ValidateEnumDecl(const DataType& dtype, SourceLoc loc,
                         bool declares_its_constants);
 
-  void ValidatePackedStructDefaults(const DataType& dtype, SourceLoc loc);
-  void ValidateUnpackedStructWithUnionDefaults(const DataType& dtype,
-                                               SourceLoc loc);
-  void ValidateStructMemberDefaultsConstant(const DataType& dtype,
-                                            SourceLoc loc,
-                                            const ScopeMap& scope);
-
-  void ValidateVoidMembers(const DataType& dtype, SourceLoc loc);
-
-  void ValidateRandQualifiers(const DataType& dtype, SourceLoc loc);
-
-  void ValidatePackedDimRequiresPackedKeyword(const DataType& dtype,
-                                              SourceLoc loc);
-
-  void ValidatePackedStructMemberTypes(const DataType& dtype, SourceLoc loc);
-
-  void ValidateChandleInUnion(const DataType& dtype, SourceLoc loc);
-
-  void ValidateVirtualInterfaceInUnion(const DataType& dtype, SourceLoc loc);
-
   void ValidateVirtualInterfaceContAssign(const ModuleItem* item);
 
   void ValidateVirtualInterfaceSensitivity(const ModuleItem* item);
@@ -589,8 +569,6 @@ class Elaborator : public ElaboratorClassRules {
   void ValidateGenericPortModportAccess(const ModuleDecl* child,
                                         const RtlirModuleInst& inst);
 
-  void ValidatePackedUnion(const DataType& dtype, SourceLoc loc);
-
   void ValidatePackedDimRange(const DataType& dtype, SourceLoc loc);
 
   void ValidateUnpackedDimRange(const std::vector<Expr*>& dims, SourceLoc loc);
@@ -600,9 +578,6 @@ class Elaborator : public ElaboratorClassRules {
   void ValidatePackedDimOnDisallowedType(const DataType& dtype, SourceLoc loc);
 
   void ValidateArrayAssignments(const ModuleDecl* decl);
-  void ValidateOneArrayAssignment(const ModuleItem* item);
-  void CheckArrayAssignExprs(const Expr* lhs, const Expr* rhs, SourceLoc loc);
-  void WalkStmtsForArrayAssign(const Stmt* s);
 
   void ValidateAssocArraySlices(const ModuleDecl* decl);
 
@@ -616,8 +591,6 @@ class Elaborator : public ElaboratorClassRules {
   void ValidateStringIndexSelect(const ModuleDecl* decl);
 
   void ValidateIntegralIndexSelect(const ModuleDecl* decl);
-
-  void ValidateAssocIndexType(const ModuleItem* item);
 
   void TrackVarArrayInfo(
       const ModuleItem* item, RtlirVariable& var, const ScopeMap& scope,

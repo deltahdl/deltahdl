@@ -206,12 +206,14 @@ bool TypesEquivalent(const DataType& a, const DataType& b);
 
 // §6.22.2 — the element-type descriptor compared when deciding whether two
 // array element types are equivalent: the kind, packed bit width, signedness,
-// and whether the element is 4-state.
+// and whether the element is 4-state, and for an element type left as a name
+// (an enumeration or a class) the name that identifies it.
 struct ElementTypeInfo {
   DataTypeKind kind;
   uint32_t width;
   bool is_signed;
   bool is_4state;
+  std::string_view type_name;
 };
 
 bool ElementTypesEquivalent(const ElementTypeInfo& a, const ElementTypeInfo& b);

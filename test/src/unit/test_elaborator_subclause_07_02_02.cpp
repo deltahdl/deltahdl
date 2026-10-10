@@ -226,4 +226,49 @@ TEST(StructAssignmentValidation,
                             2, "7.2.2"));
 }
 
+// §7.2.2: a packed structure written in place inside an unpacked one is still
+// a packed structure whose members carry no defaults, and a union member
+// written through a typedef name is still a union beside which no member of
+// the unpacked structure carries one.
+TEST(StructAssignmentValidation, DefaultsJudgedThroughNestingAndNames) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef union { int i; bit b; } u_t;\n"
+      "  struct { struct packed { int x = 1; } p; } a;\n"
+      "  struct { u_t u; int n = 1; } c;\n"
+      "  struct { int n = 1; } ok;\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(diags,
+                            "a member of a packed structure cannot carry a "
+                            "default value of its own",
+                            3, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags,
+                            "a member of an unpacked structure that contains "
+                            "a union cannot carry a default value of its own",
+                            4, "7.2.2"));
+  for (const auto& d : diags) EXPECT_NE(d.loc.line, 5u) << d.message;
+}
+
+// §7.2.2: a member default of a structure type declared in the compilation unit
+// is a constant expression as much as one declared in a module, and it may name
+// the compilation unit's own parameters (§11.2.1) but not its variables.
+TEST(StructAssignmentValidation, UnitTypedefMemberDefaultMustBeConstant) {
+  ElabFixture f;
+  ElaborateSrc(
+      "parameter int P = 3;\n"
+      "int g = 5;\n"
+      "typedef struct { int a = P; int b = g; } t;\n"
+      "typedef struct { int a = P; } ok_t;\n"
+      "module top; t v; ok_t w; endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "struct member default value must be a constant expression", 3,
+      "7.2.2"));
+  for (const auto& d : diags) EXPECT_NE(d.loc.line, 4u) << d.message;
+}
+
 }  // namespace

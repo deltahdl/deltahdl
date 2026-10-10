@@ -432,4 +432,28 @@ TEST(ClassIndexAssocArrayElaboration,
                             8, "7.8.3"));
 }
 
+// §7.8.3: a class index shall be an object of the index class, whatever form
+// the index takes; a string method giving an integral value gives no object.
+TEST(ClassIndexAssocArrayElaboration, NonObjectIndexExpressionRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  class K; endclass\n"
+      "  int c [K];\n"
+      "  string t;\n"
+      "  int q[$];\n"
+      "  function int f(int x); return x; endfunction\n"
+      "  initial begin\n"
+      "    c[t.len()] = 1;\n"
+      "    c[f(1)] = 1;\n"
+      "    c[q.size()] = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class-indexed associative array 'c' shall be "
+                            "indexed by an object of class 'K'",
+                            8, "7.8.3"));
+}
+
 }  // namespace

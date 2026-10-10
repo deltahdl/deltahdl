@@ -1,8 +1,10 @@
 #include "common/diagnostic.h"
 
+#include <algorithm>
 #include <format>
 #include <iostream>
 #include <string>
+#include <tuple>
 #include <utility>
 
 #include "common/source_loc.h"
@@ -23,6 +25,14 @@ void DiagEngine::Warning(SourceLoc loc, std::string msg, Subclause subclause) {
 
 void DiagEngine::Error(SourceLoc loc, std::string msg, Subclause subclause) {
   Emit(DiagSeverity::kError, loc, std::move(msg), subclause);
+}
+
+void DiagEngine::ErrorOnce(SourceLoc loc, std::string msg,
+                           Subclause subclause) {
+  bool fresh = std::ranges::none_of(diags_, [&](const Diagnostic& d) {
+    return std::tie(d.loc.line, d.message) == std::tie(loc.line, msg);
+  });
+  if (fresh) Error(loc, std::move(msg), subclause);
 }
 
 void DiagEngine::Emit(DiagSeverity sev, SourceLoc loc, std::string msg,

@@ -833,9 +833,9 @@ static bool CheckOrderingWithClause(const MethodCallParts& parts,
   handled = false;
   result = false;
   if (!expr->args.empty() && !expr->with_expr) {
-    ctx.GetDiag().Error(expr->args.front()->range.start,
-                        "iterator argument without 'with' clause",
-                        Subclause("7.12"));
+    ctx.GetDiag().ErrorOnce(expr->args.front()->range.start,
+                            "iterator argument without 'with' clause",
+                            Subclause("7.12"));
     handled = true;
     result = false;
     return false;

@@ -1,4 +1,3 @@
-#include <algorithm>
 #include <cstddef>
 #include <format>
 #include <string_view>
@@ -27,15 +26,6 @@ static bool IsDpiOpenArrayOutputFormal(const FunctionArg& formal) {
   return is_open && is_output;
 }
 
-// §7.7: true when every name in `arg_names` is empty, i.e. the call uses pure
-// positional binding (named association suppresses this analysis).
-static bool AllPositionalArgs(const Expr* call) {
-  for (auto name : call->arg_names) {
-    if (!name.empty()) return false;
-  }
-  return true;
-}
-
 // §7.7: true when the i-th positional actual of `call` is an identifier naming
 // a dynamic array or queue, given the per-variable array info map.
 static bool ActualIsDynamicOrQueue(
@@ -57,12 +47,15 @@ void Elaborator::CheckDpiOpenArrayCall(const Expr* call) {
   auto it = dpi_import_decls_.find(call->callee);
   if (it == dpi_import_decls_.end() || it->second == nullptr) return;
   const ModuleItem* imp = it->second;
-  // Only positional binding is analyzed; named association is left untouched.
-  if (!AllPositionalArgs(call)) return;
-  size_t count = std::min(call->args.size(), imp->func_args.size());
-  for (size_t i = 0; i < count; ++i) {
-    if (!IsDpiOpenArrayOutputFormal(imp->func_args[i])) continue;
-    const Expr* actual = call->args[i];
+  // The rule is the formal's, so an actual bound to it by name is judged as
+  // one bound by position is.
+  size_t positional_count = call->args.size() - call->arg_names.size();
+  for (size_t i = 0; i < imp->func_args.size(); ++i) {
+    const FunctionArg& formal = imp->func_args[i];
+    if (!IsDpiOpenArrayOutputFormal(formal)) continue;
+    int at = ResolveActualArgIndex(call, i, formal.name, positional_count);
+    if (at < 0) continue;
+    const Expr* actual = call->args[static_cast<size_t>(at)];
     if (!ActualIsDynamicOrQueue(actual, var_array_info_)) continue;
     diag_.Error(actual->range.start,
                 std::format("a dynamic array or queue cannot be passed to the "

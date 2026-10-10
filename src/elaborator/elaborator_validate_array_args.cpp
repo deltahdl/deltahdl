@@ -46,6 +46,7 @@ static Elaborator::VarArrayInfo FormalArrayInfo(const FunctionArg& arg,
                                                 const ArrayArgTypeCtx& ctx) {
   Elaborator::VarArrayInfo info;
   info.elem_type = ElementKindThroughTypedefs(arg.data_type, ctx.typedefs);
+  info.elem_type_name = ElementTypeIdentity(arg.data_type, ctx.typedefs);
   info.elem_width = EvalTypeWidth(arg.data_type, ctx.typedefs);
   info.elem_is_signed = IsSignedType(arg.data_type, ctx.typedefs);
   info.elem_is_4state = Is4stateType(arg.data_type, ctx.typedefs);
@@ -78,12 +79,9 @@ static Elaborator::VarArrayInfo FormalArrayInfo(const FunctionArg& arg,
   return info;
 }
 
-// Resolves the index into `expr->args` that binds to the formal at position
-// `formal_index` (named `formal_name`), handling pure-positional, mixed, and
-// named-argument call forms. Returns -1 when no actual binds to the formal.
-static int ResolveActualArgIndex(const Expr* expr, size_t formal_index,
-                                 std::string_view formal_name,
-                                 size_t positional_count) {
+int ResolveActualArgIndex(const Expr* expr, size_t formal_index,
+                          std::string_view formal_name,
+                          size_t positional_count) {
   if (expr->arg_names.empty()) {
     return (formal_index < expr->args.size()) ? static_cast<int>(formal_index)
                                               : -1;
@@ -124,9 +122,11 @@ static bool CheckArrayArgCompat(const Expr* actual,
   if (actual_info.is_assoc && formal_info.is_assoc &&
       !ElementTypesEquivalent(
           {actual_info.elem_type, actual_info.elem_width,
-           actual_info.elem_is_signed, actual_info.elem_is_4state},
+           actual_info.elem_is_signed, actual_info.elem_is_4state,
+           actual_info.elem_type_name},
           {formal_info.elem_type, formal_info.elem_width,
-           formal_info.elem_is_signed, formal_info.elem_is_4state})) {
+           formal_info.elem_is_signed, formal_info.elem_is_4state,
+           formal_info.elem_type_name})) {
     diag.Error(actual->range.start,
                "associative array element type mismatch in argument",
                Subclause("7.9.10"));
@@ -172,21 +172,19 @@ static bool ReportArrayArgShapeMismatch(
 
 // §7.7 with §7.6 and §6.22.2: the elements of a non-associative array actual
 // shall be of a type equivalent to the formal's elements. A type left named --
-// a class, an enumeration, a name with no typedef -- is not judged here, its
-// width and state not being what the comparison needs.
+// a class, an enumeration, a name with no typedef -- is judged by the name that
+// identifies it, its width and state not being what the comparison needs.
 static void ReportArrayArgElementMismatch(
     const Expr* actual, std::string_view formal_name,
     const Elaborator::VarArrayInfo& actual_info,
     const Elaborator::VarArrayInfo& formal_info, DiagEngine& diag) {
-  if (actual_info.elem_type == DataTypeKind::kNamed ||
-      formal_info.elem_type == DataTypeKind::kNamed) {
-    return;
-  }
   if (ElementTypesEquivalent(
           {actual_info.elem_type, actual_info.elem_width,
-           actual_info.elem_is_signed, actual_info.elem_is_4state},
+           actual_info.elem_is_signed, actual_info.elem_is_4state,
+           actual_info.elem_type_name},
           {formal_info.elem_type, formal_info.elem_width,
-           formal_info.elem_is_signed, formal_info.elem_is_4state})) {
+           formal_info.elem_is_signed, formal_info.elem_is_4state,
+           formal_info.elem_type_name})) {
     return;
   }
   diag.Error(actual->range.start,

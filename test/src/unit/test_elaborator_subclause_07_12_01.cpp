@@ -69,4 +69,65 @@ TEST(ArrayLocatorWildcard, ElementFindOnWildcardIsAllowed) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §7.12.1 and §7.12.2: min, max, unique, unique_index, sort and rsort compare
+// the elements by their relational operators unless a with clause gives what
+// to compare, and then compare that. A class handle and an unpacked structure
+// have no relational operators, so the element itself, or a with expression
+// that is the element, is not something they can compare. An enumeration has
+// them, and so does a member of int or a variable named in the with clause.
+TEST(ArrayLocatorValidation, ComparingValuesWithoutRelationalOperators) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  class C; int v; endclass\n"
+      "  typedef struct { int a; } s_t;\n"
+      "  typedef enum {A, B} e_t;\n"
+      "  C ca[3];\n"
+      "  s_t sa[3];\n"
+      "  C cq[$];\n"
+      "  s_t sq[$];\n"
+      "  e_t ea[2];\n"
+      "  e_t eq[$];\n"
+      "  int k;\n"
+      "  initial begin\n"
+      "    ca.sort;\n"
+      "    sq = sa.min;\n"
+      "    cq = ca.unique;\n"
+      "    sa.rsort with (item);\n"
+      "    sa.sort with (item.a);\n"
+      "    sa.sort(x) with (x);\n"
+      "    ca.sort with (k);\n"
+      "    sq = sa.max(y) with (y.a);\n"
+      "    eq = ea.min;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(diags,
+                            "array method 'sort' compares values of a type "
+                            "without relational operators",
+                            13, "7.12.2"));
+  EXPECT_TRUE(ReportedError(diags,
+                            "array method 'min' compares values of a type "
+                            "without relational operators",
+                            14, "7.12.1"));
+  EXPECT_TRUE(ReportedError(diags,
+                            "array method 'unique' compares values of a type "
+                            "without relational operators",
+                            15, "7.12.1"));
+  EXPECT_TRUE(ReportedError(diags,
+                            "array method 'rsort' compares values of a type "
+                            "without relational operators",
+                            16, "7.12.2"));
+  EXPECT_TRUE(ReportedError(diags,
+                            "array method 'sort' compares values of a type "
+                            "without relational operators",
+                            18, "7.12.2"));
+  for (const auto& d : diags) {
+    EXPECT_NE(d.loc.line, 17u) << d.message;
+    EXPECT_FALSE(d.loc.line >= 19 && d.loc.line <= 21)
+        << d.loc.line << ": " << d.message;
+  }
+}
+
 }  // namespace

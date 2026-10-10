@@ -288,4 +288,77 @@ TEST(StructDeclarationValidation,
   EXPECT_EQ(ResolvedAggregateType(memberless, kCycle, arena), nullptr);
 }
 
+// §7.2 footnote 20 and §7.3.2: a structure or union written in place as the
+// type of another one's member is a type of its own, under the same rules as
+// one declared anywhere else, at whatever depth it is written.
+TEST(StructDeclarationValidation, AggregatesNestedInPlaceAreJudged) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  struct { union { chandle c; int i; } u; } a;\n"
+      "  struct { union { void v; int i; } u; } d;\n"
+      "  struct { struct packed { rand bit x; } p; } r;\n"
+      "  struct { union tagged { void v; int i; } u; } ok;\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "chandle type can only be used in tagged unions", 2, "7.3.2"));
+  EXPECT_TRUE(ReportedError(
+      diags, "void member is only allowed in tagged unions", 3, "7.2"));
+  EXPECT_TRUE(ReportedError(
+      diags, "random qualifier is only allowed in unpacked structures", 4,
+      "7.2"));
+  for (const auto& d : diags) EXPECT_NE(d.loc.line, 5u) << d.message;
+}
+
+// §7.2 to §7.3.2: the rules on a structure or union type hold wherever the type
+// is written: as a port's type, a class property's, a function's return type
+// and a procedural block's variable's.
+TEST(StructDeclarationValidation, AggregatesWrittenInsideTheModuleAreJudged) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top(input struct packed { real r; } p);\n"
+      "  class C; union { chandle h; int i; } u; endclass\n"
+      "  function struct packed { int a = 1; } f(); endfunction\n"
+      "  initial begin\n"
+      "    struct { union { void v; int i; } u; } s;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(
+      ReportedError(diags, "type of member 'r' is not allowed", 1, "7.2.1"));
+  EXPECT_TRUE(ReportedError(
+      diags, "chandle type can only be used in tagged unions", 2, "7.3.2"));
+  EXPECT_TRUE(ReportedError(
+      diags, "a member of a packed structure cannot carry a default value", 3,
+      "7.2.2"));
+  EXPECT_TRUE(ReportedError(
+      diags, "void member is only allowed in tagged unions", 5, "7.2"));
+}
+
+// The same rules for what no module's elaboration reaches: a package's
+// typedefs and variables and a variable of the compilation unit.
+TEST(StructDeclarationValidation, AggregatesInPackagesAndTheUnitAreJudged) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n"
+      "  typedef struct packed { real r; } bad_t;\n"
+      "  union { chandle h; int i; } pu;\n"
+      "  typedef struct { int a = 1; } dflt_t;\n"
+      "endpackage\n"
+      "struct { union { void v; int i; } u; } cu_var;\n"
+      "module top; endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(
+      ReportedError(diags, "type of member 'r' is not allowed", 2, "7.2.1"));
+  EXPECT_TRUE(ReportedError(
+      diags, "chandle type can only be used in tagged unions", 3, "7.3.2"));
+  EXPECT_TRUE(ReportedError(
+      diags, "void member is only allowed in tagged unions", 6, "7.2"));
+  for (const auto& d : diags) EXPECT_NE(d.loc.line, 4u) << d.message;
+}
+
 }  // namespace

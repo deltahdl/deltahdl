@@ -483,10 +483,10 @@ static bool CheckAssocWithClauseRequired(std::string_view method,
                           method == "find_first_index" ||
                           method == "find_last" || method == "find_last_index";
   if (!expr->with_expr && kNeedsWith) {
-    ctx.GetDiag().Error(expr->range.start,
-                        "array locator method '" + std::string(method) +
-                            "' requires a 'with' clause",
-                        Subclause("7.12.1"));
+    ctx.GetDiag().ErrorOnce(expr->range.start,
+                            "array locator method '" + std::string(method) +
+                                "' requires a 'with' clause",
+                            Subclause("7.12.1"));
     return false;
   }
   return true;
@@ -652,9 +652,9 @@ static bool CheckIndexedWithClauseRequired(std::string_view method,
   // and that clause is required: there is nothing to evaluate without it, so a
   // bare map() is illegal rather than a silent no-op.
   if (method == "map" && !expr->with_expr) {
-    ctx.GetDiag().Error(expr->range.start,
-                        "array method 'map' requires a 'with' clause",
-                        Subclause("7.12.5"));
+    ctx.GetDiag().ErrorOnce(expr->range.start,
+                            "array method 'map' requires a 'with' clause",
+                            Subclause("7.12.5"));
     return false;
   }
 
@@ -666,10 +666,10 @@ static bool CheckIndexedWithClauseRequired(std::string_view method,
     if (method == "find" || method == "find_index" || method == "find_first" ||
         method == "find_first_index" || method == "find_last" ||
         method == "find_last_index") {
-      ctx.GetDiag().Error(expr->range.start,
-                          "array locator method '" + std::string(method) +
-                              "' requires a 'with' clause",
-                          Subclause("7.12.1"));
+      ctx.GetDiag().ErrorOnce(expr->range.start,
+                              "array locator method '" + std::string(method) +
+                                  "' requires a 'with' clause",
+                              Subclause("7.12.1"));
     }
     return false;
   }
@@ -765,9 +765,9 @@ static bool CollectLocatorResult(const Expr* expr, SimContext& ctx,
   if (!IsLocatorMethod(parts.method_name)) return false;
 
   if (!expr->args.empty() && !expr->with_expr) {
-    ctx.GetDiag().Error(expr->args.front()->range.start,
-                        "iterator argument without 'with' clause",
-                        Subclause("7.12"));
+    ctx.GetDiag().ErrorOnce(expr->args.front()->range.start,
+                            "iterator argument without 'with' clause",
+                            Subclause("7.12"));
     return false;
   }
 
@@ -915,9 +915,9 @@ bool TryCollectAssocMapResult(const Expr* expr, SimContext& ctx, Arena& arena,
   if (!aa) return false;
   if (parts.method_name != "map") return false;
   if (!expr->with_expr) {
-    ctx.GetDiag().Error(expr->range.start,
-                        "array method 'map' requires a 'with' clause",
-                        Subclause("7.12.5"));
+    ctx.GetDiag().ErrorOnce(expr->range.start,
+                            "array method 'map' requires a 'with' clause",
+                            Subclause("7.12.5"));
     return false;
   }
 
