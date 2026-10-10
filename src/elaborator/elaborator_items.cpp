@@ -30,6 +30,7 @@
 #include "elaborator/rtlir_checker_site.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/unit_scope_order.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -140,17 +141,6 @@ bool IsNameDeclared(std::string_view name, const RtlirModule* mod) {
   return false;
 }
 
-bool UnitDeclaresData(const CompilationUnit* unit, std::string_view name) {
-  for (const auto* item : unit->cu_items) {
-    if ((item->kind == ModuleItemKind::kVarDecl ||
-         item->kind == ModuleItemKind::kNetDecl) &&
-        item->name == name) {
-      return true;
-    }
-  }
-  return false;
-}
-
 // True when `name` is a parameter of `mod` that a reference standing in the
 // generate blocks `scopes` can see. A parameter is a declaration of the module
 // like a net or a variable, but it is held apart from both, so the implicit-net
@@ -218,7 +208,8 @@ bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
   // (printed 108) lets the reference reach, and §10.3.2 (printed 249) lets a
   // continuous assignment drive a variable. `int g;` outside every module with
   // `assign g = 1;` in a module got an implicit net `g` shadowing the unit's.
-  if (UnitDeclaresData(unit_, name)) return true;
+  // The search reaches only the part of the unit written before the reference.
+  if (UnitDeclaresData(unit_, name, loc)) return true;
   if (mod->default_nettype == NetType::kNone) {
     diag_.Error(loc,
                 std::format("implicit net '{}' forbidden by "
@@ -336,17 +327,9 @@ void CheckGateInstanceArrayTerminalWidths(
   }
 }
 
-// Emits the redeclaration and dynamic-override-specifier diagnostics for a
-// function or task declaration item. Records `scoped_name` in
-// `declared_names`, which is the name keyed by the scope the declaration
-// stands in, and reports the name the source wrote.
-void CheckFunctionDeclDiagnostics(
-    const ModuleItem* item, std::string_view scoped_name,
-    std::unordered_set<std::string_view>& declared_names, DiagEngine& diag) {
-  if (!item->name.empty() && !declared_names.insert(scoped_name).second) {
-    diag.Error(item->loc, std::format("redeclaration of '{}'", item->name),
-               Subclause("23.9"));
-  }
+// Emits the dynamic-override-specifier diagnostic for a function or task
+// declaration item.
+void CheckFunctionDeclDiagnostics(const ModuleItem* item, DiagEngine& diag) {
   if (item->method_class.empty() &&
       (item->is_method_initial || item->is_method_extends ||
        item->is_method_final)) {
@@ -357,14 +340,10 @@ void CheckFunctionDeclDiagnostics(
   }
 }
 
-// Emits the gate-instance name-conflict and redeclaration diagnostics. Records
-// `scoped_inst_name` in `declared_names`, which is the instance name keyed by
-// the scope the gate instance stands in, and reports the name the source
-// wrote. The conflict with the output net is a comparison between two names
-// the source wrote, so it reads item->gate_inst_name on both sides.
-void CheckGateInstNameDiagnostics(
-    const ModuleItem* item, std::string_view scoped_inst_name,
-    std::unordered_set<std::string_view>& declared_names, DiagEngine& diag) {
+// Emits the gate-instance name-conflict diagnostic. The conflict with the
+// output net is a comparison between two names the source wrote, so it reads
+// item->gate_inst_name on both sides.
+void CheckGateInstNameDiagnostics(const ModuleItem* item, DiagEngine& diag) {
   if (!item->gate_inst_name.empty() && !item->gate_terminals.empty() &&
       item->gate_terminals[0] &&
       item->gate_terminals[0]->kind == ExprKind::kIdentifier &&
@@ -373,26 +352,6 @@ void CheckGateInstNameDiagnostics(
                std::format("gate instance name '{}' conflicts with its "
                            "output net",
                            item->gate_inst_name),
-               Subclause("23.9"));
-  }
-  if (!item->gate_inst_name.empty() &&
-      !declared_names.insert(scoped_inst_name).second) {
-    diag.Error(item->loc,
-               std::format("redeclaration of '{}'", item->gate_inst_name),
-               Subclause("23.9"));
-  }
-}
-
-// Emits the UDP-instance redeclaration diagnostic and records
-// `scoped_inst_name`, the instance name keyed by the scope the UDP instance
-// stands in. The report names the instance as the source wrote it.
-void CheckUdpInstNameDiagnostics(
-    const ModuleItem* item, std::string_view scoped_inst_name,
-    std::unordered_set<std::string_view>& declared_names, DiagEngine& diag) {
-  if (!item->gate_inst_name.empty() &&
-      !declared_names.insert(scoped_inst_name).second) {
-    diag.Error(item->loc,
-               std::format("redeclaration of '{}'", item->gate_inst_name),
                Subclause("23.9"));
   }
 }
@@ -538,8 +497,52 @@ void FoldTypeRefComparesInStmt(Stmt* s, const TypeRefCompareFolder& fold) {
       s, [&](Stmt* const& sub) { FoldTypeRefComparesInStmt(sub, fold); });
 }
 
+// §3.13 (e) (printed page 58): the module name space unifies, beside the nets,
+// variables, subroutines, instances and named blocks entered where each is
+// elaborated, the parameters, user-defined types, classes, lets, covergroups,
+// sequences, properties, clocking blocks and nested modules, interfaces,
+// programs and checkers (§23.4) a module declares, and a genvar, which §27.4
+// has it declare. The name `item` declares as one of those, or empty: §6.18's
+// forward typedef announces the type its later definition declares, an extern
+// module (§23.5) only its ports, and `default clocking cb;` names a clocking
+// block declared elsewhere.
+std::string_view ModuleNameSpaceEntry(const ModuleItem* item) {
+  switch (item->kind) {
+    case ModuleItemKind::kParamDecl:
+    case ModuleItemKind::kClassDecl:
+    case ModuleItemKind::kLetDecl:
+    case ModuleItemKind::kCovergroupDecl:
+    case ModuleItemKind::kSequenceDecl:
+    case ModuleItemKind::kPropertyDecl:
+      return item->name;
+    case ModuleItemKind::kTypedef:
+      return item->typedef_type.kind == DataTypeKind::kImplicit
+                 ? std::string_view{}
+                 : item->name;
+    case ModuleItemKind::kVarDecl:
+      return item->is_genvar ? item->name : std::string_view{};
+    case ModuleItemKind::kClockingBlock:
+      return item->clocking_event.empty() ? std::string_view{} : item->name;
+    case ModuleItemKind::kNestedModuleDecl:
+      return item->nested_module_decl->is_extern
+                 ? std::string_view{}
+                 : item->nested_module_decl->name;
+    default:
+      return {};
+  }
+}
+
 }  // namespace
 
+// §28.3.6 rules the terminal of an instance array, whose bit-length shall be
+// either one or the instance-array length. §4.9.6 rules the output or inout
+// terminal of a single instance, which connects straight to 1-bit nets or
+// 1-bit structural net expressions. Both kinds of instance ask this together
+// because §29.8 puts them under one rule: a user-defined primitive instance
+// connects its terminals by the terminal connection rules of §28.3.6, the
+// rules a gate instance connects by, and §4.9.6 states its rule of primitive
+// terminals, UDP terminals among them.
+//
 // The instance range is what makes §28.3.6's widths a question at all, so an
 // item carrying none is left alone by CheckGateInstanceArrayTerminalWidths: its
 // rule is about the bit length of each single-instance port or terminal of the
@@ -565,6 +568,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
   if (ItemCarriesDelay(item)) {
     ValidateItemDelaysNonNegative(item, BuildParamScope(mod), diag_);
   }
+  DeclareInModuleNameSpace(ModuleNameSpaceEntry(item), item->loc);
   if (ElaborateDeclItem(item, mod)) return;
   ResolveProceduralTypeRefs(
       item, [&](DataType& dt, SourceLoc loc) { ResolveTypeRef(dt, loc, mod); });
@@ -637,16 +641,10 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       // §27.4: a generate block forms a scope of its own and a further level of
       // hierarchy once instantiated, so a gate instance written in a loop
       // generate body declares its name afresh in each iteration rather than
-      // again, and is keyed by the generate prefix that tells those scopes
-      // apart. Outside a generate block ScopedName hands the name back
-      // unchanged, so a repeat at module level is still a redeclaration. The
-      // empty check guards it: ScopedName("") returns the prefix itself, which
-      // would key an unnamed gate instance under the block's own name.
-      CheckGateInstNameDiagnostics(item,
-                                   item->gate_inst_name.empty()
-                                       ? item->gate_inst_name
-                                       : ScopedName(item->gate_inst_name),
-                                   declared_names_, diag_);
+      // again; DeclareInModuleNameSpace keys it by the generate prefix that
+      // tells those scopes apart, and leaves an unnamed instance out.
+      CheckGateInstNameDiagnostics(item, diag_);
+      DeclareInModuleNameSpace(item->gate_inst_name, item->loc);
       CreateImplicitNetsForTerminals(item->gate_terminals, item->loc,
                                      make_implicit_net);
       CheckInstanceTerminalWidths(item, mod);
@@ -658,11 +656,7 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kUdpInst:
       // §27.4 keys the instance name by the generate block instance it stands
       // in, as the kGateInst case above does and for the same reason.
-      CheckUdpInstNameDiagnostics(item,
-                                  item->gate_inst_name.empty()
-                                      ? item->gate_inst_name
-                                      : ScopedName(item->gate_inst_name),
-                                  declared_names_, diag_);
+      DeclareInModuleNameSpace(item->gate_inst_name, item->loc);
       CreateImplicitNetsForTerminals(item->gate_terminals, item->loc,
                                      make_implicit_net);
       // Checked before ElaborateUdpInst expands the array, so a terminal the
@@ -793,9 +787,8 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       // §27.4 keys the name by the generate block instance the declaration
       // stands in, as the kGateInst case in Elaborator::ElaborateDeclItem does
       // and for the same reason.
-      CheckFunctionDeclDiagnostics(
-          item, item->name.empty() ? item->name : ScopedName(item->name),
-          declared_names_, diag_);
+      DeclareInModuleNameSpace(item->name, item->loc);
+      CheckFunctionDeclDiagnostics(item, diag_);
       ValidateFunctionBody(item);
       ValidateFunctionArgDefaultsScope(item);
       ResolveFormalAggregateTypes(item, typedefs_, arena_);

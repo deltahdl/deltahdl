@@ -3,6 +3,7 @@
 #include <string_view>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "common/types.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_decls_internal.h"
@@ -33,10 +34,11 @@ static void CheckPortNameRedeclaration(const ModuleItem* item,
 }
 
 // §23.2.2.1: reconcile a declaration against an earlier partial
-// (direction-only) port declaration — width mismatch is an error — or, when
-// there is no partial port, record the name and diagnose any plain
-// redeclaration. `kind_word` selects "net" or "variable" in the vector-range
-// message.
+// (direction-only) port declaration — width mismatch is an error — and record
+// the name, diagnosing any plain redeclaration. §3.13 (g) has the first net or
+// variable of a port's name reintroduce it in the module name space, so a
+// second one is a redeclaration there like any other. `kind_word` selects
+// "net" or "variable" in the vector-range message.
 static void CheckPartialPortOrNameRedeclaration(const ModuleItem* item,
                                                 const DeclTypeRef& decl_type,
                                                 DeclNameTables tables,
@@ -52,7 +54,8 @@ static void CheckPartialPortOrNameRedeclaration(const ModuleItem* item,
                              kind_word, item->name),
                  Subclause("23.2.2.1"));
     }
-  } else if (!tables.declared_names.insert(tables.scoped_name).second) {
+  }
+  if (!tables.declared_names.insert(tables.scoped_name).second) {
     // §27.4: each generate-loop iteration is a distinct block instance, so the
     // name is tracked under its generate-prefixed (scoped) form; an unprefixed
     // top-level declaration scopes to its bare name, leaving that case
@@ -77,6 +80,30 @@ void CheckDeclRedeclaration(const ModuleItem* item,
                             std::string_view kind_word, DiagEngine& diag) {
   CheckPortNameRedeclaration(item, tables, diag);
   CheckPartialPortOrNameRedeclaration(item, decl_type, tables, kind_word, diag);
+}
+
+// §3.13 (g) (printed page 58): a port's name may be reintroduced in the module
+// name space only by a net or variable of that name, which
+// CheckDeclRedeclaration reconciles with the port, so a declaration of any
+// other kind taking it in the module itself is a redeclaration under §3.13's
+// closing rule. A generate block is a scope of its own (§27.4), whose names do
+// not reach the ports. Every other name enters §3.13 (e)'s one module name
+// space under its generate-prefixed form, where a second declaration of it is
+// the redeclaration §23.9 states.
+void Elaborator::DeclareInModuleNameSpace(std::string_view name,
+                                          SourceLoc loc) {
+  if (name.empty()) return;
+  if (gen_prefix_.empty() && (ansi_port_names_.contains(name) ||
+                              non_ansi_complete_ports_.contains(name) ||
+                              non_ansi_partial_ports_.contains(name))) {
+    diag_.Error(loc, std::format("redeclaration of port '{}'", name),
+                Subclause("3.13"));
+    return;
+  }
+  if (!declared_names_.insert(ScopedName(name)).second) {
+    diag_.Error(loc, std::format("redeclaration of '{}'", name),
+                Subclause("23.9"));
+  }
 }
 
 bool Elaborator::ReconcilePartialPort(std::string_view name, bool decl_signed,

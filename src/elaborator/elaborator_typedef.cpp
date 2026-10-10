@@ -21,6 +21,7 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/unit_scope_order.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
@@ -918,13 +919,16 @@ static void EmitWildcardImportEnumLiterals(
 // the outer scope (printed page 810), so an explicit import of the module
 // shadows a wildcard's literal in the module and in the unit, and an explicit
 // import of the unit shadows a wildcard's literal in the unit alone: the
-// module's own wildcard candidate is found before the unit is searched.
+// module's own wildcard candidate is found before the unit is searched. The
+// unit's imports written after the module are not in force in it (§3.12.1).
 void RegisterImportedEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,
                                   const ImportedEnumCtx& ctx) {
+  const std::vector<ModuleItem*> kUnitBefore =
+      UnitItemsBefore(ctx.unit, decl->range.start);
   auto module_explicit = ExplicitImportNames(decl->items);
-  auto unit_explicit = ExplicitImportNames(ctx.unit->cu_items);
+  auto unit_explicit = ExplicitImportNames(kUnitBefore);
   unit_explicit.insert(module_explicit.begin(), module_explicit.end());
-  EmitWildcardImportEnumLiterals(ctx.unit->cu_items, mod, ctx, unit_explicit);
+  EmitWildcardImportEnumLiterals(kUnitBefore, mod, ctx, unit_explicit);
   EmitWildcardImportEnumLiterals(decl->items, mod, ctx, module_explicit);
 }
 

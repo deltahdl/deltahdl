@@ -10,6 +10,7 @@
 #include <functional>
 #include <optional>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -21,6 +22,7 @@
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_items_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
@@ -528,6 +530,18 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   mod->params.push_back(pd);
 
   const_names_.insert(item->name);
+}
+
+// §8.25.1: the parameterized-class declarations of a compilation unit, indexed
+// by class name. Only a class with parameter ports can be specialized, so only
+// those are exposed to the constant folder.
+std::unordered_map<std::string_view, const ClassDecl*> BuildParamClassRegistry(
+    const CompilationUnit* unit) {
+  std::unordered_map<std::string_view, const ClassDecl*> registry;
+  for (const auto* cls : unit->classes) {
+    if (cls && !cls->params.empty()) registry.emplace(cls->name, cls);
+  }
+  return registry;
 }
 
 }  // namespace delta

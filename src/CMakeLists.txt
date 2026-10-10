@@ -125,6 +125,8 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/assertion_body_slots.cpp
     elaborator/package_assertion_scope.cpp
     elaborator/assertion_name_rules.cpp
+    elaborator/block_name_space.cpp
+    elaborator/unit_scope_order.cpp
     elaborator/semantic_leading_clocks.cpp
     elaborator/procedural_concurrent_assertion.cpp
     elaborator/interface_syntax.cpp

@@ -13,6 +13,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/assertion_name_rules.h"
+#include "elaborator/block_name_space.h"
 #include "elaborator/class_method_reads.h"
 #include "elaborator/covergroup_rules.h"
 #include "elaborator/covergroup_variables.h"
@@ -24,6 +25,7 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/unit_scope_order.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -49,7 +51,6 @@ struct BareCall {
 };
 
 struct ScopeWalk {
-  std::vector<std::pair<std::string_view, SourceLoc>> block_labels;
   std::unordered_set<std::string_view> local_names;
   std::vector<std::pair<std::string_view, SourceLoc>> proc_lhs;
   std::vector<BareCall> bare_calls;
@@ -125,9 +126,6 @@ void CollectBareCall(const Stmt* s, ScopeWalk& out) {
 
 void CollectScopeWalk(const Stmt* s, ScopeWalk& out) {
   if (!s) return;
-  if (s->kind == StmtKind::kBlock && !s->label.empty()) {
-    out.block_labels.emplace_back(s->label, s->range.start);
-  }
   if (s->kind == StmtKind::kVarDecl && !s->var_name.empty()) {
     out.local_names.insert(s->var_name);
   }
@@ -139,14 +137,14 @@ void CollectScopeWalk(const Stmt* s, ScopeWalk& out) {
     out.proc_lhs.emplace_back(s->lhs->text, s->range.start);
   }
   CollectBareCall(s, out);
-  // §23.9 makes a block label, a local declaration and an assignment target
-  // part of the scope they are written in wherever the statement holding them
-  // stands, so every position a statement holds a statement in is one this
-  // collection reaches. ForEachChildStmt in elaborator_validate_internal.h
-  // states those positions once for the whole elaborator, which is why the
-  // list is not written out again here. The visitor takes `Stmt* const&`
-  // because `s` is a `const Stmt*`, which is how ForEachChildStmt lets a walk
-  // that only reads the tree share its list with the walks that rewrite it.
+  // §23.9 makes a local declaration and an assignment target part of the scope
+  // they are written in wherever the statement holding them stands, so every
+  // position a statement holds a statement in is one this collection reaches.
+  // ForEachChildStmt in elaborator_validate_internal.h states those positions
+  // once for the whole elaborator, which is why the list is not written out
+  // again here. The visitor takes `Stmt* const&` because `s` is a `const
+  // Stmt*`, which is how ForEachChildStmt lets a walk that only reads the tree
+  // share its list with the walks that rewrite it.
   //
   // §12.7.1: the control variables a for-loop header declares are in scope
   // while the loop's own sub-statements are walked and are dropped afterwards
@@ -161,49 +159,6 @@ void CollectScopeWalk(const Stmt* s, ScopeWalk& out) {
   size_t pushed = PushTypedForInitVars(s, out) + PushForeachVars(s, out);
   ForEachChildStmt(s, [&](Stmt* const& sub) { CollectScopeWalk(sub, out); });
   out.active_loop_vars.resize(out.active_loop_vars.size() - pushed);
-}
-
-// §23.9: each begin-end block and each fork-join block -- named or unnamed --
-// defines a new scope, and an identifier shall be used to declare only one item
-// within a scope. Flags a second variable declaration that shares a name with
-// an earlier one in the SAME statement list. Only the declarations that are
-// direct children of one list are compared: a nested block is a distinct scope,
-// so reusing a name there is legal shadowing rather than a redeclaration. The
-// caller passes one scope's own statement list, and then descends so every
-// nested block is checked against itself.
-static void CheckOneBlockLocals(const std::vector<Stmt*>& block_stmts,
-                                DiagEngine& diag) {
-  std::unordered_set<std::string_view> block_locals;
-  for (const auto* child : block_stmts) {
-    if (!child || child->kind != StmtKind::kVarDecl || child->var_name.empty())
-      continue;
-    if (!block_locals.insert(child->var_name).second) {
-      diag.Error(child->range.start,
-                 std::format("redeclaration of '{}'", child->var_name),
-                 Subclause("23.9"));
-    }
-  }
-}
-
-void CheckBlockLocalRedeclarations(const Stmt* s, DiagEngine& diag) {
-  if (!s) return;
-  if (s->kind == StmtKind::kBlock) CheckOneBlockLocals(s->stmts, diag);
-  // §23.9 lists fork-join blocks, named or not, among the elements that define
-  // a new scope, beside begin-end blocks, named or not. A declaration written
-  // directly inside a fork lands in Stmt::fork_stmts on a node whose kind is
-  // StmtKind::kFork, so that list is the fork-join block's own scope and two
-  // declarations of one name in it are a redeclaration. The list is checked on
-  // its own rather than merged into the enclosing block's, because the
-  // fork-join block is a separate scope and a name reused there is legal
-  // shadowing.
-  if (s->kind == StmtKind::kFork) CheckOneBlockLocals(s->fork_stmts, diag);
-  // §23.9 puts no condition on where the block whose declarations it governs
-  // is written, so every position a statement holds a statement in is a
-  // position a begin-end or fork-join block stands in. ForEachChildStmt in
-  // elaborator_validate_internal.h states those positions once for the whole
-  // elaborator, which is why the list is not written out again here.
-  ForEachChildStmt(
-      s, [&](Stmt* const& sub) { CheckBlockLocalRedeclarations(sub, diag); });
 }
 
 // §8.30.1: a weak_reference's type parameter shall name a class type. The same
@@ -334,32 +289,34 @@ static void ReportBareCallsNamingNothing(
 
 void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
   ScopeWalk walk;
+  // §3.13 (e) and (f): a procedure opens no name space, so the outermost named
+  // blocks of its body are declared in the module's, and every block below
+  // them in the name space of the block holding it.
+  std::vector<BlockLabel> labels;
   for (const auto* item : decl->items) {
     if (IsProceduralItemKind(item->kind)) {
       CollectScopeWalk(item->body, walk);
+      CollectNameSpaceLabels(item->body, labels);
       ValidateLocalWeakRefDecls(item->body, typedefs_, class_names_, diag_);
-      CheckBlockLocalRedeclarations(item->body, diag_);
+      CheckNestedBlockNameSpaces(item->body, diag_);
     }
   }
-  for (const auto& [label, loc] : walk.block_labels) {
-    if (!declared_names_.insert(label).second) {
-      diag_.Error(loc, std::format("redeclaration of '{}'", label),
-                  Subclause("23.9"));
-    }
-  }
+  for (const auto& [label, loc] : labels) DeclareInModuleNameSpace(label, loc);
   // §3.12.1 (printed page 56) has an import written at compilation-unit
   // scope stand for the module too, as the read-side check honours it, and
   // the unit's own variable and net declarations likewise, which §6.21
   // (printed 132) gives a static lifetime: `int g;` outside every module
   // with `initial g = 5;` in a module was reported as undeclared, while a
   // unit function's or class's name still is (UnitDeclaresData in
-  // elaborator_items.cpp asks the unit's items for a data declaration).
+  // unit_scope_order.cpp asks the unit's items for a data declaration). The
+  // search reaches only the part of the unit written before the module.
+  const std::vector<ModuleItem*> kUnitBefore =
+      UnitItemsBefore(unit_, decl->range.start);
   auto target_visible = [&](std::string_view name) {
     return walk.local_names.count(name) != 0 || IsNameInModuleScope(name) ||
            ImportsProvideName(unit_, pkg_provided_names_, decl->items, name) ||
-           ImportsProvideName(unit_, pkg_provided_names_, unit_->cu_items,
-                              name) ||
-           UnitDeclaresData(unit_, name);
+           ImportsProvideName(unit_, pkg_provided_names_, kUnitBefore, name) ||
+           UnitDeclaresData(unit_, name, decl->range.start);
   };
   for (const auto& [name, loc] : walk.proc_lhs) {
     if (target_visible(name)) continue;
@@ -766,13 +723,18 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
       WildcardImportedPackages(mod);
   std::unordered_set<std::string_view> generate_names;
   CollectModuleGenerateNames(decl->items, generate_names);
-  auto declared = [this, &explicit_imported, &wildcard_packages,
+  // §3.12.1: a unit variable or net written after the module is no name the
+  // module's references reach, unless the module declares one of its own.
+  auto declared = [this, decl, &explicit_imported, &wildcard_packages,
                    &generate_names](std::string_view n) {
-    return IsDeclaredNameForRhs(n) || explicit_imported.count(n) != 0 ||
-           generate_names.count(n) != 0 ||
+    bool unit_later = UnitDataDeclaredOnlyAfter(unit_, n, decl->range.start) &&
+                      var_types_.count(n) == 0 && !IsNameInModuleScope(n);
+    return (!unit_later && IsDeclaredNameForRhs(n)) ||
+           explicit_imported.count(n) != 0 || generate_names.count(n) != 0 ||
            AnyPackageProvidesName(unit_, pkg_provided_names_, wildcard_packages,
                                   n);
   };
+  ReportUnitScopedReferences(decl->items, unit_, diag_);
 
   // §19.6 makes a cross item a coverpoint of its covergroup or a variable, and
   // the variables it may name are the ones a bare read may: the module's
@@ -911,8 +873,25 @@ void ReportUnresolvedInUnitScopeSubroutines(const CompilationUnit* unit,
            names.typedefs.count(n) != 0 || names.class_names.count(n) != 0 ||
            ImportsProvideName(unit, provided_cache, unit->cu_items, n);
   };
-  ReportSubroutineUnresolved(unit->cu_items, unit_declares, unit,
-                             provided_cache, diag);
+  // §3.12.1: a subroutine of the unit reads only the part of the unit written
+  // before it, so neither a unit variable or net nor an import written after
+  // it is reached.
+  for (auto* sub : unit->cu_items) {
+    if (sub->kind != ModuleItemKind::kTaskDecl &&
+        sub->kind != ModuleItemKind::kFunctionDecl)
+      continue;
+    const std::vector<ModuleItem*> kBefore = UnitItemsBefore(unit, sub->loc);
+    auto declared_before = [&](std::string_view n) {
+      return (!UnitDataDeclaredOnlyAfter(unit, n, sub->loc) &&
+              (names.item_names.count(n) != 0 ||
+               names.constants.count(n) != 0 || names.typedefs.count(n) != 0 ||
+               names.class_names.count(n) != 0)) ||
+             ImportsProvideName(unit, provided_cache, kBefore, n);
+    };
+    ReportSubroutineUnresolved(std::vector<ModuleItem*>{sub}, declared_before,
+                               unit, provided_cache, diag);
+  }
+  ReportUnitScopedReferences(unit->cu_items, unit, diag);
   for (const auto* pkg : unit->packages) {
     if (pkg == nullptr) continue;
     std::unordered_set<std::string> pkg_names =

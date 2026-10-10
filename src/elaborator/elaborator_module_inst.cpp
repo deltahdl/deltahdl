@@ -792,12 +792,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   // holding it.
   std::string_view scoped_inst_name =
       item->inst_name.empty() ? item->inst_name : ScopedName(item->inst_name);
-  if (!item->inst_name.empty() &&
-      !declared_names_.insert(scoped_inst_name).second) {
-    diag_.Error(item->loc,
-                std::format("redeclaration of '{}'", item->inst_name),
-                Subclause("23.9"));
-  }
+  DeclareInModuleNameSpace(item->inst_name, item->loc);
   RtlirModuleInst inst;
   inst.module_name = item->inst_module;
   inst.inst_name = scoped_inst_name;

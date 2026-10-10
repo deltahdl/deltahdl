@@ -1,9 +1,11 @@
 #include <format>
 #include <string_view>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "elaborator/block_name_space.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
@@ -647,62 +649,6 @@ static void ValidateTaskBody(const ModuleItem* item, DiagEngine& diag) {
   }
 }
 
-// §23.9: an identifier shall be used to declare only one item within a scope.
-// Flags a second variable declaration that reuses a name already declared by a
-// prior variable declaration in the SAME scope. Only the declarations that are
-// direct members of one block are compared here.
-// §23.9 lists tasks, functions and begin-end blocks, named or not, among the
-// elements that define a new scope, which is every construct this is called on.
-// §3.13(f) reaches the same result in two steps, introducing a block name space
-// for named or unnamed blocks and for the function and task constructs, and
-// then forbidding a redeclaration of a name already declared within a name
-// space. §23.9 is cited instead because it names the constructs and states the
-// prohibition on declarations in one place, and because CheckOneBlockLocals in
-// src/elaborator/elaborator_scope_rules.cpp reports the same clash in a
-// procedural block under §23.9.
-static void CheckBlockDeclDups(const std::vector<Stmt*>& block_stmts,
-                               DiagEngine& diag) {
-  std::unordered_set<std::string_view> names;
-  for (const auto* child : block_stmts) {
-    if (!child || child->kind != StmtKind::kVarDecl || child->var_name.empty())
-      continue;
-    if (!names.insert(child->var_name).second) {
-      diag.Error(child->range.start,
-                 std::format("redeclaration of '{}'", child->var_name),
-                 Subclause("23.9"));
-    }
-  }
-}
-
-// §23.9: functions, tasks and every named or unnamed begin-end or fork-join
-// block nested inside the body each define a new scope, and an identifier shall
-// be used to declare only one item within a scope. Walks the body so each
-// nested block is compared against itself; a name reused in a nested or sibling
-// block is a distinct scope, hence legal shadowing rather than a
-// redeclaration. The body's own top-level statement list is handled separately
-// by the caller (it is a bare statement list, not a kBlock node).
-static void CheckSubroutineBodyRedeclarations(const Stmt* s, DiagEngine& diag) {
-  if (!s) return;
-  if (s->kind == StmtKind::kBlock) CheckBlockDeclDups(s->stmts, diag);
-  // §23.9 lists fork-join blocks, named or not, among the elements that define
-  // a new scope, beside begin-end blocks, named or not. A declaration written
-  // directly inside a fork standing in a function or task body lands in
-  // Stmt::fork_stmts on a node whose kind is StmtKind::kFork, so that list is
-  // the fork-join block's own scope and two declarations of one name in it are
-  // a redeclaration. The list is checked on its own rather than merged into the
-  // enclosing block's, because the fork-join block is a separate scope and a
-  // name reused there is legal shadowing.
-  if (s->kind == StmtKind::kFork) CheckBlockDeclDups(s->fork_stmts, diag);
-  // §23.9 puts no condition on where the block whose declarations it governs is
-  // written, so every position a statement holds a statement in is a position a
-  // begin-end or fork-join block stands in. ForEachChildStmt in
-  // elaborator_validate_internal.h states those positions once for the whole
-  // elaborator, which is why the list is not written out again here.
-  ForEachChildStmt(s, [&](Stmt* const& sub) {
-    CheckSubroutineBodyRedeclarations(sub, diag);
-  });
-}
-
 void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
   ValidateRefLifetime(item, diag_);
 
@@ -712,13 +658,13 @@ void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
 
   ValidateRefArgsInForkBlocks(item, diag_);
 
-  // §23.9: a function or a task defines a new scope, and an identifier shall be
-  // used to declare only one item within a scope, so the body's top-level
-  // variable declarations must be unique. Nested begin-end blocks are checked
-  // as their own separate scopes during the walk below.
-  CheckBlockDeclDups(item->func_body_stmts, diag_);
-  for (auto* s : item->func_body_stmts)
-    CheckSubroutineBodyRedeclarations(s, diag_);
+  // §3.13 (f): a function or a task opens a block name space holding its
+  // formal arguments and the declarations and named blocks of its body, and
+  // each block nested in the body opens one of its own.
+  std::unordered_set<std::string_view> formals;
+  for (const auto& arg : item->func_args) formals.insert(arg.name);
+  CheckBlockNameSpace(item->func_body_stmts, std::move(formals), diag_);
+  for (auto* s : item->func_body_stmts) CheckNestedBlockNameSpaces(s, diag_);
 
   if (item->kind == ModuleItemKind::kTaskDecl) {
     ValidateTaskBody(item, diag_);

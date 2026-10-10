@@ -109,8 +109,12 @@ std::vector<ModuleDecl*> CollectAutoTopModules(const CompilationUnit* unit) {
   }
   for (const auto* prog : unit->programs)
     CollectInstantiatedNames(prog->items, instantiated);
-  for (const auto* iface : unit->interfaces)
+  // §3.11 with A.1.6: an interface's items reach module_common_item, so an
+  // interface may instantiate a program, which is then no top.
+  for (const auto* iface : unit->interfaces) {
+    CollectInstantiatedNames(iface->items, instantiated);
     CollectBoundNames(iface->bind_directives, instantiated);
+  }
   CollectBoundNames(unit->bind_directives, instantiated);
 
   std::vector<ModuleDecl*> tops;

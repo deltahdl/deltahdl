@@ -131,24 +131,6 @@ void ValidateNameSpaceDefinitions(const CompilationUnit* unit,
   }
 }
 
-void ValidateNameSpacePackages(const CompilationUnit* unit, DiagEngine& diag) {
-  std::unordered_set<std::string_view> pkg_names;
-  for (auto* pkg : unit->packages) {
-    if (!pkg_names.insert(pkg->name).second) {
-      diag.Error(pkg->range.start,
-                 std::format("duplicate package '{}'", pkg->name),
-                 Subclause("3.13"));
-    }
-
-    if (pkg->name == "std") {
-      diag.Error(pkg->range.start,
-                 "'std' is reserved for the built-in package and cannot "
-                 "be declared by the user",
-                 Subclause("26.7"));
-    }
-  }
-}
-
 // True where a compilation-unit item declares a name of the unit's scope that
 // §3.13(c) holds to one declaration. An import or export declares none; an
 // item an anonymous program contributed is that program's; §6.18's forward
@@ -169,6 +151,38 @@ static bool DeclaresACuScopeName(const ModuleItem* item) {
       item->typedef_type.kind == DataTypeKind::kImplicit)
     return false;
   return item->method_class.empty();
+}
+
+void ValidateNameSpacePackages(const CompilationUnit* unit, DiagEngine& diag) {
+  std::unordered_set<std::string_view> pkg_names;
+  for (auto* pkg : unit->packages) {
+    if (!pkg_names.insert(pkg->name).second) {
+      diag.Error(pkg->range.start,
+                 std::format("duplicate package '{}'", pkg->name),
+                 Subclause("3.13"));
+    }
+
+    if (pkg->name == "std") {
+      diag.Error(pkg->range.start,
+                 "'std' is reserved for the built-in package and cannot "
+                 "be declared by the user",
+                 Subclause("26.7"));
+    }
+    // §3.13 (e) (printed page 58) introduces a module name space with each
+    // package, unifying its subroutines, parameters, named events, nets,
+    // variables and user-defined types; a package item is one of those names
+    // by the test a compilation-unit item is.
+    std::unordered_set<std::string_view> item_names;
+    for (const auto* item : pkg->items) {
+      if (!DeclaresACuScopeName(item) || item->name.empty() ||
+          item_names.insert(item->name).second)
+        continue;
+      diag.Error(item->loc,
+                 std::format("redeclaration of '{}' in package '{}'",
+                             item->name, pkg->name),
+                 Subclause("3.13"));
+    }
+  }
 }
 
 void ValidateNameSpaceCompilationUnit(const CompilationUnit* unit,

@@ -8,6 +8,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/unit_scope_order.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
@@ -123,8 +124,12 @@ void ApplyImport(const ImportItem& import_item, const CompilationUnit* unit,
 // it takes its own header imports, ahead of them so that a module's own
 // declarations and imports shadow the unit's (§23.9), and each is recorded on
 // the RTLIR module as a header import is, which is what the lowering reads.
-void Elaborator::ApplyCompilationUnitImports(RtlirModule* mod) {
-  for (const auto* item : unit_->cu_items) {
+// §3.12.1 (printed page 56) has a reference search only the part of the unit
+// written before it, imports included, so an import written after the module
+// is not in force in it.
+void Elaborator::ApplyCompilationUnitImports(const ModuleDecl* decl,
+                                             RtlirModule* mod) {
+  for (const auto* item : UnitItemsBefore(unit_, decl->range.start)) {
     if (item->kind != ModuleItemKind::kImportDecl) continue;
     const ImportItem& imp = item->import_item;
     ApplyImport(imp, unit_,

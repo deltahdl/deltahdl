@@ -119,4 +119,133 @@ TEST(CompilationUnitScopeWrites, NameDeclaredNowhereStillGetsAnImplicitNet) {
   EXPECT_NE(FindNet(design, "m", "h"), nullptr);
 }
 
+// §3.12.1 (printed pages 56-57): a reference searches only the part of the
+// compilation-unit scope written before it, and a name other than a task's or
+// a function's has to be declared in the unit before it is referenced.
+TEST(CompilationUnitScopeOrder, UnitTaskReadsUnitVariableDeclaredAfterIt) {
+  ElabFixture f;
+  ElaborateSrc(
+      "task t; int x; x = 5 + b; endtask\n"
+      "bit b;\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "unresolved identifier 'b'",
+                            1, "23.9"));
+}
+
+TEST(CompilationUnitScopeOrder, ModuleWritesUnitVariableDeclaredAfterIt) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial g = 5;\n"
+      "endmodule\n"
+      "int g;\n",
+      f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "undeclared identifier 'g'",
+                            2, "23.9"));
+}
+
+TEST(CompilationUnitScopeOrder, ModuleReadsUnitVariableDeclaredAfterIt) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int y;\n"
+      "  initial y = g;\n"
+      "endmodule\n"
+      "int g;\n",
+      f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "'g'", 3, "23.9"));
+}
+
+TEST(CompilationUnitScopeOrder, ModuleReadsUnitNetDeclaredAfterIt) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic y;\n"
+      "  initial y = w;\n"
+      "endmodule\n"
+      "wire w;\n",
+      f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "'w'", 3, "23.9"));
+}
+
+// §6.10 (printed page 108): with the unit's `g` written after the module, the
+// assignment's target is declared nowhere the module can reach, so it is the
+// module's implicit net.
+TEST(CompilationUnitScopeOrder,
+     AssignTargetDeclaredLaterInUnitGetsImplicitNet) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  assign g = 1;\n"
+      "endmodule\n"
+      "int g;\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_NE(FindNet(design, "m", "g"), nullptr);
+}
+
+// §3.12.1: `$unit::b` selects a declaration of the unit and refers forward no
+// more than `b` does, and a `$unit::` name the unit declares nowhere names
+// nothing.
+TEST(CompilationUnitScopeOrder, UnitScopedReferenceToLaterDeclaration) {
+  ElabFixture f;
+  ElaborateSrc(
+      "task t; int x; x = 5 + $unit::b; endtask\n"
+      "bit b;\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'$unit::b' precedes its declaration", 1,
+                            "3.12.1"));
+}
+
+TEST(CompilationUnitScopeOrder, UnitScopedReferenceToNothing) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int y;\n"
+      "  initial y = $unit::nope;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "undeclared identifier '$unit::nope'", 3,
+                            "3.12.1"));
+}
+
+TEST(CompilationUnitScopeOrder, UnitScopedReferencesToEarlierDataAndAnyTaskOk) {
+  EXPECT_TRUE(
+      ElabOk("int a;\n"
+             "module m;\n"
+             "  int y;\n"
+             "  initial begin y = $unit::a; $unit::later_task(); end\n"
+             "endmodule\n"
+             "task later_task; endtask\n"));
+}
+
+// §3.12.1: an import written at compilation-unit scope is part of the scope
+// the references after it search, and no reference before it.
+TEST(CompilationUnitScopeOrder, UnitImportAfterModuleDoesNotReachIt) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p; int x = 1; endpackage\n"
+      "module m;\n"
+      "  int y;\n"
+      "  initial y = x;\n"
+      "endmodule\n"
+      "import p::*;\n",
+      f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "'x'", 4, "23.9"));
+}
+
+TEST(CompilationUnitScopeOrder, UnitImportBeforeModuleReachesIt) {
+  EXPECT_TRUE(
+      ElabOk("package p; int x = 1; endpackage\n"
+             "import p::*;\n"
+             "module m;\n"
+             "  int y;\n"
+             "  initial y = x;\n"
+             "endmodule\n"));
+}
+
 }  // namespace

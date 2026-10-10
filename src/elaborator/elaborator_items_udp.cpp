@@ -394,18 +394,24 @@ void CheckNestedDeclItemRules(
   }
 }
 
+// §24.3: a program or checker instantiates no user-defined primitive.
+void CheckUdpInstParentRule(const ModuleItem* item, const ModuleDecl* decl,
+                            const ParentScopeKind& parent, DiagEngine& diag) {
+  if (!parent.is_program && !parent.is_checker) return;
+  diag.Error(item->loc,
+             std::format("primitive cannot be instantiated inside "
+                         "{} '{}'",
+                         parent.kind_word, decl->name),
+             Subclause("24.3"));
+}
+
 void CheckProgramCheckerItemRules(
     const ModuleItem* item, const ModuleDecl* decl,
     const ParentScopeKind& parent,
     std::unordered_set<std::string_view>& program_inst_names,
     DiagEngine& diag) {
-  if ((parent.is_program || parent.is_checker) &&
-      item->kind == ModuleItemKind::kUdpInst) {
-    diag.Error(item->loc,
-               std::format("primitive cannot be instantiated inside "
-                           "{} '{}'",
-                           parent.kind_word, decl->name),
-               Subclause("24.3"));
+  if (item->kind == ModuleItemKind::kUdpInst) {
+    CheckUdpInstParentRule(item, decl, parent, diag);
   }
   CheckCheckerBodyItemRules(item, decl, parent.is_checker, diag);
   CheckNestedDeclItemRules(item, decl, program_inst_names, diag);
@@ -556,13 +562,47 @@ struct ItemScopeContext {
   DiagEngine& diag;
 };
 
+// §3.4 (printed page 51) with §27: a generate block is part of the design
+// element it is written in, so an instance in one -- in the body, the else
+// body or a case arm of the generate construct `item`, at any depth -- is held
+// to the placement rules of §25.3, §17.2 and §24.3 that the element's own
+// items are. A user-defined primitive declared after the element is still
+// read as a module instance there, so `is_udp` names one by its name.
+template <typename FindChild, typename IsUdp>
+void CheckGeneratePlacement(const ModuleItem* item, const ModuleDecl* decl,
+                            const ItemScopeContext& item_scope,
+                            FindChild& find_child, IsUdp& is_udp) {
+  auto check = [&](const ModuleItem* sub) {
+    if (sub->kind == ModuleItemKind::kModuleInst) {
+      const ModuleDecl* child = find_child(sub->inst_module);
+      if (child != nullptr) {
+        CheckModuleInstParentRules(sub, decl, child, item_scope.parent_scope,
+                                   item_scope.diag);
+      } else if (is_udp(sub->inst_module)) {
+        CheckUdpInstParentRule(sub, decl, item_scope.parent_scope,
+                               item_scope.diag);
+      }
+    }
+    if (sub->kind == ModuleItemKind::kUdpInst) {
+      CheckUdpInstParentRule(sub, decl, item_scope.parent_scope,
+                             item_scope.diag);
+    }
+    CheckGeneratePlacement(sub, decl, item_scope, find_child, is_udp);
+  };
+  for (const auto* sub : item->gen_body) check(sub);
+  if (item->gen_else != nullptr) check(item->gen_else);
+  for (const auto& arm : item->gen_case_items) {
+    for (const auto* sub : arm.body) check(sub);
+  }
+}
+
 // §17.2/§17.7/§25.9: applies instance-classification and parent-scope legality
 // rules to every item of `decl`; `find_child` resolves an instance's target.
-template <typename FindChild>
+template <typename FindChild, typename IsUdp>
 void ClassifyAndCheckItems(const ModuleDecl* decl,
                            const ItemScopeContext& item_scope,
                            InstClassTables& inst_class_tables,
-                           FindChild&& find_child) {
+                           FindChild&& find_child, IsUdp&& is_udp) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kModuleInst) {
       const ModuleDecl* child = find_child(item->inst_module);
@@ -577,6 +617,7 @@ void ClassifyAndCheckItems(const ModuleDecl* decl,
     CheckProgramCheckerItemRules(item, decl, item_scope.parent_scope,
                                  inst_class_tables.program_inst_names,
                                  item_scope.diag);
+    CheckGeneratePlacement(item, decl, item_scope, find_child, is_udp);
   }
 }
 
@@ -727,18 +768,6 @@ void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
   ValidateForwardTypedefScopePrefix(decl);
 }
 
-// §8.25.1: the parameterized-class declarations of a compilation unit, indexed
-// by class name. Only a class with parameter ports can be specialized, so only
-// those are exposed to the constant folder.
-std::unordered_map<std::string_view, const ClassDecl*> BuildParamClassRegistry(
-    const CompilationUnit* unit) {
-  std::unordered_map<std::string_view, const ClassDecl*> registry;
-  for (const auto* cls : unit->classes) {
-    if (cls && !cls->params.empty()) registry.emplace(cls->name, cls);
-  }
-  return registry;
-}
-
 void Elaborator::InstantiateImplicitNestedModules(
     const std::vector<std::pair<std::string_view, ModuleDecl*>>& nested,
     RtlirModule* mod) {
@@ -797,7 +826,8 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
 
   ClassifyAndCheckItems(
       decl, {kParentScope, BuildParamScope(mod), diag_}, inst_class_tables,
-      [&](std::string_view name) { return FindModuleInScope(name); });
+      [&](std::string_view name) { return FindModuleInScope(name); },
+      [&](std::string_view name) { return FindUdpByName(name) != nullptr; });
   RegisterGenerateBlockInterfaces(
       decl->items,
       [&](std::string_view name) { return FindModuleInScope(name); },
@@ -868,6 +898,11 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   // nested declaration are read first, for BeginNestedDeclScope to join with
   // the names declared so far at such an instance.
   RecordNestedDeclNamesAbove(decl->items);
+  // §3.13 (e): an interface's modports are in its module name space too; they
+  // are held apart from its items, so they enter it before the items do.
+  for (const auto* modport : decl->modports) {
+    DeclareInModuleNameSpace(modport->name, modport->loc);
+  }
   for (auto* item : decl->items) {
     // The same rule for an instance written or implied below: this scope's
     // names are recorded as they stand when the loop reaches the declaration,

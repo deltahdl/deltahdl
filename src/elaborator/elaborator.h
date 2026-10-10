@@ -146,7 +146,7 @@ class Elaborator : public ElaboratorClassRules {
                                      const RtlirModule* mod);
 
   // §26.3: the three places an import is applied from, in reaching order.
-  void ApplyCompilationUnitImports(RtlirModule* mod);
+  void ApplyCompilationUnitImports(const ModuleDecl* decl, RtlirModule* mod);
   void ApplyHeaderImports(const ModuleDecl* decl);
   void ApplyBodyImport(const ImportItem& import_item);
 
@@ -286,14 +286,6 @@ class Elaborator : public ElaboratorClassRules {
 
   // Reports a gate or user-defined primitive instance whose terminals are the
   // wrong width, under whichever of the two rules the instance is held to.
-  // §28.3.6 rules the terminal of an instance array, whose bit-length shall be
-  // either one or the instance-array length. §4.9.6 rules the output or inout
-  // terminal of a single instance, which connects straight to 1-bit nets or
-  // 1-bit structural net expressions. Both kinds of instance ask this together
-  // because §29.8 puts them under one rule: a user-defined primitive instance
-  // connects its terminals by the terminal connection rules of §28.3.6, the
-  // rules a gate instance connects by, and §4.9.6 states its rule of primitive
-  // terminals, UDP terminals among them.
   void CheckInstanceTerminalWidths(const ModuleItem* item,
                                    const RtlirModule* mod);
 
@@ -512,6 +504,9 @@ class Elaborator : public ElaboratorClassRules {
                               RtlirModule* mod);
   // Whether an explicit or implicit net or variable of the module declares it.
   bool DeclaresNetOrVariable(std::string_view name) const;
+  // §3.13 (e) and (g): enters `name`, which a declaration other than a net or
+  // a variable declares at `loc`, in the module name space.
+  void DeclareInModuleNameSpace(std::string_view name, SourceLoc loc);
 
   std::string_view ScopedName(std::string_view base);
   // The generate prefix currently in force, arena-persisted so it outlives the

@@ -70,4 +70,48 @@ TEST(TimescalePrecedenceSimulation, PackagePrecisionFollowsTheTimescale) {
             "1.500\n");
 }
 
+// §3.14.2.3 (printed page 60) a): a module declared inside another (§23.4)
+// that specifies no timeunit takes the enclosing module's, ahead of the
+// `timescale and the compilation unit's, and its precision by the same order.
+// inner's #5 is then 5 us, at top's 3 us after top has printed; run at the
+// 1 ns / 1 ns default, it fell to 0 at the 1 us global precision and printed
+// first, reading its unit as -9.
+TEST(TimescalePrecedenceSimulation, NestedModuleTakesTheEnclosingTimescale) {
+  SimFixture f;
+  EXPECT_EQ(
+      PreprocessAndCapture("`timescale 1us/1us\n"
+                           "module top;\n"
+                           "  module inner;\n"
+                           "    initial begin\n"
+                           "      #5 $display(\"inner %0d %0d\", $time, "
+                           "$timeunit);\n"
+                           "    end\n"
+                           "  endmodule\n"
+                           "  inner i();\n"
+                           "  initial begin #3 $display(\"top %0d\", $time); "
+                           "end\n"
+                           "endmodule\n",
+                           f),
+      "top 3\ninner 5 -6\n");
+}
+
+TEST(TimescalePrecedenceSimulation, NestedModuleTakesTheEnclosingTimeunit) {
+  SimFixture f;
+  EXPECT_EQ(
+      PreprocessAndCapture("module top;\n"
+                           "  timeunit 1us; timeprecision 1us;\n"
+                           "  module inner;\n"
+                           "    initial begin\n"
+                           "      #5 $display(\"inner %0d %0d\", $time, "
+                           "$timeunit);\n"
+                           "    end\n"
+                           "  endmodule\n"
+                           "  inner i();\n"
+                           "  initial begin #3 $display(\"top %0d\", $time); "
+                           "end\n"
+                           "endmodule\n",
+                           f),
+      "top 3\ninner 5 -6\n");
+}
+
 }  // namespace
