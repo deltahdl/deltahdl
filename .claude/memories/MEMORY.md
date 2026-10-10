@@ -73,7 +73,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [Verifying through CI](verifying-through-ci.md) — keep local work to what CI has no way to perform; a build, a test binary or a probe of a defect is pushed and read from the run.
 - [Reading a CI run](reading-a-ci-run.md) — `gh run list --limit 1` before pushing, `gh run view --log-failed` after.
 - [gh run list --commit takes a full SHA](gh-run-list-commit-takes-a-full-sha.md) — pass `$(git rev-parse HEAD)`; a short SHA lists no run, and a watcher waiting on it never ends.
-- [Watching a run in the background](watching-a-run-in-the-background.md) — a background shell or a Monitor, never a foreground `gh run watch`.
+- [Watching a run in the background](watching-a-run-in-the-background.md) — a background shell or a Monitor, never a foreground `gh run watch`, and `--interval 60`: the 3-second default trips the rate limit.
 - [Long-running commands in the background](long-running-commands-in-the-background.md) — anything over about a minute (a `gh` sweep, a CI watch) runs with `run_in_background: true`, then the turn ends; a foreground command holds back every cron reminder.
 - [Waiting while a CI run is in progress](waiting-while-a-ci-run-is-in-progress.md) — while any CI run of any workflow is in progress, only wait: no diagnosis, edits or commits until it lands, except preparing comment-only edits.
 - [Fixing a red run after a push](fixing-a-red-run.md) — when a push's own run goes red, the pushing session fixes it, caused or inherited, in a push of its own before the next batch.
