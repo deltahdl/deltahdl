@@ -886,7 +886,8 @@ void Lowerer::RegisterClassDecl(const ClassDecl* cls,
   // §3.12.1: where each unit has a scope of its own, the unit's class is also
   // held under that scope's name, which SimContext::FindClassType asks first
   // for the running code's unit, so two units' classes of one name are two.
-  if (ctx_.Units().Separate() && UnitScopes::IsUnitScope(scope)) {
+  if (design_ != nullptr && !design_->compilation_units.empty() &&
+      UnitScopes::IsUnitScope(scope)) {
     ctx_.RegisterClassType(
         *arena_.Create<std::string>(std::string(scope) +
                                     "::" + std::string(cls->name)),

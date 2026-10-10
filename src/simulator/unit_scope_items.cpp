@@ -9,6 +9,7 @@
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "simulator/sim_context.h"
+#include "simulator/unit_scopes.h"
 
 namespace delta {
 
@@ -45,10 +46,10 @@ std::string_view UnitScopeOfClass(const RtlirDesign* design,
 // subroutines are registered, and under the bare names themselves for the
 // first top, whose names stand under no prefix. The module's own subroutines,
 // registered after this, take a name it shares over.
-void RegisterOwnUnitSubroutines(const RtlirDesign* design,
-                                const RtlirModule* mod, std::string_view prefix,
-                                SimContext& ctx, Arena& arena) {
+void EnterInstanceUnit(const RtlirDesign* design, const RtlirModule* mod,
+                       std::string_view prefix, SimContext& ctx, Arena& arena) {
   if (mod->unit_index < 0) return;
+  ctx.Units().SetInstanceUnit(prefix, mod->unit_index);
   const CompilationUnit* unit =
       design->compilation_units[static_cast<size_t>(mod->unit_index)];
   for (auto* item : unit->cu_items) {

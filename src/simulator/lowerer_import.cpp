@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include <functional>
 #include <string>
 #include <string_view>
@@ -833,22 +834,32 @@ void Lowerer::LowerUnitImportItems(const std::vector<ModuleItem*>& items) {
   }
 }
 
+// The compilation unit's classes to lower: the first of each name, and in a
+// design of several units every unit's own, two units' classes of one name
+// being two classes (§3.12.1).
+static std::vector<const ClassDecl*> UnitClassesToLower(
+    const RtlirDesign* design) {
+  std::unordered_set<std::string_view> names;
+  std::unordered_set<const ClassDecl*> chosen;
+  std::vector<const ClassDecl*> classes;
+  for (const auto* cls : design->cu_class_decls) {
+    if (!names.insert(cls->name).second) continue;
+    chosen.insert(cls);
+    classes.push_back(cls);
+  }
+  for (const auto* unit : design->compilation_units) {
+    for (const auto* cls : unit->classes) {
+      if (chosen.insert(cls).second) classes.push_back(cls);
+    }
+  }
+  return classes;
+}
+
 void Lowerer::LowerCompilationUnitClasses() {
   std::unordered_set<std::string_view> unit_class_names;
-  std::unordered_set<const ClassDecl*> lowered;
-  for (auto* cls : design_->cu_class_decls) {
-    if (!unit_class_names.insert(cls->name).second) continue;
+  for (const auto* cls : UnitClassesToLower(design_)) {
+    unit_class_names.insert(cls->name);
     LowerClassDecl(cls, design_->cu_function_decls);
-    lowered.insert(cls);
-  }
-  // §3.12.1: two units' classes of one name are two classes, each lowered,
-  // the first of the name having been lowered above.
-  for (const auto* unit : design_->compilation_units) {
-    for (auto* cls : unit->classes) {
-      if (lowered.insert(cls).second) {
-        LowerClassDecl(cls, design_->cu_function_decls);
-      }
-    }
   }
   // §24.6: an anonymous program declares its items in the compilation unit's
   // space without a scope of its own, so a class it declares is a unit class

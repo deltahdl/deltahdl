@@ -24,7 +24,6 @@
 #include "simulator/sim_context.h"
 #include "simulator/switch_network.h"
 #include "simulator/unit_scope_items.h"
-#include "simulator/unit_scopes.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -486,9 +485,7 @@ void Lowerer::LowerChildInstance(const RtlirModuleInst& child) {
   std::string child_path =
       RegisterChildInstancePath(saved_prefix, child_prefix, child, ctx_);
   inst_prefix_ = child_prefix;
-  ctx_.Units().SetInstanceUnit(inst_prefix_, child.resolved->unit_index);
-  RegisterOwnUnitSubroutines(design_, child.resolved, inst_prefix_, ctx_,
-                             arena_);
+  EnterInstanceUnit(design_, child.resolved, inst_prefix_, ctx_, arena_);
   if (child.resolved->is_interface) {
     interface_instance_prefixes_.push_back(child_prefix);
   }

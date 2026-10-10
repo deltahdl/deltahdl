@@ -99,19 +99,23 @@ TEST(SeparateUnitsSim, EachUnitsFunctionIsItsOwn) {
 }
 
 // §3.12.1 with §8.3: each unit's class of one name is its own, so `new` in a
-// module constructs its own unit's class.
+// module constructs its own unit's class; a package's class is the same in
+// both.
 TEST(SeparateUnitsSim, EachUnitsClassIsItsOwn) {
-  EXPECT_EQ(RunTopAndChild({"class C; int v = 3; endclass\n"
+  EXPECT_EQ(RunTopAndChild({"package q; class K; endclass endpackage\n"
+                            "class C; int v = 3; endclass\n"
                             "module top;\n"
                             "  int a;\n"
+                            "  C h;\n"
                             "  child c();\n"
-                            "  initial begin C h = new; a = h.v; end\n"
+                            "  initial begin h = new; a = h.v; end\n"
                             "endmodule\n",
                             "class C; int v = 4; endclass\n"
                             "class D; endclass\n"
                             "module child;\n"
                             "  int b;\n"
-                            "  initial begin C h = new; b = h.v; end\n"
+                            "  C h;\n"
+                            "  initial begin h = new; b = h.v; end\n"
                             "endmodule\n"}),
             (std::vector<uint64_t>{3, 4}));
 }
@@ -143,23 +147,23 @@ TEST(SeparateUnitsSim, EachUnitsTypedefIsItsOwn) {
 TEST(SeparateUnitsSim, EachUnitsCovergroupIsItsOwn) {
   EXPECT_EQ(RunTopAndChild({"covergroup cg with function sample(int v);\n"
                             "  coverpoint v { bins b[] = {[0:1]}; }\n"
-                            "endcovergroup\n"
+                            "endgroup\n"
                             "module top;\n"
                             "  int a;\n"
                             "  child c();\n"
                             "  initial begin\n"
-                            "    cg k = new;\n"
+                            "    automatic cg k = new;\n"
                             "    k.sample(0);\n"
                             "    a = int'(k.get_inst_coverage());\n"
                             "  end\n"
                             "endmodule\n",
                             "covergroup cg with function sample(int v);\n"
                             "  coverpoint v { bins b[] = {[0:3]}; }\n"
-                            "endcovergroup\n"
+                            "endgroup\n"
                             "module child;\n"
                             "  int b;\n"
                             "  initial begin\n"
-                            "    cg k = new;\n"
+                            "    automatic cg k = new;\n"
                             "    k.sample(0);\n"
                             "    b = int'(k.get_inst_coverage());\n"
                             "  end\n"

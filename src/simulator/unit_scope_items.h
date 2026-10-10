@@ -6,7 +6,6 @@
 
 #include "common/arena.h"
 #include "elaborator/rtlir.h"
-#include "parser/ast_design.h"
 #include "parser/ast_module.h"
 #include "simulator/unit_scopes.h"
 
@@ -49,12 +48,11 @@ void ForEachUnitScope(const RtlirDesign* design, Arena& arena, Fn fn) {
 std::string_view UnitScopeOfClass(const RtlirDesign* design,
                                   const ClassDecl* cls, Arena& arena);
 
-// §3.12.1: in a design of several units, registers the subroutines of the
-// unit `mod` was declared in for the instance under `prefix`, by their bare
-// names under the prefix (unit_scope_items.cpp). Nothing for a design of one
-// unit.
-void RegisterOwnUnitSubroutines(const RtlirDesign* design,
-                                const RtlirModule* mod, std::string_view prefix,
-                                SimContext& ctx, Arena& arena);
+// §3.12.1: in a design of several units, records that the instance under
+// `prefix` stands in the unit `mod` was declared in (UnitScopes), and
+// registers that unit's subroutines for it by their bare names under the
+// prefix (unit_scope_items.cpp). Nothing for a design of one unit.
+void EnterInstanceUnit(const RtlirDesign* design, const RtlirModule* mod,
+                       std::string_view prefix, SimContext& ctx, Arena& arena);
 
 }  // namespace delta

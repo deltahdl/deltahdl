@@ -49,7 +49,6 @@
 #include "simulator/timing_check_delayed_signals.h"
 #include "simulator/timing_check_driver.h"
 #include "simulator/unit_scope_items.h"
-#include "simulator/unit_scopes.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_data_structs.h"
@@ -233,8 +232,7 @@ void Lowerer::RecordSpecifyScope(const RtlirModule* mod) {
 }
 
 void Lowerer::LowerModule(const RtlirModule* mod) {
-  ctx_.Units().SetInstanceUnit(inst_prefix_, mod->unit_index);
-  RegisterOwnUnitSubroutines(design_, mod, inst_prefix_, ctx_, arena_);
+  EnterInstanceUnit(design_, mod, inst_prefix_, ctx_, arena_);
   RegisterInstanceKeyBinding(inst_prefix_, mod->library, mod->name, ctx_);
   LowerParams(mod);
   RecordSpecifyScope(mod);
