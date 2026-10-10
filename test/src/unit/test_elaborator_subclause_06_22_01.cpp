@@ -220,4 +220,36 @@ TEST(MatchingTypesElaboration, TypesEachInstanceDeclaresAreDistinct) {
   }
 }
 
+// The instances' module is found wherever the compilation unit declares it,
+// after the module instantiating it too, and a value a package names is no
+// instance's variable.
+TEST(MatchingTypesElaboration, InstanceOfALaterModuleIsJudged) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n"
+      "  parameter int k = 1;\n"
+      "endpackage\n"
+      "module top();\n"
+      "  sub s1 ();\n"
+      "  sub s2 ();\n"
+      "  initial begin\n"
+      "    s1.n = p::k;\n"
+      "    s1.e = s2.e;\n"
+      "  end\n"
+      "endmodule\n"
+      "module sub();\n"
+      "  typedef enum {X, Y} e_t;\n"
+      "  e_t e;\n"
+      "  int n;\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'s1.e' and 's2.e' have types the instances 's1' "
+                            "and 's2' each declare for themselves, which are "
+                            "distinct types",
+                            9, "6.22"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "each declare for themselves", 8, "6.22"));
+}
+
 }  // namespace

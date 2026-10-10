@@ -643,14 +643,13 @@ static void ReportContAssignUnresolved(const ModuleDecl* decl,
   ReportUnresolvedRefs(refs, declared, diag, DeclaredGenvars(decl->items));
 }
 
-// The variables among `infos` that are unpacked arrays.
+// The variables `infos` records, which are the unpacked arrays: a variable is
+// recorded only when it is declared with an unpacked dimension.
 static std::unordered_set<std::string_view> UnpackedArrayNames(
     const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
         infos) {
   std::unordered_set<std::string_view> names;
-  for (const auto& [name, info] : infos) {
-    if (info.num_unpacked_dims != 0) names.insert(name);
-  }
+  for (const auto& entry : infos) names.insert(entry.first);
   return names;
 }
 

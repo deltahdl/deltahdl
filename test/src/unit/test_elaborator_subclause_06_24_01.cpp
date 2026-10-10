@@ -557,7 +557,8 @@ TEST(CastOperatorElaboration,
 // expression of any shape is refused as a bare real variable is, and so is a
 // string, a class handle, a chandle, an event, an unpacked array and an
 // unpacked structure. An integral expression built from real operands, a
-// relation, is accepted, as are integral operands of every shape.
+// relation, is accepted, as are integral operands of every shape, a
+// conditional choosing between two integral values among them.
 TEST(CastOperatorElaboration, NonIntegralOperandOfAnyFormRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -591,6 +592,7 @@ TEST(CastOperatorElaboration, NonIntegralOperandOfAnyFormRejected) {
       "    v = 8'(n + 1);\n"
       "    v = 8'(v[3:0]);\n"
       "    v = signed'(v);\n"
+      "    v = 8'(n ? 1 : 2);\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -604,7 +606,7 @@ TEST(CastOperatorElaboration, NonIntegralOperandOfAnyFormRejected) {
                               "a signing cast works only on an integral value",
                               line, "6.24.1"));
   }
-  for (uint32_t line : {26U, 27U, 28U, 29U, 30U}) {
+  for (uint32_t line : {26U, 27U, 28U, 29U, 30U, 31U}) {
     EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
                                "works only on an integral value", line,
                                "6.24.1"));

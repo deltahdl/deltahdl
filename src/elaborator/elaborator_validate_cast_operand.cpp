@@ -76,8 +76,9 @@ bool ElaboratorOperationRules::CastOperandIsNonIntegral(
       cast_unpacked_structs_.count(operand->text) != 0) {
     return true;
   }
-  auto array = var_array_info_.find(operand->text);
-  return array != var_array_info_.end() && array->second.num_unpacked_dims != 0;
+  // var_array_info_ records a variable only when it is declared with an
+  // unpacked dimension.
+  return var_array_info_.count(operand->text) != 0;
 }
 
 }  // namespace delta

@@ -62,10 +62,12 @@ static void CheckDims(const std::vector<Expr*>& dims,
 
 // §7.10: an index or a slice of a queue is a queue select, the one context
 // where `$` itself may carry operators, and the one a `$` parameter may not
-// enter.
+// enter. A value range of `inside` is a select with no base, and selects
+// nothing.
 static void CheckExpr(const Expr* e, const QueueContextScan& scan) {
   if (e == nullptr) return;
-  if (e->kind == ExprKind::kSelect && e->base->kind == ExprKind::kIdentifier &&
+  if (e->kind == ExprKind::kSelect && e->base != nullptr &&
+      e->base->kind == ExprKind::kIdentifier &&
       scan.queues.count(e->base->text) != 0) {
     ReportUnboundedParamsIn(e->index, scan);
     ReportUnboundedParamsIn(e->index_end, scan);

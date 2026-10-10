@@ -537,8 +537,9 @@ TEST(DollarConstantElaboration,
 
 // A type name the tables cannot resolve leaves nothing to judge, so the type
 // is taken as a simple bit vector type and `$` is not reported against it; a
-// class name resolving to no typedef is no bit vector all the same.
-TEST(DollarConstantElaboration, UnresolvedTypeNameIsNotJudged) {
+// class name resolving to no typedef is no bit vector all the same. A
+// parameter with no declared type at all is judged by nothing either.
+TEST(DollarConstantElaboration, UnresolvedOrAbsentTypeIsNotJudged) {
   const TypedefMap kTypedefs;
   const std::unordered_map<std::string_view, std::vector<Expr*>> kDims;
   const std::unordered_set<std::string_view> kClasses = {"C"};
@@ -551,6 +552,9 @@ TEST(DollarConstantElaboration, UnresolvedTypeNameIsNotJudged) {
   handle.kind = DataTypeKind::kNamed;
   handle.type_name = "C";
   EXPECT_FALSE(IsSimpleBitVectorType(handle, kTables));
+  ElabFixture f;
+  ValidateUnboundedParamType({"W", nullptr, false, {}}, kTables, f.diag);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 // §6.20.7 bars a parameter holding `$` from every queue context: a queue's
@@ -558,8 +562,8 @@ TEST(DollarConstantElaboration, UnresolvedTypeNameIsNotJudged) {
 // a queue, in a module, a procedural block or a function alike. A dynamic,
 // fixed or bounded dimension is no such context, nor is an index of a queue
 // written with a bounded parameter, an index of an element of a queue of
-// queues written with one, or the compilation unit's `P` that `$unit::P`
-// names.
+// queues written with one, the compilation unit's `P` that `$unit::P` names,
+// an index of an array that is no queue, or the bound of a value range.
 TEST(DollarConstantElaboration, DollarParameterInAQueueContextIsRejected) {
   ElabFixture f;
   Elaborate(
@@ -584,6 +588,8 @@ TEST(DollarConstantElaboration, DollarParameterInAQueueContextIsRejected) {
       "    q[$unit::P] = 1;\n"
       "    qq[0][N] = 1;\n"
       "    b[N] = 1;\n"
+      "    g[N] = 1;\n"
+      "    if (N inside {[0:P]}) g[0] = 1;\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -593,7 +599,7 @@ TEST(DollarConstantElaboration, DollarParameterInAQueueContextIsRejected) {
                               "does not permit",
                               line, "6.20.7"));
   }
-  for (uint32_t line : {19U, 20U, 21U}) {
+  for (uint32_t line : {19U, 20U, 21U, 22U, 23U}) {
     EXPECT_FALSE(
         ReportedError(f.diag.Diagnostics(), "holds '$'", line, "6.20.7"));
   }
