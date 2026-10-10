@@ -11,6 +11,7 @@
 #include "elaborator/const_eval_internal.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
