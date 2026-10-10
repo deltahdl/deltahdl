@@ -435,7 +435,11 @@ uint32_t LiteralWidth(std::string_view text, uint64_t val) {
   // so 2^32 is 34 bits as a simple decimal and 2^63 is 65.
   const auto kBits = static_cast<uint32_t>(std::bit_width(val)) +
                      (IsSignedLiteral(text) ? 1U : 0U);
-  return std::max(kBits, uint32_t{32});
+  const uint32_t kWidth = std::max(kBits, uint32_t{32});
+  // A literal the elaborator builds, such as an enumeration member's value,
+  // has no text and holds its value in `val` alone, a negative one as its
+  // 64-bit two's complement, so it is never wider than those 64 bits.
+  return text.empty() ? std::min(kWidth, uint32_t{64}) : kWidth;
 }
 
 // §5.7.1 (printed page 78): an unbased unsized literal is one bit wide where
