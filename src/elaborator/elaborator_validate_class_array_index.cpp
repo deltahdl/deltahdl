@@ -8,8 +8,8 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
-#include "elaborator/index_value_kind.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/value_kind.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -37,10 +37,11 @@ struct ClassIndexCtx {
   const std::unordered_map<std::string_view, std::string_view>& class_var_types;
   const std::unordered_set<std::string_view>& class_names;
   const std::unordered_map<std::string_view, const ClassDecl*>& local_classes;
-  // Type kind of every declared variable in scope. Used to reject a
-  // non-class-typed variable (e.g. an int or a string) used as a class index,
-  // which class_var_types alone cannot see because it holds only class handles.
-  const TypeMap& var_types;
+  // The declarations that type an index expression (KindOfValue), the type
+  // kind of every declared variable among them. Used to reject a value of no
+  // class (e.g. an int or a string) used as a class index, which
+  // class_var_types alone cannot see because it holds only class handles.
+  const ValueScope& values;
   const CompilationUnit* unit;
   DiagEngine& diag;
 };
@@ -93,12 +94,15 @@ static bool IsIllegalClassIndex(const Expr* idx, std::string_view index_class,
     // Not a class-typed variable. A declared variable of a concrete non-class
     // type (an integral, string, real, etc. value, kind != kNamed) is of any
     // other type and is therefore an illegal class index.
-    auto gt = ctx.var_types.find(idx->text);
-    return gt != ctx.var_types.end() && gt->second != DataTypeKind::kNamed;
+    auto gt = ctx.values.var_types.find(idx->text);
+    return gt != ctx.values.var_types.end() &&
+           gt->second != DataTypeKind::kNamed;
   }
   // Any other expression whose value is integral, real or a string is no
   // object of any class.
-  return KindOfIndexValue(idx, ctx.var_types) != IndexValueKind::kUnknown;
+  ValueKind kind = KindOfValue(idx, ctx.values);
+  return kind == ValueKind::kIntegral || kind == ValueKind::kReal ||
+         kind == ValueKind::kString;
 }
 
 // Validates a single select node against the class-index rule, emitting a
@@ -191,11 +195,13 @@ void Elaborator::ValidateClassIndexSelect(const ModuleDecl* decl) {
   }
   if (!has_class_index) return;
   auto local_classes = CollectModuleLocalClasses(decl);
+  const ValueScope kValues{var_types_,  var_named_types_, var_array_info_,
+                           func_decls_, typedefs_,        class_names_};
   ClassIndexCtx ctx{var_array_info_,
                     class_var_types_,
                     class_names_,
                     local_classes,
-                    var_types_,
+                    kValues,
                     unit_,
                     diag_};
   for (const auto* item : decl->items) {
@@ -217,9 +223,10 @@ void Elaborator::ValidateClassIndexSelect(const ModuleDecl* decl) {
 //
 // Returns true when the index of a string-indexed associative array select is
 // an illegal index (a non-string literal, an identifier of a non-string type,
-// or any other expression whose value is integral or real). A string literal
-// of any length, including "", is valid.
-static bool IsIllegalStringIndex(const Expr* idx, const TypeMap& var_types) {
+// or any other expression whose value is integral, real, or one of the kinds
+// ValueKind::kOther stands for). A string literal of any length, including "",
+// is valid.
+static bool IsIllegalStringIndex(const Expr* idx, const ValueScope& values) {
   if (idx->kind == ExprKind::kStringLiteral) {
     // A string literal of any length, including "", is a valid index.
     return false;
@@ -230,11 +237,12 @@ static bool IsIllegalStringIndex(const Expr* idx, const TypeMap& var_types) {
     return true;
   }
   if (idx->kind == ExprKind::kIdentifier) {
-    auto vt = var_types.find(idx->text);
-    return vt != var_types.end() && vt->second != DataTypeKind::kString;
+    auto vt = values.var_types.find(idx->text);
+    return vt != values.var_types.end() && vt->second != DataTypeKind::kString;
   }
-  IndexValueKind kind = KindOfIndexValue(idx, var_types);
-  return kind == IndexValueKind::kIntegral || kind == IndexValueKind::kReal;
+  ValueKind kind = KindOfValue(idx, values);
+  return kind == ValueKind::kIntegral || kind == ValueKind::kReal ||
+         kind == ValueKind::kOther;
 }
 
 // Validates a single select node against the string-index rule, emitting a
@@ -244,7 +252,7 @@ static void CheckStringIndexSelectNode(
     const Expr* e,
     const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
         var_array_info,
-    const TypeMap& var_types, DiagEngine& diag) {
+    const ValueScope& values, DiagEngine& diag) {
   // Plain element selects only; a slice on an associative array is reported
   // separately, so skip it here to avoid a second diagnostic on one site.
   if (e->kind != ExprKind::kSelect || !e->base || !e->index ||
@@ -256,7 +264,7 @@ static void CheckStringIndexSelectNode(
       it->second.assoc_index_type != "string") {
     return;
   }
-  if (IsIllegalStringIndex(e->index, var_types)) {
+  if (IsIllegalStringIndex(e->index, values)) {
     diag.Error(e->range.start,
                std::format("string-indexed associative array '{}' shall be "
                            "indexed by a string or string literal",
@@ -269,18 +277,18 @@ static void CheckStringIndexSelectExpr(
     const Expr* e,
     const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
         var_array_info,
-    const TypeMap& var_types, DiagEngine& diag) {
+    const ValueScope& values, DiagEngine& diag) {
   if (!e) return;
-  CheckStringIndexSelectNode(e, var_array_info, var_types, diag);
-  CheckStringIndexSelectExpr(e->lhs, var_array_info, var_types, diag);
-  CheckStringIndexSelectExpr(e->rhs, var_array_info, var_types, diag);
-  CheckStringIndexSelectExpr(e->base, var_array_info, var_types, diag);
-  CheckStringIndexSelectExpr(e->index, var_array_info, var_types, diag);
-  CheckStringIndexSelectExpr(e->condition, var_array_info, var_types, diag);
-  CheckStringIndexSelectExpr(e->true_expr, var_array_info, var_types, diag);
-  CheckStringIndexSelectExpr(e->false_expr, var_array_info, var_types, diag);
+  CheckStringIndexSelectNode(e, var_array_info, values, diag);
+  CheckStringIndexSelectExpr(e->lhs, var_array_info, values, diag);
+  CheckStringIndexSelectExpr(e->rhs, var_array_info, values, diag);
+  CheckStringIndexSelectExpr(e->base, var_array_info, values, diag);
+  CheckStringIndexSelectExpr(e->index, var_array_info, values, diag);
+  CheckStringIndexSelectExpr(e->condition, var_array_info, values, diag);
+  CheckStringIndexSelectExpr(e->true_expr, var_array_info, values, diag);
+  CheckStringIndexSelectExpr(e->false_expr, var_array_info, values, diag);
   for (const auto* elem : e->elements) {
-    CheckStringIndexSelectExpr(elem, var_array_info, var_types, diag);
+    CheckStringIndexSelectExpr(elem, var_array_info, values, diag);
   }
 }
 
@@ -288,12 +296,12 @@ static void WalkStmtsForStringIndexSelect(
     const Stmt* s,
     const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
         var_array_info,
-    const TypeMap& var_types, DiagEngine& diag) {
+    const ValueScope& values, DiagEngine& diag) {
   if (!s) return;
-  CheckStringIndexSelectExpr(s->lhs, var_array_info, var_types, diag);
-  CheckStringIndexSelectExpr(s->rhs, var_array_info, var_types, diag);
-  CheckStringIndexSelectExpr(s->expr, var_array_info, var_types, diag);
-  CheckStringIndexSelectExpr(s->condition, var_array_info, var_types, diag);
+  CheckStringIndexSelectExpr(s->lhs, var_array_info, values, diag);
+  CheckStringIndexSelectExpr(s->rhs, var_array_info, values, diag);
+  CheckStringIndexSelectExpr(s->expr, var_array_info, values, diag);
+  CheckStringIndexSelectExpr(s->condition, var_array_info, values, diag);
   // §7.8.2 requires a string or a string literal wherever such an array is
   // indexed, and names no statement the requirement is suspended in. This walk
   // therefore names no statement link itself: the list comes from
@@ -303,7 +311,7 @@ static void WalkStmtsForStringIndexSelect(
   // action of an immediate assertion, so an integer index written in either
   // went unreported.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
-    WalkStmtsForStringIndexSelect(sub, var_array_info, var_types, diag);
+    WalkStmtsForStringIndexSelect(sub, var_array_info, values, diag);
   });
 }
 
@@ -317,16 +325,18 @@ void Elaborator::ValidateStringIndexSelect(const ModuleDecl* decl) {
     }
   }
   if (!has_string_index) return;
+  const ValueScope kValues{var_types_,  var_named_types_, var_array_info_,
+                           func_decls_, typedefs_,        class_names_};
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
-      CheckStringIndexSelectExpr(item->assign_lhs, var_array_info_, var_types_,
+      CheckStringIndexSelectExpr(item->assign_lhs, var_array_info_, kValues,
                                  diag_);
-      CheckStringIndexSelectExpr(item->assign_rhs, var_array_info_, var_types_,
+      CheckStringIndexSelectExpr(item->assign_rhs, var_array_info_, kValues,
                                  diag_);
     }
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
-      WalkStmtsForStringIndexSelect(item->body, var_array_info_, var_types_,
+      WalkStmtsForStringIndexSelect(item->body, var_array_info_, kValues,
                                     diag_);
     }
   }
@@ -338,38 +348,38 @@ void Elaborator::ValidateStringIndexSelect(const ModuleDecl* decl) {
 // is a nonintegral (real) expression.
 static void CheckIntegralIndexSelectExpr(
     const Expr* e, const std::unordered_set<std::string_view>& integral_names,
-    const TypeMap& var_types, DiagEngine& diag) {
+    const ValueScope& values, DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kSelect && e->base && e->index &&
       e->base->kind == ExprKind::kIdentifier && !IsSliceSelect(e) &&
       integral_names.count(e->base->text) &&
-      IsNonintegralIndex(e->index, var_types)) {
+      IsNonintegralIndex(e->index, values)) {
     diag.Error(e->index->range.start,
                std::format("real or shortreal index is not allowed on "
                            "integral-indexed associative array '{}'",
                            e->base->text),
                Subclause("7.8.4"));
   }
-  CheckIntegralIndexSelectExpr(e->lhs, integral_names, var_types, diag);
-  CheckIntegralIndexSelectExpr(e->rhs, integral_names, var_types, diag);
-  CheckIntegralIndexSelectExpr(e->base, integral_names, var_types, diag);
-  CheckIntegralIndexSelectExpr(e->index, integral_names, var_types, diag);
-  CheckIntegralIndexSelectExpr(e->condition, integral_names, var_types, diag);
-  CheckIntegralIndexSelectExpr(e->true_expr, integral_names, var_types, diag);
-  CheckIntegralIndexSelectExpr(e->false_expr, integral_names, var_types, diag);
+  CheckIntegralIndexSelectExpr(e->lhs, integral_names, values, diag);
+  CheckIntegralIndexSelectExpr(e->rhs, integral_names, values, diag);
+  CheckIntegralIndexSelectExpr(e->base, integral_names, values, diag);
+  CheckIntegralIndexSelectExpr(e->index, integral_names, values, diag);
+  CheckIntegralIndexSelectExpr(e->condition, integral_names, values, diag);
+  CheckIntegralIndexSelectExpr(e->true_expr, integral_names, values, diag);
+  CheckIntegralIndexSelectExpr(e->false_expr, integral_names, values, diag);
   for (const auto* elem : e->elements) {
-    CheckIntegralIndexSelectExpr(elem, integral_names, var_types, diag);
+    CheckIntegralIndexSelectExpr(elem, integral_names, values, diag);
   }
 }
 
 static void WalkStmtsForIntegralIndexSelect(
     const Stmt* s, const std::unordered_set<std::string_view>& integral_names,
-    const TypeMap& var_types, DiagEngine& diag) {
+    const ValueScope& values, DiagEngine& diag) {
   if (!s) return;
-  CheckIntegralIndexSelectExpr(s->lhs, integral_names, var_types, diag);
-  CheckIntegralIndexSelectExpr(s->rhs, integral_names, var_types, diag);
-  CheckIntegralIndexSelectExpr(s->expr, integral_names, var_types, diag);
-  CheckIntegralIndexSelectExpr(s->condition, integral_names, var_types, diag);
+  CheckIntegralIndexSelectExpr(s->lhs, integral_names, values, diag);
+  CheckIntegralIndexSelectExpr(s->rhs, integral_names, values, diag);
+  CheckIntegralIndexSelectExpr(s->expr, integral_names, values, diag);
+  CheckIntegralIndexSelectExpr(s->condition, integral_names, values, diag);
   // §7.8.4 forbids an implicit cast from a real or shortreal expression to the
   // index type wherever such an array is indexed, and names no statement the
   // prohibition is suspended in. This walk therefore names no statement link
@@ -379,7 +389,7 @@ static void WalkStmtsForIntegralIndexSelect(
   // production code block nor a for-loop step, so `x = map[r]` written in
   // either was never looked at.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
-    WalkStmtsForIntegralIndexSelect(sub, integral_names, var_types, diag);
+    WalkStmtsForIntegralIndexSelect(sub, integral_names, values, diag);
   });
 }
 
@@ -415,16 +425,18 @@ void Elaborator::ValidateIntegralIndexSelect(const ModuleDecl* decl) {
   std::unordered_set<std::string_view> integral_names =
       CollectIntegralIndexNames(var_array_info_, class_names_, typedefs_);
   if (integral_names.empty()) return;
+  const ValueScope kValues{var_types_,  var_named_types_, var_array_info_,
+                           func_decls_, typedefs_,        class_names_};
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
-      CheckIntegralIndexSelectExpr(item->assign_lhs, integral_names, var_types_,
+      CheckIntegralIndexSelectExpr(item->assign_lhs, integral_names, kValues,
                                    diag_);
-      CheckIntegralIndexSelectExpr(item->assign_rhs, integral_names, var_types_,
+      CheckIntegralIndexSelectExpr(item->assign_rhs, integral_names, kValues,
                                    diag_);
     }
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
-      WalkStmtsForIntegralIndexSelect(item->body, integral_names, var_types_,
+      WalkStmtsForIntegralIndexSelect(item->body, integral_names, kValues,
                                       diag_);
     }
   }

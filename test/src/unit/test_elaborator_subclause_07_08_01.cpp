@@ -389,4 +389,39 @@ TEST(WildcardIndexElaboration, RealIndexExpressionOfAnyFormRejected) {
   for (const auto& d : diags) EXPECT_NE(d.loc.line, 8u) << d.message;
 }
 
+// §7.8.1: a wildcard index shall be integral, and a select, a cast or a
+// function call gives the type its declaration states: a real array's element,
+// a cast to real or to a typedef of real, a const cast of a real, and a
+// function returning real are no integral value.
+TEST(WildcardIndexElaboration, RealSelectCastAndCallIndexRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int w [*];\n"
+      "  real ra [2];\n"
+      "  int a [2];\n"
+      "  typedef real r_t;\n"
+      "  function real g(); return 1.0; endfunction\n"
+      "  initial begin\n"
+      "    w[ra[0]] = 1;\n"
+      "    w[real'(2)] = 1;\n"
+      "    w[g()] = 1;\n"
+      "    w[r_t'(a[0])] = 1;\n"
+      "    w[const'(ra[1])] = 1;\n"
+      "    w[int'(ra[1])] = 1;\n"
+      "    w[8'(a[1])] = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  const char* const kReport =
+      "nonintegral index is not allowed on wildcard associative array 'w'";
+  for (uint32_t line = 8; line <= 12; ++line) {
+    EXPECT_TRUE(ReportedError(diags, kReport, line, "7.8.1"));
+  }
+  for (uint32_t line = 13; line <= 14; ++line) {
+    EXPECT_FALSE(ReportedError(diags, kReport, line, "7.8.1"));
+  }
+}
+
 }  // namespace

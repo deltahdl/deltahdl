@@ -196,6 +196,10 @@ bool WeakRefTypeParamNamesClass(
 
 bool IsIntegralType(DataTypeKind kind);
 
+// §6.7.1: the net types, whose net declared with no data type takes the
+// implicit logic type.
+bool IsNetTypeKind(DataTypeKind kind);
+
 bool IsSimpleBitVectorType(DataTypeKind kind);
 
 bool IsSimpleBitVectorType(const DataType& dtype);

@@ -17,12 +17,8 @@
 
 namespace delta {
 
-// §6.18: the type a member is written with when that is more than a keyword: a
-// structure, union or enumeration written in place, or the type a typedef name
-// stands for once every name in the chain is followed. Null for a keyword type
-// and for a name that resolves to nothing, such as a class.
-static const DataType* MemberOwnType(const StructMember& m,
-                                     const TypedefMap& typedefs) {
+const DataType* MemberOwnType(const StructMember& m,
+                              const TypedefMap& typedefs) {
   if (m.nested_type != nullptr) return m.nested_type;
   if (m.type_kind != DataTypeKind::kNamed) return nullptr;
   const DataType* named = MemberNamedType(m, typedefs);

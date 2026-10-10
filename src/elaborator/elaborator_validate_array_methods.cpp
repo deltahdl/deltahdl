@@ -1,29 +1,24 @@
 #include <format>
 #include <string_view>
-#include <unordered_map>
-#include <unordered_set>
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/value_kind.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
-#include "parser/ast_type.h"
 
 namespace delta {
 
 namespace {
 
-using ArrayInfos =
-    std::unordered_map<std::string_view, Elaborator::VarArrayInfo>;
-
-// What the array method checks read besides the call: the module's arrays and
-// its class names.
+// What the array method checks read besides the call: the declarations that
+// type what a method visits, the module's arrays among them, and where the
+// reports go.
 struct ArrayMethodScan {
-  const ArrayInfos& arrays;
-  const std::unordered_set<std::string_view>& class_names;
+  const ValueScope& values;
   DiagEngine& diag;
 };
 
@@ -94,31 +89,13 @@ ArrayKind KindOf(const Elaborator::VarArrayInfo& info) {
   return {"fixed-size array", "7.12"};
 }
 
-// §7.12.1 to §7.12.3: an element of an unpacked structure or union, a class
-// handle, a chandle or an event has neither relational nor arithmetic
-// operators.
-bool ElementHasNoOperators(const Elaborator::VarArrayInfo& info,
-                           const ArrayMethodScan& scan) {
-  switch (info.elem_type) {
-    case DataTypeKind::kChandle:
-    case DataTypeKind::kEvent:
-      return true;
-    case DataTypeKind::kNamed:
-      return scan.class_names.count(info.elem_type_name) != 0;
-    default:
-      return info.elem_is_unpacked_aggregate;
-  }
-}
-
 // §7.12.3: sum and product need the arithmetic operators, which a string has
-// not; and, or and xor the bitwise ones, which a real has not either.
-bool ElementHasReduction(std::string_view method,
-                         const Elaborator::VarArrayInfo& info,
-                         const ArrayMethodScan& scan) {
-  if (ElementHasNoOperators(info, scan)) return false;
-  if (info.elem_type == DataTypeKind::kString) return false;
+// not; and, or and xor the bitwise ones, which a real has not either. A value
+// of a kind not known is not judged.
+bool LacksReduction(std::string_view method, ValueKind kind) {
+  if (kind == ValueKind::kOther || kind == ValueKind::kString) return true;
   bool bitwise = method == "and" || method == "or" || method == "xor";
-  return !bitwise || !IsRealType(info.elem_type);
+  return bitwise && kind == ValueKind::kReal;
 }
 
 // Recognize an array-method invocation, in either the call form `arr.m()` or
@@ -154,14 +131,18 @@ bool MatchArrayMethodSite(const Expr* e, ArrayMethodSite& out) {
   return true;
 }
 
-// §7.12: the with expression names each element as it is visited, by the
-// iterator argument or else as `item`; a with expression that is that name
-// alone has the element's type.
-bool WithIsTheElement(const ArrayMethodSite& site) {
-  std::string_view iterator =
-      site.iterator != nullptr ? site.iterator->text : "item";
-  return site.with_expr->kind == ExprKind::kIdentifier &&
-         site.with_expr->text == iterator;
+// §7.12.1 to §7.12.3: what a method's operation is applied to: the with
+// expression's value where the method is given one, and the element otherwise.
+// The with expression names each element as it is visited, by the iterator
+// argument or else as `item`.
+ValueKind KindVisited(const ArrayMethodSite& site,
+                      const Elaborator::VarArrayInfo& info,
+                      const ArrayMethodScan& scan) {
+  if (site.with_expr == nullptr) return KindOfElement(info, scan.values);
+  ValueScope with_scope = scan.values;
+  with_scope.iterator = {
+      site.iterator != nullptr ? site.iterator->text : "item", &info};
+  return KindOfValue(site.with_expr, with_scope);
 }
 
 // §7.12, §7.12.1 and §7.12.5: an iterator argument needs a with clause, and so
@@ -196,8 +177,7 @@ void ReportUnorderedComparison(const Expr* e, const ArrayMethodSite& site,
                                const Elaborator::VarArrayInfo& info,
                                const ArrayMethodScan& scan) {
   if (!ComparesElements(site.method)) return;
-  if (site.with_expr != nullptr && !WithIsTheElement(site)) return;
-  if (!ElementHasNoOperators(info, scan)) return;
+  if (KindVisited(site, info, scan) != ValueKind::kOther) return;
   scan.diag.Error(
       e->range.start,
       std::format("array method '{}' compares values of a type "
@@ -209,8 +189,8 @@ void ReportUnorderedComparison(const Expr* e, const ArrayMethodSite& site,
 // §7.12.3: a reduction leaves its with clause off only where the reduction is
 // defined for the element type, which it is not for an element that is itself
 // an unpacked array, as each element of an array of more than one unpacked
-// dimension is; and the element, or the with expression that is the element,
-// needs the reduction's operation.
+// dimension is; and the element, or the with expression's value, needs the
+// reduction's operation.
 void ReportReduction(const Expr* e, const ArrayMethodSite& site,
                      const Elaborator::VarArrayInfo& info,
                      const ArrayMethodScan& scan) {
@@ -223,8 +203,7 @@ void ReportReduction(const Expr* e, const ArrayMethodSite& site,
                     Subclause("7.12.3"));
     return;
   }
-  if (site.with_expr != nullptr && !WithIsTheElement(site)) return;
-  if (ElementHasReduction(site.method, info, scan)) return;
+  if (!LacksReduction(site.method, KindVisited(site, info, scan))) return;
   scan.diag.Error(e->range.start,
                   std::format("array reduction method '{}' reduces values of "
                               "a type its operation is not defined for",
@@ -285,8 +264,8 @@ void CheckArrayMethodExpr(const Expr* e, const ArrayMethodScan& scan) {
   ArrayMethodSite site;
   bool matched = MatchArrayMethodSite(e, site);
   if (matched && site.base->kind == ExprKind::kIdentifier) {
-    auto it = scan.arrays.find(site.base->text);
-    if (it != scan.arrays.end())
+    auto it = scan.values.arrays.find(site.base->text);
+    if (it != scan.values.arrays.end())
       CheckArrayMethodSite(e, site, it->second, scan);
   }
   // The method access under a call is the site itself, already checked, so
@@ -320,7 +299,9 @@ void WalkStmtsForArrayMethods(const Stmt* s, const ArrayMethodScan& scan) {
 }  // namespace
 
 void Elaborator::ValidateArrayOrderingMethods(const ModuleDecl* decl) {
-  const ArrayMethodScan kScan{var_array_info_, class_names_, diag_};
+  const ValueScope kValues{var_types_,  var_named_types_, var_array_info_,
+                           func_decls_, typedefs_,        class_names_};
+  const ArrayMethodScan kScan{kValues, diag_};
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
       CheckArrayMethodExpr(item->assign_lhs, kScan);

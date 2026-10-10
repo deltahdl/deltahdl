@@ -550,7 +550,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/assoc_index_type.cpp
     elaborator/declared_types.cpp
     elaborator/elaborator_validate_array_methods.cpp
-    elaborator/index_value_kind.cpp
+    elaborator/value_kind.cpp
     elaborator/resolution_function_body.cpp
     lexer/lexer_numbers.cpp
     lexer/lexer_operators.cpp

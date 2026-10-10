@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "elaborator/elaborator.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -126,6 +128,53 @@ TEST(ArrayLocatorValidation, ComparingValuesWithoutRelationalOperators) {
   for (const auto& d : diags) {
     EXPECT_NE(d.loc.line, 17u) << d.message;
     EXPECT_FALSE(d.loc.line >= 19 && d.loc.line <= 21)
+        << d.loc.line << ": " << d.message;
+  }
+}
+
+// §7.12.1 and §7.12.2: given a with clause, a method compares the with
+// expression's values, so their type needs the relational operators whatever
+// form the expression takes: a class handle member, a member that is an
+// unpacked array and a member of a member that is a handle have none; an int
+// member, a member of a class element, a member no element has, a class
+// handle variable's member and an element of a member array do.
+TEST(BuiltinMethodElaboration,
+     WithExpressionOfAnyFormNeedsRelationalOperators) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  class C; int v; endclass\n"
+      "  typedef struct { C h; int a; int arr[2]; } s_t;\n"
+      "  typedef struct { s_t inner; } o_t;\n"
+      "  s_t sa[3];\n"
+      "  s_t sq[$];\n"
+      "  o_t oa[2];\n"
+      "  o_t oq[$];\n"
+      "  C ca[3];\n"
+      "  C cq[$];\n"
+      "  C hv;\n"
+      "  initial begin\n"
+      "    sq = sa.min with (item.h);\n"
+      "    sa.sort with (item.arr);\n"
+      "    oq = oa.min with (item.inner.h);\n"
+      "    sq = sa.max with (item.a);\n"
+      "    oq = oa.min with (item.inner.a);\n"
+      "    cq = ca.min with (item.v);\n"
+      "    sq = sa.unique with (item.zz);\n"
+      "    cq = ca.max with (hv.v);\n"
+      "    sq = sa.min with (item.arr[0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  const char* const kReport =
+      "compares values of a type without relational operators";
+  EXPECT_TRUE(ReportedError(diags, kReport, 13, "7.12.1"));
+  EXPECT_TRUE(ReportedError(diags, kReport, 14, "7.12.2"));
+  EXPECT_TRUE(ReportedError(diags, kReport, 15, "7.12.1"));
+  for (const auto& d : diags) {
+    EXPECT_FALSE(d.loc.line >= 16 && d.loc.line <= 21 &&
+                 d.message.find(kReport) != std::string::npos)
         << d.loc.line << ": " << d.message;
   }
 }

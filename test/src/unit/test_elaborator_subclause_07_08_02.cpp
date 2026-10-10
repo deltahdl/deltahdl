@@ -307,4 +307,52 @@ TEST(StringIndexAssocArrayElaboration, NonStringIndexExpressionRejected) {
   for (const auto& d : diags) EXPECT_NE(d.loc.line, 13u) << d.message;
 }
 
+// §7.8.2: a string index shall be a string, and a select, a cast, a function
+// call or a concatenation gives the type its declaration states: an int
+// array's element, a string's character, a net's bit, a real array's element,
+// a cast to int, an int negated, an integral concatenation and a class array's
+// element are no string; a string array's element, a function returning a
+// string, a cast to string and a concatenation holding a string are.
+TEST(StringIndexAssocArrayElaboration, NonStringSelectCastAndCallRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  class K; endclass\n"
+      "  int s [string];\n"
+      "  string t;\n"
+      "  string sa [2];\n"
+      "  int a [2];\n"
+      "  real ra [2];\n"
+      "  K ka [2];\n"
+      "  wire [3:0] wv;\n"
+      "  function string g(); return \"x\"; endfunction\n"
+      "  initial begin\n"
+      "    s[a[0]] = 1;\n"
+      "    s[t[0]] = 1;\n"
+      "    s[wv[1]] = 1;\n"
+      "    s[ra[0]] = 1;\n"
+      "    s[int'(3)] = 1;\n"
+      "    s[-a[1]] = 1;\n"
+      "    s[{a[0], a[1]}] = 1;\n"
+      "    s[ka[0]] = 1;\n"
+      "    s[sa[1]] = 1;\n"
+      "    s[g()] = 1;\n"
+      "    s[string'(a[0])] = 1;\n"
+      "    s[{t, \"x\"}] = 1;\n"
+      "    s[{a[0], \"x\", a[1]}] = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  const char* const kReport =
+      "string-indexed associative array 's' shall be indexed by a string or "
+      "string literal";
+  for (uint32_t line = 12; line <= 19; ++line) {
+    EXPECT_TRUE(ReportedError(diags, kReport, line, "7.8.2"));
+  }
+  for (uint32_t line = 20; line <= 24; ++line) {
+    EXPECT_FALSE(ReportedError(diags, kReport, line, "7.8.2"));
+  }
+}
+
 }  // namespace

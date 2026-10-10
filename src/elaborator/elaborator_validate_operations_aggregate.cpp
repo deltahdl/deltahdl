@@ -82,28 +82,6 @@ struct AggregateOperandNames {
   const DeclarationTypes& types;
 };
 
-// §6.7.1: the net types, whose net declared with no data type takes the
-// implicit logic type.
-bool IsNetTypeKind(DataTypeKind kind) {
-  switch (kind) {
-    case DataTypeKind::kWire:
-    case DataTypeKind::kTri:
-    case DataTypeKind::kWand:
-    case DataTypeKind::kWor:
-    case DataTypeKind::kTriand:
-    case DataTypeKind::kTrior:
-    case DataTypeKind::kTri0:
-    case DataTypeKind::kTri1:
-    case DataTypeKind::kTrireg:
-    case DataTypeKind::kSupply0:
-    case DataTypeKind::kSupply1:
-    case DataTypeKind::kUwire:
-      return true;
-    default:
-      return false;
-  }
-}
-
 // §6.11.1: whether a variable or net of `dtype` is integral -- of an integer
 // type, an enum, a packed structure or union, or a net type's implicit logic
 // (§6.7.1), directly or through typedef names, none of which names an unpacked

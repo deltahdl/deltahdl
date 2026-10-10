@@ -15,10 +15,10 @@
 #include "elaborator/elaborator_array_shape.h"
 #include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
-#include "elaborator/index_value_kind.h"
 #include "elaborator/net_data_type.h"
 #include "elaborator/queue_dim.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/value_kind.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -519,16 +519,16 @@ static bool IsIndexReturningMethod(std::string_view name) {
 
 // §7.8.1 — true when `idx` is a nonintegral index expression for a wildcard
 // associative array: one whose value is real, whatever its form
-// (KindOfIndexValue). (A string literal is not nonintegral here; it is cast to
+// (KindOfValue). (A string literal is not nonintegral here; it is cast to
 // an equivalent-width bit vector.)
-bool IsNonintegralIndex(const Expr* idx, const TypeMap& var_types) {
+bool IsNonintegralIndex(const Expr* idx, const ValueScope& values) {
   if (!idx) return false;
-  return KindOfIndexValue(idx, var_types) == IndexValueKind::kReal;
+  return KindOfValue(idx, values) == ValueKind::kReal;
 }
 
 static void CheckWildcardTraversalExpr(
     const Expr* e, const std::unordered_set<std::string_view>& wildcard_names,
-    const TypeMap& var_types, DiagEngine& diag) {
+    const ValueScope& values, DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kCall && e->base &&
       e->base->kind == ExprKind::kIdentifier && IsTraversalMethod(e->callee) &&
@@ -559,7 +559,7 @@ static void CheckWildcardTraversalExpr(
   // to index the array is illegal.
   if (e->kind == ExprKind::kSelect && e->base &&
       e->base->kind == ExprKind::kIdentifier &&
-      IsNonintegralIndex(e->index, var_types) &&
+      IsNonintegralIndex(e->index, values) &&
       wildcard_names.count(e->base->text)) {
     diag.Error(e->index->range.start,
                std::format("nonintegral index is not allowed on wildcard "
@@ -567,22 +567,22 @@ static void CheckWildcardTraversalExpr(
                            e->base->text),
                Subclause("7.8.1"));
   }
-  CheckWildcardTraversalExpr(e->lhs, wildcard_names, var_types, diag);
-  CheckWildcardTraversalExpr(e->rhs, wildcard_names, var_types, diag);
-  CheckWildcardTraversalExpr(e->base, wildcard_names, var_types, diag);
-  CheckWildcardTraversalExpr(e->index, wildcard_names, var_types, diag);
-  CheckWildcardTraversalExpr(e->index_end, wildcard_names, var_types, diag);
-  CheckWildcardTraversalExpr(e->condition, wildcard_names, var_types, diag);
-  CheckWildcardTraversalExpr(e->true_expr, wildcard_names, var_types, diag);
-  CheckWildcardTraversalExpr(e->false_expr, wildcard_names, var_types, diag);
+  CheckWildcardTraversalExpr(e->lhs, wildcard_names, values, diag);
+  CheckWildcardTraversalExpr(e->rhs, wildcard_names, values, diag);
+  CheckWildcardTraversalExpr(e->base, wildcard_names, values, diag);
+  CheckWildcardTraversalExpr(e->index, wildcard_names, values, diag);
+  CheckWildcardTraversalExpr(e->index_end, wildcard_names, values, diag);
+  CheckWildcardTraversalExpr(e->condition, wildcard_names, values, diag);
+  CheckWildcardTraversalExpr(e->true_expr, wildcard_names, values, diag);
+  CheckWildcardTraversalExpr(e->false_expr, wildcard_names, values, diag);
   for (const auto* elem : e->elements) {
-    CheckWildcardTraversalExpr(elem, wildcard_names, var_types, diag);
+    CheckWildcardTraversalExpr(elem, wildcard_names, values, diag);
   }
 }
 
 static void WalkStmtsForWildcardTraversal(
     const Stmt* s, const std::unordered_set<std::string_view>& wildcard_names,
-    const TypeMap& var_types, DiagEngine& diag) {
+    const ValueScope& values, DiagEngine& diag) {
   if (!s) return;
   // §7.8.1 — a wildcard-indexed associative array may not drive a foreach loop.
   std::string_view foreach_array;
@@ -602,10 +602,10 @@ static void WalkStmtsForWildcardTraversal(
                            foreach_array),
                Subclause("7.8.1"));
   }
-  CheckWildcardTraversalExpr(s->lhs, wildcard_names, var_types, diag);
-  CheckWildcardTraversalExpr(s->rhs, wildcard_names, var_types, diag);
-  CheckWildcardTraversalExpr(s->expr, wildcard_names, var_types, diag);
-  CheckWildcardTraversalExpr(s->condition, wildcard_names, var_types, diag);
+  CheckWildcardTraversalExpr(s->lhs, wildcard_names, values, diag);
+  CheckWildcardTraversalExpr(s->rhs, wildcard_names, values, diag);
+  CheckWildcardTraversalExpr(s->expr, wildcard_names, values, diag);
+  CheckWildcardTraversalExpr(s->condition, wildcard_names, values, diag);
   // §7.8.1 bars a wildcard-indexed associative array from a foreach loop, from
   // the §7.12 methods that return an index and from a nonintegral index, and
   // names no statement the prohibition is lifted in, so this descends every
@@ -614,7 +614,7 @@ static void WalkStmtsForWildcardTraversal(
   // `fork foreach (aa[i]) ; join` and `assert (1) else x = aa[1.5];`
   // elaborated clean.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
-    WalkStmtsForWildcardTraversal(sub, wildcard_names, var_types, diag);
+    WalkStmtsForWildcardTraversal(sub, wildcard_names, values, diag);
   });
 }
 
@@ -625,17 +625,18 @@ void Elaborator::ValidateAssocWildcardTraversal(const ModuleDecl* decl) {
       wildcard_names.insert(name);
   }
   if (wildcard_names.empty()) return;
+  const ValueScope kValues{var_types_,  var_named_types_, var_array_info_,
+                           func_decls_, typedefs_,        class_names_};
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
-      CheckWildcardTraversalExpr(item->assign_lhs, wildcard_names, var_types_,
+      CheckWildcardTraversalExpr(item->assign_lhs, wildcard_names, kValues,
                                  diag_);
-      CheckWildcardTraversalExpr(item->assign_rhs, wildcard_names, var_types_,
+      CheckWildcardTraversalExpr(item->assign_rhs, wildcard_names, kValues,
                                  diag_);
     }
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
-      WalkStmtsForWildcardTraversal(item->body, wildcard_names, var_types_,
-                                    diag_);
+      WalkStmtsForWildcardTraversal(item->body, wildcard_names, kValues, diag_);
     }
   }
 }

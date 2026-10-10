@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -438,6 +440,44 @@ TEST(IntegralIndexAssocArrayElaboration, RealIndexExpressionRejected) {
                             "real or shortreal index is not allowed on "
                             "integral-indexed associative array 'n'",
                             6, "7.8.4"));
+}
+
+// §7.8.4: an integral index type takes no real, and a select, a cast or a
+// function call gives the type its declaration states: a real array's element,
+// a cast to real and a function returning real are real; a cast to int, a
+// void function, a function not declared, a select of a real scalar and the
+// negation of a value of a kind not known are not.
+TEST(IntegralIndexAssocArrayElaboration, RealSelectCastAndCallRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int n [int];\n"
+      "  real ra [2];\n"
+      "  real r;\n"
+      "  function real g(); return 1.0; endfunction\n"
+      "  function void vf(); endfunction\n"
+      "  initial begin\n"
+      "    n[ra[0]] = 1;\n"
+      "    n[real'(1)] = 1;\n"
+      "    n[g()] = 1;\n"
+      "    n[int'(r)] = 1;\n"
+      "    n[vf()] = 1;\n"
+      "    n[nofunc()] = 1;\n"
+      "    n[r[0]] = 1;\n"
+      "    n[-nofunc()] = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  const char* const kReport =
+      "real or shortreal index is not allowed on integral-indexed associative "
+      "array 'n'";
+  for (uint32_t line = 8; line <= 10; ++line) {
+    EXPECT_TRUE(ReportedError(diags, kReport, line, "7.8.4"));
+  }
+  for (uint32_t line = 11; line <= 15; ++line) {
+    EXPECT_FALSE(ReportedError(diags, kReport, line, "7.8.4"));
+  }
 }
 
 }  // namespace

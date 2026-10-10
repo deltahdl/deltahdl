@@ -147,6 +147,10 @@ class ElaboratorData {
     // §7.12: the element type is an unpacked structure or union, which has
     // neither relational nor arithmetic operators.
     bool elem_is_unpacked_aggregate = false;
+    // §7.12: the type the elements are declared with, before typedef names are
+    // followed, through which a with expression reaches an element's members;
+    // null where the array is no declared variable.
+    const DataType* elem_data_type = nullptr;
   };
 
   // §23.9 (printed page 761) with §27.4 (printed 820): a module's

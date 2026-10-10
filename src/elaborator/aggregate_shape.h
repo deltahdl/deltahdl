@@ -4,10 +4,12 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/net_data_type.h"
+#include "elaborator/type_eval.h"
 
 namespace delta {
 
 struct DataType;
+struct StructMember;
 
 // What the structure and union rules read besides the type they judge.
 struct AggregateShapeCtx {
@@ -35,6 +37,14 @@ struct AggregateShapeCtx {
 // is left alone.
 void CheckAggregateShape(const DataType& dtype, SourceLoc loc,
                          const AggregateShapeCtx& ctx);
+
+// §6.18: the type the structure or union member `m` is written with when that
+// is more than a keyword: a structure, union or enumeration written in place,
+// or the type a typedef name stands for once every name in the chain is
+// followed. Null for a keyword type and for a name that resolves to nothing,
+// such as a class.
+const DataType* MemberOwnType(const StructMember& m,
+                              const TypedefMap& typedefs);
 
 // Whether `type` is an unpacked structure or union: one written without
 // `packed`, and for a union without `soft` either. False for null.

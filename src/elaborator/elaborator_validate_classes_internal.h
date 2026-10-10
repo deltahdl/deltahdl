@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "elaborator/value_kind.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -47,7 +48,7 @@ bool IsClassDerivedFrom(std::string_view a, std::string_view b,
 
 // Defined in elaborator_validate_class_array_assign.cpp.
 bool IsSliceSelect(const Expr* e);
-bool IsNonintegralIndex(const Expr* idx, const TypeMap& var_types);
+bool IsNonintegralIndex(const Expr* idx, const ValueScope& values);
 
 // Defined in elaborator_validate_static_methods.cpp: the names a statement
 // brings into scope for its own expressions and its child statements (§6.21),

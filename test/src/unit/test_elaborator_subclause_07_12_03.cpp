@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -154,6 +155,76 @@ TEST(BuiltinMethodElaboration, ReductionOverAnElementWithoutItsOperation) {
   for (const auto& d : diags) {
     EXPECT_NE(d.loc.line, 17u) << d.message;
     EXPECT_NE(d.loc.line, 19u) << d.message;
+  }
+}
+
+// §7.12.3: given a with clause, a reduction applies its operation to the with
+// expression's values, whatever form the expression takes: a class handle
+// member, a string array's element, a real member under a bitwise reduction,
+// an unpacked union member, a subarray, a slice, an element's handle member,
+// a class handle variable and a whole array have no such operation; an int
+// member, a real member under sum, a packed structure member, a union's int
+// member, an element of an element, a string's character, a member of an
+// element of an array of more dimensions, a member of a variable, a member of
+// a call's result, a member of what has no members and a range in place of
+// a with expression are left alone.
+TEST(BuiltinMethodElaboration, WithExpressionOfAnyFormNeedsTheReduction) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  class C; int v; endclass\n"
+      "  typedef struct { C h; int a; real r; } s_t;\n"
+      "  typedef struct packed { logic [3:0] x; } p_t;\n"
+      "  typedef union { int i; real f; } u_t;\n"
+      "  typedef struct { u_t u; p_t p; } w_t;\n"
+      "  s_t sa[3];\n"
+      "  s_t ssa[2][2];\n"
+      "  w_t wa[2];\n"
+      "  string tags[3];\n"
+      "  int m2[2][3];\n"
+      "  int ia[2];\n"
+      "  C hv;\n"
+      "  s_t sv;\n"
+      "  int n;\n"
+      "  real x;\n"
+      "  function s_t mk(); return sv; endfunction\n"
+      "  initial begin\n"
+      "    n = sa.sum with (item.h);\n"
+      "    n = sa.xor with (tags[0]);\n"
+      "    n = sa.xor with (item.r);\n"
+      "    n = wa.sum with (item.u);\n"
+      "    n = sa.sum with (m2[0]);\n"
+      "    n = sa.sum with (tags[0:1]);\n"
+      "    n = sa.sum with (sa[0].h);\n"
+      "    n = sa.sum with (hv);\n"
+      "    n = sa.sum with (ia);\n"
+      "    n = sa.sum with (item.a);\n"
+      "    x = sa.sum with (item.r);\n"
+      "    n = wa.xor with (item.p);\n"
+      "    n = wa.sum with (item.u.i);\n"
+      "    n = sa.sum with (m2[0][1]);\n"
+      "    n = sa.sum with (tags[0][0]);\n"
+      "    n = sa.sum with (ssa[0][1].a);\n"
+      "    n = sa.sum with (ssa[0].a);\n"
+      "    n = sa.sum with (sv.a);\n"
+      "    n = sa.sum with (mk().a);\n"
+      "    n = ia.sum with (item.x);\n"
+      "    n = sa.sum with (n.x);\n"
+      "    n = sa.sum with (item.zz.a);\n"
+      "    n = ia.sum with [0:1];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  const char* const kReport =
+      "reduces values of a type its operation is not defined for";
+  for (uint32_t line = 19; line <= 27; ++line) {
+    EXPECT_TRUE(ReportedError(diags, kReport, line, "7.12.3"));
+  }
+  for (const auto& d : diags) {
+    EXPECT_FALSE(d.loc.line >= 28 && d.loc.line <= 41 &&
+                 d.message.find(kReport) != std::string::npos)
+        << d.loc.line << ": " << d.message;
   }
 }
 

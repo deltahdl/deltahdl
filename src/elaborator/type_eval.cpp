@@ -594,6 +594,26 @@ bool IsIntegralType(DataTypeKind kind) {
   }
 }
 
+bool IsNetTypeKind(DataTypeKind kind) {
+  switch (kind) {
+    case DataTypeKind::kWire:
+    case DataTypeKind::kTri:
+    case DataTypeKind::kWand:
+    case DataTypeKind::kWor:
+    case DataTypeKind::kTriand:
+    case DataTypeKind::kTrior:
+    case DataTypeKind::kTri0:
+    case DataTypeKind::kTri1:
+    case DataTypeKind::kTrireg:
+    case DataTypeKind::kSupply0:
+    case DataTypeKind::kSupply1:
+    case DataTypeKind::kUwire:
+      return true;
+    default:
+      return false;
+  }
+}
+
 bool IsSimpleBitVectorType(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kBit:

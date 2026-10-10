@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -454,6 +456,48 @@ TEST(ClassIndexAssocArrayElaboration, NonObjectIndexExpressionRejected) {
                             "class-indexed associative array 'c' shall be "
                             "indexed by an object of class 'K'",
                             8, "7.8.3"));
+}
+
+// §7.8.3: a class index shall be an object of the index class, and a select, a
+// cast, a function call or a concatenation gives the type its declaration
+// states: an int array's element, a real array's element, a cast to int, an
+// integral concatenation and a function returning a string are no object; a
+// class array's element, a cast to the class and a function returning a
+// handle are left to the class rule.
+TEST(ClassIndexAssocArrayElaboration, NonObjectSelectCastAndCallRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  class K; endclass\n"
+      "  int c [K];\n"
+      "  int a [2];\n"
+      "  real ra [2];\n"
+      "  K ka [2];\n"
+      "  K h;\n"
+      "  function string g(); return \"x\"; endfunction\n"
+      "  function K mk(); return h; endfunction\n"
+      "  initial begin\n"
+      "    c[a[0]] = 1;\n"
+      "    c[ra[0]] = 1;\n"
+      "    c[int'(1)] = 1;\n"
+      "    c[{a[0], a[1]}] = 1;\n"
+      "    c[g()] = 1;\n"
+      "    c[ka[0]] = 1;\n"
+      "    c[K'(h)] = 1;\n"
+      "    c[mk()] = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  const char* const kReport =
+      "class-indexed associative array 'c' shall be indexed by an object of "
+      "class 'K'";
+  for (uint32_t line = 11; line <= 15; ++line) {
+    EXPECT_TRUE(ReportedError(diags, kReport, line, "7.8.3"));
+  }
+  for (uint32_t line = 16; line <= 18; ++line) {
+    EXPECT_FALSE(ReportedError(diags, kReport, line, "7.8.3"));
+  }
 }
 
 }  // namespace
