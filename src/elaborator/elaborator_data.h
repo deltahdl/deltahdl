@@ -322,6 +322,10 @@ class ElaboratorData {
   std::unordered_set<std::string_view> specparam_names_;
   std::unordered_set<std::string_view> enum_var_names_;
   std::unordered_set<std::string_view> enum_member_names_;
+  // §7.12.1 with §6.19.3: the associative arrays indexed by an enumeration,
+  // whose index locators return a queue of that enumeration
+  // (Elaborator::ValidateEnumAssignments).
+  std::unordered_set<std::string_view> enum_keyed_arrays_;
   // §6.19: the name the enumeration of the inline enum declaration list being
   // elaborated is declared under, its first declarator's (SetEnumTypeInfo).
   std::string_view inline_enum_list_key_;

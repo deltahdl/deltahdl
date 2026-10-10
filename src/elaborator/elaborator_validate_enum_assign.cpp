@@ -8,10 +8,12 @@
 #include <cstddef>
 #include <format>
 #include <functional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
@@ -77,18 +79,26 @@ static bool IsEnumTypedMethodResult(const Expr* e) {
   return m == "first" || m == "last" || m == "next" || m == "prev";
 }
 
-// §7.12.1: the locator methods that return elements of the array rather than
-// indices, each a queue of the array's element type. Over an array of an
-// enumeration that is a queue of the enumeration, which §6.19.3 lets a queue of
-// the enumeration take without a cast. find_index and the other index locators
-// return a queue of int and are not among them.
-static bool IsEnumArrayLocatorResult(const Expr* e, const NameSet& enum_vars) {
-  static constexpr std::array<std::string_view, 6> kElementLocators = {
-      "find", "find_first", "find_last", "min", "max", "unique"};
+// §7.12.1: the locator methods that return elements of the array, each a queue
+// of the array's element type. Over an array of an enumeration that is a queue
+// of the enumeration, which §6.19.3 lets a queue of the enumeration take
+// without a cast.
+constexpr std::array<std::string_view, 6> kElementLocators = {
+    "find", "find_first", "find_last", "min", "max", "unique"};
+
+// §7.12.1: the locator methods that return indices, each a queue of int, except
+// over an associative array, where each is a queue of the index type: over one
+// indexed by an enumeration, a queue of that enumeration.
+constexpr std::array<std::string_view, 4> kIndexLocators = {
+    "find_index", "find_first_index", "find_last_index", "unique_index"};
+
+// Whether `e` calls one of `methods` on an array `arrays` names.
+static bool CallsMethodOn(const Expr* e, const NameSet& arrays,
+                          std::span<const std::string_view> methods) {
   const Expr* member = MethodAccess(e);
-  return member != nullptr && enum_vars.count(ExprIdent(member->lhs)) != 0 &&
-         std::find(kElementLocators.begin(), kElementLocators.end(),
-                   member->rhs->text) != kElementLocators.end();
+  return member != nullptr && arrays.count(ExprIdent(member->lhs)) != 0 &&
+         std::find(methods.begin(), methods.end(), member->rhs->text) !=
+             methods.end();
 }
 
 // §6.19: whether the enumeration `item` declares, through a typedef or as the
@@ -223,25 +233,26 @@ static bool IsNonEnumVariableRead(
 }
 
 // What ReportEnumValueWithoutCast reads: the type of each of the module's
-// variables and nets, the enum variables and members in scope, and where the
-// report goes.
+// variables and nets, the enum variables and members in scope, the associative
+// arrays indexed by an enumeration, and where the report goes.
 struct EnumValueScreen {
   const std::unordered_map<std::string_view, DataTypeKind>& var_types;
   EnumOperandNames names;
+  const NameSet& enum_keyed_arrays;
   DiagEngine& diag;
 };
 
 // §6.19.3, §6.19.4: reports `value`, bound at `loc` for an enum, where it
 // reaches the enum without the cast those clauses require: an expression
-// IsBareEnumAssignable refuses that is no enumeration array's locator result
-// either, or the bare name of a variable of a built-in type other than an
-// enumeration. `bound` says where the value goes, as
-// kAssignedToEnum does.
+// IsBareEnumAssignable refuses and no array's locator returns as a queue of an
+// enumeration, or the bare name of a variable of a built-in type other than an
+// enumeration. `bound` says where the value goes, as kAssignedToEnum does.
 static void ReportEnumValueWithoutCast(const Expr* value, SourceLoc loc,
                                        std::string_view bound,
                                        const EnumValueScreen& screen) {
   if (!IsBareEnumAssignable(value, screen.names.unit) &&
-      !IsEnumArrayLocatorResult(value, screen.names.enum_vars)) {
+      !CallsMethodOn(value, screen.names.enum_vars, kElementLocators) &&
+      !CallsMethodOn(value, screen.enum_keyed_arrays, kIndexLocators)) {
     screen.diag.Error(loc, std::format("integer {} without cast", bound),
                       Subclause(EnumValueSubclause(value, screen.names)));
     return;
@@ -269,9 +280,11 @@ void Elaborator::CheckEnumAssignStmt(const Stmt* s) {
     return;
   }
   if (!s->rhs) return;
-  ReportEnumValueWithoutCast(
-      s->rhs, s->range.start, kAssignedToEnum,
-      {var_types_, {enum_var_names_, enum_member_names_, unit_}, diag_});
+  ReportEnumValueWithoutCast(s->rhs, s->range.start, kAssignedToEnum,
+                             {var_types_,
+                              {enum_var_names_, enum_member_names_, unit_},
+                              enum_keyed_arrays_,
+                              diag_});
 }
 
 static bool FormalIsEnumType(const DataType& formal,
@@ -431,6 +444,14 @@ std::string_view EnumTypedefBehind(std::string_view name,
   return {};
 }
 
+// §7.8: whether the first of the unpacked dimensions `dims` is associative and
+// indexed by an enumeration, `[e_t]`, for which the parser leaves the index
+// type's name.
+bool KeyedByEnum(const std::vector<Expr*>& dims, const TypedefMap& typedefs) {
+  return !dims.empty() &&
+         !EnumTypedefBehind(ExprIdent(dims[0]), typedefs).empty();
+}
+
 // The enumeration typedef that declares `member` as a member; empty where none
 // does, and where more than one does.
 std::string_view EnumTypedefDeclaringMember(std::string_view member,
@@ -526,15 +547,21 @@ static void ValidateEnumReturns(const ModuleItem* fn,
 void Elaborator::WalkStmtsForEnumAssign(const Stmt* s) {
   if (!s) return;
   RegisterForHeaderEnumVars(s, typedefs_, enum_var_names_);
+  if (s->kind == StmtKind::kVarDecl &&
+      KeyedByEnum(s->var_unpacked_dims, typedefs_)) {
+    enum_keyed_arrays_.insert(s->var_name);
+  }
   WalkExprForEnumCalls(s->rhs);
   WalkExprForEnumCalls(s->expr);
   WalkExprForEnumCalls(s->condition);
   if (StmtDeclaresEnumVar(s, typedefs_)) {
     enum_var_names_.insert(s->var_name);
     if (s->var_init) {
-      ReportEnumValueWithoutCast(
-          s->var_init, s->range.start, kAssignedToEnum,
-          {var_types_, {enum_var_names_, enum_member_names_, unit_}, diag_});
+      ReportEnumValueWithoutCast(s->var_init, s->range.start, kAssignedToEnum,
+                                 {var_types_,
+                                  {enum_var_names_, enum_member_names_, unit_},
+                                  enum_keyed_arrays_,
+                                  diag_});
     }
   } else if (StmtIsProceduralAssign(s)) {
     CheckEnumAssignStmt(s);
@@ -561,9 +588,16 @@ void Elaborator::WalkStmtsForEnumAssign(const Stmt* s) {
 }
 
 void Elaborator::ValidateEnumAssignments(const ModuleDecl* decl) {
-  EnumValueScreen screen{
-      var_types_, {enum_var_names_, enum_member_names_, unit_}, diag_};
+  enum_keyed_arrays_.clear();
+  EnumValueScreen screen{var_types_,
+                         {enum_var_names_, enum_member_names_, unit_},
+                         enum_keyed_arrays_,
+                         diag_};
   for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kVarDecl &&
+        KeyedByEnum(item->unpacked_dims, typedefs_)) {
+      enum_keyed_arrays_.insert(item->name);
+    }
     if (item->kind == ModuleItemKind::kVarDecl &&
         enum_var_names_.count(item->name) != 0 && item->init_expr) {
       ReportEnumValueWithoutCast(item->init_expr, item->loc, kAssignedToEnum,
