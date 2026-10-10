@@ -191,7 +191,7 @@ TEST(ArrayLiteralElaboration,
      UntypedPatternInEachAssignmentLikeContextAccepted) {
   EXPECT_TRUE(
       ElabOk("typedef int pair_t [0:1];\n"
-             "module sub(input pair_t p);\n"
+             "module sub(input var int p [0:1]);\n"
              "endmodule\n"
              "module t;\n"
              "  parameter pair_t P = '{1, 2};\n"
