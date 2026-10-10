@@ -98,6 +98,19 @@ bool ChainNames(const Expr& expr, std::vector<std::string_view>& names);
 int ForeachIndexKind(const Expr* array, const BlockParent& parent,
                      const BodyWalk& walk);
 
+// §18.7 with §8.4: the class defn of the class of the value the method call
+// whose callee is `access`, a member access, is applied through, as the scope
+// `parent` stands in reads it; null where it reads no class the design
+// declares.
+VpiObject* MethodCallClassDefn(const Expr& access, const BlockParent& parent,
+                               const BodyWalk& walk);
+
+// §37.42: make `made` the tf call the call `call`, written in an expression
+// standing in `parent`, is, as a call statement written there is made; false,
+// leaving `made` alone, where the call calls nothing the walk resolves.
+bool ShapeExprCall(const Expr& call, VpiObject* made, const BlockParent& parent,
+                   const BodyWalk& walk);
+
 // §37.42 with §37.60: what the expression statement `expr`, standing in the
 // scope `parent` stands for, calls. A task is enabled with or without an
 // argument list (§13.3), so the callee is the expression itself where no list

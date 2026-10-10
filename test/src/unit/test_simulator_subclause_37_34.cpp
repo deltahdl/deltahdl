@@ -1,10 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_vpi_run.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
@@ -55,30 +57,37 @@ class ConstraintDistribution : public ::testing::Test {
 };
 
 // D5: a constraint's vpiConstraintItem iteration collects the constraint items
-// it groups - the constraint orderings and constraint expressions - in the
-// order they occur, and nothing else. A child that is neither (here an ordinary
-// operation expression) is excluded, showing the grouping matches the
-// constraint-item kinds rather than every expression.
+// it groups - the constraint orderings and the kinds §37.38's constraint expr
+// class groups, an expression such as an operation among them - in the order
+// they occur, and nothing else. An attribute child is no constraint item and is
+// excluded, showing the grouping matches the constraint-item kinds rather than
+// every child (#5841).
 TEST_F(ConstraintDistribution, ConstraintItemIterationReturnsItemsInOrder) {
   VpiObject ordering;
   ordering.type = vpiConstraintOrdering;  // a solve-before/after ordering
   VpiObject not_item;
-  not_item.type = vpiOperation;  // an expression that is not a constraint item
+  not_item.type = vpiAttribute;  // an attribute, no constraint item
+  VpiObject implication;
+  implication.type = vpiImplication;  // a constraint expression
   VpiObject expr;
-  expr.type = vpiConstraintExpr;  // a constraint expression
+  expr.type = vpiOperation;  // an expression, a constraint expression too
+  VpiObject var;
+  var.type = vpiIntVar;  // a name standing alone as a constraint expression
 
   VpiObject constraint;
   constraint.type = vpiConstraint;
-  constraint.children = {&ordering, &not_item, &expr};
+  constraint.children = {&ordering, &not_item, &implication, &expr, &var};
 
   vpiHandle it = vpi_iterate(vpiConstraintItem, VpiHandleOf(&constraint));
   ASSERT_NE(it, nullptr);
   std::vector<vpiHandle> seen;
   while (vpiHandle h = vpi_scan(it)) seen.push_back(h);
 
-  ASSERT_EQ(seen.size(), 2u);                  // the non-item child is excluded
+  ASSERT_EQ(seen.size(), 4u);                  // the non-item child is excluded
   EXPECT_EQ(VpiObjectOf(seen[0]), &ordering);  // occurrence order is preserved
-  EXPECT_EQ(VpiObjectOf(seen[1]), &expr);
+  EXPECT_EQ(VpiObjectOf(seen[1]), &implication);
+  EXPECT_EQ(VpiObjectOf(seen[2]), &expr);
+  EXPECT_EQ(VpiObjectOf(seen[3]), &var);
 }
 
 // D4: the vpiConstraint iteration returns a class's constraints in syntactic
@@ -210,6 +219,107 @@ TEST_F(ConstraintDistribution, ScalarPropertiesAreReported) {
   dist_item.type = vpiDistItem;
   dist_item.dist_type = vpiDivDist;
   EXPECT_EQ(vpi_get(vpiDistType, VpiHandleOf(&dist_item)), vpiDivDist);
+}
+
+// A design run with a PLI application registered, whose class defns' and
+// class objects' constraints are read back from the model the run built.
+class ConstraintsOfARun : public VpiDesignRun {
+ protected:
+  // The names of the constraints `ref` iterates, in the iteration's order.
+  static std::vector<std::string> ConstraintNames(vpiHandle ref) {
+    std::vector<std::string> names;
+    vpiHandle it = vpi_iterate(vpiConstraint, ref);
+    if (it == nullptr) return names;
+    while (vpiHandle obj = vpi_scan(it)) {
+      names.emplace_back(vpi_get_str(vpiName, obj));
+    }
+    return names;
+  }
+};
+
+// §37.31 with §37.34: a class defn iterates a constraint per constraint block
+// the class declares, in declaration order, an extern one in its prototype's
+// place (D4). Each is named after its block and full-named through the class,
+// reports vpiAutomatic 0 only where it was declared
+// static (D1, §18.5.10) and vpiExternAcc only where a prototype declares it
+// (D3, §18.5.1), and is enabled, as every constraint is at first (§18.9)
+// (#5839).
+TEST_F(ConstraintsOfARun, AClassDefnIteratesItsConstraints) {
+  Run("module top;\n"
+      "  class C; rand int x;\n"
+      "    constraint c { x > 0; }\n"
+      "    extern constraint e;\n"
+      "    static constraint d { x < 9; }\n"
+      "  endclass\n"
+      "  constraint C::e { x != 3; }\n"
+      "endmodule\n");
+  vpiHandle defn = Named(vpiClassDefn, By("top"), "C");
+  ASSERT_NE(defn, nullptr);
+  EXPECT_EQ(ConstraintNames(defn), (std::vector<std::string>{"c", "e", "d"}));
+  vpiHandle c = Named(vpiConstraint, defn, "c");
+  vpiHandle e = Named(vpiConstraint, defn, "e");
+  vpiHandle d = Named(vpiConstraint, defn, "d");
+  ASSERT_NE(c, nullptr);
+  ASSERT_NE(e, nullptr);
+  ASSERT_NE(d, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, c), "top.C::c");
+  EXPECT_EQ(vpi_get(vpiAutomatic, c), 1);
+  EXPECT_EQ(vpi_get(vpiAutomatic, d), 0);
+  EXPECT_EQ(vpi_get(vpiAccessType, c), 0);
+  EXPECT_EQ(vpi_get(vpiAccessType, e), vpiExternAcc);
+  EXPECT_EQ(vpi_get(vpiIsConstraintEnabled, c), 1);
+}
+
+// §37.33 with §37.34: a class obj iterates a constraint per constraint block
+// of the class it was created with and the classes that class extends, the
+// base's first. Each reaches the class obj through vpiParent, and reports as
+// enabled what constraint_mode() last set on the object (§18.9), a static
+// block's state being the class's (§18.5.10). A call of constraint_mode
+// applied to a block is applied to that block's constraint of the object the
+// handle references (§37.42 detail 2) (#5838).
+TEST_F(ConstraintsOfARun, AClassObjIteratesItsConstraints) {
+  Run("module top;\n"
+      "  class B; rand int x; constraint b { x < 9; } endclass\n"
+      "  class C extends B;\n"
+      "    constraint c { x > 0; }\n"
+      "    static constraint s { x != 3; }\n"
+      "  endclass\n"
+      "  C h = new;\n"
+      "  initial begin : p h.c.constraint_mode(0); h.s.constraint_mode(0); "
+      "end\n"
+      "endmodule\n");
+  vpiHandle obj = vpi_handle(vpiClassObj, By("top.h"));
+  ASSERT_NE(obj, nullptr);
+  EXPECT_EQ(ConstraintNames(obj), (std::vector<std::string>{"b", "c", "s"}));
+  vpiHandle b = Named(vpiConstraint, obj, "b");
+  vpiHandle c = Named(vpiConstraint, obj, "c");
+  vpiHandle s = Named(vpiConstraint, obj, "s");
+  ASSERT_NE(b, nullptr);
+  ASSERT_NE(c, nullptr);
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, c)), VpiObjectOf(obj));
+  EXPECT_EQ(vpi_get(vpiIsConstraintEnabled, b), 1);
+  EXPECT_EQ(vpi_get(vpiIsConstraintEnabled, c), 0);
+  EXPECT_EQ(vpi_get(vpiIsConstraintEnabled, s), 0);
+  vpiHandle call = Named(vpiMethodFuncCall, By("top.p"), "constraint_mode");
+  ASSERT_NE(call, nullptr);
+  vpiHandle prefix = vpi_handle(vpiPrefix, call);
+  ASSERT_NE(prefix, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, prefix), vpiConstraint);
+}
+
+// §37.34: the figure draws a constraint's vpiParent to the class obj holding
+// it and from nowhere else, so a class defn's constraint, and one held by
+// nothing, reach none.
+TEST_F(ConstraintsOfARun, OnlyAClassObjsConstraintReachesAParent) {
+  Run("module top; class C; rand int x; constraint c { x > 0; } endclass\n"
+      "endmodule\n");
+  vpiHandle c = Named(vpiConstraint, Named(vpiClassDefn, By("top"), "C"), "c");
+  ASSERT_NE(c, nullptr);
+  EXPECT_EQ(vpi_handle(vpiParent, c), nullptr);
+  VpiObject loose;
+  loose.type = vpiConstraint;
+  EXPECT_EQ(vpi_handle(vpiParent, VpiHandleOf(&loose)), nullptr);
 }
 
 }  // namespace

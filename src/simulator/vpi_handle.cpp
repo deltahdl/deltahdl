@@ -18,6 +18,7 @@
 #include "simulator/vpi_class_objects.h"
 #include "simulator/vpi_collection_elements.h"
 #include "simulator/vpi_constants.h"
+#include "simulator/vpi_constraint_relations.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_design_walk.h"
@@ -400,7 +401,8 @@ bool TryResolveClockingAndParentRelation(int type, VpiHandle ref,
                                          VpiHandle& out) {
   return TryResolveClockingRelation(type, ref, out) ||
          TryResolveClockingSkew(type, ref, out) ||
-         TryResolveParentRelation(type, ref, out);
+         TryResolveParentRelation(type, ref, out) ||
+         VpiTryResolveConstraintRelation(type, ref, out);
 }
 
 // §37.28/§37.65/§37.68: type/value parameter typespecs, defaults, ranges, the

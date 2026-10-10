@@ -8,6 +8,7 @@
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
+#include "simulator/vpi_constraint_relations.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_internal.h"
@@ -177,8 +178,9 @@ struct VpiIterateModes {
   bool constr_foreach_loopvars = false;
   bool foreach_stmt_loopvars = false;
   bool constraint_expr = false;
-  // §37.38 (figure): a constraint if-else's vpiElseConst relation.
-  bool else_constraint_expr = false;
+  // §37.38 (figure): a constraint if-else's vpiElseConst relation, and
+  // §37.34's vpiSolveBefore and vpiSolveAfter of a constraint ordering.
+  bool constraint_list = false;
   bool callback_object = false;
   // §37.57 detail 1: a let expression's vpiArgument iteration, which reads the
   // let declaration's formals rather than the expression's own children.
@@ -338,10 +340,8 @@ void ComputeConstraintAndCallbackModes(int type, VpiHandle ref,
   m.constraint_expr = ref && type == vpiConstraintExpr &&
                       VpiIsConstraintExprContainerType(ref->type);
   // §37.38 (figure): a constraint if-else's else branch, drawn as a relation of
-  // its own and recognized by nothing, so it was reachable from the if-else by
-  // nothing either.
-  m.else_constraint_expr =
-      ref && type == vpiElseConst && ref->type == vpiConstrIfElse;
+  // its own, and §37.34's two lists of a constraint ordering.
+  m.constraint_list = ref && VpiConstraintListOf(type, ref) != nullptr;
   // §37.80 detail 2: with no reference object the iteration hands back the
   // callbacks not related to the objects the diagram draws reaching one, so
   // this mode covers both forms rather than the object-scoped one alone.
@@ -794,8 +794,8 @@ bool DispatchRefSpecialMode(int type, VpiHandle ref,
     CollectForeachLoopVars(ref, stores.all_objects, iter);
     return true;
   }
-  if (modes.else_constraint_expr) {
-    VpiCollectElseConstraintExprs(ref, iter);
+  if (modes.constraint_list) {
+    iter->children = *VpiConstraintListOf(type, ref);
     return true;
   }
   if (modes.constraint_expr) {

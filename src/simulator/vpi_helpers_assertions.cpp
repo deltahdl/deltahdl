@@ -40,14 +40,22 @@ bool VpiIsAssertionType(int type) {
 bool VpiIsConstraintItemType(int type) {
   // §37.34 detail 5: the constraint-item grouping spans the constraint
   // orderings (the solve-before/solve-after relations) and the constraint
-  // expressions that make up a constraint. Any other object kind is not a
-  // constraint item.
+  // expressions that make up a constraint. §37.4.1 makes `constraint expr` a
+  // class, not a kind, so what it groups is what §37.38 draws in it: an
+  // implication, a constr if, a constr if else, a constr foreach, a
+  // distribution, a soft disable, and an expression of any kind, a name
+  // standing as the variable it names among them (§37.58).
   switch (type) {
     case vpiConstraintOrdering:
-    case vpiConstraintExpr:
+    case vpiImplication:
+    case vpiConstrIf:
+    case vpiConstrIfElse:
+    case vpiConstrForEach:
+    case vpiDistribution:
+    case vpiSoftDisable:
       return true;
     default:
-      return false;
+      return VpiIsExprType(type) || VpiIsVariablesType(type);
   }
 }
 
@@ -72,9 +80,10 @@ VpiHandle VpiConstraintConditionExpr(VpiHandle container) {
   // §37.38 (figure): an implication, a constraint if and a constraint if-else
   // each reach the expression they are guarded by through vpiCondition. The
   // condition's own type is an expression kind rather than the vpiCondition
-  // relation tag, so it is found by scanning for the first expression child;
-  // the guarded constraint expressions are held in the container's own
-  // constraint_exprs list and are not children, so nothing else is in the way.
+  // relation tag, so it is found by scanning for the first expression child,
+  // a name standing alone being the variable it names (§37.58); the guarded
+  // constraint expressions are held in the container's own constraint_exprs
+  // list and are not children, so nothing else is in the way.
   if (!container) return nullptr;
   switch (container->type) {
     case vpiImplication:
@@ -85,7 +94,9 @@ VpiHandle VpiConstraintConditionExpr(VpiHandle container) {
       return nullptr;
   }
   for (auto* child : container->children) {
-    if (VpiIsExprType(child->type)) return child;
+    if (VpiIsExprType(child->type) || VpiIsVariablesType(child->type)) {
+      return child;
+    }
   }
   return nullptr;
 }
@@ -918,10 +929,5 @@ void VpiCollectConstraintExprs(VpiObject* ref, VpiObject* iter) {
 }
 
 // §37.38 (figure): the else branch, in the order its expressions occur.
-void VpiCollectElseConstraintExprs(VpiObject* ref, VpiObject* iter) {
-  for (auto* expr : ref->else_constraint_exprs) {
-    iter->children.push_back(expr);
-  }
-}
 
 }  // namespace delta

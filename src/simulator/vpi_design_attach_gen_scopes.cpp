@@ -99,7 +99,60 @@ void FoldInto(VpiObject* flat, VpiObject* alias) {
   flat->index = alias->index;
 }
 
+// §23.6: give `obj`, and each object it holds beneath it, the full name its
+// own one, `from` and what it continues with, becomes under `to`.
+void Refullname(VpiObject* obj, const std::string& from,
+                const std::string& to) {
+  const std::string_view kName(obj->full_name);
+  if (kName.starts_with(from) &&
+      (kName.size() == from.size() ||
+       std::string_view(".[:").find(kName[from.size()]) !=
+           std::string_view::npos)) {
+    obj->full_name = to + obj->full_name.substr(from.size());
+  }
+  for (VpiObject* child : obj->children) {
+    if (child->parent == obj) Refullname(child, from, to);
+  }
+}
+
+// §23.6 with §27.4 and §37.85: the instance `flat` a generate block instance
+// holds, which the run keys under a flattened name, `g_d2`, moved under the
+// block's gen scope `scope` and named as the source wrote it, `d2`, with what
+// it holds full-named through it.
+void MoveIntoGenScope(VpiObject* flat, VpiObject* scope, std::string_view name,
+                      const VpiNameKeeper& keep) {
+  const std::string kFrom = flat->full_name;
+  std::erase(flat->parent->children, flat);
+  flat->parent = scope;
+  flat->name = keep(std::string(name));
+  scope->children.push_back(flat);
+  Refullname(flat, kFrom, scope->full_name + "." + std::string(name));
+}
+
 }  // namespace
+
+void AttachGenBlockInstances(const RtlirDesign* design,
+                             const VpiObjectMap& objects,
+                             const VpiNameKeeper& keep) {
+  // §23.6: an instance a generate block instance holds is a scope inside that
+  // block's, and its hierarchical name runs through the block's name. The run
+  // keys it under a name it flattens with the block's generate prefix, and
+  // the scope DesignObjectForFlatName made for it hung from its module under
+  // that name.
+  WalkInstanceObjects(
+      design, objects,
+      [&](const RtlirModule* mod, const std::string& prefix,
+          VpiObject* instance) {
+        for (const RtlirModuleInst& child : mod->children) {
+          if (child.gen_block_path.empty()) continue;
+          VpiObject* scope = VpiGenScopeOf(instance, child.gen_block_path);
+          VpiObject* flat = FindObjectForFlatName(
+              objects, VpiFlatName(prefix, child.inst_name));
+          if (scope == nullptr || flat == nullptr) continue;
+          MoveIntoGenScope(flat, scope, child.simple_inst_name, keep);
+        }
+      });
+}
 
 void AttachGenBlockStorage(const RtlirDesign* design,
                            const VpiObjectMap& objects) {

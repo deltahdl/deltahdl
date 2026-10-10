@@ -80,9 +80,9 @@ int VpiSmallestTimePrecision(const std::vector<int>& precisions);
 bool VpiIsAssertionType(int type);
 
 // §37.34 detail 5: a constraint item is the abstract grouping of the kinds the
-// vpiConstraintItem iteration reaches - a constraint ordering or a constraint
-// expression. An object qualifies as a constraint item exactly when its type is
-// one of these.
+// vpiConstraintItem iteration reaches - a constraint ordering or one of the
+// kinds §37.38's constraint expr class groups, an expression among them. An
+// object qualifies as a constraint item exactly when its type is one of these.
 bool VpiIsConstraintItemType(int type);
 
 // §37.38 (figure): the expression an implication, a constraint if, or a
@@ -93,10 +93,6 @@ VpiHandle VpiConstraintConditionExpr(VpiHandle container);
 // §37.38 detail 3: push a container's body constraint expressions onto `iter`,
 // in the order they occur in the implication, if, if-else, or foreach.
 void VpiCollectConstraintExprs(VpiObject* ref, VpiObject* iter);
-
-// §37.38 (figure): the same for a constraint if-else's else branch, which the
-// figure draws as a vpiElseConst relation of its own.
-void VpiCollectElseConstraintExprs(VpiObject* ref, VpiObject* iter);
 
 // §37.38 detail 3: a constraint-expression container is the kind of constraint
 // expression whose vpiConstraintExpr iteration reaches the nested expressions

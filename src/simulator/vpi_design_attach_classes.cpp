@@ -198,12 +198,13 @@ int PropertyKind(const DataType& type, const RtlirDesign& design,
 
 // §37.31 detail 1 with §37.17: the variable a property of the class stands
 // as, static or automatic, of the kind its type takes and an array var where
-// it declares unpacked dimensions. Detail 25 full-names a static property
-// through its class defn, and gives an automatic one no full name.
-void MakeProperty(const MadeClassDefn& owner, const ClassMember& member,
-                  const RtlirDesign& design,
-                  const std::vector<MadeClassDefn>& made,
-                  const VpiAttachBuild& build) {
+// it declares unpacked dimensions, whose indices the caller records.
+// Detail 25 full-names a static property through its class defn, and gives an
+// automatic one no full name.
+VpiObject* MakeProperty(const MadeClassDefn& owner, const ClassMember& member,
+                        const RtlirDesign& design,
+                        const std::vector<MadeClassDefn>& made,
+                        const VpiAttachBuild& build) {
   VpiObject* var = build.alloc();
   var->type = member.unpacked_dims.empty()
                   ? PropertyKind(member.data_type, design, made)
@@ -214,6 +215,7 @@ void MakeProperty(const MadeClassDefn& owner, const ClassMember& member,
   var->parent = owner.defn;
   var->visibility = DeclaredVisibility(member);
   owner.defn->children.push_back(var);
+  return var;
 }
 
 // §37.31 detail 1 with §37.41: the task or function a method the class
@@ -240,7 +242,7 @@ void MakeMethod(const MadeClassDefn& owner, const ClassMember& member,
 // §37.31: the properties and methods of the class `owner` was made for, in
 // the order the class declares them. A parameter is no property of it.
 void MakeMembers(const MadeClassDefn& owner, const RtlirDesign& design,
-                 const std::vector<MadeClassDefn>& made,
+                 const std::vector<MadeClassDefn>& made, SimContext& ctx,
                  const VpiAttachBuild& build) {
   for (const ClassMember* member : owner.decl->members) {
     if (member == nullptr) continue;
@@ -248,8 +250,27 @@ void MakeMembers(const MadeClassDefn& owner, const RtlirDesign& design,
       MakeMethod(owner, *member, build);
     } else if (member->kind == ClassMemberKind::kProperty &&
                !member->is_param) {
-      MakeProperty(owner, *member, design, made, build);
+      VpiObject* var = MakeProperty(owner, *member, design, made, build);
+      VpiRecordWrittenDims(*var, member->unpacked_dims, ctx);
     }
+  }
+}
+
+// §37.31 with §37.34: the constraints of the class `owner` was made for, in
+// the order the class declares them (detail 4). A name in one finds the
+// properties of the class and of those it extends first, so they are made
+// once every class's extends object is.
+void MakeConstraints(const MadeClassDefn& owner, const VpiObjectMap& objects,
+                     SimContext& ctx, const VpiAttachBuild& build) {
+  static const std::vector<std::string_view> kNoGenBlocks;
+  VpiObject* scope = VpiClassNameScope(owner.defn, owner.defn->parent, build);
+  for (const ClassMember* member : owner.decl->members) {
+    if (member == nullptr || member->kind != ClassMemberKind::kConstraint) {
+      continue;
+    }
+    owner.defn->children.push_back(VpiMakeConstraint(
+        *member, owner.defn, {objects, owner.prefix, kNoGenBlocks, scope, ctx},
+        build));
   }
 }
 
@@ -276,10 +297,13 @@ VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
   MakePackageClassDefns(*design, objects, build, made);
   MakeUnitClassDefns(*design, objects, build, made);
   for (const MadeClassDefn& owner : made) {
-    MakeMembers(owner, *design, made, build);
+    MakeMembers(owner, *design, made, ctx, build);
     if (!owner.decl->base_class.empty()) {
       MakeExtends(owner, made, objects, ctx, build);
     }
+  }
+  for (const MadeClassDefn& owner : made) {
+    MakeConstraints(owner, objects, ctx, build);
   }
   VpiClassDefnObjects defns;
   for (const MadeClassDefn& owner : made) {

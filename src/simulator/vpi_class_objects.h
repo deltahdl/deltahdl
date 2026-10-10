@@ -19,9 +19,12 @@ struct ClassObject;
 // class typespec of the class the object was created with, reaching that
 // class's defn `defn` where there is one (§37.32), and a variable per property
 // that class and the classes it extends declare, base first, each holding a
-// copy of the value the object holds.
+// copy of the value the object holds; and a constraint per constraint block
+// they declare (§37.34), whose names resolve among the object's variables and
+// then among `objects`.
 VpiObject* VpiMakeClassObject(ClassObject& obj, VpiObject* defn,
-                              SimContext& ctx, const VpiAttachBuild& build);
+                              const VpiObjectMap& objects, SimContext& ctx,
+                              const VpiAttachBuild& build);
 
 // The storage of the value the property `name` of `obj` holds now: a ref
 // cell's where one stands (§13.5.2), the object's own, or the class's where

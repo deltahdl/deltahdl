@@ -243,6 +243,10 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
   }
   AttachContinuousAssignments(design, subroutines);
   AttachGenBlockStorage(design, object_map_);
+  AttachGenBlockInstances(design, object_map_, [this](std::string name) {
+    name_pool_.push_back(std::move(name));
+    return std::string_view(name_pool_.back());
+  });
 }
 
 void AttachModports(const RtlirDesign* design, const VpiObjectMap& objects,

@@ -1,10 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <string>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_vpi_run.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
@@ -345,5 +348,269 @@ TEST(ConstraintCondition, NoConditionWithoutAnExpressionChild) {
   implication.children = {&typespec};
   EXPECT_EQ(VpiConstraintConditionExpr(&implication), nullptr);
 }
+
+// A design run with a PLI application registered, whose constraints' items are
+// read back from the model the run built.
+class ConstraintExpressionsOfARun : public VpiDesignRun {
+ protected:
+  // What `ref` iterates through `type`, in the iteration's order.
+  static std::vector<vpiHandle> All(int type, vpiHandle ref) {
+    std::vector<vpiHandle> all;
+    vpiHandle it = vpi_iterate(type, ref);
+    if (it == nullptr) return all;
+    while (vpiHandle obj = vpi_scan(it)) all.push_back(obj);
+    return all;
+  }
+
+  // The operand at `index` of the operation `op`.
+  static VpiObject* Operand(vpiHandle op, std::size_t index) {
+    const std::vector<vpiHandle> kOperands = All(vpiOperand, op);
+    return index < kOperands.size() ? VpiObjectOf(kOperands[index]) : nullptr;
+  }
+};
+
+// §37.34 detail 5 with §37.38: a constraint holds a constraint expression per
+// one its block writes, in order: an expression, written soft or not (a name
+// standing alone being the variable it names), an implication, a constr if, a
+// constr if else, a constr foreach and a soft disable. A uniqueness
+// constraint, which §37.38 draws no object for, is none of them (#5840).
+TEST_F(ConstraintExpressionsOfARun, AConstraintHoldsItsExpressionsInOrder) {
+  Run("module top;\n"
+      "  class C; rand int x, y; rand bit b;\n"
+      "    constraint c {\n"
+      "      soft x > 0; soft b; y < 9;\n"
+      "      x < 5 -> x != 3;\n"
+      "      if (b) y > 1;\n"
+      "      if (y > 2) x > 2; else x < 2;\n"
+      "      unique { x, y };\n"
+      "      disable soft x;\n"
+      "    }\n"
+      "  endclass\n"
+      "endmodule\n");
+  vpiHandle c = Named(vpiConstraint, Named(vpiClassDefn, By("top"), "C"), "c");
+  ASSERT_NE(c, nullptr);
+  const std::vector<vpiHandle> kItems = All(vpiConstraintItem, c);
+  std::vector<int> types;
+  for (vpiHandle item : kItems) types.push_back(vpi_get(vpiType, item));
+  EXPECT_EQ(types, (std::vector<int>{vpiOperation, vpiBitVar, vpiOperation,
+                                     vpiImplication, vpiConstrIf,
+                                     vpiConstrIfElse, vpiSoftDisable}));
+  ASSERT_EQ(kItems.size(), 7u);
+  EXPECT_EQ(vpi_get(vpiSoft, kItems[0]), 1);
+  EXPECT_EQ(vpi_get(vpiSoft, kItems[2]), 0);
+  // An implication and a constr if reach their guards through vpiCondition,
+  // a name standing alone among them, and what they govern through
+  // vpiConstraintExpr; an if-else's else branch is reached apart.
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiCondition, kItems[3])),
+            vpiOperation);
+  EXPECT_EQ(All(vpiConstraintExpr, kItems[3]).size(), 1u);
+  vpiHandle guard = vpi_handle(vpiCondition, kItems[4]);
+  ASSERT_NE(guard, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, guard), "b");
+  EXPECT_EQ(All(vpiConstraintExpr, kItems[5]).size(), 1u);
+  EXPECT_EQ(All(vpiElseConst, kItems[5]).size(), 1u);
+  EXPECT_EQ(All(vpiElseConst, kItems[4]).size(), 0u);
+}
+
+// §8.13 with §37.38: a name in a constraint of a class finds the class's
+// property, one the class inherits among them, and else a declaration of the
+// module declaring the class (#5840).
+TEST_F(ConstraintExpressionsOfARun, AConstraintsNamesFindTheClassFirst) {
+  Run("module top; int m, x;\n"
+      "  class B; rand int y; endclass\n"
+      "  class C extends B; rand int x;\n"
+      "    constraint c { x < y; y < m; }\n"
+      "  endclass\n"
+      "endmodule\n");
+  vpiHandle defn = Named(vpiClassDefn, By("top"), "C");
+  vpiHandle c = Named(vpiConstraint, defn, "c");
+  ASSERT_NE(c, nullptr);
+  const std::vector<vpiHandle> kItems = All(vpiConstraintItem, c);
+  ASSERT_EQ(kItems.size(), 2u);
+  vpiHandle y = Named(vpiVariables, Named(vpiClassDefn, By("top"), "B"), "y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(Operand(kItems[0], 0), VpiObjectOf(Named(vpiVariables, defn, "x")));
+  EXPECT_EQ(Operand(kItems[0], 1), VpiObjectOf(y));
+  EXPECT_EQ(Operand(kItems[1], 1), VpiObjectOf(By("top.m")));
+}
+
+// §37.38 details 1 and 2: a constr foreach reaches the array it indexes
+// through vpiVariables and its index variables through vpiLoopVars, a skipped
+// one standing as a null operation; a name in its body finds the index
+// variables first, ahead of a property of the class of the same name (#5840).
+TEST_F(ConstraintExpressionsOfARun, AForeachConstraintReachesItsArray) {
+  Run("module top;\n"
+      "  class C; rand int a[2][2], j;\n"
+      "    constraint c { foreach (a[, j]) j < 2; }\n"
+      "  endclass\n"
+      "endmodule\n");
+  vpiHandle defn = Named(vpiClassDefn, By("top"), "C");
+  const std::vector<vpiHandle> kItems =
+      All(vpiConstraintItem, Named(vpiConstraint, defn, "c"));
+  ASSERT_EQ(kItems.size(), 1u);
+  vpiHandle loop = kItems[0];
+  EXPECT_EQ(vpi_get(vpiType, loop), vpiConstrForEach);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiVariables, loop)),
+            VpiObjectOf(Named(vpiVariables, defn, "a")));
+  const std::vector<vpiHandle> kIndices = All(vpiLoopVars, loop);
+  ASSERT_EQ(kIndices.size(), 2u);
+  EXPECT_EQ(vpi_get(vpiOpType, kIndices[0]), vpiNullOp);
+  EXPECT_STREQ(vpi_get_str(vpiName, kIndices[1]), "j");
+  const std::vector<vpiHandle> kBody = All(vpiConstraintExpr, loop);
+  ASSERT_EQ(kBody.size(), 1u);
+  EXPECT_EQ(Operand(kBody[0], 0), VpiObjectOf(kIndices[1]));
+}
+
+// §18.7 with §37.38: a name in a randomize call's inline constraint block
+// finds the randomized object's class's property ahead of a declaration of the
+// module, and else a declaration of the block the call stands in. A call on
+// an object of a class the design does not declare finds the scope's only
+// (#5840).
+TEST_F(ConstraintExpressionsOfARun, AnInlineBlocksNamesFindTheClassFirst) {
+  Run("module top; int x;\n"
+      "  class C; rand int x; endclass\n"
+      "  C h = new;\n"
+      "  initial begin : b int lim;\n"
+      "    void'(h.randomize() with { x < lim; });\n"
+      "    void'(process::self().randomize() with { x < lim; });\n"
+      "  end\n"
+      "endmodule\n");
+  std::vector<vpiHandle> constraints;
+  for (vpiHandle call : All(vpiStmt, By("top.b"))) {
+    constraints.push_back(vpi_handle(vpiWith, call));
+  }
+  ASSERT_EQ(constraints.size(), 2u);
+  ASSERT_NE(constraints[0], nullptr);
+  ASSERT_NE(constraints[1], nullptr);
+  const std::vector<vpiHandle> kOwn = All(vpiConstraintItem, constraints[0]);
+  ASSERT_EQ(kOwn.size(), 1u);
+  EXPECT_EQ(Operand(kOwn[0], 0),
+            VpiObjectOf(
+                Named(vpiVariables, Named(vpiClassDefn, By("top"), "C"), "x")));
+  EXPECT_EQ(Operand(kOwn[0], 1), VpiObjectOf(By("top.b.lim")));
+  const std::vector<vpiHandle> kScopes = All(vpiConstraintItem, constraints[1]);
+  ASSERT_EQ(kScopes.size(), 1u);
+  EXPECT_EQ(Operand(kScopes[0], 0), VpiObjectOf(By("top.x")));
+}
+
+// §37.33 with §37.38: a name in a constraint of a class obj finds the
+// object's variable (#5840).
+TEST_F(ConstraintExpressionsOfARun, AClassObjsConstraintFindsItsVariables) {
+  Run("module top; int m;\n"
+      "  class C; rand int x; constraint c { x < m; } endclass\n"
+      "  C h = new;\n"
+      "endmodule\n");
+  vpiHandle obj = vpi_handle(vpiClassObj, By("top.h"));
+  ASSERT_NE(obj, nullptr);
+  const std::vector<vpiHandle> kItems =
+      All(vpiConstraintItem, Named(vpiConstraint, obj, "c"));
+  ASSERT_EQ(kItems.size(), 1u);
+  EXPECT_EQ(Operand(kItems[0], 0), VpiObjectOf(Named(vpiVariables, obj, "x")));
+  EXPECT_EQ(Operand(kItems[0], 1), VpiObjectOf(By("top.m")));
+}
+
+// §18.5.9 with §37.34: a solve-before item is a constraint ordering among a
+// constraint's items, reaching the expressions it solves before through
+// vpiSolveBefore and those it solves after through vpiSolveAfter, each in the
+// order written (#5842).
+TEST_F(ConstraintExpressionsOfARun, ASolveBeforeItemIsAConstraintOrdering) {
+  Run("module top;\n"
+      "  class C; rand int x, y, z;\n"
+      "    constraint c { solve x, y before z; }\n"
+      "  endclass\n"
+      "endmodule\n");
+  vpiHandle defn = Named(vpiClassDefn, By("top"), "C");
+  const std::vector<vpiHandle> kItems =
+      All(vpiConstraintItem, Named(vpiConstraint, defn, "c"));
+  ASSERT_EQ(kItems.size(), 1u);
+  EXPECT_EQ(vpi_get(vpiType, kItems[0]), vpiConstraintOrdering);
+  std::vector<std::string> before;
+  for (vpiHandle expr : All(vpiSolveBefore, kItems[0])) {
+    before.emplace_back(vpi_get_str(vpiName, expr));
+  }
+  EXPECT_EQ(before, (std::vector<std::string>{"x", "y"}));
+  const std::vector<vpiHandle> kAfter = All(vpiSolveAfter, kItems[0]);
+  ASSERT_EQ(kAfter.size(), 1u);
+  EXPECT_EQ(VpiObjectOf(kAfter[0]),
+            VpiObjectOf(Named(vpiVariables, defn, "z")));
+  EXPECT_EQ(All(vpiSolveAfter, defn).size(), 0u);
+  EXPECT_EQ(All(vpiElseConst, kItems[0]).size(), 0u);
+}
+
+// §18.5.3 with §37.34 and §37.38: a dist item of a constraint block is a
+// distribution among the constraint's items, reaching the expression it
+// weights and a dist item per entry, in order. A dist item reaches its value,
+// or the range [lo:hi] it gives, through vpiValueRange, its weight through
+// vpiWeight, and reports := as vpiEqualDist and :/ as vpiDivDist. A default
+// item and a range about a centre reach no value range, and an item written
+// with no weight no weight (#5843).
+TEST_F(ConstraintExpressionsOfARun, ADistItemIsADistribution) {
+  Run("module top;\n"
+      "  class C; rand int x;\n"
+      "    constraint c {\n"
+      "      x dist { 0 := 2, [1:3] :/ 4, 7, [9 +/- 1] := 1, default :/ 5 };\n"
+      "    }\n"
+      "  endclass\n"
+      "endmodule\n");
+  vpiHandle defn = Named(vpiClassDefn, By("top"), "C");
+  const std::vector<vpiHandle> kItems =
+      All(vpiConstraintItem, Named(vpiConstraint, defn, "c"));
+  ASSERT_EQ(kItems.size(), 1u);
+  vpiHandle dist = kItems[0];
+  EXPECT_EQ(vpi_get(vpiType, dist), vpiDistribution);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, dist)),
+            VpiObjectOf(Named(vpiVariables, defn, "x")));
+  const std::vector<vpiHandle> kEntries = All(vpiDistItem, dist);
+  ASSERT_EQ(kEntries.size(), 5u);
+  EXPECT_EQ(vpi_get(vpiDistType, kEntries[0]), vpiEqualDist);
+  EXPECT_EQ(vpi_get(vpiDistType, kEntries[1]), vpiDivDist);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiValueRange, kEntries[0])),
+            vpiConstant);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiWeight, kEntries[0])), vpiConstant);
+  vpiHandle range = vpi_handle(vpiValueRange, kEntries[1]);
+  ASSERT_NE(range, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, range), vpiRange);
+  EXPECT_NE(vpi_handle(vpiLeftRange, range), nullptr);
+  EXPECT_NE(vpi_handle(vpiRightRange, range), nullptr);
+  EXPECT_EQ(vpi_handle(vpiWeight, kEntries[2]), nullptr);
+  EXPECT_EQ(vpi_handle(vpiValueRange, kEntries[3]), nullptr);
+  EXPECT_EQ(vpi_handle(vpiValueRange, kEntries[4]), nullptr);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiWeight, kEntries[4])), vpiConstant);
+  EXPECT_EQ(vpi_handle(vpiCondition, kEntries[0]), nullptr);
+}
+
+// §37.19 with §37.38: a select through two unpacked dimensions of a class's
+// array property, written as a size or as a range either way, is a var select
+// of a var select, in a constraint of the class defn and of a class obj
+// alike; one through a dynamic array's one dimension is a var select too
+// (#5844).
+TEST_F(ConstraintExpressionsOfARun, ASelectThroughAPropertysDimensions) {
+  Run("module top;\n"
+      "  class C; rand int a[2][2], b[3:0][1:2], d[];\n"
+      "    constraint c {\n"
+      "      foreach (a[i, j]) a[i][j] > 0;\n"
+      "      foreach (b[i, j]) b[i][j] > 0;\n"
+      "      foreach (d[k]) d[k] > 0;\n"
+      "    }\n"
+      "  endclass\n"
+      "  C h = new;\n"
+      "endmodule\n");
+  vpiHandle defn = Named(vpiClassDefn, By("top"), "C");
+  vpiHandle obj = vpi_handle(vpiClassObj, By("top.h"));
+  ASSERT_NE(obj, nullptr);
+  for (vpiHandle holder : {defn, obj}) {
+    const std::vector<vpiHandle> kLoops =
+        All(vpiConstraintItem, Named(vpiConstraint, holder, "c"));
+    ASSERT_EQ(kLoops.size(), 3u);
+    for (vpiHandle loop : kLoops) {
+      const std::vector<vpiHandle> kBody = All(vpiConstraintExpr, loop);
+      ASSERT_EQ(kBody.size(), 1u);
+      VpiObject* select = Operand(kBody[0], 0);
+      ASSERT_NE(select, nullptr);
+      EXPECT_EQ(select->type, vpiVarSelect);
+    }
+  }
+}
+
 }  // namespace
 }  // namespace delta

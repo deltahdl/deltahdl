@@ -195,19 +195,66 @@ constexpr std::array<std::string_view, 10> kLocatorMethods = {
     "find_last", "find_last_index", "min",        "max",
     "unique",    "unique_index"};
 
-// §37.42 detail 1: the with expression an array locator method call `expr` is
-// written with, hung from `call`'s vpiWith; any other method's call, with
-// clause or not, has no vpiWith.
+// §18.7 with §37.34: the constraint the inline constraint block `block` of
+// the call `call` of randomize stands as, a constraint §37.31 detail 3 calls
+// inline. A name in it finds the properties of the class `defn` of the
+// randomized object, and of those it extends, ahead of the declarations of
+// the scope the call stands in.
+VpiObject* InlineConstraint(const ClassMember& block, VpiObject* call,
+                            const VpiObject* defn, const BlockParent& parent,
+                            const BodyWalk& walk) {
+  static const GenBlockPrefixes kNoGenBlocks;
+  VpiObject* constraint = VpiMakeConstraint(
+      block, call,
+      {walk.objects, walk.prefix,
+       walk.gen_prefixes != nullptr ? *walk.gen_prefixes : kNoGenBlocks,
+       VpiClassNameScope(defn, parent.scope, walk.build), walk.calls.ctx},
+      walk.build);
+  constraint->inline_constraint = true;
+  return constraint;
+}
+
+// §37.42 detail 1: what a call `expr` of a randomize method or an array
+// locator method is written with, hung from `call`'s vpiWith: the inline
+// constraint block of a call of randomize (§18.7), a constraint §37.31 detail 3
+// calls inline, or the with expression of a locator method's call. Any other
+// call, with clause or not, has no vpiWith.
 void MakeWithClause(VpiObject* call, const Expr& expr,
                     const BlockParent& parent, const BodyWalk& walk) {
   call->tf_with_method =
       call->type == vpiMethodFuncCall &&
-      std::ranges::find(kLocatorMethods, call->name) != kLocatorMethods.end();
-  if (call->tf_with_method && expr.with_expr != nullptr) {
+      (call->name == "randomize" ||
+       std::ranges::find(kLocatorMethods, call->name) != kLocatorMethods.end());
+  if (!call->tf_with_method) return;
+  // §18.7: the identifier list of a restricted block, randomize() with (a)
+  // {...}, is kept as a with expression too, so the block is looked for first.
+  if (expr.inline_constraint != nullptr) {
+    call->tf_with = InlineConstraint(
+        *expr.inline_constraint, call,
+        MethodCallClassDefn(*expr.lhs, parent, walk), parent, walk);
+  } else if (expr.with_expr != nullptr) {
     call->tf_with = VpiCallSiteExpression(expr.with_expr, walk.objects,
                                           CallSiteOf(parent, walk),
                                           walk.calls.ctx, walk.build);
   }
+}
+
+// §37.42: give `call` what the shape `shape` of the call `called`, standing
+// in `parent`, says it is: its kind, its name, what a method is applied to
+// (detail 2), the subroutine it calls, whether that is user-defined, the
+// systf of a registered system task or function, its arguments and its with
+// clause (detail 1).
+void FillCall(VpiObject* call, const CallShape& shape, const Expr& called,
+              const BlockParent& parent, const BodyWalk& walk) {
+  call->type = shape.type;
+  call->name = walk.build.keep(std::string(shape.name));
+  call->tf_prefix = shape.prefix;
+  call->prefix_members = shape.prefix_members;
+  call->tf_decl = shape.called;
+  call->user_defined = shape.user_defined;
+  call->user_systf = shape.systf;
+  MakeCallArguments(call, called, parent, walk);
+  MakeWithClause(call, called, parent, walk);
 }
 
 // §37.42 with §37.60: the call statement `stmt` stands as, null for a
@@ -228,15 +275,8 @@ VpiObject* MakeCallStatement(const Stmt& stmt, const BlockParent& parent,
   const CallShape kShape = CallShapeOf(*called, parent, walk);
   if (kShape.type == 0) return nullptr;
   VpiObject* call = MakeAtomicStatement(stmt, kShape.type, parent, walk);
-  call->name = walk.build.keep(std::string(kShape.name));
-  call->tf_prefix = kShape.prefix;
-  call->prefix_members = kShape.prefix_members;
-  call->tf_decl = kShape.called;
-  call->user_defined = kShape.user_defined;
-  call->user_systf = kShape.systf;
   call->written_as_stmt = true;
-  MakeCallArguments(call, *called, parent, walk);
-  MakeWithClause(call, *called, parent, walk);
+  FillCall(call, kShape, *called, parent, walk);
   if (kShape.type == vpiSysTaskCall || kShape.type == vpiSysFuncCall) {
     call->decompile = VpiExprDecompile(called);
     walk.calls.sites[{called, walk.prefix}] = call;
@@ -488,6 +528,14 @@ void AttachInstanceProcedures(VpiObject* instance,
 }
 
 }  // namespace
+
+bool ShapeExprCall(const Expr& call, VpiObject* made, const BlockParent& parent,
+                   const BodyWalk& walk) {
+  const CallShape kShape = CallShapeOf(call, parent, walk);
+  if (kShape.type == 0) return false;
+  FillCall(made, kShape, call, parent, walk);
+  return true;
+}
 
 void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,
                       const VpiCallBuild& calls, const VpiAttachBuild& build) {

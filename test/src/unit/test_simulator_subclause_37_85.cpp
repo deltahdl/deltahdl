@@ -360,5 +360,32 @@ TEST_F(GeneratesOfARun, AGenScopeReachesTheTypedefsItsBlockDeclares) {
       vpi_handle(vpiTypespec, Named(vpiPropFormalDecl, decl, "v")), nib));
 }
 
+// §23.6 with §27.4: an instance a generate block instance holds is a module
+// of the block's gen scope, named as written and full-named through the
+// block's name, as is everything it holds; its module holds no instance under
+// the name the run keys it by. A call in it still reaches the task of the
+// module enclosing it (§23.8, §37.42) (#5805).
+TEST_F(GeneratesOfARun, AnInstanceOfAGenerateBlockIsInItsGenScope) {
+  Run("module deep; initial begin : b t(); end endmodule\n"
+      "module top; task t; endtask\n"
+      "  if (1) begin : g deep d2 (); end\n"
+      "endmodule\n");
+  EXPECT_EQ(NamesOf(vpiModule, By("top")), std::vector<std::string>{});
+  vpiHandle g = By("top.g");
+  ASSERT_NE(g, nullptr);
+  EXPECT_EQ(NamesOf(vpiModule, g), std::vector<std::string>{"d2"});
+  vpiHandle d2 = By("top.g.d2");
+  ASSERT_NE(d2, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, d2), "top.g.d2");
+  EXPECT_EQ(By("top.g_d2"), nullptr);
+  vpiHandle b = By("top.g.d2.b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, b), "top.g.d2.b");
+  vpiHandle call = Named(vpiTaskCall, b, "t");
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, call)),
+            VpiObjectOf(Named(vpiTaskFunc, By("top"), "t")));
+}
+
 }  // namespace
 }  // namespace delta

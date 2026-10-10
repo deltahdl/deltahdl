@@ -775,20 +775,20 @@ struct VpiObject {
   std::vector<VpiObject*> for_init_stmts;
   std::vector<VpiObject*> for_inc_stmts;
 
-  // §37.38 detail 3: the constraint expressions held in the body of a
-  // constraint-expression container - an implication, a constraint if, a
-  // constraint if-else, or a foreach constraint - in the order they occur. The
-  // vpiConstraintExpr iteration walks this list so the expressions come back in
-  // source order. Empty for an object that holds no such body.
+  // §37.34 and §37.38: what the parts of a constraint reach, in source order:
+  // the constraint expressions an implication, constr if, constr if else or
+  // constr foreach governs (vpiConstraintExpr, detail 3) and an if-else's else
+  // branch (vpiElseConst); what a constraint ordering solves before and after
+  // (vpiSolveBefore, vpiSolveAfter); a dist item's value or range and weight
+  // (vpiValueRange, vpiWeight); and, of a class obj's constraint, the run's
+  // class object whose constraint_mode() state it reports.
   std::vector<VpiObject*> constraint_exprs;
-
-  // §37.38 (figure): the constraint expressions of a constraint if-else's else
-  // branch, which the figure draws as a vpiElseConst relation of its own rather
-  // than as part of the body above - the two branches of an if-else are two
-  // sets of expressions and vpiConstraintExpr reaches the then branch. Empty
-  // for every object that is not a constraint if-else, and for one whose else
-  // branch holds nothing.
   std::vector<VpiObject*> else_constraint_exprs;
+  std::vector<VpiObject*> solve_before;
+  std::vector<VpiObject*> solve_after;
+  VpiObject* value_range = nullptr;
+  VpiObject* weight = nullptr;
+  ClassObject* constraint_of = nullptr;
 
   // §37.41 details 1-3: the variable that captures a function's return value,
   // reached through the vpiReturn relation. Detail 1 makes a function contain a

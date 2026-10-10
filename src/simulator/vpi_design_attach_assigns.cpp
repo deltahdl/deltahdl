@@ -225,6 +225,7 @@ struct AssignBuild {
   AssignNames names;
   VpiCalleeResolver callees;
   std::function<std::string_view(std::string)> keep;
+  std::function<bool(const Expr&, VpiObject*)> shape_call = nullptr;
 };
 
 VpiObject* ExpressionObject(const Expr* expr, const AssignBuild& build);
@@ -465,6 +466,12 @@ VpiObject* CallObject(const Expr* expr, const AssignBuild& build) {
   VpiObject* call = build.alloc();
   call->type =
       expr->kind == ExprKind::kSystemCall ? vpiSysFuncCall : vpiFuncCall;
+  // A call a procedure writes is the tf call its statement would be: a method
+  // func call of a method, named, with its prefix (details 2 and 11).
+  if (expr->kind == ExprKind::kCall && build.shape_call &&
+      build.shape_call(*expr, call)) {
+    return call;
+  }
   if (call->type == vpiFuncCall && expr->lhs != nullptr && build.callees) {
     call->tf_decl = build.callees(*expr->lhs);
   }
@@ -673,13 +680,14 @@ VpiObject* ModelledExpression(const Expr* expr, const AssignBuild& build) {
 VpiObject* ExpressionObject(const Expr* expr, const AssignBuild& build) {
   if (expr == nullptr) return nullptr;
   VpiObject* obj = ModelledExpression(expr, build);
-  // §37.3.5 with §38.15: an operation and a function or system function call
-  // hold no storage, so the value of each is its expression evaluated where
+  // §37.3.5 with §38.15: an operation and a function, method function or
+  // system function call hold no storage, so the value of each is its
+  // expression evaluated where
   // the source wrote it, in the instance and the generate blocks the
   // expression stands in.
   if (obj != nullptr &&
       (obj->type == vpiOperation || obj->type == vpiFuncCall ||
-       obj->type == vpiSysFuncCall)) {
+       obj->type == vpiMethodFuncCall || obj->type == vpiSysFuncCall)) {
     obj->expr_scope = std::make_shared<const VpiExprScope>(
         VpiExprScope{expr, VpiFlatName(build.names.prefix, ""),
                      std::vector<std::string>(build.names.gen.begin(),
@@ -852,12 +860,12 @@ VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
 VpiObject* VpiGenBlockExpression(const Expr* expr, const VpiExprNames& names,
                                  SimContext& ctx, const VpiAttachBuild& build) {
   return ExpressionObject(
-      expr,
-      AssignBuild{build.alloc,
-                  &ctx,
-                  AssignNames{names.objects, names.prefix, names.gen_prefixes},
-                  {},
-                  build.keep});
+      expr, AssignBuild{build.alloc,
+                        &ctx,
+                        AssignNames{names.objects, names.prefix,
+                                    names.gen_prefixes, names.scope},
+                        {},
+                        build.keep});
 }
 
 namespace {
@@ -870,9 +878,12 @@ AssignBuild CallSiteBuild(const VpiObjectMap& objects, const VpiCallSite& site,
   static const GenBlockPrefixes kNoGenBlocks;
   const GenBlockPrefixes& gen =
       site.gen_prefixes != nullptr ? *site.gen_prefixes : kNoGenBlocks;
-  return AssignBuild{build.alloc, &ctx,
+  return AssignBuild{build.alloc,
+                     &ctx,
                      AssignNames{objects, site.prefix, gen, site.scope},
-                     VpiCalleesAt(site), build.keep};
+                     VpiCalleesAt(site),
+                     build.keep,
+                     site.shape_call};
 }
 
 }  // namespace

@@ -130,10 +130,12 @@ struct MethodCall {
 // The method `method` of the class `cls`, of the package `package` where one is
 // named, found in the class or, by §8.13, in the classes it extends. A class
 // the design declares answers ahead of a built-in one of its name, which §15.2
-// lets user code redefine.
+// lets user code redefine. A method none of them declares is one of the
+// built-in methods every class has (§18), a function, or else nothing.
 MethodCall ClassMethodCall(const BodyWalk& walk, std::string_view cls,
                            std::string_view method,
                            std::string_view package = {}) {
+  const bool kNamesClass = !cls.empty();
   while (!cls.empty()) {
     ScopedClass found = FindClassDecl(walk, cls, package);
     if (found.decl == nullptr) {
@@ -146,7 +148,8 @@ MethodCall ClassMethodCall(const BodyWalk& walk, std::string_view cls,
     }
     cls = found.decl->base_class;
   }
-  return {};
+  const bool kBuiltIn = kNamesClass && VpiIsClassBuiltInMethod(method);
+  return {kBuiltIn ? vpiMethodFuncCall : 0, false};
 }
 
 // §37.42: a system task or system function call, named after what it calls. A
@@ -663,7 +666,9 @@ CallShape ExprCallShape(const Expr& access, const BlockParent& parent,
 // instance below it the leading names reach, u.h.run(). The class of the
 // chain's last member says what the method is, and the call is applied to
 // that member in the object the var references, which is read when the
-// prefix is asked for.
+// prefix is asked for. A method that class does not declare may be one of the
+// built-in methods of the member itself, h.x.rand_mode(0) or
+// h.c.constraint_mode(0) (§18.8, §18.9).
 CallShape MemberChainCallShape(const Expr& access, const BlockParent& parent,
                                const BodyWalk& walk) {
   std::vector<std::string_view> names;
@@ -691,9 +696,9 @@ CallShape MemberChainCallShape(const Expr& access, const BlockParent& parent,
   if (!type.vif.empty()) {
     return InterfaceCallShape(kAt, type.vif, access.rhs->text);
   }
-  CallShape shape =
-      MethodShape(ClassMethodCall(kAt, type.cls, access.rhs->text),
-                  access.rhs->text, prefix, kAt);
+  MethodCall call = ClassMethodCall(kAt, type.cls, access.rhs->text);
+  if (call.type == 0) call.type = VpiMemberBuiltInCallKind(access.rhs->text);
+  CallShape shape = MethodShape(call, access.rhs->text, prefix, kAt);
   if (shape.type != 0) {
     shape.prefix_members.assign(
         names.begin() + static_cast<std::ptrdiff_t>(first), names.end());
@@ -732,7 +737,10 @@ VpiCallSite CallSiteOf(const BlockParent& parent, const BodyWalk& walk) {
           walk.prefix,
           parent.scope,
           walk.calls.subroutines,
-          walk.gen_prefixes};
+          walk.gen_prefixes,
+          [&parent, &walk](const Expr& call, VpiObject* made) {
+            return ShapeExprCall(call, made, parent, walk);
+          }};
 }
 
 int TypeVariableKind(const DataType& type, const BodyWalk& walk) {
@@ -780,6 +788,14 @@ int ForeachIndexKind(const Expr* array, const BlockParent& parent,
     return FirstDimIndexKind(item->var_unpacked_dims, walk);
   }
   return ModuleIndexKind(walk.mod, array->text, walk);
+}
+
+VpiObject* MethodCallClassDefn(const Expr& access, const BlockParent& parent,
+                               const BodyWalk& walk) {
+  const ExprClassName kClass = ExprClass(*access.lhs, parent, walk);
+  const ScopedClass kFound = FindClassDecl(walk, kClass.cls, kClass.package);
+  const auto kMade = walk.calls.classes.find({kFound.decl, kFound.scope});
+  return kMade == walk.calls.classes.end() ? nullptr : kMade->second;
 }
 
 CallShape CallShapeOf(const Expr& expr, const BlockParent& parent,

@@ -7,6 +7,7 @@
 #include "simulator/vpi_user.h"
 // §37.10 detail 3: the package/interface/program instance kinds are defined in
 // the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
+#include "simulator/eval_randomize_internal.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
@@ -627,9 +628,13 @@ int VpiGetSimplePropertyB(int property, VpiHandle obj, bool& handled) {
     // §37.34: whether a constraint is virtual, as a Boolean property.
     case vpiVirtual:
       return VpiBool(obj->is_virtual);
-    // §37.34: whether a constraint is currently enabled, as a Boolean property.
+    // §37.34: whether a constraint is currently enabled, as a Boolean property;
+    // a class obj's is what constraint_mode() last set on the object (§18.9).
     case vpiIsConstraintEnabled:
-      return VpiBool(obj->constraint_enabled);
+      return VpiBool(
+          obj->constraint_of != nullptr
+              ? IsObjectConstraintActive(obj->constraint_of, obj->name)
+              : obj->constraint_enabled);
     // §37.34: the distribution kind a dist item carries, as an int property.
     case vpiDistType:
       return obj->dist_type;

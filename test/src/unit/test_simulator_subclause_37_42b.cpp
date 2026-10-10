@@ -639,5 +639,158 @@ TEST_F(CallStatementsInAScope, ALocatorCallReachesItsWithExpression) {
   }
 }
 
+// §18.6, §18.8, §18.9 and §18.13 with §37.42: a call through a class handle
+// of one of the built-in methods every class has, which neither the class nor
+// a class it extends declares, is a method func call applied to the handle.
+// It is not user-defined and reaches no function object (detail 11). A class
+// overriding pre_randomize declares it, and a call of it through a handle of
+// that class reaches the declaration (#5831).
+TEST_F(CallStatementsInAScope, ACallOfAClassBuiltInMethodIsAMethodFuncCall) {
+  Run("module top;\n"
+      "  class B; rand int x; endclass\n"
+      "  class C extends B;\n"
+      "    function void pre_randomize(); endfunction\n"
+      "  endclass\n"
+      "  B h = new; C k = new;\n"
+      "  initial begin : b\n"
+      "    void'(h.randomize()); h.pre_randomize(); h.post_randomize();\n"
+      "    h.rand_mode(0); h.constraint_mode(0); h.srandom(1);\n"
+      "    void'(h.get_randstate()); h.set_randstate(\"s\");\n"
+      "    void'(k.randomize()); k.pre_randomize();\n"
+      "  end\n"
+      "endmodule\n");
+  using Call = std::pair<std::string, std::string>;
+  EXPECT_EQ(MethodCallsOf(By("top.b")),
+            (std::vector<Call>{{"randomize", "h"},
+                               {"pre_randomize", "h"},
+                               {"post_randomize", "h"},
+                               {"rand_mode", "h"},
+                               {"constraint_mode", "h"},
+                               {"srandom", "h"},
+                               {"get_randstate", "h"},
+                               {"set_randstate", "h"},
+                               {"randomize", "k"},
+                               {"pre_randomize", "k"}}));
+  vpiHandle it = vpi_iterate(vpiStmt, By("top.b"));
+  ASSERT_NE(it, nullptr);
+  std::vector<vpiHandle> calls;
+  while (vpiHandle stmt = vpi_scan(it)) calls.push_back(stmt);
+  ASSERT_EQ(calls.size(), 10u);
+  for (std::size_t i = 0; i + 1 < calls.size(); ++i) {
+    EXPECT_EQ(vpi_get(vpiUserDefn, calls[i]), 0) << i;
+    EXPECT_EQ(vpi_handle(vpiFunction, calls[i]), nullptr) << i;
+  }
+  vpiHandle declared =
+      Named(vpiMethods, Named(vpiClassDefn, By("top"), "C"), "pre_randomize");
+  ASSERT_NE(declared, nullptr);
+  EXPECT_EQ(vpi_get(vpiUserDefn, calls.back()), 1);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, calls.back())),
+            VpiObjectOf(declared));
+}
+
+// §15.4 and §18.6.1 with §37.42: a built-in class is a class too, so a call
+// of randomize through a handle of a class extending mailbox, which declares
+// no randomize, is a method func call of a built-in method, though §15.4 names
+// no such method of mailbox (#5836).
+TEST_F(CallStatementsInAScope, ACallOfRandomizeThroughABuiltInBaseIsACall) {
+  Run("module top;\n"
+      "  class M extends mailbox #(int); endclass\n"
+      "  M m = new;\n"
+      "  initial begin : b void'(m.randomize()); end\n"
+      "endmodule\n");
+  using Call = std::pair<std::string, std::string>;
+  EXPECT_EQ(MethodCallsOf(By("top.b")),
+            (std::vector<Call>{{"randomize", "m"}}));
+}
+
+// §18.8 and §18.9 with §37.42: rand_mode applied to a random variable, and
+// constraint_mode applied to a constraint block, through a class handle, are
+// method func calls of built-in methods, not user-defined and reaching no
+// function object (detail 11). The prefix of the call of rand_mode is the
+// variable it is applied to, read in the object the handle references
+// (detail 2) (#5835).
+TEST_F(CallStatementsInAScope, AModeCallOnAMemberIsAMethodFuncCall) {
+  Run("module top;\n"
+      "  class C; rand int x; constraint c { x > 0; } endclass\n"
+      "  C h = new;\n"
+      "  initial begin : b h.x.rand_mode(0); h.c.constraint_mode(0); end\n"
+      "endmodule\n");
+  for (const char* method : {"rand_mode", "constraint_mode"}) {
+    vpiHandle call = Named(vpiMethodFuncCall, By("top.b"), method);
+    ASSERT_NE(call, nullptr) << method;
+    EXPECT_EQ(vpi_get(vpiUserDefn, call), 0) << method;
+    EXPECT_EQ(vpi_handle(vpiFunction, call), nullptr) << method;
+  }
+  vpiHandle prefix =
+      vpi_handle(vpiPrefix, Named(vpiMethodFuncCall, By("top.b"), "rand_mode"));
+  ASSERT_NE(prefix, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, prefix), "x");
+}
+
+// §37.42 detail 1 with §18.7: a call of randomize written with an inline
+// constraint block, restricted to an identifier list or not, reaches the block
+// through vpiWith as a constraint; one written with none reaches nothing
+// (#5834).
+TEST_F(CallStatementsInAScope, ARandomizeCallReachesItsInlineConstraint) {
+  Run("module top;\n"
+      "  class C; rand int x; endclass\n"
+      "  C h = new;\n"
+      "  initial begin : b\n"
+      "    void'(h.randomize() with { x > 0; });\n"
+      "    void'(h.randomize() with (x) { x < 9; });\n"
+      "    void'(h.randomize());\n"
+      "  end\n"
+      "endmodule\n");
+  std::vector<vpiHandle> calls;
+  vpiHandle it = vpi_iterate(vpiStmt, By("top.b"));
+  ASSERT_NE(it, nullptr);
+  while (vpiHandle stmt = vpi_scan(it)) calls.push_back(stmt);
+  ASSERT_EQ(calls.size(), 3u);
+  for (std::size_t i = 0; i < 2; ++i) {
+    vpiHandle with = vpi_handle(vpiWith, calls[i]);
+    ASSERT_NE(with, nullptr) << i;
+    EXPECT_EQ(vpi_get(vpiType, with), vpiConstraint) << i;
+  }
+  EXPECT_EQ(vpi_handle(vpiWith, calls[2]), nullptr);
+}
+
+// §37.42 details 2 and 11: a method call written within an expression is a
+// method func call named after its method and applied through vpiPrefix to
+// the value it is called on, as a call statement of it is. A method the class
+// declares is reached through vpiFunction, a built-in method's call reaches
+// none, and the call's value is the method's result (#5832).
+TEST_F(CallStatementsInAScope, AMethodCallInAnExpressionIsAMethodFuncCall) {
+  Run("module top;\n"
+      "  class C; function int get(); return 7; endfunction endclass\n"
+      "  C h = new; int r; int q[$] = '{1, 2};\n"
+      "  initial begin : b r = h.get(); r = q.size(); end\n"
+      "endmodule\n");
+  std::vector<vpiHandle> calls;
+  vpiHandle it = vpi_iterate(vpiStmt, By("top.b"));
+  ASSERT_NE(it, nullptr);
+  while (vpiHandle stmt = vpi_scan(it)) {
+    calls.push_back(vpi_handle(vpiRhs, stmt));
+  }
+  ASSERT_EQ(calls.size(), 2u);
+  const char* const kNames[] = {"get", "size"};
+  const char* const kPrefixes[] = {"h", "q"};
+  for (std::size_t i = 0; i < calls.size(); ++i) {
+    ASSERT_NE(calls[i], nullptr) << i;
+    EXPECT_EQ(vpi_get(vpiType, calls[i]), vpiMethodFuncCall) << i;
+    EXPECT_STREQ(vpi_get_str(vpiName, calls[i]), kNames[i]) << i;
+    EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiPrefix, calls[i])),
+                 kPrefixes[i])
+        << i;
+  }
+  vpiHandle get = Named(vpiMethods, Named(vpiClassDefn, By("top"), "C"), "get");
+  ASSERT_NE(get, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, calls[0])), VpiObjectOf(get));
+  EXPECT_EQ(vpi_handle(vpiFunction, calls[1]), nullptr);
+  s_vpi_value value{};
+  value.format = vpiIntVal;
+  vpi_get_value(calls[0], &value);
+  EXPECT_EQ(value.value.integer, 7);
+}
+
 }  // namespace
 }  // namespace delta

@@ -38,13 +38,14 @@ int PropertyVariableKind(const ClassMember& member, SimContext& ctx) {
 
 // §37.33 detail 6 with §37.17 detail 24: the variable the property `member`
 // of the object `obj` stands as, under the class obj `holder`, automatic or
-// static as declared, with the visibility it was declared with and a copy of
-// the value the object holds.
+// static as declared, with the indices of its fixed unpacked dimensions, the
+// visibility it was declared with and a copy of the value the object holds.
 void MakePropertyVariable(VpiObject* holder, ClassObject& obj,
                           const ClassMember& member, SimContext& ctx,
                           const VpiAttachBuild& build) {
   VpiObject* var = build.alloc();
   var->type = PropertyVariableKind(member, ctx);
+  VpiRecordWrittenDims(*var, member.unpacked_dims, ctx);
   var->name = build.keep(std::string(member.name));
   var->parent = holder;
   var->automatic = !member.is_static;
@@ -104,6 +105,26 @@ VpiObject* ClassDefnOf(
   return found == by_decl.end() ? nullptr : found->second;
 }
 
+// §37.33 with §37.34: a constraint per constraint block of the classes
+// `chain` names, base first, under the class obj `holder` of the object `obj`,
+// whose constraint_mode() state each reports (§18.9). A name in one resolves
+// through `names`.
+void MakeObjectConstraints(VpiObject* holder, ClassObject& obj,
+                           const std::vector<const ClassTypeInfo*>& chain,
+                           const VpiConstraintNames& names,
+                           const VpiAttachBuild& build) {
+  for (const ClassTypeInfo* cls : chain) {
+    for (const ClassMember* member : cls->decl->members) {
+      if (member == nullptr || member->kind != ClassMemberKind::kConstraint) {
+        continue;
+      }
+      VpiObject* constraint = VpiMakeConstraint(*member, holder, names, build);
+      constraint->constraint_of = &obj;
+      holder->children.push_back(constraint);
+    }
+  }
+}
+
 }  // namespace
 
 Logic4Vec* VpiHeldPropertyValue(ClassObject& obj, std::string_view name) {
@@ -122,7 +143,8 @@ Logic4Vec* VpiHeldPropertyValue(ClassObject& obj, std::string_view name) {
 }
 
 VpiObject* VpiMakeClassObject(ClassObject& obj, VpiObject* defn,
-                              SimContext& ctx, const VpiAttachBuild& build) {
+                              const VpiObjectMap& objects, SimContext& ctx,
+                              const VpiAttachBuild& build) {
   VpiObject* made = build.alloc();
   made->type = vpiClassObj;
   made->obj_id = static_cast<int64_t>(obj.handle);
@@ -133,8 +155,11 @@ VpiObject* VpiMakeClassObject(ClassObject& obj, VpiObject* defn,
   typespec->parent = made;
   if (defn != nullptr) typespec->children.push_back(defn);
   made->children.push_back(typespec);
+  std::vector<const ClassTypeInfo*> chain;
   for (const ClassTypeInfo* cls : ClassChain(obj.type)) {
-    if (cls->decl == nullptr) continue;
+    if (cls->decl != nullptr) chain.push_back(cls);
+  }
+  for (const ClassTypeInfo* cls : chain) {
     for (const ClassMember* member : cls->decl->members) {
       if (member != nullptr && member->kind == ClassMemberKind::kProperty &&
           !member->is_param) {
@@ -142,6 +167,13 @@ VpiObject* VpiMakeClassObject(ClassObject& obj, VpiObject* defn,
       }
     }
   }
+  // A name in a constraint finds the object's variables first, then the
+  // instance's or package's the object was created in, keyed in `objects`.
+  static const std::vector<std::string_view> kNoGenBlocks;
+  std::string prefix(obj.instance);
+  if (!prefix.empty() && prefix.back() == '.') prefix.pop_back();
+  MakeObjectConstraints(made, obj, chain,
+                        {objects, prefix, kNoGenBlocks, made, ctx}, build);
   return made;
 }
 
@@ -161,7 +193,7 @@ VpiHandle VpiContext::MadeClassObject(ClassObject& obj) {
   VpiObject*& made = run_objects_[&obj];
   if (made == nullptr || made->obj_id != static_cast<int64_t>(obj.handle)) {
     made = VpiMakeClassObject(obj, ClassDefnOf(obj, object_map_, run_objects_),
-                              *sim_ctx_,
+                              object_map_, *sim_ctx_,
                               {[this] { return AllocObject(); },
                                [this](std::string name) {
                                  name_pool_.push_back(std::move(name));

@@ -637,6 +637,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vpi_class_objects.cpp
     simulator/vpi_collection_elements.cpp
     simulator/vpi_compatibility.cpp
+    simulator/vpi_constraint_relations.cpp
     simulator/vpi_control.cpp
     simulator/vpi_delays_side_effects.cpp
     simulator/vpi_design_attach.cpp
@@ -650,6 +651,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/vpi_design_attach_builtins.cpp
     simulator/vpi_design_attach_calls.cpp
     simulator/vpi_design_attach_classes.cpp
+    simulator/vpi_design_attach_constraints.cpp
     simulator/vpi_design_attach_elements.cpp
     simulator/vpi_design_attach_gen_scopes.cpp
     simulator/vpi_design_attach_instances.cpp

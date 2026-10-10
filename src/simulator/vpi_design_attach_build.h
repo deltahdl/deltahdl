@@ -19,6 +19,7 @@ namespace delta {
 class Arena;
 class SimContext;
 struct ClassDecl;
+struct ClassMember;
 struct DataType;
 struct EventExpr;
 enum class DataTypeKind : uint8_t;
@@ -49,6 +50,9 @@ struct VpiAttachBuild {
   std::function<std::string_view(std::string)> keep;
   Arena& arena;
 };
+
+// What keeps a name for as long as the model lives, answering the kept copy.
+using VpiNameKeeper = std::function<std::string_view(std::string)>;
 
 // The objects VpiContext keyed by flat name, which a step finds a declaration's
 // object among.
@@ -125,6 +129,14 @@ PackedDims WrittenPackedDims(const DataType* type, SimContext& ctx);
 // scope `ctx` has set. Empty for a dynamic, queue or associative dimension,
 // and for a size that is not positive.
 std::optional<PackedRange> WrittenUnpackedDim(const Expr* dim, SimContext& ctx);
+
+// §38.16 and §38.35: give the array var `array`, standing for a class's
+// property (§37.31, §37.33), which no element of the run is kept under, the
+// indices each of its unpacked dimensions `dims` writes, left first, as a
+// module's array var has them, through which a select of a select is told from
+// a select of an element (§37.19); none where a dimension is not fixed.
+void VpiRecordWrittenDims(VpiObject& array, const std::vector<Expr*>& dims,
+                          SimContext& ctx);
 
 // §37.16 (figure): the nets `mod` declares - those its body declares, and those
 // its ANSI ports declare, which stand in no list of the body's - each as a
@@ -230,6 +242,11 @@ struct VpiCallSite {
   // innermost last, whose declarations a name finds ahead of the instance's;
   // null where it stands in none.
   const std::vector<std::string_view>* gen_prefixes = nullptr;
+  // §37.42: what makes the call `call`, a call of a subroutine or a method
+  // written in an expression at the site, into `made` as a call statement
+  // written there is made, true where it does; none where the site stands in
+  // no procedure.
+  std::function<bool(const Expr& call, VpiObject* made)> shape_call = nullptr;
 };
 
 // §26.2: the task or function the package `package` declares under `name`.
@@ -306,6 +323,9 @@ struct VpiExprNames {
   const VpiObjectMap& objects;
   const std::string& prefix;
   const std::vector<std::string_view>& gen_prefixes;
+  // The object whose declarations, and those of the objects above it up to
+  // the instance, a name finds first (§23.9); null for none.
+  const VpiObject* scope = nullptr;
 };
 
 // The same of an expression written in the generate block instances `names`
@@ -340,8 +360,20 @@ VpiObject* VpiCallSiteAssignedExpression(const VpiAssignedSide& side,
 
 // §9.7, §15.3 and §15.4: the kind of tf call a call of the method `method` of
 // the built-in class `cls` is, vpiMethodTaskCall or vpiMethodFuncCall, zero
-// for none.
+// for none. A built-in class has the built-in methods every class has too.
 int VpiBuiltInClassCallKind(std::string_view cls, std::string_view method);
+
+// §18.6.1, §18.6.2, §18.8, §18.9 and §18.13.3 to §18.13.5: whether `method` is
+// one of the built-in methods every class has without declaring it, randomize,
+// pre_randomize, post_randomize, rand_mode, constraint_mode, srandom,
+// get_randstate and set_randstate, each a function.
+bool VpiIsClassBuiltInMethod(std::string_view method);
+
+// §18.8 and §18.9: the kind of tf call a call of `method` applied to a member
+// of a class is where the member's own class declares no such method: the
+// built-in function rand_mode of a random variable, or constraint_mode of a
+// constraint block, vpiMethodFuncCall; zero for any other method.
+int VpiMemberBuiltInCallKind(std::string_view method);
 
 // The kind of value a built-in method is called on: a string (§6.16), an enum
 // (§6.19.5), a fixed-size, dynamic or associative array or a queue (§7.4,
@@ -616,6 +648,14 @@ void AttachGenScopes(const RtlirDesign* design, const VpiObjectMap& objects,
 void AttachGenBlockStorage(const RtlirDesign* design,
                            const VpiObjectMap& objects);
 
+// §23.6 with §37.85: move each instance a generate block instance holds from
+// its module, where the run's flattened key for it put it, into the block's
+// gen scope, named as written and full-named through the scope, with what it
+// holds. Run after every pass that finds an object by its key.
+void AttachGenBlockInstances(const RtlirDesign* design,
+                             const VpiObjectMap& objects,
+                             const VpiNameKeeper& keep);
+
 // §37.14 details 3, 4 and 10: link each port of each instance to its higher
 // connection, the expression the instantiation wrote for it, and its lower
 // one, the instance's own net or variable of the port. The ports are those
@@ -648,6 +688,43 @@ void AttachPortConnections(const RtlirDesign* design,
 // object per concurrent assertion written as an item (VpiMakeItemAssertion).
 void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,
                       const VpiCallBuild& calls, const VpiAttachBuild& build);
+
+// §8.13 with §37.31 detail 5: the class defn of the class the class defn
+// `defn` extends, reached through its extends object; null for none.
+VpiObject* VpiBaseClassDefn(const VpiObject* defn);
+
+// §8.13: an object holding the variables the class defn `defn` and the classes
+// it extends hold, the derived class's first, beneath `outer`, through which
+// a name in a constraint of the class finds the class's properties ahead of
+// the scopes around (§18.5, §18.7). It stands for nothing in the VPI model.
+VpiObject* VpiClassNameScope(const VpiObject* defn, VpiObject* outer,
+                             const VpiAttachBuild& build);
+
+// Where the names in a constraint block's expressions resolve: `scope`, which
+// holds the class's properties as variables, and the objects above it, then
+// the instance or package whose objects `objects` keys under `prefix`, and the
+// generate blocks `gen` names; with the run a constant's value is evaluated
+// in.
+struct VpiConstraintNames {
+  const VpiObjectMap& objects;
+  const std::string& prefix;
+  const std::vector<std::string_view>& gen;
+  VpiObject* scope;
+  SimContext& ctx;
+};
+
+// §37.34: the constraint object the constraint block `block` stands as, held
+// by `holder`, a class defn, a class obj or a call of randomize, which the
+// caller hangs it from: named after the block, full-named through a class
+// defn holding it, automatic unless the block was declared static (detail 1,
+// §18.5.10), reporting vpiExternAcc where a prototype in the class declares a
+// block defined outside it (detail 3, §18.5.1), and enabled, as every
+// constraint is at first (§18.9). §37.38: its items are the constraint
+// expressions the block writes, in order (detail 5), each name in them
+// resolved through `names`.
+VpiObject* VpiMakeConstraint(const ClassMember& block, VpiObject* holder,
+                             const VpiConstraintNames& names,
+                             const VpiAttachBuild& build);
 
 // §37.7: give each interface instance a modport per modport its interface
 // declares, each with an io decl per port it gives a direction, and §37.13:

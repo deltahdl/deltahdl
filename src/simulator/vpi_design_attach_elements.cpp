@@ -1,8 +1,11 @@
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "common/packed_range.h"
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "simulator/sv_vpi_user.h"
@@ -153,6 +156,22 @@ void AttachNetArray(const RtlirNet& net, const std::string& prefix,
 }
 
 }  // namespace
+
+void VpiRecordWrittenDims(VpiObject& array, const std::vector<Expr*>& dims,
+                          SimContext& ctx) {
+  std::vector<std::vector<int>> written;
+  for (const Expr* dim : dims) {
+    const std::optional<PackedRange> kRange = WrittenUnpackedDim(dim, ctx);
+    if (!kRange) return;
+    std::vector<int>& indices = written.emplace_back();
+    const int64_t kStep = kRange->left <= kRange->right ? 1 : -1;
+    for (int64_t index = kRange->left; index != kRange->right + kStep;
+         index += kStep) {
+      indices.push_back(static_cast<int>(index));
+    }
+  }
+  array.array_dim_indices = std::move(written);
+}
 
 void AttachArrayElements(const RtlirDesign* design, const VpiObjectMap& objects,
                          const VpiAttachBuild& build) {
