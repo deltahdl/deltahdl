@@ -539,7 +539,7 @@ std::unordered_map<std::string_view, const ClassDecl*> BuildParamClassRegistry(
     const CompilationUnit* unit) {
   std::unordered_map<std::string_view, const ClassDecl*> registry;
   for (const auto* cls : unit->classes) {
-    if (cls && !cls->params.empty()) registry.emplace(cls->name, cls);
+    if (!cls->params.empty()) registry.emplace(cls->name, cls);
   }
   return registry;
 }

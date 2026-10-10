@@ -107,7 +107,9 @@ struct UnitNameSearch {
 };
 
 // Whether a declaration of the unit written before the search's reference, or
-// a task or function of the unit written anywhere, is what it names.
+// a task or function of the unit written anywhere, is what it names. A class
+// is reached as the head of `$unit::C::K`; a checker is no expression primary,
+// so no `$unit::` identifier names one.
 bool FindsUnitDeclaration(UnitNameSearch& search, const CompilationUnit* unit) {
   for (const auto* item : unit->cu_items) {
     bool is_subroutine = item->kind == ModuleItemKind::kTaskDecl ||
@@ -120,9 +122,6 @@ bool FindsUnitDeclaration(UnitNameSearch& search, const CompilationUnit* unit) {
   }
   for (const auto* cls : unit->classes) {
     if (search.Names(cls->name, cls->range.start, false)) return true;
-  }
-  for (const auto* chk : unit->checkers) {
-    if (search.Names(chk->name, chk->range.start, false)) return true;
   }
   return false;
 }

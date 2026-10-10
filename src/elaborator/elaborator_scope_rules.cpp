@@ -663,9 +663,9 @@ bool Elaborator::IsDeclaredNameForRhs(std::string_view name) const {
   // var_types_ records the bare name of every elaborated net and variable; the
   // remaining sets cover names that are not signals (typedefs, nettypes,
   // sequences, compilation-unit names) but may still be read by name.
-  return var_types_.count(name) != 0 || IsNameInModuleScope(name) ||
-         typedefs_.count(name) != 0 || nettype_names_.count(name) != 0 ||
-         sequence_names_.count(name) != 0 ||
+  return var_types_.count(name) != 0 || sequence_names_.count(name) != 0 ||
+         IsNameInModuleScope(name) || typedefs_.count(name) != 0 ||
+         nettype_names_.count(name) != 0 ||
          assoc_typedef_names_.count(name) != 0 ||
          cu_scope_names_.count(name) != 0;
 }
@@ -877,25 +877,26 @@ void ReportUnresolvedInUnitScopeSubroutines(const CompilationUnit* unit,
                                             const UnitScopeNames& names,
                                             ProvidedNameCache& provided_cache,
                                             DiagEngine& diag) {
-  auto unit_declares = [&](std::string_view n) {
+  // A name the unit declares, or one an import among `imports` provides.
+  auto declared_with = [&](std::string_view n,
+                           const std::vector<ModuleItem*>& imports) {
     return names.item_names.count(n) != 0 || names.constants.count(n) != 0 ||
            names.typedefs.count(n) != 0 || names.class_names.count(n) != 0 ||
-           ImportsProvideName(unit, provided_cache, unit->cu_items, n);
+           ImportsProvideName(unit, provided_cache, imports, n);
+  };
+  auto unit_declares = [&](std::string_view n) {
+    return declared_with(n, unit->cu_items);
   };
   // §3.12.1: a subroutine of the unit reads only the part of the unit written
   // before it, so neither a unit variable or net nor an import written after
-  // it is reached.
+  // it is reached. ReportSubroutineUnresolved passes over an item that is no
+  // task or function.
   for (auto* sub : unit->cu_items) {
-    if (sub->kind != ModuleItemKind::kTaskDecl &&
-        sub->kind != ModuleItemKind::kFunctionDecl)
-      continue;
     const std::vector<ModuleItem*> kBefore = UnitItemsBefore(unit, sub->loc);
     auto declared_before = [&](std::string_view n) {
-      return (!UnitDataDeclaredOnlyAfter(unit, n, sub->loc) &&
-              (names.item_names.count(n) != 0 ||
-               names.constants.count(n) != 0 || names.typedefs.count(n) != 0 ||
-               names.class_names.count(n) != 0)) ||
-             ImportsProvideName(unit, provided_cache, kBefore, n);
+      return UnitDataDeclaredOnlyAfter(unit, n, sub->loc)
+                 ? ImportsProvideName(unit, provided_cache, kBefore, n)
+                 : declared_with(n, kBefore);
     };
     ReportSubroutineUnresolved(std::vector<ModuleItem*>{sub}, declared_before,
                                unit, provided_cache, diag);

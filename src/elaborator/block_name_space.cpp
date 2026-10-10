@@ -48,7 +48,6 @@ void CheckBlockNameSpace(const std::vector<Stmt*>& stmts,
                Subclause("23.9"));
   };
   for (const Stmt* child : stmts) {
-    if (child == nullptr) continue;
     if (child->kind == StmtKind::kVarDecl) {
       declare(child->var_name, child->range.start);
       continue;

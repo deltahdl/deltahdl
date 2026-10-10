@@ -31,6 +31,7 @@ static bool NameInEnclosingScope(
 }
 
 bool Elaborator::IsNameInModuleScope(std::string_view name) const {
+  if (let_names_.count(name)) return true;
   if (declared_names_.count(name)) return true;
   if (ansi_port_names_.count(name)) return true;
   if (non_ansi_complete_ports_.count(name)) return true;
@@ -41,7 +42,6 @@ bool Elaborator::IsNameInModuleScope(std::string_view name) const {
   if (class_names_.count(name)) return true;
   if (class_var_names_.count(name)) return true;
   if (task_names_.count(name)) return true;
-  if (let_names_.count(name)) return true;
   if (func_decls_.count(name)) return true;
   if (interface_inst_types_.count(name)) return true;
   if (checker_inst_names_.count(name)) return true;

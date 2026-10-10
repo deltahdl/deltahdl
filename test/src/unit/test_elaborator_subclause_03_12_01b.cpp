@@ -248,4 +248,108 @@ TEST(CompilationUnitScopeOrder, UnitImportBeforeModuleReachesIt) {
              "endmodule\n"));
 }
 
+// §3.12.1 with §23.9: a unit variable written after the module is out of the
+// module's reach, but a name the module declares itself is the module's own,
+// whatever kind of declaration gives it and whatever the unit writes later.
+TEST(CompilationUnitScopeOrder, ModuleVariableShadowsALaterUnitVariable) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  int x;\n"
+             "  int y;\n"
+             "  initial y = x;\n"
+             "endmodule\n"
+             "int x;\n"));
+}
+
+TEST(CompilationUnitScopeOrder, ModuleParameterShadowsALaterUnitVariable) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  parameter int x = 1;\n"
+             "  int y;\n"
+             "  initial y = x;\n"
+             "endmodule\n"
+             "int x;\n"));
+}
+
+// §3.12.1: only a unit variable or net written later is out of reach; a later
+// unit function of the name a module variable has leaves the read alone.
+TEST(CompilationUnitScopeOrder, ModuleVariableNamedLikeALaterUnitFunction) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  int f;\n"
+             "  int y;\n"
+             "  initial y = f;\n"
+             "endmodule\n"
+             "function int f(); return 1; endfunction\n"));
+}
+
+// §3.12.1 lets a unit task or function be named before it is written, and a
+// function or a DPI import (§35.5.4) is one as much as a task is.
+TEST(CompilationUnitScopeOrder, UnitScopedCallsToLaterFunctionAndImportOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  int y;\n"
+             "  initial begin\n"
+             "    y = $unit::later_f(2);\n"
+             "    y = $unit::c_add(1);\n"
+             "  end\n"
+             "endmodule\n"
+             "function int later_f(int a); return a; endfunction\n"
+             "import \"DPI-C\" function int c_add(int a);\n"));
+}
+
+// §3.12.1 with §6.19: an enumeration member declares a name of the scope its
+// type stands in, so `$unit::GREEN` names the unit's member once it is
+// written, and refers forward to it before.
+TEST(CompilationUnitScopeOrder, UnitScopedReferenceToEarlierEnumMemberOk) {
+  EXPECT_TRUE(
+      ElabOk("typedef enum {RED, GREEN} color_t;\n"
+             "module m;\n"
+             "  int y;\n"
+             "  initial y = $unit::GREEN;\n"
+             "endmodule\n"));
+}
+
+TEST(CompilationUnitScopeOrder, UnitScopedReferenceToLaterEnumMember) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int y;\n"
+      "  initial y = $unit::GREEN;\n"
+      "endmodule\n"
+      "typedef enum {RED, GREEN} color_t;\n",
+      f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'$unit::GREEN' precedes its declaration", 3,
+                            "3.12.1"));
+}
+
+// §3.12.1 with §8.23: `$unit::C::K` heads with the unit's class C, which is
+// reached once it is written and refers forward to it before.
+TEST(CompilationUnitScopeOrder, UnitScopedReferenceToEarlierClassNotReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; static int K = 3; endclass\n"
+      "module m;\n"
+      "  int y;\n"
+      "  initial y = $unit::C::K;\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "'$unit::C'", 4, "3.12.1"));
+}
+
+TEST(CompilationUnitScopeOrder, UnitScopedReferenceToLaterClass) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int y;\n"
+      "  initial y = $unit::C::K;\n"
+      "endmodule\n"
+      "class C; static int K = 3; endclass\n",
+      f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'$unit::C' precedes its declaration", 3,
+                            "3.12.1"));
+}
+
 }  // namespace
