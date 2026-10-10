@@ -120,6 +120,14 @@ uint32_t TaggedUnionTagBitOffset(const DataType& dtype);
 const DataType* FindNamedType(const DataType& dtype,
                               const TypedefMap& typedefs);
 
+// §6.18 with §23.9: enters the typedef `name`, declared with `type`, into
+// `typedefs`. A typedef writing its own bare name as its type names the type
+// the name stood for before it, so the table keeps that entry, with any packed
+// dimensions the typedef writes added outside its own, or keeps none where the
+// name stands for a class.
+void RecordTypedef(TypedefMap& typedefs, std::string_view name,
+                   const DataType& type);
+
 // §26.2 with §6.18: `type`, the type a typedef of the package `package` was
 // declared with, its name written behind the package's scope where it names a
 // typedef the package declares, so it is looked up under the package's

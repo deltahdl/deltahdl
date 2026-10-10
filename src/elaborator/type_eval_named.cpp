@@ -1,14 +1,19 @@
 // Named-type and member-type resolution: FindNamedType, MemberNamedType,
 // NestedAggregateSource and ResolveNestedAggregateTypes, moved out of
 // type_eval.cpp verbatim, for room, once that file reached the source-size
-// gate; and ResolvedTypeKind, which follows a chain of names to its type.
+// gate; ResolvedTypeKind, which follows a chain of names to its type; and
+// RecordTypedef, which enters a typedef into the table.
 
 #include <cstddef>
 #include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 #include "common/arena.h"
 #include "elaborator/std_package.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 
@@ -106,6 +111,38 @@ void ResolveNestedAggregateTypes(DataType& dt, const TypedefMap& typedefs,
     ResolveNestedAggregateTypes(*copy, typedefs, arena);
     m.nested_type = copy;
   }
+}
+
+// §6.18 has a typedef name a type declared before it, and §23.9 looks a name a
+// module does not yet declare up in the compilation unit's scope. So in a
+// module, `typedef HU HU;` names the compilation unit's HU and declares the
+// module's HU as the type that HU stood for. Recorded as written, the entry
+// would name itself, and following it would never end; the table already
+// holds what the name stood for, a typedef's type or, for a class, no entry at
+// all. Packed dimensions the typedef writes after the name are packed outside
+// that type's own (§7.4.1), so `typedef w_t [1:0] w_t;` under a compilation
+// unit `typedef logic [3:0] w_t;` is `logic [1:0][3:0]`.
+void RecordTypedef(TypedefMap& typedefs, std::string_view name,
+                   const DataType& type) {
+  if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty() ||
+      type.type_name != name) {
+    typedefs[name] = type;
+    return;
+  }
+  auto outer = typedefs.find(name);
+  if (outer == typedefs.end() || type.packed_dim_left == nullptr) return;
+  DataType& stood_for = outer->second;
+  std::vector<std::pair<Expr*, Expr*>> dims{
+      {type.packed_dim_left, type.packed_dim_right}};
+  dims.insert(dims.end(), type.extra_packed_dims.begin(),
+              type.extra_packed_dims.end());
+  if (stood_for.packed_dim_left != nullptr)
+    dims.emplace_back(stood_for.packed_dim_left, stood_for.packed_dim_right);
+  dims.insert(dims.end(), stood_for.extra_packed_dims.begin(),
+              stood_for.extra_packed_dims.end());
+  stood_for.packed_dim_left = dims.front().first;
+  stood_for.packed_dim_right = dims.front().second;
+  stood_for.extra_packed_dims.assign(dims.begin() + 1, dims.end());
 }
 
 }  // namespace delta

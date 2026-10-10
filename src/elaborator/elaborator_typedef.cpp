@@ -430,7 +430,7 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
                 Subclause("6.18"));
   }
   AdoptMemberTypedefDims(item->typedef_type, td_array_dims_);
-  typedefs_[item->name] = item->typedef_type;
+  RecordTypedef(typedefs_, item->name, item->typedef_type);
   // §6.18: the dimensions belong to the type the name stands for, so a name
   // written with any of them stands for an aggregate rather than for one
   // element. Recording that is what lets the elaborated type-width table
