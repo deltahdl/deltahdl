@@ -87,7 +87,7 @@ TEST(ArrayLocatorValidation, ComparingValuesWithoutRelationalOperators) {
       "  C cq[$];\n"
       "  s_t sq[$];\n"
       "  e_t ea[2];\n"
-      "  e_t eq[$];\n"
+      "  e_t ea2[2];\n"
       "  int k;\n"
       "  initial begin\n"
       "    ca.sort;\n"
@@ -98,7 +98,7 @@ TEST(ArrayLocatorValidation, ComparingValuesWithoutRelationalOperators) {
       "    sa.sort(x) with (x);\n"
       "    ca.sort with (k);\n"
       "    sq = sa.max(y) with (y.a);\n"
-      "    eq = ea.min;\n"
+      "    ea.sort;\n"
       "  end\n"
       "endmodule\n",
       f);
