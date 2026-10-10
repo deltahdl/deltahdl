@@ -800,13 +800,16 @@ void Elaborator::ReportUndeclaredTypeName(const ModuleItem* item) {
 }
 
 // §6.6.7: a declaration naming a nettype declares a net, and only a net may
-// be declared with one, so the same declaration written with `var` declares a
-// variable of the nettype, which is reported and elaborated as a variable of
-// the data type the nettype names.
+// be declared with one. A.2.1.3 opens a data declaration, and never a net
+// declaration, with `const`, `var` or a lifetime, so the same declaration
+// written with any of them declares a variable of the nettype, which is
+// reported and elaborated as a variable of the data type the nettype names.
+// The parser refuses `automatic` at this scope, so `static` is the lifetime
+// left to judge.
 bool Elaborator::ElaborateUserNettypeNet(ModuleItem* item, RtlirModule* mod) {
   if (item->data_type.kind != DataTypeKind::kNamed) return false;
   if (nettype_names_.count(item->data_type.type_name) == 0) return false;
-  if (item->has_explicit_var) {
+  if (item->has_explicit_var || item->is_static || item->data_type.is_const) {
     ReportNettypeNotNet(item->data_type.type_name,
                         std::format("variable '{}'", item->name), item->loc,
                         diag_);

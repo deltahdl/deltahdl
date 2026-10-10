@@ -8,6 +8,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -97,7 +98,10 @@ static void CheckSubroutine(const ModuleItem* item, const NettypeScan& scan) {
   for (const Stmt* s : item->func_body_stmts) CheckStmt(s, scan);
 }
 
+static void CheckClass(const ClassDecl* cls, const NettypeScan& scan);
+
 static void CheckItem(const ModuleItem* item, const NettypeScan& scan) {
+  if (item->class_decl != nullptr) CheckClass(item->class_decl, scan);
   CheckMembers(item->data_type, item->loc, scan);
   CheckMembers(item->typedef_type, item->loc, scan);
   if (item->kind == ModuleItemKind::kParamDecl &&
@@ -111,6 +115,22 @@ static void CheckItem(const ModuleItem* item, const NettypeScan& scan) {
   CheckExpr(item->assign_lhs, scan);
   CheckExpr(item->assign_rhs, scan);
   CheckStmt(item->body, scan);
+}
+
+// A class property is a variable (§8.3), and a method, a typedef and a class
+// nested in the class are judged as the module's own would be.
+static void CheckClass(const ClassDecl* cls, const NettypeScan& scan) {
+  for (const ClassMember* m : cls->members) {
+    if (m->kind == ClassMemberKind::kProperty &&
+        IsNettype(m->data_type, scan)) {
+      ReportNettypeNotNet(m->data_type.type_name,
+                          std::format("property '{}'", m->name), m->loc,
+                          scan.diag);
+    }
+    if (m->method != nullptr) CheckItem(m->method, scan);
+    if (m->typedef_item != nullptr) CheckItem(m->typedef_item, scan);
+    if (m->nested_class != nullptr) CheckClass(m->nested_class, scan);
+  }
 }
 
 void CheckNettypeUses(const ModuleDecl* decl,

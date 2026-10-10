@@ -279,4 +279,47 @@ TEST(NettypeElaboration, NettypeNamedAsTheTypeOfAnythingButANetRejected) {
   }
 }
 
+// A module-scope declaration written with `const` or a lifetime is a data
+// declaration, so naming a nettype in one declares a variable, as `var` does.
+// Inside a class the nettype is refused as a property's type, through a
+// method, a typedef and a nested class alike, while a property of another
+// type is accepted.
+TEST(NettypeElaboration, NettypeNamedInAConstStaticOrClassDeclarationRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  nettype logic [3:0] nt;\n"
+      "  static nt s;\n"
+      "  const nt c = 0;\n"
+      "  class C;\n"
+      "    nt p;\n"
+      "    int i;\n"
+      "    typedef struct { nt m; } t;\n"
+      "    function nt get(nt a); return a; endfunction\n"
+      "    class D;\n"
+      "      nt q;\n"
+      "    endclass\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  const std::pair<uint32_t, std::string_view> kUses[] = {
+      {3, "variable 's'"},
+      {4, "variable 'c'"},
+      {6, "property 'p'"},
+      {8, "member 'm'"},
+      {9, "the return of function 'get'"},
+      {9, "argument 'a' of 'get'"},
+      {11, "property 'q'"}};
+  for (const auto& [line, use] : kUses) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::format("nettype 'nt' may declare only a net, and is named here "
+                    "as the type of {}",
+                    use),
+        line, "6.6.7"));
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "may declare only a net", 7,
+                             "6.6.7"));
+}
+
 }  // namespace
