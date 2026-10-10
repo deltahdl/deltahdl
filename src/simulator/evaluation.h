@@ -163,6 +163,19 @@ int64_t LongintValue(const Logic4Vec& val);
 // so that all of them answer such a read alike.
 Logic4Vec NonexistentQueueElement(const QueueObject* q, Arena& arena);
 
+// §7.4.5's Table 7-1 for an element the select `select` reads from an array
+// whose element type is `is_4state` and `elem_width` bits wide, where the
+// element does not exist: the value NonexistentQueueElement gives, except that
+// an unpacked structure or union element, whose layout the array's root name
+// holds, takes the table's value member by member
+// (NonexistentAggregateElement), so that a `logic` member reads x and a member
+// with a declared default reads it, where the whole element read 0 because an
+// unpacked structure is not a 4-state type. Read by a fixed-size array's,
+// a queue's, a dynamic array's and an associative array's element select.
+Logic4Vec NonexistentElementOf(const Expr* select, bool is_4state,
+                               uint32_t elem_width, SimContext& ctx,
+                               Arena& arena);
+
 // §6.11 with §7.5 and §7.10: `val`, read out of an element of the queue or
 // dynamic array `q`, given the signedness of `q`'s element type
 // (QueueObject::is_signed), whichever the value written into the element had.

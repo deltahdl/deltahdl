@@ -20,10 +20,14 @@ void TakeElementSignedness(const AssocArrayObject& aa, Logic4Vec& val) {
   val.is_signed = aa.is_signed;
 }
 
-static Logic4Vec AssocDefault(const AssocArrayObject* aa, Arena& arena) {
+// §7.8.6: the value a read of a nonexistent entry of `aa` by the select
+// `select` yields: the array's default where it has one, and otherwise the
+// value Table 7-1 gives its element type (NonexistentElementOf).
+static Logic4Vec AssocDefault(const AssocArrayObject* aa, const Expr* select,
+                              SimContext& ctx, Arena& arena) {
   if (aa->has_default) return aa->default_value;
-  return aa->is_4state ? MakeAllX(arena, aa->elem_width)
-                       : MakeLogic4VecVal(arena, aa->elem_width, 0);
+  return NonexistentElementOf(select, aa->is_4state, aa->elem_width, ctx,
+                              arena);
 }
 
 // `loc` is where the index was written, which the report names: the array
@@ -37,19 +41,21 @@ static void WarnAssocMiss(const AssocArrayObject* aa, std::string_view name,
                           Subclause("7.8.6"));
 }
 
-static Logic4Vec AssocReadStr(AssocArrayObject* aa, const Expr* idx_expr,
+static Logic4Vec AssocReadStr(AssocArrayObject* aa, const Expr* select,
                               std::string_view name, SimContext& ctx,
                               Arena& arena) {
+  const Expr* idx_expr = select->index;
   auto s = AssocStringKey(EvalExpr(idx_expr, ctx, arena));
   auto it = aa->str_data.find(s);
   if (it != aa->str_data.end()) return it->second;
   WarnAssocMiss(aa, name, ctx, idx_expr->range.start);
-  return AssocDefault(aa, arena);
+  return AssocDefault(aa, select, ctx, arena);
 }
 
-static Logic4Vec AssocReadInt(AssocArrayObject* aa, const Expr* idx_expr,
+static Logic4Vec AssocReadInt(AssocArrayObject* aa, const Expr* select,
                               std::string_view name, SimContext& ctx,
                               Arena& arena) {
+  const Expr* idx_expr = select->index;
   auto val = EvalExpr(idx_expr, ctx, arena);
   if (HasUnknownBits(val)) {
     // §7.8.6: an x/z index is an invalid read. A configured user default
@@ -60,14 +66,14 @@ static Logic4Vec AssocReadInt(AssocArrayObject* aa, const Expr* idx_expr,
           idx_expr->range.start,
           "associative array '" + std::string(name) + "': index contains x/z",
           Subclause("7.8.6"));
-    return AssocDefault(aa, arena);
+    return AssocDefault(aa, select, ctx, arena);
   }
   auto key =
       AssocIntKey(val, aa->is_wildcard, aa->index_width, aa->is_index_signed);
   auto it = aa->int_data.find(key);
   if (it != aa->int_data.end()) return it->second;
   WarnAssocMiss(aa, name, ctx, idx_expr->range.start);
-  return AssocDefault(aa, arena);
+  return AssocDefault(aa, select, ctx, arena);
 }
 
 // §7.8: the array an element select reads is a declared one under its bare
@@ -95,8 +101,8 @@ bool TryAssocSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   auto* aa = FindAssocArrayOfBase(expr->base, ctx, arena);
   if (!aa) return false;
   std::string_view name = AssocReportName(expr->base);
-  out = aa->is_string_key ? AssocReadStr(aa, expr->index, name, ctx, arena)
-                          : AssocReadInt(aa, expr->index, name, ctx, arena);
+  out = aa->is_string_key ? AssocReadStr(aa, expr, name, ctx, arena)
+                          : AssocReadInt(aa, expr, name, ctx, arena);
   TakeElementSignedness(*aa, out);
   return true;
 }

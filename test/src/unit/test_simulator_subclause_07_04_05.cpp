@@ -905,4 +905,28 @@ TEST(ArrayIndexingAndSlicing, InvalidIndexReadsAStructureMemberByMember) {
   EXPECT_EQ(out, "5 x 0 0 0 xx\n5 x 0\n0 0 xx\n");
 }
 
+TEST(ArrayIndexingAndSlicing, InvalidIndexOfVariableSizeArrayReadsAStructure) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef struct { int a; logic [3:0] b; int c = 5; } s_t;\n"
+      "  s_t q[$];\n"
+      "  s_t d[];\n"
+      "  s_t r, rx, rd;\n"
+      "  logic [31:0] kx = 'x;\n"
+      "  initial begin\n"
+      "    q.push_back('{1, 4'h1, 2});\n"
+      "    d = new[1];\n"
+      "    r = q[3];\n"
+      "    rx = q[kx];\n"
+      "    rd = d[4];\n"
+      "    $display(\"%0d %h %0d\", r.a, r.b, r.c);\n"
+      "    $display(\"%0d %h %0d\", rx.a, rx.b, rx.c);\n"
+      "    $display(\"%0d %h %0d\", rd.a, rd.b, rd.c);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 x 5\n0 x 5\n0 x 5\n");
+}
+
 }  // namespace

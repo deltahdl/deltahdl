@@ -199,8 +199,18 @@ Variable* TryResolveCompoundElementBase(const Expr* lhs, SimContext& ctx,
   // say -- #3598. Until they do, an element type written as a name is left to
   // the element the writer below materializes, and an element type that is an
   // integral type of its own is a packed object whose bits this addresses.
-  if (info->elem_type_kind == DataTypeKind::kNamed) return nullptr;
-  return DeepestElementPrefix(lhs, ctx, arena);
+  // §7.4.1: a name with packed dimensions written on it, `s8_t [1:0] y [2]`,
+  // is a packed array all the same: its element is a vector of elements of
+  // the named type (Variable::packed_elem_width), and `y[1][0]` is one of
+  // them, which reads signed where the type is (Variable::signed_elem_depth).
+  // Materialized as an element of its own, it was a separate unsigned
+  // variable the read then found, and `y[1]` was never written.
+  Variable* prefix = DeepestElementPrefix(lhs, ctx, arena);
+  if (info->elem_type_kind == DataTypeKind::kNamed &&
+      (prefix == nullptr || prefix->packed_elem_width <= 1)) {
+    return nullptr;
+  }
+  return prefix;
 }
 
 // §7.4.4: writes `rhs_val` to the element a multidimensional indexed name such

@@ -369,9 +369,10 @@ struct AssocArrayObject {
   // declaration carried no '{default:...}, recorded only when the element type
   // supplies one of its own. A struct whose members carry initializers is the
   // case the subclause gives: `typedef struct {int x=1,y=2;} xy_t;
-  // xy_t b[int];` allocates b[2] holding 1 and 2. Table 7-1 (see §7.4.5)
-  // governs what a read of a nonexistent entry yields and is a separate
-  // question; it names no struct type, so a read still yields x or 0.
+  // xy_t b[int];` allocates b[2] holding 1 and 2. What a read of a
+  // nonexistent entry yields is a separate question, which Table 7-1 (see
+  // §7.4.5) answers: for an unpacked struct, member by member, a member's
+  // initial assignment included (NonexistentElementOf).
   bool has_elem_init = false;
   Logic4Vec elem_init;
   // §8.4 with §7.8: the key the run holds the class under whose handles the

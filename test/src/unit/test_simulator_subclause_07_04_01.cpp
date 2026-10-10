@@ -153,21 +153,27 @@ TEST(PackedArraySimulation, ElementOfSignedNamedTypeIsSigned) {
       "  s8_t [1:0] x;\n"
       "  s8_t [1:0][1:0] z;\n"
       "  s1_t [3:0] b;\n"
-      "  logic signed [15:0] r, rz, rb;\n"
+      "  s8_t [1:0] y [2];\n"
+      "  logic signed [15:0] r, rz, rb, ry;\n"
       "  logic signed [31:0] ru;\n"
       "  initial begin\n"
       "    x[1] = 8'h80;\n"
       "    z[1] = 16'h8080;\n"
       "    b[1] = 1'b1;\n"
+      "    y[1] = 16'h0101;\n"
+      "    y[1][0] = 8'h80;\n"
+      "    y[5][0] = 8'h7f;\n"
       "    r = x[1];\n"
       "    rz = z[1][0];\n"
       "    ru = z[1];\n"
       "    rb = b[1];\n"
+      "    ry = y[1][0];\n"
       "    $display(\"%h %h %h %h %0d\", r, rz, ru, rb, x[1] < 0);\n"
+      "    $display(\"%h %h %0d\", ry, y[1], y[1][0] < 0);\n"
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_EQ(out, "ff80 ff80 00008080 ffff 1\n");
+  EXPECT_EQ(out, "ff80 ff80 00008080 ffff 1\nff80 0180 1\n");
 }
 
 }  // namespace

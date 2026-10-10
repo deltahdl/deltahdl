@@ -85,7 +85,7 @@ static bool TryQueueSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   bool idx_xz = false;
   auto idx = ResolveQueueIdx(expr->index, q, ctx, arena, &idx_xz);
   if (idx_xz) {
-    out = NonexistentQueueElement(q, arena);
+    out = NonexistentElementOf(expr, q->is_4state, q->elem_width, ctx, arena);
     return true;
   }
   // §16.6: within a concurrent assertion's property the element read is the
@@ -95,8 +95,10 @@ static bool TryQueueSelect(const Expr* expr, SimContext& ctx, Arena& arena,
       ctx.AssertionSamples().ReadQueueWithinProperty(q, ctx.CurrentTime());
   const std::vector<Logic4Vec>& elements =
       sampled != nullptr ? *sampled : q->elements;
-  out = (idx < elements.size()) ? elements[idx]
-                                : NonexistentQueueElement(q, arena);
+  out =
+      (idx < elements.size())
+          ? elements[idx]
+          : NonexistentElementOf(expr, q->is_4state, q->elem_width, ctx, arena);
   TakeElementSignedness(*q, out);
   return true;
 }
@@ -129,16 +131,24 @@ static Logic4Vec ElementDefault(bool is_4state, uint32_t elem_width,
                    : MakeLogic4VecVal(arena, elem_width, 0);
 }
 
-// The same table for an element of the array `info` held under `key`, whose
-// element may be an unpacked structure or union: the table gives that a value
-// member by member (NonexistentAggregateElement) rather than one for the whole,
-// where a packed one is a vector like any other.
-static Logic4Vec NonexistentElement(const ArrayInfo& info, std::string_view key,
-                                    SimContext& ctx, Arena& arena) {
+// The same table for an element of the array held under `key`, whose element
+// may be an unpacked structure or union: the table gives that a value member
+// by member (NonexistentAggregateElement) rather than one for the whole, where
+// a packed one is a vector like any other.
+static Logic4Vec NonexistentElement(std::string_view key, bool is_4state,
+                                    uint32_t elem_width, SimContext& ctx,
+                                    Arena& arena) {
   const StructTypeInfo* layout = StructLayoutOfName(key, ctx);
   if (layout != nullptr && !layout->is_packed)
     return NonexistentAggregateElement(*layout, ctx, arena);
-  return ElementDefault(info.is_4state, info.elem_width, arena);
+  return ElementDefault(is_4state, elem_width, arena);
+}
+
+Logic4Vec NonexistentElementOf(const Expr* select, bool is_4state,
+                               uint32_t elem_width, SimContext& ctx,
+                               Arena& arena) {
+  return NonexistentElement(SelectRootKey(select, ctx), is_4state, elem_width,
+                            ctx, arena);
 }
 
 // Reports whether the object a select reads from is four-state. An invalid
@@ -211,7 +221,8 @@ static bool TryArrayElementSelect(const Expr* expr, uint64_t idx,
       out.is_string = true;
       return true;
     }
-    out = NonexistentElement(*info, key, ctx, arena);
+    out =
+        NonexistentElement(key, info->is_4state, info->elem_width, ctx, arena);
     return true;
   }
   out = elem->value;
@@ -254,7 +265,8 @@ static bool TryCompoundDefaultElem(const Expr* expr, SimContext& ctx,
                                    Arena& arena, Logic4Vec& out) {
   const ArrayInfo* info = FindRootArrayInfo(expr, ctx);
   if (info == nullptr) return false;
-  out = NonexistentElement(*info, SelectRootKey(expr, ctx), ctx, arena);
+  out =
+      NonexistentElementOf(expr, info->is_4state, info->elem_width, ctx, arena);
   return true;
 }
 

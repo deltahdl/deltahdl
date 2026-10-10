@@ -495,4 +495,31 @@ TEST(AssocInvalidIndex, QueueMethodStatementOnAMissingElementDoesNotWarn) {
   EXPECT_EQ(n->value.ToUint64(), 3u);
 }
 
+// R1 with Table 7-1 (§7.4.5): the nonexistent-entry value of an unpacked
+// structure is given member by member, a member's initial assignment
+// included, so a logic member reads x though the structure as a whole is not
+// a 4-state type, which read every member 0.
+TEST(AssocInvalidIndex, MissingEntryOfAStructureReadsMemberByMember) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef struct { int a; logic [3:0] b; int c = 5; } s_t;\n"
+      "  s_t m[int];\n"
+      "  s_t w[string];\n"
+      "  s_t r, rw;\n"
+      "  initial begin\n"
+      "    m[1] = '{1, 4'h1, 2};\n"
+      "    r = m[7];\n"
+      "    rw = w[\"k\"];\n"
+      "    $display(\"%0d %h %0d\", r.a, r.b, r.c);\n"
+      "    $display(\"%0d %h %0d\", rw.a, rw.b, rw.c);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 x 5\n0 x 5\n");
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(), "associative array 'm': read of non-existent index",
+      8, "7.8.6"));
+}
+
 }  // namespace
