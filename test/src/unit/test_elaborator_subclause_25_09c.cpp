@@ -5,7 +5,7 @@
 // through a variable or a class property; the cases here reach the class that
 // holds the property through a nested class, a typedef its own scope resolves
 // and a forward typedef, index an array of virtual interfaces, and stand in
-// the methods of a class.
+// the methods of a class and in generate blocks.
 
 #include <gtest/gtest.h>
 
@@ -326,6 +326,86 @@ TEST(VirtualInterfaceCallElaboration, AMethodOutOfTheBodyOfNoClass) {
       "module top; endmodule\n",
       f, "top");
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kNoSuch, 2, "25.9"));
+}
+
+// §25.9 with §8.11: a method reaches a property of its own class, or one it
+// inherits, through `this`, and a call through this.vif, or through an element
+// of this.vifs, naming nothing the interface declares is reported (#5824).
+// this.n names a property that is no virtual interface and this.none names no
+// property, and neither call is checked against the interface.
+TEST(VirtualInterfaceCallElaboration, ACallThroughThis) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc; task t(); endtask endinterface\n"
+      "class C; virtual ifc vif; virtual ifc vifs[2]; int n;\n"
+      "  task r(); this.vif.nosuch(); endtask\n"
+      "  task r2(); this.vifs[0].nosuch(); endtask\n"
+      "  task ok(); this.vif.t(); this.vifs[1].t(); endtask\n"
+      "  task other(); this.n.nosuch(); this.none.nosuch(); endtask\n"
+      "endclass\n"
+      "class D extends C; task r3(); this.vif.nosuch(); endtask endclass\n"
+      "module top; endmodule\n",
+      f, "top");
+  for (const uint32_t kLine : {3u, 4u, 8u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoSuch, kLine, "25.9"))
+        << kLine;
+  }
+  EXPECT_TRUE(NoErrorOnLine(f, 5));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kNoSuch, 6, "25.9"));
+}
+
+// §25.9 with §23.9: a method of a class a module declares sees the module's
+// variables, and a call through the module's virtual interface v naming
+// nothing the interface declares is reported (#5825). The class's property w
+// hides the module's virtual interface of its name, and the call through it is
+// not checked against the interface.
+TEST(VirtualInterfaceCallElaboration, ACallThroughTheModulesVariableInAClass) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc; task t(); endtask endinterface\n"
+      "module top;\n"
+      "  virtual ifc v; virtual ifc w;\n"
+      "  class M; int w; task r(); v.nosuch(); endtask\n"
+      "    task r2(); w.nosuch(); v.t(); endtask endclass\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoSuch, 4, "25.9"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kNoSuch, 5, "25.9"));
+}
+
+// §25.9 with §27: a procedure of a generate block, whether the block is a
+// conditional construct's (line 7), its else branch's (line 9), a case
+// construct's (line 11) or a loop's (line 12), or nested in another (line 8),
+// is checked as the module's own are (#5826), through the module's virtual
+// interface and through one the block declares. A task the block declares is
+// called there (line 7) and nowhere after the block (line 13, §23.9); the
+// block's net and its parameter declare nothing a call names.
+TEST(VirtualInterfaceCallElaboration, ACallInAGenerateBlock) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc; task t(); endtask endinterface\n"
+      "module top;\n"
+      "  ifc i (); virtual ifc v = i;\n"
+      "  if (1) begin : g\n"
+      "    virtual ifc gv; wire gn; localparam int P = 1;\n"
+      "    task automatic gt(int a); endtask\n"
+      "    initial begin v.nosuch(); gt(1); gv.t(); end\n"
+      "    if (0) begin : g2 initial gv.nosuch(); end\n"
+      "    else begin : g3 initial v.nosuch(); end\n"
+      "  end\n"
+      "  case (1) 1: begin : c initial v.nosuch(); end default: ; endcase\n"
+      "  for (genvar k = 0; k < 2; k++) begin : l initial v.nosuch(); end\n"
+      "  initial gt(1);\n"
+      "endmodule\n",
+      f, "top");
+  for (const uint32_t kLine : {7u, 8u, 9u, 11u, 12u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoSuch, kLine, "25.9"))
+        << kLine;
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "undeclared identifier 'gt'",
+                             7, "23.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "undeclared identifier 'gt'",
+                            13, "23.9"));
 }
 
 }  // namespace

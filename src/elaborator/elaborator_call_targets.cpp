@@ -52,6 +52,10 @@ struct DataScope {
   // The declaration of each variable of the module and of a block around the
   // statement walked.
   std::unordered_map<std::string_view, DeclaredVar> module_vars = {};
+  // In a method of a class, the declaration of each property the class
+  // declares or inherits (§8.13), which hides a variable of the scope around
+  // the class of its name and is what `this` reaches (§8.11).
+  std::unordered_map<std::string_view, DeclaredVar> properties = {};
   std::unordered_set<std::string_view> module = {};
   std::vector<std::pair<std::string_view, DeclaredVar>> blocks = {};
   std::unordered_set<std::string_view> uncallable = {};
@@ -68,13 +72,24 @@ struct DataScope {
   }
 
   // The declaration of the variable `name` names in the scope, the innermost
-  // block's first (§23.9); null for a name no variable bears.
+  // block's first, then a property of the class a method's scope is in, then
+  // the module's (§23.9); null for a name no variable bears.
   const DeclaredVar* Declared(std::string_view name) const {
     for (auto it = blocks.rbegin(); it != blocks.rend(); ++it) {
       if (it->first == name) return &it->second;
     }
-    const auto kFound = module_vars.find(name);
-    return kFound == module_vars.end() ? nullptr : &kFound->second;
+    for (const auto* vars : {&properties, &module_vars}) {
+      const auto kFound = vars->find(name);
+      if (kFound != vars->end()) return &kFound->second;
+    }
+    return nullptr;
+  }
+
+  // §8.11: the declaration of the property `name` names through `this`; null
+  // for a name no property of the class bears, and outside a method.
+  const DeclaredVar* Property(std::string_view name) const {
+    const auto kFound = properties.find(name);
+    return kFound == properties.end() ? nullptr : &kFound->second;
   }
 };
 
@@ -351,18 +366,28 @@ const ClassMember* HandleProperty(const Expr& access, const DataScope& scope) {
   return found;
 }
 
+// The variable the root `root` of a prefix names: the innermost declaration
+// of a plain name, v, or a property of the class whose method writes the
+// prefix, reached through `this`, this.vif (§8.11); null for anything else.
+const DeclaredVar* RootVar(const Expr& root, const DataScope& scope) {
+  if (root.kind == ExprKind::kIdentifier) return scope.Declared(root.text);
+  const bool kThis =
+      root.kind == ExprKind::kMemberAccess && !root.is_scope_resolution &&
+      root.lhs->kind == ExprKind::kIdentifier && root.lhs->text == "this";
+  return kThis ? scope.Property(root.rhs->text) : nullptr;
+}
+
 // §25.9: the interface the virtual interface `prefix` names refers to an
-// instance of: a variable of the module or of a block around the call, v, or a
+// instance of: a variable of the module or of a block around the call, v, a
+// property of the class whose method writes the call, vif or this.vif, or a
 // property of the class a variable holds a handle of, h.vif, or an element of
-// an array of either, one select per unpacked dimension (§7.4), va[0] or
+// an array of any of them, one select per unpacked dimension (§7.4), va[0] or
 // h.vifs[0]; empty for anything else.
 std::string_view VifOf(const Expr& prefix, const DataScope& scope) {
   std::size_t selects = 0;
   const Expr& root = SelectRoot(prefix, selects);
-  if (root.kind == ExprKind::kIdentifier) {
-    const DeclaredVar* var = scope.Declared(root.text);
-    return var != nullptr && var->dims == selects ? VifInterface(*var->type)
-                                                  : std::string_view();
+  if (const DeclaredVar* var = RootVar(root, scope)) {
+    return var->dims == selects ? VifInterface(*var->type) : std::string_view();
   }
   const ClassMember* property = HandleProperty(root, scope);
   return property != nullptr && property->unpacked_dims.size() == selects
@@ -515,16 +540,25 @@ std::unordered_set<std::string_view> EnclosingSubroutineNames(
 
 namespace {
 
-// The names the items of module `decl` declare, each in the set of `scope`
-// its kind puts it in: data, subroutines and the rest, which no call names.
-void DeclareModuleItems(const ModuleDecl& decl, const CompilationUnit& unit,
-                        DataScope& scope) {
-  std::unordered_set<std::string_view>& subroutines = scope.subroutines;
-  for (const ModuleItem* item : decl.items) {
+// The declaration of each variable the items `items` of a module declare, as
+// a variable of `scope`.
+void DeclareModuleVars(const std::vector<ModuleItem*>& items,
+                       DataScope& scope) {
+  for (const ModuleItem* item : items) {
     if (item->kind == ModuleItemKind::kVarDecl) {
       scope.module_vars[item->name] =
           DeclaredVar{&item->data_type, item->unpacked_dims.size()};
     }
+  }
+}
+
+// The names the items of module `decl` declare, each in the set of `scope`
+// its kind puts it in: data, subroutines and the rest, which no call names.
+void DeclareModuleItems(const ModuleDecl& decl, const CompilationUnit& unit,
+                        DataScope& scope) {
+  DeclareModuleVars(decl.items, scope);
+  std::unordered_set<std::string_view>& subroutines = scope.subroutines;
+  for (const ModuleItem* item : decl.items) {
     if (item->kind == ModuleItemKind::kVarDecl ||
         item->kind == ModuleItemKind::kNetDecl) {
       scope.module.insert(item->name);
@@ -545,8 +579,8 @@ void DeclareModuleItems(const ModuleDecl& decl, const CompilationUnit& unit,
 }
 
 // §8.13: the properties the class `cls` declares and those it inherits, as
-// variables of `scope`, a derived class's shadowing a base's of its name. Each
-// base is looked up from the scope's site; no class is its own ancestor
+// the properties of `scope`, a derived class's shadowing a base's of its name.
+// Each base is looked up from the scope's site; no class is its own ancestor
 // (§8.13), so the walk ends at a class that extends none.
 void DeclareClassProperties(const ClassDecl& cls, DataScope& scope) {
   const TypeSite kSite{&scope.items, scope.items.size(), scope.site};
@@ -554,7 +588,7 @@ void DeclareClassProperties(const ClassDecl& cls, DataScope& scope) {
        walked = ClassIn(scope.unit, kSite, walked->base_class)) {
     for (const ClassMember* member : walked->members) {
       if (member->kind == ClassMemberKind::kProperty) {
-        scope.module_vars.emplace(
+        scope.properties.emplace(
             member->name,
             DeclaredVar{&member->data_type, member->unpacked_dims.size()});
       }
@@ -563,10 +597,12 @@ void DeclareClassProperties(const ClassDecl& cls, DataScope& scope) {
 }
 
 // The scope a method of the class `cls`, declared in the scope `site` sees,
-// is walked in: the site's, with the class's properties as its variables.
+// is walked in: the site's, its variables among them (§23.9), with the
+// class's properties hiding those of their names.
 DataScope ClassScope(const ClassDecl& cls, const DataScope& site) {
   DataScope scope{site.visible, site.unit, site.items};
   scope.site = site.site;
+  scope.module_vars = site.module_vars;
   DeclareClassProperties(cls, scope);
   return scope;
 }
@@ -612,6 +648,67 @@ void CheckSiteClasses(const DataScope& site,
   }
 }
 
+void CheckItemCalls(const std::vector<ModuleItem*>& items, DataScope& scope,
+                    DiagEngine& diag);
+
+// §27: each call the generate block whose items are `items` writes, the
+// variables and nets it declares in scope over its items as a block's are,
+// and the tasks and functions it declares callable there (§23.9).
+void CheckGenerateBlockCalls(const std::vector<ModuleItem*>& items,
+                             DataScope& scope, DiagEngine& diag) {
+  const std::size_t kOuter = scope.blocks.size();
+  const std::unordered_set<std::string_view> kOuterSubroutines =
+      scope.subroutines;
+  for (const ModuleItem* item : items) {
+    if (item->kind == ModuleItemKind::kVarDecl ||
+        item->kind == ModuleItemKind::kNetDecl) {
+      scope.blocks.emplace_back(
+          item->name,
+          DeclaredVar{&item->data_type, item->unpacked_dims.size()});
+    } else if (IsSubroutineItem(*item)) {
+      scope.subroutines.insert(item->name);
+    }
+  }
+  CheckItemCalls(items, scope, diag);
+  scope.blocks.resize(kOuter);
+  scope.subroutines = kOuterSubroutines;
+}
+
+// §27.4 and §27.5: each call the blocks of the generate construct `construct`
+// write: a loop's one block, each block of a conditional construct and of the
+// else chain after it, and each case item's block.
+void CheckGenerateCalls(const ModuleItem& construct, DataScope& scope,
+                        DiagEngine& diag) {
+  for (const ModuleItem* branch = &construct; branch != nullptr;
+       branch = branch->gen_else) {
+    CheckGenerateBlockCalls(branch->gen_body, scope, diag);
+    for (const GenerateCaseItem& item : branch->gen_case_items) {
+      CheckGenerateBlockCalls(item.body, scope, diag);
+    }
+  }
+}
+
+// Each call the items `items` of a module or of a generate block write: in
+// their procedures, in the tasks and functions they declare, a method defined
+// out of its class's body (§8.24) excepted, and in the generate constructs
+// among them.
+void CheckItemCalls(const std::vector<ModuleItem*>& items, DataScope& scope,
+                    DiagEngine& diag) {
+  for (const ModuleItem* item : items) {
+    if (IsProceduralItemKind(item->kind)) {
+      CheckStmtCalls(item->body, scope, diag);
+    } else if ((item->kind == ModuleItemKind::kTaskDecl ||
+                item->kind == ModuleItemKind::kFunctionDecl) &&
+               item->method_class.empty()) {
+      CheckSubroutineCalls(*item, scope, diag);
+    } else if (item->kind == ModuleItemKind::kGenerateFor ||
+               item->kind == ModuleItemKind::kGenerateIf ||
+               item->kind == ModuleItemKind::kGenerateCase) {
+      CheckGenerateCalls(*item, scope, diag);
+    }
+  }
+}
+
 }  // namespace
 
 void ReportCallsOfDataNames(
@@ -619,15 +716,7 @@ void ReportCallsOfDataNames(
     const std::function<bool(std::string_view)>& visible, DiagEngine& diag) {
   DataScope scope{visible, unit, decl.items};
   DeclareModuleItems(decl, unit, scope);
-  for (const ModuleItem* item : decl.items) {
-    if (IsProceduralItemKind(item->kind)) {
-      CheckStmtCalls(item->body, scope, diag);
-    } else if ((item->kind == ModuleItemKind::kTaskDecl ||
-                item->kind == ModuleItemKind::kFunctionDecl) &&
-               item->method_class.empty()) {
-      CheckSubroutineCalls(*item, scope, diag);
-    }
-  }
+  CheckItemCalls(decl.items, scope, diag);
 }
 
 void ReportClassMethodCalls(const CompilationUnit& unit, DiagEngine& diag) {
@@ -645,7 +734,9 @@ void ReportClassMethodCalls(const CompilationUnit& unit, DiagEngine& diag) {
   for (const std::vector<ModuleDecl*>* decls :
        {&unit.modules, &unit.interfaces, &unit.programs, &unit.checkers}) {
     for (const ModuleDecl* decl : *decls) {
-      CheckSiteClasses(DataScope{kSeesAll, unit, decl->items}, {}, diag);
+      DataScope at_module{kSeesAll, unit, decl->items};
+      DeclareModuleVars(decl->items, at_module);
+      CheckSiteClasses(at_module, {}, diag);
     }
   }
 }
