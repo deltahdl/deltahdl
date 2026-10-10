@@ -1,10 +1,16 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+#include <string>
 #include <string_view>
 
+#include "common/source_loc.h"
+#include "elaborator/net_data_type.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 
@@ -467,6 +473,258 @@ TEST(NetDataType, StructNetWithADimensionCarriesNoAggregate) {
   ASSERT_NE(v->dtype, nullptr);
   EXPECT_NE(v->dtype->packed_dim_left, nullptr);
   EXPECT_TRUE(v->dtype->struct_members.empty());
+}
+
+// --- Fixed-size unpacked dimensions (Syntax 6-2 and §6.7.1 item b) ---
+// A net declarator takes unpacked_dimension, a constant range or size, and
+// never the variable_dimension a variable declarator takes. Each case below
+// writes one of the four variable forms, so a check that recognised only some
+// of them is caught by the form it missed.
+
+void ExpectNetDimensionReported(const std::string& items) {
+  ElabFixture f;
+  const std::string kSrc = "module m;\n" + items + "\nendmodule\n";
+  ElaborateSrc(kSrc, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a net's unpacked dimension must be fixed-size",
+                            LineHolding(kSrc, "wire logic w"), "6.7"));
+}
+
+TEST(NetDataType, DynamicDimensionOnANetIsRejected) {
+  ExpectNetDimensionReported("  wire logic w[];");
+}
+
+TEST(NetDataType, QueueDimensionOnANetIsRejected) {
+  ExpectNetDimensionReported("  wire logic w[$];");
+}
+
+TEST(NetDataType, AssociativeDimensionOnANetIsRejected) {
+  ExpectNetDimensionReported("  wire logic w[int];");
+}
+
+TEST(NetDataType, WildcardAssociativeDimensionOnANetIsRejected) {
+  ExpectNetDimensionReported("  wire logic w[*];");
+}
+
+// An associative index may be a user-defined type, a typedef or a class, which
+// the parser keeps as the bare name a parameter-sized dimension is kept as.
+TEST(NetDataType, TypedefIndexedDimensionOnANetIsRejected) {
+  ExpectNetDimensionReported("  typedef int k_t;\n  wire logic w[k_t];");
+}
+
+TEST(NetDataType, ClassIndexedDimensionOnANetIsRejected) {
+  ExpectNetDimensionReported("  class K; endclass\n  wire logic w[K];");
+}
+
+// A net of a user-defined nettype is declared by the same net_decl_assignment,
+// so its declarator is held to the same dimension.
+TEST(NetDataType, QueueDimensionOnANettypeNetIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  nettype logic [3:0] nt;\n"
+      "  nt w[$];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a net's unpacked dimension must be fixed-size", 3,
+                            "6.7"));
+}
+
+// A typedef carries its unpacked dimensions into the type it names, so a net
+// declared through one is an array of that shape, and item b requires it to be
+// fixed-size.
+TEST(NetDataType, TypedefOfADynamicArrayIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef logic da_t[];\n"
+      "  wire da_t w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net data type must be a fixed-size array", 3,
+                            "6.7.1"));
+}
+
+// The counterparts: a dimension sized by a parameter is a constant size, and a
+// typedef of a fixed-size array names a fixed-size array, so neither is
+// confused with the variable forms above.
+TEST(NetDataType, ParameterSizedDimensionAndFixedArrayTypedefAreValid) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  parameter int N = 3;\n"
+      "  typedef logic fa_t[2];\n"
+      "  wire logic w[N];\n"
+      "  wire fa_t v;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// --- Members of a structure or union net (§6.7.1 items a and b) ---
+
+// Item b is recursive: an unpacked structure is a valid net data type only when
+// each member is, and a 2-state member is not, whether written as a keyword or
+// named through a typedef.
+TEST(NetDataType, UnpackedStructNetWithATwoStateMemberIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire struct { logic [3:0] a; bit b; } w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unpacked struct/union net member must be a valid net data type", 2,
+      "6.7.1"));
+}
+
+TEST(NetDataType, UnpackedStructNetWithATypedefTwoStateMemberIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef int i_t;\n"
+      "  wire struct { logic [3:0] a; i_t b; } w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unpacked struct/union net member must be a valid net data type", 3,
+      "6.7.1"));
+}
+
+// A member that is itself a packed structure is judged as one: all-2-state
+// members make it 2-state, and the union holding it is no net data type.
+TEST(NetDataType, UnpackedUnionNetWithATwoStatePackedStructMemberIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire union { logic [7:0] a; struct packed { bit [7:0] x; } b; } w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "unpacked struct/union net member must be a valid net data type", 2,
+      "6.7.1"));
+}
+
+// The counterpart: members named through a 4-state typedef, and a nested
+// unpacked structure of 4-state members, are valid net data types.
+TEST(NetDataType, UnpackedStructNetWithFourStateNamedAndNestedMembersIsValid) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef logic [3:0] n_t;\n"
+      "  wire struct { n_t a; struct { logic c; } s; } w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// Item a: a packed structure is 4-state only when a member is, and a member
+// named through a typedef or nested as a packed structure is 4-state only when
+// what it stands for is. Here every member resolves to a 2-state type.
+TEST(NetDataType, PackedStructNetWithTwoStateTypedefMembersIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef bit [3:0] nib_t;\n"
+      "  wire struct packed { nib_t a; bit b; } w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net data type must be 4-state", 3, "6.7.1"));
+}
+
+TEST(NetDataType, PackedStructNetWithATwoStateNestedStructIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire struct packed { struct packed { bit x; } s; int b; } w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net data type must be 4-state", 2, "6.7.1"));
+}
+
+// An enumeration member is as 4-state as its base, so a 2-state base leaves the
+// packed structure 2-state.
+TEST(NetDataType, PackedStructNetWithATwoStateEnumMemberIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef enum bit [1:0] { A, B } e_t;\n"
+      "  wire struct packed { e_t e; bit b; } w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net data type must be 4-state", 3, "6.7.1"));
+}
+
+// The counterpart: one 4-state member, named or nested, makes the packed
+// structure 4-state, whatever the other members are.
+TEST(NetDataType, PackedStructNetWithFourStateNamedOrNestedMembersIsValid) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef logic [3:0] nib_t;\n"
+      "  wire struct packed { nib_t a; bit b; } w;\n"
+      "  wire struct packed { struct packed { logic x; } s; int b; } v;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A soft union is packed (§7.3.1), so it is judged by item a as a packed
+// structure is: all-2-state members make it a 2-state type.
+TEST(NetDataType, TwoStateSoftUnionNetIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire union soft { bit [3:0] a; bit [1:0] b; } w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net data type must be 4-state", 2, "6.7.1"));
+}
+
+// A typedef table can hold what no source the elaborator accepts gives it:
+// names that lead to each other in a cycle, and member types, direct or through
+// a typedef, that name nothing in the table. Such a type leaves nothing to
+// judge, so none of these is reported and none loops.
+TEST(NetDataType, TypesResolvingToNothingAreNotReported) {
+  ElabFixture f;
+  DataType to_b;
+  to_b.kind = DataTypeKind::kNamed;
+  to_b.type_name = "b_t";
+  DataType to_a = to_b;
+  to_a.type_name = "a_t";
+  DataType to_missing = to_b;
+  to_missing.type_name = "missing_t";
+  StructMember missing;
+  missing.type_kind = DataTypeKind::kNamed;
+  missing.type_name = "missing_t";
+  StructMember dangling = missing;
+  dangling.type_name = "dangling_t";
+  DataType packed_missing;
+  packed_missing.kind = DataTypeKind::kStruct;
+  packed_missing.is_packed = true;
+  packed_missing.struct_members = {missing};
+  DataType packed_dangling = packed_missing;
+  packed_dangling.struct_members = {dangling};
+  DataType unpacked;
+  unpacked.kind = DataTypeKind::kStruct;
+  unpacked.struct_members = {missing, dangling};
+  const TypedefMap kTable{
+      {"a_t", to_b}, {"b_t", to_a}, {"dangling_t", to_missing}};
+
+  for (const DataType* type :
+       {&to_a, &packed_missing, &packed_dangling, &unpacked}) {
+    ValidateNetDataTypeIs4State(*type, kTable, f.diag, SourceLoc{});
+  }
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
 }
 
 }  // namespace

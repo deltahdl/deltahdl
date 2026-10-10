@@ -19,6 +19,8 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/net_data_type.h"
+#include "elaborator/resolution_function_body.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/unit_scope_order.h"
@@ -518,26 +520,11 @@ void Elaborator::EmitBareEnumMembers(const ModuleItem* item, RtlirModule* mod) {
       });
 }
 
-// §6.6.7: the data type of a user-defined nettype shall be a 4-state or 2-state
-// integral type, a real or shortreal type, or a fixed-size unpacked aggregate
-// of such types. The named-type forms (a typedef or an existing nettype named
-// in the alias form) resolve to one of those and are accepted here; only the
-// direct data types that can never be a legal nettype data type are rejected.
-static bool IsIllegalNettypeDataTypeKind(DataTypeKind kind) {
-  switch (kind) {
-    case DataTypeKind::kString:
-    case DataTypeKind::kChandle:
-    case DataTypeKind::kEvent:
-    case DataTypeKind::kVoid:
-    case DataTypeKind::kVirtualInterface:
-      return true;
-    default:
-      return false;
-  }
-}
-
 void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule* mod) {
-  if (IsIllegalNettypeDataTypeKind(item->typedef_type.kind)) {
+  // §6.6.7 judges the data type a nettype names, typedef names and all, and
+  // IsLegalNettypeDataType in net_data_type.cpp says which those are.
+  if (!IsLegalNettypeDataType(item->typedef_type,
+                              {typedefs_, td_array_dims_, class_names_})) {
     diag_.Error(item->loc,
                 std::format("data type of user-defined nettype '{}' is not a "
                             "legal nettype data type",
@@ -764,6 +751,7 @@ void Elaborator::CheckNettypeResolutionFunction(const ModuleItem* item) {
                 Subclause("6.6.7"));
     return;
   }
+  CheckResolutionFunctionBody(target.fn, diag_);
   NettypeResolutionSig sig = BuildNettypeResolutionSig(item, target.fn);
   sig.is_class_method = target.is_class_method;
   sig.is_static_method = target.is_static_method;

@@ -165,16 +165,6 @@ bool ExpandInstanceArray(
 std::optional<uint32_t> InstanceArrayLength(const ModuleItem* item,
                                             const ScopeMap& scope);
 
-// §6.7.1 restricts a net's data type to a) a 4-state integral type or b) a
-// fixed-size unpacked array, structure or union each of whose elements has a
-// valid net data type. Reports `dtype` at `loc` when it is not one of those.
-// Shared because a net is not only what a net declaration produces: §23.2.2.3
-// makes a port with the port kind omitted a net too, and the rule that decides
-// what such a thing may carry is one rule wherever the net came from.
-void ValidateNetDataTypeIs4State(const DataType& dtype,
-                                 const TypedefMap& typedefs, DiagEngine& diag,
-                                 SourceLoc loc);
-
 // §6.22.6: a nettype matches itself and the nettype of nets declared using it,
 // and a renaming alias of a user-defined nettype matches the nettype it
 // renames. Two nettype names match when they resolve to the same canonical

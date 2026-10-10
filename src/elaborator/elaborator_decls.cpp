@@ -19,6 +19,7 @@
 #include "elaborator/elaborator_decls_internal.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
+#include "elaborator/net_data_type.h"
 #include "elaborator/queue_dim.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_element_shape.h"
@@ -238,113 +239,6 @@ void ComputeUnpackedDims(const std::vector<Expr*>& dims, RtlirVariable& var,
   if (TryParseRangeDim(dim, var, ctx.scope)) return;
 
   ApplyConstSizedUnpackedDim(dim, var, ctx.diag, ctx.loc, ctx.scope);
-}
-
-// §6.7.1 item a / §6.11.1: a packed structure or union is an integral type,
-// but per §7.2.1 it is treated as a 2-state vector when every one of its
-// members is 2-state. Report such an aggregate as conclusively 2-state. A
-// member of any other kind (a 4-state integer, an enum, or a named/nested
-// aggregate that could resolve to a 4-state type) leaves the result 4-state,
-// so the aggregate is not rejected.
-static bool PackedAggregateIsAll2State(const DataType& dtype) {
-  if (dtype.struct_members.empty()) return false;
-  for (const auto& m : dtype.struct_members) {
-    switch (m.type_kind) {
-      case DataTypeKind::kBit:
-      case DataTypeKind::kByte:
-      case DataTypeKind::kShortint:
-      case DataTypeKind::kInt:
-      case DataTypeKind::kLongint:
-        break;
-      default:
-        return false;
-    }
-  }
-  return true;
-}
-
-// §6.7.1 item b: a member of one of these types can never itself be a net
-// (they are neither integral nor an aggregate of nets), so an unpacked
-// struct/union containing such a member is not a valid net data type.
-static bool MemberKindCannotBeNet(DataTypeKind kind) {
-  switch (kind) {
-    case DataTypeKind::kReal:
-    case DataTypeKind::kShortreal:
-    case DataTypeKind::kRealtime:
-    case DataTypeKind::kString:
-    case DataTypeKind::kChandle:
-    case DataTypeKind::kEvent:
-    case DataTypeKind::kVoid:
-      return true;
-    default:
-      return false;
-  }
-}
-
-// §6.7.1 / §23.2.2.1: a net declared with a vector type that cannot carry a
-// 4-state value is rejected. Item a of §6.7.1 requires a 4-state integral type
-// (see §6.11.1); a plain 2-state integer net type, or a packed struct/union
-// whose members are all 2-state, is not legal. Item b allows a fixed-size
-// unpacked struct/union, but only when each member is itself a valid net type.
-// §6.7.1 item b: a struct/union net data type. A packed (or soft-packed)
-// aggregate is a net data type only if it is not all-2-state. An unpacked one's
-// members must each be a valid net type: a directly non-net member kind (real,
-// string, chandle, ...) makes the whole aggregate invalid.
-static void ValidateAggregateNetDataType(const DataType& dtype,
-                                         DiagEngine& diag, SourceLoc loc) {
-  if (dtype.is_packed || dtype.is_soft) {
-    if (PackedAggregateIsAll2State(dtype))
-      diag.Error(loc, "net data type must be 4-state", Subclause("6.7.1"));
-    return;
-  }
-  for (const auto& m : dtype.struct_members) {
-    if (MemberKindCannotBeNet(m.type_kind)) {
-      diag.Error(loc,
-                 "unpacked struct/union net member must be a valid net "
-                 "data type",
-                 Subclause("6.7.1"));
-      return;
-    }
-  }
-}
-
-void ValidateNetDataTypeIs4State(const DataType& dtype,
-                                 const TypedefMap& typedefs, DiagEngine& diag,
-                                 SourceLoc loc) {
-  if (dtype.is_interconnect) return;
-  DataTypeKind k = dtype.kind;
-  // §6.7.1 lists the data types a net may have, and its own example declares
-  // one through a name: "typedef logic [31:0] addressT; wire addressT w1;". A
-  // name is not a data type of its own, so what the clause judges is the type
-  // the name stands for, and the same question is asked again of that type. A
-  // name standing for nothing nameable here -- one declared elsewhere, or a
-  // forward typedef still without a definition -- leaves no data type to judge
-  // and is passed over.
-  if (k == DataTypeKind::kNamed) {
-    auto it = typedefs.find(dtype.type_name);
-    if (it == typedefs.end()) return;
-    ValidateNetDataTypeIs4State(it->second, typedefs, diag, loc);
-    return;
-  }
-  if (k == DataTypeKind::kStruct || k == DataTypeKind::kUnion) {
-    ValidateAggregateNetDataType(dtype, diag, loc);
-    return;
-  }
-  // §6.19: an enumeration written with no base names no data type, and then
-  // takes int, which is 2-state. An absent base leaves the base kind implicit,
-  // and the one-argument Is4stateType reads an implicit kind as 4-state --
-  // right for a net that named no data type of its own, wrong for an enum's
-  // missing base. So the question goes to the resolved data type, which reads
-  // the base kind and a named base through the typedefs.
-  if (k == DataTypeKind::kEnum) {
-    if (!Is4stateType(dtype, typedefs))
-      diag.Error(loc, "net data type must be 4-state", Subclause("6.7.1"));
-    return;
-  }
-  if (DataTypeToNetType(k) == NetType::kWire && k != DataTypeKind::kWire &&
-      !Is4stateType(k)) {
-    diag.Error(loc, "net data type must be 4-state", Subclause("6.7.1"));
-  }
 }
 
 // §6.9.2: vectored and scalared are optional advisory keywords for vector net
@@ -652,12 +546,14 @@ PackedRange SignalDeclaredRange(std::string_view name, const RtlirModule* mod,
 static void ValidateNetDeclDataType(
     const ModuleItem* item,
     const std::unordered_set<std::string_view>& nettype_names,
-    const TypedefMap& typedefs, DiagEngine& diag) {
+    const TypeShapeTables& tables, DiagEngine& diag) {
   if (item->data_type.kind == DataTypeKind::kNamed &&
       nettype_names.count(item->data_type.type_name) != 0) {
     return;
   }
-  ValidateNetDataTypeIs4State(item->data_type, typedefs, diag, item->loc);
+  ValidateNetDataTypeIs4State(item->data_type, tables.typedefs, diag,
+                              item->loc);
+  ValidateNetTypedefDims(item->data_type, tables, diag, item->loc);
 }
 
 // Records what a select written on this net may reach. §11.5.2 draws no
@@ -787,7 +683,10 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
       ReconcilePartialPort(item->name, net.is_signed, net.net_type, mod);
   ValidatePackedDimRange(item->data_type, item->loc);
 
-  ValidateNetDeclDataType(item, nettype_names_, typedefs_, diag_);
+  const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
+  ValidateNetDeclDataType(item, nettype_names_, kShapeTables, diag_);
+  ValidateNetDeclaratorDims(item->unpacked_dims, kShapeTables, diag_,
+                            item->loc);
 
   // §6.7.1: one delay value is the limit for an interconnect net. A single
   // delay (net_delay) is permitted; a second or third delay term is not.

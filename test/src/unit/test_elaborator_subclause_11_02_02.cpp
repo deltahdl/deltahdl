@@ -108,10 +108,12 @@ TEST(AggregateExpr, StructPassedThroughPort) {
   ElabFixture f;
   // The struct type is declared at compilation-unit scope so it is visible
   // both where inner's ANSI port list names it and where m instantiates inner;
-  // the aggregate s then flows through the port (§11.2.2 ¶2).
+  // the aggregate s then flows through the port (§11.2.2 ¶2). The port is
+  // declared `var`: §23.2.2.3 makes an input whose port kind is omitted a net,
+  // and §6.7.1 gives no net a structure of 2-state int members.
   auto* design = ElaborateSrc(
       "typedef struct { int a; int b; } pair_t;\n"
-      "module inner(input pair_t p);\n"
+      "module inner(input var pair_t p);\n"
       "endmodule\n"
       "module m;\n"
       "  pair_t s;\n"

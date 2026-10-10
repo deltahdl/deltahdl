@@ -537,6 +537,8 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_subroutine_args.cpp
     elaborator/elaborator_validate_std_prototypes.cpp
     elaborator/queue_dim.cpp
+    elaborator/net_data_type.cpp
+    elaborator/resolution_function_body.cpp
     lexer/lexer_numbers.cpp
     lexer/lexer_operators.cpp
     parser/display_format_check.cpp

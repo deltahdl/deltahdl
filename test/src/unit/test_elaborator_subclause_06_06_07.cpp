@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/arena.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/rtlir.h"
@@ -648,6 +650,200 @@ TEST(NettypeElaboration, NamedPackedVectorTypeFollowsAChainOfNames) {
   written.type_name = "missing_t";
   EXPECT_EQ(NamedPackedVectorType(written, kTable, arena), nullptr);
   EXPECT_EQ(NamedPackedVectorType(to_a, kTable, arena), nullptr);
+}
+
+// --- The data type a nettype resolves to (§6.6.7 items a to d) ---
+// The rule judges a type, so a typedef name is judged as what it stands for, an
+// array by whether it is fixed-size and by its element, and an unpacked
+// structure member by member.
+
+void ExpectIllegalNettypeDataType(const std::string& body) {
+  ElabFixture f;
+  const std::string kSrc =
+      "module m;\n" + body + "  nettype bad_t n;\nendmodule\n";
+  Elaborate(kSrc, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "data type of user-defined nettype 'n' is not a "
+                            "legal nettype data type",
+                            LineHolding(kSrc, "nettype bad_t"), "6.6.7"));
+}
+
+TEST(NettypeElaboration, TypedefOfAStringDataTypeRejected) {
+  ExpectIllegalNettypeDataType("  typedef string bad_t;\n");
+}
+
+TEST(NettypeElaboration, TypedefOfAClassDataTypeRejected) {
+  ExpectIllegalNettypeDataType(
+      "  class C; endclass\n"
+      "  typedef C bad_t;\n");
+}
+
+TEST(NettypeElaboration, TypedefOfADynamicArrayDataTypeRejected) {
+  ExpectIllegalNettypeDataType("  typedef logic [3:0] bad_t[];\n");
+}
+
+TEST(NettypeElaboration, TypedefOfAQueueOfRealDataTypeRejected) {
+  ExpectIllegalNettypeDataType("  typedef real bad_t[$];\n");
+}
+
+TEST(NettypeElaboration, UnpackedStructWithAStringMemberDataTypeRejected) {
+  ExpectIllegalNettypeDataType(
+      "  typedef struct { real r; string s; } bad_t;\n");
+}
+
+// Item d asks of each element that it be fixed-size, so a member that is a
+// queue makes the structure illegal even though its element type is real.
+TEST(NettypeElaboration, UnpackedStructWithAQueueMemberDataTypeRejected) {
+  ExpectIllegalNettypeDataType("  typedef struct { real r[$]; } bad_t;\n");
+}
+
+// void and a virtual interface name no value at all, and neither is among
+// items a to d.
+TEST(NettypeElaboration, VoidDataTypeRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  nettype void vn;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "data type of user-defined nettype 'vn' is not a "
+                            "legal nettype data type",
+                            2, "6.6.7"));
+}
+
+TEST(NettypeElaboration, VirtualInterfaceDataTypeRejected) {
+  ElabFixture f;
+  Elaborate(
+      "interface I; endinterface\n"
+      "module m;\n"
+      "  nettype virtual I vn;\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "data type of user-defined nettype 'vn' is not a "
+                            "legal nettype data type",
+                            3, "6.6.7"));
+}
+
+// A class named directly is a data type too, and no more a legal one.
+TEST(NettypeElaboration, ClassDataTypeRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  class C; endclass\n"
+      "  nettype C cn;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "data type of user-defined nettype 'cn' is not a "
+                            "legal nettype data type",
+                            3, "6.6.7"));
+}
+
+// The counterpart: a fixed-size array of an unpacked structure whose members
+// are real and 2-state integral is item d applied twice over, and an alias of
+// the nettype names a nettype rather than a data type.
+TEST(NettypeElaboration, FixedArrayOfARealAndTwoStateStructDataTypeAccepted) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  typedef struct { real r; bit [3:0] b; struct { shortreal s; } n; } "
+      "ok_t;\n"
+      "  typedef ok_t ok_arr_t[2];\n"
+      "  nettype ok_arr_t n5;\n"
+      "  nettype n5 n6;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// --- What a resolution function may do with its argument (§6.6.7) ---
+
+// The function shall neither write any part of its driver array nor resize it.
+TEST(NettypeElaboration, ResolutionFunctionWritingItsDriverArrayRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  function automatic logic [3:0] res(input logic [3:0] d[]);\n"
+      "    d[0] = 4'h0;\n"
+      "    return d[1];\n"
+      "  endfunction\n"
+      "  nettype logic [3:0] nt with res;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "resolution function 'res' writes to or resizes "
+                            "its driver array 'd'",
+                            3, "6.6.7"));
+}
+
+TEST(NettypeElaboration, ResolutionFunctionResizingItsDriverArrayRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  function automatic logic [3:0] res(input logic [3:0] d[]);\n"
+      "    logic [3:0] r = d[0];\n"
+      "    d.delete();\n"
+      "    return r;\n"
+      "  endfunction\n"
+      "  nettype logic [3:0] nt with res;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "resolution function 'res' writes to or resizes "
+                            "its driver array 'd'",
+                            4, "6.6.7"));
+}
+
+// The function shall have no side effects, and a write to a variable it does
+// not declare is one: the count would depend on how often the simulator
+// resolves the net. The write is reported whether it is an increment or one
+// name of a concatenation on an assignment's left side.
+TEST(NettypeElaboration, ResolutionFunctionWritingAModuleVariableRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int calls;\n"
+      "  function automatic logic [3:0] res(input logic [3:0] d[]);\n"
+      "    logic [3:0] r = '0;\n"
+      "    calls++;\n"
+      "    {r, calls} = {r, calls};\n"
+      "    foreach (d[i]) r |= d[i];\n"
+      "    return r;\n"
+      "  endfunction\n"
+      "  nettype logic [3:0] nt with res;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "resolution function 'res' has a side effect: it "
+                            "writes 'calls'",
+                            5, "6.6.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "resolution function 'res' has a side effect: it "
+                            "writes 'calls'",
+                            6, "6.6.7"));
+}
+
+// The counterpart, the clause's own Tsum: it writes its local result through
+// the function's name and a member of it, inside a foreach over the drivers,
+// and reads the driver array alone. None of that is a write the rule forbids.
+TEST(NettypeElaboration, ResolutionFunctionWritingOnlyItsOwnResultAccepted) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n"
+      "  typedef struct { real field1; bit field2; } T;\n"
+      "  function automatic T Tsum(input T driver[]);\n"
+      "    real acc;\n"
+      "    acc = 0.0;\n"
+      "    Tsum.field1 = 0.0;\n"
+      "    foreach (driver[i]) Tsum.field1 += driver[i].field1;\n"
+      "  endfunction\n"
+      "  nettype T wTsum with Tsum;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace
