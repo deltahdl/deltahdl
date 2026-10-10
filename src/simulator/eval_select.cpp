@@ -17,11 +17,13 @@
 #include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_call_result.h"
 #include "simulator/eval_class_array.h"
+#include "simulator/eval_expr_internal.h"
 #include "simulator/eval_member_path.h"
 #include "simulator/eval_select_assoc.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/struct_string_member.h"
@@ -41,10 +43,12 @@ void TakeElementSignedness(const QueueObject& q, Logic4Vec& val) {
   val.is_signed = q.is_signed;
 }
 
-int64_t SelectBoundValue(const Logic4Vec& val) {
+int64_t LongintValue(const Logic4Vec& val) {
   return val.is_signed ? SignExtend(val.ToUint64(), val.width)
                        : static_cast<int64_t>(val.ToUint64());
 }
+
+int64_t SelectBoundValue(const Logic4Vec& val) { return LongintValue(val); }
 
 static uint64_t ResolveQueueIdx(const Expr* idx_expr, QueueObject* q,
                                 SimContext& ctx, Arena& arena,
@@ -114,6 +118,27 @@ static std::string_view SelectRootKey(const Expr* expr, SimContext& ctx) {
 static const ArrayInfo* FindRootArrayInfo(const Expr* expr, SimContext& ctx) {
   std::string_view key = SelectRootKey(expr, ctx);
   return key.empty() ? nullptr : ctx.FindArrayInfo(key);
+}
+
+// §7.4.5's Table 7-1, "Value read from a nonexistent array entry": 'x for a
+// 4-state integral element type and '0 for a 2-state one. Said once here for
+// the readers of a single element and of a slice of the same array.
+static Logic4Vec ElementDefault(bool is_4state, uint32_t elem_width,
+                                Arena& arena) {
+  return is_4state ? MakeAllX(arena, elem_width)
+                   : MakeLogic4VecVal(arena, elem_width, 0);
+}
+
+// The same table for an element of the array `info` held under `key`, whose
+// element may be an unpacked structure or union: the table gives that a value
+// member by member (NonexistentAggregateElement) rather than one for the whole,
+// where a packed one is a vector like any other.
+static Logic4Vec NonexistentElement(const ArrayInfo& info, std::string_view key,
+                                    SimContext& ctx, Arena& arena) {
+  const StructTypeInfo* layout = StructLayoutOfName(key, ctx);
+  if (layout != nullptr && !layout->is_packed)
+    return NonexistentAggregateElement(*layout, ctx, arena);
+  return ElementDefault(info.is_4state, info.elem_width, arena);
 }
 
 // Reports whether the object a select reads from is four-state. An invalid
@@ -186,8 +211,7 @@ static bool TryArrayElementSelect(const Expr* expr, uint64_t idx,
       out.is_string = true;
       return true;
     }
-    out = info->is_4state ? MakeAllX(arena, info->elem_width)
-                          : MakeLogic4VecVal(arena, info->elem_width, 0);
+    out = NonexistentElement(*info, key, ctx, arena);
     return true;
   }
   out = elem->value;
@@ -223,17 +247,15 @@ static bool BuildCompoundName(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// Fills `out` with the default element value (x for four-state, 0 otherwise)
-// for the array a compound select reads from, when the addressed element does
+// Fills `out` with the value Table 7-1 gives an element (NonexistentElement)
+// of the array a compound select reads from, when the addressed element does
 // not exist. Returns false when the root is not a recognized array.
 static bool TryCompoundDefaultElem(const Expr* expr, SimContext& ctx,
                                    Arena& arena, Logic4Vec& out) {
-  if (auto* info = FindRootArrayInfo(expr, ctx)) {
-    out = info->is_4state ? MakeAllX(arena, info->elem_width)
-                          : MakeLogic4VecVal(arena, info->elem_width, 0);
-    return true;
-  }
-  return false;
+  const ArrayInfo* info = FindRootArrayInfo(expr, ctx);
+  if (info == nullptr) return false;
+  out = NonexistentElement(*info, SelectRootKey(expr, ctx), ctx, arena);
+  return true;
 }
 
 // Whether a prefix of the select chain `expr`, short of the whole of it, names
@@ -318,17 +340,6 @@ struct UnpackedSliceRun {
   // neither could ask, so both answered the 2-state row for every array.
   bool is_4state;
 };
-
-// §7.4.5's Table 7-1, "Value read from a nonexistent array entry": 'x for a
-// 4-state integral element type and '0 for a 2-state one. Said once here for
-// the two slice readers below, which answer the same table
-// TryArrayElementSelect and TryCompoundDefaultElem above answer for a single
-// element of the same array.
-static Logic4Vec ElementDefault(bool is_4state, uint32_t elem_width,
-                                Arena& arena) {
-  return is_4state ? MakeAllX(arena, elem_width)
-                   : MakeLogic4VecVal(arena, elem_width, 0);
-}
 
 // Names the run `expr` addresses, or declines when `expr` is not a slice of an
 // unpacked array. A compound base that is itself a stored packed element is not
@@ -728,12 +739,9 @@ static uint32_t UnknownIndexPartSelectWidth(const Expr* expr, SimContext& ctx,
 // depending on whether the selected object is four-state.
 static Logic4Vec EvalUnknownIndexSelect(const Expr* expr, SimContext& ctx,
                                         Arena& arena) {
-  if (!expr->index_end) {
-    if (auto* info = FindRootArrayInfo(expr, ctx)) {
-      return info->is_4state ? MakeAllX(arena, info->elem_width)
-                             : MakeLogic4VecVal(arena, info->elem_width, 0);
-    }
-  }
+  Logic4Vec elem;
+  if (!expr->index_end && TryCompoundDefaultElem(expr, ctx, arena, elem))
+    return elem;
 
   if (expr->index_end) {
     return MakeAllX(arena, UnknownIndexPartSelectWidth(expr, ctx, arena));
@@ -756,16 +764,26 @@ static Logic4Vec EvalStringByteSelect(const Logic4Vec& base_val, uint64_t idx,
   return MakeLogic4VecVal(arena, 8, ch);
 }
 
+// §7.4.1: whether the single-index select `expr` of a packed array reaches an
+// element of a named type declared signed (Variable::signed_elem_depth), which
+// is signed where every other element is unsigned.
+static bool SelectsSignedElement(const Expr* expr, SimContext& ctx,
+                                 Arena& arena) {
+  SelectBaseObject obj = FindSelectBaseObject(expr->base, ctx, arena);
+  return obj.var != nullptr && obj.var->signed_elem_depth == obj.depth;
+}
+
 // §7.4.1: a single-index select of a packed multidimensional array selects an
-// outermost element (the inner-dimension width) as an unsigned vector, not a
-// single bit. Returns the element value when `expr` names such an array -- by
-// its own name, or as an element of an unpacked array declared with packed
-// dimensions (§7.4.4), `y[0][3]` on a `logic [3:0][7:0] y[1:0]` being subfield
-// 3 of the element `y[0]` -- or a subfield of one with a dimension still
-// inside it, `z[1][0]` on a `logic [1:0][1:0][7:0] z` being the eight-bit
-// subfield 0 of the sixteen-bit `z[1]`. Only a bare name was asked at first,
-// so `y[0][3]` read bit 3 of the element, and then only the outermost
-// dimension was known, so `z[1][0]` read bit 0 of `z[1]`.
+// outermost element (the inner-dimension width) as a vector, not a single
+// bit, unsigned unless SelectsSignedElement says it is of a signed named type.
+// Returns the element value when `expr` names such an array -- by its own name,
+// or as an element of an unpacked array declared with packed dimensions
+// (§7.4.4), `y[0][3]` on a `logic [3:0][7:0] y[1:0]` being subfield 3 of the
+// element `y[0]` -- or a subfield of one with a dimension still inside it,
+// `z[1][0]` on a `logic [1:0][1:0][7:0] z` being the eight-bit subfield 0 of
+// the sixteen-bit `z[1]`. Only a bare name was asked at first, so `y[0][3]`
+// read bit 3 of the element, and then only the outermost dimension was known,
+// so `z[1][0]` read bit 0 of `z[1]`.
 static std::optional<Logic4Vec> TryPackedElementSelect(
     const Expr* expr, int64_t idx, const Logic4Vec& base_val, SimContext& ctx,
     Arena& arena) {
@@ -788,10 +806,13 @@ static std::optional<Logic4Vec> TryPackedElementSelect(
   uint64_t off = range.Contains(idx)
                      ? static_cast<uint64_t>(range.OffsetOf(idx)) * w
                      : base_val.width;
-  if (off >= base_val.width)
-    return SelectBaseIs4State(expr, ctx) ? MakeAllX(arena, w)
-                                         : MakeLogic4VecVal(arena, w, 0);
-  return ExtractBitField(arena, base_val, static_cast<uint32_t>(off), w);
+  Logic4Vec elem =
+      off < base_val.width
+          ? ExtractBitField(arena, base_val, static_cast<uint32_t>(off), w)
+      : SelectBaseIs4State(expr, ctx) ? MakeAllX(arena, w)
+                                      : MakeLogic4VecVal(arena, w, 0);
+  elem.is_signed = SelectsSignedElement(expr, ctx, arena);
+  return elem;
 }
 
 // A select from the value `base_val` of a packed base: a byte of a string, a
@@ -814,13 +835,18 @@ static Logic4Vec SelectFromPackedValue(const Expr* expr,
   // of what is being selected from, so it is resolved against that range rather
   // than taken as a storage offset.
   auto range = SelectBaseRange(expr->base, base_val.width, ctx, arena);
-  if (!range.Contains(declared_idx))
-    return SelectBaseIs4State(expr, ctx) ? MakeAllX(arena, 1)
-                                         : MakeLogic4VecVal(arena, 1, 0);
   // One bit is a window of one, read the way EvalPartSelect above reads the
-  // other spelling of it and for the reasons set out there.
-  auto off = static_cast<uint32_t>(range.OffsetOf(declared_idx));
-  return ExtractBitField(arena, base_val, off, 1);
+  // other spelling of it and for the reasons set out there. It is an element
+  // of a one-bit named type where the declaration writes its dimensions on one.
+  Logic4Vec bit =
+      range.Contains(declared_idx)
+          ? ExtractBitField(arena, base_val,
+                            static_cast<uint32_t>(range.OffsetOf(declared_idx)),
+                            1)
+      : SelectBaseIs4State(expr, ctx) ? MakeAllX(arena, 1)
+                                      : MakeLogic4VecVal(arena, 1, 0);
+  bit.is_signed = SelectsSignedElement(expr, ctx, arena);
+  return bit;
 }
 
 // §7.2 with §7.4.2: `m.v[1]` reads one element of an unpacked array member,

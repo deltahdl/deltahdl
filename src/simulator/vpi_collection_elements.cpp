@@ -7,6 +7,7 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "simulator/assoc_index.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_class_objects.h"

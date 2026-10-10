@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -271,6 +272,28 @@ TEST(WildcardAssocArraySimulation, ForeachRejectionNames7_8_1) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "foreach not allowed on wildcard associative array",
                             6, "7.8.1"));
+}
+
+// §7.8.1: a wildcard index of any integral size is taken by its value, so two
+// indices that differ only above bit 63 are two entries, while 3'b101 and
+// 8'd5, one value at two widths, are one.
+TEST(WildcardAssocArraySimulation, IndexIsKeyedByItsWholeValue) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int c [*];\n"
+      "  initial begin\n"
+      "    c[100'h1_0000_0000_0000_0000] = 1;\n"
+      "    c[100'h2_0000_0000_0000_0000] = 2;\n"
+      "    c[3'b101] = 3;\n"
+      "    c[8'd5] = 4;\n"
+      "    $display(\"%0d %0d %0d %0d\", c.num(), "
+      "c[100'h1_0000_0000_0000_0000],\n"
+      "             c[100'h2_0000_0000_0000_0000], c[5]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 1 2 4\n");
 }
 
 }  // namespace

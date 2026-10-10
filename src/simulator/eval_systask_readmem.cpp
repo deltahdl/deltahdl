@@ -13,6 +13,7 @@
 #include "common/source_loc.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "simulator/assoc_index.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/eval_systask_readmem_internal.h"

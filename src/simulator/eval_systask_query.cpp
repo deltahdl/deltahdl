@@ -12,6 +12,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
+#include "simulator/assoc_index.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
@@ -320,8 +321,8 @@ static QueryDimBounds AssocDimBounds(AssocArrayObject* assoc) {
   if (assoc->int_data.empty()) {
     q.low_high_unknown = true;
   } else {
-    q.low = assoc->int_data.begin()->first;
-    q.high = assoc->int_data.rbegin()->first;
+    q.low = assoc->int_data.begin()->first.Low();
+    q.high = assoc->int_data.rbegin()->first.Low();
   }
   return q;
 }

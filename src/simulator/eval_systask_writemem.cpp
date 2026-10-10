@@ -11,6 +11,7 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "simulator/assoc_index.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
@@ -29,7 +30,7 @@ static void WriteAssocMem(std::ofstream& ofs, bool is_hex,
   for (const auto& entry : aa->int_data) {
     char addr_buf[20];
     std::snprintf(addr_buf, sizeof(addr_buf), "%llx",
-                  static_cast<unsigned long long>(entry.first));
+                  static_cast<unsigned long long>(entry.first.Low()));
     ofs << "@" << addr_buf << "\n";
     ofs << FormatArg(entry.second, is_hex ? 'h' : 'b') << "\n";
   }

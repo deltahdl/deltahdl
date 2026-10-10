@@ -29,6 +29,7 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "simulator/assoc_index.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_internal.h"
@@ -77,8 +78,8 @@ static std::string EvalStrKey(const Expr* expr, SimContext& ctx, Arena& arena) {
   return Vec2Str(EvalExpr(expr, ctx, arena));
 }
 
-static int64_t EvalIntKey(const Expr* expr, SimContext& ctx, Arena& arena,
-                          const AssocKeySpec& spec = {}) {
+static AssocIndex EvalIntKey(const Expr* expr, SimContext& ctx, Arena& arena,
+                             const AssocKeySpec& spec = {}) {
   auto val = EvalExpr(expr, ctx, arena);
   if (HasUnknownBits(val)) {
     ctx.GetDiag().Warning(expr->range.start,
@@ -150,12 +151,16 @@ static bool AssocStrTraversal(AssocArrayObject* aa, std::string_view method,
   return true;
 }
 
-static int WriteTraversalKey(Variable* ref, int64_t key, uint32_t idx_width,
-                             Arena& arena) {
+// §7.9.4 to §7.9.7: the index the traversal reached, written into the index
+// variable at the variable's own width, -1 where that is too narrow to hold an
+// index of the array's index type.
+static int WriteTraversalKey(Variable* ref, const AssocIndex& key,
+                             const AssocArrayObject& aa, Arena& arena) {
   uint32_t w = ref->value.width;
   if (w == 0) w = 32;
-  ref->value = MakeLogic4VecVal(arena, w, static_cast<uint64_t>(key));
-  return (w < idx_width) ? -1 : 1;
+  bool is_signed = ref->value.is_signed;
+  ref->value = key.ToVec(arena, w, is_signed);
+  return (w < aa.index_width) ? -1 : 1;
 }
 
 static bool AssocIntTraversal(AssocArrayObject* aa, std::string_view method,
@@ -166,18 +171,18 @@ static bool AssocIntTraversal(AssocArrayObject* aa, std::string_view method,
     return true;
   }
   if (method == "first") {
-    auto r =
-        WriteTraversalKey(ref_var, m.begin()->first, aa->index_width, arena);
+    auto r = WriteTraversalKey(ref_var, m.begin()->first, *aa, arena);
     out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(r));
     return true;
   }
   if (method == "last") {
-    auto r =
-        WriteTraversalKey(ref_var, m.rbegin()->first, aa->index_width, arena);
+    auto r = WriteTraversalKey(ref_var, m.rbegin()->first, *aa, arena);
     out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(r));
     return true;
   }
-  auto cur_key = static_cast<int64_t>(ref_var->value.ToUint64());
+  // The argument is an index of the array's index type, read as one.
+  AssocIndex cur_key = AssocIntKey(ref_var->value, aa->is_wildcard,
+                                   aa->index_width, aa->is_index_signed);
   if (method == "next") {
     // §7.9.6 — next() yields the smallest index strictly greater than the
     // argument value. The argument need not itself be a stored index, so
@@ -187,7 +192,7 @@ static bool AssocIntTraversal(AssocArrayObject* aa, std::string_view method,
       out = MakeLogic4VecVal(arena, 32, 0);
       return true;
     }
-    auto r = WriteTraversalKey(ref_var, it->first, aa->index_width, arena);
+    auto r = WriteTraversalKey(ref_var, it->first, *aa, arena);
     out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(r));
     return true;
   }
@@ -200,7 +205,7 @@ static bool AssocIntTraversal(AssocArrayObject* aa, std::string_view method,
     return true;
   }
   --it;
-  auto r = WriteTraversalKey(ref_var, it->first, aa->index_width, arena);
+  auto r = WriteTraversalKey(ref_var, it->first, *aa, arena);
   out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(r));
   return true;
 }
@@ -216,12 +221,8 @@ std::vector<Logic4Vec> AssocIndexValues(const AssocArrayObject* aa,
   }
   keys.reserve(aa->int_data.size());
   uint32_t width = aa->index_width == 0 ? 32 : aa->index_width;
-  for (const auto& [key, val] : aa->int_data) {
-    Logic4Vec index =
-        MakeLogic4VecVal(arena, width, static_cast<uint64_t>(key));
-    index.is_signed = aa->is_index_signed;
-    keys.push_back(index);
-  }
+  for (const auto& [key, val] : aa->int_data)
+    keys.push_back(key.ToVec(arena, width, aa->is_index_signed));
   return keys;
 }
 

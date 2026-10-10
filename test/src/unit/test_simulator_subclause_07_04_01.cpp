@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -134,6 +137,41 @@ TEST(PackedArraySimulation, ByteCanBeSelectedAsPackedArray) {
       "endmodule\n",
       "result");
   EXPECT_EQ(v, 0xAu);
+}
+
+// §7.4.1: an element of a packed array is signed when its type is a named type
+// declared signed, so widening one sign-extends and it compares below zero.
+// Only an element of that type is: `z[1]` of `s8_t [1:0][1:0] z` is a packed
+// array of two s8_t and stays unsigned, while `z[1][0]` is an s8_t. The rule
+// holds for an element of an unpacked array's element, `y[1][0]`, and for a
+// one-bit named type, whose element a bit-select reads.
+TEST(PackedArraySimulation, ElementOfSignedNamedTypeIsSigned) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef logic signed [7:0] s8_t;\n"
+      "  typedef bit signed s1_t;\n"
+      "  s8_t [1:0] x;\n"
+      "  s8_t [1:0][1:0] z;\n"
+      "  s8_t [1:0] y [2];\n"
+      "  s1_t [3:0] b;\n"
+      "  logic signed [15:0] r, rz, ry, rb;\n"
+      "  logic signed [31:0] ru;\n"
+      "  initial begin\n"
+      "    x[1] = 8'h80;\n"
+      "    z[1] = 16'h8080;\n"
+      "    y[1][0] = 8'h80;\n"
+      "    b[1] = 1'b1;\n"
+      "    r = x[1];\n"
+      "    rz = z[1][0];\n"
+      "    ru = z[1];\n"
+      "    ry = y[1][0];\n"
+      "    rb = b[1];\n"
+      "    $display(\"%h %h %h %h %h %0d\", r, rz, ru, ry, rb, x[1] < 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "ff80 ff80 00008080 ff80 ffff 1\n");
 }
 
 }  // namespace

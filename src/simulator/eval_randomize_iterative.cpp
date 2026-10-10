@@ -10,6 +10,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "simulator/assoc_index.h"
 #include "simulator/class_object.h"
 #include "simulator/constraint_solver.h"
 #include "simulator/eval_array_internal.h"
@@ -301,7 +302,7 @@ Expr* AssocKeyLiteral(const RandInfo& ri, std::string_view array,
                       const Expr* like, Arena& arena) {
   bool string_key =
       ri.name.size() > array.size() + 1 && ri.name[array.size() + 1] == '"';
-  if (!string_key) return IndexLiteral(ri.int_key, like, arena);
+  if (!string_key) return IndexLiteral(ri.int_key.Low(), like, arena);
   std::string text = "\"" + ri.str_key + "\"";
   auto* literal = arena.Create<Expr>();
   literal->kind = ExprKind::kStringLiteral;

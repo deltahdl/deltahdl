@@ -13,6 +13,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 #include "simulator/assoc_element.h"
+#include "simulator/assoc_index.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
@@ -161,12 +162,12 @@ QueueObject* OfAssocElement(AssocArrayObject* aa, const Expr* sel,
         key, allocate, arena);
   }
   if (HasUnknownBits(idx)) return nullptr;
-  int64_t key =
+  AssocIndex key =
       AssocIntKey(idx, aa->is_wildcard, aa->index_width, aa->is_index_signed);
   if (!allocate)
     WarnAssocElementMiss(aa, aa->int_data.count(key) != 0, sel, ctx);
   return AssocElementQueue(
-      aa, KeyedEntries<int64_t>{aa->int_data, aa->int_element_queues}, key,
+      aa, KeyedEntries<AssocIndex>{aa->int_data, aa->int_element_queues}, key,
       allocate, arena);
 }
 

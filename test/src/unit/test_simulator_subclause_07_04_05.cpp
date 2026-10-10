@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 #include "builders_ast.h"
@@ -866,6 +867,42 @@ TEST(ArrayIndexingAndSlicing, ArraySliceAsValueOfSixtyFourBitElements) {
   ASSERT_EQ(var->value.nwords, 2u);
   EXPECT_EQ(var->value.words[0].aval, 0x1122334455667788ull);
   EXPECT_EQ(var->value.words[1].aval, 0x99AABBCCDDEEFF00ull);
+}
+
+// §7.4.5, Table 7-1: an unpacked structure read at an invalid index, out of
+// bounds or holding an x, gives each member the value the table gives its own
+// type -- x for a 4-state member, 0 for a 2-state one, whether written as a
+// keyword or through a typedef name, and a packed structure 0 only when every
+// member of it is 2-state -- and a member written with an initial assignment
+// (§7.2.2) its initializer. A member of an unpacked structure type is filled
+// the same way in turn. An unpacked union gives the value of its first
+// member's type, so the 2-state int makes every member of it read 0. An array
+// of a packed structure reads the vector's x.
+TEST(ArrayIndexingAndSlicing, InvalidIndexReadsAStructureMemberByMember) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  typedef bit [3:0] n_t;\n"
+      "  typedef struct packed { bit p; int q; } p2_t;\n"
+      "  typedef struct packed { bit p; logic q; } p4_t;\n"
+      "  typedef struct { logic m; byte n; } in_t;\n"
+      "  typedef struct { int a = 5; logic b; int c; n_t d; p2_t e;\n"
+      "                   in_t g; p4_t h; } s_t;\n"
+      "  typedef union { int i; logic [31:0] l; } u_t;\n"
+      "  s_t arr [2];\n"
+      "  u_t ua [2];\n"
+      "  p4_t pa [2];\n"
+      "  int k = 7;\n"
+      "  logic [31:0] kx = 'x;\n"
+      "  initial begin\n"
+      "    $display(\"%0d %b %0d %0d %0d %b\", arr[k].a, arr[k].b, arr[k].c,\n"
+      "             arr[k].d, arr[k].e, arr[k].h);\n"
+      "    $display(\"%0d %b %0d\", arr[kx].a, arr[kx].b, arr[kx].c);\n"
+      "    $display(\"%0d %0h %b\", ua[k].i, ua[k].l, pa[k]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "5 x 0 0 0 xx\n5 x 0\n0 0 xx\n");
 }
 
 }  // namespace

@@ -407,4 +407,66 @@ TEST(IntegralIndexAssocArraySimulation,
   EXPECT_EQ(out, "-3 5 15 -3\n");
 }
 
+// §7.8.4: the index is cast to an index type that may be wider than 64 bits,
+// and two indices differing in any bit are two entries, ordered by their whole
+// value: the two keys below differ only above bit 63. An unsigned 64-bit index
+// type orders a key with bit 63 set after every small key, and a signed one
+// orders -1 first, and -2**64 ahead of -1 where the type is wider still.
+// first(), last(), next(), prev() and foreach hand back the whole index.
+TEST(IntegralIndexAssocArraySimulation, IndexIsKeyedAndOrderedByItsWholeValue) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int w [bit [99:0]];\n"
+      "  int u [bit [63:0]];\n"
+      "  int s [longint];\n"
+      "  int sw [bit signed [99:0]];\n"
+      "  bit [99:0] kw;\n"
+      "  bit [63:0] k;\n"
+      "  longint ks;\n"
+      "  bit signed [99:0] kws;\n"
+      "  initial begin\n"
+      "    w[100'h1_0000_0000_0000_0000] = 1;\n"
+      "    w[100'h2_0000_0000_0000_0000] = 2;\n"
+      "    w[5] = 3;\n"
+      "    u[64'h8000_0000_0000_0000] = 1;\n"
+      "    u[1] = 2;\n"
+      "    s[1] = 1;\n"
+      "    s[-1] = 2;\n"
+      "    sw[-1] = 1;\n"
+      "    sw[{100{1'b1}} << 64] = 2;\n"
+      "    $display(\"%0d %0d %0d\", w.num(), w[100'h2_0000_0000_0000_0000],\n"
+      "             w.exists(100'h3_0000_0000_0000_0000));\n"
+      "    void'(w.last(kw));\n"
+      "    $display(\"%0h\", kw);\n"
+      "    void'(w.prev(kw));\n"
+      "    $display(\"%0h\", kw);\n"
+      "    void'(u.first(k));\n"
+      "    $display(\"%0h\", k);\n"
+      "    void'(u.next(k));\n"
+      "    $display(\"%0h\", k);\n"
+      "    void'(s.first(ks));\n"
+      "    $display(\"%0d\", ks);\n"
+      "    void'(sw.first(kws));\n"
+      "    $display(\"%0d\", kws);\n"
+      "    void'(sw.next(kws));\n"
+      "    $display(\"%0d\", kws);\n"
+      "    foreach (w[i]) $display(\"%0h\", i);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "3 2 0\n"
+            "20000000000000000\n"
+            "10000000000000000\n"
+            "1\n"
+            "8000000000000000\n"
+            "-1\n"
+            "-18446744073709551616\n"
+            "-1\n"
+            "5\n"
+            "10000000000000000\n"
+            "20000000000000000\n");
+}
+
 }  // namespace

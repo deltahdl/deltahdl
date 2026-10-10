@@ -568,7 +568,7 @@ bool TryClassArrayNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!ResolveClassArray(stmt->lhs, ctx, arena, ref) || !ref.prop->is_dynamic)
     return false;
   Logic4Vec size_val = EvalExpr(rhs->args[0], ctx, arena);
-  int64_t size = SignExtend(size_val.ToUint64(), size_val.width);
+  int64_t size = LongintValue(size_val);
   if (size < 0) {
     ctx.GetDiag().Error(rhs->args[0]->range.start,
                         "dynamic array new[] size is negative",

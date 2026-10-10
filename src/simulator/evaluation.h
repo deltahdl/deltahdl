@@ -13,6 +13,7 @@
 #include "common/source_loc.h"
 #include "common/types.h"
 #include "lexer/token.h"
+#include "simulator/assoc_index.h"
 
 namespace delta {
 
@@ -147,6 +148,12 @@ int64_t SignExtend(uint64_t val, uint32_t width);
 // names a bit of a real object had before.
 int64_t SelectBoundValue(const Logic4Vec& val);
 
+// §6.24.1 with §11.8.2 — the value `val` takes cast to longint: sign-extended
+// when it is signed and zero-extended when it is not, then cut to 64 bits. The
+// size operand of new[] (§7.5.1) is read this way, so an unsigned operand with
+// its top bit set is a size and not a negative number.
+int64_t LongintValue(const Logic4Vec& val);
+
 // §7.10.1 — the value a read of a queue element that is not there yields. An
 // invalid index (a 4-state expression with an x or z bit, or a value outside
 // 0...$) reads as the value Table 7-1 in §7.4.5 gives a nonexistent array entry
@@ -181,13 +188,14 @@ double RealVecToDouble(const Logic4Vec& v);
 Logic4Vec MakeRealVec(Arena& arena, double val, uint32_t width);
 
 // §7.8.1/§7.8.4 — canonicalize an integral associative-array index into its
-// map key. A wildcard index ([*]) is self-determined and treated as unsigned:
-// leading zeros are dropped and the minimal numeric value is used, so equal
-// values of differing widths collapse to one entry. A typed integral index is
-// cast to its index width: sign-extended when the index type is signed and
-// zero-extended when it is unsigned, which fixes the key ordering.
-int64_t AssocIntKey(const Logic4Vec& val, bool is_wildcard,
-                    uint32_t index_width, bool is_signed = true);
+// map key (AssocIndex::Of). A wildcard index ([*]) is self-determined and
+// treated as unsigned: leading zeros are dropped and the minimal numeric value
+// is used, so equal values of differing widths collapse to one entry. A typed
+// integral index is cast to its index type, however wide: sign-extended when
+// the index type is signed and zero-extended when it is unsigned, which fixes
+// the key ordering.
+AssocIndex AssocIntKey(const Logic4Vec& val, bool is_wildcard,
+                       uint32_t index_width, bool is_signed = true);
 
 // §7.8.2 — the map key a string associative-array index evaluates to. The
 // index arrives as a vector holding the characters most significant first, and

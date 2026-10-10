@@ -10,6 +10,7 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
+#include "simulator/assoc_index.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
@@ -504,10 +505,7 @@ void CollectAssocKeyVals(const AssocArrayObject& aa, Arena& arena,
     return;
   }
   for (const auto& [k, v] : aa.int_data) {
-    Logic4Vec key =
-        MakeLogic4VecVal(arena, aa.index_width, static_cast<uint64_t>(k));
-    key.is_signed = aa.is_index_signed;
-    keys.push_back(key);
+    keys.push_back(k.ToVec(arena, aa.index_width, aa.is_index_signed));
     vals.push_back(v);
     TakeElementSignedness(aa, vals.back());
   }
@@ -891,8 +889,7 @@ static void MapIntKeyedAssoc(const LocatorEnv& env, const LocatorCtx& lc,
         ctx.CreateLocalVariable(lc.iter_name, val.width, aa.is_signed);
     item_var->value = val;
     auto* idx_var = ctx.CreateLocalVariable(lc.idx_var_name, kIw);
-    idx_var->value =
-        MakeLogic4VecVal(env.arena, kIw, static_cast<uint64_t>(key));
+    idx_var->value = key.ToVec(env.arena, kIw, aa.is_index_signed);
     Logic4Vec mapped = EvalExpr(lc.with_expr, ctx, env.arena);
     ctx.PopScope();
     out.int_data[key] = mapped;

@@ -7,6 +7,7 @@
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
+#include "simulator/assoc_index.h"
 #include "simulator/class_object.h"
 #include "simulator/sim_context_types.h"
 
@@ -90,7 +91,7 @@ TEST(ClassIndexAssocArraySimulation, ClassIndex_DeterministicOrdering) {
   std::vector<int64_t> keys;
   keys.reserve(aa->int_data.size());
   for (auto& [k, _] : aa->int_data) {
-    keys.push_back(k);
+    keys.push_back(k.Low());
   }
   EXPECT_EQ(keys.size(), 3u);
 

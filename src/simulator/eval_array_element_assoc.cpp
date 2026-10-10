@@ -8,6 +8,7 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "simulator/assoc_element.h"
+#include "simulator/assoc_index.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context_types.h"
@@ -64,11 +65,12 @@ AssocArrayObject* ElementAssocOfSelect(const Expr* sel, SimContext& ctx,
         AssocStringKey(idx), allocate, arena);
   }
   if (HasUnknownBits(idx)) return nullptr;
-  int64_t key = AssocIntKey(idx, outer->is_wildcard, outer->index_width,
-                            outer->is_index_signed);
+  AssocIndex key = AssocIntKey(idx, outer->is_wildcard, outer->index_width,
+                               outer->is_index_signed);
   return ElementAssoc(
-      outer, KeyedAssocs<int64_t>{outer->int_data, outer->int_element_assocs},
-      key, allocate, arena);
+      outer,
+      KeyedAssocs<AssocIndex>{outer->int_data, outer->int_element_assocs}, key,
+      allocate, arena);
 }
 
 }  // namespace delta

@@ -96,6 +96,10 @@ void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
   if (span(range.left, range.right) * stride != v->value.width) return;
   v->packed_range = range;
   v->has_packed_range = true;
+  // §7.4.1: the elements a select reaches through every dimension written
+  // here are of the named type, signed when it was declared so.
+  if (dt->kind == DataTypeKind::kNamed && DeclaredTypeIsSigned(*dt, ctx))
+    v->signed_elem_depth = dt->extra_packed_dims.size();
 }
 
 // §6.20.2 lets a value parameter's expression name literals, parameters,

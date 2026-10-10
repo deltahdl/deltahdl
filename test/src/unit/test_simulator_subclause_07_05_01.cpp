@@ -621,4 +621,29 @@ TEST(DynamicArrayNewSimulation, NewSizesEachElementOfAnArrayOfDynamicArrays) {
   EXPECT_EQ(out, "3 0 2 5 9\n0 3 6 4 8\n");
 }
 
+// §7.5.1: the size operand is a longint, and an unsigned operand converts to
+// one by zero-extension, so a 4-bit 8 with its top bit set is a size of eight
+// and not -8: in a declaration, in a procedural assignment and in an
+// assignment to a class's dynamic array property alike.
+TEST(DynamicArrayNewSimulation, UnsignedSizeWithTopBitSetIsNotNegative) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class C; int d[]; endclass\n"
+      "  bit [3:0] n = 4'd8;\n"
+      "  int a[] = new[4'd8];\n"
+      "  int b[];\n"
+      "  C c;\n"
+      "  initial begin\n"
+      "    b = new[n];\n"
+      "    c = new;\n"
+      "    c.d = new[n];\n"
+      "    $display(\"%0d %0d %0d\", a.size(), b.size(), c.d.size());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "8 8 8\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

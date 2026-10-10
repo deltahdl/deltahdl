@@ -7,6 +7,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "lexer/token.h"
+#include "simulator/assoc_index.h"
 #include "simulator/evaluation.h"
 #include "simulator/evaluation_internal.h"
 #include "simulator/wide_arith.h"
@@ -574,22 +575,9 @@ int64_t SignExtend(uint64_t val, uint32_t width) {
   return static_cast<int64_t>((val ^ mask) - mask);
 }
 
-int64_t AssocIntKey(const Logic4Vec& val, bool is_wildcard,
-                    uint32_t index_width, bool is_signed) {
-  // A wildcard index keeps its self-determined, unsigned value. A typed
-  // integral index is cast to its declared width per §7.8.4: a signed index
-  // type is sign-extended, an unsigned index type is zero-extended. Because
-  // the key map orders by signed int64, a zero-extended (non-negative) key
-  // yields the unsigned numeric ordering an unsigned index type requires.
-  // The value is cut to the index width first, since SignExtend reads the
-  // sign bit of a value already that wide: -3 to an 8-bit signed index,
-  // 0xfffffffd from its 32-bit literal, kept its upper bits and keyed
-  // 4294967293, ordered after 5.
-  if (is_wildcard) return static_cast<int64_t>(val.ToUint64());
-  uint64_t raw = val.ToUint64();
-  if (index_width < 64) raw &= (uint64_t{1} << index_width) - 1;
-  if (is_signed) return SignExtend(raw, index_width);
-  return static_cast<int64_t>(raw);
+AssocIndex AssocIntKey(const Logic4Vec& val, bool is_wildcard,
+                       uint32_t index_width, bool is_signed) {
+  return AssocIndex::Of(val, is_wildcard, index_width, is_signed);
 }
 
 std::string AssocStringKey(const Logic4Vec& val) {

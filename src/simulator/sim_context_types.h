@@ -11,6 +11,7 @@
 
 #include "common/types.h"
 #include "parser/ast_type.h"
+#include "simulator/assoc_index.h"
 #include "simulator/class_object.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"
@@ -339,14 +340,14 @@ struct AssocArrayObject;
 struct AssocRefBinding {
   AssocArrayObject* assoc = nullptr;
   bool is_string_key = false;
-  int64_t int_key = 0;
+  AssocIndex int_key;
   std::string str_key;
   Variable* local_var = nullptr;
   std::string_view var_name;
 };
 
 struct AssocArrayObject {
-  std::map<int64_t, Logic4Vec> int_data;
+  std::map<AssocIndex, Logic4Vec> int_data;
   std::map<std::string, Logic4Vec> str_data;
   uint32_t elem_width = 32;
   uint32_t index_width = 32;
@@ -402,7 +403,7 @@ struct AssocArrayObject {
   // keyed the way the element itself is. An associative array's keys are its
   // elements' identities, so a record outlives every insertion and deletion of
   // another entry and goes only when its own entry is deleted.
-  std::map<int64_t, ElementDrive> int_drives;
+  std::map<AssocIndex, ElementDrive> int_drives;
   std::map<std::string, ElementDrive> str_drives;
   // §7.8 with §7.10 (printed pages 163 and 169): whether each element is
   // itself a queue, `int aq[string][$]` or UVM's `rsrc_sv_q_t all[int]` under
@@ -425,7 +426,7 @@ struct AssocArrayObject {
   int64_t element_array_lo = 0;
   bool element_array_descending = false;
   std::vector<FixedDimShape> element_inner_dims;
-  std::map<int64_t, QueueObject*> int_element_queues;
+  std::map<AssocIndex, QueueObject*> int_element_queues;
   std::map<std::string, QueueObject*> str_element_queues;
   // §7.8 with §7.4 (printed pages 162 and 153): for an array whose element
   // type is an associative array, `int m[string][int]`, the empty array each
@@ -434,7 +435,7 @@ struct AssocArrayObject {
   // str_data marks the key present and the element's own array is kept under
   // the same key below (ElementAssocOfSelect in eval_array_element_assoc.h).
   const AssocArrayObject* element_assoc = nullptr;
-  std::map<int64_t, AssocArrayObject*> int_element_assocs;
+  std::map<AssocIndex, AssocArrayObject*> int_element_assocs;
   std::map<std::string, AssocArrayObject*> str_element_assocs;
   uint32_t Size() const;
 };

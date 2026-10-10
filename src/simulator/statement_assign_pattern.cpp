@@ -862,7 +862,7 @@ bool TryQueueBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (stmt->rhs->kind == ExprKind::kCall && stmt->rhs->text == "new" &&
       !stmt->rhs->args.empty()) {
     auto sz_val = EvalExpr(stmt->rhs->args[0], ctx, arena);
-    int64_t sz = SignExtend(sz_val.ToUint64(), sz_val.width);
+    int64_t sz = LongintValue(sz_val);
 
     if (sz < 0) {
       ctx.GetDiag().Error(stmt->rhs->args[0]->range.start,

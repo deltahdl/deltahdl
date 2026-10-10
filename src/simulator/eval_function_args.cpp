@@ -12,6 +12,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 #include "simulator/assoc_element.h"
+#include "simulator/assoc_index.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_queue.h"

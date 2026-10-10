@@ -515,7 +515,7 @@ static bool LowerDynArrayNewInit(const Expr* init_expr, QueueObject* q,
     return false;
 
   auto sz_val = EvalExpr(init_expr->args[0], ctx, arena);
-  int64_t sz = SignExtend(sz_val.ToUint64(), sz_val.width);
+  int64_t sz = LongintValue(sz_val);
   if (sz < 0) {
     ctx.GetDiag().Error(init_expr->args[0]->range.start,
                         "dynamic array new[] size is negative",

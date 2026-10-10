@@ -68,6 +68,17 @@ const StructTypeInfo* ContainerElementLayout(const Expr* base, SimContext& ctx);
 bool TryContainerElementMember(const Expr* expr, SimContext& ctx, Arena& arena,
                                Logic4Vec& out);
 
+// §7.4.5, Table 7-1: the value an element of an array of the unpacked
+// structure or union `layout` reads at an invalid index. A structure gives each
+// member the value the table gives that member's type -- '0 for a 2-state type,
+// 'x for a 4-state one -- and a member declared with an initial assignment
+// (§7.2.2) that initializer; a union gives the value of its first member's
+// type. A member of an unpacked structure type is filled member by member in
+// turn, and one of a packed type is a single vector, '0 when every member of
+// it is 2-state.
+Logic4Vec NonexistentAggregateElement(const StructTypeInfo& layout,
+                                      SimContext& ctx, Arena& arena);
+
 // §7.2.1 with §8.5: the bits a member of a packed structure property
 // occupies: the property, the member's lowest bit and its width.
 struct PackedMemberBits {

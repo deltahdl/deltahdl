@@ -1,5 +1,7 @@
 #include "simulator/eval_member_path.h"
 
+#include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -471,6 +473,58 @@ bool ResolveStructArrayElement(const Expr* select, SimContext& ctx,
       offset + (field->elem_count - 1 - static_cast<uint32_t>(pos)) * out.width;
   out.in_range = true;
   return true;
+}
+
+// §6.11.2 with §6.12 and §6.16: the member types whose Table 7-1 value is '0.
+constexpr std::array kTwoStateMemberKinds = {
+    DataTypeKind::kBit,    DataTypeKind::kByte,     DataTypeKind::kShortint,
+    DataTypeKind::kInt,    DataTypeKind::kLongint,  DataTypeKind::kShortreal,
+    DataTypeKind::kReal,   DataTypeKind::kRealtime, DataTypeKind::kString,
+    DataTypeKind::kChandle};
+
+static bool LayoutIsTwoState(const StructTypeInfo& layout, SimContext& ctx);
+
+// Whether the member `f` is of a 2-state type: a 2-state kind, written or
+// reached through a typedef name, or a packed aggregate every member of which
+// is.
+static bool MemberIsTwoState(const StructFieldInfo& f, SimContext& ctx) {
+  if (f.nested != nullptr) return LayoutIsTwoState(*f.nested, ctx);
+  DataTypeKind kind = f.type_kind == DataTypeKind::kNamed
+                          ? ctx.FindTypeKind(f.type_name)
+                          : f.type_kind;
+  return std::ranges::find(kTwoStateMemberKinds, kind) !=
+         kTwoStateMemberKinds.end();
+}
+
+static bool LayoutIsTwoState(const StructTypeInfo& layout, SimContext& ctx) {
+  return std::ranges::all_of(layout.fields, [&](const StructFieldInfo& f) {
+    return MemberIsTwoState(f, ctx);
+  });
+}
+
+// Clears the members of `layout`, laid at `base` in `value`, whose type is
+// 2-state, descending into a member of an unpacked aggregate type; of a union
+// only the first member counts.
+static void ClearTwoStateMembers(Logic4Vec& value, const StructTypeInfo& layout,
+                                 uint32_t base, SimContext& ctx, Arena& arena) {
+  size_t count = layout.is_union ? 1 : layout.fields.size();
+  for (size_t i = 0; i < count; ++i) {
+    const StructFieldInfo& f = layout.fields[i];
+    if (f.nested != nullptr && !f.nested->is_packed) {
+      ClearTwoStateMembers(value, *f.nested, base + f.bit_offset, ctx, arena);
+    } else if (MemberIsTwoState(f, ctx)) {
+      DepositBitField(value, base + f.bit_offset,
+                      MakeLogic4VecVal(arena, f.width, 0), f.width);
+    }
+  }
+}
+
+Logic4Vec NonexistentAggregateElement(const StructTypeInfo& layout,
+                                      SimContext& ctx, Arena& arena) {
+  Logic4Vec value = MakeAllX(arena, layout.total_width);
+  ClearTwoStateMembers(value, layout, 0, ctx, arena);
+  ApplyLayoutDefaults(value, layout, 0, ctx, arena);
+  return value;
 }
 
 bool TryContainerElementMember(const Expr* expr, SimContext& ctx, Arena& arena,

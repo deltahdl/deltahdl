@@ -202,6 +202,14 @@ struct Variable {
   // it the eight bits 23 to 16 and `z[1][0][3]` their bit 3, storage bit 19.
   std::vector<PackedRange> inner_packed_dims;
 
+  // §7.4.1: how many single-index selects deep an element of this variable is
+  // of the named type its declaration's packed dimensions are written on, when
+  // that type was declared signed -- 0 for `x[1]` of `s8_t [1:0] x`, 1 for
+  // `z[1][0]` of `s8_t [1:0][1:0] z` -- and none otherwise. An element there is
+  // signed; every other element of a packed array, and every part-select, is
+  // unsigned.
+  std::optional<size_t> signed_elem_depth;
+
   // The range an index in a select of this variable is resolved against.
   PackedRange DeclaredRange() const {
     return has_packed_range ? packed_range : PackedRange::Implicit(value.width);

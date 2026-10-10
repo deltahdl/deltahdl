@@ -13,6 +13,7 @@
 #include "common/types.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
+#include "simulator/assoc_index.h"
 #include "simulator/class_object.h"
 #include "simulator/constraint_solver.h"
 #include "simulator/evaluation.h"
@@ -109,7 +110,7 @@ struct RandInfo {
   // §18.4: for an element of a rand member declared as an associative array,
   // the key it is held under, an integer or, for a string index, `str_key`.
   bool in_assoc = false;
-  int64_t int_key = 0;
+  AssocIndex int_key;
   std::string str_key;
   // §18.4: for a rand member of a rand unpacked structure property, the
   // property's name and the member's lowest bit in the value it holds, into

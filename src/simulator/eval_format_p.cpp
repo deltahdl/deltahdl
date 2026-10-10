@@ -13,12 +13,14 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
+#include "simulator/assoc_index.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_array_element_queue.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_expr_internal.h"
+#include "simulator/eval_format_internal.h"
 #include "simulator/eval_function_args_scoped.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
@@ -375,7 +377,8 @@ static std::optional<std::string> BuildFormatPAssoc(std::string_view name,
       add_item("\"" + k + "\"", value_of(aa->str_element_queues, k, v));
   } else {
     for (const auto& [k, v] : aa->int_data)
-      add_item(std::to_string(k), value_of(aa->int_element_queues, k, v));
+      add_item(FormatDecimalDigits(k.ToSignedVec(ctx.GetArena())),
+               value_of(aa->int_element_queues, k, v));
   }
   out += "}";
   return out;

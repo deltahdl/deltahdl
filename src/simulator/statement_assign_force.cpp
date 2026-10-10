@@ -11,6 +11,7 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
+#include "simulator/assoc_index.h"
 #include "simulator/eval_array.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
@@ -82,7 +83,7 @@ struct ContainerElement {
   AssocArrayObject* assoc = nullptr;
   uint64_t queue_id = 0;
   bool string_key = false;
-  int64_t int_key = 0;
+  AssocIndex int_key;
   std::string str_key;
   std::string name;
   uint32_t elem_width = 32;

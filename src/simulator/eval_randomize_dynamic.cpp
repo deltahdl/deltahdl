@@ -11,6 +11,7 @@
 #include "common/types.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
+#include "simulator/assoc_index.h"
 #include "simulator/class_object.h"
 #include "simulator/constraint_solver.h"
 #include "simulator/dyn_struct_member.h"
@@ -196,7 +197,7 @@ void AddAssocElements(const ClassMember* m, const ClassTypeInfo* level,
     rands.push_back(std::move(elem));
   };
   for (const auto& [key, value] : aa.int_data) {
-    add(ClassArrayElementKey(m->name, key));
+    add(ClassArrayElementKey(m->name, key.Low()));
     rands.back().int_key = key;
   }
   for (const auto& [key, value] : aa.str_data) {
