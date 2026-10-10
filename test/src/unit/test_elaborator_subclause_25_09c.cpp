@@ -4,7 +4,8 @@
 // test_elaborator_subclause_25_09b.cpp writes reach the virtual interface
 // through a variable or a class property; the cases here reach the class that
 // holds the property through a nested class, a typedef its own scope resolves
-// and a forward typedef, and index an array of virtual interfaces.
+// and a forward typedef, index an array of virtual interfaces, and stand in
+// the methods of a class.
 
 #include <gtest/gtest.h>
 
@@ -269,6 +270,62 @@ TEST(VirtualInterfaceArrayElaboration, AValueRangeSelectsFromNothing) {
       "endmodule\n",
       f, "top");
   EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §25.9 with §8.3: a call in a method of a class, through a virtual interface
+// property the class declares (line 3), one a class nested in it declares
+// (line 5), one it inherits (§8.13, line 9), or one of a class a package or a
+// module declares (lines 13 and 16), naming nothing the interface declares, is
+// reported (#5823), as is one in a method defined out of its class's body
+// (§8.24, line 11). A property of a derived class shadows the base's of its
+// name, and the call through it, no virtual interface, is not checked against
+// the interface (line 10); the valid calls are not reported (line 4). A call
+// of a method's local variable names data (A.8.2, line 7).
+TEST(VirtualInterfaceCallElaboration, ACallInAClassMethod) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc; task t(); endtask endinterface\n"
+      "class C; virtual ifc vif;\n"
+      "  task run(); vif.nosuch(); endtask\n"
+      "  task ok(int a); vif.t(); ok(1); endtask\n"
+      "  class In; virtual ifc iv; task r(); iv.nosuch(); endtask endclass\n"
+      "  extern task late();\n"
+      "  task w(); int d; d(); endtask\n"
+      "endclass\n"
+      "class D extends C; task r(); vif.nosuch(); endtask endclass\n"
+      "class E extends C; int vif; task r(); vif.nosuch(); endtask endclass\n"
+      "task C::late(); vif.nosuch(); endtask\n"
+      "package p;\n"
+      "  class K; virtual ifc vif; task r(); vif.nosuch(); endtask endclass\n"
+      "endpackage\n"
+      "module top;\n"
+      "  class M; virtual ifc vif; task r(); vif.nosuch(); endtask endclass\n"
+      "endmodule\n",
+      f, "top");
+  for (const uint32_t kLine : {3u, 5u, 9u, 11u, 13u, 16u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoSuch, kLine, "25.9"))
+        << kLine;
+  }
+  EXPECT_TRUE(NoErrorOnLine(f, 4));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kNoSuch, 10, "25.9"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'d' names a variable or a net, and a call names a task or a function", 7,
+      "A.8.2"));
+}
+
+// §8.24: a method defined out of the body of a class the scope does not
+// declare, Nope::t2, has no class scope to be walked in, and the call it
+// writes through a name no property bears is not checked against an
+// interface.
+TEST(VirtualInterfaceCallElaboration, AMethodOutOfTheBodyOfNoClass) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc; task t(); endtask endinterface\n"
+      "task Nope::t2(); vif.nosuch(); endtask\n"
+      "module top; endmodule\n",
+      f, "top");
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kNoSuch, 2, "25.9"));
 }
 
 }  // namespace

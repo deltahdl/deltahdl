@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <format>
 #include <functional>
+#include <initializer_list>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -25,6 +26,11 @@
 namespace delta {
 
 namespace {
+
+// The kind of scope a type name is written in (§23.9): a module's, which the
+// compilation unit's scope surrounds, the compilation unit's own, or a
+// package's, which sees neither (§26.2).
+enum class SiteKind : std::uint8_t { kModule, kUnit, kPackage };
 
 // A variable's declaration: the type it was declared with and the number of
 // unpacked dimensions it writes after its name (§7.4).
@@ -50,6 +56,9 @@ struct DataScope {
   std::vector<std::pair<std::string_view, DeclaredVar>> blocks = {};
   std::unordered_set<std::string_view> uncallable = {};
   std::unordered_set<std::string_view> subroutines = {};
+  // The kind of scope `items` belong to, which the types of the scope's
+  // variables are looked up from.
+  SiteKind site = SiteKind::kModule;
 
   bool Names(std::string_view name) const {
     return module.contains(name) ||
@@ -160,11 +169,6 @@ std::string_view DeclaredName(const ModuleItem& item) {
   return item.kind == ModuleItemKind::kClassDecl ? item.class_decl->name
                                                  : item.name;
 }
-
-// The kind of scope a type name is written in (§23.9): a module's, which the
-// compilation unit's scope surrounds, the compilation unit's own, or a
-// package's, which sees neither (§26.2).
-enum class SiteKind : std::uint8_t { kModule, kUnit, kPackage };
 
 // Where a type name is looked up: among the items of the scope it is written
 // in, those before `end` alone, as a typedef names only a type declared before
@@ -301,7 +305,7 @@ FoundItem TypedefOf(const CompilationUnit& unit, const TypeSite& site,
 // typedef naming no type the parser has not yet read, so the walk ends.
 const ClassDecl* ClassNamed(const DataScope& scope, const DataType& type) {
   const CompilationUnit& unit = scope.unit;
-  TypeSite site{&scope.items, scope.items.size(), SiteKind::kModule};
+  TypeSite site{&scope.items, scope.items.size(), scope.site};
   const DataType* named = &type;
   for (FoundItem def = TypedefOf(unit, site, *named); def.item != nullptr;
        def = TypedefOf(unit, site, *named)) {
@@ -447,9 +451,7 @@ void CheckStmtCalls(const Stmt* stmt, DataScope& scope, DiagEngine& diag) {
 
 // §13.3: each call the body of the task or function `item` writes, the
 // subroutine's formal arguments and the variables its body declares in scope
-// over its statements as a block's are (§23.9). A method of a class defined
-// out of its class's body (§8.24) is not the module's subroutine, its scope
-// being the class's, and is not walked.
+// over its statements as a block's are (§23.9).
 void CheckSubroutineCalls(const ModuleItem& item, DataScope& scope,
                           DiagEngine& diag) {
   const std::size_t kOuter = scope.blocks.size();
@@ -542,6 +544,74 @@ void DeclareModuleItems(const ModuleDecl& decl, const CompilationUnit& unit,
   subroutines.insert("randomize");
 }
 
+// §8.13: the properties the class `cls` declares and those it inherits, as
+// variables of `scope`, a derived class's shadowing a base's of its name. Each
+// base is looked up from the scope's site; no class is its own ancestor
+// (§8.13), so the walk ends at a class that extends none.
+void DeclareClassProperties(const ClassDecl& cls, DataScope& scope) {
+  const TypeSite kSite{&scope.items, scope.items.size(), scope.site};
+  for (const ClassDecl* walked = &cls; walked != nullptr;
+       walked = ClassIn(scope.unit, kSite, walked->base_class)) {
+    for (const ClassMember* member : walked->members) {
+      if (member->kind == ClassMemberKind::kProperty) {
+        scope.module_vars.emplace(
+            member->name,
+            DeclaredVar{&member->data_type, member->unpacked_dims.size()});
+      }
+    }
+  }
+}
+
+// The scope a method of the class `cls`, declared in the scope `site` sees,
+// is walked in: the site's, with the class's properties as its variables.
+DataScope ClassScope(const ClassDecl& cls, const DataScope& site) {
+  DataScope scope{site.visible, site.unit, site.items};
+  scope.site = site.site;
+  DeclareClassProperties(cls, scope);
+  return scope;
+}
+
+// §8.3: each call the methods of the class `cls`, declared in the scope
+// `site`, write, and those of each class nested in it (§8.23).
+void CheckClassCalls(const ClassDecl& cls, const DataScope& site,
+                     DiagEngine& diag) {
+  DataScope scope = ClassScope(cls, site);
+  for (const ClassMember* member : cls.members) {
+    if (member->kind == ClassMemberKind::kMethod) {
+      CheckSubroutineCalls(*member->method, scope, diag);
+    }
+    if (member->nested_class != nullptr) {
+      CheckClassCalls(*member->nested_class, site, diag);
+    }
+  }
+}
+
+// Each call the classes the scope `site` declares write in their methods,
+// `classes` among them where the site's items do not hold its classes, and
+// each a method defined out of its class's body there writes (§8.24), in the
+// scope of the class the site sees under the name the method is written
+// behind.
+void CheckSiteClasses(const DataScope& site,
+                      const std::vector<ClassDecl*>& classes,
+                      DiagEngine& diag) {
+  for (const ClassDecl* cls : classes) CheckClassCalls(*cls, site, diag);
+  const TypeSite kSite{&site.items, site.items.size(), site.site};
+  for (const ModuleItem* item : site.items) {
+    if (item->kind == ModuleItemKind::kClassDecl) {
+      CheckClassCalls(*item->class_decl, site, diag);
+      continue;
+    }
+    const bool kOutOfBody = (item->kind == ModuleItemKind::kTaskDecl ||
+                             item->kind == ModuleItemKind::kFunctionDecl) &&
+                            !item->method_class.empty();
+    const ClassDecl* cls =
+        kOutOfBody ? ClassIn(site.unit, kSite, item->method_class) : nullptr;
+    if (cls == nullptr) continue;
+    DataScope scope = ClassScope(*cls, site);
+    CheckSubroutineCalls(*item, scope, diag);
+  }
+}
+
 }  // namespace
 
 void ReportCallsOfDataNames(
@@ -556,6 +626,26 @@ void ReportCallsOfDataNames(
                 item->kind == ModuleItemKind::kFunctionDecl) &&
                item->method_class.empty()) {
       CheckSubroutineCalls(*item, scope, diag);
+    }
+  }
+}
+
+void ReportClassMethodCalls(const CompilationUnit& unit, DiagEngine& diag) {
+  const std::function<bool(std::string_view)> kSeesAll = [](std::string_view) {
+    return true;
+  };
+  DataScope at_unit{kSeesAll, unit, unit.cu_items};
+  at_unit.site = SiteKind::kUnit;
+  CheckSiteClasses(at_unit, unit.classes, diag);
+  for (const PackageDecl* package : unit.packages) {
+    DataScope at_package{kSeesAll, unit, package->items};
+    at_package.site = SiteKind::kPackage;
+    CheckSiteClasses(at_package, {}, diag);
+  }
+  for (const std::vector<ModuleDecl*>* decls :
+       {&unit.modules, &unit.interfaces, &unit.programs, &unit.checkers}) {
+    for (const ModuleDecl* decl : *decls) {
+      CheckSiteClasses(DataScope{kSeesAll, unit, decl->items}, {}, diag);
     }
   }
 }

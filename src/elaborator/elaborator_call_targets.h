@@ -30,4 +30,14 @@ void ReportCallsOfDataNames(
     const ModuleDecl& decl, const CompilationUnit& unit,
     const std::function<bool(std::string_view)>& visible, DiagEngine& diag);
 
+// §8.3 with §25.9: reports each call through a virtual interface naming no
+// task or function of the interface, among the calls the methods of each class
+// of `unit` write, whether the class is declared in the compilation unit, a
+// package, a module, an interface, a program or a checker, or nested in
+// another, and whether a method stands in its class's body or out of it
+// (§8.24); and each call a method writes by the name of one of its formal
+// arguments or local variables (A.8.2). A property of the class, or one it
+// inherits (§8.13), is a variable of the method's scope.
+void ReportClassMethodCalls(const CompilationUnit& unit, DiagEngine& diag);
+
 }  // namespace delta
