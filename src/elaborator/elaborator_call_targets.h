@@ -17,8 +17,9 @@ std::unordered_set<std::string_view> EnclosingSubroutineNames(
     const CompilationUnit& unit, std::string_view module);
 
 // A.8.2 and A.6.9: a tf_call names a task or a function. Reports each call in
-// the procedures `decl` declares whose name, written alone, the module or a
-// block around the call declares as a variable or a net (§23.9), whether a
+// the procedures `decl` declares whose name, written alone, the module, a
+// block around the call or the compilation unit declares as a variable or a
+// net (§23.9, §3.12.1), whether a
 // call statement, `x;` or `x();`, or a call within an expression,
 // `y = x(1);`; each call statement naming something else the module declares,
 // or imports from a package of `unit` as data, other than a task or a

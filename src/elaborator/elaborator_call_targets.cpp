@@ -574,6 +574,20 @@ void DeclareModuleVars(const std::vector<ModuleItem*>& items,
   }
 }
 
+// §3.12.1: each variable and net the compilation unit `unit` declares, as data
+// of `scope`, but for a name the module declares as something else, which
+// hides it (§23.9).
+void DeclareUnitData(const CompilationUnit& unit, DataScope& scope) {
+  for (const ModuleItem* item : unit.cu_items) {
+    const bool kData = item->kind == ModuleItemKind::kVarDecl ||
+                       item->kind == ModuleItemKind::kNetDecl;
+    if (kData && !scope.subroutines.contains(item->name) &&
+        !scope.uncallable.contains(item->name)) {
+      scope.module.insert(item->name);
+    }
+  }
+}
+
 // The names the items of module `decl` declare, each in the set of `scope`
 // its kind puts it in: data, subroutines and the rest, which no call names.
 void DeclareModuleItems(const ModuleDecl& decl, const CompilationUnit& unit,
@@ -738,6 +752,7 @@ void ReportCallsOfDataNames(
     const std::function<bool(std::string_view)>& visible, DiagEngine& diag) {
   DataScope scope{visible, unit, decl.items};
   DeclareModuleItems(decl, unit, scope);
+  DeclareUnitData(unit, scope);
   CheckItemCalls(decl.items, scope, diag);
 }
 

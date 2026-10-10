@@ -521,4 +521,47 @@ TEST(SubroutineCallElaborationSyntax, ACallStatementNamesASubroutine) {
   }
 }
 
+// A.8.2 with §3.12.1: a variable or a net the compilation unit declares is
+// data in every module, and a call naming one, as a statement, g(1), or within
+// an expression, w(1), is reported (#5829). A module's task hides the unit's
+// variable of its name, and the call of it is not reported; a module's
+// parameter hides one too, and the call statement naming it is reported as
+// naming no task or function.
+TEST(SubroutineCallElaborationSyntax, ACallNamingAUnitVariableIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "int g;\n"
+      "wire w;\n"
+      "int h;\n"
+      "int q;\n"
+      "module m;\n"
+      "  task h(int a); endtask\n"
+      "  parameter int q = 1;\n"
+      "  int y;\n"
+      "  initial begin\n"
+      "    g(1);\n"
+      "    y = w(1);\n"
+      "    h(1);\n"
+      "    q(1);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const char* const kData =
+      "' names a variable or a net, and a call names a task or a function";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), std::string("'g") + kData, 10,
+                            "A.8.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), std::string("'w") + kData, 11,
+                            "A.8.2"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'q' names no task or function, and a call statement calls one", 13,
+      "A.6.9"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), std::string("'q") + kData,
+                             13, "A.8.2"));
+  for (const Diagnostic& diag : f.diag.Diagnostics()) {
+    if (diag.severity != DiagSeverity::kError) continue;
+    EXPECT_NE(diag.loc.line, 12u) << diag.message;
+  }
+}
+
 }  // namespace
