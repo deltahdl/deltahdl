@@ -890,4 +890,52 @@ TEST(Elaboration, EnumFunctionReturnWithoutCastIsReported) {
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
+// §7.12.1 has find, find_first, find_last, min, max and unique return a queue
+// of the array's element type, so over an array of an enumeration a queue of
+// that enumeration, which a queue of the enumeration takes without a cast.
+TEST(Elaboration, EnumArrayLocatorResultAssignedToEnumQueueAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef enum {A, B} e_t;\n"
+      "  e_t ea[2];\n"
+      "  e_t eq[$];\n"
+      "  initial begin\n"
+      "    eq = ea.min;\n"
+      "    eq = ea.max();\n"
+      "    eq = ea.unique;\n"
+      "    eq = ea.find with (item == A);\n"
+      "    eq = ea.find_first with (item == B);\n"
+      "    eq = ea.find_last(x) with (x != A);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// The element locators of an array of int return a queue of int, and the index
+// locators a queue of int whatever the elements are; neither is a value of the
+// enumeration, so each needs the cast.
+TEST(Elaboration, IntQueueFromLocatorAssignedToEnumQueueIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef enum {A, B} e_t;\n"
+      "  e_t ea[2];\n"
+      "  int ia[2];\n"
+      "  e_t eq[$];\n"
+      "  initial begin\n"
+      "    eq = ia.min;\n"
+      "    eq = ea.find_index with (item == A);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 7,
+                            "6.19.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "integer assigned to enum variable without cast", 8,
+                            "6.19.3"));
+}
+
 }  // namespace

@@ -4,6 +4,7 @@
 // enumeration.
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <format>
 #include <functional>
@@ -48,6 +49,21 @@ static bool IsCompoundAssignOp(TokenKind op) {
   }
 }
 
+// The member access naming the method `e` calls, written with or without
+// parentheses (c.next, c.next()); null where `e` calls no named method.
+static const Expr* MethodAccess(const Expr* e) {
+  const Expr* member = e;
+  if (e->kind == ExprKind::kCall && e->lhs &&
+      e->lhs->kind == ExprKind::kMemberAccess) {
+    member = e->lhs;
+  }
+  if (member->kind != ExprKind::kMemberAccess) return nullptr;
+  if (!member->rhs || member->rhs->kind != ExprKind::kIdentifier) {
+    return nullptr;
+  }
+  return member;
+}
+
 // §6.19.5/§6.19.6: the first, last, next, and prev enumeration methods return a
 // value of the same enumeration type, so assigning their result to an enum
 // variable requires no cast. Recognizes both the no-parens member access
@@ -55,15 +71,24 @@ static bool IsCompoundAssignOp(TokenKind op) {
 // int/string and are intentionally excluded.
 static bool IsEnumTypedMethodResult(const Expr* e) {
   if (!e) return false;
-  const Expr* member = e;
-  if (e->kind == ExprKind::kCall && e->lhs &&
-      e->lhs->kind == ExprKind::kMemberAccess) {
-    member = e->lhs;
-  }
-  if (member->kind != ExprKind::kMemberAccess) return false;
-  if (!member->rhs || member->rhs->kind != ExprKind::kIdentifier) return false;
+  const Expr* member = MethodAccess(e);
+  if (member == nullptr) return false;
   std::string_view m = member->rhs->text;
   return m == "first" || m == "last" || m == "next" || m == "prev";
+}
+
+// §7.12.1: the locator methods that return elements of the array rather than
+// indices, each a queue of the array's element type. Over an array of an
+// enumeration that is a queue of the enumeration, which §6.19.3 lets a queue of
+// the enumeration take without a cast. find_index and the other index locators
+// return a queue of int and are not among them.
+static bool IsEnumArrayLocatorResult(const Expr* e, const NameSet& enum_vars) {
+  static constexpr std::array<std::string_view, 6> kElementLocators = {
+      "find", "find_first", "find_last", "min", "max", "unique"};
+  const Expr* member = MethodAccess(e);
+  return member != nullptr && enum_vars.count(ExprIdent(member->lhs)) != 0 &&
+         std::find(kElementLocators.begin(), kElementLocators.end(),
+                   member->rhs->text) != kElementLocators.end();
 }
 
 // §6.19: whether the enumeration `item` declares, through a typedef or as the
@@ -208,13 +233,15 @@ struct EnumValueScreen {
 
 // §6.19.3, §6.19.4: reports `value`, bound at `loc` for an enum, where it
 // reaches the enum without the cast those clauses require: an expression
-// IsBareEnumAssignable refuses, or the bare name of a variable of a built-in
-// type other than an enumeration. `bound` says where the value goes, as
+// IsBareEnumAssignable refuses that is no enumeration array's locator result
+// either, or the bare name of a variable of a built-in type other than an
+// enumeration. `bound` says where the value goes, as
 // kAssignedToEnum does.
 static void ReportEnumValueWithoutCast(const Expr* value, SourceLoc loc,
                                        std::string_view bound,
                                        const EnumValueScreen& screen) {
-  if (!IsBareEnumAssignable(value, screen.names.unit)) {
+  if (!IsBareEnumAssignable(value, screen.names.unit) &&
+      !IsEnumArrayLocatorResult(value, screen.names.enum_vars)) {
     screen.diag.Error(loc, std::format("integer {} without cast", bound),
                       Subclause(EnumValueSubclause(value, screen.names)));
     return;
