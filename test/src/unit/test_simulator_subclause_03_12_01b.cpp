@@ -15,6 +15,7 @@
 #include "simulator/dpi_binding.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/lowerer.h"
+#include "simulator/sv_vpi_user.h"
 #include "simulator/unit_scopes.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_user.h"
