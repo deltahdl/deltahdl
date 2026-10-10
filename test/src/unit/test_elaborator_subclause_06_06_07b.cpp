@@ -223,8 +223,8 @@ TEST(NettypeElaboration, ResolutionFunctionWritingThroughAScopeRejected) {
 // a variable written with `var` or declared in a procedural block, of a
 // structure member at any depth, of a function's return or a subroutine's
 // argument, of a parameter in the body or the header, and of a cast. A net
-// declared with it, a package's type of the same name and a size cast are no
-// such uses.
+// declared with it, a member of a package's type of the same name and a size
+// cast are no such uses.
 TEST(NettypeElaboration, NettypeNamedAsTheTypeOfAnythingButANetRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -236,10 +236,10 @@ TEST(NettypeElaboration, NettypeNamedAsTheTypeOfAnythingButANetRejected) {
       "  nettype logic [3:0] nt;\n"
       "  nt w;\n"
       "  var nt v;\n"
-      "  typedef struct { int k; nt m; struct { nt n; } s; } s_t;\n"
+      "  typedef struct { int k; nt m; p::nt o; struct { nt n; } s; } s_t;\n"
       "  function nt f(nt a, int c); return a; endfunction\n"
       "  parameter nt P = 0;\n"
-      "  parameter p::nt R = 0;\n"
+      "  parameter int R = 0;\n"
       "  logic [3:0] x;\n"
       "  initial begin\n"
       "    nt b;\n"
@@ -271,6 +271,8 @@ TEST(NettypeElaboration, NettypeNamedAsTheTypeOfAnythingButANetRejected) {
                     u.nettype, u.use),
         u.line, "6.6.7"));
   }
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "type of member 'o'", 9, "6.6.7"));
   for (uint32_t line : {7U, 12U, 16U, 18U}) {
     EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "may declare only a net",
                                line, "6.6.7"));

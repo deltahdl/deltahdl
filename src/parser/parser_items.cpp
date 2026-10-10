@@ -659,31 +659,27 @@ void Parser::ParseDataDeclItem(std::vector<ModuleItem*>& items, size_t before,
   AttachAttrs(items, before, attrs);
 }
 
+// Each declarator of the declaration is marked as written after `var`.
 void Parser::ParseVarPrefixed(std::vector<ModuleItem*>& items) {
-  if (TryParseTypeRef(items)) return;
-  if (Check(TokenKind::kKwEnum)) {
-    auto dtype = ParseEnumType();
-    ParsePackedDims(dtype);
+  const size_t kFirst = items.size();
+  if (!TryParseTypeRef(items)) {
+    DataType dtype;
+    if (Check(TokenKind::kKwEnum)) {
+      dtype = ParseEnumType();
+      ParsePackedDims(dtype);
+    } else if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
+      dtype = ParseStructOrUnionType();
+      ParsePackedDims(dtype);
+    } else {
+      dtype = ParseDataType();
+      if (dtype.kind == DataTypeKind::kImplicit &&
+          Check(TokenKind::kLBracket)) {
+        ParsePackedDims(dtype);
+      }
+    }
     ParseVarDeclList(items, dtype);
-    return;
   }
-  if (Check(TokenKind::kKwStruct) || Check(TokenKind::kKwUnion)) {
-    auto dtype = ParseStructOrUnionType();
-    ParsePackedDims(dtype);
-    ParseVarDeclList(items, dtype);
-    return;
-  }
-  auto dtype = ParseDataType();
-  if (dtype.kind == DataTypeKind::kImplicit && Check(TokenKind::kLBracket)) {
-    ParsePackedDims(dtype);
-  }
-  ParseVarDeclList(items, dtype);
-}
-
-// Marks each declarator ParseVarPrefixed added, from `first` on, as declared
-// after the `var` keyword.
-static void MarkExplicitVar(std::vector<ModuleItem*>& items, size_t first) {
-  for (size_t i = first; i < items.size(); ++i) {
+  for (size_t i = kFirst; i < items.size(); ++i) {
     items[i]->has_explicit_var = true;
   }
 }
@@ -691,9 +687,7 @@ static void MarkExplicitVar(std::vector<ModuleItem*>& items, size_t first) {
 void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
                                   bool had_lifetime) {
   if (Match(TokenKind::kKwVar)) {
-    const size_t kFirst = items.size();
     ParseVarPrefixed(items);
-    MarkExplicitVar(items, kFirst);
     return;
   }
 
