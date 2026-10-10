@@ -6,6 +6,7 @@
 #include "helpers_preprocess_and_get.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
@@ -353,6 +354,45 @@ TEST(LexicalConventionSim, StringLiteralUnderSwriteDecimalConversion) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "65\n");
+}
+
+// §5.9: a string literal assigned to an unpacked array of bytes is
+// left-justified, the elements past its characters zero, in a procedural
+// assignment as in a declaration. The procedural assignment did nothing.
+TEST(LexicalConventionSim, ProceduralStringToUnpackedByteArrayLeftJustified) {
+  SimFixture f;
+  auto* c0 = RunAndFindVar(
+      "module t;\n"
+      "  byte c [0:2];\n"
+      "  initial c = \"ab\";\n"
+      "endmodule\n",
+      f, "c[0]");
+  ASSERT_NE(c0, nullptr);
+  EXPECT_EQ(ElemChar(f, "c[0]"), "a");
+  EXPECT_EQ(ElemChar(f, "c[1]"), "b");
+  EXPECT_EQ(f.ctx.FindVariable("c[2]")->value.ToUint64(), 0u);
+}
+
+// A cast of a string literal to an unpacked byte array type follows the same
+// rule, in a declaration and in a procedural assignment. The declaration left
+// every element its default, and the procedural assignment did nothing.
+TEST(LexicalConventionSim, CastStringToUnpackedByteArrayTypeLeftJustified) {
+  SimFixture f;
+  auto* b0 = RunAndFindVar(
+      "module t;\n"
+      "  typedef byte b3_t [0:2];\n"
+      "  b3_t b = b3_t'(\"ab\");\n"
+      "  b3_t c;\n"
+      "  initial c = b3_t'(\"ab\");\n"
+      "endmodule\n",
+      f, "b[0]");
+  ASSERT_NE(b0, nullptr);
+  EXPECT_EQ(ElemChar(f, "b[0]"), "a");
+  EXPECT_EQ(ElemChar(f, "b[1]"), "b");
+  EXPECT_EQ(f.ctx.FindVariable("b[2]")->value.ToUint64(), 0u);
+  EXPECT_EQ(ElemChar(f, "c[0]"), "a");
+  EXPECT_EQ(ElemChar(f, "c[1]"), "b");
+  EXPECT_EQ(f.ctx.FindVariable("c[2]")->value.ToUint64(), 0u);
 }
 
 }  // namespace

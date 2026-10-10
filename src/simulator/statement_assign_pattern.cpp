@@ -438,33 +438,6 @@ static bool TryArraySliceCopy(const Stmt* stmt, std::string_view dst_name,
   return true;
 }
 
-// §6.24.3: a bit-stream cast whose casting type is an unpacked array, `e =
-// B8'(x)` under `typedef bit B8 [8:1]`, turns its operand into a stream of
-// bits and fills the destination's elements from it, left to right, the
-// stream's most significant bits in the leftmost element, e[8]. Evaluated as
-// a vector, the cast named no elements and left every one as it was. Taken
-// only where the stream is exactly as wide as the one-dimensional fixed-size
-// destination, which §6.24.3 requires of the cast.
-static bool TryBitStreamCastToArray(const Stmt* stmt, const ArrayInfo& dst,
-                                    SimContext& ctx, Arena& arena) {
-  if (stmt->rhs->kind != ExprKind::kCast || stmt->rhs->lhs == nullptr ||
-      dst.is_dynamic || dst.is_queue || dst.dim_sizes.size() > 1)
-    return false;
-  Logic4Vec stream = PackBitStreamOperand(stmt->rhs->lhs, ctx, arena);
-  if (stream.width != dst.size * dst.elem_width) return false;
-  for (uint32_t i = 0; i < dst.size; ++i) {
-    uint32_t di =
-        dst.is_descending ? (dst.lo + dst.size - 1 - i) : (dst.lo + i);
-    auto name = std::string(stmt->lhs->text) + "[" + std::to_string(di) + "]";
-    auto* elem = ctx.FindVariable(name);
-    if (!elem) continue;
-    elem->value = ExtractBitField(
-        arena, stream, stream.width - (i + 1) * dst.elem_width, dst.elem_width);
-    elem->NotifyWatchers();
-  }
-  return true;
-}
-
 bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (stmt->lhs->kind != ExprKind::kIdentifier || !stmt->rhs) return false;
   auto* ainfo = ctx.FindArrayInfo(stmt->lhs->text);
@@ -481,7 +454,7 @@ bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
        TryArraySliceCopy(stmt, stmt->lhs->text, *ainfo, ctx, arena))) {
     return true;
   }
-  if (ainfo && TryBitStreamCastToArray(stmt, *ainfo, ctx, arena)) return true;
+  if (ainfo && TryFillArrayFromValue(stmt, *ainfo, ctx, arena)) return true;
   if (stmt->rhs->kind == ExprKind::kIdentifier) {
     bool handled = false;
     bool result = TryArrayIdentifierCopy(stmt, ctx, &handled);

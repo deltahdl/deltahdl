@@ -14,6 +14,7 @@
 
 namespace delta {
 
+struct ArrayInfo;
 struct Expr;
 struct Stmt;
 struct StructTypeInfo;
@@ -402,6 +403,13 @@ void SizeAndOwnQueueElements(const QueueObject& q,
 Logic4Vec CoerceToPropertyType(const ClassTypeInfo* type, std::string_view name,
                                Logic4Vec val, Arena& arena);
 bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
+// Fills the unpacked array `dst` that the blocking assignment `stmt` targets
+// from one value rather than an element at a time: a string literal, alone or
+// cast to the array's type, left-justified (§5.9), or a bit-stream cast as
+// wide as the array (§6.24.3). Answers whether `stmt` was either; defined in
+// statement_assign_array_value.cpp.
+bool TryFillArrayFromValue(const Stmt* stmt, const ArrayInfo& dst,
+                           SimContext& ctx, Arena& arena);
 // §7.10.1: the element of `q` an index expression names, with `$` standing for
 // the last element as the clause writes it. Signed, because §7.10.1 gives an
 // out-of-range index its own answer -- a read returns the element type's

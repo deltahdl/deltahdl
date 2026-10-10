@@ -706,4 +706,73 @@ TEST(IntegerLiteralSim, WhiteSpaceBeforeTheDigitsOfAWideConstant) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
+// §5.7.1: an unsized number needing more than 32 bits takes the minimum width
+// representing it, a sign bit included when it is signed: 2^32 is 34 bits as
+// a simple decimal and 33 with an unsigned 'd base. Any value past 32 bits was
+// given 64.
+TEST(IntegerLiteralSim, UnsizedDecimalPastThirtyTwoBitsTakesItsMinimumWidth) {
+  SimFixture f;
+  auto* a = RunAndFindVar(
+      "module t;\n"
+      "  int a, b;\n"
+      "  initial begin\n"
+      "    a = $bits(4294967296);\n"
+      "    b = $bits('d4294967296);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(a->value.ToUint64(), 34u);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 33u);
+}
+
+// 2^63 as a simple decimal is signed and needs 65 bits to stay positive. At 64
+// bits its top bit read as a sign bit, so it sign-extended into a wider
+// target with the upper half all ones.
+TEST(IntegerLiteralSim, SignedDecimalAtTwoToTheSixtyThreeStaysPositive) {
+  SimFixture f;
+  auto* hi = RunAndFindVar(
+      "module t;\n"
+      "  logic [127:0] y;\n"
+      "  logic [63:0] hi;\n"
+      "  int w;\n"
+      "  initial begin\n"
+      "    y = 9223372036854775808;\n"
+      "    hi = y[127:64];\n"
+      "    w = $bits(9223372036854775808);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "hi");
+  ASSERT_NE(hi, nullptr);
+  EXPECT_EQ(hi->value.ToUint64(), 0u);
+  EXPECT_EQ(f.ctx.FindVariable("w")->value.ToUint64(), 65u);
+}
+
+// §5.7.1: an unsized unsigned literal whose high-order bit is x extends with x
+// to the width of the expression holding it, as an operand of an operator as
+// much as in an assignment. Against an unsigned 64-bit operand 'hx was
+// zero-extended, so === found bits 63:32 differing and | gave them 0.
+TEST(IntegerLiteralSim, HighOrderXExtendsToTheWidthOfAnOperatorsOperands) {
+  SimFixture f;
+  auto* r = RunAndFindVar(
+      "module t;\n"
+      "  logic [63:0] a, b, c;\n"
+      "  bit r, u, k;\n"
+      "  initial begin\n"
+      "    a = 'x;\n"
+      "    r = (a === 'hx);\n"
+      "    b = 64'd0 | 'hx;\n"
+      "    u = &$isunknown(b[63:32]);\n"
+      "    c = 64'd0 | 'h3x;\n"
+      "    k = (c[63:32] === 32'd0);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("u")->value.ToUint64(), 1u);
+  // An x below the top digit leaves the literal zero-extended.
+  EXPECT_EQ(f.ctx.FindVariable("k")->value.ToUint64(), 1u);
+}
+
 }  // namespace

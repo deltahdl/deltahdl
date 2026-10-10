@@ -272,4 +272,22 @@ TEST(StructLiteralSim, RealMemberReadsAsAReal) {
   EXPECT_EQ(out, "3.5\n");
 }
 
+// §5.10 and §10.9.2: a replication in a structure pattern gives each member one
+// item, at that member's width: '{3{1}} sets three byte members to 1. It was
+// concatenated as three 32-bit 1s, of which the structure kept 000001.
+TEST(StructLiteralSim, ReplicatedPatternFillsEachMember) {
+  SimFixture f;
+  auto* s = RunAndFindVar(
+      "module t;\n"
+      "  typedef struct packed { byte x, y, z; } s_t;\n"
+      "  s_t s = '{3{1}};\n"
+      "  s_t p;\n"
+      "  initial p = '{3{2}};\n"
+      "endmodule\n",
+      f, "s");
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(s->value.ToUint64(), 0x010101u);
+  EXPECT_EQ(f.ctx.FindVariable("p")->value.ToUint64(), 0x020202u);
+}
+
 }  // namespace

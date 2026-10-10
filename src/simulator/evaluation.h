@@ -638,7 +638,16 @@ Logic4Vec EvalUnbasedUnsized(const Expr* expr, Arena& arena);
 // context it stands in. The result stands for no literal any more: its
 // fills_width is clear. Defined in evaluation.cpp.
 Logic4Vec FillUnbasedUnsized(const Logic4Vec& v, uint32_t width, Arena& arena);
-Logic4Vec EvalIntLiteral(const Expr* expr, Arena& arena);
+// §5.9: the string literal `expr` assigns to an unpacked array of bytes, alone
+// or under a cast to the array's type (§6.24), or null where it is neither.
+// Defined in lowerer_var.cpp.
+const Expr* StringLiteralSource(const Expr* expr);
+// §5.9: the byte a string literal's value `packed` gives the element `i`
+// places from the left of an unpacked byte array, left-justified: its first
+// character first, and 0 past its last. Defined in lowerer_var.cpp.
+uint8_t StringLiteralByteAt(const Logic4Vec& packed, uint32_t i);
+Logic4Vec EvalIntLiteral(const Expr* expr, Arena& arena,
+                         uint32_t context_width = 0);
 // The text between a string literal token's delimiters, `"""` or `"`, with
 // its escape sequences still undecoded; text with neither is returned as it
 // is. Defined in evaluation_literal.cpp.

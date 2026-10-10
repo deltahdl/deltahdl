@@ -431,9 +431,11 @@ uint32_t LiteralWidth(std::string_view text, uint64_t val) {
   // likewise, `val` being the value's low 64 bits alone.
   if (uint32_t based = UnsizedBasedLiteralWidth(text); based > 0) return based;
   if (uint32_t wide = WideDecimalLiteralWidth(text); wide > 0) return wide;
-  if (val > UINT32_MAX) return 64;
-  if (IsSignedLiteral(text) && val > uint64_t{0x7FFFFFFF}) return 33;
-  return 32;
+  // Up to 64 bits `val` is the whole value: its bit length, plus the sign bit,
+  // so 2^32 is 34 bits as a simple decimal and 2^63 is 65.
+  const auto kBits = static_cast<uint32_t>(std::bit_width(val)) +
+                     (IsSignedLiteral(text) ? 1U : 0U);
+  return std::max(kBits, uint32_t{32});
 }
 
 // §5.7.1 (printed page 78): an unbased unsized literal is one bit wide where
@@ -556,11 +558,20 @@ static bool MsbBvalSet(const Logic4Vec& vec, uint32_t width) {
   return (vec.words[msb_word].bval & msb_mask) != 0;
 }
 
-Logic4Vec EvalIntLiteral(const Expr* expr, Arena& arena) {
+Logic4Vec EvalIntLiteral(const Expr* expr, Arena& arena,
+                         uint32_t context_width) {
   uint32_t width = LiteralWidth(expr->text, expr->int_val);
   bool is_signed = IsSignedLiteral(expr->text);
   if (TextHasXZ(expr->text)) {
     auto vec = ParseBasedXZLiteral(expr->text, width, arena);
+    // §5.7.1: an unsized literal whose high-order bit is x or z extends with it
+    // to the width of the expression holding it, an operator's operands
+    // included, which ParseBasedXZLiteral's left padding gives.
+    if (IsUnsizedLiteral(expr->text) && context_width > width &&
+        MsbBvalSet(vec, width)) {
+      vec = ParseBasedXZLiteral(expr->text, context_width, arena);
+      width = context_width;
+    }
     vec.is_signed = is_signed;
     // An unsized literal whose high-order bit ended up as x or z must
     // propagate that high-order bit through any wider context the

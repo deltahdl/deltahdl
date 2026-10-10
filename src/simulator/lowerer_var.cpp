@@ -34,7 +34,7 @@ static void RegisterStructInfo(std::string_view name, const RtlirVariable& var,
   MarkUnpackedStructStorage(name, v, var.init_expr == nullptr, ctx);
 }
 
-static uint8_t StringLiteralByteAt(const Logic4Vec& packed, uint32_t i) {
+uint8_t StringLiteralByteAt(const Logic4Vec& packed, uint32_t i) {
   uint32_t nbytes = packed.width / 8;
   if (i >= nbytes) return 0;
   uint32_t byte_idx = nbytes - 1 - i;
@@ -42,6 +42,11 @@ static uint8_t StringLiteralByteAt(const Logic4Vec& packed, uint32_t i) {
   uint32_t bit = (byte_idx * 8) % 64;
   if (word >= packed.nwords) return 0;
   return static_cast<uint8_t>((packed.words[word].aval >> bit) & 0xFF);
+}
+
+const Expr* StringLiteralSource(const Expr* expr) {
+  if (expr->kind == ExprKind::kCast && expr->lhs != nullptr) expr = expr->lhs;
+  return expr->kind == ExprKind::kStringLiteral ? expr : nullptr;
 }
 
 // §6.8, Table 6-7: the value an element left without one takes -- the default
@@ -107,8 +112,8 @@ static void InitArrayElement(const RtlirVariable& var, uint32_t elem_idx,
     return;
   }
 
-  if (var.init_expr->kind == ExprKind::kStringLiteral) {
-    auto packed = EvalExpr(var.init_expr, ctx, arena);
+  if (const Expr* str = StringLiteralSource(var.init_expr)) {
+    auto packed = EvalExpr(str, ctx, arena);
     auto b = StringLiteralByteAt(packed, elem_idx);
     elem->value = MakeLogic4VecVal(arena, var.width, b);
     return;

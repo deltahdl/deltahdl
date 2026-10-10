@@ -876,7 +876,7 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
   }
   switch (expr->kind) {
     case ExprKind::kIntegerLiteral:
-      return EvalIntLiteral(expr, arena);
+      return EvalIntLiteral(expr, arena, context_width);
     case ExprKind::kUnbasedUnsizedLiteral: {
       auto v = EvalUnbasedUnsized(expr, arena);
       // §5.7.1: an unbased unsized literal takes the size of the context it

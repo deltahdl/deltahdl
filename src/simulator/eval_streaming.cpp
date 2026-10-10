@@ -847,6 +847,27 @@ Logic4Vec EvalItemForLayout(const Expr* item, const StructTypeInfo* layout,
   return EvalExpr(item, ctx, arena);
 }
 
+// §5.10 and §10.9.2: the items a positional pattern gives, one per member, a
+// replication `'{N{a, b}}` -- held by the pattern itself or by its one
+// element -- spelled out as its items N times over, so each member takes one.
+static std::vector<const Expr*> PatternItems(const Expr* expr, SimContext& ctx,
+                                             Arena& arena) {
+  const Expr* rep = expr;
+  if (expr->repeat_count == nullptr && expr->elements.size() == 1 &&
+      expr->elements[0]->kind == ExprKind::kReplicate) {
+    rep = expr->elements[0];
+  }
+  if (rep->repeat_count == nullptr) {
+    return {expr->elements.begin(), expr->elements.end()};
+  }
+  auto count = EvalExpr(rep->repeat_count, ctx, arena).ToUint64();
+  std::vector<const Expr*> items;
+  for (uint64_t n = 0; n < count; ++n) {
+    items.insert(items.end(), rep->elements.begin(), rep->elements.end());
+  }
+  return items;
+}
+
 Logic4Vec EvalStructPatternValue(const Expr* expr, const StructTypeInfo* info,
                                  SimContext& ctx, Arena& arena) {
   // Keyed form (member name / type / default keys): field-by-field placement.
@@ -858,21 +879,19 @@ Logic4Vec EvalStructPatternValue(const Expr* expr, const StructTypeInfo* info,
   // type. Coercing each element to its member's width (rather than
   // concatenating at its self-determined width) is what keeps an over-wide
   // element from spilling into the following members, and a nested pattern
-  // is placed by its member's own layout (EvalMemberExpr). The replication
-  // form and a pattern with other than one element per member fall back to
-  // the width-summing concatenation path. A structure wider than a word took
+  // is placed by its member's own layout (EvalMemberExpr). A replication gives
+  // the items PatternItems spells out, one per member as well; a pattern with
+  // other than one item per member falls back to the width-summing
+  // concatenation path. A structure wider than a word took
   // that path too, from before PlaceFieldValue deposited a member above the
   // first word; the placement now reaches any width, and the fallback left
   // `'{'{1, 2}, 3}` for a 96-bit structure concatenated, its nested pattern
   // never reaching the member's layout.
-  bool is_replication =
-      expr->repeat_count || (expr->elements.size() == 1 &&
-                             expr->elements[0]->kind == ExprKind::kReplicate);
-  if (!is_replication && expr->elements.size() == info->fields.size()) {
+  const std::vector<const Expr*> kItems = PatternItems(expr, ctx, arena);
+  if (kItems.size() == info->fields.size()) {
     auto result = MakeLogic4Vec(arena, info->total_width);
     for (size_t i = 0; i < info->fields.size(); ++i) {
-      auto val =
-          EvalStructMemberValue(expr->elements[i], info->fields[i], ctx, arena);
+      auto val = EvalStructMemberValue(kItems[i], info->fields[i], ctx, arena);
       PlaceFieldValue(result, info->fields[i], val, arena);
     }
     return result;
