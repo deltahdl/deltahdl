@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string>
 #include <utility>
 #include <vector>
@@ -589,6 +590,53 @@ TEST_F(CallStatementsInAScope, ACallOnALetsHandleReachesItsMethod) {
   ASSERT_NE(call, nullptr);
   ASSERT_NE(run, nullptr);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, call)), VpiObjectOf(run));
+}
+
+// §18.12 with §37.42: a call of the scope randomize function, written without
+// its std:: prefix or with it, is a func call named randomize. No design
+// declares the function, so the call reaches no function object, as detail 11
+// has a built-in method's call reach none (#5828).
+TEST_F(CallStatementsInAScope, AScopeRandomizeCallIsAFuncCall) {
+  Run("module top; int a;\n"
+      "  initial begin : b randomize(a); std::randomize(a); end\n"
+      "endmodule\n");
+  EXPECT_EQ(NamesOf(vpiFuncCall, By("top.b")),
+            (std::vector<std::string>{"randomize", "randomize"}));
+  vpiHandle call = Named(vpiFuncCall, By("top.b"), "randomize");
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(vpi_handle(vpiFunction, call), nullptr);
+}
+
+// §37.42 detail 1 with §7.12.1: an array locator method call written as a
+// statement reaches its with expression through vpiWith, whichever of the
+// locator methods it calls (#5830). A locator call written with no with
+// clause, a reduction method's call, which detail 1 does not name, and a scope
+// randomize call, a func call rather than a method's, reach none.
+TEST_F(CallStatementsInAScope, ALocatorCallReachesItsWithExpression) {
+  Run("module top; int q[$] = '{1, 2}; int z;\n"
+      "  initial begin : b\n"
+      "    q.find with (item > 1); q.find_index with (item > 1);\n"
+      "    q.find_first with (item > 1); q.find_first_index with (item > 1);\n"
+      "    q.find_last with (item > 1); q.find_last_index with (item > 1);\n"
+      "    q.min with (item + 1); q.max with (item + 1);\n"
+      "    q.unique with (item + 1); q.unique_index with (item + 1);\n"
+      "    q.unique(); q.sum with (item * 2);\n"
+      "    void'(std::randomize(z) with { z > 0; });\n"
+      "  end\n"
+      "endmodule\n");
+  std::vector<vpiHandle> calls;
+  vpiHandle it = vpi_iterate(vpiStmt, By("top.b"));
+  ASSERT_NE(it, nullptr);
+  while (vpiHandle stmt = vpi_scan(it)) calls.push_back(stmt);
+  ASSERT_EQ(calls.size(), 13u);
+  for (std::size_t i = 0; i < 10; ++i) {
+    vpiHandle with = vpi_handle(vpiWith, calls[i]);
+    ASSERT_NE(with, nullptr) << i;
+    EXPECT_EQ(vpi_get(vpiType, with), vpiOperation) << i;
+  }
+  for (std::size_t i = 10; i < calls.size(); ++i) {
+    EXPECT_EQ(vpi_handle(vpiWith, calls[i]), nullptr) << i;
+  }
 }
 
 }  // namespace

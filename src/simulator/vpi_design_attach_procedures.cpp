@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <array>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -186,6 +188,28 @@ void MakeCallArguments(VpiObject* call, const Expr& expr,
   }
 }
 
+// §7.12.1: the array locator methods, whose calls §37.42 detail 1 has
+// vpiWith reach the with expression of.
+constexpr std::array<std::string_view, 10> kLocatorMethods = {
+    "find",      "find_index",      "find_first", "find_first_index",
+    "find_last", "find_last_index", "min",        "max",
+    "unique",    "unique_index"};
+
+// §37.42 detail 1: the with expression an array locator method call `expr` is
+// written with, hung from `call`'s vpiWith; any other method's call, with
+// clause or not, has no vpiWith.
+void MakeWithClause(VpiObject* call, const Expr& expr,
+                    const BlockParent& parent, const BodyWalk& walk) {
+  call->tf_with_method =
+      call->type == vpiMethodFuncCall &&
+      std::ranges::find(kLocatorMethods, call->name) != kLocatorMethods.end();
+  if (call->tf_with_method && expr.with_expr != nullptr) {
+    call->tf_with = VpiCallSiteExpression(expr.with_expr, walk.objects,
+                                          CallSiteOf(parent, walk),
+                                          walk.calls.ctx, walk.build);
+  }
+}
+
 // §37.42 with §37.60: the call statement `stmt` stands as, null for a
 // statement that calls nothing the walk resolves. A call is named after what
 // it calls; a label written on it names the begin §9.3.5 makes around it
@@ -212,6 +236,7 @@ VpiObject* MakeCallStatement(const Stmt& stmt, const BlockParent& parent,
   call->user_systf = kShape.systf;
   call->written_as_stmt = true;
   MakeCallArguments(call, *called, parent, walk);
+  MakeWithClause(call, *called, parent, walk);
   if (kShape.type == vpiSysTaskCall || kShape.type == vpiSysFuncCall) {
     call->decompile = VpiExprDecompile(called);
     walk.calls.sites[{called, walk.prefix}] = call;

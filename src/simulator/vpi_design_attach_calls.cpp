@@ -34,10 +34,14 @@ int CallKindOf(const ModuleItem& decl, int task, int function) {
 }
 
 // §37.42: a task or function call named `name` of the subroutine `sub`
-// resolves to, reaching the task or function object made for it.
+// resolves to, reaching the task or function object made for it. A call the
+// elaborator accepts naming no declared subroutine calls the scope randomize
+// function the language builds in, randomize(a) or std::randomize(a) (§18.12):
+// a func call reaching no function object, as detail 11 has a built-in
+// method's call reach none.
 CallShape SubroutineCallShape(const VpiCalledSubroutine& sub,
                               std::string_view name) {
-  if (sub.decl == nullptr) return {};
+  if (sub.decl == nullptr) return {vpiFuncCall, name};
   CallShape shape{CallKindOf(*sub.decl, vpiTaskCall, vpiFuncCall), name};
   shape.called = sub.object;
   return shape;
@@ -698,9 +702,10 @@ CallShape MemberChainCallShape(const Expr& access, const BlockParent& parent,
 }
 
 // §37.42: a call written behind a scope: a package's subroutine, p::t (§26.3);
-// else a static method of the class the scope names, C::f (§8.10, §8.23), or
-// of a class a package declares, p::C::f. A static method is called through no
-// object, so the call has no prefix.
+// the scope randomize function of the built-in package std, std::randomize
+// (§18.12, §26.7); else a static method of the class the scope names, C::f
+// (§8.10, §8.23), or of a class a package declares, p::C::f. A static method is
+// called through no object, so the call has no prefix.
 CallShape ScopedCallShape(const Expr& callee, const BlockParent& parent,
                           const BodyWalk& walk) {
   const std::string_view kName = callee.rhs->text;
@@ -708,7 +713,9 @@ CallShape ScopedCallShape(const Expr& callee, const BlockParent& parent,
   if (scope.kind == ExprKind::kIdentifier) {
     const VpiCalledSubroutine kSub =
         VpiCalleeSubroutine(CallSiteOf(parent, walk), callee);
-    if (kSub.decl != nullptr) return SubroutineCallShape(kSub, kName);
+    if (kSub.decl != nullptr || scope.text == "std") {
+      return SubroutineCallShape(kSub, kName);
+    }
     return MethodShape(ClassMethodCall(walk, scope.text, kName), kName, nullptr,
                        walk);
   }
