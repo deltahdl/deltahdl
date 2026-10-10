@@ -108,4 +108,16 @@ TEST(EscapedIdentifierPreprocessor, EscapedMacroUsageFindsTheSimpleName) {
   EXPECT_NE(out.find("x 7"), std::string::npos);
 }
 
+// An escaped identifier inside macro text, after other tokens, is stepped over
+// whole just as one opening the text is.
+TEST(EscapedIdentifierPreprocessor, EscapedNameAfterOtherMacroText) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`define M x \\a//b y\n"
+      "`M\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("x \\a//b y"), std::string::npos);
+}
+
 }  // namespace
