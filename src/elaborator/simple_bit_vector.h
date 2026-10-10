@@ -22,14 +22,21 @@ struct DataType;
 bool IsSimpleBitVectorType(const DataType& dtype,
                            const TypeShapeTables& tables);
 
+// A value parameter `$` is assigned to: its name, its declared type (null when
+// it is untyped), whether it is declared with unpacked dimensions, and where
+// the assignment is written.
+struct UnboundedParam {
+  std::string_view name;
+  const DataType* dtype;
+  bool has_unpacked_dims;
+  SourceLoc loc;
+};
+
 // §6.20.7 (printed page 131): `$` may be assigned only to a value parameter of
 // a simple bit vector type, which an untyped parameter is, its type following
-// its value. Reports the parameter `name`, declared with `dtype` (null when
-// untyped) and with unpacked dimensions when `has_unpacked_dims`, when its
-// type is not one.
-void ValidateUnboundedParamType(std::string_view name, const DataType* dtype,
-                                bool has_unpacked_dims,
-                                const TypeShapeTables& tables, DiagEngine& diag,
-                                SourceLoc loc);
+// its value. Reports `param` when its type is not one.
+void ValidateUnboundedParamType(const UnboundedParam& param,
+                                const TypeShapeTables& tables,
+                                DiagEngine& diag);
 
 }  // namespace delta

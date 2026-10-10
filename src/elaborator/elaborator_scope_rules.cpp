@@ -643,6 +643,17 @@ static void ReportContAssignUnresolved(const ModuleDecl* decl,
   ReportUnresolvedRefs(refs, declared, diag, DeclaredGenvars(decl->items));
 }
 
+// The variables among `infos` that are unpacked arrays.
+static std::unordered_set<std::string_view> UnpackedArrayNames(
+    const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
+        infos) {
+  std::unordered_set<std::string_view> names;
+  for (const auto& [name, info] : infos) {
+    if (info.num_unpacked_dims != 0) names.insert(name);
+  }
+  return names;
+}
+
 void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
                                               const RtlirModule* mod) {
   if (!mod) return;
@@ -650,11 +661,8 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
   // §6.16: an assignment between a string and an integral or real value
   // needs a cast whatever a module imports, so this check answers on its own
   // and is stated before the §23.9 reads below.
-  std::unordered_set<std::string_view> arrays;
-  for (const auto& [name, info] : var_array_info_) {
-    if (info.num_unpacked_dims != 0) arrays.insert(name);
-  }
-  CheckStringNumericAssignments(decl->items, var_types_, arrays, diag_);
+  CheckStringNumericAssignments(decl->items, var_types_,
+                                UnpackedArrayNames(var_array_info_), diag_);
 
   std::unordered_set<std::string_view> explicit_imported =
       ExplicitlyImportedNames(mod);

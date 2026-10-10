@@ -322,8 +322,9 @@ static bool TryResolveUnboundedParamValue(RtlirParamDecl& pd,
     return false;
   }
   pd.is_unbounded = true;
-  ValidateUnboundedParamType(val.pname, val.param_type, val.has_unpacked_dims,
-                             val.tables, diag, val.pval->range.start);
+  ValidateUnboundedParamType(
+      {val.pname, val.param_type, val.has_unpacked_dims, val.pval->range.start},
+      val.tables, diag);
   return true;
 }
 

@@ -45,18 +45,17 @@ bool IsSimpleBitVectorType(const DataType& dtype,
   }
 }
 
-void ValidateUnboundedParamType(std::string_view name, const DataType* dtype,
-                                bool has_unpacked_dims,
-                                const TypeShapeTables& tables, DiagEngine& diag,
-                                SourceLoc loc) {
-  if (!has_unpacked_dims &&
-      (dtype == nullptr || IsSimpleBitVectorType(*dtype, tables))) {
+void ValidateUnboundedParamType(const UnboundedParam& param,
+                                const TypeShapeTables& tables,
+                                DiagEngine& diag) {
+  if (!param.has_unpacked_dims &&
+      (param.dtype == nullptr || IsSimpleBitVectorType(*param.dtype, tables))) {
     return;
   }
-  diag.Error(loc,
+  diag.Error(param.loc,
              std::format("'$' may be assigned only to a parameter of a simple "
                          "bit vector type, and parameter '{}' is not one",
-                         name),
+                         param.name),
              Subclause("6.20.7"));
 }
 

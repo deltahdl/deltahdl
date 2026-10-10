@@ -516,8 +516,8 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
        RefersToUnboundedParam(mod, item->init_expr->text))) {
     pd.is_unbounded = true;
     ValidateUnboundedParamType(
-        item->name, &item->data_type, !item->unpacked_dims.empty(),
-        {typedefs_, td_array_dims_, class_names_}, diag_, item->loc);
+        {item->name, &item->data_type, !item->unpacked_dims.empty(), item->loc},
+        {typedefs_, td_array_dims_, class_names_}, diag_);
   } else if (kFoldsDefault) {
     if (ContainsDollarSubexpr(item->init_expr)) {
       // §6.20.7: $ must be the entire, self-contained parameter value; it may

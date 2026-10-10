@@ -5,10 +5,18 @@
 #include <format>
 #include <initializer_list>
 #include <string_view>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
+#include <vector>
 
+#include "elaborator/net_data_type.h"
+#include "elaborator/simple_bit_vector.h"
+#include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 
@@ -527,20 +535,22 @@ TEST(DollarConstantElaboration,
   ExpectDollarTypeReported(f, kParams);
 }
 
-// A type name the elaborator cannot resolve leaves nothing to judge, so `$` is
-// not reported against it; the unknown name is reported on its own.
-TEST(DollarConstantElaboration,
-     DollarAssignedThroughAnUnresolvedTypeNotJudged) {
-  ElabFixture f;
-  Elaborate(
-      "module m;\n"
-      "  parameter missing_t P = $;\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
-                             "'$' may be assigned only to a parameter of a "
-                             "simple bit vector type",
-                             2, "6.20.7"));
+// A type name the tables cannot resolve leaves nothing to judge, so the type
+// is taken as a simple bit vector type and `$` is not reported against it; a
+// class name resolving to no typedef is no bit vector all the same.
+TEST(DollarConstantElaboration, UnresolvedTypeNameIsNotJudged) {
+  const TypedefMap kTypedefs;
+  const std::unordered_map<std::string_view, std::vector<Expr*>> kDims;
+  const std::unordered_set<std::string_view> kClasses = {"C"};
+  const TypeShapeTables kTables{kTypedefs, kDims, kClasses};
+  DataType missing;
+  missing.kind = DataTypeKind::kNamed;
+  missing.type_name = "missing_t";
+  EXPECT_TRUE(IsSimpleBitVectorType(missing, kTables));
+  DataType handle;
+  handle.kind = DataTypeKind::kNamed;
+  handle.type_name = "C";
+  EXPECT_FALSE(IsSimpleBitVectorType(handle, kTables));
 }
 
 // §6.20.7 bars a parameter holding `$` from every queue context: a queue's
