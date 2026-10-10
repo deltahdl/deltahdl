@@ -10,6 +10,7 @@
 #include "elaborator/compilation_unit_set.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_scope_rules_names.h"
+#include "elaborator/elaborator_validate_classes.h"
 #include "parser/ast_design.h"
 
 namespace delta {

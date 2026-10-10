@@ -12,6 +12,7 @@
 
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "elaborator/compilation_unit_set.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_bind_scope.h"
 #include "elaborator/elaborator_data.h"
@@ -67,8 +68,7 @@ class Elaborator : public ElaboratorClassRules {
   using ParamList = std::vector<ParamOverride>;
 
   Elaborator(Arena& arena, DiagEngine& diag, CompilationUnit* unit);
-  // §3.12.1: elaborates `units` together, each file a compilation unit of its
-  // own (compilation_unit_set.h). `units` holds at least one unit.
+  // §3.12.1: `units`, at least one, each file a unit of its own, together.
   Elaborator(Arena& arena, DiagEngine& diag,
              const std::vector<CompilationUnit*>& units);
 
