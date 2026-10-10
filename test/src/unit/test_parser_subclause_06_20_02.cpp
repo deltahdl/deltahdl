@@ -2,8 +2,10 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 
@@ -94,6 +96,30 @@ TEST(DataTypeParsing, RangedUntypedParameterParses) {
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
   EXPECT_EQ(item->name, "P");
+}
+
+// A value parameter's data type may stand behind a package scope, in the body
+// as in the header's parameter port list, and the parser reads the scope and
+// the type name rather than taking the package name for the parameter's.
+TEST(DeclarationListParsing, ValueParameterOfAPackageScopedType) {
+  auto r = Parse(
+      "package p;\n"
+      "  typedef logic [3:0] word_t;\n"
+      "endpackage\n"
+      "module top #(parameter p::word_t Q = 0);\n"
+      "  parameter p::word_t R = 0;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const ModuleDecl* top = r.cu->modules[0];
+  ASSERT_EQ(top->param_types.size(), 1u);
+  EXPECT_EQ(top->params[0].first, "Q");
+  EXPECT_EQ(top->param_types[0].scope_name, "p");
+  EXPECT_EQ(top->param_types[0].type_name, "word_t");
+  ASSERT_EQ(top->items.size(), 1u);
+  EXPECT_EQ(top->items[0]->name, "R");
+  EXPECT_EQ(top->items[0]->data_type.scope_name, "p");
+  EXPECT_EQ(top->items[0]->data_type.type_name, "word_t");
 }
 
 }  // namespace

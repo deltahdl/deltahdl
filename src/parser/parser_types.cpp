@@ -524,6 +524,7 @@ DataType Parser::ParseDataType() {
 
   if (Check(TokenKind::kKwSigned) || Check(TokenKind::kKwUnsigned)) {
     dtype.is_signed = Check(TokenKind::kKwSigned);
+    dtype.signing_written = true;
     Consume();
     ParsePackedDims(dtype);
     return dtype;
@@ -830,7 +831,9 @@ void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
     ParseTypeParamDecl(items, loc, localparam);
     return;
   }
-  DataType dtype = ParseDataType();
+  // A.2.2.1 lets the type stand behind a package or class scope, which
+  // ParseDeclaredDataType reads past known_types_.
+  DataType dtype = ParseDeclaredDataType();
   ParseImplicitParamRange(dtype);
   // §40.4.6: a pragma right after the keyword or the bit width makes the
   // parameters declared here the legal states of the FSM it names.

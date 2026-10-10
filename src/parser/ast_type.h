@@ -94,6 +94,10 @@ struct StructMember {
 struct DataType {
   DataTypeKind kind = DataTypeKind::kImplicit;
   bool is_signed = false;
+  // A.2.2.1: the type was written with a `signed` or `unsigned` keyword. An
+  // implicit type written `unsigned` alone is otherwise indistinguishable from
+  // one written with nothing at all.
+  bool signing_written = false;
   bool is_packed = false;
   bool is_const = false;
   bool is_net = false;

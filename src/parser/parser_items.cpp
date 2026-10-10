@@ -684,6 +684,19 @@ void Parser::ParseVarPrefixed(std::vector<ModuleItem*>& items) {
   }
 }
 
+// §6.8, footnote 14 of Syntax 6-3: a data declaration whose type is implicit,
+// written as a sign, a packed range or nothing at all behind `const`, declares
+// a variable only after `var`, which `const var` writes after the `const`.
+static void ReportImplicitTypeWithoutVar(const DataType& dtype,
+                                         bool var_follows, SourceLoc loc,
+                                         DiagEngine& diag) {
+  if (dtype.kind != DataTypeKind::kImplicit || var_follows) return;
+  diag.Error(loc,
+             "data_declaration without an explicit data type requires the "
+             "'var' keyword",
+             Subclause("6.8"));
+}
+
 void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
                                   bool had_lifetime) {
   if (Match(TokenKind::kKwVar)) {
@@ -725,7 +738,9 @@ void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
   }
   auto dtype = ParseDataType();
   if (dtype.kind != DataTypeKind::kImplicit || dtype.packed_dim_left ||
-      dtype.is_signed || dtype.is_const) {
+      dtype.signing_written || dtype.is_const) {
+    ReportImplicitTypeWithoutVar(dtype, Check(TokenKind::kKwVar), CurrentLoc(),
+                                 diag_);
     ParseVarDeclList(items, dtype);
     return;
   }

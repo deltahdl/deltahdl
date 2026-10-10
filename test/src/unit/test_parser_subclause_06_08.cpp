@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -414,6 +417,34 @@ TEST(VariableDeclarations, AutomaticAtModuleScopeWithoutDataTypeOrVarIsError) {
                             "data_declaration without an explicit data type "
                             "requires the 'var' keyword",
                             2, "6.8"));
+}
+
+// Footnote 14 of Syntax 6-3 holds at module scope whatever stands in place of
+// the data type: a sign alone, a sign with a packed range, `const` alone or
+// with a sign, and a lifetime with a sign. Written with `var`, `const var`
+// included, each declares a variable, as does a declaration with a data type.
+TEST(VariableDeclarations, ImplicitTypeAtModuleScopeWithoutVarIsError) {
+  auto r = Parse(
+      "module m;\n"
+      "  signed [3:0] x;\n"
+      "  unsigned u;\n"
+      "  const c = 1;\n"
+      "  const signed [3:0] k = 2;\n"
+      "  automatic signed [3:0] a;\n"
+      "  var signed [3:0] vx;\n"
+      "  const var cv = 1;\n"
+      "  int i;\n"
+      "endmodule\n");
+  for (uint32_t line : {2U, 3U, 4U, 5U, 6U}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "data_declaration without an explicit data type "
+                              "requires the 'var' keyword",
+                              line, "6.8"));
+  }
+  for (uint32_t line : {7U, 8U, 9U}) {
+    EXPECT_FALSE(
+        ReportedError(r.diags, "requires the 'var' keyword", line, "6.8"));
+  }
 }
 
 TEST(VariableDeclarations, AutomaticVarWithoutDataTypeOk) {

@@ -131,7 +131,9 @@ struct ParserParamPortHelpers {
   // A value parameter declaration in a parameter_port_list.
   static void ParseValueParamPortDecl(Parser& p, ParamPortList& out,
                                       bool is_localparam_group) {
-    DataType dtype = p.ParseDataType();
+    // A.2.2.1 lets the type stand behind a package or class scope, which
+    // ParseDeclaredDataType reads past known_types_.
+    DataType dtype = p.ParseDeclaredDataType();
     p.ParseImplicitParamRange(dtype);
     auto name = p.Expect(TokenKind::kIdentifier, Subclause("6.20.2"));
     if (p.Check(TokenKind::kLBracket)) {
