@@ -197,17 +197,23 @@ Variable* TryResolveCompoundElementBase(const Expr* lhs, SimContext& ctx,
   // The two names have the same shape, and what tells them apart is whether the
   // element type stands for an array, which the elaborated tables do not yet
   // say -- #3598. Until they do, an element type written as a name is left to
-  // the element the writer below materializes, and an element type that is an
-  // integral type of its own is a packed object whose bits this addresses.
-  // §7.4.1: a name with packed dimensions written on it, `s8_t [1:0] y [2]`,
-  // is a packed array all the same: its element is a vector of elements of
-  // the named type (Variable::packed_elem_width), and `y[1][0]` is one of
-  // them, which reads signed where the type is (Variable::signed_elem_depth).
-  // Materialized as an element of its own, it was a separate unsigned
-  // variable the read then found, and `y[1]` was never written.
+  // the element the writer below materializes unless its element shows it is
+  // a vector, and an element type that is an integral type of its own is a
+  // packed object whose bits this addresses.
+  //
+  // §7.4.1 and §11.5.1: a name standing for a vector, `byte_t mem [4]` under
+  // `typedef logic [7:0] byte_t` or `s8_t [1:0] y [2]` with packed dimensions
+  // written on it, is a packed object all the same, and the index past its
+  // element selects within it -- a bit of `mem[0]`, or the element `y[1][0]`
+  // of the named type, which reads signed where the type is
+  // (Variable::signed_elem_depth). The element's declared packed range
+  // accounts for its whole width there (Variable::has_packed_range), where the
+  // staged typedef's element is wider than the one range the name's own
+  // typedef writes. Materialized as an element of its own, `mem[0][3]` was a
+  // separate variable the read then found, and `mem[0]` was never written.
   Variable* prefix = DeepestElementPrefix(lhs, ctx, arena);
   if (info->elem_type_kind == DataTypeKind::kNamed &&
-      (prefix == nullptr || prefix->packed_elem_width <= 1)) {
+      (prefix == nullptr || !prefix->has_packed_range)) {
     return nullptr;
   }
   return prefix;
