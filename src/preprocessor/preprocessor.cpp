@@ -101,6 +101,7 @@ Preprocessor::Preprocessor(SourceManager& src_mgr, DiagEngine& diag,
   DefinePredefined("SV_COV_NOCOV", "0");
   DefinePredefined("SV_COV_OK", "1");
   DefinePredefined("SV_COV_PARTIAL", "2");
+  initial_macros_ = macros_;
 }
 
 void Preprocessor::DefinePredefined(std::string name, std::string body) {

@@ -515,10 +515,12 @@ void Preprocessor::HandlePragma(std::string_view rest, SourceLoc loc) {
     for (const auto& expr : keywords) ResetPragma(expr.keyword);
     return;
   }
-  if (name == kResetallPragmaName) {
-    for (std::string_view recognized : RecognizedPragmaNames()) {
-      ResetPragma(recognized);
-    }
+  if (name == kResetallPragmaName) ResetAllPragmas();
+}
+
+void Preprocessor::ResetAllPragmas() {
+  for (std::string_view recognized : RecognizedPragmaNames()) {
+    ResetPragma(recognized);
   }
 }
 

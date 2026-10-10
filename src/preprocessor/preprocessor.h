@@ -163,6 +163,15 @@ class Preprocessor {
   // preprocessed, which is why this is a separate call the driver makes after
   // its last Preprocess() rather than something Preprocess() does on its own.
   void ReportUnterminatedKeywordRegions();
+  // §3.12.1 (printed page 56): in the use model where each file is a
+  // compilation unit of its own, the directives one unit read do not affect
+  // another. Called between two units' files, this puts back the macro table
+  // every unit starts with, holding the configuration's defines and the
+  // predefined macros alone, returns each directive and pragma to its initial
+  // state, and reports a `begin_keywords region the ending unit left open.
+  // What spans the design stays: the line origins, the module directive
+  // records and §3.14.3's global precision.
+  void BeginCompilationUnit();
   static std::string_view Trim(std::string_view s);
 
  private:
@@ -301,6 +310,9 @@ class Preprocessor {
   std::string ResolveInclude(std::string_view filename,
                              const std::string& src_dir, bool quoted);
   void DefinePredefined(std::string name, std::string body);
+  // §22.11.1: restores every pragma_name this implementation recognises, as the
+  // resetall pragma does.
+  void ResetAllPragmas();
   void TrackDesignElement(std::string_view trimmed);
   void TrackDesignElementHeader(std::string_view trimmed);
   void ExpandAndAppendLine(std::string_view line, uint32_t file_id,
@@ -545,6 +557,9 @@ class Preprocessor {
   DiagEngine& diag_;
   PreprocConfig config_;
   MacroTable macros_;
+  // The table as the constructor left it, holding the configuration's defines
+  // and the predefined macros, which BeginCompilationUnit gives each new unit.
+  MacroTable initial_macros_;
   std::vector<CondState> cond_stack_;
   int include_depth_ = 0;
   static constexpr int kMaxIncludeDepth = 15;

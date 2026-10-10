@@ -343,6 +343,13 @@ void Preprocessor::ReportUnterminatedKeywordRegions() {
   keyword_version_stack_.clear();
 }
 
+void Preprocessor::BeginCompilationUnit() {
+  ReportUnterminatedKeywordRegions();
+  macros_ = initial_macros_;
+  ResetDirectiveState();
+  ResetAllPragmas();
+}
+
 // Digits, with at most one decimal point among them.
 static bool ValidateDecayTimeChars(std::string_view arg) {
   bool saw_dot = false;
