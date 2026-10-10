@@ -680,10 +680,20 @@ void Parser::ParseVarPrefixed(std::vector<ModuleItem*>& items) {
   ParseVarDeclList(items, dtype);
 }
 
+// Marks each declarator ParseVarPrefixed added, from `first` on, as declared
+// after the `var` keyword.
+static void MarkExplicitVar(std::vector<ModuleItem*>& items, size_t first) {
+  for (size_t i = first; i < items.size(); ++i) {
+    items[i]->has_explicit_var = true;
+  }
+}
+
 void Parser::ParseTypedItemOrInst(std::vector<ModuleItem*>& items,
                                   bool had_lifetime) {
   if (Match(TokenKind::kKwVar)) {
+    const size_t kFirst = items.size();
     ParseVarPrefixed(items);
+    MarkExplicitVar(items, kFirst);
     return;
   }
 

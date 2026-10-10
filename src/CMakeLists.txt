@@ -544,6 +544,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/class_property_cont_assign.cpp
     elaborator/string_numeric_assign.cpp
     elaborator/instance_local_types.cpp
+    elaborator/nettype_uses.cpp
     elaborator/resolution_function_body.cpp
     lexer/lexer_numbers.cpp
     lexer/lexer_operators.cpp

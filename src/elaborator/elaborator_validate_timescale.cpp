@@ -12,6 +12,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/instance_local_types.h"
+#include "elaborator/nettype_uses.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/unit_scope_switch.h"
 #include "parser/ast_design.h"
@@ -163,6 +164,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
   CheckDollarOperands(decl, diag_);
   CheckContinuousPropertyWrites(decl, class_var_types_, unit_, diag_);
   CheckInstanceLocalTypeAssignments(decl, unit_, diag_);
+  CheckNettypeUses(decl, nettype_names_, diag_);
 }
 
 namespace {

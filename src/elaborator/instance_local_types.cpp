@@ -2,6 +2,7 @@
 
 #include <format>
 #include <string_view>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
@@ -43,16 +44,26 @@ static bool DeclaresClass(const ModuleDecl* mod, std::string_view name) {
   return false;
 }
 
-// The module the instance `name` of the scanned module instantiates.
+static const ModuleDecl* DeclNamed(const std::vector<ModuleDecl*>& decls,
+                                   std::string_view name) {
+  for (const ModuleDecl* decl : decls) {
+    if (decl->name == name) return decl;
+  }
+  return nullptr;
+}
+
+// The module or interface the instance `name` of the scanned module
+// instantiates. Each instance of either is a scope of its own, and so declares
+// types of its own (§6.22.1).
 static const ModuleDecl* ModuleOfInstance(std::string_view name,
                                           const InstanceScan& scan) {
   for (const ModuleItem* item : scan.decl->items) {
     if (item->kind != ModuleItemKind::kModuleInst || item->inst_name != name) {
       continue;
     }
-    for (const ModuleDecl* mod : scan.unit->modules) {
-      if (mod->name == item->inst_module) return mod;
-    }
+    const ModuleDecl* mod = DeclNamed(scan.unit->modules, item->inst_module);
+    return mod != nullptr ? mod
+                          : DeclNamed(scan.unit->interfaces, item->inst_module);
   }
   return nullptr;
 }

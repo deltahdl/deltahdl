@@ -252,6 +252,34 @@ TEST(MatchingTypesElaboration, InstanceOfALaterModuleIsJudged) {
                              "each declare for themselves", 8, "6.22"));
 }
 
+// An interface instance is a scope of its own as a module instance is, so the
+// type each of two instances of one interface declares is its own.
+TEST(MatchingTypesElaboration, TypesEachInterfaceInstanceDeclaresAreDistinct) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc;\n"
+      "  typedef enum {X, Y} e_t;\n"
+      "  e_t e;\n"
+      "  int n;\n"
+      "endinterface\n"
+      "module top();\n"
+      "  ifc i1 ();\n"
+      "  ifc i2 ();\n"
+      "  initial begin\n"
+      "    i1.e = i2.e;\n"
+      "    i1.n = i2.n;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'i1.e' and 'i2.e' have types the instances 'i1' "
+                            "and 'i2' each declare for themselves, which are "
+                            "distinct types",
+                            10, "6.22"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "each declare for themselves", 11, "6.22"));
+}
+
 // Instances of a module the compilation unit does not declare have no
 // declarations to judge, so an assignment between their variables is left to
 // the report of the unknown module.

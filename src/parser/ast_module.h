@@ -492,6 +492,10 @@ struct ModuleItem {
   // introduces once -- an inline enumeration's named constants, say -- is not
   // taken to be introduced again by each name in the list.
   bool first_in_decl_list = true;
+  // A.2.1.3: set on each declarator of a data_declaration written with the
+  // `var` keyword. A declaration naming a user-defined nettype declares a net
+  // only without it (§6.6.7); with it, the declaration is a variable's.
+  bool has_explicit_var = false;
   // §40.4.1 and §40.4.6: the enumeration name of the FSM pragma written in
   // this item's declaration, before its first name; empty for none.
   std::string_view fsm_enum;

@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <format>
 #include <initializer_list>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include "fixture_elaborator.h"
@@ -212,6 +214,66 @@ TEST(NettypeElaboration, ResolutionFunctionWritingThroughAScopeRejected) {
                               "it writes '" +
                                   name + "'",
                               line, "6.6.7"));
+  }
+}
+
+// --- Where a nettype may be named (§6.6.7) ---
+
+// A nettype may be used only to declare a net, so it is refused as the type of
+// a variable written with `var` or declared in a procedural block, of a
+// structure member at any depth, of a function's return or a subroutine's
+// argument, of a parameter in the body or the header, and of a cast. A net
+// declared with it, a package's type of the same name and a size cast are no
+// such uses.
+TEST(NettypeElaboration, NettypeNamedAsTheTypeOfAnythingButANetRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "nettype logic [3:0] cu_nt;\n"
+      "package p;\n"
+      "  typedef logic [3:0] nt;\n"
+      "endpackage\n"
+      "module top #(parameter cu_nt Q = 0, parameter int W = 1);\n"
+      "  nettype logic [3:0] nt;\n"
+      "  nt w;\n"
+      "  var nt v;\n"
+      "  typedef struct { int k; nt m; struct { nt n; } s; } s_t;\n"
+      "  function nt f(nt a, int c); return a; endfunction\n"
+      "  parameter nt P = 0;\n"
+      "  parameter p::nt R = 0;\n"
+      "  logic [3:0] x;\n"
+      "  initial begin\n"
+      "    nt b;\n"
+      "    s_t q;\n"
+      "    x = nt'(x);\n"
+      "    x = 4'(x);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  struct NettypeUse {
+    uint32_t line;
+    std::string_view nettype;
+    std::string_view use;
+  };
+  const NettypeUse kUses[] = {{5, "cu_nt", "parameter 'Q'"},
+                              {8, "nt", "variable 'v'"},
+                              {9, "nt", "member 'm'"},
+                              {9, "nt", "member 'n'"},
+                              {10, "nt", "the return of function 'f'"},
+                              {10, "nt", "argument 'a' of 'f'"},
+                              {11, "nt", "parameter 'P'"},
+                              {15, "nt", "variable 'b'"},
+                              {17, "nt", "a cast"}};
+  for (const NettypeUse& u : kUses) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::format("nettype '{}' may declare only a net, and is named here "
+                    "as the type of {}",
+                    u.nettype, u.use),
+        u.line, "6.6.7"));
+  }
+  for (uint32_t line : {7U, 12U, 16U, 18U}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "may declare only a net",
+                               line, "6.6.7"));
   }
 }
 

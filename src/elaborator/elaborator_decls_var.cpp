@@ -20,6 +20,7 @@
 #include "elaborator/elaborator_decls_internal.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
+#include "elaborator/nettype_uses.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
@@ -798,9 +799,19 @@ void Elaborator::ReportUndeclaredTypeName(const ModuleItem* item) {
               Subclause("6.18"));
 }
 
+// §6.6.7: a declaration naming a nettype declares a net, and only a net may
+// be declared with one, so the same declaration written with `var` declares a
+// variable of the nettype, which is reported and elaborated as a variable of
+// the data type the nettype names.
 bool Elaborator::ElaborateUserNettypeNet(ModuleItem* item, RtlirModule* mod) {
   if (item->data_type.kind != DataTypeKind::kNamed) return false;
   if (nettype_names_.count(item->data_type.type_name) == 0) return false;
+  if (item->has_explicit_var) {
+    ReportNettypeNotNet(item->data_type.type_name,
+                        std::format("variable '{}'", item->name), item->loc,
+                        diag_);
+    return false;
+  }
   item->data_type.is_net = true;
   item->kind = ModuleItemKind::kNetDecl;
   nettype_net_names_.insert(item->name);
