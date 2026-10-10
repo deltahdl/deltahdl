@@ -425,9 +425,7 @@ class DeclaredNameTables {
   // §3.12.1 (printed page 56): the running code's compilation-unit scope name
   // where each unit has a scope of its own, empty otherwise; SimContext
   // answers it from the running instance (SimContext::ActiveUnitScope).
-  std::function<std::string()> running_unit_scope_ = [] {
-    return std::string();
-  };
+  std::function<std::string()> running_unit_scope_;
   // `name` as the running unit's own declaration of it is keyed, where `table`
   // holds one under the unit's scope name, and `name` otherwise. `scoped`
   // holds the key the answer may view.

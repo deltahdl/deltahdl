@@ -267,17 +267,16 @@ std::string SimContext::ActiveInstancePrefix() const {
                           : lowering_inst_prefix_;
 }
 
-// §3.12.1 (printed page 56): the scope name the compilation-unit names of the
-// running code stand under where each unit has a scope of its own, and empty
-// for a design of one unit. A unit's subroutine runs in its unit's frame
-// (EnterSubroutinePackage), whatever instance enabled it; other code stands in
-// the unit of its instance's module.
+// §3.12.1 (printed page 56): the scope name the declarations of the running
+// code's scope stand under where each unit has a scope of its own, and empty
+// for a design of one unit. A unit's or a package's subroutine runs in the
+// frame of the scope declaring it (EnterSubroutinePackage), whatever instance
+// enabled it, so its own unit's "$unit#k" or its own package's name; other
+// code stands in the unit of its instance's module.
 std::string SimContext::ActiveUnitScope() const {
   if (!units_.Separate()) return {};
   const Scope* frame = PackageFrame();
-  if (frame != nullptr && UnitScopes::IsUnitScope(frame->package)) {
-    return std::string(frame->package);
-  }
+  if (frame != nullptr) return std::string(frame->package);
   return UnitScopes::ScopeName(units_.UnitOf(ActiveInstancePrefix()));
 }
 

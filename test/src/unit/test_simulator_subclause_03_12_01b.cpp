@@ -173,25 +173,28 @@ TEST(SeparateUnitsSim, EachUnitsCovergroupIsItsOwn) {
 }
 
 // §3.12.1 with §35.5.4: each unit's import of one SystemVerilog name is its
-// own, so a call reaches the C function the module's own unit imported.
+// own, so a call reaches the C function the module's own unit imported; an
+// import the module declares itself is reached as ever.
 int SeparateUnitsAddOne(int x) { return x + 1; }
 int SeparateUnitsAddTwo(int x) { return x + 2; }
+int SeparateUnitsAddThree(int x) { return x + 3; }
 
 TEST(SeparateUnitsSim, EachUnitsDpiImportIsItsOwn) {
   SimFixture f;
-  auto* design =
-      LowerUnits({"import \"DPI-C\" add_one = function int f(input int x);\n"
-                  "module top;\n"
-                  "  int a;\n"
-                  "  child c();\n"
-                  "  initial a = f(10);\n"
-                  "endmodule\n",
-                  "import \"DPI-C\" add_two = function int f(input int x);\n"
-                  "module child;\n"
-                  "  int b;\n"
-                  "  initial b = f(10);\n"
-                  "endmodule\n"},
-                 f);
+  auto* design = LowerUnits(
+      {"import \"DPI-C\" add_one = function int f(input int x);\n"
+       "module top;\n"
+       "  int a;\n"
+       "  child c();\n"
+       "  initial a = f(10);\n"
+       "endmodule\n",
+       "import \"DPI-C\" add_two = function int f(input int x);\n"
+       "module child;\n"
+       "  import \"DPI-C\" add_three = function int h(input int x);\n"
+       "  int b, bh;\n"
+       "  initial begin b = f(10); bh = h(10); end\n"
+       "endmodule\n"},
+      f);
   ASSERT_NE(design, nullptr);
   ASSERT_NE(f.ctx.GetDpiRuntime(), nullptr);
   // Each unit's declaration is held under its own unit's scope, and the child
@@ -202,12 +205,15 @@ TEST(SeparateUnitsSim, EachUnitsDpiImportIsItsOwn) {
   EXPECT_EQ(f.ctx.Units().UnitOf("c."), 1);
   BindDpiImports(
       *f.ctx.GetDpiRuntime(),
-      LookupIn({{"add_one", reinterpret_cast<void*>(&SeparateUnitsAddOne)},
-                {"add_two", reinterpret_cast<void*>(&SeparateUnitsAddTwo)}}),
+      LookupIn(
+          {{"add_one", reinterpret_cast<void*>(&SeparateUnitsAddOne)},
+           {"add_two", reinterpret_cast<void*>(&SeparateUnitsAddTwo)},
+           {"add_three", reinterpret_cast<void*>(&SeparateUnitsAddThree)}}),
       CallBuildDir("separate_units_dpi"), "cc", f.diag);
   f.scheduler.Run();
   EXPECT_EQ(ValueOf(f, "a"), 11u);
   EXPECT_EQ(ValueOf(f, "c.b"), 12u);
+  EXPECT_EQ(ValueOf(f, "c.bh"), 13u);
 }
 
 // §3.12.1 with §26.3: a unit's import is a declaration of that unit's scope,
