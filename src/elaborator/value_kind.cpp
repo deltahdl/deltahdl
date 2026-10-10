@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "elaborator/aggregate_shape.h"
+#include "elaborator/elaborator_data.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/net_data_type.h"
 #include "elaborator/type_eval.h"
