@@ -14,12 +14,6 @@
 
 namespace delta {
 
-// The destinations both fills below write: a one-dimensional fixed-size
-// unpacked array, neither dynamic nor a queue.
-static bool IsFixedOneDimensional(const ArrayInfo& dst) {
-  return !dst.is_dynamic && !dst.is_queue && dst.dim_sizes.size() <= 1;
-}
-
 // Writes element i of the destination, counted from its leftmost, the value
 // value_of(i), for every element.
 static void FillElementsLeftToRight(
@@ -45,9 +39,7 @@ static void FillElementsLeftToRight(
 // destination, which §6.24.3 requires of the cast.
 static bool TryBitStreamCastToArray(const Stmt* stmt, const ArrayInfo& dst,
                                     SimContext& ctx, Arena& arena) {
-  if (stmt->rhs->kind != ExprKind::kCast || stmt->rhs->lhs == nullptr ||
-      !IsFixedOneDimensional(dst))
-    return false;
+  if (stmt->rhs->kind != ExprKind::kCast) return false;
   Logic4Vec stream = PackBitStreamOperand(stmt->rhs->lhs, ctx, arena);
   if (stream.width != dst.size * dst.elem_width) return false;
   FillElementsLeftToRight(stmt, dst, ctx, [&](uint32_t i) {
@@ -63,7 +55,7 @@ static bool TryBitStreamCastToArray(const Stmt* stmt, const ArrayInfo& dst,
 static bool TryStringLiteralToArray(const Stmt* stmt, const ArrayInfo& dst,
                                     SimContext& ctx, Arena& arena) {
   const Expr* str = StringLiteralSource(stmt->rhs);
-  if (str == nullptr || !IsFixedOneDimensional(dst)) return false;
+  if (str == nullptr) return false;
   Logic4Vec packed = EvalExpr(str, ctx, arena);
   FillElementsLeftToRight(stmt, dst, ctx, [&](uint32_t i) {
     return MakeLogic4VecVal(arena, dst.elem_width,
@@ -74,6 +66,9 @@ static bool TryStringLiteralToArray(const Stmt* stmt, const ArrayInfo& dst,
 
 bool TryFillArrayFromValue(const Stmt* stmt, const ArrayInfo& dst,
                            SimContext& ctx, Arena& arena) {
+  // Both fills write a one-dimensional fixed-size unpacked array, neither
+  // dynamic nor a queue.
+  if (dst.is_dynamic || dst.is_queue || dst.dim_sizes.size() > 1) return false;
   return TryStringLiteralToArray(stmt, dst, ctx, arena) ||
          TryBitStreamCastToArray(stmt, dst, ctx, arena);
 }
