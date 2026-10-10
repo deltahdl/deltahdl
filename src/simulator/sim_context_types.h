@@ -450,6 +450,10 @@ struct ArrayInfo {
   bool is_queue = false;
   bool is_4state = true;
   DataTypeKind elem_type_kind = DataTypeKind::kImplicit;
+  // RtlirElementShape::type_is_unpacked_array: the element type is a name
+  // standing for an unpacked array, `mem_type ba [0:7]` under
+  // `typedef bsix mem_type [0:3]`.
+  bool elem_type_is_unpacked_array = false;
   // §21.4.3: address extents of each unpacked dimension, outermost (leftmost in
   // the declaration) first, for a multidimensional unpacked array. Empty when
   // the array has a single unpacked dimension, in which case lo/size above

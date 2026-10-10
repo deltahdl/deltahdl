@@ -193,30 +193,20 @@ Variable* TryResolveCompoundElementBase(const Expr* lhs, SimContext& ctx,
   // only the range the declaration itself wrote is recorded:
   // `typedef bsix mem_type [0:3]; mem_type ba [0:7];` leaves one dimension
   // known, so `ba[0]` is a leaf of that dimension and `ba[0][0]` is the second
-  // dimension the record does not have rather than a bit of a packed object.
-  // The two names have the same shape, and what tells them apart is whether the
-  // element type stands for an array, which the elaborated tables do not yet
-  // say -- #3598. Until they do, an element type written as a name is left to
-  // the element the writer below materializes unless its element shows it is
-  // a vector, and an element type that is an integral type of its own is a
-  // packed object whose bits this addresses.
+  // dimension the record does not have rather than a bit of a packed object,
+  // which the elaborator marks (ArrayInfo::elem_type_is_unpacked_array) and
+  // this leaves to the element the writer below materializes.
   //
-  // §7.4.1 and §11.5.1: a name standing for a vector, `byte_t mem [4]` under
-  // `typedef logic [7:0] byte_t` or `s8_t [1:0] y [2]` with packed dimensions
-  // written on it, is a packed object all the same, and the index past its
-  // element selects within it -- a bit of `mem[0]`, or the element `y[1][0]`
-  // of the named type, which reads signed where the type is
-  // (Variable::signed_elem_depth). The element's declared packed range
-  // accounts for its whole width there (Variable::has_packed_range), where the
-  // staged typedef's element is wider than the one range the name's own
-  // typedef writes. Materialized as an element of its own, `mem[0][3]` was a
-  // separate variable the read then found, and `mem[0]` was never written.
-  Variable* prefix = DeepestElementPrefix(lhs, ctx, arena);
-  if (info->elem_type_kind == DataTypeKind::kNamed &&
-      (prefix == nullptr || !prefix->has_packed_range)) {
-    return nullptr;
-  }
-  return prefix;
+  // §7.4.1 and §11.5.1: an element type written as a name standing for an
+  // integral type is a packed object all the same, and the index past its
+  // element selects within it -- a bit of `mem[0]` under `typedef logic [7:0]
+  // byte_t` or `typedef int myint`, or the element `y[1][0]` of
+  // `s8_t [1:0] y [2]`, which reads signed where the type is
+  // (Variable::signed_elem_depth). Materialized as an element of its own,
+  // `mem[0][3]` was a separate variable the read then found, and `mem[0]` was
+  // never written.
+  if (info->elem_type_is_unpacked_array) return nullptr;
+  return DeepestElementPrefix(lhs, ctx, arena);
 }
 
 // §7.4.4: writes `rhs_val` to the element a multidimensional indexed name such

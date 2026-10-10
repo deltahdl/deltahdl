@@ -395,6 +395,7 @@ static bool TryCreateMultiDimArray(std::string_view name,
   info.is_descending = var.is_descending;
   info.is_4state = var.is_4state;
   info.elem_type_kind = var.elem_type_kind;
+  info.elem_type_is_unpacked_array = var.element.type_is_unpacked_array;
   // ArrayInfo::dim_los is uint32_t, so a negative bound (§7.4.2) is held as
   // its 32 bits, the bits CreateMultiDimLeaves names the leaves by. The
   // direction beside it is the comparison of the two int64_t bounds, made here
@@ -453,6 +454,7 @@ void CreateArrayElements(std::string_view name, const RtlirVariable& var,
   info.is_descending = var.is_descending;
   info.is_4state = var.is_4state;
   info.elem_type_kind = var.elem_type_kind;
+  info.elem_type_is_unpacked_array = var.element.type_is_unpacked_array;
   ctx.RegisterArray(name, info);
 
   for (uint32_t i = 0; i < var.unpacked_size; ++i) {

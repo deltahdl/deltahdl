@@ -909,8 +909,9 @@ TEST(MultidimensionalArraySimulation, TypedefDefinesAModuleVariablesDims) {
   EXPECT_EQ(out, "a 5 0 1\na3\n12\n");
 }
 
-// §7.4.4 with §11.5.1: an element type written as a name standing for a
-// vector is a packed object, so an index past the element selects a bit or a
+// §7.4.4 with §11.5.1: an element type written as a name standing for an
+// integral type -- a vector, an integer atom, a packed structure -- is a
+// packed object, so an index past the element selects a bit or a
 // part of it, written in place whether the assignment blocks or not, while the
 // staged typedef above still reads its second index as an array dimension.
 TEST(MultidimensionalArraySimulation, IndexPastANamedVectorElementSelectsBits) {
@@ -918,18 +919,27 @@ TEST(MultidimensionalArraySimulation, IndexPastANamedVectorElementSelectsBits) {
   std::string out = RunCapture(
       "module t;\n"
       "  typedef logic [7:0] byte_t;\n"
+      "  typedef int myint;\n"
+      "  typedef struct packed { logic [3:0] a, b; } p_t;\n"
       "  byte_t mem [4];\n"
+      "  myint m [4];\n"
+      "  p_t pm [2];\n"
       "  initial begin\n"
       "    mem[0] = 8'h00;\n"
       "    mem[1] = 8'h00;\n"
+      "    m[0] = 0;\n"
+      "    pm[1] = 8'h00;\n"
       "    mem[0][3] = 1'b1;\n"
       "    mem[0][7:6] = 2'b11;\n"
       "    mem[1][0] <= 1'b1;\n"
-      "    #1 $display(\"%h %h %b\", mem[0], mem[1], mem[0][3]);\n"
+      "    m[0][3] = 1'b1;\n"
+      "    pm[1][0] = 1'b1;\n"
+      "    #1 $display(\"%h %h %b %0d %h\", mem[0], mem[1], mem[0][3], m[0],\n"
+      "                pm[1]);\n"
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_EQ(out, "c8 01 1\n");
+  EXPECT_EQ(out, "c8 01 1 8 01\n");
 }
 
 }  // namespace

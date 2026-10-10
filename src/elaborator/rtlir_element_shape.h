@@ -56,6 +56,11 @@ struct RtlirElementShape {
   // array, `int m[string][int]`, the index its elements have; empty for any
   // other variable.
   std::optional<RtlirAssocIndex> assoc_index;
+  // §7.4.4: whether the element type is a name whose typedef writes unpacked
+  // dimensions of its own, `mem_type` under `typedef bsix mem_type [0:3]`, so
+  // that an index past an element of the array is a further array dimension
+  // rather than a select within a packed object.
+  bool type_is_unpacked_array = false;
 };
 
 }  // namespace delta

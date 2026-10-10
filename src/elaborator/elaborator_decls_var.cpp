@@ -899,6 +899,9 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   var.is_signed =
       ReconcilePartialPort(item->name, var.is_signed, NetType::kNone, mod);
   var.elem_type_kind = item->data_type.kind;
+  var.element.type_is_unpacked_array =
+      item->data_type.kind == DataTypeKind::kNamed &&
+      td_array_dims_.contains(item->data_type.type_name);
   var.init_expr = item->init_expr;
   var.gen_block_consts = gen_loop_consts_;
 
