@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "common/arena.h"
@@ -11,6 +12,7 @@
 #include "simulator/variable.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_globals.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -216,4 +218,42 @@ TEST(PliPreActiveSim, VpiPutValueFromPreActiveTakesEffectAndIsNotFlagged) {
   EXPECT_EQ(sched.IllegalPreponedWriteCount(), 0u);
   EXPECT_EQ(sched.IllegalPostponedWriteCount(), 0u);
   EXPECT_EQ(sched.IllegalPreObservedWriteCount(), 0u);
+}
+
+namespace {
+
+std::vector<std::string>* g_next_sim_time_order = nullptr;
+
+int RecordNextSimTime(s_cb_data* /*data*/) {
+  g_next_sim_time_order->push_back("next_sim_time");
+  return 0;
+}
+
+}  // namespace
+
+// Table 4-1 places cbNextSimTime in the Pre-Active region, which §4.5 runs
+// after the slot's Preponed region; called ahead of the slot, a value the
+// callback wrote was seen by the Preponed sampling.
+TEST(PliPreActiveSim, NextSimTimeCallbackRunsAfterThePreponedRegion) {
+  Arena arena;
+  Scheduler sched(arena);
+  VpiContext vpi;
+  vpi.SetScheduler(&sched);
+  SetGlobalVpiContext(&vpi);
+  std::vector<std::string> order;
+  g_next_sim_time_order = &order;
+  s_vpi_time time = {};
+  time.type = vpiSimTime;
+  s_cb_data cb = {};
+  cb.reason = cbNextSimTime;
+  cb.time = &time;
+  cb.cb_rtn = RecordNextSimTime;
+  EXPECT_NE(vpi_register_cb(&cb), nullptr);
+  auto* preponed = sched.GetEventPool().Acquire();
+  preponed->callback = [&]() { order.push_back("preponed"); };
+  sched.ScheduleEvent({5}, Region::kPreponed, preponed);
+  sched.Run();
+  SetGlobalVpiContext(nullptr);
+  g_next_sim_time_order = nullptr;
+  EXPECT_EQ(order, (std::vector<std::string>{"preponed", "next_sim_time"}));
 }

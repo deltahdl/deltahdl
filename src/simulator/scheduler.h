@@ -216,6 +216,11 @@ class Scheduler {
   void ExecuteTimeSlot(TimeSlot& slot);
   void ExecuteRegion(TimeSlot& slot, Region region);
   void DrainQueue(EventQueue& queue);
+  // Calls `event` and gives it back to the pool.
+  void RunEvent(Event* event);
+  // Executes `region` of an iterative loop whose home region is `home`
+  // (scheduler.cpp).
+  void ExecuteIterativeRegion(TimeSlot& slot, Region region, Region home);
 
   bool IterateActiveSet(TimeSlot& slot);
   bool IterateReactiveSet(TimeSlot& slot);

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
 #include "common/arena.h"
@@ -242,4 +243,28 @@ TEST(ReInactiveRegionSim,
   EXPECT_EQ(f.ctx.FindVariable("done")->value.ToUint64(), 1u);
   EXPECT_EQ(f.ctx.FindVariable("seen")->value.ToUint64(), 42u);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
+}
+
+// §4.4.2.7 with §4.5: the reactive dual of the Inactive rule. An event
+// scheduled into Re-Inactive while a Re-Inactive event runs waits for the
+// Reactive event that one created meanwhile.
+TEST(ReInactiveRegionSim,
+     ReInactiveEventWaitsForReactiveEventsCreatedMeanwhile) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<std::string> order;
+  auto* first = sched.GetEventPool().Acquire();
+  first->callback = [&]() {
+    order.push_back("reinactive1");
+    auto* reactive = sched.GetEventPool().Acquire();
+    reactive->callback = [&]() { order.push_back("reactive"); };
+    sched.ScheduleEvent({0}, Region::kReactive, reactive);
+    auto* second = sched.GetEventPool().Acquire();
+    second->callback = [&]() { order.push_back("reinactive2"); };
+    sched.ScheduleEvent({0}, Region::kReInactive, second);
+  };
+  sched.ScheduleEvent({0}, Region::kReInactive, first);
+  sched.Run();
+  EXPECT_EQ(order, (std::vector<std::string>{"reinactive1", "reactive",
+                                             "reinactive2"}));
 }

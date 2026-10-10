@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "common/arena.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_scheduler_event.h"
@@ -242,4 +243,47 @@ TEST(InactiveRegionSim, NonzeroDelayAdvancesTimeInsteadOfInactiveResume) {
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("snap")->value.ToUint64(), 7u);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 1u);
+}
+
+// §4.4.2.3 with §4.5: the Inactive region's events run only after all the
+// Active events, so an event scheduled into Inactive while an Inactive event
+// runs waits for the Active event that one created meanwhile. Drained in
+// place, the second Inactive event ran ahead of it.
+TEST(InactiveRegionSim, InactiveEventWaitsForActiveEventsCreatedMeanwhile) {
+  Arena arena;
+  Scheduler sched(arena);
+  std::vector<std::string> order;
+  auto* first = sched.GetEventPool().Acquire();
+  first->callback = [&]() {
+    order.push_back("inactive1");
+    auto* active = sched.GetEventPool().Acquire();
+    active->callback = [&]() { order.push_back("active"); };
+    sched.ScheduleEvent({0}, Region::kActive, active);
+    auto* second = sched.GetEventPool().Acquire();
+    second->callback = [&]() { order.push_back("inactive2"); };
+    sched.ScheduleEvent({0}, Region::kInactive, second);
+  };
+  sched.ScheduleEvent({0}, Region::kInactive, first);
+  sched.Run();
+  EXPECT_EQ(order,
+            (std::vector<std::string>{"inactive1", "active", "inactive2"}));
+}
+
+// The same in a design: the process resumed from its first `#0` writes a,
+// which wakes the always block in the Active region, and its second `#0`
+// resumes only once that block has copied a into b.
+TEST(InactiveRegionSim, SecondZeroDelayResumesAfterTheProcessesItWoke) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a = 0;\n"
+      "  int b = 0;\n"
+      "  int seen = 5;\n"
+      "  always @(a) b = a;\n"
+      "  initial begin #0; a = 1; #0; seen = b; end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("seen")->value.ToUint64(), 1u);
 }

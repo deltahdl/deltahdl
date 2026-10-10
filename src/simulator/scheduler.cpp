@@ -190,9 +190,6 @@ void Scheduler::Run() {
       continue;
     }
     current_time_ = it->first;
-    // §38.36.2: a cbNextSimTime callback is called before the events of the
-    // next time slot, the first after the one it was registered in.
-    GetGlobalVpiContext().DispatchCallbacks(kCbNextSimTime);
     ExecuteTimeSlot(it->second);
     ReleaseSlot(it->second);
     event_calendar_.erase(it);
@@ -220,6 +217,12 @@ void Scheduler::Run() {
 void Scheduler::ExecuteTimeSlot(TimeSlot& slot) {
   ExecuteRegion(slot, Region::kPreponed);
 
+  // §38.36.2: a cbNextSimTime callback is called before the events of the
+  // next time slot, the first after the one it was registered in, and Table
+  // 4-1 places it in the Pre-Active region, which §4.5 enters after the
+  // Preponed region has sampled the slot.
+  current_region_ = Region::kPreActive;
+  GetGlobalVpiContext().DispatchCallbacks(kCbNextSimTime);
   ExecuteRegion(slot, Region::kPreActive);
 
   while (!Halted() && slot.AnyIterativeNonempty()) {
@@ -251,8 +254,9 @@ bool Scheduler::IterateActiveSet(TimeSlot& slot) {
   // earlier active-set region — including Inactive→Active re-entries — settles.
   while (!Halted() &&
          slot.AnyNonemptyIn(Region::kActive, Region::kPostObserved)) {
-    ExecuteRegion(slot,
-                  slot.FirstNonemptyIn(Region::kActive, Region::kPostObserved));
+    ExecuteIterativeRegion(
+        slot, slot.FirstNonemptyIn(Region::kActive, Region::kPostObserved),
+        Region::kActive);
   }
   return true;
 }
@@ -265,10 +269,36 @@ bool Scheduler::IterateReactiveSet(TimeSlot& slot) {
   // reactive region set (Reactive..Post-Re-NBA).
   while (!Halted() &&
          slot.AnyNonemptyIn(Region::kReactive, Region::kPostReNBA)) {
-    ExecuteRegion(slot,
-                  slot.FirstNonemptyIn(Region::kReactive, Region::kPostReNBA));
+    ExecuteIterativeRegion(
+        slot, slot.FirstNonemptyIn(Region::kReactive, Region::kPostReNBA),
+        Region::kReactive);
   }
   return true;
+}
+
+// §4.5 moves the events of the first nonempty region after `home` -- the
+// Active region, or the Reactive region for the reactive set -- into `home`
+// and executes `home`, so an event scheduled into that region while they run
+// stays there until `home` is empty again: a process resumed from `#0` in the
+// Inactive region that writes a variable and executes `#0` again resumes after
+// the Active events its write created (§4.4.2.3, §4.4.2.7). The region runs in
+// place, keeping its own identity for the region checks, but only the events
+// it held on entry.
+void Scheduler::ExecuteIterativeRegion(TimeSlot& slot, Region region,
+                                       Region home) {
+  if (region == home) {
+    ExecuteRegion(slot, region);
+    return;
+  }
+  current_region_ = region;
+  EventQueue& queue = slot.regions[static_cast<size_t>(region)];
+  const Event* const kLastOnEntry = queue.tail;
+  const Event* ran = nullptr;
+  do {
+    Event* event = queue.Pop();
+    ran = event;
+    RunEvent(event);
+  } while (ran != kLastOnEntry && !Halted());
 }
 
 void Scheduler::ExecuteRegion(TimeSlot& slot, Region region) {
@@ -277,13 +307,12 @@ void Scheduler::ExecuteRegion(TimeSlot& slot, Region region) {
 }
 
 void Scheduler::DrainQueue(EventQueue& queue) {
-  while (!queue.empty() && !Halted()) {
-    Event* event = queue.Pop();
-    if (event->callback) {
-      event->callback();
-    }
-    pool_.Release(event);
-  }
+  while (!queue.empty() && !Halted()) RunEvent(queue.Pop());
+}
+
+void Scheduler::RunEvent(Event* event) {
+  if (event->callback) event->callback();
+  pool_.Release(event);
 }
 
 }  // namespace delta
