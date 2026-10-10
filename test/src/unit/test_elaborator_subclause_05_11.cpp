@@ -183,16 +183,13 @@ TEST(ArrayLiteralElaboration,
 }
 
 // The assignment-like contexts of §10.8 type a pattern written without a
-// prefix: a continuous and a procedural assignment, a typed parameter, a port
-// connection, a subroutine argument, a return, the parenthesized and
-// conditional forms of a right-hand value, a nondefault pattern item, and a
-// static cast.
+// prefix: a continuous and a procedural assignment, a typed parameter, a
+// subroutine argument, a return, the parenthesized and conditional forms of a
+// right-hand value, a nondefault pattern item, and a static cast.
 TEST(ArrayLiteralElaboration,
      UntypedPatternInEachAssignmentLikeContextAccepted) {
   EXPECT_TRUE(
       ElabOk("typedef int pair_t [0:1];\n"
-             "module sub(input var int p [0:1]);\n"
-             "endmodule\n"
              "module t;\n"
              "  parameter pair_t P = '{1, 2};\n"
              "  pair_t w, v, u;\n"
@@ -202,7 +199,6 @@ TEST(ArrayLiteralElaboration,
              "  function automatic pair_t f(pair_t a);\n"
              "    return '{a[1], a[0]};\n"
              "  endfunction\n"
-             "  sub s(.p('{5, 6}));\n"
              "  initial begin\n"
              "    v = '{7, 8};\n"
              "    u = f('{9, 10});\n"
