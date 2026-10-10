@@ -148,12 +148,20 @@ struct UnitScopeNames {
   const std::unordered_set<std::string_view>& class_names;
 };
 
-// §23.9 over the subroutines the compilation unit and each package declare,
-// which no module's walk reaches; reports every bare read that none of `names`,
-// the scope's own declarations and imports, or the body's own names answers.
-void ReportUnresolvedInUnitScopeSubroutines(const CompilationUnit* unit,
-                                            const UnitScopeNames& names,
-                                            ProvidedNameCache& provided_cache,
-                                            DiagEngine& diag);
+// §23.9 over the subroutines the compilation unit declares, which no module's
+// walk reaches; reports every bare read that none of `names`, the unit's
+// imports, or the body's own names answers, and every `$unit::` name the unit
+// does not declare before it (§3.12.1).
+void ReportUnresolvedInUnitSubroutines(const CompilationUnit* unit,
+                                       const UnitScopeNames& names,
+                                       ProvidedNameCache& provided_cache,
+                                       DiagEngine& diag);
+
+// The same over the subroutines each package of `unit` declares, which read
+// their package's own names and imports besides.
+void ReportUnresolvedInPackageSubroutines(const CompilationUnit* unit,
+                                          const UnitScopeNames& names,
+                                          ProvidedNameCache& provided_cache,
+                                          DiagEngine& diag);
 
 }  // namespace delta

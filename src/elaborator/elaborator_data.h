@@ -15,6 +15,7 @@
 
 #include "common/source_loc.h"
 #include "elaborator/checker_instance_binding.h"
+#include "elaborator/compilation_unit_set.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_bind_scope.h"
 #include "elaborator/elaborator_helpers.h"
@@ -192,6 +193,11 @@ class ElaboratorData {
 
  protected:
   friend struct ItemElaborationStateSaver;  // per-module state save/restore
+  friend struct UnitScopeTables;            // unit_scope_switch.h
+
+  // §3.12.1: the units of a compilation in which each file is one, each read
+  // through its own view; empty where the compilation is a single unit.
+  CompilationUnitSet units_;
 
   // §23.9/§24.3: stack of enclosing lexical scopes' visible names. A lexically
   // nested module/program/interface sees names declared in the modules that

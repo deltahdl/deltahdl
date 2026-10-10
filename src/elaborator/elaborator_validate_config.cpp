@@ -226,7 +226,15 @@ void ValidateNameSpaceCompilationUnit(const CompilationUnit* unit,
 void Elaborator::ValidateNameSpaces() {
   ValidateNameSpaceDefinitions(unit_, diag_);
   ValidateNameSpacePackages(unit_, diag_);
-  ValidateNameSpaceCompilationUnit(unit_, diag_);
+  // §3.13: each unit of a compilation where every file is one has a
+  // compilation-unit scope name space of its own.
+  if (units_.views.empty()) {
+    ValidateNameSpaceCompilationUnit(unit_, diag_);
+    return;
+  }
+  for (const auto* view : units_.views) {
+    ValidateNameSpaceCompilationUnit(view, diag_);
+  }
 }
 
 std::unordered_set<std::string_view> NonConfigCellNames(

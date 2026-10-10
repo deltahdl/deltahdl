@@ -8,6 +8,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/unit_scope_switch.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -292,15 +293,17 @@ void CheckDesignElementTimescales(const ModuleDecl* decl,
 
 }  // namespace
 
-void Elaborator::ValidateTimescaleConsistency() {
-  TimescaleScan scan;
-  DeclaredTimescale cu = DeclaredBy(unit_);
+// The design elements `unit` declares, each classified into `scan` against
+// `unit`'s own compilation-unit declarations.
+static void ScanTimescaleElements(const CompilationUnit* unit,
+                                  TimescaleScan& scan) {
+  DeclaredTimescale cu = DeclaredBy(unit);
 
   // An extern declaration (§23.5) declares the ports of the design element its
   // definition gives, and is not an element of its own, so only the definition
   // is classified.
   for (const auto* list :
-       {&unit_->modules, &unit_->interfaces, &unit_->programs}) {
+       {&unit->modules, &unit->interfaces, &unit->programs}) {
     for (const auto* decl : *list) {
       if (decl->is_extern) continue;
       ClassifyTimescaleElement(
@@ -311,12 +314,21 @@ void Elaborator::ValidateTimescaleConsistency() {
   }
   // §3.2 (printed page 50) counts a package among the design elements, and
   // §3.14.2.2 lets it declare its own time unit and precision.
-  for (const auto* pkg : unit_->packages) {
+  for (const auto* pkg : unit->packages) {
     ClassifyTimescaleElement(
         DeclaredBy(pkg),
         DeclaredBy(pkg->has_directive_timescale, pkg->directive_timescale), cu,
         pkg->range.start, scan);
   }
+}
+
+void Elaborator::ValidateTimescaleConsistency() {
+  TimescaleScan scan;
+  // §3.14.2.3 (printed page 60) states the rule over the design elements of
+  // the design, whichever compilation unit each stands in, and §3.12.1 gives
+  // each its own unit's declarations to be specified by.
+  UnitScopeTables::ForEachUnit(*this,
+                               [&] { ScanTimescaleElements(unit_, scan); });
 
   if (scan.any_specified && scan.any_unspecified) {
     diag_.Error(scan.unspecified_loc,

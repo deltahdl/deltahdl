@@ -873,20 +873,21 @@ static std::unordered_set<std::string> PackageDeclaredNames(
   return pkg_names;
 }
 
-void ReportUnresolvedInUnitScopeSubroutines(const CompilationUnit* unit,
-                                            const UnitScopeNames& names,
-                                            ProvidedNameCache& provided_cache,
-                                            DiagEngine& diag) {
-  // A name the unit declares, or one an import among `imports` provides.
-  auto declared_with = [&](std::string_view n,
-                           const std::vector<ModuleItem*>& imports) {
-    return names.item_names.count(n) != 0 || names.constants.count(n) != 0 ||
-           names.typedefs.count(n) != 0 || names.class_names.count(n) != 0 ||
-           ImportsProvideName(unit, provided_cache, imports, n);
-  };
-  auto unit_declares = [&](std::string_view n) {
-    return declared_with(n, unit->cu_items);
-  };
+// Whether `names` holds `n` or an import among `imports` provides it.
+static bool UnitDeclaresWith(const CompilationUnit* unit,
+                             const UnitScopeNames& names,
+                             ProvidedNameCache& provided_cache,
+                             const std::vector<ModuleItem*>& imports,
+                             std::string_view n) {
+  return names.item_names.count(n) != 0 || names.constants.count(n) != 0 ||
+         names.typedefs.count(n) != 0 || names.class_names.count(n) != 0 ||
+         ImportsProvideName(unit, provided_cache, imports, n);
+}
+
+void ReportUnresolvedInUnitSubroutines(const CompilationUnit* unit,
+                                       const UnitScopeNames& names,
+                                       ProvidedNameCache& provided_cache,
+                                       DiagEngine& diag) {
   // §3.12.1: a subroutine of the unit reads only the part of the unit written
   // before it, so neither a unit variable or net nor an import written after
   // it is reached. ReportSubroutineUnresolved passes over an item that is no
@@ -896,18 +897,25 @@ void ReportUnresolvedInUnitScopeSubroutines(const CompilationUnit* unit,
     auto declared_before = [&](std::string_view n) {
       return UnitDataDeclaredOnlyAfter(unit, n, sub->loc)
                  ? ImportsProvideName(unit, provided_cache, kBefore, n)
-                 : declared_with(n, kBefore);
+                 : UnitDeclaresWith(unit, names, provided_cache, kBefore, n);
     };
     ReportSubroutineUnresolved(std::vector<ModuleItem*>{sub}, declared_before,
                                unit, provided_cache, diag);
   }
   ReportUnitScopedReferences(unit->cu_items, unit, diag);
+}
+
+void ReportUnresolvedInPackageSubroutines(const CompilationUnit* unit,
+                                          const UnitScopeNames& names,
+                                          ProvidedNameCache& provided_cache,
+                                          DiagEngine& diag) {
   for (const auto* pkg : unit->packages) {
     if (pkg == nullptr) continue;
     std::unordered_set<std::string> pkg_names =
         PackageDeclaredNames(pkg, names.constants);
     auto pkg_declares = [&](std::string_view n) {
-      return pkg_names.count(std::string(n)) != 0 || unit_declares(n) ||
+      return pkg_names.count(std::string(n)) != 0 ||
+             UnitDeclaresWith(unit, names, provided_cache, unit->cu_items, n) ||
              ImportsProvideName(unit, provided_cache, pkg->items, n);
     };
     ReportSubroutineUnresolved(pkg->items, pkg_declares, unit, provided_cache,

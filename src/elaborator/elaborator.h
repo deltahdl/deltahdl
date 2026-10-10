@@ -67,6 +67,10 @@ class Elaborator : public ElaboratorClassRules {
   using ParamList = std::vector<ParamOverride>;
 
   Elaborator(Arena& arena, DiagEngine& diag, CompilationUnit* unit);
+  // §3.12.1: elaborates `units` together, each file a compilation unit of its
+  // own (compilation_unit_set.h). `units` holds at least one unit.
+  Elaborator(Arena& arena, DiagEngine& diag,
+             const std::vector<CompilationUnit*>& units);
 
   RtlirDesign* Elaborate(std::string_view top_module_name);
 
@@ -93,6 +97,7 @@ class Elaborator : public ElaboratorClassRules {
 
  private:
   friend struct ItemElaborationStateSaver;  // per-module state save/restore
+  friend struct UnitScopeTables;            // unit_scope_switch.h
 
   void RunPreElaborationValidations();
 

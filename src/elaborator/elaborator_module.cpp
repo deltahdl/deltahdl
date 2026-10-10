@@ -18,6 +18,7 @@
 #include "elaborator/elaborator_items_params.h"
 #include "elaborator/global_clock_assertion_event.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/unit_scope_switch.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -550,6 +551,9 @@ static const std::vector<EventExpr>* EnterGlobalClockingChain(
 
 RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
                                          const ParamList& params) {
+  // §3.12.1: the design element is elaborated in the compilation-unit scope
+  // of the unit that declared it, before anything here reads that scope.
+  UnitScopeTables::Switch unit_scope(*this, decl);
   auto* mod = arena_.Create<RtlirModule>();
   InitRtlirModuleHeader(mod, decl, unit_, diag_);
 

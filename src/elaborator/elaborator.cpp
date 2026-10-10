@@ -23,6 +23,7 @@
 #include "elaborator/elaborator_validate_classes.h"
 #include "elaborator/package_assertion_scope.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/unit_scope_switch.h"
 #include "elaborator/viewport_resolution.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -422,7 +423,8 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidateConfigParamOverrides();
 
-  ValidateAnonymousProgramNameSharing();
+  UnitScopeTables::ForEachUnit(
+      *this, [this] { ValidateAnonymousProgramNameSharing(); });
 
   ValidateAnonymousProgramHierRefs();
 
@@ -467,7 +469,7 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidateTimescaleConsistency();
 
-  ValidateTimescaleOrder();
+  UnitScopeTables::ForEachUnit(*this, [this] { ValidateTimescaleOrder(); });
 
   ValidateDpiDeclarations();
 
@@ -655,7 +657,7 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
   // no design.
   if (top_module_name.empty()) {
     if (unit_->DeclaresNothing()) return nullptr;
-    RunPreElaborationValidations();
+    UnitScopeTables::RunPreElaborationValidations(*this);
     auto tops = CollectAutoTopModules(unit_);
     // §23.3.1: a design shall contain at least one top-level module. If the
     // unit declares modules but every one is instantiated by another (e.g. a
@@ -670,7 +672,7 @@ RtlirDesign* Elaborator::Elaborate(std::string_view top_module_name) {
     return ElaborateTops(tops);
   }
 
-  RunPreElaborationValidations();
+  UnitScopeTables::RunPreElaborationValidations(*this);
 
   auto* mod_decl = FindModule(top_module_name);
   if (!mod_decl) {
@@ -690,7 +692,7 @@ RtlirDesign* Elaborator::Elaborate(
     return nullptr;
   }
 
-  RunPreElaborationValidations();
+  UnitScopeTables::RunPreElaborationValidations(*this);
 
   std::vector<ModuleDecl*> tops;
   tops.reserve(top_names.size());
@@ -891,7 +893,7 @@ RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
     qualified_in_source.push_back(!design_cell.library.empty());
   }
 
-  RunPreElaborationValidations();
+  UnitScopeTables::RunPreElaborationValidations(*this);
 
   // A config localparam is restricted to a literal value (§33.4.3), so it can
   // be evaluated once here and made available to parameter-override
