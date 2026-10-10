@@ -7,7 +7,6 @@
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
-#include "simulator/assoc_index.h"
 #include "simulator/class_object.h"
 #include "simulator/sim_context_types.h"
 

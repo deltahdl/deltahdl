@@ -1,6 +1,5 @@
 #include "simulator/eval_array_element_assoc.h"
 
-#include <cstdint>
 #include <map>
 #include <string>
 

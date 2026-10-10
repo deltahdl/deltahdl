@@ -438,9 +438,9 @@ TEST(IntegralIndexAssocArraySimulation, IndexIsKeyedAndOrderedByItsWholeValue) {
       "    $display(\"%0d %0d %0d\", w.num(), w[100'h2_0000_0000_0000_0000],\n"
       "             w.exists(100'h3_0000_0000_0000_0000));\n"
       "    void'(w.last(kw));\n"
-      "    $display(\"%0h\", kw);\n"
+      "    $display(\"%0d\", kw);\n"
       "    void'(w.prev(kw));\n"
-      "    $display(\"%0h\", kw);\n"
+      "    $display(\"%0d\", kw);\n"
       "    void'(u.first(k));\n"
       "    $display(\"%0h\", k);\n"
       "    void'(u.next(k));\n"
@@ -451,22 +451,22 @@ TEST(IntegralIndexAssocArraySimulation, IndexIsKeyedAndOrderedByItsWholeValue) {
       "    $display(\"%0d\", kws);\n"
       "    void'(sw.next(kws));\n"
       "    $display(\"%0d\", kws);\n"
-      "    foreach (w[i]) $display(\"%0h\", i);\n"
+      "    foreach (w[i]) $display(\"%0d\", i);\n"
       "  end\n"
       "endmodule\n",
       f);
   EXPECT_EQ(out,
             "3 2 0\n"
-            "20000000000000000\n"
-            "10000000000000000\n"
+            "36893488147419103232\n"
+            "18446744073709551616\n"
             "1\n"
             "8000000000000000\n"
             "-1\n"
             "-18446744073709551616\n"
             "-1\n"
             "5\n"
-            "10000000000000000\n"
-            "20000000000000000\n");
+            "18446744073709551616\n"
+            "36893488147419103232\n");
 }
 
 }  // namespace
