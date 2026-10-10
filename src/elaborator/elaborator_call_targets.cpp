@@ -395,17 +395,39 @@ std::string_view VifOf(const Expr& prefix, const DataScope& scope) {
              : std::string_view();
 }
 
+// §8.11: the property of the class whose method writes `root` that `root`
+// names, vif where no local variable of the method hides it, or this.vif;
+// null for anything else.
+const DeclaredVar* OwnProperty(const Expr& root, const DataScope& scope) {
+  if (root.kind != ExprKind::kIdentifier) return RootVar(root, scope);
+  const DeclaredVar* property = scope.Property(root.text);
+  return property != nullptr && scope.Declared(root.text) == property ? property
+                                                                      : nullptr;
+}
+
+// The declaration of the class property `root` names: one of the class whose
+// method writes it, vif or this.vif, or one of the class a variable holds a
+// handle of, h.vif; one with no type for anything else.
+DeclaredVar SelectedProperty(const Expr& root, const DataScope& scope) {
+  if (const DeclaredVar* own = OwnProperty(root, scope)) return *own;
+  const ClassMember* held = HandleProperty(root, scope);
+  return held == nullptr
+             ? DeclaredVar{}
+             : DeclaredVar{&held->data_type, held->unpacked_dims.size()};
+}
+
 // §25.9 with §7.4: a select `select` into a class property that is a virtual
-// interface, past the property's unpacked dimensions, h.vif[0], which selects
-// into a virtual interface; reported once, at the first select past them.
+// interface, past the property's unpacked dimensions, vif[0], this.vif[0] or
+// h.vif[0], which selects into a virtual interface; reported once, at the
+// first select past them.
 void ReportPropertyVifSelect(const Expr& select, const DataScope& scope,
                              DiagEngine& diag) {
   std::size_t selects = 0;
-  const ClassMember* property =
-      HandleProperty(SelectRoot(select, selects), scope);
-  if (property == nullptr ||
-      property->data_type.kind != DataTypeKind::kVirtualInterface ||
-      property->unpacked_dims.size() + 1 != selects) {
+  const DeclaredVar kProperty =
+      SelectedProperty(SelectRoot(select, selects), scope);
+  if (kProperty.type == nullptr ||
+      kProperty.type->kind != DataTypeKind::kVirtualInterface ||
+      kProperty.dims + 1 != selects) {
     return;
   }
   diag.Error(select.range.start, "bit-select on virtual interface is illegal",

@@ -408,4 +408,34 @@ TEST(VirtualInterfaceCallElaboration, ACallInAGenerateBlock) {
                             13, "23.9"));
 }
 
+// §25.9 with §7.4 and §8.11: a method of a class selecting into the class's
+// own virtual interface property, vif[0] or this.vif[0], past the last
+// dimension of its array of them, vifs[0][1], or into one it inherits (line
+// 9), selects into a virtual interface and is reported (#5827). A select of a
+// logic array property, a call through an element of the array, and a select
+// of the method's local variable hiding the property's name are not.
+TEST(VirtualInterfaceArrayElaboration, ASelectIntoTheMethodsOwnProperty) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc; task t(); endtask endinterface\n"
+      "class C; virtual ifc vif; virtual ifc vifs[2]; logic arr[2]; logic b;\n"
+      "  task r(); b = vif[0]; endtask\n"
+      "  task r2(); b = this.vif[0]; endtask\n"
+      "  task r3(); b = vifs[0][1]; endtask\n"
+      "  task ok(); b = arr[0]; vifs[0].t(); endtask\n"
+      "  task hid(); logic [1:0] vif; b = vif[0]; endtask\n"
+      "endclass\n"
+      "class D extends C; task r4(); b = vif[0]; endtask endclass\n"
+      "module top; endmodule\n",
+      f, "top");
+  for (const uint32_t kLine : {3u, 4u, 5u, 9u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "bit-select on virtual interface is illegal",
+                              kLine, "25.9"))
+        << kLine;
+  }
+  EXPECT_TRUE(NoErrorOnLine(f, 6));
+  EXPECT_TRUE(NoErrorOnLine(f, 7));
+}
+
 }  // namespace
