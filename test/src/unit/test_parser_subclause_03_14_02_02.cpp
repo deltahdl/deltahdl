@@ -594,4 +594,64 @@ TEST(DesignBuildingBlockParsing, TimeunitSlashInPackageSetsBoth) {
   EXPECT_EQ(pkg->time_prec, TimeUnit::kFs);
 }
 
+TEST(DesignBuildingBlockParsing, TimeunitInGenerateBlockRejected) {
+  auto r = Parse(
+      "module top;\n"
+      "  if (1) begin : g\n"
+      "    timeunit 10ns;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a timeunit or timeprecision declaration is not an "
+                            "item of a generate block or region, which is no "
+                            "time scope",
+                            3, "3.14.2.2"));
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_FALSE(r.cu->modules[0]->has_timeunit);
+}
+
+TEST(DesignBuildingBlockParsing, TimeprecisionInGenerateRegionRejected) {
+  auto r = Parse(
+      "module top;\n"
+      "  generate\n"
+      "    timeprecision 1ps;\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a timeunit or timeprecision declaration is not an "
+                            "item of a generate block or region, which is no "
+                            "time scope",
+                            3, "3.14.2.2"));
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_FALSE(r.cu->modules[0]->has_timeprecision);
+}
+
+TEST(DesignBuildingBlockParsing, TimeunitAfterNonAnsiPortDeclRejected) {
+  auto r = Parse(
+      "module top(a);\n"
+      "  input a;\n"
+      "  timeunit 10ns;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "timeunit as a later item requires a matching "
+                            "prior declaration in the same time scope",
+                            3, "3.14.2.2"));
+}
+
+TEST(DesignBuildingBlockParsing, TimeunitBeforeNonAnsiPortDeclAccepted) {
+  auto r = Parse(
+      "module top(a);\n"
+      "  timeunit 10ns;\n"
+      "  input a;\n"
+      "  timeunit 10ns;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
+  EXPECT_EQ(r.cu->modules[0]->time_unit_magnitude, 10);
+}
+
 }  // namespace

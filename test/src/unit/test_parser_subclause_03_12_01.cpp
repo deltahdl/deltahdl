@@ -725,4 +725,93 @@ TEST(CompilationUnitParsing, CuScopeExplicitlyImportedClassVariable) {
   ExpectUnitClassVarDecl(r.cu->cu_items[1], "h2");
 }
 
+TEST(CompilationUnitParsing, CuScopeNetDeclarationOfEveryNetType) {
+  // §3.12.1 (printed page 56) lets the compilation-unit scope hold any item a
+  // package may, and A.2.1.3's net_declaration takes every net_type keyword.
+  auto r = Parse(
+      "triand a;\n"
+      "trior b;\n"
+      "tri0 c;\n"
+      "tri1 d;\n"
+      "trireg e;\n"
+      "wand f;\n"
+      "wor g;\n"
+      "supply0 h;\n"
+      "supply1 i;\n"
+      "uwire j;\n"
+      "interconnect k;\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->cu_items.size(), 11u);
+  const DataTypeKind kKinds[] = {DataTypeKind::kTriand,  DataTypeKind::kTrior,
+                                 DataTypeKind::kTri0,    DataTypeKind::kTri1,
+                                 DataTypeKind::kTrireg,  DataTypeKind::kWand,
+                                 DataTypeKind::kWor,     DataTypeKind::kSupply0,
+                                 DataTypeKind::kSupply1, DataTypeKind::kUwire};
+  for (size_t n = 0; n < 10; ++n) {
+    EXPECT_EQ(r.cu->cu_items[n]->data_type.kind, kKinds[n]) << n;
+  }
+  EXPECT_EQ(r.cu->cu_items[7]->name, "h");
+  EXPECT_TRUE(r.cu->cu_items[10]->data_type.is_interconnect);
+  EXPECT_EQ(r.cu->cu_items[10]->name, "k");
+}
+
+TEST(CompilationUnitParsing, CuScopeConstDataDeclaration) {
+  // A.2.1.3's data_declaration opens with an optional `const`.
+  auto r = Parse(
+      "const int C = 3;\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->cu_items.size(), 1u);
+  EXPECT_EQ(r.cu->cu_items[0]->name, "C");
+  EXPECT_TRUE(r.cu->cu_items[0]->data_type.is_const);
+  EXPECT_EQ(r.cu->cu_items[0]->data_type.kind, DataTypeKind::kInt);
+  EXPECT_NE(r.cu->cu_items[0]->init_expr, nullptr);
+}
+
+TEST(CompilationUnitParsing, CuScopeVirtualInterfaceDeclaration) {
+  // A.2.2.1's data_type includes `virtual [ interface ] interface_identifier`.
+  auto r = Parse(
+      "interface ifc; endinterface\n"
+      "virtual ifc vif;\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->cu_items.size(), 1u);
+  EXPECT_EQ(r.cu->cu_items[0]->name, "vif");
+  EXPECT_EQ(r.cu->cu_items[0]->data_type.kind, DataTypeKind::kVirtualInterface);
+}
+
+TEST(CompilationUnitParsing, CuScopeStaticLifetimeDataDeclaration) {
+  // A.2.1.3's data_declaration may give a lifetime, and only `static`
+  // followed by `constraint` opens §18.5.1's external constraint block.
+  auto r = Parse(
+      "static int s;\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->cu_items.size(), 1u);
+  EXPECT_EQ(r.cu->cu_items[0]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(r.cu->cu_items[0]->name, "s");
+  EXPECT_TRUE(r.cu->cu_items[0]->is_static);
+  EXPECT_TRUE(r.cu->external_constraints.empty());
+}
+
+TEST(CompilationUnitParsing, CuScopePackageScopedTypeDeclaration) {
+  // A.2.2.1's data_type may name a type behind a package scope.
+  auto r = Parse(
+      "package p; typedef logic [7:0] byte_t; endpackage\n"
+      "p::byte_t v;\n"
+      "module m; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->cu_items.size(), 1u);
+  EXPECT_EQ(r.cu->cu_items[0]->kind, ModuleItemKind::kVarDecl);
+  EXPECT_EQ(r.cu->cu_items[0]->name, "v");
+  EXPECT_EQ(r.cu->cu_items[0]->data_type.scope_name, "p");
+  EXPECT_EQ(r.cu->cu_items[0]->data_type.type_name, "byte_t");
+}
+
 }  // namespace

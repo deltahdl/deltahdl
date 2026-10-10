@@ -83,7 +83,7 @@ TimeScopeRefs CollectTimeScopeRefs(ModuleDecl* mod, PackageDecl* pkg) {
     refs.prec = &mod->time_prec;
     refs.unit_mag = &mod->time_unit_magnitude;
     refs.prec_mag = &mod->time_prec_magnitude;
-    refs.has_other_items = !mod->items.empty();
+    refs.has_other_items = !mod->items.empty() || mod->has_body_port_decls;
   } else if (validate_pkg) {
     refs.active = true;
     refs.has_unit = &pkg->has_timeunit;
@@ -361,7 +361,21 @@ ModuleItem* Parser::ParseExternTfDeclaration(SourceLoc extern_loc) {
 // Parses a timeunit/timeprecision declaration with its surrounding §3.14.2
 // snapshot/validate dance. A function of its own so its branch logic is
 // scored separately and does not inflate the dispatcher's complexity.
+//
+// §3.14.2.2 (printed page 60) gives a time scope to a module, program,
+// package, interface or compilation unit and to nothing inside one, and
+// A.4.2's generate_item reaches no timeunits_declaration. So one inside a
+// generate block or region is reported and read with no time scope to set,
+// leaving the enclosing element's unit and precision as they were.
 void Parser::ParseTimeunitItem() {
+  if (InGenerateBlock() || in_generate_region_) {
+    diag_.Error(CurrentLoc(),
+                "a timeunit or timeprecision declaration is not an item of a "
+                "generate block or region, which is no time scope",
+                Subclause("3.14.2.2"));
+    ParseTimeunitDecl(nullptr, nullptr, nullptr);
+    return;
+  }
   bool validate_pkg = !current_module_ && current_package_ != nullptr;
   TimeScopeRefs refs = CollectTimeScopeRefs(current_module_, current_package_);
   auto loc = CurrentLoc();

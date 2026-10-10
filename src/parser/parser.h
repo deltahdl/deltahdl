@@ -104,6 +104,8 @@ class Parser {
   void ParseExternTopLevel(CompilationUnit* unit);
   bool TryParseSecondaryTopLevel(CompilationUnit* unit);
   bool TryParseCuScopeDataDecl(CompilationUnit* unit);
+  bool StaticOpensConstraint();
+  bool AtScopedIdentifier();
   bool TryParseCuScopeItem(CompilationUnit* unit);
   // §H.9.2 with A.1.2: a DPI import or export can be declared at compilation-
   // unit scope, whose description admits a package_item and through it A.1.11's

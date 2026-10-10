@@ -854,6 +854,10 @@ struct ModuleDecl {
   bool is_automatic = false;
   bool has_wildcard_ports = false;
   bool is_non_ansi_ports = false;
+  // Whether the body holds a non-ANSI port declaration, `input a;`. Those are
+  // read into `ports` rather than `items`, but A.1.2 makes each a module_item,
+  // and §3.14.2.2 has a timeunits_declaration precede every module_item.
+  bool has_body_port_decls = false;
   std::string_view name;
   SourceRange range;
   std::vector<Attribute> attrs;

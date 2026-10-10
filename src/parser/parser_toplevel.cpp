@@ -5,6 +5,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "lexer/token.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/parser.h"
@@ -563,6 +564,110 @@ bool Parser::TryParseStrengthSpec(uint8_t& str0, uint8_t& str1) {
                 Subclause("28.3.2"));
   }
   return true;
+}
+
+static bool IsCuScopeDataTypeKeyword(TokenKind tk) {
+  switch (tk) {
+    case TokenKind::kKwLogic:
+    case TokenKind::kKwReg:
+    case TokenKind::kKwBit:
+    case TokenKind::kKwByte:
+    case TokenKind::kKwShortint:
+    case TokenKind::kKwInt:
+    case TokenKind::kKwLongint:
+    case TokenKind::kKwInteger:
+    case TokenKind::kKwReal:
+    case TokenKind::kKwShortreal:
+    case TokenKind::kKwRealtime:
+    case TokenKind::kKwTime:
+    case TokenKind::kKwString:
+    case TokenKind::kKwVar:
+    case TokenKind::kKwEvent:
+    case TokenKind::kKwChandle:
+    // A.1.11's package_or_generate_item_declaration reaches net_declaration,
+    // whose net_type A.2.2.1 gives every one of these keywords, and
+    // data_declaration, which may open with `const`, with a lifetime, or with a
+    // `virtual interface` data type.
+    case TokenKind::kKwWire:
+    case TokenKind::kKwTri:
+    case TokenKind::kKwTriand:
+    case TokenKind::kKwTrior:
+    case TokenKind::kKwTri0:
+    case TokenKind::kKwTri1:
+    case TokenKind::kKwTrireg:
+    case TokenKind::kKwWand:
+    case TokenKind::kKwWor:
+    case TokenKind::kKwSupply0:
+    case TokenKind::kKwSupply1:
+    case TokenKind::kKwUwire:
+    case TokenKind::kKwConst:
+    case TokenKind::kKwStatic:
+    case TokenKind::kKwVirtual:
+    // §3.12.1 gives the compilation-unit scope every item a package may hold,
+    // a data declaration of an enumeration, structure or union written in the
+    // declaration among them (§6.19's `enum {X, Y} v;`), which
+    // ParseTypedItemOrInst already reads; the gate alone refused the head and
+    // reported "expected top-level declaration".
+    case TokenKind::kKwEnum:
+    case TokenKind::kKwStruct:
+    case TokenKind::kKwUnion:
+      return true;
+    default:
+      return false;
+  }
+}
+
+// §3.12.1 (printed page 56) gives the compilation-unit scope every item a
+// package may hold, and A.1.2's package_item reaches data_declaration, whose
+// data_type A.2.2.1 lets be a type_identifier: the `C` of `class C; ...
+// endclass  C h;` outside every module, which §8.3 (printed 180) makes a type
+// at its declaration, or a package's class the unit's `import p::*;` made
+// visible under §26.3 (printed 810). Both stand in known_types_ by the time
+// the declaration is read -- ParseClassDecl registers the class's name ahead
+// of its scope guard and ApplyImportedTypeNames adopts the package's -- and
+// ParseTypedItemOrInst reads such a name as a named type, as it does in a
+// module body; the keyword gate alone refused the identifier and reported
+// "expected top-level declaration".
+//
+// A data_type may also be a type named through a package or class scope,
+// `p::byte_t v;` (A.2.2.1's `[ class_scope | package_scope ] type_identifier`),
+// whose first identifier is a package and never in known_types_; no other
+// item a compilation unit holds opens with an identifier and `::`.
+bool Parser::TryParseCuScopeDataDecl(CompilationUnit* unit) {
+  std::vector<ModuleItem*> items;
+  if (Check(TokenKind::kKwInterconnect)) {
+    ParseInterconnectItem(items);
+  } else {
+    bool known_type_name = Check(TokenKind::kIdentifier) &&
+                           known_types_.count(CurrentToken().text) != 0;
+    if (!known_type_name && !IsCuScopeDataTypeKeyword(CurrentToken().kind) &&
+        !AtScopedIdentifier()) {
+      return false;
+    }
+    ParseDataDeclItem(items, 0, {});
+  }
+  for (auto* item : items) unit->cu_items.push_back(item);
+  return true;
+}
+
+// Whether the `static` at the current token opens §18.5.1's external
+// constraint block rather than a data declaration of static lifetime.
+bool Parser::StaticOpensConstraint() {
+  auto saved = lexer_.SavePos();
+  Consume();
+  bool opens_constraint = Check(TokenKind::kKwConstraint);
+  lexer_.RestorePos(saved);
+  return opens_constraint;
+}
+
+// Whether the current token is an identifier followed by `::`.
+bool Parser::AtScopedIdentifier() {
+  if (!Check(TokenKind::kIdentifier)) return false;
+  auto saved = lexer_.SavePos();
+  Consume();
+  bool scoped = Check(TokenKind::kColonColon);
+  lexer_.RestorePos(saved);
+  return scoped;
 }
 
 }  // namespace delta

@@ -784,8 +784,11 @@ void Parser::ParseModuleBody(ModuleDecl& mod) {
   }
   while (!Check(TokenKind::kKwEndmodule) && !AtEnd()) {
     if (Match(TokenKind::kSemicolon)) continue;
-    if (non_ansi && ParserPortHelpers::TryParseNonAnsiBodyPortDecl(*this, mod))
+    if (non_ansi &&
+        ParserPortHelpers::TryParseNonAnsiBodyPortDecl(*this, mod)) {
+      mod.has_body_port_decls = true;
       continue;
+    }
     ParseModuleItem(mod.items);
   }
   current_module_ = prev_module;
