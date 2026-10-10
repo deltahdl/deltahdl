@@ -835,10 +835,18 @@ void Lowerer::LowerUnitImportItems(const std::vector<ModuleItem*>& items) {
 }
 
 void Lowerer::LowerCompilationUnitClasses() {
+  const auto kRenamed = ScopeSameNamedUnitClasses(design_, arena_);
   std::unordered_set<std::string_view> unit_class_names;
   for (const auto* cls : UnitClassesToLower(design_)) {
     unit_class_names.insert(cls->name);
     LowerClassDecl(cls, design_->cu_function_decls);
+  }
+  // The bare name a scoped class gave away still answers, with the first
+  // unit's class, a lookup made from no unit's code.
+  for (const auto& [bare, scoped] : kRenamed) {
+    if (ctx_.FindClassType(bare) == nullptr) {
+      ctx_.RegisterClassType(bare, ctx_.FindClassType(scoped));
+    }
   }
   // §24.6: an anonymous program declares its items in the compilation unit's
   // space without a scope of its own, so a class it declares is a unit class

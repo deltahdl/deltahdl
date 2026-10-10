@@ -3,10 +3,13 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
@@ -46,6 +49,45 @@ std::string_view UnitScopeOfClass(const RtlirDesign* design,
 // The compilation unit's classes to lower: the first of each name, and in a
 // design of several units every unit's own, two units' classes of one name
 // being two classes (§3.12.1).
+std::vector<std::pair<std::string_view, std::string_view>>
+ScopeSameNamedUnitClasses(const RtlirDesign* design, Arena& arena) {
+  std::unordered_map<std::string_view, int> units_declaring;
+  for (const auto* unit : design->compilation_units) {
+    for (const auto* cls : unit->classes) ++units_declaring[cls->name];
+  }
+  std::vector<std::pair<std::string_view, std::string_view>> renamed;
+  for (size_t k = 0; k < design->compilation_units.size(); ++k) {
+    for (auto* cls : design->compilation_units[k]->classes) {
+      if (units_declaring[cls->name] < 2) continue;
+      std::string_view scoped = *arena.Create<std::string>(
+          UnitScopes::ScopeName(static_cast<int>(k)) +
+          "::" + std::string(cls->name));
+      renamed.emplace_back(cls->name, scoped);
+      cls->name = scoped;
+    }
+  }
+  return renamed;
+}
+
+void RegisterUnitTimeScales(const RtlirDesign* design, SimContext& ctx,
+                            Arena& arena) {
+  if (design->compilation_units.empty()) return;
+  ForEachUnitScope(
+      design, arena, [&](const CompilationUnit& unit, std::string_view scope) {
+        TimeScale scale;
+        if (unit.has_cu_timeunit) {
+          scale.unit = unit.cu_time_unit;
+          scale.magnitude = unit.cu_time_unit_magnitude;
+        }
+        if (unit.has_cu_timeprecision) {
+          scale.precision = unit.cu_time_prec;
+          scale.prec_magnitude = unit.cu_time_prec_magnitude;
+        }
+        ctx.SetScopeTimeScale(
+            *arena.Create<std::string>(std::string(scope) + "::"), scale);
+      });
+}
+
 std::vector<const ClassDecl*> UnitClassesToLower(const RtlirDesign* design) {
   std::unordered_set<std::string_view> names;
   std::unordered_set<const ClassDecl*> chosen;

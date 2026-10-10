@@ -37,7 +37,6 @@
 #include "simulator/sim_context.h"
 // §37.82: the VPI model reaches the $timeformat() call that set the active time
 // format, so the run stands one up as the task runs.
-#include "simulator/unit_scopes.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 
@@ -188,9 +187,10 @@ static std::string TimeOrderToUnitString(int order) {
 // declares among them -- runs in that unit whichever instance calls it.
 const TimeScale& ActiveInstanceTimeScale(const SimContext& ctx) {
   if (const Scope* frame = ctx.PackageFrame()) {
-    if (UnitScopes::IsUnitScope(frame->package)) {
-      return ctx.CompUnitTimeScale();
-    }
+    // §3.12.1: where each file is a unit of its own, a unit's frame is
+    // "$unit#k", whose time scale stands under "$unit#k::" as a package's
+    // does (RegisterUnitTimeScales in unit_scope_items.cpp).
+    if (frame->package == "$unit") return ctx.CompUnitTimeScale();
     // §3.14.2.2: a package that declares its time unit is a time scope of its
     // own, registered by the lowerer under the package's name and "::".
     std::string key(frame->package);

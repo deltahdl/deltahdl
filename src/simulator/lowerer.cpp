@@ -751,6 +751,7 @@ static void RegisterDesignScopes(const RtlirDesign* design, SimContext& ctx) {
   // scope reported when those functions take no argument.
   ctx.SetGlobalPrecision(design->global_time_precision);
   ctx.SetCompUnitTimeScale(design->cu_timescale);
+  RegisterUnitTimeScales(design, ctx, ctx.GetArena());
   if (!design->top_modules.empty()) {
     const RtlirModule* top = design->top_modules.front();
     ctx.SetCurrentTimeScale(top->timescale);

@@ -12,6 +12,7 @@
 #include "parser/ast_type.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/unit_scopes.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
@@ -164,6 +165,17 @@ void VpiContext::AttachPackages(const RtlirDesign* design) {
   for (const PackageDecl* pkg : design->packages) {
     MakePackageScope(DesignObjectForFlatName(pkg->name), pkg->name);
   }
+  // §3.12.1: where each file is a unit of its own, each unit's data is keyed
+  // under its own scope name, "$unit#k", and each unit is a compilation-unit
+  // scope of its own, named and drawn as the one unit is below.
+  for (size_t k = 0; k < design->compilation_units.size(); ++k) {
+    auto own = object_map_.find(UnitScopes::ScopeName(static_cast<int>(k)));
+    if (own == object_map_.end()) continue;
+    own->second->name = kUnitScope;
+    MakePackageScope(own->second, kUnitScope);
+    MarkInCompilationUnit(own->second);
+  }
+  if (!design->compilation_units.empty()) return;
   // The compilation unit's data is keyed the same way, under "$unit". It is
   // part of no module either, and detail 5 names its objects "$unit::name".
   auto unit = object_map_.find(kUnitScope);

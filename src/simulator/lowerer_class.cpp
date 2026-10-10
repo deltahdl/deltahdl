@@ -30,7 +30,6 @@
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/unit_scope_items.h"
-#include "simulator/unit_scopes.h"
 
 namespace delta {
 
@@ -883,16 +882,6 @@ void Lowerer::RegisterClassDecl(const ClassDecl* cls,
   if (!scope.empty()) ctx_.PopScope();
   RecordClassPackage(info, scope, ctx_);
   ctx_.RegisterClassType(cls->name, info);
-  // §3.12.1: where each unit has a scope of its own, the unit's class is also
-  // held under that scope's name, which SimContext::FindClassType asks first
-  // for the running code's unit, so two units' classes of one name are two.
-  if (design_ != nullptr && !design_->compilation_units.empty() &&
-      UnitScopes::IsUnitScope(scope)) {
-    ctx_.RegisterClassType(
-        *arena_.Create<std::string>(std::string(scope) +
-                                    "::" + std::string(cls->name)),
-        info);
-  }
   // §6.18 with §8.3: the class's typedefs naming a class, its own included,
   // bound before InitClassStaticProperties runs its methods.
   RegisterClassScopeTypedefAliases(info, ctx_, arena_);

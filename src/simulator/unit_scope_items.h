@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -48,6 +49,21 @@ void ForEachUnitScope(const RtlirDesign* design, Arena& arena, Fn fn) {
 // design behind it.
 std::string_view UnitScopeOfClass(const RtlirDesign* design,
                                   const ClassDecl* cls, Arena& arena);
+
+// §3.12.1 with §8.23: in a design of several units, gives each unit's class
+// whose name another unit's class shares the unit's scoped name, "$unit#k::C",
+// so every key the run builds from a class's name -- its typedefs, statics and
+// methods "C::name" among them -- is that class's alone. SimContext::
+// FindClassType reaches each from its own unit's code by the bare name.
+// Answers each bare name so given away beside the class's new name.
+std::vector<std::pair<std::string_view, std::string_view>>
+ScopeSameNamedUnitClasses(const RtlirDesign* design, Arena& arena);
+
+// §3.12.1 with §3.14.2.3: in a design of several units, each unit's own time
+// scale, from its compilation-unit timeunit and timeprecision declarations,
+// registered under "$unit#k::", the time scope its subroutines run in.
+void RegisterUnitTimeScales(const RtlirDesign* design, SimContext& ctx,
+                            Arena& arena);
 
 // The compilation unit's classes to lower: the first of each name, and in a
 // design of several units every unit's own, two units' classes of one name

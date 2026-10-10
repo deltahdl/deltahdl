@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -8,6 +9,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_simulator.h"
+#include "fixture_vpi_run.h"
 #include "helpers_dpi_c_binding.h"
 #include "helpers_separate_units.h"
 #include "simulator/dpi_binding.h"
@@ -15,6 +17,7 @@
 #include "simulator/lowerer.h"
 #include "simulator/unit_scopes.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_user.h"
 
 using namespace delta;
 
@@ -254,6 +257,86 @@ TEST(SeparateUnitsSim, InstanceUnitIsTheNearestRecordedHolder) {
   EXPECT_EQ(UnitScopes::ScopeName(2), "$unit#2");
   EXPECT_TRUE(UnitScopes::IsUnitScope("$unit#2"));
   EXPECT_FALSE(UnitScopes::IsUnitScope("pkg"));
+}
+
+// §3.12.1 with §8.23 and §8.9: each unit's class of one name keeps its own
+// static property, reached as `C::s` from a module of each unit.
+TEST(SeparateUnitsSim, EachUnitsClassKeepsItsOwnStatics) {
+  EXPECT_EQ(RunTopAndChild({"class C; static int s = 5; endclass\n"
+                            "module top;\n"
+                            "  int a;\n"
+                            "  child c();\n"
+                            "  initial a = C::s;\n"
+                            "endmodule\n",
+                            "class C; static int s = 7; endclass\n"
+                            "module child;\n"
+                            "  int b;\n"
+                            "  initial b = C::s;\n"
+                            "endmodule\n"}),
+            (std::vector<uint64_t>{5, 7}));
+}
+
+// §3.12.1 with §3.14.2.3: a unit's task runs in its own unit's time scale, so
+// the second unit's `#1` waits 10 ns, one of its module's time units; waited
+// in the first unit's 1 ns, the child would read $time as 0. A unit
+// declaring no time scale keeps the default.
+TEST(SeparateUnitsSim, EachUnitsTaskRunsInItsOwnTimeScale) {
+  EXPECT_EQ(RunTopAndChild({"timeunit 1ns;\n"
+                            "timeprecision 1ps;\n"
+                            "task automatic t0(); #1; endtask\n"
+                            "module top;\n"
+                            "  int a;\n"
+                            "  child c();\n"
+                            "  initial begin t0(); a = $time; end\n"
+                            "endmodule\n",
+                            "timeunit 10ns;\n"
+                            "timeprecision 1ps;\n"
+                            "task automatic t1(); #1; endtask\n"
+                            "module child;\n"
+                            "  int b;\n"
+                            "  initial begin t1(); b = $time; end\n"
+                            "endmodule\n",
+                            "typedef int unused_t;\n"}),
+            (std::vector<uint64_t>{1, 1}));
+}
+
+// §3.12.1: the PLI reaches the items of every compilation unit, each unit a
+// scope of its own drawn as a package named "$unit"; a unit declaring no data
+// adds no scope.
+class SeparateUnitsVpi : public VpiDesignRun {
+ protected:
+  void RunUnits(const std::vector<std::string>& srcs) {
+    Elaborator elab(f_.arena, f_.diag,
+                    ParseUnitsApart(srcs, f_.mgr, f_.arena, f_.diag));
+    auto* design = elab.Elaborate("");
+    ASSERT_NE(design, nullptr);
+    ASSERT_FALSE(f_.diag.HasErrors());
+    LowerAndRun(design, f_);
+  }
+};
+
+TEST_F(SeparateUnitsVpi, EachUnitIsACompilationUnitScope) {
+  RunUnits(
+      {"int g = 3;\n"
+       "module top; int x = $unit::g; child c(); endmodule\n",
+       "int g = 4;\n"
+       "module child; int y = $unit::g; endmodule\n",
+       "module other; endmodule\n"});
+  std::vector<int> values;
+  vpiHandle it = vpi_iterate(vpiPackage, nullptr);
+  ASSERT_NE(it, nullptr);
+  while (vpiHandle pkg = vpi_scan(it)) {
+    vpiHandle g = Named(vpiVariables, pkg, "g");
+    if (g == nullptr) continue;
+    EXPECT_STREQ(vpi_get_str(vpiName, pkg), "$unit");
+    EXPECT_EQ(FullNameOfChild(pkg, "g"), "$unit::g");
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(g, &value);
+    values.push_back(value.value.integer);
+  }
+  std::ranges::sort(values);
+  EXPECT_EQ(values, (std::vector<int>{3, 4}));
 }
 
 }  // namespace
