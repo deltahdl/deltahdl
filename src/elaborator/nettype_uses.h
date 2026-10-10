@@ -8,7 +8,9 @@
 
 namespace delta {
 
+struct CompilationUnit;
 struct ModuleDecl;
+struct ModuleItem;
 
 // §6.6.7 (printed page 97): a user-defined nettype names a data type as a
 // typedef does, but may be used only to declare a net. Reports `nettype` named
@@ -26,5 +28,16 @@ void ReportNettypeNotNet(std::string_view nettype, std::string_view use,
 void CheckNettypeUses(const ModuleDecl* decl,
                       const std::unordered_set<std::string_view>& nettypes,
                       DiagEngine& diag);
+
+// A.2.1.3: whether `item` opens with `var`, `const` or `static`, which begin a
+// data declaration and never a net declaration, so that naming a nettype in it
+// declares a variable. The parser refuses `automatic` outside procedural code.
+bool WrittenAsDataDeclaration(const ModuleItem* item);
+
+// The same report for the compilation unit's items and classes and for each
+// package's items, which no module's elaboration reaches: a nettype named
+// anywhere a module's is reported, and as the type of a variable declared at
+// that scope. Each scope is judged against the nettypes it declares itself.
+void CheckUnitNettypeUses(const CompilationUnit* unit, DiagEngine& diag);
 
 }  // namespace delta

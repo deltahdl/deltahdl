@@ -322,4 +322,57 @@ TEST(NettypeElaboration, NettypeNamedInAConstStaticOrClassDeclarationRejected) {
                              "6.6.7"));
 }
 
+// The compilation unit and a package are scopes no module's elaboration
+// reaches, and a nettype is held to nets in them as in a module: refused as a
+// structure member's, a variable's, a function's return, a class property's
+// and a parameter's type, while a net declared with it, and a variable of
+// another type, are accepted. Each scope is judged by the nettypes it declares.
+TEST(NettypeElaboration, NettypeNamedAtUnitOrPackageScopeRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "nettype logic [3:0] nt;\n"
+      "typedef struct { nt m; } s_t;\n"
+      "var nt v;\n"
+      "nt w;\n"
+      "var int i;\n"
+      "function nt f(); return 0; endfunction\n"
+      "class C;\n"
+      "  nt p;\n"
+      "endclass\n"
+      "package q;\n"
+      "  nettype logic [1:0] pn;\n"
+      "  const pn c = 0;\n"
+      "  parameter pn P = 0;\n"
+      "endpackage\n"
+      "module top;\n"
+      "endmodule\n",
+      f, "top");
+  const std::pair<uint32_t, std::string_view> kUses[] = {
+      {2,
+       "nettype 'nt' may declare only a net, and is named here as the "
+       "type of member 'm'"},
+      {3,
+       "nettype 'nt' may declare only a net, and is named here as the "
+       "type of variable 'v'"},
+      {6,
+       "nettype 'nt' may declare only a net, and is named here as the "
+       "type of the return of function 'f'"},
+      {8,
+       "nettype 'nt' may declare only a net, and is named here as the "
+       "type of property 'p'"},
+      {12,
+       "nettype 'pn' may declare only a net, and is named here as the "
+       "type of variable 'c'"},
+      {13,
+       "nettype 'pn' may declare only a net, and is named here as the "
+       "type of parameter 'P'"}};
+  for (const auto& [line, message] : kUses) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, line, "6.6.7"));
+  }
+  for (uint32_t line : {4U, 5U}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "may declare only a net",
+                               line, "6.6.7"));
+  }
+}
+
 }  // namespace

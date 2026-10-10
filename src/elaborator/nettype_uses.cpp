@@ -4,11 +4,13 @@
 #include <format>
 #include <string_view>
 #include <unordered_set>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast_class.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -145,6 +147,48 @@ void CheckNettypeUses(const ModuleDecl* decl,
                           std::format("parameter '{}'", decl->params[i].first),
                           decl->range.start, diag);
     }
+  }
+}
+
+bool WrittenAsDataDeclaration(const ModuleItem* item) {
+  return item->has_explicit_var || item->is_static || item->data_type.is_const;
+}
+
+// The nettypes `items` declare.
+static std::unordered_set<std::string_view> DeclaredNettypes(
+    const std::vector<ModuleItem*>& items) {
+  std::unordered_set<std::string_view> names;
+  for (const ModuleItem* item : items) {
+    if (item->kind == ModuleItemKind::kNettypeDecl) names.insert(item->name);
+  }
+  return names;
+}
+
+// A package's or the compilation unit's items, among which a variable
+// declared with a nettype is judged here, no module's elaboration reaching it.
+static void CheckScopeItems(const std::vector<ModuleItem*>& items,
+                            const NettypeScan& scan) {
+  for (const ModuleItem* item : items) {
+    if (item->kind == ModuleItemKind::kVarDecl &&
+        WrittenAsDataDeclaration(item) && IsNettype(item->data_type, scan)) {
+      ReportNettypeNotNet(item->data_type.type_name,
+                          std::format("variable '{}'", item->name), item->loc,
+                          scan.diag);
+    }
+    CheckItem(item, scan);
+  }
+}
+
+void CheckUnitNettypeUses(const CompilationUnit* unit, DiagEngine& diag) {
+  const std::unordered_set<std::string_view> kUnitNettypes =
+      DeclaredNettypes(unit->cu_items);
+  const NettypeScan kUnitScan{kUnitNettypes, diag};
+  CheckScopeItems(unit->cu_items, kUnitScan);
+  for (const ClassDecl* cls : unit->classes) CheckClass(cls, kUnitScan);
+  for (const PackageDecl* pkg : unit->packages) {
+    const std::unordered_set<std::string_view> kPackageNettypes =
+        DeclaredNettypes(pkg->items);
+    CheckScopeItems(pkg->items, {kPackageNettypes, diag});
   }
 }
 

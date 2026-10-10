@@ -19,6 +19,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/nettype_uses.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 
@@ -171,6 +172,7 @@ void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
   for (const auto* pkg : unit_->packages) {
     if (pkg != nullptr) run_over(pkg->items);
   }
+  CheckUnitNettypeUses(unit_, diag_);
   // §23.9 for the same two scopes: their subroutines are in no module's item
   // list, so Elaborator::ValidateUnresolvedReferences never reads them.
   const UnitScopeNames kNames{cu_scope_names_, cu_param_scope_, typedefs_,
