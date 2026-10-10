@@ -45,7 +45,7 @@ uint8_t StringLiteralByteAt(const Logic4Vec& packed, uint32_t i) {
 }
 
 const Expr* StringLiteralSource(const Expr* expr) {
-  if (expr->kind == ExprKind::kCast && expr->lhs != nullptr) expr = expr->lhs;
+  if (expr->kind == ExprKind::kCast) expr = expr->lhs;
   return expr->kind == ExprKind::kStringLiteral ? expr : nullptr;
 }
 

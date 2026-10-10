@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <functional>
 #include <string>
 
 #include "common/arena.h"
@@ -13,6 +14,28 @@
 
 namespace delta {
 
+// The destinations both fills below write: a one-dimensional fixed-size
+// unpacked array, neither dynamic nor a queue.
+static bool IsFixedOneDimensional(const ArrayInfo& dst) {
+  return !dst.is_dynamic && !dst.is_queue && dst.dim_sizes.size() <= 1;
+}
+
+// Writes element i of the destination, counted from its leftmost, the value
+// value_of(i), for every element.
+static void FillElementsLeftToRight(
+    const Stmt* stmt, const ArrayInfo& dst, SimContext& ctx,
+    const std::function<Logic4Vec(uint32_t)>& value_of) {
+  for (uint32_t i = 0; i < dst.size; ++i) {
+    uint32_t di =
+        dst.is_descending ? (dst.lo + dst.size - 1 - i) : (dst.lo + i);
+    auto name = std::string(stmt->lhs->text) + "[" + std::to_string(di) + "]";
+    auto* elem = ctx.FindVariable(name);
+    if (!elem) continue;
+    elem->value = value_of(i);
+    elem->NotifyWatchers();
+  }
+}
+
 // §6.24.3: a bit-stream cast whose casting type is an unpacked array, `e =
 // B8'(x)` under `typedef bit B8 [8:1]`, turns its operand into a stream of
 // bits and fills the destination's elements from it, left to right, the
@@ -23,20 +46,14 @@ namespace delta {
 static bool TryBitStreamCastToArray(const Stmt* stmt, const ArrayInfo& dst,
                                     SimContext& ctx, Arena& arena) {
   if (stmt->rhs->kind != ExprKind::kCast || stmt->rhs->lhs == nullptr ||
-      dst.is_dynamic || dst.is_queue || dst.dim_sizes.size() > 1)
+      !IsFixedOneDimensional(dst))
     return false;
   Logic4Vec stream = PackBitStreamOperand(stmt->rhs->lhs, ctx, arena);
   if (stream.width != dst.size * dst.elem_width) return false;
-  for (uint32_t i = 0; i < dst.size; ++i) {
-    uint32_t di =
-        dst.is_descending ? (dst.lo + dst.size - 1 - i) : (dst.lo + i);
-    auto name = std::string(stmt->lhs->text) + "[" + std::to_string(di) + "]";
-    auto* elem = ctx.FindVariable(name);
-    if (!elem) continue;
-    elem->value = ExtractBitField(
+  FillElementsLeftToRight(stmt, dst, ctx, [&](uint32_t i) {
+    return ExtractBitField(
         arena, stream, stream.width - (i + 1) * dst.elem_width, dst.elem_width);
-    elem->NotifyWatchers();
-  }
+  });
   return true;
 }
 
@@ -46,20 +63,12 @@ static bool TryBitStreamCastToArray(const Stmt* stmt, const ArrayInfo& dst,
 static bool TryStringLiteralToArray(const Stmt* stmt, const ArrayInfo& dst,
                                     SimContext& ctx, Arena& arena) {
   const Expr* str = StringLiteralSource(stmt->rhs);
-  if (str == nullptr || dst.is_dynamic || dst.is_queue ||
-      dst.dim_sizes.size() > 1)
-    return false;
+  if (str == nullptr || !IsFixedOneDimensional(dst)) return false;
   Logic4Vec packed = EvalExpr(str, ctx, arena);
-  for (uint32_t i = 0; i < dst.size; ++i) {
-    uint32_t di =
-        dst.is_descending ? (dst.lo + dst.size - 1 - i) : (dst.lo + i);
-    auto name = std::string(stmt->lhs->text) + "[" + std::to_string(di) + "]";
-    auto* elem = ctx.FindVariable(name);
-    if (!elem) continue;
-    elem->value =
-        MakeLogic4VecVal(arena, dst.elem_width, StringLiteralByteAt(packed, i));
-    elem->NotifyWatchers();
-  }
+  FillElementsLeftToRight(stmt, dst, ctx, [&](uint32_t i) {
+    return MakeLogic4VecVal(arena, dst.elem_width,
+                            StringLiteralByteAt(packed, i));
+  });
   return true;
 }
 
