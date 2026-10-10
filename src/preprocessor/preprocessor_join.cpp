@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -71,6 +72,9 @@ static bool HasOpenBlockComment(std::string_view text) {
       continue;
     }
     if (in_string) continue;
+    // §5.4: a one-line comment runs to the end of the line, and a /* inside
+    // it opens nothing.
+    if (!in_block && text.substr(i).starts_with("//")) return false;
     TryToggleBlockComment(text, i, in_block);
   }
   return in_block;
@@ -290,6 +294,35 @@ uint32_t JoinMacroUsage(
     }
   }
   return 0;
+}
+
+bool EndsInContinuedQuotedString(std::string_view text) {
+  bool in_string = false;
+  size_t i = 0;
+  while (i < text.size()) {
+    // A '\\' opens a string_escape_seq inside a string and an escaped
+    // identifier (§5.6.1) outside one; a final one inside escapes the newline.
+    if (text[i] == '\\') {
+      i = in_string ? i + 2 : EndOfEscapedIdentifier(text, i);
+      continue;
+    }
+    if (text[i] == '"') in_string = !in_string;
+    ++i;
+  }
+  return in_string && i > text.size();
+}
+
+bool CopyContinuedQuotedString(std::string_view& line, std::string& output,
+                               bool& continued) {
+  if (!continued) return false;
+  size_t i = 0;
+  while (i < line.size() && line[i] != '"') i += line[i] == '\\' ? 2 : 1;
+  // A final '\\' steps past the end: it escapes this line's newline as well.
+  continued = i > line.size();
+  const size_t kEnd = std::min(i + 1, line.size());
+  output.append(line.substr(0, kEnd));
+  line.remove_prefix(kEnd);
+  return true;
 }
 
 }  // namespace delta

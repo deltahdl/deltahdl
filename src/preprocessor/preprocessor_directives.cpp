@@ -348,6 +348,8 @@ void Preprocessor::BeginCompilationUnit() {
   macros_ = initial_macros_;
   ResetDirectiveState();
   ResetAllPragmas();
+  // §5.6.4: a `line read in the unit before shall not number this one's lines.
+  has_line_override_ = false;
 }
 
 // Digits, with at most one decimal point among them.

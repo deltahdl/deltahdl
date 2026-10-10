@@ -121,6 +121,19 @@ size_t StepOverStringSyntax(std::string_view line, size_t i,
 // still open at the end of its line (22.5.1). Each moves the cursor to the
 // last line it read.
 bool DefineSpansMultipleLines(std::string_view line);
+
+// §5.9: whether `text`, an active line with its comments stripped, ends inside
+// a quoted_string whose newline a backslash escapes, the string then running
+// on into the next line.
+bool EndsInContinuedQuotedString(std::string_view text);
+
+// §5.9: where `continued` says a quoted_string runs on from the line before,
+// copies to `output` the text it still holds at the start of `line`, through
+// the '"' closing it, narrows `line` to what follows, and leaves `continued`
+// saying whether the string runs on past this line too. Answers whether one
+// ran on into the line; §22.5.1 substitutes nothing in a string.
+bool CopyContinuedQuotedString(std::string_view& line, std::string& output,
+                               bool& continued);
 std::string JoinDefineBody(LineCursor& cursor);
 // Returns the number of lines read beyond the first, or 0 when nothing was
 // joined; `end_of_macro_usage` is Preprocessor::EndOfMacroUsage, reached

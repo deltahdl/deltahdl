@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_preprocessor.h"
 
 using namespace delta;
@@ -108,6 +110,19 @@ TEST(CommentPreprocessor, CommentAfterMacroDefinition) {
       "endmodule\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §5.4: a /* inside a one-line comment opens nothing, on a `define line as
+// anywhere. Read as an open block comment, it joined every line after it into
+// the macro's text, and the module that follows vanished with them.
+TEST(CommentPreprocessor, BlockOpenerInALineCommentOnADefineJoinsNoLine) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`define M a // see /*\n"
+      "module t; endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("module t; endmodule"), std::string::npos);
 }
 
 }  // namespace

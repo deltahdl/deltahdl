@@ -79,7 +79,7 @@ static std::string_view ExtractMacroName(std::string_view macro_name) {
 bool Preprocessor::IsRecursiveExpansion(std::string_view name,
                                         SourceLoc loc) const {
   for (const auto& expanding : expansion_stack_) {
-    if (expanding == name) {
+    if (expanding == MacroTable::Key(name)) {
       diag_.Error(loc,
                   "recursive expansion of macro '" + std::string(name) + "'",
                   Subclause("22.5.1"));
@@ -155,7 +155,7 @@ bool Preprocessor::ExpandUserDefinedMacro(std::string_view name,
     rest = macro_name.substr(name.size());
   }
 
-  expansion_stack_.emplace_back(name);
+  expansion_stack_.emplace_back(def->name);
   // A body opening with a directive the inline expanders do not read, such as
   // `include or `timescale, is a directive line and goes to ProcessDirective.
   // A body holding a conditional compilation directive is not: §22.6 lets
@@ -459,7 +459,7 @@ size_t Preprocessor::ExpandSingleInlineMacro(std::string_view line, size_t pos,
     return advance;
   }
 
-  expansion_stack_.emplace_back(name);
+  expansion_stack_.emplace_back(def->name);
   std::string body = ExpandMacro(*def, {}, loc);
   result += ExpandSubstitutedBody(body, file_id, line_num);
   expansion_stack_.pop_back();
@@ -528,6 +528,19 @@ static bool SkipBlockComment(std::string_view body, size_t& i) {
   return true;
 }
 
+// §5.6.1: copies the escaped identifier whose '\' stands at `i`, whole to the
+// white space ending it, so no `//`, `/*` or '"' inside it is read as a
+// comment or a string; answers whether one stood there. The '\' of the `\`"
+// macro-text escape (§22.5.1) follows a grave accent and opens none.
+static bool CopyEscapedIdentifier(std::string_view body, size_t& i,
+                                  std::string& result) {
+  if (body[i] != '\\' || (i > 0 && body[i - 1] == '`')) return false;
+  const size_t kEnd = EndOfEscapedIdentifier(body, i);
+  result.append(body.substr(i, kEnd - i));
+  i = kEnd;
+  return true;
+}
+
 static bool ProcessMacroBodyChar(std::string_view body, size_t& i,
                                  bool& in_string, bool& unclosed_comment,
                                  std::string& result) {
@@ -546,12 +559,17 @@ static bool ProcessMacroBodyChar(std::string_view body, size_t& i,
     return true;
   }
 
+  if (CopyEscapedIdentifier(body, i, result)) return true;
+
   if (i + 1 < body.size() && body[i] == '/' && body[i + 1] == '/') {
     return false;
   }
 
+  // §5.2: a block comment is a token of its own, so the text on either side
+  // of it stays apart: it leaves one space behind.
   if (i + 1 < body.size() && body[i] == '/' && body[i + 1] == '*') {
     if (!SkipBlockComment(body, i)) unclosed_comment = true;
+    result += ' ';
     return true;
   }
 

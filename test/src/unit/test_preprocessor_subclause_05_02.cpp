@@ -189,4 +189,18 @@ TEST(LexicalConventionPreprocessor,
   EXPECT_EQ(KindOfWordIn(out, "logic"), TokenKind::kKwLogic);
 }
 
+// §5.2 counts a comment among the lexical tokens, so a block comment in macro
+// text keeps apart the text on either side of it, as it does outside a macro.
+// Deleted outright, it ran `a` and `b` together into one identifier `ab`.
+TEST(LexicalTokenPreprocessor, BlockCommentInMacroTextSeparatesTokens) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`define M a/**/b\n"
+      "x `M y\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out.find("ab"), std::string::npos);
+  EXPECT_NE(out.find("a b"), std::string::npos);
+}
+
 }  // namespace

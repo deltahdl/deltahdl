@@ -261,6 +261,11 @@ bool HasUnterminatedString(std::string_view body) {
   bool in_triple = false;
   for (size_t i = 0; i < body.size(); ++i) {
     if (SkipBacktickQuote(body, i)) continue;
+    // §5.6.1: a '"' inside an escaped identifier opens no string.
+    if (!in_string && !in_triple && body[i] == '\\') {
+      i = EndOfEscapedIdentifier(body, i);
+      continue;
+    }
     if (body[i] == '"' && (i == 0 || body[i - 1] != '\\')) {
       ProcessQuoteChar(body, i, in_string, in_triple);
     }
@@ -824,6 +829,9 @@ void Preprocessor::EmitCommentedActiveLine(std::string_view line,
   std::vector<std::string> comments;
   auto stripped = StripComments(std::string(line), in_block_comment_,
                                 in_triple_string_, &comments);
+  if (!in_triple_string_ && EndsInContinuedQuotedString(stripped)) {
+    in_continued_string_ = true;
+  }
   size_t from = output.size();
   EmitStrippedActiveLine(stripped, HasInlineConditional(stripped), emit,
                          output);
@@ -875,7 +883,8 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
     return EndOfMacroUsage(text);
   };
   ops.copy_open_string = [&](std::string_view& line) {
-    return CopyOpenTripleString(line, output, in_triple_string_);
+    return CopyOpenTripleString(line, output, in_triple_string_) ||
+           CopyContinuedQuotedString(line, output, in_continued_string_);
   };
   // An open block comment (22.6) emits or skips its text and handles its own
   // trailing newline; a directive may still follow the comment close.

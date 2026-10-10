@@ -104,4 +104,22 @@ TEST(CompilerDirectivePreprocessor, ConcurrentCusIndependent) {
   EXPECT_EQ(cu2.DefaultNetType(), NetType::kTri);
 }
 
+// §5.6.4: a directive shall not affect another compilation unit, `line among
+// them. Carried into the next unit, the override of a.sv's line 10 numbered
+// b.sv's line 3 from it and named it x.v.
+TEST(CompilerDirectivePreprocessor, LineOverrideEndsWithItsCompilationUnit) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessFile("a.sv", std::string(9, '\n') + "`line 1 \"x.v\" 0\n", f, pp);
+  pp.BeginCompilationUnit();
+  auto out = PreprocessFile("b.sv",
+                            "// b.sv\n"
+                            "module t;\n"
+                            "  initial $display(`__LINE__, `__FILE__);\n"
+                            "endmodule\n",
+                            f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("$display(3, \"b.sv\")"), std::string::npos);
+}
+
 }  // namespace

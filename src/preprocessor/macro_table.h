@@ -27,6 +27,11 @@ class MacroTable {
   const MacroDef* Lookup(std::string_view name) const;
   bool IsDefined(std::string_view name) const;
 
+  // §5.6.1: the backslash of an escaped identifier is no part of it, so the
+  // text macro names `\cpu3` and `cpu3` are one name. The table keeps and
+  // seeks every name as this gives it, without the backslash.
+  static std::string Key(std::string_view name);
+
  private:
   std::unordered_map<std::string, MacroDef> macros_;
 };

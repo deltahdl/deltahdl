@@ -768,6 +768,9 @@ class Preprocessor {
   // A.8.8's triple_quoted_string may span lines, so one left open at a line's
   // end is carried to the next as an open block comment is.
   bool in_triple_string_ = false;
+  // §5.9: a quoted_string whose newline a backslash escapes runs on into the
+  // next line, so it too is carried (CopyContinuedQuotedString).
+  bool in_continued_string_ = false;
   ProtectEnvelopeState protect_envelopes_;
   ProtectKeywordScope protect_keywords_;
   // The viewports written since the envelope in force opened. §34.5.32.2 has
