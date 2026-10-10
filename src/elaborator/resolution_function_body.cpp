@@ -2,6 +2,7 @@
 
 #include <array>
 #include <format>
+#include <string>
 #include <string_view>
 #include <unordered_set>
 
@@ -36,18 +37,8 @@ struct BodyScan {
 
 }  // namespace
 
-static void ReportWrite(std::string_view name, SourceLoc loc,
-                        const BodyScan& scan) {
-  if (name.empty()) return;
-  if (name == scan.drivers) {
-    scan.diag.Error(loc,
-                    std::format("resolution function '{}' writes to or "
-                                "resizes its driver array '{}'",
-                                scan.function, name),
-                    Subclause("6.6.7"));
-    return;
-  }
-  if (scan.locals.count(name) != 0) return;
+static void ReportSideEffect(std::string_view name, SourceLoc loc,
+                             const BodyScan& scan) {
   scan.diag.Error(loc,
                   std::format("resolution function '{}' has a side effect: it "
                               "writes '{}', which it does not declare",
@@ -55,8 +46,60 @@ static void ReportWrite(std::string_view name, SourceLoc loc,
                   Subclause("6.6.7"));
 }
 
-// The variables an assignment's left side writes: the data object a dotted or
-// selected name begins with, and each such name a concatenation gathers.
+// The data object a write's target begins with: the target with its selects
+// and its dotted members taken off, down to a plain name or to a name written
+// with a scope (`p::calls`, `$unit::u`, `$root.m`).
+static const Expr* TargetHead(const Expr* e) {
+  for (;;) {
+    if (e->kind == ExprKind::kSelect) {
+      e = e->base;
+    } else if (e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution) {
+      e = e->lhs;
+    } else {
+      return e;
+    }
+  }
+}
+
+// A write's target as written, with its selects left out: `p::q` for
+// p::q[0], `$root.m.calls` for $root.m.calls[1].
+static std::string TargetName(const Expr* e) {
+  if (e->kind == ExprKind::kSelect) return TargetName(e->base);
+  if (e->kind == ExprKind::kMemberAccess) {
+    return TargetName(e->lhs) + (e->is_scope_resolution ? "::" : ".") +
+           std::string(e->rhs->text);
+  }
+  if (e->scope_prefix.empty()) return std::string(e->text);
+  return std::string(e->scope_prefix) +
+         (e->scope_prefix == "$root" ? "." : "::") + std::string(e->text);
+}
+
+// A target that begins with a plain name writes the driver array, one of the
+// function's own declarations, or something outside it. One written with a
+// package, class, `$unit` or `$root` scope (§23.7.1) is outside it whatever
+// the function declares, since a declaration of the function is reached by its
+// plain name alone.
+static void ReportWrite(const Expr* target, SourceLoc loc,
+                        const BodyScan& scan) {
+  const Expr* head = TargetHead(target);
+  if (head->kind == ExprKind::kMemberAccess || !head->scope_prefix.empty()) {
+    ReportSideEffect(TargetName(target), loc, scan);
+    return;
+  }
+  if (head->text == scan.drivers) {
+    scan.diag.Error(loc,
+                    std::format("resolution function '{}' writes to or "
+                                "resizes its driver array '{}'",
+                                scan.function, head->text),
+                    Subclause("6.6.7"));
+    return;
+  }
+  if (scan.locals.count(head->text) != 0) return;
+  ReportSideEffect(head->text, loc, scan);
+}
+
+// The variables an assignment's left side writes: the target itself, or each
+// one a concatenation gathers.
 static void ReportLhsWrites(const Expr* lhs, SourceLoc loc,
                             const BodyScan& scan) {
   if (lhs->kind == ExprKind::kConcatenation) {
@@ -65,7 +108,7 @@ static void ReportLhsWrites(const Expr* lhs, SourceLoc loc,
     }
     return;
   }
-  ReportWrite(LhsBaseName(lhs), loc, scan);
+  ReportWrite(lhs, loc, scan);
 }
 
 // The parser builds every call a statement can make through ParseCallExpr,
@@ -88,10 +131,10 @@ static bool IsMutatingMethodCall(const Expr* e) {
 static void ReportExprStmtWrites(const Expr* e, SourceLoc loc,
                                  const BodyScan& scan) {
   if (e->op == TokenKind::kPlusPlus || e->op == TokenKind::kMinusMinus) {
-    ReportWrite(LhsBaseName(e->lhs), loc, scan);
+    ReportWrite(e->lhs, loc, scan);
     return;
   }
-  if (IsMutatingMethodCall(e)) ReportWrite(LhsBaseName(e->lhs->lhs), loc, scan);
+  if (IsMutatingMethodCall(e)) ReportWrite(e->lhs->lhs, loc, scan);
 }
 
 // ForEachChildStmt hands over every child slot a statement has, the empty ones

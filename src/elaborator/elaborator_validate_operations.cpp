@@ -898,14 +898,14 @@ void ElaboratorOperationRules::CheckCastExpr(const Expr* expr) {
         diag_.Error(expr->range.start,
                     "size cast target width must be a positive constant",
                     Subclause("6.24.1"));
-      } else if (CastOperandIsReal(expr->lhs)) {
+      } else if (CastOperandIsNonIntegral(expr->lhs)) {
         // §6.24.1: a size cast takes an integral operand only.
         diag_.Error(expr->range.start,
                     "a size cast works only on an integral value",
                     Subclause("6.24.1"));
       }
     }
-  } else if (IsSigningCast(expr) && CastOperandIsReal(expr->lhs)) {
+  } else if (IsSigningCast(expr) && CastOperandIsNonIntegral(expr->lhs)) {
     // §6.24.1: a signing cast takes an integral operand only.
     diag_.Error(expr->range.start,
                 "a signing cast works only on an integral value",

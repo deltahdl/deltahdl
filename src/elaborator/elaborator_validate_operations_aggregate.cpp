@@ -38,10 +38,7 @@ static bool IsUnpackedStructOrUnion(const DataType* d) {
          (d->kind == DataTypeKind::kStruct || d->kind == DataTypeKind::kUnion);
 }
 
-// §11.3 and §11.4.13: the variables of a module an operator is asked to take
-// as a whole when it takes no aggregate -- those of an unpacked structure or
-// union type, declared in place or through a name standing for one.
-static std::unordered_set<std::string_view> UnpackedStructVars(
+std::unordered_set<std::string_view> UnpackedStructVars(
     const ModuleDecl* decl, const TypedefMap& typedefs) {
   std::unordered_set<std::string_view> names;
   for (const auto* item : decl->items) {

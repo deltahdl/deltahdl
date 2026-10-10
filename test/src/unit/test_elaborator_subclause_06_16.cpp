@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
 #include <string>
+#include <string_view>
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -242,6 +245,63 @@ TEST(Elaboration, StringNumericAssignInARandsequenceWeightCodeBlock) {
       "        alt : { ok = 1; };\n"
       "      endsequence\n"
       "    end");
+}
+
+// §6.16 needs a cast between a string and an integral value in either
+// direction, whatever expression supplies the value: an integral literal, an
+// operation on an integral variable, a real literal, an integral initializer
+// of a module's or a block's string, a string written into one character of a
+// string, and a string method's string result written to an integer are each
+// reported. An element of an array of strings is a string, a method giving an
+// integer, a comparison of strings and a string literal stand on neither side,
+// and a structure's member, a call's result and a chandle are not read here.
+TEST(Elaboration, UncastStringIntegralAssignmentOfAnyShapeReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef struct {string a;} T;\n"
+      "  int n = 1;\n"
+      "  real r;\n"
+      "  string s = \"ab\";\n"
+      "  string t = n;\n"
+      "  string sa[2];\n"
+      "  int arr[];\n"
+      "  T st;\n"
+      "  chandle ch;\n"
+      "  function automatic void f();\n"
+      "    s = 8'h41;\n"
+      "  endfunction\n"
+      "  function automatic int g();\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    string u;\n"
+      "    string w = n;\n"
+      "    s = n + 1;\n"
+      "    s <= 1.5;\n"
+      "    s[0] = t;\n"
+      "    n = t.substr(0, 1);\n"
+      "    sa[0] = t;\n"
+      "    n = t.len();\n"
+      "    arr = new[2];\n"
+      "    n = arr.size();\n"
+      "    n = g();\n"
+      "    n = st.a[0];\n"
+      "    n = (s == t);\n"
+      "    s = \"x\";\n"
+      "    ch = null;\n"
+      "    n = r;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  constexpr std::string_view kMessage =
+      "type-incompatible assignment between string and numeric type";
+  for (uint32_t line : {6U, 12U, 19U, 20U, 21U, 22U, 23U}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, line, "6.16"));
+  }
+  for (uint32_t line : {24U, 25U, 26U, 27U, 28U, 29U, 30U, 31U, 32U, 33U}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kMessage, line, "6.16"));
+  }
 }
 
 }  // namespace

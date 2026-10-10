@@ -536,8 +536,14 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_scope_randomize.cpp
     elaborator/elaborator_validate_subroutine_args.cpp
     elaborator/elaborator_validate_std_prototypes.cpp
+    elaborator/elaborator_validate_cast_operand.cpp
     elaborator/queue_dim.cpp
     elaborator/net_data_type.cpp
+    elaborator/simple_bit_vector.cpp
+    elaborator/dollar_contexts.cpp
+    elaborator/class_property_cont_assign.cpp
+    elaborator/string_numeric_assign.cpp
+    elaborator/instance_local_types.cpp
     elaborator/resolution_function_body.cpp
     lexer/lexer_numbers.cpp
     lexer/lexer_operators.cpp

@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
@@ -547,6 +550,65 @@ TEST(CastOperatorElaboration,
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "a signing cast works only on an integral value", 5,
                             "6.24.1"));
+}
+
+// §6.24.1 holds a size or a signing cast's operand to an integral type, which
+// is a matter of the operand's type rather than its form: a real-valued
+// expression of any shape is refused as a bare real variable is, and so is a
+// string, a class handle, a chandle, an event, an unpacked array and an
+// unpacked structure. An integral expression built from real operands, a
+// relation, is accepted, as are integral operands of every shape.
+TEST(CastOperatorElaboration, NonIntegralOperandOfAnyFormRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  real r = 1.5;\n"
+      "  string s = \"a\";\n"
+      "  int arr[2];\n"
+      "  chandle ch;\n"
+      "  event ev;\n"
+      "  struct {int a;} st;\n"
+      "  class C;\n"
+      "  endclass\n"
+      "  C h;\n"
+      "  int n;\n"
+      "  logic [15:0] v;\n"
+      "  initial begin\n"
+      "    v = 8'(r * 2.0);\n"
+      "    v = 8'(n + r);\n"
+      "    v = 8'(-r);\n"
+      "    v = 8'(n ? r : 1);\n"
+      "    v = 8'(n ? 2 : r);\n"
+      "    v = 8'(2ns);\n"
+      "    v = 8'(s);\n"
+      "    v = 16'(h);\n"
+      "    v = 8'(ch);\n"
+      "    v = 8'(ev);\n"
+      "    v = signed'(arr);\n"
+      "    v = signed'(st);\n"
+      "    v = 8'(r > 1.0);\n"
+      "    v = 8'(-n);\n"
+      "    v = 8'(n + 1);\n"
+      "    v = 8'(v[3:0]);\n"
+      "    v = signed'(v);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {14U, 15U, 16U, 17U, 18U, 19U, 20U, 21U, 22U, 23U}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "a size cast works only on an integral value",
+                              line, "6.24.1"));
+  }
+  for (uint32_t line : {24U, 25U}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "a signing cast works only on an integral value",
+                              line, "6.24.1"));
+  }
+  for (uint32_t line : {26U, 27U, 28U, 29U, 30U}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                               "works only on an integral value", line,
+                               "6.24.1"));
+  }
 }
 
 }  // namespace

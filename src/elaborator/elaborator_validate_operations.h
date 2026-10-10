@@ -4,6 +4,7 @@
 #include <optional>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -136,6 +137,12 @@ class ElaboratorOperationRules : public ElaboratorData {
   // which WalkExprForCast reaches for every expression.
   void CheckSigningSystemCallExpr(const Expr* expr);
   bool CastOperandIsReal(const Expr* operand) const;
+  // §6.24.1: whether a size or a signing cast's operand is of a type that is
+  // not integral. Defined in elaborator_validate_cast_operand.cpp.
+  bool CastOperandIsNonIntegral(const Expr* operand) const;
+  // The module's variables of an unpacked structure or union type, filled by
+  // ValidateCastOperations for the module it walks.
+  std::unordered_set<std::string_view> cast_unpacked_structs_;
 
   // §11.12: a let used before its declaration in its scope, and a let
   // referenced through a hierarchical name.

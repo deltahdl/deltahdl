@@ -24,6 +24,14 @@ struct TypeShapeTables {
   const std::unordered_set<std::string_view>& class_names;
 };
 
+// The type `dtype` stands for once every typedef name it is written with has
+// been followed, or null when a name resolves to nothing in `typedefs` or the
+// names run in a cycle. Each name followed is appended to `names`, so a caller
+// can ask what each one wrote besides the type.
+const DataType* FollowTypedefs(const DataType& dtype,
+                               const TypedefMap& typedefs,
+                               std::vector<std::string_view>& names);
+
 // §7.4 (printed page 153): whether the unpacked dimension `dim` is a constant
 // range or size. The parser keeps a dynamic array's `[]` as a null dimension,
 // a queue's `[$]` and `[$:N]` and the wildcard `[*]` as identifiers of that

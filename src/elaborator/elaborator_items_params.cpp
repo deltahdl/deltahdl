@@ -23,7 +23,9 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
+#include "elaborator/net_data_type.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/simple_bit_vector.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
@@ -513,6 +515,9 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
       (item->init_expr->text == "$" ||
        RefersToUnboundedParam(mod, item->init_expr->text))) {
     pd.is_unbounded = true;
+    ValidateUnboundedParamType(
+        item->name, &item->data_type, !item->unpacked_dims.empty(),
+        {typedefs_, td_array_dims_, class_names_}, diag_, item->loc);
   } else if (kFoldsDefault) {
     if (ContainsDollarSubexpr(item->init_expr)) {
       // §6.20.7: $ must be the entire, self-contained parameter value; it may

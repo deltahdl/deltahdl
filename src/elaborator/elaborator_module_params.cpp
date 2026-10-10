@@ -22,7 +22,9 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_params.h"
+#include "elaborator/net_data_type.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/simple_bit_vector.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -250,25 +252,6 @@ int64_t ConvertOverrideValue(int64_t value, const RtlirParamDecl& pd) {
 // contains_dollar are precomputed by the caller because they require Elaborator
 // member helpers; has_param_type / param_type describe the optional declared
 // data type.
-// §6.20.7: an unbounded ($) parameter value, or a reference to another
-// unbounded parameter, makes this parameter unbounded too. Returns true when
-// the value was recognized as unbounded (and pd updated), so the caller can
-// stop.
-static bool TryResolveUnboundedParamValue(RtlirParamDecl& pd, const Expr* pval,
-                                          bool refers_to_unbounded) {
-  if (pval->kind == ExprKind::kIdentifier && pval->text == "$") {
-    pd.is_unbounded = true;
-    return true;
-  }
-  if (pval->kind == ExprKind::kIdentifier && refers_to_unbounded) {
-    // §6.20.7: assigning a $ (unbounded) parameter to another parameter is
-    // legal; the assigned-to parameter is itself unbounded.
-    pd.is_unbounded = true;
-    return true;
-  }
-  return false;
-}
-
 // Fold a parameter's default expression into a concrete value: prefer an
 // integer constant, then (for integer-typed parameters) a real constant rounded
 // per §6.12.1. §11.6.1 (printed page 299): the default is the right-hand side
@@ -321,13 +304,34 @@ struct ParamValueExpr {
   bool contains_dollar;      // §6.20.7: expr contains a $ subexpression
   bool has_param_type;       // parameter has an explicit declared data type
   const DataType* param_type;  // §6.20.2: that declared type (null if none)
+  bool has_unpacked_dims;      // the port is declared with unpacked dimensions
+  // What a typedef name in param_type stands for.
+  const TypeShapeTables& tables;
 };
+
+// §6.20.7: an unbounded ($) parameter value, or a reference to another
+// unbounded parameter, makes this parameter unbounded too, and either one is
+// `$` assigned to the parameter, which its type has to permit. Returns true
+// when the value was recognized as unbounded (and pd updated), so the caller
+// can stop.
+static bool TryResolveUnboundedParamValue(RtlirParamDecl& pd,
+                                          const ParamValueExpr& val,
+                                          DiagEngine& diag) {
+  if (val.pval->kind != ExprKind::kIdentifier ||
+      (val.pval->text != "$" && !val.refers_to_unbounded)) {
+    return false;
+  }
+  pd.is_unbounded = true;
+  ValidateUnboundedParamType(val.pname, val.param_type, val.has_unpacked_dims,
+                             val.tables, diag, val.pval->range.start);
+  return true;
+}
 
 static void ResolveUnresolvedParamValue(RtlirParamDecl& pd,
                                         const ParamValueExpr& val,
                                         const ScopeMap& scope,
                                         DiagEngine& diag) {
-  if (TryResolveUnboundedParamValue(pd, val.pval, val.refers_to_unbounded)) {
+  if (TryResolveUnboundedParamValue(pd, val, diag)) {
     return;
   }
   if (val.contains_dollar) {
@@ -496,6 +500,7 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
                                         RtlirModule* mod) {
   TypeParamValueCtx tp_ctx{typedefs_, class_names_, diag_};
   const TypedefMap kWrittenTypes = std::exchange(pending_type_param_types_, {});
+  const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
   // The instantiating module is the one registered here, from the item loop
   // this instantiation is an item of, and its parameters are what the
   // assignments' expressions name.
@@ -516,9 +521,14 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
       bool refers_to_unbounded = pval->kind == ExprKind::kIdentifier &&
                                  RefersToUnboundedParam(mod, pval->text);
       bool contains_dollar = ContainsDollarSubexpr(pval);
-      ParamValueExpr val{
-          pval,           pname,     refers_to_unbounded, contains_dollar,
-          has_param_type, param_type};
+      ParamValueExpr val{pval,
+                         pname,
+                         refers_to_unbounded,
+                         contains_dollar,
+                         has_param_type,
+                         param_type,
+                         decl->param_port_unpacked_dims.count(pname) != 0,
+                         kShapeTables};
       // §6.20.2 (printed page 126): the default is written in the declaring
       // module, so this module is the one registered while it is folded, as
       // it is for a parameter among the items: a real parameter port already

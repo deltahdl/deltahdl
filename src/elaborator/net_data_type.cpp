@@ -29,13 +29,9 @@ constexpr std::array<std::string_view, 10> kAssocIndexKeywords = {
 
 }  // namespace
 
-// The type `dtype` stands for once every typedef name it is written with has
-// been followed, or null when a name resolves to nothing in `typedefs` or the
-// names run in a cycle. Each name followed is appended to `names`, so a caller
-// can ask what each one wrote besides the type.
-static const DataType* FollowTypedefs(const DataType& dtype,
-                                      const TypedefMap& typedefs,
-                                      std::vector<std::string_view>& names) {
+const DataType* FollowTypedefs(const DataType& dtype,
+                               const TypedefMap& typedefs,
+                               std::vector<std::string_view>& names) {
   const DataType* type = &dtype;
   for (int hops = 0; hops < kMaxTypedefHops; ++hops) {
     if (type->kind != DataTypeKind::kNamed) return type;

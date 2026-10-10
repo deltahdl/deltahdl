@@ -57,6 +57,7 @@ void ElaboratorOperationRules::WalkStmtsForCast(const Stmt* s) {
 }
 
 void ElaboratorOperationRules::ValidateCastOperations(const ModuleDecl* decl) {
+  cast_unpacked_structs_ = UnpackedStructVars(decl, typedefs_);
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {

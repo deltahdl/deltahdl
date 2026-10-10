@@ -1,5 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <format>
+#include <initializer_list>
+#include <string_view>
+#include <utility>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -447,6 +453,58 @@ TEST(LifetimeIntentElaboration, GenerateForAutoVarProcContAssignsReported) {
              "    end\n"
              "  end\n"
              "endmodule\n"));
+}
+
+// §6.21: a non-static class property lives in an object created at run time,
+// so neither a continuous assignment nor a procedural continuous one, `assign`
+// or `force` in a procedure or a task, may write it, whether the target is the
+// property itself, a select of it, a member of it or one name of a
+// concatenation. A static property belongs to the class and is left alone,
+// whether reached through a handle or the class, as are a structure's member
+// and a name the class does not declare.
+TEST(LifetimeElaboration, ContinuousWriteOfANonStaticPropertyRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module top;\n"
+      "  typedef struct {bit f;} st_t;\n"
+      "  class C;\n"
+      "    bit x;\n"
+      "    bit [1:0] v;\n"
+      "    st_t p;\n"
+      "    static bit s;\n"
+      "  endclass\n"
+      "  C h = new;\n"
+      "  st_t st;\n"
+      "  bit y;\n"
+      "  assign h.x = 1'b1;\n"
+      "  assign st.f = 1'b0;\n"
+      "  initial begin\n"
+      "    assign h.v[0] = 1'b0;\n"
+      "    force {h.x, y} = 2'b10;\n"
+      "    force h.p.f = 1'b1;\n"
+      "    force h.s = 1'b1;\n"
+      "    force C::s = 1'b1;\n"
+      "    force h.nosuch = 1'b1;\n"
+      "  end\n"
+      "  task automatic t();\n"
+      "    force h.x = 1'b1;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  const std::pair<uint32_t, std::string_view> kWrites[] = {
+      {12, "h.x"}, {15, "h.v"}, {16, "h.x"}, {17, "h.p"}, {23, "h.x"}};
+  for (const auto& [line, target] : kWrites) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::format("'{}' is a non-static class property, which no "
+                    "continuous or procedural continuous assignment may write",
+                    target),
+        line, "6.21"));
+  }
+  for (uint32_t line : {13U, 18U, 19U, 20U}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                               "is a non-static class property", line, "6.21"));
+  }
 }
 
 }  // namespace

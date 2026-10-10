@@ -399,6 +399,13 @@ void ForEachExprChild(const Expr* e, Fn&& fn) {
 // Defined in elaborator_validate.cpp.
 std::optional<int64_t> ComputeDimSize(const Expr* dim);
 
+// §11.3 and §11.4.13: the variables of a module an operator is asked to take
+// as a whole when it takes no aggregate -- those of an unpacked structure or
+// union type, declared in place or through a name standing for one. Defined in
+// elaborator_validate_operations_aggregate.cpp.
+std::unordered_set<std::string_view> UnpackedStructVars(
+    const ModuleDecl* decl, const TypedefMap& typedefs);
+
 // §5.10, §5.11 and §10.9.1: the checks an assignment pattern written for an
 // unpacked array has to pass, wherever it is written -- a declaration's
 // initializer, a block's or the module's, or the right-hand side of a

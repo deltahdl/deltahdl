@@ -1,12 +1,17 @@
 #include <cstddef>
+#include <string_view>
+#include <unordered_set>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "elaborator/class_property_cont_assign.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/dollar_contexts.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/instance_local_types.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/unit_scope_switch.h"
 #include "parser/ast_design.h"
@@ -146,6 +151,18 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
     }
   }
   CheckIsunboundedArgs(decl, diag_);
+  std::unordered_set<std::string_view> unbounded;
+  for (const auto& param : mod->params) {
+    if (param.is_unbounded) unbounded.insert(param.name);
+  }
+  std::unordered_set<std::string_view> queues;
+  for (const auto& [name, info] : var_array_info_) {
+    if (info.is_queue) queues.insert(name);
+  }
+  CheckUnboundedParamsInQueueContexts(decl, unbounded, queues, diag_);
+  CheckDollarOperands(decl, diag_);
+  CheckContinuousPropertyWrites(decl, class_var_types_, unit_, diag_);
+  CheckInstanceLocalTypeAssignments(decl, unit_, diag_);
 }
 
 namespace {

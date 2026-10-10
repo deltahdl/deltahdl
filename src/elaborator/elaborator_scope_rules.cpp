@@ -24,6 +24,7 @@
 #include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/string_numeric_assign.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/unit_scope_order.h"
 #include "parser/ast_design.h"
@@ -340,76 +341,6 @@ void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
 
 namespace {
 
-// §6.16/§6.22.5: a string and an integral or real type are type-incompatible —
-// no implicit or explicit cast bridges them — so a direct procedural assignment
-// between a string variable and a numeric variable is an error. The check is
-// restricted to the string<->numeric pair: it is the residual §6.22.5 case that
-// carries no width/signedness nuance, so flagging it stays free of the false
-// positives that a general residual check would raise on integral/real
-// conversions (which are assignment-compatible).
-bool IsStringKind(DataTypeKind k) { return k == DataTypeKind::kString; }
-
-bool IsNumericKind(DataTypeKind k) {
-  return IsIntegralType(k) || k == DataTypeKind::kReal ||
-         k == DataTypeKind::kShortreal || k == DataTypeKind::kRealtime;
-}
-
-// Leaf check for a single statement: flag a blocking/nonblocking assign whose
-// two sides are identifiers resolving to a string and a numeric var.
-void CheckStringNumericAssignStmt(
-    const Stmt* s,
-    const std::unordered_map<std::string_view, DataTypeKind>& var_types,
-    DiagEngine& diag) {
-  if (s->kind != StmtKind::kBlockingAssign &&
-      s->kind != StmtKind::kNonblockingAssign) {
-    return;
-  }
-  if (!s->lhs || s->lhs->kind != ExprKind::kIdentifier || !s->rhs ||
-      s->rhs->kind != ExprKind::kIdentifier) {
-    return;
-  }
-  auto lit = var_types.find(s->lhs->text);
-  auto rit = var_types.find(s->rhs->text);
-  if (lit == var_types.end() || rit == var_types.end()) return;
-  bool incompatible =
-      (IsStringKind(lit->second) && IsNumericKind(rit->second)) ||
-      (IsStringKind(rit->second) && IsNumericKind(lit->second));
-  if (incompatible) {
-    diag.Error(s->range.start,
-               "type-incompatible assignment between string and numeric type",
-               Subclause("6.16"));
-  }
-}
-
-void CheckStringNumericAssigns(
-    const Stmt* s,
-    const std::unordered_map<std::string_view, DataTypeKind>& var_types,
-    DiagEngine& diag) {
-  if (!s) return;
-  CheckStringNumericAssignStmt(s, var_types, diag);
-  // §6.16 makes a string and a numeric type incompatible whatever statement
-  // the assignment between them stands in, so every position a statement holds
-  // a statement in is a position the report is made at. ForEachChildStmt in
-  // elaborator_validate_internal.h states those positions once for the whole
-  // elaborator, which is why the list is not written out again here.
-  ForEachChildStmt(s, [&](Stmt* const& sub) {
-    CheckStringNumericAssigns(sub, var_types, diag);
-  });
-}
-
-// §6.16/§6.22.5: the string-numeric assignment check over every procedural
-// item among `items`.
-void CheckProceduralStringNumericAssigns(
-    const std::vector<ModuleItem*>& items,
-    const std::unordered_map<std::string_view, DataTypeKind>& var_types,
-    DiagEngine& diag) {
-  for (const auto* item : items) {
-    if (IsProceduralItemKind(item->kind)) {
-      CheckStringNumericAssigns(item->body, var_types, diag);
-    }
-  }
-}
-
 // The genvars declared among `items`. §27.4 lets a genvar be referenced only
 // within a loop generate scheme, so one of these read by the items themselves,
 // outside every loop generate construct, is a misuse rather than a name that
@@ -716,10 +647,14 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
                                               const RtlirModule* mod) {
   if (!mod) return;
 
-  // §6.16/§6.22.5: a string and an integral or real type are
-  // type-incompatible whatever a module imports, so this check answers on its
-  // own and is stated before the §23.9 reads below.
-  CheckProceduralStringNumericAssigns(decl->items, var_types_, diag_);
+  // §6.16: an assignment between a string and an integral or real value
+  // needs a cast whatever a module imports, so this check answers on its own
+  // and is stated before the §23.9 reads below.
+  std::unordered_set<std::string_view> arrays;
+  for (const auto& [name, info] : var_array_info_) {
+    if (info.num_unpacked_dims != 0) arrays.insert(name);
+  }
+  CheckStringNumericAssignments(decl->items, var_types_, arrays, diag_);
 
   std::unordered_set<std::string_view> explicit_imported =
       ExplicitlyImportedNames(mod);

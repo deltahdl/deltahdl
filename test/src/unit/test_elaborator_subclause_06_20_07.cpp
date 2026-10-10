@@ -1,5 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <cstdint>
+#include <format>
+#include <initializer_list>
+#include <string_view>
+#include <utility>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -426,6 +433,199 @@ TEST(DollarConstantElaboration, OverrideNamingADollarParameterIsAccepted) {
              "  class D extends C #(P);\n"
              "  endclass\n"
              "endmodule\n"));
+}
+
+// Each parameter of `params`, a line and a name, is reported as holding `$`
+// though its type is no simple bit vector type.
+template <size_t N>
+void ExpectDollarTypeReported(
+    const ElabFixture& f,
+    const std::pair<uint32_t, std::string_view> (&params)[N]) {
+  for (const auto& [line, name] : params) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::format("'$' may be assigned only to a parameter of a simple bit "
+                    "vector type, and parameter '{}' is not one",
+                    name),
+        line, "6.20.7"));
+  }
+}
+
+// §6.20.7 lets `$` be assigned to a value parameter of a simple bit vector
+// type, which §6.11.1 makes every integer type of Table 6-8 and a bit, logic or
+// reg vector of one packed dimension, written directly or through a typedef. An
+// untyped parameter takes its type from its value and is one too.
+TEST(DollarConstantElaboration,
+     DollarAssignedToEachSimpleBitVectorTypeIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  typedef bit [7:0] octet_t;\n"
+             "  parameter P0 = $;\n"
+             "  parameter signed [3:0] P1 = $;\n"
+             "  parameter logic [7:0] P2 = $;\n"
+             "  parameter reg P3 = $;\n"
+             "  parameter bit [3:0] P4 = $;\n"
+             "  parameter byte P5 = $;\n"
+             "  parameter shortint P6 = $;\n"
+             "  parameter int P7 = $;\n"
+             "  parameter longint P8 = $;\n"
+             "  parameter integer P9 = $;\n"
+             "  parameter time P10 = $;\n"
+             "  parameter octet_t P11 = $;\n"
+             "endmodule\n"));
+}
+
+// Every other parameter type refuses `$`: a non-integral type, an enumeration,
+// a packed structure, a second packed dimension (written on the parameter or
+// added to a typedef's), and an unpacked dimension, written on the parameter or
+// carried by a typedef. A class name is no bit vector either.
+TEST(DollarConstantElaboration,
+     DollarAssignedToAnotherParameterTypeIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  typedef enum {A, B} e_t;\n"
+      "  typedef struct packed {bit a;} s_t;\n"
+      "  typedef logic [3:0] nib_t;\n"
+      "  typedef int i_t;\n"
+      "  typedef bit a_t [2];\n"
+      "  class C;\n"
+      "  endclass\n"
+      "  parameter real R = $;\n"
+      "  parameter string S = $;\n"
+      "  parameter e_t E = $;\n"
+      "  parameter s_t T = $;\n"
+      "  parameter bit [1:0][3:0] M = $;\n"
+      "  parameter nib_t [1:0] N = $;\n"
+      "  parameter i_t [1:0] I = $;\n"
+      "  parameter int U [2] = $;\n"
+      "  parameter a_t D = $;\n"
+      "  parameter C H = $;\n"
+      "endmodule\n",
+      f);
+  const std::pair<uint32_t, std::string_view> kParams[] = {
+      {9, "R"},  {10, "S"}, {11, "E"}, {12, "T"}, {13, "M"},
+      {14, "N"}, {15, "I"}, {16, "U"}, {17, "D"}, {18, "H"}};
+  ExpectDollarTypeReported(f, kParams);
+}
+
+// A parameter port is held to the same rule, and so is a parameter assigned a
+// parameter whose value is `$`, since that assigns it `$` too (§6.20.7 gives
+// `parameter P=Q;` as legal only where `$` itself would be).
+TEST(DollarConstantElaboration,
+     DollarPortOrDollarParameterOfAnotherTypeRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m #(parameter real R = $,\n"
+      "           parameter int A [2] = $,\n"
+      "           parameter W = $);\n"
+      "  parameter real Q = W;\n"
+      "endmodule\n",
+      f);
+  const std::pair<uint32_t, std::string_view> kParams[] = {
+      {1, "R"}, {2, "A"}, {4, "Q"}};
+  ExpectDollarTypeReported(f, kParams);
+}
+
+// A type name the elaborator cannot resolve leaves nothing to judge, so `$` is
+// not reported against it; the unknown name is reported on its own.
+TEST(DollarConstantElaboration,
+     DollarAssignedThroughAnUnresolvedTypeNotJudged) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  parameter missing_t P = $;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "'$' may be assigned only to a parameter of a "
+                             "simple bit vector type",
+                             2, "6.20.7"));
+}
+
+// §6.20.7 bars a parameter holding `$` from every queue context: a queue's
+// bound, a dimension that would make a queue of it, and an index or a slice of
+// a queue, in a module, a procedural block or a function alike. A dynamic,
+// fixed or bounded dimension is no such context, nor is an index of a queue
+// written with a bounded parameter, an index of an element of a queue of
+// queues written with one, or the compilation unit's `P` that `$unit::P`
+// names.
+TEST(DollarConstantElaboration, DollarParameterInAQueueContextIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "parameter P = 1;\n"
+      "module m;\n"
+      "  parameter P = $;\n"
+      "  parameter N = 2;\n"
+      "  int q[$];\n"
+      "  int b[$:P];\n"
+      "  int c[P];\n"
+      "  int d[];\n"
+      "  int e[N];\n"
+      "  int g[4];\n"
+      "  int qq[$][$];\n"
+      "  function automatic int f();\n"
+      "    return q[P];\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    int lq[$:P];\n"
+      "    q[P] = 1;\n"
+      "    q = q[0:P-1];\n"
+      "    q[$unit::P] = 1;\n"
+      "    qq[0][N] = 1;\n"
+      "    b[N] = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {6U, 7U, 13U, 16U, 17U, 18U}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "parameter 'P' holds '$', which a queue context "
+                              "does not permit",
+                              line, "6.20.7"));
+  }
+  for (uint32_t line : {19U, 20U, 21U}) {
+    EXPECT_FALSE(
+        ReportedError(f.diag.Diagnostics(), "holds '$'", line, "6.20.7"));
+  }
+}
+
+// §6.20.7 lists the contexts `$` may be written in, and an ordinary operand is
+// none of them: not a variable's or a net's initializer, a continuous or a
+// procedural assignment's value, an operand of an operator, a condition or a
+// function's return value. A queue select, with operators applied to `$` or
+// without, a value range's bound and a call's arguments are left alone.
+TEST(DollarConstantElaboration, DollarAsAnOrdinaryOperandIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module top;\n"
+      "  int x, y, q[$];\n"
+      "  wire [7:0] w;\n"
+      "  wire [7:0] v = $;\n"
+      "  int z = $;\n"
+      "  assign w = $;\n"
+      "  function automatic int f();\n"
+      "    return $;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    x = $;\n"
+      "    y = $ + 1;\n"
+      "    if (x == $) y = 0;\n"
+      "    x = q[$];\n"
+      "    y = q[$-1];\n"
+      "    x = int'(y inside {[0:$]});\n"
+      "    y = f();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  constexpr std::string_view kMessage =
+      "'$' may stand only in a queue's dimension or select, a value range's "
+      "bound";
+  for (uint32_t line : {4U, 5U, 6U, 8U, 11U, 12U, 13U}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, line, "6.20.7"));
+  }
+  for (uint32_t line : {14U, 15U, 16U, 17U}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kMessage, line, "6.20.7"));
+  }
 }
 
 }  // namespace
