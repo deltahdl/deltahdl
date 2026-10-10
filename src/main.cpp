@@ -153,7 +153,7 @@ struct PreprocResult {
       delta::DelayModeDirective::kNone;
 
   delta::TimeScale timescale;
-  bool has_timescale = false;
+  bool has_global_precision = false;
   delta::TimeUnit global_precision = delta::TimeUnit::kNs;
   // The line of `source` each command-line source file's text begins on, in
   // command-line order. §33.3.1 maps a source file to a library, and a design
@@ -200,7 +200,7 @@ PreprocResult PreprocessSources(const delta::CliOptions& opts,
   result.has_default_trireg_strength = preproc.HasDefaultTriregStrength();
   result.delay_mode_directive = preproc.DelayModeDirective();
   result.timescale = preproc.CurrentTimescale();
-  result.has_timescale = preproc.HasTimescale();
+  result.has_global_precision = preproc.HasGlobalPrecision();
   result.global_precision = preproc.GlobalPrecision();
   result.runtime_licenses = preproc.RuntimeLicenses();
   return result;
@@ -283,7 +283,7 @@ void ApplyPreprocMetadata(delta::CompilationUnit* cu, const PreprocResult& pp) {
   cu->has_default_trireg_strength = pp.has_default_trireg_strength;
   cu->delay_mode_directive = pp.delay_mode_directive;
   cu->preproc_timescale = pp.timescale;
-  cu->has_preproc_timescale = pp.has_timescale;
+  cu->has_preproc_timescale = pp.has_global_precision;
   cu->preproc_global_precision = pp.global_precision;
 }
 

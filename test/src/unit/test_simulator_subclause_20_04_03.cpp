@@ -38,7 +38,7 @@ RtlirDesign* PreprocElaborate(const std::string& src, SimFixture& f) {
   // driver does. Without this the compilation unit reports no timescale and
   // the elaborator falls back to its ns default.
   cu->preproc_timescale = preproc.CurrentTimescale();
-  cu->has_preproc_timescale = preproc.HasTimescale();
+  cu->has_preproc_timescale = preproc.HasGlobalPrecision();
   cu->preproc_global_precision = preproc.GlobalPrecision();
   Elaborator elab(f.arena, f.diag, cu);
   auto* design = elab.Elaborate(cu->modules.back()->name);

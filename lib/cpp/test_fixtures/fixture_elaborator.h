@@ -142,7 +142,7 @@ inline void PropagateDirectivesToCu(CompilationUnit* cu,
   // As the driver's ApplyPreprocMetadata does, so §3.14's resolutions and
   // §3.14.3's global precision see every `timescale the source holds.
   cu->preproc_timescale = preproc.CurrentTimescale();
-  cu->has_preproc_timescale = preproc.HasTimescale();
+  cu->has_preproc_timescale = preproc.HasGlobalPrecision();
   cu->preproc_global_precision = preproc.GlobalPrecision();
 }
 

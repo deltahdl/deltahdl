@@ -572,6 +572,10 @@ class Preprocessor {
   const TimeScale& CurrentTimescale() const { return current_timescale_; }
   TimeUnit GlobalPrecision() const { return global_precision_; }
   bool HasTimescale() const { return has_timescale_; }
+  // Whether any `timescale was read, so GlobalPrecision holds the finest of
+  // their precisions. A `resetall clears HasTimescale but not this, because
+  // §3.14.3 counts every precision in the design toward the global one.
+  bool HasGlobalPrecision() const { return has_global_precision_; }
   NetType DefaultNetType() const { return default_net_type_; }
   bool InCelldefine() const { return in_celldefine_; }
   // Annex E: the default decay time, charge strength and delay mode in force
@@ -712,6 +716,7 @@ class Preprocessor {
   TimeScale current_timescale_;
   TimeUnit global_precision_ = TimeUnit::kNs;
   bool has_timescale_ = false;
+  bool has_global_precision_ = false;
   NetType default_net_type_ = NetType::kWire;
   bool in_celldefine_ = false;
   NetType unconnected_drive_ = NetType::kWire;

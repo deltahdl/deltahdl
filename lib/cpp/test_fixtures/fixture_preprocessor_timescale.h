@@ -79,7 +79,7 @@ inline ParseResult31402 ParseTimescale31402(const std::string& src) {
   Preprocessor preproc(result.mgr, diag, {});
   auto pp = preproc.Preprocess(fid);
   result.preproc_timescale = preproc.CurrentTimescale();
-  result.has_preproc_timescale = preproc.HasTimescale();
+  result.has_preproc_timescale = preproc.HasGlobalPrecision();
   result.preproc_global_precision = preproc.GlobalPrecision();
   auto pp_fid = result.mgr.AddFile("<preprocessed>", pp);
   Lexer lexer(result.mgr.FileContent(pp_fid), pp_fid, diag,

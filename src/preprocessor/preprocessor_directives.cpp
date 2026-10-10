@@ -94,11 +94,12 @@ void Preprocessor::HandleTimescale(std::string_view rest, SourceLoc loc) {
   }
 
   current_timescale_ = ts;
-  if (!has_timescale_ ||
+  if (!has_global_precision_ ||
       static_cast<int>(ts.precision) < static_cast<int>(global_precision_)) {
     global_precision_ = ts.precision;
   }
   has_timescale_ = true;
+  has_global_precision_ = true;
 }
 
 static bool ParseNetTypeName(std::string_view name, NetType& out) {

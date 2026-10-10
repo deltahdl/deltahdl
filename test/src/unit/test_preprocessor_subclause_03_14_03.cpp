@@ -55,6 +55,58 @@ TEST(DesignBuildingBlockParsing, EarlierTimescaleFinerPrecision) {
   EXPECT_EQ(gp, TimeUnit::kFs);
 }
 
+// §3.14.3: the global precision is the finest precision written anywhere in
+// the design, and a `resetall (§22.3) returns only the directive state for the
+// text after it; the `timescale read before it is still part of the design.
+TEST(Preprocessor, GlobalPrecisionKeptAcrossResetall) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "`timescale 1ns / 1ps\n"
+      "module a; endmodule\n"
+      "`resetall\n",
+      f, pp);
+  EXPECT_FALSE(pp.HasTimescale());
+  EXPECT_TRUE(pp.HasGlobalPrecision());
+  EXPECT_EQ(pp.GlobalPrecision(), TimeUnit::kPs);
+}
+
+TEST(Preprocessor, CoarserTimescaleAfterResetallKeepsFinerPrecision) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "`timescale 1ns / 1ps\n"
+      "`resetall\n"
+      "`timescale 1us / 1ns\n",
+      f, pp);
+  EXPECT_TRUE(pp.HasTimescale());
+  EXPECT_TRUE(pp.HasGlobalPrecision());
+  EXPECT_EQ(pp.GlobalPrecision(), TimeUnit::kPs);
+}
+
+TEST(Preprocessor, NoTimescaleGivesNoGlobalPrecision) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP("`resetall\nmodule a; endmodule\n", f, pp);
+  EXPECT_FALSE(pp.HasGlobalPrecision());
+}
+
+TEST(DesignBuildingBlockParsing, TimescaleBeforeResetallSetsGlobalPrecision) {
+  auto r = ParseTimescale31402(
+      "`timescale 1ns / 1ps\n"
+      "module a; endmodule\n"
+      "`resetall\n"
+      "module top;\n"
+      "  timeunit 1ns; timeprecision 1ns;\n"
+      "  a u();\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+
+  auto gp = ComputeGlobalTimePrecision(r.cu, r.has_preproc_timescale,
+                                       r.preproc_global_precision);
+  EXPECT_EQ(gp, TimeUnit::kPs);
+}
+
 TEST(Preprocessor, DelayToTicks_Basic) {
   TimeScale ts;
   ts.unit = TimeUnit::kNs;
