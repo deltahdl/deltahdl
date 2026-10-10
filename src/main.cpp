@@ -748,22 +748,20 @@ int RunSeparateUnits(const delta::CliOptions& opts,
                      delta::SourceManager& src_mgr, delta::DiagEngine& diag,
                      delta::ProtectLicenseLibraries& licenses) {
   delta::Arena ast_arena;
-  std::vector<delta::SeparateUnit> parsed;
-  if (!delta::ParseSeparateUnits(opts, src_mgr, diag, licenses, ast_arena,
-                                 parsed)) {
-    return 1;
-  }
+  delta::SeparateUnits parsed =
+      delta::ParseSeparateUnits(opts, src_mgr, diag, licenses, ast_arena);
+  if (!parsed.read) return 1;
   ParsedUnits units;
   bool tagged = true;
-  for (auto& unit : parsed) {
+  for (auto& unit : parsed.units) {
     tagged &= TagDesignElementLibraries(*unit.cu, unit.pp, lib_map, diag);
     units.separate.push_back(unit.cu);
   }
   if (!tagged) return 1;
   units.cu = delta::PoolCompilationUnits(units.separate, ast_arena).merged;
   return RunParsedUnit(opts, lib_map, units, diag, [&] {
-    return delta::RuntimeLicensesGranted(parsed.back().pp.runtime_licenses,
-                                         licenses, diag);
+    return delta::RuntimeLicensesGranted(
+        parsed.units.back().pp.runtime_licenses, licenses, diag);
   });
 }
 
@@ -840,8 +838,7 @@ int main(int argc, char* argv[]) {
   }
 
   delta::Arena ast_arena;
-  auto* cu =
-      delta::ParseSource(pp.source, pp.line_origins, src_mgr, diag, ast_arena);
+  auto* cu = delta::ParseSource(pp, src_mgr, diag, ast_arena);
   if (diag.HasErrors()) {
     return 1;
   }

@@ -65,11 +65,9 @@ PreprocResult PreprocessSources(const CliOptions& opts, SourceManager& src_mgr,
                                 DiagEngine& diag,
                                 ProtectLicenseLibraries& licenses);
 
-// Parses `source`, the preprocessed text of one compilation unit.
-CompilationUnit* ParseSource(const std::string& source,
-                             const std::vector<OutputLineOrigin>& line_origins,
-                             SourceManager& src_mgr, DiagEngine& diag,
-                             Arena& arena);
+// Parses `pp`'s text, the preprocessed text of one compilation unit.
+CompilationUnit* ParseSource(const PreprocResult& pp, SourceManager& src_mgr,
+                             DiagEngine& diag, Arena& arena);
 
 // Gives `cu` the directive state its preprocessing ended in.
 void ApplyPreprocMetadata(CompilationUnit* cu, const PreprocResult& pp);
@@ -81,13 +79,20 @@ struct SeparateUnit {
   PreprocResult pp;
 };
 
+// The units ParseSeparateUnits read, and whether it read them all without a
+// file it could not open or an error reported.
+struct SeparateUnits {
+  std::vector<SeparateUnit> units;
+  bool read = false;
+};
+
 // Preprocesses and parses each file of the command line as a compilation unit
-// of its own, appending each unit to `units`. A unit whose text ends inside a
-// declaration extends through the files after it until none ends inside one,
-// and the compiler directives of one unit do not reach the next. False where
-// a file could not be read or an error was reported.
-bool ParseSeparateUnits(const CliOptions& opts, SourceManager& src_mgr,
-                        DiagEngine& diag, ProtectLicenseLibraries& licenses,
-                        Arena& arena, std::vector<SeparateUnit>& units);
+// of its own. A unit whose text ends inside a declaration extends through the
+// files after it until none ends inside one, and the compiler directives of
+// one unit do not reach the next.
+SeparateUnits ParseSeparateUnits(const CliOptions& opts, SourceManager& src_mgr,
+                                 DiagEngine& diag,
+                                 ProtectLicenseLibraries& licenses,
+                                 Arena& arena);
 
 }  // namespace delta

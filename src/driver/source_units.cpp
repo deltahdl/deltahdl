@@ -11,7 +11,6 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
-#include "common/source_loc.h"
 #include "common/source_mgr.h"
 #include "driver/cli_options.h"
 #include "driver/precompile_run.h"
@@ -69,36 +68,34 @@ struct UnitParse {
   bool ended_inside_declaration = false;
 };
 
-// Parses `source` knowing the type names `known` holds. The text is registered
-// with its origins, so a report about a token of it names the file and line
-// somebody can open rather than a position in a buffer they have never seen;
-// the path stays <preprocessed> because it is what a position with no origin
-// recorded falls back to.
-UnitParse ParseUnitText(const std::string& source,
-                        const std::vector<OutputLineOrigin>& line_origins,
+// Parses `pp`'s text knowing the type names `known` holds. The text is
+// registered with its origins, so a report about a token of it names the file
+// and line somebody can open rather than a position in a buffer they have never
+// seen; the path stays <preprocessed> because it is what a position with no
+// origin recorded falls back to.
+UnitParse ParseUnitText(const PreprocResult& pp,
                         const CompilationUnitScopeNames& known,
                         SourceManager& src_mgr, DiagEngine& diag,
                         Arena& arena) {
   auto file_id =
-      src_mgr.AddPreprocessedFile("<preprocessed>", source, line_origins);
-  Lexer lexer(source, file_id, diag, TextOrigin::kPreprocessorOutput);
+      src_mgr.AddPreprocessedFile("<preprocessed>", pp.source, pp.line_origins);
+  Lexer lexer(pp.source, file_id, diag, TextOrigin::kPreprocessorOutput);
   Parser parser(lexer, arena, diag);
   parser.AdoptCompilationUnitScope(known);
   auto* cu = parser.Parse();
   return {cu, parser.CompilationUnitScope(), parser.EndedInsideDeclaration()};
 }
 
-// §3.12.1: whether `source` ends inside a declaration, asked of a trial parse
-// whose reports are kept from the user, the text being parsed again once the
-// unit is complete.
-bool EndsInsideDeclaration(const std::string& source,
-                           const std::vector<OutputLineOrigin>& line_origins,
+// §3.12.1: whether `pp`'s text ends inside a declaration, asked of a trial
+// parse whose reports are kept from the user, the text being parsed again once
+// the unit is complete.
+bool EndsInsideDeclaration(const PreprocResult& pp,
                            const CompilationUnitScopeNames& known,
                            SourceManager& src_mgr) {
   DiagEngine trial(src_mgr);
   trial.SetQuiet(true);
   Arena arena;
-  return ParseUnitText(source, line_origins, known, src_mgr, trial, arena)
+  return ParseUnitText(pp, known, src_mgr, trial, arena)
       .ended_inside_declaration;
 }
 
@@ -121,11 +118,9 @@ PreprocResult PreprocessSources(const CliOptions& opts, SourceManager& src_mgr,
   return result;
 }
 
-CompilationUnit* ParseSource(const std::string& source,
-                             const std::vector<OutputLineOrigin>& line_origins,
-                             SourceManager& src_mgr, DiagEngine& diag,
-                             Arena& arena) {
-  return ParseUnitText(source, line_origins, {}, src_mgr, diag, arena).cu;
+CompilationUnit* ParseSource(const PreprocResult& pp, SourceManager& src_mgr,
+                             DiagEngine& diag, Arena& arena) {
+  return ParseUnitText(pp, {}, src_mgr, diag, arena).cu;
 }
 
 void ApplyPreprocMetadata(CompilationUnit* cu, const PreprocResult& pp) {
@@ -144,9 +139,12 @@ void ApplyPreprocMetadata(CompilationUnit* cu, const PreprocResult& pp) {
   cu->preproc_global_precision = pp.global_precision;
 }
 
-bool ParseSeparateUnits(const CliOptions& opts, SourceManager& src_mgr,
-                        DiagEngine& diag, ProtectLicenseLibraries& licenses,
-                        Arena& arena, std::vector<SeparateUnit>& units) {
+SeparateUnits ParseSeparateUnits(const CliOptions& opts, SourceManager& src_mgr,
+                                 DiagEngine& diag,
+                                 ProtectLicenseLibraries& licenses,
+                                 Arena& arena) {
+  SeparateUnits result;
+  auto& units = result.units;
   Preprocessor preproc(src_mgr, diag, PreprocConfigFor(opts, licenses.Asker()));
   // §3.12.1: packages and primitives are visible in every unit, so a later
   // unit's parse knows the type names the earlier units' packages and the
@@ -161,17 +159,16 @@ bool ParseSeparateUnits(const CliOptions& opts, SourceManager& src_mgr,
         static_cast<std::ptrdiff_t>(preproc.LineOrigins().size());
     do {
       if (!PreprocessFile(files[next++], preproc, src_mgr, unit.pp)) {
-        return false;
+        return result;
       }
       unit.pp.line_origins.assign(
           std::next(preproc.LineOrigins().begin(), kFirstOrigin),
           preproc.LineOrigins().end());
     } while (next < files.size() &&
-             EndsInsideDeclaration(unit.pp.source, unit.pp.line_origins,
-                                   design_wide, src_mgr));
+             EndsInsideDeclaration(unit.pp, design_wide, src_mgr));
     ReadPreprocessorState(preproc, unit.pp);
-    UnitParse parsed = ParseUnitText(unit.pp.source, unit.pp.line_origins,
-                                     design_wide, src_mgr, diag, arena);
+    UnitParse parsed =
+        ParseUnitText(unit.pp, design_wide, src_mgr, diag, arena);
     design_wide.packages.insert(parsed.scope.packages.begin(),
                                 parsed.scope.packages.end());
     design_wide.own.udps.insert(parsed.scope.own.udps.begin(),
@@ -181,7 +178,8 @@ bool ParseSeparateUnits(const CliOptions& opts, SourceManager& src_mgr,
     units.push_back(std::move(unit));
   }
   preproc.ReportUnterminatedKeywordRegions();
-  return !diag.HasErrors();
+  result.read = !diag.HasErrors();
+  return result;
 }
 
 }  // namespace delta
