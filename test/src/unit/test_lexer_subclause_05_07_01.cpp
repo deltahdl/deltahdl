@@ -363,4 +363,22 @@ TEST(IntegerLiteralLexing, ApostropheEndingTheTextIsAnUnexpectedCharacter) {
       ReportedError(LexDiagnostics("x = '"), "unexpected character", 1, "5.2"));
 }
 
+// §5.7.1 lets white space stand between the base format and the digits, and
+// §5.3 counts a newline and a formfeed as white space as much as a blank. Only
+// blanks and tabs were stepped over, so the digits on the next line were left
+// to lex as an identifier after a literal reported as missing its value.
+TEST(IntegerLiteralLexing, NewlineBetweenBaseAndDigits) {
+  auto r = LexWithDiag("8'h\n  FF");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.tokens.size(), 2u);
+  EXPECT_EQ(r.tokens[0].kind, TokenKind::kIntLiteral);
+}
+
+TEST(IntegerLiteralLexing, FormfeedBetweenBaseAndDigits) {
+  auto r = LexWithDiag("8'h\fFF");
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.tokens.size(), 2u);
+  EXPECT_EQ(r.tokens[0].kind, TokenKind::kIntLiteral);
+}
+
 }  // namespace

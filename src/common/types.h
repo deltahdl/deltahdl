@@ -198,6 +198,11 @@ uint64_t RealDelayToTicks(double delay, const TimeScale& scale,
 
 bool ParseTimeUnitStr(std::string_view str, TimeUnit& out);
 
+// §5.7.1: the text of an integer literal without what carries no value: the
+// underscores among its digits and the white space that may stand between its
+// size, its base format and its digits, newlines and formfeeds among it (§5.3).
+std::string LiteralTextWithoutSeparators(std::string_view text);
+
 // §5.8: the realtime value of the time literal written `text` -- a number
 // followed by one of the six unit names -- as a count of the time unit of
 // `scale`, its magnitude included.

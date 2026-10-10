@@ -4,6 +4,7 @@
 #include <string_view>
 
 #include "common/diagnostic.h"
+#include "common/types.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
@@ -77,11 +78,7 @@ static uint64_t FoldDigitsModulo64(std::string_view digits, uint64_t base) {
 // z or ? digit ends the fold, the digits before it standing; the same run-time
 // reparse sets the bits such a digit covers.
 uint64_t ParseIntText(std::string_view text) {
-  std::string buf;
-  buf.reserve(text.size());
-  for (char c : text) {
-    if (c != '_' && c != ' ' && c != '\t') buf.push_back(c);
-  }
+  std::string buf = LiteralTextWithoutSeparators(text);
 
   auto tick = buf.find('\'');
   if (tick == std::string::npos) return FoldDigitsModulo64(buf, 10);

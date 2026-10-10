@@ -23,6 +23,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/types.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
 #include "lexer/token.h"
@@ -59,18 +60,15 @@ uint64_t LiteralBase(char base_char) {
   }
 }
 
-// The digits of a literal wider than 64 bits with the underscores dropped,
+// The digits of a literal wider than 64 bits with the underscores and the
+// white space before them dropped,
 // and its base. §5.7.1's three tokens are the size, the apostrophe with its
 // base format character and the digits; a literal past 64 bits has a size
 // constant and so an apostrophe, and the lexer admits no apostrophe without a
 // base format character after it, so both are found. The s designator between
 // them changes the interpretation and not the bit pattern.
 std::pair<std::string, uint64_t> LiteralDigits(std::string_view text) {
-  std::string buf;
-  buf.reserve(text.size());
-  for (char c : text) {
-    if (c != '_') buf.push_back(c);
-  }
+  std::string buf = LiteralTextWithoutSeparators(text);
   size_t i = buf.find('\'') + 1;
   if ((buf[i] | 0x20) == 's') ++i;
   uint64_t base = LiteralBase(buf[i++]);

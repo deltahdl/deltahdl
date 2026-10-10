@@ -659,4 +659,51 @@ TEST(IntegerLiteralSim, UnsizedBasedLiteralPastSixtyFourBitsKeepsItsDigits) {
   EXPECT_EQ(ohi->value.ToUint64(), 0xFFu);
   EXPECT_EQ(olo->value.ToUint64(), ~uint64_t{0});
 }
+
+// §5.7.1 and §5.3: a newline between the base format and the digits is white
+// space the value ignores, as a blank there is.
+TEST(IntegerLiteralSim, NewlineBetweenBaseAndDigitsKeepsTheValue) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial x = 8'h\n"
+      "    A5;\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xA5u);
+}
+
+// The width of an unsized literal is read from its digits alone, white space
+// before them aside: 'h7_0000_0000 is 35 bits however the gap is written.
+TEST(IntegerLiteralSim, NewlineBeforeTheDigitsLeavesTheUnsizedWidth) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int n;\n"
+      "  initial n = $bits('h\n"
+      "    7_0000_0000);\n"
+      "endmodule\n",
+      f, "n");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 35u);
+}
+
+// A literal wider than 64 bits folded during elaboration reads its digits
+// past the white space before them too: a blank or a newline there left the
+// digits unread.
+TEST(IntegerLiteralSim, WhiteSpaceBeforeTheDigitsOfAWideConstant) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  localparam logic [95:0] P = 96'h \n"
+      "    3_0000_0000_0000_0000;\n"
+      "  logic [31:0] hi;\n"
+      "  initial hi = P[95:64];\n"
+      "endmodule\n",
+      f, "hi");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 3u);
+}
 }  // namespace

@@ -317,10 +317,7 @@ static int DigitValue(char c) {
 
 static size_t ParseLiteralBase(std::string_view text, std::string& buf,
                                int& bpd) {
-  buf.clear();
-  buf.reserve(text.size());
-  for (char c : text)
-    if (c != '_' && c != ' ' && c != '\t') buf.push_back(c);
+  buf = LiteralTextWithoutSeparators(text);
   auto tick = buf.find('\'');
   if (tick == std::string::npos) return 0;
   size_t i = tick + 1;
@@ -410,8 +407,7 @@ static uint32_t UnsizedBasedLiteralWidth(std::string_view text) {
   int bpd = (i < text.size()) ? BitsPerDigit(text[i]) : 0;
   if (bpd == 0) return 0;
   uint32_t len = 0;
-  for (char c : text.substr(i + 1)) {
-    if (c == '_' || c == ' ' || c == '\t') continue;
+  for (char c : LiteralTextWithoutSeparators(text.substr(i + 1))) {
     len = (len == 0) ? TopDigitBits(c, bpd) : len + static_cast<uint32_t>(bpd);
   }
   if (IsSignedLiteral(text)) ++len;

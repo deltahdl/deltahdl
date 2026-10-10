@@ -1,5 +1,6 @@
 #include "common/types.h"
 
+#include <cctype>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -362,6 +363,17 @@ bool ParseTimeUnitStr(std::string_view str, TimeUnit& out) {
     return false;
   }
   return true;
+}
+
+std::string LiteralTextWithoutSeparators(std::string_view text) {
+  std::string kept;
+  kept.reserve(text.size());
+  for (char c : text) {
+    if (c != '_' && std::isspace(static_cast<unsigned char>(c)) == 0) {
+      kept.push_back(c);
+    }
+  }
+  return kept;
 }
 
 double TimeLiteralValue(std::string_view text, const TimeScale& scale) {
