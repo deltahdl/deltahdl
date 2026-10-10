@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+
 #include "common/types.h"
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
