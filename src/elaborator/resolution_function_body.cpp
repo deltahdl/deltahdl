@@ -91,7 +91,10 @@ static void ReportExprStmtWrites(const Expr* e, SourceLoc loc,
   if (IsMutatingMethodCall(e)) ReportWrite(LhsBaseName(e->lhs->lhs), loc, scan);
 }
 
+// ForEachChildStmt hands over every child slot a statement has, the empty ones
+// too, such as the else branch of an if written without one.
 static void ScanStmt(const Stmt* s, const BodyScan& scan) {
+  if (s == nullptr) return;
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign) {
     ReportLhsWrites(s->lhs, s->range.start, scan);
