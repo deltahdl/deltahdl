@@ -252,4 +252,22 @@ TEST(MatchingTypesElaboration, InstanceOfALaterModuleIsJudged) {
                              "each declare for themselves", 8, "6.22"));
 }
 
+// Instances of a module the compilation unit does not declare have no
+// declarations to judge, so an assignment between their variables is left to
+// the report of the unknown module.
+TEST(MatchingTypesElaboration, InstancesOfAnUndeclaredModuleAreNotJudged) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top();\n"
+      "  missing m1 ();\n"
+      "  missing m2 ();\n"
+      "  initial m1.x = m2.x;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "unknown module 'missing'", 2,
+                            "23.3.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "each declare for themselves", 4, "6.22"));
+}
+
 }  // namespace
