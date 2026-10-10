@@ -34,6 +34,8 @@ Simulation:
                        Accept negative $setuphold/$recrem limits (31.9.4)
   --no-timing-checks   Turn every timing check off (31.9.4)
   -D <name>[=<value>]  Define preprocessor macro
+  --compilation-unit-per-file
+                       Make each source file a compilation unit (3.12.1)
   --lint-only          Parse and elaborate only
   --parse-only         Parse only
   --dump-ast           Print AST to stdout

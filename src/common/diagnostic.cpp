@@ -37,6 +37,11 @@ void DiagEngine::Emit(DiagSeverity sev, SourceLoc loc, std::string msg,
     ++warning_count_;
   }
 
+  if (quiet_) {
+    diags_.push_back({sev, loc, std::move(msg), std::string(subclause.Text())});
+    return;
+  }
+
   // A named subclause is appended to the sentence in the form the messages that
   // spell it out already use, so a report that moved the subclause out of its
   // sentence reads to a user exactly as it did before.

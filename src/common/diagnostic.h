@@ -106,6 +106,12 @@ class DiagEngine {
   // itself being discarded.
   uint32_t SuppressedErrorCount() const { return suppressed_error_count_; }
 
+  // Keeps every report in Diagnostics() and the counts without writing it out,
+  // for a caller that reads back where a trial parse reported -- which a
+  // suppressed report, never recorded, cannot answer -- on an engine of its
+  // own whose reports nobody is to see.
+  void SetQuiet(bool val) { quiet_ = val; }
+
  private:
   void Emit(DiagSeverity sev, SourceLoc loc, std::string msg,
             Subclause subclause);
@@ -117,6 +123,7 @@ class DiagEngine {
   bool warnings_as_errors_ = false;
   uint32_t suppress_depth_ = 0;
   uint32_t suppressed_error_count_ = 0;
+  bool quiet_ = false;
 };
 
 }  // namespace delta

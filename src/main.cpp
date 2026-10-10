@@ -30,20 +30,18 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/source_mgr.h"
-#include "common/types.h"
 #include "driver/cli_options.h"
 #include "driver/precompile_run.h"
 #include "driver/protect_license_libraries.h"
+#include "driver/source_units.h"
 #include "elaborator/command_line_bind.h"
+#include "elaborator/compilation_unit_set.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/separate_compilation_bind.h"
-#include "lexer/lexer.h"
 #include "parser/ast_design.h"
 #include "parser/library_map.h"
-#include "parser/parser.h"
-#include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_cli.h"
 #include "preprocessor/protect_processing.h"
 #include "simulator/cover_results.h"
@@ -62,6 +60,16 @@
 #include "synthesizer/synth_lower.h"
 
 namespace {
+
+using delta::PreprocResult;
+
+// The compilation units a run elaborates: the one every file makes up, or,
+// where each file is a unit of its own (§3.12.1), every unit beside the merged
+// view of them that the run's other steps read (compilation_unit_set.h).
+struct ParsedUnits {
+  delta::CompilationUnit* cu = nullptr;
+  std::vector<delta::CompilationUnit*> separate;
+};
 
 void PrintVersion() {
   std::cout << "deltahdl 0.1.0\n";
@@ -109,6 +117,9 @@ void PrintHelp() {
                "limits (31.9.4)\n"
             << "  --no-timing-checks   Turn every timing check off (31.9.4)\n"
             << "  -D <name>[=<value>]  Define preprocessor macro\n"
+            << "  --compilation-unit-per-file\n"
+            << "                       Make each source file a compilation "
+               "unit (3.12.1)\n"
             << "  --lint-only          Parse and elaborate only\n"
             << "  --parse-only         Parse only\n"
             << "  --dump-ast           Print AST to stdout\n"
@@ -123,104 +134,6 @@ void PrintHelp() {
             << "                       File the precompiled cells go to\n"
             << "  --no-opt             Skip optimization passes\n"
             << "  --dump-aig           Print AIG to stdout\n";
-}
-
-struct PreprocResult {
-  std::string source;
-  // Whether a source file named on the command line could not be opened. Such
-  // a file fails the run wherever it stands in the list, and empty text cannot
-  // say so: a source of no bytes preprocesses to empty text too, and the text
-  // gathered before a later file failed is not empty.
-  bool unreadable = false;
-  // The source each line of `source` was written on, which §22.12 requires a
-  // compiler to maintain and which `source` does not carry: it splices in the
-  // lines of every `include and joins a `define body that spanned continuation
-  // lines. It travels beside `source` because the two are appended together.
-  std::vector<delta::OutputLineOrigin> line_origins;
-  delta::NetType default_nettype = delta::NetType::kWire;
-  delta::NetType unconnected_drive = delta::NetType::kWire;
-  std::vector<std::string> cell_module_names;
-  std::vector<delta::ModuleDirectives> module_directives;
-
-  uint64_t default_decay_time = 0;
-  double default_decay_time_real = 0.0;
-  bool default_decay_time_infinite = true;
-
-  uint32_t default_trireg_strength = 0;
-  bool has_default_trireg_strength = false;
-
-  delta::DelayModeDirective delay_mode_directive =
-      delta::DelayModeDirective::kNone;
-
-  delta::TimeScale timescale;
-  bool has_global_precision = false;
-  delta::TimeUnit global_precision = delta::TimeUnit::kNs;
-  // The line of `source` each command-line source file's text begins on, in
-  // command-line order. §33.3.1 maps a source file to a library, and a design
-  // element belongs to the file named on the command line whose text holds
-  // it, whichever file an `include put the element's own lines in.
-  std::vector<std::pair<uint32_t, std::string>> file_first_lines;
-  // The runtime_license expressions met in encrypted models, which §34.5.29.2
-  // has asked before the model is executed.
-  std::vector<delta::ProtectRuntimeLicense> runtime_licenses;
-};
-
-PreprocResult PreprocessSources(const delta::CliOptions& opts,
-                                delta::SourceManager& src_mgr,
-                                delta::DiagEngine& diag,
-                                delta::ProtectLicenseLibraries& licenses) {
-  delta::Preprocessor preproc(src_mgr, diag,
-                              delta::PreprocConfigFor(opts, licenses.Asker()));
-
-  PreprocResult result;
-  for (const auto& path : opts.source_files) {
-    std::optional<std::string> content = delta::ReadSource(path);
-    if (!content) {
-      result.unreadable = true;
-      return result;
-    }
-    auto file_id = src_mgr.AddFile(path, std::move(*content));
-    auto first_line = static_cast<uint32_t>(
-        std::count(result.source.begin(), result.source.end(), '\n') + 1);
-    result.file_first_lines.emplace_back(first_line, path);
-    result.source += preproc.Preprocess(file_id);
-  }
-  // A `begin_keywords region may span source file boundaries (22.14), so the
-  // pairing check only makes sense once every file has been preprocessed.
-  preproc.ReportUnterminatedKeywordRegions();
-  result.line_origins = preproc.LineOrigins();
-  result.default_nettype = preproc.DefaultNetType();
-  result.unconnected_drive = preproc.UnconnectedDrive();
-  result.cell_module_names = preproc.CellModuleNames();
-  result.module_directives = preproc.ModuleDirectivesList();
-  result.default_decay_time = preproc.DefaultDecayTime();
-  result.default_decay_time_real = preproc.DefaultDecayTimeReal();
-  result.default_decay_time_infinite = preproc.DefaultDecayTimeInfinite();
-  result.default_trireg_strength = preproc.DefaultTriregStrength();
-  result.has_default_trireg_strength = preproc.HasDefaultTriregStrength();
-  result.delay_mode_directive = preproc.DelayModeDirective();
-  result.timescale = preproc.CurrentTimescale();
-  result.has_global_precision = preproc.HasGlobalPrecision();
-  result.global_precision = preproc.GlobalPrecision();
-  result.runtime_licenses = preproc.RuntimeLicenses();
-  return result;
-}
-
-delta::CompilationUnit* ParseSource(
-    const std::string& source,
-    const std::vector<delta::OutputLineOrigin>& line_origins,
-    delta::SourceManager& src_mgr, delta::DiagEngine& diag,
-    delta::Arena& arena) {
-  // Registered with its origins, so a report about a token of this text names
-  // the file and line somebody can open rather than a position in a buffer
-  // they have never seen. The path stays <preprocessed> because it is what a
-  // position with no origin recorded falls back to.
-  auto file_id =
-      src_mgr.AddPreprocessedFile("<preprocessed>", source, line_origins);
-  delta::Lexer lexer(source, file_id, diag,
-                     delta::TextOrigin::kPreprocessorOutput);
-  delta::Parser parser(lexer, arena, diag);
-  return parser.Parse();
 }
 
 // --vcd is not one of the VCD system tasks §21.7.1 creates a dump file with,
@@ -269,22 +182,6 @@ void DumpIr(const delta::RtlirDesign* design) {
               << " assigns, " << mod->processes.size() << " processes, "
               << mod->children.size() << " children\n";
   }
-}
-
-void ApplyPreprocMetadata(delta::CompilationUnit* cu, const PreprocResult& pp) {
-  cu->default_nettype = pp.default_nettype;
-  cu->unconnected_drive = pp.unconnected_drive;
-  delta::MarkCellModules(cu, pp.cell_module_names);
-  delta::ApplyModuleDirectives(cu, pp.module_directives);
-  cu->default_decay_time = pp.default_decay_time;
-  cu->default_decay_time_real = pp.default_decay_time_real;
-  cu->default_decay_time_infinite = pp.default_decay_time_infinite;
-  cu->default_trireg_strength = pp.default_trireg_strength;
-  cu->has_default_trireg_strength = pp.has_default_trireg_strength;
-  cu->delay_mode_directive = pp.delay_mode_directive;
-  cu->preproc_timescale = pp.timescale;
-  cu->has_preproc_timescale = pp.has_global_precision;
-  cu->preproc_global_precision = pp.global_precision;
 }
 
 // §33.3.1 (printed pages 935-936): the library mapping is read from a
@@ -410,7 +307,7 @@ struct Elaboration {
 
 Elaboration ElaborateDesign(const delta::CliOptions& opts,
                             const delta::LibraryMap& lib_map,
-                            delta::CompilationUnit* cu, delta::DiagEngine& diag,
+                            const ParsedUnits& units, delta::DiagEngine& diag,
                             delta::Arena& arena) {
   // §11.11's three values are chosen among while a constant expression is
   // folded, and elaboration is where that folding happens, so the guard is
@@ -418,7 +315,13 @@ Elaboration ElaborateDesign(const delta::CliOptions& opts,
   // elaboration, and both RunSimulation and RunSynthesis reach it through here.
   delta::DelayModeGuard mintypmax_guard(opts.mintypmax);
 
-  delta::Elaborator elaborator(arena, diag, cu);
+  std::optional<delta::Elaborator> built;
+  if (units.separate.empty()) {
+    built.emplace(arena, diag, units.cu);
+  } else {
+    built.emplace(arena, diag, units.separate);
+  }
+  delta::Elaborator& elaborator = *built;
   elaborator.SetMaxGenerateIterations(opts.max_generate_iterations);
 
   if (!InstallLibrarySearchOrder(opts, lib_map, elaborator)) {
@@ -436,9 +339,9 @@ Elaboration ElaborateDesign(const delta::CliOptions& opts,
   // the standard's own §23.5 example, `module top` followed by `module m (.*)`
   // and `module a (.*)` -- elaborated one of those alone and ran nothing.
   const auto* design = delta::ElaborateCommandLine(
-      elaborator, *cu, opts.top_module, opts.config, diag);
+      elaborator, *units.cu, opts.top_module, opts.config, diag);
   if (diag.HasErrors()) return {.failed = true};
-  if (design == nullptr) return {.failed = !cu->DeclaresNothing()};
+  if (design == nullptr) return {.failed = !units.cu->DeclaresNothing()};
   if (opts.dump_ir) DumpIr(design);
   return {.design = design};
 }
@@ -450,9 +353,9 @@ Elaboration ElaborateDesign(const delta::CliOptions& opts,
 // reported adds nothing to that report. This is a limit of what synthesis can
 // produce, not a rule of IEEE 1800-2023, so the report cites no subclause.
 int RunSynthesis(const delta::CliOptions& opts,
-                 const delta::LibraryMap& lib_map, delta::CompilationUnit* cu,
+                 const delta::LibraryMap& lib_map, const ParsedUnits& units,
                  delta::DiagEngine& diag, delta::Arena& arena) {
-  auto [design, failed] = ElaborateDesign(opts, lib_map, cu, diag, arena);
+  auto [design, failed] = ElaborateDesign(opts, lib_map, units, diag, arena);
   if (failed) return 1;
   if (design == nullptr || design->top_modules.empty()) {
     std::cerr << "error: design has no top-level module to synthesize\n";
@@ -491,9 +394,9 @@ int RunSynthesis(const delta::CliOptions& opts,
 // as soon as the source had parsed, so a source only the elaborator could
 // reject was reported clean.
 int RunLint(const delta::CliOptions& opts, const delta::LibraryMap& lib_map,
-            delta::CompilationUnit* cu, delta::DiagEngine& diag,
+            const ParsedUnits& units, delta::DiagEngine& diag,
             delta::Arena& arena) {
-  if (ElaborateDesign(opts, lib_map, cu, diag, arena).failed) return 1;
+  if (ElaborateDesign(opts, lib_map, units, diag, arena).failed) return 1;
   std::cout << "lint pass: no errors\n";
   return 0;
 }
@@ -559,9 +462,9 @@ int SimulateDesign(const delta::CliOptions& opts,
 // passes, as one of a package alone does. A run ElaborateDesign stopped on an
 // error it reported fails, whatever the source declares.
 int RunSimulation(const delta::CliOptions& opts,
-                  const delta::LibraryMap& lib_map, delta::CompilationUnit* cu,
+                  const delta::LibraryMap& lib_map, const ParsedUnits& units,
                   delta::DiagEngine& diag, delta::Arena& arena) {
-  auto [design, failed] = ElaborateDesign(opts, lib_map, cu, diag, arena);
+  auto [design, failed] = ElaborateDesign(opts, lib_map, units, diag, arena);
   if (failed) return 1;
   if (design == nullptr) return 0;
   return SimulateDesign(opts, design, diag, arena);
@@ -813,11 +716,11 @@ bool ForeignCodeIsLoaded(const delta::CliOptions& opts,
 // NOTE 1 counts as executing it, so each begins only once `licensed` has
 // answered that every runtime licence the model states is granted.
 int RunParsedUnit(const delta::CliOptions& opts,
-                  const delta::LibraryMap& lib_map, delta::CompilationUnit* cu,
+                  const delta::LibraryMap& lib_map, const ParsedUnits& units,
                   delta::DiagEngine& diag,
                   const std::function<bool()>& licensed) {
   if (opts.dump_ast) {
-    DumpAst(cu);
+    DumpAst(units.cu);
   }
   if (opts.parse_only) {
     std::cout << "parse pass: no errors\n";
@@ -826,14 +729,42 @@ int RunParsedUnit(const delta::CliOptions& opts,
 
   delta::Arena elab_arena;
   if (opts.lint_only) {
-    return RunLint(opts, lib_map, cu, diag, elab_arena);
+    return RunLint(opts, lib_map, units, diag, elab_arena);
   }
   if (!licensed()) return 1;
   if (opts.synth_mode) {
-    return RunSynthesis(opts, lib_map, cu, diag, elab_arena);
+    return RunSynthesis(opts, lib_map, units, diag, elab_arena);
   }
   return RunOnDeepStack(
-      [&] { return RunSimulation(opts, lib_map, cu, diag, elab_arena); });
+      [&] { return RunSimulation(opts, lib_map, units, diag, elab_arena); });
+}
+
+// §3.12.1 (printed page 56): --compilation-unit-per-file reads each source file
+// as a compilation unit of its own and runs the units together, the merged
+// view of them standing where the one parsed unit stands otherwise. Each unit's
+// design elements take the libraries of the files that unit was read from.
+int RunSeparateUnits(const delta::CliOptions& opts,
+                     const delta::LibraryMap& lib_map,
+                     delta::SourceManager& src_mgr, delta::DiagEngine& diag,
+                     delta::ProtectLicenseLibraries& licenses) {
+  delta::Arena ast_arena;
+  std::vector<delta::SeparateUnit> parsed;
+  if (!delta::ParseSeparateUnits(opts, src_mgr, diag, licenses, ast_arena,
+                                 parsed)) {
+    return 1;
+  }
+  ParsedUnits units;
+  bool tagged = true;
+  for (auto& unit : parsed) {
+    tagged &= TagDesignElementLibraries(*unit.cu, unit.pp, lib_map, diag);
+    units.separate.push_back(unit.cu);
+  }
+  if (!tagged) return 1;
+  units.cu = delta::PoolCompilationUnits(units.separate, ast_arena).merged;
+  return RunParsedUnit(opts, lib_map, units, diag, [&] {
+    return delta::RuntimeLicensesGranted(parsed.back().pp.runtime_licenses,
+                                         licenses, diag);
+  });
 }
 
 // --version and --help are answered with no design read, and so is an
@@ -900,19 +831,23 @@ int main(int argc, char* argv[]) {
   // asked through, whose exit functions are called as this object goes, when
   // main returns.
   delta::ProtectLicenseLibraries licenses;
-  auto pp = PreprocessSources(opts, src_mgr, diag, licenses);
+  if (opts.compilation_unit_per_file) {
+    return RunSeparateUnits(opts, lib_map, src_mgr, diag, licenses);
+  }
+  auto pp = delta::PreprocessSources(opts, src_mgr, diag, licenses);
   if (pp.unreadable || diag.HasErrors()) {
     return 1;
   }
 
   delta::Arena ast_arena;
-  auto* cu = ParseSource(pp.source, pp.line_origins, src_mgr, diag, ast_arena);
+  auto* cu =
+      delta::ParseSource(pp.source, pp.line_origins, src_mgr, diag, ast_arena);
   if (diag.HasErrors()) {
     return 1;
   }
-  ApplyPreprocMetadata(cu, pp);
+  delta::ApplyPreprocMetadata(cu, pp);
   if (!TagDesignElementLibraries(*cu, pp, lib_map, diag)) return 1;
-  return RunParsedUnit(opts, lib_map, cu, diag, [&] {
+  return RunParsedUnit(opts, lib_map, ParsedUnits{cu, {}}, diag, [&] {
     return delta::RuntimeLicensesGranted(pp.runtime_licenses, licenses, diag);
   });
 }

@@ -71,6 +71,9 @@ struct CliOptions {
   uint32_t seed = 0;
   bool synth_mode = false;
   bool lint_only = false;
+  // §3.12.1: each source file a compilation unit of its own, where without it
+  // every file of the command line makes up one.
+  bool compilation_unit_per_file = false;
   // --parse-only stops after the parse, where --lint-only stops after the
   // elaboration: a source only the elaborator rejects passes under it.
   bool parse_only = false;

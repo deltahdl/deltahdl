@@ -63,6 +63,23 @@ TEST(RunStageOptions, LintOnlySetsLintOnlyAlone) {
   EXPECT_FALSE(opts.parse_only);
 }
 
+// §3.12.1 has a tool provide the use model in which each file is a
+// compilation unit of its own; --compilation-unit-per-file selects it, and a
+// command line without it keeps every file in one unit.
+TEST(CompilationUnitOptions, PerFileOptionSelectsTheSeparateModel) {
+  CliOptions opts;
+  EXPECT_TRUE(
+      ParseCommandLine({"--compilation-unit-per-file", "a.sv", "b.sv"}, opts));
+  EXPECT_TRUE(opts.compilation_unit_per_file);
+  EXPECT_EQ(opts.source_files.size(), 2u);
+}
+
+TEST(CompilationUnitOptions, WithoutTheOptionEveryFileIsOneUnit) {
+  CliOptions opts;
+  EXPECT_TRUE(ParseCommandLine({"a.sv", "b.sv"}, opts));
+  EXPECT_FALSE(opts.compilation_unit_per_file);
+}
+
 // Neither option written leaves both unset, which is the run to a simulation.
 TEST(RunStageOptions, NoStageOptionLeavesBothUnset) {
   CliOptions opts;

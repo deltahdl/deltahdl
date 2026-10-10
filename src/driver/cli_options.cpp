@@ -276,6 +276,10 @@ bool TryParseGeneralFlag(std::string_view arg, CliOptions& opts) {
     opts.lint_only = true;
     return true;
   }
+  if (arg == "--compilation-unit-per-file") {
+    opts.compilation_unit_per_file = true;
+    return true;
+  }
   if (arg == "--parse-only") {
     opts.parse_only = true;
     return true;

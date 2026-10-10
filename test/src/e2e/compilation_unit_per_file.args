@@ -1,0 +1,4 @@
+--compilation-unit-per-file
+second.sv
+split_head.sv
+split_tail.sv
