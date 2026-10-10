@@ -9,7 +9,6 @@
 
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
-#include "elaborator/elaborator_validate_internal.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 

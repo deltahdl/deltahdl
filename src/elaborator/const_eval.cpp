@@ -434,19 +434,6 @@ static bool ConstDecodeEscape(std::string_view text, size_t& i, uint8_t& out) {
   return true;
 }
 
-// The text a string literal's quotes enclose. §5.9 gives the literal two
-// spellings, and the triple-quoted one carries three quote characters at each
-// end rather than one.
-static std::string_view StringLiteralBody(std::string_view text) {
-  if (text.size() >= 6 && text.substr(0, 3) == "\"\"\"") {
-    return text.substr(3, text.size() - 6);
-  }
-  if (text.size() >= 2 && text.front() == '"') {
-    return text.substr(1, text.size() - 2);
-  }
-  return text;
-}
-
 // §5.9: the bytes one string literal denotes, with the quotes removed and each
 // escape replaced by the one 8-bit value it stands for, a zero byte included.
 static std::string StringLiteralBytes(const Expr* expr) {

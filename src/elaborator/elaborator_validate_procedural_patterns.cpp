@@ -6,7 +6,6 @@
 
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/elaborator_validate_operations.h"
-#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
