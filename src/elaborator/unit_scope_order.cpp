@@ -89,43 +89,56 @@ bool DeclaresEnumMember(const ModuleItem* item, std::string_view name) {
   return found;
 }
 
-// Reports `ref`, a `$unit::` name, unless a declaration of the unit written
-// before it, or a task or function of the unit written anywhere, is what it
-// names.
-void CheckUnitScopedName(const Expr* ref, const CompilationUnit* unit,
-                         DiagEngine& diag) {
+// A search of the unit for the declaration `ref`, a `$unit::` name, names.
+struct UnitNameSearch {
+  const Expr* ref;
+  // Set when a declaration of the name stands only after `ref`.
   bool declared_after = false;
-  auto names_it = [&](std::string_view name, SourceLoc loc, bool any_order) {
+
+  // Whether the declaration of `name` at `loc` is one `ref` names: a
+  // declaration written before it, or one that `any_order` lets be written
+  // anywhere.
+  bool Names(std::string_view name, SourceLoc loc, bool any_order) {
     if (name != ref->text) return false;
     if (any_order || PrecedesInText(loc, ref->range.start)) return true;
     declared_after = true;
     return false;
-  };
+  }
+};
+
+// Whether a declaration of the unit written before the search's reference, or
+// a task or function of the unit written anywhere, is what it names.
+bool FindsUnitDeclaration(UnitNameSearch& search, const CompilationUnit* unit) {
   for (const auto* item : unit->cu_items) {
     bool is_subroutine = item->kind == ModuleItemKind::kTaskDecl ||
                          item->kind == ModuleItemKind::kFunctionDecl ||
                          item->kind == ModuleItemKind::kDpiImport;
-    if (names_it(item->name, item->loc, is_subroutine)) return;
-    if (DeclaresEnumMember(item, ref->text) &&
-        names_it(ref->text, item->loc, false))
-      return;
+    if (search.Names(item->name, item->loc, is_subroutine)) return true;
+    if (DeclaresEnumMember(item, search.ref->text) &&
+        search.Names(search.ref->text, item->loc, false))
+      return true;
   }
   for (const auto* cls : unit->classes) {
-    if (names_it(cls->name, cls->range.start, false)) return;
+    if (search.Names(cls->name, cls->range.start, false)) return true;
   }
   for (const auto* chk : unit->checkers) {
-    if (names_it(chk->name, chk->range.start, false)) return;
+    if (search.Names(chk->name, chk->range.start, false)) return true;
   }
-  if (declared_after) {
-    diag.Error(ref->range.start,
-               std::format("'$unit::{}' precedes its declaration in the "
-                           "compilation unit",
-                           ref->text),
-               Subclause("3.12.1"));
-    return;
-  }
+  return false;
+}
+
+// Reports `ref`, a `$unit::` name, unless FindsUnitDeclaration finds what it
+// names.
+void CheckUnitScopedName(const Expr* ref, const CompilationUnit* unit,
+                         DiagEngine& diag) {
+  UnitNameSearch search{ref};
+  if (FindsUnitDeclaration(search, unit)) return;
   diag.Error(ref->range.start,
-             std::format("undeclared identifier '$unit::{}'", ref->text),
+             search.declared_after
+                 ? std::format("'$unit::{}' precedes its declaration in the "
+                               "compilation unit",
+                               ref->text)
+                 : std::format("undeclared identifier '$unit::{}'", ref->text),
              Subclause("3.12.1"));
 }
 

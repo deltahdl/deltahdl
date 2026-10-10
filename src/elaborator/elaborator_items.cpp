@@ -32,7 +32,6 @@
 #include "elaborator/type_eval.h"
 #include "elaborator/unit_scope_order.h"
 #include "parser/ast_class.h"
-#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"

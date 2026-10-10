@@ -263,6 +263,7 @@ class Elaborator : public ElaboratorClassRules {
   void CheckNettypeResolutionFunction(const ModuleItem* item);
 
   void ElaborateItems(const ModuleDecl* decl, RtlirModule* mod);
+  void ElaborateItemsInOrder(const ModuleDecl* decl, RtlirModule* mod);
 
   // §23.4: a nested design element with no ports and no un-defaulted parameter
   // port is implicitly instantiated once inside its enclosing element, unless

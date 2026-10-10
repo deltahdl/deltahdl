@@ -397,6 +397,19 @@ void CheckStringNumericAssigns(
   });
 }
 
+// §6.16/§6.22.5: the string-numeric assignment check over every procedural
+// item among `items`.
+void CheckProceduralStringNumericAssigns(
+    const std::vector<ModuleItem*>& items,
+    const std::unordered_map<std::string_view, DataTypeKind>& var_types,
+    DiagEngine& diag) {
+  for (const auto* item : items) {
+    if (IsProceduralItemKind(item->kind)) {
+      CheckStringNumericAssigns(item->body, var_types, diag);
+    }
+  }
+}
+
 // The genvars declared among `items`. §27.4 lets a genvar be referenced only
 // within a loop generate scheme, so one of these read by the items themselves,
 // outside every loop generate construct, is a misuse rather than a name that
@@ -706,11 +719,7 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
   // §6.16/§6.22.5: a string and an integral or real type are
   // type-incompatible whatever a module imports, so this check answers on its
   // own and is stated before the §23.9 reads below.
-  for (const auto* item : decl->items) {
-    if (IsProceduralItemKind(item->kind)) {
-      CheckStringNumericAssigns(item->body, var_types_, diag_);
-    }
-  }
+  CheckProceduralStringNumericAssigns(decl->items, var_types_, diag_);
 
   std::unordered_set<std::string_view> explicit_imported =
       ExplicitlyImportedNames(mod);

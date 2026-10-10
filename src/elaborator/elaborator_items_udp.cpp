@@ -804,6 +804,38 @@ void Elaborator::InstantiateImplicitNestedModules(
   }
 }
 
+// The items of `decl` in source order, each seeing only the names declared
+// above it, then the delayed signals its timing checks imply.
+void Elaborator::ElaborateItemsInOrder(const ModuleDecl* decl,
+                                       RtlirModule* mod) {
+  // §6.10 with §23.4: a reference inside a nested declaration sees an outer
+  // name only if it was declared previously, above the declaration's text. An
+  // instance written above its declaration is elaborated before the loop
+  // below reaches the declaration, so the names the text declares above each
+  // nested declaration are read first, for BeginNestedDeclScope to join with
+  // the names declared so far at such an instance.
+  RecordNestedDeclNamesAbove(decl->items);
+  // §3.13 (e): an interface's modports are in its module name space too; they
+  // are held apart from its items, so they enter it before the items do.
+  for (const auto* modport : decl->modports) {
+    DeclareInModuleNameSpace(modport->name, modport->loc);
+  }
+  for (auto* item : decl->items) {
+    // The same rule for an instance written or implied below: this scope's
+    // names are recorded as they stand when the loop reaches the declaration,
+    // for BeginNestedDeclScope to hand on when the instance is elaborated.
+    if (item->kind == ModuleItemKind::kNestedModuleDecl &&
+        item->nested_module_decl != nullptr) {
+      nested_decl_scope_names_[item->nested_module_decl] =
+          CaptureCurrentScopeNames();
+    }
+    ElaborateItem(item, mod);
+  }
+  for (auto* item : TimingCheckDelayedSignalItems(decl, arena_)) {
+    ElaborateItem(item, mod);
+  }
+}
+
 void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   ReclassifyForwardUdpInstances(decl);
   // §23.2.2.1: do NOT reset the per-module item-elaboration state here.
@@ -891,32 +923,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   // module's, and gen_prefix_scopes_ is already where the instance stands.
   RegisteredGenScopeGuard gen_scope_guard(gen_prefix_scopes_);
 
-  // §6.10 with §23.4: a reference inside a nested declaration sees an outer
-  // name only if it was declared previously, above the declaration's text. An
-  // instance written above its declaration is elaborated before the loop
-  // below reaches the declaration, so the names the text declares above each
-  // nested declaration are read first, for BeginNestedDeclScope to join with
-  // the names declared so far at such an instance.
-  RecordNestedDeclNamesAbove(decl->items);
-  // §3.13 (e): an interface's modports are in its module name space too; they
-  // are held apart from its items, so they enter it before the items do.
-  for (const auto* modport : decl->modports) {
-    DeclareInModuleNameSpace(modport->name, modport->loc);
-  }
-  for (auto* item : decl->items) {
-    // The same rule for an instance written or implied below: this scope's
-    // names are recorded as they stand when the loop reaches the declaration,
-    // for BeginNestedDeclScope to hand on when the instance is elaborated.
-    if (item->kind == ModuleItemKind::kNestedModuleDecl &&
-        item->nested_module_decl != nullptr) {
-      nested_decl_scope_names_[item->nested_module_decl] =
-          CaptureCurrentScopeNames();
-    }
-    ElaborateItem(item, mod);
-  }
-  for (auto* item : TimingCheckDelayedSignalItems(decl, arena_)) {
-    ElaborateItem(item, mod);
-  }
+  ElaborateItemsInOrder(decl, mod);
 
   // §6.18: a class method's or a module subroutine's formal may name a
   // typedef the module forward-declares above it and defines below it, so

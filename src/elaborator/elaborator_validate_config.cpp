@@ -132,7 +132,8 @@ void ValidateNameSpaceDefinitions(const CompilationUnit* unit,
 }
 
 // True where a compilation-unit item declares a name of the unit's scope that
-// §3.13(c) holds to one declaration. An import or export declares none; an
+// §3.13(c) holds to one declaration. An import or export declares none, nor
+// does a §35.5.4 DPI export, which names a subroutine declared elsewhere; an
 // item an anonymous program contributed is that program's; §6.18's forward
 // typedef (`typedef interface class IC;`, carried as a kTypedef with an
 // implicit aliased type) is a forward declaration and not a definition, so it
@@ -144,7 +145,8 @@ void ValidateNameSpaceDefinitions(const CompilationUnit* unit,
 // a class's own duplicate members being the class checks' to report.
 static bool DeclaresACuScopeName(const ModuleItem* item) {
   if (item->kind == ModuleItemKind::kImportDecl ||
-      item->kind == ModuleItemKind::kExportDecl)
+      item->kind == ModuleItemKind::kExportDecl ||
+      item->kind == ModuleItemKind::kDpiExport)
     return false;
   if (item->from_anonymous_program) return false;
   if (item->kind == ModuleItemKind::kTypedef &&
