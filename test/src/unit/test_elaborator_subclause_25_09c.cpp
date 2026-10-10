@@ -253,4 +253,22 @@ TEST(VirtualInterfaceArrayElaboration, ASelectIntoAPropertysVirtualInterface) {
   EXPECT_TRUE(NoErrorOnLine(f, 8));
 }
 
+// §11.4.13: the value range [0:1] of an inside set is a select with no
+// expression it selects from, and the walk that looks for selects into a
+// virtual interface leaves it and reports nothing, whether the set follows
+// an inside operator or labels an item of a case inside statement.
+TEST(VirtualInterfaceArrayElaboration, AValueRangeSelectsFromNothing) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  logic [1:0] x; logic b;\n"
+      "  initial begin\n"
+      "    b = x inside {[0:1]};\n"
+      "    case (x) inside [0:1]: b = 1; default: b = 0; endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

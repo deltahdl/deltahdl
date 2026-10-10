@@ -318,7 +318,7 @@ const ClassDecl* ClassNamed(const DataScope& scope, const DataType& type) {
 // counted into `selects`: `va` of va[0][1], two.
 const Expr& SelectRoot(const Expr& e, std::size_t& selects) {
   const Expr* root = &e;
-  while (root->kind == ExprKind::kSelect) {
+  while (root->kind == ExprKind::kSelect && root->base != nullptr) {
     ++selects;
     root = root->base;
   }
@@ -511,10 +511,12 @@ std::unordered_set<std::string_view> EnclosingSubroutineNames(
   return names;
 }
 
-void ReportCallsOfDataNames(
-    const ModuleDecl& decl, const CompilationUnit& unit,
-    const std::function<bool(std::string_view)>& visible, DiagEngine& diag) {
-  DataScope scope{visible, unit, decl.items};
+namespace {
+
+// The names the items of module `decl` declare, each in the set of `scope`
+// its kind puts it in: data, subroutines and the rest, which no call names.
+void DeclareModuleItems(const ModuleDecl& decl, const CompilationUnit& unit,
+                        DataScope& scope) {
   std::unordered_set<std::string_view>& subroutines = scope.subroutines;
   for (const ModuleItem* item : decl.items) {
     if (item->kind == ModuleItemKind::kVarDecl) {
@@ -538,6 +540,15 @@ void ReportCallsOfDataNames(
   for (std::string_view name : subroutines) scope.uncallable.erase(name);
   // §18.12: a scope randomize call may be written without its std:: prefix.
   subroutines.insert("randomize");
+}
+
+}  // namespace
+
+void ReportCallsOfDataNames(
+    const ModuleDecl& decl, const CompilationUnit& unit,
+    const std::function<bool(std::string_view)>& visible, DiagEngine& diag) {
+  DataScope scope{visible, unit, decl.items};
+  DeclareModuleItems(decl, unit, scope);
   for (const ModuleItem* item : decl.items) {
     if (IsProceduralItemKind(item->kind)) {
       CheckStmtCalls(item->body, scope, diag);
