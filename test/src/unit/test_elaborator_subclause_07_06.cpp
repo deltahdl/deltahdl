@@ -568,4 +568,29 @@ TEST(ArrayAssignmentValidation, ArraysOfBlocksAndSubroutinesAreJudged) {
   }
 }
 
+// §7.6 with §6.22.2: an enumeration is equivalent only to a type matching it,
+// so an array of int and an array of an enumeration are not assignment
+// compatible in either direction, however wide the enumeration's base is.
+TEST(ArrayAssignmentValidation, IntAndEnumElementsAreNotEquivalent) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef enum {A, B} e_t;\n"
+      "  e_t x[2];\n"
+      "  int ia[2];\n"
+      "  initial begin\n"
+      "    ia = x;\n"
+      "    x = ia;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "array element type mismatch in assignment ('ia' vs 'x')", 6,
+      "7.6"));
+  EXPECT_TRUE(ReportedError(
+      diags, "array element type mismatch in assignment ('x' vs 'ia')", 7,
+      "7.6"));
+}
+
 }  // namespace
