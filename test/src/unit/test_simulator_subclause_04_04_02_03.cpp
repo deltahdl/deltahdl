@@ -287,3 +287,19 @@ TEST(InactiveRegionSim, SecondZeroDelayResumesAfterTheProcessesItWoke) {
   LowerAndRun(design, f);
   EXPECT_EQ(f.ctx.FindVariable("seen")->value.ToUint64(), 1u);
 }
+
+// A `$finish` from one of the events the Inactive region held on entry ends
+// the run there: the process resumed after it in the same region never writes.
+TEST(InactiveRegionSim, FinishFromAnInactiveEventStopsTheRestOfTheRegion) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int x = 0;\n"
+      "  initial begin #0; $finish; end\n"
+      "  initial begin #0; x = 1; end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 0u);
+}
