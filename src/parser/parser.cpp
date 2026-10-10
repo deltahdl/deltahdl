@@ -2,11 +2,14 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <iterator>
+#include <tuple>
 #include <utility>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "common/types.h"
 #include "lexer/lexer.h"
 #include "lexer/token.h"
@@ -19,6 +22,7 @@
 #include "parser/parser_fsm.h"
 #include "parser/parser_token_skips.h"
 #include "parser/parser_type_name_scope.h"
+#include "parser/scope_type_names.h"
 
 namespace delta {
 
@@ -207,6 +211,19 @@ Token Parser::Expect(TokenKind kind, Subclause subclause) {
   return tok;
 }
 
+bool Parser::ReportedAtEnd(size_t first_report) {
+  const SourceLoc kEnd = CurrentLoc();
+  const auto kAtEnd =
+      std::tuple(DiagSeverity::kError, kEnd.file_id, kEnd.line, kEnd.column);
+  const auto& reports = diag_.Diagnostics();
+  return std::any_of(
+      std::next(reports.begin(), static_cast<std::ptrdiff_t>(first_report)),
+      reports.end(), [&](const Diagnostic& d) {
+        return std::tuple(d.severity, d.loc.file_id, d.loc.line,
+                          d.loc.column) == kAtEnd;
+      });
+}
+
 void Parser::SynchronizeWithProgress() {
   auto before = lexer_.SavePos().pos;
   Synchronize();
@@ -257,11 +274,25 @@ void Parser::AttachAttrs(std::vector<ModuleItem*>& items, size_t before,
   }
 }
 
+void Parser::AdoptCompilationUnitScope(const CompilationUnitScopeNames& names) {
+  AdoptTypeNames(names.own);
+  package_types_.insert(names.packages.begin(), names.packages.end());
+  class_types_.insert(names.classes.begin(), names.classes.end());
+}
+
+CompilationUnitScopeNames Parser::CompilationUnitScope() const {
+  return CompilationUnitScopeNames{
+      ScopeTypeNames{known_types_, known_nettypes_, known_udps_},
+      package_types_, class_types_};
+}
+
 CompilationUnit* Parser::Parse() {
   auto* unit = arena_.Create<CompilationUnit>();
+  const size_t kFirstReport = diag_.Diagnostics().size();
   while (!AtEnd()) {
     ParseTopLevel(unit);
   }
+  ended_inside_declaration_ = ReportedAtEnd(kFirstReport);
 
   DefaultLibraryToWork(unit->modules);
   DefaultLibraryToWork(unit->interfaces);

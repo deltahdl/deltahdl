@@ -65,16 +65,13 @@ class Parser {
   // exactly that reason, so they are carried whole. known_udps_ is the whole
   // compilation-unit scope already: TypeNameScope saves and restores
   // known_types_ and known_nettypes_ alone, and nothing else narrows it.
-  void AdoptCompilationUnitScope(const CompilationUnitScopeNames& names) {
-    AdoptTypeNames(names.own);
-    package_types_.insert(names.packages.begin(), names.packages.end());
-    class_types_.insert(names.classes.begin(), names.classes.end());
-  }
-  CompilationUnitScopeNames CompilationUnitScope() const {
-    return CompilationUnitScopeNames{
-        ScopeTypeNames{known_types_, known_nettypes_, known_udps_},
-        package_types_, class_types_};
-  }
+  void AdoptCompilationUnitScope(const CompilationUnitScopeNames& names);
+  CompilationUnitScopeNames CompilationUnitScope() const;
+
+  // §3.12.1 (printed page 56): a declaration incomplete at the end of a file
+  // extends its compilation unit into the next file. True where the last
+  // Parse() reported an error at its end of input, which wanted more there.
+  bool EndedInsideDeclaration() const { return ended_inside_declaration_; }
 
  private:
   // Shared gate/UDP instance-tail parser (see parser_instance_internal.h).
@@ -825,6 +822,8 @@ class Parser {
   bool AtEnd();
   SourceLoc CurrentLoc();
   void Synchronize();
+  // Whether an error reported since report `first_report` is at the token now.
+  bool ReportedAtEnd(size_t first_report);
   // Synchronize() that guarantees forward progress: a body parse loop ending
   // on its own end keyword alone would spin forever when Synchronize() halts
   // on a foreign block-closing keyword without consuming it.
@@ -940,6 +939,7 @@ class Parser {
   int package_body_depth_ = 0;
   bool in_cu_scope_param_ = false;
   bool in_anonymous_program_ = false;
+  bool ended_inside_declaration_ = false;
   bool ForceLocalparam() const {
     return InGenerateBlock() || class_body_depth_ > 0 ||
            package_body_depth_ > 0 || in_cu_scope_param_;

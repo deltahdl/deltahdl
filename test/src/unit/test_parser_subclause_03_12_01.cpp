@@ -1,13 +1,19 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <string>
 
+#include "common/arena.h"
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
 #include "common/types.h"
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
+#include "lexer/lexer.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
+#include "parser/parser.h"
 
 using namespace delta;
 
@@ -814,6 +820,44 @@ TEST(CompilationUnitParsing, CuScopePackageScopedTypeDeclaration) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "v");
   EXPECT_EQ(r.cu->cu_items[0]->data_type.scope_name, "p");
   EXPECT_EQ(r.cu->cu_items[0]->data_type.type_name, "byte_t");
+}
+
+// Parses `src` as one file and answers Parser::EndedInsideDeclaration.
+static bool EndsInsideDeclaration(const std::string& src) {
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  Arena arena;
+  auto fid = mgr.AddFile("<file>", src);
+  Lexer lexer(mgr.FileContent(fid), fid, diag);
+  Parser parser(lexer, arena, diag);
+  parser.Parse();
+  return parser.EndedInsideDeclaration();
+}
+
+// §3.12.1: a file ending inside a declaration leaves its compilation unit to
+// extend into the next file. A module whose endmodule never came is one.
+TEST(IncompleteDeclarationAtEnd, ModuleWithoutEndmodule) {
+  EXPECT_TRUE(EndsInsideDeclaration("module m;\n  logic a;\n"));
+}
+
+TEST(IncompleteDeclarationAtEnd, StructTypedefWithoutClosingBrace) {
+  EXPECT_TRUE(EndsInsideDeclaration("typedef struct {\n  int a;\n"));
+}
+
+TEST(IncompleteDeclarationAtEnd, CompleteModuleIsNot) {
+  EXPECT_FALSE(EndsInsideDeclaration("module m;\n  logic a;\nendmodule\n"));
+}
+
+// An error the parse reports inside the text, here §3.14.2.2's timeunit in a
+// generate block, leaves the input ending between items all the same, so it
+// is no incomplete declaration.
+TEST(IncompleteDeclarationAtEnd, ErrorBeforeTheEndIsNot) {
+  EXPECT_FALSE(
+      EndsInsideDeclaration("module top;\n"
+                            "  if (1) begin : g\n"
+                            "    timeunit 10ns;\n"
+                            "  end\n"
+                            "endmodule\n"));
 }
 
 }  // namespace
