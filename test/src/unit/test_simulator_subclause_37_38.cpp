@@ -391,6 +391,7 @@ TEST_F(ConstraintExpressionsOfARun, AConstraintHoldsItsExpressionsInOrder) {
   ASSERT_NE(c, nullptr);
   const std::vector<vpiHandle> kItems = All(vpiConstraintItem, c);
   std::vector<int> types;
+  types.reserve(kItems.size());
   for (vpiHandle item : kItems) types.push_back(vpi_get(vpiType, item));
   EXPECT_EQ(types, (std::vector<int>{vpiOperation, vpiBitVar, vpiOperation,
                                      vpiImplication, vpiConstrIf,
