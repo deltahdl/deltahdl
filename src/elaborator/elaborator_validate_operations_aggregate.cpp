@@ -371,10 +371,38 @@ void CheckAggregateOperandNode(const Expr* e, const AggregateOperandNames& n,
   }
 }
 
+// §10.9 gives an assignment pattern written without a type prefix no type of
+// its own, §10.8 lists the assignment-like contexts that lend it one and allows
+// no other, and §5.10 and §5.11 require a structure or array literal to have a
+// type. An operator's operand and a system task's or function's argument are
+// no such context, so a pattern there is reported. The right operand of
+// `matches` and the left of a case item's `&&&` are §12.6 patterns, which share
+// the spelling.
+void CheckUntypedPatternOperand(const Expr* e, DiagEngine& diag) {
+  std::vector<const Expr*> operands;
+  bool is_pattern_operator =
+      e->op == TokenKind::kKwMatches || e->op == TokenKind::kAmpAmpAmp;
+  if (e->kind == ExprKind::kUnary ||
+      (e->kind == ExprKind::kBinary && !is_pattern_operator)) {
+    operands = {e->lhs, e->rhs};
+  } else if (e->kind == ExprKind::kSystemCall) {
+    operands.assign(e->args.begin(), e->args.end());
+  }
+  for (const Expr* operand : operands) {
+    if (operand == nullptr || operand->kind != ExprKind::kAssignmentPattern)
+      continue;
+    diag.Error(operand->range.start,
+               "assignment pattern without a type prefix outside an "
+               "assignment-like context",
+               Subclause("10.9"));
+  }
+}
+
 void WalkExprForAggregateOperands(const Expr* e, const AggregateOperandNames& n,
                                   DiagEngine& diag) {
   if (e == nullptr) return;
   CheckAggregateOperandNode(e, n, diag);
+  CheckUntypedPatternOperand(e, diag);
   ForEachExprChild(e, [&](const Expr* child) {
     WalkExprForAggregateOperands(child, n, diag);
   });

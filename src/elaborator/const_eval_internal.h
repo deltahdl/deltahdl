@@ -322,8 +322,9 @@ std::optional<RtlirUnpackedDim> FoldUnpackedDimBounds(const Expr* dim,
 std::optional<int64_t> EvalConstArrayQuery(const Expr* expr,
                                            const ScopeMap& scope);
 
-// §5.7.1: the width an integer literal's size constant states, and 32 for an
-// unsized one. Defined in const_eval.cpp.
+// §5.7.1: the width an integer literal's size constant states, or for an
+// unsized one the width its value needs, at least 32 bits and with a sign bit
+// when it is signed, as the simulator sizes it. Defined in const_eval.cpp.
 uint32_t ConstLiteralWidth(const Expr* expr);
 
 // §20.6.2: the value of a `$bits(...)` call whose argument is sized at

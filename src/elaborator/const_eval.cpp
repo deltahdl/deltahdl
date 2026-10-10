@@ -14,6 +14,7 @@
 #include "elaborator/rtlir_scopes.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
+#include "simulator/evaluation.h"
 
 namespace delta {
 
@@ -161,16 +162,10 @@ static bool SizedByOperand(TokenKind op) {
 }
 
 uint32_t ConstLiteralWidth(const Expr* expr) {
-  auto tick = expr->text.find('\'');
-  if (tick != std::string_view::npos && tick > 0) {
-    uint32_t w = 0;
-    for (size_t i = 0; i < tick; ++i) {
-      char c = expr->text[i];
-      if (c >= '0' && c <= '9') w = w * 10 + (c - '0');
-    }
-    if (w > 0) return w;
-  }
-  return 32;
+  // A literal the elaborator builds, with no text, keeps the 32 bits of an
+  // integer.
+  if (expr->text.empty()) return 32;
+  return LiteralWidth(expr->text, expr->int_val);
 }
 
 static int64_t Clog2(int64_t val) {
@@ -452,18 +447,11 @@ static std::string_view StringLiteralBody(std::string_view text) {
   return text;
 }
 
-// The characters one string literal denotes, with the quotes removed and each
-// escape replaced by the one character it stands for, except that a zero byte
-// contributes no character at all. §6.16 keeps the special character "\0" out
-// of a string variable and ignores an assignment of 0 to a string character
-// (printed page 112 of IEEE 1800-2023), so the value of "a\0b" is the two
-// characters "ab" and its length is 2. Dropping the character rather than
-// reporting it is what the second sentence says to do, and
-// src/simulator/eval_string.cpp does the same thing to the run-time value in
-// StripStringZeros and in StringWriteByte.
-static std::string StringLiteralChars(const Expr* expr) {
+// §5.9: the bytes one string literal denotes, with the quotes removed and each
+// escape replaced by the one 8-bit value it stands for, a zero byte included.
+static std::string StringLiteralBytes(const Expr* expr) {
   std::string_view text = StringLiteralBody(expr->text);
-  std::string chars;
+  std::string bytes;
   for (size_t i = 0; i < text.size(); ++i) {
     uint8_t byte = 0;
     if (text[i] == '\\' && i + 1 < text.size()) {
@@ -472,9 +460,21 @@ static std::string StringLiteralChars(const Expr* expr) {
     } else {
       byte = static_cast<uint8_t>(text[i]);
     }
-    if (byte == 0) continue;
-    chars.push_back(static_cast<char>(byte));
+    bytes.push_back(static_cast<char>(byte));
   }
+  return bytes;
+}
+
+// The characters one string literal gives a string, its bytes less every zero
+// byte. §6.16 keeps the special character "\0" out of a string variable and
+// ignores an assignment of 0 to a string character (printed page 112 of IEEE
+// 1800-2023), so the value of "a\0b" is the two characters "ab" and its length
+// is 2. Dropping the character rather than reporting it is what the second
+// sentence says to do, and src/simulator/eval_string.cpp does the same thing to
+// the run-time value in StripStringZeros and in StringWriteByte.
+static std::string StringLiteralChars(const Expr* expr) {
+  std::string chars = StringLiteralBytes(expr);
+  std::erase(chars, '\0');
   return chars;
 }
 
@@ -586,7 +586,11 @@ std::optional<std::string> ConstEvalString(const Expr* expr) {
 // in constant expressions (e.g. a parameter/localparam initializer). The folded
 // value keeps the low 64 bits, matching the low word of the equivalent vector.
 std::optional<ConstVal> ConstEvalStringLiteral(const Expr* expr) {
-  auto chars = ConstEvalString(expr);
+  // §5.9: a string literal used as an operand is an integer of one 8-bit value
+  // per character or escape, so its zero bytes stay; only a string drops them.
+  auto chars = expr->kind == ExprKind::kStringLiteral
+                   ? std::optional<std::string>(StringLiteralBytes(expr))
+                   : ConstEvalString(expr);
   if (!chars) return std::nullopt;
   uint64_t value = 0;
   for (char c : *chars) value = (value << 8) | static_cast<uint8_t>(c);

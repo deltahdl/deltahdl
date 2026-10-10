@@ -209,4 +209,70 @@ TEST(StructLiteralElaboration, ReplicationStructLiteral) {
              "endmodule\n"));
 }
 
+// §5.10 (printed page 84) has a replication set the values for the exact
+// number of members, its multiplier times its items. Three values for two
+// members was let through, every replication excused from the count.
+TEST(StructLiteralElaboration, ReplicationSupplyingTooManyMembersRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  struct { int a; int b; } s = '{3{1}};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "replication supplies 3 values, but struct has 2 "
+                            "members",
+                            2, "5.10"));
+}
+
+// The count is the multiplier times the items: two copies of two values fill
+// four members, which a count of the multiplier alone would reject.
+TEST(StructLiteralElaboration,
+     ReplicationOfSeveralItemsFillingMembersAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  struct { int a; int b; int c; int d; } s = '{2{1, 2}};\n"
+             "endmodule\n"));
+}
+
+// The flat form of §5.10 is just as wrong in a procedural assignment and in
+// the initializer of a declaration inside a block as at a module-level
+// declaration. Only the module-level declaration was checked.
+TEST(StructLiteralElaboration, FlatLiteralOutsideModuleDeclarationRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef struct { int a; shortreal b; } ab;\n"
+      "  ab abarr [1:0];\n"
+      "  initial abarr = '{1, 1.0, 2, 2.0};\n"
+      "  initial begin\n"
+      "    ab local_arr [1:0] = '{1, 1.0, 2, 2.0};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const char* const kMessage =
+      "assignment pattern for an array of structures shall nest a pattern per "
+      "structure";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 4, "5.10"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 6, "5.10"));
+}
+
+// An array of structures whose unpacked dimension comes from its typedef is
+// the same array, and the flat form is as wrong for it: the declaration takes
+// the typedef's dimension before its pattern is checked.
+TEST(StructLiteralElaboration, FlatLiteralForTypedefArrayOfStructsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef struct { int a; shortreal b; } ab;\n"
+      "  typedef ab ab2_t [1:0];\n"
+      "  ab2_t abarr = '{1, 1.0, 2, 2.0};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern for an array of structures "
+                            "shall nest a pattern per structure",
+                            4, "5.10"));
+}
+
 }  // namespace

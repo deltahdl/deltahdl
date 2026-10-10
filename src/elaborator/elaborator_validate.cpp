@@ -23,25 +23,23 @@
 
 namespace delta {
 
-static bool IsArrayPatternSpecial(const Expr* init) {
-  if (init->repeat_count) return true;
-  if (init->elements.size() == 1 &&
-      init->elements[0]->kind == ExprKind::kReplicate)
-    return true;
-  return !init->pattern_keys.empty();
+// §5.10 and §5.11: the replication an assignment pattern consists of,
+// `'{n{...}}`, or null for a pattern of any other form.
+static const Expr* PatternReplication(const Expr* pattern) {
+  if (pattern->elements.size() != 1) return nullptr;
+  const Expr* only = pattern->elements[0];
+  return only->is_pattern_replication ? only : nullptr;
 }
 
-uint32_t ExtractLiteralWidth(std::string_view text) {
-  auto tick = text.find('\'');
-  if (tick != std::string_view::npos && tick > 0) {
-    uint32_t w = 0;
-    for (size_t i = 0; i < tick; ++i) {
-      char c = text[i];
-      if (c >= '0' && c <= '9') w = w * 10 + (c - '0');
-    }
-    if (w > 0) return w;
-  }
-  return 32;
+// §5.10 and §5.11: the items a positional pattern supplies -- its elements, or
+// a replication's multiplier times the items inside it, the inner braces being
+// removed -- or nothing where the multiplier does not fold.
+static std::optional<int64_t> PositionalItemCount(const Expr* pattern) {
+  const Expr* rep = PatternReplication(pattern);
+  if (rep == nullptr) return static_cast<int64_t>(pattern->elements.size());
+  auto times = ConstEvalInt(rep->repeat_count);
+  if (!times) return std::nullopt;
+  return *times * static_cast<int64_t>(rep->elements.size());
 }
 
 std::optional<int64_t> ComputeDimSize(const Expr* dim) {
@@ -71,7 +69,6 @@ static std::optional<std::string> ArrayPatternKeyIdentity(const Expr* key) {
 
 static void CheckArrayPatternDuplicateIndices(const Expr* init, SourceLoc loc,
                                               DiagEngine& diag) {
-  if (init->pattern_keys.empty()) return;
   std::unordered_set<std::string> seen;
   for (const auto* key : init->pattern_keys) {
     if (key->text == "default" || IsTypeKeyword(key->text)) continue;
@@ -86,11 +83,9 @@ static void CheckArrayPatternDuplicateIndices(const Expr* init, SourceLoc loc,
   }
 }
 
-static void CheckArrayPatternCoverage(const ModuleItem* item, SourceLoc loc,
-                                      DiagEngine& diag) {
-  if (item->init_expr->pattern_keys.empty()) return;
-  if (item->unpacked_dims.empty()) return;
-  const auto* dim = item->unpacked_dims[0];
+static void CheckArrayPatternCoverage(const Expr* pattern,
+                                      DataTypeKind elem_kind, const Expr* dim,
+                                      SourceLoc loc, DiagEngine& diag) {
   if (!dim) return;
   auto dim_size = ComputeDimSize(dim);
   if (!dim_size) return;
@@ -102,7 +97,7 @@ static void CheckArrayPatternCoverage(const ModuleItem* item, SourceLoc loc,
   // a key, and leaving them out would read a pattern whose keys the elaborator
   // cannot fold as covering fewer elements than it was written for.
   int64_t unidentified_keys = 0;
-  for (const auto* key : item->init_expr->pattern_keys) {
+  for (const auto* key : pattern->pattern_keys) {
     if (key->text == "default") {
       has_default = true;
     } else if (IsTypeKeyword(key->text)) {
@@ -117,8 +112,7 @@ static void CheckArrayPatternCoverage(const ModuleItem* item, SourceLoc loc,
       // and the type and default keys -- a key matching the leaf type covers a
       // multidimensional array at every level, which is what CreateMultiDimLeaf
       // already does.
-      has_type_key =
-          has_type_key || TypeKeyMatchesKind(key->text, item->data_type.kind);
+      has_type_key = has_type_key || TypeKeyMatchesKind(key->text, elem_kind);
     } else if (auto identity = ArrayPatternKeyIdentity(key)) {
       index_keys.insert(*identity);
     } else {
@@ -177,12 +171,14 @@ static bool IsElementThatIsNoStruct(
   }
 }
 
-void Elaborator::ValidateArrayInitPattern(const ModuleItem* item) {
-  if (!item->init_expr || item->unpacked_dims.empty()) return;
-  if (item->init_expr->kind != ExprKind::kAssignmentPattern) return;
-  if (IsArrayPatternSpecial(item->init_expr)) {
-    CheckArrayPatternDuplicateIndices(item->init_expr, item->loc, diag_);
-    CheckArrayPatternCoverage(item, item->loc, diag_);
+void ArrayPatternCheck::Check(const Expr* pattern, const DataType& elem_type,
+                              const std::vector<Expr*>& dims,
+                              SourceLoc loc) const {
+  if (pattern->kind != ExprKind::kAssignmentPattern) return;
+  const Expr* dim = dims[0];
+  if (!pattern->pattern_keys.empty()) {
+    CheckArrayPatternDuplicateIndices(pattern, loc, diag);
+    CheckArrayPatternCoverage(pattern, elem_type.kind, dim, loc, diag);
     return;
   }
 
@@ -191,31 +187,37 @@ void Elaborator::ValidateArrayInitPattern(const ModuleItem* item) {
   // makes the pattern the flat form, and that is the rule the spelling breaks
   // rather than the element count below, which the flat form fails only when
   // the counts happen to disagree.
-  if (IsUnpackedStructType(item->data_type, typedefs_)) {
-    for (const auto* e : item->init_expr->elements) {
-      if (IsElementThatIsNoStruct(e, var_types_)) {
-        diag_.Error(item->loc,
-                    "assignment pattern for an array of structures shall nest "
-                    "a pattern per structure",
-                    Subclause("5.10"));
+  if (IsUnpackedStructType(elem_type, typedefs)) {
+    for (const auto* e : pattern->elements) {
+      if (IsElementThatIsNoStruct(e, var_types)) {
+        diag.Error(loc,
+                   "assignment pattern for an array of structures shall nest "
+                   "a pattern per structure",
+                   Subclause("5.10"));
         return;
       }
     }
   }
 
-  const auto* dim = item->unpacked_dims[0];
   if (!dim) return;
   auto dim_size = ComputeDimSize(dim);
   if (!dim_size) return;
-
-  auto count = static_cast<int64_t>(item->init_expr->elements.size());
-  if (count != *dim_size) {
-    diag_.Error(item->loc,
-                std::format("assignment pattern has {} elements, but array "
-                            "dimension requires {}",
-                            count, *dim_size),
-                Subclause("10.9.1"));
+  // §5.11: a replication operates within one dimension, so what it supplies
+  // is counted against that dimension as a positional list is.
+  auto count = PositionalItemCount(pattern);
+  if (count && *count != *dim_size) {
+    diag.Error(loc,
+               std::format("assignment pattern has {} elements, but array "
+                           "dimension requires {}",
+                           *count, *dim_size),
+               Subclause("10.9.1"));
   }
+}
+
+void Elaborator::ValidateArrayInitPattern(const ModuleItem* item) {
+  if (!item->init_expr || item->unpacked_dims.empty()) return;
+  ArrayPatternCheck{typedefs_, var_types_, diag_}.Check(
+      item->init_expr, item->data_type, item->unpacked_dims, item->loc);
 }
 
 static void CheckPatternCoverage(
@@ -298,11 +300,19 @@ void Elaborator::ValidateStructInitPattern(const ModuleItem* item) {
   if (!members) return;
 
   if (item->init_expr->pattern_keys.empty()) {
-    bool is_replication =
-        item->init_expr->repeat_count ||
-        (item->init_expr->elements.size() == 1 &&
-         item->init_expr->elements[0]->kind == ExprKind::kReplicate);
-    if (is_replication) return;
+    // §5.10 (printed page 84): a replication sets the values for the exact
+    // number of members, its multiplier times its items.
+    if (PatternReplication(item->init_expr) != nullptr) {
+      auto count = PositionalItemCount(item->init_expr);
+      if (count && *count != static_cast<int64_t>(members->size())) {
+        diag_.Error(item->loc,
+                    std::format("replication supplies {} values, but struct "
+                                "has {} members",
+                                *count, members->size()),
+                    Subclause("5.10"));
+      }
+      return;
+    }
     if (item->init_expr->elements.size() != members->size()) {
       diag_.Error(
           item->loc,

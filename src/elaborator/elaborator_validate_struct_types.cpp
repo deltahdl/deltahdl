@@ -11,6 +11,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
@@ -35,7 +36,7 @@ static uint32_t InferTypeRefExprWidth(const Expr* expr,
       }
       return 0;
     case ExprKind::kIntegerLiteral:
-      return ExtractLiteralWidth(expr->text);
+      return ConstLiteralWidth(expr);
     case ExprKind::kBinary: {
       uint32_t lw = InferTypeRefExprWidth(expr->lhs, mod);
       uint32_t rw = InferTypeRefExprWidth(expr->rhs, mod);

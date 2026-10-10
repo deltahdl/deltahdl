@@ -20,6 +20,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/global_clocking_sampled_value.h"
+#include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
@@ -395,13 +396,26 @@ void ForEachExprChild(const Expr* e, Fn&& fn) {
   });
 }
 
-// Parses the size prefix of an integer literal's text (the digits before the
-// base tick "'"). Returns that width when present and positive, otherwise the
-// default unsized-literal width of 32. Defined in elaborator_validate.cpp.
-uint32_t ExtractLiteralWidth(std::string_view text);
-
 // Defined in elaborator_validate.cpp.
 std::optional<int64_t> ComputeDimSize(const Expr* dim);
+
+// §5.10, §5.11 and §10.9.1: the checks an assignment pattern written for an
+// unpacked array has to pass, wherever it is written -- a declaration's
+// initializer, a block's or the module's, or the right-hand side of a
+// procedural assignment. `typedefs` resolves a structure named as the element
+// type, and `var_types` the declared kind of a name written as an element.
+// Defined in elaborator_validate.cpp.
+struct ArrayPatternCheck {
+  const TypedefMap& typedefs;
+  const std::unordered_map<std::string_view, DataTypeKind>& var_types;
+  DiagEngine& diag;
+
+  // Checks `pattern` against an array of `elem_type` with the unpacked
+  // dimensions `dims`, outermost first, reporting at `loc`. Nothing for an
+  // expression that is no assignment pattern.
+  void Check(const Expr* pattern, const DataType& elem_type,
+             const std::vector<Expr*>& dims, SourceLoc loc) const;
+};
 std::string_view LhsBaseName(const Expr* e);
 // §23.6 gives a hierarchical name as a sequence of components separated by
 // periods, and §23.7 makes what the first of them resolves to decide whether

@@ -128,6 +128,7 @@ Expr* Parser::ParsePatternReplication(Expr* count, SourceLoc loc) {
   auto* rep = arena_.Create<Expr>();
   rep->kind = ExprKind::kReplicate;
   rep->repeat_count = count;
+  rep->is_pattern_replication = true;
   rep->range.start = loc;
   rep->elements.push_back(ParseExpr());
   while (Match(TokenKind::kComma)) {

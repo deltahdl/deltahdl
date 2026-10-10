@@ -64,6 +64,16 @@ class ElaboratorOperationRules : public ElaboratorData {
   void WalkStmtsForArrayPatternElemType(const Stmt* s);
   void CheckArrayPatternElemTypeInAssign(const Stmt* s);
   void CheckArrayPatternElemTypeInInit(const ModuleItem* item);
+  // §5.10, §5.11 and §10.9.1: the checks ArrayPatternCheck makes of a
+  // module-level declaration's initializer, made of a pattern a procedure
+  // assigns to one of the module's unpacked arrays and of one initializing an
+  // unpacked array a block declares.
+  void ValidateProceduralArrayPatterns(const ModuleDecl* decl);
+  void WalkStmtsForProceduralArrayPattern(const Stmt* s);
+  // The module's unpacked arrays by name, each with its declaration, filled by
+  // ValidateProceduralArrayPatterns for the module it walks.
+  std::unordered_map<std::string_view, const ModuleItem*>
+      pattern_target_arrays_;
   void ValidateReplicateTargetingArray(const ModuleDecl* decl);
   void WalkStmtsForReplicateTargetingArray(const Stmt* s);
   void CheckReplicateTargetingArrayInAssign(const Stmt* s);
@@ -149,10 +159,11 @@ class ElaboratorOperationRules : public ElaboratorData {
   void WalkExprForUnsizedInConcat(const Expr* expr);
   void WalkStmtsForUnsizedInConcat(const Stmt* s);
   void CheckBlockVarInitUnsizedInConcat(const Stmt* s);
-  // The variables the statements WalkStmtsForUnsizedInConcat is inside
-  // declare, innermost last, each with whether it is an unpacked array: a
-  // block's declaration hides a module's of the same name for the rest of the
-  // block (§6.21, §23.9), and var_array_info_ knows the module's alone.
+  // The variables the statements WalkStmtsForUnsizedInConcat or
+  // WalkStmtsForProceduralArrayPattern is inside declare, innermost last, each
+  // with whether it is an unpacked array: a block's declaration hides a
+  // module's of the same name for the rest of the block (§6.21, §23.9), and
+  // var_array_info_ knows the module's alone.
   std::vector<std::pair<std::string_view, bool>> block_decls_;
 
   void ValidateSelectOnConcatLvalue(const ModuleDecl* decl);

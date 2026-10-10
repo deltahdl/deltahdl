@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "elaborator/const_eval.h"
+#include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
@@ -801,7 +802,7 @@ uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs) {
   if (!expr) return 0;
   switch (expr->kind) {
     case ExprKind::kIntegerLiteral:
-      return ExtractLiteralWidth(expr->text);
+      return ConstLiteralWidth(expr);
     case ExprKind::kRealLiteral:
     case ExprKind::kTimeLiteral:
       return 64;

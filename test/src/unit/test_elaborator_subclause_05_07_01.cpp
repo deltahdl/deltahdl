@@ -537,4 +537,56 @@ TEST(IntegerLiteralElaboration, LiteralDecodedThroughLocalparam) {
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }
 
+// §5.7.1: an unsized number is at least 32 bits and wider where its value needs
+// more, with a sign bit when it is signed, so a parameter folded from one keeps
+// every bit: 2147483648 is 33 bits, 'h7_0000_0000 is 35. The fold gave every
+// unsized literal 32 bits, turning P negative and Q to 0.
+TEST(IntegerLiteralElaboration, UnsizedLiteralFoldsAtTheWidthItsValueNeeds) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  localparam longint P = 2147483648;\n"
+      "  localparam Q = 'h7_0000_0000;\n"
+      "  longint x, y;\n"
+      "  initial begin x = P; y = Q; end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 2147483648u);
+  EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 0x700000000u);
+}
+
+// §5.7.1's widths reach $bits folded during elaboration: 35 for 'h7_0000_0000
+// and, a signed decimal needing a sign bit, 34 for 4294967296. Both were 32.
+TEST(IntegerLiteralElaboration, BitsOfAnUnsizedLiteralIsTheWidthItsValueNeeds) {
+  SimFixture f;
+  auto* w = RunAndFindVar(
+      "module t;\n"
+      "  localparam int W = $bits('h7_0000_0000);\n"
+      "  localparam int D = $bits(4294967296);\n"
+      "  int w, d;\n"
+      "  initial begin w = W; d = D; end\n"
+      "endmodule\n",
+      f, "w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(w->value.ToUint64(), 35u);
+  EXPECT_EQ(f.ctx.FindVariable("d")->value.ToUint64(), 34u);
+}
+
+// The type of an unsized literal has the literal's §5.7.1 width, so a variable
+// declared with type('h7_0000_0000) (§6.23) is 35 bits. It was 32.
+TEST(IntegerLiteralElaboration,
+     TypeOfAnUnsizedLiteralHasTheWidthItsValueNeeds) {
+  SimFixture f;
+  auto* w = RunAndFindVar(
+      "module t;\n"
+      "  var type('h7_0000_0000) v;\n"
+      "  int w;\n"
+      "  initial w = $bits(v);\n"
+      "endmodule\n",
+      f, "w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(w->value.ToUint64(), 35u);
+}
+
 }  // namespace

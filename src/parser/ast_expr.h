@@ -99,6 +99,11 @@ struct Expr {
 
   std::vector<Expr*> elements;
   Expr* repeat_count = nullptr;
+  // §10.9: set on the kReplicate an assignment pattern's replication form,
+  // `'{n{...}}`, makes its only element, telling it from the replication
+  // operator of §11.4.12.1 written as a pattern's one positional item,
+  // `'{ {n{...}} }`, whose node is the same kind.
+  bool is_pattern_replication = false;
 
   // §10.9: the key of each keyed element of an assignment pattern, in the order
   // the elements were written, and empty for a positional one. Syntax 10-5

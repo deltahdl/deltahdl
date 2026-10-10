@@ -524,6 +524,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_operations_aggregate.cpp
     elaborator/elaborator_validate_operations_streaming.cpp
     elaborator/elaborator_validate_operations_unsized.cpp
+    elaborator/elaborator_validate_procedural_patterns.cpp
     elaborator/elaborator_validate_isunbounded.cpp
     elaborator/elaborator_validate_queries.cpp
     elaborator/elaborator_validate_queries_dims.cpp
