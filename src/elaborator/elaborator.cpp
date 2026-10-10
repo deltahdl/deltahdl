@@ -567,6 +567,7 @@ RtlirDesign* Elaborator::ElaborateTops(
   // parsed hierarchy, so the design keeps the way back to it. See
   // RtlirDesign::compilation_unit.
   design->compilation_unit = unit_;
+  design->compilation_units = units_.units;
   design->top_decls.assign(top_decls.begin(), top_decls.end());
   pending_generates_.clear();
   applied_defparams_.clear();
@@ -645,6 +646,7 @@ RtlirDesign* Elaborator::ElaborateTops(
       DesignMetadata{elab_simulation_blocked_, elab_last_severity_,
                      elab_last_severity_msg_, elab_last_severity_scope_,
                      elab_last_severity_loc_});
+  UnitScopeTables::PopulateUnitTypeFacts(*this, design);
   return design;
 }
 

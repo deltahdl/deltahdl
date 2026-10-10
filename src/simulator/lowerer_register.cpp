@@ -38,6 +38,7 @@
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_exec.h"
+#include "simulator/unit_scope_items.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -578,15 +579,24 @@ void RegisterPackageEnumConstants(const RtlirDesign* design, SimContext& ctx,
 // a design that declares no import never asks for one. The registry holds one
 // entry per SystemVerilog name, and a module instantiated twice registers its
 // declarations once: the second instance's are the same declarations.
+// §3.12.1: a unit's declarations in a design of several units stand under
+// "scope::name" where `unit_scope` names the unit's scope
+// (DpiRuntime::FindImportIn).
 static void RegisterDpiImportDecls(const std::vector<ModuleItem*>& decls,
-                                   const ScopeMap& scope, SimContext& ctx) {
+                                   const ScopeMap& scope, SimContext& ctx,
+                                   std::string_view unit_scope = {}) {
   DpiRuntime* dpi = nullptr;
   for (const auto* item : decls) {
     if (item->kind != ModuleItemKind::kDpiImport) continue;
     if (dpi == nullptr) dpi = &ctx.AcquireDpiRuntime();
-    if (dpi->HasImport(item->name)) continue;
+    std::string_view sv_name = item->name;
+    if (!unit_scope.empty()) {
+      sv_name = *ctx.GetArena().Create<std::string>(
+          std::string(unit_scope) + "::" + std::string(item->name));
+    }
+    if (dpi->HasImport(sv_name)) continue;
     DpiRtFunction func;
-    func.sv_name = item->name;
+    func.sv_name = sv_name;
     // §35.4: a declaration that gives no global name takes the SystemVerilog
     // name of the subroutine as its global name, which is the rule
     // DpiLinkageName states for the elaborator's own reading of the same
@@ -654,7 +664,17 @@ static void RegisterTypeDeclarations(const RtlirDesign* design,
   const CompilationUnit* unit = design->compilation_unit;
   if (unit == nullptr) return;
   RegisterTypedefItems(unit->cu_items, {}, ctx);
-  RegisterUnitCovergroups(unit->cu_items, ctx);
+  RegisterUnitCovergroups(unit->cu_items, {}, ctx);
+  // §3.12.1: where each unit has a scope of its own, each unit's typedefs and
+  // covergroups stand under that scope's name too, which the run's lookups ask
+  // first for the running code's unit (DeclaredNameTables::UnitKeyIn).
+  if (!design->compilation_units.empty()) {
+    ForEachUnitScope(design, ctx.GetArena(),
+                     [&](const CompilationUnit& own, std::string_view scope) {
+                       RegisterTypedefItems(own.cu_items, scope, ctx);
+                       RegisterUnitCovergroups(own.cu_items, scope, ctx);
+                     });
+  }
   for (const PackageDecl* pkg : unit->packages)
     RegisterTypedefItems(pkg->items, pkg->name, ctx);
   RegisterScopeTypedefs(unit->modules, ctx);
@@ -896,6 +916,12 @@ void RegisterDesignScopeDpiImports(const RtlirDesign* design, SimContext& ctx) {
   if (design->compilation_unit != nullptr) {
     RegisterDpiImportDecls(design->compilation_unit->cu_items, ScopeMap{}, ctx);
   }
+  if (design->compilation_units.empty()) return;
+  ForEachUnitScope(design, ctx.GetArena(),
+                   [&](const CompilationUnit& unit, std::string_view scope) {
+                     RegisterDpiImportDecls(unit.cu_items, ScopeMap{}, ctx,
+                                            scope);
+                   });
 }
 
 }  // namespace delta

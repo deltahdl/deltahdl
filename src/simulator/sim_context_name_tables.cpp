@@ -78,7 +78,8 @@ void DeclaredNameTables::RegisterLetDecl(std::string_view name,
 }
 
 ModuleItem* DeclaredNameTables::FindLetDecl(std::string_view name) {
-  auto it = let_decls_.find(name);
+  std::string scoped;
+  auto it = let_decls_.find(UnitKeyIn(let_decls_, name, scoped));
   return (it != let_decls_.end()) ? it->second : nullptr;
 }
 
@@ -240,7 +241,8 @@ void DeclaredNameTables::RegisterEnumType(std::string_view name,
 
 const EnumTypeInfo* DeclaredNameTables::FindEnumType(
     std::string_view name) const {
-  auto it = enum_types_.find(name);
+  std::string scoped;
+  auto it = enum_types_.find(UnitKeyIn(enum_types_, name, scoped));
   return (it != enum_types_.end()) ? &it->second : nullptr;
 }
 
@@ -325,7 +327,8 @@ void DeclaredNameTables::RegisterStructType(std::string_view name,
 
 const StructTypeInfo* DeclaredNameTables::FindStructType(
     std::string_view name) const {
-  auto it = struct_types_.find(name);
+  std::string scoped;
+  auto it = struct_types_.find(UnitKeyIn(struct_types_, name, scoped));
   return (it != struct_types_.end()) ? &it->second : nullptr;
 }
 
@@ -353,7 +356,8 @@ void DeclaredNameTables::RegisterTypeWidth(std::string_view name,
 }
 
 uint32_t DeclaredNameTables::FindTypeWidth(std::string_view name) const {
-  auto it = type_widths_.find(name);
+  std::string scoped;
+  auto it = type_widths_.find(UnitKeyIn(type_widths_, name, scoped));
   return (it != type_widths_.end()) ? it->second : 0;
 }
 
@@ -374,7 +378,8 @@ void DeclaredNameTables::RegisterTypeKind(std::string_view name,
 }
 
 DataTypeKind DeclaredNameTables::FindTypeKind(std::string_view name) const {
-  auto it = type_kinds_.find(name);
+  std::string scoped;
+  auto it = type_kinds_.find(UnitKeyIn(type_kinds_, name, scoped));
   return (it != type_kinds_.end()) ? it->second : DataTypeKind::kNamed;
 }
 
@@ -384,7 +389,8 @@ void DeclaredNameTables::RegisterTypeSigned(std::string_view name,
 }
 
 bool DeclaredNameTables::FindTypeSigned(std::string_view name) const {
-  auto it = type_signed_.find(name);
+  std::string scoped;
+  auto it = type_signed_.find(UnitKeyIn(type_signed_, name, scoped));
   return it != type_signed_.end() && it->second;
 }
 
@@ -395,7 +401,8 @@ void DeclaredNameTables::RegisterTypeRange(std::string_view name,
 
 std::optional<PackedRange> DeclaredNameTables::FindTypeRange(
     std::string_view name) const {
-  auto it = type_ranges_.find(name);
+  std::string scoped;
+  auto it = type_ranges_.find(UnitKeyIn(type_ranges_, name, scoped));
   if (it == type_ranges_.end()) return std::nullopt;
   return it->second;
 }
@@ -407,7 +414,8 @@ void DeclaredNameTables::RegisterTypeTarget(std::string_view name,
 
 std::string_view DeclaredNameTables::FindTypeTarget(
     std::string_view name) const {
-  auto it = type_targets_.find(name);
+  std::string scoped;
+  auto it = type_targets_.find(UnitKeyIn(type_targets_, name, scoped));
   return (it != type_targets_.end()) ? it->second : std::string_view{};
 }
 
@@ -457,7 +465,9 @@ const DataType* DeclaredNameTables::PackedTypeBehind(
 
 const ModuleItem* DeclaredNameTables::FindTypedefItem(
     std::string_view name) const {
-  auto it = type_declarations_.find(name);
+  std::string scoped;
+  auto it =
+      type_declarations_.find(UnitKeyIn(type_declarations_, name, scoped));
   return (it != type_declarations_.end()) ? it->second : nullptr;
 }
 

@@ -10,6 +10,7 @@
 // lowerer_register.cpp, which registers a module's own declarations, once
 // the two scopes' data outgrew it.
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -37,6 +38,8 @@
 #include "simulator/statement_assign_internal.h"
 #include "simulator/sync_objects.h"
 #include "simulator/sync_variable.h"
+#include "simulator/unit_scope_items.h"
+#include "simulator/unit_scopes.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -542,11 +545,11 @@ static std::string_view CreatePackageDataItem(const ModuleItem* item,
   if (!DeclaresPackageData(item)) return {};
   item = WithPackageOwnType(item, pkg, ctx, arena);
   auto* qname = arena.Create<std::string>(PackageDataKey(item, pkg));
-  if (pkg == kUnitScope) CarryUnitClassRecord(item, *qname, ctx);
+  if (UnitScopes::IsUnitScope(pkg)) CarryUnitClassRecord(item, *qname, ctx);
   auto* var = ctx.CreateVariable(*qname, PackageDataWidth(item, *qname, ctx));
   // §20.6.1: what $typename reads of the declaration.
   var->declared_type = &item->data_type;
-  if (pkg != kUnitScope) {
+  if (!UnitScopes::IsUnitScope(pkg)) {
     auto* scope = arena.Create<std::string>(std::string(pkg) + "::");
     var->declared_scope = *scope;
   }
@@ -603,9 +606,11 @@ void CreatePackageDataVariables(const RtlirDesign* design, SimContext& ctx,
 // constructed nothing.
 void CreateUnitDataVariables(const RtlirDesign* design, SimContext& ctx,
                              Arena& arena) {
-  if (design->compilation_unit == nullptr) return;
-  for (auto* item : design->compilation_unit->cu_items)
-    CreatePackageDataItem(item, kUnitScope, ctx, arena);
+  ForEachUnitScope(design, arena,
+                   [&](const CompilationUnit& unit, std::string_view scope) {
+                     for (auto* item : unit.cu_items)
+                       CreatePackageDataItem(item, scope, ctx, arena);
+                   });
 }
 
 // §3.12.1 (printed page 56) with §23.9 (printed 761) and §6.21 (printed
@@ -628,17 +633,30 @@ void CreateUnitDataVariables(const RtlirDesign* design, SimContext& ctx,
 void AliasUnitDataItems(const RtlirDesign* design, const RtlirModule* mod,
                         std::string_view inst_prefix, SimContext& ctx,
                         Arena& arena) {
-  if (design->compilation_unit == nullptr) return;
-  for (const auto* item : design->compilation_unit->cu_items) {
+  const CompilationUnit* unit =
+      mod->unit_index < 0
+          ? design->compilation_unit
+          : design->compilation_units[static_cast<size_t>(mod->unit_index)];
+  if (unit == nullptr) return;
+  const std::string kScope = UnitScopes::ScopeName(mod->unit_index);
+  for (const auto* item : unit->cu_items) {
     if (!DeclaresPackageData(item) || ModuleDeclaresName(mod, item->name))
       continue;
     std::string key = std::string(inst_prefix) + std::string(item->name);
     if (ctx.GetVariables().count(key) != 0) continue;
     std::string_view stored = *arena.Create<std::string>(key);
-    std::string qname = PackageDataKey(item, kUnitScope);
+    std::string qname = PackageDataKey(item, kScope);
     ctx.AliasVariable(stored, qname);
     AliasVariableKinds(stored, qname, ctx, arena);
     ctx.RegisterImportedName(stored);
+    // §3.12.1: where each unit's storage stands under its own scope name, the
+    // instance's `$unit::name` reaches its own unit's too.
+    if (mod->unit_index < 0) continue;
+    std::string_view unit_key = *arena.Create<std::string>(
+        std::string(inst_prefix) + std::string(kUnitScope) + "." +
+        std::string(item->name));
+    ctx.AliasVariable(unit_key, qname);
+    AliasVariableKinds(unit_key, qname, ctx, arena);
   }
 }
 
@@ -848,9 +866,10 @@ void InitUnitDataVariables(const RtlirDesign* design, SimContext& ctx,
   // initializers and the unit's imports, which Lowerer::InitCompilationUnitData
   // (lowerer_data_init.cpp) binds just ahead of this; bound after this, the
   // imports left `import p::*; int g = K;` reading no K, and g 0.
-  if (design->compilation_unit == nullptr) return;
-  InitScopeDataItems(design->compilation_unit->cu_items, kUnitScope, ctx,
-                     arena);
+  ForEachUnitScope(design, arena,
+                   [&](const CompilationUnit& unit, std::string_view scope) {
+                     InitScopeDataItems(unit.cu_items, scope, ctx, arena);
+                   });
 }
 
 // §8.7 (printed page 184) with §6.8 and §26.2 (printed 808): `C h = new;`
@@ -920,9 +939,10 @@ void ConstructDataClassInitializers(const RtlirDesign* design, SimContext& ctx,
   // called the method on a null handle.
   for (auto* pkg : design->packages)
     ConstructScopeClassInits(pkg->items, pkg->name, ctx, arena);
-  if (design->compilation_unit == nullptr) return;
-  ConstructScopeClassInits(design->compilation_unit->cu_items, kUnitScope, ctx,
-                           arena);
+  ForEachUnitScope(design, arena,
+                   [&](const CompilationUnit& unit, std::string_view scope) {
+                     ConstructScopeClassInits(unit.cu_items, scope, ctx, arena);
+                   });
 }
 
 }  // namespace delta

@@ -678,6 +678,7 @@ struct RtlirModule {
   SourceLoc loc;
 
   std::string_view library;
+  int unit_index = -1;  // §3.12.1: into RtlirDesign::compilation_units
   bool has_param_port_list = false;
   bool is_program = false;
   bool is_interface = false;
@@ -908,6 +909,7 @@ struct RtlirDesign {
   // (src/simulator/specify_sdf.h) reads that hierarchy off the AST, and a
   // lowered design has no other route back to it.
   const CompilationUnit* compilation_unit = nullptr;
+  std::vector<CompilationUnit*> compilation_units;  // §3.12.1; one: empty
   std::vector<const ModuleDecl*> top_decls;
 
   std::vector<ModuleItem*> cu_function_decls;

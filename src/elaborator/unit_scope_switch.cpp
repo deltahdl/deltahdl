@@ -2,6 +2,9 @@
 
 #include <cstddef>
 #include <memory>
+#include <string>
+#include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -10,7 +13,9 @@
 #include "elaborator/compilation_unit_set.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_scope_rules_names.h"
+#include "elaborator/elaborator_type_facts.h"
 #include "elaborator/elaborator_validate_classes.h"
+#include "elaborator/rtlir.h"
 #include "parser/ast_design.h"
 
 namespace delta {
@@ -78,6 +83,46 @@ void UnitScopeTables::RunPreElaborationValidations(Elaborator& e) {
   e.all_typedefs_ = std::move(all_typedefs);
   e.all_cu_param_scope_ = std::move(all_cu_param_scope);
   e.unit_ = units.merged;
+}
+
+namespace {
+
+// The unit's own entries of `from`, the ones under a bare name, added to `to`
+// under `scope`'s name; a package's or a class's entry, "p::t", is the same in
+// every unit and stands in `to` already.
+template <typename Value>
+void AddUnitScoped(std::unordered_map<std::string_view, Value>& to,
+                   const std::unordered_map<std::string_view, Value>& from,
+                   std::string_view scope, Arena& arena) {
+  for (const auto& [name, value] : from) {
+    if (name.find("::") != std::string_view::npos) continue;
+    to.emplace(*arena.Create<std::string>(std::string(scope) +
+                                          "::" + std::string(name)),
+               value);
+  }
+}
+
+}  // namespace
+
+void UnitScopeTables::PopulateUnitTypeFacts(Elaborator& e,
+                                            RtlirDesign* design) {
+  for (size_t k = 0; k < e.units_.tables.size(); ++k) {
+    const UnitScopeTables& unit = *e.units_.tables[k];
+    RtlirDesign own;
+    TypeNameFacts facts{own.type_widths,  own.type_kinds,   own.type_signed,
+                        own.type_layouts, own.type_targets, own.type_ranges,
+                        own.type_enums};
+    PopulateTypeWidths({unit.typedefs, unit.aggregate_typedef_names, e.arena_},
+                       facts);
+    const std::string kScope = "$unit#" + std::to_string(k);
+    AddUnitScoped(design->type_widths, own.type_widths, kScope, e.arena_);
+    AddUnitScoped(design->type_kinds, own.type_kinds, kScope, e.arena_);
+    AddUnitScoped(design->type_signed, own.type_signed, kScope, e.arena_);
+    AddUnitScoped(design->type_layouts, own.type_layouts, kScope, e.arena_);
+    AddUnitScoped(design->type_targets, own.type_targets, kScope, e.arena_);
+    AddUnitScoped(design->type_ranges, own.type_ranges, kScope, e.arena_);
+    AddUnitScoped(design->type_enums, own.type_enums, kScope, e.arena_);
+  }
 }
 
 UnitScopeTables::Switch::Switch(Elaborator& e, const ModuleDecl* decl) : e_(e) {

@@ -422,6 +422,25 @@ class DeclaredNameTables {
   std::string_view VirtualInterfaceBinding(const Variable* v) const;
 
  protected:
+  // §3.12.1 (printed page 56): the running code's compilation-unit scope name
+  // where each unit has a scope of its own, empty otherwise; SimContext
+  // answers it from the running instance (SimContext::ActiveUnitScope).
+  std::function<std::string()> running_unit_scope_ = [] {
+    return std::string();
+  };
+  // `name` as the running unit's own declaration of it is keyed, where `table`
+  // holds one under the unit's scope name, and `name` otherwise. `scoped`
+  // holds the key the answer may view.
+  template <typename Table>
+  std::string_view UnitKeyIn(const Table& table, std::string_view name,
+                             std::string& scoped) const {
+    scoped = running_unit_scope_();
+    if (scoped.empty()) return name;
+    scoped += "::";
+    scoped += name;
+    return table.contains(scoped) ? std::string_view(scoped) : name;
+  }
+
   std::unordered_map<std::string_view, ModuleItem*> functions_;
   // §19.6.1.4: see PushFunctionScope.
   std::vector<std::vector<ModuleItem*>> function_scopes_;

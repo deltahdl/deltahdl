@@ -255,6 +255,8 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_mailbox.cpp
     simulator/queue_bound.cpp
     simulator/sim_context.cpp
+    simulator/unit_scopes.cpp
+    simulator/unit_scope_items.cpp
     simulator/cover_results.cpp
     simulator/scope_hier_name.cpp
     simulator/sim_context_binding.cpp

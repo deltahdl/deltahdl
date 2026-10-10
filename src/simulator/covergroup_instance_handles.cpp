@@ -152,10 +152,15 @@ bool TryCreateCovergroupLocal(const DataType& type, const Expr* init,
 }
 
 void RegisterUnitCovergroups(const std::vector<ModuleItem*>& items,
-                             SimContext& ctx) {
+                             std::string_view scope, SimContext& ctx) {
   for (ModuleItem* item : items) {
-    if (item->kind == ModuleItemKind::kCovergroupDecl)
-      ctx.RegisterLetDecl(item->name, item);
+    if (item->kind != ModuleItemKind::kCovergroupDecl) continue;
+    std::string_view key = item->name;
+    if (!scope.empty()) {
+      key = *ctx.GetArena().Create<std::string>(std::string(scope) +
+                                                "::" + std::string(item->name));
+    }
+    ctx.RegisterLetDecl(key, item);
   }
 }
 

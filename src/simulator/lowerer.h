@@ -243,6 +243,9 @@ class Lowerer {
   // inst_prefix_ names; LowerImports and LowerCompilationUnitImports both go
   // through it. Defined in lowerer_import.cpp.
   void LowerOneImport(const ImportItem& imp);
+  // The import declarations among a compilation unit's `items`, the explicit
+  // ones first (§26.5), each through LowerOneImport.
+  void LowerUnitImportItems(const std::vector<ModuleItem*>& items);
   PackageDecl* FindPackage(std::string_view name) const;
 
   void LowerImportedName(PackageDecl* pkg, std::string_view name,

@@ -10,34 +10,17 @@
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
-#include "lexer/lexer.h"
-#include "parser/ast_design.h"
-#include "parser/parser.h"
-#include "parser/scope_type_names.h"
+#include "helpers_separate_units.h"
 
 using namespace delta;
 
 namespace {
 
-// Parses each of `srcs` as a compilation unit of its own, the use model
-// §3.12.1 (printed page 56) has a tool provide where each file is one, and
-// elaborates the units together. A package is visible in every unit, so each
-// parse is handed the package names the units before it declared, which is
-// what lets a later unit's `import p::*;` read p's type names as types.
+// Elaborates `srcs` together, each a compilation unit of its own.
 RtlirDesign* ElaborateUnits(const std::vector<std::string>& srcs,
                             ElabFixture& f, std::string_view top = "") {
-  std::vector<CompilationUnit*> units;
-  CompilationUnitScopeNames packages;
-  for (const auto& src : srcs) {
-    auto fid = f.mgr.AddFile("<unit>", src);
-    Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-    Parser parser(lexer, f.arena, f.diag);
-    parser.AdoptCompilationUnitScope(packages);
-    units.push_back(parser.Parse());
-    auto scope = parser.CompilationUnitScope();
-    packages.packages.insert(scope.packages.begin(), scope.packages.end());
-  }
-  Elaborator elab(f.arena, f.diag, units);
+  Elaborator elab(f.arena, f.diag,
+                  ParseUnitsApart(srcs, f.mgr, f.arena, f.diag));
   auto* design = elab.Elaborate(top);
   f.has_errors = f.diag.HasErrors();
   return design;

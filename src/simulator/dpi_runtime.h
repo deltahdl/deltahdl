@@ -241,6 +241,11 @@ class DpiRuntime {
   std::vector<DpiRtFunction>& Imports() { return imports_; }
   std::vector<DpiRtExport>& Exports() { return exports_; }
   const DpiRtFunction* FindImport(std::string_view sv_name) const;
+  // §3.12.1: the import a call written `sv_name` reaches from code of the unit
+  // whose scope `unit_scope` names, which a unit's own declaration of the name
+  // answers first; FindImport's answer for an empty scope.
+  const DpiRtFunction* FindImportIn(std::string_view unit_scope,
+                                    std::string_view sv_name) const;
   bool HasImport(std::string_view sv_name) const;
   uint32_t ImportCount() const;
 

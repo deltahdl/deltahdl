@@ -29,6 +29,8 @@
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
+#include "simulator/unit_scope_items.h"
+#include "simulator/unit_scopes.h"
 
 namespace delta {
 
@@ -785,8 +787,8 @@ static void LowerNestedClasses(ClassTypeInfo* outer, const ClassDecl* cls,
 // EvalFunctionCall gives a package function's, and the package's parameters,
 // enum literals, variables and functions answer to their bare names inside
 // the body. §3.12.1 (printed page 56): the compilation unit's scope is
-// recorded the same way under kUnitScopeName for a class the unit declares,
-// so a method's frame and the property defaults' frame
+// recorded the same way under the unit's scope name (UnitScopeOfClass) for a
+// class it declares, so a method's frame and the property defaults' frame
 // (ConstructBaseThenDefaults in eval_class_new.cpp) resolve a bare name to
 // the unit's "$unit.name" storage ahead of the calling module's like-named
 // declaration, which the class's scope never contains (§23.9). With nothing
@@ -849,25 +851,6 @@ std::string_view Lowerer::DeclaringPackage(const ClassDecl* cls) const {
   return {};
 }
 
-// §3.12.1 (printed page 56): the name the compilation-unit scope's frames
-// are pushed with and its items keyed under, "$unit.name", as
-// lowerer_package_data.cpp spells it for the unit's storage and its own
-// initializers' frames (kUnitScope there); no package can be named so, `$`
-// starting no identifier.
-constexpr std::string_view kUnitScopeName = "$unit";
-
-// §3.12.1: kUnitScopeName for a class the compilation unit itself declares
-// (RtlirDesign::cu_class_decls), and an empty view for a package's or a
-// module's class, or with no design behind the class.
-static std::string_view UnitScopeOf(const RtlirDesign* design,
-                                    const ClassDecl* cls) {
-  if (design == nullptr) return {};
-  for (const ClassDecl* unit_cls : design->cu_class_decls) {
-    if (unit_cls == cls) return kUnitScopeName;
-  }
-  return {};
-}
-
 void Lowerer::RegisterClassDecl(const ClassDecl* cls,
                                 const std::vector<ModuleItem*>& scope_items) {
   auto* info = arena_.Create<ClassTypeInfo>();
@@ -894,12 +877,21 @@ void Lowerer::RegisterClassDecl(const ClassDecl* cls,
   // `C::s` read 0; a package class's read the package's variable through
   // no key at all. A module's class is populated in no frame, as before.
   std::string_view scope = DeclaringPackage(cls);
-  if (scope.empty()) scope = UnitScopeOf(design_, cls);
+  if (scope.empty()) scope = UnitScopeOfClass(design_, cls, arena_);
   if (!scope.empty()) ctx_.PushScope(scope);
   PopulateClassType(info, cls, {scope_items, constants}, ctx_, arena_);
   if (!scope.empty()) ctx_.PopScope();
   RecordClassPackage(info, scope, ctx_);
   ctx_.RegisterClassType(cls->name, info);
+  // §3.12.1: where each unit has a scope of its own, the unit's class is also
+  // held under that scope's name, which SimContext::FindClassType asks first
+  // for the running code's unit, so two units' classes of one name are two.
+  if (ctx_.Units().Separate() && UnitScopes::IsUnitScope(scope)) {
+    ctx_.RegisterClassType(
+        *arena_.Create<std::string>(std::string(scope) +
+                                    "::" + std::string(cls->name)),
+        info);
+  }
   // §6.18 with §8.3: the class's typedefs naming a class, its own included,
   // bound before InitClassStaticProperties runs its methods.
   RegisterClassScopeTypedefAliases(info, ctx_, arena_);

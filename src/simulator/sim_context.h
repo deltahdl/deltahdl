@@ -56,6 +56,7 @@
 #include "simulator/specify.h"
 #include "simulator/sva_engine_sampling.h"
 #include "simulator/sync_objects.h"
+#include "simulator/unit_scopes.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_dump_state.h"
 #include "simulator/vcd_writer.h"
@@ -76,9 +77,9 @@ class SimContext : public DeclaredNameTables,
   SimContext(Scheduler& sched, Arena& arena, DiagEngine& diag,
              uint32_t seed = 0)
       : scheduler_(sched), arena_(arena), diag_(diag), default_seed_(seed) {
-    // Wire the scheduler's back-reference so it can clear the executing process
-    // when it goes idle (see Scheduler::Run).
+    // The scheduler clears the executing process through it (Scheduler::Run).
     scheduler_.SetContext(this);
+    running_unit_scope_ = [this] { return ActiveUnitScope(); };
   }
 
   // Declared (not defaulted inline) so the owning unique_ptr to the
@@ -386,6 +387,8 @@ class SimContext : public DeclaredNameTables,
   // and reached by the bare name its module declared
   // (ClockingManager::FindInScope).
   std::string ActiveInstancePrefix() const;
+  UnitScopes& Units() { return units_; }  // §3.12.1, unit_scopes.h
+  std::string ActiveUnitScope() const;    // "$unit#k" running, "" for one unit
 
   // §32.4.3: the instance an evaluation stands in, where that is not the
   // running process's. simulator/instance_prefix_override.h holds the reason
@@ -506,9 +509,6 @@ class SimContext : public DeclaredNameTables,
   // Marking a name no variable answers to marks nothing, which is what a
   // registration made before the variable exists would do; every caller
   // creates the variable first.
-  //
-  // The query is not const because FindVariable is not, the lookup walking
-  // scope frames it hands out mutable variables from.
   void RegisterStringVariable(std::string_view name);
   bool IsStringVariable(std::string_view name);
   ArrayInfo* FindArrayInfo(std::string_view name);
@@ -821,6 +821,7 @@ class SimContext : public DeclaredNameTables,
   Process* current_process_ = nullptr;
   // The instance being built. See SetLoweringInstancePrefix.
   std::string lowering_inst_prefix_;
+  UnitScopes units_;
   InstancePrefixOverrideState prefix_override_;
   bool stop_requested_ = false;
   bool finish_requested_ = false;

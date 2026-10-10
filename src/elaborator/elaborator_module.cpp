@@ -555,6 +555,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   // of the unit that declared it, before anything here reads that scope.
   UnitScopeTables::Switch unit_scope(*this, decl);
   auto* mod = arena_.Create<RtlirModule>();
+  if (!units_.views.empty()) mod->unit_index = static_cast<int>(units_.current);
   InitRtlirModuleHeader(mod, decl, unit_, diag_);
 
   // The per-module item-elaboration state (the members reset by

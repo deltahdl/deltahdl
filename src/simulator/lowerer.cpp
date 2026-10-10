@@ -17,6 +17,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "simulator/assertion_read_names.h"
@@ -47,6 +48,8 @@
 #include "simulator/stmt_result.h"
 #include "simulator/timing_check_delayed_signals.h"
 #include "simulator/timing_check_driver.h"
+#include "simulator/unit_scope_items.h"
+#include "simulator/unit_scopes.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_data_structs.h"
@@ -230,6 +233,8 @@ void Lowerer::RecordSpecifyScope(const RtlirModule* mod) {
 }
 
 void Lowerer::LowerModule(const RtlirModule* mod) {
+  ctx_.Units().SetInstanceUnit(inst_prefix_, mod->unit_index);
+  RegisterOwnUnitSubroutines(design_, mod, inst_prefix_, ctx_, arena_);
   RegisterInstanceKeyBinding(inst_prefix_, mod->library, mod->name, ctx_);
   LowerParams(mod);
   RecordSpecifyScope(mod);
@@ -621,16 +626,18 @@ static void RegisterScopeTimescales(const RtlirModule* mod, SimContext& ctx,
 // f, or a generate block's the caller stood in, answered t's call.
 static void RegisterFreeCuFunctions(const RtlirDesign* design, SimContext& ctx,
                                     Arena& arena) {
-  static constexpr std::string_view kUnitScope = "$unit";
-  for (auto* item : design->cu_function_decls) {
-    if (!item->method_class.empty()) continue;
-    ctx.RegisterFunction(item->name, item);
-    ctx.RegisterFunction(
-        *arena.Create<std::string>(std::string(kUnitScope) +
-                                   "::" + std::string(item->name)),
-        item);
-    ctx.RegisterSubroutinePackage(item, kUnitScope);
-  }
+  ForEachUnitScope(
+      design, arena, [&](const CompilationUnit& unit, std::string_view scope) {
+        for (auto* item : unit.cu_items) {
+          if (!IsFreeUnitSubroutine(item)) continue;
+          ctx.RegisterFunction(item->name, item);
+          ctx.RegisterFunction(
+              *arena.Create<std::string>(std::string(scope) +
+                                         "::" + std::string(item->name)),
+              item);
+          ctx.RegisterSubroutinePackage(item, scope);
+        }
+      });
 }
 
 // §30.3, §32.4.1 and §6.20.5: the timing every module instance declared,

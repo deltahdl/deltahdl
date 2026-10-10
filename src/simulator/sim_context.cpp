@@ -26,6 +26,7 @@
 #include "simulator/sim_context_name_tables.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/specify.h"
+#include "simulator/unit_scopes.h"
 
 namespace delta {
 
@@ -264,6 +265,20 @@ std::string SimContext::ActiveInstancePrefix() const {
   if (prefix_override_.active) return prefix_override_.prefix;
   return current_process_ ? current_process_->inst_prefix
                           : lowering_inst_prefix_;
+}
+
+// §3.12.1 (printed page 56): the scope name the compilation-unit names of the
+// running code stand under where each unit has a scope of its own, and empty
+// for a design of one unit. A unit's subroutine runs in its unit's frame
+// (EnterSubroutinePackage), whatever instance enabled it; other code stands in
+// the unit of its instance's module.
+std::string SimContext::ActiveUnitScope() const {
+  if (!units_.Separate()) return {};
+  const Scope* frame = PackageFrame();
+  if (frame != nullptr && UnitScopes::IsUnitScope(frame->package)) {
+    return std::string(frame->package);
+  }
+  return UnitScopes::ScopeName(units_.UnitOf(ActiveInstancePrefix()));
 }
 
 // §26.3 with §13.4: a bare name read inside a package subroutine's body is
@@ -785,6 +800,8 @@ void SimContext::RegisterStringVariable(std::string_view name) {
   if (auto* var = FindVariable(name)) var->is_string = true;
 }
 
+// Not const because FindVariable is not, the lookup walking scope frames it
+// hands out mutable variables from.
 bool SimContext::IsStringVariable(std::string_view name) {
   const auto* var = FindVariable(name);
   return var != nullptr && var->is_string;

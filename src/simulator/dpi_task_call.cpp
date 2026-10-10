@@ -125,7 +125,8 @@ ExecTask RunRequestedTask(DpiTaskChannel& channel, SimContext& ctx,
 bool EnablesDpiImportTask(const Expr* expr, SimContext& ctx) {
   DpiRuntime* dpi = ctx.GetDpiRuntime();
   if (dpi == nullptr || expr->callee.empty()) return false;
-  const DpiRtFunction* import = dpi->FindImport(expr->callee);
+  const DpiRtFunction* import =
+      dpi->FindImportIn(ctx.ActiveUnitScope(), expr->callee);
   return import != nullptr && import->is_task;
 }
 

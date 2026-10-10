@@ -266,9 +266,10 @@ bool TryCovergroupNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 // §19.3 with §3.12.1: registers each covergroup among `items`, the
 // compilation unit's, as a type found by its bare name (CovergroupOfType); a
 // module's own covergroup, registered when the module is lowered, takes the
-// name after.
+// name after. Under "scope::name" where `scope` is not empty, a unit's own
+// scope name in a design of several units (§3.12.1).
 void RegisterUnitCovergroups(const std::vector<ModuleItem*>& items,
-                             SimContext& ctx);
+                             std::string_view scope, SimContext& ctx);
 
 // §19.3 with §8.7: the handle the declaration initializer `init`, a call of
 // `new(...)`, gives the property `name` of `type` where the property is of a

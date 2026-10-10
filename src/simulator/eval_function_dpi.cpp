@@ -802,8 +802,9 @@ bool BeginDpiImportCall(const Expr* expr, SimContext& ctx, Arena& arena,
   call.dpi = ctx.GetDpiRuntime();
   call.expr = expr;
   call.callee = DpiCalleeName(expr);
-  call.import =
-      call.dpi == nullptr ? nullptr : call.dpi->FindImport(call.callee);
+  call.import = call.dpi == nullptr ? nullptr
+                                    : call.dpi->FindImportIn(
+                                          ctx.ActiveUnitScope(), call.callee);
   if (call.import == nullptr) return false;
   // §35.4 makes an imported subroutine's declaration a reference to a global
   // symbol the foreign side defines, and §35.5.4 leaves the binding of that

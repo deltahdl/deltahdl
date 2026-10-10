@@ -9,6 +9,7 @@ namespace delta {
 
 struct CompilationUnit;
 struct ModuleDecl;
+struct RtlirDesign;
 
 // §3.12.1 (printed page 56) with §3.13: what the elaborator has registered of
 // one compilation unit's scope -- its typedefs, parameters, classes, nettypes
@@ -38,6 +39,13 @@ struct UnitScopeTables {
   // Elaborator::RunPreElaborationValidations, over the merged view where `e`
   // elaborates several units, followed by each unit's own tables.
   static void RunPreElaborationValidations(Elaborator& e);
+
+  // §6.18 with §3.12.1: what each unit's own typedefs say of their names --
+  // widths, kinds, layouts and the rest of RtlirDesign's type tables -- under
+  // the unit's scope name, "$unit#k::t", beside the bare names the merged
+  // view's typedefs answer for, so the run asks the running code's unit's
+  // first. Nothing where `e` elaborates one unit.
+  static void PopulateUnitTypeFacts(Elaborator& e, RtlirDesign* design);
 
   // Runs `check` over each unit as parsed, which holds its own declarations
   // alone, where `e` elaborates several units, and over the one unit `e`

@@ -25,6 +25,7 @@
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec.h"
+#include "simulator/unit_scope_items.h"
 
 namespace delta {
 
@@ -471,6 +472,14 @@ void Lowerer::LowerImports(const RtlirModule* mod) {
     if (!imp.is_wildcard) apply_import(imp);
   for (const auto& imp : mod->imports)
     if (imp.is_wildcard) apply_import(imp);
+  // §3.12.1: where each unit has a scope of its own, the imports of the unit
+  // the module was declared in, bound for this instance after its own, a name
+  // the module declares left to the declaration as for its own imports.
+  if (mod->unit_index >= 0) {
+    LowerUnitImportItems(
+        design_->compilation_units[static_cast<size_t>(mod->unit_index)]
+            ->cu_items);
+  }
   importing_module_ = nullptr;
   // §3.12.1: the compilation unit's items the module does not declare, the
   // scope searched after the module's own and its imports', bound under the
@@ -791,7 +800,27 @@ void Lowerer::AliasExportedClassKeys(const PackageDecl* pkg,
 
 void Lowerer::LowerCompilationUnitImports() {
   if (!design_ || !design_->compilation_unit) return;
-  const auto& items = design_->compilation_unit->cu_items;
+  // §3.12.1: where each unit has a scope of its own, a unit's imports are its
+  // own, so each instance binds those of its own unit (LowerImports), and the
+  // unit's initializers reach them through the unit's frame.
+  if (!design_->compilation_units.empty()) {
+    ForEachUnitScope(design_, arena_,
+                     [&](const CompilationUnit& unit, std::string_view scope) {
+                       for (const auto* item : unit.cu_items) {
+                         if (item->kind != ModuleItemKind::kImportDecl)
+                           continue;
+                         const ImportItem& imp = item->import_item;
+                         ctx_.RegisterPackageImport(
+                             scope, imp.package_name,
+                             imp.is_wildcard ? "*" : imp.item_name);
+                       }
+                     });
+    return;
+  }
+  LowerUnitImportItems(design_->compilation_unit->cu_items);
+}
+
+void Lowerer::LowerUnitImportItems(const std::vector<ModuleItem*>& items) {
   // §26.5's precedence of an explicit import over a wildcard one holds in the
   // compilation-unit scope as in a module, so the explicit imports bind first.
   for (const auto* item : items) {
@@ -806,9 +835,20 @@ void Lowerer::LowerCompilationUnitImports() {
 
 void Lowerer::LowerCompilationUnitClasses() {
   std::unordered_set<std::string_view> unit_class_names;
+  std::unordered_set<const ClassDecl*> lowered;
   for (auto* cls : design_->cu_class_decls) {
-    if (unit_class_names.insert(cls->name).second)
-      LowerClassDecl(cls, design_->cu_function_decls);
+    if (!unit_class_names.insert(cls->name).second) continue;
+    LowerClassDecl(cls, design_->cu_function_decls);
+    lowered.insert(cls);
+  }
+  // §3.12.1: two units' classes of one name are two classes, each lowered,
+  // the first of the name having been lowered above.
+  for (const auto* unit : design_->compilation_units) {
+    for (auto* cls : unit->classes) {
+      if (lowered.insert(cls).second) {
+        LowerClassDecl(cls, design_->cu_function_decls);
+      }
+    }
   }
   // §24.6: an anonymous program declares its items in the compilation unit's
   // space without a scope of its own, so a class it declares is a unit class

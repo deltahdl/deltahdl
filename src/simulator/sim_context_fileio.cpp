@@ -19,6 +19,7 @@
 #include "simulator/sim_context_name_tables.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/sync_objects.h"
+#include "simulator/unit_scopes.h"
 #include "simulator/vcd_writer.h"
 
 namespace delta {
@@ -563,6 +564,13 @@ ClassTypeInfo* SimContext::FindClassType(std::string_view name) {
   constexpr std::string_view kStdScope = "std::";
   if (name.substr(0, kStdScope.size()) == kStdScope)
     name = name.substr(kStdScope.size());
+  // §3.12.1: where each unit has a scope of its own, the running code's unit's
+  // class of the name stands ahead of another unit's
+  // (Lowerer::RegisterClassDecl).
+  if (units_.Separate()) {
+    auto own = class_types_.find(ActiveUnitScope() + "::" + std::string(name));
+    if (own != class_types_.end()) return own->second;
+  }
   auto it = class_types_.find(name);
   if (it != class_types_.end()) return it->second;
   for (const ClassTypeInfo* scope = CurrentMethodClass(); scope != nullptr;

@@ -278,6 +278,16 @@ const DpiRtFunction* DpiRuntime::FindImport(std::string_view sv_name) const {
   return &imports_[it->second];
 }
 
+const DpiRtFunction* DpiRuntime::FindImportIn(std::string_view unit_scope,
+                                              std::string_view sv_name) const {
+  if (!unit_scope.empty()) {
+    const DpiRtFunction* own =
+        FindImport(std::string(unit_scope) + "::" + std::string(sv_name));
+    if (own != nullptr) return own;
+  }
+  return FindImport(sv_name);
+}
+
 bool DpiRuntime::HasImport(std::string_view sv_name) const {
   return import_index_.count(sv_name) != 0;
 }
