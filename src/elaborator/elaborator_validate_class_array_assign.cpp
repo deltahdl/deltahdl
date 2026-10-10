@@ -263,7 +263,8 @@ std::optional<Elaborator::VarArrayInfo> OperandArrayInfo(
   bool sliced = last->index_end != nullptr;
   size_t kept = sliced ? selects - 1 : selects;
   if (kept >= shape.size()) return std::nullopt;
-  std::vector<std::optional<uint32_t>> sizes(shape.begin() + kept, shape.end());
+  std::vector<std::optional<uint32_t>> sizes(
+      shape.begin() + static_cast<std::ptrdiff_t>(kept), shape.end());
   if (sliced) sizes.front() = ConstantSliceWidth(last);
   Elaborator::VarArrayInfo part = whole;
   part.dim_sizes.clear();
