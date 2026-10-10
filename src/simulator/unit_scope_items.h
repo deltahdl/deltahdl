@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/arena.h"
 #include "elaborator/rtlir.h"
@@ -47,6 +48,11 @@ void ForEachUnitScope(const RtlirDesign* design, Arena& arena, Fn fn) {
 // design behind it.
 std::string_view UnitScopeOfClass(const RtlirDesign* design,
                                   const ClassDecl* cls, Arena& arena);
+
+// The compilation unit's classes to lower: the first of each name, and in a
+// design of several units every unit's own, two units' classes of one name
+// being two classes (§3.12.1). Defined in unit_scope_items.cpp.
+std::vector<const ClassDecl*> UnitClassesToLower(const RtlirDesign* design);
 
 // §3.12.1: in a design of several units, records that the instance under
 // `prefix` stands in the unit `mod` was declared in (UnitScopes), and

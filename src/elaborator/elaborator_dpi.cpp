@@ -605,7 +605,8 @@ void ValidateDpiScopeGlobalNames(const std::vector<ModuleItem*>& items,
 // four through Parser::ParseModuleItem and a package body through it as well.
 // §3.12.1's compilation-unit scope holds every declaration outside any other
 // scope and comes last, since a declaration reaches it only by being in none of
-// the others.
+// the others; where each file is a unit of its own, `separate_units` holds the
+// units, and each unit's scope is a scope of its own.
 // §27.6 makes a generate block a scope, so the items of one are a scope of
 // their own for every rule §35.4, §35.5.4 and §35.7 state over declarations in
 // one scope, and they belong in the tables those clauses state across scopes --
@@ -626,7 +627,8 @@ void AddGenerateScopes(const std::vector<ModuleItem*>& items,
 }
 
 std::vector<const std::vector<ModuleItem*>*> DpiDeclarationScopes(
-    const CompilationUnit* unit) {
+    const CompilationUnit* unit,
+    const std::vector<CompilationUnit*>& separate_units) {
   std::vector<const std::vector<ModuleItem*>*> scopes;
   for (const auto* group :
        {&unit->modules, &unit->interfaces, &unit->programs, &unit->checkers}) {
@@ -637,7 +639,8 @@ std::vector<const std::vector<ModuleItem*>*> DpiDeclarationScopes(
   for (const auto* pkg : unit->packages) {
     if (pkg != nullptr) scopes.push_back(&pkg->items);
   }
-  scopes.push_back(&unit->cu_items);
+  if (separate_units.empty()) scopes.push_back(&unit->cu_items);
+  for (const auto* own : separate_units) scopes.push_back(&own->cu_items);
   // The generate blocks of every scope collected above, each its own scope. The
   // list is walked by index rather than by iterator because the descent appends
   // to it, and a generate block of a generate block is reached by the recursion
@@ -657,7 +660,7 @@ void Elaborator::ValidateDpiDeclarations() {
   std::unordered_map<std::string_view, DpiSignatureKey> signatures;
   std::unordered_map<std::string_view, SourceLoc> first_decl_loc;
 
-  for (const auto* items : DpiDeclarationScopes(unit_)) {
+  for (const auto* items : DpiDeclarationScopes(unit_, units_.units)) {
     CheckDpiScopeImportDeclarations(*items, signatures, first_decl_loc, diag_);
   }
 }
@@ -684,7 +687,7 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
   // at compilation-unit scope, beside the module holding the import. So the
   // names are collected across every scope a DPI declaration can be written in
   // before any of them is checked.
-  auto scopes = DpiDeclarationScopes(unit_);
+  auto scopes = DpiDeclarationScopes(unit_, units_.units);
   DpiClassNames classes = CollectDpiClassNames(unit_, scopes);
 
   DpiNameContext names{unit_, typedefs_, classes};

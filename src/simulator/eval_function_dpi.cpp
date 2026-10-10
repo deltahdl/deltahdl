@@ -840,21 +840,24 @@ bool BeginDpiImportCall(const Expr* expr, SimContext& ctx, Arena& arena,
   // an export that instance declares is reached in (§35.5.3).
   DpiScope scope;
   scope.name = DpiInstanceScopeName(ctx.ActiveInstancePrefix(), ctx);
-  call.dpi->EnterDeclaredImportCall(call.callee, std::move(scope));
+  call.dpi->EnterDeclaredImportCall(call.import->sv_name, std::move(scope));
   return true;
 }
 
+// The call is made by the key the import found stands under, which in a design
+// of several units is its own unit's (§3.12.1) rather than the callee's text.
 void CallDpiImport(DpiImportCall& call) {
   if (call.import->is_pure) {
     // §35.5.2: a call of a pure function may be swapped for the result an
     // earlier call with equal inputs computed, and a
     // pure function has no output or inout formals for a copy-back to carry.
-    call.result = call.dpi->CallImportReusingPureResult(call.callee, call.args);
+    call.result =
+        call.dpi->CallImportReusingPureResult(call.import->sv_name, call.args);
   } else {
     // §35.5.1.2 and §35.6.1 copy the written formals back into the actuals;
     // §35.6.2 says which of those actuals the call actually changed.
-    call.result = call.dpi->CallImportDetectingChanges(call.callee, call.args,
-                                                       call.changes);
+    call.result = call.dpi->CallImportDetectingChanges(call.import->sv_name,
+                                                       call.args, call.changes);
   }
 }
 

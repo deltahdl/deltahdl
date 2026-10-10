@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <unordered_set>
+#include <vector>
 
 #include "common/arena.h"
 #include "elaborator/rtlir.h"
@@ -39,6 +41,26 @@ std::string_view UnitScopeOfClass(const RtlirDesign* design,
                      }
                    });
   return found;
+}
+
+// The compilation unit's classes to lower: the first of each name, and in a
+// design of several units every unit's own, two units' classes of one name
+// being two classes (§3.12.1).
+std::vector<const ClassDecl*> UnitClassesToLower(const RtlirDesign* design) {
+  std::unordered_set<std::string_view> names;
+  std::unordered_set<const ClassDecl*> chosen;
+  std::vector<const ClassDecl*> classes;
+  for (const auto* cls : design->cu_class_decls) {
+    if (!names.insert(cls->name).second) continue;
+    chosen.insert(cls);
+    classes.push_back(cls);
+  }
+  for (const auto* unit : design->compilation_units) {
+    for (const auto* cls : unit->classes) {
+      if (chosen.insert(cls).second) classes.push_back(cls);
+    }
+  }
+  return classes;
 }
 
 // §3.12.1: in a design of several units, the instance under `prefix` reaches

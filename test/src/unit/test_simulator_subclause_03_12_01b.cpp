@@ -11,6 +11,7 @@
 #include "helpers_dpi_c_binding.h"
 #include "helpers_separate_units.h"
 #include "simulator/dpi_binding.h"
+#include "simulator/dpi_runtime.h"
 #include "simulator/lowerer.h"
 #include "simulator/unit_scopes.h"
 #include "simulator/variable.h"
@@ -193,6 +194,12 @@ TEST(SeparateUnitsSim, EachUnitsDpiImportIsItsOwn) {
                  f);
   ASSERT_NE(design, nullptr);
   ASSERT_NE(f.ctx.GetDpiRuntime(), nullptr);
+  // Each unit's declaration is held under its own unit's scope, and the child
+  // instance stands in the second unit.
+  const auto* second = f.ctx.GetDpiRuntime()->FindImportIn("$unit#1", "f");
+  ASSERT_NE(second, nullptr);
+  EXPECT_EQ(second->c_name, "add_two");
+  EXPECT_EQ(f.ctx.Units().UnitOf("c."), 1);
   BindDpiImports(
       *f.ctx.GetDpiRuntime(),
       LookupIn({{"add_one", reinterpret_cast<void*>(&SeparateUnitsAddOne)},
