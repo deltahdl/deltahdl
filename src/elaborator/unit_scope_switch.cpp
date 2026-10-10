@@ -16,6 +16,7 @@
 #include "elaborator/elaborator_type_facts.h"
 #include "elaborator/elaborator_validate_classes.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/time_literal_scale.h"
 #include "parser/ast_design.h"
 
 namespace delta {
@@ -53,6 +54,13 @@ void UnitScopeTables::Put(UnitScopeTables tables, Elaborator& e) {
 
 void UnitScopeTables::RunPreElaborationValidations(Elaborator& e) {
   auto& units = e.units_;
+  // §5.8: every time literal takes its scope's unit before anything evaluates
+  // it, each unit's against that unit's own declarations.
+  if (units.units.empty()) {
+    ScaleTimeLiterals(*e.unit_);
+  } else {
+    for (const CompilationUnit* unit : units.units) ScaleTimeLiterals(*unit);
+  }
   if (units.views.empty()) {
     e.RunPreElaborationValidations();
     return;

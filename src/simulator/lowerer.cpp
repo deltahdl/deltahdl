@@ -16,6 +16,7 @@
 #include "elaborator/global_clocking_sampled_value.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/sensitivity.h"
+#include "elaborator/time_literal_scale.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -776,17 +777,8 @@ static void RegisterDesignScopes(const RtlirDesign* design, SimContext& ctx) {
   // declares one and the default where it does not. A package is never
   // nested, so no enclosing element stands ahead of those.
   for (const PackageDecl* pkg : design->packages) {
-    TimeScale scale = pkg->has_directive_timescale ? pkg->directive_timescale
-                                                   : design->cu_timescale;
-    if (pkg->has_timeunit) {
-      scale.unit = pkg->time_unit;
-      scale.magnitude = pkg->time_unit_magnitude;
-    }
-    if (pkg->has_timeprecision) {
-      scale.precision = pkg->time_prec;
-      scale.prec_magnitude = pkg->time_prec_magnitude;
-    }
-    ctx.SetScopeTimeScale(std::string(pkg->name) + "::", scale);
+    ctx.SetScopeTimeScale(std::string(pkg->name) + "::",
+                          PackageTimescale(*pkg, design->cu_timescale));
   }
 }
 

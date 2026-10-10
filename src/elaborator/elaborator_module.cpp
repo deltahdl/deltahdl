@@ -18,6 +18,7 @@
 #include "elaborator/elaborator_items_params.h"
 #include "elaborator/global_clock_assertion_event.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/time_literal_scale.h"
 #include "elaborator/unit_scope_switch.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -145,76 +146,6 @@ static void InitInterfaceHeader(RtlirModule* mod, const ModuleDecl* decl) {
   }
 }
 
-// §23.4: the declaration among `scope` and those nested in it whose items
-// hold the nested declaration `decl`, or null where none does.
-static const ModuleDecl* EnclosingDeclIn(const ModuleDecl* scope,
-                                         const ModuleDecl* decl) {
-  for (const auto* item : scope->items) {
-    if (item->kind != ModuleItemKind::kNestedModuleDecl) continue;
-    if (item->nested_module_decl == decl) return scope;
-    const ModuleDecl* found = EnclosingDeclIn(item->nested_module_decl, decl);
-    if (found != nullptr) return found;
-  }
-  return nullptr;
-}
-
-// The module, interface or program declaration `decl` is nested in, or null
-// for one written outside every other.
-static const ModuleDecl* EnclosingDecl(const ModuleDecl* decl,
-                                       const CompilationUnit* unit) {
-  for (const auto* scopes :
-       {&unit->modules, &unit->interfaces, &unit->programs, &unit->checkers}) {
-    for (const ModuleDecl* scope : *scopes) {
-      const ModuleDecl* found = EnclosingDeclIn(scope, decl);
-      if (found != nullptr) return found;
-    }
-  }
-  return nullptr;
-}
-
-// The time unit and precision a declaration written outside every other takes
-// where it declares neither: the last `timescale directive before it in the
-// compilation unit, then the compilation unit's own declarations; absent all
-// of them, the TimeScale struct's 1 ns / 1 ns default stands.
-static void InitOutermostTimescale(RtlirModule* mod, const ModuleDecl* decl,
-                                   const CompilationUnit* unit) {
-  if (decl->has_directive_timescale) {
-    mod->timescale = decl->directive_timescale;
-    return;
-  }
-  if (unit->has_cu_timeunit) {
-    mod->timescale.unit = unit->cu_time_unit;
-    mod->timescale.magnitude = unit->cu_time_unit_magnitude;
-  }
-  if (unit->has_cu_timeprecision) {
-    mod->timescale.precision = unit->cu_time_prec;
-    mod->timescale.prec_magnitude = unit->cu_time_prec_magnitude;
-  }
-}
-
-// §20.4.1: the time unit and precision $timeunit and $timeprecision report
-// for an element. §3.14.2.3 orders their sources: the element's own
-// timeunit or timeprecision declaration; for a module or interface nested in
-// another (§23.4), the enclosing one's, whatever source it took them from;
-// and for one written outside every other, InitOutermostTimescale's.
-static void InitRtlirModuleTimescale(RtlirModule* mod, const ModuleDecl* decl,
-                                     const CompilationUnit* unit) {
-  const ModuleDecl* enclosing = EnclosingDecl(decl, unit);
-  if (enclosing != nullptr) {
-    InitRtlirModuleTimescale(mod, enclosing, unit);
-  } else {
-    InitOutermostTimescale(mod, decl, unit);
-  }
-  if (decl->has_timeunit) {
-    mod->timescale.unit = decl->time_unit;
-    mod->timescale.magnitude = decl->time_unit_magnitude;
-  }
-  if (decl->has_timeprecision) {
-    mod->timescale.precision = decl->time_prec;
-    mod->timescale.prec_magnitude = decl->time_prec_magnitude;
-  }
-}
-
 // Initialize the standalone (non-port, non-item) header fields of a freshly
 // created RtlirModule from its declaration.
 static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
@@ -251,7 +182,9 @@ static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
   mod->unconnected_drive = decl->has_net_directives ? decl->unconnected_drive
                                                     : unit->unconnected_drive;
   mod->attrs = ResolveAttributes(decl->attrs, diag);
-  InitRtlirModuleTimescale(mod, decl, unit);
+  // §20.4.1: the time unit and precision $timeunit and $timeprecision report
+  // for the element.
+  mod->timescale = ModuleTimescale(decl, *unit);
 
   RtlirImport std_import;
   std_import.package_name = "std";

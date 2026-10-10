@@ -6,6 +6,7 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "lexer/token.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
@@ -488,6 +489,7 @@ static Direction TokenToDirection(TokenKind kind) {
 }
 
 void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
+  const size_t kFirstSite = time_literals_.size();
   SourceLoc import_loc;
   bool has_header_import = false;
   while (Check(TokenKind::kKwImport)) {
@@ -519,6 +521,13 @@ void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
     ParsePortList(decl);
   }
   Expect(TokenKind::kSemicolon, Subclause("23.2.1"));
+  // §3.14.2.3: a time literal in the header -- a parameter's or a port's
+  // default -- belongs to the element's time scope, which current_module_
+  // names only once the body begins.
+  for (size_t i = kFirstSite; i < time_literals_.size(); ++i) {
+    time_literals_[i] =
+        TimeLiteralSite{time_literals_[i].literal, &decl, nullptr};
+  }
 }
 
 // A port with an inferred (non-var, non-net) type becomes an implicit net when

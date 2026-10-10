@@ -198,6 +198,11 @@ uint64_t RealDelayToTicks(double delay, const TimeScale& scale,
 
 bool ParseTimeUnitStr(std::string_view str, TimeUnit& out);
 
+// §5.8: the realtime value of the time literal written `text` -- a number
+// followed by one of the six unit names -- as a count of the time unit of
+// `scale`, its magnitude included.
+double TimeLiteralValue(std::string_view text, const TimeScale& scale);
+
 // The text a TimeUnit is written as -- "s", "ms", "us", "ns", "ps" or
 // "fs" -- which is what ParseTimeUnitStr reads back. §3.14.2.1 gives that
 // set as the time_literal unit, and Syntax 21-20's time_unit repeats it, so

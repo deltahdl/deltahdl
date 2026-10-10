@@ -15,7 +15,6 @@
 // src/parser/parser.h declares.
 
 #include <cctype>
-#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <string>
@@ -25,7 +24,9 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "lexer/token.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/expr_parser_internal.h"
 #include "parser/parser.h"
 #include "parser/parser_token_skips.h"
@@ -64,22 +65,19 @@ static double ParseRealText(std::string_view text) {
   return std::strtod(buf.c_str(), nullptr);
 }
 
-// Scales a time-literal's real value from the unit named by its suffix into the
-// enclosing module's time unit (defaulting to ns when no module is active).
-static double ScaleTimeLiteral(double real_val, std::string_view text,
-                               TimeUnit current_unit) {
-  TimeUnit literal_unit = TimeUnit::kNs;
-  auto t = text;
-  if (t.size() < 2 || !ParseTimeUnitStr(t.substr(t.size() - 2), literal_unit)) {
-    if (!t.empty()) {
-      ParseTimeUnitStr(t.substr(t.size() - 1), literal_unit);
-    }
+// The time unit the innermost element around a literal declares in its body:
+// `mod`'s where there is one, else `pkg`'s, else the 1 ns default.
+static TimeScale DeclaredTimeUnit(const ModuleDecl* mod,
+                                  const PackageDecl* pkg) {
+  TimeScale scale;
+  if (mod != nullptr) {
+    scale.unit = mod->time_unit;
+    scale.magnitude = mod->time_unit_magnitude;
+  } else if (pkg != nullptr) {
+    scale.unit = pkg->time_unit;
+    scale.magnitude = pkg->time_unit_magnitude;
   }
-  int exp = static_cast<int>(literal_unit) - static_cast<int>(current_unit);
-  if (exp != 0) {
-    real_val *= std::pow(10.0, exp);
-  }
-  return real_val;
+  return scale;
 }
 
 Expr* Parser::MakeLiteral(ExprKind kind, const Token& tok) {
@@ -97,10 +95,14 @@ Expr* Parser::MakeLiteral(ExprKind kind, const Token& tok) {
     }
   } else if (kind == ExprKind::kRealLiteral || kind == ExprKind::kTimeLiteral) {
     lit->real_val = ParseRealText(tok.text);
+    // §5.8: a time literal is scaled by the unit its element declares, the
+    // most the parse knows of its time scope, and recorded with that scope
+    // for ScaleTimeLiterals to scale again once the scope's unit is known.
     if (kind == ExprKind::kTimeLiteral) {
-      TimeUnit current_unit =
-          current_module_ ? current_module_->time_unit : TimeUnit::kNs;
-      lit->real_val = ScaleTimeLiteral(lit->real_val, tok.text, current_unit);
+      lit->real_val = TimeLiteralValue(
+          lit->text, DeclaredTimeUnit(current_module_, current_package_));
+      time_literals_.push_back(
+          TimeLiteralSite{lit, current_module_, current_package_});
     }
   }
   return lit;

@@ -23,6 +23,7 @@
 #include "elaborator/elaborator_validate_classes.h"
 #include "elaborator/package_assertion_scope.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/time_literal_scale.h"
 #include "elaborator/unit_scope_switch.h"
 #include "elaborator/viewport_resolution.h"
 #include "parser/ast_design.h"
@@ -356,14 +357,7 @@ void CopyDesignMetadata(RtlirDesign* design, const CompilationUnit* unit,
   // §20.4.1: carry the compilation unit's timescale (reported by the $unit
   // argument) and the simulation time unit (the smallest precision across the
   // design, reported by $root; see §3.14.3) onto the finished design.
-  if (unit->has_cu_timeunit) {
-    design->cu_timescale.unit = unit->cu_time_unit;
-    design->cu_timescale.magnitude = unit->cu_time_unit_magnitude;
-  }
-  if (unit->has_cu_timeprecision) {
-    design->cu_timescale.precision = unit->cu_time_prec;
-    design->cu_timescale.prec_magnitude = unit->cu_time_prec_magnitude;
-  }
+  design->cu_timescale = CompilationUnitTimescale(*unit);
   // §3.14.3 counts the smallest precision of every `timescale directive, so
   // pass the finest the preprocessor read rather than the last directive's: a
   // finer directive earlier in the unit is a candidate too, and without any a

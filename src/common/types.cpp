@@ -1,7 +1,9 @@
 #include "common/types.h"
 
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -360,6 +362,19 @@ bool ParseTimeUnitStr(std::string_view str, TimeUnit& out) {
     return false;
   }
   return true;
+}
+
+double TimeLiteralValue(std::string_view text, const TimeScale& scale) {
+  const size_t kNumberEnd = text.find_first_not_of("0123456789._");
+  std::string digits;
+  for (char c : text.substr(0, kNumberEnd)) {
+    if (c != '_') digits.push_back(c);
+  }
+  TimeUnit written = TimeUnit::kNs;
+  ParseTimeUnitStr(text.substr(kNumberEnd), written);
+  const int kExp = static_cast<int>(written) - static_cast<int>(scale.unit);
+  return std::strtod(digits.c_str(), nullptr) * std::pow(10.0, kExp) /
+         scale.magnitude;
 }
 
 static uint64_t PowerOf10(int exp) {

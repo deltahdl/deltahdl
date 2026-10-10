@@ -844,6 +844,7 @@ class Parser {
   DiagEngine& diag_;
   // §16.13.6: see RecordTriggeredRead.
   std::unordered_set<std::string_view> triggered_names_;
+  std::vector<TimeLiteralSite> time_literals_;  // §5.8: see MakeLiteral.
   std::unordered_set<std::string_view> known_types_;
   std::unordered_set<std::string_view> known_nettypes_;
   std::unordered_set<std::string_view> known_udps_;
@@ -864,8 +865,7 @@ class Parser {
   // the parser stands; these two answer what §26.3's import declaration and
   // §8.13's extends clause can put back into it. They are maps rather than more
   // saved sets because a package's names reach a module that named the package,
-  // which is not a containment relation and so is not what TypeNameScope
-  // expresses.
+  // not one containing it, and containment is all TypeNameScope expresses.
   std::unordered_map<std::string_view, ScopeTypeNames> package_types_;
   std::unordered_map<std::string_view, ScopeTypeNames> class_types_;
 

@@ -127,6 +127,17 @@ struct ExternalConstraintBlock {
   const std::vector<ModuleItem*>* scope_items = nullptr;
 };
 
+// §5.8: a time literal and the time scope it is written in, which gives it
+// the time unit it is scaled to (§3.14.2.3): `module`, the innermost module,
+// interface, program or checker around it, where there is one, else
+// `package`, the package around it; with neither it stands in the
+// compilation-unit scope.
+struct TimeLiteralSite {
+  Expr* literal = nullptr;
+  const ModuleDecl* module = nullptr;
+  const PackageDecl* package = nullptr;
+};
+
 struct CompilationUnit {
   std::vector<ModuleDecl*> modules;
   std::vector<PackageDecl*> packages;
@@ -182,6 +193,14 @@ struct CompilationUnit {
   SourceLoc cu_timeunit_loc;
   bool has_cu_timeprecision = false;
   SourceLoc cu_timeprecision_loc;
+
+  // Every time literal the unit's source wrote, with its time scope. The
+  // parser can scale one only provisionally, by the element's own declared
+  // unit, because the `timescale before the element's header reaches it only
+  // after the parse (ApplyModuleDirectives); ScaleTimeLiterals in
+  // src/elaborator/time_literal_scale.cpp scales each again before
+  // elaboration, once every source of its unit is known.
+  std::vector<TimeLiteralSite> time_literals;
 
   TimeScale preproc_timescale;
   bool has_preproc_timescale = false;
@@ -334,6 +353,12 @@ inline void AppendCellDeclarations(CompilationUnit& target,
   // written with, which the flat names of their objects are not split at.
   target.dotted_escaped_names.insert(src.dotted_escaped_names.begin(),
                                      src.dotted_escaped_names.end());
+  // §5.8: the time literals written inside these declarations go with them.
+  for (const TimeLiteralSite& site : src.time_literals) {
+    if (site.module != nullptr || site.package != nullptr) {
+      target.time_literals.push_back(site);
+    }
+  }
 }
 
 // Everything a source description declared outside every design element, which
@@ -400,6 +425,12 @@ inline void AppendCompilationUnitDeclarations(CompilationUnit& target,
   target.external_constraints.insert(target.external_constraints.end(),
                                      src.external_constraints.begin(),
                                      src.external_constraints.end());
+  // §5.8: and so do the time literals written outside every design element.
+  for (const TimeLiteralSite& site : src.time_literals) {
+    if (site.module == nullptr && site.package == nullptr) {
+      target.time_literals.push_back(site);
+    }
+  }
   if (src.has_cu_timeunit && !target.has_cu_timeunit) {
     target.cu_time_unit = src.cu_time_unit;
     target.cu_time_unit_magnitude = src.cu_time_unit_magnitude;
