@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
 #include <string>
 
 #include "common/arena.h"
@@ -844,6 +845,78 @@ TEST(NettypeElaboration, ResolutionFunctionWritingOnlyItsOwnResultAccepted) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// A nonblocking assignment and a decrement write as an assignment and an
+// increment do, so either one to a module variable is a side effect.
+TEST(NettypeElaboration,
+     ResolutionFunctionNonblockingOrDecrementWriteRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int calls;\n"
+      "  function automatic logic [3:0] res(input logic [3:0] d[]);\n"
+      "    calls <= 1;\n"
+      "    --calls;\n"
+      "    return d[0];\n"
+      "  endfunction\n"
+      "  nettype logic [3:0] nt with res;\n"
+      "endmodule\n",
+      f);
+  for (int line : {4, 5}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "resolution function 'res' has a side effect: "
+                              "it writes 'calls'",
+                              line, "6.6.7"));
+  }
+}
+
+// A call written as a statement writes nothing the rule names unless it is
+// one of the methods that change an array in place: a system task, a plain or
+// a package-scoped subroutine, and a method of another name all pass.
+TEST(NettypeElaboration, ResolutionFunctionCallingWithoutWritingAccepted) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "package p;\n"
+      "  function automatic void note(logic [3:0] v);\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "module m;\n"
+      "  class C;\n"
+      "    function void peek();\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  function automatic void note(logic [3:0] v);\n"
+      "  endfunction\n"
+      "  function automatic logic [3:0] res(input logic [3:0] d[]);\n"
+      "    C c = new;\n"
+      "    $display(\"%h\", d[0]);\n"
+      "    note(d[0]);\n"
+      "    p::note(d[0]);\n"
+      "    c.peek();\n"
+      "    return d[0];\n"
+      "  endfunction\n"
+      "  nettype logic [3:0] nt with res;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A function with no argument has no driver array whose writes the body could
+// be judged by; the count of its arguments is what is reported.
+TEST(NettypeElaboration, ResolutionFunctionWithoutAnArgumentReportsItsCount) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  function logic res();\n"
+      "    return 1'b0;\n"
+      "  endfunction\n"
+      "  nettype logic nt with res;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "shall take a single input argument", 5, "6.6.7"));
 }
 
 }  // namespace

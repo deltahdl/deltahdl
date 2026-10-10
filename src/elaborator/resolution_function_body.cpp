@@ -68,9 +68,11 @@ static void ReportLhsWrites(const Expr* lhs, SourceLoc loc,
   ReportWrite(LhsBaseName(lhs), loc, scan);
 }
 
+// The parser builds every call a statement can make through ParseCallExpr,
+// which always records the callee in `lhs`.
 static bool IsMutatingMethodCall(const Expr* e) {
-  if (e->kind != ExprKind::kCall || e->lhs == nullptr ||
-      e->lhs->kind != ExprKind::kMemberAccess || e->lhs->is_scope_resolution) {
+  if (e->kind != ExprKind::kCall || e->lhs->kind != ExprKind::kMemberAccess ||
+      e->lhs->is_scope_resolution) {
     return false;
   }
   for (std::string_view method : kMutatingMethods) {
@@ -80,11 +82,12 @@ static bool IsMutatingMethodCall(const Expr* e) {
 }
 
 // An expression statement writes when it increments or decrements a variable
-// (§11.4.2) or calls a method that changes an array in place.
+// (§11.4.2) or calls a method that changes an array in place. No operator but
+// an increment or decrement carries the `++` or `--` token, so the operator
+// alone says which expression is one.
 static void ReportExprStmtWrites(const Expr* e, SourceLoc loc,
                                  const BodyScan& scan) {
-  if ((e->kind == ExprKind::kUnary || e->kind == ExprKind::kPostfixUnary) &&
-      (e->op == TokenKind::kPlusPlus || e->op == TokenKind::kMinusMinus)) {
+  if (e->op == TokenKind::kPlusPlus || e->op == TokenKind::kMinusMinus) {
     ReportWrite(LhsBaseName(e->lhs), loc, scan);
     return;
   }
@@ -98,7 +101,7 @@ static void ScanStmt(const Stmt* s, const BodyScan& scan) {
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign) {
     ReportLhsWrites(s->lhs, s->range.start, scan);
-  } else if (s->kind == StmtKind::kExprStmt && s->expr != nullptr) {
+  } else if (s->kind == StmtKind::kExprStmt) {
     ReportExprStmtWrites(s->expr, s->range.start, scan);
   }
   ForEachChildStmt(s, [&scan](Stmt* const& sub) { ScanStmt(sub, scan); });
