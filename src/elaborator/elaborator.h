@@ -259,6 +259,8 @@ class Elaborator : public ElaboratorClassRules {
                                RtlirVariable& var);
   void ElaborateContAssign(ModuleItem* item, RtlirModule* mod);
   void ValidateGeneratedItem(const ModuleItem* item);
+  void ValidateSubroutineBodyTargets(const ModuleItem* item,
+                                     const ScopeMap& scope);
   void ResolvePackedStructParam(RtlirParamDecl& pd, const DataType* type,
                                 const Expr* default_value,
                                 const ScopeMap& scope);
@@ -721,9 +723,8 @@ class Elaborator : public ElaboratorClassRules {
 
   void ValidateFinalTaskEnables(const ModuleDecl* decl);
 
-  // §13 and §10.4.2's rules over one task or function body. A method of a
-  // class is automatic whatever its declaration says (§8.6), which
-  // `is_class_method` tells the body's checks.
+  // §13's and §10.4.2's rules over one task or function body; a class's
+  // method, `is_class_method`, is automatic whatever it declares (§8.6).
   void ValidateFunctionBody(const ModuleItem* item,
                             bool is_class_method = false);
 

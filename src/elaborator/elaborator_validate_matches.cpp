@@ -52,6 +52,30 @@ static void WalkStmtsForLhsPatternKeys(const Stmt* s, DiagEngine& diag) {
       s, [&](Stmt* const& sub) { WalkStmtsForLhsPatternKeys(sub, diag); });
 }
 
+// §10.4, §10.6.2 and §10.9 state their rules of a procedural statement
+// wherever it stands, and the body of a task or function is such a place.
+// §6.5 weighs a subroutine's procedural assignment to a variable against a
+// continuous one as it weighs a process's, so the variables are recorded with
+// the processes' targets; a net it writes is reported here, once. A class
+// method defined out of its class writes the class's properties, which no
+// module name stands for.
+void Elaborator::ValidateSubroutineBodyTargets(const ModuleItem* item,
+                                               const ScopeMap& scope) {
+  if (item->kind != ModuleItemKind::kTaskDecl &&
+      item->kind != ModuleItemKind::kFunctionDecl)
+    return;
+  if (!item->method_class.empty()) return;
+  std::unordered_map<std::string_view, SourceLoc> targets;
+  CollectProcTargets(item->func_args, item->func_body_stmts, targets);
+  ReportProceduralNetTargets(targets);
+  for (const auto& [name, loc] : targets)
+    if (net_names_.count(name) == 0) proc_assign_targets_.emplace(name, loc);
+  for (const Stmt* s : item->func_body_stmts) {
+    CheckForceLhs(s, net_names_, nettype_net_names_, scope, diag_);
+    WalkStmtsForLhsPatternKeys(s, diag_);
+  }
+}
+
 void Elaborator::ValidateItemConstraints(const ModuleItem* item,
                                          const ScopeMap& scope) {
   bool is_proc = IsProceduralItemKind(item->kind);
@@ -69,23 +93,7 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item,
 
     WalkStmtsForLhsPatternKeys(item->body, diag_);
   }
-  // §10.4, §10.6.2 and §10.9 state their rules of a procedural statement
-  // wherever it stands, and the body of a task or function is such a place.
-  // The targets are judged for §10.4 alone, a subroutine being no process
-  // whose assignments §6.5 weighs against a continuous one here.
-  // A class method defined out of its class writes the class's properties,
-  // which no module name stands for.
-  if ((item->kind == ModuleItemKind::kTaskDecl ||
-       item->kind == ModuleItemKind::kFunctionDecl) &&
-      item->method_class.empty()) {
-    std::unordered_map<std::string_view, SourceLoc> targets;
-    CollectProcTargets(item->func_args, item->func_body_stmts, targets);
-    ReportProceduralNetTargets(targets);
-    for (const Stmt* s : item->func_body_stmts) {
-      CheckForceLhs(s, net_names_, nettype_net_names_, scope, diag_);
-      WalkStmtsForLhsPatternKeys(s, diag_);
-    }
-  }
+  ValidateSubroutineBodyTargets(item, scope);
   // §10.8 makes a continuous assignment an assignment-like context, so a
   // pattern on its left-hand side is positional too (§10.9).
   if (item->kind == ModuleItemKind::kContAssign)

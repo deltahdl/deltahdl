@@ -433,8 +433,9 @@ TEST(AlwaysCombMultiDriver, FunctionAssignedLhsCountsAsCombDriver) {
 
 TEST(AlwaysCombMultiDriver, TaskAssignedLhsNotCombDriver) {
   // §9.2.2.2: variables assigned inside a task called by the procedure are
-  // explicitly excluded, so the always_comb is not a driver of 'y' and the lone
-  // continuous assignment to 'y' is legal.
+  // explicitly excluded, so the always_comb is not a driver of 'y' and the
+  // initial procedure writing 'y' is no other process writing one of its
+  // variables.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -446,7 +447,7 @@ TEST(AlwaysCombMultiDriver, TaskAssignedLhsNotCombDriver) {
       "    t();\n"
       "    z = a;\n"
       "  end\n"
-      "  assign y = a;\n"
+      "  initial y = 1'b0;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);

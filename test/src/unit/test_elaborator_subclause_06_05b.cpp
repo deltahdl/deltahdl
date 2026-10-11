@@ -210,4 +210,30 @@ TEST(NetsAndVariables, NetSelectTakesSeveralContinuousAssignments) {
              f));
 }
 
+// §6.5: a procedural assignment written in a task or a function body writes
+// the variable as one in a process does, so a variable a continuous assignment
+// also writes is written by a mixture of the two; a subroutine's own formal or
+// local of the same name is not that variable.
+TEST(NetsAndVariables, SubroutineWriteMeetsContinuousAssignment) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, y, z;\n"
+      "  task automatic t(); y = a; endtask\n"
+      "  function automatic void g(output logic z); z = a; endfunction\n"
+      "  always_comb t();\n"
+      "  assign y = a;\n"
+      "  assign z = a;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'y' has both continuous and procedural "
+                            "assignments",
+                            6, "6.5"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "variable 'z' has both continuous and procedural "
+                             "assignments",
+                             7, "6.5"));
+}
+
 }  // namespace
