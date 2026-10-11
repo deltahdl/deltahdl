@@ -40,6 +40,10 @@ class ScopeStack {
   // body, another branch of the name tree, is not searched.
   std::vector<Scope>::const_reverse_iterator VisibleFramesEnd() const;
   Variable* FindLocalVariable(std::string_view name);
+  // §9.3.4: whether the innermost frame, the block now declaring, already
+  // binds `name`, where FindLocalVariable would also find an enclosing
+  // block's variable the declaration hides.
+  bool InnermostScopeDeclares(std::string_view name) const;
   // §26.3 with §23.9: the innermost frame naming a package, or null where
   // the innermost subroutine frame is reached first.
   const Scope* PackageFrame() const;

@@ -1,13 +1,58 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_globals.h"
+#include "simulator/vpi_user.h"
 
 using namespace delta;
 
 namespace {
+
+// The variable the cbEndOfSimulation callback below reads, and the value it
+// found there when the callback ran.
+Variable* g_final_written = nullptr;
+uint64_t g_value_at_end_of_simulation = 0;
+
+PLI_INT32 ReadAtEndOfSimulation(p_cb_data) {
+  g_value_at_end_of_simulation = g_final_written->value.ToUint64();
+  return 0;
+}
+
+class FinalBeforeEndOfSimulation : public ::testing::Test {
+ protected:
+  void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
+  void TearDown() override { SetGlobalVpiContext(nullptr); }
+
+  VpiContext vpi_ctx_;
+};
+
+// §9.2.3: a final procedure runs before the PLI callbacks that mark the end of
+// simulation, so the cbEndOfSimulation callback reads the 77 the final
+// procedure wrote rather than the 0 the run left.
+TEST_F(FinalBeforeEndOfSimulation, TheCallbackSeesWhatTheFinalProcedureWrote) {
+  s_cb_data ended = {};
+  ended.reason = cbEndOfSimulation;
+  ended.cb_rtn = &ReadAtEndOfSimulation;
+  ASSERT_NE(vpi_register_cb(&ended), nullptr);
+
+  LowerFixture f;
+  g_final_written = RunAndFindVar(
+      "module t;\n"
+      "  logic [31:0] x;\n"
+      "  final x = 77;\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(g_final_written, nullptr);
+  g_value_at_end_of_simulation = 0;
+  f.scheduler.EndSimulation();
+  EXPECT_EQ(g_value_at_end_of_simulation, 77u);
+}
 
 TEST(FinalProcedureSimulation, FinalBlockExecutesAfterRun) {
   LowerFixture f;

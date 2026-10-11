@@ -434,7 +434,7 @@ int SimulateDesign(const delta::CliOptions& opts,
   if (!opts.vcd_file.empty()) SetupVcd(sim_ctx, top, opts.vcd_file);
 
   scheduler.Run();
-  sim_ctx.RunFinalBlocks();
+  scheduler.EndSimulation();
   // §16.3 and §16.14.3: the results of coverage for the immediate and the
   // concurrent cover statements are reported at the end of simulation, once
   // the final blocks that could still evaluate one have run.

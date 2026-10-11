@@ -377,6 +377,7 @@ TEST_F(VpiLifetimeCallbacksInARun, TheThreeLifetimeActionsOccurInOrder) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
+  f.scheduler.EndSimulation();
 
   // The order is the tool's life: the data structure is compiled, simulation
   // starts, simulation ends. Asserting the sequence rather than three counts is
@@ -400,6 +401,7 @@ TEST_F(VpiLifetimeCallbacksInARun, TheEndOfSimulationActionOccursAfterAFinish) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
+  f.scheduler.EndSimulation();
 
   // §38.36.3 gives cbEndOfSimulation two ways of being reached, the event queue
   // running empty or a $finish system task executing, and the case above is the

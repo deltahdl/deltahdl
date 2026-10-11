@@ -115,4 +115,19 @@ TEST(BlockNameSimulation, NamedBlockVariableReadByHierarchicalName) {
       "8\n");
 }
 
+// §9.3.4 with §6.21: a block declaring an item is a scope of its own, so a
+// nested block's `x` is a variable apart from the enclosing block's, which it
+// hides, and its initializer is applied to it; the outer `x` keeps its 5.
+TEST(BlockNameSimulation, ANestedBlockDeclarationHidesTheOuterVariable) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t; initial begin\n"
+                       "  int x; x = 5;\n"
+                       "  begin int x = 7; $display(\"%0d\", x); x = 9; end\n"
+                       "  begin int x; x = 3; end\n"
+                       "  $display(\"%0d\", x);\n"
+                       "end endmodule\n",
+                       f),
+            "7\n5\n");
+}
+
 }  // namespace

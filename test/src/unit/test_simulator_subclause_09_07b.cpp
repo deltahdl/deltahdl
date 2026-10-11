@@ -360,4 +360,21 @@ TEST(FineGrainProcessControlRun, SuspendDesensitizesAWaitCondition) {
             "p 12\nq 15\n");
 }
 
+// §9.7 with §24: a program's process resumed while RUNNING goes into the
+// Reactive region of the time step, so it runs before the Re-NBA region applies
+// the nonblocking update its resumer made after the resume() call.
+TEST(FineGrainProcessControlRun,
+     AResumedProgramProcessRunsInTheReactiveRegion) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("program p; process h; int r;\n"
+                       "  initial begin\n"
+                       "    h = process::self(); h.suspend();\n"
+                       "    $display(\"r=%0d\", r);\n"
+                       "  end\n"
+                       "  initial begin #1; h.resume(); r <= 1; end\n"
+                       "endprogram\n",
+                       f),
+            "r=0\n");
+}
+
 }  // namespace

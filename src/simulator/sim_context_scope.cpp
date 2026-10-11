@@ -175,6 +175,10 @@ Variable* ScopeStack::FindLocalVariable(std::string_view name) {
   return nullptr;
 }
 
+bool ScopeStack::InnermostScopeDeclares(std::string_view name) const {
+  return !scope_stack_.empty() && scope_stack_.back().vars.contains(name);
+}
+
 Variable* SimContext::CreateLocalVariable(std::string_view name, uint32_t width,
                                           bool is_signed) {
   auto* var = arena_.Create<Variable>();

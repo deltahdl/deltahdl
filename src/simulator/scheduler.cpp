@@ -202,9 +202,10 @@ void Scheduler::Run() {
   // last-run instance's prefix and finding a same-named variable it shadows.
   if (ctx_) ctx_->SetCurrentProcess(nullptr);
   if (ProgramsEnded()) ctx_->RequestStop();
+}
 
-  // §38.36.3: cbEndOfSimulation marks the end of simulation, whether the event
-  // queue ran empty or a $finish executed. Both are how the loop above ends.
+void Scheduler::EndSimulation() {
+  ctx_->RunFinalBlocks();
   GetGlobalVpiContext().DispatchCallbacks(kCbEndOfSimulation);
 }
 

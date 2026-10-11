@@ -609,9 +609,10 @@ static bool TryReuseExistingDeclVar(const Stmt* stmt,
       return true;
     }
   } else if (!stmt->var_is_automatic) {
-    if (ctx.HasLocalScope() && ctx.FindLocalVariable(stmt->var_name)) {
-      return true;
-    }
+    // §9.3.4 with §6.21: the variable a block re-entered keeps is in its own
+    // frame; an enclosing block's of the same name is another variable, which
+    // this declaration hides rather than reuses.
+    return ctx.InnermostScopeDeclares(stmt->var_name);
   }
   return false;
 }

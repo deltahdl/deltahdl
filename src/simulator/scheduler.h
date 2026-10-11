@@ -110,12 +110,18 @@ class Scheduler {
   Region CurrentRegion() const { return current_region_; }
   bool HasEvents() const { return !event_calendar_.empty(); }
 
-  // Back-reference to the owning context, set once at construction. Used only
-  // to clear the executing process when the scheduler goes idle (see Run()).
+  // Back-reference to the owning context, set once at construction. Used to
+  // clear the executing process when the scheduler goes idle (see Run()) and
+  // to run the final procedures (see EndSimulation()).
   void SetContext(SimContext* ctx) { ctx_ = ctx; }
 
   void ScheduleEvent(SimTime time, Region region, Event* event);
   void Run();
+  // §9.2.3 with §38.36.3: ends a simulation whose event loop Run() has ended,
+  // by the event queue running empty or by a $finish: the final procedures
+  // run, and then the cbEndOfSimulation callbacks, which §9.2.3 puts after
+  // them.
+  void EndSimulation();
 
   EventPool& GetEventPool() { return pool_; }
 

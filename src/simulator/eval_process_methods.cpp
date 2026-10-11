@@ -237,7 +237,12 @@ static void EvalProcessResume(Process* proc, SimContext& ctx, Arena& arena,
     auto* event = ctx.GetScheduler().GetEventPool().Acquire();
     Process* target = proc;
     event->callback = [target, &ctx]() { DriveResumedProcess(target, ctx); };
-    ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kActive, event);
+    // §9.7: a process resumed while RUNNING goes into the Active region, or
+    // into the Reactive region where it is a program's (§24), so that it runs
+    // before the Re-NBA region applies its program's nonblocking updates.
+    const Region kRegion =
+        target->is_reactive ? Region::kReactive : Region::kActive;
+    ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), kRegion, event);
   }
   out = MakeLogic4VecVal(arena, 1, 0);
 }
