@@ -913,7 +913,7 @@ static void ValidateAutomaticVarRulesOfItems(
 
 void Elaborator::ValidateAutomaticVarProcWrites(const ModuleDecl* decl) {
   ValidateAutomaticVarRulesOfItems(decl->items, decl->is_automatic,
-                                   class_names_, diag_);
+                                   {class_names_, typedefs_}, diag_);
 }
 
 // §6.21's initializer rule over a package's tasks and functions, which §13.3.1
