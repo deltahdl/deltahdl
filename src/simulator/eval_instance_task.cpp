@@ -52,16 +52,11 @@ static bool ResolveStaticTaskByScope(const Expr* expr, SimContext& ctx,
       access->rhs->kind != ExprKind::kIdentifier) {
     return false;
   }
-  std::string_view class_key = ScopedClassKey(access->lhs, arena);
-  if (class_key.empty()) return false;
-  const ClassTypeInfo* cls = ctx.FindClassType(class_key);
+  const ClassTypeInfo* cls =
+      access->lhs->elements.empty()
+          ? ctx.FindClassType(ScopedClassKey(access->lhs, arena))
+          : ScopeNamedSpecialization(access->lhs, ctx, arena);
   if (cls == nullptr) return false;
-  if (access->lhs != nullptr && !access->lhs->elements.empty()) {
-    if (const ClassTypeInfo* spec =
-            ScopeNamedSpecialization(access->lhs, ctx, arena)) {
-      cls = spec;
-    }
-  }
   auto it = cls->methods.find(std::string(access->rhs->text));
   if (it == cls->methods.end()) return false;
   call.obj = nullptr;
