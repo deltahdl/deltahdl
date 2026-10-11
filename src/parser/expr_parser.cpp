@@ -1,5 +1,8 @@
+#include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstdlib>
+#include <format>
 #include <string>
 #include <string_view>
 
@@ -37,6 +40,16 @@ static bool IsCastTypeToken(TokenKind kind) {
     default:
       return false;
   }
+}
+
+// §10.9, Syntax 10-5: of the keywords IsCastTypeToken admits, only an
+// integer_atom_type may prefix an assignment pattern; the other prefixes the
+// grammar gives are names and type references, which are not keywords.
+static bool IsIntegerAtomType(TokenKind kind) {
+  static constexpr std::array kIntegerAtomTypes = {
+      TokenKind::kKwByte,    TokenKind::kKwShortint, TokenKind::kKwInt,
+      TokenKind::kKwLongint, TokenKind::kKwInteger,  TokenKind::kKwTime};
+  return std::ranges::find(kIntegerAtomTypes, kind) != kIntegerAtomTypes.end();
 }
 
 // The value of one digit character of an integer literal, or -1 for a
@@ -455,6 +468,12 @@ Expr* Parser::ParseCastOrTypedPattern() {
   auto type_tok = Consume();
 
   if (Check(TokenKind::kApostropheLBrace)) {
+    if (!IsIntegerAtomType(type_tok.kind)) {
+      diag_.Error(type_tok.loc,
+                  std::format("'{}' cannot prefix an assignment pattern",
+                              type_tok.text),
+                  Subclause("10.9"));
+    }
     auto* pat = ParseAssignmentPattern();
     return MakeTextCast(arena_, type_tok.text, type_tok.loc, pat);
   }

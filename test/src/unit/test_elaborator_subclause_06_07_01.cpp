@@ -377,17 +377,6 @@ TEST(InterconnectNet, SingleDelayIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.7.1 (negative): more than one delay value on an interconnect net is
-// rejected.
-TEST(InterconnectNet, MultipleDelayValuesRejected) {
-  ElabFixture f;
-  ElaborateSrc("module m; interconnect #(1, 2) w; endmodule\n", f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "an interconnect net accepts one delay value, and "
-                            "this declaration gives more",
-                            1, "6.7.1"));
-}
-
 // §6.7.1 (printed page 103 of IEEE 1800-2023) admits a packed structure
 // as a net's data type, and §7.2.1 (printed 147) lays its members out as
 // windows of the vector, which the simulator needs the members' order and

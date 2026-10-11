@@ -252,6 +252,14 @@ Expr* Parser::ParseAssignmentPattern() {
                   "key of its own",
                   Subclause("10.9"));
     }
+    // The other way round breaks the same rule, and the keys would no longer
+    // line up with the elements every consumer pairs them with by index.
+    if (!was_named && named) {
+      diag_.Error(CurrentLoc(),
+                  "a keyed assignment pattern element cannot follow a "
+                  "positional one",
+                  Subclause("10.9"));
+    }
   }
 
   Expect(TokenKind::kRBrace, Subclause("10.9"));

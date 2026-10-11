@@ -90,6 +90,29 @@ struct ParserPortHelpers {
     return sel;
   }
 
+  // §10.9: an assignment pattern expression shall not be written in a port
+  // expression of a module, interface or program declaration. A port
+  // expression is built of names, their constant selects and a concatenation
+  // of these, so a pattern is reported wherever in the expression it stands,
+  // a typed pattern's being the operand of its cast.
+  static void RejectPatternInPortExpr(Parser& p, const Expr* e) {
+    if (e->kind == ExprKind::kAssignmentPattern) {
+      p.diag_.Error(e->range.start,
+                    "an assignment pattern cannot be written in a port "
+                    "expression",
+                    Subclause("10.9"));
+      return;
+    }
+    if (e->lhs != nullptr) RejectPatternInPortExpr(p, e->lhs);
+    for (const Expr* item : e->elements) RejectPatternInPortExpr(p, item);
+  }
+
+  static Expr* ParsePortExpression(Parser& p) {
+    Expr* e = p.ParseExpr();
+    RejectPatternInPortExpr(p, e);
+    return e;
+  }
+
   // Parse a single non-ANSI list_of_ports entry (.name(expr), {concat}, or a
   // bare name with an optional bit-/part-select).
   static PortDecl ParseNonAnsiPortEntry(Parser& p) {
@@ -100,11 +123,11 @@ struct ParserPortHelpers {
       port.name = p.ExpectIdentifier(Subclause("23.2.2.1")).text;
       p.Expect(TokenKind::kLParen, Subclause("23.2.2.1"));
       if (!p.Check(TokenKind::kRParen)) {
-        port.port_expr = p.ParseExpr();
+        port.port_expr = ParsePortExpression(p);
       }
       p.Expect(TokenKind::kRParen, Subclause("23.2.2.1"));
     } else if (p.Check(TokenKind::kLBrace)) {
-      port.port_expr = p.ParseExpr();
+      port.port_expr = ParsePortExpression(p);
     } else {
       Token name_tok = p.ExpectIdentifier(Subclause("23.2.2.1"));
       port.name = name_tok.text;
@@ -204,7 +227,7 @@ struct ParserPortHelpers {
     port.name = p.ExpectIdentifier(Subclause("23.2.2.2")).text;
     p.Expect(TokenKind::kLParen, Subclause("23.2.2.2"));
     if (!p.Check(TokenKind::kRParen)) {
-      port.port_expr = p.ParseExpr();
+      port.port_expr = ParsePortExpression(p);
     }
     p.Expect(TokenKind::kRParen, Subclause("23.2.2.2"));
     return true;

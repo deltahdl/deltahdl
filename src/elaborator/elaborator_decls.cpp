@@ -688,16 +688,6 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   ValidateNetDeclaratorDims(item->unpacked_dims, kShapeTables, diag_,
                             item->loc);
 
-  // §6.7.1: one delay value is the limit for an interconnect net. A single
-  // delay (net_delay) is permitted; a second or third delay term is not.
-  if (item->data_type.is_interconnect &&
-      (item->net_delay_fall != nullptr || item->net_delay_decay != nullptr)) {
-    diag_.Error(item->loc,
-                "an interconnect net accepts one delay value, and this "
-                "declaration gives more",
-                Subclause("6.7.1"));
-  }
-
   if (item->data_type.charge_strength != 0 &&
       net.net_type != NetType::kTrireg) {
     // §6.3.2.1 states the rule as prose, keeping the charge strength

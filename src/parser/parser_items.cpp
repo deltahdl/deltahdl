@@ -392,6 +392,22 @@ void Parser::ParseInterconnectItem(std::vector<ModuleItem*>& items) {
   dtype.is_signed = Match(TokenKind::kKwSigned);
   if (!dtype.is_signed) Match(TokenKind::kKwUnsigned);
   ParsePackedDims(dtype);
+  // Syntax 10-1 gives an interconnect net `[ # delay_value ]`, one value
+  // written without parentheses, where other nets take a delay3. A
+  // parenthesized delay, of one value or of more, is the delay3 form.
+  if (Check(TokenKind::kHash)) {
+    auto saved = lexer_.SavePos();
+    auto loc = CurrentLoc();
+    Consume();
+    bool parenthesized = Check(TokenKind::kLParen);
+    lexer_.RestorePos(saved);
+    if (parenthesized) {
+      diag_.Error(loc,
+                  "an interconnect net's delay is one delay value written "
+                  "without parentheses",
+                  Subclause("10.3"));
+    }
+  }
   ParseVarDeclList(items, dtype);
 }
 

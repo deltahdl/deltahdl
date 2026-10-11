@@ -501,4 +501,65 @@ TEST(AssignmentPattern, MalformedPatternNames10_9) {
   EXPECT_TRUE(ReportedError(r.diags, "expected '}'", 2, "10.9"));
 }
 
+// §10.9, Syntax 10-5: a pattern is positional throughout or keyed throughout,
+// so a keyed element after a positional one is as illegal as the reverse.
+TEST(AssignmentPatternParsing, KeyedElementAfterPositionalRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  int a[2];\n"
+      "  initial a = '{1, 0: 3};\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "a keyed assignment pattern element cannot follow a positional "
+      "one",
+      3, "10.9"));
+}
+
+// §10.9, Syntax 10-5: a pattern's type prefix is a type or parameter name, an
+// integer atom type or a type reference; a keyword such as `logic` names none
+// of these.
+TEST(AssignmentPatternParsing, LogicTypePrefixRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic [1:0] x;\n"
+      "  initial x = logic'{1'b1, 1'b0};\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "'logic' cannot prefix an assignment pattern", 3, "10.9"));
+}
+
+// §10.9: an assignment pattern shall not be written in a port expression of a
+// module declaration, whether it is the whole expression, typed, or an item of
+// the concatenation a port expression may be.
+TEST(AssignmentPatternParsing, PatternInExplicitPortExpressionRejected) {
+  auto r = Parse(
+      "module m(.p('{a, b}));\n"
+      "  input [7:0] a, b;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "an assignment pattern cannot be written in a port expression",
+      1, "10.9"));
+}
+
+TEST(AssignmentPatternParsing, TypedPatternInAnsiPortExpressionRejected) {
+  auto r = Parse(
+      "module m(input .p(int'{a, b}));\n"
+      "  logic [15:0] a, b;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "an assignment pattern cannot be written in a port expression",
+      1, "10.9"));
+}
+
+TEST(AssignmentPatternParsing, PatternInPortConcatenationRejected) {
+  auto r = Parse(
+      "module m({a, '{b}});\n"
+      "  input a, b;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "an assignment pattern cannot be written in a port expression",
+      1, "10.9"));
+}
+
 }  // namespace

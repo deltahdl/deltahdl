@@ -247,4 +247,23 @@ TEST(ContinuousAssignSyntax, ListOfVariableAssignments) {
   EXPECT_EQ(CountKind(r, ModuleItemKind::kContAssign), 3);
 }
 
+// Syntax 10-1: an interconnect net takes `# delay_value`, a single value
+// written without parentheses, so a parenthesized delay of one value or of
+// more is a syntax error.
+TEST(ContinuousAssignSyntax, InterconnectParenthesizedDelayRejected) {
+  auto r = Parse("module m; interconnect #(5) w; endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "an interconnect net's delay is one delay value "
+                            "written without parentheses",
+                            1, "10.3"));
+}
+
+TEST(ContinuousAssignSyntax, InterconnectDelayOfSeveralValuesRejected) {
+  auto r = Parse("module m; interconnect #(1, 2) w; endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "an interconnect net's delay is one delay value "
+                            "written without parentheses",
+                            1, "10.3"));
+}
+
 }  // namespace
