@@ -874,13 +874,6 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
                         scalar_var_names_, real_var_names_, packed_array_vars_,
                         var_named_types_, var_select_shapes_},
                        typedefs_, diag_);
-  // §10.10.1 / §11.2.2: keep the named-type association for a variable that
-  // adopted a typedef array's dimensions above; rewriting it to a non-named
-  // base type kept RegisterVarDeclNames from recording it, but aggregate
-  // type-equivalence checks still need to know its declared array typedef.
-  if (!adopted_array_typedef.empty()) {
-    var_named_types_[item->name] = adopted_array_typedef;
-  }
   RegisterVirtualInterfaceVarDecl(
       item,
       item->data_type.kind == DataTypeKind::kVirtualInterface
@@ -914,11 +907,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   }
 
   SetVariableTypeInfo(item, var);
-  // §6.19: the enumeration a variable adopted above is the typedef's own.
-  if (!adopted_array_typedef.empty() &&
-      item->data_type.kind == DataTypeKind::kEnum) {
-    var.enum_type_name = adopted_array_typedef;
-  }
+  NameAdoptedArrayTypedef(item, adopted_array_typedef, var);
   BindCovergroupVariable(*item, var, mod, unit_, arena_);
 
   ElaborateUnpackedDims(

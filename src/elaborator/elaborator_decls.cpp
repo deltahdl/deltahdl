@@ -829,4 +829,18 @@ void Elaborator::SetVariableTypeInfo(const ModuleItem* item,
   }
 }
 
+// A variable `item` declared through the array typedef `typedef_name`, whose
+// dimensions it adopted in place of the name, still answers to that typedef:
+// §10.10.1's and §11.2.2's aggregate type-equivalence checks look its declared
+// type up, and an enumeration the typedef writes is the typedef's own (§6.19).
+void Elaborator::NameAdoptedArrayTypedef(const ModuleItem* item,
+                                         std::string_view typedef_name,
+                                         RtlirVariable& var) {
+  if (typedef_name.empty()) return;
+  var_named_types_[item->name] = typedef_name;
+  if (item->data_type.kind == DataTypeKind::kEnum) {
+    var.enum_type_name = typedef_name;
+  }
+}
+
 }  // namespace delta

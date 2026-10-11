@@ -250,6 +250,9 @@ class Elaborator : public ElaboratorClassRules {
   bool ReconcilePartialPort(std::string_view name, bool decl_signed,
                             NetType net_type, RtlirModule* mod);
   void SetVariableTypeInfo(const ModuleItem* item, RtlirVariable& var);
+  void NameAdoptedArrayTypedef(const ModuleItem* item,
+                               std::string_view typedef_name,
+                               RtlirVariable& var);
   void ElaborateContAssign(ModuleItem* item, RtlirModule* mod);
   void ValidateContAssignIdentLhs(ModuleItem* item, RtlirModule* mod);
   void ValidateContAssignNettypeAndDelay(ModuleItem* item);
