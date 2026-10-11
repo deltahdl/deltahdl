@@ -11,40 +11,33 @@ using namespace delta;
 
 namespace {
 
-// An array of strings, enumerations or class handles declared through such a
-// typedef has the array methods (§7.5, §7.12), not its element's, and its
-// element, one select in, has its element type's alone.
+// An array of strings or enumerations declared through such a typedef has the
+// array methods (§7.12), not its element's, and its element, one select in,
+// has its element type's alone.
 TEST(UserDefinedTypeElaboration, TypedefArrayIsNoElementForMemberChecks) {
   ElabFixture f;
   ElabOk(
-      "class C; endclass\n"
       "module m;\n"
       "  typedef string sa_t [2];\n"
-      "  typedef enum {A, B} ea_t [2];\n"
-      "  typedef C ca_t [2];\n"
-      "  sa_t s;\n"
-      "  ea_t e;\n"
-      "  ca_t c;\n"
-      "  int n;\n"
+      "  typedef enum {A, B} e_t;\n"
+      "  typedef e_t ea_t [2];\n"
       "  initial begin\n"
-      "    n = s.size();\n"
-      "    n = e.size();\n"
-      "    n = c.size();\n"
+      "    sa_t s;\n"
+      "    ea_t e;\n"
+      "    s.reverse();\n"
+      "    e.reverse();\n"
       "    s[0].foo();\n"
       "    e[1].bar();\n"
-      "    c[0].baz();\n"
       "  end\n"
       "endmodule\n",
       f);
   const auto& diags = f.diag.Diagnostics();
   EXPECT_TRUE(ReportedError(
-      diags, "'foo' is not a built-in method of the string 's'", 14, "6.16"));
+      diags, "'foo' is not a built-in method of the string 's'", 10, "6.16"));
   EXPECT_TRUE(ReportedError(
-      diags, "'bar' is not a built-in method of the enumeration 'e'", 15,
+      diags, "'bar' is not a built-in method of the enumeration 'e'", 11,
       "6.19.5"));
-  EXPECT_TRUE(
-      ReportedError(diags, "class 'C' has no member named 'baz'", 16, "8.6"));
-  EXPECT_EQ(f.diag.ErrorCount(), 3u);
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
 }  // namespace

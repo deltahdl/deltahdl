@@ -413,18 +413,15 @@ TEST(StringMethodElaboration, MethodOfAStringACallReturnsIsReported) {
   ElabFixture f;
   ElabOk(
       "package q;\n"
-      "  function string pf(); return " q
-      "; endfunction\n"
+      "  function string pf(); return \"q\"; endfunction\n"
       "endpackage\n"
-      "function string uf(); return "
-      u"; endfunction\n"
+      "function string uf(); return \"u\"; endfunction\n"
       "class K;\n"
       "  function K me(); return this; endfunction\n"
       "endclass\n"
       "module m;\n"
       "  typedef string sa_t [2];\n"
-      "  function string g(); return " g
-      "; endfunction\n"
+      "  function string g(); return \"g\"; endfunction\n"
       "  function sa_t ga(); sa_t v; return v; endfunction\n"
       "  process p;\n"
       "  K k = new;\n"
@@ -434,7 +431,7 @@ TEST(StringMethodElaboration, MethodOfAStringACallReturnsIsReported) {
       "    p = process::self();\n"
       "    g().foo();\n"
       "    p.get_randstate().bar();\n"
-      "    n = g().len() + ga().size() + ga()[0].len();\n"
+      "    n = g().len() + ga().unique().size() + ga()[0].len();\n"
       "    n = q::pf().len() + uf().len() + s.substr(0, 1).len();\n"
       "    n = k.get_randstate().len();\n"
       "  end\n"
