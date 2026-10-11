@@ -35,6 +35,16 @@ bool AddOwnMemberNames(const ClassDecl& cls,
   return true;
 }
 
+// The names of the classes `cls` extends or implements.
+std::vector<std::string_view> BaseNames(const ClassDecl& cls) {
+  std::vector<std::string_view> bases;
+  if (!cls.base_class.empty()) bases.push_back(cls.base_class);
+  for (const auto* refs : {&cls.extends_interfaces, &cls.implements_types}) {
+    for (const InterfaceRef& ref : *refs) bases.push_back(ref.name);
+  }
+  return bases;
+}
+
 }  // namespace
 
 const ClassDecl* SoleClassIndex::Find(std::string_view name) const {
@@ -64,13 +74,7 @@ bool SoleClassIndex::SelectableNames(
     work.pop_back();
     if (!seen.insert(walked).second) continue;
     if (!AddOwnMemberNames(*walked, names)) return false;
-    std::vector<std::string_view> bases;
-    if (!walked->base_class.empty()) bases.push_back(walked->base_class);
-    for (const auto* refs :
-         {&walked->extends_interfaces, &walked->implements_types}) {
-      for (const InterfaceRef& ref : *refs) bases.push_back(ref.name);
-    }
-    for (const std::string_view kBase : bases) {
+    for (const std::string_view kBase : BaseNames(*walked)) {
       const ClassDecl* base = Find(kBase);
       if (base == nullptr || walked->type_param_names.contains(kBase)) {
         return false;
