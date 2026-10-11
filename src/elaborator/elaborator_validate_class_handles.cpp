@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
@@ -543,6 +544,15 @@ static void CheckConstruction(std::string_view type, const Expr* init,
   ReportUnconstructibleClass(type, loc, unit, diag);
 }
 
+// The class type a declaration of `type` with the unpacked dimensions `dims`
+// gives one handle of; empty for an array of handles, `process job[]`, whose
+// `new [N]` initializer is §7.5.1's dynamic_array_new, sizing the array, and
+// constructs no object.
+static std::string_view DeclaredHandleType(const DataType& type,
+                                           const std::vector<Expr*>& dims) {
+  return dims.empty() ? type.type_name : std::string_view();
+}
+
 // The construction a handle assignment writes, `p = new;` or `h = B::new;`.
 static void CheckNewOnUnconstructibleHandle(
     const Stmt* s,
@@ -709,8 +719,9 @@ void ElaboratorClassRules::WalkStmtsForClassHandleOps(const Stmt* s) {
     if (s->var_unpacked_dims.empty()) class_var_names_.insert(s->var_name);
     class_var_types_[s->var_name] = s->var_decl_type.type_name;
     CheckTypedConstructorDeclInitCompatibility(s, class_names_, unit_, diag_);
-    CheckConstruction(s->var_decl_type.type_name, s->var_init, s->range.start,
-                      unit_, diag_);
+    CheckConstruction(
+        DeclaredHandleType(s->var_decl_type, s->var_unpacked_dims), s->var_init,
+        s->range.start, unit_, diag_);
   }
 
   if ((s->kind == StmtKind::kBlockingAssign ||
@@ -798,8 +809,9 @@ void ElaboratorClassRules::ValidateClassHandleOps(const ModuleDecl* decl) {
         class_names_.count(item->data_type.type_name)) {
       CheckTypedConstructorModuleItemCompatibility(item, class_names_, unit_,
                                                    diag_);
-      CheckConstruction(item->data_type.type_name, item->init_expr, item->loc,
-                        unit_, diag_);
+      CheckConstruction(
+          DeclaredHandleType(item->data_type, item->unpacked_dims),
+          item->init_expr, item->loc, unit_, diag_);
     }
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {

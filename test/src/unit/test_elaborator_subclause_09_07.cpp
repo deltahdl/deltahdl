@@ -120,19 +120,26 @@ TEST(FineGrainProcessControlElaboration, ProcessNewError) {
 
 // §9.7 gives the process class no construction by the user, so `new` written
 // as a declaration's initializer, at module scope or in a block, is reported
-// as the assignment `p = new;` is.
+// as the assignment `p = new;` is. An array of process handles initialized
+// with `new [N]` sizes the array (§7.5.1), as §9.7's own example does, and
+// constructs no process.
 TEST(FineGrainProcessControlElaboration, ProcessNewInADeclarationError) {
   ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
              "  process q = new;\n"
              "  initial begin process p = new; end\n"
+             "  process jobs[] = new [2];\n"
+             "  initial begin process job[] = new [2]; end\n"
              "endmodule\n",
              f));
+  const char* const kMessage = "cannot construct a process object with 'new'";
   for (const int kLine : {2, 3}) {
-    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                              "cannot construct a process object with 'new'",
-                              kLine, "9.7"))
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, kLine, "9.7"))
+        << kLine;
+  }
+  for (const int kLine : {4, 5}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kMessage, kLine, "9.7"))
         << kLine;
   }
 }

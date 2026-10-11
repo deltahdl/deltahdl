@@ -77,7 +77,7 @@ TEST(ProceduralStatementContainmentSim, AlwaysFFRunsItsStatement) {
       "module m;\n"
       "  logic clk;\n"
       "  logic [31:0] x, y;\n"
-      "  initial begin clk = 0; x = 0; y = 9; #1 clk = 1; #1 $finish; end\n"
+      "  initial begin clk = 0; y = 9; #1 clk = 1; #1 $finish; end\n"
       "  always_ff @(posedge clk) x <= y;\n"
       "endmodule\n",
       "x");
