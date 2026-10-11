@@ -378,6 +378,38 @@ TEST_F(CallStatementsInAScope, AStaticMethodCalledThroughItsScopeIsACall) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, g)), VpiObjectOf(d_g));
 }
 
+// §8.23 and §8.25 with §37.42: a static method called through a
+// specialization's scope is one of the class the specialization gives C's type
+// parameter as its base: B2's tick for C #(.T(B2)) and C #(B2), and B's run
+// for C #(.T()), whose empty argument leaves the parameter its default.
+TEST_F(CallStatementsInAScope, AScopesSpecializationChoosesItsBase) {
+  Run("module top;\n"
+      "  class B; static function void run(); endfunction endclass\n"
+      "  class B2; static task tick(); endtask endclass\n"
+      "  class C #(type T = B) extends T; endclass\n"
+      "  initial begin : b\n"
+      "    C #(.T(B2))::tick(); C #(B2)::tick(); C #(.T())::run();\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle tick =
+      Named(vpiMethods, Named(vpiClassDefn, By("top"), "B2"), "tick");
+  vpiHandle run = Named(vpiMethods, Named(vpiClassDefn, By("top"), "B"), "run");
+  ASSERT_NE(tick, nullptr);
+  ASSERT_NE(run, nullptr);
+  vpiHandle it = vpi_iterate(vpiStmt, By("top.b"));
+  ASSERT_NE(it, nullptr);
+  std::vector<vpiHandle> calls;
+  while (vpiHandle stmt = vpi_scan(it)) calls.push_back(stmt);
+  ASSERT_EQ(calls.size(), 3u);
+  for (std::size_t i = 0; i < 2; ++i) {
+    EXPECT_EQ(vpi_get(vpiType, calls[i]), vpiMethodTaskCall) << i;
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, calls[i])), VpiObjectOf(tick))
+        << i;
+  }
+  EXPECT_EQ(vpi_get(vpiType, calls[2]), vpiMethodFuncCall);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, calls[2])), VpiObjectOf(run));
+}
+
 // §6.18 with §37.42: a handle whose class a typedef names is a handle of that
 // class, so a call applied to it, or through a property of its class, is a
 // method task call reaching the class's method (#5778).

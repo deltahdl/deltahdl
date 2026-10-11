@@ -779,6 +779,23 @@ CallShape MemberChainCallShape(const Expr& access, const BlockParent& parent,
 // (§18.12, §26.7); else a static method of the class the scope names, C::f
 // (§8.10, §8.23), or of a class a package declares, p::C::f. A static method is
 // called through no object, so the call has no prefix.
+// §8.23 with §8.25: the arguments the parameter_value_assignment a class scope
+// is written with gives, C #(.T(B2)):: or C #(B2)::, as the data types BaseOf
+// binds: the type each names, by the parameter it binds in the named form.
+// A named argument left empty, .T(), binds nothing (§8.25.1); the ordered form
+// leaves none empty.
+std::vector<DataType> ScopeArguments(const Expr& scope) {
+  std::vector<DataType> args;
+  for (std::size_t i = 0; i < scope.elements.size(); ++i) {
+    if (scope.elements[i] == nullptr) continue;
+    DataType& arg = args.emplace_back();
+    arg.kind = DataTypeKind::kNamed;
+    arg.type_name = scope.elements[i]->text;
+    arg.param_arg_name = scope.arg_names[i];
+  }
+  return args;
+}
+
 CallShape ScopedCallShape(const Expr& callee, const BlockParent& parent,
                           const BodyWalk& walk) {
   const std::string_view kName = callee.rhs->text;
@@ -789,8 +806,9 @@ CallShape ScopedCallShape(const Expr& callee, const BlockParent& parent,
     if (kSub.decl != nullptr || scope.text == "std") {
       return SubroutineCallShape(kSub, kName);
     }
-    return MethodShape(ClassMethodCall(walk, scope.text, kName), kName, nullptr,
-                       walk);
+    const std::vector<DataType> kArgs = ScopeArguments(scope);
+    return MethodShape(ClassMethodCall(walk, scope.text, kName, {}, kArgs),
+                       kName, nullptr, walk);
   }
   return MethodShape(
       ClassMethodCall(walk, scope.rhs->text, kName, scope.lhs->text), kName,
