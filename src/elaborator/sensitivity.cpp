@@ -133,12 +133,12 @@ void CollectExprReads(const Expr* expr, std::unordered_set<std::string>& out) {
 // left-hand side writes, `{y[i], z} = d`, included (§9.4.2.2).
 static void ForEachLhsIndexRead(const Expr* lhs,
                                 const std::function<void(const Expr*)>& fn) {
-  if (lhs != nullptr && lhs->kind == ExprKind::kConcatenation) {
-    for (const Expr* target : lhs->elements) ForEachLhsIndexRead(target, fn);
-    return;
-  }
-  for (const Expr* cur = lhs; cur != nullptr && cur->kind == ExprKind::kSelect;
-       cur = cur->base) {
+  for (const Expr* cur = lhs; cur != nullptr; cur = cur->base) {
+    if (cur->kind == ExprKind::kConcatenation) {
+      for (const Expr* target : cur->elements) ForEachLhsIndexRead(target, fn);
+      return;
+    }
+    if (cur->kind != ExprKind::kSelect) return;
     if (cur->index) fn(cur->index);
   }
 }
