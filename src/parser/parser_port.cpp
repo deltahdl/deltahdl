@@ -91,10 +91,11 @@ struct ParserPortHelpers {
   }
 
   // §10.9: an assignment pattern expression shall not be written in a port
-  // expression of a module, interface or program declaration. A port
-  // expression is built of names, their constant selects and a concatenation
-  // of these, so a pattern is reported wherever in the expression it stands,
-  // a typed pattern's being the operand of its cast.
+  // expression of a module, interface or program declaration, the
+  // port_expression of a non-ANSI list of ports. A port expression is built of
+  // names, their constant selects and a concatenation of these, so a pattern
+  // is reported wherever in the expression it stands, a typed pattern's being
+  // the operand of its cast.
   static void RejectPatternInPortExpr(Parser& p, const Expr* e) {
     if (e->kind == ExprKind::kAssignmentPattern) {
       p.diag_.Error(e->range.start,
@@ -226,8 +227,11 @@ struct ParserPortHelpers {
     p.Consume();
     port.name = p.ExpectIdentifier(Subclause("23.2.2.2")).text;
     p.Expect(TokenKind::kLParen, Subclause("23.2.2.2"));
+    // §23.2.2.2 lets this form bind an assignment pattern expression of
+    // elements declared in the module: Syntax 23-4 gives it an expression,
+    // not the port_expression §10.9 keeps patterns out of.
     if (!p.Check(TokenKind::kRParen)) {
-      port.port_expr = ParsePortExpression(p);
+      port.port_expr = p.ParseExpr();
     }
     p.Expect(TokenKind::kRParen, Subclause("23.2.2.2"));
     return true;

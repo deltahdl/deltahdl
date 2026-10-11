@@ -531,7 +531,10 @@ TEST(AssignmentPatternParsing, LogicTypePrefixRejected) {
 
 // §10.9: an assignment pattern shall not be written in a port expression of a
 // module declaration, whether it is the whole expression, typed, or an item of
-// the concatenation a port expression may be.
+// the concatenation a port expression may be. The explicitly named ANSI port,
+// which §23.2.2.2 lets bind a pattern, takes an expression and no port
+// expression
+// (AnsiStylePortDeclarations.ExplicitlyNamedAnsiPortAssignmentPattern).
 TEST(AssignmentPatternParsing, PatternInExplicitPortExpressionRejected) {
   auto r = Parse(
       "module m(.p('{a, b}));\n"
@@ -542,10 +545,10 @@ TEST(AssignmentPatternParsing, PatternInExplicitPortExpressionRejected) {
       1, "10.9"));
 }
 
-TEST(AssignmentPatternParsing, TypedPatternInAnsiPortExpressionRejected) {
+TEST(AssignmentPatternParsing, TypedPatternInPortExpressionRejected) {
   auto r = Parse(
-      "module m(input .p(int'{a, b}));\n"
-      "  logic [15:0] a, b;\n"
+      "module m(.p(int'{a, b}));\n"
+      "  input [15:0] a, b;\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedError(
       r.diags, "an assignment pattern cannot be written in a port expression",
