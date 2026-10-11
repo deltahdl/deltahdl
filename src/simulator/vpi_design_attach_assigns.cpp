@@ -21,6 +21,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/evaluation.h"
+#include "simulator/pattern_type_key.h"
 #include "simulator/sim_context.h"
 #include "simulator/stmt_exec_internal.h"
 #include "simulator/sv_vpi_user.h"
@@ -542,7 +543,7 @@ const Expr* KeyedValue(const Expr* pattern, const VpiObject* slot,
   for (std::size_t i = 0; i < pattern->pattern_keys.size(); ++i) {
     Expr* key = pattern->pattern_keys[i];
     const Expr* value = pattern->elements[i];
-    const DataTypeKind kType = PatternTypeKeyKind(key->text);
+    const DataTypeKind kType = PatternKeyKeywordKind(key->text);
     if (key->text == "default") {
       fallback = value;
     } else if (kType != DataTypeKind::kImplicit) {

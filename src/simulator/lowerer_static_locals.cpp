@@ -1,7 +1,9 @@
 #include <algorithm>
+#include <tuple>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/source_loc.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -81,10 +83,10 @@ void InitSubroutineStatics(const StaticLocalOwner& owner, SimContext& ctx,
 bool IsGenBlockSubroutine(const ModuleItem* func, const RtlirModule* mod) {
   return std::ranges::any_of(
       mod->gen_block_subroutines, [&](const RtlirGenBlockSubroutine& sub) {
-        return sub.decl->name == func->name &&
-               sub.decl->loc.file_id == func->loc.file_id &&
-               sub.decl->loc.line == func->loc.line &&
-               sub.decl->loc.column == func->loc.column;
+        const SourceLoc& at = sub.decl->loc;
+        return std::tie(sub.decl->name, at.file_id, at.line, at.column) ==
+               std::tie(func->name, func->loc.file_id, func->loc.line,
+                        func->loc.column);
       });
 }
 

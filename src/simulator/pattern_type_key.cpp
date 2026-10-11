@@ -61,6 +61,14 @@ constexpr std::array<DataTypeKind, 5> kSignedKinds = {
 constexpr std::array<DataTypeKind, 3> kNominalKinds = {
     DataTypeKind::kStruct, DataTypeKind::kUnion, DataTypeKind::kEnum};
 
+// The entry of kKeywordTypes for `name`; null where `name` is no keyword.
+const KeywordType* FindKeywordType(std::string_view name) {
+  for (const KeywordType& k : kKeywordTypes) {
+    if (k.keyword == name) return &k;
+  }
+  return nullptr;
+}
+
 template <size_t N>
 bool KindIn(const std::array<DataTypeKind, N>& kinds, DataTypeKind kind) {
   return std::ranges::find(kinds, kind) != kinds.end();
@@ -68,13 +76,16 @@ bool KindIn(const std::array<DataTypeKind, N>& kinds, DataTypeKind kind) {
 
 }  // namespace
 
+DataTypeKind PatternKeyKeywordKind(std::string_view key) {
+  const KeywordType* k = FindKeywordType(key);
+  return k != nullptr ? k->kind : DataTypeKind::kImplicit;
+}
+
 std::optional<PatternKeyType> ResolvePatternKeyType(std::string_view key,
                                                     const SimContext& ctx) {
-  for (const KeywordType& k : kKeywordTypes) {
-    if (k.keyword == key)
-      return PatternKeyType{
-          k.kind, k.width, k.is_signed, PackedRange::Implicit(k.width), {}};
-  }
+  if (const KeywordType* k = FindKeywordType(key))
+    return PatternKeyType{
+        k->kind, k->width, k->is_signed, PackedRange::Implicit(k->width), {}};
   DataTypeKind kind = ctx.FindTypeKind(key);
   if (kind == DataTypeKind::kNamed) return std::nullopt;
   uint32_t width = ctx.FindTypeWidth(key);
@@ -108,9 +119,7 @@ PatternKeySubject SubjectOf(PatternKeySubject subject, const SimContext& ctx) {
   // signing came from a typedef table holding no `int`, and an int element
   // took no `int:` key.
   bool named = !subject.type_name.empty() &&
-               std::ranges::none_of(kKeywordTypes, [&](const KeywordType& k) {
-                 return k.keyword == subject.type_name;
-               });
+               FindKeywordType(subject.type_name) == nullptr;
   if (subject.kind == DataTypeKind::kNamed)
     subject.kind = ctx.FindTypeKind(subject.type_name);
   if (!subject.is_signed) {

@@ -42,6 +42,10 @@ struct PatternKeySubject {
   bool is_array = false;
 };
 
+// §10.9.2: the built-in type the type key `key` names by its keyword;
+// kImplicit for a key that is no type keyword.
+DataTypeKind PatternKeyKeywordKind(std::string_view key);
+
 // The type `key` names, or nothing where it names no type -- an index or a
 // member name, or `default`.
 std::optional<PatternKeyType> ResolvePatternKeyType(std::string_view key,

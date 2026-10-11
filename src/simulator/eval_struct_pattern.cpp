@@ -132,23 +132,6 @@ static void PlaceKeyValue(Logic4Vec& result, const StructFieldInfo& f,
     DepositBitField(result, base + f.bit_offset + i * ew, bits, ew);
 }
 
-DataTypeKind PatternTypeKeyKind(std::string_view key) {
-  if (key == "int") return DataTypeKind::kInt;
-  if (key == "integer") return DataTypeKind::kInteger;
-  if (key == "logic") return DataTypeKind::kLogic;
-  if (key == "reg") return DataTypeKind::kReg;
-  if (key == "byte") return DataTypeKind::kByte;
-  if (key == "shortint") return DataTypeKind::kShortint;
-  if (key == "longint") return DataTypeKind::kLongint;
-  if (key == "bit") return DataTypeKind::kBit;
-  if (key == "real") return DataTypeKind::kReal;
-  if (key == "shortreal") return DataTypeKind::kShortreal;
-  if (key == "string") return DataTypeKind::kString;
-  if (key == "time") return DataTypeKind::kTime;
-  if (key == "realtime") return DataTypeKind::kRealtime;
-  return DataTypeKind::kImplicit;
-}
-
 static bool IsMemberNameKey(std::string_view key, const StructTypeInfo* info) {
   for (const auto& f : info->fields) {
     if (f.name == key) return true;
