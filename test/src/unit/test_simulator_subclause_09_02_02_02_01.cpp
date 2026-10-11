@@ -812,4 +812,89 @@ TEST(AlwaysCombSensitivitySim, ImportedPackageFunctionReadWakes) {
             "y=5\n");
 }
 
+// §9.2.2.2.1 with §26.3, end to end: a write of a package's variable the
+// block reads through the package scope re-runs the block.
+TEST(AlwaysCombSensitivitySim, PackageScopedReadWakes) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  int g;\n"
+                       "endpackage\n"
+                       "module t;\n"
+                       "  int y;\n"
+                       "  always_comb y = p::g + 1;\n"
+                       "  initial begin\n"
+                       "    #1 p::g = 5;\n"
+                       "    #1 $display(\"y=%0d\", y);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "y=6\n");
+}
+
+// §9.2.2.2.1 with §8.23, end to end: a write of the static property a class's
+// static method reads re-runs the block calling the method.
+TEST(AlwaysCombSensitivitySim, ClassStaticMethodReadWakes) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  class C;\n"
+                       "    static int g;\n"
+                       "    static function int f(int x);\n"
+                       "      return x + g;\n"
+                       "    endfunction\n"
+                       "  endclass\n"
+                       "  int a, y;\n"
+                       "  always_comb y = C::f(a);\n"
+                       "  initial begin\n"
+                       "    #1 C::g = 5;\n"
+                       "    #1 $display(\"y=%0d\", y);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "y=5\n");
+}
+
+// §9.2.2.2.1 with §23.6, end to end: a write of the child instance's variable
+// a function of the instance reads re-runs the block calling it by its
+// hierarchical name.
+TEST(AlwaysCombSensitivitySim, InstanceFunctionReadWakes) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module sub;\n"
+                       "  int g;\n"
+                       "  function int f(int x); return x + g; endfunction\n"
+                       "endmodule\n"
+                       "module t;\n"
+                       "  sub s();\n"
+                       "  int a, y;\n"
+                       "  always_comb y = s.f(a);\n"
+                       "  initial begin\n"
+                       "    #1 s.g = 5;\n"
+                       "    #1 $display(\"y=%0d\", y);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "y=5\n");
+}
+
+// §9.2.2.2.1 with §26.3, end to end: what a package's function reads through
+// another function of its package, called by its bare name, re-runs the
+// block.
+TEST(AlwaysCombSensitivitySim, PackageFunctionsBareCallReadWakes) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  int g;\n"
+                       "  function int h(int x); return x + g; endfunction\n"
+                       "  function int f(int x); return h(x); endfunction\n"
+                       "endpackage\n"
+                       "module t;\n"
+                       "  int a, y;\n"
+                       "  always_comb y = p::f(a);\n"
+                       "  initial begin\n"
+                       "    #1 p::g = 5;\n"
+                       "    #1 $display(\"y=%0d\", y);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "y=5\n");
+}
+
 }  // namespace

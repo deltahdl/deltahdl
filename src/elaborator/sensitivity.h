@@ -13,6 +13,8 @@ struct Expr;
 struct Stmt;
 struct EventExpr;
 struct ModuleItem;
+struct ModuleDecl;
+struct ClassDecl;
 class Arena;
 
 using FuncMap = std::unordered_map<std::string_view, const ModuleItem*>;
@@ -49,5 +51,18 @@ std::vector<EventExpr> InferSensitivity(
     const Stmt* body, Arena& arena, const FuncMap* funcs = nullptr,
     bool exclude_written = true,
     const std::unordered_set<std::string_view>* const_names = nullptr);
+
+// §9.2.2.2.1 with §8.23 and §23.6: `funcs` and, besides, the functions an
+// always_comb in a module holding `items` may call by a scoped name, each under
+// the key its call spells: every static function of a class `items` or the
+// compilation unit (`unit_classes`) declares under "C::f", and every function
+// of the module `find_module` finds for an instance `items` declares under
+// "s.f", the instance's name. Only the inference reads the result; the
+// elaborator's own function table stays as it is for every other rule.
+FuncMap WithScopedCallFunctions(
+    const FuncMap& funcs, const std::vector<ModuleItem*>& items,
+    const std::vector<ClassDecl*>& unit_classes,
+    const std::function<const ModuleDecl*(std::string_view)>& find_module,
+    Arena& arena);
 
 }  // namespace delta

@@ -169,6 +169,10 @@ void Elaborator::ApplyBodyImport(const ImportItem& import_item) {
   ApplyImport(import_item, unit_,
               {typedefs_, aggregate_typedef_names_, cu_param_scope_,
                class_names_, parameterized_class_names_, func_decls_});
+  // §9.2.2.2.1: a function the import brings in is one an always_comb below it
+  // may call, and the table the inference reads was filled ahead of the walk
+  // (BuildInferenceFuncs).
+  inference_funcs_.insert(func_decls_.begin(), func_decls_.end());
 }
 
 }  // namespace delta

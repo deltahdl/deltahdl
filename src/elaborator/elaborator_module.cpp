@@ -241,6 +241,7 @@ void Elaborator::ResetItemElaborationState() {
   let_names_.clear();
   sequence_names_.clear();
   func_decls_.clear();
+  inference_funcs_.clear();
 }
 
 // Holds a snapshot of the per-module item-elaboration state. The constructor
@@ -300,6 +301,7 @@ struct ItemElaborationStateSaver {
   // declarations only because it is put back.
   decltype(Elaborator::property_registry_) property_registry;
   decltype(Elaborator::func_decls_) func_decls;
+  decltype(Elaborator::inference_funcs_) inference_funcs;
 
   // §26.3 and §6.18: a name an import or a typedef declaration introduces
   // belongs to the scope it was written in, so what a module adds to typedefs_
@@ -373,6 +375,7 @@ struct ItemElaborationStateSaver {
     sequence_names = std::move(e.sequence_names_);
     property_registry = std::move(e.property_registry_);
     func_decls = std::move(e.func_decls_);
+    inference_funcs = std::move(e.inference_funcs_);
     e.ResetItemElaborationState();
   }
 
@@ -438,6 +441,7 @@ struct ItemElaborationStateSaver {
     e.sequence_names_ = std::move(sequence_names);
     e.property_registry_ = std::move(property_registry);
     e.func_decls_ = std::move(func_decls);
+    e.inference_funcs_ = std::move(inference_funcs);
     RestoreScopeMaps(e);
   }
 };

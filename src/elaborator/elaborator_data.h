@@ -387,6 +387,9 @@ class ElaboratorData {
   PropertyRegistry property_registry_;
 
   std::unordered_map<std::string_view, const ModuleItem*> func_decls_;
+  // §9.2.2.2.1: func_decls_ and the functions a call by a scoped name reaches
+  // besides (WithScopedCallFunctions), read only to infer a sensitivity list.
+  std::unordered_map<std::string_view, const ModuleItem*> inference_funcs_;
   // §6.14 with §35.5.5: the functions of the module declared to return a
   // chandle, native and imported, whose call is a chandle for the assignment
   // rules ValidateChandleOps holds; filled by it for each module.

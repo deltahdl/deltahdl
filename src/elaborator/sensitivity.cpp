@@ -9,7 +9,9 @@
 #include "common/arena.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 
 namespace delta {
@@ -69,20 +71,21 @@ static void CollectSelectReads(const Expr* expr,
 }
 
 // The dotted name a member access down a path of plain names spells,
-// `dif.clk` for the member clk of the interface instance dif; false where a
-// step of the path is anything but a name.
+// `dif.clk` for the member clk of the interface instance dif, a step through
+// a package's or a class's scope spelled as written, `p::g` (§26.3, §8.23);
+// false where a step of the path is anything but a name, having added nothing
+// to `out`.
 static bool DottedNamePath(const Expr* expr, std::string& out) {
   if (expr->kind == ExprKind::kIdentifier) {
     out += expr->text;
     return true;
   }
-  if (expr->kind != ExprKind::kMemberAccess || expr->is_scope_resolution ||
-      expr->lhs == nullptr || expr->rhs == nullptr ||
-      expr->rhs->kind != ExprKind::kIdentifier) {
+  if (expr->kind != ExprKind::kMemberAccess || expr->lhs == nullptr ||
+      expr->rhs == nullptr || expr->rhs->kind != ExprKind::kIdentifier) {
     return false;
   }
   if (!DottedNamePath(expr->lhs, out)) return false;
-  out += '.';
+  out += expr->is_scope_resolution ? "::" : ".";
   out += expr->rhs->text;
   return true;
 }
@@ -97,9 +100,11 @@ void CollectExprReads(const Expr* expr, std::unordered_set<std::string>& out) {
   // the variable held under the dotted name, a member of an interface
   // instance, `assign w = dif.clk;`, or of a module instance, as well as the
   // parts the recursion below collects (a struct member's variable is its
-  // base's). A name no variable is held under is dropped by the reader
-  // (DropUnwatchableNames). Collected as `dif` and `clk` alone, the reads
-  // named no variable, and a port connected to `dif.clk` never followed it.
+  // base's). §26.3 and §8.23 make `p::g` such a path too, a package's variable
+  // or a class's static property. A name no variable is held under is dropped
+  // by the reader (DropUnwatchableNames). Collected as `dif` and `clk` alone,
+  // the reads named no variable, and a port connected to `dif.clk` never
+  // followed it.
   if (expr->kind == ExprKind::kMemberAccess) {
     std::string dotted;
     if (DottedNamePath(expr, dotted)) out.insert(dotted);
@@ -285,18 +290,17 @@ static void CollectBlockLocalNames(const Stmt* stmt,
       stmt, [&out](Stmt* const& sub) { CollectBlockLocalNames(sub, out); });
 }
 
-// The key a call's function stands under in the FuncMap: its callee's name,
-// or, for a call through a package scope, `p::f(a)`, whose callee is a member
-// access with no name of its own, the "pkg::name" key RecordPackageFuncNames
-// (elaborator_items_udp.cpp) enters each package's function under (§26.3). A
-// call with no callee node, a constructor's `new`, keeps its empty name, and a
-// scope that is not a plain name spells a key the table holds for nothing.
+// The key a call's function stands under in the FuncMap, the path of names
+// its callee spells: `f`; the "p::f" RecordPackageFuncNames
+// (elaborator_items_udp.cpp) enters a package's function under (§26.3); and
+// the "C::f" and "s.f" WithScopedCallFunctions enters a class's static method
+// and a child instance's function under (§8.23, §23.6). A callee that is no
+// such path, and a call with no callee node, a constructor's `new`, spell an
+// empty key the table holds nothing under.
 static std::string CalledFunctionKey(const Expr& call) {
-  const Expr* callee = call.lhs;
-  if (callee == nullptr || !callee->is_scope_resolution) {
-    return std::string(call.callee);
-  }
-  return std::string(callee->lhs->text) + "::" + std::string(callee->rhs->text);
+  std::string path;
+  if (call.lhs != nullptr) DottedNamePath(call.lhs, path);
+  return path;
 }
 
 static void CollectCallNamesFromExpr(const Expr* expr,
@@ -345,23 +349,58 @@ static void CollectCallNamesFromStmt(const Stmt* stmt,
   });
 }
 
+// The scope a called function's own names are read in, as the prefix its
+// FuncMap key carries: "p::" of "p::f", "C::" of "C::f", "s." of "s.f". A bare
+// key carries none, and for a package's function an import entered under its
+// bare name the prefix is that of the "p::f" key RecordPackageFuncNames
+// (elaborator_items_udp.cpp) enters it under as well (§26.3); empty for a
+// function the module declares.
+static std::string_view ScopeOf(std::string_view key, const ModuleItem* func,
+                                const FuncMap& funcs) {
+  auto end = key.find_last_of(":.");
+  if (end != std::string_view::npos) return key.substr(0, end + 1);
+  for (const auto& [other, item] : funcs) {
+    auto scope = other.find("::");
+    if (item == func && scope != std::string_view::npos) {
+      return other.substr(0, scope + 2);
+    }
+  }
+  return {};
+}
+
+// The FuncMap entry a call `name` in the body of a function of the scope
+// `scope` reaches: the scope's own function of that name first, the "p::h" a
+// bare h(x) inside a function of the package p names (§26.3), and likewise a
+// class's static method or an instance's function, and then the name as
+// written.
+static FuncMap::const_iterator FindCalledFunction(const FuncMap& funcs,
+                                                  std::string_view scope,
+                                                  const std::string& name) {
+  auto it = funcs.find(std::string(scope) + name);
+  return it != funcs.end() ? it : funcs.find(name);
+}
+
+// The keys of every function the block calls, directly or through the
+// functions it calls, each call inside a function looked up from that
+// function's scope.
 static std::unordered_set<std::string_view> ResolveCalledFunctions(
     const Stmt* body, const FuncMap& funcs) {
   std::unordered_set<std::string_view> visited;
-  std::unordered_set<std::string> pending;
-  CollectCallNamesFromStmt(body, pending);
+  std::unordered_set<std::string> names;
+  CollectCallNamesFromStmt(body, names);
+  std::vector<std::pair<std::string, std::string>> pending;
+  for (const auto& name : names) pending.emplace_back("", name);
   while (!pending.empty()) {
-    std::unordered_set<std::string> next;
-    for (auto& name : pending) {
-      if (visited.count(name)) continue;
-      auto it = funcs.find(name);
-      if (it == funcs.end()) continue;
-      visited.insert(it->first);
-      for (auto* s : it->second->func_body_stmts) {
-        CollectCallNamesFromStmt(s, next);
-      }
+    auto [scope, name] = std::move(pending.back());
+    pending.pop_back();
+    auto it = FindCalledFunction(funcs, scope, name);
+    if (it == funcs.end() || !visited.insert(it->first).second) continue;
+    std::unordered_set<std::string> inner;
+    for (auto* s : it->second->func_body_stmts) {
+      CollectCallNamesFromStmt(s, inner);
     }
-    pending = std::move(next);
+    const std::string kScope(ScopeOf(it->first, it->second, funcs));
+    for (const auto& callee : inner) pending.emplace_back(kScope, callee);
   }
   return visited;
 }
@@ -370,8 +409,9 @@ static std::unordered_set<std::string_view> ResolveCalledFunctions(
 // stands on. It is one of the two names the prefix expands to, and the one that
 // always denotes a simulation object: `logic [7:0] a` is a single Variable
 // named `a`, so a bit-select read of it can only be watched through that name.
-// A package's object a package function reads is spelled "pkg::name"
-// (MergeNamesOfScope), and the package's name is part of its base.
+// A package's object or a class's static property is spelled "X::name"
+// (DottedNamePath, MergeNamesOfScope), and the scope's name is part of its
+// base.
 static std::string_view BaseSignalName(std::string_view name) {
   auto scope = name.find("::");
   auto pos =
@@ -433,33 +473,21 @@ struct SignalSets {
   std::unordered_set<std::string> written;
 };
 
-// §26.3: the package declaring `func`, read off the "pkg::name" key
-// RecordPackageFuncNames (elaborator_items_udp.cpp) enters each package's
-// function under, which the function has whether it is called through the
-// package or by the bare name an import enters it under too; empty for a
-// function the module declares.
-static std::string_view PackageOf(const ModuleItem* func,
-                                  const FuncMap& funcs) {
-  for (const auto& [key, item] : funcs) {
-    auto scope = key.find("::");
-    if (item == func && scope != std::string_view::npos) {
-      return key.substr(0, scope);
-    }
-  }
-  return {};
-}
-
 // Copies into `out` the names `names` holds, each one a called function reads
-// or writes beyond its own formals and locals. A function of the package
-// `pkg` names that package's objects, which the calling module may not name
-// at all, so each is spelled "pkg::name" and watched by the key the simulator
-// holds it under (EmitSignalEvent); taken bare, `g` of `p::f` named nothing
-// in the module and a write of p::g never re-ran the block.
-static void MergeNamesOfScope(std::string_view pkg,
+// or writes beyond its own formals and locals. A function of a package, a
+// class or a child instance names the objects of its own scope, which the
+// calling module may not name at all, so each is spelled with the scope's
+// prefix (ScopeOf), "p::g", "C::g" or "s.g", and watched by the name the
+// simulator holds it under (EmitSignalEvent); taken bare, `g` of `p::f` named
+// nothing in the module and a write of p::g never re-ran the block. A name
+// already written through a package's or a class's scope, `p::g`, is kept as
+// written.
+static void MergeNamesOfScope(std::string_view scope,
                               const std::unordered_set<std::string>& names,
                               std::unordered_set<std::string>& out) {
   for (const auto& name : names) {
-    out.insert(pkg.empty() ? name : std::string(pkg) + "::" + name);
+    const bool kScoped = name.find("::") != std::string::npos;
+    out.insert(kScoped ? name : std::string(scope) + name);
   }
 }
 
@@ -467,43 +495,50 @@ static void MergeCalledFunctionSignals(const Stmt* body, const FuncMap& funcs,
                                        bool exclude_written, SignalSets& sigs) {
   auto called = ResolveCalledFunctions(body, funcs);
   for (auto& fname : called) {
-    auto it = funcs.find(fname);
-    if (it == funcs.end()) continue;
-    const auto* func = it->second;
-    const std::string_view kPkg = PackageOf(func, funcs);
+    const auto* func = funcs.at(fname);
+    const std::string_view kScope = ScopeOf(fname, func, funcs);
     std::unordered_set<std::string> func_locals;
     MergeOneCalledFunctionLocals(func, func_locals);
     std::unordered_set<std::string> func_reads;
     MergeOneCalledFunctionReads(func, func_reads);
     std::unordered_set<std::string> kept;
     MergeNamesNotLocalTo(func_reads, func_locals, kept);
-    MergeNamesOfScope(kPkg, kept, sigs.reads);
+    MergeNamesOfScope(kScope, kept, sigs.reads);
     if (exclude_written) {
       std::unordered_set<std::string> func_written;
       MergeOneCalledFunctionWritten(func, func_written);
       kept.clear();
       MergeNamesNotLocalTo(func_written, func_locals, kept);
-      MergeNamesOfScope(kPkg, kept, sigs.written);
+      MergeNamesOfScope(kScope, kept, sigs.written);
     }
   }
 }
 
 // Records one watchable name, deduped, as a plain identifier event the
-// simulator resolves through FindVariable, a package's object, "pkg::name",
-// by the "pkg.name" key its storage stands under (PackageDataKey in
-// src/simulator/lowerer_package_data.cpp).
+// simulator resolves through FindVariable. §26.3 and §8.23 spell a package's
+// variable and a class's static property alike, "X::n", and the simulator
+// holds the first under the "X.n" key its storage stands under (PackageDataKey
+// in src/simulator/lowerer_package_data.cpp) and watches the second as written
+// (NamesStaticProperty in src/simulator/awaiters.h), so both spellings are
+// recorded and the one that designates no object is dropped
+// (DropUnwatchableNames).
 static void EmitSignalEvent(std::string_view text,
                             std::unordered_set<std::string_view>& emitted,
                             std::vector<EventExpr>& events, Arena& arena) {
   if (text.empty() || !emitted.insert(text).second) return;
-  std::string watched(text);
-  auto scope = watched.find("::");
-  if (scope != std::string::npos) watched.replace(scope, 2, ".");
   auto* expr = arena.Create<Expr>();
   expr->kind = ExprKind::kIdentifier;
-  expr->text = std::string_view(
-      arena.AllocString(watched.data(), watched.size()), watched.size());
+  expr->text = std::string_view(arena.AllocString(text.data(), text.size()),
+                                text.size());
   events.push_back({Edge::kNone, expr});
+  auto scope = text.find("::");
+  if (scope == std::string_view::npos) return;
+  std::string dotted(text);
+  dotted.replace(scope, 2, ".");
+  EmitSignalEvent(
+      std::string_view(arena.AllocString(dotted.data(), dotted.size()),
+                       dotted.size()),
+      emitted, events, arena);
 }
 
 static std::vector<EventExpr> BuildSensitivityEvents(
@@ -560,6 +595,44 @@ std::vector<EventExpr> InferSensitivity(
   }
 
   return BuildSensitivityEvents(sigs, exclude_written, const_names, arena);
+}
+
+// Enters each static function `cls` declares under the "C::f" its call
+// through the class scope spells (§8.23).
+static void AddStaticMethods(const ClassDecl& cls, Arena& arena,
+                             FuncMap& funcs) {
+  for (const ClassMember* m : cls.members) {
+    const ModuleItem* method = m->method;
+    if (method == nullptr || !method->is_static_method ||
+        method->kind != ModuleItemKind::kFunctionDecl) {
+      continue;
+    }
+    funcs[*arena.Create<std::string>(
+        std::string(cls.name) + "::" + std::string(method->name))] = method;
+  }
+}
+
+FuncMap WithScopedCallFunctions(
+    const FuncMap& funcs, const std::vector<ModuleItem*>& items,
+    const std::vector<ClassDecl*>& unit_classes,
+    const std::function<const ModuleDecl*(std::string_view)>& find_module,
+    Arena& arena) {
+  FuncMap out = funcs;
+  for (const ClassDecl* cls : unit_classes) AddStaticMethods(*cls, arena, out);
+  for (const ModuleItem* item : items) {
+    if (item->kind == ModuleItemKind::kClassDecl) {
+      AddStaticMethods(*item->class_decl, arena, out);
+    }
+    if (item->kind != ModuleItemKind::kModuleInst) continue;
+    const ModuleDecl* decl = find_module(item->inst_module);
+    if (decl == nullptr) continue;
+    for (const ModuleItem* sub : decl->items) {
+      if (sub->kind != ModuleItemKind::kFunctionDecl) continue;
+      out[*arena.Create<std::string>(std::string(item->inst_name) + "." +
+                                     std::string(sub->name))] = sub;
+    }
+  }
+  return out;
 }
 
 }  // namespace delta

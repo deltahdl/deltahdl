@@ -871,6 +871,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
 
   ClassifyTaskFuncDecls(decl, task_names_, func_decls_, auto_task_func_names_);
   RecordPackageFuncNames(unit_, func_decls_, arena_);
+  BuildInferenceFuncs(decl);
 
   std::vector<std::pair<std::string_view, ModuleDecl*>> local_nested_modules(
       nested_module_decls_.begin(), nested_module_decls_.end());

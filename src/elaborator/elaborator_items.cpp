@@ -29,9 +29,11 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_checker_site.h"
 #include "elaborator/rtlir_scopes.h"
+#include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/unit_scope_order.h"
 #include "parser/ast_class.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -693,6 +695,19 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
   }
 }
 
+// §9.2.2.2.1 with §8.23 and §23.6: an always_comb in `decl` may call a
+// class's static method or a child instance's function by a scoped name, and
+// what that function reads joins the inferred list as what a function called
+// by its bare name reads does.
+void Elaborator::BuildInferenceFuncs(const ModuleDecl* decl) {
+  inference_funcs_ = WithScopedCallFunctions(
+      func_decls_, decl->items, unit_->classes,
+      [this](std::string_view name) -> const ModuleDecl* {
+        return FindModuleInScope(name);
+      },
+      arena_);
+}
+
 // §16.14.6: the concurrent assertions the procedure embeds take their clock
 // from it, or from the default clocking, before the process is built over its
 // body. §17.3: each checker the procedure instantiates is a procedural checker
@@ -720,9 +735,9 @@ void Elaborator::AddProcedure(ModuleItem* item, RtlirModule* mod,
     sites.push_back({site.stmt, ScopedName(inst->inst_name)});
   }
   bool infers = kind != RtlirProcessKind::kInitial;
-  const ProcessBuildEnv kEnv{arena_, diag_, infers ? &func_decls_ : nullptr,
-                             infers ? &const_names_ : nullptr,
-                             module_global_clocking_event_};
+  const ProcessBuildEnv kEnv{
+      arena_, diag_, infers ? &inference_funcs_ : nullptr,
+      infers ? &const_names_ : nullptr, module_global_clocking_event_};
   AddProcess(kind, item, mod, kEnv);
   mod->processes.back().checker_instances = std::move(sites);
 }
