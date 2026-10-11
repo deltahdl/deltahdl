@@ -321,7 +321,8 @@ TEST(AssignmentLikeContextSim, PatternOnOutputArgumentReceivesMembers) {
 
 // §10.8: an instance's override of a parameter declared with a structure type
 // is an assignment-like context, so a pattern there takes the parameter's type
-// and replaces its default.
+// and replaces its default, and an instance with no override keeps the
+// default's structure.
 TEST(AssignmentLikeContextSim, PatternOverridesStructureParameter) {
   SimFixture f;
   RunAndFindVar(
@@ -332,11 +333,15 @@ TEST(AssignmentLikeContextSim, PatternOverridesStructureParameter) {
       "endmodule\n"
       "module top;\n"
       "  sub #(.P('{8'h33, 8'h44})) u();\n"
+      "  sub d();\n"
       "endmodule\n",
       f, "u.q");
   auto* q = f.ctx.FindVariable("u.q");
   ASSERT_NE(q, nullptr);
   EXPECT_EQ(q->value.ToUint64(), 0x3344u);
+  auto* kept = f.ctx.FindVariable("d.q");
+  ASSERT_NE(kept, nullptr);
+  EXPECT_EQ(kept->value.ToUint64(), 0x1122u);
 }
 
 }  // namespace

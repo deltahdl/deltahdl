@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <optional>
@@ -8,6 +9,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/net_data_type.h"
@@ -131,6 +133,29 @@ void CheckStructPatternFor(const Expr* value, const DataType* target_type,
     members = StructMembersOf(*target_type, target.typedefs);
   }
   if (members != nullptr) CheckStructPattern(pattern, *members, target);
+}
+
+std::optional<int64_t> FoldPackedStructPattern(const Expr* pattern,
+                                               const DataType& type,
+                                               const TypedefMap& typedefs,
+                                               const ScopeMap& scope) {
+  if (pattern->kind != ExprKind::kAssignmentPattern ||
+      !pattern->pattern_keys.empty())
+    return std::nullopt;
+  const std::vector<StructMember>* members = StructMembersOf(type, typedefs);
+  if (members == nullptr || members->size() != pattern->elements.size())
+    return std::nullopt;
+  uint64_t value = 0;
+  uint32_t total = 0;
+  for (size_t i = 0; i < members->size(); ++i) {
+    uint32_t width = EvalStructMemberWidth((*members)[i], typedefs);
+    auto item = ConstEvalInt(pattern->elements[i], scope);
+    if (!item || total + width > 63) return std::nullopt;
+    uint64_t mask = (uint64_t{1} << width) - 1;
+    value = (value << width) | (static_cast<uint64_t>(*item) & mask);
+    total += width;
+  }
+  return static_cast<int64_t>(value);
 }
 
 void Elaborator::ValidateStructInitPattern(const ModuleItem* item) {

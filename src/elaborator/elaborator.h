@@ -259,6 +259,9 @@ class Elaborator : public ElaboratorClassRules {
                                RtlirVariable& var);
   void ElaborateContAssign(ModuleItem* item, RtlirModule* mod);
   void ValidateGeneratedItem(const ModuleItem* item);
+  void ResolvePackedStructParam(RtlirParamDecl& pd, const DataType* type,
+                                const Expr* default_value,
+                                const ScopeMap& scope);
   void ReportProceduralNetTargets(
       const std::unordered_map<std::string_view, SourceLoc>& targets);
   void RecordGateOutputDrivers(const ModuleItem* item);

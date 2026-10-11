@@ -464,6 +464,14 @@ const std::vector<StructMember>* StructMembersOf(const DataType& type,
 void CheckStructPattern(const Expr* pattern,
                         const std::vector<StructMember>& members,
                         const StructPatternTarget& target);
+// §10.8 with §7.2.1: the packed value a positional pattern gives a structure
+// of `type`, each item folded and placed at its member's bits, the first
+// member most significant; nothing where an item does not fold or the
+// structure is 64 bits wide or wider.
+std::optional<int64_t> FoldPackedStructPattern(const Expr* pattern,
+                                               const DataType& type,
+                                               const TypedefMap& typedefs,
+                                               const ScopeMap& scope);
 // Checks `value` as a structure pattern where it is one: a typed pattern
 // against the type its prefix names, an untyped one against `target_type`,
 // the type of what it is assigned to, null where that is not known.

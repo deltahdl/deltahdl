@@ -23,6 +23,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_params.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/net_data_type.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/simple_bit_vector.h"
@@ -497,6 +498,27 @@ static RtlirParamDecl BuildParamDeclShell(const ModuleDecl* decl, size_t i,
   return pd;
 }
 
+// §10.8 (printed page 259) with §7.2.1: a parameter port declared with a
+// structure type whose value -- its own default or an instance's override --
+// is a positional pattern holds the packed structure the pattern builds, which
+// the integer fold, taking no pattern, left unresolved. An override's items
+// are written in the instantiating module and fold against its scope.
+void Elaborator::ResolvePackedStructParam(RtlirParamDecl& pd,
+                                          const DataType* type,
+                                          const Expr* default_value,
+                                          const ScopeMap& scope) {
+  if (type == nullptr) return;
+  const Expr* value =
+      pd.override_expr != nullptr ? pd.override_expr : default_value;
+  const ScopeMap& value_scope =
+      pd.override_expr != nullptr ? pd.override_scope : scope;
+  if (value == nullptr) return;
+  auto folded = FoldPackedStructPattern(value, *type, typedefs_, value_scope);
+  if (!folded) return;
+  pd.resolved_value = *folded;
+  pd.is_resolved = true;
+}
+
 void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
                                         const ParamList& params,
                                         RtlirModule* mod) {
@@ -569,6 +591,7 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
       RecordStringParamValue(pd, pval, param_type, arena_);
     }
     CheckTypeParamValueAssignable(decl, i, pval, scope, tp_ctx);
+    ResolvePackedStructParam(pd, param_type, pval, scope);
     mod->params.push_back(pd);
   }
 }
@@ -692,14 +715,14 @@ void PushInstParamAssignment(const ModuleDecl* child_decl,
   // §10.8 (printed page 259): an override of a parameter declared with an
   // explicit type is an assignment-like context, so a pattern there takes the
   // parameter's type -- a structure's or a union's, written inline or through
-  // a typedef -- and is folded at that type rather than dropped unfolded.
+  // a typedef -- and is kept for the declaration to fold at that type
+  // (ResolvePackedStructParam) rather than dropped unfolded.
   const DataType* aggregate =
       pexpr != nullptr && pexpr->kind == ExprKind::kAssignmentPattern
           ? AggregateParamType(child_decl, pname)
           : nullptr;
   if (aggregate != nullptr) {
-    if (auto val = FoldDeclaredParamValue(pexpr, *aggregate, parent_scope))
-      child_params.push_back({pname, *val, pexpr});
+    child_params.push_back({pname, 0, pexpr});
     return;
   }
   if (auto real = RealOverrideValue(pexpr, parent_scope)) {
