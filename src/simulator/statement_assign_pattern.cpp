@@ -18,6 +18,7 @@
 #include "simulator/eval_array_element_assoc.h"
 #include "simulator/eval_array_element_queue.h"
 #include "simulator/eval_expr_internal.h"
+#include "simulator/eval_function_args_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/queue_bound.h"
 #include "simulator/scheduler.h"
@@ -51,9 +52,11 @@ static size_t FindIndexKeyedElement(const Expr* rhs, uint32_t idx,
 
 // Finds the pattern element keyed by a type keyword matching elem_type. Returns
 // the matching element index, or rhs->elements.size() when none matches.
+// §10.9.1: when more than one type key matches an element, the last one's
+// value is used, so the keys are searched from the end.
 static size_t FindTypeKeyedElement(const Expr* rhs, DataTypeKind elem_type) {
-  for (size_t i = 0; i < rhs->pattern_keys.size(); ++i) {
-    if (i >= rhs->elements.size()) break;
+  size_t keyed = std::min(rhs->pattern_keys.size(), rhs->elements.size());
+  for (size_t i = keyed; i-- > 0;) {
     auto key = rhs->pattern_keys[i]->text;
     if (IsTypeKeyword(key) && TypeKeyMatchesKind(key, elem_type)) return i;
   }
@@ -82,6 +85,9 @@ struct PatternArrayElem {
   // §6.8's Table 6-7 row this element's type takes, for the branch below where
   // no §10.9.1 rule covers it.
   bool is_4state;
+  // The layout of a structure element, which a default is applied to member
+  // by member (EvalDefaultForElement); null for any other element.
+  const StructTypeInfo* layout = nullptr;
 };
 }  // namespace
 
@@ -91,7 +97,13 @@ static Logic4Vec FindArrayKeyedValue(const Expr* rhs,
   size_t match = FindIndexKeyedElement(rhs, slot.idx, ctx, arena);
   if (match >= rhs->elements.size())
     match = FindTypeKeyedElement(rhs, slot.elem_type_kind);
-  if (match >= rhs->elements.size()) match = FindDefaultKeyedElement(rhs);
+  if (match >= rhs->elements.size()) {
+    match = FindDefaultKeyedElement(rhs);
+    if (match < rhs->elements.size()) {
+      return EvalDefaultForElement(rhs->elements[match], slot.layout, ctx,
+                                   arena);
+    }
+  }
   if (match < rhs->elements.size())
     return EvalExpr(rhs->elements[match], ctx, arena);
   // §10.9.1 forbids an element no rule covers, requiring one of its rules to
@@ -199,10 +211,11 @@ static void DistributeDimPattern(const PatternDist& pd,
     std::string child = prefix + "[" + std::to_string(lo + i) + "]";
     const Expr* sub =
         SelectDimElement(pat, lo + i, descending ? (size - 1 - i) : i, pd);
-    bool is_pattern = sub && (sub->kind == ExprKind::kAssignmentPattern ||
-                              sub->kind == ExprKind::kConcatenation);
+    bool is_pattern = sub && sub->kind == ExprKind::kAssignmentPattern;
     if (last)
       WriteLeaf(pd, child, sub);
+    else if (sub && sub->kind == ExprKind::kConcatenation)
+      DistributeConcatToSubarray(child, pd.info, d + 1, sub, pd.ctx, pd.arena);
     else if (is_pattern)
       DistributeDimPattern(pd, child, d + 1, sub);
     else
@@ -221,7 +234,7 @@ Logic4Vec PatternItemAt(const Expr* rhs, const ArrayPatternTarget& target,
     uint32_t idx =
         info.is_descending ? (info.lo + info.size - 1 - i) : (info.lo + i);
     PatternArrayElem slot{idx, info.elem_width, info.elem_type_kind,
-                          info.is_4state};
+                          info.is_4state, target.layout};
     return FindArrayKeyedValue(rhs, slot, ctx, arena);
   }
   if (replicate && inner_count > 0) {
@@ -272,13 +285,12 @@ void DistributePatternToArray(std::string_view arr_name, const ArrayInfo& info,
 // §10.10: an element of an unpacked array concatenation may itself be an
 // assignment pattern that contributes its elements (not a single value),
 // either bare ('{...}) or typed (AI3'{5, 6, 7}). The typed form parses as a
-// cast wrapping the pattern, so unwrap it here.
-static const Expr* AsArrayConcatPattern(const Expr* item) {
+// cast wrapping the pattern, and only one whose type is an unpacked array
+// contributes elements; a typed structure pattern, P'{8'h1, 8'h2}, is one
+// value, as the queue path already reads it.
+static const Expr* AsArrayConcatPattern(const Expr* item, SimContext& ctx) {
   if (item->kind == ExprKind::kAssignmentPattern) return item;
-  if (item->kind == ExprKind::kCast && item->lhs &&
-      item->lhs->kind == ExprKind::kAssignmentPattern)
-    return item->lhs;
-  return nullptr;
+  return UnpackedArrayTypedPattern(item, ctx);
 }
 
 // Replace each collected element with a copy that owns its words, the blocking
@@ -304,15 +316,26 @@ static void OwnConcatElements(std::vector<Logic4Vec>& elems, Arena& arena) {
   for (auto& elem : elems) elem = OwnRhsWords(elem, arena);
 }
 
-static std::vector<Logic4Vec> CollectConcatElements(const Expr* rhs,
-                                                    SimContext& ctx,
-                                                    Arena& arena) {
+// §10.10: the values an array item contributes, read in the order its
+// elements are written, through every dimension. An item of a
+// multidimensional target's element type, a row, gives that row's values, so
+// the target reads one element of its own per row it is given.
+static void CollectArrayLeaves(std::string_view name, const ArrayInfo& ai,
+                               SimContext& ctx, std::vector<Logic4Vec>& out) {
+  for (uint32_t k = 0; k < ArrayElementCount(ai); ++k) {
+    auto* v = ctx.FindVariable(std::string(name) + ArrayElementSuffixAt(ai, k));
+    if (v) out.push_back(v->value);
+  }
+}
+
+std::vector<Logic4Vec> CollectConcatElements(const Expr* rhs, SimContext& ctx,
+                                             Arena& arena) {
   std::vector<Logic4Vec> elems;
   for (auto* item : rhs->elements) {
     if (item->kind == ExprKind::kIdentifier) {
       auto* ai = ctx.FindArrayInfo(item->text);
       if (ai) {
-        CollectFixedArrayElements(item->text, *ai, ctx, elems);
+        CollectArrayLeaves(item->text, *ai, ctx, elems);
         continue;
       }
       auto* q = ctx.FindQueue(item->text);
@@ -321,10 +344,16 @@ static std::vector<Logic4Vec> CollectConcatElements(const Expr* rhs,
         continue;
       }
     }
-    if (const Expr* pat = AsArrayConcatPattern(item)) {
+    if (const Expr* pat = AsArrayConcatPattern(item, ctx)) {
       for (auto* elem : pat->elements) {
         elems.push_back(EvalExpr(elem, ctx, arena));
       }
+      continue;
+    }
+    // §10.10: a slice of an unpacked array is an array item, contributing its
+    // elements in order as the queue path's collector already reads it.
+    if (item->kind == ExprKind::kSelect &&
+        CollectUnpackedSliceElements(item, ctx, arena, elems)) {
       continue;
     }
     elems.push_back(EvalExpr(item, ctx, arena));
@@ -332,24 +361,24 @@ static std::vector<Logic4Vec> CollectConcatElements(const Expr* rhs,
   return elems;
 }
 
-static void DistributeConcatToArray(std::string_view arr_name,
-                                    const ArrayInfo& info, const Expr* rhs,
-                                    SimContext& ctx, Arena& arena) {
+void DistributeConcatToArray(std::string_view arr_name, const ArrayInfo& info,
+                             const Expr* rhs, SimContext& ctx, Arena& arena) {
   auto elems = CollectConcatElements(rhs, ctx, arena);
   OwnConcatElements(elems, arena);
-  if (elems.size() != info.size) {
+  // A multidimensional target is held as its innermost elements, and the
+  // values arrive in that order, so they are counted and stored by them.
+  uint32_t count = ArrayElementCount(info);
+  if (elems.size() != count) {
     ctx.GetDiag().Error(
         rhs->range.start,
         "unpacked array concatenation size mismatch: expected " +
-            std::to_string(info.size) + " elements, got " +
+            std::to_string(count) + " elements, got " +
             std::to_string(elems.size()),
         Subclause("10.10"));
     return;
   }
-  for (uint32_t i = 0; i < info.size; ++i) {
-    uint32_t idx =
-        info.is_descending ? (info.lo + info.size - 1 - i) : (info.lo + i);
-    auto name = std::string(arr_name) + "[" + std::to_string(idx) + "]";
+  for (uint32_t i = 0; i < count; ++i) {
+    auto name = std::string(arr_name) + ArrayElementSuffixAt(info, i);
     auto* elem = ctx.FindVariable(name);
     if (!elem) continue;
     elem->value = ResizeToWidth(elems[i], info.elem_width, arena);
@@ -437,7 +466,7 @@ static bool TryArraySliceCopy(const Stmt* stmt, std::string_view dst_name,
   return true;
 }
 
-bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+bool TryArrayAggregateAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (stmt->lhs->kind != ExprKind::kIdentifier || !stmt->rhs) return false;
   auto* ainfo = ctx.FindArrayInfo(stmt->lhs->text);
   if (ainfo && stmt->rhs->kind == ExprKind::kAssignmentPattern) {
@@ -448,6 +477,12 @@ bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     DistributeConcatToArray(stmt->lhs->text, *ainfo, stmt->rhs, ctx, arena);
     return true;
   }
+  return false;
+}
+
+bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  if (stmt->lhs->kind != ExprKind::kIdentifier || !stmt->rhs) return false;
+  auto* ainfo = ctx.FindArrayInfo(stmt->lhs->text);
   if (ainfo && stmt->rhs->kind == ExprKind::kSelect &&
       (TryCopyElementQueueToArray(stmt, *ainfo, ctx, arena) ||
        TryArraySliceCopy(stmt, stmt->lhs->text, *ainfo, ctx, arena))) {

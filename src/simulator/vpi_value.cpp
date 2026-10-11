@@ -655,6 +655,8 @@ static void PutValueApplyWriteAndForce(VpiHandle obj, const s_vpi_value* value,
   // value takes effect now and is held as the forced value.
   if (mode == vpiForceFlag) {
     obj->var->is_forced = true;
+    obj->var->force_active = true;
+    obj->var->held_parts.assign(1, Variable::HeldPart{});
     obj->var->forced_value = obj->var->value;
   }
 }
@@ -777,6 +779,8 @@ static void PutValueRelease(VpiObject& obj, SimContext* sim) {
     ReleaseForcedTarget(obj.var, obj.net, *sim, sim->GetArena());
   } else {
     obj.var->is_forced = false;
+    obj.var->force_active = false;
+    obj.var->held_parts.clear();
   }
 }
 

@@ -676,13 +676,15 @@ static void ResolveForcedStrength(Net& net) {
 // overrides the drivers of those bits and no others, so the resolution below
 // runs as it always does and the forced bits are laid back over its answer.
 // forced_value carries the whole object with those bits in place, which is
-// where they are read from and where they go.
+// where they are read from and where they go, for each part a force holds.
 static void ApplyPartialForcedValue(Net& net, Arena& arena) {
-  const auto& window = net.resolved->forced_window;
-  DepositBitField(net.resolved->value, window.dst_lo,
-                  ExtractBitField(arena, net.resolved->forced_value,
-                                  window.dst_lo, window.dst_width),
-                  window.dst_width);
+  for (const auto& part : net.resolved->held_parts) {
+    const auto& window = part.window;
+    DepositBitField(net.resolved->value, window.dst_lo,
+                    ExtractBitField(arena, net.resolved->forced_value,
+                                    window.dst_lo, window.dst_width),
+                    window.dst_width);
+  }
 }
 
 // The strength of the bits a partial force holds, which §10.6.2 makes the

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 
 // §10.6.2: the force statement's right-hand side is an expression assigned to
 // the target, and §10.7 sizes an assigned value to its target. A singular
@@ -117,6 +118,106 @@ TEST(ForceReleaseSim, ReleasedUndrivenNetAndNetArrayElementReadTheirDrivers) {
                        "endmodule\n",
                        f),
             "1 11 1 b\nz z1 z 3\n");
+}
+
+// §10.6.1 with §10.6.2: an assign and a force on one variable are two
+// procedural continuous assignments. The force overrides the assign while it
+// is in effect, a release puts the assign back in force against procedural
+// assignments, a deassign ends the assign alone, and the assign put back
+// stops driving the moment a later force takes the variable. One override
+// flag stood for both, so each statement undid the other.
+TEST(ForceReleaseSim, AnAssignAndAForceAreTwoHolds) {
+  const char* src =
+      "module t;\n"
+      "  logic [7:0] d, p, q, r, s;\n"
+      "  initial begin\n"
+      "    d = 10;\n"
+      "    assign p = d; force p = 99; release p; p = 55;\n"
+      "    assign q = d; force q = 99; release q; force q = 77;\n"
+      "    force r = 99; assign r = d;\n"
+      "    force s = 99; deassign s; s = 1;\n"
+      "    #1 d = 5;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "p"), 5u);
+  EXPECT_EQ(RunAndGet(src, "q"), 77u);
+  EXPECT_EQ(RunAndGet(src, "r"), 99u);
+  EXPECT_EQ(RunAndGet(src, "s"), 99u);
+}
+
+// §10.6.2: releasing a variable a continuous assignment drives reestablishes
+// the assignment and schedules its reevaluation, so the variable takes the
+// assignment's value without waiting for an operand of it to change. It
+// kept the forced value.
+TEST(ForceReleaseSim, ReleaseReevaluatesTheContinuousAssignment) {
+  const char* src =
+      "module t;\n"
+      "  logic [7:0] src, x, seen;\n"
+      "  assign x = src;\n"
+      "  initial begin\n"
+      "    src = 10;\n"
+      "    #1 force x = 99;\n"
+      "    #1 release x;\n"
+      "    #1 seen = x;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "seen"), 10u);
+}
+
+// §10.6.2: two forces on different bits of a net are two holds, each on its
+// own bits; releasing one leaves the other, a force on bits already held
+// takes them over, and a force on the whole net takes every bit. One window
+// stood for the net, so the second force replaced the first and a release of
+// either released both.
+TEST(ForceReleaseSim, ForcesOnDifferentBitsOfANetHoldTheirOwnBits) {
+  const char* src =
+      "module t;\n"
+      "  wire [7:0] bus;\n"
+      "  logic [7:0] s, a, b, c, d, e;\n"
+      "  assign bus = s;\n"
+      "  initial begin\n"
+      "    s = 0;\n"
+      "    force bus[3] = 1'b1;\n"
+      "    force bus[5] = 1'b1;\n"
+      "    #1 s = 8'h01;\n"
+      "    #1 a = bus;\n"
+      "    release bus[3];\n"
+      "    #1 b = bus;\n"
+      "    force bus[5] = 1'b0;\n"
+      "    #1 c = bus;\n"
+      "    force bus = 8'hAA;\n"
+      "    #1 d = bus;\n"
+      "    release bus;\n"
+      "    #1 e = bus;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "a"), 0x29u);
+  EXPECT_EQ(RunAndGet(src, "b"), 0x21u);
+  EXPECT_EQ(RunAndGet(src, "c"), 0x01u);
+  EXPECT_EQ(RunAndGet(src, "d"), 0xAAu);
+  EXPECT_EQ(RunAndGet(src, "e"), 0x01u);
+}
+
+// §10.6.2: a released net takes its drivers' value at once, a bit-select of
+// one released within a concatenation as well as alone. Released without
+// its net, bus[3] kept the forced 1 until a driver of bus changed.
+TEST(ForceReleaseSim, ReleasingAConcatenationRestoresANetBitSelect) {
+  const char* src =
+      "module t;\n"
+      "  wire w;\n"
+      "  wire [7:0] bus;\n"
+      "  logic [7:0] a, b;\n"
+      "  assign w = 1'b0;\n"
+      "  assign bus = 8'h55;\n"
+      "  initial begin\n"
+      "    #1 force {w, bus[3]} = 2'b11;\n"
+      "    #1 a = bus;\n"
+      "    release {w, bus[3]};\n"
+      "    #1 b = bus;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "a"), 0x5Du);
+  EXPECT_EQ(RunAndGet(src, "b"), 0x55u);
 }
 
 }  // namespace

@@ -10,6 +10,7 @@
 #include "common/packed_range.h"
 #include "common/types.h"
 #include "parser/ast_type.h"
+#include "simulator/scheduler.h"
 #include "simulator/stmt_result.h"
 
 namespace delta {
@@ -110,6 +111,17 @@ NbaSample SampleNonblockingRhs(const Stmt* stmt, SimContext& ctx, Arena& arena);
 void ScheduleNonblockingAssign(const Stmt* stmt, const NbaSample& sample,
                                uint64_t delay_ticks, SimContext& ctx,
                                Arena& arena);
+
+// §10.4.2 with §9.4.5: the updates of `stmt` with `sample`, its target
+// resolved now, held rather than queued for an intra-assignment event control
+// to release when its event occurs (ReleaseNbaUpdates).
+Scheduler::NbaCapture* CaptureNonblockingAssign(const Stmt* stmt,
+                                                const NbaSample& sample,
+                                                SimContext& ctx, Arena& arena);
+
+// Queues the updates CaptureNonblockingAssign held, in the regions they were
+// made for, at the present time.
+void ReleaseNbaUpdates(const Scheduler::NbaCapture& updates, SimContext& ctx);
 
 void BuildLhsName(const Expr* expr, std::string& out);
 
@@ -403,6 +415,11 @@ void SizeAndOwnQueueElements(const QueueObject& q,
 Logic4Vec CoerceToPropertyType(const ClassTypeInfo* type, std::string_view name,
                                Logic4Vec val, Arena& arena);
 bool TryArrayBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
+// §10.9.1 and §10.10: an assignment pattern or an unpacked array concatenation
+// assigned to a whole unpacked array, which evaluates each item into its
+// element. The caller makes no vector of the right-hand side first, so an item
+// is evaluated once.
+bool TryArrayAggregateAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 // Fills the unpacked array `dst` that the blocking assignment `stmt` targets
 // from one value rather than an element at a time: a string literal, alone or
 // cast to the array's type, left-justified (§5.9), or a bit-stream cast as

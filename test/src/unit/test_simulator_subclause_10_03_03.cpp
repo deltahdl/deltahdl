@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"
@@ -169,6 +170,28 @@ TEST(AssignmentDelaySim, VectorNonzeroToZeroUsesFall) {
       "  initial begin\n"
       "    src = 8'hFF;\n"
       "    #50 src = 8'h00;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 55u);
+}
+
+// §10.3.3: whether the right-hand side went from nonzero to zero is a
+// question about every bit of it, so a vector wider than one word whose only
+// set bit lies above the first word is nonzero, and clearing it falls.
+TEST(AssignmentDelaySim, WideVectorNonzeroAboveTheFirstWordToZeroUsesFall) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [127:0] src;\n"
+      "  wire [127:0] y;\n"
+      "  assign #(20, 5) y = src;\n"
+      "  initial begin\n"
+      "    src = 128'h1 << 100;\n"
+      "    #50 src = '0;\n"
       "  end\n"
       "endmodule\n",
       f, "y");
@@ -614,6 +637,25 @@ TEST(AssignmentDelaySim, OneBitDrivenWindowTakesTheScalarTransitionTable) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToString(), "zzzzzzz0");
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 3u);
+}
+
+// §10.3.3: a net delay delays every driver's change to the net, an instance's
+// output port among the drivers. The driver an output port connection makes
+// is created as the instance is lowered, after the net delays were given out,
+// and x followed the port at once.
+TEST(AssignmentDelaySim, ANetDelayDelaysAnOutputPortDriver) {
+  const char* src =
+      "module c(output logic o);\n"
+      "  initial begin o = 1'b0; #1 o = 1'b1; end\n"
+      "endmodule\n"
+      "module t;\n"
+      "  wire #10 x;\n"
+      "  logic r5, r12;\n"
+      "  c u(.o(x));\n"
+      "  initial begin #5 r5 = (x === 1'b1); #7 r12 = (x === 1'b1); end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "r5"), 0u);
+  EXPECT_EQ(RunAndGet(src, "r12"), 1u);
 }
 
 }  // namespace

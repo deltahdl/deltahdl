@@ -228,6 +228,7 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
   size_t first_child = mod->children.size();
   size_t first_assertion = mod->assertions.size();
   size_t first_property = mod->declared_properties.size();
+  size_t first_alias = mod->aliases.size();
   ElaborateItem(item, mod);
   // §27.4 with §13.4 and §23.6: a subroutine the block declares is a member
   // of this instance's scope, reached from outside by the instance's
@@ -267,6 +268,11 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
   // assignments (Lowerer::LowerPortBindings), which read the same two.
   StampGenBlockInstance(mod->children, first_child, gen_loop_consts_,
                         gen_prefix_scopes_);
+  // §10.11 with §27.5: an alias names the nets of the block it stands in by
+  // their simple names, which the block declares under its prefixes.
+  for (size_t i = first_alias; i < mod->aliases.size(); ++i) {
+    mod->aliases[i].gen_block_prefixes = gen_prefix_scopes_;
+  }
 }
 
 // §27.5 (printed page 824) makes a generate block a scope of its own, §23.9

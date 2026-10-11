@@ -260,4 +260,43 @@ TEST(ArrayLiteralSim, AConcatenationReplicationItemFillsOneMemberElement) {
   EXPECT_EQ(out, "5 1212 3456\n");
 }
 
+// §10.9.1: when more than one type key matches an element, the last one gives
+// its value, in an assignment and in a declaration's initializer alike. The
+// first was taken.
+TEST(ArrayLiteralSim, TheLastOfTwoMatchingTypeKeysGivesTheValue) {
+  const char* src =
+      "module t;\n"
+      "  int d[2] = '{int: 3, int: 7};\n"
+      "  int a[2];\n"
+      "  int a0, d1;\n"
+      "  initial begin a = '{int: 1, int: 2}; a0 = a[0]; d1 = d[1]; end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "a0"), 2u);
+  EXPECT_EQ(RunAndGet(src, "d1"), 7u);
+}
+
+// §10.9.1: a default falling on an element that is a structure is applied to
+// it member by member, unless the value's own type is that structure, which
+// the element is then assigned whole; by an assignment and by a declaration's
+// initializer alike. The value was resized to the element's width, giving
+// 16'h0001 where each member is 1.
+TEST(ArrayLiteralSim, ADefaultFillsAStructureElementMemberByMember) {
+  const char* src =
+      "typedef struct packed { byte a, b; } s_t;\n"
+      "module t;\n"
+      "  s_t pv = 16'h1234;\n"
+      "  s_t brr[2] = '{default: 1};\n"
+      "  s_t arr[2], crr[2];\n"
+      "  int a0, b1, c1;\n"
+      "  initial begin\n"
+      "    arr = '{default: 1};\n"
+      "    crr = '{default: pv};\n"
+      "    a0 = arr[0]; b1 = brr[1]; c1 = crr[1];\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "a0"), 0x0101u);
+  EXPECT_EQ(RunAndGet(src, "b1"), 0x0101u);
+  EXPECT_EQ(RunAndGet(src, "c1"), 0x1234u);
+}
+
 }  // namespace

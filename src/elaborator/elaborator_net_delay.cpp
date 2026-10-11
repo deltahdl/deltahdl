@@ -174,28 +174,40 @@ static void ApplyNetDelaysToUdpInstances(
   }
 }
 
+// Gives the driver `ca` the net delay of the net of `delayed` it drives, if it
+// drives one. A driver that wrote a delay of its own has the net's added to it,
+// which is what §10.3.3 states of a net delay. A driver that wrote none takes
+// the net's slots as they stand: there is nothing to add them to, and copying
+// the expressions rather than expanding them leaves a one-delay specification
+// the one slot it was written with, which is what every reader of these fields
+// already handles.
+static void ApplyNetDelayToDriver(
+    Arena& arena, RtlirContAssign& ca,
+    const std::unordered_map<std::string_view, const RtlirNet*>& delayed) {
+  const RtlirNet* net =
+      FindDelayedNetDriven(ca.lhs, ca.gen_block_prefixes, delayed);
+  if (net == nullptr) return;
+  if (ca.delay != nullptr) {
+    AddNetDelayToDriverDelay(arena, ca, *net);
+    return;
+  }
+  ca.delay = net->delay_rise;
+  ca.delay_fall = net->delay_fall;
+  ca.delay_decay = net->delay_turnoff;
+}
+
 void ApplyNetDeclDelaysToDrivers(Arena& arena, RtlirModule* mod) {
   std::unordered_map<std::string_view, const RtlirNet*> delayed =
       CollectDelayedNets(mod);
   for (RtlirContAssign& ca : mod->assigns) {
-    const RtlirNet* net =
-        FindDelayedNetDriven(ca.lhs, ca.gen_block_prefixes, delayed);
-    if (net == nullptr) continue;
-    // A driver that wrote a delay of its own has the net's added to it, which
-    // is what §10.3.3 states of a net delay. A driver that wrote none takes the
-    // net's slots as they stand: there is nothing to add them to, and copying
-    // the expressions rather than expanding them leaves a one-delay
-    // specification the one slot it was written with, which is what every
-    // reader of these fields already handles.
-    if (ca.delay != nullptr) {
-      AddNetDelayToDriverDelay(arena, ca, *net);
-      continue;
-    }
-    ca.delay = net->delay_rise;
-    ca.delay_fall = net->delay_fall;
-    ca.delay_decay = net->delay_turnoff;
+    ApplyNetDelayToDriver(arena, ca, delayed);
   }
   ApplyNetDelaysToUdpInstances(arena, mod, delayed);
+}
+
+void ApplyNetDeclDelayToPortDriver(Arena& arena, RtlirContAssign& ca,
+                                   const RtlirModule& mod) {
+  ApplyNetDelayToDriver(arena, ca, CollectDelayedNets(&mod));
 }
 
 }  // namespace delta

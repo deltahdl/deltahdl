@@ -703,17 +703,18 @@ static ExecTask ExecBlockingAssignRepeatEvent(const Stmt* stmt, SimContext& ctx,
   co_return StmtResult::kDone;
 }
 
-static SimCoroutine NbaEventCoroutine(const Stmt* stmt, NbaSample rhs_val,
+static SimCoroutine NbaEventCoroutine(const Stmt* stmt,
+                                      const Scheduler::NbaCapture* updates,
                                       SimContext& ctx, Arena& arena) {
   co_await EventAwaiter{ctx, stmt->events, arena};
-  ScheduleNonblockingAssign(stmt, rhs_val, 0, ctx, arena);
+  ReleaseNbaUpdates(*updates, ctx);
 }
 
-static SimCoroutine NbaRepeatEventCoroutine(const Stmt* stmt, NbaSample rhs_val,
-                                            uint64_t count, SimContext& ctx,
-                                            Arena& arena) {
+static SimCoroutine NbaRepeatEventCoroutine(
+    const Stmt* stmt, const Scheduler::NbaCapture* updates, uint64_t count,
+    SimContext& ctx, Arena& arena) {
   co_await RepeatEventAwaiter{ctx, stmt->events, arena, count};
-  ScheduleNonblockingAssign(stmt, rhs_val, 0, ctx, arena);
+  ReleaseNbaUpdates(*updates, ctx);
 }
 
 static void SpawnNbaEventProcess(SimCoroutine coro, SimContext& ctx,
@@ -736,25 +737,26 @@ static void SpawnNbaEventProcess(SimCoroutine coro, SimContext& ctx,
 
 static StmtResult ExecNbaWithEvent(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
-  // §10.4.2 (printed page 253): the right-hand side is evaluated when the
-  // statement executes, and the event control only defers the update, so the
-  // sample is the one the undeferred statement takes -- copied into the arena
-  // (§4.9.4, SampleNbaRhs) as it is held across the widest gap between
-  // sampling and update in the simulator, and carrying the tag a tagged union
-  // target's update sets (§7.3.2, printed 151), which the vector never holds:
-  // `u <= @(e) tagged Valid 5` landed the bits alone, so `u.Other` raised
-  // nothing after the event.
-  NbaSample rhs_val = SampleNonblockingRhs(stmt, ctx, arena);
+  // §10.4.2 (printed page 253): the right-hand side and the target are both
+  // evaluated when the statement executes, and the event control only defers
+  // the update, so the sample is the one the undeferred statement takes --
+  // copied into the arena (§4.9.4, SampleNbaRhs) as it is held across the
+  // widest gap between sampling and update in the simulator, and carrying the
+  // tag a tagged union target's update sets (§7.3.2, printed 151): `u <= @(e)
+  // tagged Valid 5` landed the bits alone, so `u.Other` raised nothing after
+  // the event. The updates made now are held for the event.
+  const Scheduler::NbaCapture* updates = CaptureNonblockingAssign(
+      stmt, SampleNonblockingRhs(stmt, ctx, arena), ctx, arena);
   if (stmt->repeat_event_count) {
     uint64_t count = EvalRepeatCount(stmt->repeat_event_count, ctx, arena);
     if (count == 0) {
-      ScheduleNonblockingAssign(stmt, rhs_val, 0, ctx, arena);
+      ReleaseNbaUpdates(*updates, ctx);
       return StmtResult::kDone;
     }
     SpawnNbaEventProcess(
-        NbaRepeatEventCoroutine(stmt, rhs_val, count, ctx, arena), ctx, arena);
+        NbaRepeatEventCoroutine(stmt, updates, count, ctx, arena), ctx, arena);
   } else {
-    SpawnNbaEventProcess(NbaEventCoroutine(stmt, rhs_val, ctx, arena), ctx,
+    SpawnNbaEventProcess(NbaEventCoroutine(stmt, updates, ctx, arena), ctx,
                          arena);
   }
   return StmtResult::kDone;

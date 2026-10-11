@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -11,13 +10,13 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
-#include "simulator/assoc_index.h"
-#include "simulator/eval_array.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
+#include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
+#include "simulator/statement_assign_force_internal.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_result.h"
 #include "simulator/variable.h"
@@ -26,288 +25,6 @@
 #include "simulator/vpi_user.h"
 
 namespace delta {
-
-static void CollectExprVars(const Expr* expr, SimContext& ctx,
-                            std::vector<Variable*>& vars) {
-  if (!expr) return;
-  if (expr->kind == ExprKind::kIdentifier) {
-    auto* var = ctx.FindVariable(expr->text);
-    if (var) vars.push_back(var);
-    return;
-  }
-  CollectExprVars(expr->lhs, ctx, vars);
-  CollectExprVars(expr->rhs, ctx, vars);
-  CollectExprVars(expr->condition, ctx, vars);
-  CollectExprVars(expr->true_expr, ctx, vars);
-  CollectExprVars(expr->false_expr, ctx, vars);
-  CollectExprVars(expr->base, ctx, vars);
-  CollectExprVars(expr->index, ctx, vars);
-  CollectExprVars(expr->index_end, ctx, vars);
-  CollectExprVars(expr->with_expr, ctx, vars);
-  CollectExprVars(expr->repeat_count, ctx, vars);
-  for (auto* e : expr->elements) CollectExprVars(e, ctx, vars);
-  for (auto* a : expr->args) CollectExprVars(a, ctx, vars);
-}
-
-// Returns the distinct variables referenced by `rhs`, excluding `self`.
-static std::vector<Variable*> CollectDistinctRhsVars(const Expr* rhs,
-                                                     SimContext& ctx,
-                                                     Variable* self) {
-  std::vector<Variable*> rhs_vars;
-  CollectExprVars(rhs, ctx, rhs_vars);
-  std::sort(rhs_vars.begin(), rhs_vars.end());
-  rhs_vars.erase(std::unique(rhs_vars.begin(), rhs_vars.end()), rhs_vars.end());
-  rhs_vars.erase(std::remove(rhs_vars.begin(), rhs_vars.end(), self),
-                 rhs_vars.end());
-  return rhs_vars;
-}
-
-// --- §10.6 on an element of a queue or of an associative array ---
-//
-// §6.4 makes every data type but an unpacked structure, union or array
-// singular, so an element of one of those containers is a singular variable
-// however the container itself is typed, and both §10.6.1 and §10.6.2, whose
-// targets include a singular variable, reach it. What such an element does not
-// have is a Variable: its value is a bare Logic4Vec inside a QueueObject or an
-// AssocArrayObject, with nowhere to keep the flag a force sets or the
-// expression it recomputes from. ResolveLhsVariable answers the container's own
-// one-element carrier for it, which no read of the container consults, so both
-// statements settled a variable nothing reads and the element kept its value.
-
-// The element a §10.6 statement names, and the container that holds it. The
-// name is carried because a write to an element is announced through the
-// variable the container is registered under (§9.4.2), which is what an
-// `@(q[0])` and an always_comb reading it are armed on.
-struct ContainerElement {
-  QueueObject* queue = nullptr;
-  AssocArrayObject* assoc = nullptr;
-  uint64_t queue_id = 0;
-  bool string_key = false;
-  AssocIndex int_key;
-  std::string str_key;
-  std::string name;
-  uint32_t elem_width = 32;
-};
-
-// The record `elem`'s drives are kept in. `create` is what a statement
-// installing one passes; a statement ending one asks without it and is answered
-// null where nothing stands.
-static ElementDrive* ElementDriveFor(const ContainerElement& elem,
-                                     bool create) {
-  if (elem.queue != nullptr) {
-    auto& drives = elem.queue->element_drives;
-    auto it = drives.find(elem.queue_id);
-    if (it != drives.end()) return &it->second;
-    return create ? &drives[elem.queue_id] : nullptr;
-  }
-  if (elem.assoc == nullptr) return nullptr;
-  if (elem.string_key) {
-    auto& drives = elem.assoc->str_drives;
-    auto it = drives.find(elem.str_key);
-    if (it != drives.end()) return &it->second;
-    return create ? &drives[elem.str_key] : nullptr;
-  }
-  auto& drives = elem.assoc->int_drives;
-  auto it = drives.find(elem.int_key);
-  if (it != drives.end()) return &it->second;
-  return create ? &drives[elem.int_key] : nullptr;
-}
-
-// Drops a record that no longer holds anything, so an element carries a record
-// only while a statement stands on it.
-static void ForgetEmptyElementDrive(const ContainerElement& elem) {
-  ElementDrive* drive = ElementDriveFor(elem, /*create=*/false);
-  if (drive == nullptr || drive->Drives()) return;
-  if (elem.queue != nullptr) {
-    elem.queue->element_drives.erase(elem.queue_id);
-  } else if (elem.string_key) {
-    elem.assoc->str_drives.erase(elem.str_key);
-  } else {
-    elem.assoc->int_drives.erase(elem.int_key);
-  }
-}
-
-// Resolves `lhs` to the queue element it names, and whether it names one. An
-// index that is out of range or carries an unknown bit names no element:
-// §7.10.1 has such an index ignore a write, and a statement that drives nothing
-// installs nothing.
-static bool ResolveQueueElement(const Expr* lhs, QueueObject* q,
-                                SimContext& ctx, Arena& arena,
-                                ContainerElement& out) {
-  bool idx_xz = false;
-  int64_t idx = QueueElementIndex(lhs->index, q, ctx, arena, &idx_xz);
-  if (idx_xz) return false;
-  if (idx < 0 || idx >= static_cast<int64_t>(q->elements.size())) return false;
-  out.queue = q;
-  out.queue_id = q->element_ids[static_cast<size_t>(idx)];
-  out.elem_width = q->elem_width;
-  return true;
-}
-
-// The same for an associative array, whose key is the element's identity.
-// §7.8.6 makes an index carrying an unknown bit invalid, and an entry the array
-// does not hold is not an element to stand on: §7.8.7 allocates one on a write
-// and a §10.6 statement is not that write.
-static bool ResolveAssocElement(const Expr* lhs, AssocArrayObject* aa,
-                                SimContext& ctx, Arena& arena,
-                                ContainerElement& out) {
-  auto key_val = EvalExpr(lhs->index, ctx, arena);
-  if (aa->is_string_key) {
-    out.str_key = AssocStringKey(key_val);
-    if (aa->str_data.find(out.str_key) == aa->str_data.end()) return false;
-    out.string_key = true;
-  } else {
-    if (HasUnknownBits(key_val)) return false;
-    out.int_key = AssocIntKey(key_val, aa->is_wildcard, aa->index_width,
-                              aa->is_index_signed);
-    if (aa->int_data.find(out.int_key) == aa->int_data.end()) return false;
-  }
-  out.assoc = aa;
-  out.elem_width = aa->elem_width;
-  return true;
-}
-
-// Resolves a §10.6 target to the container element it names. A select with a
-// second index is a slice rather than an element and names none.
-static bool ResolveContainerElement(const Expr* lhs, SimContext& ctx,
-                                    Arena& arena, ContainerElement& out) {
-  if (lhs == nullptr || lhs->kind != ExprKind::kSelect) return false;
-  if (lhs->base == nullptr || lhs->base->kind != ExprKind::kIdentifier)
-    return false;
-  if (lhs->index == nullptr || lhs->index_end != nullptr) return false;
-  out.name = std::string(lhs->base->text);
-  if (auto* q = ctx.FindQueue(lhs->base->text)) {
-    return ResolveQueueElement(lhs, q, ctx, arena, out);
-  }
-  if (auto* aa = ctx.FindAssocArray(lhs->base->text)) {
-    return ResolveAssocElement(lhs, aa, ctx, arena, out);
-  }
-  return false;
-}
-
-// Stores `val` in the element, at the element's own width, and announces the
-// change the way every other write to one does (§9.4.2). The element the
-// identity names is looked up again on each store, because a queue's elements
-// move under it.
-static void StoreContainerElement(const ContainerElement& elem,
-                                  const Logic4Vec& val, SimContext& ctx,
-                                  Arena& arena) {
-  Logic4Vec sized = ResizeToWidth(val, elem.elem_width, arena);
-  if (elem.queue != nullptr) {
-    const auto& ids = elem.queue->element_ids;
-    for (size_t i = 0; i < ids.size() && i < elem.queue->elements.size(); ++i) {
-      if (ids[i] != elem.queue_id) continue;
-      elem.queue->elements[i] = sized;
-      NotifyOwningVar(ctx, elem.name);
-      return;
-    }
-    return;
-  }
-  if (elem.assoc == nullptr) return;
-  if (elem.string_key) {
-    auto it = elem.assoc->str_data.find(elem.str_key);
-    if (it == elem.assoc->str_data.end()) return;
-    it->second = sized;
-  } else {
-    auto it = elem.assoc->int_data.find(elem.int_key);
-    if (it == elem.assoc->int_data.end()) return;
-    it->second = sized;
-  }
-  NotifyOwningVar(ctx, elem.name);
-}
-
-// The value one drive puts in the element: the whole right-hand value where the
-// statement named the element alone, and §11.4.12's slice of it where the
-// target was a concatenation.
-static Logic4Vec ElementDriveValue(const ElementDriveSource& src,
-                                   SimContext& ctx, Arena& arena) {
-  auto val = EvalExpr(src.rhs, ctx, arena, src.rhs_width);
-  if (src.width == 0) return val;
-  return ExtractBitField(arena, val, src.src_lo, src.width);
-}
-
-// Installs, on each variable the drive's expression reads, a watcher that
-// recomputes the element while the drive stands. The drive is looked up again
-// rather than captured, so a record dropped by a release -- or by the removal
-// of the element the queue identity named -- retires the watcher.
-static void InstallElementDriveWatchers(const ContainerElement& elem,
-                                        const ElementDriveSource& src,
-                                        bool forced, SimContext& ctx,
-                                        Arena& arena) {
-  auto* ctx_ptr = &ctx;
-  auto* arena_ptr = &arena;
-  for (auto* rhs_var : CollectDistinctRhsVars(src.rhs, ctx, nullptr)) {
-    rhs_var->AddWatcher([elem, src, forced, ctx_ptr, arena_ptr]() {
-      const ElementDrive* drive = ElementDriveFor(elem, /*create=*/false);
-      if (drive == nullptr) return true;
-      const ElementDriveSource& standing =
-          forced ? drive->forced : drive->assigned;
-      if (standing.rhs != src.rhs) return true;
-      StoreContainerElement(elem, ElementDriveValue(src, *ctx_ptr, *arena_ptr),
-                            *ctx_ptr, *arena_ptr);
-      return false;
-    });
-  }
-}
-
-// §10.6.1 and §10.6.2: installs the statement's drive on the element, writes
-// the value it computes now, and arms the recomputation. A force installed over
-// an assign leaves the assign standing beneath it, which is what §10.6.2's
-// release reestablishes.
-static void DriveContainerElement(const ContainerElement& elem,
-                                  const Stmt* stmt,
-                                  const ElementDriveSource& src,
-                                  SimContext& ctx, Arena& arena) {
-  ElementDrive* drive = ElementDriveFor(elem, /*create=*/true);
-  bool forced = stmt->kind == StmtKind::kForce;
-  if (forced) {
-    drive->forced = src;
-  } else {
-    drive->assigned = src;
-  }
-  StoreContainerElement(elem, ElementDriveValue(src, ctx, arena), ctx, arena);
-  InstallElementDriveWatchers(elem, src, forced, ctx, arena);
-}
-
-// §10.6.2's release and §10.6.1's deassign, on the element the target names.
-// Releasing an element that has an assign standing beneath the force
-// reestablishes that assignment, which is what the clause requires of a
-// variable in the same position.
-static void EndContainerElementDrive(const ContainerElement& elem,
-                                     const Stmt* stmt, SimContext& ctx,
-                                     Arena& arena) {
-  ElementDrive* drive = ElementDriveFor(elem, /*create=*/false);
-  if (drive == nullptr) return;
-  if (stmt->kind == StmtKind::kDeassign) {
-    drive->assigned = {};
-  } else {
-    drive->forced = {};
-    if (drive->assigned.rhs != nullptr) {
-      StoreContainerElement(
-          elem, ElementDriveValue(drive->assigned, ctx, arena), ctx, arena);
-    }
-  }
-  ForgetEmptyElementDrive(elem);
-}
-
-// Answers one of the four §10.6 statements on a container element, and whether
-// the target named one. `src_lo`, `width` and `rhs_width` are the concatenation
-// slot the element takes; a lone target passes a zero width and takes the whole
-// right-hand value.
-static bool TryContainerElementDrive(const Expr* lhs, const Stmt* stmt,
-                                     const ElementDriveSource& slot,
-                                     SimContext& ctx, Arena& arena) {
-  ContainerElement elem;
-  if (!ResolveContainerElement(lhs, ctx, arena, elem)) return false;
-  if (stmt->kind == StmtKind::kRelease || stmt->kind == StmtKind::kDeassign) {
-    EndContainerElementDrive(elem, stmt, ctx, arena);
-    return true;
-  }
-  ElementDriveSource src = slot;
-  src.rhs = stmt->rhs;
-  DriveContainerElement(elem, stmt, src, ctx, arena);
-  return true;
-}
 
 // Behavior of the watchers InstallRhsWatchers installs, and of the write each
 // installer makes before installing them: `still_valid` gates the watcher
@@ -399,6 +116,24 @@ static void InstallRhsWatchers(Variable* var, const Expr* rhs, SimContext& ctx,
   }
 }
 
+// Whether two windows of one variable share a bit; the empty window is the
+// whole object and shares every bit.
+static bool WindowsOverlap(const ProcContAssignWindow& a,
+                           const ProcContAssignWindow& b) {
+  if (a.dst_width == 0 || b.dst_width == 0) return true;
+  return a.dst_lo < b.dst_lo + b.dst_width && b.dst_lo < a.dst_lo + a.dst_width;
+}
+
+// Whether `var` still holds the part `window` names for the right-hand side
+// `rhs`, which is what keeps that part's watchers recomputing it.
+static bool HoldsPart(const Variable& var, const ProcContAssignWindow& window,
+                      const Expr* rhs) {
+  return std::ranges::any_of(var.held_parts, [&](const Variable::HeldPart& p) {
+    return p.rhs == rhs && p.window.dst_lo == window.dst_lo &&
+           p.window.dst_width == window.dst_width;
+  });
+}
+
 // Applies a procedural continuous-assignment forced value to `var` from the
 // expression `rhs`, then installs watchers on each variable appearing in `rhs`
 // so the forced value is re-evaluated whenever those variables change. The spec
@@ -412,8 +147,13 @@ static void InstallForcedValueWatcher(Variable* var, const Expr* rhs,
   var->is_forced = true;
   // §10.6.2 overrides every driver of the net that was named, and a constant
   // select of a vector net names some of its bits: the window travels onto the
-  // variable so Net::Resolve can leave the drivers of the rest alone.
-  var->forced_window = spec.window;
+  // variable so Net::Resolve can leave the drivers of the rest alone. A hold
+  // of bits another part held takes them from it, and a part of other bits
+  // goes on holding its own.
+  std::erase_if(var->held_parts, [&spec](const Variable::HeldPart& part) {
+    return WindowsOverlap(part.window, spec.window);
+  });
+  var->held_parts.push_back({spec.window, rhs});
   WriteOwnedBits(var, rhs_val, spec, arena);
   var->proc_cont_rhs = rhs;
   var->NotifyWatchers();
@@ -424,33 +164,75 @@ static void InstallForcedValueWatcher(Variable* var, const Expr* rhs,
   // strength recorded at all.
   if (spec.net != nullptr) spec.net->Resolve(arena);
 
-  spec.still_valid = [var, rhs]() {
-    return var->is_forced && var->proc_cont_rhs == rhs;
+  spec.still_valid = [var, rhs, window = spec.window]() {
+    return var->is_forced && HoldsPart(*var, window, rhs);
   };
   InstallRhsWatchers(var, rhs, ctx, arena, spec);
 }
 
-// Reestablishes a continuous assignment on `var` from expression `rhs` after
-// a release statement. Similar to InstallForcedValueWatcher but for
-// assignments: does not set is_forced, and watchers check assign_cont_rhs
-// instead of is_forced to remain valid after release.
-static void ReestablishContinuousAssignment(Variable* var, const Expr* rhs,
-                                            SimContext& ctx, Arena& arena,
-                                            RhsWatcherSpec spec) {
-  // §10.6.1 gives the assign statement a singular variable or a concatenation
-  // of variables as its target, so nothing it reestablishes stands on a net
-  // and the force's net does not carry over into the assignment that outlives
-  // it.
-  spec.net = nullptr;
-  spec.forced = false;
-  auto rhs_val = EvalExpr(rhs, ctx, arena, spec.window.rhs_width);
-  WriteOwnedBits(var, rhs_val, spec, arena);
-  var->NotifyWatchers();
+// §10.6.1 with §10.6.2: a release puts back in force the assign procedural
+// continuous assignment the force overrode, through the window the assign was
+// installed with, and the assign again overrides every procedural assignment
+// until it is deassigned. It holds the variable as it did before the force, so
+// every other writer goes on declining. §10.6.1 gives the assign statement a
+// variable or a concatenation of variables as its target, so nothing it
+// reestablishes stands on a net.
+static void ReestablishAssign(Variable* var, SimContext& ctx, Arena& arena) {
+  RhsWatcherSpec spec;
+  spec.window = var->assign_cont_window;
+  InstallForcedValueWatcher(var, var->assign_cont_rhs, ctx, arena, spec);
+}
 
-  spec.still_valid = [var, rhs]() {
-    return var->assign_cont_rhs && var->assign_cont_rhs == rhs;
-  };
-  InstallRhsWatchers(var, rhs, ctx, arena, spec);
+// §10.6.2: releasing a variable a continuous assignment drives reestablishes
+// that assignment and schedules its reevaluation in the continuous
+// assignment's own region, which for a variable driven no further is the
+// Active region of the present time step. Waiting for an operand of the
+// assignment to change left the forced value standing until one did.
+static void ScheduleContAssignReevaluation(const Variable* var,
+                                           SimContext& ctx) {
+  auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+  event->callback = var->cont_assign_reevaluate;
+  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kActive, event);
+}
+
+// Installs one of §10.6's two statements that hold a variable. An assign is
+// recorded whatever else holds the variable, since a later release puts it
+// back, but §10.6.2 has a force in effect override it, so while one is the
+// assign drives nothing. A force overrides whatever held the variable before.
+static void InstallProcContAssign(Variable* var, const Stmt* stmt,
+                                  const RhsWatcherSpec& spec, SimContext& ctx,
+                                  Arena& arena) {
+  if (stmt->kind == StmtKind::kAssign) {
+    var->assign_cont_rhs = stmt->rhs;
+    var->assign_cont_window = spec.window;
+    if (var->force_active) return;
+  } else {
+    var->force_active = true;
+  }
+  InstallForcedValueWatcher(var, stmt->rhs, ctx, arena, spec);
+}
+
+// Ends one of §10.6's two statements on a variable: a release when `release`
+// says so, a deassign otherwise. A deassign ends the assign alone (§10.6.1),
+// leaving a force in effect; a release ends the force alone (§10.6.2) and puts
+// back whatever it overrode, an assign or a continuous assignment.
+static void EndProcContAssign(Variable* var, bool release, SimContext& ctx,
+                              Arena& arena) {
+  if (!release) {
+    var->assign_cont_rhs = nullptr;
+    var->assign_cont_window = {};
+    if (var->force_active) return;
+  }
+  var->is_forced = false;
+  var->force_active = false;
+  var->held_parts.clear();
+  var->proc_cont_rhs = nullptr;
+  if (!release) return;
+  if (var->assign_cont_rhs) {
+    ReestablishAssign(var, ctx, arena);
+  } else if (var->cont_assign_reevaluate) {
+    ScheduleContAssignReevaluation(var, ctx);
+  }
 }
 
 // One element of a concatenation left-hand side, the window of the right-hand
@@ -533,57 +315,40 @@ static RhsWatcherSpec SpecForSlot(const ConcatElemSlot& slot, SimContext& ctx,
 // bits of a net holds those bits alone: §10.6.2's override of every driver of
 // the net reaches the drivers of what was named, which for `force {w, bus[3]}`
 // is bit 3 rather than every bit of `bus`.
+// §10.6.1's reestablishment is of the assignment an assign installs, so the
+// window it gave this element travels with the expression that will be
+// re-evaluated through it, however the release that reestablishes it is
+// written; InstallProcContAssign records the two together.
 static void ForceOneElement(const ConcatElemSlot& slot, const Stmt* stmt,
                             SimContext& ctx, Arena& arena) {
-  RhsWatcherSpec spec = SpecForSlot(slot, ctx, arena);
-  if (stmt->kind == StmtKind::kAssign) {
-    slot.var->assign_cont_rhs = stmt->rhs;
-    // §10.6.1's reestablishment is of this assignment, so the window it gave
-    // this element travels with the expression that will be re-evaluated
-    // through it, however the release that reestablishes it is written.
-    slot.var->assign_cont_window = spec.window;
-  }
-  InstallForcedValueWatcher(slot.var, stmt->rhs, ctx, arena, spec);
+  InstallProcContAssign(slot.var, stmt, SpecForSlot(slot, ctx, arena), ctx,
+                        arena);
 }
 
 // Releases or deassigns one element of a concatenation target. §10.6.1: a
 // deassign ends the assign procedural continuous assignment to a variable, and
 // §10.6.2 ends a force on a release; each element was marked on its own and so
 // is cleared on its own.
+//
+// §10.6.2: a released net at once takes the value its drivers determine, and
+// an element naming bits of a net is released as the lone select would be:
+// the net under the select is found as ForceTargetNet finds it for a select
+// standing alone, where the element's own spec, made for the force, stands on
+// no net for a select. Released without its net, `bus[3]` kept its forced
+// value until a driver of the net happened to change.
+static Net* ForceTargetNet(const Expr* lhs, SimContext& ctx);
+static void ReleaseForcedBits(Variable* var, Net* net,
+                              const ProcContAssignWindow& window,
+                              SimContext& ctx, Arena& arena);
+
 static void ReleaseOneElement(const ConcatElemSlot& slot, const Stmt* stmt,
                               SimContext& ctx, Arena& arena) {
-  Variable* var = slot.var;
-  var->is_forced = false;
-  var->forced_window = {};
-  var->proc_cont_rhs = nullptr;
-  if (stmt->kind == StmtKind::kDeassign) {
-    var->assign_cont_rhs = nullptr;
-    var->assign_cont_window = {};
+  if (stmt->kind != StmtKind::kRelease) {
+    EndProcContAssign(slot.var, /*release=*/false, ctx, arena);
     return;
   }
-
-  RhsWatcherSpec spec = SpecForSlot(slot, ctx, arena);
-  // §10.6.2: a released net at once takes the value its drivers determine.
-  if (spec.net != nullptr) spec.net->Resolve(arena);
-
-  // §10.6.1: releasing a variable that a continuous assignment drives, or that
-  // has an assign procedural continuous assignment active, puts that assignment
-  // back in force, and the element gets back the window of that
-  // assignment's value it held, not the whole of it: without the window,
-  // `assign {a, b} = 16'h1234; force {a, b} = ...; release {a, b};` handed `a`
-  // the entire sixteen-bit value.
-  //
-  // The window is the assignment's own rather than this statement's. The two
-  // agree only where the release names the target the assign named, and
-  // `assign {a, b} = 16'h1234; force a = 8'h55; release a;` is where they part:
-  // this release's element is the whole of `a`, whose window is the whole of
-  // the value, while the assignment gave `a` the value's high eight bits.
-  if (var->assign_cont_rhs) {
-    RhsWatcherSpec reestablished;
-    reestablished.window = var->assign_cont_window;
-    ReestablishContinuousAssignment(var, var->assign_cont_rhs, ctx, arena,
-                                    reestablished);
-  }
+  ReleaseForcedBits(slot.var, ForceTargetNet(slot.el, ctx),
+                    SpecForSlot(slot, ctx, arena).window, ctx, arena);
 }
 
 // Routes one element to the statement that named it: the two statements that
@@ -767,6 +532,23 @@ static bool ProcContAssignTargetHandled(const Stmt* stmt, SimContext& ctx,
   return *var == nullptr;
 }
 
+// The window of `var` a lone target of §10.6's statements names: empty for a
+// whole object, and the bits §11.5.1 resolves for a select of a vector net.
+// False for a select naming no bit of the object, which a statement leaves
+// untouched.
+static bool TargetWindow(const Expr* lhs, Variable& var, SimContext& ctx,
+                         Arena& arena, ProcContAssignWindow& window) {
+  if (lhs->kind != ExprKind::kSelect || !ArrayElementKeyOf(lhs, ctx).empty()) {
+    return true;
+  }
+  PartSelectBits dst = SelectStorageBits(var, lhs, ctx, arena);
+  window.src_lo = dst.src_lo;
+  window.src_width = dst.width;
+  window.dst_lo = dst.lo;
+  window.dst_width = dst.width;
+  return dst.width != 0;
+}
+
 StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
                                  Arena& arena) {
   if (!stmt->lhs) return StmtResult::kDone;
@@ -785,32 +567,31 @@ StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
   // makes; a select naming no bit of the object leaves the stored data
   // untouched, which here is a force that holds nothing and marks nothing.
   RhsWatcherSpec spec;
-  if (stmt->lhs->kind == ExprKind::kSelect &&
-      ArrayElementKeyOf(stmt->lhs, ctx).empty()) {
-    PartSelectBits dst = SelectStorageBits(*var, stmt->lhs, ctx, arena);
-    if (dst.width == 0) return StmtResult::kDone;
-    spec.window.src_lo = dst.src_lo;
-    spec.window.src_width = dst.width;
-    spec.window.dst_lo = dst.lo;
-    spec.window.dst_width = dst.width;
+  if (!TargetWindow(stmt->lhs, *var, ctx, arena, spec.window)) {
+    return StmtResult::kDone;
   }
+  // §10.7 with §10.6: the target's width is the context the right-hand side is
+  // evaluated in, as for any assignment, so `force w = a + b` keeps the carry
+  // a sixteen-bit `w` has room for and a signed value is sign-extended into a
+  // wider select. A concatenation target has its context width from
+  // LhsContextWidth.
+  spec.window.rhs_width =
+      spec.window.dst_width != 0 ? spec.window.dst_width : var->value.width;
 
-  if (stmt->kind == StmtKind::kAssign) {
-    var->assign_cont_rhs = stmt->rhs;
-    // §10.6.1 gives the assign statement a singular variable or a concatenation
-    // of variables as its target, and this is the singular one: it owns every
-    // bit of the value and every bit of itself, which is the empty window. It
-    // is recorded rather than left alone so that an earlier assign through a
-    // concatenation leaves no window behind for this one's release to read.
-    var->assign_cont_window = {};
-  }
+  // §10.6.1 gives the assign statement a singular variable or a concatenation
+  // of variables as its target, and this is the singular one: it owns every
+  // bit of the value and every bit of itself, which is the empty window with
+  // the variable's width as the context. InstallProcContAssign records it
+  // rather than leaving it alone, so that an earlier assign through a
+  // concatenation leaves no window behind for this one's release to read.
+  //
   // §10.6.2 makes force a statement on a net as well as on a variable, and the
   // net is what holds the strength the force settles. A select of a vector net
   // stands on that net as much as its name does -- the clause names both forms
   // in one sentence -- so the lookup follows the select to its base, which is
   // the name ResolveLhsVariable above resolved through.
   spec.net = ForceTargetNet(stmt->lhs, ctx);
-  InstallForcedValueWatcher(var, stmt->rhs, ctx, arena, spec);
+  InstallProcContAssign(var, stmt, spec, ctx, arena);
   // §38.36.1: a cbForce callback is called after the force.
   if (stmt->kind == StmtKind::kForce) {
     GetGlobalVpiContext().NoteForce(cbForce, var, stmt,
@@ -844,6 +625,28 @@ static void ReleaseUndrivenBits(Net& net, const ProcContAssignWindow& window) {
   net.resolved->NotifyWatchers();
 }
 
+// §10.6.2: ends the force on the bits of `var` that `window` names, the whole
+// of it for the empty window. The parts it held on those bits go, a part
+// holding other bits stays, and the variable is let go only when no part is
+// left. A net released at once takes its drivers' value on the bits let go.
+static void ReleaseForcedBits(Variable* var, Net* net,
+                              const ProcContAssignWindow& window,
+                              SimContext& ctx, Arena& arena) {
+  auto released_by = [&window](const Variable::HeldPart& part) {
+    return WindowsOverlap(part.window, window);
+  };
+  std::vector<ProcContAssignWindow> released;
+  for (const auto& part : var->held_parts) {
+    if (released_by(part)) released.push_back(part.window);
+  }
+  std::erase_if(var->held_parts, released_by);
+  if (var->held_parts.empty())
+    EndProcContAssign(var, /*release=*/true, ctx, arena);
+  if (net == nullptr) return;
+  for (const auto& bits : released) ReleaseUndrivenBits(*net, bits);
+  net->Resolve(arena);
+}
+
 StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena) {
   if (!stmt->lhs) return StmtResult::kDone;
@@ -853,19 +656,19 @@ StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
   }
 
   if (stmt->kind == StmtKind::kDeassign) {
-    var->is_forced = false;
-    var->forced_window = {};
-    var->proc_cont_rhs = nullptr;
-    var->assign_cont_rhs = nullptr;
-    var->assign_cont_window = {};
+    EndProcContAssign(var, /*release=*/false, ctx, arena);
     return StmtResult::kDone;
   }
   // §10.6.2: a released net at once takes the value its drivers determine,
   // which is as true of the bits a select named as of a whole net. The lookup
   // followed the identifier form alone, so `release bus[3];` cleared the flag
   // and left the net holding the forced value until some driver happened to
-  // notify.
-  ReleaseForcedTarget(var, ForceTargetNet(stmt->lhs, ctx), ctx, arena);
+  // notify. The release ends the force on the bits it names and no other: a
+  // force on other bits of the net goes on holding them.
+  ProcContAssignWindow window;
+  if (TargetWindow(stmt->lhs, *var, ctx, arena, window)) {
+    ReleaseForcedBits(var, ForceTargetNet(stmt->lhs, ctx), window, ctx, arena);
+  }
   // §38.36.1: a cbRelease callback is called after the release.
   GetGlobalVpiContext().NoteForce(cbRelease, var, stmt,
                                   ctx.ActiveInstancePrefix());
@@ -874,23 +677,7 @@ StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
 
 void ReleaseForcedTarget(Variable* var, Net* net, SimContext& ctx,
                          Arena& arena) {
-  bool was_forced = var->is_forced;
-  ProcContAssignWindow released = var->forced_window;
-  var->is_forced = false;
-  var->forced_window = {};
-  var->proc_cont_rhs = nullptr;
-  if (net != nullptr) {
-    if (was_forced) ReleaseUndrivenBits(*net, released);
-    net->Resolve(arena);
-  }
-  if (var->assign_cont_rhs) {
-    // The window the assignment was installed with, which for an assign through
-    // a concatenation is this variable's slice of it and not the whole value.
-    RhsWatcherSpec reestablished;
-    reestablished.window = var->assign_cont_window;
-    ReestablishContinuousAssignment(var, var->assign_cont_rhs, ctx, arena,
-                                    reestablished);
-  }
+  ReleaseForcedBits(var, net, ProcContAssignWindow{}, ctx, arena);
 }
 
 }  // namespace delta

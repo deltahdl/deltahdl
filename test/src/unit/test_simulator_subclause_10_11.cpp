@@ -4,6 +4,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 
 using namespace delta;
 
@@ -210,6 +211,50 @@ TEST(NetAliasingSimulation, PartSelectAliasCarriesTheOtherWay) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "ab cd\n01 02\n");
+}
+
+// §10.11: the effects of several alias statements naming the same nets are
+// cumulative, so two statements sharing b join a, b and c into one net,
+// whichever order they name them in. Each statement pointed its nets at its
+// own first net, and the second took b away from a.
+TEST(NetAliasingSimulation, TwoStatementsSharingANetJoinAllThree) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wire a, b, c;\n"
+      "  alias a = b;\n"
+      "  alias c = b;\n"
+      "  assign a = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  ExpectThreeNetsAllEqual(f, 1);
+}
+
+// §10.11 with §27.5: an alias in a generate block names the block's own nets
+// by their simple names, and a net the block does not declare by the name the
+// enclosing module gives it. Looked up under the module's names alone, the
+// block's nets were not found and no alias was made.
+TEST(NetAliasingSimulation, AnAliasInAGenerateBlockJoinsTheBlocksNets) {
+  const char* src =
+      "module m;\n"
+      "  wire o;\n"
+      "  logic r1, r2;\n"
+      "  if (1) begin : g\n"
+      "    wire a, b;\n"
+      "    alias a = b;\n"
+      "    assign a = 1'b1;\n"
+      "  end\n"
+      "  if (1) begin : h\n"
+      "    wire p;\n"
+      "    alias p = o;\n"
+      "    assign p = 1'b1;\n"
+      "  end\n"
+      "  initial #1 begin r1 = g.b; r2 = o; end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "r1"), 1u);
+  EXPECT_EQ(RunAndGet(src, "r2"), 1u);
 }
 
 }  // namespace

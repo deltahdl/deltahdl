@@ -7,12 +7,14 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/packed_range.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
@@ -157,21 +159,44 @@ static std::optional<std::pair<int64_t, int64_t>> AliasSelectOffsets(
   return std::make_pair(std::min(a, b), std::max(a, b));
 }
 
+// The scope an alias statement stands in: the instance's prefix and the
+// generate blocks around the statement, outermost first.
+struct AliasScope {
+  const std::string& inst_prefix;
+  const GenBlockPrefixes& gen_blocks;
+};
+
+// §10.11 with §27.5 and §23.9: the key a net an alias names by its simple
+// name is held under. A generate block declares its nets under its prefix and
+// a name declared locally stands over the enclosing scope's, so the innermost
+// block declaring the name is the one meant, and the instance's own net where
+// none does. Looked up under the instance prefix alone, `alias a = b;` in a
+// block found no net, or an outer one of the same name.
+static std::string AliasNetKey(const AliasScope& scope, std::string_view name,
+                               SimContext& ctx) {
+  for (auto it = scope.gen_blocks.rbegin(); it != scope.gen_blocks.rend();
+       ++it) {
+    std::string key = scope.inst_prefix + std::string(*it) + std::string(name);
+    if (ctx.FindNet(key) != nullptr) return key;
+  }
+  return scope.inst_prefix + std::string(name);
+}
+
 // Appends the bits the alias operand `e` lists, the most significant first: a
 // net's, a bit-select's or a part-select's of one, or those of each operand
 // of a concatenation in turn. False where `e` is none of these.
-static bool AppendAliasBits(const Expr* e, const std::string& prefix,
+static bool AppendAliasBits(const Expr* e, const AliasScope& scope,
                             SimContext& ctx, Arena& arena,
                             std::vector<AliasBit>& out) {
   if (e->kind == ExprKind::kConcatenation) {
     for (const Expr* el : e->elements) {
-      if (!AppendAliasBits(el, prefix, ctx, arena, out)) return false;
+      if (!AppendAliasBits(el, scope, ctx, arena, out)) return false;
     }
     return true;
   }
   const Expr* base = e->kind == ExprKind::kSelect ? e->base : e;
   if (base == nullptr || base->kind != ExprKind::kIdentifier) return false;
-  Net* net = ctx.FindNet(prefix + std::string(base->text));
+  Net* net = ctx.FindNet(AliasNetKey(scope, base->text, ctx));
   if (net == nullptr || net->resolved == nullptr) return false;
   std::pair<int64_t, int64_t> span{0, net->resolved->value.width - 1};
   if (e->kind == ExprKind::kSelect) {
@@ -214,10 +239,11 @@ static std::map<std::pair<Net*, Net*>, AliasBitMap> JoinedBitMaps(
 // one net joined to each other are left apart.
 static void LowerBitAlias(const RtlirAlias& alias, const std::string& prefix,
                           SimContext& ctx, Arena& arena) {
+  const AliasScope kScope{prefix, alias.gen_block_prefixes};
   std::vector<std::vector<AliasBit>> operands;
   for (const Expr* e : alias.nets) {
     operands.emplace_back();
-    if (!AppendAliasBits(e, prefix, ctx, arena, operands.back())) return;
+    if (!AppendAliasBits(e, kScope, ctx, arena, operands.back())) return;
     if (operands.back().size() != operands.front().size()) return;
   }
   auto* join = arena.Create<BidirSwitchState>();
@@ -229,7 +255,24 @@ static void LowerBitAlias(const RtlirAlias& alias, const std::string& prefix,
   }
 }
 
+// §10.11 (printed page 268): the same nets may appear in several alias
+// statements and the effects are cumulative, so the statements naming whole
+// nets join them into groups, one group for every net any chain of statements
+// connects. The group is the union of the statements' nets: pointing each
+// statement's nets at its own first net instead split `alias a = b; alias c =
+// b;` in two, the second statement taking b from a.
+static std::string AliasGroupRoot(
+    const std::unordered_map<std::string, std::string>& parent,
+    std::string name) {
+  for (auto it = parent.find(name); it != parent.end() && it->second != name;
+       it = parent.find(name)) {
+    name = it->second;
+  }
+  return name;
+}
+
 void Lowerer::LowerAliases(const RtlirModule* mod) {
+  std::unordered_map<std::string, std::string> parent;
   for (const auto& alias : mod->aliases) {
     if (alias.nets.size() < 2) continue;
     bool whole_nets = std::all_of(
@@ -239,22 +282,28 @@ void Lowerer::LowerAliases(const RtlirModule* mod) {
       LowerBitAlias(alias, inst_prefix_, ctx_, arena_);
       continue;
     }
-    std::string_view primary;
+    const AliasScope kScope{inst_prefix_, alias.gen_block_prefixes};
+    std::string root =
+        AliasGroupRoot(parent, AliasNetKey(kScope, alias.nets[0]->text, ctx_));
+    parent.emplace(root, root);
     for (auto* net : alias.nets) {
-      if (net->kind != ExprKind::kIdentifier) continue;
-      const std::string& name =
-          *arena_.Create<std::string>(inst_prefix_ + std::string(net->text));
-      if (primary.empty()) {
-        primary = name;
-        continue;
-      }
-      // The aliased nets share one resolved storage. Both the variable map,
-      // which reads go through, and the net map, which continuous-assign
-      // driver resolution goes through, are redirected; otherwise a driver on
-      // the non-primary net writes a Variable the alias never sees.
-      ctx_.AliasVariable(name, primary);
-      ctx_.AliasNet(name, primary);
+      std::string other =
+          AliasGroupRoot(parent, AliasNetKey(kScope, net->text, ctx_));
+      parent[other] = root;
     }
+  }
+  // The aliased nets share one resolved storage. Both the variable map, which
+  // reads go through, and the net map, which continuous-assign driver
+  // resolution goes through, are redirected; otherwise a driver on the
+  // non-primary net writes a Variable the alias never sees.
+  for (const auto& entry : parent) {
+    const std::string& member = entry.first;
+    std::string root = AliasGroupRoot(parent, member);
+    if (root == member) continue;
+    const std::string& name = *arena_.Create<std::string>(member);
+    const std::string& primary = *arena_.Create<std::string>(root);
+    ctx_.AliasVariable(name, primary);
+    ctx_.AliasNet(name, primary);
   }
 }
 
@@ -434,9 +483,11 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
     while (const RtlirModuleInst* ifc =
                UnplacedInterfaceActual(children[i], children, placed, index)) {
       placed[index] = true;
+      port_parent_ = mod;
       LowerChildInstance(*ifc);
     }
     placed[i] = true;
+    port_parent_ = mod;
     LowerChildInstance(children[i]);
   }
 }

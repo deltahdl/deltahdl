@@ -203,7 +203,10 @@ TEST(ForceReleaseSim, ReleaseReestablishesAssign) {
       "endmodule\n",
       f, "x");
   ASSERT_NE(x, nullptr);
-  EXPECT_FALSE(x->is_forced);
+  // §10.6.1: the assign put back in force holds the variable again, against
+  // every procedural assignment, though no force does.
+  EXPECT_TRUE(x->is_forced);
+  EXPECT_FALSE(x->force_active);
   EXPECT_EQ(x->value.ToUint64(), 10u);
 }
 

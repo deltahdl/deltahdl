@@ -375,6 +375,10 @@ class Lowerer {
   uint32_t next_id_ = 0;
   uint32_t next_program_block_id_ = 1;
   std::string inst_prefix_;
+  // The module whose instance LowerChildInstance is lowering, whose nets the
+  // instance's port connections stand on (§10.3.3's net delay of a net an
+  // output port drives). Set by LowerChildModules before each instance.
+  const RtlirModule* port_parent_ = nullptr;
   // The module whose imports LowerImports is lowering, so that
   // AliasImportedPackageName can leave a name the module declares to the
   // declaration (§26.5); null outside LowerImports, where the compilation

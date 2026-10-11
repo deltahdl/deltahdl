@@ -29,6 +29,7 @@
 #include "parser/ast_expr.h"
 #include "simulator/awaiters.h"
 #include "simulator/contassign_delay.h"
+#include "simulator/contassign_strength.h"
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
 #include "simulator/lowerer.h"
@@ -47,23 +48,6 @@
 
 namespace delta {
 
-static Strength ParserStrToStrength(uint8_t s) {
-  switch (s) {
-    case 1:
-      return Strength::kHighz;
-    case 2:
-      return Strength::kWeak;
-    case 3:
-      return Strength::kPull;
-    case 4:
-      return Strength::kStrong;
-    case 5:
-      return Strength::kSupply;
-    default:
-      return Strength::kStrong;
-  }
-}
-
 static bool Logic4VecEqual(const Logic4Vec& a, const Logic4Vec& b) {
   if (a.nwords != b.nwords) return false;
   for (uint32_t i = 0; i < a.nwords; ++i) {
@@ -72,32 +56,6 @@ static bool Logic4VecEqual(const Logic4Vec& a, const Logic4Vec& b) {
       return false;
   }
   return true;
-}
-
-static Logic4Vec ApplyHighzStrengthsToValue(const Logic4Vec& val,
-                                            DriverStrength ds, Arena& arena) {
-  bool s0_is_z = (ds.s0 == Strength::kHighz);
-  bool s1_is_z = (ds.s1 == Strength::kHighz);
-  if (!s0_is_z && !s1_is_z) return val;
-  auto out = MakeLogic4Vec(arena, val.width);
-  out.is_real = val.is_real;
-  out.is_signed = val.is_signed;
-  out.is_string = val.is_string;
-  for (uint32_t w = 0; w < val.nwords; ++w) {
-    uint64_t a = val.words[w].aval;
-    uint64_t b = val.words[w].bval;
-    uint64_t mask = ~uint64_t{0};
-    uint32_t bits_done = w * 64;
-    if (val.width > bits_done && val.width - bits_done < 64)
-      mask = (uint64_t{1} << (val.width - bits_done)) - 1;
-    uint64_t to_z = 0;
-    if (s0_is_z) to_z |= (~a & ~b) & mask;
-    if (s1_is_z) to_z |= (a & ~b) & mask;
-    // A high-impedance bit is z = (aval=0, bval=1).
-    out.words[w].aval = a & ~to_z;
-    out.words[w].bval = b | to_z;
-  }
-  return out;
 }
 
 struct ContAssignDelayExprs {
@@ -354,10 +312,20 @@ static void ApplyContAssignToVariable(const ContAssignParams& params,
     return;
   }
   auto* var = ctx.FindVariable(params.lhs->text);
-  if (var && !var->is_forced) {
-    var->value = ResizeToWidth(driven_val, var->value.width, arena);
-    var->NotifyWatchers();
+  if (var == nullptr) return;
+  // §10.6.2: a release of the variable reestablishes this assignment and
+  // schedules its reevaluation, which ReleaseForcedTarget reaches through
+  // this. Recorded on the first drive, whether or not the variable is held
+  // then, and from what outlives the coroutine.
+  if (!var->cont_assign_reevaluate) {
+    var->cont_assign_reevaluate = [params, &ctx, &arena]() {
+      ApplyContAssignToVariable(
+          params, EvalExpr(params.rhs, ctx, arena, params.width), ctx, arena);
+    };
   }
+  if (var->is_forced) return;
+  var->value = ResizeToWidth(driven_val, var->value.width, arena);
+  var->NotifyWatchers();
 }
 
 static void ApplyContAssignResult(const ContAssignParams& params,
@@ -926,8 +894,8 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca, bool from_program) {
   ContAssignParams cap;
   cap.lhs = ca.lhs;
   cap.rhs = ca.rhs;
-  cap.ds = {ParserStrToStrength(ca.drive_strength0),
-            ParserStrToStrength(ca.drive_strength1)};
+  cap.ds = {StrengthFromParserCode(ca.drive_strength0),
+            StrengthFromParserCode(ca.drive_strength1)};
   cap.nonresistive_switch = ca.from_nonresistive_switch;
   cap.resistive_switch = ca.from_resistive_switch;
   cap.data_input = ca.data_input;

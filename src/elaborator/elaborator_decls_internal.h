@@ -107,4 +107,10 @@ void CheckDeclRedeclaration(const ModuleItem* item,
 // declaration of the net it drives.
 void ApplyNetDeclDelaysToDrivers(Arena& arena, RtlirModule* mod);
 
+// §10.3.3: the same for the driver `ca` that a child instance's output port
+// makes on a net of its parent `mod`, which lowering creates after `mod` was
+// elaborated (Lowerer::LowerPortBindings).
+void ApplyNetDeclDelayToPortDriver(Arena& arena, RtlirContAssign& ca,
+                                   const RtlirModule& mod);
+
 }  // namespace delta

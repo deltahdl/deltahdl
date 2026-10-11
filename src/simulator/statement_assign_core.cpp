@@ -797,6 +797,7 @@ bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
   if (TryEventVarAssign(stmt, ctx)) return true;
   if (TryUnpackedSliceAssign(stmt, ctx, arena)) return true;
   if (TrySubarrayAssign(stmt, ctx, arena)) return true;
+  if (TryArrayAggregateAssign(stmt, ctx, arena)) return true;
   // A bare `lhs op= rhs` statement carries the compound operator as its own rhs
   // node. A parenthesized compound assign is instead an embedded assignment
   // expression (11.4.1 primary `( operator_assignment )`), e.g. `x = (y += 2)`,

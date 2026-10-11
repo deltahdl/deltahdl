@@ -116,6 +116,13 @@ class Scheduler {
   void SetContext(SimContext* ctx) { ctx_ = ctx; }
 
   void ScheduleEvent(SimTime time, Region region, Event* event);
+  // §10.4.2 with §9.4.5: a nonblocking assignment whose update an intra-
+  // assignment event control defers resolves its target where it executes,
+  // and the updates that resolution makes wait for the event. While a capture
+  // is set, every event scheduled is held in it, with its region, rather than
+  // queued; the deferring statement queues them once the event has occurred.
+  using NbaCapture = std::vector<std::pair<Event*, Region>>;
+  void SetNbaCapture(NbaCapture* capture) { nba_capture_ = capture; }
   void Run();
   // §9.2.3 with §38.36.3: ends a simulation whose event loop Run() has ended,
   // by the event queue running empty or by a $finish: the final procedures
@@ -254,6 +261,7 @@ class Scheduler {
   size_t evaluation_events_scheduled_count_ = 0;
   size_t mid_statement_suspension_count_ = 0;
   bool stop_requested_ = false;
+  NbaCapture* nba_capture_ = nullptr;
 };
 
 }  // namespace delta

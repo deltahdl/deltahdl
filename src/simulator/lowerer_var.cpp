@@ -162,10 +162,11 @@ static const Expr* FindIndexKeyedItem(const Expr* pat, uint32_t idx,
 }
 
 // §10.9.1: a type:value item sets every element or subarray of a matching type
-// that no index key has already set. Null when no type key matches this kind.
+// that no index key has already set, the last of several matching keys giving
+// the value. Null when no type key matches this kind.
 static const Expr* FindTypeKeyedItem(const Expr* pat, DataTypeKind kind) {
-  for (size_t i = 0; i < pat->pattern_keys.size(); ++i) {
-    if (i >= pat->elements.size()) break;
+  size_t keyed = std::min(pat->pattern_keys.size(), pat->elements.size());
+  for (size_t i = keyed; i-- > 0;) {
     auto key = pat->pattern_keys[i]->text;
     if (IsTypeKeyword(key) && TypeKeyMatchesKind(key, kind))
       return pat->elements[i];
@@ -196,20 +197,23 @@ static const Expr* FindKeyedItem(const Expr* pat, uint32_t idx,
 }
 
 static void InitArrayFromNamed(const RtlirVariable& var, uint32_t idx,
-                               Variable* elem, SimContext& ctx, Arena& arena) {
-  // §10.9.1: a key resolves a value that is then evaluated in the assignment
-  // context of the element. An element covered by none of the keys is a pattern
-  // the clause forbids, since one of its rules has to cover every element, and
-  // is reported at elaboration; the branch stays reachable for a
-  // caller that does not stop on that report, and answers Table 6-7 as the
-  // positional maker above and the multidimensional one below do rather than
-  // the known zero it gave, which had one spelling of an illegal pattern
-  // reading 00 where the other read 'x.
+                               const ElementTarget& target, SimContext& ctx,
+                               Arena& arena) {
+  // §10.9.1: a key resolves a value evaluated in the assignment context of
+  // the element, a default member by member for a structure element. An
+  // element no key covers is a pattern the clause forbids, reported at
+  // elaboration; for a caller that goes on, it answers Table 6-7 as the
+  // positional and multidimensional makers do.
   const Expr* item =
       FindKeyedItem(var.init_expr, idx, var.elem_type_kind, ctx, arena);
-  elem->value =
-      item ? CoerceArrayInitItem(var, EvalExpr(item, ctx, arena), arena)
-           : Table67ElementDefault(var, arena);
+  if (item == nullptr) {
+    target.elem->value = Table67ElementDefault(var, arena);
+    return;
+  }
+  Logic4Vec val = item == FindDefaultKeyedItem(var.init_expr)
+                      ? EvalDefaultForElement(item, target.layout, ctx, arena)
+                      : EvalExpr(item, ctx, arena);
+  target.elem->value = CoerceArrayInitItem(var, val, arena);
 }
 
 namespace {
@@ -435,7 +439,7 @@ static void FillArrayElement(const RtlirVariable& var, uint32_t i,
   uint32_t idx = static_cast<uint32_t>(var.unpacked_lo) + i;
   uint32_t pat_idx = var.is_descending ? (var.unpacked_size - 1 - i) : i;
   if (named) {
-    InitArrayFromNamed(var, idx, target.elem, ctx, arena);
+    InitArrayFromNamed(var, idx, target, ctx, arena);
   } else if (replicate) {
     InitArrayFromReplicate(var, pat_idx, target, ctx, arena);
   } else {
@@ -572,13 +576,18 @@ void InitQueueFromDeclInit(QueueObject* q, const Expr* init, SimContext& ctx,
     EnforceQueueBound(q, "declaration initializer", init->range.start, ctx);
     return;
   }
-  if (init->kind != ExprKind::kAssignmentPattern &&
-      init->kind != ExprKind::kConcatenation)
+  std::vector<Logic4Vec> items;
+  // §10.10: a concatenation's array items contribute each of their elements.
+  if (init->kind == ExprKind::kConcatenation) {
+    CollectQueueElements(init, ctx, arena, items);
+  } else if (init->kind == ExprKind::kAssignmentPattern) {
+    for (auto* elem : init->elements)
+      items.push_back(EvalExpr(elem, ctx, arena));
+  } else {
     return;
-  for (auto* elem : init->elements) {
-    q->elements.push_back(
-        SizedForQueueElement(*q, EvalExpr(elem, ctx, arena), arena));
   }
+  for (const auto& item : items)
+    q->elements.push_back(SizedForQueueElement(*q, item, arena));
   EnforceQueueBound(q, "declaration initializer", init->range.start, ctx);
   // Every element carries an id, and the two lists are indexed together, so
   // they have to be the same length however the elements arrived. Leaving the

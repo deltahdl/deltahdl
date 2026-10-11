@@ -1,10 +1,12 @@
 #include <algorithm>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "common/packed_range.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
@@ -462,6 +464,50 @@ bool TryUnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
   if (!IsConcatLhs(lhs)) return false;
   UnpackConcatLhs(UnwrapTypedPattern(lhs), rhs_val, ctx, arena);
   return true;
+}
+
+// The leaves of the subarray of `info`'s array at `prefix`, from dimension
+// `d` down, in the order §10.9.1 counts its positions: from each dimension's
+// left bound.
+static void AppendSubarrayLeafNames(const std::string& prefix,
+                                    const ArrayInfo& info, size_t d,
+                                    std::vector<std::string>& out) {
+  uint32_t lo = info.dim_los[d];
+  uint32_t size = info.dim_sizes[d];
+  bool last = d + 1 == info.dim_sizes.size();
+  for (uint32_t i = 0; i < size; ++i) {
+    uint32_t addr = info.dim_descending[d] ? lo + size - 1 - i : lo + i;
+    std::string child = prefix + "[" + std::to_string(addr) + "]";
+    if (last) {
+      out.push_back(child);
+    } else {
+      AppendSubarrayLeafNames(child, info, d + 1, out);
+    }
+  }
+}
+
+void DistributeConcatToSubarray(const std::string& prefix,
+                                const ArrayInfo& info, size_t d,
+                                const Expr* concat, SimContext& ctx,
+                                Arena& arena) {
+  std::vector<std::string> leaves;
+  AppendSubarrayLeafNames(prefix, info, d, leaves);
+  std::vector<Logic4Vec> elems = CollectConcatElements(concat, ctx, arena);
+  if (elems.size() != leaves.size()) {
+    ctx.GetDiag().Error(
+        concat->range.start,
+        "unpacked array concatenation size mismatch: expected " +
+            std::to_string(leaves.size()) + " elements, got " +
+            std::to_string(elems.size()),
+        Subclause("10.10"));
+    return;
+  }
+  for (size_t i = 0; i < leaves.size(); ++i) {
+    Variable* leaf = ctx.FindVariable(leaves[i]);
+    leaf->value =
+        OwnRhsWords(ResizeToWidth(elems[i], info.elem_width, arena), arena);
+    leaf->NotifyWatchers();
+  }
 }
 
 }  // namespace delta

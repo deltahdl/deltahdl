@@ -8,6 +8,7 @@
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
+#include "helpers_scheduler.h"
 #include "parser/ast_expr.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context_types.h"
@@ -365,6 +366,209 @@ TEST(UnpackedArrayConcatSim, ItemOfTheQueuesElementTypeIsOneElement) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "3 6 1 3 5 2 8\n");
+}
+
+// §10.10: each item of an unpacked array concatenation is an expression whose
+// value becomes its element, so an item with a side effect has it once. The
+// right-hand side was evaluated whole as a vector before being distributed,
+// and each call ran twice.
+TEST(UnpackedArrayConcatSim, EachItemIsEvaluatedOnce) {
+  const char* src =
+      "module t;\n"
+      "  int n = 0;\n"
+      "  int A[2];\n"
+      "  int a0, a1, calls;\n"
+      "  function int f(); n++; return n; endfunction\n"
+      "  initial begin A = {f(), f()}; a0 = A[0]; a1 = A[1]; calls = n; end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "a0"), 1u);
+  EXPECT_EQ(RunAndGet(src, "a1"), 2u);
+  EXPECT_EQ(RunAndGet(src, "calls"), 2u);
+}
+
+// §10.10: a slice of an unpacked array is an item whose type is an unpacked
+// array, so it contributes each of its elements, while an element select
+// beside it is one element. The slice was evaluated as one value and the
+// assignment reported a size mismatch.
+TEST(UnpackedArrayConcatSim, ASliceItemContributesItsElements) {
+  const char* src =
+      "module t;\n"
+      "  int A[4] = '{1, 2, 3, 4};\n"
+      "  int B[3];\n"
+      "  int b0, b1, b2;\n"
+      "  initial begin B = {A[1:2], A[0]}; b0 = B[0]; b1 = B[1]; b2 = B[2]; "
+      "end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "b0"), 2u);
+  EXPECT_EQ(RunAndGet(src, "b1"), 3u);
+  EXPECT_EQ(RunAndGet(src, "b2"), 1u);
+}
+
+// §10.10: an item whose type is the target's element type is one element, so
+// each row of a two-dimensional array takes one whole array item. Each item
+// was counted by its own elements, giving six for a target of two.
+TEST(UnpackedArrayConcatSim, AnItemOfTheElementTypeIsOneRow) {
+  const char* src =
+      "module t;\n"
+      "  int M[2][3];\n"
+      "  int R[3] = '{1, 2, 3};\n"
+      "  int S[3] = '{4, 5, 6};\n"
+      "  int m02, m10;\n"
+      "  initial begin M = {R, S}; m02 = M[0][2]; m10 = M[1][0]; end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "m02"), 3u);
+  EXPECT_EQ(RunAndGet(src, "m10"), 4u);
+}
+
+// §10.10: a typed pattern item whose type is the target's structure element
+// type is one element; only one of an unpacked array type contributes each of
+// its elements. Every typed pattern was expanded, so two structure items
+// counted four.
+TEST(UnpackedArrayConcatSim, ATypedStructurePatternItemIsOneElement) {
+  const char* src =
+      "typedef struct packed { byte a, b; } P;\n"
+      "module t;\n"
+      "  P arr[2];\n"
+      "  int e0, e1;\n"
+      "  initial begin\n"
+      "    arr = {P'{8'h1, 8'h2}, P'{8'h3, 8'h4}};\n"
+      "    e0 = arr[0]; e1 = arr[1];\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "e0"), 0x0102u);
+  EXPECT_EQ(RunAndGet(src, "e1"), 0x0304u);
+}
+
+// §10.10.1: a typed pattern item of an unpacked array type, `AI3'{2, 3, 4}`,
+// still contributes each of its elements to a fixed-size target.
+TEST(UnpackedArrayConcatSim, ATypedArrayPatternItemFillsSeveralElements) {
+  const char* src =
+      "module t;\n"
+      "  typedef int AI3[1:3];\n"
+      "  int A5[1:5];\n"
+      "  int a2, a4, a5;\n"
+      "  initial begin\n"
+      "    A5 = {1, AI3'{2, 3, 4}, 5};\n"
+      "    a2 = A5[2]; a4 = A5[4]; a5 = A5[5];\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "a2"), 2u);
+  EXPECT_EQ(RunAndGet(src, "a4"), 4u);
+  EXPECT_EQ(RunAndGet(src, "a5"), 5u);
+}
+
+// §10.10.1 with §10.4.2: a nonblocking assignment collects the items of an
+// unpacked array concatenation as the blocking one does, so a typed pattern
+// of an unpacked array type contributes each of its elements. It counted as
+// one, and the assignment reported 7 elements for 9.
+TEST(UnpackedArrayConcatSim, ANonblockingConcatenationExpandsATypedArrayItem) {
+  const char* src =
+      "module t;\n"
+      "  typedef int AI3[1:3];\n"
+      "  int A3[1:3] = '{1, 2, 3};\n"
+      "  int A9[1:9];\n"
+      "  int a5, a9;\n"
+      "  initial begin\n"
+      "    A9 <= {A3, 4, AI3'{5, 6, 7}, 8, 9};\n"
+      "    #1 a5 = A9[5]; a9 = A9[9];\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "a5"), 5u);
+  EXPECT_EQ(RunAndGet(src, "a9"), 9u);
+}
+
+// §10.10: a dynamic array is a legal target, the concatenation giving it its
+// size, by a nonblocking assignment as by a blocking one. The nonblocking
+// assignment compared three elements against a size of 0 and wrote none.
+TEST(UnpackedArrayConcatSim, ANonblockingConcatenationSizesADynamicArray) {
+  const char* src =
+      "module t;\n"
+      "  int d[];\n"
+      "  int n, d2;\n"
+      "  initial begin d <= {1, 2, 3}; #1 n = d.size(); d2 = d[2]; end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "n"), 3u);
+  EXPECT_EQ(RunAndGet(src, "d2"), 3u);
+}
+
+// §10.10: a declaration's initializer that is an unpacked array concatenation
+// expands an array item into its elements, into a fixed-size array and into a
+// queue alike. Each item filled one element, so B[0] took A as one value.
+TEST(UnpackedArrayConcatSim, ADeclarationInitializerExpandsAnArrayItem) {
+  const char* src =
+      "module t;\n"
+      "  int A[2] = '{10, 20};\n"
+      "  int B[4] = {A, 30, 40};\n"
+      "  int q[$] = {A, 5};\n"
+      "  int b0, b1, b3, n, q1;\n"
+      "  initial begin b0 = B[0]; b1 = B[1]; b3 = B[3]; n = q.size(); q1 = "
+      "q[1]; end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "b0"), 10u);
+  EXPECT_EQ(RunAndGet(src, "b1"), 20u);
+  EXPECT_EQ(RunAndGet(src, "b3"), 40u);
+  EXPECT_EQ(RunAndGet(src, "n"), 3u);
+  EXPECT_EQ(RunAndGet(src, "q1"), 20u);
+}
+
+// §10.10: a concatenation giving a fixed-size array a different number of
+// elements is an error in a declaration's initializer as in an assignment.
+TEST(UnpackedArrayConcatSim, ADeclarationInitializerOfTheWrongSizeIsReported) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int C[3] = {1, 2};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array concatenation size mismatch: "
+                            "expected 3 elements, got 2",
+                            2, "10.10"));
+}
+
+// §10.10.3: an item of a multidimensional assignment pattern that is written
+// in braces is an unpacked array concatenation over its row, so an array item
+// in it contributes each of its elements. It was read as a nested positional
+// pattern, A standing as one value and C[0][1] left at 0.
+TEST(UnpackedArrayConcatSim, ABracedPatternItemIsAConcatenationOverItsRow) {
+  const char* src =
+      "module t;\n"
+      "  int A[2] = '{1, 2};\n"
+      "  int C[2][2];\n"
+      "  int c00, c01, c10, c11;\n"
+      "  initial begin\n"
+      "    C = '{{A}, {3, 4}};\n"
+      "    c00 = C[0][0]; c01 = C[0][1]; c10 = C[1][0]; c11 = C[1][1];\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "c00"), 1u);
+  EXPECT_EQ(RunAndGet(src, "c01"), 2u);
+  EXPECT_EQ(RunAndGet(src, "c10"), 3u);
+  EXPECT_EQ(RunAndGet(src, "c11"), 4u);
+}
+
+// §10.10: a row's concatenation of the wrong size is reported as any
+// concatenation's is.
+TEST(UnpackedArrayConcatSim, ABracedPatternItemOfTheWrongSizeIsReported) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int C[2][2];\n"
+      "  initial C = '{{1}, {3, 4}};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array concatenation size mismatch: "
+                            "expected 2 elements, got 1",
+                            3, "10.10"));
 }
 
 }  // namespace

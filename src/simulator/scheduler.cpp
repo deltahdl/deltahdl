@@ -93,6 +93,10 @@ bool TimeSlot::AnyIterativeNonempty() const {
 }
 
 void Scheduler::ScheduleEvent(SimTime time, Region region, Event* event) {
+  if (nba_capture_ != nullptr) {
+    nba_capture_->emplace_back(event, region);
+    return;
+  }
   if (time < current_time_) {
     std::fprintf(
         stderr,

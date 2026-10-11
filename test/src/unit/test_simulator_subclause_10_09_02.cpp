@@ -5,6 +5,7 @@
 #include <string_view>
 
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "simulator/eval_array.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
@@ -513,6 +514,48 @@ TEST(StructPatternSimulation,
       f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(out, "5 5 [z] [z]\n");
+}
+
+// §10.9.2: the type keys, like the default, apply to each member of a nested
+// structure no member key matched. They reached the top-level members alone,
+// so the nested members took the default.
+TEST(StructPatternSim, ATypeKeyReachesTheMembersOfANestedStructure) {
+  const char* src =
+      "module t;\n"
+      "  struct packed { int A; struct packed { int B, C; } BC; } s;\n"
+      "  int a, b, c;\n"
+      "  initial begin\n"
+      "    s = '{int: 5, default: 0};\n"
+      "    a = s.A; b = s.BC.B; c = s.BC.C;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "a"), 5u);
+  EXPECT_EQ(RunAndGet(src, "b"), 5u);
+  EXPECT_EQ(RunAndGet(src, "c"), 5u);
+}
+
+// §10.9.2: a default whose own type is a member's structure type is assigned
+// to that member whole, and applied member by member to a structure member of
+// any other type. It was spread over the fields of every structure member.
+TEST(StructPatternSim, ADefaultOfAMembersOwnTypeIsAssignedWhole) {
+  const char* src =
+      "typedef struct packed { logic [7:0] a, b; } pair_t;\n"
+      "typedef struct packed { logic [7:0] c, d; } other_t;\n"
+      "module t;\n"
+      "  pair_t pv = '{8'h12, 8'h34};\n"
+      "  int k = 7;\n"
+      "  struct packed { pair_t p; other_t o; int x; } s;\n"
+      "  struct packed { pair_t p; int x; } s2;\n"
+      "  logic [15:0] sp, so, s2p;\n"
+      "  initial begin\n"
+      "    s = '{default: pv};\n"
+      "    s2 = '{default: k};\n"
+      "    sp = s.p; so = s.o; s2p = s2.p;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "sp"), 0x1234u);
+  EXPECT_EQ(RunAndGet(src, "so"), 0x3434u);
+  EXPECT_EQ(RunAndGet(src, "s2p"), 0x0707u);
 }
 
 }  // namespace

@@ -13,11 +13,13 @@
 #include "common/types.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_stmt.h"
 #include "simulator/class_object.h"
 #include "simulator/clocking.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_call_result.h"
 #include "simulator/eval_expr_internal.h"
+#include "simulator/eval_function_args_internal.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
 #include "simulator/modport_expression.h"
@@ -104,49 +106,6 @@ static Logic4Vec SampleNbaRhs(const Logic4Vec& val, Arena& arena) {
   return copy;
 }
 
-// Append the elements of array `info` named `base` (in declared order) to
-// `elems`. Missing element variables are skipped, matching a sparse store.
-static void AppendArrayElements(std::string_view base, const ArrayInfo* info,
-                                SimContext& ctx,
-                                std::vector<Logic4Vec>& elems) {
-  for (uint32_t i = 0; i < info->size; ++i) {
-    uint32_t idx =
-        info->is_descending ? (info->lo + info->size - 1 - i) : (info->lo + i);
-    auto name = std::string(base) + "[" + std::to_string(idx) + "]";
-    auto* v = ctx.FindVariable(name);
-    if (v) elems.push_back(v->value);
-  }
-}
-
-// Expand a single identifier `item` of an array-concatenation rhs: array
-// identifiers contribute their elements, queue identifiers splice their
-// elements. Returns false when `item` is not an array/queue identifier.
-static bool TryAppendConcatIdentifier(const Expr* item, SimContext& ctx,
-                                      std::vector<Logic4Vec>& elems) {
-  if (item->kind != ExprKind::kIdentifier) return false;
-  if (auto* src_arr = ctx.FindArrayInfo(item->text)) {
-    AppendArrayElements(item->text, src_arr, ctx, elems);
-    return true;
-  }
-  if (auto* src_q = ctx.FindQueue(item->text)) {
-    elems.insert(elems.end(), src_q->elements.begin(), src_q->elements.end());
-    return true;
-  }
-  return false;
-}
-
-// Flatten the elements of an unpacked-array concatenation rhs into `elems`:
-// array identifiers expand to their elements (in declared order), queue
-// identifiers splice their elements, anything else evaluates as a scalar.
-static void CollectArrayConcatElements(const Expr* rhs, SimContext& ctx,
-                                       Arena& arena,
-                                       std::vector<Logic4Vec>& elems) {
-  for (auto* item : rhs->elements) {
-    if (TryAppendConcatIdentifier(item, ctx, elems)) continue;
-    elems.push_back(EvalExpr(item, ctx, arena));
-  }
-}
-
 // Replace each collected element with a copy that owns its words. Every
 // collector pushes a variable's own vec or a queue's own elements, so every
 // entry arrives aliasing live storage. Copying here rather than inside each
@@ -162,19 +121,20 @@ static void ScheduleArrayConcatNbaElements(const Stmt* stmt,
                                            const ArrayInfo* ainfo,
                                            const std::vector<Logic4Vec>& elems,
                                            const NbaScheduleSlot& slot) {
-  if (elems.size() != ainfo->size) {
+  // Counted and stored by the innermost elements, as the blocking
+  // DistributeConcatToArray does.
+  uint32_t count = ArrayElementCount(*ainfo);
+  if (elems.size() != count) {
     slot.ctx.GetDiag().Error(
         stmt->range.start,
         "unpacked array concatenation size mismatch: expected " +
-            std::to_string(ainfo->size) + " elements, got " +
+            std::to_string(count) + " elements, got " +
             std::to_string(elems.size()),
         Subclause("10.10"));
     return;
   }
-  for (uint32_t i = 0; i < ainfo->size; ++i) {
-    uint32_t idx = ainfo->is_descending ? (ainfo->lo + ainfo->size - 1 - i)
-                                        : (ainfo->lo + i);
-    auto name = std::string(stmt->lhs->text) + "[" + std::to_string(idx) + "]";
+  for (uint32_t i = 0; i < count; ++i) {
+    auto name = std::string(stmt->lhs->text) + ArrayElementSuffixAt(*ainfo, i);
     auto* var = slot.ctx.FindVariable(name);
     if (!var) continue;
     auto val = ResizeToWidth(elems[i], ainfo->elem_width, slot.arena);
@@ -220,7 +180,11 @@ static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier || !stmt->rhs)
     return false;
 
+  // §10.10 sizes a dynamic array target from the concatenation, which the
+  // queue path below does: a dynamic array's elements are held as a queue's,
+  // and the ArrayInfo it also registers records no size.
   auto* ainfo = ctx.FindArrayInfo(stmt->lhs->text);
+  if (ainfo != nullptr && ainfo->is_dynamic) ainfo = nullptr;
   auto* q = ainfo ? nullptr : ctx.FindQueue(stmt->lhs->text);
   if (!ainfo && !q) return false;
   if (ainfo && stmt->rhs->kind != ExprKind::kConcatenation) return false;
@@ -233,7 +197,7 @@ static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   // requires.
   std::vector<Logic4Vec> elems;
   if (ainfo) {
-    CollectArrayConcatElements(stmt->rhs, ctx, arena, elems);
+    elems = CollectConcatElements(stmt->rhs, ctx, arena);
   } else {
     CollectQueueElements(stmt->rhs, ctx, arena, elems);
   }
@@ -389,15 +353,13 @@ static void SetupWholeVarNbaCallback(Event* event, Variable* var,
 // expression, a class handle, a virtual interface reference -- at the time it
 // evaluates the right-hand side, and §4.9.4 computes both the right-hand value
 // and the left-hand target from the values in effect when the update is placed
-// in the event region. The two brace arms below defer the write itself, which
-// is where the write belongs -- resolving the elements at schedule time cannot
-// answer for the forms their unpackers handle -- but their unpackers evaluate
-// the lvalue's index expressions where they run, which is the update region. So
-// `{a[idx], b} <= x` read whatever `idx` held when the update fired rather than
-// what it held when the statement executed. The two arms therefore pair each
-// index node under the left-hand side with the value it has now
-// (CollectLhsIndexSnapshots, in statement_assign_lhs_snapshots.cpp) and install
-// the pairs in their callbacks.
+// in the event region. The streaming arm below defers the write itself, but
+// its unpacker evaluates the lvalue's index expressions where it runs, which is
+// the update region, so `{>>{a[idx], b}} <= x` would read whatever `idx` held
+// when the update fired rather than what it held when the statement executed.
+// The arm therefore pairs each index node under the left-hand side with the
+// value it has now (CollectLhsIndexSnapshots, in
+// statement_assign_lhs_snapshots.cpp) and installs the pairs in its callback.
 //
 // The snapshots are installed for the length of one callback body and dropped
 // again at its end. The store is one map per SimContext keyed by expression
@@ -424,27 +386,34 @@ static void SetupWholeVarNbaCallback(Event* event, Variable* var,
 // concatenation is a nonblocking target exactly as it is a blocking one, and
 // `{a, b} <= x` has to distribute where `{a, b} = x` does.
 //
-// The distribution is the blocking one, deferred rather than restated: one
-// event carries the sampled right-hand value and runs TryUnpackConcatLhs in the
-// update region, as the streaming arm below carries its own unpacker. Resolving
-// the elements here instead and scheduling a whole-variable write for each
-// cannot answer for the forms that unpacker handles -- a nested concatenation
-// names no variable to write, and a select element resolves to the whole of the
-// variable it selects from, which is the boundary error ConcatLhsElemWidth
-// records having already been made once on the blocking side.
+// §10.4.2 evaluates what the left-hand side needs evaluated -- an index, a
+// class handle -- where the statement executes, and §11.4.12 gives each
+// element of a concatenation target its own slice of the value, the rightmost
+// the least significant bits. So the update is placed element by element, each
+// element taken through ScheduleNonblockingAssign as a lone target is: a
+// nested concatenation is distributed again and a select deposits its window,
+// as each would be standing alone. Unpacking the whole value in the update
+// region resolved a member access, `{h.f, b}` or `{arr[i].f, b}`, against the
+// handle or the index as it stood then.
 static void ScheduleConcatNba(const Stmt* stmt, const Logic4Vec& rhs_val,
                               uint64_t delay_ticks, SimContext& ctx,
                               Arena& arena) {
-  auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-  event->kind = EventKind::kUpdate;
-  const Expr* lhs = stmt->lhs;
-  auto snaps = CollectLhsIndexSnapshots(lhs, ctx, arena);
-  event->callback = [lhs, rhs_val, snaps, &ctx, &arena]() {
-    InstallLhsIndexSnapshots(snaps, ctx);
-    TryUnpackConcatLhs(lhs, rhs_val, ctx, arena);
-    ClearLhsIndexSnapshots(snaps, ctx);
-  };
-  ScheduleNbaEvent(event, delay_ticks, ctx);
+  const Expr* lhs = UnwrapTypedPattern(stmt->lhs);
+  uint32_t bit_offset = 0;
+  for (auto it = lhs->elements.rbegin(); it != lhs->elements.rend(); ++it) {
+    Expr* el = *it;
+    uint32_t width = ConcatLhsElemWidth(el, ctx, arena);
+    if (width == 0) {
+      ReportZeroWidthPartSelect(el, ctx, arena);
+      continue;
+    }
+    auto* el_stmt = arena.Create<Stmt>(*stmt);
+    el_stmt->lhs = el;
+    NbaSample part;
+    part.value = ExtractBitField(arena, rhs_val, bit_offset, width);
+    bit_offset += width;
+    ScheduleNonblockingAssign(el_stmt, part, delay_ticks, ctx, arena);
+  }
 }
 
 static void ScheduleStreamingConcatNba(const Stmt* stmt,
@@ -860,6 +829,22 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const NbaSample& sample,
     AttachUpdateTag(event, var, sample.tag, ctx);
   }
   ScheduleNbaEvent(event, delay_ticks, ctx);
+}
+
+Scheduler::NbaCapture* CaptureNonblockingAssign(const Stmt* stmt,
+                                                const NbaSample& sample,
+                                                SimContext& ctx, Arena& arena) {
+  auto* updates = arena.Create<Scheduler::NbaCapture>();
+  ctx.GetScheduler().SetNbaCapture(updates);
+  ScheduleNonblockingAssign(stmt, sample, 0, ctx, arena);
+  ctx.GetScheduler().SetNbaCapture(nullptr);
+  return updates;
+}
+
+void ReleaseNbaUpdates(const Scheduler::NbaCapture& updates, SimContext& ctx) {
+  for (const auto& [event, region] : updates) {
+    ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), region, event);
+  }
 }
 
 }  // namespace delta

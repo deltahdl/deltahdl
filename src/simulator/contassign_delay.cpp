@@ -15,6 +15,15 @@ static bool IsAllHighZ(const Logic4Vec& v) {
   return v.nwords > 0;
 }
 
+// Whether a value with no x or z bit is zero, read across every word: a
+// vector wider than one word may hold its only set bit above the first.
+static bool IsKnownZero(const Logic4Vec& v) {
+  for (uint32_t i = 0; i < v.nwords; ++i) {
+    if (v.words[i].aval != 0) return false;
+  }
+  return true;
+}
+
 static uint64_t SelectScalarContAssignDelay(const Logic4Vec& old_val,
                                             const Logic4Vec& new_val,
                                             const ContAssignDelays& d) {
@@ -72,9 +81,9 @@ uint64_t SelectContAssignDelay(const Logic4Vec& old_val,
     return SelectScalarContAssignDelay(old_val, new_val, d);
   }
 
-  if (!HasUnknownBits(new_val) && new_val.ToUint64() == 0 &&
+  if (!HasUnknownBits(new_val) && IsKnownZero(new_val) &&
       !HasUnknownBits(old_val) && !IsAllHighZ(old_val) &&
-      old_val.ToUint64() != 0) {
+      !IsKnownZero(old_val)) {
     return d.fall;
   }
   return d.rise;

@@ -367,6 +367,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/lowerer_contassign.cpp
     simulator/lowerer_bidir_switch.cpp
     simulator/contassign_delay.cpp
+    simulator/contassign_strength.cpp
     simulator/lowerer_udp.cpp
     simulator/lowerer_register.cpp
     simulator/lowerer_package_data.cpp
@@ -604,6 +605,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_select.cpp
     simulator/eval_select_assoc.cpp
     simulator/eval_streaming.cpp
+    simulator/eval_struct_pattern.cpp
     simulator/eval_systask_io.cpp
     simulator/eval_systask_scanf.cpp
     simulator/eval_systask_pla.cpp
@@ -642,6 +644,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/statement_assign_decl_array.cpp
     simulator/static_aggregate.cpp
     simulator/statement_assign_force.cpp
+    simulator/statement_assign_force_element.cpp
     simulator/statement_assign_lhs.cpp
     simulator/statement_assign_lhs_snapshots.cpp
     simulator/statement_assign_select.cpp

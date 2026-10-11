@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -131,6 +132,53 @@ TEST(ProceduralContinuousAssignSim,
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 0x467u);
   EXPECT_EQ(b->value.ToUint64(), 0x8u);
+}
+
+// §10.6: the right-hand side of a force is re-evaluated when any variable it
+// reads changes, a variable of another instance named by its path among them,
+// and so is one reading a member of a structure. `u1.x` was watched as `u1`
+// and `x`, neither a variable, so the force kept its first value.
+TEST(ProceduralContinuousAssignSim, ForceFollowsAVariableItReadsByPath) {
+  const char* src =
+      "module sub; logic [7:0] x = 8'h01; endmodule\n"
+      "module t;\n"
+      "  sub u1();\n"
+      "  struct packed { logic [7:0] f; } s;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    s.f = 8'h02;\n"
+      "    force a = u1.x;\n"
+      "    force b = s.f;\n"
+      "    #1 u1.x = 8'h5a;\n"
+      "    s.f = 8'h6b;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "a"), 0x5au);
+  EXPECT_EQ(RunAndGet(src, "b"), 0x6bu);
+}
+
+// §10.7 with §10.6: a force or a procedural assign evaluates its right-hand
+// side in the context of its target's width, carrying into a wider variable
+// and sign-extending into a select. Evaluated at the operands' own eight bits,
+// a + b lost its carry, and 2'sb11 filled bus[7:4] with zeros above its two
+// bits.
+TEST(ProceduralContinuousAssignSim, ForceAndAssignTakeTheTargetsWidth) {
+  const char* src =
+      "module t;\n"
+      "  logic [7:0] a = 8'hFF, b = 8'h01;\n"
+      "  logic [15:0] w, v;\n"
+      "  wire [7:0] bus;\n"
+      "  logic [7:0] hi;\n"
+      "  initial begin\n"
+      "    force w = a + b;\n"
+      "    assign v = a + b;\n"
+      "    force bus[7:4] = 2'sb11;\n"
+      "    #1 hi = bus;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "w"), 0x0100u);
+  EXPECT_EQ(RunAndGet(src, "v"), 0x0100u);
+  EXPECT_EQ(RunAndGet(src, "hi") >> 4, 0xFu);
 }
 
 }  // namespace

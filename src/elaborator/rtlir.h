@@ -405,6 +405,7 @@ struct RtlirContAssign {
 
 struct RtlirAlias {
   std::vector<Expr*> nets;
+  GenBlockPrefixes gen_block_prefixes;  // §27.5: the blocks it stands in.
 };
 
 struct RtlirProcess {
@@ -516,8 +517,7 @@ struct RtlirParamDecl {
   // and a parameter a defparam made over. A width of 0 says none was
   // recorded, and RegisteredParamValue in src/elaborator/const_eval_bits.cpp
   // then refolds the declaration's default or a literal override for it.
-  // RecordResolvedHighWords there fills both as it fills
-  // resolved_high_words.
+  // RecordResolvedHighWords there fills both as it fills resolved_high_words.
   uint32_t value_width = 0;
   bool value_is_signed = false;
   // §6.20.2: a parameter declared with a real type takes a real value, which

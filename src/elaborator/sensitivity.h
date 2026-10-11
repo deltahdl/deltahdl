@@ -33,6 +33,13 @@ struct InferenceFuncs {
 
 void CollectExprReads(const Expr* expr, std::unordered_set<std::string>& out);
 
+// The dotted name a member access down a path of plain names spells,
+// `dif.clk` for the member clk of the interface instance dif, a step through
+// a package's or a class's scope spelled as written, `p::g` (§26.3, §8.23);
+// false where a step of the path is anything but a name, having added nothing
+// to `out`. Also how the simulator names the variable such a read watches.
+bool DottedNamePath(const Expr* expr, std::string& out);
+
 // The expressions a statement reads, in the positions §9.2.2.2.1's inferred
 // sensitivity list takes them from, handed over one at a time. CollectStmtReads
 // below is this walk with the names collected off each expression, and a caller

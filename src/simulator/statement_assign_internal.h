@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -250,6 +251,34 @@ const Expr* UnpackedArrayTypedPattern(const Expr* expr, SimContext& ctx);
 // declaration writes them. Defined in statement_assign_pattern.cpp.
 void CollectFixedArrayElements(std::string_view name, const ArrayInfo& ai,
                                SimContext& ctx, std::vector<Logic4Vec>& out);
+
+// §10.10: the values an unpacked array concatenation `rhs` gives a fixed-size
+// target, in order through every dimension: an array item's elements, a
+// slice's, an unpacked-array-typed pattern's items, and every other item's own
+// value. Defined in statement_assign_pattern.cpp, for the blocking and the
+// nonblocking assignment alike.
+std::vector<Logic4Vec> CollectConcatElements(const Expr* rhs, SimContext& ctx,
+                                             Arena& arena);
+
+// §10.10: stores the values CollectConcatElements gives into the fixed-size
+// array `arr_name` that `info` describes, or reports at `rhs` that their count
+// is not the array's. Defined in statement_assign_pattern.cpp; also used for a
+// declaration's initializer (lowerer_var_aggregate.cpp).
+void DistributeConcatToArray(std::string_view arr_name, const ArrayInfo& info,
+                             const Expr* rhs, SimContext& ctx, Arena& arena);
+
+// §10.10.3 (printed page 266): each non-default item of an assignment pattern
+// is an assignment-like context, so braces standing as the item for a
+// subarray of a multidimensional array are an unpacked array concatenation
+// giving that subarray its elements: an array item contributes each of its
+// elements, and a count unlike the subarray's is an error. `prefix` names the
+// subarray of `info`'s array whose dimensions run from `d`. Read as a nested
+// positional pattern, `'{{A}, {3, 4}}` took A as one value and left the rest
+// of the row at 0. Defined in statement_assign_concat.cpp.
+void DistributeConcatToSubarray(const std::string& prefix,
+                                const ArrayInfo& info, size_t d,
+                                const Expr* concat, SimContext& ctx,
+                                Arena& arena);
 
 // Defined in statement_assign_concat.cpp; also used by the §11.4.14 streaming
 // unpack in statement_assign_stream.cpp, which sizes a target element that is a

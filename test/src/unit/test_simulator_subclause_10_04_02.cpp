@@ -711,4 +711,57 @@ TEST(NonblockingAssignSim, BitSelectIndexEvaluatedOnce) {
   EXPECT_EQ(out, "1 00000001\n");
 }
 
+// §10.4.2: a nonblocking assignment's index is evaluated when the statement
+// executes, an intra-assignment event control deferring only the update. The
+// target was resolved after the event, by which time idx had moved on.
+TEST(NonblockingAssignSim, AnEventControlledUpdateKeepsTheIndexOfItsExecution) {
+  const char* src =
+      "module t;\n"
+      "  logic [7:0] arr[0:1];\n"
+      "  int idx;\n"
+      "  event e;\n"
+      "  logic [7:0] a0, a1;\n"
+      "  initial begin\n"
+      "    arr[0] = 0; arr[1] = 0; idx = 0;\n"
+      "    arr[idx] <= @(e) 8'hAA;\n"
+      "    idx = 1;\n"
+      "    #1 ->e;\n"
+      "    #1 a0 = arr[0]; a1 = arr[1];\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "a0"), 0xAAu);
+  EXPECT_EQ(RunAndGet(src, "a1"), 0u);
+}
+
+// §10.4.2: a member access in a concatenation target is resolved when the
+// statement executes, the class handle and the index alike. The concatenation
+// was unpacked in the update region, which wrote through the handle and the
+// index as they stood by then.
+TEST(NonblockingAssignSim,
+     AConcatenationElementsHandleAndIndexAreTheExecutions) {
+  const char* src =
+      "class C; logic [7:0] f; endclass\n"
+      "module t;\n"
+      "  typedef struct { logic [7:0] f; } s_t;\n"
+      "  C h, first, other;\n"
+      "  s_t arr[2];\n"
+      "  int i;\n"
+      "  logic [7:0] b, c;\n"
+      "  logic [7:0] first_f, other_f, a0, a1;\n"
+      "  initial begin\n"
+      "    first = new; other = new; h = first;\n"
+      "    first.f = 0; other.f = 0; arr[0].f = 0; arr[1].f = 0; i = 0;\n"
+      "    {h.f, b} <= 16'hAA55;\n"
+      "    {arr[i].f, c} <= 16'hBB66;\n"
+      "    h = other; i = 1;\n"
+      "    #1 first_f = first.f; other_f = other.f; a0 = arr[0].f; a1 = "
+      "arr[1].f;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "first_f"), 0xAAu);
+  EXPECT_EQ(RunAndGet(src, "other_f"), 0u);
+  EXPECT_EQ(RunAndGet(src, "a0"), 0xBBu);
+  EXPECT_EQ(RunAndGet(src, "a1"), 0u);
+}
+
 }  // namespace

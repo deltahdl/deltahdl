@@ -148,17 +148,29 @@ struct Variable {
   uint8_t last_change_edge = 0;
   std::vector<uint8_t> bit_change_edges;
 
+  // §10.6: is_forced says some procedural continuous assignment holds this
+  // variable, so that every other writer declines; force_active says the one
+  // holding it is a force. §10.6.2 has a force override an active assign, a
+  // deassign end the assign alone and a release the force alone, so the two
+  // are kept apart rather than read off the one flag.
   bool is_forced = false;
+  bool force_active = false;
   Logic4Vec forced_value{};
   // §10.6.2 names a constant bit-select or part-select of a vector net among
   // the things a force may hold, and holds exactly what was named: the drivers
   // it overrides are the drivers of those bits, and the rest of the net goes on
-  // being driven. This is the window of this variable those bits are, empty for
-  // a force on the whole of it -- which is every force on a variable, §10.6.2
-  // barring a bit-select or part-select of a variable as its target. The value
-  // is deposited through the same window, so forced_value carries the whole
-  // object with the forced bits in place.
-  ProcContAssignWindow forced_window{};
+  // being driven. Each part held is the window of this variable its bits are,
+  // empty for a hold on the whole of it -- which is every force on a variable,
+  // §10.6.2 barring a bit-select or part-select of a variable as its target --
+  // with the right-hand side holding it. Two forces on different bits of a net
+  // are two parts, each released on its own. The values are deposited through
+  // the same windows, so forced_value carries the whole object with every
+  // held bit in place.
+  struct HeldPart {
+    ProcContAssignWindow window;
+    const Expr* rhs = nullptr;
+  };
+  std::vector<HeldPart> held_parts;
   Logic4Vec pending_nba{};
   bool has_pending_nba = false;
   bool is_event = false;
@@ -261,9 +273,11 @@ struct Variable {
   // a driver of any other bit is overridden by nothing.
   bool BitIsForced(uint32_t bit) const {
     if (!is_forced) return false;
-    if (forced_window.dst_width == 0) return true;
-    return bit >= forced_window.dst_lo &&
-           bit < forced_window.dst_lo + forced_window.dst_width;
+    return std::ranges::any_of(held_parts, [bit](const HeldPart& part) {
+      return part.window.dst_width == 0 ||
+             (bit >= part.window.dst_lo &&
+              bit < part.window.dst_lo + part.window.dst_width);
+    });
   }
 
   // Whether a force holds every bit of this variable, which is the force that
@@ -274,9 +288,10 @@ struct Variable {
   // name.
   bool WholeIsForced() const {
     if (!is_forced) return false;
-    return forced_window.dst_width == 0 ||
-           (forced_window.dst_lo == 0 &&
-            forced_window.dst_width == value.width);
+    return std::ranges::any_of(held_parts, [this](const HeldPart& part) {
+      return part.window.dst_width == 0 ||
+             (part.window.dst_lo == 0 && part.window.dst_width == value.width);
+    });
   }
 
   const Expr* proc_cont_rhs = nullptr;
@@ -294,6 +309,12 @@ struct Variable {
   // two cannot drift apart and a release naming a target written differently
   // from the assign's reestablishes what the assign actually installed.
   ProcContAssignWindow assign_cont_window{};
+
+  // §10.6.2: releasing a variable a continuous assignment drives reestablishes
+  // that assignment and schedules its reevaluation. Set by the continuous
+  // assignment the first time it drives this variable; empty for a variable
+  // no continuous assignment drives.
+  std::function<void()> cont_assign_reevaluate;
 
   std::vector<std::function<bool()>> watchers;
 

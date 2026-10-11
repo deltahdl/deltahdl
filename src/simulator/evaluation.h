@@ -421,6 +421,15 @@ Logic4Vec EvalStructMemberValue(const Expr* elem, const StructFieldInfo& field,
 Logic4Vec EvalItemForLayout(const Expr* item, const StructTypeInfo* layout,
                             SimContext& ctx, Arena& arena);
 
+// §10.9.1 (printed page 262): the value a `default:` item `value` gives an
+// element of an array whose elements are structures laid out by `layout`. A
+// value whose own type is that structure is assigned whole; any other is
+// applied to the element member by member by §10.9.2's rules for a default,
+// as `'{default: value}` would be. Evaluated as it is where `layout` is null.
+// Defined in eval_streaming.cpp.
+Logic4Vec EvalDefaultForElement(const Expr* value, const StructTypeInfo* layout,
+                                SimContext& ctx, Arena& arena);
+
 // §7.2.2: gives the structure `value` holds, laid out by `layout` from bit
 // `base`, the default value each member's declaration writes -- a member of a
 // nested structure its own -- leaving a member written with none as it is. A

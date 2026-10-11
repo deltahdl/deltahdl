@@ -6,6 +6,7 @@
 #include "common/arena.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_element_shape.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 #include "simulator/lowerer.h"
 #include "simulator/lowerer_register.h"
@@ -120,6 +121,21 @@ static const AssocArrayObject* ElementAssocTemplate(
   return inner;
 }
 
+// §10.10: a declaration's initializer that is an unpacked array concatenation
+// is laid into the array as the same concatenation assigned to it is: an array
+// item contributes its elements, and a count unlike the array's is reported.
+// The positional fill CreateArrayElements makes counts it item by item.
+static void InitFixedArrayFromConcat(std::string_view name,
+                                     const RtlirVariable& var, SimContext& ctx,
+                                     Arena& arena) {
+  if (var.unpacked_size == 0 || var.init_expr == nullptr ||
+      var.init_expr->kind != ExprKind::kConcatenation) {
+    return;
+  }
+  DistributeConcatToArray(name, *ctx.FindArrayInfo(name), var.init_expr, ctx,
+                          arena);
+}
+
 void Lowerer::LowerVarAggregate(std::string_view name,
                                 const RtlirVariable& var) {
   if (var.is_queue) {
@@ -181,6 +197,7 @@ void Lowerer::LowerVarAggregate(std::string_view name,
     RecordAssocElemInit(name, var, aa, ctx_, arena_);
   } else {
     CreateArrayElements(name, var, ctx_, arena_);
+    InitFixedArrayFromConcat(name, var, ctx_, arena_);
     if (var.elements_are_queues)
       CreateFixedElementQueues(name, var, ctx_, arena_);
   }

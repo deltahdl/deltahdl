@@ -73,12 +73,7 @@ static void CollectSelectReads(const Expr* expr,
   CollectExprReads(cur, out);
 }
 
-// The dotted name a member access down a path of plain names spells,
-// `dif.clk` for the member clk of the interface instance dif, a step through
-// a package's or a class's scope spelled as written, `p::g` (§26.3, §8.23);
-// false where a step of the path is anything but a name, having added nothing
-// to `out`.
-static bool DottedNamePath(const Expr* expr, std::string& out) {
+bool DottedNamePath(const Expr* expr, std::string& out) {
   if (expr->kind == ExprKind::kIdentifier) {
     out += expr->text;
     return true;
