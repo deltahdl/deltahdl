@@ -688,6 +688,41 @@ TEST_F(CallStatementsInAScope, ACallOfAClassBuiltInMethodIsAMethodFuncCall) {
             VpiObjectOf(declared));
 }
 
+// §8.13 and §8.25 with §37.42: a call through a handle of a class extending
+// its own type parameter, C #(int N = 1, type T = B) extends T, reaches the
+// method of the class the parameter takes, through a variable or a property:
+// B's run for the default C, B2's tick for C #(1, B2) and C #(.T(B2)).
+TEST_F(CallStatementsInAScope, ACallReachesTheMethodATypeParameterBaseHas) {
+  Run("module top;\n"
+      "  class B; function void run(); endfunction endclass\n"
+      "  class B2; task tick(); endtask endclass\n"
+      "  class C #(int N = 1, type T = B) extends T; endclass\n"
+      "  class H; C c = new; C #(.T(B2)) d = new; endclass\n"
+      "  C c = new; C #(1, B2) e = new; H h = new;\n"
+      "  initial begin : b c.run(); h.c.run(); e.tick(); h.d.tick(); end\n"
+      "endmodule\n");
+  vpiHandle run = Named(vpiMethods, Named(vpiClassDefn, By("top"), "B"), "run");
+  vpiHandle tick =
+      Named(vpiMethods, Named(vpiClassDefn, By("top"), "B2"), "tick");
+  ASSERT_NE(run, nullptr);
+  ASSERT_NE(tick, nullptr);
+  vpiHandle it = vpi_iterate(vpiStmt, By("top.b"));
+  ASSERT_NE(it, nullptr);
+  std::vector<vpiHandle> calls;
+  while (vpiHandle stmt = vpi_scan(it)) calls.push_back(stmt);
+  ASSERT_EQ(calls.size(), 4u);
+  for (std::size_t i = 0; i < 2; ++i) {
+    EXPECT_EQ(vpi_get(vpiType, calls[i]), vpiMethodFuncCall) << i;
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, calls[i])), VpiObjectOf(run))
+        << i;
+  }
+  for (std::size_t i = 2; i < 4; ++i) {
+    EXPECT_EQ(vpi_get(vpiType, calls[i]), vpiMethodTaskCall) << i;
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, calls[i])), VpiObjectOf(tick))
+        << i;
+  }
+}
+
 // §15.4 and §18.6.1 with §37.42: a built-in class is a class too, so a call
 // of randomize through a handle of a class extending mailbox, which declares
 // no randomize, is a method func call of a built-in method, though §15.4 names

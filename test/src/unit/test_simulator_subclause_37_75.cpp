@@ -517,6 +517,32 @@ TEST_F(DoWhileAndForeachLoopsOfARun, AStructMembersArrayGivesItsIndexType) {
             (std::vector<int>{vpiStringVar, vpiStringVar}));
 }
 
+// §8.13 with §8.25 and §12.7.3: a class extending its own type parameter,
+// C #(int N = 1, type T = B) extends T, inherits the members of the class the
+// parameter takes: the default's, B's string-indexed v, for C and for C
+// #(.N(3)) whose arguments leave T alone, and the argument's, B2's byte-indexed
+// v, for C #(.T(B2)) and C #(2, B2), held by a variable or by a property.
+TEST_F(DoWhileAndForeachLoopsOfARun, ATypeParameterBaseGivesItsIndexType) {
+  Run("module top;\n"
+      "  class B; int v [string]; endclass\n"
+      "  class B2; int v [byte]; endclass\n"
+      "  class C #(int N = 1, type T = B) extends T; endclass\n"
+      "  class H; C #(.T(B2)) c = new; endclass\n"
+      "  C c0 = new; C #(.T(B2)) c1 = new; C #(2, B2) c2 = new;\n"
+      "  C #(.N(3)) c3 = new; H h = new;\n"
+      "  initial begin : b\n"
+      "    foreach (c0.v[k]) begin end\n"
+      "    foreach (c1.v[k]) begin end\n"
+      "    foreach (c2.v[k]) begin end\n"
+      "    foreach (c3.v[k]) begin end\n"
+      "    foreach (h.c.v[k]) begin end\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(FirstLoopVarKinds(By("top.b")),
+            (std::vector<int>{vpiStringVar, vpiByteVar, vpiByteVar,
+                              vpiStringVar, vpiByteVar}));
+}
+
 // §37.75: a null handle has no do-while condition.
 TEST_F(DoWhileForeach, DoWhileConditionOfANullHandleIsNull) {
   EXPECT_EQ(VpiDoWhileConditionExpr(nullptr), nullptr);
