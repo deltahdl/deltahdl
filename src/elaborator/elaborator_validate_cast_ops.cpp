@@ -3,6 +3,7 @@
 #include <format>
 #include <optional>
 #include <set>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -484,6 +485,22 @@ void CheckAliasBitDuplicates(
   }
 }
 
+// §10.11: an alias operand in a generate block names the net of the innermost
+// enclosing scope that declares it, which may be the module itself, so a name
+// is tried under each block prefix from the innermost out before bare.
+std::string_view ResolveAliasNetScope(
+    std::string_view raw, const RtlirModule* mod,
+    const std::vector<std::string_view>& prefixes) {
+  for (auto it = prefixes.rbegin(); it != prefixes.rend(); ++it) {
+    for (const auto& n : mod->nets) {
+      if (n.name.size() == it->size() + raw.size() && n.name.starts_with(*it) &&
+          n.name.ends_with(raw))
+        return n.name;
+    }
+  }
+  return raw;
+}
+
 void CheckAliasDuplicatePairs(
     const ModuleItem* item, DiagEngine& diag,
     std::set<std::pair<std::string_view, std::string_view>>& alias_pairs,
@@ -512,7 +529,9 @@ void Elaborator::ValidateAlias(const ModuleItem* item, RtlirModule* mod) {
   std::vector<std::string_view> ident_names =
       CollectAliasNetNames(item, net_names_);
   CheckAliasNetTypeCompat(item, diag_, var_types_, ident_names);
-  auto scoped = [this](std::string_view n) { return ScopedName(n); };
+  auto scoped = [this, mod](std::string_view n) {
+    return ResolveAliasNetScope(n, mod, gen_prefix_scopes_);
+  };
   CheckAliasNetWidthCompat(item, diag_, mod, ident_names, scoped);
   ScopeMap param_scope = BuildParamScope(mod);
   CheckAliasStructuredWidthCompat(item, diag_, mod, scoped, param_scope);

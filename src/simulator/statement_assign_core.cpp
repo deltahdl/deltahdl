@@ -874,6 +874,9 @@ void PerformBlockingAssign(const Expr* lhs, const Logic4Vec& rhs_val,
     UnpackStreamingConcatLhs(lhs, owned, ctx, arena);
     return;
   }
+  // A member of a selected element, `arr[i].f`, is written as the statement
+  // path writes it; WriteStructField below finds no storage for it.
+  if (TryContainerElementMemberWrite(lhs, owned, ctx, arena)) return;
   if (lhs->kind == ExprKind::kSelect) {
     TrySelectBlockingAssign(lhs, owned, ctx, arena);
     return;

@@ -302,13 +302,14 @@ class ElaboratorData {
   // (src/elaborator/elaborator_module_inst.cpp:799), so instantiating one
   // module twice yields two keys and neither instance's names are offered to
   // the other.
-  std::unordered_map<const RtlirModule*, std::unordered_set<std::string_view>>
-      module_declared_names_;
-  // §10.11 with §27.5: the nets among each module scope's declared names,
-  // kept for its generate blocks as module_declared_names_ is, so an alias in
-  // a block can tell the enclosing module's nets from its variables.
-  std::unordered_map<const RtlirModule*, std::unordered_set<std::string_view>>
-      module_net_names_;
+  //
+  // §10.11 with §27.5: the nets among those names are kept beside them, so an
+  // alias in a block can tell the enclosing module's nets from its variables.
+  struct ModuleScopeNames {
+    std::unordered_set<std::string_view> declared;
+    std::unordered_set<std::string_view> nets;
+  };
+  std::unordered_map<const RtlirModule*, ModuleScopeNames> module_scope_names_;
   // §27.4: genvar names of the loop generate constructs currently being
   // elaborated. Used to reject a nested loop generate construct that reuses an
   // enclosing loop's genvar, which is illegal because the inner reference names

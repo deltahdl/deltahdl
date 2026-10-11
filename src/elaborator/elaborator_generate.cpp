@@ -54,12 +54,12 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   // §23.9 judges a declaration against the scope it is written in, and a
   // generate block's enclosing scope is the module Elaborator::ElaborateModule
   // has already returned from. Install that module's names, which
-  // Elaborator::ElaborateModule captured into module_declared_names_ before
+  // Elaborator::ElaborateModule captured into module_scope_names_ before
   // ItemElaborationStateSaver::Restore took them out of declared_names_.
   auto saved_declared_names = std::move(declared_names_);
-  declared_names_ = std::move(module_declared_names_[pg.mod]);
+  declared_names_ = std::move(module_scope_names_[pg.mod].declared);
   auto saved_net_names = std::move(net_names_);
-  net_names_ = std::move(module_net_names_[pg.mod]);
+  net_names_ = std::move(module_scope_names_[pg.mod].nets);
   // §11.5.1 addresses a select on a parameter over the range that parameter
   // was declared with, and §6.16 gives a string parameter characters a
   // concatenation and §6.16.1's len() read back. Both answer from the module
@@ -171,11 +171,11 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   // the switch above. Elaborating a generate block reaches
   // Elaborator::ElaborateModuleInst and so re-enters
   // Elaborator::ElaborateModule for a module instantiated inside the block,
-  // which inserts into module_declared_names_ and can rehash it, and a
+  // which inserts into module_scope_names_ and can rehash it, and a
   // reference taken before that would dangle.
-  module_declared_names_[pg.mod] = std::move(declared_names_);
+  module_scope_names_[pg.mod].declared = std::move(declared_names_);
   declared_names_ = std::move(saved_declared_names);
-  module_net_names_[pg.mod] = std::move(net_names_);
+  module_scope_names_[pg.mod].nets = std::move(net_names_);
   net_names_ = std::move(saved_net_names);
 }
 
