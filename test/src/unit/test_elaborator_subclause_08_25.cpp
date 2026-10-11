@@ -601,7 +601,8 @@ TEST(ParameterizedClassElaboration, NoDefaultSpecializationInEveryDeclaration) {
 // parameter written as the base shall resolve to a class type after
 // elaboration. A name nothing declares, a typedef of int, and a type
 // parameter a specialization gives int are each reported; a typedef of a
-// class, a built-in class and a specialization giving a class are not.
+// class, a built-in class and a specialization giving a class are not, nor is
+// a parameter given no type at all, which is reported as having no default.
 TEST(ParameterizedClassElaboration, ABaseResolvingToNoClassIsAnError) {
   ElabFixture f;
   ElabOk(
@@ -616,7 +617,9 @@ TEST(ParameterizedClassElaboration, ABaseResolvingToNoClassIsAnError) {
       "module m;\n"
       "  C c;\n"
       "  C #(1, B) cb;\n"
-      "endmodule\n",
+      "  G g;\n"
+      "endmodule\n"
+      "class G #(type Q) extends Q; endclass\n",
       f);
   const auto& diags = f.diag.Diagnostics();
   EXPECT_TRUE(ReportedError(
@@ -630,6 +633,12 @@ TEST(ParameterizedClassElaboration, ABaseResolvingToNoClassIsAnError) {
       "extends, a type that is no class";
   EXPECT_TRUE(ReportedError(diags, kSpecialization, 10, "8.25"));
   EXPECT_FALSE(ReportedError(diags, kSpecialization, 11, "8.25"));
+  EXPECT_TRUE(ReportedError(diags,
+                            "parameterized class 'G' has no default "
+                            "specialization; parameter 'Q' has no default "
+                            "value",
+                            12, "8.25"));
+  EXPECT_FALSE(ReportedError(diags, "this specialization of 'G'", 12, "8.25"));
   for (const int kLine : {6, 7, 8}) {
     EXPECT_FALSE(ReportedError(diags, "extends", kLine, "8.13")) << kLine;
     EXPECT_FALSE(ReportedError(diags, "extends", kLine, "8.25")) << kLine;

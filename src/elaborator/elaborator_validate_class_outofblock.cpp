@@ -400,10 +400,10 @@ void ElaboratorClassRules::ValidateOutOfBlockDeclarations() {
   }
   OutOfBlockLinks links;
   for (const OutOfBlockSite& site : sites) {
+    // Only a function or task declaration carries a method_class (§8.24's
+    // class_scope before its name, §25.7's interface port).
     for (auto* item : *site.items) {
-      if (!item->method_class.empty() &&
-          (item->kind == ModuleItemKind::kFunctionDecl ||
-           item->kind == ModuleItemKind::kTaskDecl)) {
+      if (!item->method_class.empty()) {
         ValidateOutOfBlockItem(item, site, links, unit_, diag_);
       }
     }

@@ -459,8 +459,9 @@ TEST(VirtualMethodElaboration, ModuleClassOverrideArgumentNameIsChecked) {
 
 // §8.20: an override's qualifiers are those of the method it overrides, and
 // `virtual` is the one it may leave off, so a local or protected qualifier
-// written on one and not the other is a mismatch either way round. Matching
-// qualifiers, the override of h, are legal.
+// written on one and not the other is a mismatch either way round, k's local
+// as much as f's and g's protected. Matching qualifiers, the override of h,
+// are legal.
 TEST(VirtualMethodElaboration, OverrideQualifiersMatchTheOverriddenMethod) {
   ElabFixture f;
   ElabOk(
@@ -468,11 +469,13 @@ TEST(VirtualMethodElaboration, OverrideQualifiersMatchTheOverriddenMethod) {
       "  protected virtual function void f(); endfunction\n"
       "  virtual function void g(); endfunction\n"
       "  local virtual function void h(); endfunction\n"
+      "  virtual function void k(); endfunction\n"
       "endclass\n"
       "class D extends B;\n"
       "  function void f(); endfunction\n"
       "  protected function void g(); endfunction\n"
       "  local function void h(); endfunction\n"
+      "  local function void k(); endfunction\n"
       "endclass\n"
       "module m; endmodule\n",
       f);
@@ -480,18 +483,22 @@ TEST(VirtualMethodElaboration, OverrideQualifiersMatchTheOverriddenMethod) {
       "virtual method override 'f' is not qualified local or protected as the "
       "method it overrides is",
       "virtual method override 'g' is not qualified local or protected as the "
+      "method it overrides is",
+      "virtual method override 'k' is not qualified local or protected as the "
       "method it overrides is"};
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage[0], 7, "8.20"));
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage[1], 8, "8.20"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage[0], 8, "8.20"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage[1], 9, "8.20"));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
-                             "virtual method override 'h'", 9, "8.20"));
+                             "virtual method override 'h'", 10, "8.20"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage[2], 11, "8.20"));
 }
 
 // §8.20 asks an override's argument types to match the prototype's and its
 // return type to match or derive from the base's, and §6.22.1 makes a typedef
 // name match the type it stands for, whether the design or the class declares
 // the typedef: the clause's Example 2 writes `T a` under `typedef int T` for
-// `int a`. A class return type is matched by a class derived from it, and by
+// `int a`. A type named behind a package scope, p::N, matches itself. A class
+// return type is matched by a class derived from it, and by
 // no other type.
 TEST(VirtualMethodElaboration, TypedefsMatchTheTypesTheyNameInAnOverride) {
   ElabFixture f;
@@ -515,10 +522,15 @@ TEST(VirtualMethodElaboration, TypedefsMatchTheTypesTheyNameInAnOverride) {
       "  virtual function int q(); return 0; endfunction\n"
       "  virtual function X w(); return null; endfunction\n"
       "endclass\n"
+      "package p; typedef bit [3:0] N; endpackage\n"
+      "class C2; virtual function void u(p::N v); endfunction endclass\n"
+      "class D2 extends C2;\n"
+      "  virtual function void u(p::N v); endfunction\n"
+      "endclass\n"
       "module m; endmodule\n",
       f);
   const auto& diags = f.diag.Diagnostics();
-  for (const int kLine : {14, 15, 16}) {
+  for (const int kLine : {14, 15, 16, 23}) {
     EXPECT_FALSE(ReportedError(diags, "virtual method override", kLine, "8.20"))
         << kLine;
   }
@@ -536,14 +548,15 @@ TEST(VirtualMethodElaboration, TypedefsMatchTheTypesTheyNameInAnOverride) {
 // the types it gives the parameters, by position, by name, or by default. The
 // clause's Example 2: Y defaulting to logic is no match for int. A base
 // method written in its own class's type parameter is likewise left to the
-// specialization the subclass extends.
+// specialization the subclass extends. An argument written in a type of its
+// own, g's b, is no specialization's to judge.
 TEST(VirtualMethodElaboration,
      AnOverrideInATypeParameterIsJudgedPerSpecialization) {
   ElabFixture f;
   ElabOk(
       "class C;\n"
       "  virtual function C some_method(int a); return null; endfunction\n"
-      "endclass\n"
+      "  virtual function void g(int b, int c); endfunction endclass\n"
       "class D extends C; endclass\n"
       "class P #(type T = int);\n"
       "  virtual function void f(T a); endfunction\n"
@@ -552,7 +565,7 @@ TEST(VirtualMethodElaboration,
       "  virtual function void f(int a); endfunction\n"
       "endclass\n"
       "class E #(type Z = int, type Y = logic) extends C;\n"
-      "  int x;\n"
+      "  int x; virtual function void g(int b, Y c); endfunction\n"
       "  virtual function D some_method(Y a); return null; endfunction\n"
       "  function void extra(); endfunction\n"
       "endclass\n"
@@ -573,7 +586,13 @@ TEST(VirtualMethodElaboration,
   EXPECT_FALSE(ReportedError(diags, kMessage, 20, "8.20"));
   EXPECT_FALSE(ReportedError(diags, kMessage, 21, "8.20"));
   EXPECT_TRUE(ReportedError(diags, kMessage, 22, "8.20"));
-  for (const int kLine : {9, 13}) {
+  EXPECT_TRUE(ReportedError(diags,
+                            "virtual method override argument 'c' of 'E::g' "
+                            "has mismatched type in this specialization",
+                            19, "8.20"));
+  EXPECT_FALSE(
+      ReportedError(diags, "virtual method override argument 'b'", 19, "8.20"));
+  for (const int kLine : {9, 13, 14, 15}) {
     EXPECT_FALSE(ReportedError(diags, "virtual method override", kLine, "8.20"))
         << kLine;
   }

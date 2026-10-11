@@ -422,7 +422,6 @@ void ElaboratorClassRules::WalkSubroutinesForVisibility(
 // subroutines and classes, read once, where a module's are read with each
 // module.
 void ElaboratorClassRules::ValidateLocalProtectedAccessOutsideModules() {
-  if (class_names_.empty()) return;
   for (const auto* item : unit_->cu_items) CheckVarInitConstructorAccess(*item);
   WalkSubroutinesForVisibility(
       unit_->cu_items, {unit_->classes.begin(), unit_->classes.end()}, {});

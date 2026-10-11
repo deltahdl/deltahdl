@@ -392,8 +392,8 @@ TEST(ParameterizedScopeResolutionElaboration,
 
 // §8.25.1 makes the unadorned name of a parameterized class illegal before
 // `::` outside the class and its out-of-block declarations, wherever the
-// expression stands: a package's declaration, another class's method or a
-// nested class's, a module's subroutine. Inside the class itself, and in a
+// expression stands: a package's declaration or task, another class's method
+// or a nested class's, a module's subroutine. Inside the class itself, and in a
 // class nested in it, the unadorned name stays legal, as the explicit form
 // does everywhere.
 TEST(ParameterizedScopeResolutionElaboration,
@@ -405,7 +405,7 @@ TEST(ParameterizedScopeResolutionElaboration,
       "endclass\n"
       "package q;\n"
       "  int a = C::p;\n"
-      "endpackage\n"
+      "  task t(output int o); o = C::p; endtask endpackage\n"
       "class D;\n"
       "  function int g(); return C::f(); endfunction\n"
       "  class N; function int n(); return C::p; endfunction endclass\n"
@@ -420,7 +420,7 @@ TEST(ParameterizedScopeResolutionElaboration,
       "endmodule\n",
       f);
   const auto& diags = f.diag.Diagnostics();
-  for (const int kLine : {5, 8, 9, 16}) {
+  for (const int kLine : {5, 6, 8, 9, 16}) {
     EXPECT_TRUE(ReportedError(diags,
                               "unadorned name 'C' used as scope resolution "
                               "prefix for parameterized class",

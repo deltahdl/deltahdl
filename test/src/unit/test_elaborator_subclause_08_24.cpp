@@ -533,7 +533,7 @@ TEST(OutOfBlockDeclElaboration, OutOfBlockDeclarationsInEveryScopeAreChecked) {
       "  function void C::g(); endfunction\n"
       "  function void C::g(); endfunction\n"
       "endpackage\n"
-      "module m;\n"
+      "module m; class E; endclass\n"
       "  function void D::h(); endfunction\n"
       "  class D; extern function void h(); endclass\n"
       "endmodule\n",
@@ -572,7 +572,8 @@ TEST(OutOfBlockDeclElaboration, AModulesClassHasNoUnitOutOfBlockDeclaration) {
 // class's types declared before it, while the out-of-block header sees them
 // all. A name the class declares only after the prototype resolves to two
 // declarations, which is reported, whether written bare or behind the class's
-// own scope; a type declared before the prototype, and a type behind another
+// own scope, and whether the class declares it as a typedef or as a nested
+// class; a type declared before the prototype, and a type behind another
 // scope, resolve alike in both.
 TEST(OutOfBlockDeclElaboration, ATypeNameResolvingDifferentlyIsReported) {
   ElabFixture f;
@@ -589,6 +590,12 @@ TEST(OutOfBlockDeclElaboration, ATypeNameResolvingDifferentlyIsReported) {
       "function void C::f(T x); endfunction\n"
       "function C::U C::g(p::T y); return 0; endfunction\n"
       "function C::T C::h(); return 0; endfunction\n"
+      "class N; endclass\n"
+      "class C2;\n"
+      "  extern function void k(N z);\n"
+      "  class N; endclass\n"
+      "endclass\n"
+      "function void C2::k(N z); endfunction\n"
       "module m; endmodule\n",
       f);
   const auto& diags = f.diag.Diagnostics();
@@ -596,10 +603,13 @@ TEST(OutOfBlockDeclElaboration, ATypeNameResolvingDifferentlyIsReported) {
       "out-of-block declaration for 'C::f' resolves 'T' to the class's own "
       "type",
       "out-of-block declaration for 'C::h' resolves 'T' to the class's own "
+      "type",
+      "out-of-block declaration for 'C2::k' resolves 'N' to the class's own "
       "type"};
   EXPECT_TRUE(ReportedError(diags, kMessage[0], 10, "8.24"));
   EXPECT_TRUE(ReportedError(diags, kMessage[1], 12, "8.24"));
   EXPECT_FALSE(ReportedError(diags, "resolves", 11, "8.24"));
+  EXPECT_TRUE(ReportedError(diags, kMessage[2], 18, "8.24"));
 }
 
 // §8.24 holds an out-of-block declaration to its prototype exactly, and an
