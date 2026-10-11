@@ -102,7 +102,9 @@ void InitOwnedSubroutineStatics(SimContext& ctx, Arena& arena) {
     stand_in.is_static_init = true;
     stand_in.frame_owners.push_back(ctx.StaticFrameOwner(func));
     CallerStandIn in_owner(&stand_in, ctx);
-    InitSubroutineStatics({.subroutine = func}, ctx, arena);
+    StaticLocalOwner owner;
+    owner.subroutine = func;
+    InitSubroutineStatics(owner, ctx, arena);
   }
 }
 
