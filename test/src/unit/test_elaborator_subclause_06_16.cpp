@@ -387,8 +387,6 @@ TEST(StringMethodElaboration, FormalsAndBlockVariablesAreChecked) {
       diags, "'bar' is not a built-in method of the string 'b'", 7, "6.16"));
 }
 
-// §3.13: a package's name and a variable's are in different name spaces, so
-// p::x names the package's x whatever variable p the scope declares.
 // §23.2.2: a port that is a string is a string variable of the module, its
 // unpacked dimensions those it writes after its name.
 TEST(StringMethodElaboration, AnsiPortsAreChecked) {
@@ -406,6 +404,51 @@ TEST(StringMethodElaboration, AnsiPortsAreChecked) {
       diags, "'foo' is not a built-in method of the string 's'", 3, "6.16"));
   EXPECT_TRUE(ReportedError(
       diags, "'baz' is not a built-in method of the string 'q'", 4, "6.16"));
+}
+
+// §6.16 with §13.4.1: the result of a call returning a string has the
+// built-in methods of one and no others, and the result of one returning an
+// array of strings has the array's.
+TEST(StringMethodElaboration, MethodOfAStringACallReturnsIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "package q;\n"
+      "  function string pf(); return " q
+      "; endfunction\n"
+      "endpackage\n"
+      "function string uf(); return "
+      u"; endfunction\n"
+      "class K;\n"
+      "  function K me(); return this; endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  typedef string sa_t [2];\n"
+      "  function string g(); return " g
+      "; endfunction\n"
+      "  function sa_t ga(); sa_t v; return v; endfunction\n"
+      "  process p;\n"
+      "  K k = new;\n"
+      "  string s;\n"
+      "  int n;\n"
+      "  initial begin\n"
+      "    p = process::self();\n"
+      "    g().foo();\n"
+      "    p.get_randstate().bar();\n"
+      "    n = g().len() + ga().size() + ga()[0].len();\n"
+      "    n = q::pf().len() + uf().len() + s.substr(0, 1).len();\n"
+      "    n = k.get_randstate().len();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "'foo' is not a built-in method of the string that 'g()' returns",
+      18, "6.16"));
+  EXPECT_TRUE(ReportedError(diags,
+                            "'bar' is not a built-in method of the string that "
+                            "'get_randstate()' returns",
+                            19, "6.16"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
 // §23.2.2.1: a port the body declares a string, and the string an explicitly
@@ -429,6 +472,8 @@ TEST(StringMethodElaboration, NonAnsiPortsAreChecked) {
       diags, "'bar' is not a built-in method of the string 't'", 6, "6.16"));
 }
 
+// §3.13: a package's name and a variable's are in different name spaces, so
+// p::x names the package's x whatever variable p the scope declares.
 TEST(StringMethodElaboration, PackageScopeIsNoSelectFromAString) {
   EXPECT_TRUE(
       ElabOk("package p;\n"

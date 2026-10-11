@@ -484,6 +484,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_resolve.cpp
     elaborator/std_package.cpp
     elaborator/elaborator_call_targets.cpp
+    elaborator/type_site_lookup.cpp
     elaborator/elaborator_scope_rules.cpp
     elaborator/elaborator_scope_rules_enclosing.cpp
     elaborator/elaborator_scope_rules_hier.cpp
