@@ -24,6 +24,7 @@
 #include "simulator/eval_assoc_class_handles.h"
 #include "simulator/eval_class_array_handles.h"
 #include "simulator/eval_class_scope_types.h"
+#include "simulator/eval_function_hier.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_member_path.h"
 #include "simulator/evaluation.h"
@@ -397,12 +398,17 @@ bool SetupInstanceTaskCall(const Expr* expr, SimContext& ctx, Arena& arena,
   ctx.PushQueueRefFrame();
   ctx.PushAssocRefFrame();
   // §20.17.2: the task is a calling context on the $stacktrace chain, as a
-  // module task enabled by name is through PushTaskCallScope.
-  ctx.PushFuncName(call.method->name);
+  // module task enabled by name is through PushTaskCallScope, named after
+  // the class level declaring it, the name its body's static frame is kept
+  // under (StaticFrameOfBody), so two classes' tasks of one name keep two.
+  BodyStaticFrame frame = StaticFrameOfBody(call.method, ctx, arena);
+  ctx.PushFuncName(frame.name);
   BindFunctionArgs(call.method, expr, ctx, arena);
   // §26.2: a task of a class a package declares reads the package's names
   // bare, as ExecClassMethod gives a function of the class its package.
   ctx.EnterSubroutineScope(ctx.SubroutinePackage(call.method));
+  // §13.4.2: and keeps its static frames under the package or unit.
+  EnterStaticFrameOwner(ctx, frame.owner);
   return true;
 }
 
@@ -417,6 +423,7 @@ void TeardownInstanceTaskCall(const InstanceMethodInfo& call, const Expr* expr,
   // still in force the value landed on B's `w` and A's never changed.
   ctx.PopThis();
   ctx.PopMethodClass();
+  LeaveStaticFrameOwner(ctx);
   WritebackOutputArgs(call.method, expr, ctx, arena);
   WritebackQueueRefs(ctx);
   WritebackAssocRefs(ctx);

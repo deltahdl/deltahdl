@@ -14,6 +14,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "simulator/class_object.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/instance_prefix_override.h"
@@ -391,8 +392,45 @@ static std::vector<std::string_view>& FrameOwners(SimContext& ctx) {
   return proc != nullptr ? proc->frame_owners : ctx.ProcesslessFrameOwners();
 }
 
+void EnterStaticFrameOwner(SimContext& ctx, std::string_view owner) {
+  FrameOwners(ctx).push_back(owner);
+}
+
+void LeaveStaticFrameOwner(SimContext& ctx) { FrameOwners(ctx).pop_back(); }
+
+BodyStaticFrame StaticFrameOfBody(const ModuleItem* func, SimContext& ctx,
+                                  Arena& arena) {
+  BodyStaticFrame frame;
+  frame.name = func->name;
+  std::string name(func->name);
+  for (const ClassTypeInfo* level = ctx.CurrentMethodClass(); level != nullptr;
+       level = level->parent) {
+    auto it = level->methods.find(name);
+    if (it == level->methods.end() || it->second != func) continue;
+    frame.name =
+        *arena.Create<std::string>(std::string(level->name) + "::" + name);
+    frame.owner = level->package;
+    frame.is_method = true;
+    break;
+  }
+  return frame;
+}
+
+StaticLocalFrameScope::StaticLocalFrameScope(const ModuleItem* func,
+                                             SimContext& ctx, Arena& arena)
+    : ctx_(ctx) {
+  BodyStaticFrame frame = StaticFrameOfBody(func, ctx, arena);
+  name_ = frame.name;
+  entered_ = frame.is_method;
+  if (entered_) EnterStaticFrameOwner(ctx, frame.owner);
+}
+
+StaticLocalFrameScope::~StaticLocalFrameScope() {
+  if (entered_) LeaveStaticFrameOwner(ctx_);
+}
+
 void EnterCalleeInstance(SimContext& ctx, const SubroutineTarget& target) {
-  FrameOwners(ctx).push_back(target.func != nullptr
+  EnterStaticFrameOwner(ctx, target.func != nullptr
                                  ? ctx.StaticFrameOwner(target.func)
                                  : std::string_view{});
   Process* proc = ctx.CurrentProcess();
@@ -409,7 +447,7 @@ void EnterCalleeInstance(SimContext& ctx, const SubroutineTarget& target) {
 }
 
 void LeaveCalleeInstance(SimContext& ctx) {
-  FrameOwners(ctx).pop_back();
+  LeaveStaticFrameOwner(ctx);
   Process* proc = ctx.CurrentProcess();
   if (proc == nullptr || proc->caller_inst_prefixes.empty()) return;
   proc->inst_prefix = std::move(proc->caller_inst_prefixes.back());

@@ -80,6 +80,54 @@ const Stmt* ExternForkjoinCall(const Expr* call, SimContext& ctx, Arena& arena);
 void EnterCalleeInstance(SimContext& ctx, const SubroutineTarget& target);
 void LeaveCalleeInstance(SimContext& ctx);
 
+// §13.4.2 with §8.10: enters `owner` as the one the static frames of the
+// method about to run are kept under -- the package or compilation unit
+// declaring its class (ClassTypeInfo::package), whose one declaration every
+// calling instance shares, and empty for a module's class, whose frames are
+// the calling instance's -- and LeaveStaticFrameOwner leaves it. They nest
+// with EnterCalleeInstance and LeaveCalleeInstance, which enter a package's
+// or unit's subroutine's owner on the same stack (Process::frame_owners).
+void EnterStaticFrameOwner(SimContext& ctx, std::string_view owner);
+void LeaveStaticFrameOwner(SimContext& ctx);
+
+// §6.21 with §13.4.2: a variable a subroutine body declares static has one
+// copy for that subroutine, kept between calls, and §8.25 (printed page 204 of
+// IEEE 1800-2023) makes each specialization of a parameterized class a type of
+// its own -- consistent, the clause says, with C++ templated classes, whose
+// function-local statics are per instantiation. A method's static locals are
+// therefore the declaring level's own: the level of the running method's
+// class, a specialization included, whose methods hold `func`, its frame
+// named "Class::method" and kept under the level's package or unit
+// (ClassTypeInfo::package, empty for a module's class). Keyed by the bare
+// name, every class's `get()` declaring `static this_type m_inst` --
+// uvm_object_registry#(T,Tname)::get and uvm_registry_common::get among them
+// -- shared one variable, and the first registry asked answered for every
+// other, and so did two classes' tasks of one name. A subroutine no running
+// class declares keeps its name and has no owner.
+struct BodyStaticFrame {
+  std::string_view name;
+  std::string_view owner;
+  bool is_method = false;
+};
+BodyStaticFrame StaticFrameOfBody(const ModuleItem* func, SimContext& ctx,
+                                  Arena& arena);
+
+// The frame StaticFrameOfBody gives a function's body, its owner entered for
+// as long as the scope lasts (EnterStaticFrameOwner).
+class StaticLocalFrameScope {
+ public:
+  StaticLocalFrameScope(const ModuleItem* func, SimContext& ctx, Arena& arena);
+  ~StaticLocalFrameScope();
+  StaticLocalFrameScope(const StaticLocalFrameScope&) = delete;
+  StaticLocalFrameScope& operator=(const StaticLocalFrameScope&) = delete;
+  std::string_view Name() const { return name_; }
+
+ private:
+  SimContext& ctx_;
+  std::string_view name_;
+  bool entered_ = false;
+};
+
 // §27.4: declares the implicit localparam of each loop generate block the
 // target's block instance is in as a local of the innermost scope, the
 // subroutine's own frame, at the value the loop index had for the instance,

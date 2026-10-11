@@ -11,12 +11,12 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
-#include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_call_result.h"
 #include "simulator/eval_class_array.h"
+#include "simulator/eval_function_hier.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_instance_task.h"
 #include "simulator/eval_mailbox.h"
@@ -866,29 +866,6 @@ static bool ShapeArrayReturnVariable(const ModuleItem* func, SimContext& ctx,
   return true;
 }
 
-// §6.21 with §13.4.2: a variable a subroutine body declares static has one
-// copy for that subroutine, kept between calls, and §8.25 (printed page 204 of
-// IEEE 1800-2023) makes each specialization of a parameterized class a type of
-// its own -- consistent, the clause says, with C++ templated classes, whose
-// function-local statics are per instantiation. A method's static locals are
-// therefore the declaring level's own: the level of the running method's
-// class, a specialization included, whose methods hold `func`. Keyed by the
-// bare name, every class's `get()` declaring `static this_type m_inst` --
-// uvm_object_registry#(T,Tname)::get and uvm_registry_common::get among them
-// -- shared one variable, and the first registry asked answered for every
-// other. A subroutine no running class declares keeps its name.
-static std::string_view StaticLocalFrame(const ModuleItem* func,
-                                         SimContext& ctx, Arena& arena) {
-  std::string name(func->name);
-  for (const ClassTypeInfo* level = ctx.CurrentMethodClass(); level != nullptr;
-       level = level->parent) {
-    auto it = level->methods.find(name);
-    if (it == level->methods.end() || it->second != func) continue;
-    return *arena.Create<std::string>(std::string(level->name) + "::" + name);
-  }
-  return func->name;
-}
-
 void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
                       SimContext& ctx, Arena& arena) {
   // §37.44 detail 1: a thread going down a chain of task and function calls
@@ -913,11 +890,11 @@ void ExecFunctionBody(const ModuleItem* func, Variable* ret_var,
   // §13.4.1 with §8.7: a class return type gives it the class a `new` in the
   // body constructs, recorded as a body local's is.
   ShapeClassReturnVariable(func, ret_var, ctx, arena);
-  std::string_view static_frame = StaticLocalFrame(func, ctx, arena);
+  StaticLocalFrameScope static_frame(func, ctx, arena);
   std::vector<std::string_view> named_scopes;
   FuncExecCtx exec{ret_var,
                    func->name,
-                   static_frame,
+                   static_frame.Name(),
                    ctx,
                    arena,
                    ret_width,

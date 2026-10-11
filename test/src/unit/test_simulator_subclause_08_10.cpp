@@ -307,4 +307,80 @@ TEST(StaticMethodSimulation, ForkOfAStaticMethodCalledFromAnObjectHasNoThis) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §8.10 with §13.4.2 and §26.2: a class a package declares has one
+// declaration, so a static local of its method is one variable whatever
+// instance calls the method: u1's call, u2's and the top's count to 3. Kept
+// per calling instance, each counted its own and the top read 1.
+TEST(StaticMethodSimulation,
+     PackageClassMethodStaticLocalSharedByEveryInstance) {
+  auto val = RunAndGet(
+      "package p;\n"
+      "  class C;\n"
+      "    static function int count();\n"
+      "      static int n = 0;\n"
+      "      n++;\n"
+      "      return n;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endpackage\n"
+      "module c; int r; initial r = p::C::count(); endmodule\n"
+      "module t;\n"
+      "  c u1();\n"
+      "  c u2();\n"
+      "  int r;\n"
+      "  initial #1 r = p::C::count();\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 3u);
+}
+
+// The same for a task of a class the compilation unit declares (§3.12.1),
+// which runs as a coroutine rather than through the function evaluator.
+TEST(StaticMethodSimulation, UnitClassTaskStaticLocalSharedByEveryInstance) {
+  auto val = RunAndGet(
+      "class C;\n"
+      "  static task count(output int r);\n"
+      "    static int n = 0;\n"
+      "    n++;\n"
+      "    r = n;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module c; int r; initial C::count(r); endmodule\n"
+      "module t;\n"
+      "  c u1();\n"
+      "  c u2();\n"
+      "  int r;\n"
+      "  initial #1 C::count(r);\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 3u);
+}
+
+// §8.3 with §13.4.2: two classes are two types, so A's task count and B's
+// task count each keep their own static n, A's counting from 0 and B's from
+// 10. Kept under the bare name count, B's declaration found A's n.
+TEST(StaticMethodSimulation, SameNamedTasksOfTwoClassesKeepTheirOwnStatics) {
+  const char* src =
+      "class A;\n"
+      "  static task count(output int r);\n"
+      "    static int n = 0;\n"
+      "    n++;\n"
+      "    r = n;\n"
+      "  endtask\n"
+      "endclass\n"
+      "class B;\n"
+      "  static task count(output int r);\n"
+      "    static int n = 10;\n"
+      "    n++;\n"
+      "    r = n;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module t;\n"
+      "  int a, b;\n"
+      "  initial begin A::count(a); B::count(b); end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "a"), 1u);
+  EXPECT_EQ(RunAndGet(src, "b"), 11u);
+}
+
 }  // namespace
