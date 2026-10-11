@@ -276,6 +276,31 @@ void RegisterPackageTypedefs(CompilationUnit* unit, TypedefMap& typedefs,
   }
 }
 
+// §7.4.4 with §26.2: a package's array written on one of the package's own
+// typedef names that writes unpacked dimensions too, `mem_type ba [0:7]`
+// under `typedef bsix mem_type [0:3]`, has an array for its element, which
+// its type is marked as (DataType::names_unpacked_array) for the simulator,
+// which shapes a package's arrays from the items themselves
+// (PackageArrayShape in src/simulator/lowerer_package_data.cpp).
+static void MarkPackageStagedArrays(CompilationUnit* unit) {
+  for (auto* pkg : unit->packages) {
+    std::unordered_set<std::string_view> array_typedefs;
+    for (const auto* item : pkg->items) {
+      if (item->kind == ModuleItemKind::kTypedef &&
+          !item->unpacked_dims.empty())
+        array_typedefs.insert(item->name);
+    }
+    for (auto* item : pkg->items) {
+      if (item->kind == ModuleItemKind::kVarDecl &&
+          item->data_type.kind == DataTypeKind::kNamed &&
+          !item->unpacked_dims.empty() &&
+          array_typedefs.contains(item->data_type.type_name)) {
+        item->data_type.names_unpacked_array = true;
+      }
+    }
+  }
+}
+
 // Records each class's typedefs under their qualified key. §8.23 makes a type
 // declared inside a class scope public and reachable from outside the class,
 // through the class name. The reach over unit->classes is the one
@@ -472,6 +497,7 @@ void Elaborator::RegisterCuScopeItems() {
   RegisterPackageParams(unit_, cu_param_scope_, arena_);
   RegisterClassParams(unit_, cu_param_scope_, arena_, diag_);
   RegisterPackageTypedefs(unit_, typedefs_, arena_);
+  MarkPackageStagedArrays(unit_);
   RegisterClassTypedefs(unit_, typedefs_, arena_);
   // §13.3 with §7.2.1: after the two registrations above, which are what give
   // the table the "pkg::T" and "Class::T" names a formal's member may be

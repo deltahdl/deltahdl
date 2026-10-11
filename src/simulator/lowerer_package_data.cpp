@@ -301,6 +301,7 @@ static std::optional<RtlirVariable> PackageArrayShape(const ModuleItem* item,
   var.init_expr = init;
   var.dtype = &type;
   var.elem_type_kind = type.kind;
+  var.element.type_is_unpacked_array = type.names_unpacked_array;
   if (!FoldPackageArrayDims(item, pkg, var, ctx, arena)) return std::nullopt;
   return var;
 }

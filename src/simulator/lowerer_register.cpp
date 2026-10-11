@@ -281,6 +281,7 @@ static bool CreatePortArrayElements(std::string_view name,
   info.is_descending = dim.left > dim.right;
   info.is_4state = !PortDefaultsToZero(port);
   info.elem_type_kind = port.type_kind;
+  info.elem_type_is_unpacked_array = port.elem_type_is_unpacked_array;
   ctx.RegisterArray(name, info);
   for (uint32_t i = 0; i < info.size; ++i) {
     auto* key = arena.Create<std::string>(std::string(name) + "[" +

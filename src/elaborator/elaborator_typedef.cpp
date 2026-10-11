@@ -316,14 +316,22 @@ void Elaborator::ValidateCuTypedefs() {
 // it is made only where the declaration wrote no dimensions of its own, since
 // §7.4.4's staging puts the declaration's own dimensions outside the typedef's
 // and that is a shape this does not yet carry.
+//
+// A declaration that wrote dimensions of its own on such a name is marked
+// instead (DataType::names_unpacked_array), so that the simulator takes an
+// index past its element as the typedef's dimension rather than as a select
+// within a packed element, as RtlirElementShape::type_is_unpacked_array tells
+// it for the declaration among a module's items.
 void Elaborator::AdoptTypedefDimsInStmt(Stmt* s) {
   if (s == nullptr) return;
   if ((s->kind == StmtKind::kVarDecl || s->kind == StmtKind::kBlockItemDecl) &&
-      s->var_unpacked_dims.empty() &&
       s->var_decl_type.kind == DataTypeKind::kNamed) {
     auto dims = td_array_dims_.find(s->var_decl_type.type_name);
     auto base = typedefs_.find(s->var_decl_type.type_name);
-    if (dims != td_array_dims_.end() && base != typedefs_.end()) {
+    s->var_decl_type.names_unpacked_array =
+        dims != td_array_dims_.end() && !s->var_unpacked_dims.empty();
+    if (s->var_unpacked_dims.empty() && dims != td_array_dims_.end() &&
+        base != typedefs_.end()) {
       bool was_const = s->var_decl_type.is_const;
       s->var_decl_type = base->second;
       s->var_decl_type.is_const = was_const;

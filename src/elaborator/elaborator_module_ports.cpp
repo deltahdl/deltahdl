@@ -652,6 +652,13 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
     // reports through vpiLineNo and vpiFile.
     rp.loc = port.loc;
     FoldPortDefaultValue(arena_, param_scope, rp);
+    // §7.4.4: an array port written on a typedef name that writes unpacked
+    // dimensions of its own, `output mem_type ba [0:1]` under
+    // `typedef bsix mem_type [0:3]`, has arrays for its elements.
+    rp.elem_type_is_unpacked_array =
+        port.data_type.kind == DataTypeKind::kNamed &&
+        !port.unpacked_dims.empty() &&
+        td_array_dims_.contains(port.data_type.type_name);
 
     if (port.is_interface_port) {
       rp.is_interface_port = true;

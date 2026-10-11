@@ -84,7 +84,8 @@ TEST(MultidimensionalArraySimulation,
   // §7.4.4: unpacked dimensions may also be assembled in stages through a
   // typedef. mem_type is an array [0:3] of bsix; `mem_type ba [0:7]` prepends a
   // second unpacked range, so ba is addressed with two unpacked indices
-  // [0:7][0:3]. Distinct two-index elements hold independent 5-bit words.
+  // [0:7][0:3]. Distinct two-index elements hold independent 5-bit words, in
+  // a declaration among the module's items and in one inside a procedure.
   auto v = RunAndGet(
       "module t;\n"
       "  typedef bit [1:5] bsix;\n"
@@ -92,14 +93,16 @@ TEST(MultidimensionalArraySimulation,
       "  mem_type ba [0:7];\n"
       "  int result;\n"
       "  initial begin\n"
+      "    mem_type bb [0:1];\n"
       "    ba[0][0] = 5'd7;\n"
       "    ba[7][3] = 5'd9;\n"
       "    ba[0][3] = 5'd1;\n"
-      "    result = ba[0][0] + ba[7][3] + ba[0][3];\n"
+      "    bb[1][2] = 5'd4;\n"
+      "    result = ba[0][0] + ba[7][3] + ba[0][3] + bb[1][2] + bb[1][0];\n"
       "  end\n"
       "endmodule\n",
       "result");
-  EXPECT_EQ(v, 17u);
+  EXPECT_EQ(v, 21u);
 }
 
 TEST(MultidimensionalArraySimulation,

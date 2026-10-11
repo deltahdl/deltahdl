@@ -146,6 +146,13 @@ struct DataType {
   // kImplicit where none was written, as for a port §23.2.2.3 makes a net of
   // the default net type.
   DataTypeKind net_keyword = DataTypeKind::kImplicit;
+
+  // §7.4.4: set by the elaborator on the type of a declaration that writes
+  // unpacked dimensions of its own on a typedef name writing unpacked
+  // dimensions too, `mem_type ba [0:7]` under `typedef bsix mem_type [0:3]`,
+  // whose element is therefore an array, so that an index past the element is
+  // the typedef's dimension rather than a select within a packed element.
+  bool names_unpacked_array = false;
 };
 
 struct FunctionArg {

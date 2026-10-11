@@ -94,6 +94,7 @@ struct RtlirPort {
   const DataType* dtype = nullptr;
 
   bool is_var = false;
+  bool elem_type_is_unpacked_array = false;  // As RtlirElementShape's.
   // §23.2.2.3: the net type of a port the clause makes a net -- the net type
   // keyword the declaration wrote, or the default net type where it wrote
   // none, since an implicit data type declaration means a net unless var is
