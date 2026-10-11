@@ -18,6 +18,7 @@
 #include "elaborator/elaborator_items_params.h"
 #include "elaborator/global_clock_assertion_event.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/sensitivity.h"
 #include "elaborator/time_literal_scale.h"
 #include "elaborator/unit_scope_switch.h"
 #include "parser/ast_design.h"
@@ -241,7 +242,7 @@ void Elaborator::ResetItemElaborationState() {
   let_names_.clear();
   sequence_names_.clear();
   func_decls_.clear();
-  inference_funcs_.clear();
+  inference_funcs_ = InferenceFuncs{};
 }
 
 // Holds a snapshot of the per-module item-elaboration state. The constructor
@@ -584,7 +585,9 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   module_global_clocking_event_ = EnterGlobalClockingChain(
       global_clocking_scopes_, own_gclk, current_inst_path_, arena_);
 
+  module_decl_path_.push_back(decl);
   ElaborateItems(decl, mod);
+  module_decl_path_.pop_back();
   ResolveExplicitPortTypes(decl, mod, BuildParamScope(mod));
   module_global_clocking_event_ = saved_global_clocking_event;
   if (own_gclk != nullptr) global_clocking_scopes_.pop_back();

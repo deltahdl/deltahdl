@@ -695,17 +695,20 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
   }
 }
 
-// §9.2.2.2.1 with §8.23 and §23.6: an always_comb in `decl` may call a
-// class's static method or a child instance's function by a scoped name, and
-// what that function reads joins the inferred list as what a function called
-// by its bare name reads does.
-void Elaborator::BuildInferenceFuncs(const ModuleDecl* decl) {
-  inference_funcs_ = WithScopedCallFunctions(
-      func_decls_, decl->items, unit_->classes,
+// §9.2.2.2.1 with §8.23, §23.6 and §23.8: a procedure may call a class's
+// static method or a function a hierarchical path reaches by a scoped name,
+// and what that function reads joins the inferred list as what a function
+// called by its bare name reads does, the function entered in the table the
+// inference reads (AddScopedCallFunctions) from the chain of modules being
+// elaborated.
+void Elaborator::AddInferenceCallees(const Stmt* body) {
+  const CompilationUnit& unit = *unit_;
+  const std::function<const ModuleDecl*(std::string_view)> kFind =
       [this](std::string_view name) -> const ModuleDecl* {
-        return FindModuleInScope(name);
-      },
-      arena_);
+    return FindModuleInScope(name);
+  };
+  AddScopedCallFunctions(body, {module_decl_path_, unit, kFind}, arena_,
+                         inference_funcs_);
 }
 
 // §16.14.6: the concurrent assertions the procedure embeds take their clock
@@ -735,6 +738,7 @@ void Elaborator::AddProcedure(ModuleItem* item, RtlirModule* mod,
     sites.push_back({site.stmt, ScopedName(inst->inst_name)});
   }
   bool infers = kind != RtlirProcessKind::kInitial;
+  if (infers) AddInferenceCallees(item->body);
   const ProcessBuildEnv kEnv{
       arena_, diag_, infers ? &inference_funcs_ : nullptr,
       infers ? &const_names_ : nullptr, module_global_clocking_event_};

@@ -465,7 +465,7 @@ ExecTask ExecEventControl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     // frame. `exclude_written` is false because @* (unlike always_comb) still
     // lists a signal that is both read and written.
     std::vector<EventExpr> implicit_events = InferSensitivity(
-        stmt->body, arena, /*funcs=*/nullptr, /*exclude_written=*/false);
+        stmt->body, arena, /*calls=*/nullptr, /*exclude_written=*/false);
     if (!implicit_events.empty()) {
       co_await EventAwaiter{ctx, implicit_events, arena};
       ctx.FlushPendingViolations();

@@ -1,5 +1,6 @@
 #include "elaborator/sensitivity.h"
 
+#include <cstddef>
 #include <functional>
 #include <string>
 #include <unordered_set>
@@ -8,8 +9,10 @@
 
 #include "common/arena.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast_class.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -293,8 +296,9 @@ static void CollectBlockLocalNames(const Stmt* stmt,
 // The key a call's function stands under in the FuncMap, the path of names
 // its callee spells: `f`; the "p::f" RecordPackageFuncNames
 // (elaborator_items_udp.cpp) enters a package's function under (§26.3); and
-// the "C::f" and "s.f" WithScopedCallFunctions enters a class's static method
-// and a child instance's function under (§8.23, §23.6). A callee that is no
+// the "C::f", "p::C::f" and "s.t.f" AddScopedCallFunctions enters a class's
+// static method and a function a hierarchical path reaches under (§8.23,
+// §23.6). A callee that is no
 // such path, and a call with no callee node, a constructor's `new`, spell an
 // empty key the table holds nothing under.
 static std::string CalledFunctionKey(const Expr& call) {
@@ -368,23 +372,53 @@ static std::string_view ScopeOf(std::string_view key, const ModuleItem* func,
   return {};
 }
 
-// The FuncMap entry a call `name` in the body of a function of the scope
-// `scope` reaches: the scope's own function of that name first, the "p::h" a
-// bare h(x) inside a function of the package p names (§26.3), and likewise a
-// class's static method or an instance's function, and then the name as
-// written.
-static FuncMap::const_iterator FindCalledFunction(const FuncMap& funcs,
-                                                  std::string_view scope,
-                                                  const std::string& name) {
-  auto it = funcs.find(std::string(scope) + name);
-  return it != funcs.end() ? it : funcs.find(name);
+// The scope enclosing the class scope `scope`: "p::" of "p::C::", the scope
+// of a class the package p declares (§26.3). Empty for a class the module or
+// the compilation unit declares, "C::", whose enclosing names are spelled
+// bare, and for a package's "p::" and an instance's "s.", which a function of
+// theirs sees past only to the names spelled bare.
+static std::string_view EnclosingScope(std::string_view scope) {
+  if (!scope.ends_with("::")) return {};
+  auto pos = scope.rfind("::", scope.size() - 3);
+  return pos == std::string_view::npos ? std::string_view{}
+                                       : scope.substr(0, pos + 2);
+}
+
+// A function a call reaches: the key the table holds it under and its
+// declaration, the declaration null where the call reaches none.
+using FoundFunction = std::pair<std::string_view, const ModuleItem*>;
+
+// Asked for a scoped key the table does not hold: enters in the table the
+// function the key names and answers it, or answers no declaration.
+using MissedKeyHandler = std::function<FoundFunction(const std::string& key)>;
+
+// The function a call `name` in the body of a function of the scope `scope`
+// reaches: the scope's own function of that name first, the "p::h" a bare h(x)
+// inside a function of the package p names (§26.3), and likewise a class's
+// static method or an instance's function; then the same from each scope
+// enclosing it, and last the name as written. A scoped key the table does not
+// hold is handed in its turn to `on_miss`, where there is one.
+static FoundFunction FindCalledFunction(const FuncMap& funcs,
+                                        std::string_view scope,
+                                        const std::string& name,
+                                        const MissedKeyHandler& on_miss) {
+  for (;; scope = EnclosingScope(scope)) {
+    const std::string kKey = std::string(scope) + name;
+    auto it = funcs.find(kKey);
+    if (it != funcs.end()) return *it;
+    if (on_miss && kKey.find_first_of(".:") != std::string::npos) {
+      FoundFunction found = on_miss(kKey);
+      if (found.second != nullptr) return found;
+    }
+    if (scope.empty()) return {};
+  }
 }
 
 // The keys of every function the block calls, directly or through the
 // functions it calls, each call inside a function looked up from that
 // function's scope.
 static std::unordered_set<std::string_view> ResolveCalledFunctions(
-    const Stmt* body, const FuncMap& funcs) {
+    const Stmt* body, const FuncMap& funcs, const MissedKeyHandler& on_miss) {
   std::unordered_set<std::string_view> visited;
   std::unordered_set<std::string> names;
   CollectCallNamesFromStmt(body, names);
@@ -394,13 +428,13 @@ static std::unordered_set<std::string_view> ResolveCalledFunctions(
   while (!pending.empty()) {
     auto [scope, name] = std::move(pending.back());
     pending.pop_back();
-    auto it = FindCalledFunction(funcs, scope, name);
-    if (it == funcs.end() || !visited.insert(it->first).second) continue;
+    auto [key, func] = FindCalledFunction(funcs, scope, name, on_miss);
+    if (func == nullptr || !visited.insert(key).second) continue;
     std::unordered_set<std::string> inner;
-    for (auto* s : it->second->func_body_stmts) {
+    for (auto* s : func->func_body_stmts) {
       CollectCallNamesFromStmt(s, inner);
     }
-    const std::string kScope(ScopeOf(it->first, it->second, funcs));
+    const std::string kScope(ScopeOf(key, func, funcs));
     for (const auto& callee : inner) pending.emplace_back(kScope, callee);
   }
   return visited;
@@ -482,35 +516,48 @@ struct SignalSets {
 // simulator holds it under (EmitSignalEvent); taken bare, `g` of `p::f` named
 // nothing in the module and a write of p::g never re-ran the block. A name
 // already written through a package's or a class's scope, `p::g`, is kept as
-// written.
-static void MergeNamesOfScope(std::string_view scope,
-                              const std::unordered_set<std::string>& names,
-                              std::unordered_set<std::string>& out) {
+// written. A class's static method takes the class's prefix only for the
+// names `class_names` says the class declares; any other name it reads is
+// one of the scope enclosing the class (§23.9), the module's `ext` read from
+// C::f staying `ext`, which `C::ext` designated nothing in place of.
+static void MergeNamesOfScope(
+    std::string_view scope,
+    const std::unordered_set<std::string_view>* class_names,
+    const std::unordered_set<std::string>& names,
+    std::unordered_set<std::string>& out) {
   for (const auto& name : names) {
-    const bool kScoped = name.find("::") != std::string::npos;
-    out.insert(kScoped ? name : std::string(scope) + name);
+    if (name.find("::") != std::string::npos) {
+      out.insert(name);
+      continue;
+    }
+    const bool kOwn =
+        class_names == nullptr || class_names->count(BaseSignalName(name)) != 0;
+    out.insert(std::string(kOwn ? scope : EnclosingScope(scope)) + name);
   }
 }
 
-static void MergeCalledFunctionSignals(const Stmt* body, const FuncMap& funcs,
+static void MergeCalledFunctionSignals(const Stmt* body,
+                                       const InferenceFuncs& calls,
                                        bool exclude_written, SignalSets& sigs) {
-  auto called = ResolveCalledFunctions(body, funcs);
+  auto called = ResolveCalledFunctions(body, calls.funcs, {});
   for (auto& fname : called) {
-    const auto* func = funcs.at(fname);
-    const std::string_view kScope = ScopeOf(fname, func, funcs);
+    const auto* func = calls.funcs.at(fname);
+    const std::string_view kScope = ScopeOf(fname, func, calls.funcs);
+    auto cls = calls.class_names.find(kScope);
+    const auto* own = cls == calls.class_names.end() ? nullptr : &cls->second;
     std::unordered_set<std::string> func_locals;
     MergeOneCalledFunctionLocals(func, func_locals);
     std::unordered_set<std::string> func_reads;
     MergeOneCalledFunctionReads(func, func_reads);
     std::unordered_set<std::string> kept;
     MergeNamesNotLocalTo(func_reads, func_locals, kept);
-    MergeNamesOfScope(kScope, kept, sigs.reads);
+    MergeNamesOfScope(kScope, own, kept, sigs.reads);
     if (exclude_written) {
       std::unordered_set<std::string> func_written;
       MergeOneCalledFunctionWritten(func, func_written);
       kept.clear();
       MergeNamesNotLocalTo(func_written, func_locals, kept);
-      MergeNamesOfScope(kScope, kept, sigs.written);
+      MergeNamesOfScope(kScope, own, kept, sigs.written);
     }
   }
 }
@@ -582,7 +629,8 @@ static std::vector<EventExpr> BuildSensitivityEvents(
 }
 
 std::vector<EventExpr> InferSensitivity(
-    const Stmt* body, Arena& arena, const FuncMap* funcs, bool exclude_written,
+    const Stmt* body, Arena& arena, const InferenceFuncs* calls,
+    bool exclude_written,
     const std::unordered_set<std::string_view>* const_names) {
   SignalSets sigs;
   CollectStmtReads(body, sigs.reads);
@@ -591,49 +639,148 @@ std::vector<EventExpr> InferSensitivity(
     CollectWrittenNames(body, sigs.written);
   }
 
-  if (funcs && !funcs->empty()) {
-    MergeCalledFunctionSignals(body, *funcs, exclude_written, sigs);
+  if (calls && !calls->funcs.empty()) {
+    MergeCalledFunctionSignals(body, *calls, exclude_written, sigs);
   }
 
   return BuildSensitivityEvents(sigs, exclude_written, const_names, arena);
 }
 
-// Enters each static function `cls` declares under the "C::f" its call
-// through the class scope spells (§8.23).
-static void AddStaticMethods(const ClassDecl& cls, Arena& arena,
-                             FuncMap& funcs) {
+// Enters each static function `cls` declares under the key its call through
+// the class's scope spells, the class's own prefix "C::" or, for a class the
+// package p declares, "p::C::" (§8.23, §26.3), and records under that prefix
+// every property the class and the classes it extends declare (§8.13), the
+// names its methods read as the class's own (MergeNamesOfScope).
+static void AddClassScope(const ClassDecl& cls, std::string_view package,
+                          const CompilationUnit& unit, Arena& arena,
+                          InferenceFuncs& calls) {
+  const std::string_view kScope = *arena.Create<std::string>(
+      std::string(package) + std::string(cls.name) + "::");
+  auto& names = calls.class_names[kScope];
+  for (const ClassDecl* c = &cls; c != nullptr; c = FindBaseClass(c, &unit)) {
+    for (const ClassMember* m : c->members) {
+      if (m->kind == ClassMemberKind::kProperty) names.insert(m->name);
+    }
+  }
   for (const ClassMember* m : cls.members) {
     const ModuleItem* method = m->method;
     if (method == nullptr || !method->is_static_method ||
         method->kind != ModuleItemKind::kFunctionDecl) {
       continue;
     }
-    funcs[*arena.Create<std::string>(
-        std::string(cls.name) + "::" + std::string(method->name))] = method;
+    calls.funcs[*arena.Create<std::string>(std::string(kScope) +
+                                           std::string(method->name))] = method;
   }
 }
 
-FuncMap WithScopedCallFunctions(
-    const FuncMap& funcs, const std::vector<ModuleItem*>& items,
-    const std::vector<ClassDecl*>& unit_classes,
-    const std::function<const ModuleDecl*(std::string_view)>& find_module,
-    Arena& arena) {
-  FuncMap out = funcs;
-  for (const ClassDecl* cls : unit_classes) AddStaticMethods(*cls, arena, out);
+// The class `name` among the class items of `items`, or null.
+static const ClassDecl* ClassAmong(const std::vector<ModuleItem*>& items,
+                                   std::string_view name) {
   for (const ModuleItem* item : items) {
-    if (item->kind == ModuleItemKind::kClassDecl) {
-      AddStaticMethods(*item->class_decl, arena, out);
-    }
-    if (item->kind != ModuleItemKind::kModuleInst) continue;
-    const ModuleDecl* decl = find_module(item->inst_module);
-    if (decl == nullptr) continue;
-    for (const ModuleItem* sub : decl->items) {
-      if (sub->kind != ModuleItemKind::kFunctionDecl) continue;
-      out[*arena.Create<std::string>(std::string(item->inst_name) + "." +
-                                     std::string(sub->name))] = sub;
+    if (item->kind == ModuleItemKind::kClassDecl &&
+        item->class_decl->name == name) {
+      return item->class_decl;
     }
   }
-  return out;
+  return nullptr;
+}
+
+// Enters the class a call key "C::f" or "p::C::f" goes through (AddClassScope):
+// the package p's class C, or else the class C a module of `site`'s chain
+// declares, innermost first, or the compilation unit's.
+static void EnterClassOfKey(std::string_view key, const ScopedCallSite& site,
+                            Arena& arena, InferenceFuncs& calls) {
+  std::string_view scope = key.substr(0, key.rfind("::"));
+  auto sep = scope.rfind("::");
+  if (sep != std::string_view::npos) {
+    for (const PackageDecl* pkg : site.unit.packages) {
+      const ClassDecl* cls = ClassAmong(pkg->items, scope.substr(sep + 2));
+      if (cls != nullptr && pkg->name == scope.substr(0, sep)) {
+        AddClassScope(*cls, scope.substr(0, sep + 2), site.unit, arena, calls);
+      }
+    }
+    return;
+  }
+  for (auto it = site.decl_path.rbegin(); it != site.decl_path.rend(); ++it) {
+    if (const ClassDecl* cls = ClassAmong((*it)->items, scope)) {
+      AddClassScope(*cls, "", site.unit, arena, calls);
+      return;
+    }
+  }
+  for (const ClassDecl* cls : site.unit.classes) {
+    if (cls->name == scope) AddClassScope(*cls, "", site.unit, arena, calls);
+  }
+}
+
+// The module the instance `inst` of `decl` instantiates, or null.
+static const ModuleDecl* InstanceModule(const ModuleDecl& decl,
+                                        std::string_view inst,
+                                        const ScopedCallSite& site) {
+  for (const ModuleItem* item : decl.items) {
+    if (item->kind == ModuleItemKind::kModuleInst && item->inst_name == inst) {
+      return site.find_module(item->inst_module);
+    }
+  }
+  return nullptr;
+}
+
+// The function the steps of `path` from `first` on name below `decl`: each
+// step but the last an instance, the last a function of the module the steps
+// before it reach (§23.6); null where a step names none.
+static const ModuleItem* FunctionBelow(
+    const ModuleDecl* decl, const std::vector<std::string_view>& path,
+    size_t first, const ScopedCallSite& site) {
+  for (size_t i = first; i + 1 < path.size(); ++i) {
+    decl = InstanceModule(*decl, path[i], site);
+    if (decl == nullptr) return nullptr;
+  }
+  for (const ModuleItem* item : decl->items) {
+    if (item->kind == ModuleItemKind::kFunctionDecl &&
+        item->name == path.back()) {
+      return item;
+    }
+  }
+  return nullptr;
+}
+
+// The function the dotted key "s.t.f" names, searched from the block's module
+// out through each module enclosing it (§23.8): from each, first as a
+// downward path whose first step is an instance the module declares, then as
+// one whose first step is the module's own name, `top.s.f` or `mid.f`.
+static const ModuleItem* FunctionOfPath(std::string_view key,
+                                        const ScopedCallSite& site) {
+  std::vector<std::string_view> path;
+  for (size_t start = 0;;) {
+    auto dot = key.find('.', start);
+    path.push_back(key.substr(start, dot - start));
+    if (dot == std::string_view::npos) break;
+    start = dot + 1;
+  }
+  for (auto it = site.decl_path.rbegin(); it != site.decl_path.rend(); ++it) {
+    if (const ModuleItem* func = FunctionBelow(*it, path, 0, site)) return func;
+    const size_t kOwnName = path.front() == (*it)->name ? 1 : 0;
+    if (const ModuleItem* func = FunctionBelow(*it, path, kOwnName, site)) {
+      return func;
+    }
+  }
+  return nullptr;
+}
+
+void AddScopedCallFunctions(const Stmt* body, const ScopedCallSite& site,
+                            Arena& arena, InferenceFuncs& calls) {
+  auto enter = [&](const std::string& key) -> FoundFunction {
+    if (key.find('.') == std::string::npos) {
+      EnterClassOfKey(key, site, arena, calls);
+      auto it = calls.funcs.find(key);
+      return it == calls.funcs.end() ? FoundFunction{} : *it;
+    }
+    const ModuleItem* func = FunctionOfPath(key, site);
+    if (func == nullptr) return {};
+    std::string_view stored = *arena.Create<std::string>(key);
+    calls.funcs[stored] = func;
+    return {stored, func};
+  };
+  ResolveCalledFunctions(body, calls.funcs, enter);
 }
 
 }  // namespace delta

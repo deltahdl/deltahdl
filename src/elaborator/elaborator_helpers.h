@@ -29,6 +29,7 @@ namespace delta {
 class Arena;
 class DiagEngine;
 struct ClassDecl;
+struct InferenceFuncs;
 struct RtlirModule;
 struct RtlirParamDecl;
 
@@ -101,8 +102,7 @@ RtlirProcessKind MapAlwaysKind(AlwaysKind ak);
 struct ProcessBuildEnv {
   Arena& arena;
   DiagEngine& diag;
-  const std::unordered_map<std::string_view, const ModuleItem*>* func_map =
-      nullptr;
+  const InferenceFuncs* func_map = nullptr;
   // §9.2.2.2.1: names that are elaboration-time constants (parameters,
   // localparams, specparams) so the inferred sensitivity list can drop them --
   // only nets and variables belong in the list.

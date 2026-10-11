@@ -7,6 +7,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/unit_scope_order.h"
 #include "parser/ast_class.h"
@@ -171,8 +172,8 @@ void Elaborator::ApplyBodyImport(const ImportItem& import_item) {
                class_names_, parameterized_class_names_, func_decls_});
   // §9.2.2.2.1: a function the import brings in is one an always_comb below it
   // may call, and the table the inference reads was filled ahead of the walk
-  // (BuildInferenceFuncs).
-  inference_funcs_.insert(func_decls_.begin(), func_decls_.end());
+  // (ElaborateItems).
+  inference_funcs_.funcs.insert(func_decls_.begin(), func_decls_.end());
 }
 
 }  // namespace delta

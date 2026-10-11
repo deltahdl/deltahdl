@@ -23,6 +23,7 @@
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
+#include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
@@ -388,8 +389,12 @@ class ElaboratorData {
 
   std::unordered_map<std::string_view, const ModuleItem*> func_decls_;
   // §9.2.2.2.1: func_decls_ and the functions a call by a scoped name reaches
-  // besides (WithScopedCallFunctions), read only to infer a sensitivity list.
-  std::unordered_map<std::string_view, const ModuleItem*> inference_funcs_;
+  // besides (AddScopedCallFunctions), read only to infer a sensitivity list.
+  InferenceFuncs inference_funcs_;
+  // §23.8: the declarations of the modules being elaborated, outermost first
+  // and the one whose items are being elaborated last, which an upward or
+  // downward path a procedure calls a function by is resolved through.
+  std::vector<const ModuleDecl*> module_decl_path_;
   // §6.14 with §35.5.5: the functions of the module declared to return a
   // chandle, native and imported, whose call is a chandle for the assignment
   // rules ValidateChandleOps holds; filled by it for each module.

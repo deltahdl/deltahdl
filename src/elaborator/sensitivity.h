@@ -14,10 +14,22 @@ struct Stmt;
 struct EventExpr;
 struct ModuleItem;
 struct ModuleDecl;
-struct ClassDecl;
+struct CompilationUnit;
 class Arena;
 
 using FuncMap = std::unordered_map<std::string_view, const ModuleItem*>;
+
+// §9.2.2.2.1: the functions an always_comb or always_latch may call, under the
+// keys its calls spell, a bare "f", a package's "p::f", a class's static
+// "C::f" or "p::C::f", an instance's "s.t.f" (AddScopedCallFunctions). Each
+// class whose static methods `funcs` holds is listed in `class_names` under
+// the scope prefix its keys carry, "C::" or "p::C::", with every property the
+// class and the classes it extends declare.
+struct InferenceFuncs {
+  FuncMap funcs;
+  std::unordered_map<std::string_view, std::unordered_set<std::string_view>>
+      class_names;
+};
 
 void CollectExprReads(const Expr* expr, std::unordered_set<std::string>& out);
 
@@ -48,21 +60,29 @@ void CollectWrittenNames(const Stmt* stmt,
 // constant select index -- is excluded from the list, since a constant can
 // never change to trigger the process.
 std::vector<EventExpr> InferSensitivity(
-    const Stmt* body, Arena& arena, const FuncMap* funcs = nullptr,
+    const Stmt* body, Arena& arena, const InferenceFuncs* calls = nullptr,
     bool exclude_written = true,
     const std::unordered_set<std::string_view>* const_names = nullptr);
 
-// §9.2.2.2.1 with §8.23 and §23.6: `funcs` and, besides, the functions an
-// always_comb in a module holding `items` may call by a scoped name, each under
-// the key its call spells: every static function of a class `items` or the
-// compilation unit (`unit_classes`) declares under "C::f", and every function
-// of the module `find_module` finds for an instance `items` declares under
-// "s.f", the instance's name. Only the inference reads the result; the
-// elaborator's own function table stays as it is for every other rule.
-FuncMap WithScopedCallFunctions(
-    const FuncMap& funcs, const std::vector<ModuleItem*>& items,
-    const std::vector<ClassDecl*>& unit_classes,
-    const std::function<const ModuleDecl*(std::string_view)>& find_module,
-    Arena& arena);
+// Where the block whose calls AddScopedCallFunctions resolves stands: the
+// module declarations being elaborated, outermost first and the block's own
+// last, the compilation unit, and the lookup of the module an instance names.
+struct ScopedCallSite {
+  const std::vector<const ModuleDecl*>& decl_path;
+  const CompilationUnit& unit;
+  const std::function<const ModuleDecl*(std::string_view)>& find_module;
+};
+
+// §9.2.2.2.1 with §8.23, §23.6, §23.8 and §26.3: enters in `calls` every
+// function `body` calls, directly or through the functions it calls, by a
+// scoped name `calls` does not yet hold, under the key the call spells: a
+// static method of a class a module of the chain, a package or the
+// compilation unit declares, "C::f" or "p::C::f", and a function a dotted
+// path reaches, searched from the block's module and then from each module
+// enclosing it, its first step an instance of that module or the module's own
+// name. Only the inference reads the result; the elaborator's own function
+// table stays as it is for every other rule.
+void AddScopedCallFunctions(const Stmt* body, const ScopedCallSite& site,
+                            Arena& arena, InferenceFuncs& calls);
 
 }  // namespace delta

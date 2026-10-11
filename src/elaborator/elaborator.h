@@ -223,9 +223,9 @@ class Elaborator : public ElaboratorClassRules {
   bool ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod);
   // §16.14.6, §17.3: a procedure's process, its assertions and checkers first.
   void AddProcedure(ModuleItem* item, RtlirModule* mod, RtlirProcessKind kind);
-  // §9.2.2.2.1: the functions an always_comb in `decl` may call, fills
-  // inference_funcs_.
-  void BuildInferenceFuncs(const ModuleDecl* decl);
+  // §9.2.2.2.1: enters in inference_funcs_ the functions `body` calls by a
+  // scoped name.
+  void AddInferenceCallees(const Stmt* body);
   void ResolveStaticAssertionClock(ModuleItem* item,
                                    const std::vector<EventExpr>& default_clock);
   // Third-level dispatch for the §16 assertion/sequence/property/clocking
