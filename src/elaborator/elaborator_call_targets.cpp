@@ -501,8 +501,9 @@ void ReportNoBuiltInMethod(const Expr& access, const DataScope& scope,
   const bool kString = kKind == DataTypeKind::kString;
   if (!kString && kKind != DataTypeKind::kEnum) return;
   const std::string_view kName = access.rhs->text;
-  const std::span<const std::string_view> kMethods =
-      kString ? std::span(kStringMethods) : std::span(kEnumMethods);
+  using Methods = std::span<const std::string_view>;
+  const Methods kMethods =
+      kString ? Methods(kStringMethods) : Methods(kEnumMethods);
   if (std::ranges::find(kMethods, kName) != kMethods.end() ||
       (!kString && kName == "rand_mode" && scope.Property(root.text) == var)) {
     return;
