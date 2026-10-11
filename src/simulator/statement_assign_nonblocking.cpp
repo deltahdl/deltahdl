@@ -208,6 +208,14 @@ static bool UpdateTimeReachable(uint64_t delay_ticks, const SimContext& ctx) {
          std::numeric_limits<uint64_t>::max() - ctx.CurrentTime().ticks;
 }
 
+// The ticks the intra-assignment delay of `stmt` puts its update after the
+// present; 0 where it writes none.
+static uint64_t IntraAssignDelayTicks(const Stmt* stmt, SimContext& ctx,
+                                      Arena& arena) {
+  if (!stmt->delay) return 0;
+  return DelayValueToTicks(EvalExpr(stmt->delay, ctx, arena), ctx);
+}
+
 static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier || !stmt->rhs)
     return false;
@@ -231,13 +239,10 @@ static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   }
   SampleConcatElements(elems, arena);
 
-  uint64_t delay = 0;
-  if (stmt->delay) {
-    delay = DelayValueToTicks(EvalExpr(stmt->delay, ctx, arena), ctx);
-  }
-  if (!UpdateTimeReachable(delay, ctx)) return true;
+  const uint64_t kDelay = IntraAssignDelayTicks(stmt, ctx, arena);
+  if (!UpdateTimeReachable(kDelay, ctx)) return true;
   auto nba_region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
-  NbaScheduleSlot slot{ctx.CurrentTime() + SimTime{delay}, nba_region, ctx,
+  NbaScheduleSlot slot{ctx.CurrentTime() + SimTime{kDelay}, nba_region, ctx,
                        arena};
 
   if (ainfo) {
@@ -351,12 +356,9 @@ StmtResult ExecNonblockingAssignImpl(const Stmt* stmt, SimContext& ctx,
   if (TryArrayConcatNba(stmt, ctx, arena)) return StmtResult::kDone;
 
   NbaSample sample = SampleNonblockingRhs(stmt, ctx, arena);
-  uint64_t delay = 0;
-  if (stmt->delay) {
-    delay = DelayValueToTicks(EvalExpr(stmt->delay, ctx, arena), ctx);
-  }
-  if (!UpdateTimeReachable(delay, ctx)) return StmtResult::kDone;
-  ScheduleNonblockingAssign(stmt, sample, delay, ctx, arena);
+  const uint64_t kDelay = IntraAssignDelayTicks(stmt, ctx, arena);
+  if (!UpdateTimeReachable(kDelay, ctx)) return StmtResult::kDone;
+  ScheduleNonblockingAssign(stmt, sample, kDelay, ctx, arena);
   return StmtResult::kDone;
 }
 
