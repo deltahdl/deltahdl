@@ -241,4 +241,27 @@ TEST(DottedNameResolution, DottedNameReadsTheStaticLocalTheCallsKeep) {
             "1 2 2\n6 6\n");
 }
 
+// §23.7 with §6.21: a static local written with no initializer is not made
+// before the procedures start as one with an initializer is (§10.5), so
+// `f.x = 4` ahead of any call makes it in the function's static frame, where
+// the call then reads it.
+TEST(DottedNameResolution, DottedNameWritesAStaticLocalNoCallHasMade) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  function int f();\n"
+                       "    static int x;\n"
+                       "    return x;\n"
+                       "  endfunction\n"
+                       "endpackage\n"
+                       "module top;\n"
+                       "  import p::*;\n"
+                       "  initial begin\n"
+                       "    f.x = 4;\n"
+                       "    #1 $display(\"%0d\", f());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "4\n");
+}
+
 }  // namespace
