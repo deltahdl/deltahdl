@@ -441,7 +441,7 @@ TEST(ClassAssignRenameSim, E2eDeclInitShallowCopyCopiesProperties) {
       "    C c1;\n"
       "    c1 = new;\n"
       "    c1.x = 55;\n"
-      "    static C c2 = new c1;\n"
+      "    automatic C c2 = new c1;\n"
       "    result = c2.x;\n"
       "  end\n"
       "endmodule\n",
@@ -559,7 +559,7 @@ TEST(ClassAssignRenameSim, E2eDeclInitHandleAssignmentAliasesObject) {
       "    C p1;\n"
       "    p1 = new;\n"
       "    p1.x = 33;\n"
-      "    static C p2 = p1;\n"
+      "    automatic C p2 = p1;\n"
       "    p2.x = 77;\n"
       "    result = p1.x;\n"
       "  end\n"

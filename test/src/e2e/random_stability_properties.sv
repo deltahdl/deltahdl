@@ -110,13 +110,13 @@ module random_stability_properties;
     p.srandom(44);
     fork
       begin
-        static Packet o = new;
+        automatic Packet o = new;
         k = o.randomize();
         m1[0] = o.payload;
         m1[1] = $urandom;
       end
       begin
-        static Packet o = new;
+        automatic Packet o = new;
         k = o.randomize();
         m1[2] = o.payload;
         m1[3] = $urandom;
@@ -125,13 +125,13 @@ module random_stability_properties;
     p.srandom(44);
     fork
       begin
-        static Packet o = new;
+        automatic Packet o = new;
         k = o.randomize();
         m2[0] = o.payload;
         m2[1] = $urandom;
       end
       begin
-        static Packet o = new;
+        automatic Packet o = new;
         k = o.randomize();
         m2[2] = o.payload;
         m2[3] = $urandom;
