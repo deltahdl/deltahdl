@@ -547,4 +547,25 @@ TEST(ContAssignSim, ReEvaluatedWhenAStaticClassPropertyItReadsChanges) {
   EXPECT_EQ(v, 62u);
 }
 
+// §10.3.2 with §26.3: a package's variable read through the package scope is
+// an operand of the continuous assignment too, which is evaluated again when
+// the variable is written.
+TEST(ContAssignSim, ReEvaluatedWhenAPackageVariableItReadsChanges) {
+  auto v = RunAndGet(
+      "package p;\n"
+      "  int g = 70;\n"
+      "endpackage\n"
+      "module t;\n"
+      "  wire [31:0] w;\n"
+      "  int result;\n"
+      "  assign w = p::g + 1;\n"
+      "  initial begin\n"
+      "    #1 p::g = 5;\n"
+      "    #1 result = w;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(v, 6u);
+}
+
 }  // namespace

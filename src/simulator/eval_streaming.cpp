@@ -693,7 +693,7 @@ static std::vector<const Expr*> ArrayPatternItems(const Expr* pattern,
                                                   Arena& arena) {
   std::vector<const Expr*> items;
   for (const Expr* e : pattern->elements) {
-    if (e->kind != ExprKind::kReplicate || e->repeat_count == nullptr) {
+    if (!e->is_pattern_replication) {
       items.push_back(e);
       continue;
     }
@@ -854,7 +854,7 @@ static std::vector<const Expr*> PatternItems(const Expr* expr, SimContext& ctx,
                                              Arena& arena) {
   const Expr* rep = expr;
   if (expr->repeat_count == nullptr && expr->elements.size() == 1 &&
-      expr->elements[0]->kind == ExprKind::kReplicate) {
+      expr->elements[0]->is_pattern_replication) {
     rep = expr->elements[0];
   }
   if (rep->repeat_count == nullptr) {

@@ -234,7 +234,7 @@ struct MultiDimArray {
 static const std::vector<Expr*>* ReplicateBody(const Expr* pat) {
   if (!pat->pattern_keys.empty()) return nullptr;
   if (pat->elements.size() != 1) return nullptr;
-  if (pat->elements[0]->kind != ExprKind::kReplicate) return nullptr;
+  if (!pat->elements[0]->is_pattern_replication) return nullptr;
   const auto& body = pat->elements[0]->elements;
   return body.empty() ? nullptr : &body;
 }
@@ -431,7 +431,7 @@ static void FillArrayElement(const RtlirVariable& var, uint32_t i,
                              Arena& arena) {
   bool named = var.init_expr && !var.init_expr->pattern_keys.empty();
   bool replicate = var.init_expr && var.init_expr->elements.size() == 1 &&
-                   var.init_expr->elements[0]->kind == ExprKind::kReplicate;
+                   var.init_expr->elements[0]->is_pattern_replication;
   uint32_t idx = static_cast<uint32_t>(var.unpacked_lo) + i;
   uint32_t pat_idx = var.is_descending ? (var.unpacked_size - 1 - i) : i;
   if (named) {

@@ -632,7 +632,7 @@ static bool PatternItemCount(const Expr* rhs, SimContext& ctx, Arena& arena,
                              uint32_t& out) {
   if (!rhs->pattern_keys.empty()) return false;
   out = static_cast<uint32_t>(rhs->elements.size());
-  if (out != 1 || rhs->elements[0]->kind != ExprKind::kReplicate) return true;
+  if (out != 1 || !rhs->elements[0]->is_pattern_replication) return true;
   const Expr* rep = rhs->elements[0];
   Logic4Vec count = EvalExpr(rep->repeat_count, ctx, arena);
   if (!count.IsKnown()) return false;

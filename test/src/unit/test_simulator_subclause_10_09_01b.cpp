@@ -172,4 +172,92 @@ TEST(ArrayLiteralSim, APatternFillsASubarrayOfAClassProperty) {
   EXPECT_EQ(out, "4 5 6 7 8 9\n");
 }
 
+// §10.9.1 with §11.4.12.1: a pattern whose one item is a concatenation
+// replication, `'{ {2{8'h12}} }`, lists one value, 16'h1212, and not the
+// replication form `'{2{8'h12}}`, whose items fill a whole dimension. So a
+// declaration's one-element array holds 1212, and the inner pattern of a
+// two-dimensional one fills its one element with 3434; read as the
+// replication form, each held its item alone, 0012 and 0034.
+TEST(ArrayLiteralSim, AConcatenationReplicationItemInitializesOneElement) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  logic [15:0] a [1] = '{ {2{8'h12}} };\n"
+      "  logic [15:0] m [2][1] = '{ '{ {2{8'h34}} }, '{16'h5678} };\n"
+      "  initial $display(\"%h %h %h\", a[0], m[0][0], m[1][0]);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1212 3434 5678\n");
+}
+
+// §10.9.1 with §11.4.12.1: the same patterns assigned in a procedure give
+// the same one value per element.
+TEST(ArrayLiteralSim, AConcatenationReplicationItemAssignsOneElement) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  logic [15:0] a [1];\n"
+      "  logic [15:0] m [2][1];\n"
+      "  initial begin\n"
+      "    a = '{ {2{8'h12}} };\n"
+      "    m = '{ '{ {2{8'h34}} }, '{16'h5678} };\n"
+      "    $display(\"%h %h %h\", a[0], m[0][0], m[1][0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1212 3434 5678\n");
+}
+
+// §10.9.1 with §7.5: a dynamic array assigned a pattern of one concatenation
+// replication item takes one element, not the two the replication form
+// `'{2{8'h12}}` would give it.
+TEST(ArrayLiteralSim, AConcatenationReplicationItemSizesADynamicArrayToOne) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  class P; logic [15:0] d[]; endclass\n"
+      "  P p;\n"
+      "  initial begin\n"
+      "    p = new;\n"
+      "    p.d = '{ {2{8'h12}} };\n"
+      "    $display(\"%0d %h\", p.d.size(), p.d[0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1212\n");
+}
+
+// §11.4.5 with §10.9.1: an array compared with a pattern of one
+// concatenation replication item is compared with that one value, so the
+// one-element array holding 1212 equals it.
+TEST(ArrayLiteralSim, AnArrayEqualsAConcatenationReplicationItem) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  logic [15:0] c [1] = '{16'h1212};\n"
+      "  initial $display(\"%0d\", c == '{ {2{8'h12}} });\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1\n");
+}
+
+// §10.9.2 with §10.9.1: in the pattern for a structure's unpacked array
+// member, a concatenation replication item gives one element, so
+// `'{ {2{8'h12}}, 16'h3456 }` fills the two elements of `v[2]`; read as
+// three items, it matched no element count.
+TEST(ArrayLiteralSim, AConcatenationReplicationItemFillsOneMemberElement) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef struct { int n; logic [15:0] v[2]; } rec_t;\n"
+      "  rec_t r;\n"
+      "  initial begin\n"
+      "    r = '{5, '{ {2{8'h12}}, 16'h3456 }};\n"
+      "    $display(\"%0d %h %h\", r.n, r.v[0], r.v[1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "5 1212 3456\n");
+}
+
 }  // namespace

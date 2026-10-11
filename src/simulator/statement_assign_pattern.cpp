@@ -126,8 +126,7 @@ static const Expr* SelectDimElement(const Expr* pat, uint32_t idx, uint32_t pos,
     // the N copies lands on successive elements (e.g. '{2{'{3{y}}}} fills a
     // [_:_][_:_] array with y at every leaf) instead of leaking the replicate
     // node out as one scalar.
-    if (pat->elements.size() == 1 &&
-        pat->elements[0]->kind == ExprKind::kReplicate) {
+    if (pat->elements.size() == 1 && pat->elements[0]->is_pattern_replication) {
       const auto& body = pat->elements[0]->elements;
       return body.empty() ? nullptr : body[pos % body.size()];
     }
@@ -214,8 +213,8 @@ static void DistributeDimPattern(const PatternDist& pd,
 Logic4Vec PatternItemAt(const Expr* rhs, const ArrayPatternTarget& target,
                         uint32_t i, SimContext& ctx, Arena& arena) {
   const ArrayInfo& info = target.info;
-  bool replicate = rhs->elements.size() == 1 &&
-                   rhs->elements[0]->kind == ExprKind::kReplicate;
+  bool replicate =
+      rhs->elements.size() == 1 && rhs->elements[0]->is_pattern_replication;
   uint32_t inner_count =
       replicate ? static_cast<uint32_t>(rhs->elements[0]->elements.size()) : 0;
   if (!rhs->pattern_keys.empty()) {
@@ -775,7 +774,7 @@ static bool IsPositionalPattern(const Expr* expr) {
   if (expr->kind != ExprKind::kAssignmentPattern) return false;
   if (!expr->pattern_keys.empty() || expr->elements.empty()) return false;
   return expr->elements.size() != 1 ||
-         expr->elements[0]->kind != ExprKind::kReplicate;
+         !expr->elements[0]->is_pattern_replication;
 }
 
 void CollectQueueElements(const Expr* expr, SimContext& ctx, Arena& arena,

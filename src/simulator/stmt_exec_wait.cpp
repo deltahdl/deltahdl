@@ -221,6 +221,7 @@ void CollectExprAndStaticReads(const Expr* expr, SimContext& ctx,
                                std::unordered_set<std::string>& reads) {
   CollectExprReads(expr, reads);
   CollectStaticPropertyReads(expr, ctx, reads);
+  CollectPackageScopedReads(expr, ctx, reads);
 }
 
 // §14.15 with §25.5.5 and §25.9.1: a clockvar the condition reads, through

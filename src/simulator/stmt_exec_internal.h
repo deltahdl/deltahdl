@@ -146,12 +146,14 @@ ExecTask ExecCheckerInstantiation(const Stmt* stmt, SimContext& ctx,
 // concluded it (expect_statement.cpp).
 ExecTask ExecExpect(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
-// §10.3.2 with §8.9: the names whose change re-evaluates `expr` -- the
-// variables it reads (CollectExprReads) and, as `C::n`, each static class
+// §10.3.2 with §8.9 and §26.3: the names whose change re-evaluates `expr` --
+// the variables it reads (CollectExprReads); as `C::n`, each static class
 // property it reads through the class scope operator, which is the class's
-// own storage and no variable, and which AnyChangeAwaiter arms on the class.
-// `assign w = C::s + 1;` collected `C` and `s` alone, neither a variable, and
-// was never evaluated again. Defined in stmt_exec_wait.cpp.
+// own storage and no variable, and which AnyChangeAwaiter arms on the class;
+// and, as `p.n`, each package variable it reads through the package scope,
+// the key its storage stands under. `assign w = C::s + 1;` collected `C` and
+// `s` alone, neither a variable, and was never evaluated again, as was
+// `assign w = p::g + 1;`. Defined in stmt_exec_wait.cpp.
 void CollectExprAndStaticReads(const Expr* expr, SimContext& ctx,
                                std::unordered_set<std::string>& reads);
 

@@ -52,7 +52,7 @@ static bool PatternItems(const Expr* pattern, SimContext& ctx, Arena& arena,
                          std::vector<Logic4Vec>& out) {
   if (!pattern->pattern_keys.empty()) return false;
   if (pattern->elements.size() == 1 && pattern->elements[0] != nullptr &&
-      pattern->elements[0]->kind == ExprKind::kReplicate) {
+      pattern->elements[0]->is_pattern_replication) {
     const Expr* rep = pattern->elements[0];
     Logic4Vec count = EvalExpr(rep->repeat_count, ctx, arena);
     if (!count.IsKnown()) return false;

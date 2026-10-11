@@ -506,16 +506,14 @@ VpiObject* ListOperationObject(const Expr* expr, const AssignBuild& build) {
 // §37.59 details 6 and 7: a positional assignment pattern is an assignment
 // pattern operation over its expressions, and a replicated one a multi
 // assignment pattern operation over its multiplier and its expressions. The
-// parser holds the replication as the pattern's one element, a replicate
-// starting where the pattern does, which tells it from a replicate written as
-// the pattern's one expression. A keyed pattern, whose positional order its
+// parser holds the replication as the pattern's one element, marked
+// is_pattern_replication, which tells it from a replicate written as the
+// pattern's one expression. A keyed pattern, whose positional order its
 // target's type decides, is not modelled.
 VpiObject* PatternObject(const Expr* expr, const AssignBuild& build) {
   if (!expr->pattern_keys.empty()) return nullptr;
   const Expr* first = expr->elements.front();
-  if (expr->elements.size() == 1 && first->kind == ExprKind::kReplicate &&
-      first->range.start.line == expr->range.start.line &&
-      first->range.start.column == expr->range.start.column) {
+  if (expr->elements.size() == 1 && first->is_pattern_replication) {
     return OperationObject(vpiMultiAssignmentPatternOp,
                            Operands(first->repeat_count, first->elements),
                            build);
