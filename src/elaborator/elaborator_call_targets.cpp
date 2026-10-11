@@ -7,6 +7,7 @@
 #include <functional>
 #include <initializer_list>
 #include <memory>
+#include <span>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -321,26 +322,37 @@ FoundItem TypedefOf(const CompilationUnit& unit, const TypeSite& site,
   return SiteItem(unit, site, ModuleItemKind::kTypedef, type.type_name);
 }
 
-// §8.3 with §6.18 and §26.3: the class declaration the type `type` of a
-// variable of the module names, through each typedef it is written as, each
-// typedef's own type looked up as the scope declaring that typedef sees it
-// before the typedef; null where none is. Each step reaches a declaration
-// before the last in its scope, or a scope around it or a package, which
-// leads to no module; a package reaches only one declared before it, a
-// typedef naming no type the parser has not yet read, so the walk ends.
+// A type written in a scope, and the site it is written at.
+struct SitedType {
+  const DataType* type = nullptr;
+  TypeSite site = {};
+};
+
+// §6.18 with §26.3: the type the type `type` of a variable of the module
+// stands for, through each typedef it is written as, each typedef's own type
+// looked up as the scope declaring that typedef sees it before the typedef.
+// Each step reaches a declaration before the last in its scope, or a scope
+// around it or a package, which leads to no module; a package reaches only
+// one declared before it, a typedef naming no type the parser has not yet
+// read, so the walk ends.
+SitedType ThroughTypedefs(const DataScope& scope, const DataType& type) {
+  SitedType named{&type, {&scope.items, scope.items.size(), scope.site}};
+  for (FoundItem def = TypedefOf(scope.unit, named.site, *named.type);
+       def.item != nullptr;
+       def = TypedefOf(scope.unit, named.site, *named.type)) {
+    named = {&def.item->typedef_type, def.site};
+  }
+  return named;
+}
+
+// §8.3: the class declaration the type `type` of a variable of the module
+// names, through the typedefs it is written as; null where none is.
 const ClassDecl* ClassNamed(const DataScope& scope, const DataType& type) {
-  const CompilationUnit& unit = scope.unit;
-  TypeSite site{&scope.items, scope.items.size(), scope.site};
-  const DataType* named = &type;
-  for (FoundItem def = TypedefOf(unit, site, *named); def.item != nullptr;
-       def = TypedefOf(unit, site, *named)) {
-    named = &def.item->typedef_type;
-    site = def.site;
-  }
+  const auto [named, site] = ThroughTypedefs(scope, type);
   if (!named->scope_name.empty()) {
-    return ScopedClass(unit, site, named->scope_name, named->type_name);
+    return ScopedClass(scope.unit, site, named->scope_name, named->type_name);
   }
-  return ClassIn(unit, site, named->type_name);
+  return ClassIn(scope.unit, site, named->type_name);
 }
 
 // The expression the selects in front of `e` select from, the number of them
@@ -450,10 +462,9 @@ const ClassDecl* HandleClass(const Expr& e, const DataScope& scope) {
 // §8.5 and §8.6: a member access `access`, h.m, applied to a handle of a class
 // that, with the classes it extends or implements, declares nothing `m`
 // names; reported under `rule`, §8.6 where the access is what a call calls and
-// §8.5 otherwise. A class scope resolution, C::m, applies to no handle.
+// §8.5 otherwise.
 void ReportUndeclaredMember(const Expr& access, std::string_view rule,
                             const DataScope& scope, DiagEngine& diag) {
-  if (access.is_scope_resolution) return;
   const ClassDecl* cls = HandleClass(*access.lhs, scope);
   std::unordered_set<std::string_view> names;
   if (cls == nullptr || !scope.classes->SelectableNames(*cls, names) ||
@@ -464,6 +475,42 @@ void ReportUndeclaredMember(const Expr& access, std::string_view rule,
              std::format("class '{}' has no member named '{}'", cls->name,
                          access.rhs->text),
              Subclause(rule));
+}
+
+// §6.16 and §6.19.5: the built-in methods of a string and of an enumeration.
+constexpr std::string_view kStringMethods[] = {
+    "len",      "putc",   "getc",   "toupper", "tolower", "compare",
+    "icompare", "substr", "atoi",   "atohex",  "atooct",  "atobin",
+    "atoreal",  "itoa",   "hextoa", "octtoa",  "bintoa",  "realtoa"};
+constexpr std::string_view kEnumMethods[] = {"first", "last", "next",
+                                             "prev",  "num",  "name"};
+
+// §6.16 and §6.19.5: a member access `access`, s.m or e.m, applied to a
+// variable of the scope that is a string or an enumeration, or to an element
+// of an array of them, one select per unpacked dimension (§7.4), naming none
+// of the built-in methods of its type, which has no members besides. A
+// random property of a class, an enumeration, also has rand_mode (§18.8).
+void ReportNoBuiltInMethod(const Expr& access, const DataScope& scope,
+                           DiagEngine& diag) {
+  std::size_t selects = 0;
+  const Expr& root = SelectRoot(*access.lhs, selects);
+  const DeclaredVar* var =
+      root.kind == ExprKind::kIdentifier ? scope.Declared(root.text) : nullptr;
+  if (var == nullptr || var->dims != selects) return;
+  const DataTypeKind kKind = ThroughTypedefs(scope, *var->type).type->kind;
+  const bool kString = kKind == DataTypeKind::kString;
+  if (!kString && kKind != DataTypeKind::kEnum) return;
+  const std::string_view kName = access.rhs->text;
+  const std::span<const std::string_view> kMethods =
+      kString ? std::span(kStringMethods) : std::span(kEnumMethods);
+  if (std::ranges::find(kMethods, kName) != kMethods.end() ||
+      (!kString && kName == "rand_mode" && scope.Property(root.text) == var)) {
+    return;
+  }
+  diag.Error(access.rhs->range.start,
+             std::format("'{}' is not a built-in method of the {} '{}'", kName,
+                         kString ? "string" : "enumeration", root.text),
+             Subclause(kString ? "6.16" : "6.19.5"));
 }
 
 // §25.9 with §7.4: a select `select` into a class property that is a virtual
@@ -504,13 +551,15 @@ void ReportVifCall(const Expr& call, const DataScope& scope, DiagEngine& diag) {
 
 // Each call by a plain name `expr` holds, itself included, each call through a
 // virtual interface, each select into a class property that is one, and each
-// member access naming nothing its class declares, `rule` being the subclause
-// one `expr` itself makes is reported under.
+// member access naming nothing its class or its string or enumeration type
+// has, `rule` being the subclause one `expr` itself makes on a class is
+// reported under. A scope resolution, C::m or p::m, selects from no value.
 void CheckExprCalls(const Expr* expr, const DataScope& scope, DiagEngine& diag,
                     std::string_view rule = "8.5") {
   if (expr == nullptr) return;
-  if (expr->kind == ExprKind::kMemberAccess) {
+  if (expr->kind == ExprKind::kMemberAccess && !expr->is_scope_resolution) {
     ReportUndeclaredMember(*expr, rule, scope, diag);
+    ReportNoBuiltInMethod(*expr, scope, diag);
   }
   if (const Expr* callee = NamedCallee(*expr)) {
     ReportIfData(callee->text, expr->range.start, scope, diag);

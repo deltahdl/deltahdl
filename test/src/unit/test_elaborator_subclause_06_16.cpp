@@ -304,4 +304,101 @@ TEST(Elaboration, UncastStringIntegralAssignmentOfAnyShapeReported) {
   }
 }
 
+// §6.16: a string has the built-in methods §6.16.1 to §6.16.15 list and no
+// others, nor any member, so a call or select naming anything else through a
+// string variable, or an element of an array of them, is reported.
+TEST(StringMethodElaboration, NameNoStringMethodIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  string s;\n"
+      "  string sa [2];\n"
+      "  initial begin\n"
+      "    s.foo();\n"
+      "    s.h.run();\n"
+      "    sa[1].bar();\n"
+      "    s.rand_mode(0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "'foo' is not a built-in method of the string 's'", 5, "6.16"));
+  EXPECT_TRUE(ReportedError(
+      diags, "'h' is not a built-in method of the string 's'", 6, "6.16"));
+  EXPECT_TRUE(ReportedError(
+      diags, "'bar' is not a built-in method of the string 'sa'", 7, "6.16"));
+  EXPECT_TRUE(ReportedError(
+      diags, "'rand_mode' is not a built-in method of the string 's'", 8,
+      "6.16"));
+}
+
+TEST(StringMethodElaboration, EveryStringMethodIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  string s;\n"
+             "  string sa [2];\n"
+             "  integer i;\n"
+             "  real r;\n"
+             "  byte b;\n"
+             "  initial begin\n"
+             "    i = s.len();\n"
+             "    s.putc(0, b);\n"
+             "    b = s.getc(0);\n"
+             "    s = s.toupper();\n"
+             "    s = s.tolower();\n"
+             "    i = s.compare(\"a\");\n"
+             "    i = s.icompare(\"a\");\n"
+             "    s = s.substr(0, 1);\n"
+             "    i = s.atoi();\n"
+             "    i = s.atohex();\n"
+             "    i = s.atooct();\n"
+             "    i = s.atobin();\n"
+             "    r = s.atoreal();\n"
+             "    s.itoa(1);\n"
+             "    s.hextoa(1);\n"
+             "    s.octtoa(1);\n"
+             "    s.bintoa(1);\n"
+             "    s.realtoa(1.0);\n"
+             "    i = sa[0].len();\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// A subroutine's formal argument and a block's variable are checked as a
+// module's variable is.
+TEST(StringMethodElaboration, FormalsAndBlockVariablesAreChecked) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  function void g(string a);\n"
+      "    a.foo();\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    string b;\n"
+      "    b.bar();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "'foo' is not a built-in method of the string 'a'", 3, "6.16"));
+  EXPECT_TRUE(ReportedError(
+      diags, "'bar' is not a built-in method of the string 'b'", 7, "6.16"));
+}
+
+// §3.13: a package's name and a variable's are in different name spaces, so
+// p::x names the package's x whatever variable p the scope declares.
+TEST(StringMethodElaboration, PackageScopeIsNoSelectFromAString) {
+  EXPECT_TRUE(
+      ElabOk("package p;\n"
+             "  int x;\n"
+             "endpackage\n"
+             "module m;\n"
+             "  string p;\n"
+             "  int y;\n"
+             "  initial y = p::x;\n"
+             "endmodule\n"));
+}
+
 }  // namespace
