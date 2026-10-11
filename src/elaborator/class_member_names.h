@@ -36,8 +36,7 @@ class SoleClassIndex {
   // §8.26), its types among them, whose access §8.5 forbids by a rule of its
   // own, and the methods §18 gives every object. False where the names are not
   // known in full: a class of the chain extends or implements one FindFrom
-  // does not give, or a range of enumeration constants is bounded by a
-  // parameter (§6.19.2).
+  // does not give.
   bool SelectableNames(const ClassDecl& cls,
                        std::unordered_set<std::string_view>& names) const;
 
@@ -75,8 +74,8 @@ class SoleClassIndex {
   // The site of each class a module, interface, program, checker, package or
   // the compilation unit declares directly.
   mutable std::unordered_map<const ClassDecl*, TypeSite> sites_;
-  // The names ranges of enumeration constants generate (§6.19.2), which no
-  // source text holds.
+  // The names of the enumeration constants the classes declare, those a range
+  // generates (§6.19.2) among them, which no source text holds.
   mutable std::unordered_set<std::string> generated_;
 };
 

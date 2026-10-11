@@ -303,23 +303,6 @@ TEST(ObjectPropertyElaboration, NumberedEnumConstantsAreMembers) {
       ReportedError(diags, "class 'C' has no member named 'nosuch'", 9, "8.6"));
 }
 
-// A range bounded by a class parameter, V[W], generates names only a
-// specialization tells, so a select from the class is left unreported.
-TEST(ObjectPropertyElaboration, EnumRangeOverAParameterLeavesSelects) {
-  ElabFixture f;
-  ElabOk(
-      "class C #(int W = 2);\n"
-      "  typedef enum {V[W]} v_t;\n"
-      "endclass\n"
-      "module m;\n"
-      "  C c = new;\n"
-      "  initial $display(c.V1);\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(
-      ReportedError(f.diag.Diagnostics(), "has no member named", 6, "8.5"));
-}
-
 // §3.13 and §23.9: a class name two scopes each declare a class under names,
 // in a property's type and in an extends clause, the class the scope
 // declaring the writer sees, so h.k and d hold b's K, which declares y and no

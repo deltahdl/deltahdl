@@ -12,6 +12,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/type_site_lookup.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
@@ -21,36 +22,14 @@ namespace delta {
 
 namespace {
 
-// §6.19.2: adds to `names` the constants the enumeration member `constant`
-// declares, its written name or, for a range, S[2] or T[3:4], the names it
-// generates, S0 and S1 or T3 and T4, owned by `generated`; false where a
-// bound does not fold without the class's parameters, which leaves the
-// generated names unknown.
-bool AddConstantNames(const EnumMember& constant,
-                      std::unordered_set<std::string_view>& names,
-                      std::unordered_set<std::string>& generated) {
-  if (constant.range_start == nullptr) {
-    names.insert(constant.name);
-    return true;
-  }
-  const ScopeMap kNoScope;
-  std::vector<std::string> declared =
-      EnumMemberDeclaredNames(constant, kNoScope);
-  // A range generates only names its written one is followed by an index in,
-  // so the written name alone is the answer for bounds that did not fold.
-  if (declared.size() == 1 && declared.front() == constant.name) return false;
-  for (std::string& name : declared) {
-    names.insert(*generated.insert(std::move(name)).first);
-  }
-  return true;
-}
-
 // Adds to `names` each member, value parameter, type parameter and enumeration
-// constant `cls` declares itself, a name an enumeration generates owned by
-// `generated`; false where an enumeration's constants are not known.
-bool AddOwnMemberNames(const ClassDecl& cls,
+// constant `cls` declares itself. A range of constants, S[2] or T[3:4],
+// declares the names it generates, S0 and S1 or T3 and T4 (§6.19.2), which
+// `generated` owns; its bounds are integral numbers, which fold in any scope.
+void AddOwnMemberNames(const ClassDecl& cls,
                        std::unordered_set<std::string_view>& names,
                        std::unordered_set<std::string>& generated) {
+  const ScopeMap kNoScope;
   for (const auto& [name, value] : cls.params) names.insert(name);
   names.insert(cls.type_param_names.begin(), cls.type_param_names.end());
   for (const ClassMember* member : cls.members) {
@@ -59,10 +38,11 @@ bool AddOwnMemberNames(const ClassDecl& cls,
                                ? member->typedef_item->typedef_type
                                : member->data_type;
     for (const EnumMember& constant : type.enum_members) {
-      if (!AddConstantNames(constant, names, generated)) return false;
+      for (std::string& name : EnumMemberDeclaredNames(constant, kNoScope)) {
+        names.insert(*generated.insert(std::move(name)).first);
+      }
     }
   }
-  return true;
 }
 
 // The names of the classes `cls` extends or implements.
@@ -135,7 +115,7 @@ bool SoleClassIndex::SelectableNames(
     const ClassDecl* walked = work.back();
     work.pop_back();
     if (!seen.insert(walked).second) continue;
-    if (!AddOwnMemberNames(*walked, names, generated_)) return false;
+    AddOwnMemberNames(*walked, names, generated_);
     for (const std::string_view kBase : BaseNames(*walked)) {
       const ClassDecl* base = FindFrom(*walked, kBase);
       if (base == nullptr || walked->type_param_names.contains(kBase)) {
