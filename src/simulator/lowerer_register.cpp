@@ -515,6 +515,7 @@ static void RegisterPackageScopedItem(const PackageDecl* pkg, ModuleItem* item,
                        item->kind == ModuleItemKind::kTaskDecl;
   if (!is_subroutine || !item->method_class.empty()) return;
   ctx.RegisterSubroutinePackage(item, pkg->name);
+  ctx.RegisterStaticFrameOwner(item, pkg->name);
   ctx.RegisterFunction(*key, item);
 }
 

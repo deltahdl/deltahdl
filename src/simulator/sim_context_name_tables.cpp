@@ -184,6 +184,18 @@ std::string_view DeclaredNameTables::SubroutinePackage(
   return it != subroutine_packages_.end() ? it->second : std::string_view{};
 }
 
+void DeclaredNameTables::RegisterStaticFrameOwner(const ModuleItem* subroutine,
+                                                  std::string_view owner) {
+  static_frame_owners_[subroutine] = owner;
+  owned_subroutines_.push_back(subroutine);
+}
+
+std::string_view DeclaredNameTables::StaticFrameOwner(
+    const ModuleItem* subroutine) const {
+  auto it = static_frame_owners_.find(subroutine);
+  return it != static_frame_owners_.end() ? it->second : std::string_view{};
+}
+
 void DeclaredNameTables::RegisterPackageImport(std::string_view pkg,
                                                std::string_view imported,
                                                std::string_view item) {

@@ -299,6 +299,11 @@ struct Process {
   // the block's for as long as the enable lasts, and any other enable leaves
   // them as they were.
   std::vector<std::vector<std::string>> caller_gen_prefixes;
+  // §13.4.2: the owner each enable still running keeps its static frames
+  // under, one entry per enable as above -- the package or compilation unit
+  // declaring a subroutine of one (DeclaredNameTables::StaticFrameOwner),
+  // empty for an instance's subroutine, whose frames are its instance's.
+  std::vector<std::string_view> frame_owners;
   // A copy of a calling process that carries its context to a display written
   // later (SnapshotCallingProcess in deferred_caller.h); no thread of the run.
   bool stand_in = false;

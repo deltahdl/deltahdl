@@ -170,6 +170,19 @@ class DeclaredNameTables {
   void RegisterSubroutinePackage(const ModuleItem* subroutine,
                                  std::string_view pkg);
   std::string_view SubroutinePackage(const ModuleItem* subroutine) const;
+  // §13.3.2 and §13.4.2: a subroutine a package or the compilation unit
+  // declares has one declaration, whose static variables every call shares
+  // from whatever instance it is made, so its static frames are kept under
+  // `owner`, the package's or the unit's name, rather than under the calling
+  // instance (SimContext::StaticFrameKey). Empty for every other subroutine.
+  // `owner` must outlive the context.
+  void RegisterStaticFrameOwner(const ModuleItem* subroutine,
+                                std::string_view owner);
+  std::string_view StaticFrameOwner(const ModuleItem* subroutine) const;
+  // The subroutines given an owner, in the order they were registered.
+  const std::vector<const ModuleItem*>& OwnedSubroutines() const {
+    return owned_subroutines_;
+  }
   void RegisterPackageImport(std::string_view pkg, std::string_view imported,
                              std::string_view item);
   // The keys a bare `name` read in package `pkg` may stand under, in the
@@ -475,6 +488,9 @@ class DeclaredNameTables {
   std::unordered_set<std::string_view> imported_names_;
   // §26.3 with §13.4: see RegisterSubroutinePackage.
   std::unordered_map<const ModuleItem*, std::string_view> subroutine_packages_;
+  // §13.4.2: see RegisterStaticFrameOwner.
+  std::unordered_map<const ModuleItem*, std::string_view> static_frame_owners_;
+  std::vector<const ModuleItem*> owned_subroutines_;
   struct PackageImport {
     std::string_view imported;
     std::string_view item;

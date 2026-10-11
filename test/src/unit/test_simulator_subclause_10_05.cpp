@@ -472,4 +472,45 @@ TEST(VariableInitSim, AStaticLocalsInitializerRunsInNoProcess) {
   EXPECT_EQ(RunAndGet(src, "own"), 1u);
 }
 
+// §10.5 with §8.30: a static weak_reference local is set before the
+// procedures start, when o is still null, and the procedure entering its
+// block stands in that reference rather than making it again from the o the
+// procedure has since set.
+TEST(VariableInitSim, AStaticWeakReferenceIsMadeBeforeTheProceduresStart) {
+  const char* src =
+      "class C; endclass\n"
+      "module t;\n"
+      "  C o;\n"
+      "  int still_null;\n"
+      "  initial begin\n"
+      "    o = new;\n"
+      "    begin\n"
+      "      static weak_reference #(C) w = new(o);\n"
+      "      still_null = w.get() == null;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "still_null"), 1u);
+}
+
+// §10.5 with §26.2 and §3.12.1: a static local of a package's function and of
+// the compilation unit's is set before the procedures start, from the g its
+// package or unit holds then, 1 and 3, not from the 2 and 4 the procedure has
+// written by the time it calls the function.
+TEST(VariableInitSim, PackageAndUnitStaticLocalsAreSetBeforeTheProcedures) {
+  const char* src =
+      "int g = 3;\n"
+      "function int uf(); static int s = g; return s; endfunction\n"
+      "package p;\n"
+      "  int g = 1;\n"
+      "  function int f(); static int s = g; return s; endfunction\n"
+      "endpackage\n"
+      "module t;\n"
+      "  int r, u;\n"
+      "  initial begin p::g = 2; $unit::g = 4; r = p::f(); u = uf(); end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "r"), 1u);
+  EXPECT_EQ(RunAndGet(src, "u"), 3u);
+}
+
 }  // namespace

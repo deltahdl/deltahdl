@@ -122,6 +122,15 @@ std::vector<Scope> ScopeStack::SwapScopeStack(std::vector<Scope> new_stack) {
 }
 
 std::string_view SimContext::StaticFrameKey(std::string_view name) {
+  // §13.4.2: a package's or the compilation unit's subroutine keeps its
+  // frames, and those of the blocks in its body, under its owner's name.
+  const std::vector<std::string_view>& owners =
+      current_process_ != nullptr ? current_process_->frame_owners
+                                  : processless_frame_owners_;
+  if (!owners.empty() && !owners.back().empty()) {
+    return *arena_.Create<std::string>(std::string(owners.back()) +
+                                       "::" + std::string(name));
+  }
   if (!current_process_ || current_process_->inst_prefix.empty()) return name;
   auto* key = arena_.Create<std::string>(current_process_->inst_prefix +
                                          std::string(name));

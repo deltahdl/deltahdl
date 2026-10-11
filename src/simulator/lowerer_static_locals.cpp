@@ -90,6 +90,22 @@ bool IsGenBlockSubroutine(const ModuleItem* func, const RtlirModule* mod) {
       });
 }
 
+// §10.5 with §13.4.2: the static locals of the package and compilation-unit
+// subroutines, each made in the one frame its calls share, kept under its
+// package's or unit's name (DeclaredNameTables::StaticFrameOwner) whatever
+// instance calls it, so standing in no instance.
+void InitOwnedSubroutineStatics(SimContext& ctx, Arena& arena) {
+  for (const ModuleItem* func : ctx.OwnedSubroutines()) {
+    if (StaticInitsOf(func).empty()) continue;
+    Process stand_in;
+    stand_in.stand_in = true;
+    stand_in.is_static_init = true;
+    stand_in.frame_owners.push_back(ctx.StaticFrameOwner(func));
+    CallerStandIn in_owner(&stand_in, ctx);
+    InitSubroutineStatics({.subroutine = func}, ctx, arena);
+  }
+}
+
 }  // namespace
 
 void Lowerer::RecordStaticLocalSubroutines(const RtlirModule* mod) {
@@ -125,6 +141,7 @@ void Lowerer::RecordStaticLocalProcess(const Process* p, const Stmt* body) {
 // it is. Made when the declaration first ran, `static int s = g;` read a g
 // the procedures had changed by then.
 void Lowerer::InitializeStaticLocals() {
+  InitOwnedSubroutineStatics(ctx_, arena_);
   for (const StaticLocalOwner& owner : static_local_owners_) {
     Process stand_in;
     stand_in.stand_in = true;

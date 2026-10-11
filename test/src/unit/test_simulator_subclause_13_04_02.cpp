@@ -343,4 +343,42 @@ TEST(FunctionLifetimeSim, PackageFunctionQueueLocalKeptBetweenCalls) {
   EXPECT_EQ(val, 2u);
 }
 
+// §13.4.2 with §26.2: a package function has one declaration, so its static
+// local is one variable every caller shares, whatever instance it calls from:
+// u1's call, u2's and the top's count to 3. Kept per calling instance, each
+// instance counted its own and the top read 1.
+TEST(FunctionLifetimeSim, PackageFunctionStaticLocalSharedByEveryInstance) {
+  auto val = RunAndGet(
+      "package p;\n"
+      "  function int count(); static int n = 0; n++; return n; endfunction\n"
+      "endpackage\n"
+      "module c; int r; initial r = p::count(); endmodule\n"
+      "module t;\n"
+      "  c u1();\n"
+      "  c u2();\n"
+      "  int r;\n"
+      "  initial #1 r = p::count();\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 3u);
+}
+
+// §13.4.2 with §3.12.1: so has a function the compilation unit declares, and
+// so has a static local of a block in its body.
+TEST(FunctionLifetimeSim, UnitFunctionStaticLocalSharedByEveryInstance) {
+  auto val = RunAndGet(
+      "function int count();\n"
+      "  begin : b static int n = 0; n++; return n; end\n"
+      "endfunction\n"
+      "module c; int r; initial r = count(); endmodule\n"
+      "module t;\n"
+      "  c u1();\n"
+      "  c u2();\n"
+      "  int r;\n"
+      "  initial #1 r = count();\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 3u);
+}
+
 }  // namespace

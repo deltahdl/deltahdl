@@ -797,10 +797,10 @@ class SimContext : public DeclaredNameTables,
  private:
   // See ResolveInstanceScope.
   std::string InstanceKeyOf(const std::string& cand) const;
-  // §13.3.2: static-task (and named-block) storage is per module instance.
-  // Qualify the bare scope name with the current process's instance path so
-  // that distinct instances of the same module do not share storage. Returns
-  // the bare name unchanged at the top level (empty instance prefix).
+  // §13.3.2: static storage is per declaration: a module's subroutine's and
+  // named block's under the running instance's path, the bare name at the
+  // top, and a package's or unit's subroutine's under its owner's name, the
+  // innermost Process::frame_owners entry (DeclaredNameTables).
   std::string_view StaticFrameKey(std::string_view name);
   Scheduler& scheduler_;
   Arena& arena_;

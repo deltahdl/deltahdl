@@ -280,7 +280,6 @@ static void RegisterForkChildScopes(const Stmt* s, Process* p,
   }
   if (s->kind == StmtKind::kBlock && !s->label.empty())
     ctx.RegisterNamedScope(s->label, p);
-
   for (auto scope : ctx.ActiveNamedScopes()) ctx.RegisterNamedScope(scope, p);
 }
 
@@ -296,14 +295,15 @@ static Process* CreateForkChildProcess(SimContext& ctx, Arena& arena,
     p->is_reactive = spawning_proc->is_reactive;
     p->home_region = spawning_proc->home_region;
     p->program_block_id = spawning_proc->program_block_id;
-    // §9.3.2 with §23.9 and §27.4: a branch's statements are statements of
-    // the scope the fork stands in, so its names resolve in the same module
-    // instance and generate block instances. Left at the defaults, a branch
-    // in a submodule or a program read and triggered the top's names, and
-    // `-> e` there woke no process waiting on the instance's e.
+    // §9.3.2 with §23.9, §27.4 and §13.4.2: a branch's statements are of the
+    // scope the fork stands in, its names resolving in the same instance and
+    // generate blocks and its static frames kept by the same owner. Left at
+    // the defaults, a branch in a submodule read and triggered the top's
+    // names, and `-> e` there woke no process waiting on the instance's e.
     p->inst_prefix = spawning_proc->inst_prefix;
     p->gen_prefixes = spawning_proc->gen_prefixes;
     p->gen_block_name = spawning_proc->gen_block_name;
+    p->frame_owners = spawning_proc->frame_owners;
   }
   ctx.CopyCarriedStacksTo(*p);
   // §18.14.2: a new thread's RNG is seeded with the next random value drawn

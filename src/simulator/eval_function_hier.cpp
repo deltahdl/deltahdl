@@ -384,7 +384,17 @@ const Stmt* ExternForkjoinCall(const Expr* call, SimContext& ctx,
   return fork;
 }
 
+// §13.4.2: the owners of the subroutines the running process, or a call made
+// where none runs, has entered (Process::frame_owners).
+static std::vector<std::string_view>& FrameOwners(SimContext& ctx) {
+  Process* proc = ctx.CurrentProcess();
+  return proc != nullptr ? proc->frame_owners : ctx.ProcesslessFrameOwners();
+}
+
 void EnterCalleeInstance(SimContext& ctx, const SubroutineTarget& target) {
+  FrameOwners(ctx).push_back(target.func != nullptr
+                                 ? ctx.StaticFrameOwner(target.func)
+                                 : std::string_view{});
   Process* proc = ctx.CurrentProcess();
   if (proc == nullptr) return;
   proc->caller_inst_prefixes.push_back(std::move(proc->inst_prefix));
@@ -399,6 +409,7 @@ void EnterCalleeInstance(SimContext& ctx, const SubroutineTarget& target) {
 }
 
 void LeaveCalleeInstance(SimContext& ctx) {
+  FrameOwners(ctx).pop_back();
   Process* proc = ctx.CurrentProcess();
   if (proc == nullptr || proc->caller_inst_prefixes.empty()) return;
   proc->inst_prefix = std::move(proc->caller_inst_prefixes.back());

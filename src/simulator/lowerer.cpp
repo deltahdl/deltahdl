@@ -652,6 +652,7 @@ static void RegisterFreeCuFunctions(const RtlirDesign* design, SimContext& ctx,
                                          "::" + std::string(item->name)),
               item);
           ctx.RegisterSubroutinePackage(item, scope);
+          ctx.RegisterStaticFrameOwner(item, scope);
         }
       });
 }
