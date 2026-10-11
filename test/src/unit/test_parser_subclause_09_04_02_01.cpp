@@ -5,6 +5,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -219,6 +220,8 @@ TEST(EventOrOperatorParsing, AParenthesizedGroupOpensWithAnyOperand) {
       "  initial @(((posedge a)) or b) x = 7;\n"
       "  initial @(((negedge a)) or b) x = 8;\n"
       "  initial @(((edge a)) or b) x = 9;\n"
+      "  initial @(((a + b)) or c) x = 10;\n"
+      "  initial @((f(a) or b) or c) x = 11;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -227,8 +230,8 @@ TEST(EventOrOperatorParsing, AParenthesizedGroupOpensWithAnyOperand) {
     if (item->kind == ModuleItemKind::kInitialBlock)
       controls.push_back(item->body);
   }
-  ASSERT_EQ(controls.size(), 9u);
-  const std::size_t kCounts[] = {3, 3, 2, 3, 2, 1, 2, 2, 2};
+  ASSERT_EQ(controls.size(), 11u);
+  const std::size_t kCounts[] = {3, 3, 2, 3, 2, 1, 2, 2, 2, 2, 3};
   for (std::size_t i = 0; i < controls.size(); ++i) {
     ASSERT_EQ(controls[i]->kind, StmtKind::kEventControl) << i;
     EXPECT_EQ(controls[i]->events.size(), kCounts[i]) << i;
@@ -242,13 +245,16 @@ TEST(EventOrOperatorParsing, AParenthesizedGroupOpensWithAnyOperand) {
   EXPECT_EQ(controls[6]->events[0].edge, Edge::kPosedge);
   EXPECT_EQ(controls[7]->events[0].edge, Edge::kNegedge);
   EXPECT_EQ(controls[8]->events[0].edge, Edge::kEdge);
+  EXPECT_EQ(controls[9]->events[0].signal->kind, ExprKind::kBinary);
+  EXPECT_EQ(controls[10]->events[0].signal->kind, ExprKind::kCall);
 }
 
-// A group the source leaves unclosed is reported rather than read past the end
-// of the file.
-TEST(EventOrOperatorParsing, AnUnclosedGroupIsReported) {
-  auto r = Parse("module m; initial @((a or b");
-  EXPECT_TRUE(r.has_errors);
+// Parentheses the source leaves unclosed are scanned to the end of the file and
+// no further, and read as the expression they open, whose missing `)` is
+// reported.
+TEST(EventOrOperatorParsing, UnclosedParenthesesAreReported) {
+  auto r = Parse("module m; initial @((a");
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got EOF", 1, "11.5"));
 }
 
 }  // namespace
