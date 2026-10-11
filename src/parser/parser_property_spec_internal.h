@@ -46,6 +46,7 @@ struct ParserPropertySpecHelpers {
   static bool AheadHoldsSequenceOperator(Parser& p);
   static PropertyExprNode* NewPropertyNode(Parser& p,
                                            PropertyExprNode::Kind kind);
+  static bool OpensPropertyGroup(Parser& p);
   static PropertyExprNode* TryParsePropertyGroup(Parser& p, bool& group);
   static Expr* ParseEventActualOperand(Parser& p);
   static Expr* ParseEventActual(Parser& p);

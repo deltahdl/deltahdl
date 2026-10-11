@@ -35,6 +35,16 @@ bool IsEitherOfEdgeAnd(const Expr* e, TokenKind lhs_edge,
   return e->lhs->op == lhs_edge && e->lhs->lhs->text == lhs_signal;
 }
 
+// Whether `e` is the `or` of the events `lhs` and `rhs`, neither of which
+// an edge keyword opens.
+bool IsEitherOfSignals(const Expr* e, std::string_view lhs,
+                       std::string_view rhs) {
+  return e != nullptr && e->kind == ExprKind::kBinary &&
+         e->op == TokenKind::kKwOr && e->lhs != nullptr && e->rhs != nullptr &&
+         e->lhs->kind == ExprKind::kIdentifier && e->lhs->text == lhs &&
+         e->rhs->kind == ExprKind::kIdentifier && e->rhs->text == rhs;
+}
+
 // §9.4, footnote 36 to Syntax 9-4: an event expression of comma-separated
 // events passed by position is written in parentheses, and the parenthesized
 // list is read as one event actual, the `or` of its events, ahead of the
@@ -126,6 +136,72 @@ TEST(EventActualParsing, ACheckerPortTakesAParenthesizedCommaList) {
   EXPECT_EQ(rhs->text, "b");
   ASSERT_NE(inst->inst_ports[1].second, nullptr);
   EXPECT_EQ(inst->inst_ports[1].second->text, "c");
+}
+
+// §9.4, footnote 36 to Syntax 9-4, with §9.4.2: the events of a
+// parenthesized list need no edge keyword, so a list of bare signals passed
+// by position is one event actual too, the `or` of its events, and not the
+// parenthesized operand its first signal would make of it.
+TEST(EventActualParsing, AnUnedgedCommaListIsOneEventActual) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, b, c;\n"
+      "  property p(event e, logic v);\n"
+      "    @(e) v;\n"
+      "  endproperty\n"
+      "  assert property (p((a, b), c));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const std::vector<Expr*>* args = AssertedActuals(r);
+  ASSERT_NE(args, nullptr);
+  ASSERT_EQ(args->size(), 2u);
+  EXPECT_TRUE(IsEitherOfSignals((*args)[0], "a", "b"));
+  ASSERT_NE((*args)[1], nullptr);
+  EXPECT_EQ((*args)[1]->text, "c");
+}
+
+// §9.4 with §17.3: a checker's port actual that is a list of bare signals is
+// one event actual as well, ahead of the expression after it.
+TEST(EventActualParsing, ACheckerPortTakesAnUnedgedCommaList) {
+  auto r = Parse(
+      "checker ck(event e, logic v);\n"
+      "  a1: assert property (@(e) v);\n"
+      "endchecker\n"
+      "module m;\n"
+      "  logic a, b, c;\n"
+      "  ck c1((b, a), c);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* inst = FindItemByKind(r, ModuleItemKind::kModuleInst);
+  ASSERT_NE(inst, nullptr);
+  ASSERT_EQ(inst->inst_ports.size(), 2u);
+  EXPECT_TRUE(IsEitherOfSignals(inst->inst_ports[0].second, "b", "a"));
+  ASSERT_NE(inst->inst_ports[1].second, nullptr);
+  EXPECT_EQ(inst->inst_ports[1].second->text, "c");
+}
+
+// §16.12.18 beside §9.4: an `iff` in parentheses joins two properties as
+// well as guarding an event, and where the parentheses read whole as a
+// property_expr, the actual is that property rather than a guarded event.
+TEST(EventActualParsing, AParenthesizedIffPropertyStaysAProperty) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, b, c;\n"
+      "  property p(property x, logic v);\n"
+      "    v |-> x;\n"
+      "  endproperty\n"
+      "  assert property (p((a iff b), c));\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const std::vector<Expr*>* args = AssertedActuals(r);
+  ASSERT_NE(args, nullptr);
+  ASSERT_EQ(args->size(), 2u);
+  ASSERT_NE((*args)[0], nullptr);
+  EXPECT_NE((*args)[0]->property_actual, nullptr);
+  EXPECT_FALSE(IsEventActual((*args)[0]));
 }
 
 // §9.4: a parenthesized actual in which no edge keyword opens an event is

@@ -187,24 +187,28 @@ PropertyExprNode* ParserPropertySpecHelpers::NewPropertyNode(
   return node;
 }
 
-// A parenthesised property holding an or or an and of its own, or opening
-// with an operand a keyword reads, read as one operand; `group` says the
-// tokens were such a group, and the node is null where the group failed to
-// read. The lexer is left where it was where the parentheses hold no such
-// property.
+// At `(`: whether the parentheses hold a property with an operator of its
+// own joining its operands, or open with an operand a keyword reads or, as
+// §16.13.2's `(@(posedge clk1) sig1)` does, with a clocking event of its
+// own. The lexer is rewound.
+bool ParserPropertySpecHelpers::OpensPropertyGroup(Parser& p) {
+  auto saved = p.lexer_.SavePos();
+  p.Consume();
+  const bool kOpens = BodyHasPropertyJunction(p) || AheadOpensKeywordTerm(p) ||
+                      p.Check(TokenKind::kAt);
+  p.lexer_.RestorePos(saved);
+  return kOpens;
+}
+
+// A parenthesised property OpensPropertyGroup finds, read as one operand;
+// `group` says the tokens were such a group, and the node is null where the
+// group failed to read. The lexer is left where it was where the parentheses
+// hold no such property.
 PropertyExprNode* ParserPropertySpecHelpers::TryParsePropertyGroup(
     Parser& p, bool& group) {
   group = false;
-  if (!p.Check(TokenKind::kLParen)) return nullptr;
-  auto saved = p.lexer_.SavePos();
+  if (!p.Check(TokenKind::kLParen) || !OpensPropertyGroup(p)) return nullptr;
   p.Consume();
-  // §16.13.2: a parenthesised operand opening with a clocking event of its
-  // own, `(@(posedge clk1) sig1)`, is a property operand as well.
-  if (!BodyHasPropertyJunction(p) && !AheadOpensKeywordTerm(p) &&
-      !p.Check(TokenKind::kAt)) {
-    p.lexer_.RestorePos(saved);
-    return nullptr;
-  }
   group = true;
   auto* inner = ParsePropertyImplication(p);
   if (inner != nullptr && p.Match(TokenKind::kRParen)) return inner;
@@ -232,7 +236,11 @@ static bool IsEdgeKeyword(TokenKind k) {
 // argument; or, where the tokens are not one, a sequence_expr or a
 // property_expr for a formal of type sequence or property, read as a property
 // and carried by an identifier standing in the argument's place. `plain` is
-// cleared where the argument is not an expression.
+// cleared where the argument is not an expression. Parentheses holding a `,`,
+// an `or` or an `iff` at their own level, which no expression holds there,
+// are a sequence's group with its match items or its `or`, a property's
+// group, or else, their events needing no edge keyword (§9.4.2), `(a, b)`
+// among them, a group of events (footnote 36 to Syntax 9-4).
 Expr* ParserPropertySpecHelpers::ParsePropertyActualArg(Parser& p,
                                                         bool& plain) {
   SourceLoc loc = p.CurrentLoc();
@@ -249,16 +257,22 @@ Expr* ParserPropertySpecHelpers::ParsePropertyActualArg(Parser& p,
     plain = false;
     return ParseEventActual(p);
   }
-  auto saved = p.lexer_.SavePos();
-  p.diag_.PushSuppress();
-  Expr* expr = p.ParseExpr();
-  bool ends = expr != nullptr && !IsImplicationExpr(expr) &&
-              (p.Check(TokenKind::kComma) || p.Check(TokenKind::kRParen));
-  p.diag_.PopSuppress();
-  if (ends) return expr;
-  p.lexer_.RestorePos(saved);
+  const bool kGroup = p.Check(TokenKind::kLParen) && p.OpensEventGroup(false);
+  if (!kGroup) {
+    auto saved = p.lexer_.SavePos();
+    p.diag_.PushSuppress();
+    Expr* expr = p.ParseExpr();
+    bool ends = expr != nullptr && !IsImplicationExpr(expr) &&
+                (p.Check(TokenKind::kComma) || p.Check(TokenKind::kRParen));
+    p.diag_.PopSuppress();
+    if (ends) return expr;
+    p.lexer_.RestorePos(saved);
+  }
   plain = false;
   PropertyExprNode* tree = ParseWholeSequenceActual(p);
+  if (tree == nullptr && kGroup && !OpensPropertyGroup(p)) {
+    return ParseEventActual(p);
+  }
   if (tree == nullptr) tree = ParsePropertyImplication(p);
   if (tree == nullptr ||
       (!p.Check(TokenKind::kComma) && !p.Check(TokenKind::kRParen))) {
