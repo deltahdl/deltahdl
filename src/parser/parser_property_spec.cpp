@@ -229,6 +229,21 @@ static bool IsEdgeKeyword(TokenKind k) {
          k == TokenKind::kKwEdge;
 }
 
+// An actual that reads whole as an expression other than an implication,
+// ending at the `,` or `)` after it; null, the position put back, for any
+// other actual.
+Expr* ParserPropertySpecHelpers::ParseWholeExpressionActual(Parser& p) {
+  auto saved = p.lexer_.SavePos();
+  p.diag_.PushSuppress();
+  Expr* expr = p.ParseExpr();
+  bool ends = expr != nullptr && !IsImplicationExpr(expr) &&
+              (p.Check(TokenKind::kComma) || p.Check(TokenKind::kRParen));
+  p.diag_.PopSuppress();
+  if (ends) return expr;
+  p.lexer_.RestorePos(saved);
+  return nullptr;
+}
+
 // §16.12.18: one actual argument of a property instance: `$`, kept as an
 // identifier named `$`; an event expression opening with an edge keyword or
 // with a group of events, kept as ParseEventActual reads it for a formal of
@@ -259,14 +274,8 @@ Expr* ParserPropertySpecHelpers::ParsePropertyActualArg(Parser& p,
   }
   const bool kGroup = p.Check(TokenKind::kLParen) && p.OpensEventGroup(false);
   if (!kGroup) {
-    auto saved = p.lexer_.SavePos();
-    p.diag_.PushSuppress();
-    Expr* expr = p.ParseExpr();
-    bool ends = expr != nullptr && !IsImplicationExpr(expr) &&
-                (p.Check(TokenKind::kComma) || p.Check(TokenKind::kRParen));
-    p.diag_.PopSuppress();
-    if (ends) return expr;
-    p.lexer_.RestorePos(saved);
+    Expr* expr = ParseWholeExpressionActual(p);
+    if (expr != nullptr) return expr;
   }
   plain = false;
   PropertyExprNode* tree = ParseWholeSequenceActual(p);
