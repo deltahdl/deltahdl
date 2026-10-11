@@ -595,20 +595,22 @@ int MemberIndexKind(const Expr& array, const BlockParent& parent,
 struct ExprClassName {
   std::string_view cls;
   std::string_view package;
+  // §8.25: the arguments the specialization the value is read as gives the
+  // class, from the data type it is read from.
+  std::span<const DataType> args = {};
 };
 
 // §26.3: the class the variable `name` the package `package` declares holds a
-// handle of; empty where the package declares no such variable of a named
-// type.
-std::string_view PackageVarClass(const RtlirDesign& design,
-                                 std::string_view package,
-                                 std::string_view name) {
-  std::string_view cls;
+// handle of, looked up in that package; empty where the package declares no
+// such variable of a named type.
+ExprClassName PackageVarClass(const RtlirDesign& design,
+                              std::string_view package, std::string_view name) {
+  ExprClassName cls{{}, package};
   for (const PackageDecl* decl : design.packages) {
     if (decl->name != package) continue;
     for (const ModuleItem* item : decl->items) {
       if (item->kind == ModuleItemKind::kVarDecl && item->name == name) {
-        cls = item->data_type.type_name;
+        cls = {item->data_type.type_name, package, item->data_type.type_params};
       }
     }
   }
@@ -648,7 +650,8 @@ ExprClassName CallResultClass(const Expr& callee, const BlockParent& parent,
       VpiCalleeSubroutine(CallSiteOf(parent, walk), callee).decl;
   if (function != nullptr) {
     return {function->return_type.type_name,
-            callee.is_scope_resolution ? callee.lhs->text : std::string_view()};
+            callee.is_scope_resolution ? callee.lhs->text : std::string_view(),
+            function->return_type.type_params};
   }
   if (callee.kind != ExprKind::kMemberAccess) {
     return LetResultClass(callee.text, parent, walk);
@@ -658,10 +661,13 @@ ExprClassName CallResultClass(const Expr& callee, const BlockParent& parent,
                                    : ExprClass(*callee.lhs, parent, walk);
   const std::string_view kMethod = callee.rhs->text;
   const ClassDecl* decl =
-      ClassMethodCall(walk, kOwner.cls, kMethod, kOwner.package).owner.decl;
-  return {decl == nullptr ? BuiltInResultClass(kOwner.cls, kMethod)
-                          : MethodNamed(*decl, kMethod)->return_type.type_name,
-          kOwner.package};
+      ClassMethodCall(walk, kOwner.cls, kMethod, kOwner.package, kOwner.args)
+          .owner.decl;
+  if (decl == nullptr) {
+    return {BuiltInResultClass(kOwner.cls, kMethod), kOwner.package};
+  }
+  const DataType& returned = MethodNamed(*decl, kMethod)->return_type;
+  return {returned.type_name, kOwner.package, returned.type_params};
 }
 
 // §8.4: the class the value `expr` writes is a handle of: a variable's of the
@@ -673,7 +679,8 @@ ExprClassName CallResultClass(const Expr& callee, const BlockParent& parent,
 ExprClassName ExprClass(const Expr& expr, const BlockParent& parent,
                         const BodyWalk& walk) {
   if (expr.kind == ExprKind::kIdentifier) {
-    return {FindPrefixVar(parent, expr.text, walk).cls, {}};
+    const PrefixVar kVar = FindPrefixVar(parent, expr.text, walk);
+    return {kVar.cls, {}, kVar.args};
   }
   if (expr.kind == ExprKind::kSelect) {
     return ExprClass(*expr.base, parent, walk);
@@ -686,12 +693,12 @@ ExprClassName ExprClass(const Expr& expr, const BlockParent& parent,
   }
   if (expr.kind != ExprKind::kMemberAccess) return {};
   if (expr.is_scope_resolution) {
-    return {PackageVarClass(walk.design, expr.lhs->text, expr.rhs->text),
-            expr.lhs->text};
+    return PackageVarClass(walk.design, expr.lhs->text, expr.rhs->text);
   }
   const ExprClassName kOuter = ExprClass(*expr.lhs, parent, walk);
-  return {PropertyType(walk, kOuter.cls, expr.rhs->text, kOuter.package).cls,
-          kOuter.package};
+  const HandleType kHeld = PropertyType(walk, kOuter.cls, expr.rhs->text,
+                                        kOuter.package, kOuter.args);
+  return {kHeld.cls, kOuter.package, kHeld.args};
 }
 
 // §37.42 detail 2: a method call applied to the value of an expression other
@@ -711,7 +718,8 @@ CallShape ExprCallShape(const Expr& access, const BlockParent& parent,
     base = base->lhs;
   }
   CallShape shape = MethodShape(
-      ClassMethodCall(walk, kClass.cls, kName, kClass.package), kName,
+      ClassMethodCall(walk, kClass.cls, kName, kClass.package, kClass.args),
+      kName,
       VpiCallSiteExpression(base, walk.objects, CallSiteOf(parent, walk),
                             walk.calls.ctx, walk.build),
       walk);

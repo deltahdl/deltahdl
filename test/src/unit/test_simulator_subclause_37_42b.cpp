@@ -723,6 +723,41 @@ TEST_F(CallStatementsInAScope, ACallReachesTheMethodATypeParameterBaseHas) {
   }
 }
 
+// §8.25 with §37.42 detail 2: a call through an expression other than a chain
+// of names, an element of an array of handles, a property selected from one,
+// or what a function or a method returns, reaches the method of the base the
+// specialization the value is read as gives C, B2's tick, for C #(.T(B2)).
+TEST_F(CallStatementsInAScope, AnExpressionsSpecializationChoosesItsBase) {
+  Run("module top;\n"
+      "  class B; endclass\n"
+      "  class B2; task tick(); endtask endclass\n"
+      "  class C #(type T = B) extends T; endclass\n"
+      "  class H; C #(.T(B2)) d = new;\n"
+      "    function C #(.T(B2)) get(); return d; endfunction\n"
+      "  endclass\n"
+      "  C #(.T(B2)) objs [2]; H hs [2];\n"
+      "  function C #(.T(B2)) make(); make = new; endfunction\n"
+      "  initial begin : b objs[0] = new; hs[0] = new;\n"
+      "    objs[0].tick(); make().tick(); hs[0].d.tick(); hs[0].get().tick();\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle tick =
+      Named(vpiMethods, Named(vpiClassDefn, By("top"), "B2"), "tick");
+  ASSERT_NE(tick, nullptr);
+  vpiHandle it = vpi_iterate(vpiStmt, By("top.b"));
+  ASSERT_NE(it, nullptr);
+  std::vector<vpiHandle> calls;
+  while (vpiHandle stmt = vpi_scan(it)) {
+    if (vpi_get(vpiType, stmt) != vpiAssignment) calls.push_back(stmt);
+  }
+  ASSERT_EQ(calls.size(), 4u);
+  for (std::size_t i = 0; i < calls.size(); ++i) {
+    EXPECT_EQ(vpi_get(vpiType, calls[i]), vpiMethodTaskCall) << i;
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, calls[i])), VpiObjectOf(tick))
+        << i;
+  }
+}
+
 // §15.4 and §18.6.1 with §37.42: a built-in class is a class too, so a call
 // of randomize through a handle of a class extending mailbox, which declares
 // no randomize, is a method func call of a built-in method, though §15.4 names
