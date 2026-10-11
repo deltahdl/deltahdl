@@ -543,11 +543,12 @@ const DataType* StructTypeOf(const BodyWalk& walk, const DataType* type) {
 }
 
 // §7.2 with §8.4: the class the member `name` of the structure `aggregate`
-// holds a handle of, named as its declaration wrote it.
+// holds a handle of, named as its declaration wrote it, with the arguments its
+// specialization gives the class (§8.25).
 HandleType StructMemberType(const DataType& aggregate, std::string_view name) {
   HandleType type;
   for (const StructMember& member : aggregate.struct_members) {
-    if (member.name == name) type.cls = member.type_name;
+    if (member.name == name) type = {member.type_name, {}, member.type_params};
   }
   return type;
 }
@@ -576,7 +577,7 @@ int MemberIndexKind(const Expr& array, const BlockParent& parent,
       if (first + 1 == names.size()) {
         return FirstDimIndexKind(member.unpacked_dims, kAt);
       }
-      held = HandleType{member.type_name, {}, {}};
+      held = HandleType{member.type_name, {}, member.type_params};
     }
     ++first;
   }

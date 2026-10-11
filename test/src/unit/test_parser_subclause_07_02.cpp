@@ -298,4 +298,26 @@ TEST(StructDeclarationParsing, MemberTypeBehindAPackageQualifierKeepsIt) {
   EXPECT_TRUE(members[1].scope_name.empty());
 }
 
+// §7.2 with §8.25: a member of a specialized class type keeps the
+// parameter_value_assignment it was written with, each declarator of the
+// member's list holding it, and a member written without one holds none.
+TEST(StructDeclarationParsing, StructMemberKeepsItsClassSpecialization) {
+  auto r = Parse(
+      "class B2; endclass\n"
+      "class C #(type T = int); endclass\n"
+      "module m;\n"
+      "  struct { C #(.T(B2)) a, b; C d; } s;\n"
+      "endmodule");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto& members = r.cu->modules[0]->items[0]->data_type.struct_members;
+  ASSERT_EQ(members.size(), 3u);
+  for (std::size_t i = 0; i < 2; ++i) {
+    ASSERT_EQ(members[i].type_params.size(), 1u) << i;
+    EXPECT_EQ(members[i].type_params[0].param_arg_name, "T") << i;
+    EXPECT_EQ(members[i].type_params[0].type_name, "B2") << i;
+  }
+  EXPECT_TRUE(members[2].type_params.empty());
+}
+
 }  // namespace

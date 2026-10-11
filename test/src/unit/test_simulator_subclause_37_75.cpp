@@ -543,6 +543,23 @@ TEST_F(DoWhileAndForeachLoopsOfARun, ATypeParameterBaseGivesItsIndexType) {
                               vpiStringVar, vpiByteVar}));
 }
 
+// §7.2 and §8.25 with §12.7.3: over an array a class inherits through its
+// type parameter, named through a structure's member of a specialized class
+// type, C #(.T(B2)) c, the index variable is of the index type of the array
+// B2 declares, a byte var, and not B's string.
+TEST_F(DoWhileAndForeachLoopsOfARun,
+       AStructMembersSpecializationGivesItsIndex) {
+  Run("module top;\n"
+      "  class B; int v [string]; endclass\n"
+      "  class B2; int v [byte]; endclass\n"
+      "  class C #(type T = B) extends T; endclass\n"
+      "  typedef struct { C #(.T(B2)) c; } s_t;\n"
+      "  s_t s;\n"
+      "  initial begin : b s.c = new; foreach (s.c.v[k]) begin end end\n"
+      "endmodule\n");
+  EXPECT_EQ(FirstLoopVarKinds(By("top.b")), (std::vector<int>{vpiByteVar}));
+}
+
 // §37.75: a null handle has no do-while condition.
 TEST_F(DoWhileForeach, DoWhileConditionOfANullHandleIsNull) {
   EXPECT_EQ(VpiDoWhileConditionExpr(nullptr), nullptr);

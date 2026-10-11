@@ -33,6 +33,7 @@ void ApplyMemberType(StructMember& member, const DataType& member_type) {
   member.extra_packed_dims = member_type.extra_packed_dims;
   member.type_name = member_type.type_name;
   member.scope_name = member_type.scope_name;
+  member.type_params = member_type.type_params;
 }
 
 // §7.2: a struct or union keyword introduces an aggregate member type.

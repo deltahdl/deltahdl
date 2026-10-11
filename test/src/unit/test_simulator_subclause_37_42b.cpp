@@ -758,6 +758,26 @@ TEST_F(CallStatementsInAScope, AnExpressionsSpecializationChoosesItsBase) {
   }
 }
 
+// §7.2 and §8.25 with §37.42: a structure's member of a specialized class
+// type, C #(.T(B2)) c, holds a handle of the class the specialization gives
+// C's type parameter as its base, so s.c.tick() reaches B2's tick.
+TEST_F(CallStatementsInAScope, AStructMembersSpecializationChoosesItsBase) {
+  Run("module top;\n"
+      "  class B; endclass\n"
+      "  class B2; task tick(); endtask endclass\n"
+      "  class C #(type T = B) extends T; endclass\n"
+      "  typedef struct { C #(.T(B2)) c; } s_t;\n"
+      "  s_t s;\n"
+      "  initial begin : b s.c = new; s.c.tick(); end\n"
+      "endmodule\n");
+  vpiHandle call = Named(vpiMethodTaskCall, By("top.b"), "tick");
+  vpiHandle tick =
+      Named(vpiMethods, Named(vpiClassDefn, By("top"), "B2"), "tick");
+  ASSERT_NE(call, nullptr);
+  ASSERT_NE(tick, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, call)), VpiObjectOf(tick));
+}
+
 // §15.4 and §18.6.1 with §37.42: a built-in class is a class too, so a call
 // of randomize through a handle of a class extending mailbox, which declares
 // no randomize, is a method func call of a built-in method, though §15.4 names

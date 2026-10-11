@@ -89,6 +89,11 @@ struct StructMember {
   // that names no aggregate -- an enum with its base, `typedef logic [5:0]
   // w_t` -- as the elaborator resolved it; 0 where it resolved none.
   uint32_t resolved_width = 0;
+  // §7.2 with §8.25: the parameter_value_assignment a named member type was
+  // written with, `C #(.T(B2)) c`, held as DataType::type_params holds a
+  // declaration's, so the specialization the member holds a handle of is
+  // known. Empty where the type was written with none.
+  std::vector<DataType> type_params;
 };
 
 struct DataType {
