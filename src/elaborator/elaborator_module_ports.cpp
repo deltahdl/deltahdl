@@ -6,6 +6,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -621,6 +622,21 @@ static Direction PortExprDirection(const ModuleDecl* decl, const Expr* expr) {
   return Direction::kNone;
 }
 
+// §6.18: a typedef carries its unpacked dimensions into the type it names, so
+// a port declared through one, or through a chain of names reaching one, is an
+// unpacked array though no dimension follows its name (§10.8 lets a pattern
+// take its type from such a port).
+static bool TypedefChainIsUnpackedArray(
+    const DataType& dtype, const TypedefMap& typedefs,
+    const std::unordered_map<std::string_view, std::vector<Expr*>>&
+        typedef_dims) {
+  std::vector<std::string_view> names;
+  FollowTypedefs(dtype, typedefs, names);
+  return std::ranges::any_of(names, [&](std::string_view name) {
+    return typedef_dims.contains(name);
+  });
+}
+
 void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
   auto param_scope = BuildParamScope(mod);
   FoldBodyParamsIntoPortScope(decl, param_scope);
@@ -659,6 +675,8 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
         port.data_type.kind == DataTypeKind::kNamed &&
         !port.unpacked_dims.empty() &&
         td_array_dims_.contains(port.data_type.type_name);
+    rp.typedef_is_unpacked_array =
+        TypedefChainIsUnpackedArray(port.data_type, typedefs_, td_array_dims_);
 
     if (port.is_interface_port) {
       rp.is_interface_port = true;

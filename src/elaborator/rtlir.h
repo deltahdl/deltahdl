@@ -136,7 +136,7 @@ struct RtlirPort {
   // holds and this says which addresses reach them, which are different
   // questions for every dimension not written `[0:n]`.
   std::vector<RtlirUnpackedDim> unpacked_dims;
-
+  bool typedef_is_unpacked_array = false;  // §6.18: from its typedef.
   // §37.3.3: where the port declaration stands, which vpiLineNo and vpiFile are
   // read off for the port object §37.14's instance-to-port relation reaches.
   SourceLoc loc;

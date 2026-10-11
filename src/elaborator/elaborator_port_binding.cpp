@@ -623,7 +623,9 @@ bool Elaborator::ResolveExplicitTarget(const PortBindScope& scope, size_t index,
 // aggregate (a struct/union or an unpacked array), where the pattern takes its
 // type from the port. It is illegal on an output/inout port (the actual must be
 // an lvalue), as a typed/cast pattern, and for a non-aggregate formal such as
-// `int`, which an assignment pattern cannot target.
+// `int`, which an assignment pattern cannot target. A formal declared through a
+// typedef is judged as the type the typedef names (§6.18): its resolved kind,
+// and the unpacked dimensions a typedef in its chain wrote.
 static bool IllegalPatternPortConnection(const Expr* conn_expr,
                                          Direction direction,
                                          const RtlirPort* port) {
@@ -633,8 +635,9 @@ static bool IllegalPatternPortConnection(const Expr* conn_expr,
   if (!bare_pattern && !cast_pattern) return false;
   bool aggregate_input =
       bare_pattern && direction == Direction::kInput && port != nullptr &&
-      (port->type_kind == DataTypeKind::kStruct ||
-       port->type_kind == DataTypeKind::kUnion || port->num_unpacked_dims > 0);
+      (port->data_kind == DataTypeKind::kStruct ||
+       port->data_kind == DataTypeKind::kUnion || port->num_unpacked_dims > 0 ||
+       port->typedef_is_unpacked_array);
   return !aggregate_input;
 }
 
