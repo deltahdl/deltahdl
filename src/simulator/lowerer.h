@@ -189,6 +189,11 @@ class Lowerer {
   void RegisterClassDecl(const ClassDecl* cls,
                          const std::vector<ModuleItem*>& scope_items);
   void InitClassStaticProperties(const ClassDecl* cls);
+  // §8 with §23.3 and §8.25: registers the classes `mod`, the module of the
+  // instance being lowered, declares, and returns those it registered, whose
+  // statics the caller initializes once the instance's variables exist.
+  // Defined, with the rule it follows, in src/simulator/lowerer_child.cpp.
+  std::vector<const ClassDecl*> RegisterChildClasses(const RtlirModule* mod);
   // §26.2: the package declaring `cls`, or empty for a class of a module or
   // the compilation unit. Defined in src/simulator/lowerer_class.cpp.
   std::string_view DeclaringPackage(const ClassDecl* cls) const;

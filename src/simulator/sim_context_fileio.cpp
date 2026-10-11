@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -539,6 +540,15 @@ bool SimContext::IsEventTriggered(std::string_view name) const {
   return it->second == scheduler_.CurrentTime().ticks;
 }
 
+// The class `table` holds under `name` within the scope `scope`, the key
+// "<scope>::<name>"; null where it holds none.
+static ClassTypeInfo* ClassUnder(
+    const std::unordered_map<std::string_view, ClassTypeInfo*>& table,
+    std::string_view scope, std::string_view name) {
+  const auto kFound = table.find(std::string(scope) + "::" + std::string(name));
+  return kFound == table.end() ? nullptr : kFound->second;
+}
+
 void SimContext::RegisterClassType(std::string_view name, ClassTypeInfo* info) {
   if (class_scope_.empty()) {
     class_types_[name] = info;
@@ -551,7 +561,7 @@ void SimContext::RegisterClassType(std::string_view name, ClassTypeInfo* info) {
 // §8.25 (printed page 204): a parameterized class a module declares is a
 // generic class of each instance of the module, with specializations and
 // static members of its own, so the copies a later instance registers stand
-// under that instance's prefix (Lowerer::LowerChildModules), and a name is
+// under that instance's prefix (Lowerer::RegisterChildClasses), and a name is
 // looked for first under the instance in hand: the scope set, else the
 // running code's instance.
 std::string SimContext::SetClassInstanceScope(std::string scope) {
@@ -561,9 +571,7 @@ std::string SimContext::SetClassInstanceScope(std::string scope) {
 }
 
 ClassTypeInfo* SimContext::ExactClassType(std::string_view name) {
-  const auto kFound =
-      class_types_.find(class_scope_ + "::" + std::string(name));
-  return kFound == class_types_.end() ? nullptr : kFound->second;
+  return ClassUnder(class_types_, class_scope_, name);
 }
 
 // §8.23: a class nested in another is held under `Outer::Inner`, the name
@@ -591,16 +599,17 @@ ClassTypeInfo* SimContext::FindClassType(std::string_view name) {
   // §3.12.1: where each unit has a scope of its own, the running code's unit's
   // class of the name stands ahead of another unit's
   // (Lowerer::RegisterClassDecl).
-  if (units_.Separate()) {
-    auto own = class_types_.find(ActiveUnitScope() + "::" + std::string(name));
-    if (own != class_types_.end()) return own->second;
+  // §8.25: so too a module instance's own class of the name, under the
+  // instance scope set or else the running code's instance.
+  ClassTypeInfo* own = units_.Separate()
+                           ? ClassUnder(class_types_, ActiveUnitScope(), name)
+                           : nullptr;
+  if (own == nullptr && instance_classes_) {
+    own = ClassUnder(
+        class_types_,
+        class_scope_.empty() ? ActiveInstancePrefix() : class_scope_, name);
   }
-  if (instance_classes_) {
-    const std::string kScope =
-        class_scope_.empty() ? ActiveInstancePrefix() : class_scope_;
-    auto own = class_types_.find(kScope + "::" + std::string(name));
-    if (own != class_types_.end()) return own->second;
-  }
+  if (own != nullptr) return own;
   auto it = class_types_.find(name);
   if (it != class_types_.end()) return it->second;
   for (const ClassTypeInfo* scope = CurrentMethodClass(); scope != nullptr;

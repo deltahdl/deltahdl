@@ -634,13 +634,25 @@ static void TakeParamArrayActuals(ClassTypeInfo* spec,
   }
 }
 
-// The specialization of `generic` the actuals `spelled`, whose parameter
-// values are `values`, make, registered under `key`.
+namespace {
+
+// The actuals a specialization is made from: as SpelledActuals spells them,
+// and the values its value parameters take from them.
+struct MadeActuals {
+  const std::vector<DataType>* spelled = nullptr;
+  const ParamValues* values = nullptr;
+};
+
+}  // namespace
+
+// The specialization of `generic` the actuals `made` give, registered under
+// `key`.
 static ClassTypeInfo* MakeSpecialization(ClassTypeInfo* generic,
                                          std::string key,
-                                         const std::vector<DataType>& spelled,
-                                         const ParamValues& values,
+                                         const MadeActuals& made,
                                          SimContext& ctx, Arena& arena) {
+  const std::vector<DataType>& spelled = *made.spelled;
+  const ParamValues& values = *made.values;
   // The declaration's type is copied rather than built again: the interfaces,
   // the members, the vtable and the methods are facts about the declaration
   // and are shared by every specialization, and only the static storage, the
@@ -711,7 +723,7 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
                             ? ctx.FindClassType(key)
                             : ctx.ExactClassType(key);
   if (spec == nullptr) {
-    spec = MakeSpecialization(generic, std::move(key), spelled, values, ctx,
+    spec = MakeSpecialization(generic, std::move(key), {&spelled, &values}, ctx,
                               arena);
   }
   ctx.SetClassInstanceScope(kOuter);

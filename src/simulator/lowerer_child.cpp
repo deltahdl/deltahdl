@@ -479,6 +479,30 @@ void Lowerer::LowerChildBody(const RtlirModule* mod) {
   LowerChildModules(mod);
 }
 
+// §8 with §23.3: a class the instance's module declares is a type of that
+// module wherever it is instantiated, registered as LowerModule registers
+// the top's -- before the variables, so a handle's `C h = new;` finds it
+// -- and once, a second instance of the module declaring the same class.
+// §8.25 (printed page 204) makes a parameterized class an exception: each
+// instance of the module declaring it creates a generic class of its own,
+// with specializations and static members of its own, so a later instance
+// registers its own copy, held under its prefix.
+std::vector<const ClassDecl*> Lowerer::RegisterChildClasses(
+    const RtlirModule* mod) {
+  std::vector<const ClassDecl*> fresh_classes;
+  for (auto* cls : mod->class_decls) {
+    const ClassTypeInfo* known = ctx_.FindClassType(cls->name);
+    const bool kRegistered = known != nullptr && known->decl == cls;
+    if (kRegistered && cls->params.empty()) continue;
+    const std::string kOuter =
+        ctx_.SetClassInstanceScope(kRegistered ? inst_prefix_ : std::string());
+    RegisterClassDecl(cls, mod->function_decls);
+    ctx_.SetClassInstanceScope(kOuter);
+    fresh_classes.push_back(cls);
+  }
+  return fresh_classes;
+}
+
 void Lowerer::LowerChildInstance(const RtlirModuleInst& child) {
   auto saved_prefix = inst_prefix_;
   auto child_prefix = inst_prefix_ + std::string(child.inst_name) + ".";
@@ -521,25 +545,8 @@ void Lowerer::LowerChildInstance(const RtlirModuleInst& child) {
   // registers the top's, so `name()` and `next()` answer on a variable of it.
   RegisterEnumTypes(child.resolved);
   RegisterParamEnumTypes(child.resolved);
-  // §8 with §23.3: a class the instance's module declares is a type of that
-  // module wherever it is instantiated, registered as LowerModule registers
-  // the top's -- before the variables, so a handle's `C h = new;` finds it
-  // -- and once, a second instance of the module declaring the same class.
-  // §8.25 (printed page 204) makes a parameterized class an exception: each
-  // instance of the module declaring it creates a generic class of its own,
-  // with specializations and static members of its own, so a later instance
-  // registers its own copy, held under its prefix.
-  std::vector<const ClassDecl*> fresh_classes;
-  for (auto* cls : child.resolved->class_decls) {
-    const ClassTypeInfo* known = ctx_.FindClassType(cls->name);
-    const bool kRegistered = known != nullptr && known->decl == cls;
-    if (kRegistered && cls->params.empty()) continue;
-    const std::string kOuter =
-        ctx_.SetClassInstanceScope(kRegistered ? inst_prefix_ : std::string());
-    RegisterClassDecl(cls, child.resolved->function_decls);
-    ctx_.SetClassInstanceScope(kOuter);
-    fresh_classes.push_back(cls);
-  }
+  std::vector<const ClassDecl*> fresh_classes =
+      RegisterChildClasses(child.resolved);
   RegisterChildInstanceKeys(child.resolved);
   CreateChildModuleVariables(inst_prefix_, child.resolved);
   for (const ClassDecl* cls : fresh_classes) InitClassStaticProperties(cls);
