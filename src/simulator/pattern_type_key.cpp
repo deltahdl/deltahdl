@@ -103,7 +103,14 @@ bool PatternKeyMatches(const PatternKeyType& key,
 }
 
 PatternKeySubject SubjectOf(PatternKeySubject subject, const SimContext& ctx) {
-  bool named = !subject.type_name.empty();
+  // A type written as a keyword carries the keyword as its type_name too, so
+  // a name is a typedef's only where it is no keyword; read as one, `int`'s
+  // signing came from a typedef table holding no `int`, and an int element
+  // took no `int:` key.
+  bool named = !subject.type_name.empty() &&
+               std::ranges::none_of(kKeywordTypes, [&](const KeywordType& k) {
+                 return k.keyword == subject.type_name;
+               });
   if (subject.kind == DataTypeKind::kNamed)
     subject.kind = ctx.FindTypeKind(subject.type_name);
   if (!subject.is_signed) {

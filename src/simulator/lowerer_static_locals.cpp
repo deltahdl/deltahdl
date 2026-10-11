@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <vector>
 
 #include "common/arena.h"
@@ -72,11 +73,28 @@ void InitSubroutineStatics(const StaticLocalOwner& owner, SimContext& ctx,
   ctx.PopStaticScope(func->name);
 }
 
+// §27.4: whether `func` is one of the subroutines a generate block of `mod`
+// declares. The elaborator lists such a subroutine among the module's own
+// function_decls as well, under its bare name and possibly as a copy, so it is
+// told by where it is written; made from there, its static locals were made
+// without the block's loop constants their initializers read.
+bool IsGenBlockSubroutine(const ModuleItem* func, const RtlirModule* mod) {
+  return std::ranges::any_of(
+      mod->gen_block_subroutines, [&](const RtlirGenBlockSubroutine& sub) {
+        return sub.decl->name == func->name &&
+               sub.decl->loc.file_id == func->loc.file_id &&
+               sub.decl->loc.line == func->loc.line &&
+               sub.decl->loc.column == func->loc.column;
+      });
+}
+
 }  // namespace
 
 void Lowerer::RecordStaticLocalSubroutines(const RtlirModule* mod) {
   for (const ModuleItem* func : mod->function_decls) {
-    if (!func->method_class.empty() || StaticInitsOf(func).empty()) continue;
+    if (!func->method_class.empty() || StaticInitsOf(func).empty() ||
+        IsGenBlockSubroutine(func, mod))
+      continue;
     static_local_owners_.push_back(
         {.inst_prefix = inst_prefix_, .subroutine = func});
   }

@@ -456,6 +456,79 @@ static Variable* CreateVarInScope(std::string_view name, uint32_t width,
   return var;
 }
 
+// §13.3.2: all variables of a static task are static. A local with no explicit
+// lifetime keyword inherits its enclosing subroutine's lifetime, so a plain
+// local declared inside a static-lifetime task/function is itself static and
+// must be a single cell shared across every activation -- including concurrent
+// ones. Such a local therefore has to resolve against the shared static-frame
+// store rather than the per-activation scope stack (which, since automatic and
+// block locals are now private to each process, would otherwise give each
+// concurrent activation its own copy). An explicit `automatic` local never
+// becomes static.
+static bool IsEffectivelyStaticLocal(const Stmt* stmt,
+                                     std::string_view func_name,
+                                     SimContext& ctx) {
+  if (stmt->var_is_static) return true;
+  if (stmt->var_is_automatic || func_name.empty()) return false;
+  auto* f = ctx.FindFunction(func_name);
+  return f && f->is_static && !f->is_automatic;
+}
+
+// The static frame a static local lives in: its subroutine's, or, for a
+// declaration written static outside any subroutine, a frame of the
+// declaration's own named after where it is written. §6.21 makes such a
+// variable one cell for the whole simulation, shared by every activation of
+// the block that declares it, and §18.17 puts one in the code block of a
+// randsequence, an anonymous automatic scope that is pushed afresh for every
+// activation and so cannot keep the cell itself. The name is arena-persisted
+// because the frame store keys on string_view.
+static std::string_view StaticFrameOf(const Stmt* stmt,
+                                      std::string_view func_name,
+                                      SimContext& ctx) {
+  if (!func_name.empty()) return func_name;
+  auto* key = ctx.GetArena().Create<std::string>(
+      std::format("static@{}:{}:{}", stmt->range.start.file_id,
+                  stmt->range.start.line, stmt->range.start.column));
+  return *key;
+}
+
+// The variable a static local's declaration made the first time it ran,
+// kept in its static frame; null where the declaration is not static or has
+// not run yet.
+static Variable* KeptStaticLocal(const Stmt* stmt, SimContext& ctx) {
+  std::string_view func_name = ctx.CurrentFuncName();
+  if (!IsEffectivelyStaticLocal(stmt, func_name, ctx)) return nullptr;
+  return ctx.FindStaticFuncVar(StaticFrameOf(stmt, func_name, ctx),
+                               stmt->var_name);
+}
+
+// §6.21 with §10.5 (printed page 256): a static local is one variable for the
+// whole simulation, its initializer run once, before any procedure starts
+// (Lowerer::InitializeStaticLocals); its declaration, executed when its block
+// is entered, stands in that variable again and runs nothing. A handle's
+// class and specialization are recorded again for the frame entered, and a
+// named block's variable is bound under its hierarchical name (§9.3.4), as
+// the declaration does where it makes the variable. Made afresh instead, a
+// handle's `new` ran a second time and `process::self()` answered the
+// procedure, and `b1.cnt` named no variable.
+static bool TryReuseKeptStaticLocal(const Stmt* stmt, SimContext& ctx,
+                                    Arena& arena) {
+  Variable* kept = KeptStaticLocal(stmt, ctx);
+  if (kept == nullptr) return false;
+  ctx.AliasLocalVariable(stmt->var_name, kept);
+  RestoreStaticAggregate(StaticFrameOf(stmt, ctx.CurrentFuncName(), ctx),
+                         stmt->var_name, ctx);
+  std::string_view class_key =
+      DeclaredClassKey(stmt->var_decl_type, ctx, arena);
+  if (!class_key.empty()) {
+    ctx.SetVariableClassType(stmt->var_name, class_key);
+    RecordClassParamActuals(stmt->var_name, class_key,
+                            stmt->var_decl_type.type_params, ctx);
+  }
+  BindNamedBlockVariable(stmt->var_name, ctx);
+  return true;
+}
+
 // §8.23 (printed pages 200-201 of IEEE 1800-2023): a procedural
 // `Outer::Inner i = new;` names the nested class by its scoped spelling, which
 // DeclaredClassKey (declared_class_key.h) resolves to the key the run holds it
@@ -480,7 +553,14 @@ static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
   // §8.11 (printed page 187): in a method, the handle is the innermost
   // scope's and hides a property of its name; made design-wide instead, a
   // task's `O d; d = new;` wrote the property d.
-  CreateVarInScope(stmt->var_name, 64, false, ctx);
+  Variable* handle = CreateVarInScope(stmt->var_name, 64, false, ctx);
+  // §6.21: a static handle is kept in its static frame, where the next
+  // execution of the declaration finds it (TryReuseKeptStaticLocal).
+  std::string_view func_name = ctx.CurrentFuncName();
+  if (IsEffectivelyStaticLocal(stmt, func_name, ctx)) {
+    ctx.SaveStaticFuncVar(StaticFrameOf(stmt, func_name, ctx), stmt->var_name,
+                          handle);
+  }
   ctx.SetVariableClassType(stmt->var_name, class_type);
 
   RecordClassParamActuals(stmt->var_name, class_type,
@@ -557,64 +637,17 @@ static void CreateDeclVariable(const Stmt* stmt, uint32_t width, bool is_real,
   }
 }
 
-// §13.3.2: all variables of a static task are static. A local with no explicit
-// lifetime keyword inherits its enclosing subroutine's lifetime, so a plain
-// local declared inside a static-lifetime task/function is itself static and
-// must be a single cell shared across every activation -- including concurrent
-// ones. Such a local therefore has to resolve against the shared static-frame
-// store rather than the per-activation scope stack (which, since automatic and
-// block locals are now private to each process, would otherwise give each
-// concurrent activation its own copy). An explicit `automatic` local never
-// becomes static.
-static bool IsEffectivelyStaticLocal(const Stmt* stmt,
-                                     std::string_view func_name,
-                                     SimContext& ctx) {
-  if (stmt->var_is_static) return true;
-  if (stmt->var_is_automatic || func_name.empty()) return false;
-  auto* f = ctx.FindFunction(func_name);
-  return f && f->is_static && !f->is_automatic;
-}
-
-// The static frame a static local lives in: its subroutine's, or, for a
-// declaration written static outside any subroutine, a frame of the
-// declaration's own named after where it is written. §6.21 makes such a
-// variable one cell for the whole simulation, shared by every activation of
-// the block that declares it, and §18.17 puts one in the code block of a
-// randsequence, an anonymous automatic scope that is pushed afresh for every
-// activation and so cannot keep the cell itself. The name is arena-persisted
-// because the frame store keys on string_view.
-static std::string_view StaticFrameOf(const Stmt* stmt,
-                                      std::string_view func_name,
-                                      SimContext& ctx) {
-  if (!func_name.empty()) return func_name;
-  auto* key = ctx.GetArena().Create<std::string>(
-      std::format("static@{}:{}:{}", stmt->range.start.file_id,
-                  stmt->range.start.line, stmt->range.start.column));
-  return *key;
-}
-
-// Returns true if the declaration resolves to an already-existing variable
-// (a static var to alias, or a local already present) and so needs no fresh
-// creation.
+// §9.3.4 with §6.21: true where a declaration that is not static is executed
+// again in the frame already holding its variable, which it then stands in.
+// The variable a block re-entered keeps is in its own frame; an enclosing
+// block's of the same name is another variable, which this declaration hides
+// rather than reuses. A static local made already is TryReuseKeptStaticLocal's.
 static bool TryReuseExistingDeclVar(const Stmt* stmt,
                                     std::string_view func_name,
                                     SimContext& ctx) {
-  if (IsEffectivelyStaticLocal(stmt, func_name, ctx)) {
-    auto* existing = ctx.FindStaticFuncVar(StaticFrameOf(stmt, func_name, ctx),
-                                           stmt->var_name);
-    if (existing) {
-      ctx.AliasLocalVariable(stmt->var_name, existing);
-      RestoreStaticAggregate(StaticFrameOf(stmt, func_name, ctx),
-                             stmt->var_name, ctx);
-      return true;
-    }
-  } else if (!stmt->var_is_automatic) {
-    // §9.3.4 with §6.21: the variable a block re-entered keeps is in its own
-    // frame; an enclosing block's of the same name is another variable, which
-    // this declaration hides rather than reuses.
-    return ctx.InnermostScopeDeclares(stmt->var_name);
-  }
-  return false;
+  if (IsEffectivelyStaticLocal(stmt, func_name, ctx) || stmt->var_is_automatic)
+    return false;
+  return ctx.InnermostScopeDeclares(stmt->var_name);
 }
 
 // §6.8's declared variable, as the declaration describes it rather than as the
@@ -777,6 +810,7 @@ static StmtResult ExecVarDeclBody(const Stmt* stmt, SimContext& ctx,
                                   Arena& arena) {
   stmt = DeclareInlineEnumOf(stmt, ctx, arena);
   stmt = DeclShapedByTypedef(stmt, ctx, arena);
+  if (TryReuseKeptStaticLocal(stmt, ctx, arena)) return StmtResult::kDone;
   if (TryExecWeakRefVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
   if (TryExecClassVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
 
@@ -861,6 +895,9 @@ static StmtResult ExecVarDeclBody(const Stmt* stmt, SimContext& ctx,
 StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (stmt->kind == StmtKind::kBlockItemDecl)
     return ExecBlockItemDeclImpl(stmt, ctx, arena);
+  // §6.21: a static local made already keeps the object it was bound to.
+  if (KeptStaticLocal(stmt, ctx) != nullptr)
+    return ExecVarDeclBody(stmt, ctx, arena);
   StmtResult result = ExecVarDeclBody(stmt, ctx, arena);
   Variable* local = ctx.FindLocalVariable(stmt->var_name);
   CreateSyncObjectForLocal(stmt, local, ctx, arena);

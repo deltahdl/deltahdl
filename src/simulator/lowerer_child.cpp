@@ -183,22 +183,11 @@ static std::string AliasNetKey(const AliasScope& scope, std::string_view name,
   return scope.inst_prefix + std::string(name);
 }
 
-// Appends the bits the alias operand `e` lists, the most significant first: a
-// net's, a bit-select's or a part-select's of one, or those of each operand
-// of a concatenation or of a positional assignment pattern in turn -- Annex
-// A.8.5's net_lvalue, the type of a typed pattern looked through. False where
-// `e` is none of these.
-static bool AppendAliasBits(const Expr* e, const AliasScope& scope,
-                            SimContext& ctx, Arena& arena,
-                            std::vector<AliasBit>& out) {
-  e = UnwrapTypedPattern(e);
-  if (e->kind == ExprKind::kConcatenation ||
-      e->kind == ExprKind::kAssignmentPattern) {
-    for (const Expr* el : e->elements) {
-      if (!AppendAliasBits(el, scope, ctx, arena, out)) return false;
-    }
-    return true;
-  }
+// Appends the bits of the net, the bit-select or the part-select `e`, the
+// most significant first. False where `e` names no net of the scope.
+static bool AppendNetOperandBits(const Expr* e, const AliasScope& scope,
+                                 SimContext& ctx, Arena& arena,
+                                 std::vector<AliasBit>& out) {
   const Expr* base = e->kind == ExprKind::kSelect ? e->base : e;
   if (base == nullptr || base->kind != ExprKind::kIdentifier) return false;
   Net* net = ctx.FindNet(AliasNetKey(scope, base->text, ctx));
@@ -211,6 +200,24 @@ static bool AppendAliasBits(const Expr* e, const AliasScope& scope,
   }
   for (int64_t off = span.second; off >= span.first; --off)
     out.push_back({net, static_cast<uint32_t>(off)});
+  return true;
+}
+
+// Appends the bits the alias operand `e` lists, the most significant first: a
+// net's, a bit-select's or a part-select's of one, or those of each operand
+// of a concatenation or of a positional assignment pattern in turn -- Annex
+// A.8.5's net_lvalue, the type of a typed pattern looked through. False where
+// `e` is none of these.
+static bool AppendAliasBits(const Expr* e, const AliasScope& scope,
+                            SimContext& ctx, Arena& arena,
+                            std::vector<AliasBit>& out) {
+  e = UnwrapTypedPattern(e);
+  if (e->kind != ExprKind::kConcatenation &&
+      e->kind != ExprKind::kAssignmentPattern)
+    return AppendNetOperandBits(e, scope, ctx, arena, out);
+  for (const Expr* el : e->elements) {
+    if (!AppendAliasBits(el, scope, ctx, arena, out)) return false;
+  }
   return true;
 }
 
