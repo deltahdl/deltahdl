@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <string_view>
 #include <tuple>
 #include <vector>
 
@@ -54,6 +55,12 @@ std::vector<const Stmt*> StaticInitsOf(const Stmt* body) {
   return out;
 }
 
+// The frame ExecFuncVarDecl makes the static locals of `func` in, held under
+// `name`.
+StaticFrame StaticLocalsFrame(std::string_view name, const ModuleItem* func) {
+  return {name, func->is_static && !func->is_automatic};
+}
+
 // §13.4.2: the static locals of `owner`'s subroutine, made in its static frame
 // as a call makes them (EvalFunctionCall): the frame entered with the
 // subroutine's package, and a generate block instance's subroutine with the
@@ -71,8 +78,7 @@ void InitSubroutineStatics(const StaticLocalOwner& owner, SimContext& ctx,
     BindGenBlockConsts(target, ctx, arena);
   }
   for (const Stmt* decl : StaticInitsOf(func)) {
-    ExecFuncVarDecl(decl, {func->name, func->is_static && !func->is_automatic},
-                    ctx, arena);
+    ExecFuncVarDecl(decl, StaticLocalsFrame(func->name, func), ctx, arena);
   }
   ctx.PopStaticScope(func->name);
 }
@@ -127,11 +133,9 @@ void InitClassMethodStatics(const ClassTypeInfo* cls, SimContext& ctx,
     ctx.EnterSubroutinePackage(func);
     {
       StaticLocalFrameScope frame(func, ctx, arena);
-      for (const Stmt* decl : inits) {
-        ExecFuncVarDecl(decl,
-                        {frame.Name(), func->is_static && !func->is_automatic},
-                        ctx, arena);
-      }
+      for (const Stmt* decl : inits)
+        ExecFuncVarDecl(decl, StaticLocalsFrame(frame.Name(), func), ctx,
+                        arena);
     }
     ctx.PopScope();
     ctx.PopMethodClass();
@@ -158,21 +162,32 @@ const ClassTypeInfo* OutermostClass(const ClassTypeInfo* cls) {
   return cls;
 }
 
-// §10.5 with §8.6: the method static locals of the classes `decls` a module
-// declares, in the instance the caller stands in, whose frames a call keeps
-// under that instance (SimContext::StaticFrameKey). The classes are the ones
-// the instance holds -- its own copies where it was given them
-// (Lowerer::RegisterChildClasses) -- with each class nested in one (§8.23)
-// and each specialization of one made by now (§8.25).
+// §8.25: the scope the classes of `decl` held for the instance `prefix` stand
+// under: the instance's own, where it was given copies of its own
+// (Lowerer::RegisterChildClasses), and otherwise none, the classes being
+// shared.
+std::string_view InstanceClassScope(const ClassDecl* decl,
+                                    std::string_view prefix,
+                                    const std::vector<ClassTypeInfo*>& held) {
+  bool own = std::ranges::any_of(held, [&](const ClassTypeInfo* cls) {
+    return cls->instance_scope == prefix && cls->decl == decl;
+  });
+  return own ? prefix : std::string_view{};
+}
+
+// §10.5 with §8.6: the method static locals of the classes `decls` the module
+// of the instance `prefix` declares, made standing in that instance, whose
+// frames a call keeps under it (SimContext::StaticFrameKey). The classes are
+// the ones the instance holds (InstanceClassScope), with each class nested in
+// one (§8.23) and each specialization of one made by now (§8.25).
 void InitModuleClassMethodStatics(const std::vector<ClassDecl*>& decls,
-                                  SimContext& ctx, Arena& arena) {
+                                  std::string_view prefix, SimContext& ctx,
+                                  Arena& arena) {
   std::vector<ClassTypeInfo*> held = ctx.RegisteredClassTypes(true);
   for (const ClassDecl* decl : decls) {
-    const ClassTypeInfo* generic = ctx.FindClassType(decl->name);
-    if (generic == nullptr || generic->decl != decl) continue;
+    std::string_view scope = InstanceClassScope(decl, prefix, held);
     for (const ClassTypeInfo* cls : held) {
-      if (cls->package.empty() &&
-          cls->instance_scope == generic->instance_scope &&
+      if (cls->package.empty() && cls->instance_scope == scope &&
           OutermostClass(cls)->decl == decl) {
         InitClassMethodStatics(cls, ctx, arena);
       }
@@ -237,7 +252,8 @@ void Lowerer::InitializeStaticLocals() {
     }
     CallerStandIn in_owner(&stand_in, ctx_);
     if (owner.classes != nullptr) {
-      InitModuleClassMethodStatics(*owner.classes, ctx_, arena_);
+      InitModuleClassMethodStatics(*owner.classes, owner.inst_prefix, ctx_,
+                                   arena_);
       continue;
     }
     if (owner.subroutine != nullptr) {
