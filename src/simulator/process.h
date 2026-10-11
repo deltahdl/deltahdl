@@ -333,9 +333,7 @@ struct Process {
     sv_state = ProcessState::kKilled;
     auto waiters = std::move(await_waiters);
     await_waiters.clear();
-    for (auto& w : waiters) {
-      if (w) w.resume();
-    }
+    for (auto& w : waiters) w.resume();
   }
 
   // Runs fork_release once, by whichever ends the process first: its own

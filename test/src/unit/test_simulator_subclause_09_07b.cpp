@@ -308,7 +308,7 @@ TEST(FineGrainProcessControlRun, AProcessDisableForkEndsIsKilled) {
 
 // §9.7: kill() terminates every descendant, a grandchild spawned by a child
 // that has already finished among them, and each process it terminates
-// releases the processes awaiting it.
+// releases the processes awaiting it. Killing it again leaves it KILLED.
 TEST(FineGrainProcessControlRun, KillReachesAndReleasesEveryDescendant) {
   SimFixture f;
   EXPECT_EQ(
@@ -323,6 +323,7 @@ TEST(FineGrainProcessControlRun, KillReachesAndReleasesEveryDescendant) {
                  "    end join_none\n"
                  "    #1 fork begin c.await(); $display(\"c %0t\", $time); end "
                  "join_none\n"
+                 "    #1 p.kill();\n"
                  "    #1 p.kill();\n"
                  "    #20 $display(\"x=%0d\", x);\n"
                  "  end\n"
