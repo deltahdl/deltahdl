@@ -2,7 +2,6 @@
 #include "common/source_loc.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
-#include "parser/ast_stmt.h"
 #include "parser/expr_substitute.h"
 #include "parser/parser.h"
 #include "parser/parser_property_spec_internal.h"
