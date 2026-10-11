@@ -116,10 +116,14 @@ static void WalkStmtsForSequenceEvents(Stmt* s, const SequenceEventCtx& ctx) {
       s, [&](Stmt* const& sub) { WalkStmtsForSequenceEvents(sub, ctx); });
 }
 
-// §9.4.2.4 with §6.21: adds to `out` the variables `s` and the statements
-// inside it declare with an automatic lifetime: each declared `automatic`, and,
-// where `automatic_by_default` (the body of an automatic task), each not
-// declared `static`.
+// §6.21: adds to `out` the variables `s` and the statements inside it declare
+// with an automatic lifetime: each declared `automatic`, and, where
+// `automatic_by_default` (the body of an automatic task or function), each not
+// declared `static`. §9.4.2.4 bars an automatic variable as an argument of a
+// sequence used in an event control, and §16.4 as the actual for a
+// pass-by-reference formal of a deferred-assertion action call; neither puts a
+// condition on the statement the variable is declared under, so this descends
+// every link ForEachChildStmt in elaborator_validate_internal.h names.
 static void CollectAutomaticVarNames(
     const Stmt* s, bool automatic_by_default,
     std::unordered_set<std::string_view>& out) {
@@ -133,6 +137,26 @@ static void CollectAutomaticVarNames(
   });
 }
 
+// The automatic-variable names in scope for one module item, so a deferred
+// action call passing one of them by reference (§16.4), or a sequence event
+// written with one as an argument (§9.4.2.4), can be rejected. An automatic
+// task or function makes its formals and its non-static locals automatic.
+static std::unordered_set<std::string_view> CollectItemAutomaticVarNames(
+    const ModuleItem* item) {
+  bool routine_is_automatic = (item->kind == ModuleItemKind::kTaskDecl ||
+                               item->kind == ModuleItemKind::kFunctionDecl) &&
+                              item->is_automatic;
+  std::unordered_set<std::string_view> auto_vars;
+  if (routine_is_automatic) {
+    for (const auto& fa : item->func_args) auto_vars.insert(fa.name);
+  }
+  CollectAutomaticVarNames(item->body, routine_is_automatic, auto_vars);
+  for (const auto* st : item->func_body_stmts) {
+    CollectAutomaticVarNames(st, routine_is_automatic, auto_vars);
+  }
+  return auto_vars;
+}
+
 // Walk one module item's statements for sequence-event arguments. A process
 // block's statements live in item->body; a task body's statements live in
 // func_body_stmts (item->body is the module-process body form), so both are
@@ -144,22 +168,16 @@ static void WalkItemForSequenceEvents(
     const ModuleItem* item,
     const std::unordered_set<std::string_view>& seq_names,
     const SequenceDeclMap& seq_decls, DiagEngine& diag) {
-  const bool kTask = item->kind == ModuleItemKind::kTaskDecl;
-  if (!kTask && !IsProceduralItemKind(item->kind)) return;
-  const bool kAutomatic = kTask && item->is_automatic;
-  std::unordered_set<std::string_view> automatic_names;
-  if (kAutomatic) {
-    for (const FunctionArg& arg : item->func_args) {
-      automatic_names.insert(arg.name);
-    }
+  if (item->kind != ModuleItemKind::kTaskDecl &&
+      !IsProceduralItemKind(item->kind)) {
+    return;
   }
+  const std::unordered_set<std::string_view> kAutomaticNames =
+      CollectItemAutomaticVarNames(item);
   std::vector<Stmt*> bodies(item->func_body_stmts.begin(),
                             item->func_body_stmts.end());
   bodies.push_back(const_cast<Stmt*>(item->body));
-  for (const Stmt* s : bodies) {
-    CollectAutomaticVarNames(s, kAutomatic, automatic_names);
-  }
-  const SequenceEventCtx kCtx{seq_names, seq_decls, automatic_names, diag};
+  const SequenceEventCtx kCtx{seq_names, seq_decls, kAutomaticNames, diag};
   for (Stmt* s : bodies) WalkStmtsForSequenceEvents(s, kCtx);
 }
 
@@ -336,33 +354,6 @@ static void CheckDeferredActionStmt(
   CheckDeferredCallRefArgs(s->assert_fail_stmt, subs, auto_vars, diag);
 }
 
-// §16.4: gather the names of automatic variables visible to deferred assertions
-// in a subroutine body. When the enclosing task or function has automatic
-// lifetime, every local variable is automatic; an explicitly-automatic local is
-// automatic even inside a static routine.
-static void CollectAutomaticVarNames(
-    const Stmt* s, bool routine_is_automatic,
-    std::unordered_set<std::string_view>& out) {
-  if (!s) return;
-  if (s->kind == StmtKind::kVarDecl &&
-      (routine_is_automatic || s->var_is_automatic)) {
-    out.insert(s->var_name);
-  }
-  // §16.4 bars an automatic variable as the actual for a pass-by-reference
-  // formal of a deferred-assertion action call, and it puts no condition on the
-  // statement the variable is declared under, so this descends every link
-  // ForEachChildStmt in elaborator_validate_internal.h names. It wrote out
-  // eight of the thirteen, so an automatic declared in a fork arm, under a
-  // randcase arm or in a randsequence code block was never collected and
-  // passing it by reference was allowed. A.6.8 admits in a for_initialization
-  // and a for_step_assignment only an assignment, an increment or a call, so no
-  // declaration stands in either; they are descended all the same because this
-  // walk names no link itself.
-  ForEachChildStmt(s, [&](Stmt* const& sub) {
-    CollectAutomaticVarNames(sub, routine_is_automatic, out);
-  });
-}
-
 void Elaborator::WalkStmtsForDeferredActions(
     const Stmt* s, const std::unordered_set<std::string_view>& auto_vars) {
   if (!s) return;
@@ -379,25 +370,6 @@ void Elaborator::WalkStmtsForDeferredActions(
   ForEachChildStmt(s, [this, &auto_vars](Stmt* const& sub) {
     WalkStmtsForDeferredActions(sub, auto_vars);
   });
-}
-
-// §16.4: the automatic-variable names in scope for one module item, so a
-// deferred action call passing one of them by reference can be rejected. An
-// automatic task or function makes its formals and its locals automatic.
-static std::unordered_set<std::string_view> CollectItemAutomaticVarNames(
-    const ModuleItem* item) {
-  bool routine_is_automatic = (item->kind == ModuleItemKind::kTaskDecl ||
-                               item->kind == ModuleItemKind::kFunctionDecl) &&
-                              item->is_automatic;
-  std::unordered_set<std::string_view> auto_vars;
-  if (routine_is_automatic) {
-    for (const auto& fa : item->func_args) auto_vars.insert(fa.name);
-  }
-  CollectAutomaticVarNames(item->body, routine_is_automatic, auto_vars);
-  for (const auto* st : item->func_body_stmts) {
-    CollectAutomaticVarNames(st, routine_is_automatic, auto_vars);
-  }
-  return auto_vars;
 }
 
 void Elaborator::ValidateDeferredAssertionActions(const ModuleDecl* decl) {
