@@ -128,6 +128,11 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/package_assertion_scope.cpp
     elaborator/assertion_name_rules.cpp
     elaborator/block_name_space.cpp
+    elaborator/body_decl_scopes.cpp
+    elaborator/nba_dynamic_element.cpp
+    elaborator/lhs_pattern_widths.cpp
+    elaborator/type_key_match.cpp
+    elaborator/struct_pattern_checks.cpp
     elaborator/unit_scope_order.cpp
     elaborator/compilation_unit_set.cpp
     elaborator/unit_scope_switch.cpp

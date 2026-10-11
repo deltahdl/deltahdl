@@ -54,6 +54,8 @@ class ElaboratorOperationRules : public ElaboratorData {
   void ValidateAssocConcatTarget(const ModuleDecl* decl);
   void WalkStmtsForAssocConcatTarget(const Stmt* s);
   void CheckAssocConcatTargetInAssign(const Stmt* s);
+  bool DeclaresAssocArray(const std::vector<Expr*>& dims) const;
+  void CheckAssocConcatInit(const Expr* init, const std::vector<Expr*>& dims);
 
   // §11.3 and §11.4.13: an unpacked structure or union as an operand of an
   // operator that takes no aggregate, and an unpacked array or structure as
@@ -87,6 +89,8 @@ class ElaboratorOperationRules : public ElaboratorData {
 
   void ValidateUnpackedArrayConcatNesting(const ModuleDecl* decl);
   void WalkStmtsForArrayConcatNesting(const Stmt* s);
+  void CheckNestedArrayConcatItems(const Expr* concat);
+  void CheckArrayConcatItemTypes(const Expr* concat, const VarArrayInfo& info);
   void CheckArrayConcatNestingInAssign(const Stmt* s);
   void CheckArrayConcatNestingInInit(const ModuleItem* item);
   void CheckNullItemInArrayConcatAssign(const Stmt* s);
@@ -172,6 +176,10 @@ class ElaboratorOperationRules : public ElaboratorData {
   // module's of the same name for the rest of the block (§6.21, §23.9), and
   // var_array_info_ knows the module's alone.
   std::vector<std::pair<std::string_view, bool>> block_decls_;
+  // §10.10.2: the declared type of each module variable, which tells whether
+  // a member a target names is an unpacked array.
+  std::unordered_map<std::string_view, const DataType*> concat_target_types_;
+  bool SelectsArrayElementArray(const Expr* sel) const;
 
   void ValidateSelectOnConcatLvalue(const ModuleDecl* decl);
   void CheckSelectOnConcatLvalue(const Expr* lhs);

@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
@@ -73,7 +76,7 @@ TEST(AssignmentPatternElaboration, LhsPositionalPatternElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(AssignmentPatternElaboration, ErrorPatternExpressionInPort) {
+TEST(AssignmentPatternElaboration, TypedPatternExpressionInPortIsAccepted) {
   ElabFixture f;
   ElaborateSrc(
       "module sub(input int a);\n"
@@ -82,10 +85,10 @@ TEST(AssignmentPatternElaboration, ErrorPatternExpressionInPort) {
       "  sub u(.a(int'{42}));\n"
       "endmodule\n",
       f);
-  // §10.8, not §10.9: a cast pattern in a port connection is what is reported.
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "an assignment pattern cannot be connected to this port", 4, "10.8"));
+  // §10.9: a typed pattern has a type of its own and stands wherever an
+  // expression may, a port connection at an instantiation among the places;
+  // only a port expression of a declaration is barred.
+  EXPECT_EQ(FindDiag(f, "an assignment pattern cannot be connected"), nullptr);
 }
 
 TEST(AssignmentPatternElaboration, ErrorLhsNamedKeys) {
@@ -500,6 +503,143 @@ TEST(AssignmentPatternElaboration,
       f.diag.Diagnostics(),
       "LHS assignment pattern needs 16 bits but RHS supplies 32 bits", 6,
       "10.9"));
+}
+
+// §10.9 states the left-hand-side pattern rules wherever the assignment
+// stands: positional notation, and the bit count the right-hand side supplies.
+TEST(AssignmentPatternElaboration, LhsPatternRulesReachFunctionBodies) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a, b;\n"
+      "  function void fn();\n"
+      "    '{0: a, 1: b} = 16'h0;\n"
+      "    '{a, b} = 32'h0;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "LHS assignment pattern shall use positional notation only", 4, "10.9"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "LHS assignment pattern needs 16 bits but RHS supplies 32 bits", 5,
+      "10.9"));
+}
+
+// §10.8 makes a continuous assignment an assignment-like context, so a pattern
+// on its left-hand side is positional too.
+TEST(AssignmentPatternElaboration, KeyedLhsPatternInContAssignIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a, b;\n"
+      "  assign '{0: a, 1: b} = 16'h0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "LHS assignment pattern shall use positional notation only", 3, "10.9"));
+}
+
+// §10.9: an untyped pattern is one side of an assignment-like context only
+// when the other side has a self-determined type, which another untyped
+// pattern does not; a typed pattern gives the other side its type.
+TEST(AssignmentPatternElaboration, UntypedPatternOnBothSidesIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef struct packed { logic [7:0] x, y; } xy_t;\n"
+      "module m;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial '{a, b} = '{8'd1, 8'd2};\n"
+      "  initial xy_t'{a, b} = '{8'd1, 8'd2};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "an assignment between two untyped assignment "
+                            "patterns gives neither a type",
+                            4, "10.9"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "an assignment between two untyped assignment "
+                             "patterns gives neither a type",
+                             5, "10.9"));
+}
+
+// §10.9: the bit count a left-hand-side pattern needs is checked against a
+// right-hand side that is a name, a select of a vector or a call, whose widths
+// the declarations give.
+TEST(AssignmentPatternElaboration, LhsPatternBitCountAgainstNamedRhs) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a, b; logic [31:0] p; logic [3:0] mem [2];\n"
+      "  function logic [23:0] g(); return 0; endfunction\n"
+      "  initial begin\n"
+      "    '{a, b} = p;\n"
+      "    '{a, b} = p[23:0];\n"
+      "    '{a, b} = g();\n"
+      "    '{a, b} = p[15:0];\n"
+      "    '{a, b} = mem[1];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "LHS assignment pattern needs 16 bits but RHS supplies 32 bits", 5,
+      "10.9"));
+  for (uint32_t line : {6u, 7u}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "LHS assignment pattern needs 16 bits but RHS supplies 24 bits", line,
+        "10.9"));
+  }
+  EXPECT_EQ(FindDiag(f, "but RHS supplies 4 bits"), nullptr);
+}
+
+// §10.9 (printed page 261): each item of a typed left-hand-side pattern has
+// the bit count of the member of its type it stands for, so items whose widths
+// are swapped against the members are reported though their total agrees.
+TEST(AssignmentPatternElaboration, TypedLhsPatternItemWidthMismatchIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef struct packed { logic [3:0] x; logic [11:0] y; } pair_t;\n"
+      "module m;\n"
+      "  logic [11:0] y4; logic [3:0] x12;\n"
+      "  initial pair_t'{y4, x12} = 16'h0;\n"
+      "  initial pair_t'{x12, y4} = 16'h0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "LHS assignment pattern item has 12 bits but "
+                            "member 'x' of its type has 4 bits",
+                            4, "10.9"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "LHS assignment pattern item has", 5, "10.9"));
+}
+
+// §10.9 lets an untyped pattern stand only as one side of an assignment-like
+// context (§10.8), and an if or ?: condition, a vector concatenation item and
+// a select index are none.
+TEST(AssignmentPatternElaboration,
+     UntypedPatternInNonAssignmentPositionIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] a, v; logic [15:0] c;\n"
+      "  initial begin\n"
+      "    if ('{1}) a = 1;\n"
+      "    a = '{1} ? 8'd1 : 8'd2;\n"
+      "    c = {'{8'd1}, a};\n"
+      "    a = v['{0}];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {4u, 5u, 6u, 7u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "assignment pattern without a type prefix "
+                              "outside an assignment-like context",
+                              line, "10.9"));
+  }
 }
 
 }  // namespace

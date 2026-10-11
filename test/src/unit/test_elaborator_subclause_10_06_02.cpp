@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -368,6 +371,50 @@ TEST(ForceReleaseElaboration, ForceOverAMemberQualifiedMixedTargetIsReported) {
                             "is assigned by a mixture of continuous and "
                             "procedural assignments",
                             7, "10.6.2"));
+}
+
+// §10.6.2 (printed page 257) admits a constant bit-select or part-select of a
+// vector net as a force target, and no other select of one.
+TEST(ForceReleaseElaboration, ForceNonConstantSelectOfNetIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  wire [7:0] bus;\n"
+      "  int i;\n"
+      "  initial force bus[i] = 1'b1;\n"
+      "  initial force {bus[i +: 2], bus[0]} = 3'b0;\n"
+      "  initial force bus[3:0] = 4'h0;\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {4u, 5u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "bit-select or part-select of a net in a force "
+                              "LHS must be constant",
+                              line, "10.6.2"));
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "bit-select or part-select of a net in a force "
+                             "LHS must be constant",
+                             6, "10.6.2"));
+}
+
+// §10.6.2 states the force target rules wherever the force stands, the body of
+// a task or a function included.
+TEST(ForceReleaseElaboration, ForceTargetRulesReachSubroutineBodies) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] data;\n"
+      "  task tk; force data[3] = 1'b1; endtask\n"
+      "  function void fn(); force data[2] = 1'b1; endfunction\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {3u, 4u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "bit-select or part-select of a variable is not "
+                              "a legal force LHS",
+                              line, "10.6.2"));
+  }
 }
 
 }  // namespace

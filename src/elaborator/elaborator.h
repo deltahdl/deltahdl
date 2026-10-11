@@ -32,6 +32,7 @@ namespace delta {
 
 class Arena;
 class DiagEngine;
+struct ContTargetLeaf;
 struct Expr;
 
 // The elaborator: it reads the compilation unit the parser produced and builds
@@ -257,8 +258,12 @@ class Elaborator : public ElaboratorClassRules {
                                std::string_view typedef_name,
                                RtlirVariable& var);
   void ElaborateContAssign(ModuleItem* item, RtlirModule* mod);
-  void ValidateContAssignIdentLhs(ModuleItem* item, RtlirModule* mod);
-  void ValidateContAssignNettypeAndDelay(ModuleItem* item);
+  void ValidateGeneratedItem(const ModuleItem* item);
+  void RecordGateOutputDrivers(const ModuleItem* item);
+  bool ValidateContAssignLeaves(ModuleItem* item, RtlirModule* mod,
+                                const std::vector<ContTargetLeaf>& leaves);
+  void ValidateContAssignIdentLhs(std::string_view name, ModuleItem* item,
+                                  RtlirModule* mod);
   void ValidateContAssignDriveStrength(ModuleItem* item, RtlirModule* mod);
   void ElaborateSpecparam(ModuleItem* item, RtlirModule* mod);
 
@@ -661,7 +666,6 @@ class Elaborator : public ElaboratorClassRules {
   void ValidateBitsCallRestrictions(const ModuleDecl* decl);
   void ValidateBitVectorFunctionArgs(const ModuleDecl* decl);
 
-  void ValidateContAssignConstSelect(const ModuleDecl* decl);
   void ValidatePartSelectBounds(const ModuleDecl* decl);
 
   void ValidateElabSystemTask(const ModuleItem* item, const RtlirModule* mod);
@@ -708,7 +712,11 @@ class Elaborator : public ElaboratorClassRules {
 
   void ValidateFinalTaskEnables(const ModuleDecl* decl);
 
-  void ValidateFunctionBody(const ModuleItem* item);
+  // §13 and §10.4.2's rules over one task or function body. A method of a
+  // class is automatic whatever its declaration says (§8.6), which
+  // `is_class_method` tells the body's checks.
+  void ValidateFunctionBody(const ModuleItem* item,
+                            bool is_class_method = false);
 
   void ValidateFunctionArgDefaultsScope(const ModuleItem* item);
 

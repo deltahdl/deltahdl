@@ -395,4 +395,20 @@ TEST(UnpackedArrayConcatElaboration,
                             "10.10.1"));
 }
 
+// §10.10.1 asks every item of an unpacked array concatenation for a
+// self-determined type, which an untyped pattern does not have.
+TEST(UnpackedArrayConcatElaboration, UntypedPatternItemIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int A3[1:3] = '{1, 2, 3}; int A9[1:9];\n"
+      "  initial A9 = {A3, '{4, 5, 6, 7, 8, 9}};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern without a type prefix outside "
+                            "an assignment-like context",
+                            3, "10.9"));
+}
+
 }  // namespace

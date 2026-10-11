@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -143,6 +146,127 @@ TEST(AssignmentLikeContext, RefPortNetBindingRejected) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "net 'w' cannot be connected to ref port 'p'", 5,
                             "23.3.3.2"));
+}
+
+// §10.8 counts a connection to an output port among the assignment-like
+// contexts, and §10.9 lets a positional pattern of lvalues stand on the side
+// being assigned; a keyed pattern, an item that is no lvalue, a formal that is
+// no aggregate and an inout port each leave the pattern illegal.
+TEST(AssignmentLikeContext, PatternOnAggregateOutputPort) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
+      "typedef struct packed { logic [7:0] a; } one_t;\n"
+      "module sub(output pair_t p); endmodule\n"
+      "module io(inout pair_t p); endmodule\n"
+      "module sc(output logic [15:0] p); endmodule\n"
+      "module top;\n"
+      "  logic [7:0] x, y; logic [15:0] z; one_t s;\n"
+      "  sub u1(.p('{x, y}));\n"
+      "  sub u2(.p('{z[15:8], s.a}));\n"
+      "  sub u3(.p('{{x[3:0], y[3:0]}, y}));\n"
+      "  sub u4(.p('{a: x, b: y}));\n"
+      "  sub u5(.p('{8'h1, y}));\n"
+      "  io u6(.p('{x, y}));\n"
+      "  sc u7(.p('{x, y}));\n"
+      "endmodule\n",
+      f, "top");
+  for (uint32_t line : {8u, 9u, 10u}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                               "an assignment pattern cannot be connected to "
+                               "this port",
+                               line, "10.8"));
+  }
+  for (uint32_t line : {11u, 12u, 13u, 14u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "an assignment pattern cannot be connected to "
+                              "this port",
+                              line, "10.8"));
+  }
+}
+
+// §10.9: a typed pattern has a type of its own and is connected to a port as
+// any expression is.
+TEST(AssignmentLikeContext, TypedPatternOnInputPortAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
+      "module sub(input pair_t p); endmodule\n"
+      "module top;\n"
+      "  sub u(.p(pair_t'{8'h56, 8'h78}));\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §10.8 counts the actual of an output argument among the assignment-like
+// contexts, so a positional pattern of variables may be passed to one.
+TEST(AssignmentLikeContext, PatternOnOutputArgumentAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef struct { logic [7:0] a, b; } ab_t;\n"
+      "module m;\n"
+      "  task automatic t(output ab_t s); s = '{8'h1, 8'h2}; endtask\n"
+      "  logic [7:0] x, y;\n"
+      "  initial t('{x, y});\n"
+      "  initial t('{x, 8'h5});\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "output argument 's' requires a variable", 5,
+                             "13.5"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "output argument 's' requires a variable", 6,
+                            "13.5"));
+}
+
+// §10.8 excludes passing to a ref argument from the assignment-like contexts,
+// and §13.5.2 has a ref argument refer to a variable, so a pattern or any
+// other expression that names no variable is reported there.
+TEST(AssignmentLikeContext, NonVariableOnRefArgumentRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef struct { logic [7:0] a, b; } ab_t;\n"
+      "module m;\n"
+      "  task automatic t(ref ab_t s); endtask\n"
+      "  ab_t v;\n"
+      "  initial t('{8'h1, 8'h2});\n"
+      "  initial t(v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "ref argument 's' of 't' requires a variable", 5,
+                            "13.5.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "ref argument 's' of 't' requires a variable", 6,
+                             "13.5.2"));
+}
+
+// §10.8: an explicitly typed class parameter's value and a class
+// specialization's parameter override are assignment-like contexts, so a
+// pattern there is constant when its items are, of a structure type as of an
+// array type.
+TEST(AssignmentLikeContext, PatternClassParameterValues) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef struct packed { logic [7:0] a, b; } ab_t;\n"
+      "class C #(parameter ab_t P = '{8'h11, 8'h22}); endclass\n"
+      "class D #(parameter int A[2] = '{1, 2}); endclass\n"
+      "module t;\n"
+      "  int x;\n"
+      "  D #('{5, 6}) h;\n"
+      "  D #('{x, 6}) g;\n"
+      "endmodule\n",
+      f, "t");
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "is not a constant", 2, "6.20.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "parameter override is not a constant expression",
+                             6, "23.10.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parameter override is not a constant expression",
+                            7, "23.10.2"));
 }
 
 }  // namespace

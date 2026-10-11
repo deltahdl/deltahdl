@@ -245,4 +245,75 @@ TEST(StructPatternSimulation, StructTypeKeyedPattern) {
   EXPECT_EQ(var->value.ToUint64(), uint64_t{99} << 8);
 }
 
+// Syntax 10-5 lets a type key name a typedef, and §10.9.2 applies it to every
+// member of that type rather than reading it as a member name.
+TEST(StructPatternElaboration, TypedefTypeKeyCoversMembers) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "typedef logic [7:0] byte_t;\n"
+      "module m;\n"
+      "  struct packed { byte_t a, b; } s = '{byte_t: 8'h1};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §10.9.2: a type key covers only the members whose type it matches, so a
+// member of another type, or an array of the key's type, is left uncovered.
+TEST(StructPatternElaboration, TypeKeyCoversOnlyMatchingMembers) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  struct packed { int a; logic [7:0] b; } s = '{int: 0};\n"
+      "  struct { int a; int c[2]; } t = '{int: 0};\n"
+      "  struct packed { int a; int b; } u = '{int: 0};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "member 'b' not covered by assignment pattern", 2,
+                            "10.9.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "member 'c' not covered by assignment pattern", 3,
+                            "10.9.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "not covered by assignment",
+                             4, "10.9.2"));
+}
+
+// §10.9.2's item count, member keys and coverage hold wherever the pattern
+// stands: assigned in a procedure, initializing a block's variable, typed, and
+// in a continuous assignment.
+TEST(StructPatternElaboration, RulesReachEveryStructurePattern) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef struct packed { logic [7:0] a, b; } pair_t;\n"
+      "module m;\n"
+      "  pair_t p, q;\n"
+      "  initial begin\n"
+      "    p = '{a: 8'h1};\n"
+      "    p = '{8'h1, 8'h2, 8'h3};\n"
+      "    begin pair_t r = '{c: 8'h1, default: 0}; end\n"
+      "    q = pair_t'{8'h1};\n"
+      "  end\n"
+      "  assign q = '{b: 8'h1};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "member 'b' not covered by assignment pattern", 5,
+                            "10.9.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "positional struct pattern has 3 elements, but "
+                            "struct has 2 members",
+                            6, "10.9.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'c' is not a member of the struct", 7, "10.9.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "positional struct pattern has 1 elements, but "
+                            "struct has 2 members",
+                            8, "10.9.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "member 'a' not covered by assignment pattern", 10,
+                            "10.9.2"));
+}
+
 }  // namespace

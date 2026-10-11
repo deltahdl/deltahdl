@@ -399,7 +399,7 @@ void Elaborator::ValidateClassMethodBodies(const ModuleDecl* decl) {
   auto validate_class_methods = [&](const ClassDecl* cls) {
     for (const auto* m : cls->members) {
       if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
-      ValidateFunctionBody(m->method);
+      ValidateFunctionBody(m->method, /*is_class_method=*/true);
     }
   };
   for (const auto* cls : unit_->classes) {

@@ -112,6 +112,16 @@ static void CheckStmt(const Stmt* s, DeclaredShapes& shapes, DiagEngine& diag) {
       }
       break;
     case StmtKind::kBlockingAssign:
+      // Syntax 10-2 (printed page 252): only the expression form of a
+      // blocking assignment takes a delay or event control, and the forms that
+      // assign a dynamic_array_new or a class_new take none.
+      if ((s->delay != nullptr || !s->events.empty()) &&
+          NewWithin(s->rhs) == s->rhs) {
+        diag.Error(s->range.start,
+                   "an assignment of 'new' takes no intra-assignment delay "
+                   "or event control",
+                   Subclause("10.4"));
+      }
       CheckAssignedNew(s->lhs, {}, s->rhs, shapes, diag);
       break;
     case StmtKind::kNonblockingAssign:

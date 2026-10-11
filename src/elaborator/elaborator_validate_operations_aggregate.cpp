@@ -353,6 +353,15 @@ void CheckAggregateOperandNode(const Expr* e, const AggregateOperandNames& n,
 // no such context, so a pattern there is reported. The right operand of
 // `matches` and the left of a case item's `&&&` are §12.6 patterns, which share
 // the spelling.
+void ReportUntypedPattern(const Expr* operand, DiagEngine& diag) {
+  if (operand == nullptr || operand->kind != ExprKind::kAssignmentPattern)
+    return;
+  diag.Error(operand->range.start,
+             "assignment pattern without a type prefix outside an "
+             "assignment-like context",
+             Subclause("10.9"));
+}
+
 void CheckUntypedPatternOperand(const Expr* e, DiagEngine& diag) {
   std::vector<const Expr*> operands;
   bool is_pattern_operator =
@@ -360,17 +369,20 @@ void CheckUntypedPatternOperand(const Expr* e, DiagEngine& diag) {
   if (e->kind == ExprKind::kUnary ||
       (e->kind == ExprKind::kBinary && !is_pattern_operator)) {
     operands = {e->lhs, e->rhs};
-  } else if (e->kind == ExprKind::kSystemCall) {
-    operands.assign(e->args.begin(), e->args.end());
+  } else if (e->kind == ExprKind::kSystemCall ||
+             e->kind == ExprKind::kConcatenation) {
+    // §10.10.1 (printed page 265) asks a self-determined type of each item of
+    // an unpacked array concatenation, and §11.4.12 of each operand of a
+    // vector concatenation, which an untyped pattern does not have.
+    const std::vector<Expr*>& list =
+        e->kind == ExprKind::kSystemCall ? e->args : e->elements;
+    operands.assign(list.begin(), list.end());
+  } else if (e->kind == ExprKind::kTernary) {
+    operands = {e->condition};
+  } else if (e->kind == ExprKind::kSelect) {
+    operands = {e->index, e->index_end};
   }
-  for (const Expr* operand : operands) {
-    if (operand == nullptr || operand->kind != ExprKind::kAssignmentPattern)
-      continue;
-    diag.Error(operand->range.start,
-               "assignment pattern without a type prefix outside an "
-               "assignment-like context",
-               Subclause("10.9"));
-  }
+  for (const Expr* operand : operands) ReportUntypedPattern(operand, diag);
 }
 
 void WalkExprForAggregateOperands(const Expr* e, const AggregateOperandNames& n,
@@ -391,6 +403,8 @@ void WalkStmtForAggregateOperands(const Stmt* s, const AggregateOperandNames& n,
 void WalkStmtChildrenForAggregateOperands(const Stmt* s,
                                           const AggregateOperandNames& n,
                                           DiagEngine& diag) {
+  // A statement's condition is no assignment-like context either (§10.8).
+  ReportUntypedPattern(s->condition, diag);
   ForEachChildExpr(
       s, [&](Expr* const& e) { WalkExprForAggregateOperands(e, n, diag); });
   ForEachChildStmt(

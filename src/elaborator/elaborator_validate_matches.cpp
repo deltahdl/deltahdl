@@ -1,4 +1,3 @@
-#include <cstdint>
 #include <format>
 #include <functional>
 #include <unordered_map>
@@ -10,9 +9,8 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/net_data_type.h"
 #include "elaborator/queue_dim.h"
-#include "elaborator/rtlir.h"
-#include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -52,85 +50,41 @@ static void WalkStmtsForLhsPatternKeys(const Stmt* s, DiagEngine& diag) {
       s, [&](Stmt* const& sub) { WalkStmtsForLhsPatternKeys(sub, diag); });
 }
 
-// §10.9: a positional assignment pattern on the LHS shall hold the same number
-// of bits as the RHS supplies. Fire only when both sides have statically known
-// widths so that unrelated diagnostics keep their primacy.
-static void CheckLhsPatternWidthSum(const Expr* lhs, const Expr* rhs,
-                                    const RtlirModule* mod,
-                                    const TypedefMap& typedefs,
-                                    DiagEngine& diag) {
-  if (!lhs || !rhs) return;
-  const Expr* pat = lhs;
-  if (pat->kind == ExprKind::kCast && pat->lhs) pat = pat->lhs;
-  if (pat->kind != ExprKind::kAssignmentPattern) return;
-  if (!pat->pattern_keys.empty()) return;
-  if (pat->elements.empty()) return;
-
-  uint32_t sum = 0;
-  for (const auto* elem : pat->elements) {
-    uint32_t w = LookupLhsWidth(elem, mod);
-    if (w == 0) return;
-    sum += w;
-  }
-  uint32_t rhs_w = InferExprWidth(rhs, typedefs);
-  if (rhs_w == 0) return;
-  if (sum == rhs_w) return;
-
-  diag.Error(lhs->range.start,
-             std::format("LHS assignment pattern needs {} bits but RHS "
-                         "supplies {} bits",
-                         sum, rhs_w),
-             Subclause("10.9"));
-}
-
-// §10.9's bit-count rule reaches an assignment wherever one is written, as the
-// keyed-notation rule above does. ForEachChildStmt in
-// elaborator_validate_internal.h states those positions once for the whole
-// elaborator, which is why the list is not written out again here.
-static void WalkStmtsForLhsPatternWidths(const Stmt* s, const RtlirModule* mod,
-                                         const TypedefMap& typedefs,
-                                         DiagEngine& diag) {
-  if (!s) return;
-  if (s->kind == StmtKind::kBlockingAssign ||
-      s->kind == StmtKind::kNonblockingAssign) {
-    CheckLhsPatternWidthSum(s->lhs, s->rhs, mod, typedefs, diag);
-  }
-  ForEachChildStmt(s, [&](Stmt* const& sub) {
-    WalkStmtsForLhsPatternWidths(sub, mod, typedefs, diag);
-  });
-}
-
-void Elaborator::ValidateLhsPatternWidths(const ModuleDecl* decl,
-                                          const RtlirModule* mod) {
-  for (const auto* item : decl->items) {
-    bool is_proc = IsProceduralItemKind(item->kind);
-    if (is_proc && item->body) {
-      WalkStmtsForLhsPatternWidths(item->body, mod, typedefs_, diag_);
-    }
-    if (item->kind == ModuleItemKind::kContAssign) {
-      CheckLhsPatternWidthSum(item->assign_lhs, item->assign_rhs, mod,
-                              typedefs_, diag_);
-    }
-  }
-}
-
 void Elaborator::ValidateItemConstraints(const ModuleItem* item,
                                          const ScopeMap& scope) {
   bool is_proc = IsProceduralItemKind(item->kind);
   if (is_proc && item->body) {
-    CollectProcTargets(item->body, proc_assign_targets_);
+    CollectProcTargets({}, {item->body}, proc_assign_targets_);
     CollectForceReleaseTargets(item->body, force_release_targets_);
 
     CheckInterconnectProcContAssign(item->body, interconnect_names_, diag_);
     CheckInterconnectProceduralRead(item->body, interconnect_names_, diag_);
     CheckProceduralAssignLhs(item->body, diag_);
 
-    CheckForceLhs(item->body, net_names_, nettype_net_names_, diag_);
+    CheckForceLhs(item->body, net_names_, nettype_net_names_, scope, diag_);
 
     CheckBlockQueueBounds(item->body, scope, diag_);
 
     WalkStmtsForLhsPatternKeys(item->body, diag_);
   }
+  // §10.4, §10.6.2 and §10.9 state their rules of a procedural statement
+  // wherever it stands, and the body of a task or function is such a place.
+  // A class method defined out of its class writes the class's properties,
+  // which no module name stands for.
+  if ((item->kind == ModuleItemKind::kTaskDecl ||
+       item->kind == ModuleItemKind::kFunctionDecl) &&
+      item->method_class.empty()) {
+    CollectProcTargets(item->func_args, item->func_body_stmts,
+                       proc_assign_targets_);
+    for (const Stmt* s : item->func_body_stmts) {
+      CheckForceLhs(s, net_names_, nettype_net_names_, scope, diag_);
+      WalkStmtsForLhsPatternKeys(s, diag_);
+    }
+  }
+  // §10.8 makes a continuous assignment an assignment-like context, so a
+  // pattern on its left-hand side is positional too (§10.9).
+  if (item->kind == ModuleItemKind::kContAssign)
+    CheckLhsPatternNamedKeys(item->assign_lhs, diag_);
   ValidateEdgeOnReal(item);
   ValidateChandleContAssign(item);
   ValidateChandleSensitivity(item);
@@ -145,14 +99,7 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item,
   // sits in ElaborateNetDecl, which every elaborated net declaration passes
   // through.
 
-  if ((item->kind == ModuleItemKind::kNetDecl ||
-       item->kind == ModuleItemKind::kContAssign ||
-       item->kind == ModuleItemKind::kGateInst ||
-       item->kind == ModuleItemKind::kUdpInst) &&
-      item->drive_strength0 == 1 && item->drive_strength1 == 1) {
-    diag_.Error(item->loc, "drive strength (highz0, highz1) is illegal",
-                Subclause("28.3.2"));
-  }
+  CheckHighzStrengthPair(item, diag_);
   const SelectOperands kOperands{real_var_names_, real_param_names_,
                                  var_select_shapes_};
   if (item->kind == ModuleItemKind::kContAssign) {
@@ -657,7 +604,7 @@ static void CollectProceduralDynamicNames(
 // §6.21's rule went unenforced there: `if (1) begin : g int q[$]; initial q[0]
 // <= 1; end` elaborated clean where the same two lines at module scope are
 // rejected. Visits the item and every item a generate construct holds under it.
-static void ForEachItemAndGenerateDescendant(
+void ForEachItemAndGenerateDescendant(
     const ModuleItem* item, const std::function<void(const ModuleItem*)>& fn) {
   if (item == nullptr) return;
   fn(item);
@@ -690,14 +637,12 @@ static void CollectItemDynamicNames(
 }
 
 void Elaborator::ValidateDynamicArrayNba(const ModuleDecl* decl) {
+  const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
+  CheckNbaDynamicElements(decl, NbaDynamicTables{kShapeTables, unit_}, diag_);
   std::unordered_set<std::string_view> dyn_names;
   std::unordered_set<std::string_view> dynsized_names;
   for (const auto& [name, info] : var_array_info_) {
     if (info.is_dynamic) dyn_names.insert(name);
-    // §10.4.2: dynamic arrays, queues, and associative arrays are all
-    // dynamically sized and are illegal nonblocking-assignment element targets.
-    if (info.is_dynamic || info.is_queue || info.is_assoc)
-      dynsized_names.insert(name);
   }
   // The two lists below are the ones the check itself walks, so the names a
   // procedure declares are collected from the same trees the offending
@@ -711,12 +656,11 @@ void Elaborator::ValidateDynamicArrayNba(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     ForEachItemAndGenerateDescendant(item, collect);
   }
-  if (dynsized_names.empty()) return;
-  auto check = [&dyn_names, &dynsized_names, this](const ModuleItem* item) {
-    if (item->body)
-      CheckNbaDynamicArrayTarget(item->body, dyn_names, dynsized_names, diag_);
+  if (dyn_names.empty()) return;
+  auto check = [&dyn_names, this](const ModuleItem* item) {
+    if (item->body) CheckPcontDynamicArrayTarget(item->body, dyn_names, diag_);
     for (auto* s : item->func_body_stmts)
-      CheckNbaDynamicArrayTarget(s, dyn_names, dynsized_names, diag_);
+      CheckPcontDynamicArrayTarget(s, dyn_names, diag_);
   };
   for (const auto* item : decl->items) {
     ForEachItemAndGenerateDescendant(item, check);

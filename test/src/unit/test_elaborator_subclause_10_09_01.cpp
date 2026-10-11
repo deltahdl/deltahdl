@@ -337,4 +337,72 @@ TEST(ArrayLiteralElaboration, TypeKeyCoversEveryDimensionOfAMultidimArray) {
              "endmodule\n"));
 }
 
+// Syntax 10-5 lets a type key name a typedef, and §10.9.1 applies it to every
+// element of that type, so it is no index key and covers the array.
+TEST(ArrayPatternElaboration, TypedefTypeKeyCoversElements) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "typedef logic [7:0] byte_t;\n"
+      "module m;\n"
+      "  byte_t arr[3] = '{byte_t: 8'h1};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §10.9.1 applies a type key to the elements whose type matches it by §6.22.1:
+// a typedef of int matches int, and logic does not match logic [7:0].
+TEST(ArrayPatternElaboration, TypeKeyMatchesByFullType) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef int myint;\n"
+      "module m;\n"
+      "  myint arr[3] = '{int: 5};\n"
+      "  logic [7:0] b[2] = '{logic: 1'b1};\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "keyed array pattern does not cover all elements",
+                             3, "10.9.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "keyed array pattern does not cover all elements",
+                            4, "10.9.1"));
+}
+
+// §10.9.1: the braces match the dimensions, each nested pattern holding as
+// many items as the dimension it stands for.
+TEST(ArrayPatternElaboration, NestedPatternCountedAgainstItsDimension) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int a[2][3] = '{'{1, 2}, '{3, 4, 5}};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 2 elements, but array "
+                            "dimension requires 3",
+                            2, "10.9.1"));
+}
+
+// §10.9.1: a type key that matches no element of an array of structures
+// descends into each and covers the element whose members it all matches.
+TEST(ArrayPatternElaboration, TypeKeyCoversStructureElementsByMembers) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef struct { int x, y; } s_t;\n"
+      "typedef struct { int x; byte y; } t_t;\n"
+      "module m;\n"
+      "  s_t arr[2] = '{int: 7};\n"
+      "  t_t brr[2] = '{int: 7};\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "keyed array pattern does not cover all elements",
+                             4, "10.9.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "keyed array pattern does not cover all elements",
+                            5, "10.9.1"));
+}
+
 }  // namespace

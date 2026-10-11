@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -187,6 +190,31 @@ TEST(DriveStrengthElaboration, MultipleAssignsPreserveIndependentStrengths) {
   EXPECT_EQ(mod->assigns[0].drive_strength1, 5u);
   EXPECT_EQ(mod->assigns[1].drive_strength0, 2u);
   EXPECT_EQ(mod->assigns[1].drive_strength1, 2u);
+}
+
+// §10.3.4 (printed page 251): a drive strength applies only to an assignment
+// to a scalar net, and neither a select of a vector net nor a concatenation of
+// nets is one; a supply net's select is excepted with the net.
+TEST(DriveStrengthElaboration, DriveStrengthOnSelectOfVectorNetIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  wire [7:0] w; wire a, b; supply1 [3:0] s;\n"
+      "  assign (weak0, weak1) w[3:0] = 4'h0;\n"
+      "  assign (weak0, weak1) {a, b} = 2'b0;\n"
+      "  assign (weak0, weak1) s[1:0] = 2'b0;\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {3u, 4u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "drive strength on continuous assignment "
+                              "applies only to scalar nets",
+                              line, "10.3.4"));
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "drive strength on continuous assignment "
+                             "applies only to scalar nets",
+                             5, "10.3.4"));
 }
 
 }  // namespace

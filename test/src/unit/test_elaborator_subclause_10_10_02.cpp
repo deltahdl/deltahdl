@@ -89,4 +89,29 @@ TEST(UnpackedArrayConcatElaboration, ScalarChandleTargetKeepsScalarRule) {
       "chandle can only be assigned from another chandle or null", 4, "6.14"));
 }
 
+// §10.10.2 (printed page 265) reads braces whose target is an unpacked array
+// as an unpacked array concatenation whatever names the target: an element of
+// a multidimensional array and a structure's array member are such arrays,
+// and a whole element of a one-dimensional array is not.
+TEST(UnpackedArrayConcatElaboration, ElementArrayAndArrayMemberTargets) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int M[2][2];\n"
+      "  struct { int a[2]; int b; } s;\n"
+      "  int V[2];\n"
+      "  initial begin M[0] = {1, 2}; s.a = {1, 2}; end\n"
+      "  initial begin V[0] = {1, 2}; s.b = {1, 2}; end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "unsized constant is not allowed in a "
+                             "concatenation",
+                             5, "11.4.12"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unsized constant is not allowed in a "
+                            "concatenation",
+                            6, "11.4.12"));
+}
+
 }  // namespace

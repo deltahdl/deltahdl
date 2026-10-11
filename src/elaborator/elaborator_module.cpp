@@ -222,7 +222,6 @@ void Elaborator::ResetItemElaborationState() {
   real_param_names_.clear();
   var_select_shapes_.clear();
   var_named_types_.clear();
-  alias_pairs_.clear();
   alias_bit_pairs_.clear();
   non_ansi_complete_ports_.clear();
   non_ansi_partial_ports_.clear();
@@ -277,7 +276,6 @@ struct ItemElaborationStateSaver {
   decltype(Elaborator::real_param_names_) real_param_names;
   decltype(Elaborator::var_select_shapes_) var_select_shapes;
   decltype(Elaborator::var_named_types_) var_named_types;
-  decltype(Elaborator::alias_pairs_) alias_pairs;
   decltype(Elaborator::alias_bit_pairs_) alias_bit_pairs;
   decltype(Elaborator::non_ansi_complete_ports_) non_ansi_complete_ports;
   decltype(Elaborator::non_ansi_partial_ports_) non_ansi_partial_ports;
@@ -355,7 +353,6 @@ struct ItemElaborationStateSaver {
     real_param_names = std::move(e.real_param_names_);
     var_select_shapes = std::move(e.var_select_shapes_);
     var_named_types = std::move(e.var_named_types_);
-    alias_pairs = std::move(e.alias_pairs_);
     alias_bit_pairs = std::move(e.alias_bit_pairs_);
     non_ansi_complete_ports = std::move(e.non_ansi_complete_ports_);
     non_ansi_partial_ports = std::move(e.non_ansi_partial_ports_);
@@ -421,7 +418,6 @@ struct ItemElaborationStateSaver {
     e.real_param_names_ = std::move(real_param_names);
     e.var_select_shapes_ = std::move(var_select_shapes);
     e.var_named_types_ = std::move(var_named_types);
-    e.alias_pairs_ = std::move(alias_pairs);
     e.alias_bit_pairs_ = std::move(alias_bit_pairs);
     e.non_ansi_complete_ports_ = std::move(non_ansi_complete_ports);
     e.non_ansi_partial_ports_ = std::move(non_ansi_partial_ports);
@@ -599,7 +595,8 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   // generate constructs this module queued are elaborated after that, by
   // Elaborator::ProcessPendingGenerate, and §23.9 judges what they declare
   // against the scope they were written in, so keep the set here for them.
-  module_scope_names_[mod] = {declared_names_, net_names_};
+  module_scope_names_[mod] = {declared_names_, net_names_, cont_assign_targets_,
+                              proc_assign_targets_};
   saved_item_state.Restore(*this);
   return mod;
 }

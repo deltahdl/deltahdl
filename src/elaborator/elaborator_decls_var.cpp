@@ -817,6 +817,13 @@ bool Elaborator::ElaborateUserNettypeNet(ModuleItem* item, RtlirModule* mod) {
                         diag_);
     return false;
   }
+  // Syntax 10-1 and §10.3.3 give such a declaration one delay at most.
+  if (item->net_delay_fall != nullptr) {
+    diag_.Error(item->loc,
+                "a net of a user-defined nettype is declared with at most a "
+                "single delay",
+                Subclause("10.3.3"));
+  }
   item->data_type.is_net = true;
   item->kind = ModuleItemKind::kNetDecl;
   nettype_net_names_.insert(item->name);

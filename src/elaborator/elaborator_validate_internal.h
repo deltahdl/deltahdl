@@ -10,6 +10,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string_view>
 #include <unordered_map>
@@ -30,6 +31,9 @@
 #include "parser/ast_type.h"
 
 namespace delta {
+
+struct CompilationUnit;
+struct TypeShapeTables;
 
 using TypeMap = std::unordered_map<std::string_view, DataTypeKind>;
 using NameSet = std::unordered_set<std::string_view>;
@@ -434,6 +438,37 @@ struct ArrayPatternCheck {
              const std::vector<Expr*>& dims, SourceLoc loc) const;
 };
 std::string_view LhsBaseName(const Expr* e);
+// §5.10 and §5.11: the replication an assignment pattern consists of,
+// `'{n{...}}`, or null, and the items a positional pattern supplies, its
+// elements or a replication's multiplier times the items inside it, or nothing
+// where the multiplier does not fold. Defined in elaborator_validate.cpp.
+const Expr* PatternReplication(const Expr* pattern);
+std::optional<int64_t> PositionalItemCount(const Expr* pattern);
+
+// Defined in struct_pattern_checks.cpp.
+//
+// Where a structure pattern is checked: the typedefs its types resolve
+// through, and the position its reports stand at.
+struct StructPatternTarget {
+  const TypedefMap& typedefs;
+  SourceLoc loc;
+  DiagEngine& diag;
+};
+// The members of the structure `type` names, written inline or through a
+// typedef, or null where it names none.
+const std::vector<StructMember>* StructMembersOf(const DataType& type,
+                                                 const TypedefMap& typedefs);
+// §10.9.2's rules of a structure pattern against the structure's members:
+// one item per member positionally, member keys naming members, and every
+// member covered.
+void CheckStructPattern(const Expr* pattern,
+                        const std::vector<StructMember>& members,
+                        const StructPatternTarget& target);
+// Checks `value` as a structure pattern where it is one: a typed pattern
+// against the type its prefix names, an untyped one against `target_type`,
+// the type of what it is assigned to, null where that is not known.
+void CheckStructPatternFor(const Expr* value, const DataType* target_type,
+                           const StructPatternTarget& target);
 // §23.6 gives a hierarchical name as a sequence of components separated by
 // periods, and §23.7 makes what the first of them resolves to decide whether
 // the name is a hierarchical reference or a member select. Every rule that bars
@@ -452,11 +487,13 @@ inline std::string_view HierRefLeftmost(const Expr* e) {
 bool ExprContainsIdent(const Expr* e, std::string_view name);
 bool ExprUsesInterconnect(const Expr* e,
                           const std::unordered_set<std::string_view>& names);
-void CheckNbaDynamicArrayTarget(
+// §6.21: reports each procedural continuous assignment in `s` and below it
+// that writes an element of one of the dynamic arrays `dyn_names` names.
+void CheckPcontDynamicArrayTarget(
     const Stmt* s, const std::unordered_set<std::string_view>& dyn_names,
-    const std::unordered_set<std::string_view>& dynsized_names,
     DiagEngine& diag);
-void CollectProcTargets(const Stmt* s,
+void CollectProcTargets(const std::vector<FunctionArg>& formals,
+                        const std::vector<Stmt*>& body,
                         std::unordered_map<std::string_view, SourceLoc>& out);
 
 void CollectForceReleaseTargets(
@@ -470,10 +507,13 @@ void CheckInterconnectProceduralRead(
     const std::unordered_set<std::string_view>& interconnect_names,
     DiagEngine& diag);
 void CheckProceduralAssignLhs(const Stmt* s, DiagEngine& diag);
+// §28.3.2 with §10.3.4: reports (highz0, highz1) on a net declaration, a
+// continuous assignment or a gate. Defined in elaborator_cont_assign.cpp.
+void CheckHighzStrengthPair(const ModuleItem* item, DiagEngine& diag);
 void CheckForceLhs(
     const Stmt* s, const std::unordered_set<std::string_view>& net_names,
     const std::unordered_set<std::string_view>& nettype_net_names,
-    DiagEngine& diag);
+    const ScopeMap& scope, DiagEngine& diag);
 using SelectShapeMap = std::unordered_map<std::string_view, VarSelectShape>;
 
 // What §11.5.1 needs to judge the operand of a select. Its second alternative
@@ -519,7 +559,26 @@ const Expr* FindGclkFunctionRefInItem(const ModuleItem* item,
 
 // Defined in elaborator_validate_matches.cpp.
 bool IsArrayQueryFunc(std::string_view callee);
+// §27.6: visits `item` and every item a generate construct holds under it, at
+// every depth.
+void ForEachItemAndGenerateDescendant(
+    const ModuleItem* item, const std::function<void(const ModuleItem*)>& fn);
 bool TypedefHasDynamicDim(const std::vector<Expr*>& dims);
+
+// Defined in nba_dynamic_element.cpp.
+//
+// What §10.4.2's rule on elements of dynamically sized arrays reads a target's
+// types with: the module's typedefs, the unpacked dimensions each typedef
+// wrote and the class names, and the compilation unit a class is found in.
+struct NbaDynamicTables {
+  const TypeShapeTables& shape;
+  const CompilationUnit* unit;
+};
+// Reports each nonblocking assignment in `decl`'s processes, subroutines,
+// generate blocks and class methods that writes an element of a dynamically
+// sized array.
+void CheckNbaDynamicElements(const ModuleDecl* decl,
+                             const NbaDynamicTables& tables, DiagEngine& diag);
 
 // Defined in elaborator_validate_funcbody.cpp.
 //
@@ -531,5 +590,38 @@ void ReportPackageSubroutineStaticInits(const PackageDecl* pkg,
 // §20.6.3: reports each call of $isunbounded in `decl` whose argument is not
 // the name of a parameter. Defined in elaborator_validate_isunbounded.cpp.
 void CheckIsunboundedArgs(const ModuleDecl* decl, DiagEngine& diag);
+
+// §23.9: the declarations a statement of a procedural body sees, innermost
+// last, so a name is judged by the declaration it reaches rather than by any
+// declaration of that name. They are a subroutine's formals, the variables of
+// each begin-end and fork-join block that encloses the statement, and the loop
+// variables §12.7.1 (printed page 330) declares with automatic lifetime in an
+// implicit block around a for-loop. A name that reaches none of them is the
+// enclosing scope's, a module's variable or net.
+class BodyDeclScopes {
+ public:
+  struct Decl {
+    std::string_view name;
+    const DataType* type = nullptr;
+    const std::vector<Expr*>* unpacked_dims = nullptr;
+    bool automatic = false;
+  };
+
+  // `default_auto` is the lifetime §6.21 gives a variable that names none: an
+  // automatic subroutine's, or a static scope's.
+  explicit BodyDeclScopes(bool default_auto) : default_auto_(default_auto) {}
+
+  void DeclareFormal(const FunctionArg& arg);
+
+  const Decl* Find(std::string_view name) const;
+
+  // Hands `visit` `s` and every statement below it, each with the declarations
+  // it sees in view.
+  void Walk(const Stmt* s, const std::function<void(const Stmt*)>& visit);
+
+ private:
+  bool default_auto_;
+  std::vector<Decl> decls_;
+};
 
 }  // namespace delta

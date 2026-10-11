@@ -35,11 +35,16 @@ static std::unordered_map<std::string_view, const RtlirNet*> CollectDelayedNets(
 }
 
 // The net of `delayed` that `lhs` drives, or null where `lhs` drives none of
-// them. A left-hand side naming no single signal reaches no entry, because
-// LhsSignalName answers an empty name for it and no net is declared under one.
+// them. §10.3.3 adds the net's delay to every driver of the net, so a driver of
+// a select of it drives it as one of the whole net does, and so does one of a
+// concatenation element, which Elaborator::ElaborateContAssign has given an
+// assignment of its own. A left-hand side naming no single signal reaches no
+// entry, because LhsSignalName answers an empty name for it and no net is
+// declared under one.
 static const RtlirNet* FindDelayedNetDriven(
     const Expr* lhs, const GenBlockPrefixes& prefixes,
     const std::unordered_map<std::string_view, const RtlirNet*>& delayed) {
+  while (lhs != nullptr && lhs->kind == ExprKind::kSelect) lhs = lhs->base;
   std::string_view base = LhsSignalName(lhs);
   if (base.empty()) return nullptr;
   // §23.9: an item declared locally is the one used, and otherwise the search

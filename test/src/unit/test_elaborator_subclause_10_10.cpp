@@ -2,6 +2,9 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
@@ -11,16 +14,25 @@ using namespace delta;
 
 namespace {
 
-TEST(UnpackedArrayConcatElaboration, EmptyConcatElaborates) {
+// §10.10 (printed page 264): `{}` is only an unpacked array concatenation, so
+// it is assigned to an unpacked array and to nothing else.
+TEST(UnpackedArrayConcatElaboration, EmptyConcatToVectorIsError) {
   ElabFixture f;
-  auto* design = ElaborateSrc(
+  ElaborateSrc(
       "module m;\n"
-      "  logic [7:0] a;\n"
+      "  logic [7:0] a; int q[$];\n"
       "  initial a = {};\n"
+      "  initial q = {};\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "an empty concatenation, {}, is assigned only to "
+                            "an unpacked array",
+                            3, "10.10"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "an empty concatenation, {}, is assigned only to "
+                             "an unpacked array",
+                             4, "10.10"));
 }
 
 TEST(UnpackedArrayConcatElaboration, ScalarItemsElaborate) {
@@ -175,18 +187,16 @@ TEST(UnpackedArrayConcatElaboration, MixedItemsForFixedSizeTarget) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Items in an unpacked array concatenation must have a self-determined type.
-// A bare brace expression nested inside the outer concatenation has no
-// self-determined type when its width does not match the target element
-// width (and so cannot represent a single element), so the elaborator shall
-// reject the assignment.
+// Items in an unpacked array concatenation must have a self-determined type,
+// and a brace expression nested inside the outer concatenation that holds
+// unpacked arrays is an unpacked array concatenation, which has none.
 TEST(UnpackedArrayConcatElaboration, NestedBraceItemRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  int A3[1:3];\n"
       "  int A9[1:9];\n"
-      "  initial A9 = {A3, {32'd4, 32'd5, 32'd6, 32'd7, 32'd8, 32'd9}};\n"
+      "  initial A9 = {A3, {A3, A3}};\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -647,6 +657,54 @@ TEST(UnpackedArrayConcatElaboration, BlockLocalScalarHidesModuleQueueError) {
                             "unsized constant is not allowed in a "
                             "concatenation",
                             5, "11.4.12"));
+}
+
+// §10.10 (printed page 264): an associative array is no target of an unpacked
+// array concatenation, whether a declaration initializes it with one at module
+// level or in a block; a dynamic array and a queue are.
+TEST(UnpackedArrayConcatElaboration, AssocDeclInitializedByConcatIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int aa[string] = {1, 2};\n"
+      "  initial begin int bb[int] = {3}; end\n"
+      "  int d[] = {1, 2}; int q[$] = {1, 2};\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {2u, 3u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "unpacked array concatenation cannot target an "
+                              "associative array",
+                              line, "10.10"));
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "unpacked array concatenation cannot target an "
+                             "associative array",
+                             4, "10.10"));
+}
+
+// §10.10 (printed page 265): an item is assignment compatible with the
+// target's elements, or `null` where they have a null value, in an assignment
+// and in a declaration's initializer alike; a class handle is no int.
+TEST(UnpackedArrayConcatElaboration, IncompatibleItemIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  C c; int q[$]; C cq[$];\n"
+      "  initial q = {c};\n"
+      "  int r[$] = {1, null};\n"
+      "  initial cq = {c, null};\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class handle 'c' is not assignment compatible", 4,
+                            "10.10"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "null is not a legal item in an unpacked array "
+                            "concatenation",
+                            5, "10.10"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "is not", 6, "10.10"));
 }
 
 }  // namespace

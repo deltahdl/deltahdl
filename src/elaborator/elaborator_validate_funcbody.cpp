@@ -381,18 +381,75 @@ struct AutoVarRule {
 
 constexpr AutoVarRule kAutomaticTaskVar{"automatic task variable",
                                         Subclause("13.3.2")};
-constexpr AutoVarRule kAutomaticVarInStaticTask{"automatic variable",
-                                                Subclause("6.21")};
+constexpr AutoVarRule kAutomaticVarInStaticScope{"automatic variable",
+                                                 Subclause("6.21")};
+// §10.4.2 (printed page 253) states the nonblocking rule for every automatic
+// variable, and it is the clause a function body answers to, §13.4 naming no
+// rule of its own for one.
+constexpr AutoVarRule kAutomaticFunctionVar{"automatic variable",
+                                            Subclause("10.4.2")};
 
-// §13.3.2: the nonblocking-assignment restriction applies to a write into an
-// automatic task variable's own storage, including a bit-select or part-select
-// of it. A bit/part-select chain is walked down to its root name. Member access
-// is deliberately not traversed: it denotes a write through a handle or
-// reference whose target outlives the automatic variable.
-static std::string_view NbaAutoTargetRoot(const Expr* e) {
-  while (e && e->kind == ExprKind::kSelect) e = e->base;
-  if (e && e->kind == ExprKind::kIdentifier) return e->text;
-  return {};
+// Whether a variable of `type` is a handle: a class or virtual interface
+// handle, whose members belong to the object or interface it refers to.
+static bool IsHandleType(const DataType& type, const NameSet& class_names) {
+  return type.kind == DataTypeKind::kVirtualInterface ||
+         (type.kind == DataTypeKind::kNamed &&
+          class_names.count(type.type_name) != 0);
+}
+
+// Whether `name`, written as the variable a nonblocking target writes into,
+// reaches an automatic variable. Written through a member of a handle it
+// writes the object the handle refers to instead, which outlives the call.
+static bool NbaNameIsAutomatic(std::string_view name, bool through_member,
+                               const BodyDeclScopes& scopes,
+                               const NameSet& class_names) {
+  const BodyDeclScopes::Decl* decl = scopes.Find(name);
+  if (decl == nullptr || !decl->automatic) return false;
+  return !through_member || !IsHandleType(*decl->type, class_names);
+}
+
+// §10.4.2 (printed page 253): a nonblocking assignment shall not write into an
+// automatic variable, whichever select, member or concatenation element of it
+// the target names, and §23.9 decides which declaration a name reaches.
+static bool NbaTargetWritesAutomatic(const Expr* e, bool through_member,
+                                     const BodyDeclScopes& scopes,
+                                     const NameSet& class_names) {
+  if (e->kind == ExprKind::kConcatenation ||
+      e->kind == ExprKind::kAssignmentPattern) {
+    for (const Expr* el : e->elements)
+      if (NbaTargetWritesAutomatic(el, false, scopes, class_names)) return true;
+    return false;
+  }
+  if (e->kind == ExprKind::kSelect)
+    return NbaTargetWritesAutomatic(e->base, through_member, scopes,
+                                    class_names);
+  if (e->kind == ExprKind::kMemberAccess)
+    return NbaTargetWritesAutomatic(e->lhs, true, scopes, class_names);
+  return e->kind == ExprKind::kIdentifier &&
+         NbaNameIsAutomatic(e->text, through_member, scopes, class_names);
+}
+
+// Reports each nonblocking assignment of a body that writes an automatic
+// variable: a subroutine's, whose formals are in view throughout, or a
+// procedural block's, which has none. `default_auto` is the lifetime of a
+// variable the body declares without saying.
+static void CheckNbaAutomaticTargets(const std::vector<FunctionArg>& formals,
+                                     const std::vector<Stmt*>& body,
+                                     bool default_auto, const AutoVarRule& rule,
+                                     const NameSet& class_names,
+                                     DiagEngine& diag) {
+  BodyDeclScopes scopes(default_auto);
+  for (const auto& arg : formals) scopes.DeclareFormal(arg);
+  for (const Stmt* s : body) {
+    scopes.Walk(s, [&](const Stmt* st) {
+      if (st->kind != StmtKind::kNonblockingAssign) return;
+      if (!NbaTargetWritesAutomatic(st->lhs, false, scopes, class_names))
+        return;
+      diag.Error(st->range.start,
+                 std::format("{} in nonblocking assignment", rule.variable),
+                 rule.subclause);
+    });
+  }
 }
 
 // An automatic task variable shall not appear in the intra-assignment event
@@ -415,21 +472,6 @@ static void CheckNbaEventControlForAutoVar(
                            rule.variable),
                rule.subclause);
   }
-}
-
-static void CheckTaskBodyNbaForAutoVar(
-    const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
-    const AutoVarRule& rule, DiagEngine& diag) {
-  if (s->kind != StmtKind::kNonblockingAssign) return;
-  if (s->lhs) {
-    auto target = NbaAutoTargetRoot(s->lhs);
-    if (!target.empty() && auto_vars.count(target) != 0) {
-      diag.Error(s->range.start,
-                 std::format("{} in nonblocking assignment", rule.variable),
-                 rule.subclause);
-    }
-  }
-  CheckNbaEventControlForAutoVar(s, auto_vars, rule, diag);
 }
 
 // §13.3.2 (printed page 339): an automatic task variable may not be traced by
@@ -514,7 +556,8 @@ static void CheckTaskBodyStmtSelf(const Stmt* s, const TaskBodyScope& scope,
     diag.Error(s->range.start, "task returns a value", Subclause("13.3"));
   }
 
-  CheckTaskBodyNbaForAutoVar(s, scope.auto_vars, scope.rule, diag);
+  if (s->kind == StmtKind::kNonblockingAssign)
+    CheckNbaEventControlForAutoVar(s, scope.auto_vars, scope.rule, diag);
   CheckTaskBodyMonitorTrace(s, scope.auto_vars, scope.rule, diag);
   CheckTaskBodyContAssign(s, scope.auto_vars, scope.rule, diag);
 
@@ -629,9 +672,8 @@ static void ValidateRefArgsInForkBlocks(const ModuleItem* item,
   }
 }
 
-static void ValidateTaskBody(const ModuleItem* item, DiagEngine& diag) {
-  bool is_auto = item->is_automatic;
-
+static void ValidateTaskBody(const ModuleItem* item, bool is_auto,
+                             const NameSet& class_names, DiagEngine& diag) {
   std::unordered_set<std::string_view> auto_vars;
   if (is_auto) {
     for (const auto& arg : item->func_args) {
@@ -642,14 +684,17 @@ static void ValidateTaskBody(const ModuleItem* item, DiagEngine& diag) {
     CollectAutoVarNames(s, is_auto, auto_vars);
   }
   const AutoVarRule& rule =
-      is_auto ? kAutomaticTaskVar : kAutomaticVarInStaticTask;
+      is_auto ? kAutomaticTaskVar : kAutomaticVarInStaticScope;
+  CheckNbaAutomaticTargets(item->func_args, item->func_body_stmts, is_auto,
+                           rule, class_names, diag);
   TaskBodyScope scope{.auto_vars = auto_vars, .rule = rule};
   for (auto* s : item->func_body_stmts) {
     CheckTaskBodyStmt(s, scope, diag);
   }
 }
 
-void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
+void Elaborator::ValidateFunctionBody(const ModuleItem* item,
+                                      bool is_class_method) {
   ValidateRefLifetime(item, diag_);
 
   ValidateConstRefWriteProtection(item, diag_);
@@ -666,11 +711,15 @@ void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
   CheckBlockNameSpace(item->func_body_stmts, std::move(formals), diag_);
   for (auto* s : item->func_body_stmts) CheckNestedBlockNameSpaces(s, diag_);
 
+  // §8.6: every method of a class is automatic.
+  bool is_auto = item->is_automatic || is_class_method;
   if (item->kind == ModuleItemKind::kTaskDecl) {
-    ValidateTaskBody(item, diag_);
+    ValidateTaskBody(item, is_auto, class_names_, diag_);
     return;
   }
   if (item->kind != ModuleItemKind::kFunctionDecl) return;
+  CheckNbaAutomaticTargets(item->func_args, item->func_body_stmts, is_auto,
+                           kAutomaticFunctionVar, class_names_, diag_);
   bool is_void = (item->return_type.kind == DataTypeKind::kVoid);
   FunctionBodyScope scope{
       .is_void = is_void, .func_name = item->name, .task_names = task_names_};
@@ -709,12 +758,6 @@ static void CheckAutoVarWritesInProc(
     const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
     DiagEngine& diag) {
   if (!s) return;
-  if (s->kind == StmtKind::kNonblockingAssign && s->lhs &&
-      s->lhs->kind == ExprKind::kIdentifier &&
-      auto_vars.count(s->lhs->text) != 0) {
-    diag.Error(s->range.start, "automatic variable in nonblocking assignment",
-               Subclause("6.21"));
-  }
   if (s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign) {
     auto name = ExprIdent(s->lhs);
     if (!name.empty() && auto_vars.count(name) != 0) {
@@ -723,10 +766,9 @@ static void CheckAutoVarWritesInProc(
                  Subclause("6.21"));
     }
   }
-  // §6.21 forbids the nonblocking assignment and the procedural continuous
-  // assignment reported above by what each writes into rather than by where it
-  // is written, so every position a statement holds a statement in is one
-  // either can stand in. ForEachChildStmt in
+  // §6.21 forbids the procedural continuous assignment reported above by what
+  // it writes into rather than by where it is written, so every position a
+  // statement holds a statement in is one it can stand in. ForEachChildStmt in
   // elaborator_validate_internal.h states those positions once for the whole
   // elaborator, which is why the list is not written out again here.
   //
@@ -792,7 +834,7 @@ static void ReportImplicitlyStaticInitsOfItem(const ModuleItem* item,
 
 static void ValidateAutomaticVarRulesOfItems(
     const std::vector<ModuleItem*>& items, bool module_is_automatic,
-    DiagEngine& diag);
+    const NameSet& class_names, DiagEngine& diag);
 
 // §27.3 (printed page 818): the procedural blocks and subroutines a generate
 // block brings into existence act as they would in a module, so §6.21's rules
@@ -801,22 +843,24 @@ static void ValidateAutomaticVarRulesOfItems(
 // case generate arm holds its block in its own body.
 static void ValidateAutomaticVarRulesOfGenerate(const ModuleItem* item,
                                                 bool module_is_automatic,
+                                                const NameSet& class_names,
                                                 DiagEngine& diag) {
   switch (item->kind) {
     case ModuleItemKind::kGenerateIf:
       ValidateAutomaticVarRulesOfItems(item->gen_body, module_is_automatic,
-                                       diag);
+                                       class_names, diag);
       if (item->gen_else != nullptr)
         ValidateAutomaticVarRulesOfGenerate(item->gen_else, module_is_automatic,
-                                            diag);
+                                            class_names, diag);
       return;
     case ModuleItemKind::kGenerateFor:
       ValidateAutomaticVarRulesOfItems(item->gen_body, module_is_automatic,
-                                       diag);
+                                       class_names, diag);
       return;
     case ModuleItemKind::kGenerateCase:
       for (const auto& ci : item->gen_case_items)
-        ValidateAutomaticVarRulesOfItems(ci.body, module_is_automatic, diag);
+        ValidateAutomaticVarRulesOfItems(ci.body, module_is_automatic,
+                                         class_names, diag);
       return;
     default:
       return;
@@ -825,12 +869,15 @@ static void ValidateAutomaticVarRulesOfGenerate(const ModuleItem* item,
 
 static void ValidateAutomaticVarRulesOfItems(
     const std::vector<ModuleItem*>& items, bool module_is_automatic,
-    DiagEngine& diag) {
+    const NameSet& class_names, DiagEngine& diag) {
   for (const auto* item : items) {
     ReportImplicitlyStaticInitsOfItem(item, module_is_automatic, diag);
-    ValidateAutomaticVarRulesOfGenerate(item, module_is_automatic, diag);
+    ValidateAutomaticVarRulesOfGenerate(item, module_is_automatic, class_names,
+                                        diag);
     bool is_proc = IsProceduralItemKind(item->kind);
     if (!is_proc || !item->body) continue;
+    CheckNbaAutomaticTargets({}, {item->body}, false,
+                             kAutomaticVarInStaticScope, class_names, diag);
     std::unordered_set<std::string_view> auto_vars;
     CollectAutoVarNames(item->body, false, auto_vars);
     if (auto_vars.empty()) continue;
@@ -839,7 +886,8 @@ static void ValidateAutomaticVarRulesOfItems(
 }
 
 void Elaborator::ValidateAutomaticVarProcWrites(const ModuleDecl* decl) {
-  ValidateAutomaticVarRulesOfItems(decl->items, decl->is_automatic, diag_);
+  ValidateAutomaticVarRulesOfItems(decl->items, decl->is_automatic,
+                                   class_names_, diag_);
 }
 
 // §6.21's initializer rule over a package's tasks and functions, which §13.3.1

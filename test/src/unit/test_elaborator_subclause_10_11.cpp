@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -315,6 +318,213 @@ TEST(NetAliasingElaboration, AliasBitSelfAliasWithLocalparamBoundIsError) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "net bits aliased to themselves in alias statement",
                             6, "10.11"));
+}
+
+// §10.11 Syntax 10-6: an alias operand is a net_lvalue, so an operator
+// expression, a literal and a select whose index or bound is no constant are
+// each reported rather than dropped.
+TEST(NetAliasingElaboration, OperandThatIsNoNetLvalueIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire w, a, b; wire [3:0] x; int i;\n"
+      "  alias w = a & b;\n"
+      "  alias w = 1'b1;\n"
+      "  alias w = x[i];\n"
+      "  alias x[3:i] = x;\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {3u, 4u, 5u, 6u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "alias operand is not a net_lvalue", line,
+                              "10.11"));
+  }
+}
+
+// §10.11 Syntax 10-6: a select is taken from a net, a concatenation holds
+// net_lvalues alone, a pattern is positional, and a cast is no net_lvalue
+// unless it types a pattern.
+TEST(NetAliasingElaboration, OperandOfAnIllegalCompositeFormIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire w, a, b; wire [3:0] x;\n"
+      "  alias w = {a, b}[0];\n"
+      "  alias x[1:0] = {a, 1'b1};\n"
+      "  alias x[1:0] = '{1: a, 0: b};\n"
+      "  alias x = int'(x);\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {3u, 4u, 5u, 6u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "alias operand is not a net_lvalue", line,
+                              "10.11"));
+  }
+}
+
+// §10.11 Syntax 10-6: a typed pattern is a net_lvalue only when its own items
+// are written positionally.
+TEST(NetAliasingElaboration, TypedPatternOperandWithKeysIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef struct packed { logic [1:0] hi, lo; } pair_t;\n"
+      "module m;\n"
+      "  wire [3:0] x; wire [1:0] a, b;\n"
+      "  alias x = pair_t'{hi: a, lo: b};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "alias operand is not a net_lvalue", 4, "10.11"));
+}
+
+// §10.11 Syntax 10-6: each form a net_lvalue takes elaborates -- a bit-select,
+// an indexed part-select, a select of a select, a positional pattern with and
+// without a type, and a select whose bound is a parameter.
+TEST(NetAliasingElaboration, EveryNetLvalueFormElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "typedef struct packed { logic [1:0] hi, lo; } pair_t;\n"
+      "module m;\n"
+      "  parameter P = 1;\n"
+      "  wire [3:0] x, z; wire [1:0] a, b, c, d; wire [1:0][1:0] y;\n"
+      "  alias x[2] = a[0];\n"
+      "  alias x[0 +: 2] = b;\n"
+      "  alias y[1][0] = a[1];\n"
+      "  alias x = pair_t'{c, d};\n"
+      "  alias z = '{c, d};\n"
+      "  alias z[P:0] = d;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A hierarchical name with a constant select is a net_lvalue by its form, and
+// §10.11 still bars it as a hierarchical reference.
+TEST(NetAliasingElaboration, HierarchicalSelectOperandIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child;\n"
+      "  wire [1:0] x;\n"
+      "endmodule\n"
+      "module m;\n"
+      "  child c1();\n"
+      "  wire a;\n"
+      "  alias a = c1.x[0];\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "hierarchical references cannot be used in alias statements", 7,
+      "10.11"));
+}
+
+// §10.11: a variable is barred from an alias statement even when the operand
+// names it through a select.
+TEST(NetAliasingElaboration, VariableNamedThroughSelectIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire [7:0] w; logic [7:0] v;\n"
+      "  alias w = v[7:0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'v' is a variable, not a net", 3, "10.11"));
+}
+
+// §10.11: nets of different net types may not be aliased, and a select counts
+// as the net it is taken from.
+TEST(NetAliasingElaboration, WandToWorSelectIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wand [1:0] a; wor [1:0] b;\n"
+      "  alias a = b[1:0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'a' and 'b' are different net types", 3, "10.11"));
+}
+
+// §10.11: the net type is the keyword the declaration wrote, so wand logic and
+// wor logic differ although both carry the data type logic.
+TEST(NetAliasingElaboration, WandLogicToWorLogicIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wand logic [1:0] a; wor logic [1:0] b;\n"
+      "  alias a = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'a' and 'b' are different net types", 3, "10.11"));
+}
+
+// §10.11: a net's bits aliased to themselves are found whatever index its range
+// starts at. a[8:5] is the top four bits of `wire [8:1] a`, which the whole
+// name places at the same positions.
+TEST(NetAliasingElaboration, SelfAliasOfRangeNotStartingAtZeroIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire [8:1] a; wire [3:0] b;\n"
+      "  alias a = {a[8:5], b};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net bits aliased to themselves in alias statement",
+                            3, "10.11"));
+}
+
+// §10.11: an ascending range is read with its first index as the most
+// significant bit, so p[0:1] written twice against q is one alias repeated.
+TEST(NetAliasingElaboration, RepeatOnAscendingRangeIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire [0:3] p; wire [1:0] q;\n"
+      "  alias p[0:1] = q;\n"
+      "  alias p[0:1] = q[1:0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "alias bit correspondence specified more than once",
+                            4, "10.11"));
+}
+
+// §10.11: an alias written once with whole nets and again with selects of the
+// same bits is specified more than once.
+TEST(NetAliasingElaboration, WholeNetAliasRepeatedAsSelectsIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire [3:0] a, b;\n"
+      "  alias a = b;\n"
+      "  alias a[3:0] = b[3:0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "alias bit correspondence specified more than once",
+                            4, "10.11"));
+}
+
+// §10.11: each iteration of a loop generate block declares nets of its own, so
+// the alias each iteration writes joins different nets and none repeats.
+TEST(NetAliasingElaboration, AliasInGenerateLoopElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wire [1:0] w, v;\n"
+      "  for (genvar i = 0; i < 2; i++) begin : g\n"
+      "    wire a, b;\n"
+      "    alias a = b;\n"
+      "    alias w[i] = v[i];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace

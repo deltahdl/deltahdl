@@ -118,10 +118,16 @@ static bool PatternItemsConstant(const Expr* e, const ScopeMap& values) {
 // values (§6.20.1), which no integer stands for: a pattern is judged item by
 // item (PatternItemsConstant), a value written as anything else -- the name of
 // another parameter array -- stands as written, and neither is recorded.
+//
+// §10.8 (printed page 259) makes an explicitly typed parameter's value an
+// assignment-like context, so a pattern there takes the parameter's type -- a
+// structure's or a union's as much as an array's -- and is judged item by item
+// as an array's is.
 static void RecordClassParam(std::string_view pname, const Expr* pexpr,
                              const DataType* type, bool is_array,
                              ClassParamRegistration& reg) {
   if (!pexpr || IsDollarValue(pexpr)) return;
+  is_array = is_array || pexpr->kind == ExprKind::kAssignmentPattern;
   bool is_real = !is_array && TakesRealClassParamValue(pexpr, type);
   std::optional<int64_t> val;
   if (!is_real && !is_array)
@@ -251,7 +257,12 @@ std::unordered_set<std::string_view> NonIntegralParamNames(
   return names;
 }
 
+// §10.8 (printed page 260): a parameter override in a class's instantiation is
+// an assignment-like context, so a pattern there is constant when its items
+// are.
 bool IsConstantClassParamValue(const Expr* e, const ScopeMap& scope) {
+  if (e->kind == ExprKind::kAssignmentPattern)
+    return PatternItemsConstant(e, scope);
   return IsDollarValue(e) || NamesUnboundedParam(e) || ConstEvalInt(e, scope) ||
          ConstEvalReal(e, scope);
 }

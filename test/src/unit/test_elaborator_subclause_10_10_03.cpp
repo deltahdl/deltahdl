@@ -76,12 +76,15 @@ TEST(UnpackedArrayConcatElaboration, VectorConcatInByteArrayConcatOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §10.10.3 (printed page 266): a complete unpacked array concatenation is no
+// item of another, and braces holding an unpacked array are one, written in a
+// nonblocking assignment as in a blocking one.
 TEST(UnpackedArrayConcatElaboration, NonblockingNestedConcatError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  int A[4];\n"
-      "  initial A <= {{1, 2}, {3, 4}};\n"
+      "  int A[4]; int P[2];\n"
+      "  initial A <= {{P, P}};\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -103,39 +106,34 @@ TEST(UnpackedArrayConcatElaboration, UnpackedConcatAsAssignPatternItemOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.10.3 (procedural, isolated): the nesting prohibition rejects a blocking
-// procedural assignment whose item is itself an unpacked array concatenation.
-// The inner literals are SIZED (combined width 48 != the 32-bit element), so
-// this observes ONLY the nesting rule; an inner concatenation of *unsized*
-// literals would additionally trip the unrelated unsized-constant-in-
-// concatenation check and mask which rule did the rejecting.
-TEST(UnpackedArrayConcatElaboration, ProceduralNestedConcatSizedError) {
+// §10.10.3 (printed page 266): inner braces are a vector concatenation, a
+// self-determined item of whatever width assigned to one element, so A's three
+// elements and one 48-bit item fill a four-element array, assigned by a
+// procedure or initializing the array in its declaration.
+TEST(UnpackedArrayConcatElaboration, NestedConcatOfAnyWidthIsOneElement) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  int A[3];\n"
-      "  int B[9];\n"
-      "  initial B = {A, {16'd4, 16'd5, 16'd6}};\n"
+      "  int B[4] = {A, {16'd4, 16'd5, 16'd6}};\n"
+      "  int C[4];\n"
+      "  initial C = {A, {16'd4, 16'd5, 16'd6}};\n"
+      "  int q[$]; byte BA[2];\n"
+      "  initial begin q = {{8'd1, 8'd2}}; BA = {{8'h1, 8'h2}, 8'h3}; end\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "nested concatenation in unpacked array "
-                            "concatenation is not self-determined",
-                            4, "10.10.3"));
+  EXPECT_EQ(FindDiag(f, "is not self-determined"), nullptr);
 }
 
-// §10.10.3: the nesting prohibition also governs a declaration initializer,
-// an assignment-like context the procedural walk never reaches. The inner
-// concatenation uses sized literals whose combined width does not match the
-// int element, so it cannot be reinterpreted as a self-determined vector
-// concatenation — it is a nested unpacked array concatenation and is illegal.
+// §10.10.3 holds the declaration's initializer to the nesting prohibition as
+// it holds a procedural assignment.
 TEST(UnpackedArrayConcatElaboration, DeclInitNestedConcatError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
       "  int A[3];\n"
-      "  int B[9] = {A, {16'd4, 16'd5, 16'd6}};\n"
+      "  int B[9] = {A, {A, A}};\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);

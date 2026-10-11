@@ -658,4 +658,22 @@ TEST(AssignmentDelaySim, ANetDelayDelaysAnOutputPortDriver) {
   EXPECT_EQ(RunAndGet(src, "r12"), 1u);
 }
 
+// §10.3.3: a net delay delays every value change any other statement applies
+// to the net, so a driver of one bit of a vector net settles at the driver's
+// change plus the net's delay: a at 1, w[0] at 11.
+TEST(AssignmentDelaySim, NetDelayAppliesToDriverOfSelect) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic a = 0;\n"
+      "  wire [1:0] #10 w;\n"
+      "  assign w[0] = a;\n"
+      "  initial #1 a = 1;\n"
+      "endmodule\n",
+      f, "w");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64() & 1u, 1u);
+  EXPECT_EQ(f.scheduler.CurrentTime().ticks, 11u);
+}
+
 }  // namespace

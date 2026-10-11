@@ -1,24 +1,35 @@
+#include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <format>
+#include <string_view>
+#include <unordered_map>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/packed_range.h"
+#include "common/source_loc.h"
 #include "common/types.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_type.h"
 
 namespace delta {
 
-void Elaborator::ValidateContAssignIdentLhs(ModuleItem* item,
+// §6.10 and §10.3.2 for an element of a continuous assignment's target that is
+// a whole name: an undeclared one is an implicit net, a variable takes one
+// continuous assignment and no initializer, and a uwire net one driver.
+void Elaborator::ValidateContAssignIdentLhs(std::string_view name,
+                                            ModuleItem* item,
                                             RtlirModule* mod) {
-  auto name = item->assign_lhs->text;
   MaybeCreateImplicitNet(name, item->loc, mod);
   if (!cont_assign_targets_.emplace(name, item->loc).second) {
     if (net_names_.count(name) == 0) {
@@ -38,66 +49,28 @@ void Elaborator::ValidateContAssignIdentLhs(ModuleItem* item,
       }
     }
   }
-  if (var_init_names_.count(name) != 0) {
-    diag_.Error(item->loc,
-                std::format("variable '{}' has both an initializer and a "
-                            "continuous assignment",
-                            name),
-                Subclause("10.3.2"));
-  }
 }
 
-void Elaborator::ValidateContAssignNettypeAndDelay(ModuleItem* item) {
-  if (item->assign_lhs->kind == ExprKind::kSelect) {
-    auto* base = item->assign_lhs->base;
-    if (base && base->kind == ExprKind::kIdentifier &&
-        nettype_net_names_.count(base->text) != 0) {
-      diag_.Error(item->loc,
-                  "a continuous assignment to a net of a user-defined nettype "
-                  "drives the whole net and cannot index or select into it",
-                  Subclause("10.3.2"));
-    }
-  }
-  if (item->assign_lhs->kind == ExprKind::kMemberAccess) {
-    auto* base = item->assign_lhs->lhs;
-    if (base && base->kind == ExprKind::kIdentifier &&
-        nettype_net_names_.count(base->text) != 0) {
-      diag_.Error(item->loc,
-                  "a continuous assignment to a net of a user-defined nettype "
-                  "drives the whole net and cannot index or select into it",
-                  Subclause("10.3.2"));
-    }
-  }
-  if (item->assign_lhs->kind == ExprKind::kIdentifier &&
-      nettype_net_names_.count(item->assign_lhs->text) != 0) {
-    if (item->assign_delay_fall || item->assign_delay_decay) {
-      diag_.Error(item->loc,
-                  "continuous assignment to a nettype net shall have at most "
-                  "a single delay",
-                  Subclause("10.3.3"));
-    }
-  }
-}
-
+// §10.3.4 (printed page 251): a drive strength applies only to an assignment
+// to a scalar net, a net of type supply0 or supply1 excepted, so a target that
+// is a select of a vector net or a concatenation is no more one than a whole
+// vector net is.
 void Elaborator::ValidateContAssignDriveStrength(ModuleItem* item,
                                                  RtlirModule* mod) {
-  if (item->assign_lhs->kind != ExprKind::kIdentifier) return;
-  uint32_t lhs_width = LookupLhsWidth(item->assign_lhs, mod);
-  if (lhs_width <= 1) return;
-  bool is_supply = false;
+  const Expr* lhs = item->assign_lhs;
+  if (lhs->kind == ExprKind::kIdentifier && LookupLhsWidth(lhs, mod) <= 1)
+    return;
+  std::string_view root = LhsBaseName(lhs);
   for (const auto& n : mod->nets) {
-    if (n.name == item->assign_lhs->text) {
-      is_supply =
-          (n.net_type == NetType::kSupply0 || n.net_type == NetType::kSupply1);
-      break;
-    }
+    if (n.name != root) continue;
+    if (n.net_type == NetType::kSupply0 || n.net_type == NetType::kSupply1)
+      return;
+    break;
   }
-  if (!is_supply) {
-    diag_.Error(item->loc,
-                "drive strength on continuous assignment applies only to "
-                "scalar nets",
-                Subclause("10.3.4"));
-  }
+  diag_.Error(item->loc,
+              "drive strength on continuous assignment applies only to "
+              "scalar nets",
+              Subclause("10.3.4"));
 }
 
 namespace {
@@ -139,6 +112,8 @@ RtlirContAssign BuildContAssign(ModuleItem* item, RtlirModule* mod,
                             LookupLhsWidth(item->assign_lhs, mod), diag);
 }
 
+}  // namespace
+
 // §11.5.1: the width of a select written as an element of a concatenation
 // left-hand side, which the clause keeps constant: the span its two indices
 // name for `[msb:lsb]`, the width expression for the two indexed forms, and one
@@ -156,6 +131,8 @@ uint32_t SelectLhsWidth(const Expr* e, const ScopeMap& scope) {
   if (!msb || !lsb) return 0;
   return static_cast<uint32_t>(std::abs(*msb - *lsb) + 1);
 }
+
+namespace {
 
 // §11.4.1/§10.10: total bit width of a continuous-assignment concatenation
 // left-hand side (a nested concatenation sums its elements; identifiers reduce
@@ -289,24 +266,233 @@ void EmitConcatContAssigns(const ConcatContAssignCtx& cx, Expr* lhs,
 
 }  // namespace
 
-void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
-  if (item->assign_lhs && item->assign_lhs->kind == ExprKind::kIdentifier) {
-    ValidateContAssignIdentLhs(item, mod);
+// One element of a continuous assignment's target: the expression, the name
+// it is rooted at, how many selects stand between that name and the first
+// member access over it, and whether it holds a member access at all.
+struct ContTargetLeaf {
+  const Expr* expr;
+  std::string_view root;
+  size_t selects = 0;
+  bool has_member = false;
+};
 
-    bool is_var_target = net_names_.count(item->assign_lhs->text) == 0;
-    if (is_var_target) {
-      ValidateContAssignVarTarget(item, diag_);
+// §10.3 Syntax 10-1: a continuous assignment's target is a net_lvalue or a
+// variable_lvalue -- a name under constant selects and member accesses, a
+// concatenation of those, or an assignment pattern of them with or without a
+// type, whose keys §10.9's own rule reports. Collects its elements, answering
+// false for any other form.
+static bool CollectContTargetLeaves(const Expr* e,
+                                    std::vector<ContTargetLeaf>& out) {
+  if (e->kind == ExprKind::kCast &&
+      e->lhs->kind == ExprKind::kAssignmentPattern)
+    e = e->lhs;
+  if (e->kind == ExprKind::kConcatenation ||
+      e->kind == ExprKind::kAssignmentPattern) {
+    for (const Expr* el : e->elements)
+      if (!CollectContTargetLeaves(el, out)) return false;
+    return true;
+  }
+  if (e->kind == ExprKind::kStreamingConcat) return true;
+  ContTargetLeaf leaf{.expr = e};
+  while (e->kind == ExprKind::kSelect || e->kind == ExprKind::kMemberAccess) {
+    if (e->kind == ExprKind::kMemberAccess) {
+      leaf.has_member = true;
+      leaf.selects = 0;
+      e = e->lhs;
+    } else {
+      ++leaf.selects;
+      e = e->base;
     }
   }
-  if (item->assign_lhs) {
-    ValidateContAssignNettypeAndDelay(item);
+  if (e->kind != ExprKind::kIdentifier) return false;
+  leaf.root = e->text;
+  out.push_back(leaf);
+  return true;
+}
+
+static bool NamesParameter(std::string_view name, const RtlirModule* mod) {
+  for (const auto& p : mod->params)
+    if (p.name == name) return true;
+  return false;
+}
+
+static size_t UnpackedDimsOfNet(std::string_view name, const RtlirModule* mod) {
+  for (const auto& n : mod->nets)
+    if (n.name == name) return n.num_unpacked_dims;
+  return 0;
+}
+
+// The rules §10.3 and §10.3.2 state of each element of a continuous
+// assignment's target, and whether any element is a variable, whose form
+// (Syntax 10-1) takes no drive strength and a delay_control alone.
+bool Elaborator::ValidateContAssignLeaves(
+    ModuleItem* item, RtlirModule* mod,
+    const std::vector<ContTargetLeaf>& leaves) {
+  // §11.2.1 with §27.4: a select index may name a parameter, or the genvar of
+  // the loop generate block the assignment stands in.
+  ScopeMap scope = BuildParamScope(mod);
+  for (const auto& [name, value] : gen_const_scope_) scope[name] = value;
+  bool any_var = false;
+  for (const ContTargetLeaf& leaf : leaves) {
+    // §10.2 and §10.3: a continuous assignment drives a net or a variable,
+    // and a parameter is a constant (§6.20).
+    if (NamesParameter(leaf.root, mod)) {
+      diag_.Error(
+          item->loc,
+          std::format("continuous assignment to parameter '{}'", leaf.root),
+          Subclause("10.3"));
+      continue;
+    }
+    // Table 10-1 (printed page 247): every select on the left-hand side of a
+    // continuous assignment is a constant one, however deep it stands.
+    if (!SelectPathIsConstant(leaf.expr, scope)) {
+      diag_.Error(item->loc,
+                  "continuous assignment left-hand side requires a "
+                  "constant select expression",
+                  Subclause("10.3.2"));
+    }
+    if (leaf.expr->kind == ExprKind::kIdentifier)
+      ValidateContAssignIdentLhs(leaf.root, item, mod);
+    // A name reached through a member access may be an instance's or an
+    // interface's, which names no variable of this module, so only a name the
+    // target writes directly or through selects is judged a variable.
+    bool is_var = net_names_.count(leaf.root) == 0 && !leaf.has_member;
+    // §6.5: the module's procedural assignments were recorded before its
+    // generate blocks are elaborated, so an assignment a block makes is
+    // weighed against them here; a module's own is weighed by
+    // Elaborator::ValidateMixedAssignments once all of them are known.
+    if (!gen_prefix_scopes_.empty() && is_var &&
+        proc_assign_targets_.count(leaf.root) != 0) {
+      diag_.Error(item->loc,
+                  std::format("variable '{}' has both continuous and "
+                              "procedural assignments",
+                              leaf.root),
+                  Subclause("6.5"));
+    }
+    // §10.3.2 (printed page 249): a variable a continuous assignment writes
+    // any part of has no initializer.
+    if (is_var && var_init_names_.count(leaf.root) != 0) {
+      diag_.Error(item->loc,
+                  std::format("variable '{}' has both an initializer and a "
+                              "continuous assignment",
+                              leaf.root),
+                  Subclause("10.3.2"));
+    }
+    any_var = any_var || is_var;
+    // §10.3.2: an assignment to a net of a user-defined nettype drives the
+    // whole net, so it may select an element of an array of such nets and
+    // nothing within the nettype's data type.
+    if (nettype_net_names_.count(leaf.root) != 0 &&
+        (leaf.has_member || leaf.selects > UnpackedDimsOfNet(leaf.root, mod))) {
+      diag_.Error(item->loc,
+                  "a continuous assignment to a net of a user-defined nettype "
+                  "drives the whole net and cannot index or select into it",
+                  Subclause("10.3.2"));
+    }
   }
-  if ((item->drive_strength0 != 0 || item->drive_strength1 != 0) &&
-      item->assign_lhs) {
+  return any_var;
+}
+
+// §28.3.2 with §10.3.4 (printed page 251): (highz0, highz1) is no drive
+// strength a net declaration, a continuous assignment or a gate may take.
+void CheckHighzStrengthPair(const ModuleItem* item, DiagEngine& diag) {
+  if ((item->kind == ModuleItemKind::kNetDecl ||
+       item->kind == ModuleItemKind::kContAssign ||
+       item->kind == ModuleItemKind::kGateInst ||
+       item->kind == ModuleItemKind::kUdpInst) &&
+      item->drive_strength0 == 1 && item->drive_strength1 == 1) {
+    diag.Error(item->loc, "drive strength (highz0, highz1) is illegal",
+               Subclause("28.3.2"));
+  }
+}
+
+// §27.3 (printed page 818): a generate block's items act as the module's own
+// would, so the strength pair §10.3.4 forbids, §10.4's rule that a procedural
+// assignment writes no net and the one-driver rule of §6.5 and §10.3.2 reach
+// them. The module's own checks run before its generate blocks are
+// elaborated, so each item of a block is checked as the block is, against the
+// targets the module's items and the earlier items recorded.
+void Elaborator::ValidateGeneratedItem(const ModuleItem* item) {
+  CheckHighzStrengthPair(item, diag_);
+  if (!IsProceduralItemKind(item->kind)) return;
+  std::unordered_map<std::string_view, SourceLoc> targets;
+  CollectProcTargets({}, {item->body}, targets);
+  for (const auto& [name, loc] : targets) {
+    if (net_names_.count(name) != 0) {
+      diag_.Error(loc,
+                  std::format("net '{}' cannot be the target of a "
+                              "procedural assignment",
+                              name),
+                  Subclause("10.4"));
+      continue;
+    }
+    if (cont_assign_targets_.count(name) != 0) {
+      diag_.Error(loc,
+                  std::format("variable '{}' has both continuous and "
+                              "procedural assignments",
+                              name),
+                  Subclause("6.5"));
+    }
+    proc_assign_targets_.emplace(name, loc);
+  }
+}
+
+// §10.3.2 (printed page 249): a variable may be driven by one primitive
+// output as by one continuous assignment, and one so driven takes neither an
+// initializer nor a procedural assignment. An n-output gate drives every
+// terminal but its last (§28.4); every other primitive drives its first.
+void Elaborator::RecordGateOutputDrivers(const ModuleItem* item) {
+  size_t count = item->gate_terminals.size();
+  bool n_output =
+      item->gate_kind == GateKind::kBuf || item->gate_kind == GateKind::kNot;
+  size_t outputs = std::min<size_t>(count, n_output ? count - 1 : 1);
+  for (size_t i = 0; i < outputs; ++i) {
+    std::string_view name = ExprIdent(item->gate_terminals[i]);
+    if (name.empty() || net_names_.count(name) != 0) continue;
+    if (!cont_assign_targets_.emplace(name, item->loc).second) {
+      diag_.Error(item->loc,
+                  std::format("variable '{}' is driven by more than one "
+                              "continuous assignment or primitive output",
+                              name),
+                  Subclause("10.3.2"));
+    }
+    if (var_init_names_.count(name) != 0) {
+      diag_.Error(item->loc,
+                  std::format("variable '{}' has both an initializer and a "
+                              "primitive output driving it",
+                              name),
+                  Subclause("10.3.2"));
+    }
+  }
+}
+
+void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
+  std::vector<ContTargetLeaf> leaves;
+  if (!CollectContTargetLeaves(item->assign_lhs, leaves)) {
+    diag_.Error(item->loc,
+                "continuous assignment target is not a net or variable "
+                "lvalue",
+                Subclause("10.3"));
+    return;
+  }
+  // A net reached through a member access is another scope's, whose
+  // declaration this module does not hold, so its strength goes unjudged.
+  if (ValidateContAssignLeaves(item, mod, leaves)) {
+    ValidateContAssignVarTarget(item, diag_);
+  } else if ((item->drive_strength0 != 0 || item->drive_strength1 != 0) &&
+             std::ranges::none_of(leaves, &ContTargetLeaf::has_member)) {
     ValidateContAssignDriveStrength(item, mod);
   }
+  if (item->assign_lhs->kind == ExprKind::kIdentifier &&
+      nettype_net_names_.count(item->assign_lhs->text) != 0 &&
+      (item->assign_delay_fall || item->assign_delay_decay)) {
+    diag_.Error(item->loc,
+                "continuous assignment to a nettype net shall have at most "
+                "a single delay",
+                Subclause("10.3.3"));
+  }
   ValidateGetpatternContAssign(item, mod);
-  if (item->assign_lhs && item->assign_lhs->kind == ExprKind::kConcatenation) {
+  if (item->assign_lhs->kind == ExprKind::kConcatenation) {
     ScopeMap scope = BuildParamScope(mod);
     ConcatContAssignCtx cx{item, mod, arena_, diag_, scope};
     EmitConcatContAssigns(cx, item->assign_lhs, item->assign_rhs);

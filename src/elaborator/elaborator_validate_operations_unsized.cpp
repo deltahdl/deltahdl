@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <optional>
 #include <string_view>
@@ -125,6 +126,17 @@ static std::optional<bool> BlockDeclIsArray(
 // `qq[0] = {qq[0], 5}` on `int qq[$][$]` assign unpacked array concatenations
 // (§10.10, printed page 264), where each unsized item had been reported under
 // §11.4.12.
+// §10.10.2 (printed page 265): selecting fewer elements than a module array
+// has unpacked dimensions leaves an unpacked array, `M[0]` of `int M[2][2]`,
+// which braces assigned to are an unpacked array concatenation into.
+bool ElaboratorOperationRules::SelectsArrayElementArray(const Expr* sel) const {
+  size_t selects = 0;
+  for (; sel->kind == ExprKind::kSelect; sel = sel->base) ++selects;
+  if (sel->kind != ExprKind::kIdentifier) return false;
+  auto it = var_array_info_.find(sel->text);
+  return it != var_array_info_.end() && it->second.num_unpacked_dims > selects;
+}
+
 bool ElaboratorOperationRules::IsUnpackedArrayConcatTarget(
     const Expr* lhs) const {
   if (lhs == nullptr) return false;
@@ -134,11 +146,24 @@ bool ElaboratorOperationRules::IsUnpackedArrayConcatTarget(
     return var_array_info_.count(lhs->text) > 0;
   }
   if (lhs->kind == ExprKind::kSelect)
-    return SelectsQueueElement(lhs, var_array_info_);
+    return SelectsArrayElementArray(lhs) ||
+           SelectsQueueElement(lhs, var_array_info_);
   if (lhs->kind != ExprKind::kMemberAccess || lhs->lhs == nullptr ||
       lhs->rhs == nullptr || lhs->lhs->kind != ExprKind::kIdentifier ||
       lhs->rhs->kind != ExprKind::kIdentifier) {
     return false;
+  }
+  // §10.10.2 (printed page 265): a structure's member that is an unpacked
+  // array is a target as a variable that is one is.
+  auto st = concat_target_types_.find(lhs->lhs->text);
+  const std::vector<StructMember>* members =
+      st == concat_target_types_.end()
+          ? nullptr
+          : StructMembersOf(*st->second, typedefs_);
+  if (members != nullptr) {
+    return std::ranges::any_of(*members, [&](const StructMember& m) {
+      return m.name == lhs->rhs->text && !m.unpacked_dims.empty();
+    });
   }
   std::string_view cls_name;
   if (lhs->is_scope_resolution) {
@@ -175,11 +200,20 @@ void ElaboratorOperationRules::WalkStmtsForUnsizedInConcat(const Stmt* s) {
   if (!s) return;
   CheckBlockVarInitUnsizedInConcat(s);
 
-  bool is_array_concat_rhs = s->rhs &&
-                             s->rhs->kind == ExprKind::kConcatenation &&
-                             (s->kind == StmtKind::kBlockingAssign ||
-                              s->kind == StmtKind::kNonblockingAssign) &&
-                             IsUnpackedArrayConcatTarget(s->lhs);
+  bool is_concat_assign = s->rhs && s->rhs->kind == ExprKind::kConcatenation &&
+                          (s->kind == StmtKind::kBlockingAssign ||
+                           s->kind == StmtKind::kNonblockingAssign);
+  bool is_array_concat_rhs =
+      is_concat_assign && IsUnpackedArrayConcatTarget(s->lhs);
+  // §10.10 (printed page 264): `{}` is only an unpacked array concatenation,
+  // a vector concatenation holding at least one item (§11.4.12), so what it
+  // is assigned to is an unpacked array.
+  if (is_concat_assign && !is_array_concat_rhs && s->rhs->elements.empty()) {
+    diag_.Error(s->rhs->range.start,
+                "an empty concatenation, {}, is assigned only to an unpacked "
+                "array",
+                Subclause("10.10"));
+  }
   if (is_array_concat_rhs) {
     for (auto* elem : s->rhs->elements) WalkExprForUnsizedInConcat(elem);
   } else {
@@ -211,6 +245,11 @@ void ElaboratorOperationRules::WalkStmtsForUnsizedInConcat(const Stmt* s) {
 }
 
 void ElaboratorOperationRules::ValidateUnsizedInConcat(const ModuleDecl* decl) {
+  concat_target_types_.clear();
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kVarDecl)
+      concat_target_types_[item->name] = &item->data_type;
+  }
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {

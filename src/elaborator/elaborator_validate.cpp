@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -15,7 +16,9 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/net_data_type.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/type_key_match.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
@@ -25,7 +28,7 @@ namespace delta {
 
 // §5.10 and §5.11: the replication an assignment pattern consists of,
 // `'{n{...}}`, or null for a pattern of any other form.
-static const Expr* PatternReplication(const Expr* pattern) {
+const Expr* PatternReplication(const Expr* pattern) {
   if (pattern->elements.size() != 1) return nullptr;
   const Expr* only = pattern->elements[0];
   return only->is_pattern_replication ? only : nullptr;
@@ -34,7 +37,7 @@ static const Expr* PatternReplication(const Expr* pattern) {
 // §5.10 and §5.11: the items a positional pattern supplies -- its elements, or
 // a replication's multiplier times the items inside it, the inner braces being
 // removed -- or nothing where the multiplier does not fold.
-static std::optional<int64_t> PositionalItemCount(const Expr* pattern) {
+std::optional<int64_t> PositionalItemCount(const Expr* pattern) {
   const Expr* rep = PatternReplication(pattern);
   if (rep == nullptr) return static_cast<int64_t>(pattern->elements.size());
   auto times = ConstEvalInt(rep->repeat_count);
@@ -68,10 +71,11 @@ static std::optional<std::string> ArrayPatternKeyIdentity(const Expr* key) {
 }
 
 static void CheckArrayPatternDuplicateIndices(const Expr* init, SourceLoc loc,
+                                              const TypedefMap& typedefs,
                                               DiagEngine& diag) {
   std::unordered_set<std::string> seen;
   for (const auto* key : init->pattern_keys) {
-    if (key->text == "default" || IsTypeKeyword(key->text)) continue;
+    if (key->text == "default" || IsTypeKey(key->text, typedefs)) continue;
     auto identity = ArrayPatternKeyIdentity(key);
     if (!identity) continue;
     if (!seen.insert(*identity).second) {
@@ -83,9 +87,25 @@ static void CheckArrayPatternDuplicateIndices(const Expr* init, SourceLoc loc,
   }
 }
 
+// §10.9.1 (printed page 262): a type key that matches no element of an array
+// of structures descends into each element and applies to the members of its
+// type, so it covers an element whose every member it matches.
+static bool TypeKeyCoversElement(std::string_view key, const DataType& elem,
+                                 const TypedefMap& typedefs) {
+  if (TypeKeyMatchesType(key, elem, typedefs)) return true;
+  std::vector<std::string_view> names;
+  const DataType* agg = FollowTypedefs(elem, typedefs, names);
+  if (agg == nullptr || agg->struct_members.empty()) return false;
+  return std::ranges::all_of(agg->struct_members, [&](const StructMember& m) {
+    return TypeKeyMatchesMember(key, m, typedefs);
+  });
+}
+
 static void CheckArrayPatternCoverage(const Expr* pattern,
-                                      DataTypeKind elem_kind, const Expr* dim,
-                                      SourceLoc loc, DiagEngine& diag) {
+                                      const DataType& elem_type,
+                                      const Expr* dim, SourceLoc loc,
+                                      const TypedefMap& typedefs,
+                                      DiagEngine& diag) {
   if (!dim) return;
   auto dim_size = ComputeDimSize(dim);
   if (!dim_size) return;
@@ -100,7 +120,7 @@ static void CheckArrayPatternCoverage(const Expr* pattern,
   for (const auto* key : pattern->pattern_keys) {
     if (key->text == "default") {
       has_default = true;
-    } else if (IsTypeKeyword(key->text)) {
+    } else if (IsTypeKey(key->text, typedefs)) {
       // §10.9.1's type key covers each field whose type matches its type, so a
       // key naming a type the element is not declared with covers nothing and
       // cannot exempt the pattern from the count below:
@@ -112,7 +132,8 @@ static void CheckArrayPatternCoverage(const Expr* pattern,
       // and the type and default keys -- a key matching the leaf type covers a
       // multidimensional array at every level, which is what CreateMultiDimLeaf
       // already does.
-      has_type_key = has_type_key || TypeKeyMatchesKind(key->text, elem_kind);
+      has_type_key =
+          has_type_key || TypeKeyCoversElement(key->text, elem_type, typedefs);
     } else if (auto identity = ArrayPatternKeyIdentity(key)) {
       index_keys.insert(*identity);
     } else {
@@ -177,8 +198,8 @@ void ArrayPatternCheck::Check(const Expr* pattern, const DataType& elem_type,
   if (pattern->kind != ExprKind::kAssignmentPattern) return;
   const Expr* dim = dims[0];
   if (!pattern->pattern_keys.empty()) {
-    CheckArrayPatternDuplicateIndices(pattern, loc, diag);
-    CheckArrayPatternCoverage(pattern, elem_type.kind, dim, loc, diag);
+    CheckArrayPatternDuplicateIndices(pattern, loc, typedefs, diag);
+    CheckArrayPatternCoverage(pattern, elem_type, dim, loc, typedefs, diag);
     return;
   }
 
@@ -212,119 +233,17 @@ void ArrayPatternCheck::Check(const Expr* pattern, const DataType& elem_type,
                            *count, *dim_size),
                Subclause("10.9.1"));
   }
+  // §10.9.1 (printed pages 261-262): the braces match the dimensions, each
+  // nested pattern holding as many items as the dimension it stands for.
+  if (dims.size() < 2) return;
+  const std::vector<Expr*> inner(dims.begin() + 1, dims.end());
+  for (const Expr* e : pattern->elements) Check(e, elem_type, inner, loc);
 }
 
 void Elaborator::ValidateArrayInitPattern(const ModuleItem* item) {
   if (!item->init_expr || item->unpacked_dims.empty()) return;
   ArrayPatternCheck{typedefs_, var_types_, diag_}.Check(
       item->init_expr, item->data_type, item->unpacked_dims, item->loc);
-}
-
-static void CheckPatternCoverage(
-    const ModuleItem* item, const std::vector<StructMember>& members,
-    const std::unordered_set<std::string_view>& seen, DiagEngine& diag) {
-  for (const auto& m : members) {
-    if (!seen.count(m.name)) {
-      diag.Error(
-          item->loc,
-          std::format("member '{}' not covered by assignment pattern", m.name),
-          Subclause("10.9.2"));
-      break;
-    }
-  }
-}
-
-static void CheckPatternKeys(const ModuleItem* item,
-                             const std::vector<StructMember>& members,
-                             DiagEngine& diag) {
-  std::unordered_set<std::string_view> member_names;
-  for (const auto& m : members) member_names.insert(m.name);
-  std::unordered_set<std::string_view> seen;
-  bool has_default = false;
-  bool has_type_key = false;
-  // §10.9: `structure_pattern_key ::= member_identifier |
-  // assignment_pattern_key`, so every key of a structure pattern is a name --
-  // a member's, `default`, or a simple type -- and the key's text is that name.
-  for (const auto* key_expr : item->init_expr->pattern_keys) {
-    auto key = key_expr->text;
-    if (key == "default") {
-      has_default = true;
-      continue;
-    }
-    if (IsTypeKeyword(key)) {
-      has_type_key = true;
-      continue;
-    }
-    if (!member_names.count(key)) {
-      diag.Error(item->loc,
-                 std::format("'{}' is not a member of the struct", key),
-                 Subclause("10.9.2"));
-    }
-    if (!seen.insert(key).second) {
-      diag.Error(item->loc,
-                 std::format("duplicate member key '{}' in pattern", key),
-                 Subclause("10.9.2"));
-    }
-  }
-
-  if (!has_default && !has_type_key) {
-    CheckPatternCoverage(item, members, seen, diag);
-  }
-}
-
-// The members of the structure a declaration's type names, written inline or
-// through a typedef, or null when the type is no structure.
-static const std::vector<StructMember>* DeclaredStructMembers(
-    const ModuleItem* item, const TypedefMap& typedefs) {
-  if (!item->data_type.struct_members.empty()) {
-    return &item->data_type.struct_members;
-  }
-  if (item->data_type.kind != DataTypeKind::kNamed) return nullptr;
-  auto td = typedefs.find(item->data_type.type_name);
-  if (td == typedefs.end() || td->second.struct_members.empty()) return nullptr;
-  return &td->second.struct_members;
-}
-
-void Elaborator::ValidateStructInitPattern(const ModuleItem* item) {
-  if (!item->init_expr) return;
-  if (item->init_expr->kind != ExprKind::kAssignmentPattern) return;
-  // §10.9.1 with §5.10: a declaration with unpacked dimensions is initialized
-  // by an array pattern whose elements are the structures, so the structure's
-  // member count says nothing about how many elements that pattern lists;
-  // reading it as a structure pattern rejected `'{'{0, 1}, '{2, 3}, '{4, 5}}`
-  // for a three-element array of a two-member structure.
-  if (!item->unpacked_dims.empty()) return;
-
-  const std::vector<StructMember>* members =
-      DeclaredStructMembers(item, typedefs_);
-  if (!members) return;
-
-  if (item->init_expr->pattern_keys.empty()) {
-    // §5.10 (printed page 84): a replication sets the values for the exact
-    // number of members, its multiplier times its items.
-    if (PatternReplication(item->init_expr) != nullptr) {
-      auto count = PositionalItemCount(item->init_expr);
-      if (count && *count != static_cast<int64_t>(members->size())) {
-        diag_.Error(item->loc,
-                    std::format("replication supplies {} values, but struct "
-                                "has {} members",
-                                *count, members->size()),
-                    Subclause("5.10"));
-      }
-      return;
-    }
-    if (item->init_expr->elements.size() != members->size()) {
-      diag_.Error(
-          item->loc,
-          std::format("positional struct pattern has {} elements, "
-                      "but struct has {} members",
-                      item->init_expr->elements.size(), members->size()),
-          Subclause("10.9.2"));
-    }
-    return;
-  }
-
-  CheckPatternKeys(item, *members, diag_);
 }
 
 std::string_view ExprIdent(const Expr* e) {
@@ -374,52 +293,24 @@ std::string_view LhsBaseName(const Expr* e) {
   return {};
 }
 
-// §6.21 (printed page 134), first sentence: no nonblocking, continuous or
-// procedural continuous assignment may write an automatic variable or an
-// element of a dynamically sized array variable. §10.4.2 (printed page 253)
-// states the nonblocking half for itself, forbidding a nonblocking assignment
-// to an automatic variable or to an element of a dynamically sized array
-// variable. Both say elements, not members. `b[2].x` nonetheless falls under
-// them, because the name is a member while the object the write lands in is the
-// element `b[2]`, and writing part of an element is writing it. That gap
-// between what the target names and what it writes is why this check missed the
-// spelling: it read the outermost node, saw a member access, and never reached
-// the element underneath. The rationale is the one the unqualified case already
-// carries -- an element's storage can move as the collection is resized between
-// the schedule and the update, and a member of that element moves with it. One
-// sentence governs all three assignment kinds, so both arms below take the same
-// lvalue reduction.
-//
-// The reach stops at `dynsized_names`, which is what keeps a member of anything
-// else legal. §6.21's second sentence bars a continuous or procedural
-// continuous write to a non-static class property and pointedly omits
-// nonblocking from that list where the first sentence includes it, so `r.val <=
-// v` is legal by the clause's own omission; a packed struct member is not an
-// element of a dynamically sized variable at all.
+// §6.21 (printed page 134), first sentence: no continuous or procedural
+// continuous assignment may write an element of a dynamically sized array
+// variable, and `b[2].x` falls under it, because the name is a member while
+// the object the write lands in is the element `b[2]`, and writing part of an
+// element is writing it. The nonblocking half of the sentence, which §10.4.2
+// states for itself, is CheckNbaDynamicElements in nba_dynamic_element.cpp.
 static void ReportDynamicLvalueAssign(
     const Stmt* s, const std::unordered_set<std::string_view>& dyn_names,
-    const std::unordered_set<std::string_view>& dynsized_names,
     DiagEngine& diag) {
-  if (!s->lhs) return;
+  if (s->kind != StmtKind::kForce && s->kind != StmtKind::kAssign) return;
   // The kind gate rather than the walk is what confines this to a part of a
-  // dynamically sized variable: a bare identifier lvalue is a write to the
-  // whole object, which the clause permits, and LhsBaseName answers the same
-  // name for it as for a select of it.
+  // dynamic array: a bare identifier lvalue is a write to the whole object,
+  // which the clause permits, and LhsBaseName answers the same name for it as
+  // for a select of it.
   if (s->lhs->kind != ExprKind::kSelect &&
       s->lhs->kind != ExprKind::kMemberAccess)
     return;
-  std::string_view name = LhsBaseName(s->lhs);
-  if (name.empty()) return;
-  if (s->kind == StmtKind::kNonblockingAssign) {
-    if (dynsized_names.count(name) != 0) {
-      diag.Error(s->range.start,
-                 "nonblocking assignment to element of dynamically sized array",
-                 Subclause("6.21"));
-    }
-    return;
-  }
-  if ((s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign) &&
-      dyn_names.count(name) != 0) {
+  if (dyn_names.count(LhsBaseName(s->lhs)) != 0) {
     diag.Error(s->range.start,
                "procedural continuous assignment to element of "
                "dynamic array",
@@ -427,18 +318,13 @@ static void ReportDynamicLvalueAssign(
   }
 }
 
-// Dynamic arrays, queues, and associative arrays are all dynamically sized, so
-// `dynsized_names` carries the three kinds and gates the nonblocking branch,
-// while `dyn_names` (dynamic arrays only) preserves the existing
-// procedural-continuous-assignment diagnostic.
-void CheckNbaDynamicArrayTarget(
+void CheckPcontDynamicArrayTarget(
     const Stmt* s, const std::unordered_set<std::string_view>& dyn_names,
-    const std::unordered_set<std::string_view>& dynsized_names,
     DiagEngine& diag) {
   if (!s) return;
-  ReportDynamicLvalueAssign(s, dyn_names, dynsized_names, diag);
+  ReportDynamicLvalueAssign(s, dyn_names, diag);
   ForEachChildStmt(s, [&](const Stmt* sub) {
-    CheckNbaDynamicArrayTarget(sub, dyn_names, dynsized_names, diag);
+    CheckPcontDynamicArrayTarget(sub, dyn_names, diag);
   });
 }
 
@@ -463,18 +349,27 @@ static void CollectLhsBaseNames(
 // Elaborator::ValidateMixedAssignments and
 // Elaborator::ValidateProceduralNetAssign report.
 //
-// The statement position an assignment stands in decides neither rule, so this
-// recurses through ForEachChildStmt, which holds the list of every field of
-// Stmt that carries a statement.
-void CollectProcTargets(const Stmt* s,
+// The statement position an assignment stands in decides neither rule, so
+// every statement of `body` is visited. §23.9 decides what a name reaches, so a
+// name the body itself declares -- a formal of `formals`, a block's variable,
+// a loop's -- is the body's own and none of the module's, and is not recorded.
+void CollectProcTargets(const std::vector<FunctionArg>& formals,
+                        const std::vector<Stmt*>& body,
                         std::unordered_map<std::string_view, SourceLoc>& out) {
-  if (!s) return;
-  if (s->kind == StmtKind::kBlockingAssign ||
-      s->kind == StmtKind::kNonblockingAssign) {
-    CollectLhsBaseNames(s->lhs, s->range.start, out);
+  BodyDeclScopes scopes(false);
+  for (const auto& arg : formals) scopes.DeclareFormal(arg);
+  std::unordered_map<std::string_view, SourceLoc> written;
+  for (const Stmt* s : body) {
+    scopes.Walk(s, [&](const Stmt* st) {
+      if (st->kind != StmtKind::kBlockingAssign &&
+          st->kind != StmtKind::kNonblockingAssign)
+        return;
+      written.clear();
+      CollectLhsBaseNames(st->lhs, st->range.start, written);
+      for (const auto& [name, loc] : written)
+        if (scopes.Find(name) == nullptr) out.emplace(name, loc);
+    });
   }
-  ForEachChildStmt(s,
-                   [&out](const Stmt* sub) { CollectProcTargets(sub, out); });
 }
 
 // Records the variable each force or release statement names, for §10.6.2's
@@ -580,30 +475,40 @@ void CheckProceduralAssignLhs(const Stmt* s, DiagEngine& diag) {
       s, [&diag](const Stmt* sub) { CheckProceduralAssignLhs(sub, diag); });
 }
 
-static void CheckForceLhsOperand(
-    const Expr* e, const std::unordered_set<std::string_view>& net_names,
-    const std::unordered_set<std::string_view>& nettype_net_names,
-    SourceLoc loc, DiagEngine& diag) {
-  if (!e) return;
+// The names a force statement may target and the scope its select bounds
+// fold in.
+struct ForceLhsNames {
+  const std::unordered_set<std::string_view>& net_names;
+  const std::unordered_set<std::string_view>& nettype_net_names;
+  const ScopeMap& scope;
+};
+
+static void CheckForceLhsOperand(const Expr* e, const ForceLhsNames& names,
+                                 SourceLoc loc, DiagEngine& diag) {
   if (e->kind == ExprKind::kConcatenation) {
-    for (auto* el : e->elements)
-      CheckForceLhsOperand(el, net_names, nettype_net_names, loc, diag);
+    for (auto* el : e->elements) CheckForceLhsOperand(el, names, loc, diag);
     return;
   }
-  if (e->kind == ExprKind::kSelect) {
-    auto base_name = LhsBaseName(e);
-    if (base_name.empty()) return;
-    if (nettype_net_names.count(base_name) != 0) {
-      diag.Error(loc,
-                 "bit-select or part-select of a net with a user-defined "
-                 "nettype is not a legal force LHS",
-                 Subclause("10.6.2"));
-    } else if (net_names.count(base_name) == 0) {
-      diag.Error(loc,
-                 "bit-select or part-select of a variable is not a "
-                 "legal force LHS",
-                 Subclause("10.6.2"));
-    }
+  if (e->kind != ExprKind::kSelect) return;
+  auto base_name = LhsBaseName(e);
+  if (base_name.empty()) return;
+  if (names.nettype_net_names.count(base_name) != 0) {
+    diag.Error(loc,
+               "bit-select or part-select of a net with a user-defined "
+               "nettype is not a legal force LHS",
+               Subclause("10.6.2"));
+  } else if (names.net_names.count(base_name) == 0) {
+    diag.Error(loc,
+               "bit-select or part-select of a variable is not a "
+               "legal force LHS",
+               Subclause("10.6.2"));
+  } else if (!SelectPathIsConstant(e, names.scope)) {
+    // §10.6.2 (printed page 257) admits a constant bit-select or constant
+    // part-select of a vector net alone.
+    diag.Error(loc,
+               "bit-select or part-select of a net in a force LHS must be "
+               "constant",
+               Subclause("10.6.2"));
   }
 }
 
@@ -612,14 +517,14 @@ static void CheckForceLhsOperand(
 void CheckForceLhs(
     const Stmt* s, const std::unordered_set<std::string_view>& net_names,
     const std::unordered_set<std::string_view>& nettype_net_names,
-    DiagEngine& diag) {
+    const ScopeMap& scope, DiagEngine& diag) {
   if (!s) return;
   if (s->kind == StmtKind::kForce && s->lhs) {
-    CheckForceLhsOperand(s->lhs, net_names, nettype_net_names, s->range.start,
-                         diag);
+    CheckForceLhsOperand(s->lhs, {net_names, nettype_net_names, scope},
+                         s->range.start, diag);
   }
   ForEachChildStmt(s, [&](const Stmt* sub) {
-    CheckForceLhs(sub, net_names, nettype_net_names, diag);
+    CheckForceLhs(sub, net_names, nettype_net_names, scope, diag);
   });
 }
 

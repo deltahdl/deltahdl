@@ -23,7 +23,11 @@ static bool IsValidOutputArg(const Expr* e) {
   // is such an lvalue only when every element is itself a valid lvalue, so a
   // concatenation containing a non-assignable element (e.g. a literal) is
   // rejected just like a bare literal actual would be.
-  if (e->kind == ExprKind::kConcatenation) {
+  // §10.8 (printed page 260) counts the actual of an output or inout argument
+  // among the assignment-like contexts, so §10.9 lets a positional pattern of
+  // lvalues stand there as the side being assigned.
+  if (e->kind == ExprKind::kConcatenation ||
+      (e->kind == ExprKind::kAssignmentPattern && e->pattern_keys.empty())) {
     if (e->elements.empty()) return false;
     for (const auto* el : e->elements) {
       if (!IsValidOutputArg(el)) return false;
@@ -123,16 +127,29 @@ static std::string_view RefActualNetName(
   return {};
 }
 
-static void CheckRefArgsNotNets(
-    const Expr* expr, const ModuleItem* func, size_t positional_count,
-    const std::unordered_set<std::string_view>& net_names, DiagEngine& diag) {
-  if (net_names.empty()) return;
+// §13.5.2: a ref argument refers to a variable, so its actual names one --
+// whole, through a select or as a member -- and §10.8 excludes passing to a ref
+// argument from the assignment-like contexts, which leaves an untyped pattern
+// there no type to take. A net is no variable either.
+static void CheckRefArgs(const Expr* expr, const ModuleItem* func,
+                         size_t positional_count,
+                         const std::unordered_set<std::string_view>& net_names,
+                         DiagEngine& diag) {
   for (size_t i = 0; i < func->func_args.size(); ++i) {
     if (func->func_args[i].direction != Direction::kRef) continue;
     int ai =
         ResolveCallArgIndex(expr, i, func->func_args[i].name, positional_count);
     if (ai < 0) continue;
     auto* arg = expr->args[static_cast<size_t>(ai)];
+    if (arg == nullptr) continue;
+    if (arg->kind != ExprKind::kIdentifier && arg->kind != ExprKind::kSelect &&
+        arg->kind != ExprKind::kMemberAccess) {
+      diag.Error(arg->range.start,
+                 std::format("ref argument '{}' of '{}' requires a variable",
+                             func->func_args[i].name, func->name),
+                 Subclause("13.5.2"));
+      continue;
+    }
     auto net = RefActualNetName(arg, net_names);
     if (net.empty()) continue;
     diag.Error(arg->range.start,
@@ -163,7 +180,7 @@ static void CheckCallArgs(
   CheckRequiredArgs(expr, func, positional_count, diag);
   CheckNamedArgs(expr, func, diag);
   CheckOutputArgs(expr, func, positional_count, diag);
-  CheckRefArgsNotNets(expr, func, positional_count, net_names, diag);
+  CheckRefArgs(expr, func, positional_count, net_names, diag);
 }
 
 static void CheckVoidCallInExpr(

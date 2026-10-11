@@ -56,10 +56,8 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   // has already returned from. Install that module's names, which
   // Elaborator::ElaborateModule captured into module_scope_names_ before
   // ItemElaborationStateSaver::Restore took them out of declared_names_.
-  auto saved_declared_names = std::move(declared_names_);
-  declared_names_ = std::move(module_scope_names_[pg.mod].declared);
-  auto saved_net_names = std::move(net_names_);
-  net_names_ = std::move(module_scope_names_[pg.mod].nets);
+  ModuleScopeNames enclosing = std::move(module_scope_names_[pg.mod]);
+  SwapModuleScopeNames(enclosing);
   // §11.5.1 addresses a select on a parameter over the range that parameter
   // was declared with, and §6.16 gives a string parameter characters a
   // concatenation and §6.16.1's len() read back. Both answer from the module
@@ -173,10 +171,8 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   // Elaborator::ElaborateModule for a module instantiated inside the block,
   // which inserts into module_scope_names_ and can rehash it, and a
   // reference taken before that would dangle.
-  module_scope_names_[pg.mod].declared = std::move(declared_names_);
-  declared_names_ = std::move(saved_declared_names);
-  module_scope_names_[pg.mod].nets = std::move(net_names_);
-  net_names_ = std::move(saved_net_names);
+  SwapModuleScopeNames(enclosing);
+  module_scope_names_[pg.mod] = std::move(enclosing);
 }
 
 // Stamp one generate block instance's loop-index values and name prefix onto
@@ -234,6 +230,7 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
   size_t first_property = mod->declared_properties.size();
   size_t first_alias = mod->aliases.size();
   ElaborateItem(item, mod);
+  ValidateGeneratedItem(item);
   // §27.4 with §13.4 and §23.6: a subroutine the block declares is a member
   // of this instance's scope, reached from outside by the instance's
   // hierarchical name, and ElaborateItem has just put the one shared

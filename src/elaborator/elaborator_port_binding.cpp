@@ -618,27 +618,38 @@ bool Elaborator::ResolveExplicitTarget(const PortBindScope& scope, size_t index,
   return true;
 }
 
-// §10.8/§10.9.1: an assignment pattern is permitted in a port connection only
-// as a bare pattern on an input port whose formal is a pattern-compatible
-// aggregate (a struct/union or an unpacked array), where the pattern takes its
-// type from the port. It is illegal on an output/inout port (the actual must be
-// an lvalue), as a typed/cast pattern, and for a non-aggregate formal such as
-// `int`, which an assignment pattern cannot target. A formal declared through a
-// typedef is judged as the type the typedef names (§6.18): its resolved kind,
-// and the unpacked dimensions a typedef in its chain wrote.
+// §10.9 (printed page 260): a pattern on the left-hand side of an
+// assignment-like context is positional and each of its items an lvalue.
+static bool IsPositionalLvaluePattern(const Expr* pattern) {
+  if (!pattern->pattern_keys.empty()) return false;
+  return std::ranges::all_of(pattern->elements, [](const Expr* item) {
+    return item->kind == ExprKind::kIdentifier ||
+           item->kind == ExprKind::kSelect ||
+           item->kind == ExprKind::kMemberAccess ||
+           item->kind == ExprKind::kConcatenation;
+  });
+}
+
+// §10.8 (printed page 260): a port connection to an input or an output port is
+// an assignment-like context, so an untyped pattern may stand there when the
+// formal is an aggregate -- a structure, a union or an unpacked array, judged
+// as the type a typedef names (§6.18) -- from which it takes its type, and on
+// an output port, the side being assigned, it is positional with lvalue items
+// (§10.9). An inout or ref connection is no such context. A typed pattern,
+// `T'{...}`, has a type of its own and is judged as any other expression is;
+// §10.9 forbids one only in a port expression of a declaration.
 static bool IllegalPatternPortConnection(const Expr* conn_expr,
                                          Direction direction,
                                          const RtlirPort* port) {
-  bool bare_pattern = conn_expr->kind == ExprKind::kAssignmentPattern;
-  bool cast_pattern = conn_expr->kind == ExprKind::kCast && conn_expr->lhs &&
-                      conn_expr->lhs->kind == ExprKind::kAssignmentPattern;
-  if (!bare_pattern && !cast_pattern) return false;
-  bool aggregate_input =
-      bare_pattern && direction == Direction::kInput && port != nullptr &&
+  if (conn_expr->kind != ExprKind::kAssignmentPattern) return false;
+  bool aggregate =
+      port != nullptr &&
       (port->data_kind == DataTypeKind::kStruct ||
        port->data_kind == DataTypeKind::kUnion || port->num_unpacked_dims > 0 ||
        port->typedef_is_unpacked_array);
-  return !aggregate_input;
+  if (direction == Direction::kInput) return !aggregate;
+  return direction != Direction::kOutput || !aggregate ||
+         !IsPositionalLvaluePattern(conn_expr);
 }
 
 // Validates an identifier port connection: a non-interface port goes through
@@ -721,7 +732,8 @@ void Elaborator::RecordOutputPortDrivenVariables(const Expr* conn_expr,
     const Expr* e = worklist.back();
     worklist.pop_back();
     if (e == nullptr) continue;
-    if (e->kind == ExprKind::kConcatenation) {
+    if (e->kind == ExprKind::kConcatenation ||
+        e->kind == ExprKind::kAssignmentPattern) {
       for (const Expr* el : e->elements) worklist.push_back(el);
       continue;
     }

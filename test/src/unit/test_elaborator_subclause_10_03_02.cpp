@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -400,6 +403,148 @@ TEST(ContAssignStatementElaboration,
                             "continuous assignment left-hand side requires a "
                             "constant select expression",
                             4, "10.3.2"));
+}
+
+// Table 10-1: every select on a continuous assignment's left-hand side is
+// constant, the selects beneath the outermost one and those under a member
+// access included.
+TEST(ContAssignStatementElaboration, NestedNonConstantSelectErrors) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  logic [1:0] i;\n"
+      "  wire [3:0] w [4];\n"
+      "  assign w[i][0] = 1'b1;\n"
+      "  assign w[0][i -: 1] = 1'b1;\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {4u, 5u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "continuous assignment left-hand side requires "
+                              "a constant select expression",
+                              line, "10.3.2"));
+  }
+}
+
+// Syntax 10-1 gives the continuous assignment to variables no drive strength
+// and a delay_control rather than a delay3, whether the target names the
+// variable whole, through a select or as a concatenation element.
+TEST(ContAssignStatementElaboration, StrengthAndDelay3OnVariableSelectErrors) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  logic [3:0] v; logic a, b;\n"
+      "  assign (strong0, weak1) v[0] = a;\n"
+      "  assign #(1,2) v[1] = a;\n"
+      "  assign #(1,2) {b, v[2]} = 2'b0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "drive strength not allowed on continuous "
+                            "assignment to a variable",
+                            3, "10.3.4"));
+  for (uint32_t line : {4u, 5u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "multiple delays not allowed on continuous "
+                              "assignment to a variable",
+                              line, "10.3.3"));
+  }
+}
+
+// §10.3.2: a variable a continuous assignment writes, through a select or as a
+// concatenation element, takes no initializer, and one written whole as an
+// element takes no procedural assignment and no second continuous one.
+TEST(ContAssignStatementElaboration, SelectAndConcatenationTargetsAreDrivers) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  logic a, b, c, x;\n"
+      "  logic [3:0] v = 4'h0;\n"
+      "  assign v[0] = x;\n"
+      "  assign {a, b} = 2'b10;\n"
+      "  assign {c, a} = 2'b01;\n"
+      "  initial b = 0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'v' has both an initializer and a "
+                            "continuous assignment",
+                            4, "10.3.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "multiple continuous assignments to 'a'", 6,
+                            "6.5"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'b' has both continuous and procedural "
+                            "assignments",
+                            5, "6.5"));
+}
+
+// §10.3.2: a variable may be driven by one primitive output as by one
+// continuous assignment, so one a gate drives takes no initializer, no
+// procedural assignment and no second driver; an n-output gate drives every
+// terminal but its last.
+TEST(ContAssignStatementElaboration, PrimitiveOutputIsVariableDriver) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  logic x, y, z, u, v;\n"
+      "  logic w = 1'b0;\n"
+      "  buf g1(y, z, x);\n"
+      "  initial y = 0;\n"
+      "  assign z = 1'b1;\n"
+      "  and g2(w, x, x);\n"
+      "  not g3(u, x);\n"
+      "  not g4(u, v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'y' has both continuous and procedural "
+                            "assignments",
+                            4, "6.5"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "multiple continuous assignments to 'z'", 6,
+                            "6.5"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'w' has both an initializer and a "
+                            "primitive output driving it",
+                            7, "10.3.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'u' is driven by more than one "
+                            "continuous assignment or primitive output",
+                            9, "10.3.2"));
+}
+
+// §10.3.2: an element of an array of nets of a user-defined nettype is itself
+// a whole net, which a continuous assignment may drive.
+TEST(ContAssignStatementElaboration, NettypeArrayElementTargetSucceeds) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module t;\n"
+      "  nettype logic T;\n"
+      "  T n[3];\n"
+      "  assign n[1] = 1'b0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §10.3.2: a select beyond the array's unpacked dimensions selects into the
+// nettype's data type, however deeply the selects nest.
+TEST(ContAssignStatementElaboration, NettypeArrayElementSelectErrors) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  nettype logic [1:0] T2;\n"
+      "  T2 p[2];\n"
+      "  assign p[1][0] = 1'b0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a continuous assignment to a net of a user-defined nettype drives the "
+      "whole net and cannot index or select into it",
+      4, "10.3.2"));
 }
 
 }  // namespace

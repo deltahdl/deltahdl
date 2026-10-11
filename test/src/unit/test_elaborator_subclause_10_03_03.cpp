@@ -222,4 +222,27 @@ TEST(AssignmentDelayElaboration, NettypeArrayAcceptsSingleDelay) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// Syntax 10-1 gives the declaration of a net of a user-defined nettype a
+// delay_control rather than a delay3, and §10.3.3 a single delay, whether or
+// not the declaration assigns the net.
+TEST(AssignmentDelayElaboration, NettypeNetDeclRejectsMultiDelay) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  nettype logic T;\n"
+      "  logic a;\n"
+      "  T #(1,2) n = a;\n"
+      "  T #3 m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a net of a user-defined nettype is declared with "
+                            "at most a single delay",
+                            4, "10.3.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "a net of a user-defined nettype is declared with "
+                             "at most a single delay",
+                             5, "10.3.3"));
+}
+
 }  // namespace

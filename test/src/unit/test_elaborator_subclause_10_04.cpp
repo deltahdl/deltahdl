@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 
@@ -124,6 +127,68 @@ TEST(ProceduralAssignmentElaboration, AssignToNonAnsiPortDeclaredAVariable) {
       "endmodule\n",
       f);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §10.4 holds wherever the procedural assignment stands: in a task, in a
+// function and in a process of a generate block.
+TEST(ProceduralAssignmentElaboration, NetTargetInSubroutineOrGenerateIsError) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  wire w;\n"
+      "  if (1) begin : g initial w = 1; end\n"
+      "  task tk; w = 0; endtask\n"
+      "  function void fn(); w = 0; endfunction\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {3u, 4u, 5u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "cannot be the target of a procedural assignment",
+                              line, "10.4"));
+  }
+}
+
+// §23.9: a block's own variable, a subroutine's formal and a loop's variable
+// are what an assignment within their scope names, even where a module net
+// has the same name.
+TEST(ProceduralAssignmentElaboration, LocalNameShadowingNetIsAccepted) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  wire w, k;\n"
+      "  initial begin logic w; w = 1; end\n"
+      "  task tk(output logic w); w = 0; endtask\n"
+      "  initial for (int k = 0; k < 2; k++) k = k;\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(FindDiag(f, "cannot be the target of a procedural assignment"),
+            nullptr);
+}
+
+// Syntax 10-2 (printed page 252): only the expression form of a blocking
+// assignment takes an intra-assignment delay or event control, and the forms
+// that assign a dynamic array's or a class's new take none.
+TEST(ProceduralAssignmentElaboration, TimingControlOnAssignmentOfNewIsError) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  class C; endclass\n"
+      "  int d[]; C c; logic clk; int x;\n"
+      "  initial d = #1 new[4];\n"
+      "  initial c = @(posedge clk) new;\n"
+      "  initial x = #1 3;\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {4u, 5u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "an assignment of 'new' takes no "
+                              "intra-assignment delay or event control",
+                              line, "10.4"));
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "an assignment of 'new' takes no "
+                             "intra-assignment delay or event control",
+                             6, "10.4"));
 }
 
 }  // namespace

@@ -1,14 +1,18 @@
 #include <algorithm>
 #include <cstddef>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include "common/diagnostic.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/elaborator_validate_operations.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -53,18 +57,78 @@ void ElaboratorOperationRules::WalkStmtsForProceduralArrayPattern(
     block_decls_.emplace_back(s->var_name, !s->var_unpacked_dims.empty());
 }
 
+using StructTargetTypes = std::unordered_map<std::string_view, const DataType*>;
+
+// The type a procedural assignment's target is declared with where the target
+// names a whole variable that is no array: a name the body declares, which
+// hides the module's, or a module variable of `module_types`.
+static const DataType* WholeTargetType(const Expr* lhs,
+                                       const BodyDeclScopes& scopes,
+                                       const StructTargetTypes& module_types) {
+  if (lhs->kind != ExprKind::kIdentifier) return nullptr;
+  if (const BodyDeclScopes::Decl* decl = scopes.Find(lhs->text))
+    return decl->unpacked_dims->empty() ? decl->type : nullptr;
+  auto it = module_types.find(lhs->text);
+  return it == module_types.end() ? nullptr : it->second;
+}
+
+// §10.9.2 (printed pages 263-264) holds a structure pattern to its structure
+// wherever it is written -- a typed pattern to the type its prefix names, and
+// an untyped one to the variable it is assigned to or initializes -- and not
+// only where a module-level declaration is initialized.
+static void CheckProceduralStructPatterns(
+    const std::vector<FunctionArg>& formals, const std::vector<Stmt*>& body,
+    const StructTargetTypes& module_types, const TypedefMap& typedefs,
+    DiagEngine& diag) {
+  BodyDeclScopes scopes(false);
+  for (const auto& arg : formals) scopes.DeclareFormal(arg);
+  for (const Stmt* s : body) {
+    scopes.Walk(s, [&](const Stmt* st) {
+      if (st->kind == StmtKind::kVarDecl && st->var_init != nullptr &&
+          st->var_unpacked_dims.empty()) {
+        CheckStructPatternFor(st->var_init, &st->var_decl_type,
+                              {typedefs, st->var_init->range.start, diag});
+      }
+      if (st->kind != StmtKind::kBlockingAssign &&
+          st->kind != StmtKind::kNonblockingAssign)
+        return;
+      CheckStructPatternFor(st->rhs,
+                            WholeTargetType(st->lhs, scopes, module_types),
+                            {typedefs, st->rhs->range.start, diag});
+    });
+  }
+}
+
 // A subroutine's formals hide the module's declarations of their names in its
 // body as a block's declarations do.
 void ElaboratorOperationRules::ValidateProceduralArrayPatterns(
     const ModuleDecl* decl) {
   pattern_target_arrays_.clear();
+  StructTargetTypes struct_targets;
   for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kVarDecl && !item->unpacked_dims.empty())
+    if (item->kind != ModuleItemKind::kVarDecl) continue;
+    if (item->unpacked_dims.empty())
+      struct_targets[item->name] = &item->data_type;
+    else
       pattern_target_arrays_[item->name] = item;
   }
   for (const auto* item : decl->items) {
-    if (IsProceduralItemKind(item->kind))
+    if (IsProceduralItemKind(item->kind)) {
       WalkStmtsForProceduralArrayPattern(item->body);
+      CheckProceduralStructPatterns({}, {item->body}, struct_targets, typedefs_,
+                                    diag_);
+    }
+    CheckProceduralStructPatterns(item->func_args, item->func_body_stmts,
+                                  struct_targets, typedefs_, diag_);
+    if (item->kind == ModuleItemKind::kContAssign) {
+      const Expr* lhs = item->assign_lhs;
+      auto it = lhs->kind == ExprKind::kIdentifier
+                    ? struct_targets.find(lhs->text)
+                    : struct_targets.end();
+      CheckStructPatternFor(item->assign_rhs,
+                            it == struct_targets.end() ? nullptr : it->second,
+                            {typedefs_, item->assign_rhs->range.start, diag_});
+    }
     for (const auto& arg : item->func_args)
       block_decls_.emplace_back(arg.name, !arg.unpacked_dims.empty());
     for (const auto* s : item->func_body_stmts)

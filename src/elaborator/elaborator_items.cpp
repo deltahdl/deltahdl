@@ -652,6 +652,7 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       ValidateBidirectionalSwitchConnections(item, mod, diag_,
                                              nettype_canonical_);
       ElaborateGateInst(item, mod, arena_, BuildParamScope(mod));
+      RecordGateOutputDrivers(item);
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
       return true;
     case ModuleItemKind::kUdpInst:

@@ -4,6 +4,7 @@
 // src/elaborator/elaborator_module.cpp, which holds the module's frame, at its
 // size limit.
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -644,13 +645,28 @@ static bool IsBodyTypeParam(const ModuleDecl* decl, std::string_view pname) {
 // declares with unpacked dimensions, in its parameter port list or among its
 // items: §6.20.1 (printed page 124) makes such a parameter's value an array,
 // written as an assignment pattern.
+// §10.8 (printed page 259): an instance's override of a parameter declared
+// with an explicit type is an assignment-like context, so a pattern there takes
+// the parameter's type -- an array the declaration's own dimensions make, or a
+// structure, a union or a typedef the type names.
+static bool IsAggregateParamType(const DataType& type) {
+  return type.kind == DataTypeKind::kStruct ||
+         type.kind == DataTypeKind::kUnion || type.kind == DataTypeKind::kNamed;
+}
+
 static bool IsArrayParamPattern(const ModuleDecl* decl, std::string_view pname,
                                 const Expr* pexpr) {
   if (pexpr == nullptr || pexpr->kind != ExprKind::kAssignmentPattern)
     return false;
   if (decl->param_port_unpacked_dims.count(pname) > 0) return true;
+  size_t ports = std::min(decl->params.size(), decl->param_types.size());
+  for (size_t i = 0; i < ports; ++i) {
+    if (decl->params[i].first == pname)
+      return IsAggregateParamType(decl->param_types[i]);
+  }
   const ModuleItem* item = BodyParamDecl(decl, pname);
-  return item != nullptr && !item->unpacked_dims.empty();
+  return item != nullptr && (!item->unpacked_dims.empty() ||
+                             IsAggregateParamType(item->data_type));
 }
 
 // The value of an assignment to a body type parameter is a type, which no

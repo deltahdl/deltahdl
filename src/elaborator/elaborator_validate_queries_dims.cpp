@@ -214,49 +214,20 @@ static bool IsConstantBitSelect(const Expr* e, const ScopeMap& scope) {
   return true;
 }
 
-static bool IsConstantSelect(const Expr* e, const ScopeMap& scope) {
-  if (!e) return true;
-  if (e->kind == ExprKind::kIdentifier) return true;
-  if (e->kind == ExprKind::kSelect) return IsConstantBitSelect(e, scope);
-  if (e->kind == ExprKind::kConcatenation) {
-    for (const auto* elem : e->elements) {
-      if (!IsConstantSelect(elem, scope)) return false;
+// Table 10-1 (printed page 247) and §10.6.2 (printed page 257): a select a
+// continuous assignment or a force writes through is a constant one, and so is
+// every select beneath it on the way down to the name the target is rooted
+// at, `w[i][0]` and `s[i].f` included.
+bool SelectPathIsConstant(const Expr* e, const ScopeMap& scope) {
+  while (e->kind == ExprKind::kSelect || e->kind == ExprKind::kMemberAccess) {
+    if (e->kind == ExprKind::kMemberAccess) {
+      e = e->lhs;
+      continue;
     }
-    return true;
+    if (!IsConstantBitSelect(e, scope)) return false;
+    e = e->base;
   }
   return true;
-}
-
-// §11.2.1 counts parameters among the operands a constant expression is made
-// of, so an index naming one is constant and the select it indexes is a
-// constant select. This runs on the module declaration rather than the
-// elaborated module, so the values come from the declaration's own parameter
-// items, each folded in the scope its predecessors established -- a parameter
-// may be defined in terms of an earlier one. A parameter whose value does not
-// fold here is simply absent, leaving the index as non-constant as it was.
-static ScopeMap DeclParamScope(const ModuleDecl* decl) {
-  ScopeMap scope;
-  for (const auto* item : decl->items) {
-    if (item->kind != ModuleItemKind::kParamDecl || !item->init_expr) continue;
-    if (auto value = ConstEvalInt(item->init_expr, scope)) {
-      scope[item->name] = *value;
-    }
-  }
-  return scope;
-}
-
-void Elaborator::ValidateContAssignConstSelect(const ModuleDecl* decl) {
-  ScopeMap scope = DeclParamScope(decl);
-  for (const auto* item : decl->items) {
-    if (item->kind != ModuleItemKind::kContAssign) continue;
-    if (!item->assign_lhs) continue;
-    if (!IsConstantSelect(item->assign_lhs, scope)) {
-      diag_.Error(item->loc,
-                  "continuous assignment left-hand side requires a "
-                  "constant select expression",
-                  Subclause("10.3.2"));
-    }
-  }
 }
 
 namespace {

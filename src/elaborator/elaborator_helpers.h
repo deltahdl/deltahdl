@@ -258,6 +258,11 @@ void RecordStringParamValue(RtlirParamDecl& pd, const Expr* init,
 bool RecordStringParamChars(RtlirParamDecl& pd, const Expr* init, Arena& arena);
 
 std::string_view ExprIdent(const Expr* e);
+// Defined in elaborator_validate_queries_dims.cpp.
+bool SelectPathIsConstant(const Expr* e, const ScopeMap& scope);
+// §11.5.1: the bits a constant select spans, 0 where a bound does not fold.
+// Defined in elaborator_cont_assign.cpp.
+uint32_t SelectLhsWidth(const Expr* e, const ScopeMap& scope);
 const ClassDecl* FindClassDecl(std::string_view name,
                                const CompilationUnit* unit);
 

@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <cstdint>
+#include <format>
 #include <string_view>
 #include <unordered_map>
 
@@ -8,7 +10,6 @@
 #include "elaborator/elaborator_data.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/elaborator_validate_operations.h"
-#include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -305,26 +306,33 @@ void ElaboratorOperationRules::ValidateArrayElementPartSelect(
   }
 }
 
+// §10.10.3 (printed page 266): inner braces in an unpacked array concatenation
+// are a vector or string concatenation, a self-determined item of whatever
+// width assigned to one element, since a complete unpacked array concatenation
+// has no self-determined type and cannot be an item. Braces holding an
+// unpacked array are therefore the nested unpacked array concatenation the
+// clause makes illegal.
+void ElaboratorOperationRules::CheckNestedArrayConcatItems(const Expr* concat) {
+  for (const Expr* elem : concat->elements) {
+    if (elem->kind != ExprKind::kConcatenation) continue;
+    bool holds_array =
+        std::ranges::any_of(elem->elements, [this](const Expr* inner) {
+          return inner->kind == ExprKind::kIdentifier &&
+                 var_array_info_.count(inner->text) != 0;
+        });
+    if (!holds_array) continue;
+    diag_.Error(elem->range.start,
+                "nested concatenation in unpacked array "
+                "concatenation is not self-determined",
+                Subclause("10.10.3"));
+  }
+}
+
 void ElaboratorOperationRules::CheckArrayConcatNestingInAssign(const Stmt* s) {
-  if (!s->lhs || !s->rhs) return;
   if (s->lhs->kind != ExprKind::kIdentifier) return;
   if (s->rhs->kind != ExprKind::kConcatenation) return;
-  auto it = var_array_info_.find(s->lhs->text);
-  if (it == var_array_info_.end()) return;
-  if (it->second.elem_type == DataTypeKind::kString) return;
-  const auto& info = it->second;
-  for (auto* elem : s->rhs->elements) {
-    if (elem->kind == ExprKind::kConcatenation) {
-      if (info.num_unpacked_dims == 1 && info.elem_width > 0 &&
-          InferExprWidth(elem, typedefs_) == info.elem_width) {
-        continue;
-      }
-      diag_.Error(elem->range.start,
-                  "nested concatenation in unpacked array "
-                  "concatenation is not self-determined",
-                  Subclause("10.10.3"));
-    }
-  }
+  if (var_array_info_.count(s->lhs->text) == 0) return;
+  CheckNestedArrayConcatItems(s->rhs);
 }
 
 // Element types for which the literal `null` is a legal item in an unpacked
@@ -338,50 +346,51 @@ static bool NullItemIsLegalForElemType(DataTypeKind k) {
          k == DataTypeKind::kVirtualInterface || k == DataTypeKind::kNamed;
 }
 
-void ElaboratorOperationRules::CheckNullItemInArrayConcatAssign(const Stmt* s) {
-  if (!s->lhs || !s->rhs) return;
-  if (s->lhs->kind != ExprKind::kIdentifier) return;
-  if (s->rhs->kind != ExprKind::kConcatenation) return;
-  auto it = var_array_info_.find(s->lhs->text);
-  if (it == var_array_info_.end()) return;
-  if (NullItemIsLegalForElemType(it->second.elem_type)) return;
-  for (auto* elem : s->rhs->elements) {
-    if (elem->kind == ExprKind::kIdentifier && elem->text == "null") {
+// §10.10 (printed page 265): an item of an unpacked array concatenation is
+// assignment compatible with the target's elements or an array of them, or
+// `null` where the elements are of a type with a null value. A class handle
+// is assignment compatible with no element of an integral, real or string
+// type.
+void ElaboratorOperationRules::CheckArrayConcatItemTypes(
+    const Expr* concat, const VarArrayInfo& info) {
+  bool handle_elems = NullItemIsLegalForElemType(info.elem_type);
+  for (const Expr* elem : concat->elements) {
+    if (elem->kind != ExprKind::kIdentifier || handle_elems) continue;
+    if (elem->text == "null") {
       diag_.Error(elem->range.start,
                   "null is not a legal item in an unpacked array "
                   "concatenation for this target element type",
+                  Subclause("10.10"));
+    } else if (class_var_types_.count(elem->text) != 0) {
+      diag_.Error(elem->range.start,
+                  std::format("class handle '{}' is not assignment compatible "
+                              "with the elements of the unpacked array "
+                              "concatenation's target",
+                              elem->text),
                   Subclause("10.10"));
     }
   }
 }
 
-// §10.10.3: a complete unpacked array concatenation has no self-determined
-// type, so it shall not itself appear as an item of another unpacked array
-// concatenation. The prohibition governs the concatenation that initializes an
-// array in its declaration (`int B[9] = {A, {4, 5, 6, 7, 8, 9}};`), an
-// assignment-like context that the procedural walk never reaches. A nested
-// `{...}` whose self-determined width matches the target element is a
-// vector/string concatenation and stays legal, mirroring the procedural check.
+void ElaboratorOperationRules::CheckNullItemInArrayConcatAssign(const Stmt* s) {
+  if (s->lhs->kind != ExprKind::kIdentifier) return;
+  if (s->rhs->kind != ExprKind::kConcatenation) return;
+  auto it = var_array_info_.find(s->lhs->text);
+  if (it == var_array_info_.end()) return;
+  CheckArrayConcatItemTypes(s->rhs, it->second);
+}
+
+// §10.10.3 holds the concatenation that initializes an array in its
+// declaration as it holds one a procedure assigns, the initializer being an
+// assignment-like context the procedural walk never reaches.
 void ElaboratorOperationRules::CheckArrayConcatNestingInInit(
     const ModuleItem* item) {
   if (!item->init_expr) return;
   if (item->init_expr->kind != ExprKind::kConcatenation) return;
   auto it = var_array_info_.find(item->name);
   if (it == var_array_info_.end()) return;
-  if (it->second.elem_type == DataTypeKind::kString) return;
-  const auto& info = it->second;
-  for (auto* elem : item->init_expr->elements) {
-    if (elem->kind == ExprKind::kConcatenation) {
-      if (info.num_unpacked_dims == 1 && info.elem_width > 0 &&
-          InferExprWidth(elem, typedefs_) == info.elem_width) {
-        continue;
-      }
-      diag_.Error(elem->range.start,
-                  "nested concatenation in unpacked array "
-                  "concatenation is not self-determined",
-                  Subclause("10.10.3"));
-    }
-  }
+  CheckNestedArrayConcatItems(item->init_expr);
+  CheckArrayConcatItemTypes(item->init_expr, it->second);
 }
 
 void ElaboratorOperationRules::WalkStmtsForArrayConcatNesting(const Stmt* s) {

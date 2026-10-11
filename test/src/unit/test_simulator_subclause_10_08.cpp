@@ -278,4 +278,65 @@ TEST(AssignmentLikeContextSim, StaticCastExtendsInAssignLikeContext) {
             0x000Au);
 }
 
+// §10.8 with §10.9: a positional pattern connected to an aggregate output port
+// receives the port's value item by item, its first item the most significant
+// member.
+TEST(AssignmentLikeContextSim, PatternOnOutputPortReceivesMembers) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
+      "module sub(output pair_t p);\n"
+      "  assign p = '{8'h12, 8'h34};\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [7:0] x, y;\n"
+      "  sub u(.p('{x, y}));\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 0x12u);
+  EXPECT_EQ(y->value.ToUint64(), 0x34u);
+}
+
+// §10.8 with §10.9: a positional pattern of variables passed to an output
+// argument of a structure type receives the argument's value member by member.
+TEST(AssignmentLikeContextSim, PatternOnOutputArgumentReceivesMembers) {
+  SimFixture f;
+  auto* x = RunAndFindVar(
+      "typedef struct { logic [7:0] a, b; } ab_t;\n"
+      "module m;\n"
+      "  task automatic t(output ab_t s); s = '{8'h1, 8'h2}; endtask\n"
+      "  logic [7:0] x, y;\n"
+      "  initial t('{x, y});\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+  auto* y = f.ctx.FindVariable("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 1u);
+  EXPECT_EQ(y->value.ToUint64(), 2u);
+}
+
+// §10.8: an instance's override of a parameter declared with a structure type
+// is an assignment-like context, so a pattern there takes the parameter's type
+// and replaces its default.
+TEST(AssignmentLikeContextSim, PatternOverridesStructureParameter) {
+  SimFixture f;
+  RunAndFindVar(
+      "typedef struct packed { logic [7:0] a, b; } ab_t;\n"
+      "module sub #(parameter ab_t P = '{8'h11, 8'h22});\n"
+      "  ab_t q;\n"
+      "  initial q = P;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  sub #(.P('{8'h33, 8'h44})) u();\n"
+      "endmodule\n",
+      f, "u.q");
+  auto* q = f.ctx.FindVariable("u.q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(q->value.ToUint64(), 0x3344u);
+}
+
 }  // namespace
