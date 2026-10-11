@@ -810,4 +810,84 @@ TEST(AlwaysCombSensitivityInference, ArrayElementReadListsPrefixAndBase) {
                             {"arr[1]", "arr"});
 }
 
+// §9.2.2.2.1 with §26.3: a package's function called through the package
+// scope is analyzed as any other function the block calls. What it reads of
+// its package joins the list through the package, `p.g` and the packed `p.w`
+// its select stands on, the keys the simulator holds them under, and never
+// by a bare name the module would resolve in its own scope; its formal stays
+// out.
+TEST(AlwaysCombSensitivityInference, PackageScopedCallReadsInSensitivity) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  int g;\n"
+      "  logic [3:0] w;\n"
+      "  function int f(int x);\n"
+      "    return x + g + w[1];\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "module t;\n"
+      "  int a, y;\n"
+      "  always_comb y = p::f(a);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& proc = design->top_modules[0]->processes[0];
+  ExpectSensitivityContains(proc, {"a", "p.g", "p.w"});
+  ExpectSensitivityExcludes(proc, {"g", "w", "x", "p.x"});
+}
+
+// §9.2.2.2.1 with §26.3: a package's function a module imports and calls by
+// its bare name reads its package's objects all the same, and they join the
+// list through the package; the import brings in `f` alone, so the module
+// names no `g`.
+TEST(AlwaysCombSensitivityInference,
+     ImportedPackageFunctionReadsInSensitivity) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  int g;\n"
+      "  function int f(int x);\n"
+      "    return x + g;\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "module t;\n"
+      "  import p::f;\n"
+      "  int a, y;\n"
+      "  always_comb y = f(a);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  auto& proc = design->top_modules[0]->processes[0];
+  ExpectSensitivityContains(proc, {"a", "p.g"});
+  ExpectSensitivityExcludes(proc, {"g"});
+}
+
+// §9.2.2.2.1: a class's constructor called in a function the block calls,
+// `new`, is a call that names no function of the module or a package, and
+// the function's other reads still join the list.
+TEST(AlwaysCombSensitivityInference, ConstructorCallInCalledFunctionNamesNone) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  class C;\n"
+      "  endclass\n"
+      "  int ext, a, y;\n"
+      "  function automatic int f(int x);\n"
+      "    C h = new;\n"
+      "    return x + ext;\n"
+      "  endfunction\n"
+      "  always_comb y = f(a);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_FALSE(design->top_modules.empty());
+  ExpectSensitivityContains(design->top_modules[0]->processes[0], {"a", "ext"});
+}
+
 }  // namespace

@@ -771,4 +771,45 @@ TEST(AlwaysCombSensitivitySim, TwoDimensionalVariableIndexReadWakes) {
             "n=6\n");
 }
 
+// §9.2.2.2.1 with §26.3, end to end: a write of the package's variable a
+// function called through the package scope reads re-runs the block.
+TEST(AlwaysCombSensitivitySim, PackageScopedFunctionReadWakes) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  int g;\n"
+                       "  function int f(int x); return x + g; endfunction\n"
+                       "endpackage\n"
+                       "module t;\n"
+                       "  int a, y;\n"
+                       "  always_comb y = p::f(a);\n"
+                       "  initial begin\n"
+                       "    #1 p::g = 5;\n"
+                       "    #1 $display(\"y=%0d\", y);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "y=5\n");
+}
+
+// §9.2.2.2.1 with §26.3, end to end: the same for an imported package
+// function called by its bare name, the import naming no `g` in the module.
+TEST(AlwaysCombSensitivitySim, ImportedPackageFunctionReadWakes) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  int g;\n"
+                       "  function int f(int x); return x + g; endfunction\n"
+                       "endpackage\n"
+                       "module t;\n"
+                       "  import p::f;\n"
+                       "  int a, y;\n"
+                       "  always_comb y = f(a);\n"
+                       "  initial begin\n"
+                       "    #1 p::g = 5;\n"
+                       "    #1 $display(\"y=%0d\", y);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "y=5\n");
+}
+
 }  // namespace

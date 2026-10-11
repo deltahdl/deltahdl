@@ -285,12 +285,24 @@ static void CollectBlockLocalNames(const Stmt* stmt,
       stmt, [&out](Stmt* const& sub) { CollectBlockLocalNames(sub, out); });
 }
 
-static void CollectCallNamesFromExpr(
-    const Expr* expr, std::unordered_set<std::string_view>& out) {
-  if (!expr) return;
-  if (expr->kind == ExprKind::kCall && !expr->callee.empty()) {
-    out.insert(expr->callee);
+// The key a call's function stands under in the FuncMap: its callee's name,
+// or, for a call through a package scope, `p::f(a)`, whose callee is a member
+// access with no name of its own, the "pkg::name" key RecordPackageFuncNames
+// (elaborator_items_udp.cpp) enters each package's function under (§26.3). A
+// call with no callee node, a constructor's `new`, keeps its empty name, and a
+// scope that is not a plain name spells a key the table holds for nothing.
+static std::string CalledFunctionKey(const Expr& call) {
+  const Expr* callee = call.lhs;
+  if (callee == nullptr || !callee->is_scope_resolution) {
+    return std::string(call.callee);
   }
+  return std::string(callee->lhs->text) + "::" + std::string(callee->rhs->text);
+}
+
+static void CollectCallNamesFromExpr(const Expr* expr,
+                                     std::unordered_set<std::string>& out) {
+  if (!expr) return;
+  if (expr->kind == ExprKind::kCall) out.insert(CalledFunctionKey(*expr));
   CollectCallNamesFromExpr(expr->lhs, out);
   CollectCallNamesFromExpr(expr->rhs, out);
   CollectCallNamesFromExpr(expr->condition, out);
@@ -310,8 +322,8 @@ static void CollectCallNamesFromExpr(
 // The positions come from ForEachChildStmt in
 // elaborator_validate_internal.h, and the expressions are read one by one for
 // the reason CollectStmtReads above gives.
-static void CollectCallNamesFromStmt(
-    const Stmt* stmt, std::unordered_set<std::string_view>& out) {
+static void CollectCallNamesFromStmt(const Stmt* stmt,
+                                     std::unordered_set<std::string>& out) {
   if (!stmt) return;
   if (stmt->kind != StmtKind::kWait) {
     CollectCallNamesFromExpr(stmt->condition, out);
@@ -336,15 +348,15 @@ static void CollectCallNamesFromStmt(
 static std::unordered_set<std::string_view> ResolveCalledFunctions(
     const Stmt* body, const FuncMap& funcs) {
   std::unordered_set<std::string_view> visited;
-  std::unordered_set<std::string_view> pending;
+  std::unordered_set<std::string> pending;
   CollectCallNamesFromStmt(body, pending);
   while (!pending.empty()) {
-    std::unordered_set<std::string_view> next;
+    std::unordered_set<std::string> next;
     for (auto& name : pending) {
       if (visited.count(name)) continue;
       auto it = funcs.find(name);
       if (it == funcs.end()) continue;
-      visited.insert(name);
+      visited.insert(it->first);
       for (auto* s : it->second->func_body_stmts) {
         CollectCallNamesFromStmt(s, next);
       }
@@ -358,8 +370,12 @@ static std::unordered_set<std::string_view> ResolveCalledFunctions(
 // stands on. It is one of the two names the prefix expands to, and the one that
 // always denotes a simulation object: `logic [7:0] a` is a single Variable
 // named `a`, so a bit-select read of it can only be watched through that name.
+// A package's object a package function reads is spelled "pkg::name"
+// (MergeNamesOfScope), and the package's name is part of its base.
 static std::string_view BaseSignalName(std::string_view name) {
-  auto pos = name.find_first_of("[.");
+  auto scope = name.find("::");
+  auto pos =
+      name.find_first_of("[.", scope == std::string_view::npos ? 0 : scope + 2);
   return pos == std::string_view::npos ? name : name.substr(0, pos);
 }
 
@@ -417,6 +433,36 @@ struct SignalSets {
   std::unordered_set<std::string> written;
 };
 
+// §26.3: the package declaring `func`, read off the "pkg::name" key
+// RecordPackageFuncNames (elaborator_items_udp.cpp) enters each package's
+// function under, which the function has whether it is called through the
+// package or by the bare name an import enters it under too; empty for a
+// function the module declares.
+static std::string_view PackageOf(const ModuleItem* func,
+                                  const FuncMap& funcs) {
+  for (const auto& [key, item] : funcs) {
+    auto scope = key.find("::");
+    if (item == func && scope != std::string_view::npos) {
+      return key.substr(0, scope);
+    }
+  }
+  return {};
+}
+
+// Copies into `out` the names `names` holds, each one a called function reads
+// or writes beyond its own formals and locals. A function of the package
+// `pkg` names that package's objects, which the calling module may not name
+// at all, so each is spelled "pkg::name" and watched by the key the simulator
+// holds it under (EmitSignalEvent); taken bare, `g` of `p::f` named nothing
+// in the module and a write of p::g never re-ran the block.
+static void MergeNamesOfScope(std::string_view pkg,
+                              const std::unordered_set<std::string>& names,
+                              std::unordered_set<std::string>& out) {
+  for (const auto& name : names) {
+    out.insert(pkg.empty() ? name : std::string(pkg) + "::" + name);
+  }
+}
+
 static void MergeCalledFunctionSignals(const Stmt* body, const FuncMap& funcs,
                                        bool exclude_written, SignalSets& sigs) {
   auto called = ResolveCalledFunctions(body, funcs);
@@ -424,29 +470,39 @@ static void MergeCalledFunctionSignals(const Stmt* body, const FuncMap& funcs,
     auto it = funcs.find(fname);
     if (it == funcs.end()) continue;
     const auto* func = it->second;
+    const std::string_view kPkg = PackageOf(func, funcs);
     std::unordered_set<std::string> func_locals;
     MergeOneCalledFunctionLocals(func, func_locals);
     std::unordered_set<std::string> func_reads;
     MergeOneCalledFunctionReads(func, func_reads);
-    MergeNamesNotLocalTo(func_reads, func_locals, sigs.reads);
+    std::unordered_set<std::string> kept;
+    MergeNamesNotLocalTo(func_reads, func_locals, kept);
+    MergeNamesOfScope(kPkg, kept, sigs.reads);
     if (exclude_written) {
       std::unordered_set<std::string> func_written;
       MergeOneCalledFunctionWritten(func, func_written);
-      MergeNamesNotLocalTo(func_written, func_locals, sigs.written);
+      kept.clear();
+      MergeNamesNotLocalTo(func_written, func_locals, kept);
+      MergeNamesOfScope(kPkg, kept, sigs.written);
     }
   }
 }
 
 // Records one watchable name, deduped, as a plain identifier event the
-// simulator resolves through FindVariable.
+// simulator resolves through FindVariable, a package's object, "pkg::name",
+// by the "pkg.name" key its storage stands under (PackageDataKey in
+// src/simulator/lowerer_package_data.cpp).
 static void EmitSignalEvent(std::string_view text,
                             std::unordered_set<std::string_view>& emitted,
                             std::vector<EventExpr>& events, Arena& arena) {
   if (text.empty() || !emitted.insert(text).second) return;
+  std::string watched(text);
+  auto scope = watched.find("::");
+  if (scope != std::string::npos) watched.replace(scope, 2, ".");
   auto* expr = arena.Create<Expr>();
   expr->kind = ExprKind::kIdentifier;
-  expr->text = std::string_view(arena.AllocString(text.data(), text.size()),
-                                text.size());
+  expr->text = std::string_view(
+      arena.AllocString(watched.data(), watched.size()), watched.size());
   events.push_back({Edge::kNone, expr});
 }
 
