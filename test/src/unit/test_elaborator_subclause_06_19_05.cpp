@@ -73,4 +73,18 @@ TEST(EnumMethodElaboration, RandModeOfAnEnumPropertyIsAccepted) {
              "endmodule\n"));
 }
 
+// §23.2.2: a port that is an enumeration is an enumeration variable of the
+// module.
+TEST(EnumMethodElaboration, PortsAreChecked) {
+  ElabFixture f;
+  ElabOk(
+      "module m(input enum {A, B} e);\n"
+      "  initial e.foo();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'foo' is not a built-in method of the enumeration 'e'", 2, "6.19.5"));
+}
+
 }  // namespace

@@ -389,6 +389,46 @@ TEST(StringMethodElaboration, FormalsAndBlockVariablesAreChecked) {
 
 // §3.13: a package's name and a variable's are in different name spaces, so
 // p::x names the package's x whatever variable p the scope declares.
+// §23.2.2: a port that is a string is a string variable of the module, its
+// unpacked dimensions those it writes after its name.
+TEST(StringMethodElaboration, AnsiPortsAreChecked) {
+  ElabFixture f;
+  ElabOk(
+      "module m(input string s, input string q [2]);\n"
+      "  initial begin\n"
+      "    s.foo();\n"
+      "    q[0].baz();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "'foo' is not a built-in method of the string 's'", 3, "6.16"));
+  EXPECT_TRUE(ReportedError(
+      diags, "'baz' is not a built-in method of the string 'q'", 4, "6.16"));
+}
+
+// §23.2.2.1: a port the body declares a string, and the string an explicitly
+// named port stands for, are string variables of the module.
+TEST(StringMethodElaboration, NonAnsiPortsAreChecked) {
+  ElabFixture f;
+  ElabOk(
+      "module m(s, .a(t));\n"
+      "  input string s;\n"
+      "  input string t;\n"
+      "  initial begin\n"
+      "    s.foo();\n"
+      "    t.bar();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "'foo' is not a built-in method of the string 's'", 5, "6.16"));
+  EXPECT_TRUE(ReportedError(
+      diags, "'bar' is not a built-in method of the string 't'", 6, "6.16"));
+}
+
 TEST(StringMethodElaboration, PackageScopeIsNoSelectFromAString) {
   EXPECT_TRUE(
       ElabOk("package p;\n"

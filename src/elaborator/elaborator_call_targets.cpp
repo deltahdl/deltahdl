@@ -669,11 +669,18 @@ std::unordered_set<std::string_view> EnclosingSubroutineNames(
 
 namespace {
 
-// The declaration of each variable the items `items` of a module declare, as
-// a variable of `scope`.
-void DeclareModuleVars(const std::vector<ModuleItem*>& items,
-                       DataScope& scope) {
-  for (const ModuleItem* item : items) {
+// The declaration of each variable the module `decl` declares, as a variable
+// of `scope`: each of its ports (§23.2.2), each object an explicitly named
+// port of it stands for (§23.2.2.1), and each variable its items declare, a
+// body declaration of a port's name giving the port its type.
+void DeclareModuleVars(const ModuleDecl& decl, DataScope& scope) {
+  for (const auto* ports : {&decl.ports, &decl.port_expr_objects}) {
+    for (const PortDecl& port : *ports) {
+      scope.module_vars[port.name] =
+          DeclaredVar{&port.data_type, port.unpacked_dims.size()};
+    }
+  }
+  for (const ModuleItem* item : decl.items) {
     if (item->kind == ModuleItemKind::kVarDecl) {
       scope.module_vars[item->name] =
           DeclaredVar{&item->data_type, item->unpacked_dims.size()};
@@ -699,7 +706,7 @@ void DeclareUnitData(const CompilationUnit& unit, DataScope& scope) {
 // its kind puts it in: data, subroutines and the rest, which no call names.
 void DeclareModuleItems(const ModuleDecl& decl, const CompilationUnit& unit,
                         DataScope& scope) {
-  DeclareModuleVars(decl.items, scope);
+  DeclareModuleVars(decl, scope);
   std::unordered_set<std::string_view>& subroutines = scope.subroutines;
   for (const ModuleItem* item : decl.items) {
     if (item->kind == ModuleItemKind::kVarDecl ||
@@ -889,7 +896,7 @@ void ReportClassMethodCalls(const CompilationUnit& unit, DiagEngine& diag) {
       DataScope at_module{kSeesAll, unit, decl->items};
       at_module.local_types = decl->type_param_names;
       at_module.classes = kClasses;
-      DeclareModuleVars(decl->items, at_module);
+      DeclareModuleVars(*decl, at_module);
       CheckSiteClasses(at_module, {}, diag);
     }
   }
