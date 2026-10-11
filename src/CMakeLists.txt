@@ -621,6 +621,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/evaluation_ops.cpp
     simulator/wide_arith.cpp
     simulator/class_specialization.cpp
+    simulator/class_specialization_key.cpp
     simulator/class_typedef_layout.cpp
     simulator/lowerer_class.cpp
     simulator/lowerer_data_init.cpp

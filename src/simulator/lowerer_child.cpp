@@ -525,11 +525,19 @@ void Lowerer::LowerChildInstance(const RtlirModuleInst& child) {
   // module wherever it is instantiated, registered as LowerModule registers
   // the top's -- before the variables, so a handle's `C h = new;` finds it
   // -- and once, a second instance of the module declaring the same class.
+  // §8.25 (printed page 204) makes a parameterized class an exception: each
+  // instance of the module declaring it creates a generic class of its own,
+  // with specializations and static members of its own, so a later instance
+  // registers its own copy, held under its prefix.
   std::vector<const ClassDecl*> fresh_classes;
   for (auto* cls : child.resolved->class_decls) {
     const ClassTypeInfo* known = ctx_.FindClassType(cls->name);
-    if (known != nullptr && known->decl == cls) continue;
+    const bool kRegistered = known != nullptr && known->decl == cls;
+    if (kRegistered && cls->params.empty()) continue;
+    const std::string kOuter =
+        ctx_.SetClassInstanceScope(kRegistered ? inst_prefix_ : std::string());
     RegisterClassDecl(cls, child.resolved->function_decls);
+    ctx_.SetClassInstanceScope(kOuter);
     fresh_classes.push_back(cls);
   }
   RegisterChildInstanceKeys(child.resolved);

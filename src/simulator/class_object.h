@@ -68,6 +68,12 @@ struct ClassTypeInfo {
   // initializers included, so a frame running one carries this name as
   // Scope::package and SimContext::FindInPackageScope answers them.
   std::string_view package;
+  // §8.25: the prefix of the module instance whose own generic class this is,
+  // where a later instance of the module declaring the class registered a
+  // copy of its own (Lowerer::LowerChildModules); empty for every other class.
+  // A specialization of it, a copy, carries it too, and is held under it
+  // (SpecializationOf).
+  std::string_view instance_scope;
   // §8.25 (printed page 204 of IEEE 1800-2023): the set of actual parameter
   // values this type is the generic class together with, as the `#(...)` list
   // naming the specialization wrote them, held in the arena so it outlives

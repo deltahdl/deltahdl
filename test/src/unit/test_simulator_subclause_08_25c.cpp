@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
 #include <string>
 
 #include "fixture_simulator.h"
@@ -505,6 +506,41 @@ TEST(ParameterizedClassSim, PortParameterArrayTakesTheActual) {
                        "endmodule\n",
                        f),
             "6 2\n");
+}
+
+// §8.25 (printed page 204): a generic class a module declares is the
+// instance's own, each instance of the module making one with its own
+// specializations, so u1's and u2's C #(4) count their own constructions,
+// and so do their default specializations; a generic class a package declares
+// is one for the whole design, P #(4) counting both instances' objects.
+TEST(ClassSim, AModulesGenericClassIsEachInstancesOwn) {
+  const std::string kSrc =
+      "package p;\n"
+      "  class P #(int N = 1);\n"
+      "    static int count = 0;\n"
+      "    function new(); count++; endfunction\n"
+      "  endclass\n"
+      "endpackage\n"
+      "module sub;\n"
+      "  class C #(int N = 1);\n"
+      "    static int count = 0;\n"
+      "    function new(); count++; endfunction\n"
+      "  endclass\n"
+      "  C #(4) a, b;\n"
+      "  C c;\n"
+      "  p::P #(4) x;\n"
+      "  int n, d, m;\n"
+      "  initial begin\n"
+      "    a = new; b = new; c = new; x = new;\n"
+      "    #1 n = C#(4)::count; d = C#()::count; m = p::P#(4)::count;\n"
+      "  end\n"
+      "endmodule\n"
+      "module t; sub u1(); sub u2(); endmodule\n";
+  for (const std::string kInst : {"u1", "u2"}) {
+    EXPECT_EQ(RunAndGet(kSrc, (kInst + ".n").c_str()), 2u) << kInst;
+    EXPECT_EQ(RunAndGet(kSrc, (kInst + ".d").c_str()), 1u) << kInst;
+    EXPECT_EQ(RunAndGet(kSrc, (kInst + ".m").c_str()), 2u) << kInst;
+  }
 }
 
 }  // namespace

@@ -855,6 +855,7 @@ void Lowerer::RegisterClassDecl(const ClassDecl* cls,
   auto* info = arena_.Create<ClassTypeInfo>();
   info->name = cls->name;
   info->decl = cls;
+  info->instance_scope = *arena_.Create<std::string>(ctx_.ClassInstanceScope());
   info->is_abstract = cls->is_virtual;
   info->is_interface = cls->is_interface;
   // A class lowered with no design behind it -- a test that builds the

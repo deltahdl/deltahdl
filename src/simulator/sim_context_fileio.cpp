@@ -10,6 +10,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/arena.h"
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/net.h"
@@ -539,7 +540,30 @@ bool SimContext::IsEventTriggered(std::string_view name) const {
 }
 
 void SimContext::RegisterClassType(std::string_view name, ClassTypeInfo* info) {
-  class_types_[name] = info;
+  if (class_scope_.empty()) {
+    class_types_[name] = info;
+    return;
+  }
+  class_types_[*arena_.Create<std::string>(class_scope_ +
+                                           "::" + std::string(name))] = info;
+}
+
+// §8.25 (printed page 204): a parameterized class a module declares is a
+// generic class of each instance of the module, with specializations and
+// static members of its own, so the copies a later instance registers stand
+// under that instance's prefix (Lowerer::LowerChildModules), and a name is
+// looked for first under the instance in hand: the scope set, else the
+// running code's instance.
+std::string SimContext::SetClassInstanceScope(std::string scope) {
+  if (!scope.empty()) instance_classes_ = true;
+  std::swap(scope, class_scope_);
+  return scope;
+}
+
+ClassTypeInfo* SimContext::ExactClassType(std::string_view name) {
+  const auto kFound =
+      class_types_.find(class_scope_ + "::" + std::string(name));
+  return kFound == class_types_.end() ? nullptr : kFound->second;
 }
 
 // §8.23: a class nested in another is held under `Outer::Inner`, the name
@@ -569,6 +593,12 @@ ClassTypeInfo* SimContext::FindClassType(std::string_view name) {
   // (Lowerer::RegisterClassDecl).
   if (units_.Separate()) {
     auto own = class_types_.find(ActiveUnitScope() + "::" + std::string(name));
+    if (own != class_types_.end()) return own->second;
+  }
+  if (instance_classes_) {
+    const std::string kScope =
+        class_scope_.empty() ? ActiveInstancePrefix() : class_scope_;
+    auto own = class_types_.find(kScope + "::" + std::string(name));
     if (own != class_types_.end()) return own->second;
   }
   auto it = class_types_.find(name);

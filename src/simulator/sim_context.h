@@ -623,9 +623,15 @@ class SimContext : public DeclaredNameTables,
 
   void RegisterClassType(std::string_view name, ClassTypeInfo* info);
   ClassTypeInfo* FindClassType(std::string_view name);
-  // Every class the run holds under its own name, an alias's entry left
-  // out, in no particular order; what RegisterClassTypeAliases walks for
-  // the classes' own typedefs.
+  // §8.25: while `scope`, a module instance's prefix, is set, the classes
+  // RegisterClassType holds are that instance's own and stand under it, and
+  // FindClassType tries them first; returns the scope set before.
+  std::string SetClassInstanceScope(std::string scope);
+  const std::string& ClassInstanceScope() const { return class_scope_; }
+  // The class held under `name` in the scope set, which is not empty.
+  ClassTypeInfo* ExactClassType(std::string_view name);
+  // Every class held under its own name, an alias's entry left out; what
+  // RegisterClassTypeAliases walks for the classes' own typedefs.
   std::vector<ClassTypeInfo*> RegisteredClassTypes() const;
   void SetVariableClassType(std::string_view var, std::string_view type);
   std::string_view GetVariableClassType(std::string_view var) const;
@@ -883,25 +889,19 @@ class SimContext : public DeclaredNameTables,
   void EnsureStdioDescriptors();
 
   std::unordered_map<std::string_view, ArrayInfo> array_infos_;
-
-  std::unordered_map<std::string_view, QueueObject*> queues_;
   std::unordered_map<uint64_t, StochasticQueue> stochastic_queues_;
-
+  std::unordered_map<std::string_view, QueueObject*> queues_;
   std::unordered_map<std::string_view, AssocArrayObject*> assoc_arrays_;
-
   std::unordered_map<std::string_view, std::string> var_tags_;
-
   std::unordered_map<std::string_view, SemaphoreObject*> semaphores_;
-
   std::unordered_map<std::string_view, MailboxObject*> mailboxes_;
-
   std::unordered_map<std::string_view, uint64_t> event_triggered_;
-
   std::unordered_map<std::string_view, ClassTypeInfo*> class_types_;
+  std::string class_scope_;        // See SetClassInstanceScope.
+  bool instance_classes_ = false;  // Whether one was ever set.
   std::unordered_map<std::string_view, std::string_view> var_class_types_;
   std::unordered_map<std::string_view, std::vector<Expr*>>
       var_class_param_exprs_;
-
   std::unordered_map<uint64_t, ClassObject*> class_objects_;
   uint64_t next_handle_id_ = 1;
   std::unordered_set<WeakReference*> weak_references_;
