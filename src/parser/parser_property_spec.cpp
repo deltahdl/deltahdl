@@ -10,7 +10,6 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
-#include "parser/expr_substitute.h"
 #include "parser/parser.h"
 #include "parser/parser_property_spec_internal.h"
 
@@ -226,29 +225,14 @@ static bool IsEdgeKeyword(TokenKind k) {
          k == TokenKind::kKwEdge;
 }
 
-// §16.8.1 b) and §9.4.2: an event expression opening with an edge keyword,
-// given as the actual argument of a formal of type event: its events, each
-// with any iff guard, joined by `or`, kept as EventAsActual and
-// EitherEventActual write them.
-Expr* ParserPropertySpecHelpers::ParseEventActual(Parser& p) {
-  SourceLoc loc = p.CurrentLoc();
-  Expr* event = EventAsActual(p.ParseSingleEvent(), loc, p.arena_);
-  while (p.Match(TokenKind::kKwOr)) {
-    loc = p.CurrentLoc();
-    Expr* next = EventAsActual(p.ParseSingleEvent(), loc, p.arena_);
-    event = EitherEventActual(event, next, p.arena_);
-  }
-  return event;
-}
-
 // §16.12.18: one actual argument of a property instance: `$`, kept as an
-// identifier named `$`; an event expression opening with an edge keyword,
-// kept as ParseEventActual reads it for a formal of type event; an
-// expression running to the comma or parenthesis ending the argument; or,
-// where the tokens are not one, a sequence_expr or a property_expr for a
-// formal of type sequence or property, read as a property and carried by
-// an identifier standing in the argument's place. `plain` is cleared where
-// the argument is not an expression.
+// identifier named `$`; an event expression opening with an edge keyword or
+// with a group of events, kept as ParseEventActual reads it for a formal of
+// type event; an expression running to the comma or parenthesis ending the
+// argument; or, where the tokens are not one, a sequence_expr or a
+// property_expr for a formal of type sequence or property, read as a property
+// and carried by an identifier standing in the argument's place. `plain` is
+// cleared where the argument is not an expression.
 Expr* ParserPropertySpecHelpers::ParsePropertyActualArg(Parser& p,
                                                         bool& plain) {
   SourceLoc loc = p.CurrentLoc();
@@ -260,7 +244,8 @@ Expr* ParserPropertySpecHelpers::ParsePropertyActualArg(Parser& p,
     dollar->range.start = tok.loc;
     return dollar;
   }
-  if (IsEdgeKeyword(p.CurrentToken().kind)) {
+  if (IsEdgeKeyword(p.CurrentToken().kind) ||
+      (p.Check(TokenKind::kLParen) && p.OpensEventGroup(true))) {
     plain = false;
     return ParseEventActual(p);
   }

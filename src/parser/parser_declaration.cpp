@@ -687,34 +687,52 @@ ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
   return item;
 }
 
+// The change in nesting depth a token makes.
+static int NestingStep(TokenKind k) {
+  if (k == TokenKind::kLParen || k == TokenKind::kLBracket ||
+      k == TokenKind::kLBrace) {
+    return 1;
+  }
+  if (k == TokenKind::kRParen || k == TokenKind::kRBracket ||
+      k == TokenKind::kRBrace) {
+    return -1;
+  }
+  return 0;
+}
+
 // §9.4 Syntax 9-4: an event_expression may be a parenthesized one, and an
 // expression may be parenthesized too, so the `(` alone does not say which it
 // opens. A group opens with an edge keyword or with a group of its own, or
 // holds an `or`, a `,` or an `iff` at its own level of nesting, none of which
 // an expression holds there; anything else in the parentheses is an
-// expression. The tokens are scanned to the matching `)` and the position is
-// restored.
-bool Parser::OpensEventGroup() {
+// expression. Where the parentheses may hold a sequence or a property as
+// well, an actual argument (footnote 36 to Syntax 9-4), `edges_only` asks
+// for the reading that settles it: an `or`, a `,` or an `iff` may join a
+// sequence's or a property's operands too, so the group is one only where an
+// edge keyword, or a group of its own that is one, opens an event at its own
+// level of nesting, first or after a `,` or an `or`, which no operand of
+// either opens with. The tokens are scanned to the matching `)` and the
+// position is restored.
+bool Parser::OpensEventGroup(bool edges_only) {
   auto saved = lexer_.SavePos();
   Consume();  // (
-  const TokenKind kFirst = CurrentToken().kind;
-  bool group = kFirst == TokenKind::kKwPosedge ||
-               kFirst == TokenKind::kKwNegedge ||
-               kFirst == TokenKind::kKwEdge ||
-               (kFirst == TokenKind::kLParen && OpensEventGroup());
+  bool group = false;
+  bool opens_event = true;
   for (int depth = 0; !group && depth >= 0 && !Check(TokenKind::kEof);
        Consume()) {
     const TokenKind kKind = CurrentToken().kind;
-    if (kKind == TokenKind::kLParen || kKind == TokenKind::kLBracket ||
-        kKind == TokenKind::kLBrace) {
-      ++depth;
-    } else if (kKind == TokenKind::kRParen || kKind == TokenKind::kRBracket ||
-               kKind == TokenKind::kRBrace) {
-      --depth;
-    } else if (depth == 0) {
-      group = kKind == TokenKind::kKwOr || kKind == TokenKind::kComma ||
-              kKind == TokenKind::kKwIff;
-    }
+    const bool kSeparates =
+        depth == 0 && (kKind == TokenKind::kKwOr || kKind == TokenKind::kComma);
+    const bool kOpensEvent =
+        opens_event &&
+        (kKind == TokenKind::kKwPosedge || kKind == TokenKind::kKwNegedge ||
+         kKind == TokenKind::kKwEdge ||
+         (kKind == TokenKind::kLParen && OpensEventGroup(edges_only)));
+    group = kOpensEvent ||
+            (!edges_only &&
+             (kSeparates || (depth == 0 && kKind == TokenKind::kKwIff)));
+    opens_event = kSeparates;
+    depth += NestingStep(kKind);
   }
   lexer_.RestorePos(saved);
   return group;
@@ -723,7 +741,7 @@ bool Parser::OpensEventGroup() {
 std::vector<EventExpr> Parser::ParseEventList() {
   std::vector<EventExpr> events;
   auto parse_event_or_group = [&]() {
-    if (Check(TokenKind::kLParen) && OpensEventGroup()) {
+    if (Check(TokenKind::kLParen) && OpensEventGroup(false)) {
       Consume();
       auto sub = ParseEventList();
       events.insert(events.end(), sub.begin(), sub.end());
