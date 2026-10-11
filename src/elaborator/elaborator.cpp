@@ -399,6 +399,8 @@ std::string DesignCellNotFoundMessage(std::string_view config_name,
 }  // namespace
 
 void Elaborator::RunPreElaborationValidations() {
+  BreakClassInheritanceCycles();
+
   ValidateNameSpaces();
 
   ValidateConfigDesignStatements();

@@ -219,6 +219,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_cast_ops.cpp
     elaborator/elaborator_validate_const_assign.cpp
     elaborator/elaborator_validate_timescale.cpp
+    elaborator/class_member_names.cpp
     elaborator/class_method_reads.cpp
     elaborator/elaborator_validate_enum_assign.cpp
     elaborator/elaborator_validate_types.cpp

@@ -78,6 +78,11 @@ class ElaboratorClassRules : public ElaboratorOperationRules {
   void ValidateThisUsage(const ModuleDecl* decl);
   void ValidateThisInItem(const ModuleItem* item);
 
+  // §8.13: reports each class whose chain of base classes comes back to it,
+  // and drops that class's extends clause, so that every later walk up such a
+  // chain ends. Runs before any other check, all of which walk the chain.
+  void BreakClassInheritanceCycles();
+
   void ValidateFinalClassExtension();
 
   void ValidateWeakReferenceMembers();

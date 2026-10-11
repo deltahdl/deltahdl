@@ -6,6 +6,7 @@
 #include <format>
 #include <functional>
 #include <initializer_list>
+#include <memory>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -14,6 +15,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "elaborator/class_member_names.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast_class.h"
@@ -63,6 +65,14 @@ struct DataScope {
   // The kind of scope `items` belong to, which the types of the scope's
   // variables are looked up from.
   SiteKind site = SiteKind::kModule;
+  // The names a type of the scope may be written as without naming a class of
+  // the scope around it: a type parameter of the module, and in a method a
+  // type parameter, typedef or nested class of its class or a class it
+  // extends.
+  std::unordered_set<std::string_view> local_types = {};
+  // The classes of the unit known by their name alone, shared by every scope
+  // copied from the one that made them.
+  std::shared_ptr<const SoleClassIndex> classes = nullptr;
 
   bool Names(std::string_view name) const {
     return module.contains(name) ||
@@ -416,6 +426,46 @@ DeclaredVar SelectedProperty(const Expr& root, const DataScope& scope) {
              : DeclaredVar{&held->data_type, held->unpacked_dims.size()};
 }
 
+// §8.4: the class whose handle `e` holds, where the scope tells it for
+// certain: a variable of the scope, or an element of one, one select per
+// unpacked dimension (§7.4), whose type names a class, or a property of such a
+// class (§8.5), h.p or h.p[0]; null for anything else.
+const ClassDecl* HandleClass(const Expr& e, const DataScope& scope) {
+  std::size_t selects = 0;
+  const Expr& root = SelectRoot(e, selects);
+  if (root.kind == ExprKind::kIdentifier) {
+    const DeclaredVar* var = scope.Declared(root.text);
+    const bool kClassType = var != nullptr && var->dims == selects &&
+                            var->type->kind == DataTypeKind::kNamed &&
+                            !scope.local_types.contains(var->type->type_name);
+    return kClassType ? ClassNamed(scope, *var->type) : nullptr;
+  }
+  if (root.kind != ExprKind::kMemberAccess) return nullptr;
+  const ClassDecl* holder = HandleClass(*root.lhs, scope);
+  return holder == nullptr
+             ? nullptr
+             : scope.classes->PropertyClass(*holder, root.rhs->text, selects);
+}
+
+// §8.5 and §8.6: a member access `access`, h.m, applied to a handle of a class
+// that, with the classes it extends or implements, declares nothing `m`
+// names; reported under `rule`, §8.6 where the access is what a call calls and
+// §8.5 otherwise. A class scope resolution, C::m, applies to no handle.
+void ReportUndeclaredMember(const Expr& access, std::string_view rule,
+                            const DataScope& scope, DiagEngine& diag) {
+  if (access.is_scope_resolution) return;
+  const ClassDecl* cls = HandleClass(*access.lhs, scope);
+  std::unordered_set<std::string_view> names;
+  if (cls == nullptr || !scope.classes->SelectableNames(*cls, names) ||
+      names.contains(access.rhs->text)) {
+    return;
+  }
+  diag.Error(access.rhs->range.start,
+             std::format("class '{}' has no member named '{}'", cls->name,
+                         access.rhs->text),
+             Subclause(rule));
+}
+
 // §25.9 with §7.4: a select `select` into a class property that is a virtual
 // interface, past the property's unpacked dimensions, vif[0], this.vif[0] or
 // h.vif[0], which selects into a virtual interface; reported once, at the
@@ -453,10 +503,15 @@ void ReportVifCall(const Expr& call, const DataScope& scope, DiagEngine& diag) {
 }
 
 // Each call by a plain name `expr` holds, itself included, each call through a
-// virtual interface, and each select into a class property that is one.
-void CheckExprCalls(const Expr* expr, const DataScope& scope,
-                    DiagEngine& diag) {
+// virtual interface, each select into a class property that is one, and each
+// member access naming nothing its class declares, `rule` being the subclause
+// one `expr` itself makes is reported under.
+void CheckExprCalls(const Expr* expr, const DataScope& scope, DiagEngine& diag,
+                    std::string_view rule = "8.5") {
   if (expr == nullptr) return;
+  if (expr->kind == ExprKind::kMemberAccess) {
+    ReportUndeclaredMember(*expr, rule, scope, diag);
+  }
   if (const Expr* callee = NamedCallee(*expr)) {
     ReportIfData(callee->text, expr->range.start, scope, diag);
   }
@@ -465,8 +520,10 @@ void CheckExprCalls(const Expr* expr, const DataScope& scope,
   }
   if (expr->kind == ExprKind::kSelect)
     ReportPropertyVifSelect(*expr, scope, diag);
-  ForEachExprChild(
-      expr, [&](const Expr* child) { CheckExprCalls(child, scope, diag); });
+  const Expr* called = expr->kind == ExprKind::kCall ? expr->lhs : nullptr;
+  ForEachExprChild(expr, [&](const Expr* child) {
+    CheckExprCalls(child, scope, diag, child == called ? "8.6" : "8.5");
+  });
 }
 
 // The calls `stmt` and the statements it holds make by a plain name: a bare
@@ -639,6 +696,9 @@ DataScope ClassScope(const ClassDecl& cls, const DataScope& site) {
   DataScope scope{site.visible, site.unit, site.items};
   scope.site = site.site;
   scope.module_vars = site.module_vars;
+  scope.local_types = site.local_types;
+  scope.classes = site.classes;
+  scope.classes->AddLocalTypes(cls, scope.local_types);
   DeclareClassProperties(cls, scope);
   return scope;
 }
@@ -751,6 +811,8 @@ void ReportCallsOfDataNames(
     const ModuleDecl& decl, const CompilationUnit& unit,
     const std::function<bool(std::string_view)>& visible, DiagEngine& diag) {
   DataScope scope{visible, unit, decl.items};
+  scope.local_types = decl.type_param_names;
+  scope.classes = std::make_shared<const SoleClassIndex>(unit);
   DeclareModuleItems(decl, unit, scope);
   DeclareUnitData(unit, scope);
   CheckItemCalls(decl.items, scope, diag);
@@ -760,18 +822,23 @@ void ReportClassMethodCalls(const CompilationUnit& unit, DiagEngine& diag) {
   const std::function<bool(std::string_view)> kSeesAll = [](std::string_view) {
     return true;
   };
+  const auto kClasses = std::make_shared<const SoleClassIndex>(unit);
   DataScope at_unit{kSeesAll, unit, unit.cu_items};
   at_unit.site = SiteKind::kUnit;
+  at_unit.classes = kClasses;
   CheckSiteClasses(at_unit, unit.classes, diag);
   for (const PackageDecl* package : unit.packages) {
     DataScope at_package{kSeesAll, unit, package->items};
     at_package.site = SiteKind::kPackage;
+    at_package.classes = kClasses;
     CheckSiteClasses(at_package, {}, diag);
   }
   for (const std::vector<ModuleDecl*>* decls :
        {&unit.modules, &unit.interfaces, &unit.programs, &unit.checkers}) {
     for (const ModuleDecl* decl : *decls) {
       DataScope at_module{kSeesAll, unit, decl->items};
+      at_module.local_types = decl->type_param_names;
+      at_module.classes = kClasses;
       DeclareModuleVars(decl->items, at_module);
       CheckSiteClasses(at_module, {}, diag);
     }

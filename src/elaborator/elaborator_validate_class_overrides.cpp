@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "elaborator/class_member_names.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
@@ -438,6 +439,36 @@ void ElaboratorClassRules::ValidateInterfaceClassInheritance(
                               "non-interface class '{}'",
                               cls->name, iface_name),
                   Subclause("8.26.2"));
+    }
+  }
+}
+
+// §8.13 has a class's superclasses run from the class it extends back to an
+// original base class. A chain of extends clauses that returns to a class it
+// passed through has no such base, so the class closing the cycle is reported
+// and its extends clause is dropped from the tree. A walk from a class off the
+// cycle stops where it meets the cycle, which the walk from a class on it
+// reports and breaks. A base is looked up as FindClassDecl looks it up and,
+// where that finds none, as SoleClassIndex does, which reaches a nested class
+// too; the two agree wherever both find a class, so a cycle either lookup
+// would follow is broken.
+void ElaboratorClassRules::BreakClassInheritanceCycles() {
+  const SoleClassIndex kClasses(*unit_);
+  for (const ClassDecl* cls : AllClassDecls(unit_)) {
+    std::unordered_set<const ClassDecl*> seen{cls};
+    for (const ClassDecl* c = cls; !c->base_class.empty();) {
+      const ClassDecl* found = FindClassDecl(c->base_class, unit_);
+      c = found != nullptr ? found : kClasses.Find(c->base_class);
+      if (c == cls) {
+        diag_.Error(cls->range.start,
+                    std::format("class '{}' inherits from itself through its "
+                                "chain of base classes",
+                                cls->name),
+                    Subclause("8.13"));
+        const_cast<ClassDecl*>(cls)->base_class = {};
+        break;
+      }
+      if (c == nullptr || !seen.insert(c).second) break;
     }
   }
 }

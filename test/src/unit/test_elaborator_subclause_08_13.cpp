@@ -112,4 +112,77 @@ TEST(InheritanceElaboration, FinalDerivedClassOk) {
              "endmodule\n"));
 }
 
+// Elaborator::BreakClassInheritanceCycles in
+// src/elaborator/elaborator_validate_class_overrides.cpp: a class extending
+// itself has no original base class for its superclasses to begin with, and
+// it is reported at its own declaration rather than sending every later walk
+// up its chain of base classes around the cycle without end.
+TEST(InheritanceElaboration, ClassExtendingItselfError) {
+  ElabFixture f;
+  ElabOk(
+      "class A extends A;\n"
+      "endclass\n"
+      "module t;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class 'A' inherits from itself", 1, "8.13"));
+}
+
+// Two classes extending each other close one cycle, reported once at the class
+// the walk set out from; the extends clause it drops leaves the other class a
+// chain that ends.
+TEST(InheritanceElaboration, MutualExtensionCycleReportedOnce) {
+  ElabFixture f;
+  ElabOk(
+      "class A extends B;\n"
+      "endclass\n"
+      "class B extends A;\n"
+      "endclass\n"
+      "module t;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class 'A' inherits from itself", 1, "8.13"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "class 'B' inherits from itself", 3, "8.13"));
+}
+
+// A class extending into a cycle it is not on is not reported: its walk stops
+// where it meets the cycle, and the cycle's own class is reported, here one
+// declared inside a module.
+TEST(InheritanceElaboration, CycleReachedFromOutsideReportsItsOwnClass) {
+  ElabFixture f;
+  ElabOk(
+      "class C extends A;\n"
+      "endclass\n"
+      "module t;\n"
+      "  class A extends B;\n"
+      "  endclass\n"
+      "  class B extends A;\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class 'A' inherits from itself", 4, "8.13"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "class 'C' inherits from itself", 1, "8.13"));
+}
+
+// A class nested in another (§8.23) is found by no scope's list of classes,
+// and a cycle through its extends clause is reported all the same.
+TEST(InheritanceElaboration, NestedClassExtendingItselfError) {
+  ElabFixture f;
+  ElabOk(
+      "class Outer;\n"
+      "  class In extends In;\n"
+      "  endclass\n"
+      "endclass\n"
+      "module t;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class 'In' inherits from itself", 2, "8.13"));
+}
+
 }  // namespace

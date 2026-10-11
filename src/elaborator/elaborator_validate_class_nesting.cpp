@@ -74,7 +74,7 @@ void AddDeclaredMembers(const ClassDecl* cls, DeclaredMembers& out) {
 
 // The chain is walked with the classes already seen held aside, so a base
 // list that comes back to a class it started from ends the walk rather than
-// running it forever; ValidateRegularClassInheritance reports that cycle.
+// running it forever; BreakClassInheritanceCycles reports that cycle.
 DeclaredMembers CollectDeclaredMembers(const ClassDecl* cls,
                                        const CompilationUnit* unit) {
   DeclaredMembers out;
