@@ -287,4 +287,20 @@ TEST(ClassConstraintElaboration, WeakReferenceStdScopedIsTheBuiltinClass) {
       "weak_reference needs a class type as its type parameter", 2, "8.30.1"));
 }
 
+// §8.30.1's restriction on a weak_reference property's type argument holds
+// over a class a module declares as over one at compilation-unit scope.
+TEST(ClassConstraintElaboration, ModuleClassPropertyTypeArgumentIsChecked) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  class C;\n"
+      "    weak_reference #(int) w;\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "weak_reference needs a class type as its type parameter", 3, "8.30.1"));
+}
+
 }  // namespace

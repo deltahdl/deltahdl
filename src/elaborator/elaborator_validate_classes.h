@@ -67,6 +67,10 @@ class ElaboratorClassRules : public ElaboratorOperationRules {
   void ValidateClassHandleOps(const ModuleDecl* decl);
 
   void WalkStmtsForClassHandleOps(const Stmt* s);
+  void WalkSubroutinesForClassHandleOps(
+      const std::vector<ModuleItem*>& items,
+      const std::vector<const ClassDecl*>& classes = {});
+  void ValidateClassHandleOpsOutsideModules();
 
   void ValidateClassHandleContAssign(const ModuleItem* item);
 
@@ -77,6 +81,7 @@ class ElaboratorClassRules : public ElaboratorOperationRules {
 
   void ValidateThisUsage(const ModuleDecl* decl);
   void ValidateThisInItem(const ModuleItem* item);
+  void ValidateThisOutsideModules();
 
   // §8.13: reports each class whose chain of base classes comes back to it,
   // and drops that class's extends clause, so that every later walk up such a
@@ -101,6 +106,14 @@ class ElaboratorClassRules : public ElaboratorOperationRules {
   void ValidateDerivedCovergroupBase();
 
   void ValidateLocalProtectedAccess(const ModuleDecl* decl);
+  void ValidateLocalProtectedAccessOutsideModules();
+  void ValidateLocalConstructorBases();
+  void CheckVarInitConstructorAccess(const ModuleItem& item);
+  void WalkSubroutinesForVisibility(
+      const std::vector<ModuleItem*>& items,
+      const std::vector<const ClassDecl*>& classes,
+      const std::unordered_map<std::string_view, std::string_view>&
+          scope_types);
 
   // §8.19: the checks on a const class property's declaration and on the
   // writes to it from its class's own methods, over every class the unit
@@ -127,6 +140,13 @@ class ElaboratorClassRules : public ElaboratorOperationRules {
   void ValidateNestedClassEnclosingAccess();
 
   void ValidateParameterizedScopeResolution(const ModuleDecl* decl);
+  void ValidateParameterizedScopeOutsideModules();
+  void CheckParamScopeInItem(const ModuleItem& item);
+  void CheckParamScopeInSubroutine(
+      const ModuleItem& sub,
+      const std::unordered_set<std::string_view>& allowed);
+  void CheckParamScopeInClass(const ClassDecl& cls,
+                              std::unordered_set<std::string_view> allowed);
 
   // §8.23: an incomplete forward type, a type defined by an interface-based
   // typedef (§6.18) and a type parameter (§6.20.3) may prefix the class scope

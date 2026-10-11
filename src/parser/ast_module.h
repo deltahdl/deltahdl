@@ -638,6 +638,8 @@ struct ModuleItem {
   bool is_ansi_ports = false;
   std::vector<FunctionArg> func_args;
   std::vector<Stmt*> func_body_stmts;
+  // §8.24: on an `extern` method prototype, its out-of-block definition.
+  const ModuleItem* out_of_block_body = nullptr;
 
   std::vector<std::pair<Expr*, Expr*>> defparam_assigns;
 

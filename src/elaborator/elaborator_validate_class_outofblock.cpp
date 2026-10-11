@@ -69,6 +69,10 @@ struct OutOfBlockScope {
   std::string_view name;
   std::string_view separator;
   Subclause subclause;
+  // §8.24 holds a class's out-of-block declaration to its prototype exactly,
+  // argument names included; §25.7 asks an interface's only for the number and
+  // the types of the arguments.
+  bool compare_names = false;
 };
 
 // Compares one prototype argument against the corresponding out-of-block
@@ -84,6 +88,15 @@ static void CheckOutOfBlockArg(const FunctionArg& proto_arg,
         std::format("out-of-block declaration for '{}{}{}' argument "
                     "'{}' has mismatched type",
                     scope.name, scope.separator, impl->name, impl_arg.name),
+        scope.subclause);
+  }
+  if (scope.compare_names && proto_arg.name != impl_arg.name) {
+    diag.Error(
+        impl->loc,
+        std::format("out-of-block declaration for '{}{}{}' names argument "
+                    "'{}' where the prototype names it '{}'",
+                    scope.name, scope.separator, impl->name, impl_arg.name,
+                    proto_arg.name),
         scope.subclause);
   }
   if (proto_arg.direction != impl_arg.direction) {
@@ -222,11 +235,55 @@ static void ValidateInterfaceOutOfBlockBody(
       proto, item, {item->method_class, ".", Subclause("25.7")}, diag);
 }
 
-// Handles an out-of-block body whose `method_class` names a regular class.
-// Mirrors the original class branch exactly.
-static void ValidateClassOutOfBlockBody(const ClassDecl* cls, ModuleItem* item,
-                                        std::unordered_set<std::string>& linked,
-                                        DiagEngine& diag) {
+// §8.24: whether the class `cls` declares a type named `name` (a typedef or a
+// nested class) after its member whose method is `proto`. The prototype,
+// resolved where it stands, does not see such a type, while the out-of-block
+// declaration's header sees every declaration of the class, so the name
+// resolves to two different declarations in the two.
+static bool ClassTypeDeclaredAfter(const ClassDecl* cls,
+                                   const ModuleItem* proto,
+                                   std::string_view name) {
+  bool after = false;
+  for (const auto* m : cls->members) {
+    if (m->method == proto) after = true;
+    const bool kType = m->typedef_item != nullptr || m->nested_class != nullptr;
+    if (kType && m->name == name) return after;
+  }
+  return false;
+}
+
+// §8.24: reports a named type of the out-of-block declaration `impl`, written
+// bare or behind its own class's scope, that resolves to a type `cls` declares
+// after the prototype `proto` of it.
+static void CheckOutOfBlockTypeResolution(const ClassDecl* cls,
+                                          const ModuleItem* proto,
+                                          const ModuleItem* impl,
+                                          DiagEngine& diag) {
+  auto check = [&](const DataType& type) {
+    const bool kInClass =
+        type.scope_name.empty() || type.scope_name == cls->name;
+    if (type.kind != DataTypeKind::kNamed || !kInClass ||
+        !ClassTypeDeclaredAfter(cls, proto, type.type_name)) {
+      return;
+    }
+    diag.Error(impl->loc,
+               std::format("out-of-block declaration for '{}::{}' resolves "
+                           "'{}' to the class's own type, declared after the "
+                           "prototype, which resolves it elsewhere",
+                           cls->name, impl->name, type.type_name),
+               Subclause("8.24"));
+  };
+  check(impl->return_type);
+  for (const auto& arg : impl->func_args) check(arg.data_type);
+}
+
+// Handles an out-of-block body whose `method_class` names a regular class: it
+// is checked against the class's `extern` prototype of it and, once it is the
+// one definition of that prototype, linked to it as the method's body
+// (MethodBody in elaborator_validate_classes_internal.h).
+static void ValidateClassOutOfBlockBody(
+    const ClassDecl* cls, ModuleItem* item,
+    std::unordered_set<const ModuleItem*>& linked, DiagEngine& diag) {
   const auto* proto = FindExternPrototype(cls, item->name);
   if (!proto) {
     diag.Error(item->loc,
@@ -248,41 +305,94 @@ static void ValidateClassOutOfBlockBody(const ClassDecl* cls, ModuleItem* item,
         Subclause("8.24"));
     return;
   }
-  auto key = std::string(item->method_class) + "::" + std::string(item->name);
-  if (linked.count(key)) {
+  if (!linked.insert(proto).second) {
     diag.Error(item->loc,
                std::format("duplicate out-of-block declaration for '{}::{}'",
                            item->method_class, item->name),
                Subclause("8.24"));
     return;
   }
-  linked.insert(key);
+  const_cast<ModuleItem*>(proto)->out_of_block_body = item;
   ValidateOutOfBlockSignature(
-      proto, item, {item->method_class, "::", Subclause("8.24")}, diag);
-  CheckStaticOutOfBlockBodyThis(item, cls, diag);
+      proto, item, {item->method_class, "::", Subclause("8.24"), true}, diag);
+  CheckOutOfBlockTypeResolution(cls, proto, item, diag);
 }
 
+// The class named `name` among `classes`, the classes one scope declares
+// directly; null where none is. §8.24 has an out-of-block declaration stand in
+// the scope of its class's declaration, so the class is looked for there and
+// nowhere else.
+static const ClassDecl* ClassNamedAmong(
+    const std::vector<const ClassDecl*>& classes, std::string_view name) {
+  for (const ClassDecl* cls : classes) {
+    if (cls->name == name) return cls;
+  }
+  return nullptr;
+}
+
+// The classes `items` declares directly.
+static std::vector<const ClassDecl*> ClassesDeclaredAmong(
+    const std::vector<ModuleItem*>& items) {
+  std::vector<const ClassDecl*> classes;
+  for (const auto* item : items) {
+    if (item->kind == ModuleItemKind::kClassDecl) {
+      classes.push_back(item->class_decl);
+    }
+  }
+  return classes;
+}
+
+namespace {
+
+// The out-of-block declarations of one scope and the classes it declares
+// directly, with what a declaration naming none of them is: an error, or, in
+// a module, interface, program or checker, a §25.7 subroutine defined for an
+// interface port, `task bus.pull()`, which is left to the interface rules.
+struct OutOfBlockSite {
+  const std::vector<ModuleItem*>* items;
+  std::vector<const ClassDecl*> classes;
+  bool unknown_is_error;
+};
+
+}  // namespace
+
 void ElaboratorClassRules::ValidateOutOfBlockDeclarations() {
-  std::unordered_set<std::string> linked;
-  for (auto* item : unit_->cu_items) {
-    if (item->method_class.empty()) continue;
-    bool is_func = (item->kind == ModuleItemKind::kFunctionDecl);
-    bool is_task = (item->kind == ModuleItemKind::kTaskDecl);
-    if (!is_func && !is_task) continue;
-    const auto* cls = FindClassDecl(item->method_class, unit_);
-    if (!cls) {
+  std::vector<OutOfBlockSite> sites;
+  sites.push_back(
+      {&unit_->cu_items, {unit_->classes.begin(), unit_->classes.end()}, true});
+  for (const auto* group : {&unit_->modules, &unit_->interfaces,
+                            &unit_->programs, &unit_->checkers}) {
+    for (const auto* decl : *group) {
+      sites.push_back({&decl->items, ClassesDeclaredAmong(decl->items), false});
+    }
+  }
+  for (const auto* pkg : unit_->packages) {
+    sites.push_back({&pkg->items, ClassesDeclaredAmong(pkg->items), true});
+  }
+  std::unordered_set<std::string> linked_interfaces;
+  std::unordered_set<const ModuleItem*> linked;
+  for (const OutOfBlockSite& site : sites) {
+    for (auto* item : *site.items) {
+      if (item->method_class.empty()) continue;
+      bool is_func = (item->kind == ModuleItemKind::kFunctionDecl);
+      bool is_task = (item->kind == ModuleItemKind::kTaskDecl);
+      if (!is_func && !is_task) continue;
+      const auto* cls = ClassNamedAmong(site.classes, item->method_class);
+      if (cls != nullptr) {
+        ValidateClassOutOfBlockBody(cls, item, linked, diag_);
+        continue;
+      }
+      if (!site.unknown_is_error) continue;
       const auto* ifc = FindInterfaceDecl(item->method_class, unit_);
       if (ifc) {
-        ValidateInterfaceOutOfBlockBody(ifc, item, linked, diag_);
+        ValidateInterfaceOutOfBlockBody(ifc, item, linked_interfaces, diag_);
         continue;
       }
       diag_.Error(item->loc,
                   std::format("out-of-block declaration for unknown class '{}'",
                               item->method_class),
                   Subclause("8.24"));
-      continue;
     }
-    ValidateClassOutOfBlockBody(cls, item, linked, diag_);
   }
 }
 

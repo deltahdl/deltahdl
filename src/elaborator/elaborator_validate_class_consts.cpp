@@ -11,11 +11,13 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_classes.h"
+#include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
@@ -176,6 +178,18 @@ static void CheckInstanceConstSingleAssign(const ModuleItem* ctor,
   }
 }
 
+// Whether `items` declares a class named `name` directly.
+static bool ClassDeclaredAmong(std::string_view name,
+                               const std::vector<ModuleItem*>& items) {
+  for (const auto* item : items) {
+    if (item->kind == ModuleItemKind::kClassDecl &&
+        item->class_decl->name == name) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // §8.10: check one class method for writes to a const class property. A class
 // subroutine body is stored in func_body_stmts, not the single `body` statement
 // used by module procedural blocks, so each statement is walked. Only the
@@ -296,9 +310,9 @@ void ElaboratorClassRules::ValidateConstClassProperties() {
     }
     for (const auto* m : cls->members) {
       if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
-      CheckConstClassPropsInMethod(m->method, props, diag_);
-      WalkSubroutineForQualifiedConstWrites(m->method, cls, handles, unit_,
-                                            diag_);
+      const ModuleItem* body = MethodBody(m->method);
+      CheckConstClassPropsInMethod(body, props, diag_);
+      WalkSubroutineForQualifiedConstWrites(body, cls, handles, unit_, diag_);
     }
   }
 }
@@ -309,6 +323,13 @@ void ElaboratorClassRules::ValidateConstPropertyWritesFromOutside(
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl) {
+      // §8.24: an out-of-block declaration of a class the module declares is
+      // that class's method, which ValidateConstClassProperties reads through
+      // MethodBody, not a subroutine standing outside the class.
+      if (!item->method_class.empty() &&
+          ClassDeclaredAmong(item->method_class, decl->items)) {
+        continue;
+      }
       WalkSubroutineForQualifiedConstWrites(item, nullptr, class_var_types_,
                                             unit_, diag_);
       continue;

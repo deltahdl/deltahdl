@@ -741,4 +741,59 @@ TEST(ChainedConstructorElaboration, SuperNewFirstInABeginEndBlockOk) {
              "endmodule\n"));
 }
 
+// §8.17's rule that super.new() opens the constructor holds over a class a
+// package declares as over one at compilation-unit scope.
+TEST(ChainedConstructorElaboration, PackageClassSuperNewNotFirstIsAnError) {
+  ElabFixture f;
+  ElabOk(
+      "package p;\n"
+      "  class B; function new(int a = 0); endfunction endclass\n"
+      "  class D extends B;\n"
+      "    int x;\n"
+      "    function new();\n"
+      "      x = 1;\n"
+      "      super.new(2);\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endpackage\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "super.new() does not open the constructor, and no "
+                            "executable statement may come before it",
+                            7, "8.17"));
+}
+
+// §8.17 asks that super.new() be the first executable statement of the
+// constructor, and a local declaration ahead of it (A.2.8) is no statement
+// executed, so the call still opens the constructor; a statement ahead of it
+// does not let it.
+TEST(ChainedConstructorElaboration, ADeclarationAheadOfSuperNewIsNoStatement) {
+  ElabFixture f;
+  ElabOk(
+      "class B; function new(int a = 0); endfunction endclass\n"
+      "class D extends B;\n"
+      "  int x;\n"
+      "  function new();\n"
+      "    int scratch;\n"
+      "    super.new(1);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class E extends B;\n"
+      "  int x;\n"
+      "  function new();\n"
+      "    int scratch;\n"
+      "    x = 1;\n"
+      "    super.new(1);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  const char* kMessage =
+      "super.new() does not open the constructor, and no executable statement "
+      "may come before it";
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kMessage, 6, "8.17"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 14, "8.17"));
+}
+
 }  // namespace

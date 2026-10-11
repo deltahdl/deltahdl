@@ -23,6 +23,15 @@ const ClassMember* FindMemberInClass(const ClassDecl* cls,
                                      std::string_view name,
                                      const CompilationUnit* unit);
 
+// The same member, with the class declaring it, which §8.18's local and
+// protected qualifiers are judged against; both null where none is.
+struct OwnedMember {
+  const ClassMember* member = nullptr;
+  const ClassDecl* owner = nullptr;
+};
+OwnedMember FindMemberAndOwner(const ClassDecl* cls, std::string_view name,
+                               const CompilationUnit* unit);
+
 // The class named `cls_name` among the items of the package named `pkg_name`,
 // or null where there is no such package or it declares no such class.
 const ClassDecl* FindClassInPackage(std::string_view pkg_name,

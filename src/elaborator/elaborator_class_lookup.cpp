@@ -13,21 +13,26 @@
 
 namespace delta {
 
-const ClassMember* FindMemberInClass(const ClassDecl* cls,
-                                     std::string_view name,
-                                     const CompilationUnit* unit) {
+OwnedMember FindMemberAndOwner(const ClassDecl* cls, std::string_view name,
+                               const CompilationUnit* unit) {
   for (const auto* c = cls; c;) {
     for (const auto* m : c->members) {
-      if (m->name == name) return m;
+      if (m->name == name) return {m, c};
       // §8.18: a method member carries its name on the method item, not on the
       // ClassMember, so match that too — the local/protected qualifiers live on
       // the ClassMember and must govern method calls just as for data members.
-      if (m->method != nullptr && m->method->name == name) return m;
+      if (m->method != nullptr && m->method->name == name) return {m, c};
     }
     if (c->base_class.empty()) break;
     c = FindClassDecl(c->base_class, unit);
   }
-  return nullptr;
+  return {};
+}
+
+const ClassMember* FindMemberInClass(const ClassDecl* cls,
+                                     std::string_view name,
+                                     const CompilationUnit* unit) {
+  return FindMemberAndOwner(cls, name, unit).member;
 }
 
 const ClassDecl* FindClassInPackage(std::string_view pkg_name,

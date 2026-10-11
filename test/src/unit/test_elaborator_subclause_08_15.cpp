@@ -694,4 +694,21 @@ TEST(SuperElaboration, SuperInARandsequenceCodeBlockOutsideASubclassNames8_15) {
                             "8.15"));
 }
 
+// §8.15's rule on 'super' in a class extending nothing holds over a class a
+// module declares as over one at compilation-unit scope.
+TEST(SuperElaboration, SuperInAModuleClassWithNoBaseIsAnError) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  class C;\n"
+      "    int k;\n"
+      "    function void g(); super.k = 1; endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'super' shall only be used in a derived class", 4,
+                            "8.15"));
+}
+
 }  // namespace

@@ -1,12 +1,15 @@
+#include <algorithm>
 #include <cstddef>
 #include <format>
 #include <functional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "elaborator/class_member_names.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
@@ -17,32 +20,56 @@
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
+namespace {
+
+// A method member, with the class declaring it.
+struct OwnedMethod {
+  const ClassMember* member = nullptr;
+  const ClassDecl* owner = nullptr;
+};
+
+// What the types of an override and of the method it overrides are read in
+// (§8.20): the class declaring each, the design's typedefs and classes, and,
+// for a specialization of the overriding class (§8.25), the types it gives
+// that class's type parameters; none for the generic declaration.
+struct OverrideTypeContext {
+  const ClassDecl* base;
+  const ClassDecl* derived;
+  const TypedefMap& typedefs;
+  const CompilationUnit* unit;
+  const std::unordered_map<std::string_view, DataType>* bound = nullptr;
+};
+
+}  // namespace
+
 // Walks the base-class chain of `cls` (excluding `cls` itself) and returns the
-// first method named `method_name` for which `accept` holds, or nullptr.
-static const ClassMember* FindBaseMethod(
+// first method named `method_name` for which `accept` holds, with the class
+// declaring it, or nothing.
+static OwnedMethod FindBaseMethod(
     const ClassDecl* cls, std::string_view method_name,
     const CompilationUnit* unit,
     const std::function<bool(const ClassMember*)>& accept) {
-  if (cls->base_class.empty()) return nullptr;
+  if (cls->base_class.empty()) return {};
   for (const auto* c = FindClassDecl(cls->base_class, unit); c;
        c = c->base_class.empty() ? nullptr
                                  : FindClassDecl(c->base_class, unit)) {
     for (const auto* m : c->members) {
       if (m->kind == ClassMemberKind::kMethod && m->method &&
           m->method->name == method_name && accept(m)) {
-        return m;
+        return {m, c};
       }
     }
   }
-  return nullptr;
+  return {};
 }
 
-static const ClassMember* FindBaseVirtualMethod(const ClassDecl* cls,
-                                                std::string_view method_name,
-                                                const CompilationUnit* unit) {
+static OwnedMethod FindBaseVirtualMethod(const ClassDecl* cls,
+                                         std::string_view method_name,
+                                         const CompilationUnit* unit) {
   return FindBaseMethod(cls, method_name, unit, [](const ClassMember* m) {
     return m->is_virtual || m->is_pure_virtual;
   });
@@ -51,14 +78,63 @@ static const ClassMember* FindBaseVirtualMethod(const ClassDecl* cls,
 static const ClassMember* FindBaseFinalMethod(const ClassDecl* cls,
                                               std::string_view method_name,
                                               const CompilationUnit* unit) {
-  return FindBaseMethod(cls, method_name, unit, [](const ClassMember* m) {
-    return m->method->is_method_final;
-  });
+  return FindBaseMethod(
+             cls, method_name, unit,
+             [](const ClassMember* m) { return m->method->is_method_final; })
+      .member;
+}
+
+// §6.18 with §6.22.1: the type `type`, written in the class `cls`, stands for,
+// a typedef name followed to the type it names: one `cls` declares, then one
+// the design's typedef table holds, so a name matches the type it stands for.
+static DataType ResolvedType(const DataType& type, const ClassDecl& cls,
+                             const TypedefMap& typedefs) {
+  DataType resolved = type;
+  if (resolved.kind == DataTypeKind::kNamed && resolved.scope_name.empty()) {
+    for (const ClassMember* m : cls.members) {
+      if (m->typedef_item != nullptr && m->name == resolved.type_name) {
+        resolved = m->typedef_item->typedef_type;
+      }
+    }
+  }
+  if (const DataType* bound = FindNamedType(resolved, typedefs)) {
+    resolved = *bound;
+  }
+  return resolved;
+}
+
+// Whether `type` names one of the type parameters of `cls`, whose type only a
+// specialization of the class gives (§8.25).
+static bool NamesTypeParameter(const DataType& type, const ClassDecl& cls) {
+  return type.kind == DataTypeKind::kNamed && type.scope_name.empty() &&
+         cls.type_param_names.contains(type.type_name);
+}
+
+// §8.20: whether the override's type `over` fails to match the overridden
+// method's `base`: a matching type (§6.22.1), or, for a return type
+// (`is_return`), a class derived from the base's. False where either names a
+// type parameter of its class the context gives no type to, which only a
+// specialization of the class settles (§8.25).
+static bool OverrideTypeMismatch(const DataType& base, const DataType& over,
+                                 bool is_return,
+                                 const OverrideTypeContext& ctx) {
+  DataType over_type = over;
+  if (NamesTypeParameter(over, *ctx.derived)) {
+    if (ctx.bound == nullptr) return false;
+    over_type = ctx.bound->at(over.type_name);
+  }
+  if (NamesTypeParameter(base, *ctx.base)) return false;
+  const DataType kBase = ResolvedType(base, *ctx.base, ctx.typedefs);
+  const DataType kOver = ResolvedType(over_type, *ctx.derived, ctx.typedefs);
+  if (TypesMatch(kBase, kOver)) return false;
+  return !(is_return && kBase.kind == DataTypeKind::kNamed &&
+           kOver.kind == DataTypeKind::kNamed &&
+           IsClassDerivedFrom(kOver.type_name, kBase.type_name, ctx.unit));
 }
 
 static void ValidateOverrideSignature(const ModuleItem* base_method,
                                       const ModuleItem* override_method,
-                                      const CompilationUnit* unit,
+                                      const OverrideTypeContext& ctx,
                                       DiagEngine& diag) {
   const auto& base_args = base_method->func_args;
   const auto& over_args = override_method->func_args;
@@ -69,7 +145,8 @@ static void ValidateOverrideSignature(const ModuleItem* base_method,
     return;
   }
   for (size_t i = 0; i < base_args.size(); ++i) {
-    if (!TypesMatch(base_args[i].data_type, over_args[i].data_type)) {
+    if (OverrideTypeMismatch(base_args[i].data_type, over_args[i].data_type,
+                             false, ctx)) {
       diag.Error(override_method->loc,
                  std::format("virtual method override argument '{}' has "
                              "mismatched type",
@@ -100,16 +177,58 @@ static void ValidateOverrideSignature(const ModuleItem* base_method,
                  Subclause("8.20"));
     }
   }
-  if (!TypesMatch(base_method->return_type, override_method->return_type)) {
-    if (base_method->return_type.kind == DataTypeKind::kNamed &&
-        override_method->return_type.kind == DataTypeKind::kNamed &&
-        IsClassDerivedFrom(override_method->return_type.type_name,
-                           base_method->return_type.type_name, unit)) {
-      return;
-    }
+  if (OverrideTypeMismatch(base_method->return_type,
+                           override_method->return_type, true, ctx)) {
     diag.Error(override_method->loc,
                "virtual method override has mismatched return type",
                Subclause("8.20"));
+  }
+}
+
+const DataType* SpecializationArgument(const std::vector<DataType>& args,
+                                       std::size_t index,
+                                       std::string_view name) {
+  for (const DataType& arg : args) {
+    if (arg.param_arg_name == name) return &arg;
+  }
+  const bool kNamed = std::ranges::any_of(
+      args, [](const DataType& arg) { return !arg.param_arg_name.empty(); });
+  return !kNamed && index < args.size() ? &args[index] : nullptr;
+}
+
+void ReportSpecializationOverrideMismatches(const DataType& type, SourceLoc loc,
+                                            const CompilationUnit* unit,
+                                            const TypedefMap& typedefs,
+                                            DiagEngine& diag) {
+  const ClassDecl* cls = FindClassDecl(type.type_name, unit);
+  if (cls == nullptr || cls->type_param_names.empty()) return;
+  std::unordered_map<std::string_view, DataType> bound;
+  for (std::size_t i = 0; i < cls->params.size(); ++i) {
+    const std::string_view kName = cls->params[i].first;
+    if (!cls->type_param_names.contains(kName)) continue;
+    const DataType* arg = SpecializationArgument(type.type_params, i, kName);
+    bound[kName] = arg != nullptr ? *arg : cls->param_types.at(i);
+  }
+  for (const ClassMember* m : cls->members) {
+    if (m->method == nullptr) continue;
+    const OwnedMethod kBase = FindBaseVirtualMethod(cls, m->method->name, unit);
+    if (kBase.member == nullptr) continue;
+    const auto& base_args = kBase.member->method->func_args;
+    const auto& over_args = m->method->func_args;
+    const OverrideTypeContext kCtx{kBase.owner, cls, typedefs, unit, &bound};
+    for (size_t i = 0; i < std::min(base_args.size(), over_args.size()); ++i) {
+      if (!NamesTypeParameter(over_args[i].data_type, *cls) ||
+          !OverrideTypeMismatch(base_args[i].data_type, over_args[i].data_type,
+                                false, kCtx)) {
+        continue;
+      }
+      diag.Error(loc,
+                 std::format("virtual method override argument '{}' of "
+                             "'{}::{}' has mismatched type in this "
+                             "specialization",
+                             over_args[i].name, cls->name, m->method->name),
+                 Subclause("8.20"));
+    }
   }
 }
 
@@ -121,7 +240,9 @@ void ElaboratorClassRules::ValidateOneMethodOverride(const ClassDecl* cls,
   // second specifier without recording it. No source can therefore set both
   // ModuleItem::is_method_initial and ModuleItem::is_method_extends, so this
   // function does not test for the pair.
-  const auto* base_virtual = FindBaseVirtualMethod(cls, method->name, unit_);
+  const OwnedMethod kBaseVirtual =
+      FindBaseVirtualMethod(cls, method->name, unit_);
+  const ClassMember* base_virtual = kBaseVirtual.member;
   if (method->is_method_initial && base_virtual) {
     diag_.Error(method->loc,
                 "method with ':initial' shall not override a virtual "
@@ -135,6 +256,17 @@ void ElaboratorClassRules::ValidateOneMethodOverride(const ClassDecl* cls,
                 Subclause("8.20"));
   }
 
+  // §8.20: an override's qualifiers are the prototype's; `virtual` alone may
+  // be left off, so the encapsulation qualifiers of §8.18 are what remain.
+  if (base_virtual && (base_virtual->is_local != m->is_local ||
+                       base_virtual->is_protected != m->is_protected)) {
+    diag_.Error(method->loc,
+                std::format("virtual method override '{}' is not qualified "
+                            "local or protected as the method it overrides is",
+                            method->name),
+                Subclause("8.20"));
+  }
+
   const auto* base_final = FindBaseFinalMethod(cls, method->name, unit_);
   if (base_final) {
     diag_.Error(method->loc, "cannot override a method declared ':final'",
@@ -142,12 +274,14 @@ void ElaboratorClassRules::ValidateOneMethodOverride(const ClassDecl* cls,
   }
 
   if (base_virtual && base_virtual->method) {
-    ValidateOverrideSignature(base_virtual->method, method, unit_, diag_);
+    ValidateOverrideSignature(base_virtual->method, method,
+                              {kBaseVirtual.owner, cls, typedefs_, unit_},
+                              diag_);
   }
 }
 
 void ElaboratorClassRules::ValidateVirtualMethodOverrides() {
-  for (const auto* cls : unit_->classes) {
+  for (const auto* cls : AllClassDecls(unit_)) {
     for (const auto* m : cls->members) {
       if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
       ValidateOneMethodOverride(cls, m);
@@ -185,7 +319,7 @@ void ElaboratorClassRules::ValidateAbstractClassUnimplemented(
   // §8.26: an interface class inherits pure virtual methods from the interfaces
   // it extends; it does not implement them. Only a non-virtual, non-interface
   // class is required to provide implementations.
-  if (cls->is_virtual || cls->is_interface || cls->base_class.empty()) return;
+  if (cls->is_virtual || cls->is_interface) return;
   std::vector<std::string_view> unimpl;
   CollectPureVirtualMethods(cls, unit_, unimpl);
   for (auto name : unimpl) {
@@ -213,7 +347,7 @@ static void CheckPureFinalMember(const ClassMember* m, DiagEngine& diag) {
 }
 
 void ElaboratorClassRules::ValidateAbstractClassRules() {
-  for (const auto* cls : unit_->classes) {
+  for (const auto* cls : AllClassDecls(unit_)) {
     for (const auto* m : cls->members) {
       CheckPureFinalMember(m, diag_);
     }

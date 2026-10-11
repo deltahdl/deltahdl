@@ -473,4 +473,157 @@ TEST(OutOfBlockDeclElaboration, ThisInUnitStaticOutOfBlockMethodIsError) {
                             "shall not be used in a static method", 5, "8.10"));
 }
 
+// §8.24: an out-of-block declaration is its extern prototype's body, so the
+// rules Clause 8 lays on a method's body hold over it as over a body written
+// in the class: §8.10's on a static method (no non-static member, no `this`),
+// §8.15's on `super` in a class extending nothing, §8.17's on super.new()
+// opening the constructor and §8.19's on a global constant, wherever the
+// declaration stands.
+TEST(OutOfBlockDeclElaboration, AnOutOfBlockBodyIsHeldToTheMethodRules) {
+  ElabFixture f;
+  ElabOk(
+      "class B; int k; function new(int a = 0); endfunction endclass\n"
+      "class C;\n"
+      "  int k;\n"
+      "  const int g = 1;\n"
+      "  extern static function int f();\n"
+      "  extern function void h();\n"
+      "endclass\n"
+      "function int C::f(); return k; endfunction\n"
+      "function void C::h(); super.k = 1; g = 2; endfunction\n"
+      "class D extends B;\n"
+      "  int x;\n"
+      "  extern function new();\n"
+      "endclass\n"
+      "function D::new(); x = 1; super.new(2); endfunction\n"
+      "package p;\n"
+      "  class E; int k; extern static function int s(); endclass\n"
+      "  function int E::s(); return this.k; endfunction\n"
+      "endpackage\n"
+      "module m; endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "static method shall not access non-static members", 8, "8.10"));
+  EXPECT_TRUE(ReportedError(
+      diags, "'super' shall only be used in a derived class", 9, "8.15"));
+  EXPECT_TRUE(
+      ReportedError(diags, "assignment to global constant 'g'", 9, "8.19"));
+  EXPECT_TRUE(ReportedError(diags,
+                            "super.new() does not open the constructor, and no "
+                            "executable statement may come before it",
+                            14, "8.17"));
+  EXPECT_TRUE(ReportedError(
+      diags, "'this' and 'super' shall not be used in a static method", 17,
+      "8.10"));
+}
+
+// §8.24 holds an out-of-block declaration standing in a package or a module
+// to its prototype, to one definition per extern method and to following its
+// class, as it holds one at compilation-unit scope.
+TEST(OutOfBlockDeclElaboration, OutOfBlockDeclarationsInEveryScopeAreChecked) {
+  ElabFixture f;
+  ElabOk(
+      "package p;\n"
+      "  class C;\n"
+      "    extern function int f(int a);\n"
+      "    extern function void g();\n"
+      "  endclass\n"
+      "  function int C::f(byte a); return 0; endfunction\n"
+      "  function void C::g(); endfunction\n"
+      "  function void C::g(); endfunction\n"
+      "endpackage\n"
+      "module m;\n"
+      "  function void D::h(); endfunction\n"
+      "  class D; extern function void h(); endclass\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags,
+      "out-of-block declaration for 'C::f' argument 'a' has mismatched "
+      "type",
+      6, "8.24"));
+  EXPECT_TRUE(ReportedError(
+      diags, "duplicate out-of-block declaration for 'C::g'", 8, "8.24"));
+  EXPECT_TRUE(ReportedError(diags,
+                            "out-of-block declaration for 'D::h' comes before "
+                            "the declaration of class 'D'",
+                            11, "8.24"));
+}
+
+// §8.24 has an out-of-block declaration stand in the scope of its class's
+// declaration, so one at compilation-unit scope finds no class a module
+// declares.
+TEST(OutOfBlockDeclElaboration, AModulesClassHasNoUnitOutOfBlockDeclaration) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  class C; extern function void f(); endclass\n"
+      "endmodule\n"
+      "function void C::f(); endfunction\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "out-of-block declaration for unknown class 'C'", 4,
+                            "8.24"));
+}
+
+// §8.24: the prototype resolves a type name where it stands, seeing only the
+// class's types declared before it, while the out-of-block header sees them
+// all. A name the class declares only after the prototype resolves to two
+// declarations, which is reported, whether written bare or behind the class's
+// own scope; a type declared before the prototype, and a type behind another
+// scope, resolve alike in both.
+TEST(OutOfBlockDeclElaboration, ATypeNameResolvingDifferentlyIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "package p; typedef int T; endpackage\n"
+      "typedef int T;\n"
+      "class C;\n"
+      "  typedef int U;\n"
+      "  extern function void f(T x);\n"
+      "  extern function U g(p::T y);\n"
+      "  extern function T h();\n"
+      "  typedef real T;\n"
+      "endclass\n"
+      "function void C::f(T x); endfunction\n"
+      "function C::U C::g(p::T y); return 0; endfunction\n"
+      "function C::T C::h(); return 0; endfunction\n"
+      "module m; endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  const char* kMessage[] = {
+      "out-of-block declaration for 'C::f' resolves 'T' to the class's own "
+      "type",
+      "out-of-block declaration for 'C::h' resolves 'T' to the class's own "
+      "type"};
+  EXPECT_TRUE(ReportedError(diags, kMessage[0], 10, "8.24"));
+  EXPECT_TRUE(ReportedError(diags, kMessage[1], 12, "8.24"));
+  EXPECT_FALSE(ReportedError(diags, "resolves", 11, "8.24"));
+}
+
+// §8.24 holds an out-of-block declaration to its prototype exactly, and an
+// argument's name is none of the three things it may differ in.
+TEST(OutOfBlockDeclElaboration, ArgumentNamesMatchThePrototype) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  extern function void f(int a);\n"
+      "  extern task t(input int x, output int y);\n"
+      "endclass\n"
+      "function void C::f(int b); endfunction\n"
+      "task C::t(input int x, output int z); endtask\n"
+      "module m; endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(diags,
+                            "out-of-block declaration for 'C::f' names "
+                            "argument 'b' where the prototype names it 'a'",
+                            5, "8.24"));
+  EXPECT_TRUE(ReportedError(diags,
+                            "out-of-block declaration for 'C::t' names "
+                            "argument 'z' where the prototype names it 'y'",
+                            6, "8.24"));
+}
+
 }  // namespace

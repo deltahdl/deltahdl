@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
 #include <string>
 #include <string_view>
 
@@ -800,6 +801,111 @@ TEST(SiblingStaticHandleHiding,
 TEST(SiblingStaticHandleHiding, PublicMemberBehindThePublicStaticHandleIsOk) {
   EXPECT_TRUE(ElabOk(SiblingStaticHandleClassSrc("int k = 9;", "static A a;") +
                      SiblingStaticHandleModuleSrc("x = Outer::B::a.k;")));
+}
+
+// §8.18: a local member is not visible within subclasses, whether a subclass
+// method names it bare or through this or super; a protected one is, and a
+// name the method declares itself hides the base's member.
+TEST(DataHidingElaboration, ASubclassMethodReachesNoBaseLocalMember) {
+  ElabFixture f;
+  ElabOk(
+      "class Base;\n"
+      "  local int secret;\n"
+      "  protected int guarded;\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  function int f(); return secret; endfunction\n"
+      "  function int g(); return this.secret; endfunction\n"
+      "  function int h(); return super.secret; endfunction\n"
+      "  function int k(); return guarded + this.guarded; endfunction\n"
+      "  function int n(int secret); return secret; endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  const char* kMessage = "cannot access local member from outside its class";
+  for (const int kLine : {6, 7, 8}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, kLine, "8.18"))
+        << kLine;
+  }
+  for (const int kLine : {9, 10}) {
+    EXPECT_FALSE(
+        ReportedError(f.diag.Diagnostics(), "cannot access", kLine, "8.18"))
+        << kLine;
+  }
+}
+
+// §8.18 confines a local member to its class's methods and a protected one to
+// its class hierarchy's, so a handle access from an unrelated class's method
+// or a module's subroutine is reported, and one from the class itself,
+// through another instance, is not.
+TEST(DataHidingElaboration, HandleAccessFromMethodsAndSubroutinesIsChecked) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  local int secret;\n"
+      "  protected int guarded;\n"
+      "  function int same(C other); return other.secret; endfunction\n"
+      "endclass\n"
+      "class D;\n"
+      "  C c;\n"
+      "  function int f(); return c.secret; endfunction\n"
+      "  function int g(); return c.guarded; endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C h;\n"
+      "  function int t(); return h.secret; endfunction\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "cannot access local member from outside its class", 8, "8.18"));
+  EXPECT_TRUE(ReportedError(diags,
+                            "cannot access protected member from outside its "
+                            "class hierarchy",
+                            9, "8.18"));
+  EXPECT_TRUE(ReportedError(
+      diags, "cannot access local member from outside its class", 13, "8.18"));
+  EXPECT_FALSE(ReportedError(diags, "cannot access", 4, "8.18"));
+}
+
+// §8.7 lets a constructor be local or protected, and §8.18 confines it as any
+// member: constructing the class from outside is reported, through a bare new
+// or a typed constructor call, and so is a class extending one whose
+// constructor is local (§8.17 NOTE 1); a protected one reaches subclasses, and
+// the class's own methods reach either.
+TEST(DataHidingElaboration, ALocalOrProtectedConstructorIsReachedFromInside) {
+  ElabFixture f;
+  ElabOk(
+      "class L;\n"
+      "  local function new(); endfunction\n"
+      "  static function L make(); L l = new; return l; endfunction\n"
+      "endclass\n"
+      "class P; protected function new(); endfunction endclass\n"
+      "class LD extends L; endclass\n"
+      "class PD extends P; endclass\n"
+      "module m;\n"
+      "  L l = new;\n"
+      "  P p;\n"
+      "  PD pd;\n"
+      "  int da[];\n"
+      "  initial begin p = new; pd = new; da = new[2]; end\n"
+      "endmodule\n"
+      "module a; class K; endclass K k; initial k = new; endmodule\n"
+      "module b; class K; endclass endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(diags,
+                            "class 'LD' extends 'L', whose constructor is "
+                            "local and so is reached by no subclass",
+                            6, "8.18"));
+  EXPECT_FALSE(ReportedError(diags, "extends 'P'", 7, "8.18"));
+  EXPECT_TRUE(ReportedError(
+      diags, "cannot access local member from outside its class", 9, "8.18"));
+  EXPECT_TRUE(ReportedError(diags,
+                            "cannot access protected member from outside its "
+                            "class hierarchy",
+                            13, "8.18"));
+  EXPECT_FALSE(ReportedError(diags, "cannot access", 3, "8.18"));
 }
 
 }  // namespace

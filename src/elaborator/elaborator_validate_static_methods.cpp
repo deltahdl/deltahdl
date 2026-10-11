@@ -266,9 +266,10 @@ static void CheckStaticMethodsForThisSuper(const ClassDecl* cls,
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kMethod || !m->is_static) continue;
     if (!m->method) continue;
-    for (const auto* s : m->method->func_body_stmts) {
+    const ModuleItem* body = MethodBody(m->method);
+    for (const auto* s : body->func_body_stmts) {
       if (StmtRefsThisOrSuper(s)) {
-        diag.Error(m->method->loc,
+        diag.Error(body->loc,
                    "'this' and 'super' shall not be used in "
                    "a static method",
                    Subclause("8.10"));
@@ -363,12 +364,12 @@ void ElaboratorClassRules::ValidateOneClassStaticMethods(const ClassDecl* cls) {
     if (m->kind != ClassMemberKind::kMethod || !m->is_static) continue;
     if (!m->method) continue;
 
-    std::unordered_set<std::string_view> locals =
-        CollectMethodLocalNames(m->method);
+    const ModuleItem* body = MethodBody(m->method);
+    std::unordered_set<std::string_view> locals = CollectMethodLocalNames(body);
 
-    for (const auto* s : m->method->func_body_stmts) {
+    for (const auto* s : body->func_body_stmts) {
       if (StmtRefsNonStaticMember(s, non_static, locals)) {
-        diag_.Error(m->method->loc,
+        diag_.Error(body->loc,
                     "static method shall not access non-static members",
                     Subclause("8.10"));
         break;
@@ -441,8 +442,8 @@ void ElaboratorClassRules::ValidateThisInItem(const ModuleItem* item) {
   // is the method its class declared `extern`, and §23.2.4 (printed page 739)
   // admits the class and the body among a module's items as well as at
   // compilation-unit scope. `this` in it names the object, so it is checked
-  // as the class's method (a static one by CheckStaticOutOfBlockBodyThis), not
-  // as a subroutine of the module.
+  // as the class's method, a static one's through MethodBody, not as a
+  // subroutine of the module.
   if (!item->method_class.empty()) return;
   for (const auto* s : item->func_body_stmts) {
     if (StmtRefsThisOrSuper(s)) {
@@ -455,54 +456,18 @@ void ElaboratorClassRules::ValidateThisInItem(const ModuleItem* item) {
   }
 }
 
-// §8.24 (printed page 202): the body `function C::f(...)` defines the method
-// `C` declares `extern`, and §8.10 (printed pages 186-187) holds over it as
-// over a body written in the class: access to the special this handle inside a
-// static method's body is illegal.
-void CheckStaticOutOfBlockBodyThis(const ModuleItem* item, const ClassDecl* cls,
-                                   DiagEngine& diag) {
-  if (cls == nullptr) return;
-  bool is_static = false;
-  for (const auto* m : cls->members) {
-    if (m->kind == ClassMemberKind::kMethod && m->method != nullptr &&
-        m->method->is_extern && m->method->name == item->name) {
-      is_static = m->is_static;
-    }
+// §8.11 holds over a subroutine a package or the compilation unit declares as
+// over a module's, and these scopes are read once, where a module's items are
+// read with each module elaborated.
+void ElaboratorClassRules::ValidateThisOutsideModules() {
+  for (const auto* item : unit_->cu_items) ValidateThisInItem(item);
+  for (const auto* pkg : unit_->packages) {
+    for (const auto* item : pkg->items) ValidateThisInItem(item);
   }
-  if (!is_static) return;
-  for (const auto* s : item->func_body_stmts) {
-    if (StmtRefsThisOrSuper(s)) {
-      diag.Error(item->loc,
-                 "'this' and 'super' shall not be used in a static method",
-                 Subclause("8.10"));
-      return;
-    }
-  }
-}
-
-// The class `name` names from among `items`, which is where §23.2.4 (printed
-// page 739) puts a class a module declares, else the one the compilation unit
-// answers for it.
-static const ClassDecl* ClassSeenAmong(std::string_view name,
-                                       const std::vector<ModuleItem*>& items,
-                                       const CompilationUnit* unit) {
-  for (const auto* item : items) {
-    if (item->kind == ModuleItemKind::kClassDecl && item->class_decl &&
-        item->class_decl->name == name) {
-      return item->class_decl;
-    }
-  }
-  return FindClassDecl(name, unit);
 }
 
 void ElaboratorClassRules::ValidateThisUsage(const ModuleDecl* decl) {
-  for (const auto* item : decl->items) {
-    ValidateThisInItem(item);
-    if (!item->method_class.empty()) {
-      CheckStaticOutOfBlockBodyThis(
-          item, ClassSeenAmong(item->method_class, decl->items, unit_), diag_);
-    }
-  }
+  for (const auto* item : decl->items) ValidateThisInItem(item);
 }
 
 }  // namespace delta

@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -704,6 +706,84 @@ TEST(ClassObjectElaboration, BitSelectOfABlockDeclaredHandleIsReported) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select on class object handle is illegal", 6,
                             "8.4"));
+}
+
+// §8.4's rules on what a handle admits hold wherever the expression stands: in
+// a module's task or function, through a formal argument, and in a class
+// method, through a property of the class, as in a procedural block. An array
+// of handles is no handle, so a select of it is an element, and a function
+// returning a handle names a handle variable, so assigning one to it is legal.
+TEST(ClassObjectElaboration,
+     HandleOperationsAreCheckedInSubroutinesAndMethods) {
+  ElabFixture f;
+  ElabOk(
+      "class C; endclass\n"
+      "class D;\n"
+      "  C c;\n"
+      "  C cs[2];\n"
+      "  function void f(); int x; x = c + 1; x = cs.size(); endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C h;\n"
+      "  int r;\n"
+      "  task t(); r = h + 1; endtask\n"
+      "  function int g(C a); return a + 1; endfunction\n"
+      "  function C k(); k = h; endfunction\n"
+      "  initial r = h + 1;\n"
+      "endmodule\n",
+      f);
+  for (const int kLine : {5, 10, 11, 13}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "operator is not allowed on class object handles",
+                              kLine, "8.4"))
+        << kLine;
+  }
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "class object handle", 12, "8.4"));
+}
+
+// §8.4's rules are about the handle value, whatever expression yields it: a
+// property of a class type selected from a handle, an element of an array of
+// handles and a function's result are each handles, while a property, element
+// or result of any other type, a structure's member and a package's variable
+// are not.
+TEST(ClassObjectElaboration, AHandleYieldedByAnExpressionIsAHandle) {
+  ElabFixture f;
+  ElabOk(
+      "class N; N next; int x; int arr[2]; endclass\n"
+      "package q; int v; endpackage\n"
+      "module m;\n"
+      "  N h, hs[2];\n"
+      "  int ia[2];\n"
+      "  typedef struct { int f; } s_t;\n"
+      "  s_t s;\n"
+      "  function N make(); return null; endfunction\n"
+      "  function int ifn(); return 0; endfunction\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    r = h.next + 1;\n"
+      "    r = hs[0] + 1;\n"
+      "    r = make() + 1;\n"
+      "    r = h.x + 1;\n"
+      "    r = ia[0] + 1;\n"
+      "    r = ifn() + 1;\n"
+      "    r = s.f + 1;\n"
+      "    r = q::v + 1;\n"
+      "    r = h.arr + 1;\n"
+      "    r = h.nosuch + 1;\n"
+      "    r = h[0] + 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const char* kMessage = "operator is not allowed on class object handles";
+  for (const int kLine : {12, 13, 14}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, kLine, "8.4"))
+        << kLine;
+  }
+  for (const int kLine : {15, 16, 17, 18, 19, 20, 21}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kMessage, kLine, "8.4"))
+        << kLine;
+  }
 }
 
 }  // namespace

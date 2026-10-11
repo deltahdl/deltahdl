@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
@@ -386,6 +388,49 @@ TEST(ParameterizedScopeResolutionElaboration,
       "endmodule\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §8.25.1 makes the unadorned name of a parameterized class illegal before
+// `::` outside the class and its out-of-block declarations, wherever the
+// expression stands: a package's declaration, another class's method or a
+// nested class's, a module's subroutine. Inside the class itself, and in a
+// class nested in it, the unadorned name stays legal, as the explicit form
+// does everywhere.
+TEST(ParameterizedScopeResolutionElaboration,
+     UnadornedPrefixOutsideTheClassIsAnError) {
+  ElabFixture f;
+  ElabOk(
+      "class C #(int p = 1);\n"
+      "  static function int f(); return p; endfunction\n"
+      "endclass\n"
+      "package q;\n"
+      "  int a = C::p;\n"
+      "endpackage\n"
+      "class D;\n"
+      "  function int g(); return C::f(); endfunction\n"
+      "  class N; function int n(); return C::p; endfunction endclass\n"
+      "endclass\n"
+      "class E #(int r = 2);\n"
+      "  function int own(); return E::r; endfunction\n"
+      "  class I; function int i(); return E::r; endfunction endclass\n"
+      "endclass\n"
+      "module m;\n"
+      "  function int h(); return C::p; endfunction\n"
+      "  int ok = C#()::p;\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {5, 8, 9, 16}) {
+    EXPECT_TRUE(ReportedError(diags,
+                              "unadorned name 'C' used as scope resolution "
+                              "prefix for parameterized class",
+                              kLine, "8.25.1"))
+        << kLine;
+  }
+  for (const int kLine : {12, 13, 17}) {
+    EXPECT_FALSE(ReportedError(diags, "unadorned name", kLine, "8.25.1"))
+        << kLine;
+  }
 }
 
 }  // namespace

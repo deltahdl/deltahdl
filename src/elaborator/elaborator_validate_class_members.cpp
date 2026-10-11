@@ -7,7 +7,6 @@
 // §8.10 and §8.11 are in elaborator_validate_static_methods.cpp, which the
 // 1000-line cap in .github/workflows/deltahdl.yml separated from this file.
 
-#include <cstddef>
 #include <format>
 #include <optional>
 #include <string_view>
@@ -21,6 +20,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_classes.h"
+#include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/std_package.h"
 #include "elaborator/type_eval.h"
@@ -49,7 +49,7 @@ void ElaboratorClassRules::ValidateFinalClassExtension() {
                   Subclause("8.13"));
     }
   };
-  for (const auto* cls : unit_->classes) {
+  for (const auto* cls : AllClassDecls(unit_)) {
     check(cls);
   }
 }
@@ -72,7 +72,7 @@ void ElaboratorClassRules::ValidateWeakReferenceMembers() {
                   Subclause("8.30.1"));
     }
   };
-  for (const auto* cls : unit_->classes) {
+  for (const auto* cls : AllClassDecls(unit_)) {
     for (const auto* m : cls->members) {
       check_member(m);
     }
@@ -176,18 +176,23 @@ static const ClassMember* FindClassConstructor(const ClassDecl* cls) {
 // §8.17: scans the top-level sequential statements of a constructor for a
 // super.new() call. Emits an error if one is present but is not the first
 // executable statement. Returns whether such a sequential call was found.
+// A.2.8 puts a body's local declarations ahead of its statements, and a
+// declaration is no executable statement, so one ahead of the call does not
+// keep it from opening the constructor, uvm_root::new's shape.
 static bool ReportSequentialSuperNew(const ModuleItem* method,
                                      DiagEngine& diag) {
-  const auto& stmts = method->func_body_stmts;
-  for (size_t i = 0; i < stmts.size(); ++i) {
-    if (!IsSuperNewCall(stmts[i])) continue;
-    if (i != 0) {
-      diag.Error(stmts[i]->range.start,
-                 "super.new() does not open the constructor, and no "
-                 "executable statement may come before it",
-                 Subclause("8.17"));
+  bool executed = false;
+  for (const Stmt* s : method->func_body_stmts) {
+    if (IsSuperNewCall(s)) {
+      if (executed) {
+        diag.Error(s->range.start,
+                   "super.new() does not open the constructor, and no "
+                   "executable statement may come before it",
+                   Subclause("8.17"));
+      }
+      return true;
     }
-    return true;
+    executed = executed || s->kind != StmtKind::kVarDecl;
   }
   return false;
 }
@@ -210,11 +215,12 @@ void ElaboratorClassRules::ValidateOneClassChainingCtor(const ClassDecl* cls) {
   if (cls->base_class.empty()) return;
   const ClassMember* ctor = FindClassConstructor(cls);
   if (!ctor || !ctor->method) return;
-  bool has_super_new = ReportSequentialSuperNew(ctor->method, diag_);
-  if (!has_super_new) ReportGuardedSuperNew(ctor->method, diag_);
+  const ModuleItem* body = MethodBody(ctor->method);
+  bool has_super_new = ReportSequentialSuperNew(body, diag_);
+  if (!has_super_new) ReportGuardedSuperNew(body, diag_);
   if (has_super_new &&
       (!cls->extends_args.empty() || cls->extends_has_default)) {
-    diag_.Error(ctor->method->loc,
+    diag_.Error(body->loc,
                 "constructor calls super.new() although the extends "
                 "specifier already supplies the superclass constructor's "
                 "arguments",
@@ -485,10 +491,10 @@ static void CheckNonDerivedClassMethodsForSuper(const ClassDecl* cls,
                                                 DiagEngine& diag) {
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
-    for (const auto* s : m->method->func_body_stmts) {
+    const ModuleItem* body = MethodBody(m->method);
+    for (const auto* s : body->func_body_stmts) {
       if (StmtRefsSuper(s)) {
-        diag.Error(m->method->loc,
-                   "'super' shall only be used in a derived class",
+        diag.Error(body->loc, "'super' shall only be used in a derived class",
                    Subclause("8.15"));
         break;
       }
@@ -623,7 +629,7 @@ static void CheckSuperParamInConstantExpr(const ClassDecl* cls,
                                           DiagEngine& diag) {
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kMethod || !m->method) continue;
-    for (const auto* s : m->method->func_body_stmts) {
+    for (const auto* s : MethodBody(m->method)->func_body_stmts) {
       CheckStmtConstantContexts(s, cls, unit, diag);
     }
   }
@@ -634,7 +640,7 @@ static void CheckSuperParamInConstantExpr(const ClassDecl* cls,
 // decides which of the two it can breach, so neither name would cover the
 // classes this walks.
 void ElaboratorClassRules::ValidateSuperRules() {
-  for (const auto* cls : unit_->classes) {
+  for (const auto* cls : AllClassDecls(unit_)) {
     // §8.15 states two rules about 'super' and whether the class extends
     // another decides which one it can breach: a class with no base class may
     // not name 'super' at all, and a class with one may not reach a base class
@@ -648,14 +654,15 @@ void ElaboratorClassRules::ValidateSuperRules() {
   }
 }
 
-// §8.17: returns the class's own 'new' constructor method, or null if the
-// class declares none.
+// §8.17: returns the declaration of the class's own 'new' constructor, its
+// out-of-block definition where it has one (§8.24), or null if the class
+// declares none.
 static const ModuleItem* FindClassCtorMethod(const ClassDecl* cls) {
   if (!cls) return nullptr;
   for (const auto* m : cls->members) {
     if (m->kind == ClassMemberKind::kMethod && m->method &&
         m->method->name == "new") {
-      return m->method;
+      return MethodBody(m->method);
     }
   }
   return nullptr;
@@ -800,7 +807,7 @@ void ElaboratorClassRules::ValidateOneClassDefaultKeyword(
 }
 
 void ElaboratorClassRules::ValidateChainingConstructors() {
-  for (const auto* cls : unit_->classes) {
+  for (const auto* cls : AllClassDecls(unit_)) {
     ValidateOneClassChainingCtor(cls);
     ValidateOneClassDefaultKeyword(cls);
   }

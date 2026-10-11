@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "helpers_child_instance.h"
 #include "helpers_param_value.h"
@@ -533,6 +535,105 @@ TEST(ParameterizedClassElaboration, ParameterArrayItemNotConstantIsError) {
                             "class parameter 'A' value is not a constant "
                             "expression",
                             3, "6.20.2"));
+}
+
+// §8.25: a type parameter may lack a default as a value parameter may, and a
+// class with one has no default specialization either, so its unadorned name
+// as a type is illegal; with the parameter given, it is a specialization.
+TEST(ParameterizedClassElaboration, TypeParameterWithoutDefaultHasNoDefault) {
+  ElabFixture f;
+  ElabOk(
+      "class D #(type T);\n"
+      "  T x;\n"
+      "endclass\n"
+      "module m;\n"
+      "  D obj;\n"
+      "  D #(int) ok;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parameterized class 'D' has no default "
+                            "specialization; parameter 'T' has no default "
+                            "value",
+                            5, "8.25"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "has no default", 6, "8.25"));
+}
+
+// §8.25: the unadorned name of a class with no default specialization is
+// illegal in every declaration that writes a type: a class property, a
+// method's return type and argument, the class an extends clause names, a
+// typedef, a block's variable, a package's and the compilation unit's
+// variables. A specialization written with its arguments stays legal.
+TEST(ParameterizedClassElaboration, NoDefaultSpecializationInEveryDeclaration) {
+  ElabFixture f;
+  ElabOk(
+      "class D #(int p);\n"
+      "endclass\n"
+      "class H;\n"
+      "  D prop;\n"
+      "  function D get(D arg); return arg; endfunction\n"
+      "  D #(3) ok;\n"
+      "endclass\n"
+      "class E extends D; endclass\n"
+      "typedef D d_t;\n"
+      "D cu_var;\n"
+      "package q;\n"
+      "  D pkg_var;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  initial begin D blk; end\n"
+      "endmodule\n",
+      f);
+  for (const int kLine : {4, 5, 8, 9, 10, 12, 15}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "parameterized class 'D' has no default "
+                              "specialization; parameter 'p' has no default "
+                              "value",
+                              kLine, "8.25"))
+        << kLine;
+  }
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "has no default", 6, "8.25"));
+}
+
+// §8.13 has a class extend a class, and §8.25 adds that a typedef or a type
+// parameter written as the base shall resolve to a class type after
+// elaboration. A name nothing declares, a typedef of int, and a type
+// parameter a specialization gives int are each reported; a typedef of a
+// class, a built-in class and a specialization giving a class are not.
+TEST(ParameterizedClassElaboration, ABaseResolvingToNoClassIsAnError) {
+  ElabFixture f;
+  ElabOk(
+      "typedef int T;\n"
+      "class B; endclass\n"
+      "typedef B b_t;\n"
+      "class A extends Nonexistent; endclass\n"
+      "class X extends T; endclass\n"
+      "class Y extends b_t; endclass\n"
+      "class M extends mailbox #(int); endclass\n"
+      "class C #(int N = 1, type P = int) extends P; endclass\n"
+      "module m;\n"
+      "  C c;\n"
+      "  C #(1, B) cb;\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "class 'A' extends 'Nonexistent', which nothing declares", 4,
+      "8.13"));
+  EXPECT_TRUE(ReportedError(
+      diags, "class 'X' extends 'T', a typedef of a type that is no class", 5,
+      "8.25"));
+  const char* kSpecialization =
+      "this specialization of 'C' gives its type parameter 'P', the class it "
+      "extends, a type that is no class";
+  EXPECT_TRUE(ReportedError(diags, kSpecialization, 10, "8.25"));
+  EXPECT_FALSE(ReportedError(diags, kSpecialization, 11, "8.25"));
+  for (const int kLine : {6, 7, 8}) {
+    EXPECT_FALSE(ReportedError(diags, "extends", kLine, "8.13")) << kLine;
+    EXPECT_FALSE(ReportedError(diags, "extends", kLine, "8.25")) << kLine;
+  }
 }
 
 }  // namespace

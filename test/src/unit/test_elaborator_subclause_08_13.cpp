@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -183,6 +185,32 @@ TEST(InheritanceElaboration, NestedClassExtendingItselfError) {
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "class 'In' inherits from itself", 2, "8.13"));
+}
+
+// §8.1 lets a class be declared in a package, a module or another class as
+// well as at compilation-unit scope, and §8.13's rule on a :final base holds
+// over a deriving class wherever it is declared.
+TEST(InheritanceElaboration, ExtendFinalClassFromAnyScopeIsAnError) {
+  ElabFixture f;
+  ElabOk(
+      "class :final F; endclass\n"
+      "package p;\n"
+      "  class P extends F; endclass\n"
+      "endpackage\n"
+      "module m;\n"
+      "  class :final G; endclass\n"
+      "  class M extends G; endclass\n"
+      "  class O;\n"
+      "    class N extends F; endclass\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  for (const int kLine : {3, 7, 9}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "cannot extend a class declared ':final'", kLine,
+                              "8.13"))
+        << kLine;
+  }
 }
 
 }  // namespace

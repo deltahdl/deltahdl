@@ -14,6 +14,8 @@
 #include "common/types.h"
 #include "elaborator/aggregate_shape.h"
 #include "elaborator/assoc_index_type.h"
+#include "elaborator/class_base_resolution.h"
+#include "elaborator/class_default_specialization.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/covergroup_variables.h"
 #include "elaborator/elaborator.h"
@@ -23,6 +25,7 @@
 #include "elaborator/elaborator_decls_internal.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
+#include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/net_data_type.h"
 #include "elaborator/nettype_uses.h"
 #include "elaborator/rtlir.h"
@@ -90,18 +93,14 @@ static void ValidateParameterizedClassDefaults(const ModuleItem* item,
                                                DiagEngine& diag) {
   if (!item->data_type.type_params.empty()) return;
   const auto* cls = FindClassDecl(item->data_type.type_name, unit);
-  if (!cls || cls->params.empty()) return;
-  for (const auto& [pname, pexpr] : cls->params) {
-    if (!pexpr && !cls->type_param_names.count(pname)) {
-      diag.Error(item->loc,
-                 std::format("parameterized class '{}' has no default "
-                             "specialization; parameter '{}' has no "
-                             "default value",
-                             cls->name, pname),
-                 Subclause("8.25"));
-      break;
-    }
-  }
+  if (cls == nullptr) return;
+  const std::string_view kMissing = ParameterWithoutDefault(*cls);
+  if (kMissing.empty()) return;
+  diag.Error(item->loc,
+             std::format("parameterized class '{}' has no default "
+                         "specialization; parameter '{}' has no default value",
+                         cls->name, kMissing),
+             Subclause("8.25"));
 }
 
 // §8.25: the objects of a parameterized class are instantiated as modules and
@@ -216,6 +215,9 @@ void Elaborator::ValidateVarDeclTypes(ModuleItem* item, const ScopeMap& scope,
     if (item->unpacked_dims.empty()) class_var_names_.insert(item->name);
     class_var_types_[item->name] = item->data_type.type_name;
     ValidateParameterizedClassDefaults(item, unit_, diag_);
+    ReportSpecializationOverrideMismatches(item->data_type, item->loc, unit_,
+                                           typedefs_, diag_);
+    ReportSpecializationBaseNotClass(item->data_type, item->loc, *unit_, diag_);
     ValidateSpecializationArgsConstant(item, scope, diag_);
     ValidateWeakReferenceTypeParam(item, typedefs_, class_names_, diag_);
   }

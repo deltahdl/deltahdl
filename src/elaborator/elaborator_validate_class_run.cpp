@@ -1,3 +1,5 @@
+#include "elaborator/class_base_resolution.h"
+#include "elaborator/class_default_specialization.h"
 #include "elaborator/class_method_reads.h"
 #include "elaborator/elaborator_call_targets.h"
 #include "elaborator/elaborator_class_constraints.h"
@@ -6,9 +8,28 @@
 namespace delta {
 
 void ElaboratorClassRules::RunPreElaborationClassValidations() {
+  // §8.24: first, so that each extern prototype is linked to the out-of-block
+  // declaration defining it before any rule below reads a method's body
+  // through MethodBody.
+  ValidateOutOfBlockDeclarations();
+
   ValidateFinalClassExtension();
 
   ValidateWeakReferenceMembers();
+
+  ReportUnadornedClassesWithoutDefaults(*unit_, diag_);
+
+  ReportBasesNamingNoClass(*unit_, diag_);
+
+  ValidateThisOutsideModules();
+
+  ValidateParameterizedScopeOutsideModules();
+
+  ValidateClassHandleOpsOutsideModules();
+
+  ValidateLocalProtectedAccessOutsideModules();
+
+  ValidateLocalConstructorBases();
 
   ValidateRestrictedScopePrefixInClasses();
 
@@ -29,8 +50,6 @@ void ElaboratorClassRules::RunPreElaborationClassValidations() {
   ValidateVirtualMethodOverrides();
 
   ValidateAbstractClassRules();
-
-  ValidateOutOfBlockDeclarations();
 
   ValidateNestedClassEnclosingAccess();
 

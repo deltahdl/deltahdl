@@ -125,9 +125,9 @@ TEST(AbstractClassSimulation, AbstractBaseConstructorRunsViaChaining) {
             7u);
 }
 
-// 8.21: an abstract class may not be instantiated directly.
-// Constructing the abstract base with 'new' is a runtime error even though
-// the declaration of the handle elaborates cleanly.
+// §8.21: an abstract class may not be instantiated directly. The elaborator
+// reports the construction from the source, and the run reports it again when
+// the 'new' executes, which leaves no object of the abstract class behind.
 TEST(AbstractClassSimulation, ConstructAbstractClassDirectlyError) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -140,7 +140,7 @@ TEST(AbstractClassSimulation, ConstructAbstractClassDirectlyError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
+  EXPECT_TRUE(f.has_errors);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();

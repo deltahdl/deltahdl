@@ -117,8 +117,10 @@ static void CheckClassHandleBinary(
     const std::unordered_map<std::string_view, std::string_view>&
         class_var_types,
     const CompilationUnit* unit, DiagEngine& diag) {
-  bool lhs_class = e->lhs && IsClassVar(e->lhs, class_vars);
-  bool rhs_class = e->rhs && IsClassVar(e->rhs, class_vars);
+  bool lhs_class =
+      e->lhs && IsHandleOperand(e->lhs, class_vars, class_var_types, unit);
+  bool rhs_class =
+      e->rhs && IsHandleOperand(e->rhs, class_vars, class_var_types, unit);
   if ((lhs_class || rhs_class) && !IsAllowedClassBinaryOp(e->op)) {
     diag.Error(e->range.start,
                "operator is not allowed on class object handles",
@@ -176,13 +178,15 @@ static void CheckClassHandleExpr(
     CheckClassHandleBinary(e, class_vars, class_var_types, unit, diag);
   }
 
-  if (e->kind == ExprKind::kUnary && IsClassVar(e->lhs, class_vars)) {
+  if (e->kind == ExprKind::kUnary &&
+      IsHandleOperand(e->lhs, class_vars, class_var_types, unit)) {
     diag.Error(e->range.start,
                "operator is not allowed on class object handles",
                Subclause("8.4"));
   }
 
-  if (e->kind == ExprKind::kPostfixUnary && IsClassVar(e->lhs, class_vars)) {
+  if (e->kind == ExprKind::kPostfixUnary &&
+      IsHandleOperand(e->lhs, class_vars, class_var_types, unit)) {
     diag.Error(e->range.start,
                "operator is not allowed on class object handles",
                Subclause("8.4"));
@@ -497,38 +501,57 @@ static bool IsBareNewCall(const Expr* e) {
   return e && e->kind == ExprKind::kCall && e->text == "new";
 }
 
-// §8.26.5: like an abstract class, an object of an interface class type shall
-// not be constructed. The construction can appear as a declaration
-// initializer (`IC ic = new;`) as well as a procedural assignment; this covers
-// the block-local declaration-initializer position, whose initializer the
-// procedural assignment walk never reaches.
-static void CheckNewOnInterfaceDeclInit(const Stmt* s,
-                                        const CompilationUnit* unit,
-                                        DiagEngine& diag) {
-  if (!IsBareNewCall(s->var_init)) return;
-  const auto* cls = FindClassDecl(s->var_decl_type.type_name, unit);
-  if (cls && cls->is_interface) {
-    diag.Error(s->range.start,
+// §8.21 and §8.26.5: no object of an abstract class or an interface class is
+// constructed directly; the class `name` names is reported at `loc` where it
+// is one of the two. The rule is on the source, so it is reported here whether
+// or not the construction ever runs.
+static void ReportUnconstructibleClass(std::string_view name, SourceLoc loc,
+                                       const CompilationUnit* unit,
+                                       DiagEngine& diag) {
+  const auto* cls = FindClassDecl(name, unit);
+  if (cls == nullptr) return;
+  if (cls->is_interface) {
+    diag.Error(loc,
                std::format("cannot construct object of interface class '{}'",
                            cls->name),
                Subclause("8.26.5"));
+  } else if (cls->is_virtual) {
+    diag.Error(loc,
+               std::format("cannot construct object of abstract class '{}'",
+                           cls->name),
+               Subclause("8.21"));
   }
 }
 
-// §8.26.5: the same interface-class construction prohibition applies to a
-// module-scope declaration initializer (`IC ic = new;` at module level), whose
-// initializer is carried on the module item rather than a procedural statement.
+// The class the construction `init` builds an object of: the one a typed
+// constructor call names, `B::new`, else, for a bare `new`, the class of the
+// handle it initializes or is assigned to, `target`; empty for anything else.
+static std::string_view ConstructedClass(const Expr* init,
+                                         std::string_view target) {
+  if (IsBareNewCall(init)) return target;
+  return TypedConstructorScopeType(init);
+}
+
+// §8.21 and §8.26.5 for a block-local declaration's initializer, `IC ic =
+// new;` or `B b = B::new;`, which the procedural assignment walk never
+// reaches.
+static void CheckNewOnInterfaceDeclInit(const Stmt* s,
+                                        const CompilationUnit* unit,
+                                        DiagEngine& diag) {
+  ReportUnconstructibleClass(
+      ConstructedClass(s->var_init, s->var_decl_type.type_name), s->range.start,
+      unit, diag);
+}
+
+// §8.21 and §8.26.5 for a module-scope declaration initializer, whose
+// initializer is carried on the module item rather than a procedural
+// statement.
 static void CheckNewOnInterfaceModuleItem(const ModuleItem* item,
                                           const CompilationUnit* unit,
                                           DiagEngine& diag) {
-  if (!IsBareNewCall(item->init_expr)) return;
-  const auto* cls = FindClassDecl(item->data_type.type_name, unit);
-  if (cls && cls->is_interface) {
-    diag.Error(item->loc,
-               std::format("cannot construct object of interface class '{}'",
-                           cls->name),
-               Subclause("8.26.5"));
-  }
+  ReportUnconstructibleClass(
+      ConstructedClass(item->init_expr, item->data_type.type_name), item->loc,
+      unit, diag);
 }
 
 // Reject a 'new' constructor call assigned to a handle whose declared type
@@ -538,10 +561,14 @@ static void CheckNewOnUnconstructibleHandle(
     const std::unordered_map<std::string_view, std::string_view>&
         class_var_types,
     const CompilationUnit* unit, DiagEngine& diag) {
-  if (!IsBareNewCall(s->rhs)) return;
   auto lhs_name = ExprIdent(s->lhs);
   auto lt = class_var_types.find(lhs_name);
   if (lt == class_var_types.end()) return;
+  if (!IsBareNewCall(s->rhs)) {
+    ReportUnconstructibleClass(TypedConstructorScopeType(s->rhs),
+                               s->range.start, unit, diag);
+    return;
+  }
   // §G.6 gives process no constructor, where the other std classes have one.
   const std::optional<StdPackageMember> kStd =
       StdPackageMemberNamed(lt->second);
@@ -553,13 +580,7 @@ static void CheckNewOnUnconstructibleHandle(
         Subclause("9.7"));
     return;
   }
-  const auto* cls = FindClassDecl(lt->second, unit);
-  if (cls && cls->is_interface) {
-    diag.Error(s->range.start,
-               std::format("cannot construct object of interface class '{}'",
-                           cls->name),
-               Subclause("8.26.5"));
-  }
+  ReportUnconstructibleClass(lt->second, s->range.start, unit, diag);
 }
 
 // §8.8: a typed constructor call may name a type different from the assignment
@@ -812,6 +833,9 @@ void ElaboratorClassRules::ValidateClassHandleOps(const ModuleDecl* decl) {
       WalkStmtsForClassHandleOps(item->body);
     }
   }
+  // §8.4 names no scope its rules are suspended in, so a task's or a
+  // function's body, and a class method's, is held to them as a procedure's.
+  WalkSubroutinesForClassHandleOps(decl->items);
 }
 
 void ElaboratorClassRules::ValidateClassHandleContAssign(

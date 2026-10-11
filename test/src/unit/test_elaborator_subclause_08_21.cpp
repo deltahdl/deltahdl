@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -214,6 +216,62 @@ TEST(AbstractClassElaboration,
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "does not implement pure virtual method", 7,
                             "8.21"));
+}
+
+// §8.21: a class not declared virtual is a constructible one, so a pure
+// virtual method of its own is unimplemented whether or not it extends a
+// class. The rule holds over a class a package declares too.
+TEST(AbstractClassElaboration, BaseLessNonAbstractPureVirtualIsAnError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  pure virtual function void f();\n"
+      "endclass\n"
+      "package p;\n"
+      "  virtual class A; pure virtual function void g(); endclass\n"
+      "  class D extends A; endclass\n"
+      "endpackage\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "non-abstract class 'C' does not implement pure "
+                            "virtual method 'f'",
+                            1, "8.21"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "non-abstract class 'D' does not implement pure "
+                            "virtual method 'g'",
+                            6, "8.21"));
+}
+
+// §8.21 forbids constructing an object of an abstract class directly, which is
+// a rule on the source: a bare new for a handle of the class, as a module or
+// block declaration's initializer or assigned in a statement that never runs,
+// and a typed constructor call naming it are each reported at elaboration. A
+// typed constructor call naming a concrete subclass stays legal.
+TEST(AbstractClassElaboration, ConstructingAnAbstractClassIsAnError) {
+  ElabFixture f;
+  ElabOk(
+      "virtual class B; endclass\n"
+      "class D extends B; endclass\n"
+      "module m;\n"
+      "  B b0 = new;\n"
+      "  B b1;\n"
+      "  initial begin\n"
+      "    B b2 = B::new;\n"
+      "    if (0) b1 = new;\n"
+      "    b1 = B::new;\n"
+      "    b1 = D::new;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (const int kLine : {4, 7, 8, 9}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "cannot construct object of abstract class 'B'",
+                              kLine, "8.21"))
+        << kLine;
+  }
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "cannot construct", 10, "8.21"));
 }
 
 }  // namespace

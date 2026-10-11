@@ -1,5 +1,6 @@
 #include "elaborator/elaborator_validate_classes.h"
 
+#include <algorithm>
 #include <format>
 #include <string_view>
 #include <unordered_map>
@@ -11,6 +12,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
@@ -21,15 +23,56 @@
 
 namespace delta {
 
-// §8.18 (printed page 194 of IEEE 1800-2023): the report for a member
-// reached from outside the class its qualifier confines it to, at `loc`, where
-// `m` is that member; nothing for a public member or for no member at all.
-static void ReportHiddenMember(const ClassMember* m, SourceLoc loc,
-                               DiagEngine& diag) {
-  if (m && m->is_local) {
+namespace {
+
+// Where a member access is judged from (§8.18): the classes it stands inside,
+// innermost first -- a method's class and the classes around it, which share
+// its access rights (§8.23) -- none outside every class; and, in a method,
+// the names the method declares itself, which hide a member of its class.
+struct AccessSite {
+  std::vector<const ClassDecl*> inside;
+  std::unordered_set<std::string_view> locals;
+
+  // §8.18: whether a local member `owner` declares is reachable here: inside
+  // that class, or a class nested in it.
+  bool SeesLocal(const ClassDecl* owner) const {
+    return std::ranges::find(inside, owner) != inside.end();
+  }
+
+  // §8.18: whether a protected member `owner` declares is reachable here:
+  // inside that class or one derived from it.
+  bool SeesProtected(const ClassDecl* owner,
+                     const CompilationUnit* unit) const {
+    return std::ranges::any_of(inside, [&](const ClassDecl* c) {
+      return IsClassDerivedFrom(c->name, owner->name, unit);
+    });
+  }
+
+  // The class `this` or `super` stands for in a method (§8.11, §8.15); null
+  // for any other name and outside every class.
+  const ClassDecl* ClassNamedBy(std::string_view name,
+                                const CompilationUnit* unit) const {
+    if (inside.empty()) return nullptr;
+    if (name == "this") return inside.front();
+    return name == "super" ? FindClassDecl(inside.front()->base_class, unit)
+                           : nullptr;
+  }
+};
+
+}  // namespace
+
+// §8.18 (printed page 194 of IEEE 1800-2023): the report for a member reached
+// from where `site` stands, at `loc`, where `found` is that member with the
+// class declaring it; nothing for a public member, for one the site may reach,
+// or for no member at all.
+static void ReportHiddenMember(const OwnedMember& found, SourceLoc loc,
+                               const AccessSite& site,
+                               const CompilationUnit* unit, DiagEngine& diag) {
+  const ClassMember* m = found.member;
+  if (m && m->is_local && !site.SeesLocal(found.owner)) {
     diag.Error(loc, "cannot access local member from outside its class",
                Subclause("8.18"));
-  } else if (m && m->is_protected) {
+  } else if (m && m->is_protected && !site.SeesProtected(found.owner, unit)) {
     diag.Error(loc,
                "cannot access protected member from outside "
                "its class hierarchy",
@@ -38,14 +81,15 @@ static void ReportHiddenMember(const ClassMember* m, SourceLoc loc,
 }
 
 // The member a `::` access names: `m_inst` of `C::m_inst` or of
-// `p::C::m_inst`, found in the class the prefix names or in a base of it.
-static const ClassMember* ScopedClassMember(const Expr* e,
-                                            const CompilationUnit* unit) {
-  if (e->rhs->kind != ExprKind::kIdentifier) return nullptr;
+// `p::C::m_inst`, found in the class the prefix names or in a base of it,
+// with the class declaring it.
+static OwnedMember ScopedClassMember(const Expr* e,
+                                     const CompilationUnit* unit) {
+  if (e->rhs->kind != ExprKind::kIdentifier) return {};
   const std::vector<const ClassDecl*> kChain =
       ClassChainOfScopePrefix(e->lhs, unit);
-  return kChain.empty() ? nullptr
-                        : FindMemberInClass(kChain.back(), e->rhs->text, unit);
+  return kChain.empty() ? OwnedMember{}
+                        : FindMemberAndOwner(kChain.back(), e->rhs->text, unit);
 }
 
 // The class the left side of a `.` access holds a handle to. A variable's is
@@ -60,10 +104,11 @@ static const ClassMember* ScopedClassMember(const Expr* e,
 static const ClassDecl* HandleClassOfBase(
     const Expr* base,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
-    const CompilationUnit* unit) {
+    const AccessSite& site, const CompilationUnit* unit) {
   if (base->kind == ExprKind::kIdentifier) {
     auto it = var_types.find(base->text);
-    return it == var_types.end() ? nullptr : FindClassDecl(it->second, unit);
+    if (it != var_types.end()) return FindClassDecl(it->second, unit);
+    return site.ClassNamedBy(base->text, unit);
   }
   if (base->kind != ExprKind::kMemberAccess || !base->is_scope_resolution ||
       !base->lhs || !base->rhs) {
@@ -83,9 +128,9 @@ static const ClassDecl* HandleClassOfBase(
 static void CheckMemberAccessVisibility(
     const Expr* e,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
-    const CompilationUnit* unit, DiagEngine& diag) {
+    const AccessSite& site, const CompilationUnit* unit, DiagEngine& diag) {
   if (e->rhs->kind != ExprKind::kIdentifier) return;
-  const auto* cls = HandleClassOfBase(e->lhs, var_types, unit);
+  const auto* cls = HandleClassOfBase(e->lhs, var_types, site, unit);
   if (!cls) return;
 
   if (cls->type_param_names.count(e->rhs->text) > 0) {
@@ -98,8 +143,8 @@ static void CheckMemberAccessVisibility(
                Subclause("8.5"));
     return;
   }
-  ReportHiddenMember(FindMemberInClass(cls, e->rhs->text, unit),
-                     e->rhs->range.start, diag);
+  ReportHiddenMember(FindMemberAndOwner(cls, e->rhs->text, unit),
+                     e->rhs->range.start, site, unit, diag);
 }
 
 // §8.18 (printed 194) confines a local member to the methods of its class and
@@ -115,12 +160,19 @@ static void CheckMemberAccessVisibility(
 // was read as 0 and `C::f()` run as though it were static. The constructor
 // is the one method §8.8 (printed 185) calls through `::` with no object,
 // `D::new(42)` being the typed constructor call that builds one.
-static void CheckScopedMemberVisibility(const Expr* e,
+static void CheckScopedMemberVisibility(const Expr* e, const AccessSite& site,
                                         const CompilationUnit* unit,
                                         DiagEngine& diag) {
-  const ClassMember* m = ScopedClassMember(e, unit);
-  ReportHiddenMember(m, e->rhs->range.start, diag);
-  if (m != nullptr && !m->is_static && !m->is_param && m->name != "new" &&
+  const OwnedMember kFound = ScopedClassMember(e, unit);
+  ReportHiddenMember(kFound, e->rhs->range.start, site, unit, diag);
+  const ClassMember* m = kFound.member;
+  // §8.23: inside the class declaring the member, or one derived from it,
+  // `C::x` names the member of the object the method runs on.
+  const bool kWithinHierarchy =
+      m != nullptr && !site.inside.empty() &&
+      IsClassDerivedFrom(site.inside.front()->name, kFound.owner->name, unit);
+  if (m != nullptr && !kWithinHierarchy && !m->is_static && !m->is_param &&
+      m->name != "new" &&
       (m->kind == ClassMemberKind::kProperty ||
        m->kind == ClassMemberKind::kMethod)) {
     diag.Error(e->rhs->range.start,
@@ -139,6 +191,7 @@ static void CheckScopedMemberVisibility(const Expr* e,
 // applies to each argument here.
 static void CheckRandomizeArgItemVisibility(const Expr* arg,
                                             const ClassDecl* cls,
+                                            const AccessSite& site,
                                             const CompilationUnit* unit,
                                             DiagEngine& diag) {
   if (!arg || arg->kind != ExprKind::kIdentifier) return;
@@ -147,13 +200,14 @@ static void CheckRandomizeArgItemVisibility(const Expr* arg,
   // declares it. §8.18 states the general rule that a local or protected member
   // is unreachable from outside, which CheckMemberAccessVisibility enforces.
   // What is rejected here is a change of random mode rather than a read.
-  const auto* m = FindMemberInClass(cls, arg->text, unit);
-  if (m && m->is_local) {
+  const OwnedMember kFound = FindMemberAndOwner(cls, arg->text, unit);
+  const ClassMember* m = kFound.member;
+  if (m && m->is_local && !site.SeesLocal(kFound.owner)) {
     diag.Error(arg->range.start,
                "cannot change random mode of local member from outside "
                "its class",
                Subclause("18.11"));
-  } else if (m && m->is_protected) {
+  } else if (m && m->is_protected && !site.SeesProtected(kFound.owner, unit)) {
     diag.Error(arg->range.start,
                "cannot change random mode of protected member from "
                "outside its class hierarchy",
@@ -164,7 +218,7 @@ static void CheckRandomizeArgItemVisibility(const Expr* arg,
 static void CheckRandomizeArgVisibility(
     const Expr* e,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
-    const CompilationUnit* unit, DiagEngine& diag) {
+    const AccessSite& site, const CompilationUnit* unit, DiagEngine& diag) {
   const Expr* recv = e->lhs;
   if (!recv || recv->kind != ExprKind::kMemberAccess || !recv->lhs ||
       !recv->rhs)
@@ -178,45 +232,92 @@ static void CheckRandomizeArgVisibility(
   const auto* cls = FindClassDecl(it->second, unit);
   if (!cls) return;
   for (const auto* arg : e->args) {
-    CheckRandomizeArgItemVisibility(arg, cls, unit, diag);
+    CheckRandomizeArgItemVisibility(arg, cls, site, unit, diag);
   }
 }
 
 static void CheckVisibilityExpr(
     const Expr* e,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
-    const CompilationUnit* unit, DiagEngine& diag) {
+    const AccessSite& site, const CompilationUnit* unit, DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kMemberAccess && e->lhs && e->rhs) {
     if (e->is_scope_resolution) {
-      CheckScopedMemberVisibility(e, unit, diag);
+      CheckScopedMemberVisibility(e, site, unit, diag);
     } else {
-      CheckMemberAccessVisibility(e, var_types, unit, diag);
+      CheckMemberAccessVisibility(e, var_types, site, unit, diag);
     }
   }
-  if (e->kind == ExprKind::kCall) {
-    CheckRandomizeArgVisibility(e, var_types, unit, diag);
+  // §8.18: in a method, a name the method does not declare itself names a
+  // member of its class or of a class that class extends, and a local member
+  // a base declares is not visible in the subclass, bare as through this or
+  // super.
+  if (e->kind == ExprKind::kIdentifier && !site.inside.empty() &&
+      !site.locals.contains(e->text)) {
+    ReportHiddenMember(FindMemberAndOwner(site.inside.front(), e->text, unit),
+                       e->range.start, site, unit, diag);
   }
-  CheckVisibilityExpr(e->lhs, var_types, unit, diag);
-  CheckVisibilityExpr(e->rhs, var_types, unit, diag);
-  CheckVisibilityExpr(e->base, var_types, unit, diag);
-  CheckVisibilityExpr(e->index, var_types, unit, diag);
-  CheckVisibilityExpr(e->condition, var_types, unit, diag);
-  CheckVisibilityExpr(e->true_expr, var_types, unit, diag);
-  CheckVisibilityExpr(e->false_expr, var_types, unit, diag);
+  if (e->kind == ExprKind::kCall) {
+    CheckRandomizeArgVisibility(e, var_types, site, unit, diag);
+  }
+  CheckVisibilityExpr(e->lhs, var_types, site, unit, diag);
+  // The right side of a member access names a member, which the access itself
+  // is judged by above, not a variable of the scope.
+  if (e->kind != ExprKind::kMemberAccess) {
+    CheckVisibilityExpr(e->rhs, var_types, site, unit, diag);
+  }
+  CheckVisibilityExpr(e->base, var_types, site, unit, diag);
+  CheckVisibilityExpr(e->index, var_types, site, unit, diag);
+  CheckVisibilityExpr(e->condition, var_types, site, unit, diag);
+  CheckVisibilityExpr(e->true_expr, var_types, site, unit, diag);
+  CheckVisibilityExpr(e->false_expr, var_types, site, unit, diag);
   for (const auto* arg : e->args)
-    CheckVisibilityExpr(arg, var_types, unit, diag);
+    CheckVisibilityExpr(arg, var_types, site, unit, diag);
+}
+
+// Whether `e` is a bare `new`, which constructs an object of the class of the
+// handle it initializes or is assigned to.
+static bool IsBareNew(const Expr* e) {
+  return e != nullptr && e->kind == ExprKind::kCall && e->text == "new";
+}
+
+// §8.7 with §8.18: constructing an object of the class `name` names calls that
+// class's own constructor, which a class may declare local or protected; one
+// `site` may not reach is reported at `loc`. A constructor is no member a
+// subclass inherits, so only the class's own is read; a class declaring none
+// has the implicit one, which is public.
+static void CheckConstructorAccess(std::string_view name, SourceLoc loc,
+                                   const AccessSite& site,
+                                   const CompilationUnit* unit,
+                                   DiagEngine& diag) {
+  const ClassDecl* cls = FindClassDecl(name, unit);
+  if (cls == nullptr) return;
+  for (const ClassMember* m : cls->members) {
+    if (m->method != nullptr && m->method->name == "new") {
+      ReportHiddenMember({m, cls}, loc, site, unit, diag);
+    }
+  }
 }
 
 static void WalkStmtsForVisibility(
     const Stmt* s,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
-    const CompilationUnit* unit, DiagEngine& diag) {
+    const AccessSite& site, const CompilationUnit* unit, DiagEngine& diag) {
   if (!s) return;
-  CheckVisibilityExpr(s->lhs, var_types, unit, diag);
-  CheckVisibilityExpr(s->rhs, var_types, unit, diag);
-  CheckVisibilityExpr(s->expr, var_types, unit, diag);
-  CheckVisibilityExpr(s->condition, var_types, unit, diag);
+  CheckVisibilityExpr(s->lhs, var_types, site, unit, diag);
+  CheckVisibilityExpr(s->rhs, var_types, site, unit, diag);
+  CheckVisibilityExpr(s->expr, var_types, site, unit, diag);
+  CheckVisibilityExpr(s->condition, var_types, site, unit, diag);
+  if (IsBareNew(s->rhs)) {
+    const auto kTarget = var_types.find(ExprIdent(s->lhs));
+    if (kTarget != var_types.end()) {
+      CheckConstructorAccess(kTarget->second, s->range.start, site, unit, diag);
+    }
+  }
+  if (s->kind == StmtKind::kVarDecl && IsBareNew(s->var_init)) {
+    CheckConstructorAccess(s->var_decl_type.type_name, s->range.start, site,
+                           unit, diag);
+  }
   // §8.18 states that a local member is unreachable from outside its class and
   // a protected member from outside its class hierarchy, and it names no
   // statement the rules are suspended in, so this descends every link
@@ -234,7 +335,7 @@ static void WalkStmtsForVisibility(
   // descends all thirteen links and records the same declarations in
   // Elaborator::class_var_types_ before this pass copies it.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
-    WalkStmtsForVisibility(sub, var_types, unit, diag);
+    WalkStmtsForVisibility(sub, var_types, site, unit, diag);
   });
 }
 
@@ -272,13 +373,62 @@ static void CollectBlockClassVarDecls(
 void ElaboratorClassRules::ValidateLocalProtectedAccess(
     const ModuleDecl* decl) {
   if (class_names_.empty()) return;
+  const AccessSite kOutside;
   for (const auto* item : decl->items) {
+    CheckVarInitConstructorAccess(*item);
     bool is_proc = IsProceduralItemKind(item->kind);
     if (!is_proc || !item->body) continue;
     // Combine module-scope handles with any declared inside this block.
     auto var_types = class_var_types_;
     CollectBlockClassVarDecls(item->body, class_names_, var_types);
-    WalkStmtsForVisibility(item->body, var_types, unit_, diag_);
+    WalkStmtsForVisibility(item->body, var_types, kOutside, unit_, diag_);
+  }
+  WalkSubroutinesForVisibility(decl->items, {}, class_var_types_);
+}
+
+// §8.7 with §8.18 for a declaration of the scope initialized with a bare new,
+// `L l = new;`, which reaches the constructor from outside every class.
+void ElaboratorClassRules::CheckVarInitConstructorAccess(
+    const ModuleItem& item) {
+  if (item.kind == ModuleItemKind::kVarDecl && IsBareNew(item.init_expr)) {
+    CheckConstructorAccess(item.data_type.type_name, item.loc, AccessSite{},
+                           unit_, diag_);
+  }
+}
+
+// §8.18 over the subroutine bodies among `items` and `classes`, each judged
+// from the classes it stands inside, with the handles `scope_types` gives its
+// scope and those its own declarations add.
+void ElaboratorClassRules::WalkSubroutinesForVisibility(
+    const std::vector<ModuleItem*>& items,
+    const std::vector<const ClassDecl*>& classes,
+    const std::unordered_map<std::string_view, std::string_view>& scope_types) {
+  for (const SubroutineSite& sub : SubroutinesAmong(items, classes)) {
+    AccessSite site{sub.inside, {}};
+    if (!sub.inside.empty()) site.locals = CollectMethodLocalNames(sub.sub);
+    auto var_types = scope_types;
+    std::unordered_set<std::string_view> names;
+    AddSubroutineHandles(sub, class_names_, unit_, names, var_types);
+    for (const Stmt* s : sub.sub->func_body_stmts) {
+      CollectBlockClassVarDecls(s, class_names_, var_types);
+    }
+    for (const Stmt* s : sub.sub->func_body_stmts) {
+      WalkStmtsForVisibility(s, var_types, site, unit_, diag_);
+    }
+  }
+}
+
+// §8.18 over the compilation unit's and each package's declarations,
+// subroutines and classes, read once, where a module's are read with each
+// module.
+void ElaboratorClassRules::ValidateLocalProtectedAccessOutsideModules() {
+  if (class_names_.empty()) return;
+  for (const auto* item : unit_->cu_items) CheckVarInitConstructorAccess(*item);
+  WalkSubroutinesForVisibility(
+      unit_->cu_items, {unit_->classes.begin(), unit_->classes.end()}, {});
+  for (const auto* pkg : unit_->packages) {
+    for (const auto* item : pkg->items) CheckVarInitConstructorAccess(*item);
+    WalkSubroutinesForVisibility(pkg->items, {}, {});
   }
 }
 
@@ -340,7 +490,65 @@ void ElaboratorClassRules::ValidateParameterizedScopeResolution(
     if (is_proc && item->body) {
       WalkStmtsForParamScope(item->body, parameterized_class_names_, diag_);
     }
+    CheckParamScopeInItem(*item);
   }
+}
+
+// §8.25.1 for what a scope declares besides its procedures: a subroutine's
+// body, and each method of a class the scope declares.
+void ElaboratorClassRules::CheckParamScopeInItem(const ModuleItem& item) {
+  if (item.kind == ModuleItemKind::kFunctionDecl ||
+      item.kind == ModuleItemKind::kTaskDecl) {
+    CheckParamScopeInSubroutine(item, {item.method_class});
+  } else if (item.kind == ModuleItemKind::kClassDecl) {
+    CheckParamScopeInClass(*item.class_decl, {});
+  }
+}
+
+// §8.25.1: the body of the subroutine `sub`, where the unadorned name of each
+// parameterized class but those `allowed` names is illegal before `::`. The
+// classes allowed are the one whose method `sub` is or defines out of block
+// and the classes around it, within whose scope the name is legal.
+void ElaboratorClassRules::CheckParamScopeInSubroutine(
+    const ModuleItem& sub,
+    const std::unordered_set<std::string_view>& allowed) {
+  std::unordered_set<std::string_view> checked;
+  for (const std::string_view kName : parameterized_class_names_) {
+    if (!allowed.contains(kName)) checked.insert(kName);
+  }
+  for (const Stmt* s : sub.func_body_stmts) {
+    WalkStmtsForParamScope(s, checked, diag_);
+  }
+}
+
+// §8.25.1 for the methods of `cls` and of the classes nested in it, inside
+// the classes `allowed` names and `cls` itself.
+void ElaboratorClassRules::CheckParamScopeInClass(
+    const ClassDecl& cls, std::unordered_set<std::string_view> allowed) {
+  allowed.insert(cls.name);
+  for (const ClassMember* m : cls.members) {
+    if (m->method != nullptr) CheckParamScopeInSubroutine(*m->method, allowed);
+    if (m->nested_class != nullptr) {
+      CheckParamScopeInClass(*m->nested_class, allowed);
+    }
+  }
+}
+
+// §8.25.1 over the compilation unit's and each package's items, read once,
+// where a module's are read with each module elaborated: declarations'
+// initializers, subroutines' bodies and the methods of the classes declared
+// there.
+void ElaboratorClassRules::ValidateParameterizedScopeOutsideModules() {
+  if (parameterized_class_names_.empty()) return;
+  std::vector<const std::vector<ModuleItem*>*> scopes{&unit_->cu_items};
+  for (const auto* pkg : unit_->packages) scopes.push_back(&pkg->items);
+  for (const auto* items : scopes) {
+    for (const auto* item : *items) {
+      CheckParamScopeExpr(item->init_expr, parameterized_class_names_, diag_);
+      CheckParamScopeInItem(*item);
+    }
+  }
+  for (const auto* cls : unit_->classes) CheckParamScopeInClass(*cls, {});
 }
 
 namespace {

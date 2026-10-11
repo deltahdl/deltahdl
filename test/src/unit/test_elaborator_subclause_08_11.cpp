@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -269,6 +271,29 @@ TEST(ThisElaboration, ThisInsideMemberAccessInsideTypeOpRejected) {
                             "'this' and 'super' shall not be used in a static "
                             "method",
                             2, "8.10"));
+}
+
+// §8.11 gives `this` no object outside a class's non-static methods, and a
+// subroutine a package or the compilation unit declares is no method of any
+// class, so `this` in one is reported as in a module's subroutine.
+TEST(ThisElaboration, ThisInAPackageOrUnitSubroutineIsAnError) {
+  ElabFixture f;
+  ElabOk(
+      "package p;\n"
+      "  int x;\n"
+      "  function void f(); this.x = 1; endfunction\n"
+      "endpackage\n"
+      "int y;\n"
+      "task t(); this.y = 1; endtask\n"
+      "module m; endmodule\n",
+      f);
+  for (const int kLine : {3, 6}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "'this' has no object to refer to outside a non-static class method",
+        kLine, "8.11"))
+        << kLine;
+  }
 }
 
 }  // namespace
