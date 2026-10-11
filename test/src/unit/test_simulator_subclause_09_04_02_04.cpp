@@ -109,7 +109,7 @@ TEST(SequenceEventSim, AnOrListWakesOnItsOtherOperands) {
                        "  end\n"
                        "endmodule\n",
                        f),
-            "woke 5\n");
+            "woke 5\n$finish at time 5\n");
 }
 
 // §9.4.2.3: an iff qualifier on a sequence instance lets a match wake the
@@ -127,7 +127,7 @@ TEST(SequenceEventSim, AnIffQualifierGatesTheSequence) {
                        "  end\n"
                        "endmodule\n",
                        f),
-            "woke 15\n");
+            "woke 15\n$finish at time 15\n");
 }
 
 // §9.4.2.1: an or-ed event control resumes its process once, on the first
@@ -146,7 +146,7 @@ TEST(SequenceEventSim, TwoSequencesResumeTheProcessOnce) {
                        "  end\n"
                        "endmodule\n",
                        f),
-            "done 105\n");
+            "done 105\n$finish at time 105\n");
 }
 
 }  // namespace

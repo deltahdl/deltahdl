@@ -328,13 +328,21 @@ struct EventAwaiter {
         return false;
       *consumed = true;
       if (proc) proc->woken_by = woke;
-      if (kAfterObserved) {
-        ScheduleResume(h, proc, *ctx_ptr, Region::kReactive);
-      } else {
-        ResumeMaybeReactive(h, proc, *ctx_ptr);
-      }
+      ResumeAfterTrigger(h, proc, *ctx_ptr, kAfterObserved);
       return true;
     });
+  }
+
+  // Resumes `h` for `proc` once a trigger has woken it: after the Observed
+  // region where the trigger is a sequence instance's end point (§9.4.2.4),
+  // and otherwise in the region ResumeMaybeReactive chooses.
+  static void ResumeAfterTrigger(std::coroutine_handle<> h, Process* proc,
+                                 SimContext& ctx, bool after_observed) {
+    if (after_observed) {
+      ScheduleResume(h, proc, ctx, Region::kReactive);
+      return;
+    }
+    ResumeMaybeReactive(h, proc, ctx);
   }
 
   // §9.4.2.4 with §16.13.6: the variable the end point of the sequence

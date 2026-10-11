@@ -745,9 +745,13 @@ void FireSequenceEndpoint(SimContext& ctx, const std::string& ep_name) {
   var->watchers.clear();
   auto& sched = ctx.GetScheduler();
   Region region = ctx.IsReactiveContext() ? Region::kReactive : Region::kActive;
+  // A watcher declining this trigger, one whose iff (§9.4.2.3) is false at it,
+  // stays armed for the next, as one on a named event does.
   for (auto& cb : pending) {
     auto* event = sched.GetEventPool().Acquire();
-    event->callback = std::move(cb);
+    event->callback = [var, watcher = std::move(cb)]() mutable {
+      if (!watcher()) var->AddWatcher(std::move(watcher));
+    };
     sched.ScheduleEvent(ctx.CurrentTime(), region, event);
   }
 }

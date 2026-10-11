@@ -23,13 +23,10 @@
 #include <functional>
 #include <limits>
 #include <memory>
-#include <string>
 #include <string_view>
 #include <vector>
 
 #include "common/types.h"
-#include "parser/ast_expr.h"
-#include "parser/ast_stmt.h"
 #include "simulator/awaiters_event_control.h"
 #include "simulator/class_object.h"
 #include "simulator/clocking.h"
@@ -370,6 +367,17 @@ struct AnyChangeAwaiter {
   // `watched` carries what the arming site learned about the name: the variable
   // it resolved to, and StateLivesInValue's answer for it. The watcher body
   // holds no name and could not ask again.
+  // §9.7: a suspended process is desensitized to what it waits on, so a change
+  // wakes nothing while it is suspended; the wake `h` is kept for resume() to
+  // replay (DriveResumedProcess), which runs the wait again in the time step
+  // of the resume, so a condition that held by then lets the process go on.
+  // Returns whether the wake was kept.
+  static bool KeepWakeWhileSuspended(Process* proc, std::coroutine_handle<> h) {
+    if (proc == nullptr || !proc->is_suspended) return false;
+    proc->pending_wake = h;
+    return true;
+  }
+
   void AttachChangeWatcher(WatchedObject watched, std::coroutine_handle<> h,
                            Process* proc, const std::shared_ptr<bool>& fin,
                            const std::shared_ptr<bool>& consumed) {
@@ -426,14 +434,7 @@ struct AnyChangeAwaiter {
       if (!ChangeGatePasses(watched, prev, ctx_ptr->CurrentTime().ticks))
         return false;
       *consumed = true;
-      // §9.7: a suspended process is desensitized to what it waits on, so the
-      // change wakes nothing now; the wake is kept for resume() to replay
-      // (DriveResumedProcess), which runs the wait again in the time step of
-      // the resume, so a condition that held by then lets the process go on.
-      if (proc && proc->is_suspended) {
-        proc->pending_wake = h;
-        return true;
-      }
+      if (KeepWakeWhileSuspended(proc, h)) return true;
       EventAwaiter::ResumeMaybeReactive(h, proc, *ctx_ptr);
       return true;
     });

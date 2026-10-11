@@ -147,17 +147,16 @@ TEST(AlwaysCombSim,
   // inferred sensitivity list, which is the list §9.4.2 governs. So the write
   // of a[9] to an 8-bit `a` stores no bit and owes the procedure no event.
   //
-  // Why the count is 2 rather than 3 or 1. The inferred list is {a} alone:
+  // Why the count is 1 rather than 2. The inferred list is {a} alone:
   // exception (b) of §9.2.2.2.1 leaves out any expression the block also
   // writes, which here is `b` and `runs`, and InferSensitivity is called with
-  // exclude_written true for an always_comb. Lowerer::LowerProcesses lowers the
-  // non-initial processes ahead of the initial ones, so at time zero the
-  // always_comb evaluates first (`runs` 1) and arms its watcher while `a` is
-  // still 8'hxx; the initial block then writes 8'd0, a genuine change of the
-  // one listed expression, and `runs` reaches 2. At time 1 the out-of-bounds
-  // write stores nothing and the count must stay at 2.
+  // exclude_written true for an always_comb. §9.2.2.2 triggers the always_comb
+  // once at time zero after the initial procedure has started, so it evaluates
+  // once (`runs` 1) after the initial block's write of 8'd0, made while it was
+  // not yet waiting. At time 1 the out-of-bounds write stores nothing and the
+  // count must stay at 1.
   //
-  // Reading 3 is the defect. A select write that returned having written
+  // Reading 2 is the defect. A select write that returned having written
   // nothing still notified the variable's watchers, and the AnyChangeAwaiter an
   // always_comb waits on compares no baseline and resumes on any notify at all.
   // @(a), always @*, $monitor and a clocking block each hold a baseline of
@@ -177,7 +176,7 @@ TEST(AlwaysCombSim,
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      2);
+      1);
 }
 
 TEST(AlwaysCombSim,
@@ -187,8 +186,8 @@ TEST(AlwaysCombSim,
   // case above from being satisfied by never notifying from a select write at
   // all: an in-bounds a[3] write does change the vector, §9.4.2 (printed page
   // 232) therefore makes it an event on the inferred sensitivity list of
-  // §9.2.2.2 (printed page 222), and the always_comb must evaluate a third
-  // time. Suppressing the notify for every select write would leave `runs` at 2
+  // §9.2.2.2 (printed page 222), and the always_comb must evaluate a second
+  // time. Suppressing the notify for every select write would leave `runs` at 1
   // here while passing the other half of the pair -- the regression the
   // neighbouring arm of this code needed a fix of its own to undo. The two
   // cases differ only in the index, so the counts have to differ with it or
@@ -207,7 +206,7 @@ TEST(AlwaysCombSim,
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      3);
+      2);
 }
 
 TEST(AlwaysCombSim,
@@ -220,27 +219,26 @@ TEST(AlwaysCombSim,
   // changes no result, so it owes the procedure no event, however genuinely the
   // store itself happened.
   //
-  // Why the count is 2 rather than 3 or 1. The inferred list is {a} alone:
+  // Why the count is 1 rather than 2. The inferred list is {a} alone:
   // exception (b) of §9.2.2.2.1 leaves out any expression the block also
   // writes, which here is `b` and `runs`, and InferSensitivity is called with
-  // exclude_written true for an always_comb. Lowerer::LowerProcesses lowers the
-  // non-initial processes ahead of the initial ones, so at time zero the
-  // always_comb evaluates first (`runs` 1) and arms its watcher while `a` is
-  // still 8'hxx; the initial block then writes 8'd5, a genuine change of the
-  // one listed expression, and `runs` reaches 2. At time 1 the second write of
-  // 8'd5 changes nothing and the count must stay at 2.
+  // exclude_written true for an always_comb. §9.2.2.2 triggers the always_comb
+  // once at time zero after the initial procedure has started, so it evaluates
+  // once (`runs` 1) after the initial block's write of 8'd5, made while it was
+  // not yet waiting. At time 1 the second write of 8'd5 changes nothing and the
+  // count must stay at 1.
   //
-  // Reading 3 is the defect. The write takes ApplyGenericBlockingAssign's
+  // Reading 2 is the defect. The write takes ApplyGenericBlockingAssign's
   // fall-through into AssignToScalarLhs, which stores the identical bits and
   // notifies the variable's watchers regardless, and the AnyChangeAwaiter an
   // always_comb waits on captures a baseline it never reads back -- every guard
   // in its body is about frame or process liveness, or a sibling having
   // consumed the suspension -- so any notify at all resumes the process.
   //
-  // The same design written `always @(a) runs = runs + 1;` ends at 2 today,
-  // because that path is EventAwaiter::CheckEdge, which compares its baseline
-  // word by word. One clause, one write, two answers from two awaiters: that
-  // divergence is what this case pins.
+  // The same design written `always @(a) runs = runs + 1;` counts no event for
+  // the second write, because that path is EventAwaiter::CheckEdge, which
+  // compares its baseline word by word. One clause, one write, two answers from
+  // two awaiters: that divergence is what this case pins.
   ExpectAlwaysCombRunCount(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -255,7 +253,7 @@ TEST(AlwaysCombSim,
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      2);
+      1);
 }
 
 TEST(AlwaysCombSim, AlwaysCombRetriggersWhenAWriteChangesTheVariable) {
@@ -264,8 +262,8 @@ TEST(AlwaysCombSim, AlwaysCombRetriggersWhenAWriteChangesTheVariable) {
   // from being satisfied by dropping the notify from the writers altogether:
   // 8'd7 does change `a`, §9.4.2 (printed page 232) therefore makes it an event
   // on the inferred sensitivity list of §9.2.2.2 (printed page 222), and the
-  // always_comb must evaluate a third time. A writer that stopped notifying
-  // would leave `runs` at 2 here while passing the other half of the pair --
+  // always_comb must evaluate a second time. A writer that stopped notifying
+  // would leave `runs` at 1 here while passing the other half of the pair --
   // exactly the regression a neighbouring arm of this code needed a fix of its
   // own to undo. The two programs differ only in the value written, so the
   // counts have to differ with them or neither case is discriminating.
@@ -283,7 +281,7 @@ TEST(AlwaysCombSim, AlwaysCombRetriggersWhenAWriteChangesTheVariable) {
       "    #1 $finish;\n"
       "  end\n"
       "endmodule\n",
-      3);
+      2);
 }
 
 TEST(AlwaysCombSim, AlwaysCombMuxPattern) {

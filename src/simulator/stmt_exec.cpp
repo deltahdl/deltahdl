@@ -218,10 +218,7 @@ static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx,
 // Marks the just-completed fork child process finished and wakes any thread
 // blocked on its await(). No-op for a process that was killed.
 static void FinalizeForkChildProcess(SimContext& ctx) {
-  if (auto* child_proc = ctx.CurrentProcess()) {
-    child_proc->Finish();
-    child_proc->ReleaseFromFork();
-  }
+  if (auto* child_proc = ctx.CurrentProcess()) child_proc->Finish();
 }
 
 // Decrements the join/wait-fork tallies for one child that has terminated --
@@ -240,20 +237,27 @@ static void DrainForkChild(SimContext& ctx, const ForkRendezvous& rdv) {
     if (state->parent_proc) ctx.SetCurrentProcess(state->parent_proc);
     state->parent.resume();
   }
+  // §9.6.1: the waiter is taken as it is resumed, so a later fork whose
+  // children bring the tally back to zero finds no wait fork pending rather
+  // than the finished one's handle.
   if (rdv.parent_wfs && --rdv.parent_wfs->remaining == 0 &&
       rdv.parent_wfs->waiter) {
+    auto waiter = std::exchange(rdv.parent_wfs->waiter, {});
     ctx.SetCurrentProcess(rdv.parent_proc);
-    rdv.parent_wfs->waiter.resume();
+    waiter.resume();
   }
 }
 
 // The child's statement, then its completion: Process::Finish and the release
-// from the fork's tallies its fork_release holds.
+// from the fork's tallies its fork_release holds. The release is the child's
+// own, `self`, rather than whichever process is current when the statement
+// completes, which a wake from another process may have left current.
 static SimCoroutine ForkChildCoroutine(const Stmt* body, SimContext& ctx,
-                                       Arena& arena) {
+                                       Arena& arena, Process* self) {
   co_await ExecStmt(body, ctx, arena);
 
   FinalizeForkChildProcess(ctx);
+  self->ReleaseFromFork();
 }
 
 static bool IsForkBlockItemDecl(const Stmt* s) {
@@ -333,7 +337,7 @@ static void SpawnForkChild(const Stmt* s, SimContext& ctx, Arena& arena,
   if (rdv.parent_wfs) rdv.parent_wfs->remaining++;
   auto* p = CreateForkChildProcess(ctx, arena, spawning_proc);
   p->fork_release = [&ctx, rdv]() { DrainForkChild(ctx, rdv); };
-  p->coro = ForkChildCoroutine(s, ctx, arena).Release();
+  p->coro = ForkChildCoroutine(s, ctx, arena, p).Release();
 
   RegisterForkChildScopes(s, p, ctx);
   auto* event = ctx.GetScheduler().GetEventPool().Acquire();

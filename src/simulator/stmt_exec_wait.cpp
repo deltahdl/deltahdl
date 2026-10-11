@@ -442,9 +442,8 @@ ExecTask ExecEventControl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
         named_event.empty() ? ClassEventOfControl(stmt, ctx, arena) : nullptr;
     // §9.4.2.4: a list holding a sequence instance is EventAwaiter's, which
     // arms the sequence and every other operand under one guard.
-    if (HasSequenceEvent(stmt)) {
-      co_await EventAwaiter{ctx, stmt->events, arena};
-    } else if (!named_event.empty() || class_event != nullptr) {
+    if (!HasSequenceEvent(stmt) &&
+        (!named_event.empty() || class_event != nullptr)) {
       co_await NamedEventAwaiter{ctx, named_event, class_event};
     } else {
       co_await EventAwaiter{ctx, stmt->events, arena};
