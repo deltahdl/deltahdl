@@ -598,4 +598,25 @@ TEST(VirtualMethodElaboration,
   }
 }
 
+// §8.20 holds an override to the method of the class its own class extends,
+// that class being the one the extends name resolves to from the scope the
+// class is written in (§8.13), though another module declares a class of the
+// same name.
+TEST(VirtualMethodElaboration, AnOverrideIsJudgedAgainstItsOwnScopesBase) {
+  ElabFixture f;
+  ElabOk(
+      "module a;\n"
+      "  class K; endclass\n"
+      "endmodule\n"
+      "module b;\n"
+      "  class K; virtual function void f(int x); endfunction endclass\n"
+      "  class D extends K; function void f(int y); endfunction endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "virtual method override argument name 'y' does "
+                            "not match base 'x'",
+                            6, "8.20"));
+}
+
 }  // namespace

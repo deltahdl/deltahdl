@@ -241,8 +241,7 @@ class InlineUniqueWalk {
   const ClassDecl* SelfClass(std::string_view name, const Scope* s) const {
     for (; s != nullptr; s = s->outer) {
       if (s->cls != nullptr) {
-        return name == "super" ? FindClassDecl(s->cls->base_class, unit_)
-                               : s->cls;
+        return name == "super" ? FindBaseClass(s->cls, unit_) : s->cls;
       }
     }
     return nullptr;

@@ -261,6 +261,15 @@ std::string_view ExprIdent(const Expr* e);
 const ClassDecl* FindClassDecl(std::string_view name,
                                const CompilationUnit* unit);
 
+// §8.13: the class `cls` extends, its `extends` name resolved from the scope
+// declaring `cls` (§3.13, §23.9, §26.3): that scope's own class of the name,
+// one it imports, or the compilation unit's. A class standing in a generate
+// block or in another class, whose scope is none of those, and a name that
+// scope does not resolve, are answered by FindClassDecl. Null for a class
+// extending nothing. Defined in elaborator_validate_struct_types.cpp.
+const ClassDecl* FindBaseClass(const ClassDecl* cls,
+                               const CompilationUnit* unit);
+
 // Every class the unit declares, wherever it is declared: the compilation
 // unit's own list, which the parser fills from the classes at the top of a
 // file alone, then the class items of each module, interface, program,

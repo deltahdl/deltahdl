@@ -213,4 +213,34 @@ TEST(InheritanceElaboration, ExtendFinalClassFromAnyScopeIsAnError) {
   }
 }
 
+// §8.13 has a class extend the class its extends name resolves to from the
+// scope the class is written in (§3.13, §23.9): that scope's own class before
+// the compilation unit's, and each module's own where several declare one
+// name. E extends c's final K and is reported; D extends b's K and DJ b's J,
+// neither of them final, though a's K and the compilation unit's J are.
+TEST(InheritanceElaboration, ABaseIsTheClassItsOwnScopeResolves) {
+  ElabFixture f;
+  ElabOk(
+      "class :final J; endclass\n"
+      "module a;\n"
+      "  class :final K; endclass\n"
+      "endmodule\n"
+      "module b;\n"
+      "  class K; endclass\n"
+      "  class D extends K; endclass\n"
+      "  class J; endclass\n"
+      "  class DJ extends J; endclass\n"
+      "endmodule\n"
+      "module c;\n"
+      "  class :final K; endclass\n"
+      "  class E extends K; endclass\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  const char* const kMessage = "cannot extend a class declared ':final'";
+  EXPECT_TRUE(ReportedError(diags, kMessage, 13, "8.13"));
+  EXPECT_FALSE(ReportedError(diags, kMessage, 7, "8.13"));
+  EXPECT_FALSE(ReportedError(diags, kMessage, 9, "8.13"));
+}
+
 }  // namespace

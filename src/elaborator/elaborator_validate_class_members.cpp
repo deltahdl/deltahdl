@@ -43,7 +43,7 @@ void ElaboratorClassRules::ValidateFinalClassExtension() {
                   Subclause("8.13"));
       return;
     }
-    const auto* base = FindClassDecl(cls->base_class, unit_);
+    const auto* base = FindBaseClass(cls, unit_);
     if (base && base->is_final) {
       diag_.Error(cls->range.start, "cannot extend a class declared ':final'",
                   Subclause("8.13"));
@@ -367,12 +367,8 @@ void ElaboratorClassRules::ValidateEmbeddedCovergroupRules() {
 static bool BaseClassDefinesCovergroup(const ClassDecl* cls,
                                        std::string_view cg_name,
                                        const CompilationUnit* unit) {
-  for (const ClassDecl* base = cls->base_class.empty()
-                                   ? nullptr
-                                   : FindClassDecl(cls->base_class, unit);
-       base; base = base->base_class.empty()
-                        ? nullptr
-                        : FindClassDecl(base->base_class, unit)) {
+  for (const ClassDecl* base = FindBaseClass(cls, unit); base;
+       base = FindBaseClass(base, unit)) {
     for (const auto* m : base->members) {
       if (m->kind == ClassMemberKind::kCovergroup && m->name == cg_name) {
         return true;
@@ -531,7 +527,7 @@ static std::string_view ParamKindIn(const ClassDecl* cls,
 static const ClassDecl* BaseOf(const ClassDecl* cls,
                                const CompilationUnit* unit) {
   if (cls->base_class.empty()) return nullptr;
-  return FindClassDecl(cls->base_class, unit);
+  return FindBaseClass(cls, unit);
 }
 
 // §8.15: names the kind of parameter `name` is in the base class chain of
@@ -798,7 +794,7 @@ void ElaboratorClassRules::ValidateOneClassDefaultKeyword(
 
   if (!ctor_has_default || cls->base_class.empty()) return;
 
-  const ClassDecl* base = FindClassDecl(cls->base_class, unit_);
+  const ClassDecl* base = FindBaseClass(cls, unit_);
   const ModuleItem* base_ctor = FindClassCtorMethod(base);
   if (!base_ctor) return;
 

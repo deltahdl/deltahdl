@@ -79,8 +79,7 @@ bool FunctionReturnsClass(std::string_view name, const CompilationUnit* unit) {
 std::vector<const ClassMember*> ChainProperties(const ClassDecl& cls,
                                                 const CompilationUnit* unit) {
   std::vector<const ClassMember*> out;
-  for (const ClassDecl* c = &cls; c != nullptr;
-       c = FindClassDecl(c->base_class, unit)) {
+  for (const ClassDecl* c = &cls; c != nullptr; c = FindBaseClass(c, unit)) {
     for (const ClassMember* m : c->members) {
       if (m->kind == ClassMemberKind::kProperty) out.push_back(m);
     }
@@ -180,7 +179,7 @@ void ElaboratorClassRules::WalkSubroutinesForClassHandleOps(
 // draws the consequence that such a class cannot be extended.
 void ElaboratorClassRules::ValidateLocalConstructorBases() {
   for (const ClassDecl* cls : AllClassDecls(unit_)) {
-    const ClassDecl* base = FindClassDecl(cls->base_class, unit_);
+    const ClassDecl* base = FindBaseClass(cls, unit_);
     if (base == nullptr) continue;
     for (const ClassMember* m : base->members) {
       if (m->method != nullptr && m->method->name == "new" && m->is_local) {

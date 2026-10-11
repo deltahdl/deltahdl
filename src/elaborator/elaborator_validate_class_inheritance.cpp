@@ -208,7 +208,7 @@ static void CollectImplementedInterfaces(const ClassDecl* cls,
     out.push_back(iface);
   }
   if (!cls->base_class.empty()) {
-    const auto* base = FindClassDecl(cls->base_class, unit);
+    const auto* base = FindBaseClass(cls, unit);
     if (base && !base->is_interface) {
       CollectImplementedInterfaces(base, unit, out);
     }
@@ -308,12 +308,8 @@ static void DiagnoseInterfaceSignatureConflicts(
 static const ModuleItem* FindVirtualMethodInBaseChain(
     const ClassDecl* cls, std::string_view method_name,
     const CompilationUnit* unit, bool require_non_pure) {
-  for (const auto* walk = cls->base_class.empty()
-                              ? nullptr
-                              : FindClassDecl(cls->base_class, unit);
-       walk; walk = walk->base_class.empty()
-                        ? nullptr
-                        : FindClassDecl(walk->base_class, unit)) {
+  for (const auto* walk = FindBaseClass(cls, unit); walk;
+       walk = FindBaseClass(walk, unit)) {
     for (const auto* bm : walk->members) {
       if (bm->kind == ClassMemberKind::kMethod && bm->method &&
           bm->method->name == method_name && bm->is_virtual &&
@@ -492,10 +488,7 @@ void ElaboratorClassRules::ValidateImplementsInterfaceMethods(
 static bool VirtualClassAddressesPrototype(const ClassDecl* cls,
                                            std::string_view method_name,
                                            const CompilationUnit* unit) {
-  for (const auto* walk = cls; walk;
-       walk = walk->base_class.empty()
-                  ? nullptr
-                  : FindClassDecl(walk->base_class, unit)) {
+  for (const auto* walk = cls; walk; walk = FindBaseClass(walk, unit)) {
     for (const auto* m : walk->members) {
       if (m->kind == ClassMemberKind::kMethod && m->method &&
           m->method->name == method_name &&
@@ -567,7 +560,7 @@ static void ForEachInterfaceParent(
     const std::function<void(const ClassDecl*, std::string_view,
                              const std::vector<DataType>&)>& fn) {
   if (!cls->base_class.empty()) {
-    const auto* base = FindClassDecl(cls->base_class, look.unit);
+    const auto* base = FindBaseClass(cls, look.unit);
     if (base && base->is_interface) {
       fn(base, cls->base_class, cls->base_class_type_params);
     }
@@ -672,10 +665,7 @@ static void CollectInterfaceTypedefNames(
 static void CollectClassVisibleTypeNames(
     const ClassDecl* cls, const CompilationUnit* unit,
     std::unordered_set<std::string_view>& out) {
-  for (const auto* walk = cls; walk;
-       walk = walk->base_class.empty()
-                  ? nullptr
-                  : FindClassDecl(walk->base_class, unit)) {
+  for (const auto* walk = cls; walk; walk = FindBaseClass(walk, unit)) {
     for (const auto* m : walk->members) {
       if (m->kind == ClassMemberKind::kTypedef) out.insert(m->name);
     }

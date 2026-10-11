@@ -54,9 +54,8 @@ static OwnedMethod FindBaseMethod(
     const CompilationUnit* unit,
     const std::function<bool(const ClassMember*)>& accept) {
   if (cls->base_class.empty()) return {};
-  for (const auto* c = FindClassDecl(cls->base_class, unit); c;
-       c = c->base_class.empty() ? nullptr
-                                 : FindClassDecl(c->base_class, unit)) {
+  for (const auto* c = FindBaseClass(cls, unit); c;
+       c = FindBaseClass(c, unit)) {
     for (const auto* m : c->members) {
       if (m->kind == ClassMemberKind::kMethod && m->method &&
           m->method->name == method_name && accept(m)) {
@@ -309,7 +308,7 @@ static void CollectPureVirtualMethods(
     std::vector<std::string_view>& pure_names) {
   if (!cls) return;
   if (!cls->base_class.empty()) {
-    const auto* base = FindClassDecl(cls->base_class, unit);
+    const auto* base = FindBaseClass(cls, unit);
     CollectPureVirtualMethods(base, unit, pure_names);
   }
   for (const auto* m : cls->members) {
@@ -559,7 +558,7 @@ void ElaboratorClassRules::ValidateInterfaceClassInheritance(
 
   ValidateInheritedInterfaceName(cls, cls->base_class, scope, diag_,
                                  {"extend", "extended", "interface class"});
-  const auto* base = FindClassDecl(cls->base_class, unit_);
+  const auto* base = FindBaseClass(cls, unit_);
   if (base && !base->is_interface) {
     diag_.Error(cls->range.start,
                 std::format("interface class '{}' cannot extend "
@@ -590,16 +589,15 @@ void ElaboratorClassRules::ValidateInterfaceClassInheritance(
 // passed through has no such base, so the class closing the cycle is reported
 // and its extends clause is dropped from the tree. A walk from a class off the
 // cycle stops where it meets the cycle, which the walk from a class on it
-// reports and breaks. A base is looked up as FindClassDecl looks it up and,
+// reports and breaks. A base is looked up as FindBaseClass looks it up and,
 // where that finds none, as SoleClassIndex does, which reaches a nested class
-// too; the two agree wherever both find a class, so a cycle either lookup
-// would follow is broken.
+// too, so a cycle either lookup would follow is broken.
 void ElaboratorClassRules::BreakClassInheritanceCycles() {
   const SoleClassIndex kClasses(*unit_);
   for (const ClassDecl* cls : AllClassDecls(unit_)) {
     std::unordered_set<const ClassDecl*> seen{cls};
     for (const ClassDecl* c = cls; !c->base_class.empty();) {
-      const ClassDecl* found = FindClassDecl(c->base_class, unit_);
+      const ClassDecl* found = FindBaseClass(c, unit_);
       c = found != nullptr ? found : kClasses.Find(c->base_class);
       if (c == cls) {
         diag_.Error(cls->range.start,
@@ -618,7 +616,7 @@ void ElaboratorClassRules::BreakClassInheritanceCycles() {
 void ElaboratorClassRules::ValidateRegularClassInheritance(
     const ClassDecl* cls, const ClassScope& scope) {
   if (!cls->base_class.empty()) {
-    const auto* base = FindClassDecl(cls->base_class, unit_);
+    const auto* base = FindBaseClass(cls, unit_);
     if (base && base->is_interface) {
       diag_.Error(cls->range.start,
                   std::format("class '{}' cannot extend interface class "

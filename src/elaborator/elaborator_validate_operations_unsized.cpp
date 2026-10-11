@@ -71,9 +71,7 @@ void ElaboratorOperationRules::WalkExprForUnsizedInConcat(const Expr* expr) {
 static const ClassMember* FindClassProperty(const ClassDecl* cls,
                                             std::string_view name,
                                             const CompilationUnit* unit) {
-  for (const auto* c = cls; c != nullptr;
-       c = c->base_class.empty() ? nullptr
-                                 : FindClassDecl(c->base_class, unit)) {
+  for (const auto* c = cls; c != nullptr; c = FindBaseClass(c, unit)) {
     for (const auto* m : c->members) {
       if (m->kind == ClassMemberKind::kProperty && !m->is_param &&
           m->name == name) {

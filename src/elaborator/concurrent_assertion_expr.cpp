@@ -72,8 +72,7 @@ bool DeclaresNonStaticMember(const ClassDecl* cls, std::string_view member,
       std::string_view name = m->method != nullptr ? m->method->name : m->name;
       if (name == member) return !m->is_static;
     }
-    cls = cls->base_class.empty() ? nullptr
-                                  : FindClassDecl(cls->base_class, unit);
+    cls = FindBaseClass(cls, unit);
   }
   return false;
 }

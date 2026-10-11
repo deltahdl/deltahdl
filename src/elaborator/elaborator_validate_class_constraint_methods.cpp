@@ -22,9 +22,7 @@ namespace delta {
 static const ModuleItem* FindClassFunction(const ClassDecl* cls,
                                            std::string_view name,
                                            const CompilationUnit* unit) {
-  for (const auto* c = cls; c; c = c->base_class.empty()
-                                       ? nullptr
-                                       : FindClassDecl(c->base_class, unit)) {
+  for (const auto* c = cls; c; c = FindBaseClass(c, unit)) {
     for (const auto* m : c->members) {
       // A method member carries its name on m->method->name (and, since
       // TryParseMethodOrConstraint mirrors it, also on ClassMember::name).
@@ -369,9 +367,8 @@ static const ClassMember* FindBaseConstraint(const ClassDecl* cls,
                                              std::string_view name,
                                              const CompilationUnit* unit) {
   if (cls->base_class.empty()) return nullptr;
-  for (const auto* c = FindClassDecl(cls->base_class, unit); c;
-       c = c->base_class.empty() ? nullptr
-                                 : FindClassDecl(c->base_class, unit)) {
+  for (const auto* c = FindBaseClass(cls, unit); c;
+       c = FindBaseClass(c, unit)) {
     for (const auto* m : c->members) {
       if (m->kind == ClassMemberKind::kConstraint && m->name == name) {
         return m;
@@ -388,9 +385,8 @@ static const ClassMember* FindBaseFinalConstraint(const ClassDecl* cls,
                                                   std::string_view name,
                                                   const CompilationUnit* unit) {
   if (cls->base_class.empty()) return nullptr;
-  for (const auto* c = FindClassDecl(cls->base_class, unit); c;
-       c = c->base_class.empty() ? nullptr
-                                 : FindClassDecl(c->base_class, unit)) {
+  for (const auto* c = FindBaseClass(cls, unit); c;
+       c = FindBaseClass(c, unit)) {
     for (const auto* m : c->members) {
       if (m->kind == ClassMemberKind::kConstraint && m->name == name &&
           m->is_constraint_final) {
@@ -475,8 +471,7 @@ static void CollectInheritedPureConstraints(
     std::vector<std::string_view>& pure_names) {
   if (!cls) return;
   if (!cls->base_class.empty()) {
-    CollectInheritedPureConstraints(FindClassDecl(cls->base_class, unit), unit,
-                                    pure_names);
+    CollectInheritedPureConstraints(FindBaseClass(cls, unit), unit, pure_names);
   }
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kConstraint) continue;
@@ -497,8 +492,7 @@ void ClassConstraintValidator::ValidateNonAbstractPureConstraints(
 
   std::vector<std::string_view> unimpl;
   if (!cls->base_class.empty()) {
-    CollectInheritedPureConstraints(FindClassDecl(cls->base_class, unit_),
-                                    unit_, unimpl);
+    CollectInheritedPureConstraints(FindBaseClass(cls, unit_), unit_, unimpl);
   }
   // Constraints declared in this class override any inherited obligation of
   // the same name; only a same-named non-pure constraint discharges it.

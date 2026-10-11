@@ -54,8 +54,7 @@ struct AccessSite {
                                 const CompilationUnit* unit) const {
     if (inside.empty()) return nullptr;
     if (name == "this") return inside.front();
-    return name == "super" ? FindClassDecl(inside.front()->base_class, unit)
-                           : nullptr;
+    return name == "super" ? FindBaseClass(inside.front(), unit) : nullptr;
   }
 };
 

@@ -72,8 +72,7 @@ bool IsClassDerivedFrom(std::string_view a, std::string_view b,
                         const CompilationUnit* unit) {
   if (a == b) return true;
   for (const auto* cls = FindClassDecl(a, unit); cls;
-       cls = cls->base_class.empty() ? nullptr
-                                     : FindClassDecl(cls->base_class, unit)) {
+       cls = FindBaseClass(cls, unit)) {
     if (cls->base_class == b) return true;
     if (AnyInterfaceDerivedFrom(cls, b, unit)) return true;
   }
@@ -261,9 +260,7 @@ static void CheckInterfaceHandleRandConstraintMode(
 static bool ClassHierarchyHasConstraint(const ClassDecl* cls,
                                         std::string_view constraint_name,
                                         const CompilationUnit* unit) {
-  for (const auto* c = cls; c; c = c->base_class.empty()
-                                       ? nullptr
-                                       : FindClassDecl(c->base_class, unit)) {
+  for (const auto* c = cls; c; c = FindBaseClass(c, unit)) {
     for (const auto* m : c->members) {
       if (m->kind == ClassMemberKind::kConstraint &&
           m->name == constraint_name) {
@@ -342,9 +339,7 @@ static void ClassHierarchyRandVariableStatus(const ClassDecl* cls,
                                              bool& found, bool& is_rand) {
   found = false;
   is_rand = false;
-  for (const auto* c = cls; c; c = c->base_class.empty()
-                                       ? nullptr
-                                       : FindClassDecl(c->base_class, unit)) {
+  for (const auto* c = cls; c; c = FindBaseClass(c, unit)) {
     for (const auto* m : c->members) {
       if (m->kind == ClassMemberKind::kProperty && m->name == var_name) {
         found = true;

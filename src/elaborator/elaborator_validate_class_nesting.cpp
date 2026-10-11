@@ -82,7 +82,7 @@ DeclaredMembers CollectDeclaredMembers(const ClassDecl* cls,
   for (const auto* c = cls; c != nullptr && seen.insert(c).second;) {
     AddDeclaredMembers(c, out);
     if (c->base_class.empty()) break;
-    c = FindClassDecl(c->base_class, unit);
+    c = FindBaseClass(c, unit);
   }
   return out;
 }

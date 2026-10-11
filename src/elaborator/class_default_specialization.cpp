@@ -54,7 +54,11 @@ class UnadornedUseWalk {
 
   // The class named `name` used with no arguments at `loc`.
   void Class(std::string_view name, SourceLoc loc) {
-    const ClassDecl* cls = FindClassDecl(name, &unit_);
+    Class(FindClassDecl(name, &unit_), loc);
+  }
+
+  // The class `cls` used with no arguments at `loc`; nothing where it is null.
+  void Class(const ClassDecl* cls, SourceLoc loc) {
     if (cls == nullptr) return;
     const std::string_view kMissing = ParameterWithoutDefault(*cls);
     if (kMissing.empty()) return;
@@ -97,7 +101,7 @@ class UnadornedUseWalk {
   void ClassBody(const ClassDecl& cls) {
     if (!cls.base_class.empty() && cls.base_class_type_params.empty() &&
         cls.extends_args.empty() && !cls.extends_has_default) {
-      Class(cls.base_class, cls.range.start);
+      Class(FindBaseClass(&cls, &unit_), cls.range.start);
     }
     std::unordered_set<std::string_view> local = cls.type_param_names;
     for (const ClassMember* m : cls.members) {

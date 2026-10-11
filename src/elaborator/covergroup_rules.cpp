@@ -631,8 +631,8 @@ std::unordered_set<std::string_view> InheritedCoverpoints(
     const CompilationUnit* unit) {
   std::unordered_set<std::string_view> names;
   if (cg.extends_base.empty()) return names;
-  for (const ClassDecl* base = FindClassDecl(cls->base_class, unit);
-       base != nullptr; base = FindClassDecl(base->base_class, unit)) {
+  for (const ClassDecl* base = FindBaseClass(cls, unit); base != nullptr;
+       base = FindBaseClass(base, unit)) {
     for (const ClassMember* m : base->members) {
       if (m->kind != ClassMemberKind::kCovergroup || m->name != cg.name)
         continue;

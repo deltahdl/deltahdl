@@ -24,7 +24,7 @@ OwnedMember FindMemberAndOwner(const ClassDecl* cls, std::string_view name,
       if (m->method != nullptr && m->method->name == name) return {m, c};
     }
     if (c->base_class.empty()) break;
-    c = FindClassDecl(c->base_class, unit);
+    c = FindBaseClass(c, unit);
   }
   return {};
 }

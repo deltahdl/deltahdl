@@ -14,6 +14,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/type_site_lookup.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -219,6 +220,37 @@ const ClassDecl* FindClassDecl(std::string_view name,
     TakeUniqueMatch(FindClassAmong(name, pkg->items), only, ambiguous);
   }
   return ambiguous ? nullptr : only;
+}
+
+// The site of the scope among `items`, of kind `kind`, that declares `cls`
+// directly; `found` is left alone where `items` does not.
+static void TakeDeclaringSite(const ClassDecl* cls,
+                              const std::vector<ModuleItem*>& items,
+                              SiteKind kind, TypeSite& found) {
+  for (const ModuleItem* item : items) {
+    if (item->kind == ModuleItemKind::kClassDecl && item->class_decl == cls) {
+      found = TypeSite{&items, items.size(), kind};
+    }
+  }
+}
+
+const ClassDecl* FindBaseClass(const ClassDecl* cls,
+                               const CompilationUnit* unit) {
+  if (cls->base_class.empty()) return nullptr;
+  TypeSite site;
+  TakeDeclaringSite(cls, unit->cu_items, SiteKind::kUnit, site);
+  for (const auto* group :
+       {&unit->modules, &unit->interfaces, &unit->programs, &unit->checkers}) {
+    for (const auto* decl : *group) {
+      TakeDeclaringSite(cls, decl->items, SiteKind::kModule, site);
+    }
+  }
+  for (const auto* pkg : unit->packages) {
+    TakeDeclaringSite(cls, pkg->items, SiteKind::kPackage, site);
+  }
+  const ClassDecl* seen =
+      site.items == nullptr ? nullptr : ClassIn(*unit, site, cls->base_class);
+  return seen != nullptr ? seen : FindClassDecl(cls->base_class, unit);
 }
 
 // Appends `cls` and, after it, each class nested in its body (§8.23), which

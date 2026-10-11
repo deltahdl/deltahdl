@@ -30,9 +30,7 @@ static bool IsRealDataType(DataTypeKind kind) {
 static std::unordered_map<std::string_view, const ClassMember*>
 BuildClassPropertyMap(const ClassDecl* cls, const CompilationUnit* unit) {
   std::unordered_map<std::string_view, const ClassMember*> properties;
-  for (const ClassDecl* c = cls; c;
-       c = c->base_class.empty() ? nullptr
-                                 : FindClassDecl(c->base_class, unit)) {
+  for (const ClassDecl* c = cls; c; c = FindBaseClass(c, unit)) {
     for (const auto* m : c->members) {
       if (m->kind != ClassMemberKind::kProperty || m->name.empty()) continue;
       properties.emplace(m->name, m);  // keeps the most-derived binding

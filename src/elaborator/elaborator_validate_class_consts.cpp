@@ -121,8 +121,7 @@ static void CollectConstClassProperties(ConstClassProps& props,
 
 static const ClassDecl* BaseOf(const ClassDecl* cls,
                                const CompilationUnit* unit) {
-  return cls->base_class.empty() ? nullptr
-                                 : FindClassDecl(cls->base_class, unit);
+  return FindBaseClass(cls, unit);
 }
 
 // Adds the const properties `base` declares to `props`, leaving out a name
