@@ -562,8 +562,7 @@ void SimContext::RegisterClassType(std::string_view name, ClassTypeInfo* info) {
 // generic class of each instance of the module, with specializations and
 // static members of its own, so the copies a later instance registers stand
 // under that instance's prefix (Lowerer::RegisterChildClasses), and a name is
-// looked for first under the instance in hand: the scope set, else the
-// running code's instance.
+// looked for first under the running code's instance.
 std::string SimContext::SetClassInstanceScope(std::string scope) {
   if (!scope.empty()) instance_classes_ = true;
   std::swap(scope, class_scope_);
@@ -599,15 +598,12 @@ ClassTypeInfo* SimContext::FindClassType(std::string_view name) {
   // §3.12.1: where each unit has a scope of its own, the running code's unit's
   // class of the name stands ahead of another unit's
   // (Lowerer::RegisterClassDecl).
-  // §8.25: so too a module instance's own class of the name, under the
-  // instance scope set or else the running code's instance.
+  // §8.25: so too the running code's instance's own class of the name.
   ClassTypeInfo* own = units_.Separate()
                            ? ClassUnder(class_types_, ActiveUnitScope(), name)
                            : nullptr;
   if (own == nullptr && instance_classes_) {
-    own = ClassUnder(
-        class_types_,
-        class_scope_.empty() ? ActiveInstancePrefix() : class_scope_, name);
+    own = ClassUnder(class_types_, ActiveInstancePrefix(), name);
   }
   if (own != nullptr) return own;
   auto it = class_types_.find(name);

@@ -623,9 +623,9 @@ class SimContext : public DeclaredNameTables,
 
   void RegisterClassType(std::string_view name, ClassTypeInfo* info);
   ClassTypeInfo* FindClassType(std::string_view name);
-  // §8.25: while `scope`, a module instance's prefix, is set, the classes
-  // RegisterClassType holds are that instance's own and stand under it, and
-  // FindClassType tries them first; returns the scope set before.
+  // §8.25: while `scope`, an instance's prefix, is set, RegisterClassType
+  // holds classes as that instance's own, under it, and FindClassType tries
+  // the running code's instance's first; returns the scope set before.
   std::string SetClassInstanceScope(std::string scope);
   const std::string& ClassInstanceScope() const { return class_scope_; }
   // The class held under `name` in the scope set, which is not empty.
