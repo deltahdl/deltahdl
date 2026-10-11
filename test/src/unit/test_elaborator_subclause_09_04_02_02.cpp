@@ -222,6 +222,23 @@ TEST(AlwaysStarElab, LhsIndexVarInSensitivity) {
   EXPECT_FALSE(names.count("y")) << "y (pure LHS) must not be in sensitivity";
 }
 
+// §9.4.2.2 adds a variable an assignment's left-hand side reads as an index,
+// and a concatenation left-hand side holds a select of its own in each target,
+// so `i` of `{y[i], z} = d` joins the list beside the right-hand side's `d`.
+TEST(AlwaysStarElab, ConcatenationLhsIndexInSensitivity) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [3:0] y; logic z; logic [1:0] i, d;\n"
+      "  always @* {y[i], z} = d;\n"
+      "endmodule\n",
+      f);
+  std::unordered_set<std::string> names;
+  CollectSensitivityNames(design, f, names);
+  EXPECT_TRUE(names.count("i")) << "i (index in a concatenation target)";
+  EXPECT_TRUE(names.count("d"));
+}
+
 TEST(AlwaysStarElab, ReadAfterWriteIntermediateInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(

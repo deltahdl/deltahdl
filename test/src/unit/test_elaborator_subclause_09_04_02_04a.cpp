@@ -10,6 +10,8 @@
 
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -67,6 +69,38 @@ TEST(SequenceEventElaboration, AutomaticVarAsSequenceArgErrors) {
                             "sequence event arguments shall not reference "
                             "automatic variables",
                             8, "9.4.2.4"));
+}
+
+// §9.4.2.4 judges an argument by what it refers to: an automatic variable, a
+// formal of an automatic task, a local of one not declared static, or a
+// variable declared automatic in a procedure, is reported; a constant, a static
+// local and a module variable are not, wherever the event control stands.
+TEST(SequenceEventElaboration, AnArgumentIsJudgedByTheVariableItNames) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m; logic clk, v0;\n"
+      "  sequence s(x); @(posedge clk) x; endsequence\n"
+      "  task automatic tk(input logic f);\n"
+      "    static logic st;\n"
+      "    @(s(1'b1)) ;\n"
+      "    @(s(st)) ;\n"
+      "    @(s(f)) ;\n"
+      "  endtask\n"
+      "  initial begin automatic logic v; @(s(v)); end\n"
+      "  initial @(s(v0));\n"
+      "endmodule\n",
+      f);
+  const char* const kMessage =
+      "sequence event arguments shall not reference automatic variables";
+  for (const int kLine : {7, 9}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, kLine, "9.4.2.4"))
+        << kLine;
+  }
+  for (const int kLine : {5, 6, 10}) {
+    EXPECT_FALSE(
+        ReportedError(f.diag.Diagnostics(), kMessage, kLine, "9.4.2.4"))
+        << kLine;
+  }
 }
 
 }  // namespace

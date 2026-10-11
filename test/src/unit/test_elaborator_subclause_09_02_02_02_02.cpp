@@ -626,4 +626,31 @@ TEST(AlwaysCombVsAlwaysStar, DelayInARandsequenceCodeBlockErrors) {
                             "9.2.2.2.2"));
 }
 
+// A blocking assignment with an intra-assignment delay or event control holds
+// its process until the control completes (§9.4.5), so it is a statement that
+// blocks: §9.2.2.2.2 bars it from an always_comb, §9.2.2.3 from an
+// always_latch and §9.2.2.4 from an always_ff. The nonblocking form schedules
+// its update and goes on, and stays legal.
+TEST(AlwaysCombVsAlwaysStar, BlockingIntraAssignmentTimingIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m; logic a, c, d, e, y, q, z, w;\n"
+      "  always_comb y = #1 a;\n"
+      "  always_latch w = @(d) a;\n"
+      "  always_ff @(posedge c) q = @(d) e;\n"
+      "  always_comb z <= #1 a;\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "always_comb shall not contain timing controls", 2, "9.2.2.2.2"));
+  EXPECT_TRUE(ReportedError(
+      diags, "always_latch shall not contain timing controls", 3, "9.2.2.3"));
+  EXPECT_TRUE(ReportedError(diags,
+                            "always_ff shall not contain blocking timing "
+                            "controls",
+                            4, "9.2.2.4"));
+  EXPECT_FALSE(ReportedError(diags, "shall not contain", 5, "9.2.2.2.2"));
+}
+
 }  // namespace

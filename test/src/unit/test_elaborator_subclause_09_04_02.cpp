@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -131,6 +133,28 @@ TEST(EventControlElaboration, UnpackedArrayEventExpressionRejected) {
                     "event expression references non-singular variable "
                     "'arr'; an event can only be watched on a singular value",
                     3, "9.4.2"));
+}
+
+// §9.4.2 holds an event expression to a singular value wherever it is
+// written, the intra-assignment event control of a blocking or a nonblocking
+// assignment (§9.4.5) included; a singular one there stays legal.
+TEST(EventControlElaboration, IntraAssignmentEventMustBeSingular) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m; int arr[4]; int x, y;\n"
+      "  initial x = @(arr) 1;\n"
+      "  initial x <= @(arr) 2;\n"
+      "  initial y = @(arr[0]) 3;\n"
+      "endmodule\n",
+      f);
+  for (const int kLine : {2, 3}) {
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(),
+                      "event expression references non-singular variable 'arr'",
+                      kLine, "9.4.2"))
+        << kLine;
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "non-singular", 4, "9.4.2"));
 }
 
 TEST(EventControlElaboration, UnpackedStructEventExpressionRejected) {

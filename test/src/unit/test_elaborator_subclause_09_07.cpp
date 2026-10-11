@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
@@ -114,6 +116,25 @@ TEST(FineGrainProcessControlElaboration, ProcessNewError) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "cannot construct a process object with 'new'", 4,
                             "9.7"));
+}
+
+// §9.7 gives the process class no construction by the user, so `new` written
+// as a declaration's initializer, at module scope or in a block, is reported
+// as the assignment `p = new;` is.
+TEST(FineGrainProcessControlElaboration, ProcessNewInADeclarationError) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  process q = new;\n"
+             "  initial begin process p = new; end\n"
+             "endmodule\n",
+             f));
+  for (const int kLine : {2, 3}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "cannot construct a process object with 'new'",
+                              kLine, "9.7"))
+        << kLine;
+  }
 }
 
 TEST(FineGrainProcessControlElaboration, ProcessPassedToTaskElaborates) {

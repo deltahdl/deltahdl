@@ -703,6 +703,8 @@ class Elaborator : public ElaboratorClassRules {
 
   void ValidateDisableTargets(const ModuleDecl* decl);
 
+  void ValidateFinalTaskEnables(const ModuleDecl* decl);
+
   void ValidateFunctionBody(const ModuleItem* item);
 
   void ValidateFunctionArgDefaultsScope(const ModuleItem* item);

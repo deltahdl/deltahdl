@@ -283,6 +283,20 @@ static void CollectCallNamesStmt(const Stmt* stmt,
                    [&](Stmt* const& sub) { CollectCallNamesStmt(sub, out); });
 }
 
+// The names a function's own declarations give it: its name, which stands for
+// its return value in its body (§13.4.1), its formals, and the variables its
+// body declares at its top. None is a variable of the module, and each call
+// has its own where the function is automatic (§13.4.2), so an assignment to
+// one is no write of the variables §9.2.2.2's single-writer rule compares.
+static std::vector<std::string_view> FunctionOwnNames(const ModuleItem& func) {
+  std::vector<std::string_view> names{func.name};
+  for (const FunctionArg& arg : func.func_args) names.push_back(arg.name);
+  for (const Stmt* s : func.func_body_stmts) {
+    if (s->kind == StmtKind::kVarDecl) names.push_back(s->var_name);
+  }
+  return names;
+}
+
 static void CollectFuncLhsPrefixes(const Stmt* body, const FuncMap& funcs,
                                    std::unordered_set<std::string>& out,
                                    const ScopeMap& scope) {
@@ -296,13 +310,25 @@ static void CollectFuncLhsPrefixes(const Stmt* body, const FuncMap& funcs,
       visited.insert(name);
       auto it = funcs.find(name);
       if (it == funcs.end()) continue;
+      std::vector<std::string_view> locals = FunctionOwnNames(*it->second);
       for (auto* s : it->second->func_body_stmts) {
-        CollectStmtLhsPrefixes(s, out, scope);
+        CollectLhsPrefixesInScope(s, out, scope, locals);
         CollectCallNamesStmt(s, next);
       }
     }
     pending = std::move(next);
   }
+}
+
+// The longest static prefix of every target the procedure `body` assigns,
+// directly or in a function it calls (§9.2.2.2), added to `out`.
+static void CollectProcedureLhsPrefixes(const Stmt* body,
+                                        const FuncMap* func_map,
+                                        std::unordered_set<std::string>& out,
+                                        const ScopeMap& scope) {
+  CollectStmtLhsPrefixes(body, out, scope);
+  if (func_map && !func_map->empty())
+    CollectFuncLhsPrefixes(body, *func_map, out, scope);
 }
 
 static bool PrefixesOverlap(const std::string& a, const std::string& b) {
@@ -351,9 +377,7 @@ static ProcInfo MakeProcInfo(const ModuleItem* item, const FuncMap* func_map,
   ProcInfo info;
   info.loc = item->loc;
   info.kind = item->kind;
-  CollectStmtLhsPrefixes(item->body, info.lhs, scope);
-  if (func_map && !func_map->empty())
-    CollectFuncLhsPrefixes(item->body, *func_map, info.lhs, scope);
+  CollectProcedureLhsPrefixes(item->body, func_map, info.lhs, scope);
   return info;
 }
 
@@ -374,15 +398,17 @@ static void CollectProcessLhsInfo(const ModuleDecl* decl,
     // §9.2.2.2: no other process may assign the variables an always_comb
     // assigns. §9.2 makes the general purpose always procedure, the initial
     // procedure and the final procedure each a process, so all three are
-    // gathered here; their assignment targets are kept apart from `procs` so an
-    // overlap with an always_comb prefix can be flagged. always_comb,
-    // always_latch and always_ff are the ones that go into `procs` instead,
-    // because a process is also compared against the other two of its own three
-    // kinds rather than only against an always_comb.
+    // gathered here, with what they assign in the functions they call, since
+    // such an assignment is still the calling process's write; their targets
+    // are kept apart from `procs` so an overlap with an always_comb prefix can
+    // be flagged. always_comb, always_latch and always_ff are the ones that go
+    // into `procs` instead, because a process is also compared against the
+    // other two of its own three kinds rather than only against an always_comb.
     if (item->kind == ModuleItemKind::kAlwaysBlock ||
         item->kind == ModuleItemKind::kInitialBlock ||
         item->kind == ModuleItemKind::kFinalBlock) {
-      CollectStmtLhsPrefixes(item->body, drivers.general_proc_lhs, scope);
+      CollectProcedureLhsPrefixes(item->body, func_map,
+                                  drivers.general_proc_lhs, scope);
     }
   }
 }
@@ -422,21 +448,24 @@ static void CheckContAssignConflict(
 
 // §9.2.2.2: report an always_comb LHS that is also assigned by a general
 // process (a plain always block or an initial block). §9.2.2.3 states that all
-// of §9.2.2.2's rules apply to always_latch, so a latch target sharing a prefix
-// with a general procedural driver is flagged the same way. always_ff's
-// analogous single-driver rule is left to §9.2.2.4. Element granularity comes
-// for free from the longest static prefix (§11.5.3): distinct array elements or
-// struct fields do not overlap and so are not reported.
+// of §9.2.2.2's rules apply to always_latch, and §9.2.2.4 puts an always_ff's
+// targets under the same restriction, so a latch or flip-flop target sharing a
+// prefix with a general procedural driver is flagged the same way, under the
+// procedure's own subclause. Element granularity comes for free from the
+// longest static prefix (§11.5.3): distinct array elements or struct fields do
+// not overlap and so are not reported.
 static void CheckGeneralProcOverlap(
     const std::string& var, const ProcInfo& proc,
     const std::unordered_set<std::string>& general_proc_lhs, DiagEngine& diag) {
   for (const auto& other : general_proc_lhs) {
     if (PrefixesOverlap(var, other)) {
-      diag.Error(proc.loc,
-                 std::format("variable '{}' driven by {} and "
-                             "another process",
-                             var, ProcessKindLabel(proc.kind)),
-                 Subclause("9.2.2.2"));
+      diag.Error(
+          proc.loc,
+          std::format("variable '{}' driven by {} and "
+                      "another process",
+                      var, ProcessKindLabel(proc.kind)),
+          Subclause(proc.kind == ModuleItemKind::kAlwaysFFBlock ? "9.2.2.4"
+                                                                : "9.2.2.2"));
       return;
     }
   }
@@ -446,9 +475,6 @@ static void CheckGeneralProcConflict(
     const std::vector<ProcInfo>& procs,
     const std::unordered_set<std::string>& general_proc_lhs, DiagEngine& diag) {
   for (const auto& proc : procs) {
-    if (proc.kind != ModuleItemKind::kAlwaysCombBlock &&
-        proc.kind != ModuleItemKind::kAlwaysLatchBlock)
-      continue;
     for (const auto& var : proc.lhs)
       CheckGeneralProcOverlap(var, proc, general_proc_lhs, diag);
   }

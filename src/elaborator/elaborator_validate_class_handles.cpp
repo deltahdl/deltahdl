@@ -518,64 +518,40 @@ static void ReportUnconstructibleClass(std::string_view name, SourceLoc loc,
   }
 }
 
-// The class the construction `init` builds an object of: the one a typed
-// constructor call names, `B::new`, else, for a bare `new`, the class of the
-// handle it initializes or is assigned to, `target`; empty for anything else.
-static std::string_view ConstructedClass(const Expr* init,
-                                         std::string_view target) {
-  if (IsBareNewCall(init)) return target;
-  return TypedConstructorScopeType(init);
+// §9.7, §8.21 and §8.26.5: the construction `init` of an object for a handle
+// declared `type`, written at `loc` as a declaration's initializer or an
+// assignment's right-hand side. A typed constructor call, `B::new`, builds an
+// object of the class it names; a bare `new` builds one of `type`, which §G.6
+// gives no constructor where it is the built-in process class (§9.7), and
+// which is reported where it is abstract or an interface class.
+static void CheckConstruction(std::string_view type, const Expr* init,
+                              SourceLoc loc, const CompilationUnit* unit,
+                              DiagEngine& diag) {
+  if (!IsBareNewCall(init)) {
+    ReportUnconstructibleClass(TypedConstructorScopeType(init), loc, unit,
+                               diag);
+    return;
+  }
+  const std::optional<StdPackageMember> kStd = StdPackageMemberNamed(type);
+  if (kStd && !StdClassPrototype(*kStd).empty() &&
+      !StdClassHasConstructor(*kStd)) {
+    diag.Error(loc,
+               std::format("cannot construct a {} object with 'new'", type),
+               Subclause("9.7"));
+    return;
+  }
+  ReportUnconstructibleClass(type, loc, unit, diag);
 }
 
-// §8.21 and §8.26.5 for a block-local declaration's initializer, `IC ic =
-// new;` or `B b = B::new;`, which the procedural assignment walk never
-// reaches.
-static void CheckNewOnInterfaceDeclInit(const Stmt* s,
-                                        const CompilationUnit* unit,
-                                        DiagEngine& diag) {
-  ReportUnconstructibleClass(
-      ConstructedClass(s->var_init, s->var_decl_type.type_name), s->range.start,
-      unit, diag);
-}
-
-// §8.21 and §8.26.5 for a module-scope declaration initializer, whose
-// initializer is carried on the module item rather than a procedural
-// statement.
-static void CheckNewOnInterfaceModuleItem(const ModuleItem* item,
-                                          const CompilationUnit* unit,
-                                          DiagEngine& diag) {
-  ReportUnconstructibleClass(
-      ConstructedClass(item->init_expr, item->data_type.type_name), item->loc,
-      unit, diag);
-}
-
-// Reject a 'new' constructor call assigned to a handle whose declared type
-// cannot be constructed: the built-in 'process' class and interface classes.
+// The construction a handle assignment writes, `p = new;` or `h = B::new;`.
 static void CheckNewOnUnconstructibleHandle(
     const Stmt* s,
     const std::unordered_map<std::string_view, std::string_view>&
         class_var_types,
     const CompilationUnit* unit, DiagEngine& diag) {
-  auto lhs_name = ExprIdent(s->lhs);
-  auto lt = class_var_types.find(lhs_name);
+  auto lt = class_var_types.find(ExprIdent(s->lhs));
   if (lt == class_var_types.end()) return;
-  if (!IsBareNewCall(s->rhs)) {
-    ReportUnconstructibleClass(TypedConstructorScopeType(s->rhs),
-                               s->range.start, unit, diag);
-    return;
-  }
-  // §G.6 gives process no constructor, where the other std classes have one.
-  const std::optional<StdPackageMember> kStd =
-      StdPackageMemberNamed(lt->second);
-  if (kStd && !StdClassPrototype(*kStd).empty() &&
-      !StdClassHasConstructor(*kStd)) {
-    diag.Error(
-        s->range.start,
-        std::format("cannot construct a {} object with 'new'", lt->second),
-        Subclause("9.7"));
-    return;
-  }
-  ReportUnconstructibleClass(lt->second, s->range.start, unit, diag);
+  CheckConstruction(lt->second, s->rhs, s->range.start, unit, diag);
 }
 
 // §8.8: a typed constructor call may name a type different from the assignment
@@ -733,7 +709,8 @@ void ElaboratorClassRules::WalkStmtsForClassHandleOps(const Stmt* s) {
     if (s->var_unpacked_dims.empty()) class_var_names_.insert(s->var_name);
     class_var_types_[s->var_name] = s->var_decl_type.type_name;
     CheckTypedConstructorDeclInitCompatibility(s, class_names_, unit_, diag_);
-    CheckNewOnInterfaceDeclInit(s, unit_, diag_);
+    CheckConstruction(s->var_decl_type.type_name, s->var_init, s->range.start,
+                      unit_, diag_);
   }
 
   if ((s->kind == StmtKind::kBlockingAssign ||
@@ -821,7 +798,8 @@ void ElaboratorClassRules::ValidateClassHandleOps(const ModuleDecl* decl) {
         class_names_.count(item->data_type.type_name)) {
       CheckTypedConstructorModuleItemCompatibility(item, class_names_, unit_,
                                                    diag_);
-      CheckNewOnInterfaceModuleItem(item, unit_, diag_);
+      CheckConstruction(item->data_type.type_name, item->init_expr, item->loc,
+                        unit_, diag_);
     }
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {

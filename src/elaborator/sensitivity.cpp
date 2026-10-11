@@ -129,9 +129,14 @@ void CollectExprReads(const Expr* expr, std::unordered_set<std::string>& out) {
 }
 
 // The index expressions of an assignment's left-hand side, which are read where
-// the object they address is written.
+// the object they address is written; those of each target a concatenation
+// left-hand side writes, `{y[i], z} = d`, included (§9.4.2.2).
 static void ForEachLhsIndexRead(const Expr* lhs,
                                 const std::function<void(const Expr*)>& fn) {
+  if (lhs != nullptr && lhs->kind == ExprKind::kConcatenation) {
+    for (const Expr* target : lhs->elements) ForEachLhsIndexRead(target, fn);
+    return;
+  }
   for (const Expr* cur = lhs; cur != nullptr && cur->kind == ExprKind::kSelect;
        cur = cur->base) {
     if (cur->index) fn(cur->index);
@@ -222,9 +227,19 @@ void CollectStmtReads(const Stmt* stmt, std::unordered_set<std::string>& out) {
                       [&out](const Expr* e) { CollectExprReads(e, out); });
 }
 
+// The names an assignment's left-hand side `lhs` writes: the identifier each
+// target stands on, and, for a select, its longest static prefix as
+// CollectSelectReads spells a read of it, `y[0]`, so that §9.2.2.2.1's
+// exception (b) takes out a select the block both writes and reads, which the
+// identifier alone does not name. Each target of a concatenation is a write.
 static void CollectAssignLhsName(const Expr* lhs,
                                  std::unordered_set<std::string>& out) {
   if (!lhs) return;
+  if (lhs->kind == ExprKind::kConcatenation) {
+    for (const Expr* target : lhs->elements) CollectAssignLhsName(target, out);
+    return;
+  }
+  if (lhs->kind == ExprKind::kSelect) out.insert(LongestStaticStorageName(lhs));
   const Expr* e = lhs;
   while (e->kind == ExprKind::kSelect && e->base) e = e->base;
   if (e->kind == ExprKind::kIdentifier && !e->text.empty())

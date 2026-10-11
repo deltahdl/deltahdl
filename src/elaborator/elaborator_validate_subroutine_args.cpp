@@ -307,13 +307,14 @@ static void WalkStmtForEventSingular(
     const std::unordered_set<std::string_view>& non_singular_funcs,
     DiagEngine& diag) {
   if (!s) return;
-  if (s->kind == StmtKind::kEventControl) {
-    for (const auto& ev : s->events) {
-      CheckEventExprSingular(ev.signal, non_singular_vars, non_singular_funcs,
-                             diag);
-      CheckEventExprSingular(ev.iff_condition, non_singular_vars,
-                             non_singular_funcs, diag);
-    }
+  // An event control's events, and the intra-assignment event control a
+  // blocking or nonblocking assignment carries (§9.4.5), `x = @(e) y;`; no
+  // other statement holds any.
+  for (const auto& ev : s->events) {
+    CheckEventExprSingular(ev.signal, non_singular_vars, non_singular_funcs,
+                           diag);
+    CheckEventExprSingular(ev.iff_condition, non_singular_vars,
+                           non_singular_funcs, diag);
   }
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtForEventSingular(sub, non_singular_vars, non_singular_funcs, diag);

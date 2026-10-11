@@ -4,10 +4,12 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
@@ -59,12 +61,12 @@ static void CheckSequenceActualArgCount(Stmt* s, const Expr* call,
 // actual-argument count rule (`s` supplies the location).
 // §16.13: what a sequence used as an event is resolved against -- the named
 // sequences visible in the scope, their declarations (for the actual-argument
-// count check), whether the enclosing subroutine is automatic, and where a
-// violation is reported.
+// count check), the automatic variables the event control's scope declares,
+// and where a violation is reported.
 struct SequenceEventCtx {
   const std::unordered_set<std::string_view>& seq_names;
   const SequenceDeclMap& seq_decls;
-  bool in_automatic;
+  const std::unordered_set<std::string_view>& automatic_names;
   DiagEngine& diag;
 };
 
@@ -82,7 +84,9 @@ static void MarkSequenceEvent(Stmt* s, EventExpr& ev,
   if (name.empty() || ctx.seq_names.count(name) == 0) return;
   ev.is_sequence_event = true;
 
-  if (has_args && ctx.in_automatic) {
+  if (has_args && std::ranges::any_of(ev.signal->args, [&](const Expr* a) {
+        return ExprMentionsAny(a, ctx.automatic_names);
+      })) {
     ctx.diag.Error(s->range.start,
                    "sequence event arguments shall not reference "
                    "automatic variables",
@@ -112,33 +116,51 @@ static void WalkStmtsForSequenceEvents(Stmt* s, const SequenceEventCtx& ctx) {
       s, [&](Stmt* const& sub) { WalkStmtsForSequenceEvents(sub, ctx); });
 }
 
+// §9.4.2.4 with §6.21: adds to `out` the variables `s` and the statements
+// inside it declare with an automatic lifetime: each declared `automatic`, and,
+// where `automatic_by_default` (the body of an automatic task), each not
+// declared `static`.
+static void CollectAutomaticVarNames(
+    const Stmt* s, bool automatic_by_default,
+    std::unordered_set<std::string_view>& out) {
+  if (!s) return;
+  if (s->kind == StmtKind::kVarDecl &&
+      (s->var_is_automatic || (automatic_by_default && !s->var_is_static))) {
+    out.insert(s->var_name);
+  }
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    CollectAutomaticVarNames(sub, automatic_by_default, out);
+  });
+}
+
 // Walk one module item's statements for sequence-event arguments. A process
 // block's statements live in item->body; a task body's statements live in
 // func_body_stmts (item->body is the module-process body form), so both are
-// walked for a task so an event control such as @(s(a, b)) inside an automatic
-// task is reached. §9.4.2.4: arguments to a sequence used in an event control
-// shall be static, so an automatic task local passed as a sequence argument is
-// an error (in_automatic is false for a process block and a non-automatic
-// task, so static sequence arguments stay legal there).
+// walked for a task. §9.4.2.4: an argument to a sequence used in an event
+// control shall be static, so one referring to an automatic variable is an
+// error: a variable declared `automatic` anywhere, and in an automatic task its
+// formals and the locals not declared `static`.
 static void WalkItemForSequenceEvents(
     const ModuleItem* item,
     const std::unordered_set<std::string_view>& seq_names,
     const SequenceDeclMap& seq_decls, DiagEngine& diag) {
-  if (IsProceduralItemKind(item->kind)) {
-    if (item->body) {
-      WalkStmtsForSequenceEvents(const_cast<Stmt*>(item->body),
-                                 {seq_names, seq_decls, false, diag});
+  const bool kTask = item->kind == ModuleItemKind::kTaskDecl;
+  if (!kTask && !IsProceduralItemKind(item->kind)) return;
+  const bool kAutomatic = kTask && item->is_automatic;
+  std::unordered_set<std::string_view> automatic_names;
+  if (kAutomatic) {
+    for (const FunctionArg& arg : item->func_args) {
+      automatic_names.insert(arg.name);
     }
-    return;
   }
-  if (item->kind != ModuleItemKind::kTaskDecl) return;
-  const SequenceEventCtx kCtx{seq_names, seq_decls, item->is_automatic, diag};
-  if (item->body) {
-    WalkStmtsForSequenceEvents(const_cast<Stmt*>(item->body), kCtx);
+  std::vector<Stmt*> bodies(item->func_body_stmts.begin(),
+                            item->func_body_stmts.end());
+  bodies.push_back(const_cast<Stmt*>(item->body));
+  for (const Stmt* s : bodies) {
+    CollectAutomaticVarNames(s, kAutomatic, automatic_names);
   }
-  for (auto* s : item->func_body_stmts) {
-    WalkStmtsForSequenceEvents(s, kCtx);
-  }
+  const SequenceEventCtx kCtx{seq_names, seq_decls, automatic_names, diag};
+  for (Stmt* s : bodies) WalkStmtsForSequenceEvents(s, kCtx);
 }
 
 void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl) {

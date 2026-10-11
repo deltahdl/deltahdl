@@ -399,6 +399,30 @@ TEST(AlwaysCombSensitivityInference, TransitiveFunctionCallReadsInSensitivity) {
                             {"a", "deep"});
 }
 
+// §9.2.2.2.1 exception (b) leaves out an expression the block also writes,
+// a select `y[0]` as much as a whole variable: the block both writes and reads
+// y[0], so y stays out of its list, where a select of y it only reads, y[1],
+// keeps y in the second block's. Each target of a concatenation is written.
+TEST(AlwaysCombSensitivityInference, WrittenSelectExcludedFromSensitivity) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [1:0] y, w; logic a, b, z, v, u;\n"
+      "  always_comb begin y[0] = a; z = y[0]; end\n"
+      "  always_comb begin w[0] = b; v = w[1]; end\n"
+      "  always_comb begin {y[1], w[1]} = {a, b}; u = y[1] ^ w[1]; end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  const auto& procs = design->top_modules[0]->processes;
+  ASSERT_EQ(procs.size(), 3u);
+  ExpectSensitivityContains(procs[0], {"a"});
+  ExpectSensitivityExcludes(procs[0], {"y"});
+  ExpectSensitivityContains(procs[1], {"b", "w"});
+  ExpectSensitivityExcludes(procs[2], {"y", "w"});
+}
+
 TEST(AlwaysCombSensitivityInference, FunctionLocalVarsExcludedFromSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(

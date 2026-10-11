@@ -525,4 +525,42 @@ TEST(AlwaysCombMultiDriver, ModuleVariableAssignedOutsideABlockLocalIsShared) {
                             "variable 'y' driven by multiple", 10, "9.2.2.2"));
 }
 
+// §9.2.2.2 counts as an always_comb's targets the variables a function it calls
+// assigns, and a function's own declarations are none of them: its formals,
+// the variables it declares and its name standing for its return value are its
+// own, a fresh set per call of an automatic function, so two always_comb blocks
+// calling one function share no target through them.
+TEST(AlwaysCombMultiDriver, CalledFunctionsOwnNamesAreNoDrivers) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m; logic a, b, y, z;\n"
+      "  function automatic logic inv(logic x);\n"
+      "    logic t; t = !x; x = t; inv = t;\n"
+      "  endfunction\n"
+      "  always_comb y = inv(a);\n"
+      "  always_comb z = inv(b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "driven by multiple", 6, "9.2.2.2"));
+}
+
+// §9.2.2.2 bars any other process from assigning an always_comb's variables,
+// and a process assigns what a function it calls assigns, so an initial
+// procedure writing y through set_y is reported as writing it directly is.
+TEST(AlwaysCombMultiDriver, AWriteThroughAnotherProcessesFunctionIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m; logic a, y;\n"
+      "  function void set_y(); y = 1; endfunction\n"
+      "  always_comb y = a;\n"
+      "  initial set_y();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'y' driven by always_comb and another "
+                            "process",
+                            3, "9.2.2.2"));
+}
+
 }  // namespace

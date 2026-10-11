@@ -679,6 +679,32 @@ void Elaborator::ValidateFunctionBody(const ModuleItem* item) {
   }
 }
 
+// §9.2.3 allows in a final procedure only the statements a function
+// declaration allows, and §13.4 bars a function from enabling a task, so a
+// task enabled anywhere in the procedure's statements is reported.
+static void CheckFinalTaskEnables(
+    const Stmt* s, const std::unordered_set<std::string_view>& task_names,
+    DiagEngine& diag) {
+  if (!s) return;
+  const Expr* call = SubroutineCallOfStmt(s);
+  if (call != nullptr && task_names.count(call->callee) != 0) {
+    diag.Error(s->range.start,
+               std::format("final procedure enables task '{}'", call->callee),
+               Subclause("9.2.3"));
+  }
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    CheckFinalTaskEnables(sub, task_names, diag);
+  });
+}
+
+void Elaborator::ValidateFinalTaskEnables(const ModuleDecl* decl) {
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kFinalBlock) {
+      CheckFinalTaskEnables(item->body, task_names_, diag_);
+    }
+  }
+}
+
 static void CheckAutoVarWritesInProc(
     const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
     DiagEngine& diag) {

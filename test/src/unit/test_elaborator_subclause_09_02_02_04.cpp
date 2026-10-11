@@ -370,4 +370,25 @@ TEST(AlwaysFFElaboration, CycleDelayInAlwaysFFErrors) {
                             3, "9.2.2.4"));
 }
 
+// §9.2.2.4 puts the variables an always_ff assigns under always_comb's rule
+// that no other process assign them, so q, also written by an initial
+// procedure, is reported under §9.2.2.4; r, which only the always_ff writes, is
+// not.
+TEST(AlwaysFFElaboration, ATargetAnotherProcessWritesIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m; logic clk, d, q, r;\n"
+      "  always_ff @(posedge clk) q <= d;\n"
+      "  initial q = 0;\n"
+      "  always_ff @(posedge clk) r <= d;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "variable 'q' driven by always_ff and another "
+                            "process",
+                            2, "9.2.2.4"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "variable 'r'", 4, "9.2.2.4"));
+}
+
 }  // namespace

@@ -317,4 +317,24 @@ TEST(FinalProcedureElaboration, FunctionCallInFinalValid) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §9.2.3 allows in a final procedure only the statements a function allows,
+// and a function shall not enable a task (§13.4), so a task enabled in a final
+// procedure is reported; a function called there is legal.
+TEST(FinalProcedureElaboration, ATaskEnabledInAFinalProcedureIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task t; endtask\n"
+      "  function int g(); return 1; endfunction\n"
+      "  int x;\n"
+      "  final begin x = 1; t(); end\n"
+      "  final x = g();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "final procedure enables task 't'", 5, "9.2.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "final procedure enables", 6,
+                             "9.2.3"));
+}
+
 }  // namespace

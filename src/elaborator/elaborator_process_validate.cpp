@@ -254,13 +254,14 @@ bool InfersLatch(const Stmt* body) {
 // blocking is the property the callers ask about and a timing control is one
 // way of having it.
 //
-// When `include_intra_assign` is set, an assignment carrying an
-// intra-assignment timing control (`x = #5 y;`, `x <= @(clk) y;`, `x = ##2 y;`,
-// the repeat-event form) also counts — a form legal for some always procedures
-// (e.g. a nonblocking delay in always_comb, §9.2.2.2) but not for a final
-// procedure, which is limited to the timing-free statements permitted in a
-// function.
-bool StmtBlocks(const Stmt* stmt, bool include_intra_assign = false);
+// A blocking assignment carrying an intra-assignment timing control (`x = #5
+// y;`, `x = @(clk) y;`, `x = ##2 y;`, the repeat-event form) counts too: §9.4.5
+// has it delay the assignment, and the process with it, until the control
+// completes. A nonblocking one, `x <= #5 y;`, schedules its update and goes on,
+// so it counts only when `include_nonblocking_intra` is set, for a final
+// procedure, which is limited to the timing-free statements a function holds;
+// always_comb admits it (§9.2.2.2).
+bool StmtBlocks(const Stmt* stmt, bool include_nonblocking_intra = false);
 
 // §9.2.2.2.2 states its rule of an always_comb's statements, §9.2.2.4 of the
 // statements of an always_ff and §9.2.3 of those a final procedure holds; none
@@ -275,7 +276,7 @@ bool StmtBlocks(const Stmt* stmt, bool include_intra_assign = false);
 // ForEachChildStmt gives the visitor no way to stop, so the first blocking
 // statement found is kept in `found` and the recursion runs only while `found`
 // is false.
-bool StmtBlocks(const Stmt* stmt, bool include_intra_assign) {
+bool StmtBlocks(const Stmt* stmt, bool include_nonblocking_intra) {
   if (!stmt) return false;
   switch (stmt->kind) {
     // §14.11 makes a cycle delay a procedural timing control that waits for the
@@ -298,7 +299,8 @@ bool StmtBlocks(const Stmt* stmt, bool include_intra_assign) {
       return true;
     case StmtKind::kBlockingAssign:
     case StmtKind::kNonblockingAssign:
-      return include_intra_assign &&
+      return (stmt->kind == StmtKind::kBlockingAssign ||
+              include_nonblocking_intra) &&
              (stmt->delay != nullptr || stmt->cycle_delay != nullptr ||
               !stmt->events.empty());
     default:
@@ -307,7 +309,7 @@ bool StmtBlocks(const Stmt* stmt, bool include_intra_assign) {
   bool found = false;
   ForEachChildStmt(stmt, [&](Stmt* const& sub) {
     if (found) return;
-    found = StmtBlocks(sub, include_intra_assign);
+    found = StmtBlocks(sub, include_nonblocking_intra);
   });
   return found;
 }
@@ -406,7 +408,7 @@ void ValidateAlwaysFFProcess(ModuleItem* item, const RtlirProcess& proc,
 
 void ValidateFinalProcess(ModuleItem* item, const RtlirProcess& proc,
                           DiagEngine& diag) {
-  if (StmtBlocks(proc.body, /*include_intra_assign=*/true)) {
+  if (StmtBlocks(proc.body, /*include_nonblocking_intra=*/true)) {
     diag.Error(item->loc, "final procedure shall not contain timing controls",
                Subclause("9.2.3"));
   }
