@@ -687,24 +687,48 @@ ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
   return item;
 }
 
-static bool IsEventExprStart(TokenKind kind) {
-  return kind == TokenKind::kKwPosedge || kind == TokenKind::kKwNegedge ||
-         kind == TokenKind::kKwEdge || kind == TokenKind::kLParen;
+// §9.4 Syntax 9-4: an event_expression may be a parenthesized one, and an
+// expression may be parenthesized too, so the `(` alone does not say which it
+// opens. A group opens with an edge keyword or with a group of its own, or
+// holds an `or`, a `,` or an `iff` at its own level of nesting, none of which
+// an expression holds there; anything else in the parentheses is an
+// expression. The tokens are scanned to the matching `)` and the position is
+// restored.
+bool Parser::OpensEventGroup() {
+  auto saved = lexer_.SavePos();
+  Consume();  // (
+  const TokenKind kFirst = CurrentToken().kind;
+  bool group = kFirst == TokenKind::kKwPosedge ||
+               kFirst == TokenKind::kKwNegedge ||
+               kFirst == TokenKind::kKwEdge ||
+               (kFirst == TokenKind::kLParen && OpensEventGroup());
+  for (int depth = 0; !group && depth >= 0 && !Check(TokenKind::kEof);
+       Consume()) {
+    const TokenKind kKind = CurrentToken().kind;
+    if (kKind == TokenKind::kLParen || kKind == TokenKind::kLBracket ||
+        kKind == TokenKind::kLBrace) {
+      ++depth;
+    } else if (kKind == TokenKind::kRParen || kKind == TokenKind::kRBracket ||
+               kKind == TokenKind::kRBrace) {
+      --depth;
+    } else if (depth == 0) {
+      group = kKind == TokenKind::kKwOr || kKind == TokenKind::kComma ||
+              kKind == TokenKind::kKwIff;
+    }
+  }
+  lexer_.RestorePos(saved);
+  return group;
 }
 
 std::vector<EventExpr> Parser::ParseEventList() {
   std::vector<EventExpr> events;
   auto parse_event_or_group = [&]() {
-    if (Check(TokenKind::kLParen)) {
-      auto saved = lexer_.SavePos();
+    if (Check(TokenKind::kLParen) && OpensEventGroup()) {
       Consume();
-      if (IsEventExprStart(CurrentToken().kind)) {
-        auto sub = ParseEventList();
-        events.insert(events.end(), sub.begin(), sub.end());
-        Expect(TokenKind::kRParen, Subclause("9.4.2"));
-        return;
-      }
-      lexer_.RestorePos(saved);
+      auto sub = ParseEventList();
+      events.insert(events.end(), sub.begin(), sub.end());
+      Expect(TokenKind::kRParen, Subclause("9.4.2"));
+      return;
     }
     events.push_back(ParseSingleEvent());
   };

@@ -1,9 +1,13 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <vector>
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "parser/ast_design.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 
 using namespace delta;
@@ -195,6 +199,56 @@ TEST(EventOrOperatorParsing, InterleavedOrGroupsWithComma) {
   auto* item = FirstAlwaysItem(r);
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->sensitivity.size(), 5u);
+}
+
+// Syntax 9-4 lets an event_expression be a parenthesized event_expression, so
+// a group of or-ed or comma-separated events, or one event with its iff, stands
+// in parentheses whatever its first operand is, and a group may be
+// parenthesized again. Parentheses holding none of
+// `or`, `,` or `iff` at their own level of nesting are part of an expression,
+// a select or a concatenation inside them included.
+TEST(EventOrOperatorParsing, AParenthesizedGroupOpensWithAnyOperand) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial @((a or b) or c) x = 1;\n"
+      "  initial @((a, b) or posedge c) x = 2;\n"
+      "  initial @((a iff en) or b) x = 3;\n"
+      "  initial @((v[0] or w[1]) or c) x = 4;\n"
+      "  initial @(({a, b}) or c) x = 5;\n"
+      "  initial @((a + b) * c) x = 6;\n"
+      "  initial @(((posedge a)) or b) x = 7;\n"
+      "  initial @(((negedge a)) or b) x = 8;\n"
+      "  initial @(((edge a)) or b) x = 9;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  std::vector<const Stmt*> controls;
+  for (const auto* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kInitialBlock)
+      controls.push_back(item->body);
+  }
+  ASSERT_EQ(controls.size(), 9u);
+  const std::size_t kCounts[] = {3, 3, 2, 3, 2, 1, 2, 2, 2};
+  for (std::size_t i = 0; i < controls.size(); ++i) {
+    ASSERT_EQ(controls[i]->kind, StmtKind::kEventControl) << i;
+    EXPECT_EQ(controls[i]->events.size(), kCounts[i]) << i;
+  }
+  EXPECT_EQ(controls[0]->events[0].signal->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(controls[1]->events[2].edge, Edge::kPosedge);
+  EXPECT_NE(controls[2]->events[0].iff_condition, nullptr);
+  EXPECT_EQ(controls[3]->events[0].signal->kind, ExprKind::kSelect);
+  EXPECT_EQ(controls[4]->events[0].signal->kind, ExprKind::kConcatenation);
+  EXPECT_EQ(controls[5]->events[0].signal->kind, ExprKind::kBinary);
+  EXPECT_EQ(controls[6]->events[0].edge, Edge::kPosedge);
+  EXPECT_EQ(controls[7]->events[0].edge, Edge::kNegedge);
+  EXPECT_EQ(controls[8]->events[0].edge, Edge::kEdge);
+}
+
+// A group the source leaves unclosed is reported rather than read past the end
+// of the file.
+TEST(EventOrOperatorParsing, AnUnclosedGroupIsReported) {
+  auto r = Parse("module m; initial @((a or b");
+  EXPECT_TRUE(r.has_errors);
 }
 
 }  // namespace

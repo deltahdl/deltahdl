@@ -792,8 +792,8 @@ class Parser {
   bool AtUnsizedPackedDim(const DataType& dtype);
   void TakeUnsizedPackedDim(DataType& dtype);
   DataType ParseVirtualInterfaceType();
-
   std::vector<EventExpr> ParseEventList();
+  bool OpensEventGroup();  // at `(`: a parenthesized event_expression follows
   EventExpr ParseSingleEvent();
   // §9.4 Syntax 9-4: a clocking_event written without parentheses, `@name`,
   // the name read alone rather than as an expression.
