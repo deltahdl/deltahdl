@@ -101,11 +101,11 @@ static bool TypeKeyCoversElement(std::string_view key, const DataType& elem,
   });
 }
 
-static void CheckArrayPatternCoverage(const Expr* pattern,
+static void CheckArrayPatternCoverage(const ArrayPatternCheck& check,
+                                      const Expr* pattern,
                                       const DataType& elem_type,
-                                      const Expr* dim, SourceLoc loc,
-                                      const TypedefMap& typedefs,
-                                      DiagEngine& diag) {
+                                      const Expr* dim, SourceLoc loc) {
+  const TypedefMap& typedefs = check.typedefs;
   if (!dim) return;
   auto dim_size = ComputeDimSize(dim);
   if (!dim_size) return;
@@ -142,8 +142,8 @@ static void CheckArrayPatternCoverage(const Expr* pattern,
   }
   if (has_default || has_type_key) return;
   if (static_cast<int64_t>(index_keys.size()) + unidentified_keys < *dim_size) {
-    diag.Error(loc, "keyed array pattern does not cover all elements",
-               Subclause("10.9.1"));
+    check.diag.Error(loc, "keyed array pattern does not cover all elements",
+                     Subclause("10.9.1"));
   }
 }
 
@@ -199,7 +199,7 @@ void ArrayPatternCheck::Check(const Expr* pattern, const DataType& elem_type,
   const Expr* dim = dims[0];
   if (!pattern->pattern_keys.empty()) {
     CheckArrayPatternDuplicateIndices(pattern, loc, typedefs, diag);
-    CheckArrayPatternCoverage(pattern, elem_type, dim, loc, typedefs, diag);
+    CheckArrayPatternCoverage(*this, pattern, elem_type, dim, loc);
     return;
   }
 
@@ -236,8 +236,8 @@ void ArrayPatternCheck::Check(const Expr* pattern, const DataType& elem_type,
   // §10.9.1 (printed pages 261-262): the braces match the dimensions, each
   // nested pattern holding as many items as the dimension it stands for.
   if (dims.size() < 2) return;
-  const std::vector<Expr*> inner(dims.begin() + 1, dims.end());
-  for (const Expr* e : pattern->elements) Check(e, elem_type, inner, loc);
+  const std::vector<Expr*> kInner(dims.begin() + 1, dims.end());
+  for (const Expr* e : pattern->elements) Check(e, elem_type, kInner, loc);
 }
 
 void Elaborator::ValidateArrayInitPattern(const ModuleItem* item) {

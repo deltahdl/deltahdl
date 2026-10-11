@@ -128,13 +128,30 @@ static std::optional<bool> BlockDeclIsArray(
 // §11.4.12.
 // §10.10.2 (printed page 265): selecting fewer elements than a module array
 // has unpacked dimensions leaves an unpacked array, `M[0]` of `int M[2][2]`,
-// which braces assigned to are an unpacked array concatenation into.
+// which braces assigned to are an unpacked array concatenation into, and so
+// does selecting an element of an array whose elements are queues.
 bool ElaboratorOperationRules::SelectsArrayElementArray(const Expr* sel) const {
+  if (SelectsQueueElement(sel, var_array_info_)) return true;
   size_t selects = 0;
   for (; sel->kind == ExprKind::kSelect; sel = sel->base) ++selects;
   if (sel->kind != ExprKind::kIdentifier) return false;
   auto it = var_array_info_.find(sel->text);
   return it != var_array_info_.end() && it->second.num_unpacked_dims > selects;
+}
+
+// §10.10.2 (printed page 265): a structure's member that is an unpacked array
+// is a target as a variable that is one is. Whether the member `lhs` names is
+// one, or nothing where `lhs` is no member of a module structure variable.
+std::optional<bool> ElaboratorOperationRules::StructMemberIsArray(
+    const Expr* lhs) const {
+  auto st = concat_target_types_.find(lhs->lhs->text);
+  if (st == concat_target_types_.end()) return std::nullopt;
+  const std::vector<StructMember>* members =
+      StructMembersOf(*st->second, typedefs_);
+  if (members == nullptr) return std::nullopt;
+  return std::ranges::any_of(*members, [&](const StructMember& m) {
+    return m.name == lhs->rhs->text && !m.unpacked_dims.empty();
+  });
 }
 
 bool ElaboratorOperationRules::IsUnpackedArrayConcatTarget(
@@ -145,26 +162,13 @@ bool ElaboratorOperationRules::IsUnpackedArrayConcatTarget(
       return *is_array;
     return var_array_info_.count(lhs->text) > 0;
   }
-  if (lhs->kind == ExprKind::kSelect)
-    return SelectsArrayElementArray(lhs) ||
-           SelectsQueueElement(lhs, var_array_info_);
+  if (lhs->kind == ExprKind::kSelect) return SelectsArrayElementArray(lhs);
   if (lhs->kind != ExprKind::kMemberAccess || lhs->lhs == nullptr ||
       lhs->rhs == nullptr || lhs->lhs->kind != ExprKind::kIdentifier ||
       lhs->rhs->kind != ExprKind::kIdentifier) {
     return false;
   }
-  // §10.10.2 (printed page 265): a structure's member that is an unpacked
-  // array is a target as a variable that is one is.
-  auto st = concat_target_types_.find(lhs->lhs->text);
-  const std::vector<StructMember>* members =
-      st == concat_target_types_.end()
-          ? nullptr
-          : StructMembersOf(*st->second, typedefs_);
-  if (members != nullptr) {
-    return std::ranges::any_of(*members, [&](const StructMember& m) {
-      return m.name == lhs->rhs->text && !m.unpacked_dims.empty();
-    });
-  }
+  if (auto member_array = StructMemberIsArray(lhs)) return *member_array;
   std::string_view cls_name;
   if (lhs->is_scope_resolution) {
     if (class_names_.count(lhs->lhs->text) == 0) return false;

@@ -99,6 +99,24 @@ static void CheckProceduralStructPatterns(
   }
 }
 
+// The structure patterns one item writes: in a process's or a subroutine's
+// statements, and on the right of a continuous assignment, whose target no
+// block declaration hides.
+static void CheckItemStructPatterns(const ModuleItem* item,
+                                    const StructTargetTypes& targets,
+                                    const TypedefMap& typedefs,
+                                    DiagEngine& diag) {
+  if (IsProceduralItemKind(item->kind))
+    CheckProceduralStructPatterns({}, {item->body}, targets, typedefs, diag);
+  CheckProceduralStructPatterns(item->func_args, item->func_body_stmts, targets,
+                                typedefs, diag);
+  if (item->kind != ModuleItemKind::kContAssign) return;
+  const BodyDeclScopes kNoLocals(false);
+  CheckStructPatternFor(item->assign_rhs,
+                        WholeTargetType(item->assign_lhs, kNoLocals, targets),
+                        {typedefs, item->assign_rhs->range.start, diag});
+}
+
 // A subroutine's formals hide the module's declarations of their names in its
 // body as a block's declarations do.
 void ElaboratorOperationRules::ValidateProceduralArrayPatterns(
@@ -113,22 +131,9 @@ void ElaboratorOperationRules::ValidateProceduralArrayPatterns(
       pattern_target_arrays_[item->name] = item;
   }
   for (const auto* item : decl->items) {
-    if (IsProceduralItemKind(item->kind)) {
+    if (IsProceduralItemKind(item->kind))
       WalkStmtsForProceduralArrayPattern(item->body);
-      CheckProceduralStructPatterns({}, {item->body}, struct_targets, typedefs_,
-                                    diag_);
-    }
-    CheckProceduralStructPatterns(item->func_args, item->func_body_stmts,
-                                  struct_targets, typedefs_, diag_);
-    if (item->kind == ModuleItemKind::kContAssign) {
-      const Expr* lhs = item->assign_lhs;
-      auto it = lhs->kind == ExprKind::kIdentifier
-                    ? struct_targets.find(lhs->text)
-                    : struct_targets.end();
-      CheckStructPatternFor(item->assign_rhs,
-                            it == struct_targets.end() ? nullptr : it->second,
-                            {typedefs_, item->assign_rhs->range.start, diag_});
-    }
+    CheckItemStructPatterns(item, struct_targets, typedefs_, diag_);
     for (const auto& arg : item->func_args)
       block_decls_.emplace_back(arg.name, !arg.unpacked_dims.empty());
     for (const auto* s : item->func_body_stmts)

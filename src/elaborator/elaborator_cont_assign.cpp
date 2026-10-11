@@ -270,11 +270,30 @@ void EmitConcatContAssigns(const ConcatContAssignCtx& cx, Expr* lhs,
 // it is rooted at, how many selects stand between that name and the first
 // member access over it, and whether it holds a member access at all.
 struct ContTargetLeaf {
-  const Expr* expr;
-  std::string_view root;
+  const Expr* expr = nullptr;
+  std::string_view root = {};
   size_t selects = 0;
   bool has_member = false;
 };
+
+// The element `e` of a target, walked down through its selects and member
+// accesses to the name it is rooted at; the root is empty where that is no
+// name.
+static ContTargetLeaf LeafOf(const Expr* e) {
+  ContTargetLeaf leaf{.expr = e};
+  while (e->kind == ExprKind::kSelect || e->kind == ExprKind::kMemberAccess) {
+    if (e->kind == ExprKind::kMemberAccess) {
+      leaf.has_member = true;
+      leaf.selects = 0;
+      e = e->lhs;
+    } else {
+      ++leaf.selects;
+      e = e->base;
+    }
+  }
+  if (e->kind == ExprKind::kIdentifier) leaf.root = e->text;
+  return leaf;
+}
 
 // §10.3 Syntax 10-1: a continuous assignment's target is a net_lvalue or a
 // variable_lvalue -- a name under constant selects and member accesses, a
@@ -293,19 +312,8 @@ static bool CollectContTargetLeaves(const Expr* e,
     return true;
   }
   if (e->kind == ExprKind::kStreamingConcat) return true;
-  ContTargetLeaf leaf{.expr = e};
-  while (e->kind == ExprKind::kSelect || e->kind == ExprKind::kMemberAccess) {
-    if (e->kind == ExprKind::kMemberAccess) {
-      leaf.has_member = true;
-      leaf.selects = 0;
-      e = e->lhs;
-    } else {
-      ++leaf.selects;
-      e = e->base;
-    }
-  }
-  if (e->kind != ExprKind::kIdentifier) return false;
-  leaf.root = e->text;
+  ContTargetLeaf leaf = LeafOf(e);
+  if (leaf.root.empty()) return false;
   out.push_back(leaf);
   return true;
 }
@@ -322,9 +330,74 @@ static size_t UnpackedDimsOfNet(std::string_view name, const RtlirModule* mod) {
   return 0;
 }
 
-// The rules §10.3 and §10.3.2 state of each element of a continuous
-// assignment's target, and whether any element is a variable, whose form
-// (Syntax 10-1) takes no drive strength and a delay_control alone.
+// The rules §10.3 and §10.3.2 state of one element of a continuous
+// assignment's target, and whether it is a variable, whose form (Syntax 10-1)
+// takes no drive strength and a delay_control alone.
+bool Elaborator::ValidateContAssignLeaf(ModuleItem* item, RtlirModule* mod,
+                                        const ContTargetLeaf& leaf,
+                                        const ScopeMap& scope) {
+  // §10.2 and §10.3: a continuous assignment drives a net or a variable, and a
+  // parameter is a constant (§6.20).
+  if (NamesParameter(leaf.root, mod)) {
+    diag_.Error(
+        item->loc,
+        std::format("continuous assignment to parameter '{}'", leaf.root),
+        Subclause("10.3"));
+    return false;
+  }
+  // Table 10-1 (printed page 247): every select on the left-hand side of a
+  // continuous assignment is a constant one, however deep it stands.
+  if (!SelectPathIsConstant(leaf.expr, scope)) {
+    diag_.Error(item->loc,
+                "continuous assignment left-hand side requires a "
+                "constant select expression",
+                Subclause("10.3.2"));
+  }
+  if (leaf.expr->kind == ExprKind::kIdentifier)
+    ValidateContAssignIdentLhs(leaf.root, item, mod);
+  // A name reached through a member access may be an instance's or an
+  // interface's, which names no variable of this module, so only a name the
+  // target writes directly or through selects is judged a variable.
+  bool is_var = net_names_.count(leaf.root) == 0 && !leaf.has_member;
+  if (is_var) ValidateContAssignVarLeaf(item, leaf.root);
+  // §10.3.2: an assignment to a net of a user-defined nettype drives the whole
+  // net, so it may select an element of an array of such nets and nothing
+  // within the nettype's data type.
+  if (nettype_net_names_.count(leaf.root) != 0 &&
+      (leaf.has_member || leaf.selects > UnpackedDimsOfNet(leaf.root, mod))) {
+    diag_.Error(item->loc,
+                "a continuous assignment to a net of a user-defined nettype "
+                "drives the whole net and cannot index or select into it",
+                Subclause("10.3.2"));
+  }
+  return is_var;
+}
+
+// §6.5 and §10.3.2 of a variable an element of a continuous assignment's
+// target writes. The module's procedural assignments were recorded before its
+// generate blocks are elaborated, so an assignment a block makes is weighed
+// against them here; a module's own is weighed by
+// Elaborator::ValidateMixedAssignments once all of them are known. A variable
+// a continuous assignment writes any part of has no initializer.
+void Elaborator::ValidateContAssignVarLeaf(ModuleItem* item,
+                                           std::string_view name) {
+  if (!gen_prefix_scopes_.empty() && proc_assign_targets_.count(name) != 0) {
+    diag_.Error(item->loc,
+                std::format("variable '{}' has both continuous and "
+                            "procedural assignments",
+                            name),
+                Subclause("6.5"));
+  }
+  if (var_init_names_.count(name) != 0) {
+    diag_.Error(item->loc,
+                std::format("variable '{}' has both an initializer and a "
+                            "continuous assignment",
+                            name),
+                Subclause("10.3.2"));
+  }
+}
+
+// Whether any element of a continuous assignment's target is a variable.
 bool Elaborator::ValidateContAssignLeaves(
     ModuleItem* item, RtlirModule* mod,
     const std::vector<ContTargetLeaf>& leaves) {
@@ -334,61 +407,7 @@ bool Elaborator::ValidateContAssignLeaves(
   for (const auto& [name, value] : gen_const_scope_) scope[name] = value;
   bool any_var = false;
   for (const ContTargetLeaf& leaf : leaves) {
-    // §10.2 and §10.3: a continuous assignment drives a net or a variable,
-    // and a parameter is a constant (§6.20).
-    if (NamesParameter(leaf.root, mod)) {
-      diag_.Error(
-          item->loc,
-          std::format("continuous assignment to parameter '{}'", leaf.root),
-          Subclause("10.3"));
-      continue;
-    }
-    // Table 10-1 (printed page 247): every select on the left-hand side of a
-    // continuous assignment is a constant one, however deep it stands.
-    if (!SelectPathIsConstant(leaf.expr, scope)) {
-      diag_.Error(item->loc,
-                  "continuous assignment left-hand side requires a "
-                  "constant select expression",
-                  Subclause("10.3.2"));
-    }
-    if (leaf.expr->kind == ExprKind::kIdentifier)
-      ValidateContAssignIdentLhs(leaf.root, item, mod);
-    // A name reached through a member access may be an instance's or an
-    // interface's, which names no variable of this module, so only a name the
-    // target writes directly or through selects is judged a variable.
-    bool is_var = net_names_.count(leaf.root) == 0 && !leaf.has_member;
-    // §6.5: the module's procedural assignments were recorded before its
-    // generate blocks are elaborated, so an assignment a block makes is
-    // weighed against them here; a module's own is weighed by
-    // Elaborator::ValidateMixedAssignments once all of them are known.
-    if (!gen_prefix_scopes_.empty() && is_var &&
-        proc_assign_targets_.count(leaf.root) != 0) {
-      diag_.Error(item->loc,
-                  std::format("variable '{}' has both continuous and "
-                              "procedural assignments",
-                              leaf.root),
-                  Subclause("6.5"));
-    }
-    // §10.3.2 (printed page 249): a variable a continuous assignment writes
-    // any part of has no initializer.
-    if (is_var && var_init_names_.count(leaf.root) != 0) {
-      diag_.Error(item->loc,
-                  std::format("variable '{}' has both an initializer and a "
-                              "continuous assignment",
-                              leaf.root),
-                  Subclause("10.3.2"));
-    }
-    any_var = any_var || is_var;
-    // §10.3.2: an assignment to a net of a user-defined nettype drives the
-    // whole net, so it may select an element of an array of such nets and
-    // nothing within the nettype's data type.
-    if (nettype_net_names_.count(leaf.root) != 0 &&
-        (leaf.has_member || leaf.selects > UnpackedDimsOfNet(leaf.root, mod))) {
-      diag_.Error(item->loc,
-                  "a continuous assignment to a net of a user-defined nettype "
-                  "drives the whole net and cannot index or select into it",
-                  Subclause("10.3.2"));
-    }
+    if (ValidateContAssignLeaf(item, mod, leaf, scope)) any_var = true;
   }
   return any_var;
 }

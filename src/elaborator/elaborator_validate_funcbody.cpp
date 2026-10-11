@@ -429,15 +429,26 @@ static bool NbaTargetWritesAutomatic(const Expr* e, bool through_member,
          NbaNameIsAutomatic(e->text, through_member, scopes, class_names);
 }
 
+// How a body's nonblocking writes into automatic variables are judged and
+// reported: the rule that names them, the class names that tell a handle, and
+// where the reports go.
+struct NbaAutoReport {
+  const AutoVarRule& rule;
+  const NameSet& class_names;
+  DiagEngine& diag;
+};
+
 // Reports each nonblocking assignment of a body that writes an automatic
 // variable: a subroutine's, whose formals are in view throughout, or a
 // procedural block's, which has none. `default_auto` is the lifetime of a
 // variable the body declares without saying.
 static void CheckNbaAutomaticTargets(const std::vector<FunctionArg>& formals,
                                      const std::vector<Stmt*>& body,
-                                     bool default_auto, const AutoVarRule& rule,
-                                     const NameSet& class_names,
-                                     DiagEngine& diag) {
+                                     bool default_auto,
+                                     const NbaAutoReport& report) {
+  const AutoVarRule& rule = report.rule;
+  const NameSet& class_names = report.class_names;
+  DiagEngine& diag = report.diag;
   BodyDeclScopes scopes(default_auto);
   for (const auto& arg : formals) scopes.DeclareFormal(arg);
   for (const Stmt* s : body) {
@@ -686,7 +697,7 @@ static void ValidateTaskBody(const ModuleItem* item, bool is_auto,
   const AutoVarRule& rule =
       is_auto ? kAutomaticTaskVar : kAutomaticVarInStaticScope;
   CheckNbaAutomaticTargets(item->func_args, item->func_body_stmts, is_auto,
-                           rule, class_names, diag);
+                           {rule, class_names, diag});
   TaskBodyScope scope{.auto_vars = auto_vars, .rule = rule};
   for (auto* s : item->func_body_stmts) {
     CheckTaskBodyStmt(s, scope, diag);
@@ -719,7 +730,7 @@ void Elaborator::ValidateFunctionBody(const ModuleItem* item,
   }
   if (item->kind != ModuleItemKind::kFunctionDecl) return;
   CheckNbaAutomaticTargets(item->func_args, item->func_body_stmts, is_auto,
-                           kAutomaticFunctionVar, class_names_, diag_);
+                           {kAutomaticFunctionVar, class_names_, diag_});
   bool is_void = (item->return_type.kind == DataTypeKind::kVoid);
   FunctionBodyScope scope{
       .is_void = is_void, .func_name = item->name, .task_names = task_names_};
@@ -877,7 +888,7 @@ static void ValidateAutomaticVarRulesOfItems(
     bool is_proc = IsProceduralItemKind(item->kind);
     if (!is_proc || !item->body) continue;
     CheckNbaAutomaticTargets({}, {item->body}, false,
-                             kAutomaticVarInStaticScope, class_names, diag);
+                             {kAutomaticVarInStaticScope, class_names, diag});
     std::unordered_set<std::string_view> auto_vars;
     CollectAutoVarNames(item->body, false, auto_vars);
     if (auto_vars.empty()) continue;

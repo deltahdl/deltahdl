@@ -262,6 +262,10 @@ class Elaborator : public ElaboratorClassRules {
   void RecordGateOutputDrivers(const ModuleItem* item);
   bool ValidateContAssignLeaves(ModuleItem* item, RtlirModule* mod,
                                 const std::vector<ContTargetLeaf>& leaves);
+  bool ValidateContAssignLeaf(ModuleItem* item, RtlirModule* mod,
+                              const ContTargetLeaf& leaf,
+                              const ScopeMap& scope);
+  void ValidateContAssignVarLeaf(ModuleItem* item, std::string_view name);
   void ValidateContAssignIdentLhs(std::string_view name, ModuleItem* item,
                                   RtlirModule* mod);
   void ValidateContAssignDriveStrength(ModuleItem* item, RtlirModule* mod);

@@ -180,6 +180,7 @@ class ElaboratorOperationRules : public ElaboratorData {
   // a member a target names is an unpacked array.
   std::unordered_map<std::string_view, const DataType*> concat_target_types_;
   bool SelectsArrayElementArray(const Expr* sel) const;
+  std::optional<bool> StructMemberIsArray(const Expr* lhs) const;
 
   void ValidateSelectOnConcatLvalue(const ModuleDecl* decl);
   void CheckSelectOnConcatLvalue(const Expr* lhs);
