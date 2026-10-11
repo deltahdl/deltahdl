@@ -288,4 +288,75 @@ TEST(FineGrainProcessControlRun, StatusNameOfAModuleStateVariable) {
             "WAITING\n");
 }
 
+// §9.7: a process ended by disable fork (§9.6.3) was forcibly terminated, so
+// status() answers KILLED and an await() on it returns.
+TEST(FineGrainProcessControlRun, AProcessDisableForkEndsIsKilled) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t; process p;\n"
+                 "  initial begin\n"
+                 "    fork begin p = process::self(); #100; end join_none\n"
+                 "    #1 disable fork;\n"
+                 "    $display(\"%s\", p.status().name());\n"
+                 "    p.await();\n"
+                 "    $display(\"after %0t\", $time);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "KILLED\nafter 1\n");
+}
+
+// §9.7: kill() terminates every descendant, a grandchild spawned by a child
+// that has already finished among them, and each process it terminates
+// releases the processes awaiting it.
+TEST(FineGrainProcessControlRun, KillReachesAndReleasesEveryDescendant) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t; int x; process p, c;\n"
+                 "  initial begin\n"
+                 "    x = 0;\n"
+                 "    fork begin\n"
+                 "      p = process::self();\n"
+                 "      fork begin fork #10 x = 99; join_none end join_none\n"
+                 "      fork begin c = process::self(); #100; end join_none\n"
+                 "      #100;\n"
+                 "    end join_none\n"
+                 "    #1 fork begin c.await(); $display(\"c %0t\", $time); end "
+                 "join_none\n"
+                 "    #1 p.kill();\n"
+                 "    #20 $display(\"x=%0d\", x);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "c 2\nx=0\n");
+}
+
+// §9.7: suspend() desensitizes a process blocked in a wait statement to its
+// condition, and resume() resensitizes it, scheduling it in the time step of
+// the resume where the condition then holds. p's condition becomes true while
+// it is suspended and holds at the resume; q's becomes true and false again, so
+// q waits on until it next holds.
+TEST(FineGrainProcessControlRun, SuspendDesensitizesAWaitCondition) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t; bit go, go2; process p, q;\n"
+                       "  initial begin\n"
+                       "    p = process::self(); wait (go);\n"
+                       "    $display(\"p %0t\", $time);\n"
+                       "  end\n"
+                       "  initial begin\n"
+                       "    q = process::self(); wait (go2);\n"
+                       "    $display(\"q %0t\", $time);\n"
+                       "  end\n"
+                       "  initial begin\n"
+                       "    #1 p.suspend(); q.suspend();\n"
+                       "    #1 go = 1; go2 = 1;\n"
+                       "    #1 go2 = 0;\n"
+                       "    #9 p.resume(); q.resume();\n"
+                       "    #3 go2 = 1;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "p 12\nq 15\n");
+}
+
 }  // namespace

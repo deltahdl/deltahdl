@@ -27,6 +27,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
 #include "simulator/process.h"
+#include "simulator/repeat_event_awaiter.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
@@ -217,25 +218,26 @@ static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx,
 // Marks the just-completed fork child process finished and wakes any thread
 // blocked on its await(). No-op for a process that was killed.
 static void FinalizeForkChildProcess(SimContext& ctx) {
-  if (auto* child_proc = ctx.CurrentProcess()) child_proc->Finish();
+  if (auto* child_proc = ctx.CurrentProcess()) {
+    child_proc->Finish();
+    child_proc->ReleaseFromFork();
+  }
 }
 
-// Decrements the join/wait-fork tallies for one finished (or, when
-// restore_parent is false, cancelled) child and resumes the join site and/or
-// the wait-fork waiter when their conditions are met. §18.14.2: a normally
-// completing child restores the spawning thread as current before the join site
-// resumes so its subsequent draws come from its own RNG, not from whichever
-// child ran last; a cancelled child never ran user code, so it does not.
-static void DrainForkChild(SimContext& ctx, const ForkRendezvous& rdv,
-                           bool restore_parent) {
+// Decrements the join/wait-fork tallies for one child that has terminated --
+// finished, cancelled before it started, or killed (§9.7) -- and resumes the
+// join site and/or the wait-fork waiter when their conditions are met. It runs
+// once per child, as Process::fork_release (SpawnForkChild). §18.14.2: the
+// spawning thread is restored as current before the join site resumes so its
+// subsequent draws come from its own RNG, not from whichever child ran last.
+static void DrainForkChild(SimContext& ctx, const ForkRendezvous& rdv) {
   auto* state = rdv.state;
   state->remaining--;
   bool should_resume =
       state->join_any ? !state->resumed : (state->remaining == 0);
   if (should_resume && state->parent) {
     state->resumed = true;
-    if (restore_parent && state->parent_proc)
-      ctx.SetCurrentProcess(state->parent_proc);
+    if (state->parent_proc) ctx.SetCurrentProcess(state->parent_proc);
     state->parent.resume();
   }
   if (rdv.parent_wfs && --rdv.parent_wfs->remaining == 0 &&
@@ -245,15 +247,13 @@ static void DrainForkChild(SimContext& ctx, const ForkRendezvous& rdv,
   }
 }
 
-// rdv is by value, not by reference: this coroutine uses rdv after the co_await
-// below, but the ForkRendezvous passed in is a temporary; a reference would
-// dangle in the frame, a by-value copy lives for the coroutine's duration.
+// The child's statement, then its completion: Process::Finish and the release
+// from the fork's tallies its fork_release holds.
 static SimCoroutine ForkChildCoroutine(const Stmt* body, SimContext& ctx,
-                                       Arena& arena, ForkRendezvous rdv) {
+                                       Arena& arena) {
   co_await ExecStmt(body, ctx, arena);
 
   FinalizeForkChildProcess(ctx);
-  DrainForkChild(ctx, rdv, /*restore_parent=*/true);
 }
 
 static bool IsForkBlockItemDecl(const Stmt* s) {
@@ -311,14 +311,14 @@ static Process* CreateForkChildProcess(SimContext& ctx, Arena& arena,
   return p;
 }
 
-// Builds the scheduler callback that starts (or, if cancelled e.g. by disable
-// fork, drains the tallies for) one fork child process when its start event
-// fires.
-static std::function<void()> MakeForkChildStartCallback(
-    Process* p, SimContext& ctx, const ForkRendezvous& rdv) {
-  return [p, &ctx, rdv]() {
+// Builds the scheduler callback that starts (or, if it was ended before it
+// started, e.g. by disable fork, releases from the fork's tallies) one fork
+// child process when its start event fires.
+static std::function<void()> MakeForkChildStartCallback(Process* p,
+                                                        SimContext& ctx) {
+  return [p, &ctx]() {
     if (!p->active) {
-      DrainForkChild(ctx, rdv, /*restore_parent=*/false);
+      p->ReleaseFromFork();
       return;
     }
     ctx.SetCurrentProcess(p);
@@ -332,11 +332,12 @@ static void SpawnForkChild(const Stmt* s, SimContext& ctx, Arena& arena,
                            Process* spawning_proc, const ForkRendezvous& rdv) {
   if (rdv.parent_wfs) rdv.parent_wfs->remaining++;
   auto* p = CreateForkChildProcess(ctx, arena, spawning_proc);
-  p->coro = ForkChildCoroutine(s, ctx, arena, rdv).Release();
+  p->fork_release = [&ctx, rdv]() { DrainForkChild(ctx, rdv); };
+  p->coro = ForkChildCoroutine(s, ctx, arena).Release();
 
   RegisterForkChildScopes(s, p, ctx);
   auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-  event->callback = MakeForkChildStartCallback(p, ctx, rdv);
+  event->callback = MakeForkChildStartCallback(p, ctx);
   auto fork_region = (spawning_proc && spawning_proc->is_reactive)
                          ? Region::kReactive
                          : Region::kActive;

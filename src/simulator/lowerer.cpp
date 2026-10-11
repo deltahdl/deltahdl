@@ -166,6 +166,21 @@ void ScheduleProcess(Process* proc, SimContext& ctx) {
     ctx.SetCurrentProcess(proc);
     proc->Resume();
   };
+  // §9.2.2.2, and §9.2.2.3 for always_latch: the procedure is triggered once at
+  // time zero after every initial and always procedure has started. Their
+  // start events are all queued while the design is lowered, so this one's,
+  // when it fires, queues the start behind them rather than running it ahead
+  // of an initial procedure lowered after it.
+  if (proc->kind == ProcessKind::kAlwaysComb) {
+    auto start = std::move(event->callback);
+    event->callback = [proc, &ctx, start]() {
+      auto* later = ctx.GetScheduler().GetEventPool().Acquire();
+      later->kind = EventKind::kEvaluation;
+      later->callback = start;
+      ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), proc->home_region,
+                                       later);
+    };
+  }
   sched.ScheduleEvent(SimTime{0}, proc->home_region, event);
 }
 

@@ -2,7 +2,8 @@
 
 // The awaiters a suspended process resumes from, one per thing it can wait
 // for: DelayAwaiter for a §9.7 delay control, NamedEventAwaiter for a named
-// event, SequenceEventAwaiter for a §16.13 sequence event, AnyChangeAwaiter
+// event (a §9.4.2.4 sequence event is an operand of EventAwaiter's in
+// awaiters_event_control.h), AnyChangeAwaiter
 // for a change on any of several named variables, InertialDelayAwaiter for a
 // §28 inertial delay a change can cancel, ForkJoinAwaiter and WaitForkAwaiter
 // for §9.3.2 fork-join completion, CycleDelayAwaiter for a §14.11 cycle delay,
@@ -10,16 +11,17 @@
 // §15.3 semaphore and MailboxPutAwaiter, MailboxGetAwaiter and
 // MailboxPeekAwaiter for a §15.4 mailbox.
 //
-// The awaiters for a §9.4.2 event control and its §9.4.5 intra-assignment
-// repeat form live in src/simulator/awaiters_event_control.h, which this
-// header includes, so a translation unit including this one still sees
-// EventAwaiter and RepeatEventAwaiter. AnyChangeAwaiter calls
-// EventAwaiter::ResumeMaybeReactive from there.
+// The awaiter for a §9.4.2 event control lives in
+// src/simulator/awaiters_event_control.h, which this header includes, so a
+// translation unit including this one still sees EventAwaiter, and its §9.4.5
+// intra-assignment repeat form's in src/simulator/repeat_event_awaiter.h.
+// AnyChangeAwaiter calls EventAwaiter::ResumeMaybeReactive from there.
 
 #include <algorithm>
 #include <coroutine>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -48,6 +50,14 @@ struct DelayAwaiter {
   bool await_ready() const noexcept { return false; }
 
   void await_suspend(std::coroutine_handle<> h) {
+    // §9.4.1: a negative delay is an unsigned time value, up to the largest
+    // time, so the wake time may lie beyond the last time the simulation can
+    // reach; such a wake never comes, and nothing is scheduled for it. Added
+    // as it is, the time wrapped to one before the present.
+    if (delay_ticks >
+        std::numeric_limits<uint64_t>::max() - ctx.CurrentTime().ticks) {
+      return;
+    }
     auto time = ctx.CurrentTime() + SimTime{delay_ticks};
     auto region = SelectDelayRegion();
     auto* event = ctx.GetScheduler().GetEventPool().Acquire();
@@ -109,43 +119,6 @@ struct NamedEventAwaiter {
       ctx_ptr->SetCurrentProcess(saved);
       return true;
     });
-  }
-
-  void await_resume() const noexcept {}
-};
-
-struct SequenceEventAwaiter {
-  SimContext& ctx;
-  const std::vector<EventExpr>& events;
-
-  bool await_ready() const noexcept { return false; }
-
-  void await_suspend(std::coroutine_handle<> h) {
-    for (const auto& ev : events) {
-      if (!ev.is_sequence_event || !ev.signal) continue;
-      std::string_view seq_name;
-      if (ev.signal->kind == ExprKind::kIdentifier)
-        seq_name = ev.signal->text;
-      else if (ev.signal->kind == ExprKind::kCall)
-        seq_name = ev.signal->callee;
-      if (seq_name.empty()) continue;
-
-      std::string ep_name = std::string("__seq_") + std::string(seq_name);
-      auto* ep_var = ctx.FindVariable(ep_name);
-      if (!ep_var) {
-        ep_var = ctx.CreateVariable(ep_name, 1);
-        ep_var->is_event = true;
-      }
-
-      auto* sched = &ctx.GetScheduler();
-      auto* ctx_ptr = &ctx;
-      ep_var->AddWatcher([h, sched, ctx_ptr]() mutable {
-        auto* event = sched->GetEventPool().Acquire();
-        event->callback = [h]() mutable { h.resume(); };
-        sched->ScheduleEvent(ctx_ptr->CurrentTime(), Region::kReactive, event);
-        return true;
-      });
-    }
   }
 
   void await_resume() const noexcept {}
@@ -453,6 +426,14 @@ struct AnyChangeAwaiter {
       if (!ChangeGatePasses(watched, prev, ctx_ptr->CurrentTime().ticks))
         return false;
       *consumed = true;
+      // §9.7: a suspended process is desensitized to what it waits on, so the
+      // change wakes nothing now; the wake is kept for resume() to replay
+      // (DriveResumedProcess), which runs the wait again in the time step of
+      // the resume, so a condition that held by then lets the process go on.
+      if (proc && proc->is_suspended) {
+        proc->pending_wake = h;
+        return true;
+      }
       EventAwaiter::ResumeMaybeReactive(h, proc, *ctx_ptr);
       return true;
     });

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "common/types.h"
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -120,6 +121,41 @@ TEST(DelayControlSim, NegativeDelayReinterpretedAsUnsignedTimeVariable) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 99u);
   EXPECT_EQ(f.ctx.CurrentTime().ticks, ~uint64_t{0});
+}
+
+// §9.4.1: a negative delay is an unsigned value of a time variable's size, so
+// taken at time 5 its wake lies past the last time the simulation can reach:
+// the statement after it never runs, and the run ends at time 5. The sum of
+// time and delay wrapped to a time before the present.
+TEST(DelayControlSim, NegativeDelayAfterTimeZeroNeverWakes) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int d;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    #5;\n"
+      "    d = -1;\n"
+      "    #d x = 8'd99;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_FALSE(var->value.IsKnown());
+  EXPECT_EQ(f.ctx.CurrentTime().ticks, 5u);
+}
+
+// §9.4.1's unsigned reading of a negative delay leaves it near the largest
+// time before it is scaled to ticks, by the time unit's magnitude and by the
+// unit's distance from the precision, and either scaling stops at the largest
+// time rather than wrapping.
+TEST(DelayControlSim, ScalingALargeDelayStopsAtTheLargestTime) {
+  constexpr uint64_t kLargest = ~uint64_t{0};
+  const TimeScale kHundredNs{TimeUnit::kNs, 100, TimeUnit::kNs, 1};
+  EXPECT_EQ(DelayToTicks(kLargest, kHundredNs, TimeUnit::kNs), kLargest);
+  const TimeScale kOneNs{TimeUnit::kNs, 1, TimeUnit::kNs, 1};
+  EXPECT_EQ(DelayToTicks(kLargest, kOneNs, TimeUnit::kPs), kLargest);
+  EXPECT_EQ(DelayToTicks(3, kOneNs, TimeUnit::kPs), 3000u);
 }
 
 TEST(DelayControlSim, SpecparamPermittedInDelayExpression) {

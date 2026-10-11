@@ -16,6 +16,7 @@
 #include "simulator/exec_task.h"
 #include "simulator/procedural_assertion.h"
 #include "simulator/process.h"
+#include "simulator/process_termination.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/stmt_exec_internal.h"
@@ -112,7 +113,7 @@ StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {
     }
     if (TryUnwindForDisable(proc, target, ctx)) continue;
 
-    proc->active = false;
+    TerminateProcess(*proc, ctx);
     // §16.4.4: applying a disable to the outermost scope of another procedure
     // that has an active deferred assertion queue flushes that queue -- every
     // pending (not-yet-matured) deferred immediate assertion report on it is
@@ -154,18 +155,22 @@ StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {
   return StmtResult::kDone;
 }
 
-static void DisableDescendants(Process* proc) {
+// §9.6.3: disable fork ends every descendant of `proc`, a descendant of a child
+// that has already finished among them. Each is ended as kill() ends a process
+// (TerminateProcess), so it is KILLED (§9.7), its awaits return, and it is
+// released from the join and wait-fork tallies of the fork that spawned it,
+// once, which is what brings `proc`'s own wait-fork tally back down.
+static void DisableDescendants(Process* proc, SimContext& ctx) {
   for (auto* child : proc->children) {
-    child->active = false;
-    DisableDescendants(child);
+    TerminateProcess(*child, ctx);
+    DisableDescendants(child, ctx);
   }
 }
 
 StmtResult ExecDisableForkImpl(SimContext& ctx) {
   auto* proc = ctx.CurrentProcess();
   if (!proc) return StmtResult::kDone;
-  DisableDescendants(proc);
-  proc->wait_fork_state.remaining = 0;
+  DisableDescendants(proc, ctx);
   proc->children.clear();
   return StmtResult::kDone;
 }

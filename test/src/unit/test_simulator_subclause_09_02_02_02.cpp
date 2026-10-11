@@ -93,6 +93,20 @@ TEST(AlwaysCombSim, AlwaysCombTriggersAfterInitial) {
   EXPECT_EQ(b->value.ToUint64(), 99u);
 }
 
+// §9.2.2.2 triggers an always_comb once at time zero after every initial
+// procedure has started, so its one evaluation at time zero reads what the
+// initial procedure wrote, and the write, made before it was waiting, does not
+// trigger it again.
+TEST(AlwaysCombSim, TheTimeZeroEvaluationFollowsTheInitialProcedures) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t; logic a, y;\n"
+                       "  always_comb begin y = a; $display(\"y=%b\", y); end\n"
+                       "  initial a = 1;\n"
+                       "endmodule\n",
+                       f),
+            "y=1\n");
+}
+
 TEST(AlwaysCombSim, AlwaysCombRetriggersOnChange) {
   SimFixture f;
   auto* b = RunAndFindVar(

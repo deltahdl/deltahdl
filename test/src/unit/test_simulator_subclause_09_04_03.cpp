@@ -123,6 +123,23 @@ TEST(LevelSensitiveEventSimulation, WaitZeroConditionNeverUnblocks) {
   EXPECT_EQ(val, 0u);
 }
 
+// §9.4.3 keeps the statements after a wait blocked until its condition
+// becomes true, and a false condition that reads no variable never does, so
+// the statement after `wait (0);` never runs.
+TEST(LevelSensitiveEventSimulation, AFalseConditionReadingNothingBlocks) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    wait (0);\n"
+      "    x = 8'd42;\n"
+      "  end\n"
+      "endmodule\n",
+      "x");
+  EXPECT_EQ(val, 0u);
+}
+
 // A variable condition already satisfied when the wait is reached must let the
 // following statement run without ever suspending the process.
 TEST(LevelSensitiveEventSimulation, WaitVariableAlreadyTrueProceeds) {

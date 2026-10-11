@@ -3,6 +3,7 @@
 #include <coroutine>
 #include <cstdint>
 #include <exception>
+#include <functional>
 #include <random>
 #include <string>
 #include <string_view>
@@ -158,6 +159,10 @@ struct Process {
   // since its start event found it suspended and ran nothing.
   bool start_deferred = false;
   std::vector<std::coroutine_handle<>> await_waiters;
+  // §9.6.1 with §9.3.2: releases this process, where a fork spawned it, from
+  // that fork's join and wait-fork tallies (stmt_exec.cpp); empty for any other
+  // process, and emptied once run (ReleaseFromFork).
+  std::function<void()> fork_release;
 
   uint32_t rng_seed = 0;
 
@@ -318,6 +323,27 @@ struct Process {
     for (auto& w : waiters) {
       if (w) w.resume();
     }
+  }
+
+  // §9.7: the process is forcibly terminated, by kill() or a disable
+  // (TerminateProcess in process_termination.h), so status() answers KILLED
+  // and every await() on it returns.
+  void Kill() {
+    active = false;
+    sv_state = ProcessState::kKilled;
+    auto waiters = std::move(await_waiters);
+    await_waiters.clear();
+    for (auto& w : waiters) {
+      if (w) w.resume();
+    }
+  }
+
+  // Runs fork_release once, by whichever ends the process first: its own
+  // completion, its start event finding it already ended, or a kill.
+  void ReleaseFromFork() {
+    auto release = std::move(fork_release);
+    fork_release = nullptr;
+    if (release) release();
   }
 
   // Starts the process: every caller is the event that begins its run.

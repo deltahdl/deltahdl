@@ -14,6 +14,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/lowerer_register.h"
 #include "simulator/process.h"
+#include "simulator/process_termination.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
@@ -131,21 +132,16 @@ static bool IsRestrictedTarget(const Process* proc) {
          proc->kind == ProcessKind::kContAssign;
 }
 
-static bool IsProcessKillable(const Process* proc) {
-  return proc && proc->sv_state != ProcessState::kFinished &&
-         proc->sv_state != ProcessState::kKilled;
-}
-
-static void KillProcessDescendants(Process* proc) {
+// §9.7: kill() terminates every descendant of `proc`, the processes forks in
+// it or in any descendant spawned, whatever state the intervening ones are in:
+// a child that has finished leaves its own children descendants still.
+static void KillProcessDescendants(Process* proc, SimContext& ctx) {
   std::vector<Process*> stack(proc->children.begin(), proc->children.end());
   while (!stack.empty()) {
     auto* child = stack.back();
     stack.pop_back();
-    if (IsProcessKillable(child)) {
-      child->active = false;
-      child->sv_state = ProcessState::kKilled;
-      for (auto* gc : child->children) stack.push_back(gc);
-    }
+    TerminateProcess(*child, ctx);
+    for (auto* gc : child->children) stack.push_back(gc);
   }
 }
 
@@ -163,19 +159,12 @@ static void EvalProcessKill(Process* proc, SimContext& ctx, Arena& arena,
     out = MakeLogic4VecVal(arena, 1, 0);
     return;
   }
-  if (IsProcessKillable(proc)) {
-    proc->active = false;
-    proc->sv_state = ProcessState::kKilled;
-    KillProcessDescendants(proc);
-    for (auto& w : proc->await_waiters) {
-      if (w) w.resume();
-    }
-    proc->await_waiters.clear();
-  } else if (proc) {
-    // §9.7: killing a process that is already FINISHED or KILLED leaves its own
-    // state untouched but still forcibly terminates any descendant subprocess
-    // that has not yet finished or been killed.
-    KillProcessDescendants(proc);
+  // §9.7: killing a process that is already FINISHED or KILLED leaves its own
+  // state untouched (TerminateProcess) but still forcibly terminates any
+  // descendant subprocess that has not yet finished or been killed.
+  if (proc) {
+    TerminateProcess(*proc, ctx);
+    KillProcessDescendants(proc, ctx);
   }
   out = MakeLogic4VecVal(arena, 1, 0);
 }

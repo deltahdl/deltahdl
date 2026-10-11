@@ -596,4 +596,37 @@ TEST(IntraAssignTimingSimulation, NbaRepeatEventCapturesRhs) {
   EXPECT_EQ(a->value.ToUint64(), 25u);
 }
 
+// §9.4.5 lets a repeat event control count the occurrences of any event
+// expression, so `posedge v[0]`, a select naming no variable of its own, is
+// counted as the value of the select changes: the second posedge is at 15.
+TEST(IntraAssignTimingSimulation, RepeatCountsAnOperandThatIsASelect) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t; logic [1:0] v = 0; int a, b = 7;\n"
+                       "  initial repeat (4) #5 v[0] = ~v[0];\n"
+                       "  initial begin\n"
+                       "    a = repeat (2) @(posedge v[0]) b;\n"
+                       "    $display(\"a=%0d %0t\", a, $time);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "a=7 15\n");
+}
+
+// §9.4.5 counts each edge Table 9-2 gives, whatever else watches the signal:
+// an always procedure waiting on negedge clk, judged first on each change,
+// leaves the repeat's posedges to it.
+TEST(IntraAssignTimingSimulation, RepeatCountsEdgesAnotherProcessWatches) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t; logic clk = 0; int n, a, b = 3;\n"
+                       "  initial repeat (6) #5 clk = ~clk;\n"
+                       "  always @(negedge clk) n++;\n"
+                       "  initial begin\n"
+                       "    #1 a = repeat (2) @(posedge clk) b;\n"
+                       "    $display(\"a=%0d %0t\", a, $time);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "a=3 15\n");
+}
+
 }  // namespace

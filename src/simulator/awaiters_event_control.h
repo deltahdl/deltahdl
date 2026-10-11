@@ -1,16 +1,14 @@
 #pragma once
 
-// The awaiters a suspended process resumes from for a §9.4.2 event control and
-// for the §9.4.5 intra-assignment repeat form of it. EventAwaiter arms one
-// watcher per operand of an `@(a or b)` list and resumes the coroutine at most
-// once per trigger; RepeatEventAwaiter arms a persistent watcher per operand
-// and counts occurrences across the whole list until the repeat count is
-// reached. The two are here together because they share what an operand is
-// made of: ResolveSignalToVariable resolves an operand expression to a
-// Variable, EventAwaiter::CheckEdge decides whether an edge qualifies, and
-// EventAwaiter::ResumeMaybeReactive decides which region the resume runs in.
-// EdgeSpec, ResumeTarget and CompoundOperand are the parameter bundles those
-// helpers take.
+// The awaiter a suspended process resumes from for a §9.4.2 event control.
+// EventAwaiter arms one watcher per operand of an `@(a or b)` list and resumes
+// the coroutine at most once per trigger. What an operand is made of is here
+// too, for the §9.4.5 intra-assignment repeat form's RepeatEventAwaiter
+// (repeat_event_awaiter.h) to share: ResolveSignalToVariable resolves an
+// operand expression to a Variable, EventAwaiter::CheckEdge decides whether an
+// edge qualifies, and EventAwaiter::ResumeMaybeReactive decides which region
+// the resume runs in. EdgeSpec, ResumeTarget and CompoundOperand are the
+// parameter bundles those helpers take.
 //
 // Split out of src/simulator/awaiters.h, which includes this header and holds
 // the awaiters for the other things a process waits on: a delay, a named
@@ -20,6 +18,7 @@
 
 #include <coroutine>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -60,6 +59,10 @@ struct EdgeSpec {
 struct ResumeTarget {
   SimContext& ctx;
   Process* proc;
+  // §9.4.2.4: the wake is that of a sequence instance's end point, detected in
+  // the Observed region, and the process resumes after it, in the Reactive
+  // region, rather than within the region the trigger runs in.
+  bool after_observed = false;
 };
 
 // §9.4.2 with §8: the per-operand watch state for an event control on a
@@ -312,21 +315,42 @@ struct EventAwaiter {
     auto* ctx_ptr = &target.ctx;
     auto* proc = target.proc;
     const Expr* iff_cond = ev.iff_condition;
-    var->AddWatcher(
-        [h, iff_cond, woke = ev, proc, ctx_ptr, consumed]() mutable {
-          if (proc && !proc->active) return true;
-          // A sibling operand of the same event control already resumed this
-          // await; the coroutine has moved on, so retire this stale watcher.
-          if (*consumed) return true;
-          if (proc && proc->is_suspended) return false;
-          if (iff_cond &&
-              !EvalExpr(iff_cond, *ctx_ptr, ctx_ptr->GetArena()).IsTruthy())
-            return false;
-          *consumed = true;
-          if (proc) proc->woken_by = woke;
-          ResumeMaybeReactive(h, proc, *ctx_ptr);
-          return true;
-        });
+    const bool kAfterObserved = target.after_observed;
+    var->AddWatcher([h, iff_cond, woke = ev, proc, ctx_ptr, consumed,
+                     kAfterObserved]() mutable {
+      if (proc && !proc->active) return true;
+      // A sibling operand of the same event control already resumed this
+      // await; the coroutine has moved on, so retire this stale watcher.
+      if (*consumed) return true;
+      if (proc && proc->is_suspended) return false;
+      if (iff_cond &&
+          !EvalExpr(iff_cond, *ctx_ptr, ctx_ptr->GetArena()).IsTruthy())
+        return false;
+      *consumed = true;
+      if (proc) proc->woken_by = woke;
+      if (kAfterObserved) {
+        ScheduleResume(h, proc, *ctx_ptr, Region::kReactive);
+      } else {
+        ResumeMaybeReactive(h, proc, *ctx_ptr);
+      }
+      return true;
+    });
+  }
+
+  // §9.4.2.4 with §16.13.6: the variable the end point of the sequence
+  // instance `ev` names triggers, `__seq_<name>` (SubstituteSequenceEndpoints
+  // in stmt_exec_wait.cpp), made here where no match has triggered it yet.
+  static Variable* SequenceEndPoint(const EventExpr& ev, SimContext& ctx) {
+    const std::string kKey =
+        "__seq_" + std::string(ev.signal->kind == ExprKind::kCall
+                                   ? ev.signal->callee
+                                   : ev.signal->text);
+    Variable* var = ctx.FindVariable(kKey);
+    if (var == nullptr) {
+      var = ctx.CreateVariable(kKey, 1);
+      var->is_event = true;
+    }
+    return var;
   }
 
   // Arms an edge-sensitive watcher on a value-carrying variable, delegating
@@ -379,6 +403,14 @@ struct EventAwaiter {
     if (proc) proc->woken_by = EventExpr{};
     for (const auto& ev : events) {
       if (!ev.signal) continue;
+      // §9.4.2.4: a sequence instance is one operand among the others, its
+      // end point triggering its watcher, under its own iff and the shared
+      // guard.
+      if (ev.is_sequence_event) {
+        AttachEventVarWatcher(SequenceEndPoint(ev, ctx), ev, h,
+                              ResumeTarget{ctx, proc, true}, consumed);
+        continue;
+      }
       if (ev.signal->kind != ExprKind::kIdentifier &&
           ev.signal->kind != ExprKind::kMemberAccess) {
         AttachCompoundWatchers(ev, h, proc, consumed);
@@ -721,22 +753,29 @@ struct EventAwaiter {
     // watch.
     auto prev = std::make_shared<Logic4Snapshot>();
     prev->Capture(EvalExpr(ev.signal, ctx, ctx.GetArena()));
-    std::vector<std::string_view> names;
-    CollectExprIdentifiers(ev.signal, ctx, names);
-    if (names.empty()) return;
     auto* ctx_ptr = &ctx;
     const Expr* signal = ev.signal;
     const Expr* iff_cond = ev.iff_condition;
     Edge edge = ev.edge;
+    WatchOperandNames(
+        signal, ctx,
+        [h, prev, consumed, signal, edge, iff_cond, ctx_ptr, proc]() mutable {
+          return EvalCompoundWatcher(h, CompoundOperand{prev, consumed, signal},
+                                     EdgeSpec{edge, iff_cond},
+                                     ResumeTarget{*ctx_ptr, proc});
+        });
+  }
+
+  // Arms `watcher` on every variable the operand expression `signal` reads, a
+  // write to any of which may change the operand's value.
+  static void WatchOperandNames(const Expr* signal, SimContext& ctx,
+                                const std::function<bool()>& watcher) {
+    std::vector<std::string_view> names;
+    CollectExprIdentifiers(signal, ctx, names);
     for (auto name : names) {
       Variable* op_var = ctx.FindVariable(name);
       if (!op_var) continue;
-      op_var->AddWatcher([h, prev, consumed, signal, edge, iff_cond, ctx_ptr,
-                          proc]() mutable {
-        return EvalCompoundWatcher(h, CompoundOperand{prev, consumed, signal},
-                                   EdgeSpec{edge, iff_cond},
-                                   ResumeTarget{*ctx_ptr, proc});
-      });
+      op_var->AddWatcher(watcher);
     }
   }
 
@@ -801,134 +840,6 @@ struct EventAwaiter {
     }
     h.resume();
   }
-};
-
-// §9.4.5 intra-assignment repeat event control. A plain event control is
-// awaited once, but the repeat form has to accumulate a fixed number of event
-// occurrences across the whole OR-list. Each operand keeps a single persistent
-// watcher (rather than being re-armed once per occurrence), so two edges in the
-// same time step on different operands are each counted, and a shared guard
-// resumes the issuing process exactly once when the target count is reached —
-// any later sibling watcher that fires afterwards removes itself without
-// touching the already-resumed coroutine.
-struct RepeatEventAwaiter {
-  SimContext& ctx;
-  const std::vector<EventExpr>& events;
-  Arena& arena;
-  uint64_t count;
-
-  bool await_ready() const noexcept { return count == 0; }
-
-  // Arms a persistent watcher on a named-event operand. Each occurrence is
-  // forwarded to tally once the active/suspended gates pass, and §9.4.2.3's
-  // `iff` qualifier gates it as it gates an edge operand: an occurrence
-  // arriving while the condition is false is not one of the occurrences the
-  // repeat is counting.
-  template <typename TallyFn>
-  static void ArmEventOperand(Variable* var, const Expr* iff_cond,
-                              ResumeTarget target,
-                              const std::shared_ptr<bool>& done,
-                              const TallyFn& tally) {
-    auto* ctx_ptr = &target.ctx;
-    auto* proc = target.proc;
-    var->AddWatcher([iff_cond, ctx_ptr, proc, done, tally]() mutable {
-      if (*done) return true;
-      if (proc && !proc->active) return true;
-      if (proc && proc->is_suspended) return false;
-      if (iff_cond &&
-          !EvalExpr(iff_cond, *ctx_ptr, ctx_ptr->GetArena()).IsTruthy())
-        return false;
-      return tally();
-    });
-  }
-
-  // Arms a persistent edge-sensitive watcher on a value-carrying operand,
-  // forwarding qualifying edges (after the iff gate) to tally.
-  // Edge-watcher gate result. `passed` is true when a qualifying edge (and the
-  // iff condition) was seen and the occurrence should be tallied; otherwise
-  // `keep_armed_return` carries the AddWatcher value to return.
-  struct EdgeOperandGate {
-    bool passed;
-    bool keep_armed_return;
-  };
-
-  // Applies the active/suspended/edge/iff gates for a repeat edge operand
-  // watcher, resyncing var->prev_value on each non-tally exit. Returns whether
-  // the occurrence should be tallied along with the watcher return value to use
-  // when it should not.
-  static EdgeOperandGate EvalEdgeOperandGate(Variable* var,
-                                             const EdgeSpec& spec,
-                                             const std::shared_ptr<bool>& done,
-                                             ResumeTarget target) {
-    if (*done) return {false, true};
-    if (target.proc && !target.proc->active) return {false, true};
-    if (target.proc && target.proc->is_suspended) return {false, false};
-    if (!EventAwaiter::CheckEdge(var, spec.edge)) {
-      var->prev_value.Capture(var->value);
-      return {false, false};
-    }
-    // §9.4.2.3 with §12.4: the guard is true when any bit of it is 1.
-    if (spec.iff_cond &&
-        !EvalExpr(spec.iff_cond, target.ctx, target.ctx.GetArena())
-             .IsTruthy()) {
-      var->prev_value.Capture(var->value);
-      return {false, false};
-    }
-    var->prev_value.Capture(var->value);
-    return {true, false};
-  }
-
-  template <typename TallyFn>
-  static void ArmEdgeOperand(Variable* var, const EventExpr& ev,
-                             const std::shared_ptr<bool>& done,
-                             ResumeTarget target, const TallyFn& tally) {
-    var->prev_value.Capture(var->value);
-    Edge edge = ev.edge;
-    const Expr* iff_cond = ev.iff_condition;
-    auto* ctx_ptr = &target.ctx;
-    auto* proc = target.proc;
-    var->AddWatcher(
-        [var, edge, iff_cond, ctx_ptr, proc, done, tally]() mutable {
-          auto gate = EvalEdgeOperandGate(var, EdgeSpec{edge, iff_cond}, done,
-                                          ResumeTarget{*ctx_ptr, proc});
-          if (!gate.passed) return gate.keep_armed_return;
-          return tally();
-        });
-  }
-
-  void await_suspend(std::coroutine_handle<> h) {
-    auto* proc = ctx.CurrentProcess();
-    auto remaining = std::make_shared<uint64_t>(count);
-    auto done = std::make_shared<bool>(false);
-    auto* ctx_ptr = &ctx;
-
-    // Counts one occurrence and, when the target is reached, resumes the
-    // process once. Returning false keeps the watcher armed for the next
-    // occurrence; returning true removes it.
-    auto tally = [h, proc, ctx_ptr, remaining, done]() {
-      if (*remaining > 0) --(*remaining);
-      if (*remaining == 0) {
-        *done = true;
-        EventAwaiter::ResumeMaybeReactive(h, proc, *ctx_ptr);
-        return true;
-      }
-      return false;
-    };
-
-    for (const auto& ev : events) {
-      if (!ev.signal) continue;
-      Variable* var = ResolveSignalToVariable(ev.signal, ctx);
-      if (!var) continue;
-      if (var->is_event) {
-        ArmEventOperand(var, ev.iff_condition, ResumeTarget{ctx, proc}, done,
-                        tally);
-        continue;
-      }
-      ArmEdgeOperand(var, ev, done, ResumeTarget{ctx, proc}, tally);
-    }
-  }
-
-  void await_resume() const noexcept {}
 };
 
 }  // namespace delta

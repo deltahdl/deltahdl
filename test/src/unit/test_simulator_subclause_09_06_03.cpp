@@ -217,4 +217,23 @@ TEST(DisableForkExecution, DisableForkSparesSameBlockInOtherThread) {
   LowerRunAndCheck(f, design, {{"a", 0u}, {"b", 2u}});
 }
 
+// §9.6.3: a child disable fork ends before it has started leaves the caller's
+// wait-fork tally as one that ran and ended would, so a wait fork on a later
+// fork waits for that fork's children alone.
+TEST(DisableForkExecution, ALaterWaitForkWaitsForItsOwnChildren) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t; int y;\n"
+                       "  initial begin\n"
+                       "    fork #5 y = 1; join_none\n"
+                       "    disable fork;\n"
+                       "    #1;\n"
+                       "    fork #3 y = 2; join_none\n"
+                       "    wait fork;\n"
+                       "    $display(\"%0t y=%0d\", $time, y);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "4 y=2\n");
+}
+
 }  // namespace

@@ -266,10 +266,9 @@ ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   while (!ctx.StopRequested()) {
     auto cond = EvalExpr(stmt->condition, ctx, arena);
     if (cond.IsTruthy()) break;
-    if (read_vars.empty()) {
-      if (labeled) ctx.PopStaticScope(stmt->label);
-      co_return StmtResult::kDone;
-    }
+    // §9.4.3: the statements after a wait stay blocked until its condition
+    // becomes true. One that reads no variable never becomes true, so the
+    // awaiter, arming no watcher, leaves the process blocked for good.
     suspended = true;
     co_await AnyChangeAwaiter{ctx, read_vars, finished};
   }
@@ -441,8 +440,10 @@ ExecTask ExecEventControl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     std::string_view named_event = NamedEventKey(stmt, ctx);
     Variable* class_event =
         named_event.empty() ? ClassEventOfControl(stmt, ctx, arena) : nullptr;
+    // §9.4.2.4: a list holding a sequence instance is EventAwaiter's, which
+    // arms the sequence and every other operand under one guard.
     if (HasSequenceEvent(stmt)) {
-      co_await SequenceEventAwaiter{ctx, stmt->events};
+      co_await EventAwaiter{ctx, stmt->events, arena};
     } else if (!named_event.empty() || class_event != nullptr) {
       co_await NamedEventAwaiter{ctx, named_event, class_event};
     } else {

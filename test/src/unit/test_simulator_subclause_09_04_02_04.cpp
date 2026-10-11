@@ -94,4 +94,59 @@ TEST(SequenceEventSim, ProcessStaysBlockedWhenSequenceNeverMatches) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
+// §9.4.2.1 with §9.4.2.4: a sequence instance or-ed with another event is one
+// operand among the others, so the edge wakes the process though the sequence
+// never matches.
+TEST(SequenceEventSim, AnOrListWakesOnItsOtherOperands) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t; logic clk = 0, a = 0;\n"
+                       "  sequence s1; @(posedge clk) a; endsequence\n"
+                       "  always #5 clk = ~clk;\n"
+                       "  initial begin\n"
+                       "    @(s1 or posedge clk);\n"
+                       "    $display(\"woke %0t\", $time);\n"
+                       "    $finish;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "woke 5\n");
+}
+
+// §9.4.2.3: an iff qualifier on a sequence instance lets a match wake the
+// process only where its condition holds, so the match at 5 passes it by.
+TEST(SequenceEventSim, AnIffQualifierGatesTheSequence) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t; logic clk = 0, a = 1; bit en = 0;\n"
+                       "  sequence s1; @(posedge clk) a; endsequence\n"
+                       "  always #5 clk = ~clk;\n"
+                       "  initial #12 en = 1;\n"
+                       "  initial begin\n"
+                       "    @(s1 iff en);\n"
+                       "    $display(\"woke %0t\", $time);\n"
+                       "    $finish;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "woke 15\n");
+}
+
+// §9.4.2.1: an or-ed event control resumes its process once, on the first
+// operand to occur, so s2's later match leaves the process in its delay.
+TEST(SequenceEventSim, TwoSequencesResumeTheProcessOnce) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t; logic clk = 0, a = 1, b = 0;\n"
+                       "  sequence s1; @(posedge clk) a; endsequence\n"
+                       "  sequence s2; @(posedge clk) b; endsequence\n"
+                       "  always #5 clk = ~clk;\n"
+                       "  initial #12 b = 1;\n"
+                       "  initial begin\n"
+                       "    @(s1 or s2);\n"
+                       "    #100 $display(\"done %0t\", $time);\n"
+                       "    $finish;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "done 105\n");
+}
+
 }  // namespace

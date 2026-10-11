@@ -202,4 +202,25 @@ TEST(WaitForkSimulation, WaitForkWaitsForChildrenSpawnedBySubroutine) {
   LowerRunAndCheck(f, design, {{"a", 5u}, {"b", 7u}, {"done", 7u}});
 }
 
+// §9.6.1 has wait fork return once every immediate child has terminated, and a
+// child kill() ends (§9.7) has terminated, so the wait returns at the kill, as
+// a join does for a branch another process kills.
+TEST(WaitForkSimulation, AKilledChildCountsAsTerminated) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t; process p, q;\n"
+                 "  initial begin\n"
+                 "    fork begin p = process::self(); #10; end join_none\n"
+                 "    #1 p.kill();\n"
+                 "    wait fork;\n"
+                 "    $display(\"wait %0t\", $time);\n"
+                 "    fork begin q = process::self(); #10; end join\n"
+                 "    $display(\"join %0t\", $time);\n"
+                 "  end\n"
+                 "  initial #3 q.kill();\n"
+                 "endmodule\n",
+                 f),
+      "wait 1\njoin 3\n");
+}
+
 }  // namespace

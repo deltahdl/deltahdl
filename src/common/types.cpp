@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -395,13 +396,22 @@ static uint64_t PowerOf10(int exp) {
   return result;
 }
 
+// The product of `a` and `b`, or the largest time where it would exceed it.
+// §9.4.1 reads a negative delay as an unsigned value of a time variable's
+// size, so a delay may already be near that largest time before it is scaled
+// to ticks, and a wrapped product would be a time before the delay began.
+static uint64_t SaturatingTickProduct(uint64_t a, uint64_t b) {
+  constexpr uint64_t kMax = std::numeric_limits<uint64_t>::max();
+  return a != 0 && b > kMax / a ? kMax : a * b;
+}
+
 uint64_t DelayToTicks(uint64_t delay, const TimeScale& scale,
                       TimeUnit global_precision) {
   int exp_diff =
       static_cast<int>(scale.unit) - static_cast<int>(global_precision);
-  uint64_t ticks = delay * scale.magnitude;
+  uint64_t ticks = SaturatingTickProduct(delay, scale.magnitude);
   if (exp_diff > 0) {
-    ticks *= PowerOf10(exp_diff);
+    ticks = SaturatingTickProduct(ticks, PowerOf10(exp_diff));
   } else if (exp_diff < 0) {
     ticks /= PowerOf10(-exp_diff);
   }
