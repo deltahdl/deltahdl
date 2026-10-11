@@ -592,7 +592,7 @@ TEST(OutOfBlockDeclElaboration, ATypeNameResolvingDifferentlyIsReported) {
       "module m; endmodule\n",
       f);
   const auto& diags = f.diag.Diagnostics();
-  const char* kMessage[] = {
+  const char* const kMessage[] = {
       "out-of-block declaration for 'C::f' resolves 'T' to the class's own "
       "type",
       "out-of-block declaration for 'C::h' resolves 'T' to the class's own "

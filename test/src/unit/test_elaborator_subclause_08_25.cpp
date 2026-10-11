@@ -625,7 +625,7 @@ TEST(ParameterizedClassElaboration, ABaseResolvingToNoClassIsAnError) {
   EXPECT_TRUE(ReportedError(
       diags, "class 'X' extends 'T', a typedef of a type that is no class", 5,
       "8.25"));
-  const char* kSpecialization =
+  const char* const kSpecialization =
       "this specialization of 'C' gives its type parameter 'P', the class it "
       "extends, a type that is no class";
   EXPECT_TRUE(ReportedError(diags, kSpecialization, 10, "8.25"));

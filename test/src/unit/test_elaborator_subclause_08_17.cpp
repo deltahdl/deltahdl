@@ -789,7 +789,7 @@ TEST(ChainedConstructorElaboration, ADeclarationAheadOfSuperNewIsNoStatement) {
       "endclass\n"
       "module m; endmodule\n",
       f);
-  const char* kMessage =
+  const char* const kMessage =
       "super.new() does not open the constructor, and no executable statement "
       "may come before it";
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kMessage, 6, "8.17"));

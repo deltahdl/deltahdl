@@ -140,7 +140,9 @@ TEST(AbstractClassSimulation, ConstructAbstractClassDirectlyError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot construct object of abstract class 'Base'",
+                            6, "8.21"));
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();

@@ -775,7 +775,8 @@ TEST(ClassObjectElaboration, AHandleYieldedByAnExpressionIsAHandle) {
       "  end\n"
       "endmodule\n",
       f);
-  const char* kMessage = "operator is not allowed on class object handles";
+  const char* const kMessage =
+      "operator is not allowed on class object handles";
   for (const int kLine : {12, 13, 14}) {
     EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, kLine, "8.4"))
         << kLine;

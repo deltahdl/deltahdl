@@ -75,6 +75,19 @@ bool FunctionReturnsClass(std::string_view name, const CompilationUnit* unit) {
   return false;
 }
 
+// The properties `cls` and the classes it extends, up the chain, declare.
+std::vector<const ClassMember*> ChainProperties(const ClassDecl& cls,
+                                                const CompilationUnit* unit) {
+  std::vector<const ClassMember*> out;
+  for (const ClassDecl* c = &cls; c != nullptr;
+       c = FindClassDecl(c->base_class, unit)) {
+    for (const ClassMember* m : c->members) {
+      if (m->kind == ClassMemberKind::kProperty) out.push_back(m);
+    }
+  }
+  return out;
+}
+
 }  // namespace
 
 bool IsHandleOperand(
@@ -128,13 +141,8 @@ void AddSubroutineHandles(
     types[name] = type.type_name;
   };
   if (!site.inside.empty()) {
-    for (const ClassDecl* c = site.inside.front(); c != nullptr;
-         c = FindClassDecl(c->base_class, unit)) {
-      for (const ClassMember* m : c->members) {
-        if (m->kind == ClassMemberKind::kProperty) {
-          add(m->name, m->data_type, m->unpacked_dims.empty());
-        }
-      }
+    for (const ClassMember* m : ChainProperties(*site.inside.front(), unit)) {
+      add(m->name, m->data_type, m->unpacked_dims.empty());
     }
   }
   for (const FunctionArg& arg : site.sub->func_args) {

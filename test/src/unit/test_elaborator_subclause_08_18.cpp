@@ -822,7 +822,8 @@ TEST(DataHidingElaboration, ASubclassMethodReachesNoBaseLocalMember) {
       "endclass\n"
       "module m; endmodule\n",
       f);
-  const char* kMessage = "cannot access local member from outside its class";
+  const char* const kMessage =
+      "cannot access local member from outside its class";
   for (const int kLine : {6, 7, 8}) {
     EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, kLine, "8.18"))
         << kLine;
@@ -883,15 +884,15 @@ TEST(DataHidingElaboration, ALocalOrProtectedConstructorIsReachedFromInside) {
       "class P; protected function new(); endfunction endclass\n"
       "class LD extends L; endclass\n"
       "class PD extends P; endclass\n"
-      "module m;\n"
+      "module a; class K; endclass K k; initial k = new; endmodule\n"
+      "module b; class K; endclass endmodule\n"
+      "module m; a ua();\n"
       "  L l = new;\n"
       "  P p;\n"
       "  PD pd;\n"
       "  int da[];\n"
       "  initial begin p = new; pd = new; da = new[2]; end\n"
-      "endmodule\n"
-      "module a; class K; endclass K k; initial k = new; endmodule\n"
-      "module b; class K; endclass endmodule\n",
+      "endmodule\n",
       f);
   const auto& diags = f.diag.Diagnostics();
   EXPECT_TRUE(ReportedError(diags,
@@ -900,11 +901,11 @@ TEST(DataHidingElaboration, ALocalOrProtectedConstructorIsReachedFromInside) {
                             6, "8.18"));
   EXPECT_FALSE(ReportedError(diags, "extends 'P'", 7, "8.18"));
   EXPECT_TRUE(ReportedError(
-      diags, "cannot access local member from outside its class", 9, "8.18"));
+      diags, "cannot access local member from outside its class", 11, "8.18"));
   EXPECT_TRUE(ReportedError(diags,
                             "cannot access protected member from outside its "
                             "class hierarchy",
-                            13, "8.18"));
+                            15, "8.18"));
   EXPECT_FALSE(ReportedError(diags, "cannot access", 3, "8.18"));
 }
 

@@ -10,7 +10,6 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_classes.h"
-#include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
@@ -354,7 +353,37 @@ struct OutOfBlockSite {
   bool unknown_is_error;
 };
 
+// The prototypes and interface methods the scopes' declarations have linked
+// so far, which a second declaration of either is reported against.
+struct OutOfBlockLinks {
+  std::unordered_set<std::string> interfaces;
+  std::unordered_set<const ModuleItem*> prototypes;
+};
+
 }  // namespace
+
+// The out-of-block declaration `item` of `site`, which names a class or
+// interface by its method_class.
+static void ValidateOutOfBlockItem(ModuleItem* item, const OutOfBlockSite& site,
+                                   OutOfBlockLinks& links,
+                                   const CompilationUnit* unit,
+                                   DiagEngine& diag) {
+  const auto* cls = ClassNamedAmong(site.classes, item->method_class);
+  if (cls != nullptr) {
+    ValidateClassOutOfBlockBody(cls, item, links.prototypes, diag);
+    return;
+  }
+  if (!site.unknown_is_error) return;
+  const auto* ifc = FindInterfaceDecl(item->method_class, unit);
+  if (ifc) {
+    ValidateInterfaceOutOfBlockBody(ifc, item, links.interfaces, diag);
+    return;
+  }
+  diag.Error(item->loc,
+             std::format("out-of-block declaration for unknown class '{}'",
+                         item->method_class),
+             Subclause("8.24"));
+}
 
 void ElaboratorClassRules::ValidateOutOfBlockDeclarations() {
   std::vector<OutOfBlockSite> sites;
@@ -369,29 +398,14 @@ void ElaboratorClassRules::ValidateOutOfBlockDeclarations() {
   for (const auto* pkg : unit_->packages) {
     sites.push_back({&pkg->items, ClassesDeclaredAmong(pkg->items), true});
   }
-  std::unordered_set<std::string> linked_interfaces;
-  std::unordered_set<const ModuleItem*> linked;
+  OutOfBlockLinks links;
   for (const OutOfBlockSite& site : sites) {
     for (auto* item : *site.items) {
-      if (item->method_class.empty()) continue;
-      bool is_func = (item->kind == ModuleItemKind::kFunctionDecl);
-      bool is_task = (item->kind == ModuleItemKind::kTaskDecl);
-      if (!is_func && !is_task) continue;
-      const auto* cls = ClassNamedAmong(site.classes, item->method_class);
-      if (cls != nullptr) {
-        ValidateClassOutOfBlockBody(cls, item, linked, diag_);
-        continue;
+      if (!item->method_class.empty() &&
+          (item->kind == ModuleItemKind::kFunctionDecl ||
+           item->kind == ModuleItemKind::kTaskDecl)) {
+        ValidateOutOfBlockItem(item, site, links, unit_, diag_);
       }
-      if (!site.unknown_is_error) continue;
-      const auto* ifc = FindInterfaceDecl(item->method_class, unit_);
-      if (ifc) {
-        ValidateInterfaceOutOfBlockBody(ifc, item, linked_interfaces, diag_);
-        continue;
-      }
-      diag_.Error(item->loc,
-                  std::format("out-of-block declaration for unknown class '{}'",
-                              item->method_class),
-                  Subclause("8.24"));
     }
   }
 }

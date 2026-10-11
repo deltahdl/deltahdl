@@ -127,9 +127,9 @@ static bool OverrideTypeMismatch(const DataType& base, const DataType& over,
   const DataType kBase = ResolvedType(base, *ctx.base, ctx.typedefs);
   const DataType kOver = ResolvedType(over_type, *ctx.derived, ctx.typedefs);
   if (TypesMatch(kBase, kOver)) return false;
-  return !(is_return && kBase.kind == DataTypeKind::kNamed &&
-           kOver.kind == DataTypeKind::kNamed &&
-           IsClassDerivedFrom(kOver.type_name, kBase.type_name, ctx.unit));
+  return !is_return || kBase.kind != DataTypeKind::kNamed ||
+         kOver.kind != DataTypeKind::kNamed ||
+         !IsClassDerivedFrom(kOver.type_name, kBase.type_name, ctx.unit);
 }
 
 static void ValidateOverrideSignature(const ModuleItem* base_method,
@@ -196,26 +196,34 @@ const DataType* SpecializationArgument(const std::vector<DataType>& args,
   return !kNamed && index < args.size() ? &args[index] : nullptr;
 }
 
+// The type each type parameter of `cls` takes in the specialization `type`:
+// the argument it writes for the parameter, or the parameter's default.
+static std::unordered_map<std::string_view, DataType> SpecializationBindings(
+    const ClassDecl& cls, const DataType& type) {
+  std::unordered_map<std::string_view, DataType> bound;
+  for (std::size_t i = 0; i < cls.params.size(); ++i) {
+    const std::string_view kName = cls.params[i].first;
+    if (!cls.type_param_names.contains(kName)) continue;
+    const DataType* arg = SpecializationArgument(type.type_params, i, kName);
+    bound[kName] = arg != nullptr ? *arg : cls.param_types.at(i);
+  }
+  return bound;
+}
+
 void ReportSpecializationOverrideMismatches(const DataType& type, SourceLoc loc,
                                             const CompilationUnit* unit,
                                             const TypedefMap& typedefs,
                                             DiagEngine& diag) {
   const ClassDecl* cls = FindClassDecl(type.type_name, unit);
   if (cls == nullptr || cls->type_param_names.empty()) return;
-  std::unordered_map<std::string_view, DataType> bound;
-  for (std::size_t i = 0; i < cls->params.size(); ++i) {
-    const std::string_view kName = cls->params[i].first;
-    if (!cls->type_param_names.contains(kName)) continue;
-    const DataType* arg = SpecializationArgument(type.type_params, i, kName);
-    bound[kName] = arg != nullptr ? *arg : cls->param_types.at(i);
-  }
+  const auto kBound = SpecializationBindings(*cls, type);
   for (const ClassMember* m : cls->members) {
     if (m->method == nullptr) continue;
     const OwnedMethod kBase = FindBaseVirtualMethod(cls, m->method->name, unit);
     if (kBase.member == nullptr) continue;
     const auto& base_args = kBase.member->method->func_args;
     const auto& over_args = m->method->func_args;
-    const OverrideTypeContext kCtx{kBase.owner, cls, typedefs, unit, &bound};
+    const OverrideTypeContext kCtx{kBase.owner, cls, typedefs, unit, &kBound};
     for (size_t i = 0; i < std::min(base_args.size(), over_args.size()); ++i) {
       if (!NamesTypeParameter(over_args[i].data_type, *cls) ||
           !OverrideTypeMismatch(base_args[i].data_type, over_args[i].data_type,

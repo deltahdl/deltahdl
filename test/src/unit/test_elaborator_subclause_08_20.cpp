@@ -476,7 +476,7 @@ TEST(VirtualMethodElaboration, OverrideQualifiersMatchTheOverriddenMethod) {
       "endclass\n"
       "module m; endmodule\n",
       f);
-  const char* kMessage[] = {
+  const char* const kMessage[] = {
       "virtual method override 'f' is not qualified local or protected as the "
       "method it overrides is",
       "virtual method override 'g' is not qualified local or protected as the "
@@ -556,23 +556,23 @@ TEST(VirtualMethodElaboration,
       "  virtual function D some_method(Y a); return null; endfunction\n"
       "  function void extra(); endfunction\n"
       "endclass\n"
-      "module m;\n"
+      "module a; class K; endclass K k; endmodule\n"
+      "module b; class K; endclass endmodule\n"
+      "module m; a ua();\n"
       "  E #() v1;\n"
       "  E #(int, int) v2;\n"
       "  E #(.Y(int)) v3;\n"
       "  E #(.Z(int)) v4;\n"
-      "endmodule\n"
-      "module a; class K; endclass K k; endmodule\n"
-      "module b; class K; endclass endmodule\n",
+      "endmodule\n",
       f);
   const auto& diags = f.diag.Diagnostics();
-  const char* kMessage =
+  const char* const kMessage =
       "virtual method override argument 'a' of 'E::some_method' has "
       "mismatched type in this specialization";
-  EXPECT_TRUE(ReportedError(diags, kMessage, 17, "8.20"));
-  EXPECT_FALSE(ReportedError(diags, kMessage, 18, "8.20"));
-  EXPECT_FALSE(ReportedError(diags, kMessage, 19, "8.20"));
-  EXPECT_TRUE(ReportedError(diags, kMessage, 20, "8.20"));
+  EXPECT_TRUE(ReportedError(diags, kMessage, 19, "8.20"));
+  EXPECT_FALSE(ReportedError(diags, kMessage, 20, "8.20"));
+  EXPECT_FALSE(ReportedError(diags, kMessage, 21, "8.20"));
+  EXPECT_TRUE(ReportedError(diags, kMessage, 22, "8.20"));
   for (const int kLine : {9, 13}) {
     EXPECT_FALSE(ReportedError(diags, "virtual method override", kLine, "8.20"))
         << kLine;
