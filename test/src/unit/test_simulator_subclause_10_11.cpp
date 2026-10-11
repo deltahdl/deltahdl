@@ -257,4 +257,27 @@ TEST(NetAliasingSimulation, AnAliasInAGenerateBlockJoinsTheBlocksNets) {
   EXPECT_EQ(RunAndGet(src, "r2"), 1u);
 }
 
+// §10.11 with Annex A.8.5: an alias operand may be a positional assignment
+// pattern of nets, typed or not, whose items list their bits in order as a
+// concatenation's do, so a shares w[7:4] and b w[3:0], and c and d share v the
+// same way. A pattern operand was dropped, and no bit was aliased.
+TEST(NetAliasingSimulation, APatternOperandJoinsItsItemsBitsInOrder) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "typedef struct packed { logic [3:0] hi, lo; } pair_t;\n"
+      "module t;\n"
+      "  wire [7:0] w, v; wire [3:0] a, b, c, d; logic [7:0] dw, dv;\n"
+      "  assign w = dw;\n"
+      "  assign v = dv;\n"
+      "  alias w = pair_t'{a, b};\n"
+      "  alias v = '{c, d};\n"
+      "  initial begin\n"
+      "    dw = 8'h5C; dv = 8'h3E;\n"
+      "    #1 $display(\"%h %h %h %h\", a, b, c, d);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "5 c 3 e\n");
+}
+
 }  // namespace

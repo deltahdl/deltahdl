@@ -81,6 +81,20 @@ struct AssertionSampleScope {
   std::vector<std::string> names;
 };
 
+// §10.5 with §6.21: an owner of `static` local declarations that give an
+// initial value -- a task or function of a module or of one of its generate
+// block instances, or a procedure with the body it runs -- with the instance
+// prefix it was lowered under. The generate block instance of a subroutine
+// one declares, and the process standing for a procedure, carry the block
+// prefixes and constants the initializers read.
+struct StaticLocalOwner {
+  std::string inst_prefix;
+  const ModuleItem* subroutine = nullptr;
+  const RtlirGenBlockSubroutine* gen_block = nullptr;
+  const Process* process = nullptr;
+  const Stmt* body = nullptr;
+};
+
 class Lowerer {
  public:
   Lowerer(SimContext& ctx, Arena& arena, DiagEngine& diag);
@@ -133,6 +147,13 @@ class Lowerer {
   void LowerProcess(const RtlirProcess& proc, bool from_program,
                     uint32_t program_block_id);
   void InstallGenBlockConsts(const GenBlockConsts& consts, Process* p);
+  // §10.5 with §6.21: records the module subroutines of `mod`, and the
+  // procedure `p` runs `body` for, that declare a `static` local with an
+  // initial value, and sets those values once every module is lowered and
+  // before any procedure starts. Defined in lowerer_static_locals.cpp.
+  void RecordStaticLocalSubroutines(const RtlirModule* mod);
+  void RecordStaticLocalProcess(const Process* p, const Stmt* body);
+  void InitializeStaticLocals();
   void LowerContAssign(const RtlirContAssign& ca, bool from_program);
   // §28.8: links a bidirectional switch's two nets and starts the process
   // that follows its control. Defined in
@@ -390,6 +411,7 @@ class Lowerer {
   std::string_view import_scope_prefix_;
   std::vector<SpecifyScope> specify_scopes_;
   std::vector<AssertionSampleScope> assertion_sample_scopes_;
+  std::vector<StaticLocalOwner> static_local_owners_;
   // §17.5: the processes being lowered are a checker's, whose always_ff
   // procedures read sampled values.
   bool lowering_checker_ = false;

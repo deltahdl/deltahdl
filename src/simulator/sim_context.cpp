@@ -695,7 +695,7 @@ std::mt19937& SimContext::ActiveRng() {
   // independent of sibling execution order. The hierarchical seed is
   // installed once, on first use, by drawing the next value from the parent's
   // active stream (which is whatever generator the current process inherits).
-  if (current_process_ != nullptr) {
+  if (current_process_ != nullptr && !current_process_->is_static_init) {
     if (!current_process_->rng_initialized) {
       current_process_->rng.seed(current_process_->rng_seed);
       current_process_->rng_initialized = true;
@@ -704,8 +704,10 @@ std::mt19937& SimContext::ActiveRng() {
   }
   // §18.14.1: with no thread running the draw is being made while the design
   // is built, and it seeds a static process or a static-initializer object of
-  // the instance being built, from that instance's own initialization RNG.
-  return InitializationRng(lowering_inst_prefix_, default_seed_);
+  // the instance being built, from that instance's own initialization RNG --
+  // a static local's initializer among them, run under the stand-in naming
+  // its instance (Lowerer::InitializeStaticLocals).
+  return InitializationRng(ActiveInstancePrefix(), default_seed_);
 }
 
 uint32_t SimContext::DrawSeedForChild() {

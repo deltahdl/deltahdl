@@ -42,8 +42,11 @@ bool TryEvalProcessStaticCall(const Expr* expr, SimContext& ctx, Arena& arena,
   if (!NamesProcessClass(access->lhs)) return false;
   if (!access->rhs || access->rhs->kind != ExprKind::kIdentifier) return false;
   if (access->rhs->text != "self") return false;
+  // §9.7: self() answers the process making the call, and a static local's
+  // initializer runs before any process exists (§10.5), so it answers null
+  // there as it does outside every process.
   auto* proc = ctx.CurrentProcess();
-  if (!proc) {
+  if (!proc || proc->is_static_init) {
     out = MakeLogic4VecVal(arena, 64, 0);
     return true;
   }

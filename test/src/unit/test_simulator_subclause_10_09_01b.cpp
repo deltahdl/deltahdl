@@ -299,4 +299,116 @@ TEST(ArrayLiteralSim, ADefaultFillsAStructureElementMemberByMember) {
   EXPECT_EQ(RunAndGet(src, "c1"), 0x1234u);
 }
 
+// §10.9.1 with Syntax 10-5: a type key may be a typedef name, which sets each
+// element of a matching type -- an array declared with the typedef or with the
+// type it names -- in an assignment and a declaration's initializer alike. The
+// name was evaluated as an index, so at most one element took the value.
+TEST(ArrayLiteralSim, ATypedefKeySetsTheElementsOfItsType) {
+  const char* src =
+      "typedef logic [7:0] byte_t;\n"
+      "module t;\n"
+      "  byte_t arr[3];\n"
+      "  byte_t ini[2] = '{byte_t: 8'h5};\n"
+      "  logic [7:0] la[2];\n"
+      "  int a0, a2, i1, l1;\n"
+      "  initial begin\n"
+      "    arr = '{byte_t: 8'h1};\n"
+      "    la = '{byte_t: 8'h7};\n"
+      "    a0 = arr[0]; a2 = arr[2]; i1 = ini[1]; l1 = la[1];\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "a0"), 1u);
+  EXPECT_EQ(RunAndGet(src, "a2"), 1u);
+  EXPECT_EQ(RunAndGet(src, "i1"), 5u);
+  EXPECT_EQ(RunAndGet(src, "l1"), 7u);
+}
+
+// §10.9.1 with §6.22.1: a type key sets the elements whose type matches its
+// own. The one-bit `logic` matches no `logic [7:0]` element; `int` matches a
+// `bit signed [31:0]` element, of its state, signing and range, and no
+// `bit [31:0]` one, which is unsigned. Matched by kind, `logic:` set the
+// vector and `int:` neither bit vector.
+TEST(ArrayLiteralSim, ATypeKeyMatchesAnElementOfItsFullType) {
+  const char* src =
+      "module t;\n"
+      "  logic [7:0] lv[2];\n"
+      "  bit signed [31:0] bs[2] = '{int: 5, default: 0};\n"
+      "  bit [31:0] bu[2];\n"
+      "  int l0, s1, u1;\n"
+      "  initial begin\n"
+      "    lv = '{logic: 8'hCD, default: 8'h0};\n"
+      "    bu = '{int: 5, default: 0};\n"
+      "    l0 = lv[0]; s1 = bs[1]; u1 = bu[1];\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "l0"), 0u);
+  EXPECT_EQ(RunAndGet(src, "s1"), 5u);
+  EXPECT_EQ(RunAndGet(src, "u1"), 0u);
+}
+
+// §10.9.1 with §6.22.1: two vector types match only over the same packed
+// bounds, so a `logic [7:0]` typedef key sets no `logic [8:1]` element, eight
+// bits wide as it is, in an assignment, a declaration's initializer or a
+// multidimensional array's; the default gives each 0.
+TEST(ArrayLiteralSim, ATypeKeyMatchesOnlyAnElementOfItsPackedBounds) {
+  const char* src =
+      "typedef logic [7:0] byte_t;\n"
+      "module t;\n"
+      "  logic [8:1] ra[2];\n"
+      "  logic [8:1] ri[2] = '{byte_t: 8'h1, default: 8'h0};\n"
+      "  logic [8:1] rm[2][2] = '{byte_t: 8'h1, default: 8'h0};\n"
+      "  logic [7:0] rk[2][2] = '{byte_t: 8'h1, default: 8'h0};\n"
+      "  int a1, i1, m11, k11;\n"
+      "  initial begin\n"
+      "    ra = '{byte_t: 8'h1, default: 8'h0};\n"
+      "    a1 = ra[1]; i1 = ri[1]; m11 = rm[1][1]; k11 = rk[1][1];\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "a1"), 0u);
+  EXPECT_EQ(RunAndGet(src, "i1"), 0u);
+  EXPECT_EQ(RunAndGet(src, "m11"), 0u);
+  EXPECT_EQ(RunAndGet(src, "k11"), 1u);
+}
+
+// §10.9.1: a type key that matches no element of an array of structures is
+// applied to each element's members by §10.9.2's rules, in an assignment and
+// a declaration's initializer alike. It was asked of the elements alone, so
+// the members kept no value.
+TEST(ArrayLiteralSim, ATypeKeyReachesTheMembersOfStructureElements) {
+  const char* src =
+      "typedef struct packed { int x, y; } s_t;\n"
+      "module t;\n"
+      "  s_t arr[2];\n"
+      "  s_t ini[2] = '{int: 4};\n"
+      "  int x0, y1, iy0;\n"
+      "  initial begin\n"
+      "    arr = '{int: 7};\n"
+      "    x0 = arr[0].x; y1 = arr[1].y; iy0 = ini[0].y;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "x0"), 7u);
+  EXPECT_EQ(RunAndGet(src, "y1"), 7u);
+  EXPECT_EQ(RunAndGet(src, "iy0"), 4u);
+}
+
+// §10.9.1 with §6.22.1: an array a block declares takes a type key by its
+// element type as a module's does -- an int element by int's signing and
+// range, and an element written with a typedef by the typedef's.
+TEST(ArrayLiteralSim, ABlockArrayTakesATypeKeyOfItsElementType) {
+  const char* src =
+      "typedef logic [7:0] byte_t;\n"
+      "module t;\n"
+      "  int i1, b0;\n"
+      "  initial begin\n"
+      "    int ia[2];\n"
+      "    byte_t ba[2];\n"
+      "    ia = '{int: 4};\n"
+      "    ba = '{logic: 8'h1, default: 8'h9};\n"
+      "    i1 = ia[1]; b0 = ba[0];\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "i1"), 4u);
+  EXPECT_EQ(RunAndGet(src, "b0"), 9u);
+}
+
 }  // namespace

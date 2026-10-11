@@ -112,7 +112,7 @@ TEST(GetRandstateSimulation, ProcessStateReflectsCurrentRngState) {
       "  int ne;\n"
       "  int a;\n"
       "  initial begin\n"
-      "    static process p = process::self();\n"
+      "    automatic process p = process::self();\n"
       "    s1 = p.get_randstate();\n"
       "    s2 = p.get_randstate();\n"
       "    eq = (s1 == s2) ? 1 : 0;\n"

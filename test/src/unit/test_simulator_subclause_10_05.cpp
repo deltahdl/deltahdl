@@ -376,8 +376,9 @@ TEST(VariableInitSim, StaticBlockQueueInitRunsOnce) {
             42u);
 }
 
-// §13.3.2: a static function's local keeps its value between calls, so its
-// initializer runs on the first call alone.
+// §13.3.2: a static function's local keeps its value between calls, and §10.5
+// runs its initializer once, before the procedures start, so no call runs it
+// again.
 TEST(VariableInitSim, StaticFunctionQueueInitRunsOnce) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int r;\n"
@@ -393,6 +394,82 @@ TEST(VariableInitSim, StaticFunctionQueueInitRunsOnce) {
                       "endmodule\n",
                       "r"),
             34u);
+}
+
+// §10.5 with §6.21: a static local's declaration initializer is set before any
+// initial or always procedure starts -- of a static function, an automatic
+// function, a block within a task, and a block within a procedure alike -- so
+// each reads g as 1, not the 2 the procedure writes before the declaration
+// first runs. It ran when the declaration first ran, and each read 2.
+TEST(VariableInitSim, AStaticLocalIsInitializedBeforeTheProceduresStart) {
+  const char* src =
+      "module t;\n"
+      "  int g = 1;\n"
+      "  int rf, ra, rt, rb;\n"
+      "  function int f(); static int s = g; return s; endfunction\n"
+      "  function automatic int fa(); static int s = g + 10; return s;\n"
+      "  endfunction\n"
+      "  task tk(output int o); begin static int s = g + 20; o = s; end\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    g = 2;\n"
+      "    rf = f(); ra = fa(); tk(rt);\n"
+      "    begin static int s = g + 30; rb = s; end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "rf"), 1u);
+  EXPECT_EQ(RunAndGet(src, "ra"), 11u);
+  EXPECT_EQ(RunAndGet(src, "rt"), 21u);
+  EXPECT_EQ(RunAndGet(src, "rb"), 31u);
+}
+
+// §10.5 with §23.6 and §27.4: a static local's initializer reads the names of
+// the scope its declaration stands in -- a child instance's own variable, and
+// a generate block instance's variable and loop index, for a procedure of the
+// block and for a function of it -- with the values they hold before the
+// procedures start.
+TEST(VariableInitSim, AStaticLocalInitializerReadsItsOwnScope) {
+  const char* src =
+      "module c;\n"
+      "  int g = 5;\n"
+      "  int r;\n"
+      "  function int f(); static int s = g; return s; endfunction\n"
+      "  initial begin g = 6; r = f(); end\n"
+      "endmodule\n"
+      "module t;\n"
+      "  int g = 1;\n"
+      "  int rp, rg;\n"
+      "  c u();\n"
+      "  for (genvar i = 3; i < 4; i++) begin : gb\n"
+      "    int h = 7;\n"
+      "    function int gf(); static int s = g + i; return s; endfunction\n"
+      "    initial begin\n"
+      "      h = 8; g = 2;\n"
+      "      begin static int s = h * 10 + i; rp = s; end\n"
+      "    end\n"
+      "  end\n"
+      "  initial #1 rg = gb[3].gf();\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "u.r"), 5u);
+  EXPECT_EQ(RunAndGet(src, "rp"), 73u);
+  EXPECT_EQ(RunAndGet(src, "rg"), 4u);
+}
+
+// §10.5 with §9.7: a static local's initializer runs before any process
+// exists, so process::self() there answers null; an automatic local's runs as
+// its block is entered and answers the procedure entering it.
+TEST(VariableInitSim, AStaticLocalsInitializerRunsInNoProcess) {
+  const char* src =
+      "module t;\n"
+      "  int none, own;\n"
+      "  initial begin\n"
+      "    static process p = process::self();\n"
+      "    automatic process q = process::self();\n"
+      "    none = p == null; own = q != null;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "none"), 1u);
+  EXPECT_EQ(RunAndGet(src, "own"), 1u);
 }
 
 }  // namespace

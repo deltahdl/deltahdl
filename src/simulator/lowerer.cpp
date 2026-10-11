@@ -297,6 +297,7 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   RegisterGenBlockSubroutines(mod, std::string(mod->name) + ".", inst_prefix_,
                               ctx_, arena_);
   RecordSubroutineAssertionSampleScopes(mod);
+  RecordStaticLocalSubroutines(mod);
   // §35.5.4: an imported subroutine is declared where the source writes it and
   // called like a native one, so the declarations of the module being lowered
   // go into the registry EvalDpiCall reaches an import through.
@@ -488,6 +489,7 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
                          proc.gen_block_prefixes.end());
   p->gen_block_name = GenBlockName(proc.gen_block_path);
   InstallGenBlockConsts(proc.gen_block_consts, p);
+  RecordStaticLocalProcess(p, proc.body);
 
   // §16.4.4: a `disable` naming the outermost scope of a procedure flushes its
   // pending deferred assertion reports even while that procedure sits suspended
@@ -847,6 +849,10 @@ void Lowerer::Lower(const RtlirDesign* design) {
   // denote one of them (§6.18), bound once the modules are lowered.
   RebindStrayPackageClassNames();
   RegisterClassTypeAliases(design, ctx_, arena_);
+  // §10.5: a static variable's declaration initializer is set before any
+  // initial or always procedure starts, the module variables it may read
+  // holding theirs by now.
+  InitializeStaticLocals();
 
   AttachDesignClocking();
   // §40.2.2 with §40.4: the FSMs the design's pragmas identify are counted

@@ -158,6 +158,7 @@ void CreateBlockArrayElements(const Stmt* stmt, uint32_t elem_width,
   // 4-state and answered its element type as implicit.
   info.is_4state = DeclaredTypeIs4State(stmt->var_decl_type, ctx);
   info.elem_type_kind = stmt->var_decl_type.kind;
+  info.elem_type_name = stmt->var_decl_type.type_name;
   info.elem_type_is_unpacked_array = stmt->var_decl_type.names_unpacked_array;
   if (dims.size() > 1) {
     for (const auto& dim : dims) {

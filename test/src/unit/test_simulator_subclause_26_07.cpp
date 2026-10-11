@@ -18,7 +18,7 @@ TEST(StdBuiltInPackageSim, StdQualifiedProcessSelfNamesTheRunningProcess) {
       "  logic [31:0] non_null, same;\n"
       "  initial begin\n"
       "    static std::process p = std::process::self();\n"
-      "    static process q = process::self();\n"
+      "    automatic process q = process::self();\n"
       "    non_null = (p != null) ? 1 : 0;\n"
       "    same = (p == q) ? 1 : 0;\n"
       "  end\n"

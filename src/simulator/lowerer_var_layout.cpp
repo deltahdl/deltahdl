@@ -5,6 +5,7 @@
 #include <string_view>
 
 #include "common/arena.h"
+#include "common/packed_range.h"
 #include "common/types.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_enum_constants.h"
@@ -29,6 +30,18 @@ static std::string_view NestedLayoutName(const StructMember& m, Arena& arena) {
   if (m.scope_name.empty()) return m.type_name;
   return *arena.Create<std::string>(std::string(m.scope_name) +
                                     "::" + std::string(m.type_name));
+}
+
+// §6.22.1: the bounds of a member's one packed dimension, which a type key of
+// a pattern compares with its own; left empty where the member writes none or
+// several, or where a bound does not fold.
+static void RecordDeclRange(const StructMember& m, StructFieldInfo& fi) {
+  if (!m.extra_packed_dims.empty() || m.packed_dim_left == nullptr ||
+      m.packed_dim_right == nullptr)
+    return;
+  auto left = ConstEvalInt(m.packed_dim_left);
+  auto right = ConstEvalInt(m.packed_dim_right);
+  if (left && right) fi.decl_range = PackedRange{*left, *right};
 }
 
 // §7.4.1: the outermost packed dimension of a member of several, and the width
@@ -91,6 +104,7 @@ static StructTypeInfo* BuildStructTypeInfo(const DataType* dtype,
       fi.elem_count = UnpackedMemberCount(m);
     fi.default_expr = m.init_expr;
     RecordOuterPackedDim(m, fi);
+    RecordDeclRange(m, fi);
     if (m.nested_type && !m.nested_type->struct_members.empty()) {
       fi.nested = BuildStructTypeInfo(m.nested_type, EvalStructMemberWidth(m),
                                       NestedLayoutName(m, arena), arena);

@@ -93,7 +93,7 @@ TEST(SetRandstateSimulation, RestoresCapturedProcessStream) {
       "  int same;\n"
       "  int differ;\n"
       "  initial begin\n"
-      "    static process p = process::self();\n"
+      "    automatic process p = process::self();\n"
       "    s = p.get_randstate();\n"
       "    a1 = $urandom;\n"
       "    a2 = $urandom;\n"

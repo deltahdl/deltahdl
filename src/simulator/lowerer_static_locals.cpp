@@ -1,0 +1,134 @@
+#include <vector>
+
+#include "common/arena.h"
+#include "elaborator/rtlir.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
+#include "simulator/deferred_caller.h"
+#include "simulator/eval_function_hier.h"
+#include "simulator/eval_function_internal.h"
+#include "simulator/lowerer.h"
+#include "simulator/process.h"
+#include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
+#include "simulator/statement_assign.h"
+
+namespace delta {
+
+namespace {
+
+// §6.21: the `static` local declarations of `s` that give an initial value,
+// in the order the source writes them, at whatever depth of block, branch,
+// loop, fork or case item. §6.21 has every other local of a static scope that
+// gives one say `automatic` (ReportImplicitlyStaticInit in the elaborator),
+// so these are all the static locals an initializer sets.
+void CollectStaticInits(const Stmt* s, std::vector<const Stmt*>& out) {
+  if (s == nullptr) return;
+  if (s->kind == StmtKind::kVarDecl) {
+    if (s->var_is_static && s->var_init != nullptr) out.push_back(s);
+    return;
+  }
+  for (const Stmt* sub : s->stmts) CollectStaticInits(sub, out);
+  for (const Stmt* sub : s->fork_stmts) CollectStaticInits(sub, out);
+  CollectStaticInits(s->then_branch, out);
+  CollectStaticInits(s->else_branch, out);
+  CollectStaticInits(s->body, out);
+  CollectStaticInits(s->for_body, out);
+  for (const CaseItem& item : s->case_items) CollectStaticInits(item.body, out);
+}
+
+std::vector<const Stmt*> StaticInitsOf(const ModuleItem* func) {
+  std::vector<const Stmt*> out;
+  for (const Stmt* s : func->func_body_stmts) CollectStaticInits(s, out);
+  return out;
+}
+
+std::vector<const Stmt*> StaticInitsOf(const Stmt* body) {
+  std::vector<const Stmt*> out;
+  CollectStaticInits(body, out);
+  return out;
+}
+
+// §13.4.2: the static locals of `owner`'s subroutine, made in its static frame
+// as a call makes them (EvalFunctionCall): the frame entered with the
+// subroutine's package, and a generate block instance's subroutine with the
+// block's loop constants beside them.
+void InitSubroutineStatics(const StaticLocalOwner& owner, SimContext& ctx,
+                           Arena& arena) {
+  const ModuleItem* func = owner.subroutine;
+  ctx.PushStaticScope(func->name);
+  ctx.EnterSubroutinePackage(func);
+  if (owner.gen_block != nullptr) {
+    GenBlockSubroutineScope scope;
+    scope.consts = owner.gen_block->gen_block_consts;
+    SubroutineTarget target;
+    target.gen_block = &scope;
+    BindGenBlockConsts(target, ctx, arena);
+  }
+  for (const Stmt* decl : StaticInitsOf(func)) {
+    ExecFuncVarDecl(decl, {func->name, func->is_static && !func->is_automatic},
+                    ctx, arena);
+  }
+  ctx.PopStaticScope(func->name);
+}
+
+}  // namespace
+
+void Lowerer::RecordStaticLocalSubroutines(const RtlirModule* mod) {
+  for (const ModuleItem* func : mod->function_decls) {
+    if (!func->method_class.empty() || StaticInitsOf(func).empty()) continue;
+    static_local_owners_.push_back(
+        {.inst_prefix = inst_prefix_, .subroutine = func});
+  }
+  for (const RtlirGenBlockSubroutine& sub : mod->gen_block_subroutines) {
+    if (StaticInitsOf(sub.decl).empty()) continue;
+    static_local_owners_.push_back({.inst_prefix = inst_prefix_,
+                                    .subroutine = sub.decl,
+                                    .gen_block = &sub});
+  }
+}
+
+void Lowerer::RecordStaticLocalProcess(const Process* p, const Stmt* body) {
+  if (StaticInitsOf(body).empty()) return;
+  static_local_owners_.push_back(
+      {.inst_prefix = inst_prefix_, .process = p, .body = body});
+}
+
+// §10.5 (printed page 256) sets a static variable's declaration initializer
+// before any initial or always procedure starts, and §6.21 makes a local of a
+// block, a task or a function declared `static` one such variable. Each is
+// made here, standing in the instance and the generate block its owner was
+// lowered in and through the path its declaration takes when it runs -- the
+// subroutine's static frame for a task's or a function's (ExecFuncVarDecl),
+// the frame of the declaration's own for a procedure's (ExecVarDeclImpl) --
+// so that the declaration finds it there when it runs and leaves its value as
+// it is. Made when the declaration first ran, `static int s = g;` read a g
+// the procedures had changed by then.
+void Lowerer::InitializeStaticLocals() {
+  for (const StaticLocalOwner& owner : static_local_owners_) {
+    Process stand_in;
+    stand_in.stand_in = true;
+    stand_in.is_static_init = true;
+    stand_in.inst_prefix = owner.inst_prefix;
+    if (owner.gen_block != nullptr) {
+      stand_in.gen_prefixes.assign(owner.gen_block->gen_block_prefixes.begin(),
+                                   owner.gen_block->gen_block_prefixes.end());
+    }
+    if (owner.process != nullptr) {
+      stand_in.gen_prefixes = owner.process->gen_prefixes;
+      stand_in.gen_block_name = owner.process->gen_block_name;
+      stand_in.saved_scope_stack = owner.process->saved_scope_stack;
+    }
+    CallerStandIn in_owner(&stand_in, ctx_);
+    if (owner.subroutine != nullptr) {
+      InitSubroutineStatics(owner, ctx_, arena_);
+      continue;
+    }
+    ctx_.PushScope();
+    for (const Stmt* decl : StaticInitsOf(owner.body))
+      ExecVarDeclImpl(decl, ctx_, arena_);
+    ctx_.PopScope();
+  }
+}
+
+}  // namespace delta

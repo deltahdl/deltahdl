@@ -73,7 +73,7 @@ TEST(RandomStabilityPropertiesRun,
       "    seedv = $urandom;\n"
       "    fork\n"
       "      begin\n"
-      "        static process q = process::self();\n"
+      "        automatic process q = process::self();\n"
       "        q.srandom(seedv);\n"
       "        for (int j = 0; j < 4; j++) cm[j] = $urandom;\n"
       "      end\n"

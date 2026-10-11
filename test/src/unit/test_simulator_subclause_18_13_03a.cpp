@@ -14,7 +14,7 @@ TEST(SrandomSimulation, SeedsProcessRng) {
   auto* design = ElaborateSrc(
       "module t;\n"
       "  initial begin\n"
-      "    static process p = process::self();\n"
+      "    automatic process p = process::self();\n"
       "    p.srandom(42);\n"
       "  end\n"
       "endmodule\n",
@@ -34,7 +34,7 @@ TEST(SrandomSimulation, SrandomWithExpressionSeed) {
   auto* design = ElaborateSrc(
       "module t;\n"
       "  initial begin\n"
-      "    static process p = process::self();\n"
+      "    automatic process p = process::self();\n"
       "    p.srandom(7 + 3);\n"
       "  end\n"
       "endmodule\n",
@@ -61,7 +61,7 @@ TEST(SrandomSimulation, DistinctSeedsPerProcess) {
       "        #100;\n"
       "      end\n"
       "      begin\n"
-      "        static process p2 = process::self();\n"
+      "        automatic process p2 = process::self();\n"
       "        p2.srandom(22);\n"
       "        #100;\n"
       "      end\n"
@@ -87,7 +87,7 @@ TEST(SrandomSimulation, NegativeSeed) {
   auto* design = ElaborateSrc(
       "module t;\n"
       "  initial begin\n"
-      "    static process p = process::self();\n"
+      "    automatic process p = process::self();\n"
       "    p.srandom(-1);\n"
       "  end\n"
       "endmodule\n",
@@ -106,7 +106,7 @@ TEST(SrandomSimulation, RecordsMostRecentSeed) {
   auto* design = ElaborateSrc(
       "module t;\n"
       "  initial begin\n"
-      "    static process p = process::self();\n"
+      "    automatic process p = process::self();\n"
       "    p.srandom(1);\n"
       "    p.srandom(2);\n"
       "    p.srandom(3);\n"
@@ -135,7 +135,7 @@ TEST(SrandomSimulation, ProcessReseedReplaysUrandomDraw) {
       "  int a2;\n"
       "  int same;\n"
       "  initial begin\n"
-      "    static process p = process::self();\n"
+      "    automatic process p = process::self();\n"
       "    p.srandom(55);\n"
       "    a1 = $urandom;\n"
       "    p.srandom(55);\n"

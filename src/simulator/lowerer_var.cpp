@@ -9,8 +9,8 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "elaborator/rtlir.h"
-#include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array_element_queue.h"
 #include "simulator/eval_string.h"
@@ -18,6 +18,7 @@
 #include "simulator/gen_block_const_frame.h"
 #include "simulator/lowerer.h"
 #include "simulator/lowerer_register.h"
+#include "simulator/pattern_type_key.h"
 #include "simulator/queue_bound.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -146,71 +147,33 @@ static void InitArrayFromReplicate(const RtlirVariable& var, uint32_t elem_idx,
       arena);
 }
 
-// §10.9.1: an index:value item gives the element at that index an explicit
-// value, and the clause makes naming one index twice in a single array pattern
-// an error, so the first key that names this element is the only one that can.
-// Null when no index key names it.
-static const Expr* FindIndexKeyedItem(const Expr* pat, uint32_t idx,
-                                      SimContext& ctx, Arena& arena) {
-  for (size_t i = 0; i < pat->pattern_keys.size(); ++i) {
-    if (i >= pat->elements.size()) break;
-    const auto* key = pat->pattern_keys[i];
-    if (key->text == "default" || IsTypeKeyword(key->text)) continue;
-    if (PatternKeyIndex(key, ctx, arena) == idx) return pat->elements[i];
-  }
-  return nullptr;
-}
-
-// §10.9.1: a type:value item sets every element or subarray of a matching type
-// that no index key has already set, the last of several matching keys giving
-// the value. Null when no type key matches this kind.
-static const Expr* FindTypeKeyedItem(const Expr* pat, DataTypeKind kind) {
-  size_t keyed = std::min(pat->pattern_keys.size(), pat->elements.size());
-  for (size_t i = keyed; i-- > 0;) {
-    auto key = pat->pattern_keys[i]->text;
-    if (IsTypeKeyword(key) && TypeKeyMatchesKind(key, kind))
-      return pat->elements[i];
-  }
-  return nullptr;
-}
-
-// §10.9.1: a default:value item covers the elements or subarrays no index key
-// and no type key matched. Null when the pattern writes no default key.
-static const Expr* FindDefaultKeyedItem(const Expr* pat) {
-  for (size_t i = 0; i < pat->pattern_keys.size(); ++i) {
-    if (i >= pat->elements.size()) break;
-    if (pat->pattern_keys[i]->text == "default") return pat->elements[i];
-  }
-  return nullptr;
-}
-
-// §10.9.1's three matching rules, asked in the order the clause writes them:
-// index key, then type key, then default. Null when none of them covers this
-// element -- which the clause forbids, requiring one of the rules to cover
-// every element, so it is a malformed pattern rather than a defined value.
-static const Expr* FindKeyedItem(const Expr* pat, uint32_t idx,
-                                 DataTypeKind kind, SimContext& ctx,
-                                 Arena& arena) {
-  if (const Expr* item = FindIndexKeyedItem(pat, idx, ctx, arena)) return item;
-  if (const Expr* item = FindTypeKeyedItem(pat, kind)) return item;
-  return FindDefaultKeyedItem(pat);
-}
-
+// §10.9.1: a key resolves a value evaluated in the assignment context of the
+// element -- an index key, then a type key, then, for an element that is a
+// structure no type key matches, the type keys and the default applied to its
+// members, and then the default, member by member for a structure element. An
+// element no key covers is a pattern the clause forbids, reported at
+// elaboration; for a caller that goes on, it answers Table 6-7 as the
+// positional and multidimensional makers do.
 static void InitArrayFromNamed(const RtlirVariable& var, uint32_t idx,
                                const ElementTarget& target, SimContext& ctx,
                                Arena& arena) {
-  // §10.9.1: a key resolves a value evaluated in the assignment context of
-  // the element, a default member by member for a structure element. An
-  // element no key covers is a pattern the clause forbids, reported at
-  // elaboration; for a caller that goes on, it answers Table 6-7 as the
-  // positional and multidimensional makers do.
-  const Expr* item =
-      FindKeyedItem(var.init_expr, idx, var.elem_type_kind, ctx, arena);
+  const Expr* pat = var.init_expr;
+  const Expr* item = IndexKeyedItem(pat, idx, ctx, arena);
+  if (item == nullptr)
+    item = TypeKeyedItem(pat, SubjectOfVariableElement(var, ctx, arena), ctx);
+  if (item == nullptr && target.layout != nullptr &&
+      PatternHasTypeKey(pat, ctx)) {
+    target.elem->value = CoerceArrayInitItem(
+        var, EvalStructPatternValue(pat, target.layout, ctx, arena), arena);
+    return;
+  }
+  const Expr* fallback = DefaultKeyedItem(pat);
+  if (item == nullptr) item = fallback;
   if (item == nullptr) {
     target.elem->value = Table67ElementDefault(var, arena);
     return;
   }
-  Logic4Vec val = item == FindDefaultKeyedItem(var.init_expr)
+  Logic4Vec val = item == fallback
                       ? EvalDefaultForElement(item, target.layout, ctx, arena)
                       : EvalExpr(item, ctx, arena);
   target.elem->value = CoerceArrayInitItem(var, val, arena);
@@ -265,6 +228,19 @@ static const Expr* ArrayInitPattern(const Expr* init) {
   return IsDimPattern(init) ? init : nullptr;
 }
 
+// §10.9.1's three matching rules for one element of a multidimensional array,
+// asked in the order the clause writes them: index key, then type key, then
+// default. Null when none of them covers the element -- which the clause
+// forbids, requiring one of the rules to cover every element.
+static const Expr* FindKeyedItem(const Expr* pat, uint32_t idx,
+                                 const MultiDimArray& m) {
+  if (const Expr* item = IndexKeyedItem(pat, idx, m.ctx, m.arena)) return item;
+  if (const Expr* item = TypeKeyedItem(
+          pat, SubjectOfVariableElement(m.var, m.ctx, m.arena), m.ctx))
+    return item;
+  return DefaultKeyedItem(pat);
+}
+
 // §10.9.1: the item of `pat` that fills one dimension's element at address
 // `idx`, position `pos` within that dimension. All three item forms the clause
 // admits are read here -- keyed, replicated, and positional -- so the descent
@@ -272,8 +248,7 @@ static const Expr* ArrayInitPattern(const Expr* init) {
 // pattern supplies nothing for this element.
 static const Expr* SelectDimItem(const Expr* pat, uint32_t idx, uint32_t pos,
                                  const MultiDimArray& m) {
-  if (!pat->pattern_keys.empty())
-    return FindKeyedItem(pat, idx, m.var.elem_type_kind, m.ctx, m.arena);
+  if (!pat->pattern_keys.empty()) return FindKeyedItem(pat, idx, m);
   if (const auto* body = ReplicateBody(pat)) return (*body)[pos % body->size()];
   return pos < pat->elements.size() ? pat->elements[pos] : nullptr;
 }
@@ -398,7 +373,7 @@ static bool TryCreateMultiDimArray(std::string_view name,
   info.elem_width = var.width;
   info.is_descending = var.is_descending;
   info.is_4state = var.is_4state;
-  info.elem_type_kind = var.elem_type_kind;
+  RecordElementType(info, var, ctx, arena);
   info.elem_type_is_unpacked_array = var.element.type_is_unpacked_array;
   // ArrayInfo::dim_los is uint32_t, so a negative bound (§7.4.2) is held as
   // its 32 bits, the bits CreateMultiDimLeaves names the leaves by. The
@@ -457,7 +432,7 @@ void CreateArrayElements(std::string_view name, const RtlirVariable& var,
   info.elem_width = var.width;
   info.is_descending = var.is_descending;
   info.is_4state = var.is_4state;
-  info.elem_type_kind = var.elem_type_kind;
+  RecordElementType(info, var, ctx, arena);
   info.elem_type_is_unpacked_array = var.element.type_is_unpacked_array;
   ctx.RegisterArray(name, info);
 

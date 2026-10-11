@@ -39,6 +39,9 @@ static ArrayInfo SubarrayInfo(const ArrayInfo& info) {
   sub.elem_width = info.elem_width;
   sub.is_4state = info.is_4state;
   sub.elem_type_kind = info.elem_type_kind;
+  sub.elem_type_name = info.elem_type_name;
+  sub.elem_is_signed = info.elem_is_signed;
+  sub.elem_range = info.elem_range;
   if (info.dim_sizes.size() > 2) {
     sub.dim_los = AfterFirst(info.dim_los);
     sub.dim_sizes = AfterFirst(info.dim_sizes);

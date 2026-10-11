@@ -302,6 +302,10 @@ struct Process {
   // A copy of a calling process that carries its context to a display written
   // later (SnapshotCallingProcess in deferred_caller.h); no thread of the run.
   bool stand_in = false;
+  // §10.5: the stand-in the initializers of static locals run under before
+  // any procedure starts (Lowerer::InitializeStaticLocals), which carries the
+  // instance they stand in and is no process at all.
+  bool is_static_init = false;
 
   ~Process() {
     if (coro) coro.destroy();

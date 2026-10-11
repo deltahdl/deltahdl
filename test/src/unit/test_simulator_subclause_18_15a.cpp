@@ -156,7 +156,7 @@ TEST(ManuallySeedingRandomize, HierarchicalSeedDerivesFromCreatingThreadRng) {
       "  int a2;\n"
       "  int same;\n"
       "  initial begin\n"
-      "    static process pr = process::self();\n"
+      "    automatic process pr = process::self();\n"
       "    C o1;\n"
       "    C o2;\n"
       "    pr.srandom(1000);\n"

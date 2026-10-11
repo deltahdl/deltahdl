@@ -389,6 +389,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/property_instance_clocks.cpp
     simulator/property_finish.cpp
     simulator/lowerer_process.cpp
+    simulator/lowerer_static_locals.cpp
     simulator/lowerer_inst.cpp
     simulator/lowerer_import.cpp
     simulator/lowerer_alias_kinds.cpp
@@ -603,6 +604,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_function_body.cpp
     simulator/foreach_dims.cpp
     simulator/pattern_match.cpp
+    simulator/pattern_type_key.cpp
     simulator/eval_function_body_decl.cpp
     simulator/eval_function_body_assign.cpp
     simulator/eval_function_dpi.cpp

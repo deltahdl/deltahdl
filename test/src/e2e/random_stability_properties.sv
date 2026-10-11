@@ -64,7 +64,7 @@ module random_stability_properties;
     seedv = $urandom;
     fork
       begin
-        static process q = process::self();
+        automatic process q = process::self();
         q.srandom(seedv);
         for (int j = 0; j < 4; j++) c_manual[j] = $urandom;
       end

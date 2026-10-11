@@ -14,6 +14,7 @@
 #include "parser/ast_type.h"
 #include "simulator/dyn_struct_member.h"
 #include "simulator/evaluation.h"
+#include "simulator/pattern_type_key.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
@@ -266,10 +267,12 @@ static void ApplyMemberKeys(const Expr* expr, const StructTypeInfo* info,
 // its value has, empty where it has none.
 namespace {
 struct TypeAndDefaultKeys {
-  std::vector<std::pair<DataTypeKind, Logic4Vec>> types;
+  std::vector<std::pair<PatternKeyType, Logic4Vec>> types;
   bool has_default = false;
   Logic4Vec default_value;
   std::string_view default_type;
+  // The context the keys' typedef names and the members' are resolved in.
+  const SimContext* ctx = nullptr;
 };
 }  // namespace
 
@@ -305,6 +308,7 @@ static TypeAndDefaultKeys CollectTypeAndDefaultKeys(const Expr* expr,
                                                     SimContext& ctx,
                                                     Arena& arena) {
   TypeAndDefaultKeys keys;
+  keys.ctx = &ctx;
   size_t n = std::min(expr->pattern_keys.size(), expr->elements.size());
   for (size_t ri = n; ri > 0; --ri) {
     size_t i = ri - 1;
@@ -315,12 +319,12 @@ static TypeAndDefaultKeys CollectTypeAndDefaultKeys(const Expr* expr,
       keys.default_type = StructTypeOfValue(expr->elements[i], ctx);
       continue;
     }
-    DataTypeKind kind = PatternTypeKeyKind(key);
-    if (kind == DataTypeKind::kImplicit) continue;
-    bool seen = std::ranges::any_of(
-        keys.types, [kind](const auto& entry) { return entry.first == kind; });
-    if (!seen)
-      keys.types.emplace_back(kind, EvalExpr(expr->elements[i], ctx, arena));
+    // Syntax 10-5: a key is a built-in type keyword or a typedef name, and
+    // the keys are gathered last written first, so the first that matches a
+    // member is the one §10.9.2 has override the others.
+    std::optional<PatternKeyType> type = ResolvePatternKeyType(key, ctx);
+    if (!type) continue;
+    keys.types.emplace_back(*type, EvalExpr(expr->elements[i], ctx, arena));
   }
   return keys;
 }
@@ -337,8 +341,8 @@ static TypeAndDefaultKeys CollectTypeAndDefaultKeys(const Expr* expr,
 static void PlaceTypeOrDefault(Logic4Vec& result, const StructFieldInfo& f,
                                uint32_t base, const TypeAndDefaultKeys& keys,
                                Arena& arena) {
-  for (const auto& [kind, val] : keys.types) {
-    if (f.type_kind != kind) continue;
+  for (const auto& [type, val] : keys.types) {
+    if (!PatternKeyMatches(type, SubjectOfField(f, *keys.ctx))) continue;
     PlaceKeyValue(result, f, val, arena, base);
     return;
   }

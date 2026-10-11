@@ -9,7 +9,6 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/types.h"
-#include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
@@ -20,6 +19,7 @@
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_args_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/pattern_type_key.h"
 #include "simulator/queue_bound.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -37,54 +37,14 @@ uint32_t PatternKeyIndex(const Expr* key, SimContext& ctx, Arena& arena) {
   return static_cast<uint32_t>(EvalExpr(key, ctx, arena).ToUint64());
 }
 
-// Finds the pattern element whose explicit integer key equals idx. Returns the
-// matching element index, or rhs->elements.size() when none matches.
-static size_t FindIndexKeyedElement(const Expr* rhs, uint32_t idx,
-                                    SimContext& ctx, Arena& arena) {
-  for (size_t i = 0; i < rhs->pattern_keys.size(); ++i) {
-    if (i >= rhs->elements.size()) break;
-    const auto* key = rhs->pattern_keys[i];
-    if (key->text == "default" || IsTypeKeyword(key->text)) continue;
-    if (PatternKeyIndex(key, ctx, arena) == idx) return i;
-  }
-  return rhs->elements.size();
-}
-
-// Finds the pattern element keyed by a type keyword matching elem_type. Returns
-// the matching element index, or rhs->elements.size() when none matches.
-// §10.9.1: when more than one type key matches an element, the last one's
-// value is used, so the keys are searched from the end.
-static size_t FindTypeKeyedElement(const Expr* rhs, DataTypeKind elem_type) {
-  size_t keyed = std::min(rhs->pattern_keys.size(), rhs->elements.size());
-  for (size_t i = keyed; i-- > 0;) {
-    auto key = rhs->pattern_keys[i]->text;
-    if (IsTypeKeyword(key) && TypeKeyMatchesKind(key, elem_type)) return i;
-  }
-  return rhs->elements.size();
-}
-
-// Finds the pattern element keyed by "default". Returns the matching element
-// index, or rhs->elements.size() when none matches.
-static size_t FindDefaultKeyedElement(const Expr* rhs) {
-  for (size_t i = 0; i < rhs->pattern_keys.size(); ++i) {
-    if (i >= rhs->elements.size()) break;
-    if (rhs->pattern_keys[i]->text == "default") return i;
-  }
-  return rhs->elements.size();
-}
-
 // One element slot of the unpacked-array target of an assignment pattern
-// (IEEE 1800 §7.6 / §10.9.2). `idx` is the array index being filled; `width`
-// and `elem_type_kind` mirror the element-type fields of the target's
-// ArrayInfo and select default/type-keyed pattern members.
+// (IEEE 1800 §7.6 / §10.9.2). `idx` is the array index being filled; `info`
+// is the target's ArrayInfo, whose element type selects the type-keyed
+// pattern members and whose width and state the Table 6-7 fallback takes.
 namespace {
 struct PatternArrayElem {
   uint32_t idx;
-  uint32_t width;
-  DataTypeKind elem_type_kind;
-  // §6.8's Table 6-7 row this element's type takes, for the branch below where
-  // no §10.9.1 rule covers it.
-  bool is_4state;
+  const ArrayInfo& info;
   // The layout of a structure element, which a default is applied to member
   // by member (EvalDefaultForElement); null for any other element.
   const StructTypeInfo* layout = nullptr;
@@ -94,26 +54,24 @@ struct PatternArrayElem {
 static Logic4Vec FindArrayKeyedValue(const Expr* rhs,
                                      const PatternArrayElem& slot,
                                      SimContext& ctx, Arena& arena) {
-  size_t match = FindIndexKeyedElement(rhs, slot.idx, ctx, arena);
-  if (match >= rhs->elements.size())
-    match = FindTypeKeyedElement(rhs, slot.elem_type_kind);
-  if (match >= rhs->elements.size()) {
-    match = FindDefaultKeyedElement(rhs);
-    if (match < rhs->elements.size()) {
-      return EvalDefaultForElement(rhs->elements[match], slot.layout, ctx,
-                                   arena);
-    }
-  }
-  if (match < rhs->elements.size())
-    return EvalExpr(rhs->elements[match], ctx, arena);
+  const Expr* item = IndexKeyedItem(rhs, slot.idx, ctx, arena);
+  if (item == nullptr)
+    item = TypeKeyedItem(rhs, SubjectOfElement(slot.info, ctx), ctx);
+  if (item != nullptr) return EvalExpr(item, ctx, arena);
+  // §10.9.1: a structure element no type key matches has the pattern's type
+  // keys and default applied to its members by §10.9.2's rules.
+  if (slot.layout != nullptr && PatternHasTypeKey(rhs, ctx))
+    return EvalStructPatternValue(rhs, slot.layout, ctx, arena);
+  if (const Expr* fallback = DefaultKeyedItem(rhs))
+    return EvalDefaultForElement(fallback, slot.layout, ctx, arena);
   // §10.9.1 forbids an element no rule covers, requiring one of its rules to
   // cover every element, so this is a pattern the elaborator
   // reports, and what the branch answers is §6.8's Table 6-7 default for the
   // element's own type, as the positional and multidimensional makers answer
   // it. The known zero it gave had one spelling of an illegal pattern reading
   // 00 where another read 'x.
-  return slot.is_4state ? MakeAllX(arena, slot.width)
-                        : MakeLogic4VecVal(arena, slot.width, 0);
+  return slot.info.is_4state ? MakeAllX(arena, slot.info.elem_width)
+                             : MakeLogic4VecVal(arena, slot.info.elem_width, 0);
 }
 
 namespace {
@@ -144,15 +102,13 @@ static const Expr* SelectDimElement(const Expr* pat, uint32_t idx, uint32_t pos,
     }
     return pos < pat->elements.size() ? pat->elements[pos] : nullptr;
   }
-  // §10.9.1 resolves a keyed pattern by index, then by type, then by default,
-  // and the type key was the one this asked for nowhere: FindTypeKeyedElement
-  // sat unused beside the other two, so `p = '{int: 7}` on an int array filled
-  // no element while the declaration form of the same pattern filled them all.
-  size_t m = FindIndexKeyedElement(pat, idx, pd.ctx, pd.arena);
-  if (m >= pat->elements.size())
-    m = FindTypeKeyedElement(pat, pd.info.elem_type_kind);
-  if (m >= pat->elements.size()) m = FindDefaultKeyedElement(pat);
-  return m < pat->elements.size() ? pat->elements[m] : nullptr;
+  // §10.9.1 resolves a keyed pattern by index, then by type, then by default.
+  if (const Expr* item = IndexKeyedItem(pat, idx, pd.ctx, pd.arena))
+    return item;
+  if (const Expr* item =
+          TypeKeyedItem(pat, SubjectOfElement(pd.info, pd.ctx), pd.ctx))
+    return item;
+  return DefaultKeyedItem(pat);
 }
 
 // Writes one scalar leaf element (resizing/defaulting to the element width).
@@ -230,8 +186,7 @@ Logic4Vec PatternItemAt(const Expr* rhs, const ArrayPatternTarget& target,
   if (!rhs->pattern_keys.empty()) {
     uint32_t idx =
         info.is_descending ? (info.lo + info.size - 1 - i) : (info.lo + i);
-    PatternArrayElem slot{idx, info.elem_width, info.elem_type_kind,
-                          info.is_4state, target.layout};
+    PatternArrayElem slot{idx, info, target.layout};
     return FindArrayKeyedValue(rhs, slot, ctx, arena);
   }
   if (replicate && inner_count > 0) {

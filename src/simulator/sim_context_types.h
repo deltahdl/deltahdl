@@ -4,11 +4,13 @@
 #include <cstdio>
 #include <deque>
 #include <map>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include "common/packed_range.h"
 #include "common/types.h"
 #include "parser/ast_type.h"
 #include "simulator/assoc_index.h"
@@ -130,6 +132,10 @@ struct StructFieldInfo {
   int64_t packed_left = 0;
   int64_t packed_right = 0;
   uint32_t packed_elem_width = 0;
+  // §6.22.1: the bounds of the member's one packed dimension as declared,
+  // `logic [8:1]`'s [8:1], which a type key's are compared with; empty for a
+  // member written with no dimension of its own or with more than one.
+  std::optional<PackedRange> decl_range = std::nullopt;
 };
 
 struct StructTypeInfo {
@@ -450,6 +456,15 @@ struct ArrayInfo {
   bool is_queue = false;
   bool is_4state = true;
   DataTypeKind elem_type_kind = DataTypeKind::kImplicit;
+  // §10.9.1 with §6.22.1: the typedef name the element type was written as,
+  // empty for a built-in type, whether the element is signed and the bounds
+  // of its outermost packed dimension -- what a type key of an assignment
+  // pattern is matched against. Empty where the array's maker did not record
+  // them, the element then taking its kind's signing and the range its
+  // typedef or its width gives.
+  std::string_view elem_type_name = {};
+  std::optional<bool> elem_is_signed = std::nullopt;
+  std::optional<PackedRange> elem_range = std::nullopt;
   // RtlirElementShape::type_is_unpacked_array: the element type is a name
   // standing for an unpacked array, `mem_type ba [0:7]` under
   // `typedef bsix mem_type [0:3]`.

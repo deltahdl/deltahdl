@@ -278,22 +278,23 @@ TEST(StructPatternSimulation, TypeKeyMultipleFieldsPipeline) {
   EXPECT_EQ(var->value.ToUint64(), (uint64_t{42} << 32) | 42);
 }
 
-// §10.9.2: a type key names a data type and sets every field whose type matches
-// it -- here the `logic` vector key covers both logic members (distinct from
-// the integer-atom key forms exercised elsewhere).
-TEST(StructPatternSimulation, LogicTypeKeyAppliesToVectorFields) {
-  SimFixture f;
-  auto* var = RunAndFindVar(
+// §10.9.2 with §6.22.1: a type key sets the members whose type matches its
+// own, and the one-bit `logic` matches no `logic [7:0]` member, which the
+// default then gives 0; a typedef of `logic [7:0]` matches both. Matched by
+// kind alone, `logic:` filled both members with CD.
+TEST(StructPatternSimulation, ALogicKeyLeavesVectorMembersToTheDefault) {
+  const char* src =
       "module t;\n"
+      "  typedef logic [7:0] byte_t;\n"
       "  typedef struct packed { logic [7:0] a; logic [7:0] b; } pair_t;\n"
-      "  pair_t p;\n"
+      "  pair_t p, q;\n"
       "  initial begin\n"
-      "    p = pair_t'{logic: 8'hCD};\n"
+      "    p = pair_t'{logic: 8'hCD, default: 0};\n"
+      "    q = pair_t'{byte_t: 8'hCD};\n"
       "  end\n"
-      "endmodule\n",
-      f, "p");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 0xCDCDu);
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "p"), 0u);
+  EXPECT_EQ(RunAndGet(src, "q"), 0xCDCDu);
 }
 
 // §10.9.2: the default: key is applied recursively to each member of an
@@ -556,6 +557,85 @@ TEST(StructPatternSim, ADefaultOfAMembersOwnTypeIsAssignedWhole) {
   EXPECT_EQ(RunAndGet(src, "sp"), 0x1234u);
   EXPECT_EQ(RunAndGet(src, "so"), 0x3434u);
   EXPECT_EQ(RunAndGet(src, "s2p"), 0x0707u);
+}
+
+// §10.9.2 with Syntax 10-5: a type key may be a typedef name, which sets each
+// member of a matching type -- one declared with the typedef or with the type
+// it names -- and leaves a member of another type to the default. The name was
+// read as a member name no member had, so the pattern set nothing.
+TEST(StructPatternSim, ATypedefKeySetsTheMembersOfItsType) {
+  const char* src =
+      "typedef logic [7:0] byte_t;\n"
+      "module t;\n"
+      "  struct packed { byte_t a, b; } s;\n"
+      "  struct packed { logic [7:0] c; int d; } u;\n"
+      "  initial begin\n"
+      "    s = '{byte_t: 8'h1};\n"
+      "    u = '{byte_t: 8'h7, default: 0};\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "s"), 0x0101u);
+  EXPECT_EQ(RunAndGet(src, "u"), uint64_t{0x07} << 32);
+}
+
+// §10.9.2 with §6.22.1: `int` matches a `bit signed [31:0]` member, a vector of
+// its state, signing and range, and no `bit [31:0]` member, which is unsigned.
+// Matched by kind, `int:` reached neither.
+TEST(StructPatternSim, AnIntKeyMatchesASignedBitVectorOfItsRange) {
+  const char* src =
+      "module t;\n"
+      "  struct packed { bit signed [31:0] a; bit [31:0] b; } s;\n"
+      "  initial s = '{int: 5, default: 0};\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "s"), uint64_t{5} << 32);
+}
+
+// §10.9.2 with §6.22.1: two vector types match only over the same packed
+// bounds, so a `logic [7:0]` typedef key sets neither a `logic [8:1]` member
+// nor a `logic [1:0][3:0]` one, eight bits wide as both are, and the default
+// gives them 0.
+TEST(StructPatternSim, ATypeKeyMatchesOnlyAMemberOfItsPackedBounds) {
+  const char* src =
+      "typedef logic [7:0] byte_t;\n"
+      "module t;\n"
+      "  struct packed { logic [8:1] a; logic [1:0][3:0] b; logic [7:0] c; } "
+      "s;\n"
+      "  initial s = '{byte_t: 8'h5A, default: 0};\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "s"), 0x5Au);
+}
+
+// §10.9.2: a member declared a dynamic array of longint is not of the type
+// longint, so the `longint` key sets the longint member alone and the default
+// leaves the dynamic array empty. Matched by kind, the key's value was written
+// over the array's handle.
+TEST(StructPatternSim, AnElementTypeKeyDoesNotSetADynamicArrayMember) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "typedef struct { longint a; longint d[]; } h_t;\n"
+      "module t;\n"
+      "  h_t z;\n"
+      "  initial begin\n"
+      "    z = '{longint: 5, default: 0};\n"
+      "    $display(\"%0d %0d\", z.a, z.d.size());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "5 0\n");
+}
+
+// §10.9.2 with §6.22.1: a structure type matches only itself, so a key naming
+// one sets the member of that type whole and no member of another type, even
+// one as wide; the default gives the int member its value.
+TEST(StructPatternSim, AStructureTypeKeySetsOnlyAMemberOfThatType) {
+  const char* src =
+      "typedef struct packed { logic [7:0] a, b; } pair_t;\n"
+      "module t;\n"
+      "  pair_t pv = '{8'h12, 8'h34};\n"
+      "  struct packed { pair_t p; shortint x; } s;\n"
+      "  initial s = '{pair_t: pv, default: 0};\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "s"), 0x12340000u);
 }
 
 }  // namespace

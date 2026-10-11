@@ -24,6 +24,7 @@
 #include "simulator/lowerer_register.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
+#include "simulator/statement_assign_internal.h"
 #include "simulator/switch_network.h"
 #include "simulator/unit_scope_items.h"
 #include "simulator/variable.h"
@@ -184,11 +185,15 @@ static std::string AliasNetKey(const AliasScope& scope, std::string_view name,
 
 // Appends the bits the alias operand `e` lists, the most significant first: a
 // net's, a bit-select's or a part-select's of one, or those of each operand
-// of a concatenation in turn. False where `e` is none of these.
+// of a concatenation or of a positional assignment pattern in turn -- Annex
+// A.8.5's net_lvalue, the type of a typed pattern looked through. False where
+// `e` is none of these.
 static bool AppendAliasBits(const Expr* e, const AliasScope& scope,
                             SimContext& ctx, Arena& arena,
                             std::vector<AliasBit>& out) {
-  if (e->kind == ExprKind::kConcatenation) {
+  e = UnwrapTypedPattern(e);
+  if (e->kind == ExprKind::kConcatenation ||
+      e->kind == ExprKind::kAssignmentPattern) {
     for (const Expr* el : e->elements) {
       if (!AppendAliasBits(el, scope, ctx, arena, out)) return false;
     }
@@ -608,6 +613,7 @@ void Lowerer::LowerChildInstance(const RtlirModuleInst& child) {
     AliasChildObjectsUnderPath(child_prefix, child_path, ctx_, arena_);
   RegisterChildInstanceDecls(child.resolved, inst_prefix_, ctx_, arena_);
   RecordSubroutineAssertionSampleScopes(child.resolved);
+  RecordStaticLocalSubroutines(child.resolved);
 
   // Port connections resolve in the parent scope (see LowerPortBindings),
   // then restore the child prefix for the child's own body.
