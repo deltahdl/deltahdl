@@ -512,7 +512,8 @@ TEST(ParameterizedClassSim, PortParameterArrayTakesTheActual) {
 // instance's own, each instance of the module making one with its own
 // specializations, so u1's and u2's C #(4) count their own constructions,
 // and so do their default specializations; a generic class a package declares
-// is one for the whole design, P #(4) counting both instances' objects.
+// is one for the whole design, P #(4) counting both instances' objects,
+// whether written through the import or behind the package's scope (§26.3).
 TEST(ClassSim, AModulesGenericClassIsEachInstancesOwn) {
   const std::string kSrc =
       "package p;\n"
@@ -530,17 +531,55 @@ TEST(ClassSim, AModulesGenericClassIsEachInstancesOwn) {
       "  C #(4) a, b;\n"
       "  C c;\n"
       "  P #(4) x;\n"
-      "  int n, d, m;\n"
+      "  p::P #(4) y;\n"
+      "  int n, d, m, mp;\n"
       "  initial begin\n"
-      "    a = new; b = new; c = new; x = new;\n"
+      "    a = new; b = new; c = new; x = new; y = new;\n"
       "    #1 n = C#(4)::count; d = C#()::count; m = P#(4)::count;\n"
+      "    mp = p::P#(4)::count;\n"
       "  end\n"
       "endmodule\n"
       "module t; sub u1(); sub u2(); endmodule\n";
   for (const std::string kInst : {"u1", "u2"}) {
     EXPECT_EQ(RunAndGet(kSrc, (kInst + ".n").c_str()), 2u) << kInst;
     EXPECT_EQ(RunAndGet(kSrc, (kInst + ".d").c_str()), 1u) << kInst;
-    EXPECT_EQ(RunAndGet(kSrc, (kInst + ".m").c_str()), 2u) << kInst;
+    EXPECT_EQ(RunAndGet(kSrc, (kInst + ".m").c_str()), 4u) << kInst;
+    EXPECT_EQ(RunAndGet(kSrc, (kInst + ".mp").c_str()), 4u) << kInst;
+  }
+}
+
+// §8.25 with §8.23: a class nested in a module instance's own generic class is
+// that instance's own too, so K, named bare in O's method, is the instance's
+// own K and counts its objects alone, and the specialization I #(2) of the
+// nested I is the instance's own as well.
+TEST(ClassSim, AClassNestedInAnInstancesGenericClassIsItsOwn) {
+  const std::string kSrc =
+      "module sub;\n"
+      "  class O #(int N = 1);\n"
+      "    class K;\n"
+      "      static int count = 0;\n"
+      "      function new(); count++; endfunction\n"
+      "    endclass\n"
+      "    class I #(int M = 1);\n"
+      "      static int count = 0;\n"
+      "      function new(); count++; endfunction\n"
+      "    endclass\n"
+      "    static function int make();\n"
+      "      K k = new;\n"
+      "      return K::count;\n"
+      "    endfunction\n"
+      "    static function int make2();\n"
+      "      I #(2) j = new;\n"
+      "      return I#(2)::count;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  int n, s;\n"
+      "  initial #1 begin n = O#()::make(); s = O#()::make2(); end\n"
+      "endmodule\n"
+      "module t; sub u1(); sub u2(); endmodule\n";
+  for (const std::string kInst : {"u1", "u2"}) {
+    EXPECT_EQ(RunAndGet(kSrc, (kInst + ".n").c_str()), 1u) << kInst;
+    EXPECT_EQ(RunAndGet(kSrc, (kInst + ".s").c_str()), 1u) << kInst;
   }
 }
 

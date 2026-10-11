@@ -549,6 +549,20 @@ static ClassTypeInfo* ClassUnder(
   return kFound == table.end() ? nullptr : kFound->second;
 }
 
+// §8.23: the class `table` holds under `name` within the class `base`, the
+// key "<base>::<name>", which a module instance's own class holds under that
+// instance as it holds the class (§8.25); null where it holds none.
+static ClassTypeInfo* NestedClassOf(
+    const std::unordered_map<std::string_view, ClassTypeInfo*>& table,
+    const ClassTypeInfo& base, std::string_view name) {
+  std::string key = std::string(base.name) + "::" + std::string(name);
+  if (!base.instance_scope.empty()) {
+    key = std::string(base.instance_scope) + "::" + key;
+  }
+  const auto kFound = table.find(key);
+  return kFound == table.end() ? nullptr : kFound->second;
+}
+
 void SimContext::RegisterClassType(std::string_view name, ClassTypeInfo* info) {
   if (class_scope_.empty()) {
     class_types_[name] = info;
@@ -612,9 +626,9 @@ ClassTypeInfo* SimContext::FindClassType(std::string_view name) {
        scope = scope->enclosing) {
     for (const ClassTypeInfo* base = scope; base != nullptr;
          base = base->parent) {
-      auto nested =
-          class_types_.find(std::string(base->name) + "::" + std::string(name));
-      if (nested != class_types_.end()) return nested->second;
+      if (ClassTypeInfo* nested = NestedClassOf(class_types_, *base, name)) {
+        return nested;
+      }
     }
   }
   return nullptr;

@@ -751,10 +751,21 @@ void BindDeclarationBase(ClassTypeInfo* info, SimContext& ctx, Arena& arena) {
   SizeBaseTypedefProperties(info, ctx);
 }
 
+// The name of the class a scope prefix names: `C` of `C#(4)::`, or `p::C` of
+// `p::C#(4)::`, which §26.3 lets name a package's class and under which
+// Lowerer::LowerPackageClass holds it; empty for a prefix of any other form.
+static std::string ScopePrefixClassName(const Expr& base) {
+  if (base.kind == ExprKind::kIdentifier) return std::string(base.text);
+  if (base.kind != ExprKind::kMemberAccess || !base.is_scope_resolution) {
+    return {};
+  }
+  return std::string(base.lhs->text) + "::" + std::string(base.rhs->text);
+}
+
 ClassTypeInfo* ScopeNamedSpecialization(const Expr* base, SimContext& ctx,
                                         Arena& arena) {
-  if (base == nullptr || base->kind != ExprKind::kIdentifier) return nullptr;
-  ClassTypeInfo* generic = ctx.FindClassType(base->text);
+  if (base == nullptr) return nullptr;
+  ClassTypeInfo* generic = ctx.FindClassType(ScopePrefixClassName(*base));
   if (generic == nullptr || generic->decl == nullptr) return nullptr;
   if (base->has_param_spec && !base->elements.empty()) {
     return SpecializationOf(

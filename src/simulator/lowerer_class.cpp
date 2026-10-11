@@ -818,6 +818,9 @@ static void LowerNestedClass(ClassTypeInfo* outer, const ClassDecl* nested,
   info->is_abstract = nested->is_virtual;
   info->is_interface = nested->is_interface;
   info->enclosing = outer;
+  // §8.25 with §8.23: a class nested in a module instance's own generic class
+  // is that instance's own too, its specializations held under the instance.
+  info->instance_scope = outer->instance_scope;
   const std::vector<ModuleItem*> kNoItems;
   PopulateClassType(info, nested, {kNoItems, constants}, ctx, arena);
   RecordClassPackage(info, outer->package, ctx);
