@@ -513,4 +513,78 @@ TEST(VariableInitSim, PackageAndUnitStaticLocalsAreSetBeforeTheProcedures) {
   EXPECT_EQ(RunAndGet(src, "u"), 3u);
 }
 
+// §10.5 with §8.6: a class method is a task or function, so a static local
+// of one is set before the procedures start, whether the class is the
+// compilation unit's, called through the class scope, or a package's, whose
+// task is called on an object.
+TEST(VariableInitSim, UnitAndPackageClassMethodStaticLocalsAreSetEarly) {
+  const char* src =
+      "int g = 1;\n"
+      "class C;\n"
+      "  static function int f(); static int s = $unit::g; return s;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "package p;\n"
+      "  int h = 3;\n"
+      "  class D;\n"
+      "    task t(output int o); static int s = h; o = s; endtask\n"
+      "  endclass\n"
+      "endpackage\n"
+      "module t;\n"
+      "  int r, u;\n"
+      "  p::D d;\n"
+      "  initial begin\n"
+      "    d = new; $unit::g = 2; p::h = 4; r = C::f(); d.t(u);\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "r"), 1u);
+  EXPECT_EQ(RunAndGet(src, "u"), 3u);
+}
+
+// §10.5 with §8.6: so is one of a method of a class a module declares, made
+// in the instance the module is, a child's included, and reading that
+// instance's variables.
+TEST(VariableInitSim, ModuleClassMethodStaticLocalsAreSetEarly) {
+  const char* src =
+      "module m;\n"
+      "  int g = 5;\n"
+      "  class E;\n"
+      "    function int f(); static int s = g; return s; endfunction\n"
+      "  endclass\n"
+      "  int r;\n"
+      "  initial begin E h; h = new; g = 6; r = h.f(); end\n"
+      "endmodule\n"
+      "module t;\n"
+      "  int g = 1;\n"
+      "  class C;\n"
+      "    function int f(); static int s = g; return s; endfunction\n"
+      "  endclass\n"
+      "  m u();\n"
+      "  int r, v;\n"
+      "  initial begin C h; h = new; g = 2; r = h.f(); #1 v = u.r; end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "r"), 1u);
+  EXPECT_EQ(RunAndGet(src, "v"), 5u);
+}
+
+// §10.5 with §8.25: each specialization the design names has its own method
+// static locals, each set before the procedures start with that
+// specialization's parameters.
+TEST(VariableInitSim, SpecializationMethodStaticLocalsAreSetEarly) {
+  const char* src =
+      "int g = 1;\n"
+      "class P #(int N = 0);\n"
+      "  static function int f(); static int s = $unit::g + N; return s;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "typedef P#(10) p10;\n"
+      "typedef P#(20) p20;\n"
+      "module t;\n"
+      "  int r, u;\n"
+      "  initial begin $unit::g = 2; r = p10::f(); u = p20::f(); end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "r"), 11u);
+  EXPECT_EQ(RunAndGet(src, "u"), 21u);
+}
+
 }  // namespace

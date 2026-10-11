@@ -83,7 +83,8 @@ struct AssertionSampleScope {
 
 // §10.5 with §6.21: an owner of `static` local declarations that give an
 // initial value -- a task or function of a module or of one of its generate
-// block instances, or a procedure with the body it runs -- with the instance
+// block instances, a procedure with the body it runs, or the classes a module
+// declares, whose methods' declarations they are (§8.6) -- with the instance
 // prefix it was lowered under. The generate block instance of a subroutine
 // one declares, and the process standing for a procedure, carry the block
 // prefixes and constants the initializers read.
@@ -93,6 +94,7 @@ struct StaticLocalOwner {
   const RtlirGenBlockSubroutine* gen_block = nullptr;
   const Process* process = nullptr;
   const Stmt* body = nullptr;
+  const std::vector<ClassDecl*>* classes = nullptr;
 };
 
 class Lowerer {
@@ -147,9 +149,9 @@ class Lowerer {
   void LowerProcess(const RtlirProcess& proc, bool from_program,
                     uint32_t program_block_id);
   void InstallGenBlockConsts(const GenBlockConsts& consts, Process* p);
-  // §10.5 with §6.21: records the module subroutines of `mod`, and the
-  // procedure `p` runs `body` for, that declare a `static` local with an
-  // initial value, and sets those values once every module is lowered and
+  // §10.5 with §6.21: records the module subroutines and classes of `mod`,
+  // and the procedure `p` runs `body` for, that declare a `static` local with
+  // an initial value, and sets those values once every module is lowered and
   // before any procedure starts. Defined in lowerer_static_locals.cpp.
   void RecordStaticLocalSubroutines(const RtlirModule* mod);
   void RecordStaticLocalProcess(const Process* p, const Stmt* body);

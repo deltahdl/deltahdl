@@ -5,8 +5,10 @@
 #include "common/arena.h"
 #include "common/source_loc.h"
 #include "elaborator/rtlir.h"
+#include "parser/ast_class.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "simulator/class_object.h"
 #include "simulator/deferred_caller.h"
 #include "simulator/eval_function_hier.h"
 #include "simulator/eval_function_internal.h"
@@ -108,9 +110,83 @@ void InitOwnedSubroutineStatics(SimContext& ctx, Arena& arena) {
   }
 }
 
+// §10.5 with §8.6 and §6.21: the static locals of the methods `cls` declares,
+// each made in the frame a call keeps them in, the one StaticFrameOfBody names
+// after the class, kept under the class's package or unit, or, for a module's
+// class, under the instance the caller stands in. The class is running and
+// the frame carries the method's package, as ExecClassMethod has them, so an
+// initializer reads the specialization's parameters and the package's names
+// as the call's own declaration would.
+void InitClassMethodStatics(const ClassTypeInfo* cls, SimContext& ctx,
+                            Arena& arena) {
+  for (const auto& [name, func] : cls->methods) {
+    std::vector<const Stmt*> inits = StaticInitsOf(func);
+    if (inits.empty()) continue;
+    ctx.PushMethodClass(cls);
+    ctx.PushScope();
+    ctx.EnterSubroutinePackage(func);
+    {
+      StaticLocalFrameScope frame(func, ctx, arena);
+      for (const Stmt* decl : inits) {
+        ExecFuncVarDecl(decl,
+                        {frame.Name(), func->is_static && !func->is_automatic},
+                        ctx, arena);
+      }
+    }
+    ctx.PopScope();
+    ctx.PopMethodClass();
+  }
+}
+
+// §10.5 with §8.6: the method static locals of every class a package or the
+// compilation unit holds, the specializations of one made by now among them
+// (§8.25), each class's in the frames its calls share under that package or
+// unit, so standing in no instance.
+void InitPackageClassMethodStatics(SimContext& ctx, Arena& arena) {
+  for (const ClassTypeInfo* cls : ctx.RegisteredClassTypes(true)) {
+    if (cls->decl == nullptr || cls->package.empty()) continue;
+    Process stand_in;
+    stand_in.stand_in = true;
+    stand_in.is_static_init = true;
+    CallerStandIn in_owner(&stand_in, ctx);
+    InitClassMethodStatics(cls, ctx, arena);
+  }
+}
+
+const ClassTypeInfo* OutermostClass(const ClassTypeInfo* cls) {
+  while (cls->enclosing != nullptr) cls = cls->enclosing;
+  return cls;
+}
+
+// §10.5 with §8.6: the method static locals of the classes `decls` a module
+// declares, in the instance the caller stands in, whose frames a call keeps
+// under that instance (SimContext::StaticFrameKey). The classes are the ones
+// the instance holds -- its own copies where it was given them
+// (Lowerer::RegisterChildClasses) -- with each class nested in one (§8.23)
+// and each specialization of one made by now (§8.25).
+void InitModuleClassMethodStatics(const std::vector<ClassDecl*>& decls,
+                                  SimContext& ctx, Arena& arena) {
+  std::vector<ClassTypeInfo*> held = ctx.RegisteredClassTypes(true);
+  for (const ClassDecl* decl : decls) {
+    const ClassTypeInfo* generic = ctx.FindClassType(decl->name);
+    if (generic == nullptr || generic->decl != decl) continue;
+    for (const ClassTypeInfo* cls : held) {
+      if (cls->package.empty() &&
+          cls->instance_scope == generic->instance_scope &&
+          OutermostClass(cls)->decl == decl) {
+        InitClassMethodStatics(cls, ctx, arena);
+      }
+    }
+  }
+}
+
 }  // namespace
 
 void Lowerer::RecordStaticLocalSubroutines(const RtlirModule* mod) {
+  if (!mod->class_decls.empty()) {
+    static_local_owners_.push_back(
+        {.inst_prefix = inst_prefix_, .classes = &mod->class_decls});
+  }
   for (const ModuleItem* func : mod->function_decls) {
     if (!func->method_class.empty() || StaticInitsOf(func).empty() ||
         IsGenBlockSubroutine(func, mod))
@@ -144,6 +220,7 @@ void Lowerer::RecordStaticLocalProcess(const Process* p, const Stmt* body) {
 // the procedures had changed by then.
 void Lowerer::InitializeStaticLocals() {
   InitOwnedSubroutineStatics(ctx_, arena_);
+  InitPackageClassMethodStatics(ctx_, arena_);
   for (const StaticLocalOwner& owner : static_local_owners_) {
     Process stand_in;
     stand_in.stand_in = true;
@@ -159,6 +236,10 @@ void Lowerer::InitializeStaticLocals() {
       stand_in.saved_scope_stack = owner.process->saved_scope_stack;
     }
     CallerStandIn in_owner(&stand_in, ctx_);
+    if (owner.classes != nullptr) {
+      InitModuleClassMethodStatics(*owner.classes, ctx_, arena_);
+      continue;
+    }
     if (owner.subroutine != nullptr) {
       InitSubroutineStatics(owner, ctx_, arena_);
       continue;

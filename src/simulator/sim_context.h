@@ -630,9 +630,9 @@ class SimContext : public DeclaredNameTables,
   const std::string& ClassInstanceScope() const { return class_scope_; }
   // The class held under `name` in the scope set, which is not empty.
   ClassTypeInfo* ExactClassType(std::string_view name);
-  // Every class held under its own name, an alias's entry left out; what
-  // RegisterClassTypeAliases walks for the classes' own typedefs.
-  std::vector<ClassTypeInfo*> RegisteredClassTypes() const;
+  // Every class held under its own name, an alias's entry left out, for
+  // RegisterClassTypeAliases; with `all`, every class any key holds, once.
+  std::vector<ClassTypeInfo*> RegisteredClassTypes(bool all = false) const;
   void SetVariableClassType(std::string_view var, std::string_view type);
   std::string_view GetVariableClassType(std::string_view var) const;
   void SetVariableClassParamExprs(std::string_view var,

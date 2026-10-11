@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cerrno>
 #include <charconv>
 #include <cstddef>
@@ -7,6 +8,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -634,14 +636,25 @@ ClassTypeInfo* SimContext::FindClassType(std::string_view name) {
   return nullptr;
 }
 
-std::vector<ClassTypeInfo*> SimContext::RegisteredClassTypes() const {
+std::vector<ClassTypeInfo*> SimContext::RegisteredClassTypes(bool all) const {
   std::vector<ClassTypeInfo*> classes;
   // A package class's bare name held back while the modules bind their own
   // stands with no class behind it (Lowerer::LowerUnimportedPackageClasses)
   // and is passed over; read through it, this dereferenced null.
   for (const auto& [key, info] : class_types_) {
-    if (info != nullptr && key == info->name) classes.push_back(info);
+    if (info != nullptr && (all || key == info->name)) classes.push_back(info);
   }
+  if (!all) return classes;
+  // A class held under several keys -- its own name, `p::C`, an alias, an
+  // instance's scope -- is listed once, and in an order the table's own does
+  // not decide.
+  std::ranges::sort(classes);
+  classes.erase(std::ranges::unique(classes).begin(), classes.end());
+  std::ranges::stable_sort(
+      classes, [](const ClassTypeInfo* a, const ClassTypeInfo* b) {
+        return std::tie(a->instance_scope, a->package, a->name) <
+               std::tie(b->instance_scope, b->package, b->name);
+      });
   return classes;
 }
 
