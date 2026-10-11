@@ -275,36 +275,80 @@ TEST(ObjectPropertyElaboration, BaseParameterNamedLikeAClassLeavesSelects) {
       ReportedError(f.diag.Diagnostics(), "has no member named", 7, "8.5"));
 }
 
-// §6.19.2: a range of enumeration constants, S[2], declares names the
-// declaration does not write out, S0 and S1, which are members all the same.
-TEST(ObjectPropertyElaboration, NumberedEnumConstantsLeaveSelects) {
+// §6.19.2: a range of enumeration constants, S[2], T[3:4] or U[1], declares
+// names the declaration does not write out, S0 and S1, T3 and T4, U0, which
+// are members all the same; S2, the name that range stops short of, is not,
+// and neither is the written S or a method no member names.
+TEST(ObjectPropertyElaboration, NumberedEnumConstantsAreMembers) {
   ElabFixture f;
   ElabOk(
       "class C;\n"
-      "  typedef enum {S[2]} s_t;\n"
+      "  typedef enum {S[2], T[3:4], U[1]} s_t;\n"
       "endclass\n"
       "module m;\n"
       "  C c = new;\n"
-      "  initial $display(c.S0, c.S1);\n"
+      "  initial $display(c.S0, c.S1, c.T3, c.T4, c.U0);\n"
+      "  initial $display(c.S2);\n"
+      "  initial $display(c.S);\n"
+      "  initial c.nosuch();\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_FALSE(ReportedError(diags, "has no member named", 6, "8.5"));
+  EXPECT_TRUE(
+      ReportedError(diags, "class 'C' has no member named 'S2'", 7, "8.5"));
+  EXPECT_TRUE(
+      ReportedError(diags, "class 'C' has no member named 'S'", 8, "8.5"));
+  EXPECT_TRUE(
+      ReportedError(diags, "class 'C' has no member named 'nosuch'", 9, "8.6"));
+}
+
+// A range bounded by a class parameter, V[W], generates names only a
+// specialization tells, so a select from the class is left unreported.
+TEST(ObjectPropertyElaboration, EnumRangeOverAParameterLeavesSelects) {
+  ElabFixture f;
+  ElabOk(
+      "class C #(int W = 2);\n"
+      "  typedef enum {V[W]} v_t;\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c = new;\n"
+      "  initial $display(c.V1);\n"
       "endmodule\n",
       f);
   EXPECT_FALSE(
       ReportedError(f.diag.Diagnostics(), "has no member named", 6, "8.5"));
 }
 
-// A class name two scopes each declare a class under does not tell which
-// class a property of that type holds, so selects through it are left alone.
-TEST(ObjectPropertyElaboration, ClassNameTwoScopesShareIsUnresolved) {
+// §3.13 and §23.9: a class name two scopes each declare a class under names,
+// in a property's type and in an extends clause, the class the scope
+// declaring the writer sees, so h.k and d hold b's K, which declares y and no
+// x, whatever module a's K declares.
+TEST(ObjectPropertyElaboration, ClassNameTwoScopesShareResolvesByScope) {
+  ElabFixture f;
+  ElabOk(
+      "module a;\n"
+      "  class K; int x; endclass\n"
+      "endmodule\n"
+      "module b;\n"
+      "  class K; int y; endclass\n"
+      "  class H; K k = new; endclass\n"
+      "  class D extends K; endclass\n"
+      "  H h = new;\n"
+      "  D d = new;\n"
+      "  initial h.k.y = 1;\n"
+      "  initial d.y = 1;\n"
+      "  initial h.k.x = 1;\n"
+      "  initial d.x = 1;\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_FALSE(ReportedError(diags, "has no member named", 10, "8.5"));
+  EXPECT_FALSE(ReportedError(diags, "has no member named", 11, "8.5"));
   EXPECT_TRUE(
-      ElabOk("module a;\n"
-             "  class K; int x; endclass\n"
-             "endmodule\n"
-             "module b;\n"
-             "  class K; int y; endclass\n"
-             "  class H; K k = new; endclass\n"
-             "  H h = new;\n"
-             "  initial h.k.y = 1;\n"
-             "endmodule\n"));
+      ReportedError(diags, "class 'K' has no member named 'x'", 12, "8.5"));
+  EXPECT_TRUE(
+      ReportedError(diags, "class 'D' has no member named 'x'", 13, "8.5"));
 }
 
 // A hierarchical name and a method of a built-in type select from no class

@@ -7,6 +7,7 @@
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
@@ -70,6 +71,29 @@ TEST(ClassScopeResolutionElaboration, TheConstructorIsReachedFromOutside) {
       "endmodule\n",
       f);
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §8.23: `Cfg::my_type` names the type Cfg declares and no other, so a module
+// array typedef sharing the bare name lends x none of its dimensions; adopted,
+// x would be a two-element array of one-bit logic, and `x = 5` an assignment
+// of an integral value to it.
+TEST(ClassScopeResolutionElaboration, ScopedTypedefTakesNoModuleArrayDims) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class Cfg;\n"
+      "  typedef int my_type;\n"
+      "endclass\n"
+      "module m;\n"
+      "  typedef logic my_type [2];\n"
+      "  Cfg::my_type x;\n"
+      "  initial x = 5;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+  const auto* x = FindVar(design, "m", "x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->width, 32u);
 }
 
 }  // namespace

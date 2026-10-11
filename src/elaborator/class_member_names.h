@@ -1,14 +1,19 @@
 #pragma once
 
 #include <cstddef>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
+
+#include "elaborator/type_site_lookup.h"
 
 namespace delta {
 
 struct ClassDecl;
 struct CompilationUnit;
+struct ModuleItem;
 
 // The classes of a compilation unit known by their name alone: each name the
 // unit declares exactly one class under, wherever the class is declared, in
@@ -30,8 +35,9 @@ class SoleClassIndex {
   // constant `cls` or a class it extends or implements declares (§8.13,
   // §8.26), its types among them, whose access §8.5 forbids by a rule of its
   // own, and the methods §18 gives every object. False where the names are not
-  // known in full: a class of the chain extends or implements one Find does
-  // not give, or an enumeration writes a range of constants (§6.19.2).
+  // known in full: a class of the chain extends or implements one FindFrom
+  // does not give, or a range of enumeration constants is bounded by a
+  // parameter (§6.19.2).
   bool SelectableNames(const ClassDecl& cls,
                        std::unordered_set<std::string_view>& names) const;
 
@@ -43,16 +49,35 @@ class SoleClassIndex {
 
   // §8.5: the class a handle the property `name` of `cls`, or of the nearest
   // class it extends declaring one by that name, holds, where the property
-  // writes `selects` unpacked dimensions (§7.4) and its type is a name Find
-  // gives a class for, not a type the class declares itself; null for
+  // writes `selects` unpacked dimensions (§7.4) and its type is a name
+  // FindFrom gives a class for, not a type the class declares itself; null for
   // anything else.
   const ClassDecl* PropertyClass(const ClassDecl& cls, std::string_view name,
                                  std::size_t selects) const;
 
  private:
+  // Fills by_name_ and sites_ on the first question asked.
+  void Build() const;
+
+  // Records the site of each class declared directly among `items`, a scope
+  // of kind `kind`.
+  void AddSites(const std::vector<ModuleItem*>& items, SiteKind kind) const;
+
+  // The class the name `name` that the class `from` writes names: the one the
+  // scope declaring `from` sees (§3.13, §26.3), else the one Find gives,
+  // which answers too for a class standing in a generate block or in another
+  // class, whose scope is not recorded.
+  const ClassDecl* FindFrom(const ClassDecl& from, std::string_view name) const;
+
   const CompilationUnit& unit_;
   mutable bool built_ = false;
   mutable std::unordered_map<std::string_view, const ClassDecl*> by_name_;
+  // The site of each class a module, interface, program, checker, package or
+  // the compilation unit declares directly.
+  mutable std::unordered_map<const ClassDecl*, TypeSite> sites_;
+  // The names ranges of enumeration constants generate (§6.19.2), which no
+  // source text holds.
+  mutable std::unordered_set<std::string> generated_;
 };
 
 }  // namespace delta
