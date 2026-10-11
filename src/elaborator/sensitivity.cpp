@@ -389,6 +389,7 @@ static std::unordered_set<std::string_view> ResolveCalledFunctions(
   std::unordered_set<std::string> names;
   CollectCallNamesFromStmt(body, names);
   std::vector<std::pair<std::string, std::string>> pending;
+  pending.reserve(names.size());
   for (const auto& name : names) pending.emplace_back("", name);
   while (!pending.empty()) {
     auto [scope, name] = std::move(pending.back());
