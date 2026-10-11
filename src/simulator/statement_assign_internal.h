@@ -18,6 +18,7 @@ struct AssocArraySpec;
 struct DataType;
 struct Expr;
 struct Stmt;
+struct StructFieldInfo;
 struct StructTypeInfo;
 struct Variable;
 class SimContext;
@@ -321,6 +322,20 @@ uint32_t SelectExprWidth(const Variable& var, const Expr* sel, SimContext& ctx,
 // addressing no bit out of the concatenation entirely, and every element to its
 // left then took its bits one element too low.
 uint32_t ConcatLhsElemWidth(const Expr* e, SimContext& ctx, Arena& arena);
+
+// §7.2 with §7.4, §7.5, §7.8 and §7.10: the member a member access of a
+// selected element names, `arr[i].f` or `d[1].a`, found in the layout of the
+// structures the container holds, with its offset in that layout. The field is
+// null where the target is no such member. Defined in
+// statement_assign_core.cpp, whose writer deposits it; ConcatLhsElemWidth sizes
+// it by the same answer.
+struct SelectedElementMember {
+  const StructTypeInfo* layout = nullptr;
+  const StructFieldInfo* field = nullptr;
+  uint32_t offset = 0;
+};
+SelectedElementMember ResolveSelectedElementMember(const Expr* lhs,
+                                                   SimContext& ctx);
 
 // Defined in statement_assign_concat.cpp; also used by the §10.6.1 and §10.6.2
 // procedural continuous assignments in statement_assign_decl.cpp, which have

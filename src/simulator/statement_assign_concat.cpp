@@ -340,8 +340,15 @@ uint32_t ConcatLhsElemWidth(const Expr* e, SimContext& ctx, Arena& arena) {
   // §11.4.12 with §8.5: a member access names no variable when its storage is
   // a class property, `h.p`, held on the object; the property's declared width
   // is what the element claims.
-  if (var == nullptr)
-    return e->kind == ExprKind::kMemberAccess ? FieldLhsWidth(e, ctx) : 0;
+  //
+  // §7.2 with §7.4: nor does a member of a selected element, `arr[i].f`, whose
+  // width is the member's in the element's layout; sized as zero, it was left
+  // out of the concatenation and its bits went to the element on its left.
+  if (var == nullptr) {
+    if (e->kind != ExprKind::kMemberAccess) return 0;
+    const StructFieldInfo* member = ResolveSelectedElementMember(e, ctx).field;
+    return member != nullptr ? member->width : FieldLhsWidth(e, ctx);
+  }
   // Two questions, not one. SelectExprWidth answers how many bits a select
   // names within a packed object; an index of a collection names a whole
   // element, whose width is the base variable's, itself one element wide.

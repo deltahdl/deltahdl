@@ -358,6 +358,19 @@ static Logic4Vec ElementBeforeMemberWrite(const Expr* select,
       ResizeToWidth(EvalExpr(select, ctx, arena), layout_width, arena), arena);
 }
 
+SelectedElementMember ResolveSelectedElementMember(const Expr* lhs,
+                                                   SimContext& ctx) {
+  SelectedElementMember m;
+  if (lhs->kind != ExprKind::kMemberAccess || lhs->lhs == nullptr ||
+      lhs->lhs->kind != ExprKind::kSelect || lhs->lhs->index_end != nullptr ||
+      lhs->rhs == nullptr || lhs->rhs->kind != ExprKind::kIdentifier)
+    return m;
+  m.layout = ContainerElementLayout(lhs->lhs->base, ctx);
+  if (m.layout != nullptr)
+    m.field = ResolveStructField(m.layout, lhs->rhs->text, &m.offset);
+  return m;
+}
+
 // §7.2 with §7.5, §7.8 and §7.10: `d[1].a = 11` writes a member of the
 // structure an element of a dynamic, associative or queue container holds, a
 // variable or a class property: the element is read, the member's bits set in
@@ -367,23 +380,16 @@ static Logic4Vec ElementBeforeMemberWrite(const Expr* select,
 static bool TryContainerElementMemberWrite(const Expr* lhs,
                                            const Logic4Vec& rhs_val,
                                            SimContext& ctx, Arena& arena) {
-  if (lhs->kind != ExprKind::kMemberAccess || lhs->lhs == nullptr ||
-      lhs->lhs->kind != ExprKind::kSelect || lhs->lhs->index_end != nullptr ||
-      lhs->rhs == nullptr || lhs->rhs->kind != ExprKind::kIdentifier)
-    return false;
+  SelectedElementMember m = ResolveSelectedElementMember(lhs, ctx);
+  if (m.field == nullptr) return false;
   const Expr* select = lhs->lhs;
-  const StructTypeInfo* layout = ContainerElementLayout(select->base, ctx);
-  if (layout == nullptr) return false;
-  uint32_t offset = 0;
-  const StructFieldInfo* field =
-      ResolveStructField(layout, lhs->rhs->text, &offset);
-  if (field == nullptr) return false;
   Logic4Vec element =
-      ElementBeforeMemberWrite(select, layout->total_width, ctx, arena);
-  DepositBitField(element, offset,
-                  ResizeToWidth(MemberBitsOf(rhs_val, field->type_kind, arena),
-                                field->width, arena),
-                  field->width);
+      ElementBeforeMemberWrite(select, m.layout->total_width, ctx, arena);
+  DepositBitField(
+      element, m.offset,
+      ResizeToWidth(MemberBitsOf(rhs_val, m.field->type_kind, arena),
+                    m.field->width, arena),
+      m.field->width);
   PerformBlockingAssign(select, element, ctx, arena);
   return true;
 }
