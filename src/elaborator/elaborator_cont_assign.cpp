@@ -17,6 +17,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -318,9 +319,15 @@ static bool CollectContTargetLeaves(const Expr* e,
   return true;
 }
 
-static bool NamesParameter(std::string_view name, const RtlirModule* mod) {
-  for (const auto& p : mod->params)
-    if (p.name == name) return true;
+// Whether `name` is a parameter of `mod` that a reference standing in the
+// generate blocks `scopes` sees: §23.9 keeps a block's parameter from the
+// module and from the block's siblings.
+static bool NamesParameter(std::string_view name, const RtlirModule* mod,
+                           const std::vector<std::string_view>& scopes) {
+  for (const auto& p : mod->params) {
+    if (p.name == name && ParamVisibleFromScopes(p.gen_block_prefix, scopes))
+      return true;
+  }
   return false;
 }
 
@@ -338,7 +345,7 @@ bool Elaborator::ValidateContAssignLeaf(ModuleItem* item, RtlirModule* mod,
                                         const ScopeMap& scope) {
   // §10.2 and §10.3: a continuous assignment drives a net or a variable, and a
   // parameter is a constant (§6.20).
-  if (NamesParameter(leaf.root, mod)) {
+  if (NamesParameter(leaf.root, mod, gen_prefix_scopes_)) {
     diag_.Error(
         item->loc,
         std::format("continuous assignment to parameter '{}'", leaf.root),

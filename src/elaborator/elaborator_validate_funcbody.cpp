@@ -389,12 +389,26 @@ constexpr AutoVarRule kAutomaticVarInStaticScope{"automatic variable",
 constexpr AutoVarRule kAutomaticFunctionVar{"automatic variable",
                                             Subclause("10.4.2")};
 
+// What a nonblocking target's names are judged against: the class names that
+// tell a handle, and the typedefs a declared type is written through.
+struct HandleNames {
+  const NameSet& class_names;
+  const TypedefMap& typedefs;
+};
+
 // Whether a variable of `type` is a handle: a class or virtual interface
-// handle, whose members belong to the object or interface it refers to.
-static bool IsHandleType(const DataType& type, const NameSet& class_names) {
-  return type.kind == DataTypeKind::kVirtualInterface ||
-         (type.kind == DataTypeKind::kNamed &&
-          class_names.count(type.type_name) != 0);
+// handle, whose members belong to the object or interface it refers to,
+// written as such or through typedefs.
+static bool IsHandleType(const DataType& type, const HandleNames& names) {
+  const DataType* t = &type;
+  while (t->kind == DataTypeKind::kNamed &&
+         names.class_names.count(t->type_name) == 0) {
+    auto it = names.typedefs.find(t->type_name);
+    if (it == names.typedefs.end()) return false;
+    t = &it->second;
+  }
+  return t->kind == DataTypeKind::kVirtualInterface ||
+         t->kind == DataTypeKind::kNamed;
 }
 
 // Whether `name`, written as the variable a nonblocking target writes into,
@@ -402,7 +416,7 @@ static bool IsHandleType(const DataType& type, const NameSet& class_names) {
 // writes the object the handle refers to instead, which outlives the call.
 static bool NbaNameIsAutomatic(std::string_view name, bool through_member,
                                const BodyDeclScopes& scopes,
-                               const NameSet& class_names) {
+                               const HandleNames& class_names) {
   const BodyDeclScopes::Decl* decl = scopes.Find(name);
   if (decl == nullptr || !decl->automatic) return false;
   return !through_member || !IsHandleType(*decl->type, class_names);
@@ -413,7 +427,7 @@ static bool NbaNameIsAutomatic(std::string_view name, bool through_member,
 // the target names, and §23.9 decides which declaration a name reaches.
 static bool NbaTargetWritesAutomatic(const Expr* e, bool through_member,
                                      const BodyDeclScopes& scopes,
-                                     const NameSet& class_names) {
+                                     const HandleNames& class_names) {
   if (e->kind == ExprKind::kConcatenation ||
       e->kind == ExprKind::kAssignmentPattern) {
     for (const Expr* el : e->elements)
@@ -434,7 +448,7 @@ static bool NbaTargetWritesAutomatic(const Expr* e, bool through_member,
 // where the reports go.
 struct NbaAutoReport {
   const AutoVarRule& rule;
-  const NameSet& class_names;
+  const HandleNames& class_names;
   DiagEngine& diag;
 };
 
@@ -447,7 +461,7 @@ static void CheckNbaAutomaticTargets(const std::vector<FunctionArg>& formals,
                                      bool default_auto,
                                      const NbaAutoReport& report) {
   const AutoVarRule& rule = report.rule;
-  const NameSet& class_names = report.class_names;
+  const HandleNames& class_names = report.class_names;
   DiagEngine& diag = report.diag;
   BodyDeclScopes scopes(default_auto);
   for (const auto& arg : formals) scopes.DeclareFormal(arg);
@@ -684,7 +698,7 @@ static void ValidateRefArgsInForkBlocks(const ModuleItem* item,
 }
 
 static void ValidateTaskBody(const ModuleItem* item, bool is_auto,
-                             const NameSet& class_names, DiagEngine& diag) {
+                             const HandleNames& class_names, DiagEngine& diag) {
   std::unordered_set<std::string_view> auto_vars;
   if (is_auto) {
     for (const auto& arg : item->func_args) {
@@ -725,12 +739,13 @@ void Elaborator::ValidateFunctionBody(const ModuleItem* item,
   // §8.6: every method of a class is automatic.
   bool is_auto = item->is_automatic || is_class_method;
   if (item->kind == ModuleItemKind::kTaskDecl) {
-    ValidateTaskBody(item, is_auto, class_names_, diag_);
+    ValidateTaskBody(item, is_auto, {class_names_, typedefs_}, diag_);
     return;
   }
   if (item->kind != ModuleItemKind::kFunctionDecl) return;
+  const HandleNames kHandles{class_names_, typedefs_};
   CheckNbaAutomaticTargets(item->func_args, item->func_body_stmts, is_auto,
-                           {kAutomaticFunctionVar, class_names_, diag_});
+                           {kAutomaticFunctionVar, kHandles, diag_});
   bool is_void = (item->return_type.kind == DataTypeKind::kVoid);
   FunctionBodyScope scope{
       .is_void = is_void, .func_name = item->name, .task_names = task_names_};
@@ -845,7 +860,7 @@ static void ReportImplicitlyStaticInitsOfItem(const ModuleItem* item,
 
 static void ValidateAutomaticVarRulesOfItems(
     const std::vector<ModuleItem*>& items, bool module_is_automatic,
-    const NameSet& class_names, DiagEngine& diag);
+    const HandleNames& class_names, DiagEngine& diag);
 
 // §27.3 (printed page 818): the procedural blocks and subroutines a generate
 // block brings into existence act as they would in a module, so §6.21's rules
@@ -854,7 +869,7 @@ static void ValidateAutomaticVarRulesOfItems(
 // case generate arm holds its block in its own body.
 static void ValidateAutomaticVarRulesOfGenerate(const ModuleItem* item,
                                                 bool module_is_automatic,
-                                                const NameSet& class_names,
+                                                const HandleNames& class_names,
                                                 DiagEngine& diag) {
   switch (item->kind) {
     case ModuleItemKind::kGenerateIf:
@@ -880,7 +895,7 @@ static void ValidateAutomaticVarRulesOfGenerate(const ModuleItem* item,
 
 static void ValidateAutomaticVarRulesOfItems(
     const std::vector<ModuleItem*>& items, bool module_is_automatic,
-    const NameSet& class_names, DiagEngine& diag) {
+    const HandleNames& class_names, DiagEngine& diag) {
   for (const auto* item : items) {
     ReportImplicitlyStaticInitsOfItem(item, module_is_automatic, diag);
     ValidateAutomaticVarRulesOfGenerate(item, module_is_automatic, class_names,

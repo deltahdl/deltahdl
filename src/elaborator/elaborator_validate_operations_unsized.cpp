@@ -16,6 +16,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 // §11.4.12's unsized constants in a concatenation, and the unpacked array
 // concatenations of §10.10 they are allowed in, apart from the other array
@@ -211,8 +212,10 @@ void ElaboratorOperationRules::WalkStmtsForUnsizedInConcat(const Stmt* s) {
       is_concat_assign && IsUnpackedArrayConcatTarget(s->lhs);
   // §10.10 (printed page 264): `{}` is only an unpacked array concatenation,
   // a vector concatenation holding at least one item (§11.4.12), so what it
-  // is assigned to is an unpacked array.
-  if (is_concat_assign && !is_array_concat_rhs && s->rhs->elements.empty()) {
+  // is assigned to is an unpacked array. A name is the target whose type this
+  // walk knows in full; a member or a select is judged no further.
+  if (is_concat_assign && !is_array_concat_rhs && s->rhs->elements.empty() &&
+      s->lhs->kind == ExprKind::kIdentifier) {
     diag_.Error(s->rhs->range.start,
                 "an empty concatenation, {}, is assigned only to an unpacked "
                 "array",

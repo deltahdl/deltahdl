@@ -1,10 +1,12 @@
 #include <format>
 #include <functional>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
@@ -69,13 +71,16 @@ void Elaborator::ValidateItemConstraints(const ModuleItem* item,
   }
   // §10.4, §10.6.2 and §10.9 state their rules of a procedural statement
   // wherever it stands, and the body of a task or function is such a place.
+  // The targets are judged for §10.4 alone, a subroutine being no process
+  // whose assignments §6.5 weighs against a continuous one here.
   // A class method defined out of its class writes the class's properties,
   // which no module name stands for.
   if ((item->kind == ModuleItemKind::kTaskDecl ||
        item->kind == ModuleItemKind::kFunctionDecl) &&
       item->method_class.empty()) {
-    CollectProcTargets(item->func_args, item->func_body_stmts,
-                       proc_assign_targets_);
+    std::unordered_map<std::string_view, SourceLoc> targets;
+    CollectProcTargets(item->func_args, item->func_body_stmts, targets);
+    ReportProceduralNetTargets(targets);
     for (const Stmt* s : item->func_body_stmts) {
       CheckForceLhs(s, net_names_, nettype_net_names_, scope, diag_);
       WalkStmtsForLhsPatternKeys(s, diag_);
@@ -517,7 +522,14 @@ void Elaborator::ValidateDisableTargets(const ModuleDecl* decl) {
 }
 
 void Elaborator::ValidateProceduralNetAssign() {
-  for (const auto& [name, loc] : proc_assign_targets_) {
+  ReportProceduralNetTargets(proc_assign_targets_);
+}
+
+// §10.4 (printed page 251): a procedural assignment's left-hand side is a
+// variable, and a net is none.
+void Elaborator::ReportProceduralNetTargets(
+    const std::unordered_map<std::string_view, SourceLoc>& targets) {
+  for (const auto& [name, loc] : targets) {
     if (net_names_.count(name) != 0) {
       diag_.Error(loc,
                   std::format("net '{}' cannot be the target of a "

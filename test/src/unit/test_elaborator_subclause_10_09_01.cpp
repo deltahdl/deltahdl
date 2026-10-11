@@ -318,11 +318,13 @@ TEST(ArrayLiteralElaboration, TypeKeyThatCannotMatchDoesNotCoverTheArray) {
 // The guard on the other direction, beside TypeKeyArrayOk above: a key that
 // does match the element type covers every element, and this must stay
 // accepted -- it is what keeps the repair from reading every type key as
-// covering nothing.
+// covering nothing. §6.22.1 has `byte` match `bit signed [7:0]`, a 2-state
+// signed vector of its width over [7:0].
 TEST(ArrayLiteralElaboration, TypeKeyMatchingTheElementTypeCoversTheArray) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
-             "  logic [7:0] arr[0:2] = '{logic: 8'h05};\n"
+             "  logic arr[0:2] = '{logic: 1'b1};\n"
+             "  bit signed [7:0] brr[0:1] = '{byte: 8'h05};\n"
              "endmodule\n"));
 }
 
@@ -333,7 +335,7 @@ TEST(ArrayLiteralElaboration, TypeKeyMatchingTheElementTypeCoversTheArray) {
 TEST(ArrayLiteralElaboration, TypeKeyCoversEveryDimensionOfAMultidimArray) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
-             "  logic [7:0] d[0:1][0:1] = '{logic: 8'h05};\n"
+             "  int d[0:1][0:1] = '{int: 5};\n"
              "endmodule\n"));
 }
 

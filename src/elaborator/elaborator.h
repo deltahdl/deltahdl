@@ -259,6 +259,8 @@ class Elaborator : public ElaboratorClassRules {
                                RtlirVariable& var);
   void ElaborateContAssign(ModuleItem* item, RtlirModule* mod);
   void ValidateGeneratedItem(const ModuleItem* item);
+  void ReportProceduralNetTargets(
+      const std::unordered_map<std::string_view, SourceLoc>& targets);
   void RecordGateOutputDrivers(const ModuleItem* item);
   bool ValidateContAssignLeaves(ModuleItem* item, RtlirModule* mod,
                                 const std::vector<ContTargetLeaf>& leaves);

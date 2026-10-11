@@ -645,28 +645,30 @@ static bool IsBodyTypeParam(const ModuleDecl* decl, std::string_view pname) {
 // declares with unpacked dimensions, in its parameter port list or among its
 // items: §6.20.1 (printed page 124) makes such a parameter's value an array,
 // written as an assignment pattern.
-// §10.8 (printed page 259): an instance's override of a parameter declared
-// with an explicit type is an assignment-like context, so a pattern there takes
-// the parameter's type -- an array the declaration's own dimensions make, or a
-// structure, a union or a typedef the type names.
-static bool IsAggregateParamType(const DataType& type) {
-  return type.kind == DataTypeKind::kStruct ||
-         type.kind == DataTypeKind::kUnion || type.kind == DataTypeKind::kNamed;
-}
-
 static bool IsArrayParamPattern(const ModuleDecl* decl, std::string_view pname,
                                 const Expr* pexpr) {
   if (pexpr == nullptr || pexpr->kind != ExprKind::kAssignmentPattern)
     return false;
   if (decl->param_port_unpacked_dims.count(pname) > 0) return true;
-  size_t ports = std::min(decl->params.size(), decl->param_types.size());
-  for (size_t i = 0; i < ports; ++i) {
-    if (decl->params[i].first == pname)
-      return IsAggregateParamType(decl->param_types[i]);
-  }
   const ModuleItem* item = BodyParamDecl(decl, pname);
-  return item != nullptr && (!item->unpacked_dims.empty() ||
-                             IsAggregateParamType(item->data_type));
+  return item != nullptr && !item->unpacked_dims.empty();
+}
+
+// The type a parameter of `decl` is declared with where that is a structure,
+// a union or a typedef name, or null.
+static const DataType* AggregateParamType(const ModuleDecl* decl,
+                                          std::string_view pname) {
+  const DataType* type = nullptr;
+  size_t ports = std::min(decl->params.size(), decl->param_types.size());
+  for (size_t i = 0; i < ports; ++i)
+    if (decl->params[i].first == pname) type = &decl->param_types[i];
+  if (const ModuleItem* item = BodyParamDecl(decl, pname))
+    type = &item->data_type;
+  if (type == nullptr) return nullptr;
+  bool aggregate = type->kind == DataTypeKind::kStruct ||
+                   type->kind == DataTypeKind::kUnion ||
+                   type->kind == DataTypeKind::kNamed;
+  return aggregate ? type : nullptr;
 }
 
 // The value of an assignment to a body type parameter is a type, which no
@@ -685,6 +687,19 @@ void PushInstParamAssignment(const ModuleDecl* child_decl,
   if (IsBodyTypeParam(child_decl, pname) ||
       IsArrayParamPattern(child_decl, pname, pexpr)) {
     child_params.push_back({pname, 0, pexpr});
+    return;
+  }
+  // §10.8 (printed page 259): an override of a parameter declared with an
+  // explicit type is an assignment-like context, so a pattern there takes the
+  // parameter's type -- a structure's or a union's, written inline or through
+  // a typedef -- and is folded at that type rather than dropped unfolded.
+  const DataType* aggregate =
+      pexpr != nullptr && pexpr->kind == ExprKind::kAssignmentPattern
+          ? AggregateParamType(child_decl, pname)
+          : nullptr;
+  if (aggregate != nullptr) {
+    if (auto val = FoldDeclaredParamValue(pexpr, *aggregate, parent_scope))
+      child_params.push_back({pname, *val, pexpr});
     return;
   }
   if (auto real = RealOverrideValue(pexpr, parent_scope)) {
