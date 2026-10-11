@@ -78,10 +78,13 @@ static void WriteOwnedBits(Variable* var, const Logic4Vec& val,
     if (spec.forced) var->forced_value = sized;
     var->value = sized;
   } else {
+    // §10.7: a select's value is sized to the select as the whole one is to
+    // the variable, a signed value sign-extended; deposited as evaluated,
+    // `force bus[7:4] = 2'sb11` left bus[7:6] zero.
     Logic4Vec updated = ExtractBitField(arena, var->value, 0, var->value.width);
     DepositBitField(updated, spec.window.dst_lo,
                     spec.window.src_width == 0
-                        ? val
+                        ? ResizeToWidth(val, spec.window.dst_width, arena)
                         : ExtractBitField(arena, val, spec.window.src_lo,
                                           spec.window.src_width),
                     spec.window.dst_width);

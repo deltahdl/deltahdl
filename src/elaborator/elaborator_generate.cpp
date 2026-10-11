@@ -58,6 +58,8 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   // ItemElaborationStateSaver::Restore took them out of declared_names_.
   auto saved_declared_names = std::move(declared_names_);
   declared_names_ = std::move(module_declared_names_[pg.mod]);
+  auto saved_net_names = std::move(net_names_);
+  net_names_ = std::move(module_net_names_[pg.mod]);
   // §11.5.1 addresses a select on a parameter over the range that parameter
   // was declared with, and §6.16 gives a string parameter characters a
   // concatenation and §6.16.1's len() read back. Both answer from the module
@@ -173,6 +175,8 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   // reference taken before that would dangle.
   module_declared_names_[pg.mod] = std::move(declared_names_);
   declared_names_ = std::move(saved_declared_names);
+  module_net_names_[pg.mod] = std::move(net_names_);
+  net_names_ = std::move(saved_net_names);
 }
 
 // Stamp one generate block instance's loop-index values and name prefix onto

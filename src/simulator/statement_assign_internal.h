@@ -271,14 +271,19 @@ void DistributeConcatToArray(std::string_view arr_name, const ArrayInfo& info,
 // is an assignment-like context, so braces standing as the item for a
 // subarray of a multidimensional array are an unpacked array concatenation
 // giving that subarray its elements: an array item contributes each of its
-// elements, and a count unlike the subarray's is an error. `prefix` names the
-// subarray of `info`'s array whose dimensions run from `d`. Read as a nested
+// elements, and a count unlike the subarray's is an error. Read as a nested
 // positional pattern, `'{{A}, {3, 4}}` took A as one value and left the rest
 // of the row at 0. Defined in statement_assign_concat.cpp.
-void DistributeConcatToSubarray(const std::string& prefix,
-                                const ArrayInfo& info, size_t d,
-                                const Expr* concat, SimContext& ctx,
-                                Arena& arena);
+//
+// A subarray of a multidimensional array: `prefix` names it within `info`'s
+// array, and its dimensions run from `dim`.
+struct SubarrayRef {
+  const ArrayInfo& info;
+  const std::string& prefix;
+  size_t dim;
+};
+void DistributeConcatToSubarray(const SubarrayRef& sub, const Expr* concat,
+                                SimContext& ctx, Arena& arena);
 
 // Defined in statement_assign_concat.cpp; also used by the §11.4.14 streaming
 // unpack in statement_assign_stream.cpp, which sizes a target element that is a

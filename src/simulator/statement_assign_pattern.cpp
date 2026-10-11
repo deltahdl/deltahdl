@@ -200,12 +200,8 @@ static void DistributeDimPattern(const PatternDist& pd,
   // §11.5.2 addresses this dimension from its smaller bound and §10.9.1 counts
   // the pattern's positional items from its left bound, which are the same
   // bound only when the dimension ascends. `i` is therefore the address offset
-  // alone, and a descending dimension takes its position the other way round --
-  // what the single-dimension arm below already does through its own idx, and
-  // what the declaration path (CreateMultiDimLeaves in lowerer_var.cpp) was
-  // fixed to do first. Until now this walk passed `i` as both, so
-  // `int a[2:1][1:3] = '{...}` and the same pattern assigned to a `b` of that
-  // shape held the rows in opposite orders; that gap closes here.
+  // alone, and a descending dimension takes its position the other way round,
+  // as the declaration path (CreateMultiDimLeaves in lowerer_var.cpp) does.
   bool descending = pd.info.dim_descending[d];
   for (uint32_t i = 0; i < size; ++i) {
     std::string child = prefix + "[" + std::to_string(lo + i) + "]";
@@ -215,7 +211,8 @@ static void DistributeDimPattern(const PatternDist& pd,
     if (last)
       WriteLeaf(pd, child, sub);
     else if (sub && sub->kind == ExprKind::kConcatenation)
-      DistributeConcatToSubarray(child, pd.info, d + 1, sub, pd.ctx, pd.arena);
+      DistributeConcatToSubarray({pd.info, child, d + 1}, sub, pd.ctx,
+                                 pd.arena);
     else if (is_pattern)
       DistributeDimPattern(pd, child, d + 1, sub);
     else
@@ -328,22 +325,26 @@ static void CollectArrayLeaves(std::string_view name, const ArrayInfo& ai,
   }
 }
 
+// The elements an item naming a fixed-size array or a queue contributes,
+// appended to `out`; false for an item naming neither.
+static bool CollectNamedArrayElements(const Expr* item, SimContext& ctx,
+                                      std::vector<Logic4Vec>& out) {
+  if (item->kind != ExprKind::kIdentifier) return false;
+  if (auto* ai = ctx.FindArrayInfo(item->text)) {
+    CollectArrayLeaves(item->text, *ai, ctx, out);
+    return true;
+  }
+  auto* q = ctx.FindQueue(item->text);
+  if (q == nullptr) return false;
+  out.insert(out.end(), q->elements.begin(), q->elements.end());
+  return true;
+}
+
 std::vector<Logic4Vec> CollectConcatElements(const Expr* rhs, SimContext& ctx,
                                              Arena& arena) {
   std::vector<Logic4Vec> elems;
   for (auto* item : rhs->elements) {
-    if (item->kind == ExprKind::kIdentifier) {
-      auto* ai = ctx.FindArrayInfo(item->text);
-      if (ai) {
-        CollectArrayLeaves(item->text, *ai, ctx, elems);
-        continue;
-      }
-      auto* q = ctx.FindQueue(item->text);
-      if (q) {
-        elems.insert(elems.end(), q->elements.begin(), q->elements.end());
-        continue;
-      }
-    }
+    if (CollectNamedArrayElements(item, ctx, elems)) continue;
     if (const Expr* pat = AsArrayConcatPattern(item, ctx)) {
       for (auto* elem : pat->elements) {
         elems.push_back(EvalExpr(elem, ctx, arena));

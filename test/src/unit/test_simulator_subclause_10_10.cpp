@@ -174,7 +174,7 @@ TEST(UnpackedArrayConcatSim, EmptyConcatToFixedSizeError) {
     f.ctx.CreateVariable("A[" + std::to_string(i) + "]", 32);
   auto* rhs = MakeConcat(f.arena, {});
   auto* stmt = MakeAssign(f.arena, "A", rhs);
-  TryArrayBlockingAssign(stmt, f.ctx, f.arena);
+  TryArrayAggregateAssign(stmt, f.ctx, f.arena);
   // The concatenation is built in the arena rather than parsed, so the report
   // carries the default location of line 0.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),

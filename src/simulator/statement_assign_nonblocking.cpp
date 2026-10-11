@@ -176,6 +176,46 @@ static uint64_t IntraAssignDelayTicks(const Stmt* stmt, SimContext& ctx,
   return DelayValueToTicks(EvalExpr(stmt->delay, ctx, arena), ctx);
 }
 
+// §10.4.2 evaluates the right-hand side of a nonblocking assignment when the
+// statement executes, so the elements are collected here and the event
+// installs the value they made. A right-hand side naming the target queue
+// therefore reads what the queue held at execution, as §7.10.4's `q = q[1:$]`
+// requires.
+static std::vector<Logic4Vec> SampleConcatNbaElements(const Stmt* stmt,
+                                                      bool fixed_target,
+                                                      SimContext& ctx,
+                                                      Arena& arena) {
+  std::vector<Logic4Vec> elems;
+  if (fixed_target) {
+    elems = CollectConcatElements(stmt->rhs, ctx, arena);
+  } else {
+    CollectQueueElements(stmt->rhs, ctx, arena, elems);
+  }
+  SampleConcatElements(elems, arena);
+  return elems;
+}
+
+// The update installing `elems` as the queue `q`'s elements.
+static void ScheduleQueueConcatNba(QueueObject* q, const Stmt* stmt,
+                                   std::vector<Logic4Vec> elems,
+                                   const NbaScheduleSlot& slot) {
+  SimContext& ctx = slot.ctx;
+  auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+  event->kind = EventKind::kUpdate;
+  event->callback = [q, &ctx, loc = stmt->rhs->range.start,
+                     elems = std::move(elems)]() {
+    q->elements = elems;
+    EnforceQueueBound(q, "nonblocking assignment", loc, ctx);
+    // §7.10.3: assigning the queue variable outdates every reference to the
+    // elements it held. Fresh ids do that, where clearing the list would also
+    // stop the queue recording a reference taken after the assignment, which
+    // the subclause outdates nothing of.
+    q->AssignFreshIds();
+    ++q->generation;
+  };
+  ctx.GetScheduler().ScheduleEvent(slot.time, slot.region, event);
+}
+
 static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier || !stmt->rhs)
     return false;
@@ -190,19 +230,8 @@ static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (ainfo && stmt->rhs->kind != ExprKind::kConcatenation) return false;
   if (q && !IsQueueValuedRhs(stmt->rhs, ctx)) return false;
 
-  // §10.4.2 evaluates the right-hand side of a nonblocking assignment when the
-  // statement executes, so the elements are collected here and the event
-  // installs the value they made. A right-hand side naming the target queue
-  // therefore reads what the queue held at execution, as §7.10.4's `q = q[1:$]`
-  // requires.
-  std::vector<Logic4Vec> elems;
-  if (ainfo) {
-    elems = CollectConcatElements(stmt->rhs, ctx, arena);
-  } else {
-    CollectQueueElements(stmt->rhs, ctx, arena, elems);
-  }
-  SampleConcatElements(elems, arena);
-
+  std::vector<Logic4Vec> elems =
+      SampleConcatNbaElements(stmt, ainfo != nullptr, ctx, arena);
   const uint64_t kDelay = IntraAssignDelayTicks(stmt, ctx, arena);
   if (!UpdateTimeReachable(kDelay, ctx)) return true;
   auto nba_region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
@@ -212,21 +241,7 @@ static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (ainfo) {
     ScheduleArrayConcatNbaElements(stmt, ainfo, elems, slot);
   } else {
-    auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-
-    event->kind = EventKind::kUpdate;
-    event->callback = [q, &ctx, loc = stmt->rhs->range.start,
-                       elems = std::move(elems)]() {
-      q->elements = elems;
-      EnforceQueueBound(q, "nonblocking assignment", loc, ctx);
-      // §7.10.3: assigning the queue variable outdates every reference to the
-      // elements it held. Fresh ids do that, where clearing the list would also
-      // stop the queue recording a reference taken after the assignment, which
-      // the subclause outdates nothing of.
-      q->AssignFreshIds();
-      ++q->generation;
-    };
-    ctx.GetScheduler().ScheduleEvent(slot.time, slot.region, event);
+    ScheduleQueueConcatNba(q, stmt, std::move(elems), slot);
   }
   return true;
 }
@@ -395,6 +410,47 @@ static void SetupWholeVarNbaCallback(Event* event, Variable* var,
 // as each would be standing alone. Unpacking the whole value in the update
 // region resolved a member access, `{h.f, b}` or `{arr[i].f, b}`, against the
 // handle or the index as it stood then.
+namespace {
+using LhsWriter = void (*)(const Expr*, const Logic4Vec&, SimContext&, Arena&);
+struct DeferredLhsWrite {
+  const Expr* lhs;
+  Logic4Vec value;
+  LhsWriter write;
+};
+}  // namespace
+
+// §10.4.2: an update performed in the NBA region by `w.write`, with every
+// index of the target pinned to its value where the statement executed.
+static void ScheduleDeferredLhsWrite(const DeferredLhsWrite& w,
+                                     uint64_t delay_ticks, SimContext& ctx,
+                                     Arena& arena) {
+  auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+  event->kind = EventKind::kUpdate;
+  auto snaps = CollectLhsIndexSnapshots(w.lhs, ctx, arena);
+  event->callback = [w, snaps, &ctx, &arena]() {
+    InstallLhsIndexSnapshots(snaps, ctx);
+    w.write(w.lhs, w.value, ctx, arena);
+    ClearLhsIndexSnapshots(snaps, ctx);
+  };
+  ScheduleNbaEvent(event, delay_ticks, ctx);
+}
+
+static void ScheduleStreamingConcatNba(const Stmt* stmt,
+                                       const Logic4Vec& rhs_val,
+                                       uint64_t delay_ticks, SimContext& ctx,
+                                       Arena& arena) {
+  ScheduleDeferredLhsWrite({stmt->lhs, rhs_val, UnpackStreamingConcatLhs},
+                           delay_ticks, ctx, arena);
+}
+
+// A member of an element an index selects, `arr[i].f`, which the nonblocking
+// field path resolves no storage for; its write is the blocking one, deferred
+// with the index pinned.
+static bool NamesSelectedElementMember(const Expr* el) {
+  return el->kind == ExprKind::kMemberAccess && el->lhs != nullptr &&
+         el->lhs->kind == ExprKind::kSelect;
+}
+
 static void ScheduleConcatNba(const Stmt* stmt, const Logic4Vec& rhs_val,
                               uint64_t delay_ticks, SimContext& ctx,
                               Arena& arena) {
@@ -407,29 +463,18 @@ static void ScheduleConcatNba(const Stmt* stmt, const Logic4Vec& rhs_val,
       ReportZeroWidthPartSelect(el, ctx, arena);
       continue;
     }
-    auto* el_stmt = arena.Create<Stmt>(*stmt);
-    el_stmt->lhs = el;
     NbaSample part;
     part.value = ExtractBitField(arena, rhs_val, bit_offset, width);
     bit_offset += width;
+    if (NamesSelectedElementMember(el)) {
+      ScheduleDeferredLhsWrite({el, part.value, PerformBlockingAssign},
+                               delay_ticks, ctx, arena);
+      continue;
+    }
+    auto* el_stmt = arena.Create<Stmt>(*stmt);
+    el_stmt->lhs = el;
     ScheduleNonblockingAssign(el_stmt, part, delay_ticks, ctx, arena);
   }
-}
-
-static void ScheduleStreamingConcatNba(const Stmt* stmt,
-                                       const Logic4Vec& rhs_val,
-                                       uint64_t delay_ticks, SimContext& ctx,
-                                       Arena& arena) {
-  auto* stream_event = ctx.GetScheduler().GetEventPool().Acquire();
-  stream_event->kind = EventKind::kUpdate;
-  const Expr* lhs = stmt->lhs;
-  auto snaps = CollectLhsIndexSnapshots(lhs, ctx, arena);
-  stream_event->callback = [lhs, rhs_val, snaps, &ctx, &arena]() {
-    InstallLhsIndexSnapshots(snaps, ctx);
-    UnpackStreamingConcatLhs(lhs, rhs_val, ctx, arena);
-    ClearLhsIndexSnapshots(snaps, ctx);
-  };
-  ScheduleNbaEvent(stream_event, delay_ticks, ctx);
 }
 
 // §11.5.1: install the deferred update that deposits the sampled right-hand

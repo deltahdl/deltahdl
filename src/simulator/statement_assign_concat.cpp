@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -486,12 +487,10 @@ static void AppendSubarrayLeafNames(const std::string& prefix,
   }
 }
 
-void DistributeConcatToSubarray(const std::string& prefix,
-                                const ArrayInfo& info, size_t d,
-                                const Expr* concat, SimContext& ctx,
-                                Arena& arena) {
+void DistributeConcatToSubarray(const SubarrayRef& sub, const Expr* concat,
+                                SimContext& ctx, Arena& arena) {
   std::vector<std::string> leaves;
-  AppendSubarrayLeafNames(prefix, info, d, leaves);
+  AppendSubarrayLeafNames(sub.prefix, sub.info, sub.dim, leaves);
   std::vector<Logic4Vec> elems = CollectConcatElements(concat, ctx, arena);
   if (elems.size() != leaves.size()) {
     ctx.GetDiag().Error(
@@ -505,7 +504,7 @@ void DistributeConcatToSubarray(const std::string& prefix,
   for (size_t i = 0; i < leaves.size(); ++i) {
     Variable* leaf = ctx.FindVariable(leaves[i]);
     leaf->value =
-        OwnRhsWords(ResizeToWidth(elems[i], info.elem_width, arena), arena);
+        OwnRhsWords(ResizeToWidth(elems[i], sub.info.elem_width, arena), arena);
     leaf->NotifyWatchers();
   }
 }

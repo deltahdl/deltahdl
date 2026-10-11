@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -18,6 +19,7 @@
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/struct_string_member.h"
+#include "simulator/variable.h"
 
 // §10.9.2's structure assignment patterns, and the packed array patterns that
 // share their placement of a value at a member's bits.
@@ -271,13 +273,32 @@ struct TypeAndDefaultKeys {
 };
 }  // namespace
 
+// The name of the type a structure layout registered as `name` is of. A
+// variable's own layout is registered under the variable's name
+// (RegisterAggregateLayout), which stands for the type its declaration wrote,
+// spelled as a member's layout spells it, "scope::name" for a scoped one; any
+// other registration is under the type's name. Taken as the type, a variable's
+// registration matched no member's, so `'{default: pv}` spread pv over a
+// member of pv's own type.
+static std::string_view LayoutTypeName(std::string_view name, SimContext& ctx) {
+  const Variable* var = ctx.FindVariable(name);
+  if (var == nullptr || var->declared_type == nullptr ||
+      var->declared_type->type_name.empty())
+    return name;
+  const DataType* t = var->declared_type;
+  if (t->scope_name.empty()) return t->type_name;
+  return *ctx.GetArena().Create<std::string>(std::string(t->scope_name) +
+                                             "::" + std::string(t->type_name));
+}
+
 // The name of the structure type `value` has as a variable of one, which a
 // default value carries whole onto a member of that type; empty for any other
 // expression.
 static std::string_view StructTypeOfValue(const Expr* value, SimContext& ctx) {
   if (value->kind != ExprKind::kIdentifier) return {};
   const StructTypeInfo* layout = ctx.GetVariableStructType(value->text);
-  return layout != nullptr ? layout->type_name : std::string_view{};
+  return layout != nullptr ? LayoutTypeName(layout->type_name, ctx)
+                           : std::string_view{};
 }
 
 static TypeAndDefaultKeys CollectTypeAndDefaultKeys(const Expr* expr,
@@ -385,7 +406,8 @@ Logic4Vec EvalDefaultForElement(const Expr* value, const StructTypeInfo* layout,
                                 SimContext& ctx, Arena& arena) {
   std::string_view value_type = StructTypeOfValue(value, ctx);
   if (layout == nullptr ||
-      (!value_type.empty() && value_type == layout->type_name)) {
+      (!value_type.empty() &&
+       value_type == LayoutTypeName(layout->type_name, ctx))) {
     return EvalExpr(value, ctx, arena);
   }
   auto* key = arena.Create<Expr>();

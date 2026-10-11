@@ -121,6 +121,11 @@ static void CollectLhsIndexSnapshotsInto(const Expr* lhs, IndexWalk& walk) {
     case ExprKind::kStreamingConcat:
       CollectElementIndices(target, walk);
       break;
+    // §10.4.1: the indices of the element a member is selected from, `i` of
+    // `arr[i].f`, are the target's own.
+    case ExprKind::kMemberAccess:
+      CollectLhsIndexSnapshotsInto(target->lhs, walk);
+      break;
     default:
       break;
   }

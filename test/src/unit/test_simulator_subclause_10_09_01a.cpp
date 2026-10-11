@@ -569,7 +569,9 @@ TEST(ArrayLiteralSim, MultidimensionalLeafVariableIsCopiedNotAliased) {
 // `p` with arr[0] and the default fills arr[1], so arr[0] has to hold the 8'h96
 // standing in `p` at that moment; `p` afterwards reads 8'h46, and an arr[0]
 // reading 8'h46 has been carried along by the deposit into `p.hi` rather than
-// holding a value of its own.
+// holding a value of its own. The default, of no structure type, is applied
+// to the structure element arr[1] member by member, each four-bit member
+// taking 4'hF.
 TEST(ArrayLiteralSim, IndexKeyedVariableIsCopiedNotAliased) {
   SimFixture f;
   auto* e0 = RunAndFindVar(
@@ -591,7 +593,7 @@ TEST(ArrayLiteralSim, IndexKeyedVariableIsCopiedNotAliased) {
   EXPECT_EQ(vp->value.ToUint64(), 0x46u);
   auto* e1 = f.ctx.FindVariable("arr[1]");
   ASSERT_NE(e1, nullptr);
-  EXPECT_EQ(e1->value.ToUint64(), 0x0Fu);
+  EXPECT_EQ(e1->value.ToUint64(), 0xFFu);
 }
 
 // The six leaf pointers of a [1:2][1:3] unpacked array, the shape §10.9.1's own
