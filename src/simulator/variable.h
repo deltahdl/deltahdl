@@ -270,11 +270,9 @@ struct Variable {
   // §10.6.2: whether a force holds bit `bit` of this variable. A force naming
   // the whole object holds every bit of it, which is what the empty window
   // says; a force naming a select of a vector net holds the bits it named, and
-  // a driver of any other bit is overridden by nothing. A force that recorded
-  // no part, as one set on the flag alone does, holds the whole object.
+  // a driver of any other bit is overridden by nothing.
   bool BitIsForced(uint32_t bit) const {
     if (!is_forced) return false;
-    if (held_parts.empty()) return true;
     return std::ranges::any_of(held_parts, [bit](const HeldPart& part) {
       return part.window.dst_width == 0 ||
              (bit >= part.window.dst_lo &&
