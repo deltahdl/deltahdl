@@ -802,7 +802,7 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
   // for the module holds: §14.14 rule b) can give two instances of that module
   // different events, and a rewrite made on `item` would give both whichever
   // instance was elaborated first.
-  const ProcessBuildEnv kEnv{arena_, diag_, &func_decls_, &const_names_,
+  const ProcessBuildEnv kEnv{arena_, diag_, &inference_funcs_, &const_names_,
                              module_global_clocking_event_};
   // §16.4.3: a module-item deferred immediate assertion is a static deferred
   // assertion, modeled as an implicit always_comb procedure.

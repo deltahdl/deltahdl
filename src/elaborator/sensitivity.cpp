@@ -772,7 +772,7 @@ void AddScopedCallFunctions(const Stmt* body, const ScopedCallSite& site,
     if (key.find('.') == std::string::npos) {
       EnterClassOfKey(key, site, arena, calls);
       auto it = calls.funcs.find(key);
-      return it == calls.funcs.end() ? FoundFunction{} : *it;
+      return it == calls.funcs.end() ? FoundFunction{} : FoundFunction(*it);
     }
     const ModuleItem* func = FunctionOfPath(key, site);
     if (func == nullptr) return {};
