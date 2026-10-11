@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <cstring>
 #include <functional>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -197,6 +198,16 @@ static bool IsQueueValuedRhs(const Expr* rhs, SimContext& ctx) {
          ctx.FindQueue(rhs->base->text) != nullptr;
 }
 
+// §9.4.5 with §9.4.1: whether an update `delay_ticks` after the present lies
+// within the times the simulation can reach. A negative intra-assignment delay
+// is an unsigned time value and may put the update past the last of them, in
+// which case it is never made; added to the present as it is, its time
+// wrapped to one before it, which the scheduler refuses.
+static bool UpdateTimeReachable(uint64_t delay_ticks, const SimContext& ctx) {
+  return delay_ticks <=
+         std::numeric_limits<uint64_t>::max() - ctx.CurrentTime().ticks;
+}
+
 static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier || !stmt->rhs)
     return false;
@@ -224,6 +235,7 @@ static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (stmt->delay) {
     delay = DelayValueToTicks(EvalExpr(stmt->delay, ctx, arena), ctx);
   }
+  if (!UpdateTimeReachable(delay, ctx)) return true;
   auto nba_region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
   NbaScheduleSlot slot{ctx.CurrentTime() + SimTime{delay}, nba_region, ctx,
                        arena};
@@ -343,6 +355,7 @@ StmtResult ExecNonblockingAssignImpl(const Stmt* stmt, SimContext& ctx,
   if (stmt->delay) {
     delay = DelayValueToTicks(EvalExpr(stmt->delay, ctx, arena), ctx);
   }
+  if (!UpdateTimeReachable(delay, ctx)) return StmtResult::kDone;
   ScheduleNonblockingAssign(stmt, sample, delay, ctx, arena);
   return StmtResult::kDone;
 }

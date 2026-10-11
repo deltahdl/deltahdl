@@ -629,4 +629,22 @@ TEST(IntraAssignTimingSimulation, RepeatCountsEdgesAnotherProcessWatches) {
             "a=3 15\n");
 }
 
+// §9.4.5 with §9.4.1: a negative intra-assignment delay is an unsigned time
+// value, so taken at time 5 a nonblocking update it delays lies past the last
+// time the simulation reaches and is never made, for a variable and for an
+// unpacked array assigned a concatenation alike; the simulation goes on.
+TEST(IntraAssignTimingSimulation, ANegativeNonblockingDelayNeverUpdates) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t; int d; logic [7:0] x; int arr[2];\n"
+                       "  initial begin\n"
+                       "    #5 d = -1;\n"
+                       "    x <= #(d) 8'd99;\n"
+                       "    arr <= #(d) {1, 2};\n"
+                       "  end\n"
+                       "  initial #10 $display(\"x=%h arr=%0d\", x, arr[0]);\n"
+                       "endmodule\n",
+                       f),
+            "x=xx arr=0\n");
+}
+
 }  // namespace
