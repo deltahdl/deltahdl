@@ -553,13 +553,13 @@ static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
   // §8.11 (printed page 187): in a method, the handle is the innermost
   // scope's and hides a property of its name; made design-wide instead, a
   // task's `O d; d = new;` wrote the property d.
-  Variable* handle = CreateVarInScope(stmt->var_name, 64, false, ctx);
+  Variable* handle_var = CreateVarInScope(stmt->var_name, 64, false, ctx);
   // §6.21: a static handle is kept in its static frame, where the next
   // execution of the declaration finds it (TryReuseKeptStaticLocal).
   std::string_view func_name = ctx.CurrentFuncName();
   if (IsEffectivelyStaticLocal(stmt, func_name, ctx)) {
     ctx.SaveStaticFuncVar(StaticFrameOf(stmt, func_name, ctx), stmt->var_name,
-                          handle);
+                          handle_var);
   }
   ctx.SetVariableClassType(stmt->var_name, class_type);
 
