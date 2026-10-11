@@ -324,9 +324,11 @@ DataType Parser::ParseNamedType() {
   // (e.g. `mynet #5 x;`), not a parameter value assignment. Leave the `#` for
   // the net-delay parse in ParseVarDeclList; only a non-nettype named type
   // (e.g. a parameterized class `C#(...)`) consumes `#(` as type parameters.
+  bool assignment_written = false;
   if (Check(TokenKind::kHash) && known_nettypes_.count(dtype.type_name) == 0) {
     Consume();
     dtype.type_params = ParseTypeParamList();
+    assignment_written = true;
   }
 
   while (Check(TokenKind::kColonColon)) {
@@ -337,8 +339,10 @@ DataType Parser::ParseNamedType() {
       break;
     }
     dtype.scope_name = dtype.type_name;
+    dtype.scope_param_assignment_written = assignment_written;
     dtype.type_name = Consume().text;
-    if (Check(TokenKind::kHash)) {
+    assignment_written = Check(TokenKind::kHash);
+    if (assignment_written) {
       Consume();
       dtype.type_params = ParseTypeParamList();
     }

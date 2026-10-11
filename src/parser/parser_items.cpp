@@ -813,7 +813,8 @@ void Parser::ParseScopedTypeOrInst(const Token& name_tok,
   DataType dtype = MakeScopedNamedType(name_tok.text, type_tok.text);
   // Parses the trailing `# (...)` parameter assignments of a scoped named type
   // (e.g. `pkg :: t #(...)`) onto the data type, if present.
-  if (Check(TokenKind::kHash)) {
+  bool assignment_written = Check(TokenKind::kHash);
+  if (assignment_written) {
     Consume();
     dtype.type_params = ParseTypeParamList();
   }
@@ -830,9 +831,11 @@ void Parser::ParseScopedTypeOrInst(const Token& name_tok,
       break;
     }
     dtype.scope_name = dtype.type_name;
+    dtype.scope_param_assignment_written = assignment_written;
     dtype.type_name = Consume().text;
     dtype.type_params.clear();
-    if (Check(TokenKind::kHash)) {
+    assignment_written = Check(TokenKind::kHash);
+    if (assignment_written) {
       Consume();
       dtype.type_params = ParseTypeParamList();
     }

@@ -433,4 +433,45 @@ TEST(ParameterizedScopeResolutionElaboration,
   }
 }
 
+// §8.25.1 holds a data type written behind the class scope operator to the
+// rule an expression is held to: outside the parameterized class, the classes
+// nested in it and its out-of-block declarations, C::T is illegal and
+// C#()::T or another specialization is required. The declarations are a
+// package's typedef, another class's property and argument, a module's
+// variable and a block's.
+TEST(ParameterizedScopeResolutionElaboration,
+     ATypeBehindAnUnadornedPrefixOutsideTheClassIsAnError) {
+  ElabFixture f;
+  ElabOk(
+      "class C #(int p = 1);\n"
+      "  typedef int T;\n"
+      "  C::T own;\n"
+      "  class N; C::T n; endclass\n"
+      "  extern function C::T f(C::T a);\n"
+      "endclass\n"
+      "function C::T C::f(C::T a); return a; endfunction\n"
+      "package q; typedef C::T qt; endpackage\n"
+      "class D;\n"
+      "  C::T d;\n"
+      "  function void g(C::T a); endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C::T x;\n"
+      "  C#()::T y;\n"
+      "  C#(3)::T z;\n"
+      "  initial begin C::T b; end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  const char* const kMessage =
+      "unadorned name 'C' used as scope resolution prefix for parameterized "
+      "class";
+  for (const int kLine : {8, 10, 11, 14, 17}) {
+    EXPECT_TRUE(ReportedError(diags, kMessage, kLine, "8.25.1")) << kLine;
+  }
+  for (const int kLine : {3, 4, 5, 7, 15, 16}) {
+    EXPECT_FALSE(ReportedError(diags, kMessage, kLine, "8.25.1")) << kLine;
+  }
+}
+
 }  // namespace

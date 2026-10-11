@@ -4,6 +4,7 @@
 #include <format>
 #include <initializer_list>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -34,17 +35,50 @@ std::string_view ParameterWithoutDefault(const ClassDecl& cls) {
 namespace {
 
 // Reports the declarations of one compilation unit that name a parameterized
-// class without arguments where it has no default specialization.
+// class without arguments where it has no default specialization, or write a
+// type behind its unadorned name where only a specialization may stand.
 class UnadornedUseWalk {
  public:
   UnadornedUseWalk(const CompilationUnit& unit, DiagEngine& diag)
-      : unit_(unit), diag_(diag) {}
+      : unit_(unit), diag_(diag) {
+    for (const ClassDecl* cls : AllClassDecls(&unit)) {
+      for (const ClassMember* m : cls->members) {
+        if (m->nested_class != nullptr) outer_[m->nested_class] = cls;
+      }
+    }
+  }
 
-  // The type `type` written at `loc`, unless `local` holds its name: a type
-  // parameter or typedef of the class the type is written in, which names no
-  // class of the scope around it.
+  // The type `type` written at `loc`, judged by both rules.
   void Type(const DataType& type, SourceLoc loc,
             const std::unordered_set<std::string_view>& local = {}) {
+    Prefix(type, loc);
+    Default(type, loc, local);
+  }
+
+  // §8.25.1: `type` written at `loc` behind the unadorned name of a
+  // parameterized class, C::T, where the explicit specialization C#()::T is
+  // required: anywhere but inside that class, the classes nested in it and
+  // its out-of-block declarations, the names inside_ holds.
+  void Prefix(const DataType& type, SourceLoc loc) {
+    if (type.scope_name.empty() || type.scope_param_assignment_written ||
+        inside_.contains(type.scope_name)) {
+      return;
+    }
+    const ClassDecl* cls = FindClassDecl(type.scope_name, &unit_);
+    if (cls == nullptr || cls->params.empty()) return;
+    diag_.Error(loc,
+                std::format("unadorned name '{}' used as scope resolution "
+                            "prefix for parameterized class; use explicit "
+                            "specialization '{}#(...)::' or '{}#()::'",
+                            cls->name, cls->name, cls->name),
+                Subclause("8.25.1"));
+  }
+
+  // §8.25: the type `type` written at `loc`, unless `local` holds its name: a
+  // type parameter or typedef of the class the type is written in, which names
+  // no class of the scope around it.
+  void Default(const DataType& type, SourceLoc loc,
+               const std::unordered_set<std::string_view>& local) {
     if (type.kind != DataTypeKind::kNamed || !type.type_params.empty() ||
         !type.scope_name.empty() || local.contains(type.type_name)) {
       return;
@@ -97,8 +131,13 @@ class UnadornedUseWalk {
     for (const ModuleItem* item : items) Item(*item, with_vars);
   }
 
-  // A class's base, properties, typedefs and methods.
+  // A class's base, properties, typedefs and methods, written inside it and
+  // inside each class it is nested in.
   void ClassBody(const ClassDecl& cls) {
+    inside_.clear();
+    for (const ClassDecl* c = &cls; c != nullptr; c = Outer(*c)) {
+      inside_.insert(c->name);
+    }
     if (!cls.base_class.empty() && cls.base_class_type_params.empty() &&
         cls.extends_args.empty() && !cls.extends_has_default) {
       Class(FindBaseClass(&cls, &unit_), cls.range.start);
@@ -116,17 +155,31 @@ class UnadornedUseWalk {
         Type(m->data_type, m->loc, local);
       }
     }
+    inside_.clear();
   }
 
  private:
+  // The class `cls` is nested in; null for one no class holds.
+  const ClassDecl* Outer(const ClassDecl& cls) const {
+    const auto kFound = outer_.find(&cls);
+    return kFound == outer_.end() ? nullptr : kFound->second;
+  }
+
   void Item(const ModuleItem& item, bool with_vars) {
-    if (item.kind == ModuleItemKind::kVarDecl && with_vars) {
-      Type(item.data_type, item.loc);
+    if (item.kind == ModuleItemKind::kVarDecl) {
+      if (with_vars) {
+        Type(item.data_type, item.loc);
+      } else {
+        Prefix(item.data_type, item.loc);
+      }
     } else if (item.kind == ModuleItemKind::kTypedef) {
       Type(item.typedef_type, item.loc);
     } else if (item.kind == ModuleItemKind::kFunctionDecl ||
                item.kind == ModuleItemKind::kTaskDecl) {
+      // §8.24: an out-of-block declaration is written inside its class.
+      if (!item.method_class.empty()) inside_.insert(item.method_class);
       Subroutine(item);
+      inside_.clear();
     }
     Statement(item.body);
     Items(item.gen_body, with_vars);
@@ -138,6 +191,10 @@ class UnadornedUseWalk {
 
   const CompilationUnit& unit_;
   DiagEngine& diag_;
+  // Each nested class's enclosing class (§8.23).
+  std::unordered_map<const ClassDecl*, const ClassDecl*> outer_;
+  // The names of the classes the declaration in hand is written inside.
+  std::unordered_set<std::string_view> inside_;
 };
 
 }  // namespace

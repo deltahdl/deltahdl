@@ -124,6 +124,10 @@ struct DataType {
   bool has_unsized_packed_dim = false;
   std::string_view type_name;
   std::string_view scope_name;
+  // §8.25.1: the class scope_name names was written with a
+  // parameter_value_assignment, even an empty one, `C#()::T`, which leaves
+  // type_params as empty as the unadorned `C::T` does.
+  bool scope_param_assignment_written = false;
   std::string_view modport_name;
   std::string_view enum_base_name;
 

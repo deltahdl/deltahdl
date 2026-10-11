@@ -23,6 +23,11 @@ std::string_view ParameterWithoutDefault(const ClassDecl& cls);
 // program or checker declares among its items is left to
 // Elaborator::ValidateVarDeclTypes, which judges it per instance, after a type
 // parameter written as its type has taken the instance's override.
+//
+// §8.25.1: reports too each of those declarations, module variables among
+// them, whose type is written behind a parameterized class's unadorned name,
+// C::T, outside that class, the classes nested in it and its out-of-block
+// declarations, where C#()::T or another specialization is required.
 void ReportUnadornedClassesWithoutDefaults(const CompilationUnit& unit,
                                            DiagEngine& diag);
 

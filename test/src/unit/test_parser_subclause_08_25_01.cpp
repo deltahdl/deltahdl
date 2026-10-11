@@ -1,8 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <map>
+#include <string_view>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 
@@ -214,6 +219,47 @@ TEST(ParameterizedScopeResolutionParsing, PlainKeywordTypeStaysAName) {
   ASSERT_EQ(scope->elements[0]->kind, ExprKind::kSelect);
   EXPECT_EQ(scope->elements[0]->base->kind, ExprKind::kIdentifier);
   EXPECT_EQ(scope->elements[0]->base->text, "logic");
+}
+
+// §8.25.1 tells C::T from C#()::T outside C, and both leave type_params
+// empty, so a declared type records whether the class it was written behind
+// was given a parameter_value_assignment, empty or not, on each path that
+// parses one: a module's declaration through the class or through its
+// package, and a declaration in a block.
+TEST(ParameterizedScopeResolutionParsing, ScopeAssignmentIsRecordedOnTheType) {
+  auto r = Parse(
+      "package p; class C #(int n = 1); typedef int T; endclass endpackage\n"
+      "class C #(int n = 1); typedef int T; endclass\n"
+      "module m;\n"
+      "  C::T a;\n"
+      "  C#()::T b;\n"
+      "  C#(3)::T c;\n"
+      "  p::C::T d;\n"
+      "  p::C#()::T e;\n"
+      "  initial begin C::T f; C#()::T g; end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  std::map<std::string_view, const DataType*> types;
+  for (const ModuleItem* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kVarDecl) {
+      types[item->name] = &item->data_type;
+    }
+  }
+  const Stmt* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  for (const Stmt* s : body->stmts) {
+    if (s->kind == StmtKind::kVarDecl) types[s->var_name] = &s->var_decl_type;
+  }
+  const std::map<std::string_view, bool> kWritten = {
+      {"a", false}, {"b", true},  {"c", true}, {"d", false},
+      {"e", true},  {"f", false}, {"g", true}};
+  for (const auto& [name, written] : kWritten) {
+    ASSERT_TRUE(types.contains(name)) << name;
+    EXPECT_EQ(types[name]->scope_name, "C") << name;
+    EXPECT_EQ(types[name]->type_name, "T") << name;
+    EXPECT_EQ(types[name]->scope_param_assignment_written, written) << name;
+  }
 }
 
 }  // namespace
