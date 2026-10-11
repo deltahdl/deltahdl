@@ -224,8 +224,16 @@ ClassDecl* Parser::ParseClassDecl() {
     Expect(TokenKind::kKwFinal, Subclause("8.13"));
     decl->is_final = true;
   }
-  Match(TokenKind::kKwAutomatic);
-  Match(TokenKind::kKwStatic);
+  // Syntax 8-1 gives a class no lifetime, so one written here is reported and
+  // passed over, and the class name after it is still read.
+  if (Check(TokenKind::kKwAutomatic) || Check(TokenKind::kKwStatic)) {
+    diag_.Error(CurrentLoc(),
+                std::format("a class declaration takes no lifetime; '{}' "
+                            "stands where its name belongs",
+                            CurrentToken().text),
+                Subclause("8.3"));
+    Consume();
+  }
   decl->name = Expect(TokenKind::kIdentifier, Subclause("8.3")).text;
   // §8.3 makes a class a type, so its own name is registered here, ahead of the
   // scope below, and is a type name wherever the declaration is written.

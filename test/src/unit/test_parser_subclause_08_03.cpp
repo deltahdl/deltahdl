@@ -33,4 +33,27 @@ TEST(ClassDeclaration, ClassItemWithOneAccessQualifierIsAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
+// Syntax 8-1 gives class_declaration no lifetime: `class` is followed by an
+// optional final_specifier and the class name. Each lifetime keyword written
+// there is reported at the keyword, and the class it stands in is still read,
+// so the name after it declares the class.
+TEST(ClassDeclaration, ALifetimeAfterClassIsReported) {
+  auto r = Parse(
+      "class automatic A; endclass\n"
+      "class static B; endclass\n"
+      "module m; A a; B b; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a class declaration takes no lifetime; "
+                            "'automatic' stands where its name belongs",
+                            1, "8.3"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a class declaration takes no lifetime; "
+                            "'static' stands where its name belongs",
+                            2, "8.3"));
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+  EXPECT_EQ(r.cu->classes[0]->name, "A");
+  EXPECT_EQ(r.cu->classes[1]->name, "B");
+}
+
 }  // namespace

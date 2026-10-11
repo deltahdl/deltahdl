@@ -522,6 +522,17 @@ bool Parser::TryParseInlineAggregateType(DataType& dt) {
   return false;
 }
 
+// §8.6 with §8.24: a body written `C::f` outside its class is the class's
+// method, which takes no static lifetime, as Parser::ValidateClassMethod
+// reports of one written in the class.
+static void RejectStaticOutOfBlockMethod(const ModuleItem* item,
+                                         DiagEngine& diag) {
+  if (item->is_static) {
+    diag.Error(item->loc, "class method shall not have static lifetime",
+               Subclause("8.6"));
+  }
+}
+
 void Parser::ParseFuncName(ModuleItem* item) {
   if (Check(TokenKind::kKwNew)) {
     item->name = "new";
@@ -552,6 +563,7 @@ void Parser::ParseFuncName(ModuleItem* item) {
                      ? "new"
                      : Expect(TokenKind::kIdentifier, Subclause("8.24")).text;
   }
+  if (!item->method_class.empty()) RejectStaticOutOfBlockMethod(item, diag_);
 
   if (Match(TokenKind::kDot)) {
     item->method_class = item->name;
@@ -643,10 +655,13 @@ ModuleItem* Parser::ParseTaskDecl(bool prototype_only) {
     item->name = Expect(TokenKind::kIdentifier, Subclause("25.7")).text;
   }
 
+  bool class_scoped = false;
   while (Match(TokenKind::kColonColon)) {
     item->method_class = item->name;
     item->name = Expect(TokenKind::kIdentifier, Subclause("8.24")).text;
+    class_scoped = true;
   }
+  if (class_scoped) RejectStaticOutOfBlockMethod(item, diag_);
   if (!item->method_class.empty())
     AdoptMethodClassTypeNames(item->method_class);
 

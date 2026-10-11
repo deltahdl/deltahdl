@@ -112,4 +112,29 @@ TEST(ObjectMethodParsing, TaskStaticLifetimeError) {
       r.diags, "class method shall not have static lifetime", 2, "8.6"));
 }
 
+// §8.24 lets a method's body be written outside its class, and that body is
+// the class's method, so §8.6 refuses it a static lifetime as it refuses one
+// written in the class. A task defined for an interface by a dotted name
+// (§25.7) is no class method and keeps the lifetime it is written with.
+TEST(ObjectMethodParsing, OutOfBlockStaticLifetimeIsReported) {
+  auto r = Parse(
+      "class C;\n"
+      "  extern function void f();\n"
+      "  extern task t();\n"
+      "endclass\n"
+      "function static void C::f(); endfunction\n"
+      "task static C::t(); endtask\n"
+      "function automatic void C::g(); endfunction\n"
+      "interface ifc; endinterface\n"
+      "task static ifc.u(); endtask\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "class method shall not have static lifetime", 5, "8.6"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "class method shall not have static lifetime", 6, "8.6"));
+  EXPECT_FALSE(ReportedError(
+      r.diags, "class method shall not have static lifetime", 7, "8.6"));
+  EXPECT_FALSE(ReportedError(
+      r.diags, "class method shall not have static lifetime", 9, "8.6"));
+}
+
 }  // namespace
