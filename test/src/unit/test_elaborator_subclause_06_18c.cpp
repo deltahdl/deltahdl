@@ -40,4 +40,25 @@ TEST(UserDefinedTypeElaboration, TypedefArrayIsNoElementForMemberChecks) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
+// A typedef of a class type writing unpacked dimensions declares an array of
+// handles (§7.4), so a variable of it has the array methods and its element,
+// one select in, is a handle whose members are those its class declares.
+TEST(UserDefinedTypeElaboration, ClassTypedefArrayIsAnArrayOfHandles) {
+  ElabFixture f;
+  ElabOk(
+      "class C; endclass\n"
+      "module m;\n"
+      "  typedef C ca_t [2];\n"
+      "  ca_t c;\n"
+      "  initial begin\n"
+      "    c.reverse();\n"
+      "    c[0].baz();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class 'C' has no member named 'baz'", 7, "8.6"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
 }  // namespace

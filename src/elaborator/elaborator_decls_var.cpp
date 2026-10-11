@@ -205,7 +205,8 @@ static void ResolveDeclaredTypeName(
   }
 }
 
-void Elaborator::ValidateVarDeclTypes(ModuleItem* item, const ScopeMap& scope) {
+void Elaborator::ValidateVarDeclTypes(ModuleItem* item, const ScopeMap& scope,
+                                      bool writes_its_type) {
   if (item->data_type.kind == DataTypeKind::kNamed &&
       class_names_.count(item->data_type.type_name)) {
     // §7.4 and §7.8: a declaration with an unpacked dimension, `C m[string]`
@@ -218,7 +219,7 @@ void Elaborator::ValidateVarDeclTypes(ModuleItem* item, const ScopeMap& scope) {
     ValidateSpecializationArgsConstant(item, scope, diag_);
     ValidateWeakReferenceTypeParam(item, typedefs_, class_names_, diag_);
   }
-  if (item->data_type.kind == DataTypeKind::kEnum) {
+  if (item->data_type.kind == DataTypeKind::kEnum && writes_its_type) {
     ValidateEnumDecl(item->data_type, item->loc, item->first_in_decl_list);
   }
   const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
@@ -837,6 +838,12 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   SpecializeClassScopedTypedef(item, unit_, BuildParamScope(mod), typedefs_,
                                arena_);
 
+  // §6.18: `ca_t c;` under `typedef C ca_t [2];` is an array of handles, so
+  // the dimensions are taken before the name is resolved to the class it
+  // names, under which they are recorded nowhere.
+  std::string_view adopted_array_typedef =
+      AdoptTypedefArrayDims(item, typedefs_, td_array_dims_);
+
   ResolveDeclaredTypeName(item, unit_, typedefs_, class_names_, diag_);
 
   // §8.23: `Cfg::my_type x;` names a type declared in a class, and the map
@@ -847,9 +854,6 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   ResolveClassScopedDeclType(item->data_type, typedefs_, unit_);
   ReportUnresolvedClassScopedType(item->data_type, item->loc, typedefs_, unit_,
                                   diag_);
-
-  std::string_view adopted_array_typedef =
-      AdoptTypedefArrayDims(item, typedefs_, td_array_dims_);
 
   if (ElaborateUserNettypeNet(item, mod)) return;
 
@@ -910,6 +914,11 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   }
 
   SetVariableTypeInfo(item, var);
+  // §6.19: the enumeration a variable adopted above is the typedef's own.
+  if (!adopted_array_typedef.empty() &&
+      item->data_type.kind == DataTypeKind::kEnum) {
+    var.enum_type_name = adopted_array_typedef;
+  }
   BindCovergroupVariable(*item, var, mod, unit_, arena_);
 
   ElaborateUnpackedDims(
@@ -924,8 +933,11 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   // type, ahead of s, whose initializer reads c. The simulator lowers
   // mod->variables in order, so the constants go first; pushed after s, the
   // initializer read a c not yet declared, and s started at a.
-  ValidateVarDeclTypes(item, BuildParamScope(mod));
-  EmitBareEnumMembers(item, mod);
+  // §6.19: the typedef declared the constants of an enumeration it writes,
+  // so a variable adopting its type above declares none of them again.
+  ValidateVarDeclTypes(item, BuildParamScope(mod),
+                       adopted_array_typedef.empty());
+  if (adopted_array_typedef.empty()) EmitBareEnumMembers(item, mod);
   mod->variables.push_back(var);
   ValidateArrayInitPattern(item);
   ValidateStructInitPattern(item);

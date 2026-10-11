@@ -555,4 +555,30 @@ TEST(EnumerationElaboration, XMemberOfA4StateEnumIsGivenItsValueAsWritten) {
   EXPECT_EQ(s1->init_expr->int_val, 1u);
 }
 
+// §6.19 with §6.18: a typedef writing an enumeration and unpacked dimensions,
+// typedef enum {A, B} ea_t [2], declares A and B itself, so a variable of it
+// is an array of that enumeration and declares neither constant again; nor
+// does a variable of a structure array type whose member's enumeration the
+// typedef wrote.
+TEST(EnumerationElaboration, ArrayTypedefVariableRedeclaresNoConstant) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef enum {A, B} ea_t [2];\n"
+      "  typedef struct {enum {C, D} k;} sa_t [2];\n"
+      "  ea_t e;\n"
+      "  sa_t s;\n"
+      "  initial begin\n"
+      "    e[0] = B;\n"
+      "    s[1].k = D;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+  const auto* e = FindVar(design, "m", "e");
+  ASSERT_NE(e, nullptr);
+  EXPECT_EQ(e->enum_type_name, "ea_t");
+}
+
 }  // namespace

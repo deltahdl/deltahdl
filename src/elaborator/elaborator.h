@@ -598,7 +598,8 @@ class Elaborator : public ElaboratorClassRules {
   void RecordNetArrayShape(ModuleItem* item, const RtlirNet& net,
                            RtlirModule* mod);
 
-  void ValidateVarDeclTypes(ModuleItem* item, const ScopeMap& scope);
+  void ValidateVarDeclTypes(ModuleItem* item, const ScopeMap& scope,
+                            bool writes_its_type);
 
   bool ValidateEnumLiteral(const EnumMember& member, uint32_t base_width,
                            bool is_2state);
