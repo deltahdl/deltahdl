@@ -178,12 +178,23 @@ static void CheckRefArgsInForkBlocks(
   });
 }
 
+// §13.4 rule (a) bars any statement containing `#` or `@`, and an assignment's
+// intra-assignment delay or event control, `a = #1 b` or `a <= @(e) b`, is
+// one the assignment contains (Stmt::delay, Stmt::events). Its intra-assignment
+// `##` is reported under §14.11 instead.
+static bool HasIntraAssignmentTiming(const Stmt* s) {
+  if (s->kind != StmtKind::kBlockingAssign &&
+      s->kind != StmtKind::kNonblockingAssign)
+    return false;
+  return s->delay != nullptr || !s->events.empty();
+}
+
 static void CheckFuncBodyTimeControl(const Stmt* s, DiagEngine& diag) {
   if (s->kind == StmtKind::kDelay || s->kind == StmtKind::kCycleDelay ||
       s->kind == StmtKind::kEventControl ||
       s->kind == StmtKind::kTimingControl || s->kind == StmtKind::kWait ||
       s->kind == StmtKind::kWaitFork || s->kind == StmtKind::kWaitOrder ||
-      s->kind == StmtKind::kExpect) {
+      s->kind == StmtKind::kExpect || HasIntraAssignmentTiming(s)) {
     diag.Error(s->range.start,
                "time-controlling statement is not allowed inside a function",
                Subclause("13.4"));

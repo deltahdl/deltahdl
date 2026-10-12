@@ -335,7 +335,7 @@ TEST(FunctionReturnElaboration, SystemFunctionAllowedAsImplicitVariable) {
 // is a return or a declaration the elaborator sees as a StmtKind::kVarDecl.
 // Stmt::for_steps does hold a function_subroutine_call, and
 // FunctionElaboration.TaskEnabledFromAForStepError in
-// test/src/unit/test_elaborator_subclause_13_04.cpp covers it, the rule that
+// test/src/unit/test_elaborator_subclause_13_04a.cpp covers it, the rule that
 // reaches a for step being §13.4's rather than §13.4.1's.
 
 // §9.3.2 already rejected this return, through CheckNoReturnInFork, but

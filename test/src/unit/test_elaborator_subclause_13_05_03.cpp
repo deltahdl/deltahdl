@@ -142,4 +142,35 @@ TEST(DefaultArgumentElaboration, DefaultRefsUndeclaredNameError) {
                             "13.5.3"));
 }
 
+// §11.9: the member a tagged union expression names is a member of the union
+// type its context gives it, no name of any scope, so a default value of
+// `tagged Invalid` references nothing §13.5.3 has to resolve (#6353).
+TEST(DefaultArgumentElaboration, TaggedMemberNameInDefaultIsNoName) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+      "  function void h(VInt a, VInt b = tagged Invalid); endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The value a tagged expression carries is an expression of the default, and
+// a name in it is still resolved in the declaring scope.
+TEST(DefaultArgumentElaboration, TaggedMemberValueInDefaultIsResolved) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+      "  function void h(VInt b = tagged Valid k); endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value for 'b' references 'k' which is not "
+                            "declared in the subroutine's declaring scope",
+                            3, "13.5.3"));
+}
+
 }  // namespace

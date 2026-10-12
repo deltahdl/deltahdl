@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <optional>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "common/packed_range.h"
@@ -14,6 +15,8 @@ namespace delta {
 struct DataType;
 struct RtlirParamDecl;
 struct RtlirUnpackedDim;
+struct ModuleItem;
+struct Stmt;
 
 struct ConstVal {
   int64_t value;
@@ -74,6 +77,47 @@ std::optional<ConstVal> ConstEvalUnaryFull(const Expr* expr,
                                            FoldContext ctx);
 std::optional<ConstVal> ConstEvalFull(const Expr* expr, const ScopeMap& scope);
 std::optional<ConstVal> ConstEvalLiteral(const Expr* expr);
+// §13.4.3 with §12.5: the statement the case statement `s` of a constant
+// function selects against `locals` -- the first item whose expression
+// matches the selector by case, casez, casex or case inside matching, else
+// the default's, else null for none -- or nothing where an operand does not
+// fold or `s` is a pattern-matching case. Defined in const_eval_func_case.cpp.
+std::optional<const Stmt*> ConstFuncCaseArm(const Stmt* s,
+                                            const ScopeMap& locals);
+
+// §13.4.3 with §6.12: a constant function is folded as it would run, so a
+// local, a formal or a result declared real keeps a real value, which the
+// integer ScopeMap cannot hold. A frame holds those of one call while it is
+// folded, for ConstEvalReal to read and the interpreter to write; a nested
+// call makes its own and hides the caller's. Defined in const_eval_real.cpp.
+class ConstFuncRealFrame {
+ public:
+  ConstFuncRealFrame();
+  ~ConstFuncRealFrame();
+  ConstFuncRealFrame(const ConstFuncRealFrame&) = delete;
+  ConstFuncRealFrame& operator=(const ConstFuncRealFrame&) = delete;
+  ConstFuncRealFrame(ConstFuncRealFrame&&) = delete;
+  ConstFuncRealFrame& operator=(ConstFuncRealFrame&&) = delete;
+
+ private:
+  std::unordered_map<std::string_view, double> values_;
+  std::unordered_map<std::string_view, double>* prev_;
+};
+// The value of the real local `name` of the innermost frame, none where it
+// holds no such local.
+std::optional<double> ConstFuncRealLocal(std::string_view name);
+// Makes `name` a real local of the innermost frame holding `value`.
+void SetConstFuncRealLocal(std::string_view name, double value);
+// Whether `type` is one of §6.12's real types.
+bool IsConstFuncRealType(const DataType& type);
+// §13.4.3: the constant function the call `call` names among those registered
+// (ConstFuncRegistryGuard), null for none. Defined in const_eval_func.cpp.
+const ModuleItem* RegisteredConstFunc(const Expr* call);
+// The value the constant function call `call` returns, as a real: the real a
+// function returning one returns, and an integral result converted. Defined in
+// const_eval_func.cpp.
+std::optional<double> ConstEvalUserCallReal(const Expr* call,
+                                            const ScopeMap& scope);
 // §5.7.1 (printed page 78): `'0`, `'1`, `'x` or `'z` at ctx.width bits, or
 // at one bit where no context propagates a width; x and z fold to 0, ConstVal
 // holding no unknown bit. Defined in const_eval.cpp.

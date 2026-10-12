@@ -764,8 +764,6 @@ class Elaborator : public ElaboratorClassRules {
   void ApplyNetDelaysInModuleTree(RtlirModule* mod);
   void ValidateConstantFunctionCalls(const ModuleDecl* decl);
   void ValidateTaskCallsInExpressions(const ModuleDecl* decl);
-  void WalkStmtsForTaskOperands(const Stmt* s);
-  void WalkExprForTaskOperands(const Expr* e, const Expr* root);
   // §7.7: a dynamic array or queue may not be passed to a DPI import formal
   // that is an open array (unsized) with an output direction.
   void ValidateDpiOpenArrayArgs(const ModuleDecl* decl);

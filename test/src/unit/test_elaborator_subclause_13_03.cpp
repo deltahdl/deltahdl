@@ -271,4 +271,95 @@ TEST(TaskElaboration, TaskEnabledAsAStatementBesideAFunctionOperandOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §13.3 enables a task only as a statement, so a task call used as an operand
+// is reported wherever the expression stands: a continuous assignment's right
+// side and a declaration's initializer as well as a procedure (#5916).
+TEST(TaskElaboration, TaskOperandInContinuousAssignError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic y;\n"
+      "  task t; endtask\n"
+      "  assign y = t();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "task 't' is enabled from a statement and "
+                            "cannot be an operand of an expression",
+                            4, "13.3"));
+}
+
+TEST(TaskElaboration, TaskOperandInDeclarationInitializerError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task t; endtask\n"
+      "  int v = t();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "task 't' is enabled from a statement and "
+                            "cannot be an operand of an expression",
+                            3, "13.3"));
+}
+
+// A generate block's procedures are procedures of the design (#5917).
+TEST(TaskElaboration, TaskOperandInGenerateBlockError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int x;\n"
+      "  task t; endtask\n"
+      "  if (1) begin : g\n"
+      "    initial x = t();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "task 't' is enabled from a statement and "
+                            "cannot be an operand of an expression",
+                            5, "13.3"));
+}
+
+// A task is no operand wherever it is declared: in a package and called
+// through `pk::`, or at compilation-unit scope (#5918).
+TEST(TaskElaboration, PackageAndUnitTaskOperandsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pk; task t; endtask endpackage\n"
+      "task u; endtask\n"
+      "module m;\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    x = pk::t();\n"
+      "    x = u();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "task 'pk::t' is enabled from a statement and "
+                            "cannot be an operand of an expression",
+                            6, "13.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "task 'u' is enabled from a statement and cannot "
+                            "be an operand of an expression",
+                            7, "13.3"));
+}
+
+// A module's own function hides a unit task of the same name (§23.9), so the
+// call names the function and is a legal operand.
+TEST(TaskElaboration, ModuleFunctionHidesUnitTask) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "task u; endtask\n"
+      "module m;\n"
+      "  int x;\n"
+      "  function int u(); return 1; endfunction\n"
+      "  initial x = u();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

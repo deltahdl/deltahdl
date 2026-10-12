@@ -745,8 +745,10 @@ TEST(ConstantFunctionElaboration, DefaultArgumentFromLocalparamFolds) {
 // function is explicitly permitted, even though a general non-constant-function
 // call would be rejected. Here the array reduction `.sum()` is invoked on a
 // body-local array, so no error about a non-constant invocation is raised. (On
-// a non-local root the same access would trip the identifier/hierarchical rule,
-// as ExternalNetReferenceError / HierarchicalReferenceError show.)
+// a root that is neither a local nor a parameter the same access would trip
+// the identifier/hierarchical rule, as ExternalNetReferenceError /
+// HierarchicalReferenceError show; one on a parameter is a constant built-in
+// method call, BuiltinMethodOnParameterAllowed in the b file.)
 TEST(ConstantFunctionElaboration, BuiltinMethodOnLocalAllowed) {
   ElabFixture f;
   auto* design = ElaborateSrc(

@@ -1,7 +1,10 @@
 #include <cstddef>
 #include <format>
+#include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
@@ -9,6 +12,7 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -111,46 +115,132 @@ void Elaborator::WalkStmtsForDpiArgs(const Stmt* s) {
   ForEachChildStmt(s, [this](Stmt* const& sub) { WalkStmtsForDpiArgs(sub); });
 }
 
+namespace {
+
 // §13.3 enables a task from a statement, and §13.2 admits a nonvoid function
-// alone as an operand of an expression: a task returns no value, so a call
-// to one anywhere but as the statement itself, `x = t(1);`, has nothing to
-// yield and is reported. task_names_ holds the module's tasks and its
-// imported ones (RecordTaskFuncNames), so an imported task (§35.2.1) is
-// caught with a native one. `root` is the expression that is the statement,
-// the one call position that is an enable.
-void Elaborator::WalkExprForTaskOperands(const Expr* e, const Expr* root) {
+// alone as an operand of an expression: a task returns no value, so a call to
+// one anywhere but as the statement itself, `x = t(1);`, has nothing to yield
+// and is reported, wherever the expression stands. `tasks` holds the names a
+// call written in the module names a task by: the module's own tasks and its
+// imported ones (task_names_, RecordTaskFuncNames), so an imported task
+// (§35.2.1) is caught with a native one; the compilation unit's tasks that no
+// function of the module hides (§23.9); and each package's tasks under the
+// "pk::t" a call through the package scope resolution operator names (§26.3).
+struct TaskOperandCheck {
+  std::unordered_set<std::string> tasks;
+  DiagEngine& diag;
+};
+
+// The name `call` names its subroutine by: the bare callee, or for a call
+// through the package scope resolution operator, `pk::t()`, which the parser
+// keeps with no callee text and the scoped name as its base, "pk::t".
+std::string CallName(const Expr* call) {
+  if (!call->callee.empty()) return std::string(call->callee);
+  const Expr* scoped = call->lhs;
+  if (scoped == nullptr || scoped->kind != ExprKind::kMemberAccess ||
+      !scoped->is_scope_resolution || scoped->lhs == nullptr ||
+      scoped->rhs == nullptr) {
+    return {};
+  }
+  return std::string(scoped->lhs->text) + "::" + std::string(scoped->rhs->text);
+}
+
+// `root` is the expression that is the statement, the one call position that
+// is an enable.
+void WalkExprForTaskOperands(const Expr* e, const Expr* root,
+                             const TaskOperandCheck& chk) {
   if (e == nullptr) return;
-  if (e->kind == ExprKind::kCall && e != root &&
-      task_names_.count(e->callee) != 0) {
-    diag_.Error(e->range.start,
-                std::format("task '{}' is enabled from a statement and cannot "
-                            "be an operand of an expression",
-                            e->callee),
-                Subclause("13.3"));
+  if (e->kind == ExprKind::kCall && e != root) {
+    std::string name = CallName(e);
+    if (chk.tasks.contains(name)) {
+      chk.diag.Error(e->range.start,
+                     std::format("task '{}' is enabled from a statement and "
+                                 "cannot be an operand of an expression",
+                                 name),
+                     Subclause("13.3"));
+    }
   }
   for (const Expr* sub : {e->lhs, e->rhs, e->condition, e->true_expr,
                           e->false_expr, e->base, e->index, e->index_end}) {
-    WalkExprForTaskOperands(sub, root);
+    WalkExprForTaskOperands(sub, root, chk);
   }
-  for (auto* a : e->args) WalkExprForTaskOperands(a, root);
-  for (auto* el : e->elements) WalkExprForTaskOperands(el, root);
+  for (auto* a : e->args) WalkExprForTaskOperands(a, root, chk);
+  for (auto* el : e->elements) WalkExprForTaskOperands(el, root, chk);
 }
 
-void Elaborator::WalkStmtsForTaskOperands(const Stmt* s) {
+void WalkStmtsForTaskOperands(const Stmt* s, const TaskOperandCheck& chk) {
   if (!s) return;
   const Expr* root = s->kind == StmtKind::kExprStmt ? s->expr : nullptr;
   ForEachChildExpr(
-      s, [this, root](Expr* const& e) { WalkExprForTaskOperands(e, root); });
-  ForEachChildStmt(s,
-                   [this](Stmt* const& sub) { WalkStmtsForTaskOperands(sub); });
+      s, [&](Expr* const& e) { WalkExprForTaskOperands(e, root, chk); });
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { WalkStmtsForTaskOperands(sub, chk); });
 }
 
-void Elaborator::ValidateTaskCallsInExpressions(const ModuleDecl* decl) {
-  if (task_names_.empty()) return;
-  for (const auto* item : decl->items) {
-    if (item->body) WalkStmtsForTaskOperands(item->body);
-    for (auto* s : item->func_body_stmts) WalkStmtsForTaskOperands(s);
+void WalkItemsForTaskOperands(const std::vector<ModuleItem*>& items,
+                              const TaskOperandCheck& chk);
+
+// §27.1: a generate block's items are the design's like any other, so the
+// procedures, continuous assignments and declarations of every block a
+// conditional, loop or case generate holds are walked as the module's are.
+void WalkGenerateForTaskOperands(const ModuleItem* item,
+                                 const TaskOperandCheck& chk) {
+  switch (item->kind) {
+    case ModuleItemKind::kGenerateIf:
+      WalkItemsForTaskOperands(item->gen_body, chk);
+      if (item->gen_else) WalkGenerateForTaskOperands(item->gen_else, chk);
+      break;
+    case ModuleItemKind::kGenerateFor:
+      WalkItemsForTaskOperands(item->gen_body, chk);
+      break;
+    case ModuleItemKind::kGenerateCase:
+      for (const auto& ci : item->gen_case_items)
+        WalkItemsForTaskOperands(ci.body, chk);
+      break;
+    default:
+      break;
   }
+}
+
+// A procedure's and a subroutine's statements, and the expressions a
+// continuous assignment's right side and a declaration's initializer are.
+void WalkItemsForTaskOperands(const std::vector<ModuleItem*>& items,
+                              const TaskOperandCheck& chk) {
+  for (const ModuleItem* item : items) {
+    WalkStmtsForTaskOperands(item->body, chk);
+    for (const Stmt* s : item->func_body_stmts)
+      WalkStmtsForTaskOperands(s, chk);
+    WalkExprForTaskOperands(item->assign_rhs, nullptr, chk);
+    WalkExprForTaskOperands(item->init_expr, nullptr, chk);
+    WalkGenerateForTaskOperands(item, chk);
+  }
+}
+
+// The compilation unit's tasks and each package's (TaskOperandCheck).
+void AddUnitAndPackageTasks(
+    const CompilationUnit& unit,
+    const std::unordered_map<std::string_view, const ModuleItem*>& funcs,
+    std::unordered_set<std::string>& tasks) {
+  for (const ModuleItem* item : unit.cu_items) {
+    if (item->kind == ModuleItemKind::kTaskDecl && item->method_class.empty() &&
+        !funcs.contains(item->name))
+      tasks.emplace(item->name);
+  }
+  for (const PackageDecl* pkg : unit.packages) {
+    for (const ModuleItem* item : pkg->items) {
+      if (item->kind == ModuleItemKind::kTaskDecl && item->method_class.empty())
+        tasks.emplace(std::string(pkg->name) + "::" + std::string(item->name));
+    }
+  }
+}
+
+}  // namespace
+
+void Elaborator::ValidateTaskCallsInExpressions(const ModuleDecl* decl) {
+  TaskOperandCheck chk{{task_names_.begin(), task_names_.end()}, diag_};
+  if (unit_ != nullptr) AddUnitAndPackageTasks(*unit_, func_decls_, chk.tasks);
+  if (chk.tasks.empty()) return;
+  WalkItemsForTaskOperands(decl->items, chk);
 }
 
 void Elaborator::ValidateDpiOpenArrayArgs(const ModuleDecl* decl) {

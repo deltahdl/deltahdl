@@ -28,6 +28,11 @@ void CollectIdentLeaves(const Expr* e, std::vector<const Expr*>& out) {
       return;
     case ExprKind::kTypeRef:
       return;
+    case ExprKind::kTagged:
+      // §11.9: the member name (rhs) is a member of the union type the
+      // context gives, no name of any scope; only the value is an expression.
+      CollectIdentLeaves(e->lhs, out);
+      return;
     default:
       break;
   }

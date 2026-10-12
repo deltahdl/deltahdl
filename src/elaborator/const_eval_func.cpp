@@ -1,7 +1,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <cstring>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -13,6 +12,7 @@
 #include "common/types.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
+#include "elaborator/elaborator_items_params.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "lexer/token.h"
@@ -182,14 +182,50 @@ static ConstFuncFlow ExecConstFuncStmt(const Stmt* s, ScopeMap& locals,
                                        std::string_view result_name,
                                        int64_t& iter_budget);
 
+// §6.12.1: the integer a real converts to, rounded with a half away from zero;
+// none for a value that is no number.
+static std::optional<int64_t> RoundConstReal(double value) {
+  if (!std::isfinite(value)) return std::nullopt;
+  return std::llround(value);
+}
+
+// The integer `e` folds to against `scope`: a real expression rounded
+// (HasRealOperand, §6.12.1), and any other folded as an integer.
+static std::optional<int64_t> FoldIntegral(const Expr* e,
+                                           const ScopeMap& scope) {
+  if (auto rounded = FoldRealValueAsInteger(e, scope)) return rounded;
+  auto v = ConstEvalFull(e, scope);
+  if (!v) return std::nullopt;
+  return v->value;
+}
+
+// Stores the value of `rhs` into the local `name`, as an assignment converts
+// it (§6.12.1): a real local (ConstFuncRealFrame) takes the real `rhs` is, an
+// integral one the value rounded where `rhs` is real (HasRealOperand) and the
+// integer it folds to otherwise. False where `rhs` does not fold.
+static bool StoreConstFuncLocal(std::string_view name, const Expr* rhs,
+                                ScopeMap& locals) {
+  if (ConstFuncRealLocal(name)) {
+    auto real = ConstEvalReal(rhs, locals);
+    if (!real) return false;
+    SetConstFuncRealLocal(name, *real);
+    locals[name] = RoundConstReal(*real).value_or(0);
+    return true;
+  }
+  auto v = FoldIntegral(rhs, locals);
+  if (!v) return false;
+  locals[name] = *v;
+  return true;
+}
+
 // A constant function may only assign to a simple (unindexed) local — its
 // arguments, body-declared variables, or the implicit result variable named
 // after the function. Anything else abandons the fold.
-static bool ConstFuncAssign(const Expr* lhs, int64_t value, ScopeMap& locals) {
+static bool ConstFuncAssign(const Expr* lhs, const Expr* rhs,
+                            ScopeMap& locals) {
   if (!lhs || lhs->kind != ExprKind::kIdentifier || lhs->text.empty())
     return false;
-  locals[lhs->text] = value;
-  return true;
+  return StoreConstFuncLocal(lhs->text, rhs, locals);
 }
 
 static ConstFuncFlow ExecConstFuncStmts(const std::vector<Stmt*>& stmts,
@@ -205,25 +241,22 @@ static ConstFuncFlow ExecConstFuncStmts(const std::vector<Stmt*>& stmts,
 
 // §13.4.3: body-local variables initialize as they would for normal
 // simulation. Model that as a fresh binding, seeded from the initializer when
-// one is present and 0 otherwise.
+// one is present and 0 otherwise; one declared real is a real local
+// (ConstFuncRealFrame) starting at 0.0 (§6.8, Table 6-7).
 static ConstFuncFlow ExecConstFuncVarDecl(const Stmt* s, ScopeMap& locals) {
   if (s->var_name.empty()) return ConstFuncFlow::kNormal;
-  int64_t init = 0;
-  if (s->var_init) {
-    auto v = ConstEvalFull(s->var_init, locals);
-    if (!v) return ConstFuncFlow::kAbort;
-    init = v->value;
-  }
-  locals[s->var_name] = init;
+  locals[s->var_name] = 0;
+  if (IsConstFuncRealType(s->var_decl_type))
+    SetConstFuncRealLocal(s->var_name, 0.0);
+  if (s->var_init && !StoreConstFuncLocal(s->var_name, s->var_init, locals))
+    return ConstFuncFlow::kAbort;
   return ConstFuncFlow::kNormal;
 }
 
 static ConstFuncFlow ExecConstFuncBlockingAssign(const Stmt* s,
                                                  ScopeMap& locals) {
   if (!s->rhs) return ConstFuncFlow::kAbort;
-  auto v = ConstEvalFull(s->rhs, locals);
-  if (!v) return ConstFuncFlow::kAbort;
-  if (!ConstFuncAssign(s->lhs, v->value, locals)) return ConstFuncFlow::kAbort;
+  if (!ConstFuncAssign(s->lhs, s->rhs, locals)) return ConstFuncFlow::kAbort;
   return ConstFuncFlow::kNormal;
 }
 
@@ -367,11 +400,8 @@ static ConstFuncFlow ExecConstFuncRepeat(const Stmt* s, ScopeMap& locals,
 
 static ConstFuncFlow ExecConstFuncReturn(const Stmt* s, ScopeMap& locals,
                                          std::string_view result_name) {
-  if (s->expr) {
-    auto v = ConstEvalFull(s->expr, locals);
-    if (!v) return ConstFuncFlow::kAbort;
-    if (!result_name.empty()) locals[result_name] = v->value;
-  }
+  if (s->expr && !StoreConstFuncLocal(result_name, s->expr, locals))
+    return ConstFuncFlow::kAbort;
   return ConstFuncFlow::kReturn;
 }
 
@@ -388,6 +418,13 @@ static ConstFuncFlow ExecConstFuncExprStmt(const Stmt* s, ScopeMap& locals) {
   bool is_step =
       e->op == TokenKind::kPlusPlus || e->op == TokenKind::kMinusMinus;
   if (is_unary && is_step && e->lhs && e->lhs->kind == ExprKind::kIdentifier) {
+    // §11.4.2: `++` and `--` on a real add and subtract 1.0.
+    if (auto real = ConstFuncRealLocal(e->lhs->text)) {
+      double next = e->op == TokenKind::kPlusPlus ? *real + 1.0 : *real - 1.0;
+      SetConstFuncRealLocal(e->lhs->text, next);
+      locals[e->lhs->text] = RoundConstReal(next).value_or(0);
+      return ConstFuncFlow::kNormal;
+    }
     auto cur = ConstEvalFull(e->lhs, locals);
     if (!cur) return ConstFuncFlow::kAbort;
     locals[e->lhs->text] =
@@ -395,6 +432,16 @@ static ConstFuncFlow ExecConstFuncExprStmt(const Stmt* s, ScopeMap& locals) {
     return ConstFuncFlow::kNormal;
   }
   return ConstFuncFlow::kAbort;
+}
+
+// §13.4.3 excludes no case statement from a constant function: the arm it
+// selects (ConstFuncCaseArm) runs as the statement would.
+static ConstFuncFlow ExecConstFuncCase(const Stmt* s, ScopeMap& locals,
+                                       std::string_view result_name,
+                                       int64_t& iter_budget) {
+  std::optional<const Stmt*> arm = ConstFuncCaseArm(s, locals);
+  if (!arm) return ConstFuncFlow::kAbort;
+  return ExecConstFuncStmt(*arm, locals, result_name, iter_budget);
 }
 
 static ConstFuncFlow ExecConstFuncStmt(const Stmt* s, ScopeMap& locals,
@@ -413,6 +460,8 @@ static ConstFuncFlow ExecConstFuncStmt(const Stmt* s, ScopeMap& locals,
       return ExecConstFuncBlockingAssign(s, locals);
     case StmtKind::kIf:
       return ExecConstFuncIf(s, locals, result_name, iter_budget);
+    case StmtKind::kCase:
+      return ExecConstFuncCase(s, locals, result_name, iter_budget);
     case StmtKind::kFor:
       return ExecConstFuncFor(s, locals, result_name, iter_budget);
     case StmtKind::kWhile:
@@ -441,16 +490,36 @@ static ConstFuncFlow ExecConstFuncStmt(const Stmt* s, ScopeMap& locals,
 // Bind each formal argument to the constant value of the matching actual,
 // falling back to the formal's default when the call supplies fewer actuals.
 // False means some actual did not fold, which abandons the whole call.
+// A formal declared real takes the real its actual is (§6.12), held in
+// `reals` until the callee's frame (ConstFuncRealFrame) exists, as the actual
+// is evaluated in the caller's.
+using RealBindings = std::vector<std::pair<std::string_view, double>>;
+
+static bool BindConstFuncArg(const FunctionArg& fa, const Expr* arg_expr,
+                             const ScopeMap& scope, ScopeMap& locals,
+                             RealBindings& reals) {
+  if (IsConstFuncRealType(fa.data_type)) {
+    auto real = ConstEvalReal(arg_expr, scope);
+    if (!real) return false;
+    reals.emplace_back(fa.name, *real);
+    locals[fa.name] = RoundConstReal(*real).value_or(0);
+    return true;
+  }
+  auto v = FoldIntegral(arg_expr, scope);
+  if (!v) return false;
+  locals[fa.name] = *v;
+  return true;
+}
+
 static bool BindConstFuncArgs(const ModuleItem* func, const Expr* expr,
-                              const ScopeMap& scope, ScopeMap& locals) {
+                              const ScopeMap& scope, ScopeMap& locals,
+                              RealBindings& reals) {
   for (size_t i = 0; i < func->func_args.size(); ++i) {
     const FunctionArg& fa = func->func_args[i];
     const Expr* arg_expr =
         i < expr->args.size() ? expr->args[i] : fa.default_value;
     if (!arg_expr) return false;
-    auto v = ConstEvalFull(arg_expr, scope);
-    if (!v) return false;
-    if (!fa.name.empty()) locals[fa.name] = v->value;
+    if (!BindConstFuncArg(fa, arg_expr, scope, locals, reals)) return false;
   }
   return true;
 }
@@ -484,16 +553,28 @@ static std::string ConstCallKey(const Expr* expr) {
   return std::string(scoped->lhs->text) + "::" + std::string(scoped->rhs->text);
 }
 
-static std::optional<ConstVal> ConstEvalUserCall(const Expr* expr,
-                                                 const ScopeMap& scope) {
-  if (!g_const_func_registry) return std::nullopt;
-  std::string key = ConstCallKey(expr);
-  if (key.empty()) return std::nullopt;
+const ModuleItem* RegisteredConstFunc(const Expr* call) {
+  if (!g_const_func_registry) return nullptr;
+  std::string key = ConstCallKey(call);
+  if (key.empty()) return nullptr;
   auto it = g_const_func_registry->find(key);
-  if (it == g_const_func_registry->end() || it->second == nullptr)
-    return std::nullopt;
-  const ModuleItem* func = it->second;
-  if (func->kind != ModuleItemKind::kFunctionDecl) return std::nullopt;
+  if (it == g_const_func_registry->end() || it->second == nullptr ||
+      it->second->kind != ModuleItemKind::kFunctionDecl)
+    return nullptr;
+  return it->second;
+}
+
+// What a constant function call returns: the integer its result variable
+// holds, and the real it holds where the function returns a real (§6.12).
+struct ConstCallResult {
+  int64_t value;
+  std::optional<double> real;
+};
+
+static std::optional<ConstCallResult> RunConstFuncCall(const Expr* expr,
+                                                       const ScopeMap& scope) {
+  const ModuleItem* func = RegisteredConstFunc(expr);
+  if (func == nullptr) return std::nullopt;
   if (g_const_func_depth >= kMaxConstFuncDepth) return std::nullopt;
   ++g_const_func_depth;
   struct DepthGuard {
@@ -504,12 +585,37 @@ static std::optional<ConstVal> ConstEvalUserCall(const Expr* expr,
   // reference module/package/$unit parameters, §13.4.3), overlaid with the
   // argument bindings and the implicit result variable.
   ScopeMap locals = scope;
-  if (!BindConstFuncArgs(func, expr, scope, locals)) return std::nullopt;
-  if (!func->name.empty()) locals[func->name] = 0;
+  RealBindings reals;
+  if (!BindConstFuncArgs(func, expr, scope, locals, reals)) return std::nullopt;
+  ConstFuncRealFrame frame;
+  for (const auto& [name, value] : reals) SetConstFuncRealLocal(name, value);
+  if (!func->name.empty()) {
+    locals[func->name] = 0;
+    if (IsConstFuncRealType(func->return_type))
+      SetConstFuncRealLocal(func->name, 0.0);
+  }
   if (!RunConstFuncBody(func, locals)) return std::nullopt;
   auto rit = locals.find(func->name);
   if (rit == locals.end()) return std::nullopt;
-  return ConstVal{rit->second, 32, true};
+  return ConstCallResult{rit->second, ConstFuncRealLocal(func->name)};
+}
+
+// §6.12.1: a real result read as an integer is rounded.
+static std::optional<ConstVal> ConstEvalUserCall(const Expr* expr,
+                                                 const ScopeMap& scope) {
+  auto result = RunConstFuncCall(expr, scope);
+  if (!result) return std::nullopt;
+  if (!result->real) return ConstVal{result->value, 32, true};
+  auto rounded = RoundConstReal(*result->real);
+  if (!rounded) return std::nullopt;
+  return ConstVal{*rounded, 32, true};
+}
+
+std::optional<double> ConstEvalUserCallReal(const Expr* call,
+                                            const ScopeMap& scope) {
+  auto result = RunConstFuncCall(call, scope);
+  if (!result) return std::nullopt;
+  return result->real.value_or(static_cast<double>(result->value));
 }
 
 // §3.12.1: a $unit:: prefix forces resolution to the compilation-unit scope,
@@ -636,198 +742,6 @@ std::optional<int64_t> ConstEvalInt(const Expr* expr, const ScopeMap& scope) {
 std::optional<int64_t> ConstEvalInt(const Expr* expr) {
   static const ScopeMap kEmptyScope;
   return ConstEvalInt(expr, kEmptyScope);
-}
-
-static std::optional<double> EvalRealBinary(TokenKind op, double lhs,
-                                            double rhs) {
-  switch (op) {
-    case TokenKind::kPlus:
-      return lhs + rhs;
-    case TokenKind::kMinus:
-      return lhs - rhs;
-    case TokenKind::kStar:
-      return lhs * rhs;
-    case TokenKind::kSlash:
-      if (rhs == 0.0) return std::nullopt;
-      return lhs / rhs;
-    case TokenKind::kPower:
-      return std::pow(lhs, rhs);
-    default:
-      return std::nullopt;
-  }
-}
-
-static std::optional<double> EvalRealUnary(TokenKind op, double operand) {
-  switch (op) {
-    case TokenKind::kMinus:
-      return -operand;
-    case TokenKind::kPlus:
-      return operand;
-    default:
-      return std::nullopt;
-  }
-}
-
-// The §20.5 real-returning conversions each take a single integral argument.
-static std::optional<int64_t> ConstEvalFirstIntArg(const Expr* expr,
-                                                   const ScopeMap& scope) {
-  if (expr->args.empty()) return std::nullopt;
-  return ConstEvalInt(expr->args[0], scope);
-}
-
-// §20.5: the real-returning conversion functions may appear in a constant real
-// context. Each folds from the constant integral value of its argument.
-// §20.8.2, Table 20-4: the real math functions, each the C function it
-// corresponds to, by the number of arguments it takes.
-using RealMathOne = double (*)(double);
-using RealMathTwo = double (*)(double, double);
-
-static const std::unordered_map<std::string_view, RealMathOne>&
-RealMathOneArg() {
-  static const std::unordered_map<std::string_view, RealMathOne> kFunctions = {
-      {"$ln", [](double x) { return std::log(x); }},
-      {"$log10", [](double x) { return std::log10(x); }},
-      {"$exp", [](double x) { return std::exp(x); }},
-      {"$sqrt", [](double x) { return std::sqrt(x); }},
-      {"$floor", [](double x) { return std::floor(x); }},
-      {"$ceil", [](double x) { return std::ceil(x); }},
-      {"$sin", [](double x) { return std::sin(x); }},
-      {"$cos", [](double x) { return std::cos(x); }},
-      {"$tan", [](double x) { return std::tan(x); }},
-      {"$asin", [](double x) { return std::asin(x); }},
-      {"$acos", [](double x) { return std::acos(x); }},
-      {"$atan", [](double x) { return std::atan(x); }},
-      {"$sinh", [](double x) { return std::sinh(x); }},
-      {"$cosh", [](double x) { return std::cosh(x); }},
-      {"$tanh", [](double x) { return std::tanh(x); }},
-      {"$asinh", [](double x) { return std::asinh(x); }},
-      {"$acosh", [](double x) { return std::acosh(x); }},
-      {"$atanh", [](double x) { return std::atanh(x); }},
-  };
-  return kFunctions;
-}
-
-static const std::unordered_map<std::string_view, RealMathTwo>&
-RealMathTwoArgs() {
-  static const std::unordered_map<std::string_view, RealMathTwo> kFunctions = {
-      {"$pow", [](double x, double y) { return std::pow(x, y); }},
-      {"$atan2", [](double y, double x) { return std::atan2(y, x); }},
-      {"$hypot", [](double x, double y) { return std::hypot(x, y); }},
-  };
-  return kFunctions;
-}
-
-// §20.8.2: a real math function may be used in a constant expression, so it
-// folds where each of its arguments, an integer one converted to real, does.
-static std::optional<double> ConstEvalRealMathCall(const Expr* expr,
-                                                   const ScopeMap& scope) {
-  std::vector<double> args;
-  for (const Expr* arg : expr->args) {
-    std::optional<double> v = ConstEvalReal(arg, scope);
-    if (!v) return std::nullopt;
-    args.push_back(*v);
-  }
-  auto one = RealMathOneArg().find(expr->callee);
-  if (one != RealMathOneArg().end() && args.size() == 1) {
-    return one->second(args[0]);
-  }
-  auto two = RealMathTwoArgs().find(expr->callee);
-  if (two != RealMathTwoArgs().end() && args.size() == 2) {
-    return two->second(args[0], args[1]);
-  }
-  return std::nullopt;
-}
-
-static std::optional<double> ConstEvalRealSysCall(const Expr* expr,
-                                                  const ScopeMap& scope) {
-  if (expr->callee == "$itor") {
-    auto iv = ConstEvalFirstIntArg(expr, scope);
-    if (!iv) return std::nullopt;
-    return static_cast<double>(*iv);
-  }
-  if (expr->callee == "$bitstoreal") {
-    auto iv = ConstEvalFirstIntArg(expr, scope);
-    if (!iv) return std::nullopt;
-    auto bits = static_cast<uint64_t>(*iv);
-    double d = 0.0;
-    std::memcpy(&d, &bits, sizeof(d));
-    return d;
-  }
-  if (expr->callee == "$bitstoshortreal") {
-    auto iv = ConstEvalFirstIntArg(expr, scope);
-    if (!iv) return std::nullopt;
-    auto bits = static_cast<uint32_t>(*iv);
-    float fv = 0.0F;
-    std::memcpy(&fv, &bits, sizeof(fv));
-    return static_cast<double>(fv);
-  }
-  return ConstEvalRealMathCall(expr, scope);
-}
-
-// §6.20.2 (printed pages 126-127): a name standing for a real parameter of
-// the registered module is worth the double the elaborator resolved it to
-// (RtlirParamDecl::resolved_real), which the ScopeMap, holding one integer
-// per name, cannot carry: its slot for such a parameter holds the 0 the
-// integer fold never wrote, so `parameter average_delay = (r + f) / 2` over
-// `parameter r = 5.7` folded to 4.5 and `parameter twice = r1 * 2` over a
-// declared `real r1` to 0. The registered parameter is consulted only where
-// the scope holds its integer value or no value at all, as
-// RegisteredParamValue (const_eval_bits.cpp) consults it, because a
-// constant function's locals (§13.4.3) sit in the same map under bare names.
-// Any other name is the integer the scope holds, widened.
-static std::optional<double> ConstEvalRealIdentifier(const Expr* expr,
-                                                     const ScopeMap& scope) {
-  auto it = scope.find(expr->text);
-  const RtlirParamDecl* pd = RegisteredParamNamed(expr->text);
-  if (pd != nullptr && pd->is_real_value &&
-      (it == scope.end() || it->second == pd->resolved_value))
-    return pd->resolved_real;
-  if (it != scope.end()) return static_cast<double>(it->second);
-  return std::nullopt;
-}
-
-std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope) {
-  if (!expr) return std::nullopt;
-
-  switch (expr->kind) {
-    case ExprKind::kRealLiteral:
-    // §5.8: a time literal is interpreted as a realtime (real) value already
-    // scaled to the current time unit; the parser folds that scaling into
-    // real_val, so in a constant real context it evaluates exactly like any
-    // other real literal.
-    case ExprKind::kTimeLiteral:
-      return expr->real_val;
-    case ExprKind::kIntegerLiteral:
-      return static_cast<double>(expr->int_val);
-    case ExprKind::kIdentifier:
-      return ConstEvalRealIdentifier(expr, scope);
-    case ExprKind::kUnary: {
-      auto operand = ConstEvalReal(expr->lhs, scope);
-      if (!operand) return std::nullopt;
-      return EvalRealUnary(expr->op, *operand);
-    }
-    case ExprKind::kBinary: {
-      auto lhs = ConstEvalReal(expr->lhs, scope);
-      auto rhs = ConstEvalReal(expr->rhs, scope);
-      if (!lhs || !rhs) return std::nullopt;
-      return EvalRealBinary(expr->op, *lhs, *rhs);
-    }
-    case ExprKind::kTernary: {
-      auto cond = ConstEvalInt(expr->condition, scope);
-      if (!cond) return std::nullopt;
-      return ConstEvalReal(*cond ? expr->true_expr : expr->false_expr, scope);
-    }
-    case ExprKind::kSystemCall:
-    case ExprKind::kCall:
-      return ConstEvalRealSysCall(expr, scope);
-    default:
-      return std::nullopt;
-  }
-}
-
-std::optional<double> ConstEvalReal(const Expr* expr) {
-  static const ScopeMap kEmptyScope;
-  return ConstEvalReal(expr, kEmptyScope);
 }
 
 struct StaticPrefixResult {

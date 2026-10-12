@@ -8,6 +8,7 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -92,12 +93,16 @@ static bool BodyContainsEventScheduling(const Stmt* s) {
 // Stmt::rs_productions is what §13.4.3 asks for: A.6.12 puts a data_declaration
 // at the head of an rs_code_block. Stmt::for_steps holds no declaration, A.6.8
 // admitting only an operator_assignment, an inc_or_dec_expression or a call.
+// Stmt::for_inits does: §12.7.1 makes a variable the initialization declares
+// a local of the implicit block around the loop, held as an assignment whose
+// type Stmt::for_init_types gives (ForHeaderDeclaredNames).
 static void CollectLocalDeclNames(const Stmt* s,
                                   std::unordered_set<std::string_view>& out) {
   if (!s) return;
   if (s->kind == StmtKind::kVarDecl || s->kind == StmtKind::kBlockItemDecl) {
     if (!s->var_name.empty()) out.insert(s->var_name);
   }
+  for (std::string_view name : ForHeaderDeclaredNames(s)) out.insert(name);
   ForEachChildStmt(s,
                    [&](Stmt* const& sub) { CollectLocalDeclNames(sub, out); });
 }
@@ -110,13 +115,14 @@ static const Expr* LeftmostIdentifier(const Expr* e) {
   return e;
 }
 
-static bool IsBuiltinMethodOnLocal(
-    const Expr* call, const std::unordered_set<std::string_view>& local_names) {
+// Whether `call` is a built-in method called on a variable `names` holds.
+static bool IsBuiltinMethodOn(
+    const Expr* call, const std::unordered_set<std::string_view>& names) {
   if (!call || call->kind != ExprKind::kCall) return false;
   if (!call->lhs || call->lhs->kind != ExprKind::kMemberAccess) return false;
   const Expr* root = LeftmostIdentifier(call->lhs);
   if (!root || root->kind != ExprKind::kIdentifier) return false;
-  return local_names.count(root->text) > 0;
+  return names.count(root->text) > 0;
 }
 
 // §13.4.3 — the recursion-invariant scope a constant function is validated
@@ -220,10 +226,15 @@ static void CheckConstFuncSystemCall(const Expr* e, ConstFuncBodyCheck& chk) {
 }
 
 // §13.4.3 (f) — built-in methods invoked on a local variable are the explicit
-// exception in the LRM; otherwise the callee must be a known function so that
-// the recursive constant-function check applies.
+// exception in the LRM, and §11.2.1 makes one invoked on a parameter with
+// constant arguments a constant built-in method call, which a constant
+// function may make as any constant expression may (`S.len()` on a string
+// parameter S); the arguments are walked under the usual rules. Otherwise the
+// callee must be a known function so that the recursive constant-function
+// check applies.
 static void CheckConstFuncCall(const Expr* e, ConstFuncBodyCheck& chk) {
-  if (IsBuiltinMethodOnLocal(e, chk.local_names)) {
+  if (IsBuiltinMethodOn(e, chk.local_names) ||
+      IsBuiltinMethodOn(e, chk.param_names)) {
     for (auto* a : e->args) WalkConstFuncExpr(a, chk);
     return;
   }

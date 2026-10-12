@@ -49,12 +49,21 @@ namespace delta {
 // real value -- is a real operand as its value would be: `(r + f) / 2` over
 // `parameter r = 5.7` is real arithmetic. Only a parameter of the registered
 // module is known here, as ConstEvalReal reads it.
+//
+// §13.4.3 folds a constant function as it would run (ConstFuncRealFrame), so
+// inside one a local declared real is a real operand, and anywhere a call of a
+// constant function declared to return a real is.
 static bool IsRealOperand(const Expr* e) {
   if (e->kind == ExprKind::kRealLiteral || e->kind == ExprKind::kTimeLiteral)
     return true;
   if (e->kind == ExprKind::kIdentifier) {
+    if (ConstFuncRealLocal(e->text)) return true;
     const RtlirParamDecl* pd = RegisteredParamNamed(e->text);
     return pd != nullptr && pd->is_real_value;
+  }
+  if (e->kind == ExprKind::kCall) {
+    const ModuleItem* fn = RegisteredConstFunc(e);
+    if (fn != nullptr) return IsConstFuncRealType(fn->return_type);
   }
   if (e->kind != ExprKind::kSystemCall && e->kind != ExprKind::kCall)
     return false;
