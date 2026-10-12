@@ -262,25 +262,29 @@ void ElaboratorOperationRules::ValidateUnsizedInConcat(const ModuleDecl* decl) {
     if (is_proc && item->body) {
       WalkStmtsForUnsizedInConcat(item->body);
     }
-    // §10.10 with §10.8 (printed pages 264 and 259): a continuous assignment
-    // is an assignment-like context, so braces it assigns to an unpacked
-    // array are an unpacked array concatenation whose items may be unsized,
-    // as a procedural assignment's are.
-    if (item->kind == ModuleItemKind::kContAssign) {
-      WalkExprForUnsizedInConcat(item->assign_lhs);
-      const Expr* rhs = item->assign_rhs;
-      if (rhs->kind == ExprKind::kConcatenation &&
-          IsUnpackedArrayConcatTarget(item->assign_lhs)) {
-        for (auto* elem : rhs->elements) WalkExprForUnsizedInConcat(elem);
-      } else {
-        WalkExprForUnsizedInConcat(rhs);
-      }
-    }
+    if (item->kind == ModuleItemKind::kContAssign)
+      CheckContAssignUnsizedInConcat(item);
     CheckVarInitUnsizedInConcat(item);
   }
   for (const auto& p : decl->params) {
     WalkExprForUnsizedInConcat(p.second);
   }
+}
+
+// §10.10 with §10.8 (printed pages 264 and 259): a continuous assignment is
+// an assignment-like context, so braces it assigns to an unpacked array are an
+// unpacked array concatenation whose items may be unsized, as a procedural
+// assignment's are.
+void ElaboratorOperationRules::CheckContAssignUnsizedInConcat(
+    const ModuleItem* item) {
+  WalkExprForUnsizedInConcat(item->assign_lhs);
+  const Expr* rhs = item->assign_rhs;
+  if (rhs->kind == ExprKind::kConcatenation &&
+      IsUnpackedArrayConcatTarget(item->assign_lhs)) {
+    for (auto* elem : rhs->elements) WalkExprForUnsizedInConcat(elem);
+    return;
+  }
+  WalkExprForUnsizedInConcat(rhs);
 }
 
 void ElaboratorOperationRules::CheckVarInitUnsizedInConcat(

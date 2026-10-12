@@ -160,6 +160,7 @@ class ElaboratorOperationRules : public ElaboratorData {
 
   void ValidateUnsizedInConcat(const ModuleDecl* decl);
   void CheckVarInitUnsizedInConcat(const ModuleItem* item);
+  void CheckContAssignUnsizedInConcat(const ModuleItem* item);
   // §10.10 with §7.10.4: whether `lhs` designates an unpacked array, so that
   // a `{...}` assigned to it is an unpacked array concatenation and not the
   // vector concatenation §11.4.12 keeps an unsized constant out of. A declared
