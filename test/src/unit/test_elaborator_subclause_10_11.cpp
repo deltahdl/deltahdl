@@ -386,13 +386,13 @@ TEST(NetAliasingElaboration, EveryNetLvalueFormElaborates) {
       "typedef struct packed { logic [1:0] hi, lo; } pair_t;\n"
       "module m;\n"
       "  parameter P = 1;\n"
-      "  wire [3:0] x, z; wire [1:0] a, b, c, d; wire [1:0][1:0] y;\n"
+      "  wire [3:0] x, z, u; wire [1:0] a, b, c, d; wire [1:0][1:0] y;\n"
       "  alias x[2] = a[0];\n"
       "  alias x[0 +: 2] = b;\n"
       "  alias y[1][0] = a[1];\n"
       "  alias x = pair_t'{c, d};\n"
       "  alias z = '{c, d};\n"
-      "  alias z[P:0] = d;\n"
+      "  alias u[P:0] = d;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -525,6 +525,59 @@ TEST(NetAliasingElaboration, AliasInGenerateLoopElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §10.11 with Syntax 10-6: a positional pattern operand stands for its items'
+// bits in order, as a concatenation does, typed or not, so a bit it places
+// against itself is aliased to itself.
+TEST(NetAliasingElaboration, PatternOperandBitAliasedToItselfIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef struct packed { logic [3:0] hi, lo; } pair_t;\n"
+      "module m;\n"
+      "  wire [7:0] w, v; wire [3:0] a, b;\n"
+      "  alias w = pair_t'{a, w[3:0]};\n"
+      "  alias v = '{v[7:4], b};\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {4u, 5u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "net bits aliased to themselves", line, "10.11"));
+  }
+}
+
+// §10.11: an alias a pattern operand specifies is the one a concatenation of
+// the same nets specifies, so writing it both ways specifies it twice.
+TEST(NetAliasingElaboration, PatternAliasRepeatedAsConcatenationIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire [7:0] p; wire [3:0] q, r;\n"
+      "  alias p = '{q, r};\n"
+      "  alias {q, r} = p;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "alias bit correspondence specified more than once",
+                            4, "10.11"));
+}
+
+// §10.9 with Syntax 10-6: a typed pattern operand of an alias is the
+// left-hand-side form of a net_lvalue, so each item has the bit count of the
+// member it stands for, though the items' total matches the other operand.
+TEST(NetAliasingElaboration, TypedPatternOperandItemWidthMismatchIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef struct packed { logic [3:0] hi, lo; } pair_t;\n"
+      "module m;\n"
+      "  wire [7:0] w; wire [4:0] c; wire [2:0] d;\n"
+      "  alias w = pair_t'{c, d};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "LHS assignment pattern item has 5 bits but "
+                            "member 'hi' of its type has 4 bits",
+                            4, "10.9"));
 }
 
 }  // namespace

@@ -135,6 +135,12 @@ void Elaborator::ValidateLhsPatternWidths(const ModuleDecl* decl,
     for (const Stmt* s : item->func_body_stmts) WalkStmtsForLhsPattern(s, kCtx);
     if (item->kind == ModuleItemKind::kContAssign)
       CheckLhsPattern(item->assign_lhs, item->assign_rhs, kCtx);
+    // Syntax 10-6: a typed pattern operand of an alias is the net_lvalue a
+    // continuous assignment's left-hand side is, its items standing for the
+    // members of its type as there.
+    if (item->kind != ModuleItemKind::kAlias) continue;
+    for (const Expr* net : item->alias_nets)
+      if (net->kind == ExprKind::kCast) CheckTypedLhsPatternItems(net, kCtx);
   }
 }
 

@@ -413,15 +413,22 @@ std::optional<std::vector<AliasBitRef>> FlattenAliasSelectBits(
 }
 
 // Flatten an alias operand (identifier, constant bit/part-select, or
-// concatenation of these) into its MSB-first list of constituent net bits.
-// Returns nullopt if any part is not a constant select over a known net, so the
-// caller skips the bit-level analysis rather than mis-reporting.
+// concatenation or positional pattern of these) into its MSB-first list of
+// constituent net bits. Syntax 10-6 has a pattern, typed or not, stand for its
+// items' bits in order, as a concatenation does; CheckAliasOperandForms has
+// already made a cast here one that types a positional pattern. Returns
+// nullopt if any part is not a constant select over a known net, so the caller
+// skips the bit-level analysis rather than mis-reporting.
 template <typename ScopeFn>
 std::optional<std::vector<AliasBitRef>> FlattenAliasOperandBits(
     const Expr* e, const AliasExpansionCtx<ScopeFn>& ctx) {
   if (e->kind == ExprKind::kIdentifier) return FlattenAliasIdentBits(e, ctx);
   if (e->kind == ExprKind::kSelect) return FlattenAliasSelectBits(e, ctx);
-  if (e->kind != ExprKind::kConcatenation) return std::nullopt;
+  if (e->kind == ExprKind::kCast) e = e->lhs;
+  if (e->kind != ExprKind::kConcatenation &&
+      e->kind != ExprKind::kAssignmentPattern) {
+    return std::nullopt;
+  }
   std::vector<AliasBitRef> bits;
   for (auto* el : e->elements) {
     auto sub = FlattenAliasOperandBits(el, ctx);
