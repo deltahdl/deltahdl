@@ -50,22 +50,11 @@ bool IsConstFuncRealType(const DataType& type) {
          type.kind == DataTypeKind::kRealtime;
 }
 
-static std::optional<double> EvalRealBinary(TokenKind op, double lhs,
-                                            double rhs) {
+// §11.3.1: the relational, equality and logical operators take real
+// operands and give a 1-bit result, read here as the real it converts to.
+static std::optional<double> EvalRealComparison(TokenKind op, double lhs,
+                                                double rhs) {
   switch (op) {
-    case TokenKind::kPlus:
-      return lhs + rhs;
-    case TokenKind::kMinus:
-      return lhs - rhs;
-    case TokenKind::kStar:
-      return lhs * rhs;
-    case TokenKind::kSlash:
-      if (rhs == 0.0) return std::nullopt;
-      return lhs / rhs;
-    case TokenKind::kPower:
-      return std::pow(lhs, rhs);
-    // §11.3.1: the relational, equality and logical operators take real
-    // operands and give a 1-bit result, read here as the real it converts to.
     case TokenKind::kLt:
       return lhs < rhs ? 1.0 : 0.0;
     case TokenKind::kLtEq:
@@ -84,6 +73,25 @@ static std::optional<double> EvalRealBinary(TokenKind op, double lhs,
       return lhs != 0.0 || rhs != 0.0 ? 1.0 : 0.0;
     default:
       return std::nullopt;
+  }
+}
+
+static std::optional<double> EvalRealBinary(TokenKind op, double lhs,
+                                            double rhs) {
+  switch (op) {
+    case TokenKind::kPlus:
+      return lhs + rhs;
+    case TokenKind::kMinus:
+      return lhs - rhs;
+    case TokenKind::kStar:
+      return lhs * rhs;
+    case TokenKind::kSlash:
+      if (rhs == 0.0) return std::nullopt;
+      return lhs / rhs;
+    case TokenKind::kPower:
+      return std::pow(lhs, rhs);
+    default:
+      return EvalRealComparison(op, lhs, rhs);
   }
 }
 
