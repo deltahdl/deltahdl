@@ -246,7 +246,7 @@ static void ExpandUnionFirstMember(Variable* var, const StructTypeInfo* sinfo,
 
 static void ExpandClassProperties(ClassObject* obj, SimContext& ctx,
                                   std::vector<Logic4Vec>& parts,
-                                  uint32_t& total_width, Arena& arena);
+                                  uint32_t& total_width);
 
 // The elements an array member holds from the left, a dynamic one's count
 // read off the object; an element it holds no value for streams as zeros.
@@ -285,7 +285,8 @@ static bool TryExpandClassCollectionMember(
 static void ExpandClassMember(ClassObject* obj,
                               const ClassTypeInfo::PropertyInfo& prop,
                               SimContext& ctx, std::vector<Logic4Vec>& parts,
-                              uint32_t& total_width, Arena& arena) {
+                              uint32_t& total_width) {
+  Arena& arena = ctx.GetArena();
   if (TryExpandClassCollectionMember(obj, prop, parts, total_width, arena))
     return;
   auto it = obj->properties.find(std::string(prop.name));
@@ -296,7 +297,7 @@ static void ExpandClassMember(ClassObject* obj,
   }
   if (ctx.FindClassType(prop.type_name) != nullptr) {
     if (ClassObject* member = ctx.GetClassObject(it->second.ToUint64()))
-      ExpandClassProperties(member, ctx, parts, total_width, arena);
+      ExpandClassProperties(member, ctx, parts, total_width);
     return;
   }
   parts.push_back(it->second);
@@ -310,14 +311,14 @@ static void ExpandClassMember(ClassObject* obj,
 // and nothing where it is null, and any other member its value.
 static void ExpandClassProperties(ClassObject* obj, SimContext& ctx,
                                   std::vector<Logic4Vec>& parts,
-                                  uint32_t& total_width, Arena& arena) {
+                                  uint32_t& total_width) {
   std::vector<const ClassTypeInfo*> chain;
   for (auto* t = obj->type; t; t = t->parent) chain.push_back(t);
   std::reverse(chain.begin(), chain.end());
   for (auto* t : chain) {
     for (const auto& prop : t->properties) {
       if (!prop.is_static)
-        ExpandClassMember(obj, prop, ctx, parts, total_width, arena);
+        ExpandClassMember(obj, prop, ctx, parts, total_width);
     }
   }
 }
@@ -392,7 +393,7 @@ static bool TryExpandStructAggregate(const Expr* elem,
 // parts. Returns true if the named class variable existed (a null handle
 // contributes zero parts but is still considered handled).
 static bool TryExpandClassAggregate(const Expr* elem, SimContext& ctx,
-                                    Arena& arena, std::vector<Logic4Vec>& parts,
+                                    std::vector<Logic4Vec>& parts,
                                     uint32_t& total_width) {
   auto* var = ctx.FindVariable(elem->text);
   if (!var) return false;
@@ -402,7 +403,7 @@ static bool TryExpandClassAggregate(const Expr* elem, SimContext& ctx,
   }
   auto* obj = ctx.GetClassObject(handle);
   if (obj) {
-    ExpandClassProperties(obj, ctx, parts, total_width, arena);
+    ExpandClassProperties(obj, ctx, parts, total_width);
     return true;
   }
   return false;
@@ -451,7 +452,7 @@ static bool TryExpandAggregateElement(const Expr* elem, SimContext& ctx,
 
   if (auto class_type = ctx.GetVariableClassType(elem->text);
       !class_type.empty()) {
-    if (TryExpandClassAggregate(elem, ctx, arena, parts, total_width)) {
+    if (TryExpandClassAggregate(elem, ctx, parts, total_width)) {
       return true;
     }
   }
