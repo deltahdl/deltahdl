@@ -665,4 +665,35 @@ TEST(DisableStatementExecution, HierarchicalDisableOfABlockInATask) {
       "n=3 t=35 after=1\n");
 }
 
+// §9.6.2 with §12.7.3: a foreach is an implicit block its label names, so a
+// disable of that label inside a function ends the loop and the function goes
+// on after it. The fixed-size array is walked by its dimensions and the queue
+// by its index values, the function body's two foreach paths.
+TEST(DisableStatementExecution, DisablingAForeachLabelInAFunctionEndsTheLoop) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int a [4];\n"
+                       "  int q [$] = '{7, 8, 9};\n"
+                       "  function automatic int fa();\n"
+                       "    int n = 0;\n"
+                       "    la: foreach (a[i]) begin\n"
+                       "      n++;\n"
+                       "      if (i == 1) disable la;\n"
+                       "    end\n"
+                       "    return n + 100;\n"
+                       "  endfunction\n"
+                       "  function automatic int fq();\n"
+                       "    int n = 0;\n"
+                       "    lq: foreach (q[i]) begin\n"
+                       "      n++;\n"
+                       "      if (i == 0) disable lq;\n"
+                       "    end\n"
+                       "    return n + 200;\n"
+                       "  endfunction\n"
+                       "  initial $display(\"%0d %0d\", fa(), fq());\n"
+                       "endmodule\n",
+                       f),
+            "102 201\n");
+}
+
 }  // namespace

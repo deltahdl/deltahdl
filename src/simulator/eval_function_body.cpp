@@ -568,14 +568,18 @@ static FuncFlow ExecFuncForeachDims(const Stmt* stmt,
   return LoopExitFlow(flow);
 }
 
+// §12.7.3 makes a foreach an implicit block its label names, so §9.6.2's
+// disable of that label ends the loop and goes on after it (FuncNamedScope),
+// as it does for the other loops.
 static FuncFlow ExecFuncForeach(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
   if (labeled) exec.ctx.PushStaticScope(stmt->label);
+  FuncNamedScope named(stmt->label, exec);
   std::vector<ForeachDim> dims = FuncForeachDims(stmt, exec);
   if (!dims.empty()) {
     FuncFlow flow = ExecFuncForeachDims(stmt, dims, exec);
     if (labeled) exec.ctx.PopStaticScope(stmt->label);
-    return flow;
+    return named.Leave(flow);
   }
   auto* aa = FindAssocArrayOfBase(stmt->expr, exec.ctx, exec.arena);
   std::vector<Logic4Vec> keys = ForeachIndexValues(stmt, exec);
@@ -584,7 +588,7 @@ static FuncFlow ExecFuncForeach(const Stmt* stmt, const FuncExecCtx& exec) {
     flow = ExecFuncForeachLoop(stmt, keys, aa, exec);
   }
   if (labeled) exec.ctx.PopStaticScope(stmt->label);
-  return flow;
+  return named.Leave(flow);
 }
 
 // Carries out a `return <expr>;`. §13.4.1: the function definition implicitly
