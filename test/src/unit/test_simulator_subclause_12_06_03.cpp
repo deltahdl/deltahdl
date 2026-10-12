@@ -42,7 +42,10 @@ TEST(TernaryMatchesSim, TernaryMatchesFalse) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST(TernaryMatchesSim, TernaryMatchesWildcard) {
+// §12.6.1 lets pattern matching ignore bits only in casez and casex, so in a
+// conditional's matches clause (§12.6.3) a z bit of the pattern matches a z
+// alone.
+TEST(TernaryMatchesSim, PatternZBitsAreNoWildcard) {
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -55,7 +58,7 @@ TEST(TernaryMatchesSim, TernaryMatchesWildcard) {
       "endmodule\n",
       f, "y");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 1u);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(TernaryMatchesSim, TernaryMatchesGuardTrue) {
@@ -294,25 +297,27 @@ TEST(TernaryMatchesSim, TernaryMatchesInDeclarationInitializer) {
 // §12.6.3: the predicate e1 can evaluate to an ambiguous value. A matches
 // clause always yields a defined 1-bit result, but a Boolean filter joined by
 // `&&&` can be unknown. Here the matches clause holds while the trailing
-// Boolean filter is x, so the conjunction does not reach a determined true and
-// the predicate does not hold; the alternative e3 (99) is selected rather than
-// the consequent e2 (10). This exercises the unknown-filter input form,
-// distinct from a filter that is a determined 0.
-TEST(TernaryMatchesSim, TernaryMatchesUnknownFilterSelectsAlternative) {
+// Boolean filter is x, so the predicate is ambiguous and §11.4.11 combines the
+// two results bit by bit: 8'd10 and 8'd99 agree on bits 7, 4, 2 and 1 and give
+// x on the rest. This exercises the unknown-filter input form, distinct from a
+// filter that is a determined 0.
+TEST(TernaryMatchesSim, TernaryMatchesUnknownFilterCombinesBothResults) {
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [7:0] x, y;\n"
       "  logic guard;\n"
+      "  int ok;\n"
       "  initial begin\n"
       "    x = 8'd5;\n"
       "    guard = 1'bx;\n"
       "    y = (x matches 8'd5 &&& guard) ? 8'd10 : 8'd99;\n"
+      "    ok = y === 8'b0xx0_x01x;\n"
       "  end\n"
       "endmodule\n",
-      f, "y");
+      f, "ok");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 99u);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 // §12.6.3: the pattern's identifiers are in scope in the consequent, which

@@ -517,7 +517,7 @@ TEST(LoopStatementSim, ForStringAndRealControlVariablesInAFunction) {
                 "  int n;\n"
                 "  function automatic int f();\n"
                 "    int c = 0;\n"
-                "    for (string s = \"\"; s.len() < 3 && c < 10;\n"
+                "    for (string s = \"\"; s != \"xxx\" && c < 10;\n"
                 "         s = {s, \"x\"})\n"
                 "      c++;\n"
                 "    for (real r = 0.0; r < 1.0 && c < 100; r = r + 0.25)\n"

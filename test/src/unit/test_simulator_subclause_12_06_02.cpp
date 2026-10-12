@@ -46,7 +46,9 @@ TEST(IfMatchesSim, MatchesConstantFalse) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-TEST(IfMatchesSim, MatchesWildcardPattern) {
+// §12.6.1 lets pattern matching ignore bits only in casez and casex, so in an
+// if statement's matches clause a z bit of the pattern matches a z alone.
+TEST(IfMatchesSim, PatternZBitsAreNoWildcard) {
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -60,7 +62,7 @@ TEST(IfMatchesSim, MatchesWildcardPattern) {
       "endmodule\n",
       f, "y");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 1u);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
 TEST(IfMatchesSim, MatchesWildcardMismatch) {

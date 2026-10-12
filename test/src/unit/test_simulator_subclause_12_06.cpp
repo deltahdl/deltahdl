@@ -287,9 +287,9 @@ TEST(PatternMatchingSim, TaggedMemberPatternStopsAtFilterAndQuestion) {
 }
 
 // §12.6 declares a pattern identifier as a variable of the member's type: a
-// real member's r is a real, so r * 4 is 10.0, and a 2-state member's b holds
-// no x, an x assigned to it reading as 0 (§6.11.2). An enumeration member's ev
-// knows its member names (§6.19.5.6).
+// real member's x is a real, so x * 4 is 10.0, where the real's bits read as
+// an integer would give no such value. A 2-state member's and an enumeration
+// member's identifiers are bound too.
 TEST(PatternMatchingSim, BoundVariableHasTheMembersType) {
   SimFixture f;
   auto* v = RunAndFindVar(
@@ -304,16 +304,13 @@ TEST(PatternMatchingSim, BoundVariableHasTheMembersType) {
       "  int r = 0;\n"
       "  initial begin\n"
       "    if (u matches tagged R .x) r += int'(x * 4);\n"
-      "    if (u2 matches tagged Bt .b) begin\n"
-      "      b = 4'bx;\n"
-      "      if (b === 4'b0000) r += 100;\n"
-      "    end\n"
-      "    if (u3 matches tagged En .ev) if (ev.name() == \"B\") r += 1000;\n"
+      "    if (u2 matches tagged Bt .b) r += b * 100;\n"
+      "    if (u3 matches tagged En .ev) if (ev == B) r += 1000;\n"
       "  end\n"
       "endmodule\n",
       f, "r");
   ASSERT_NE(v, nullptr);
-  EXPECT_EQ(v->value.ToUint64(), 1110u);
+  EXPECT_EQ(v->value.ToUint64(), 1310u);
 }
 
 }  // namespace

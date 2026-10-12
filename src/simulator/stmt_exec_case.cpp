@@ -27,40 +27,56 @@
 
 namespace delta {
 
-static bool BitIsZ(const Logic4Vec& v, uint32_t bit) {
-  if (v.nwords == 0 || !v.words) return false;
-  uint32_t wi = bit / 64;
-  uint32_t bi = bit % 64;
-  if (wi >= v.nwords) return false;
-  bool a = (v.words[wi].aval >> bi) & 1;
-  bool b = (v.words[wi].bval >> bi) & 1;
-  return !a && b;  // z = (aval=0, bval=1)
+// §12.5: a plain `case` comparison succeeds only when every bit matches
+// exactly with respect to 0/1/x/z. To make that bitwise comparison meaningful,
+// the selector and the item expression are first made equal in length to the
+// longer of the two. The bits added by that extension are sign-filled only when
+// both operands are signed; if either is unsigned the whole comparison is
+// unsigned, so the added bits are zero. This mirrors the width/sign resolution
+// the simulator already applies to the equality operators (see 11.6.1, 11.8.1).
+// The (aval, bval) bit pair of `v` at position `i`, extending past the
+// operand's own width with either its replicated sign bit or zero.
+static void CaseBitAt(const Logic4Vec& v, uint32_t i, bool sign_ext,
+                      uint64_t& a, uint64_t& b) {
+  uint32_t src = i;
+  if (i >= v.width) {
+    if (!sign_ext || v.width == 0) {
+      a = 0;
+      b = 0;
+      return;
+    }
+    src = v.width - 1;
+  }
+  uint32_t wi = src / 64;
+  uint32_t bi = src % 64;
+  a = (wi < v.nwords) ? ((v.words[wi].aval >> bi) & 1) : 0;
+  b = (wi < v.nwords) ? ((v.words[wi].bval >> bi) & 1) : 0;
 }
 
-static bool BitIsXZ(const Logic4Vec& v, uint32_t bit) {
-  if (v.nwords == 0 || !v.words) return false;
-  uint32_t wi = bit / 64;
-  uint32_t bi = bit % 64;
-  if (wi >= v.nwords) return false;
-  return (v.words[wi].bval >> bi) & 1;
-}
+// §12.5.1: a z bit, which casez ignores, and an x or z bit, which casex
+// ignores, as the (aval, bval) pair CaseBitAt gives.
+static bool BitIsZ(uint64_t a, uint64_t b) { return a == 0 && b == 1; }
 
-using BitPredicate = bool (*)(const Logic4Vec&, uint32_t);
+static bool BitIsXZ(uint64_t /*a*/, uint64_t b) { return b == 1; }
 
+using BitPredicate = bool (*)(uint64_t, uint64_t);
+
+// §12.5.1 keeps §12.5's lengths and signedness: the two operands are extended
+// to the longer length, by sign where both are signed (CaseBitAt), and a bit
+// the predicate keeps compares as the plain case compares it, both halves, so
+// a casez x matches an x alone.
 static bool CaseDontCareMatch(const Logic4Vec& sel, const Logic4Vec& pat,
                               BitPredicate skip_bit) {
   uint32_t width = (sel.width > pat.width) ? sel.width : pat.width;
+  bool sign_ext = sel.is_signed && pat.is_signed;
   for (uint32_t i = 0; i < width; ++i) {
-    if (skip_bit(sel, i) || skip_bit(pat, i)) continue;
-    uint32_t swi = i / 64, sbi = i % 64;
-    uint32_t pwi = i / 64, pbi = i % 64;
-    bool sa = (swi < sel.nwords) && ((sel.words[swi].aval >> sbi) & 1);
-    bool pa = (pwi < pat.nwords) && ((pat.words[pwi].aval >> pbi) & 1);
-    // §12.5.1: a bit the predicate keeps compares as the plain case compares
-    // it, both halves, so a casez x matches an x alone; by the value half
-    // only, an x (aval 1, bval 1) matched a 1.
-    bool sb = (swi < sel.nwords) && ((sel.words[swi].bval >> sbi) & 1);
-    bool pb = (pwi < pat.nwords) && ((pat.words[pwi].bval >> pbi) & 1);
+    uint64_t sa = 0;
+    uint64_t sb = 0;
+    uint64_t pa = 0;
+    uint64_t pb = 0;
+    CaseBitAt(sel, i, sign_ext, sa, sb);
+    CaseBitAt(pat, i, sign_ext, pa, pb);
+    if (skip_bit(sa, sb) || skip_bit(pa, pb)) continue;
     if (sa != pa || sb != pb) return false;
   }
   return true;
@@ -86,32 +102,6 @@ static bool CasezMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
 static bool CaseInsidePatternMatch(const Logic4Vec& sel, const Expr* pat,
                                    SimContext& ctx, Arena& arena) {
   return EvalInsideElement(sel, pat, ctx, arena) == 1;
-}
-
-// §12.5: a plain `case` comparison succeeds only when every bit matches
-// exactly with respect to 0/1/x/z. To make that bitwise comparison meaningful,
-// the selector and the item expression are first made equal in length to the
-// longer of the two. The bits added by that extension are sign-filled only when
-// both operands are signed; if either is unsigned the whole comparison is
-// unsigned, so the added bits are zero. This mirrors the width/sign resolution
-// the simulator already applies to the equality operators (see 11.6.1, 11.8.1).
-// The (aval, bval) bit pair of `v` at position `i`, extending past the
-// operand's own width with either its replicated sign bit or zero.
-static void CaseBitAt(const Logic4Vec& v, uint32_t i, bool sign_ext,
-                      uint64_t& a, uint64_t& b) {
-  uint32_t src = i;
-  if (i >= v.width) {
-    if (!sign_ext || v.width == 0) {
-      a = 0;
-      b = 0;
-      return;
-    }
-    src = v.width - 1;
-  }
-  uint32_t wi = src / 64;
-  uint32_t bi = src % 64;
-  a = (wi < v.nwords) ? ((v.words[wi].aval >> bi) & 1) : 0;
-  b = (wi < v.nwords) ? ((v.words[wi].bval >> bi) & 1) : 0;
 }
 
 static bool CaseExactMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
@@ -186,9 +176,15 @@ static void SizeCaseStatement(const Stmt* stmt, SimContext& ctx,
 static Logic4Vec CaseOperandValue(const Expr* e, const CaseSubject& cs,
                                   SimContext& ctx, Arena& arena) {
   Logic4Vec v = EvalExpr(e, ctx, arena, cs.width);
-  if (v.is_real || v.is_string || v.width >= cs.width) return v;
-  if (v.fills_width) return FillUnbasedUnsized(v, cs.width, arena);
-  return ExtendVec(v, cs.width, cs.all_signed, arena);
+  if (v.is_real || v.is_string) return v;
+  if (v.fills_width && v.width < cs.width)
+    return FillUnbasedUnsized(v, cs.width, arena);
+  // Where every expression's type is signed, as far as their forms show it,
+  // each comparison extends its pair by sign, a form SimSelfSigned does not
+  // read -- a select, a call -- answering by its value's own (CaseBitAt).
+  if (cs.all_signed) return v;
+  v.is_signed = false;
+  return v.width < cs.width ? ExtendVec(v, cs.width, false, arena) : v;
 }
 
 // §12.6.1: the `&&&` filters of the item pattern `e` after its pattern

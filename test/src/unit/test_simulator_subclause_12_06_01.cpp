@@ -218,6 +218,8 @@ TEST(CaseMatchesItemSim, CaseMatchesNoMatchNoDefault) {
             42u);
 }
 
+// §12.6.1: casez ignores the z bits of a pattern-matching case, so 4'b1???
+// matches 4'b1010; with case no bit is ignored (PlainCaseConstantPattern...).
 TEST(CaseMatchesItemSim, CaseMatchesWildcardPattern) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -226,7 +228,7 @@ TEST(CaseMatchesItemSim, CaseMatchesWildcardPattern) {
                       "  logic [7:0] x;\n"
                       "  initial begin\n"
                       "    sel = 4'b1010;\n"
-                      "    case(sel) matches\n"
+                      "    casez(sel) matches\n"
                       "      4'b0???: x = 8'd1;\n"
                       "      4'b1???: x = 8'd2;\n"
                       "      default: x = 8'd0;\n"
