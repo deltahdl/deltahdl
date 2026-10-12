@@ -174,6 +174,10 @@ void ReevaluateParamValue(const RtlirParamDecl& param, Variable* var,
     // a bare parameter name answers that parameter's own storage.
     Logic4Vec value = EvalExpr(expr, ctx, arena, width);
     var->value = OwnRhsWords(ResizeToWidth(value, width, arena), arena);
+    // §6.11.2: a parameter of a 2-state type stores an unknown bit its value
+    // has, `$size` of a dimension the operand lacks (§20.7), as 0.
+    if (param.decl_type != nullptr && !Is4stateType(param.decl_type->kind))
+      CoerceTo2State(var->value);
   }
   ctx.SetLoweringInstancePrefix(own);
 }

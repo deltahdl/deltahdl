@@ -392,7 +392,7 @@ TEST(AggregateExpr, EquivalentArraySliceInequality) {
       "  typedef logic [7:0] arr_t [0:7];\n"
       "  arr_t x, y;\n"
       "  logic neq;\n"
-      "  initial neq = (x[0:3] != y[0:4]);\n"
+      "  initial neq = (x[0:3] != y[0:3]);\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
