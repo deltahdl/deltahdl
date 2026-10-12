@@ -425,6 +425,9 @@ uint32_t LhsContextWidth(const Expr* lhs, SimContext& ctx, Arena& arena);
 // Defined in statement_assign_conditional.cpp.
 bool TryConditionalCollectionAssign(const Stmt* stmt, SimContext& ctx,
                                     Arena& arena);
+// §11.4.11: the same for a conditional over two fixed-size unpacked arrays of
+// one dimension assigned to one. Defined in statement_assign_conditional.cpp.
+bool TryConditionalArrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
 // §11.4.1 with §11.6.1: `a op= b` is `a = a op (b)`, so where `op` sizes its
 // operands by context -- the arithmetic and bitwise operators of Table 11-21

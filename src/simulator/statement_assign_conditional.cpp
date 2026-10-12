@@ -1,7 +1,10 @@
 // §11.4.11 for a conditional whose operands are queues, dynamic arrays or
 // associative arrays assigned whole, which a value of one vector cannot carry.
 
+#include <algorithm>
 #include <cstddef>
+#include <cstdint>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -17,6 +20,7 @@
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -87,6 +91,57 @@ bool MergeAssocOperands(AssocArrayObject* assoc, const Expr* rhs,
   return true;
 }
 
+// §11.4.11 with Table 7-1: the element an unknown predicate yields from the two
+// arms' elements `t` and `e` -- the value both hold where they match, and the
+// element type's default, x for a four-state type and 0 for a two-state one,
+// where they do not.
+Logic4Vec MergedConditionalElement(const Logic4Vec& t, const Logic4Vec& e,
+                                   const ArrayInfo& dst, Arena& arena) {
+  Logic4Vec a = ResizeToWidth(t, dst.elem_width, arena);
+  Logic4Vec b = ResizeToWidth(e, dst.elem_width, arena);
+  bool same = true;
+  for (uint32_t w = 0; w < a.nwords && same; ++w)
+    same = a.words[w].aval == b.words[w].aval &&
+           a.words[w].bval == b.words[w].bval;
+  if (same) return OwnRhsWords(a, arena);
+  return dst.is_4state ? MakeAllX(arena, dst.elem_width)
+                       : MakeLogic4VecVal(arena, dst.elem_width, 0);
+}
+
+// Whether the known predicate `cond` holds: any bit of it set.
+bool KnownPredicateHolds(const Logic4Vec& cond) {
+  for (uint32_t w = 0; w < cond.nwords; ++w) {
+    if (cond.words[w].aval != 0) return true;
+  }
+  return false;
+}
+
+// Writes each element of the array `dst_name` describes by `dst` the element
+// MergedConditionalElement makes of the elements of the conditional `cond`'s
+// two arms at the same position, left to right.
+void WriteMergedConditionalArray(std::string_view dst_name,
+                                 const ArrayInfo& dst, const Expr* cond,
+                                 SimContext& ctx, Arena& arena) {
+  const Expr* t = cond->true_expr;
+  const Expr* e = cond->false_expr;
+  std::vector<Logic4Vec> tv;
+  std::vector<Logic4Vec> ev;
+  CollectFixedArrayElements(t->text, *ctx.FindArrayInfo(t->text), ctx, tv);
+  CollectFixedArrayElements(e->text, *ctx.FindArrayInfo(e->text), ctx, ev);
+  size_t count =
+      std::min({static_cast<size_t>(dst.size), tv.size(), ev.size()});
+  for (size_t i = 0; i < count; ++i) {
+    auto offset = static_cast<uint32_t>(i);
+    uint32_t idx =
+        dst.is_descending ? dst.lo + dst.size - 1 - offset : dst.lo + offset;
+    Variable* var = ctx.FindVariable(std::string(dst_name) + "[" +
+                                     std::to_string(idx) + "]");
+    if (var == nullptr) continue;
+    var->value = MergedConditionalElement(tv[i], ev[i], dst, arena);
+    var->NotifyWatchers();
+  }
+}
+
 }  // namespace
 
 // §11.4.11 with §7.5, §7.8 and §7.10: a known predicate assigns the chosen
@@ -118,6 +173,35 @@ bool TryConditionalCollectionAssign(const Stmt* stmt, SimContext& ctx,
                            : MergeAssocOperands(assoc, rhs, ctx);
   if (kMerged) NotifyOwningVar(ctx, kTarget);
   return kMerged;
+}
+
+// §11.4.11: `r = c ? a : b` over fixed-size unpacked arrays. A known predicate
+// copies the array it selects whole; an unknown one merges the two arms
+// element by element (WriteMergedConditionalArray). Evaluated as a value, the
+// conditional read each arm's name as one element, and nothing reached `r`.
+bool TryConditionalArrayAssign(const Stmt* stmt, SimContext& ctx,
+                               Arena& arena) {
+  const Expr* rhs = stmt->rhs;
+  if (rhs == nullptr || rhs->kind != ExprKind::kTernary ||
+      stmt->lhs->kind != ExprKind::kIdentifier)
+    return false;
+  const ArrayInfo* dst = ctx.FindArrayInfo(stmt->lhs->text);
+  const Expr* t = rhs->true_expr;
+  const Expr* e = rhs->false_expr;
+  if (dst == nullptr || dst->is_dynamic || dst->is_queue ||
+      !dst->dim_sizes.empty() || t->kind != ExprKind::kIdentifier ||
+      e->kind != ExprKind::kIdentifier || !ctx.FindArrayInfo(t->text) ||
+      !ctx.FindArrayInfo(e->text))
+    return false;
+  Logic4Vec cond = EvalExpr(rhs->condition, ctx, arena);
+  if (!cond.IsKnown()) {
+    WriteMergedConditionalArray(stmt->lhs->text, *dst, rhs, ctx, arena);
+    return true;
+  }
+  const Expr* src = KnownPredicateHolds(cond) ? t : e;
+  CopyArrayElements(stmt->lhs->text, *dst, src->text,
+                    *ctx.FindArrayInfo(src->text), ctx);
+  return true;
 }
 
 }  // namespace delta
