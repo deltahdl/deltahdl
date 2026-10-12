@@ -206,8 +206,9 @@ TEST(AssignmentLikeContext, RefPortNetBindingRejected) {
 
 // §10.8 counts a connection to an output port among the assignment-like
 // contexts, and §10.9 lets a positional pattern of lvalues stand on the side
-// being assigned; a keyed pattern, an item that is no lvalue, a formal that is
-// no aggregate and an inout port each leave the pattern illegal.
+// being assigned; a keyed pattern, an item that is no lvalue, a formal of no
+// type §10.9 has a pattern construct, as int is no array, and an inout port
+// each leave the pattern illegal.
 TEST(AssignmentLikeContext, PatternOnAggregateOutputPort) {
   ElabFixture f;
   ElaborateSrc(
@@ -215,7 +216,7 @@ TEST(AssignmentLikeContext, PatternOnAggregateOutputPort) {
       "typedef struct packed { logic [7:0] a; } one_t;\n"
       "module sub(output pair_t p); endmodule\n"
       "module io(inout pair_t p); endmodule\n"
-      "module sc(output logic [15:0] p); endmodule\n"
+      "module sc(output int p); endmodule\n"
       "module top;\n"
       "  logic [7:0] x, y; logic [15:0] z; one_t s;\n"
       "  sub u1(.p('{x, y}));\n"
