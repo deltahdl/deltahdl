@@ -135,6 +135,13 @@ void RecordTypedef(TypedefMap& typedefs, std::string_view name,
 // package, which may declare one of its own under that name.
 DataType InPackageScope(const DataType& type, const PackageDecl& package);
 
+// The type `dtype` stands for, following each typedef or user-defined nettype
+// name (§6.18, §6.6.7) to the type it was declared with as far as the table
+// holds one: a type, or the last name on the way the table holds nothing for,
+// a class's among them.
+const DataType& LastTypeInChain(const DataType& dtype,
+                                const TypedefMap& typedefs);
+
 // The kind of the type `dtype` stands for, following each typedef or
 // user-defined nettype name (§6.18, §6.6.7) to the type it was declared with;
 // the kind as written for a type no name stands for.

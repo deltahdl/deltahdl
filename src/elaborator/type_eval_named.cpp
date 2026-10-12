@@ -1,8 +1,8 @@
 // Named-type and member-type resolution: FindNamedType, MemberNamedType,
 // NestedAggregateSource and ResolveNestedAggregateTypes, moved out of
 // type_eval.cpp verbatim, for room, once that file reached the source-size
-// gate; ResolvedTypeKind, which follows a chain of names to its type; and
-// RecordTypedef, which enters a typedef into the table.
+// gate; LastTypeInChain and ResolvedTypeKind, which follow a chain of names to
+// its type; and RecordTypedef, which enters a typedef into the table.
 
 #include <cstddef>
 #include <string>
@@ -57,8 +57,8 @@ DataType InPackageScope(const DataType& type, const PackageDecl& package) {
   return scoped;
 }
 
-DataTypeKind ResolvedTypeKind(const DataType& dtype,
-                              const TypedefMap& typedefs) {
+const DataType& LastTypeInChain(const DataType& dtype,
+                                const TypedefMap& typedefs) {
   // Each step follows one name, and a chain longer than the table has names
   // runs through one of them twice, so the walk is bounded by the table.
   const DataType* type = &dtype;
@@ -67,7 +67,12 @@ DataTypeKind ResolvedTypeKind(const DataType& dtype,
     if (named == nullptr) break;
     type = named;
   }
-  return type->kind;
+  return *type;
+}
+
+DataTypeKind ResolvedTypeKind(const DataType& dtype,
+                              const TypedefMap& typedefs) {
+  return LastTypeInChain(dtype, typedefs).kind;
 }
 
 // ResolvedTypeKind answers the named kind for every chain that does not end

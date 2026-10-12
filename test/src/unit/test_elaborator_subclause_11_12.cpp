@@ -637,10 +637,10 @@ TEST(LetDeclElaboration, ActualTypesAreJudgedByCastCompatibility) {
 
 // §11.12 with §6.22.5, §8.12 and §8.16: a class handle fits a formal of its
 // own class, of a class it derives from, or of one derived from it, the last
-// by $cast, and a class reached through a typedef or a type named through a
-// package is left to the typedef walk; a handle of an unrelated class, a
-// class handle for an int or a string formal, and an int or a string for a
-// class formal are reported.
+// by $cast, a typedef of a class standing for that class and a package's
+// typedef of int for int; a handle of an unrelated class, a class handle for
+// an int or a string formal, and an int or a string for a class formal are
+// reported.
 TEST(LetDeclElaboration, ClassActualsAndFormalsAreJudgedByTheirHierarchy) {
   ElabFixture f;
   ElaborateSrc(
@@ -670,6 +670,48 @@ TEST(LetDeclElaboration, ClassActualsAndFormalsAreJudgedByTheirHierarchy) {
                              "is not cast compatible with the type of formal",
                              14, "11.12"));
   for (uint32_t line : {15u, 16u, 17u, 18u, 19u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "is not cast compatible with the type of formal",
+                              line, "11.12"));
+  }
+}
+
+// §11.12 with §6.22.5 and §26.3: a class named through a chain of typedefs,
+// or behind its package's prefix, is judged as that class, so a handle of a
+// class deriving from it fits, while an int for a typedef of a class, a
+// package's typedef of int for a class formal, a class handle for a package's
+// unrelated class, and a package's class handle for an unrelated class formal
+// are reported.
+TEST(LetDeclElaboration, ClassesNamedThroughTypedefsAndPackagesAreJudged) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class B; endclass\n"
+      "package pk; typedef int int_t; endpackage\n"
+      "package pc;\n"
+      "  typedef int n_t;\n"
+      "  class P; endclass\n"
+      "  class P2 extends P; endclass\n"
+      "endpackage\n"
+      "module m;\n"
+      "  typedef B b_t;\n"
+      "  typedef b_t bb_t;\n"
+      "  B b; bb_t tb; pk::int_t pi; int i; pc::P p; pc::P2 p2;\n"
+      "  let lb(B x) = 1;\n"
+      "  let lt(bb_t x) = 1;\n"
+      "  let lp(pc::P x) = 1;\n"
+      "  initial begin\n"
+      "    $display(\"%0d\", lt(b) + lb(tb) + lp(p2) + lp(p));\n"
+      "    $display(\"%0d\", lt(i));\n"
+      "    $display(\"%0d\", lb(pi));\n"
+      "    $display(\"%0d\", lp(b));\n"
+      "    $display(\"%0d\", lb(p2));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "is not cast compatible with the type of formal",
+                             16, "11.12"));
+  for (uint32_t line : {17u, 18u, 19u, 20u}) {
     EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                               "is not cast compatible with the type of formal",
                               line, "11.12"));

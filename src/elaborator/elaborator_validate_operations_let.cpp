@@ -328,40 +328,42 @@ class LetActualCheck {
       Report(actual, formal);
       return;
     }
-    if (JudgedAsClasses(actual, formal, *it->second.type)) return;
-    const DataType* a = TypeAtChainEnd(*it->second.type, typedefs_);
-    const DataType* f = TypeAtChainEnd(written, typedefs_);
-    if (a == nullptr || f == nullptr || ActualFitsFormal(*a, *f, typedefs_))
-      return;
-    Report(actual, formal);
+    if (!SidesFit(LastTypeInChain(*it->second.type, typedefs_),
+                  LastTypeInChain(written, typedefs_)))
+      Report(actual, formal);
   }
 
-  // The class a type names by its bare name, null for any other type.
+  // The class `t` names: by its bare name where FindClassDecl looks, and
+  // behind a package's prefix among that package's declarations (§26.3).
   const ClassDecl* NamedClass(const DataType& t) const {
-    if (t.kind != DataTypeKind::kNamed || !t.scope_name.empty()) return nullptr;
-    return FindClassDecl(t.type_name, unit_);
+    if (t.kind != DataTypeKind::kNamed) return nullptr;
+    if (t.scope_name.empty()) return FindClassDecl(t.type_name, unit_);
+    const ClassDecl* found = nullptr;
+    for (const PackageDecl* pkg : unit_->packages) {
+      if (pkg->name != t.scope_name) continue;
+      for (const ModuleItem* item : pkg->items) {
+        if (item->kind == ModuleItemKind::kClassDecl &&
+            item->class_decl->name == t.type_name)
+          found = item->class_decl;
+      }
+    }
+    return found;
   }
 
+  // An actual's type and its formal's, each where LastTypeInChain leaves it.
   // §6.22.5: a class handle is type incompatible with every type but a
   // class's. §8.12 passes one up its hierarchy by assignment and §8.16 down it
   // by $cast, so two class types fit where one derives from the other
-  // (IsClassDerivedFrom, which follows interface classes too). Answers whether
-  // either side names a class, the pair having then been judged here. A side
-  // whose named type is no class, a typedef's, leaves the pair to the walk
-  // through the typedefs.
-  bool JudgedAsClasses(const Expr* actual, const FunctionArg& formal,
-                       const DataType& actual_type) {
-    const ClassDecl* a = NamedClass(actual_type);
-    const ClassDecl* f = NamedClass(formal.data_type);
-    if (a == nullptr && f == nullptr) return false;
-    if ((a == nullptr && actual_type.kind == DataTypeKind::kNamed) ||
-        (f == nullptr && formal.data_type.kind == DataTypeKind::kNamed))
-      return false;
-    if (a == nullptr || f == nullptr ||
-        !(IsClassDerivedFrom(a->name, f->name, unit_) ||
-          IsClassDerivedFrom(f->name, a->name, unit_)))
-      Report(actual, formal);
-    return true;
+  // (IsClassDerivedFrom, which follows interface classes too). A pair naming
+  // no class is ActualFitsFormal's.
+  bool SidesFit(const DataType& actual, const DataType& formal) const {
+    const ClassDecl* a = NamedClass(actual);
+    const ClassDecl* f = NamedClass(formal);
+    if (a == nullptr && f == nullptr)
+      return ActualFitsFormal(actual, formal, typedefs_);
+    return a != nullptr && f != nullptr &&
+           (IsClassDerivedFrom(a->name, f->name, unit_) ||
+            IsClassDerivedFrom(f->name, a->name, unit_));
   }
 
   void Report(const Expr* actual, const FunctionArg& formal) {
