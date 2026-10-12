@@ -160,6 +160,17 @@ RegisteredConstFuncs() {
 // §11.11: the min:typ:max member the folder selects. It is the typical value
 // unless a DelayModeGuard installed another, which is what src/main.cpp does
 // for the whole of an elaboration.
+static const ConstFuncSeverityHandler* g_severity_handler = nullptr;
+
+ConstFuncSeverityGuard::ConstFuncSeverityGuard(ConstFuncSeverityHandler handler)
+    : handler_(std::move(handler)), prev_(g_severity_handler) {
+  g_severity_handler = &handler_;
+}
+
+ConstFuncSeverityGuard::~ConstFuncSeverityGuard() {
+  g_severity_handler = prev_;
+}
+
 static DelayMode g_delay_mode = DelayMode::kTyp;
 
 DelayModeGuard::DelayModeGuard(DelayMode mode) : prev_(g_delay_mode) {
@@ -441,14 +452,25 @@ static ConstFuncFlow ExecConstFuncReturn(const Stmt* s, ScopeMap& locals,
   return ConstFuncFlow::kReturn;
 }
 
-// §13.4.3: system task calls in a constant function are ignored (the
-// elaboration severity tasks of §20.10.1 are handled elsewhere). Other bare
+// §20.10.1: whether `name` is one of the elaboration severity tasks.
+static bool IsElabSeverityTask(std::string_view name) {
+  return name == "$fatal" || name == "$error" || name == "$warning" ||
+         name == "$info";
+}
+
+// §13.4.3: system task calls in a constant function are ignored but for the
+// elaboration severity tasks of §20.10.1, handed to the live
+// ConstFuncSeverityGuard's handler. Other bare
 // expression statements — a pre/post increment on a local, say — are
 // interpreted for their side effect; anything else abandons the fold.
 static ConstFuncFlow ExecConstFuncExprStmt(const Stmt* s, ScopeMap& locals) {
   const Expr* e = s->expr;
   if (!e) return ConstFuncFlow::kNormal;
-  if (e->kind == ExprKind::kSystemCall) return ConstFuncFlow::kNormal;
+  if (e->kind == ExprKind::kSystemCall) {
+    if (g_severity_handler != nullptr && IsElabSeverityTask(e->callee))
+      (*g_severity_handler)(e, locals);
+    return ConstFuncFlow::kNormal;
+  }
   bool is_unary =
       e->kind == ExprKind::kPostfixUnary || e->kind == ExprKind::kUnary;
   bool is_step =

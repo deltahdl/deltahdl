@@ -96,8 +96,28 @@ static int ResolveCallArgIndex(const Expr* expr, size_t i,
   return -1;
 }
 
+static std::string_view RefActualNetName(
+    const Expr* e, const std::unordered_set<std::string_view>& nets);
+
+// §13.5 with §10.4: the net an output or inout actual names -- whole, through
+// a select, or as an element of a concatenation or positional pattern -- or
+// empty for none.
+static std::string_view OutputActualNetName(
+    const Expr* e, const std::unordered_set<std::string_view>& nets) {
+  if (e->kind != ExprKind::kConcatenation &&
+      e->kind != ExprKind::kAssignmentPattern)
+    return RefActualNetName(e, nets);
+  for (const Expr* el : e->elements) {
+    std::string_view net = OutputActualNetName(el, nets);
+    if (!net.empty()) return net;
+  }
+  return {};
+}
+
 static void CheckOutputArgs(const Expr* expr, const ModuleItem* func,
-                            size_t positional_count, DiagEngine& diag) {
+                            size_t positional_count,
+                            const std::unordered_set<std::string_view>& nets,
+                            DiagEngine& diag) {
   for (size_t i = 0; i < func->func_args.size(); ++i) {
     auto dir = func->func_args[i].direction;
     if (dir != Direction::kOutput && dir != Direction::kInout) continue;
@@ -105,13 +125,21 @@ static void CheckOutputArgs(const Expr* expr, const ModuleItem* func,
         ResolveCallArgIndex(expr, i, func->func_args[i].name, positional_count);
     if (ai < 0) continue;
     auto* arg = expr->args[static_cast<size_t>(ai)];
-    if (arg && !IsValidOutputArg(arg)) {
+    if (arg == nullptr) continue;
+    std::string_view kind = dir == Direction::kOutput ? "output" : "inout";
+    if (!IsValidOutputArg(arg)) {
       diag.Error(arg->range.start,
-                 std::format("{} argument '{}' requires a variable",
-                             dir == Direction::kOutput ? "output" : "inout",
+                 std::format("{} argument '{}' requires a variable", kind,
                              func->func_args[i].name),
                  Subclause("13.5"));
+      continue;
     }
+    std::string_view net = OutputActualNetName(arg, nets);
+    if (net.empty()) continue;
+    diag.Error(arg->range.start,
+               std::format("net '{}' cannot be the actual of {} argument '{}'",
+                           net, kind, func->func_args[i].name),
+               Subclause("13.5"));
   }
 }
 
@@ -179,7 +207,7 @@ static void CheckCallArgs(
   }
   CheckRequiredArgs(expr, func, positional_count, diag);
   CheckNamedArgs(expr, func, diag);
-  CheckOutputArgs(expr, func, positional_count, diag);
+  CheckOutputArgs(expr, func, positional_count, net_names, diag);
   CheckRefArgs(expr, func, positional_count, net_names, diag);
 }
 
@@ -524,9 +552,10 @@ static void WalkStmtForCallArgs(
     CheckCallNoOutInoutRefInExpr(s->rhs, func_decls, diag,
                                  "a procedural continuous assignment");
   }
-  if (s->kind == StmtKind::kEventControl) {
-    CheckEventControlCalls(s, func_decls, diag);
-  }
+  // §9.4.2 and §13.4: the events of an event control, and of the
+  // intra-assignment event control a blocking or nonblocking assignment
+  // carries (§9.4.5), `a = @(f(y)) b;`, are event expressions alike.
+  if (!s->events.empty()) CheckEventControlCalls(s, func_decls, diag);
   WalkChildStmtsForCallArgs(s, func_decls, net_names, diag);
 }
 
@@ -666,6 +695,9 @@ static void ValidateCallArgsInItem(const ModuleItem* item,
   if (item->kind == ModuleItemKind::kContAssign) {
     ValidateContAssignCallArgs(item, ctx.all_decls, ctx.diag);
   }
+  // §13.4: a declaration's initializer stands in no procedural statement.
+  CheckCallNoOutInoutRefInExpr(item->init_expr, ctx.all_decls, ctx.diag,
+                               "a declaration's initializer");
 }
 
 void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {

@@ -428,4 +428,45 @@ TEST(FunctionReturnElaboration, ValueReturningProductionInAVoidFunctionOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
+
+// §13.4.1: a return in a nonvoid function specifies an expression (#6431).
+TEST(FunctionReturnElaboration, ReturnWithoutValueInNonvoidFunctionError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function int f(int a);\n"
+      "    if (a > 0) return;\n"
+      "    return a;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return in nonvoid function 'f' has no value", 3,
+                            "13.4.1"));
+}
+
+// A return in a randsequence production's code block ends the production
+// (§18.17.6), and a class constructor declares no return type (§8.7); neither
+// return carries a value.
+TEST(FunctionReturnElaboration, ProductionAndConstructorReturnsTakeNoValue) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  function new();\n"
+      "    return;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  function int f();\n"
+      "    randsequence (main)\n"
+      "      main : { return; };\n"
+      "    endsequence\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

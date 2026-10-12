@@ -14,6 +14,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "common/types.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
@@ -186,6 +187,31 @@ void Elaborator::ValidateElabSystemTask(const ModuleItem* item,
   elab_last_severity_loc_ = item->loc;
   if (is_fatal || is_error) {
     elab_simulation_blocked_ = true;
+  }
+}
+
+void ReportConstFuncSeverity(const Expr* call, const ScopeMap& locals,
+                             DiagEngine& diag, Arena& arena) {
+  const bool kFatal = call->callee == "$fatal";
+  const bool kError = call->callee == "$error";
+  size_t arg_start = 0;
+  if (kFatal && !call->args.empty() &&
+      call->args[0]->kind != ExprKind::kStringLiteral)
+    arg_start = 1;
+  std::string message =
+      std::format("elaboration {}: {}",
+                  ElabTaskSeverity(kFatal, kError, call->callee == "$warning"),
+                  FormatElabTaskMessage(call, arg_start, locals, arena));
+  const SourceLoc kAt = call->range.start;
+  for (const Diagnostic& d : diag.Diagnostics()) {
+    if (d.loc.file_id == kAt.file_id && d.loc.line == kAt.line &&
+        d.loc.column == kAt.column && d.message == message)
+      return;
+  }
+  if (kFatal || kError) {
+    diag.Error(kAt, message, Subclause("20.10.1"));
+  } else {
+    diag.Warning(kAt, message, Subclause("20.10.1"));
   }
 }
 

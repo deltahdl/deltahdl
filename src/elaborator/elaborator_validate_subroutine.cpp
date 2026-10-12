@@ -250,6 +250,33 @@ void Elaborator::ValidateTaskCallsInExpressions(const ModuleDecl* decl) {
   WalkItemsForTaskOperands(decl->items, chk);
 }
 
+// §9.2.3 allows in a final procedure only the statements a function
+// declaration allows, and §13.4 bars a function from enabling a task, so a
+// task enabled anywhere in the procedure's statements is reported.
+static void CheckFinalTaskEnables(
+    const Stmt* s, const std::unordered_set<std::string>& task_names,
+    DiagEngine& diag) {
+  if (!s) return;
+  std::string name = EnabledSubroutineName(s);
+  if (task_names.contains(name)) {
+    diag.Error(s->range.start,
+               std::format("final procedure enables task '{}'", name),
+               Subclause("9.2.3"));
+  }
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    CheckFinalTaskEnables(sub, task_names, diag);
+  });
+}
+
+void Elaborator::ValidateFinalTaskEnables(const ModuleDecl* decl) {
+  const std::unordered_set<std::string> kTasks = ReachableTaskNames();
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kFinalBlock) {
+      CheckFinalTaskEnables(item->body, kTasks, diag_);
+    }
+  }
+}
+
 void Elaborator::ValidateDpiOpenArrayArgs(const ModuleDecl* decl) {
   dpi_import_decls_.clear();
   for (const auto* item : decl->items) {
@@ -327,6 +354,48 @@ static bool FuncSpawnsBackgroundProcess(const ModuleItem* func) {
 }
 
 // §13.4.4
+// The callees of the calls in `e`, and in the statement `s` and those below it.
+static void CollectExprCallees(const Expr* e,
+                               std::vector<std::string_view>& out) {
+  if (e == nullptr) return;
+  if (e->kind == ExprKind::kCall && !e->callee.empty())
+    out.push_back(e->callee);
+  for (const Expr* sub : {e->lhs, e->rhs, e->condition, e->true_expr,
+                          e->false_expr, e->base, e->index, e->index_end}) {
+    CollectExprCallees(sub, out);
+  }
+  for (const Expr* a : e->args) CollectExprCallees(a, out);
+  for (const Expr* el : e->elements) CollectExprCallees(el, out);
+}
+
+static void CollectStmtCallees(const Stmt* s,
+                               std::vector<std::string_view>& out) {
+  if (s == nullptr) return;
+  ForEachChildExpr(s, [&](Expr* const& e) { CollectExprCallees(e, out); });
+  ForEachChildStmt(s, [&](Stmt* const& sub) { CollectStmtCallees(sub, out); });
+}
+
+// §13.4.4: whether a call of `func` tries to schedule an event that cannot
+// become active until it returns, by a statement of its own or through a call
+// of another of the module's functions; `visited` keeps a recursive call from
+// being followed twice.
+static bool FuncReachesBackgroundProcess(
+    const ModuleItem* func,
+    const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
+    std::unordered_set<const ModuleItem*>& visited) {
+  if (func == nullptr || !visited.insert(func).second) return false;
+  if (FuncSpawnsBackgroundProcess(func)) return true;
+  std::vector<std::string_view> callees;
+  for (const Stmt* s : func->func_body_stmts) CollectStmtCallees(s, callees);
+  for (std::string_view name : callees) {
+    auto it = func_decls.find(name);
+    if (it != func_decls.end() && it->second != nullptr &&
+        FuncReachesBackgroundProcess(it->second, func_decls, visited))
+      return true;
+  }
+  return false;
+}
+
 static void CheckBackgroundFuncCallInExpr(
     const Expr* expr,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
@@ -334,7 +403,9 @@ static void CheckBackgroundFuncCallInExpr(
   if (!expr) return;
   if (expr->kind == ExprKind::kCall && !expr->callee.empty()) {
     auto it = func_decls.find(expr->callee);
-    if (it != func_decls.end() && FuncSpawnsBackgroundProcess(it->second)) {
+    std::unordered_set<const ModuleItem*> visited;
+    if (it != func_decls.end() &&
+        FuncReachesBackgroundProcess(it->second, func_decls, visited)) {
       diag.Error(expr->range.start,
                  std::format(
                      "function '{}' schedules a background event and cannot be "

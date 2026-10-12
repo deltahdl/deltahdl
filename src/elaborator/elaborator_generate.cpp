@@ -362,11 +362,11 @@ static void RestoreEnclosingTypedefs(const EnclosingTypedefs& taken,
 // a generate block once port declarations, specify blocks and specparam
 // declarations are excluded, so a function may be declared among these items.
 // §13.4.3 has a constant function call evaluated during elaboration, and the
-// folder answers such a call from the table a ConstFuncRegistryGuard installs.
-// RecordTaskFuncNames in src/elaborator/elaborator_items_udp.cpp fills the
-// module's table by walking ModuleDecl::items and does not descend into a
-// generate construct, so a function declared here is in no table until this
-// site puts it in one.
+// folder answers such a call from the table a ConstFuncRegistryGuard installs;
+// but it also bars a constant function from being declared inside a generate
+// block, so a function declared here is entered with no declaration, which the
+// folder folds no call of (RegisteredConstFunc) and the validator reports a
+// constant-context call of (ValidateConstFuncCallsInBlock).
 //
 // The table installed here is the one already registered, copied and added
 // to. §23.9 has the search for a directly referenced identifier climb until it
@@ -375,7 +375,8 @@ static void RestoreEnclosingTypedefs(const EnclosingTypedefs& taken,
 // written in a nested block names a function of the block enclosing it and a
 // call written in any block names a function of the module. A name these items
 // declare overwrites the entry they inherited, which is §23.9's identifier
-// declared locally.
+// declared locally: its call names the block's function, which folds to
+// nothing, rather than a module function of the same name.
 //
 // A sibling block names none of them, because the guard puts back what it
 // found when these items are done and each block's items are one call to this
@@ -402,7 +403,8 @@ static bool CollectGenerateBlockFunctions(
   if (!declares_function) return false;
   if (const auto* outer = RegisteredConstFuncs()) decls = *outer;
   for (const auto* item : items)
-    if (item->kind == ModuleItemKind::kFunctionDecl) decls[item->name] = item;
+    if (item->kind == ModuleItemKind::kFunctionDecl)
+      decls[item->name] = nullptr;
   return true;
 }
 

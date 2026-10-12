@@ -447,6 +447,51 @@ static bool CheckConstFuncBody(
   return !chk.failed;
 }
 
+// Whether `e` calls a subroutine, by name or through a package.
+static bool ExprCallsSubroutine(const Expr* e) {
+  if (e == nullptr) return false;
+  if (e->kind == ExprKind::kCall) return true;
+  for (const Expr* sub : {e->lhs, e->rhs, e->condition, e->true_expr,
+                          e->false_expr, e->base, e->index, e->index_end}) {
+    if (ExprCallsSubroutine(sub)) return true;
+  }
+  for (const Expr* a : e->args)
+    if (ExprCallsSubroutine(a)) return true;
+  for (const Expr* el : e->elements)
+    if (ExprCallsSubroutine(el)) return true;
+  return false;
+}
+
+// §13.4.3 bars a constant function from calling a constant function in a
+// context requiring a constant expression, which a local parameter's
+// initializer in its body is (A.2.8's local_parameter_declaration, kept as a
+// declaration statement marked var_is_param).
+static bool StmtCallsInLocalParam(const Stmt* s) {
+  if (s == nullptr) return false;
+  if (s->kind == StmtKind::kVarDecl && s->var_is_param &&
+      ExprCallsSubroutine(s->var_init))
+    return true;
+  bool found = false;
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    found = found || StmtCallsInLocalParam(sub);
+  });
+  return found;
+}
+
+static bool CheckNoCallInLocalParams(const ModuleItem* func, SourceLoc loc,
+                                     DiagEngine& diag) {
+  for (const Stmt* s : func->func_body_stmts) {
+    if (!StmtCallsInLocalParam(s)) continue;
+    diag.Error(loc,
+               std::format("constant function '{}' calls a function in a "
+                           "local parameter's initializer",
+                           func->name),
+               Subclause("13.4.3"));
+    return false;
+  }
+  return true;
+}
+
 static bool ValidateConstantFunction(const ModuleItem* func, SourceLoc loc,
                                      const ConstFuncScope& scope) {
   if (scope.visited && !func->name.empty()) {
@@ -455,6 +500,7 @@ static bool ValidateConstantFunction(const ModuleItem* func, SourceLoc loc,
   if (!ValidateConstFuncArgs(func, loc, scope.param_names, scope.diag))
     return false;
   if (!ValidateConstFuncBodyContent(func, loc, scope.diag)) return false;
+  if (!CheckNoCallInLocalParams(func, loc, scope.diag)) return false;
 
   std::unordered_set<std::string_view> local_names =
       CollectConstFuncLocalNames(func);
@@ -467,6 +513,9 @@ struct ConstFuncCallCtx {
   const std::unordered_set<std::string_view>& function_names;
   const std::unordered_set<std::string_view>& dpi_import_names;
   DiagEngine& diag;
+  // §13.4.3: the functions the generate blocks enclosing the items walked
+  // declare, none of which is a constant function; null outside every block.
+  const std::unordered_set<std::string_view>* gen_funcs;
 };
 
 // §13.4.3 — the arguments to a constant function call must all be constant
@@ -492,6 +541,16 @@ static void CheckConstFuncCallArgs(const Expr* expr, SourceLoc loc,
 // kCall) used in a constant context, recursing into a resolved callee.
 static void ValidateConstFuncCallNode(const Expr* expr, SourceLoc loc,
                                       const ConstFuncCallCtx& ctx) {
+  // §13.4.3 bars a constant function from being declared inside a generate
+  // block, so a function one declares is called in no constant context.
+  if (ctx.gen_funcs != nullptr && ctx.gen_funcs->contains(expr->callee)) {
+    ctx.diag.Error(loc,
+                   std::format("function '{}' is declared inside a generate "
+                               "block and is no constant function",
+                               expr->callee),
+                   Subclause("13.4.3"));
+    return;
+  }
   // §13.4.3 (b) — DPI imports cannot be constant functions, so any attempt to
   // invoke one in a constant context is rejected here.
   if (ctx.dpi_import_names.count(expr->callee)) {
@@ -530,6 +589,21 @@ static void ValidateConstantFuncCallsInExpr(const Expr* expr, SourceLoc loc,
 static void ValidateConstFuncCallsInItems(const std::vector<ModuleItem*>& items,
                                           const ConstFuncCallCtx& ctx);
 
+// The items `items` of one generate block, with the functions the block
+// declares joining those of the blocks around it (ConstFuncCallCtx::gen_funcs).
+static void ValidateConstFuncCallsInBlock(const std::vector<ModuleItem*>& items,
+                                          const ConstFuncCallCtx& ctx) {
+  std::unordered_set<std::string_view> gen_funcs;
+  if (ctx.gen_funcs != nullptr) gen_funcs = *ctx.gen_funcs;
+  for (const auto* item : items) {
+    if (item->kind == ModuleItemKind::kFunctionDecl)
+      gen_funcs.insert(item->name);
+  }
+  ConstFuncCallCtx inner = ctx;
+  inner.gen_funcs = &gen_funcs;
+  ValidateConstFuncCallsInItems(items, inner);
+}
+
 // Validates constant-function calls within a generate construct's condition
 // and all of its nested bodies (then/else/case arms).
 static void ValidateConstFuncCallsInGenerate(const ModuleItem* item,
@@ -537,12 +611,12 @@ static void ValidateConstFuncCallsInGenerate(const ModuleItem* item,
   if (item->gen_cond) {
     ValidateConstantFuncCallsInExpr(item->gen_cond, item->loc, ctx);
   }
-  ValidateConstFuncCallsInItems(item->gen_body, ctx);
+  ValidateConstFuncCallsInBlock(item->gen_body, ctx);
   if (item->gen_else) {
-    ValidateConstFuncCallsInItems(item->gen_else->gen_body, ctx);
+    ValidateConstFuncCallsInBlock(item->gen_else->gen_body, ctx);
   }
   for (const auto& ci : item->gen_case_items) {
-    ValidateConstFuncCallsInItems(ci.body, ctx);
+    ValidateConstFuncCallsInBlock(ci.body, ctx);
   }
 }
 
@@ -578,8 +652,8 @@ void Elaborator::ValidateConstantFunctionCalls(const ModuleDecl* decl) {
       dpi_import_names.insert(item->name);
   }
 
-  ConstFuncCallCtx ctx{func_decls_, param_names, function_names,
-                       dpi_import_names, diag_};
+  ConstFuncCallCtx ctx{func_decls_,      param_names, function_names,
+                       dpi_import_names, diag_,       nullptr};
 
   for (const auto& [name, default_expr] : decl->params) {
     if (default_expr) {

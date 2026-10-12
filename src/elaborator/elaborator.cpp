@@ -570,6 +570,11 @@ RtlirDesign* Elaborator::ElaborateTops(
   generate_defparams_.clear();
   defparam_top_roots_.clear();
   defparam_writer_blocks_.clear();
+  // §13.4.3 with §20.10.1: a folded constant function's severity tasks.
+  ConstFuncSeverityGuard severity_guard(
+      [this](const Expr* call, const ScopeMap& locals) {
+        ReportConstFuncSeverity(call, locals, diag_, arena_);
+      });
 
   if (!ElaborateTopModules(top_decls, design)) return nullptr;
 

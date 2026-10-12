@@ -403,4 +403,30 @@ TEST(FunctionBackgroundProcessElaboration,
                             12, "13.4.4"));
 }
 
+// A function that schedules the event through a call of another function
+// tries to schedule it as much as one that writes the statement itself, and
+// the check follows a recursive call no further than once (#6435).
+TEST(FunctionBackgroundProcessElaboration,
+     BackgroundEventThroughAnotherFunction) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic q, y, z;\n"
+      "  function int g(); q <= 1; return 1; endfunction\n"
+      "  function int f(); return g(); endfunction\n"
+      "  function automatic int r(int n); return n > 0 ? r(n - 1) : 0;\n"
+      "  endfunction\n"
+      "  assign y = f();\n"
+      "  assign z = r(2);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function 'f' schedules a background event and "
+                            "cannot be called",
+                            7, "13.4.4"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "function 'r' schedules a background event", 8,
+                             "13.4.4"));
+}
+
 }  // namespace

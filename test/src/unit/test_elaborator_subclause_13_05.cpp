@@ -434,4 +434,32 @@ TEST(SubroutineCallElaboration,
                             "13.5"));
 }
 
+// §13.5 restricts an output or inout actual to what a procedural assignment
+// may assign, and §10.4 makes that a variable, so a net, whole, selected or in
+// a concatenation, is no such actual (#6436).
+TEST(SubroutineCallElaboration, NetAsOutputOrInoutActualError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire w;\n"
+      "  wire [3:0] wv;\n"
+      "  logic v;\n"
+      "  task t(output logic o); o = 1; endtask\n"
+      "  function void g(inout logic [1:0] io); endfunction\n"
+      "  initial begin\n"
+      "    t(w);\n"
+      "    g({v, wv[0]});\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net 'w' cannot be the actual of output argument "
+                            "'o'",
+                            8, "13.5"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net 'wv' cannot be the actual of inout argument "
+                            "'io'",
+                            9, "13.5"));
+}
+
 }  // namespace

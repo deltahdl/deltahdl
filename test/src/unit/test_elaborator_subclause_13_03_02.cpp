@@ -514,4 +514,27 @@ TEST(TaskBodyElaboration, AutoTaskLocalInMonitorInAForStepError) {
                             "13.3.2"));
 }
 
+// The same where the variable is read on the right side: a procedural
+// continuous assignment keeps reading it after the task returns (#6428).
+TEST(TaskBodyElaboration, AutoTaskVarReadByForceOrAssignError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic g;\n"
+      "  task automatic t(input logic a);\n"
+      "    force g = a;\n"
+      "    assign g = !a;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "automatic task variable in procedural continuous assignment", 4,
+      "13.3.2"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "automatic task variable in procedural continuous assignment", 5,
+      "13.3.2"));
+}
+
 }  // namespace

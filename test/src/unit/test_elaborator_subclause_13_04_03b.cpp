@@ -5,6 +5,7 @@
 
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -453,6 +454,71 @@ TEST(ConstantFunctionElaboration, RealForLoopVariableKeepsItsValue) {
   EXPECT_EQ(ResolvedParam(design, "P1"), 3);
   EXPECT_EQ(ResolvedParam(design, "P2"), 23);
   EXPECT_EQ(ResolvedParam(design, "P3"), 7);
+}
+
+// §13.4.3 ignores a constant function's system task calls, but not the
+// elaboration severity tasks (§20.10.1), which report while the call is
+// folded, formatted against the function's locals (#6434).
+TEST(ConstantFunctionElaboration, SeverityTaskInBodyReportsWhileFolding) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function automatic int f(int n);\n"
+      "    if (n > 3) $error(\"n is %0d, above 3\", n);\n"
+      "    return n;\n"
+      "  endfunction\n"
+      "  localparam int P = f(5);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "n is 5, above 3", 3, "20.10.1"));
+}
+
+// A call whose body never reaches the task reports nothing.
+TEST(ConstantFunctionElaboration, SeverityTaskNotReachedReportsNothing) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function automatic int f(int n);\n"
+      "    if (n > 3) $warning(\"n is %0d\", n);\n"
+      "    return n;\n"
+      "  endfunction\n"
+      "  localparam int P = f(2);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+  EXPECT_EQ(ResolvedParam(design, "P"), 2);
+}
+
+// §13.4.3 bars a constant function from calling a constant function in any
+// context requiring a constant expression, and a local parameter's
+// initializer in its body is one (#6441); a constant there is not.
+TEST(ConstantFunctionElaboration, ConstantCallInALocalParameterError) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function automatic int g(int n); return n * 2; endfunction\n"
+      "  function automatic int f(int n);\n"
+      "    localparam int L = g(2);\n"
+      "    return n + L;\n"
+      "  endfunction\n"
+      "  function automatic int h(int n);\n"
+      "    localparam int L = 4;\n"
+      "    return n + L;\n"
+      "  endfunction\n"
+      "  localparam int P = f(1);\n"
+      "  localparam int Q = h(1);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constant function 'f' calls a function in a local "
+                            "parameter's initializer",
+                            11, "13.4.3"));
+  EXPECT_EQ(ResolvedParam(design, "Q"), 5);
 }
 
 }  // namespace

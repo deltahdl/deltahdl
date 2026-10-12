@@ -232,9 +232,9 @@ struct FunctionBodyScope {
   // this name.
   std::string_view func_name;
   // §13.4: no function may enable a task, whether or not the task holds a
-  // time-controlling statement. A call is a task enable when it names one of
-  // these.
-  const std::unordered_set<std::string_view>& task_names;
+  // time-controlling statement. A statement is a task enable when the name it
+  // enables (EnabledSubroutineName) is one of these (ReachableTaskNames).
+  const std::unordered_set<std::string>& task_names;
   // §18.17.6: return ends the generation of the current production. Such a
   // return is not the function's return, and §18.17.7 has it carry an
   // expression -- a production returns a value through a return with an
@@ -247,17 +247,29 @@ struct FunctionBodyScope {
   bool in_fork = false;
 };
 
-static void CheckFuncBodyStmtSelf(const Stmt* s, const FunctionBodyScope& scope,
-                                  DiagEngine& diag) {
-  // §18.17.6 and §18.17.7: the expression a return carries in a randsequence
-  // production code block is the production's value and not a value returned
-  // from the function, so §13.4.1's rule about a void function is not what
-  // governs it.
-  if (s->kind == StmtKind::kReturn && s->expr && scope.is_void &&
-      !scope.in_production_code_block) {
+// §13.4.1: a void function's return carries no value, and a nonvoid
+// function's carries one. §18.17.6 and §18.17.7: a return in a randsequence
+// production code block ends the production, its expression the production's
+// value rather than the function's, so neither rule governs it; and §8.7
+// gives a class constructor no return type, so its return carries none.
+static void CheckFuncBodyReturn(const Stmt* s, const FunctionBodyScope& scope,
+                                DiagEngine& diag) {
+  if (s->kind != StmtKind::kReturn || scope.in_production_code_block) return;
+  if (s->expr && scope.is_void) {
     diag.Error(s->range.start, "void function returns a value",
                Subclause("13.4.1"));
   }
+  if (!s->expr && !scope.is_void && scope.func_name != "new") {
+    diag.Error(s->range.start,
+               std::format("return in nonvoid function '{}' has no value",
+                           scope.func_name),
+               Subclause("13.4.1"));
+  }
+}
+
+static void CheckFuncBodyStmtSelf(const Stmt* s, const FunctionBodyScope& scope,
+                                  DiagEngine& diag) {
+  CheckFuncBodyReturn(s, scope, diag);
   if (s->kind == StmtKind::kFork && s->join_kind != TokenKind::kKwJoinNone) {
     diag.Error(s->range.start,
                "only fork/join_none is permitted inside a function",
@@ -266,9 +278,7 @@ static void CheckFuncBodyStmtSelf(const Stmt* s, const FunctionBodyScope& scope,
 
   CheckFuncBodyTimeControl(s, diag);
 
-  if (s->kind == StmtKind::kExprStmt && s->expr &&
-      s->expr->kind == ExprKind::kCall &&
-      scope.task_names.count(s->expr->callee) != 0) {
+  if (scope.task_names.contains(EnabledSubroutineName(s))) {
     diag.Error(s->range.start, "function cannot enable a task",
                Subclause("13.4"));
   }
@@ -542,9 +552,13 @@ static void CheckTaskBodyMonitorTrace(
 static void CheckTaskBodyContAssign(
     const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
     const AutoVarRule& rule, DiagEngine& diag) {
+  // §13.3.2 bars an automatic task variable from being the target of an
+  // assign or force and from being referenced by one, which keeps reading its
+  // right side after the task returns.
   if (s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign) {
     auto name = ExprIdent(s->lhs);
-    if (!name.empty() && auto_vars.count(name) != 0) {
+    if ((!name.empty() && auto_vars.count(name) != 0) ||
+        ExprRefsAutoVar(s->rhs, auto_vars)) {
       diag.Error(
           s->range.start,
           std::format("{} in procedural continuous assignment", rule.variable),
@@ -759,37 +773,11 @@ void Elaborator::ValidateFunctionBody(const ModuleItem* item,
   CheckNbaAutomaticTargets(item->func_args, item->func_body_stmts, is_auto,
                            {kAutomaticFunctionVar, kHandles, diag_});
   bool is_void = (item->return_type.kind == DataTypeKind::kVoid);
+  const std::unordered_set<std::string> kTasks = ReachableTaskNames();
   FunctionBodyScope scope{
-      .is_void = is_void, .func_name = item->name, .task_names = task_names_};
+      .is_void = is_void, .func_name = item->name, .task_names = kTasks};
   for (auto* s : item->func_body_stmts) {
     CheckFuncBodyStmt(s, scope, diag_);
-  }
-}
-
-// §9.2.3 allows in a final procedure only the statements a function
-// declaration allows, and §13.4 bars a function from enabling a task, so a
-// task enabled anywhere in the procedure's statements is reported.
-static void CheckFinalTaskEnables(
-    const Stmt* s, const std::unordered_set<std::string>& task_names,
-    DiagEngine& diag) {
-  if (!s) return;
-  std::string name = EnabledSubroutineName(s);
-  if (task_names.contains(name)) {
-    diag.Error(s->range.start,
-               std::format("final procedure enables task '{}'", name),
-               Subclause("9.2.3"));
-  }
-  ForEachChildStmt(s, [&](Stmt* const& sub) {
-    CheckFinalTaskEnables(sub, task_names, diag);
-  });
-}
-
-void Elaborator::ValidateFinalTaskEnables(const ModuleDecl* decl) {
-  const std::unordered_set<std::string> kTasks = ReachableTaskNames();
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kFinalBlock) {
-      CheckFinalTaskEnables(item->body, kTasks, diag_);
-    }
   }
 }
 

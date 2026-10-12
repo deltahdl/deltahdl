@@ -827,25 +827,12 @@ TEST(ConstantFunctionRulesElaboration,
   EXPECT_EQ(p->resolved_value, 12);
 }
 
-// §27.2 rules that every other module item, generate constructs among them, may
-// stand in a generate block once port declarations, specify blocks and
-// specparam declarations are excluded, so a function may be declared inside
-// one. §13.4.3 has a constant function call evaluated during elaboration and
-// §23.9 has an identifier declared in the scope itself name that local item, so
-// the triple block 'a' declares is what the call in block 'a' names and P folds
-// to 12.
-//
-// The test fails with P unresolved, which ResolvedParam reports as -1.
-// RecordTaskFuncNames in src/elaborator/elaborator_items_udp.cpp fills the
-// module's function table by walking ModuleDecl::items, and a function written
-// inside a generate construct is reached through ModuleItem::gen_items rather
-// than being one of those items, so triple is in no table at all unless
-// Elaborator::ElaborateGenerateItems puts it in one.
-//
-// 12 rather than a power of two, so a fold against some other body is a
-// different number.
+// §27.2 lets a function be declared inside a generate block, and §13.4.3
+// bars a constant function from being declared inside one (printed page 345).
+// So the triple block 'a' declares is no constant function, and its call in a
+// constant expression of the block is reported and left unfolded (#6433).
 TEST(ConstantFunctionRulesElaboration,
-     ConstantFunctionDeclaredInAGenerateBlockFoldsInThatBlock) {
+     ConstantCallOfAFunctionDeclaredInAGenerateBlockIsReported) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -858,18 +845,20 @@ TEST(ConstantFunctionRulesElaboration,
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_EQ(ResolvedParam(design, "P"), 12);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function 'triple' is declared inside a generate "
+                            "block and is no constant function",
+                            5, "13.4.3"));
+  EXPECT_EQ(ResolvedParam(design, "P"), -1);
 }
 
-// The control the case above needs. §23.9 lists generate blocks among the
-// elements that open a new scope, and blocks 'a' and 'b' are siblings, so
-// neither stands above the other in the same branch of the name tree and the
-// triple block 'a' declares is not what a call in block 'b' names. N is left
-// with no value.
+// §23.9 lists generate blocks among the elements that open a new scope, and
+// blocks 'a' and 'b' are siblings, so neither stands above the other in the
+// same branch of the name tree and the triple block 'a' declares is not what
+// a call in block 'b' names. N is left with no value.
 //
-// The test fails when N is resolved, which is what a fix that recorded every
-// generate block's functions into one table for the module would leave: such a
-// fix passes the case above and answers block 'b' from block 'a' as well.
+// The test fails when N is resolved, which is what recording every generate
+// block's functions into one table for the module would leave.
 TEST(ConstantFunctionRulesElaboration,
      ConstantFunctionOfAGenerateBlockDoesNotFoldInASiblingBlock) {
   ElabFixture f;

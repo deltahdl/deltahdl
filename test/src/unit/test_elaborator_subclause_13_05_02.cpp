@@ -429,4 +429,73 @@ TEST(PassByRefValidation, ConstRefWriteNames13_5_2) {
                             "cannot write to const ref argument", 0, "13.5.2"));
 }
 
+// §13.5.2 matches a ref argument with an equivalent data type (§6.22.2) and
+// permits no cast: logic [7:0] is not equivalent to int, and int is (#6437).
+TEST(PassByRefValidation, RefActualOfANonEquivalentTypeError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] v;\n"
+      "  int w;\n"
+      "  function automatic void f(ref int x); x = 1; endfunction\n"
+      "  initial begin\n"
+      "    f(v);\n"
+      "    f(w);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "ref argument 'x' of 'f' is passed 'v', whose data "
+                            "type is not equivalent",
+                            6, "13.5.2"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "is passed 'w'", 7, "13.5.2"));
+}
+
+// Only a variable, a class property, a member of an unpacked structure or an
+// element of an unpacked array passes by reference, so a select of a packed
+// vector does not, and an element of an unpacked array does (#6438).
+TEST(PassByRefValidation, PackedSelectPassedByReferenceError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] v;\n"
+      "  logic a [8];\n"
+      "  function automatic void f(ref logic b); b = 1; endfunction\n"
+      "  initial begin\n"
+      "    f(v[3]);\n"
+      "    f(a[3]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a select of packed 'v' cannot be passed by "
+                            "reference to argument 'b' of 'f'",
+                            6, "13.5.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "packed 'a'", 7, "13.5.2"));
+}
+
+// A ref static argument is passed only what has a static lifetime: an
+// automatic task's local has none, and a module variable has one (#6439).
+TEST(PassByRefValidation, RefStaticPassedAnAutomaticVariableError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int g;\n"
+      "  function automatic void f(ref static int x); endfunction\n"
+      "  task automatic t();\n"
+      "    int a;\n"
+      "    f(a);\n"
+      "    f(g);\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "ref static argument 'x' of 'f' is passed 'a', "
+                            "which has no static lifetime",
+                            6, "13.5.2"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "is passed 'g'", 7, "13.5.2"));
+}
+
 }  // namespace

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -38,6 +39,28 @@ class ConstFuncRegistryGuard {
 
  private:
   const std::unordered_map<std::string_view, const ModuleItem*>* prev_;
+};
+
+// §13.4.3 ignores the system task calls of a constant function but for the
+// elaboration severity tasks of §20.10.1, which report as written as module
+// items would. The folder knows no diagnostic engine, so the elaborator hands
+// it, for the duration of a guard, what to do with one: called with the task's
+// call and the locals of the function being folded. The guard restores
+// whatever handler was live before it on destruction.
+using ConstFuncSeverityHandler =
+    std::function<void(const Expr* call, const ScopeMap& locals)>;
+class ConstFuncSeverityGuard {
+ public:
+  explicit ConstFuncSeverityGuard(ConstFuncSeverityHandler handler);
+  ~ConstFuncSeverityGuard();
+  ConstFuncSeverityGuard(const ConstFuncSeverityGuard&) = delete;
+  ConstFuncSeverityGuard& operator=(const ConstFuncSeverityGuard&) = delete;
+  ConstFuncSeverityGuard(ConstFuncSeverityGuard&&) = delete;
+  ConstFuncSeverityGuard& operator=(ConstFuncSeverityGuard&&) = delete;
+
+ private:
+  ConstFuncSeverityHandler handler_;
+  const ConstFuncSeverityHandler* prev_;
 };
 
 // The function table a live ConstFuncRegistryGuard installed, or null when none

@@ -781,6 +781,7 @@ class Elaborator : public ElaboratorClassRules {
   void ValidateBackgroundFuncCallContext(const ModuleDecl* decl);
 
   void ValidateSubroutineCallArgs(const ModuleDecl* decl);
+  void ValidateRefArgActuals(const ModuleDecl* decl);
 
   // §A.8.2 footnote 43 and §G.5: the forms a scope randomize_call may not
   // take -- a null argument, a parenthesized identifier list after with, and

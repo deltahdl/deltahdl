@@ -79,4 +79,75 @@ TEST(FunctionElaboration, IntraAssignmentDelayUnderJoinNoneAllowed) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §13.4 rule (b): a function cannot enable a task, and A.8.2's optional
+// argument list makes `t;` an enable of t (#6424).
+TEST(FunctionElaboration, FunctionEnablingATaskByItsBareNameError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task t; endtask\n"
+      "  function void f();\n"
+      "    t;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function cannot enable a task", 4, "13.4"));
+}
+
+// The same for a task declared in a package or at compilation-unit scope
+// (#6425).
+TEST(FunctionElaboration, FunctionEnablingAPackageOrUnitTaskError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pk; task t; endtask endpackage\n"
+      "task u; endtask\n"
+      "module m;\n"
+      "  function void f();\n"
+      "    pk::t();\n"
+      "    u();\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function cannot enable a task", 5, "13.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function cannot enable a task", 6, "13.4"));
+}
+
+// §13.4: a function with an output, inout or ref argument is called neither in
+// an event expression, which an assignment's intra-assignment event control
+// holds (#6429), nor in an expression outside every procedural statement,
+// which a module variable's initializer is (#6430).
+TEST(FunctionElaboration, OutputArgumentCallInIntraAssignmentEventError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  logic y;\n"
+      "  function logic f(output logic o); o = 1; return 1; endfunction\n"
+      "  initial a = @(f(y)) b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function 'f' has output argument; cannot be "
+                            "called in an event expression",
+                            5, "13.4"));
+}
+
+TEST(FunctionElaboration, OutputArgumentCallInModuleInitializerError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic y;\n"
+      "  function int f(output logic o); o = 1; return 1; endfunction\n"
+      "  int v = f(y);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function 'f' has output argument; cannot be "
+                            "called in a declaration's initializer",
+                            4, "13.4"));
+}
+
 }  // namespace
