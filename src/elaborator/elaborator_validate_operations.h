@@ -73,8 +73,9 @@ class ElaboratorOperationRules : public ElaboratorData {
   // block declares, packed (§7.4) or unpacked.
   void ValidateProceduralArrayPatterns(const ModuleDecl* decl);
   void WalkStmtsForProceduralArrayPattern(const Stmt* s);
-  // The module's variables by name, each with its declaration, filled by
-  // ValidateProceduralArrayPatterns for the module it walks; a pattern
+  void CheckContinuousArrayPattern(const ModuleItem* item);
+  // The module's variables and nets by name, each with its declaration, filled
+  // by ValidateProceduralArrayPatterns for the module it walks; a pattern
   // assigned to one is checked against the dimensions it declares.
   std::unordered_map<std::string_view, const ModuleItem*>
       pattern_target_arrays_;

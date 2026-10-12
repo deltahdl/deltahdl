@@ -18,7 +18,7 @@ TEST(AssignmentPatternSynth, PositionalPatternIsReportedUnlowered) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
                            "module m;\n"
-                           "  logic [15:0] x;\n"
+                           "  logic [1:0][7:0] x;\n"
                            "  assign x = '{8'h12, 8'h34};\n"
                            "endmodule\n");
   ASSERT_NE(mod, nullptr);
@@ -58,7 +58,7 @@ TEST(AssignmentPatternSynth, ReplicationPatternIsReportedUnlowered) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
                            "module m;\n"
-                           "  logic [31:0] x;\n"
+                           "  logic [3:0][7:0] x;\n"
                            "  assign x = '{4{8'hAB}};\n"
                            "endmodule\n");
   ASSERT_NE(mod, nullptr);

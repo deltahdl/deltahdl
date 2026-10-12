@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -440,6 +441,11 @@ struct ArrayPatternCheck {
   // assignment pattern.
   void Check(const Expr* pattern, const DataType& elem_type,
              const std::vector<Expr*>& dims, SourceLoc loc) const;
+  // As Check, with the unpacked dimensions given by their element counts,
+  // folded already, as a port's are.
+  void CheckSized(const Expr* pattern, const DataType& elem_type,
+                  std::span<const uint32_t> unpacked_sizes,
+                  SourceLoc loc) const;
 };
 std::string_view LhsBaseName(const Expr* e);
 // §5.10 and §5.11: the replication an assignment pattern consists of,

@@ -699,12 +699,16 @@ void Elaborator::CheckExplicitConnLegality(const PortBindScope& scope,
     diag_.Error(conn_expr->range.start,
                 "an assignment pattern cannot be connected to this port",
                 Subclause("10.8"));
-  } else if (conn_expr && port && port->dtype && port->num_unpacked_dims == 0) {
+  } else if (conn_expr && port &&
+             port->unpacked_dim_sizes.size() == port->num_unpacked_dims) {
     // §10.8 with §10.9.1: a connection is an assignment-like context with the
-    // port's type, so the braces of a pattern connected to a port written with
-    // packed dimensions alone match those dimensions (§7.4).
+    // port's type, so the braces of a pattern connected to a port match the
+    // port's dimensions, its unpacked ones and then the packed ones its header
+    // writes or its typedef carries (§7.4, §6.18). A port with a dimension that
+    // did not fold to a size has nothing to count against.
     ArrayPatternCheck{typedefs_, aggregate_typedef_names_, var_types_, diag_}
-        .Check(conn_expr, *port->dtype, {}, conn_expr->range.start);
+        .CheckSized(conn_expr, *port->declared_type, port->unpacked_dim_sizes,
+                    conn_expr->range.start);
   }
 
   // §23.3.3.2: an output (or inout) port connected to a variable implies a

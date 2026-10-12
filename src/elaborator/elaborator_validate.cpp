@@ -9,6 +9,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -291,6 +292,17 @@ static void CheckPatternDims(const ArrayPatternCheck& check,
     CheckPatternDims(check, e, elem_type, dims.subspan(1), loc);
 }
 
+// Checks `pattern` against the unpacked dimensions `dims` of an array of
+// `elem_type` and then against the packed dimensions of `elem_type`.
+static void CheckAgainstUnpackedDims(const ArrayPatternCheck& check,
+                                     const Expr* pattern,
+                                     const DataType& elem_type,
+                                     std::vector<PatternDim> dims,
+                                     SourceLoc loc) {
+  AppendElementPackedDims(check, elem_type, dims);
+  CheckPatternDims(check, pattern, elem_type, dims, loc);
+}
+
 void ArrayPatternCheck::Check(const Expr* pattern, const DataType& elem_type,
                               const std::vector<Expr*>& dims,
                               SourceLoc loc) const {
@@ -300,8 +312,19 @@ void ArrayPatternCheck::Check(const Expr* pattern, const DataType& elem_type,
     pattern_dims.push_back(
         {dim == nullptr ? std::nullopt : ComputeDimSize(dim), false});
   }
-  AppendElementPackedDims(*this, elem_type, pattern_dims);
-  CheckPatternDims(*this, pattern, elem_type, pattern_dims, loc);
+  CheckAgainstUnpackedDims(*this, pattern, elem_type, std::move(pattern_dims),
+                           loc);
+}
+
+void ArrayPatternCheck::CheckSized(const Expr* pattern,
+                                   const DataType& elem_type,
+                                   std::span<const uint32_t> unpacked_sizes,
+                                   SourceLoc loc) const {
+  std::vector<PatternDim> pattern_dims;
+  pattern_dims.reserve(unpacked_sizes.size());
+  for (uint32_t size : unpacked_sizes) pattern_dims.push_back({size, false});
+  CheckAgainstUnpackedDims(*this, pattern, elem_type, std::move(pattern_dims),
+                           loc);
 }
 
 void Elaborator::ValidateArrayInitPattern(const ModuleItem* item) {

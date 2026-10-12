@@ -120,9 +120,8 @@ struct RtlirPort {
   // connection is joined to it rather than to storage of the port's own. Null
   // for a port written without one.
   Expr* port_expr = nullptr;
-  // §23.2.2.1: for a non-ANSI port written as a select of a declared vector,
-  // `a[7:4]` of `input [7:0] a`, the width of that vector, which the port's
-  // own width -- four -- does not give. 0 for every other port.
+  // §23.2.2.1: the width of the vector a non-ANSI port selects, 8 for `a[7:4]`
+  // of `input [7:0] a`, which the port's own width does not give; 0 otherwise.
   uint32_t selected_width = 0;
   std::vector<ResolvedAttribute> attrs;
   // The number of unpacked dimensions the port declaration wrote, whether or
@@ -137,6 +136,7 @@ struct RtlirPort {
   // questions for every dimension not written `[0:n]`.
   std::vector<RtlirUnpackedDim> unpacked_dims;
   bool type_is_array = false;  // §7.4: packed, or by its typedef (§6.18).
+  const DataType* declared_type = nullptr;  // The header's type, as written.
   // §37.3.3: where the port declaration stands, which vpiLineNo and vpiFile are
   // read off for the port object §37.14's instance-to-port relation reaches.
   SourceLoc loc;

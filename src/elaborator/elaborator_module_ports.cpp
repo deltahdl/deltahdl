@@ -393,6 +393,7 @@ static RtlirPort BuildRtlirPortBase(const PortDecl& port, bool port_is_var,
   if (!port.is_explicit_named && port.port_expr != nullptr) rp.name = {};
   rp.direction = port.direction;
   rp.type_kind = port.data_type.kind;
+  rp.declared_type = &port.data_type;
   rp.width = width;
   // §23.2.2.1 (printed page 732), Example 3: `split_ports (a[7:4], a[3:0])`
   // makes the first port a's upper four bits and the second its lower four.

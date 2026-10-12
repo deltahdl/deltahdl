@@ -583,4 +583,100 @@ TEST(ArrayPatternElaboration, PortConnectionCountedAgainstPackedDimension) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
+// §10.8 counts a continuous assignment and a net declaration assignment among
+// the assignment-like contexts, so §10.9.1 holds a pattern there to its
+// target's dimensions, unpacked and packed, as it does an initializer.
+TEST(ArrayPatternElaboration, ContinuousAssignmentPatternCountedAgainstTarget) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire [7:0] w [0:2];\n"
+      "  assign w = '{8'h1, 8'h2};\n"
+      "  logic [3:0] v;\n"
+      "  assign v = '{1'b1, 1'b0};\n"
+      "  int a [2][3];\n"
+      "  assign a = '{'{1, 2}, '{3, 4, 5}};\n"
+      "  wire [3:0] n = '{1'b1};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 2 elements, but array "
+                            "dimension requires 3",
+                            3, "10.9.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 2 elements, but array "
+                            "dimension requires 4",
+                            5, "10.9.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 2 elements, but array "
+                            "dimension requires 3",
+                            7, "10.9.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 1 elements, but array "
+                            "dimension requires 4",
+                            8, "10.9.1"));
+}
+
+TEST(ArrayPatternElaboration, ContinuousAssignmentPatternMatchingTargetOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  wire [7:0] w [0:2];\n"
+             "  assign w = '{8'h1, 8'h2, 8'h3};\n"
+             "  logic [3:0] v;\n"
+             "  assign v = '{4{1'b1}};\n"
+             "  wire [3:0] n = '{1'b1, 1'b0, 1'b1, 1'b0};\n"
+             "endmodule\n"));
+}
+
+// §6.18 with §7.4: a port declared through a packed array typedef has the
+// typedef's packed dimensions, so a pattern connected to it is counted against
+// them as against dimensions the port header writes out.
+TEST(ArrayPatternElaboration, PortOfPackedTypedefCountedAgainstItsDimension) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef logic [3:0] nib_t;\n"
+      "module sub(input nib_t p);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic x, y;\n"
+      "  sub u1(.p('{x, y}));\n"
+      "  sub u2(.p('{x, y, x, y}));\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 2 elements, but array "
+                            "dimension requires 4",
+                            6, "10.9.1"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+// §10.9.1: a pattern connected to a port with unpacked dimensions stands for
+// those first, and a nested pattern for the packed ones inside them. A dynamic
+// array port (§7.5) has no size to count against, and its connection elaborates
+// past the check.
+TEST(ArrayPatternElaboration, PortWithUnpackedDimensionsCountedAgainstThem) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module sub(input var int p [0:1]);\n"
+      "endmodule\n"
+      "module sa(input logic [3:0] q [2]);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  sub u(.p('{5, 6, 7}));\n"
+      "  sa v(.q('{'{1'b1, 1'b0}, 4'h0}));\n"
+      "  sd w(.d('{1, 2, 3}));\n"
+      "endmodule\n"
+      "module sd(input var int d []);\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 3 elements, but array "
+                            "dimension requires 2",
+                            6, "10.9.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 2 elements, but array "
+                            "dimension requires 4",
+                            7, "10.9.1"));
+}
+
 }  // namespace

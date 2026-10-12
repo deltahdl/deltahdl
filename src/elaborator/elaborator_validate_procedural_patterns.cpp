@@ -118,6 +118,27 @@ static void CheckItemStructPatterns(const ModuleItem* item,
                         {typedefs, item->assign_rhs->range.start, diag});
 }
 
+// §10.8 counts a continuous assignment and a net declaration assignment among
+// the assignment-like contexts, so §10.9.1 holds the pattern each drives to the
+// dimensions of its target: the variable or net its left-hand side names
+// whole, or the net it declares.
+void ElaboratorOperationRules::CheckContinuousArrayPattern(
+    const ModuleItem* item) {
+  const ArrayPatternCheck kCheck{typedefs_, aggregate_typedef_names_,
+                                 var_types_, diag_};
+  if (item->kind == ModuleItemKind::kNetDecl && item->init_expr != nullptr) {
+    kCheck.Check(item->init_expr, item->data_type, item->unpacked_dims,
+                 item->init_expr->range.start);
+  }
+  if (item->kind != ModuleItemKind::kContAssign ||
+      item->assign_lhs->kind != ExprKind::kIdentifier)
+    return;
+  auto it = pattern_target_arrays_.find(item->assign_lhs->text);
+  if (it == pattern_target_arrays_.end()) return;
+  kCheck.Check(item->assign_rhs, it->second->data_type,
+               it->second->unpacked_dims, item->assign_rhs->range.start);
+}
+
 // A subroutine's formals hide the module's declarations of their names in its
 // body as a block's declarations do.
 void ElaboratorOperationRules::ValidateProceduralArrayPatterns(
@@ -125,12 +146,15 @@ void ElaboratorOperationRules::ValidateProceduralArrayPatterns(
   pattern_target_arrays_.clear();
   StructTargetTypes struct_targets;
   for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kNetDecl)
+      pattern_target_arrays_[item->name] = item;
     if (item->kind != ModuleItemKind::kVarDecl) continue;
     pattern_target_arrays_[item->name] = item;
     if (item->unpacked_dims.empty())
       struct_targets[item->name] = &item->data_type;
   }
   for (const auto* item : decl->items) {
+    CheckContinuousArrayPattern(item);
     if (IsProceduralItemKind(item->kind))
       WalkStmtsForProceduralArrayPattern(item->body);
     CheckItemStructPatterns(item, struct_targets, typedefs_, diag_);
