@@ -131,6 +131,27 @@ void CollectProcRhsIdents(const Stmt* s,
                           const std::unordered_set<std::string_view>& locals,
                           std::vector<const Expr*>& out);
 
+// §12.6: the variables the patterns under each `matches` operator of `e` bind.
+std::unordered_set<std::string_view> MatchesBindingsOf(const Expr* e);
+
+// §12.7.1: the variables the initialization of a for loop `s` declares, the
+// targets whose Stmt::for_init_types entry names a data type. Empty for any
+// other statement and for an initialization that only assigns.
+std::vector<std::string_view> ForHeaderDeclaredNames(const Stmt* s);
+
+// §12.6.1 and §12.6.2: calls `visit` on each statement `s` holds, with the
+// variables the patterns of `s` bind that are in scope at that statement: an
+// if's true arm with those its predicate binds, and not its false arm, a
+// `case ... matches` item's statement with those its own patterns bind, and
+// every other statement with none. A walk that has to know which names a
+// statement's patterns put in scope where takes its children from here rather
+// than from ForEachChildStmt, which hands over a child with no word of the
+// field it came from. A child may be null.
+void ForEachChildStmtWithBindings(
+    const Stmt* s,
+    const std::function<
+        void(const Stmt*, const std::unordered_set<std::string_view>&)>& visit);
+
 // The names a subroutine's body may read without the module declaring them: its
 // formal arguments, a function's own name, and what the body declares.
 void CollectSubroutineLocalNames(const ModuleItem* item,

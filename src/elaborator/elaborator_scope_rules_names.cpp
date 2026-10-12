@@ -1,6 +1,7 @@
 #include "elaborator/elaborator_scope_rules_names.h"
 
 #include <cstddef>
+#include <functional>
 #include <initializer_list>
 #include <string>
 #include <string_view>
@@ -566,9 +567,7 @@ void CollectProcReadableNames(const Stmt* s,
   CollectLocalNames(s, names, false, false);
 }
 
-// The variables the patterns of `e` bind, under each `matches` operator it
-// holds.
-static std::unordered_set<std::string_view> MatchesBindingsOf(const Expr* e) {
+std::unordered_set<std::string_view> MatchesBindingsOf(const Expr* e) {
   std::unordered_set<std::string_view> names;
   CollectMatchesBindings(e, names);
   return names;
@@ -633,29 +632,19 @@ static void KeepUndeclaredReads(
   }
 }
 
-// §12.6.2 and §12.6.1: the variables an if statement's predicate binds are in
-// scope in its true arm and not its false arm, and those a case item's pattern
-// binds in that item's statement alone. So the statements below an if or a
-// `case ... matches` are walked here, each with the names in scope where it
-// stands, which is why this walk names the two arms of an if rather than take
-// them from ForEachChildStmt. Returns whether `s` was one of the two.
-static bool CollectPatternScopedReads(
+// CollectProcRhsIdents over `s` with the variables `bound` names in scope
+// beside `locals`.
+static void CollectBoundProcRhsIdents(
     const Stmt* s, const std::unordered_set<std::string_view>& locals,
+    const std::unordered_set<std::string_view>& bound,
     std::vector<const Expr*>& out) {
-  if (s->kind == StmtKind::kIf) {
-    std::unordered_set<std::string_view> inner = locals;
-    inner.merge(MatchesBindingsOf(s->condition));
-    CollectProcRhsIdents(s->then_branch, inner, out);
-    CollectProcRhsIdents(s->else_branch, locals, out);
-    return true;
+  if (bound.empty()) {
+    CollectProcRhsIdents(s, locals, out);
+    return;
   }
-  if (!s->case_matches) return false;
-  for (const auto& ci : s->case_items) {
-    std::unordered_set<std::string_view> inner = locals;
-    CollectCaseItemBindings(ci, inner);
-    CollectProcRhsIdents(ci.body, inner, out);
-  }
-  return true;
+  std::unordered_set<std::string_view> inner = locals;
+  inner.insert(bound.begin(), bound.end());
+  CollectProcRhsIdents(s, inner, out);
 }
 
 static void CollectProcRhsIdentsIn(
@@ -698,7 +687,6 @@ static void CollectProcRhsIdentsIn(
   ForEachRandsequenceExpr(s,
                           [&](Expr* const& e) { CollectBareIdents(e, refs); });
   KeepUndeclaredReads(refs, {read, s->condition, s->for_cond}, locals, out);
-  if (CollectPatternScopedReads(s, locals, out)) return;
   // §6.5's declared-before-use rule is broken by the assignment wherever the
   // assignment stands, and §26.3 makes an identifier a package supplies
   // visible in the current scope with no package name qualifier wherever the
@@ -715,14 +703,20 @@ static void CollectProcRhsIdentsIn(
   // in either code block of a randsequence production, so §23.9's "reference to
   // unresolved identifier" was never reported for it and the source elaborated
   // clean.
-  ForEachChildStmt(
-      s, [&](Stmt* const& sub) { CollectProcRhsIdents(sub, locals, out); });
+  //
+  // §12.6.2 and §12.6.1: the variables an if statement's predicate binds are
+  // in scope in its true arm and not its false arm, and those a case item's
+  // pattern binds in that item's statement alone, so each child is walked
+  // with the names in scope where it stands (ForEachChildStmtWithBindings,
+  // which takes every other position from ForEachChildStmt).
+  ForEachChildStmtWithBindings(
+      s,
+      [&](const Stmt* sub, const std::unordered_set<std::string_view>& bound) {
+        CollectBoundProcRhsIdents(sub, locals, bound, out);
+      });
 }
 
-// §12.7.1: the variables the initialization of a for loop `s` declares, the
-// targets whose Stmt::for_init_types entry names a data type. Empty for any
-// other statement and for an initialization that only assigns.
-static std::vector<std::string_view> ForHeaderDeclaredNames(const Stmt* s) {
+std::vector<std::string_view> ForHeaderDeclaredNames(const Stmt* s) {
   std::vector<std::string_view> names;
   for (size_t k = 0; k < s->for_inits.size() && k < s->for_init_types.size();
        ++k) {
@@ -733,6 +727,26 @@ static std::vector<std::string_view> ForHeaderDeclaredNames(const Stmt* s) {
     }
   }
   return names;
+}
+
+void ForEachChildStmtWithBindings(
+    const Stmt* s,
+    const std::function<void(
+        const Stmt*, const std::unordered_set<std::string_view>&)>& visit) {
+  if (s->kind == StmtKind::kIf) {
+    visit(s->then_branch, MatchesBindingsOf(s->condition));
+    visit(s->else_branch, {});
+    return;
+  }
+  if (s->case_matches) {
+    for (const auto& ci : s->case_items) {
+      std::unordered_set<std::string_view> bound;
+      CollectCaseItemBindings(ci, bound);
+      visit(ci.body, bound);
+    }
+    return;
+  }
+  ForEachChildStmt(s, [&](Stmt* const& sub) { visit(sub, {}); });
 }
 
 void CollectProcRhsIdents(const Stmt* s,

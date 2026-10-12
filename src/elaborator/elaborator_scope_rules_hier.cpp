@@ -18,6 +18,7 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
+#include "lexer/token.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -599,29 +600,73 @@ const Expr* HierHead(const Expr* e) {
   return e;
 }
 
-// The heads of the hierarchical names `e` holds. A `with` clause is left
-// alone: an array method's reads its iterator, `item` unless it names
-// another, which no scope declares (§7.12).
-void CollectHierHeads(const Expr* e, std::vector<const Expr*>& out) {
+using NameSet = std::unordered_set<std::string_view>;
+
+// `base` widened by `names`, built in `storage` where there are any.
+const NameSet& Widened(const NameSet& base, const NameSet& names,
+                       NameSet& storage) {
+  if (names.empty()) return base;
+  storage = base;
+  storage.insert(names.begin(), names.end());
+  return storage;
+}
+
+// The heads of the hierarchical names `e` holds, but for those `bound` names:
+// a variable in scope where the name stands, which the name then reaches
+// through rather than heads a hierarchical name of (§12.6, §12.7.1). §12.6.3
+// puts what a conditional expression's predicate binds in scope in its
+// second operand and not its third, and §12.6.2 what a `&&&` clause binds in
+// the clauses after it. A `with` clause is left alone: an array method's
+// reads its iterator, `item` unless it names another, which no scope
+// declares (§7.12).
+void CollectHierHeads(const Expr* e, const NameSet& bound,
+                      std::vector<const Expr*>& out) {
   if (e == nullptr) return;
   if (e->kind == ExprKind::kMemberAccess) {
-    if (const Expr* head = HierHead(e)) out.push_back(head);
+    const Expr* head = HierHead(e);
+    if (head != nullptr && !bound.contains(head->text)) out.push_back(head);
+    return;
+  }
+  NameSet storage;
+  if (e->kind == ExprKind::kTernary) {
+    const NameSet& inner =
+        Widened(bound, MatchesBindingsOf(e->condition), storage);
+    CollectHierHeads(e->condition, inner, out);
+    CollectHierHeads(e->true_expr, inner, out);
+    CollectHierHeads(e->false_expr, bound, out);
+    return;
+  }
+  if (e->kind == ExprKind::kBinary && e->op == TokenKind::kAmpAmpAmp) {
+    CollectHierHeads(e->lhs, bound, out);
+    CollectHierHeads(e->rhs, Widened(bound, MatchesBindingsOf(e->lhs), storage),
+                     out);
     return;
   }
   for (const Expr* child :
        {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr, e->base,
         e->index, e->index_end, e->repeat_count}) {
-    CollectHierHeads(child, out);
+    CollectHierHeads(child, bound, out);
   }
-  for (const Expr* child : e->args) CollectHierHeads(child, out);
-  for (const Expr* child : e->elements) CollectHierHeads(child, out);
+  for (const Expr* child : e->args) CollectHierHeads(child, bound, out);
+  for (const Expr* child : e->elements) CollectHierHeads(child, bound, out);
 }
 
-void CollectStmtHierHeads(const Stmt* s, std::vector<const Expr*>& out) {
+// The same over the statement `s`, with `bound` the variables in scope where
+// it stands. §12.7.1 adds those a for loop's initialization declares for the
+// loop's own header and body, and §12.6.1 and §12.6.2 those a pattern binds
+// for the statement it guards (ForEachChildStmtWithBindings).
+void CollectStmtHierHeads(const Stmt* s, const NameSet& bound,
+                          std::vector<const Expr*>& out) {
   if (s == nullptr) return;
-  ForEachChildExpr(s, [&](const Expr* e) { CollectHierHeads(e, out); });
-  ForEachChildStmt(s,
-                   [&](Stmt* const& sub) { CollectStmtHierHeads(sub, out); });
+  std::vector<std::string_view> header = ForHeaderDeclaredNames(s);
+  NameSet storage;
+  const NameSet& inner =
+      Widened(bound, NameSet(header.begin(), header.end()), storage);
+  ForEachChildExpr(s, [&](const Expr* e) { CollectHierHeads(e, inner, out); });
+  ForEachChildStmtWithBindings(s, [&](const Stmt* sub, const NameSet& names) {
+    NameSet sub_storage;
+    CollectStmtHierHeads(sub, Widened(inner, names, sub_storage), out);
+  });
 }
 
 }  // namespace
@@ -632,11 +677,12 @@ void ReportUnresolvedHierHeads(
   std::vector<const Expr*> heads;
   for (const ModuleItem* item : decl->items) {
     if (IsProceduralItemKind(item->kind))
-      CollectStmtHierHeads(item->body, heads);
+      CollectStmtHierHeads(item->body, {}, heads);
     bool is_subroutine = item->kind == ModuleItemKind::kTaskDecl ||
                          item->kind == ModuleItemKind::kFunctionDecl;
     if (!is_subroutine || !item->method_class.empty()) continue;
-    for (const Stmt* s : item->func_body_stmts) CollectStmtHierHeads(s, heads);
+    for (const Stmt* s : item->func_body_stmts)
+      CollectStmtHierHeads(s, {}, heads);
   }
   for (const Expr* head : heads) {
     if (admits(head->text)) continue;

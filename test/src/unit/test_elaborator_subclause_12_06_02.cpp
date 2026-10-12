@@ -241,4 +241,79 @@ TEST(IfMatchesElaboration, PatternIdentifierReadInTheElseArmIsUnresolved) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
+// §12.6 declares a pattern identifier as a new variable, and §12.6.2 makes the
+// if's true arm part of its scope, so an assignment there writes it (#6415).
+TEST(IfMatchesElaboration, AssignmentToPatternIdentifierInTrueArm) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { bit [3:0] Bt; int I; } U;\n"
+      "  U u = tagged Bt 4'd3;\n"
+      "  initial if (u matches tagged Bt .b) begin\n"
+      "    b = 4'd5;\n"
+      "    $display(\"%0d\", b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The false arm stands outside that scope, so `b` there names nothing.
+TEST(IfMatchesElaboration,
+     AssignmentToPatternIdentifierInFalseArmIsUndeclared) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef union tagged { bit [3:0] Bt; int I; } U;\n"
+      "  U u = tagged Bt 4'd3;\n"
+      "  initial if (u matches tagged Bt .b) $display(\"%0d\", b);\n"
+      "  else b = 4'd5;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "undeclared identifier 'b'",
+                            5, "23.9"));
+}
+
+// A method call through a pattern identifier, in the if's true arm, in a
+// later `&&&` clause of its predicate and in a conditional expression's
+// second operand (§12.6.3), names that variable and no hierarchical name
+// (#6416).
+TEST(IfMatchesElaboration, MethodCallThroughPatternIdentifier) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  typedef enum {A, B} E;\n"
+      "  typedef union tagged { E En; int I; } U;\n"
+      "  U u = tagged En B;\n"
+      "  string s;\n"
+      "  initial begin\n"
+      "    if (u matches tagged En .ev) $display(\"%s\", ev.name());\n"
+      "    if (u matches tagged En .e2 &&& e2.name() == \"B\") s = \"y\";\n"
+      "    s = (u matches tagged En .e3) ? e3.name() : \"\";\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// Outside that scope, in the false arm, the same name heads a hierarchical
+// name that resolves to nothing.
+TEST(IfMatchesElaboration, MethodCallThroughPatternIdentifierInFalseArm) {
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef enum {A, B} E;\n"
+      "  typedef union tagged { E En; int I; } U;\n"
+      "  U u = tagged En B;\n"
+      "  initial if (u matches tagged En .ev) $display(\"%s\", ev.name());\n"
+      "  else $display(\"%s\", ev.name());\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical name 'ev' resolves to no declaration",
+                            6, "23.8"));
+}
+
 }  // namespace

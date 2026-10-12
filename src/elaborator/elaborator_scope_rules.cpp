@@ -62,6 +62,9 @@ struct ScopeWalk {
   // loop's implicit block. This stack holds the names currently in scope while
   // walking a loop's sub-statements, so assignments to them are not mistaken
   // for writes to an undeclared identifier and the names never leak outward.
+  // §12.6.2 and §12.6.1 scope a pattern identifier the same way, to an if's
+  // true arm or a case item's statement, and it stands here while that
+  // statement is walked.
   std::vector<std::string_view> active_loop_vars;
 };
 
@@ -142,10 +145,8 @@ void CollectScopeWalk(const Stmt* s, ScopeWalk& out) {
   // they are written in wherever the statement holding them stands, so every
   // position a statement holds a statement in is one this collection reaches.
   // ForEachChildStmt in elaborator_validate_internal.h states those positions
-  // once for the whole elaborator, which is why the list is not written out
-  // again here. The visitor takes `Stmt* const&` because `s` is a `const
-  // Stmt*`, which is how ForEachChildStmt lets a walk that only reads the tree
-  // share its list with the walks that rewrite it.
+  // once for the whole elaborator, and ForEachChildStmtWithBindings takes them
+  // from it, which is why the list is not written out again here.
   //
   // §12.7.1: the control variables a for-loop header declares are in scope
   // while the loop's own sub-statements are walked and are dropped afterwards
@@ -157,8 +158,21 @@ void CollectScopeWalk(const Stmt* s, ScopeWalk& out) {
   // other. §12.7.3's foreach loop variables are bracketed the same way:
   // Stmt::foreach_vars is filled on a foreach statement alone, whose one
   // sub-statement is its body.
+  //
+  // §12.6 declares each pattern identifier a variable, in scope in the true
+  // arm of the if whose predicate binds it and the statement of the case item
+  // whose pattern does (ForEachChildStmtWithBindings), so it is pushed for the
+  // walk of that statement alone: `b = 4'd5;` there writes the variable the
+  // pattern declared, and the same assignment in the false arm names nothing.
   size_t pushed = PushTypedForInitVars(s, out) + PushForeachVars(s, out);
-  ForEachChildStmt(s, [&](Stmt* const& sub) { CollectScopeWalk(sub, out); });
+  ForEachChildStmtWithBindings(
+      s,
+      [&](const Stmt* sub, const std::unordered_set<std::string_view>& bound) {
+        out.active_loop_vars.insert(out.active_loop_vars.end(), bound.begin(),
+                                    bound.end());
+        CollectScopeWalk(sub, out);
+        out.active_loop_vars.resize(out.active_loop_vars.size() - bound.size());
+      });
   out.active_loop_vars.resize(out.active_loop_vars.size() - pushed);
 }
 

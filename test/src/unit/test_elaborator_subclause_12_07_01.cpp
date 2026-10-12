@@ -207,4 +207,45 @@ TEST(LoopStatementElaboration, ConstantFunctionForVariableHidesOuterOne) {
   EXPECT_EQ(p->resolved_value, 7);
 }
 
+// §12.7.1 makes a variable the for loop's initialization declares a local of
+// the loop's implicit block, visible in its condition, step and body, so a
+// method call through it names that local and no hierarchical name (#6417).
+TEST(LoopStatementElaboration, MethodCallThroughForLoopVariable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int n;\n"
+      "  function automatic int f();\n"
+      "    int c = 0;\n"
+      "    for (string s = \"\"; s.len() < 3; s = {s, \"x\"}) c += s.len();\n"
+      "    return c;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    for (string s = \"\"; s.len() < 3; s = {s, \"x\"}) n++;\n"
+      "    n += f();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// After the loop the variable is gone, and the name heads a hierarchical name
+// that resolves to nothing.
+TEST(LoopStatementElaboration, MethodCallThroughForLoopVariableAfterTheLoop) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int n;\n"
+      "  initial begin\n"
+      "    for (string s = \"\"; s.len() < 3; s = {s, \"x\"}) n++;\n"
+      "    n = s.len();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical name 's' resolves to no declaration",
+                            5, "23.8"));
+}
+
 }  // namespace
