@@ -273,15 +273,16 @@ static void CheckPatternDims(const ArrayPatternCheck& check,
     return;
   }
   if (ReportsFlatStructPattern(check, pattern, elem_type, loc)) return;
-  if (!dims[0].size) return;
+  const std::optional<int64_t> kDimSize = dims[0].size;
+  if (!kDimSize) return;
   // §5.11: a replication operates within one dimension, so what it supplies
   // is counted against that dimension as a positional list is.
   auto count = PositionalItemCount(pattern);
-  if (count && *count != *dims[0].size) {
+  if (count && *count != *kDimSize) {
     check.diag.Error(loc,
                      std::format("assignment pattern has {} elements, but "
                                  "array dimension requires {}",
-                                 *count, *dims[0].size),
+                                 *count, *kDimSize),
                      Subclause("10.9.1"));
   }
   // §10.9.1 (printed pages 261-262): the braces match the dimensions, each
@@ -294,6 +295,7 @@ void ArrayPatternCheck::Check(const Expr* pattern, const DataType& elem_type,
                               const std::vector<Expr*>& dims,
                               SourceLoc loc) const {
   std::vector<PatternDim> pattern_dims;
+  pattern_dims.reserve(dims.size());
   for (const Expr* dim : dims) {
     pattern_dims.push_back(
         {dim == nullptr ? std::nullopt : ComputeDimSize(dim), false});

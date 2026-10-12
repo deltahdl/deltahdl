@@ -15,7 +15,7 @@ TEST(AssignmentPatternElaboration, ReplicationPatternElaborates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
-      "  logic [31:0] x;\n"
+      "  logic [3:0][7:0] x;\n"
       "  initial begin\n"
       "    x = '{4{8'hAB}};\n"
       "  end\n"

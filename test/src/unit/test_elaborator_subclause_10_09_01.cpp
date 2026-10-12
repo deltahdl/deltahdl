@@ -473,7 +473,7 @@ TEST(ArrayPatternElaboration, ProceduralPatternCountedAgainstPackedDimension) {
       "  logic [1:0][3:0] w;\n"
       "  initial w = '{4'h1, 4'h2, 4'h3};\n"
       "  initial begin\n"
-      "    logic [3:0] b = '{1'b1};\n"
+      "    static logic [3:0] b = '{1'b1};\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -517,7 +517,7 @@ TEST(ArrayPatternElaboration, TypedefUnpackedDimensionsComeBeforePackedOnes) {
              "  typedef logic [3:0] row_t [2];\n"
              "  row_t a [3] = '{'{4'h1, 4'h2}, '{4'h3, 4'h4}, '{4'h5, 4'h6}};\n"
              "  initial begin\n"
-             "    row_t r = '{4'h1, 4'h2};\n"
+             "    static row_t r = '{4'h1, 4'h2};\n"
              "  end\n"
              "endmodule\n"));
 }
@@ -532,7 +532,7 @@ TEST(ArrayPatternElaboration, PackageScopedTypePackedDimensionCounted) {
       "endpackage\n"
       "module m;\n"
       "  initial begin\n"
-      "    p::nib_t [1:0] w = '{4'h1, 4'h2, 4'h3};\n"
+      "    static p::nib_t [1:0] w = '{4'h1, 4'h2, 4'h3};\n"
       "  end\n"
       "endmodule\n",
       f, "m");
@@ -558,8 +558,9 @@ TEST(ArrayPatternElaboration, KeyedPackedPatternUncoveredElementError) {
 
 // §10.8 makes a port connection an assignment-like context, so a pattern
 // connected to a packed array port supplies an item per element of its packed
-// dimension. A port with an unpacked dimension as well has its pattern stand
-// for that dimension first, two rows of `sa`'s port rather than four bits.
+// dimension. A port with an unpacked dimension as well is matched from that
+// dimension first, so its four packed bits are not what a connection to it is
+// counted against.
 TEST(ArrayPatternElaboration, PortConnectionCountedAgainstPackedDimension) {
   ElabFixture f;
   ElaborateSrc(
@@ -569,15 +570,16 @@ TEST(ArrayPatternElaboration, PortConnectionCountedAgainstPackedDimension) {
       "endmodule\n"
       "module top;\n"
       "  logic x, y;\n"
+      "  logic [3:0] rows [2];\n"
       "  sc u1(.p('{x, y}));\n"
       "  sc u2(.p('{16{x}}));\n"
-      "  sa u3(.p('{4'h1, 4'h2}));\n"
+      "  sa u3(.p(rows));\n"
       "endmodule\n",
       f, "top");
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "assignment pattern has 2 elements, but array "
                             "dimension requires 16",
-                            7, "10.9.1"));
+                            8, "10.9.1"));
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
