@@ -281,4 +281,28 @@ TEST(DefaultArgumentSim, WriteIntoParallelTopByHierarchicalName) {
   LowerRunAndCheck(f, design, {{"a", 7u}, {"b", 107u}});
 }
 
+// §13.5.3 (printed pages 350-351): an output argument's default names a
+// variable of the scope declaring the task, so u.t1() called from top copies
+// the result to u.a, the instance's a, and leaves top's own a at 0.
+TEST(DefaultArgumentSim, OutputDefaultBindsInTheDeclaringScope) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module m;\n"
+      "  logic a = 0;\n"
+      "  task t1(output logic o = a); o = 1; endtask\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic a = 0;\n"
+      "  int r;\n"
+      "  m u();\n"
+      "  initial begin\n"
+      "    u.t1();\n"
+      "    #1 r = u.a * 10 + a;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 10u);
+}
+
 }  // namespace

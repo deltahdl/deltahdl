@@ -420,4 +420,29 @@ TEST(FunctionReturnSim, InstanceMethodReturnRangeNamesClassConstants) {
   EXPECT_EQ(out, "63 5 127 7 31\n");
 }
 
+// §13.4.1 (printed pages 343-344): parentheses tell a call used as an implicit
+// variable from a hierarchical reference into the function's scope. F.member,
+// without them, reads the static function's own local, 0 before any call;
+// F().member calls F and reads the member of the object it returns, 1.
+TEST(FunctionReturnSim, FunctionNameWithoutParenthesesIsAScope) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "class A;\n"
+      "  int member = 1;\n"
+      "endclass\n"
+      "module top;\n"
+      "  A a;\n"
+      "  function A F;\n"
+      "    int member;\n"
+      "    a = new();\n"
+      "    return a;\n"
+      "  endfunction\n"
+      "  int r;\n"
+      "  initial r = F.member * 10 + F().member;\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 1u);
+}
+
 }  // namespace

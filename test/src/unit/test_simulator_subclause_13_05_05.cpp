@@ -372,4 +372,29 @@ TEST(ArgumentBindingSim, ScopedAndHierarchicalEnablesNeedNoParentheses) {
             "n=4\ns=3\na=6\na=9\n");
 }
 
+// §13.5.5 (printed page 351) bars omitting the parentheses in a directly
+// recursive call of a nonvoid class function method, so inside the method its
+// bare name is the implicit result variable (§13.4.1), not a call: f = 7 and
+// f + n read it, and c.f(1) returns 8.
+TEST(ArgumentBindingSim, BareMethodNameInsideItIsTheResultVariable) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "class C;\n"
+      "  function int f(int n);\n"
+      "    f = 7;\n"
+      "    return f + n;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    automatic C c = new;\n"
+      "    r = c.f(1);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 8u);
+}
+
 }  // namespace
