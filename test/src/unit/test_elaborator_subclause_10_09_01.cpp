@@ -679,4 +679,92 @@ TEST(ArrayPatternElaboration, PortWithUnpackedDimensionsCountedAgainstThem) {
                             7, "10.9.1"));
 }
 
+// §10.9: a typed pattern takes the type its prefix names, a typedef or a type
+// reference to a data type or a variable, in place of its context's, and
+// §10.9.1 counts its braces against that type's dimensions, unpacked and then
+// packed, as it counts an untyped pattern's against its target's.
+TEST(ArrayPatternElaboration, TypedPatternCountedAgainstItsPrefixType) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef logic [3:0] nib_t;\n"
+      "  typedef int pair_t [2];\n"
+      "  logic [15:0] x;\n"
+      "  nib_t n;\n"
+      "  int p [2];\n"
+      "  assign x = type(x)'{8'd1, 8'd2};\n"
+      "  initial n = nib_t'{1'b1, 1'b0};\n"
+      "  initial p = pair_t'{1, 2, 3};\n"
+      "  logic [23:0] y = type(logic [2:0][7:0])'{8'd1, 8'd2};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 2 elements, but array "
+                            "dimension requires 16",
+                            7, "10.9.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 2 elements, but array "
+                            "dimension requires 4",
+                            8, "10.9.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 3 elements, but array "
+                            "dimension requires 2",
+                            9, "10.9.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 2 elements, but array "
+                            "dimension requires 3",
+                            10, "10.9.1"));
+  EXPECT_EQ(f.diag.ErrorCount(), 4u);
+}
+
+// §10.9.1: a typed pattern is counted wherever it is written, an operand of an
+// operator and a subroutine's return value among the places, since its type
+// comes from its prefix and not from an assignment it stands in.
+TEST(ArrayPatternElaboration, TypedPatternCountedOutsideAssignmentLikeContext) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef logic [1:0][7:0] w_t;\n"
+      "  logic [15:0] r;\n"
+      "  function automatic logic [15:0] f();\n"
+      "    return w_t'{8'd1, 8'd2, 8'd3};\n"
+      "  endfunction\n"
+      "  initial r = w_t'{8'd1, 8'd2} + w_t'{8'd3};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 3 elements, but array "
+                            "dimension requires 2",
+                            5, "10.9.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 1 elements, but array "
+                            "dimension requires 2",
+                            7, "10.9.1"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+// A typed pattern whose items match the type its prefix names elaborates, and
+// `type(h)` names the declaration that is visible where it is written: the
+// block's two-bit h, which hides the module's four-bit one.
+TEST(ArrayPatternElaboration, TypedPatternMatchingItsPrefixTypeOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  typedef logic [3:0] nib_t;\n"
+             "  typedef int pair_t [2];\n"
+             "  logic [1:0][7:0] x;\n"
+             "  nib_t n;\n"
+             "  int p [2];\n"
+             "  logic [3:0] h;\n"
+             "  parameter logic [1:0] P = 2'b01;\n"
+             "  assign x = type(x)'{8'd1, 8'd2};\n"
+             "  initial h = type(P)'{1'b1, 1'b0};\n"
+             "  initial n = nib_t'{4{1'b1}};\n"
+             "  initial p = pair_t'{1, 2};\n"
+             "  initial begin\n"
+             "    logic [1:0] h;\n"
+             "    h = type(h)'{1'b1, 1'b0};\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
 }  // namespace

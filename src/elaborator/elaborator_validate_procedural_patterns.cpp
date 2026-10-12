@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/elaborator_validate_operations.h"
 #include "elaborator/type_eval.h"
@@ -50,12 +51,71 @@ void ElaboratorOperationRules::WalkStmtsForProceduralArrayPattern(
     kCheck.Check(s->var_init, s->var_decl_type, s->var_unpacked_dims,
                  s->var_init->range.start);
   }
+  ForEachChildExpr(s,
+                   [this](const Expr* e) { WalkExprForTypedArrayPattern(e); });
   size_t mark = block_decls_.size();
   ForEachChildStmt(
       s, [this](Stmt* const& sub) { WalkStmtsForProceduralArrayPattern(sub); });
   block_decls_.resize(mark);
   if (s->kind == StmtKind::kVarDecl)
     block_decls_.emplace_back(s->var_name, !s->var_unpacked_dims.empty());
+}
+
+const ModuleItem* ElaboratorOperationRules::TypeRefVariable(
+    const Expr* ref) const {
+  std::string_view name = ExprIdent(ref->lhs);
+  if (IsBlockDeclared(block_decls_, name)) return nullptr;
+  auto it = pattern_target_arrays_.find(name);
+  return it == pattern_target_arrays_.end() ? nullptr : it->second;
+}
+
+// §10.9: a pattern prefixed with a type parses as a cast wrapping it, and the
+// type the prefix names is the one its braces follow (§10.9.1). A typedef's
+// name is the element type its entry holds, with the unpacked dimensions an
+// array typedef carries kept apart (§7.4.4); a name no typedef in scope gives,
+// an integer atom type among them, has no dimensions to count against.
+// `type(...)` encloses either a data type or an expression, whose type §6.23
+// makes the reference's.
+void ElaboratorOperationRules::CheckTypedArrayPattern(const Expr* e) {
+  if (e->kind != ExprKind::kCast ||
+      e->lhs->kind != ExprKind::kAssignmentPattern)
+    return;
+  const ArrayPatternCheck kCheck{typedefs_, aggregate_typedef_names_,
+                                 var_types_, diag_};
+  const Expr* ref = e->rhs;
+  if (ref == nullptr) {
+    auto td = typedefs_.find(e->text);
+    if (td == typedefs_.end()) return;
+    std::vector<Expr*> unpacked_dims;
+    auto dims = td_array_dims_.find(e->text);
+    if (dims != td_array_dims_.end()) unpacked_dims = dims->second;
+    kCheck.Check(e->lhs, td->second, unpacked_dims, e->range.start);
+    return;
+  }
+  if (ref->type_value != nullptr) {
+    kCheck.Check(e->lhs, *ref->type_value, {}, e->range.start);
+    return;
+  }
+  if (const ModuleItem* var = TypeRefVariable(ref))
+    kCheck.Check(e->lhs, var->data_type, var->unpacked_dims, e->range.start);
+}
+
+void ElaboratorOperationRules::WalkExprForTypedArrayPattern(const Expr* e) {
+  if (e == nullptr) return;
+  CheckTypedArrayPattern(e);
+  ForEachExprChild(
+      e, [this](const Expr* child) { WalkExprForTypedArrayPattern(child); });
+}
+
+// A module item's own expressions: a declaration's initializer, both sides of
+// a continuous assignment, and an instance's port connections.
+void ElaboratorOperationRules::WalkItemForTypedArrayPatterns(
+    const ModuleItem* item) {
+  WalkExprForTypedArrayPattern(item->init_expr);
+  WalkExprForTypedArrayPattern(item->assign_lhs);
+  WalkExprForTypedArrayPattern(item->assign_rhs);
+  for (const auto& conn : item->inst_ports)
+    WalkExprForTypedArrayPattern(conn.second);
 }
 
 using StructTargetTypes = std::unordered_map<std::string_view, const DataType*>;
@@ -153,8 +213,11 @@ void ElaboratorOperationRules::ValidateProceduralArrayPatterns(
     if (item->unpacked_dims.empty())
       struct_targets[item->name] = &item->data_type;
   }
+  for (const auto& param : decl->params)
+    WalkExprForTypedArrayPattern(param.second);
   for (const auto* item : decl->items) {
     CheckContinuousArrayPattern(item);
+    WalkItemForTypedArrayPatterns(item);
     if (IsProceduralItemKind(item->kind))
       WalkStmtsForProceduralArrayPattern(item->body);
     CheckItemStructPatterns(item, struct_targets, typedefs_, diag_);

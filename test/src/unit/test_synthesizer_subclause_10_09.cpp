@@ -38,7 +38,7 @@ TEST(AssignmentPatternSynth, TypePrefixedPatternIsReportedUnloweredAsACast) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
                            "module m;\n"
-                           "  logic [15:0] x;\n"
+                           "  logic [1:0][7:0] x;\n"
                            "  assign x = type(x)'{8'd1, 8'd2};\n"
                            "endmodule\n");
   ASSERT_NE(mod, nullptr);

@@ -79,6 +79,16 @@ class ElaboratorOperationRules : public ElaboratorData {
   // assigned to one is checked against the dimensions it declares.
   std::unordered_map<std::string_view, const ModuleItem*>
       pattern_target_arrays_;
+  // §10.9 with §10.9.1: a typed pattern, `T'{...}` or `type(x)'{...}`, takes
+  // the type its prefix names in place of its context's, so its braces are
+  // counted against that type's dimensions wherever it is written. The walks
+  // reach a module item's expressions and a statement's.
+  void WalkItemForTypedArrayPatterns(const ModuleItem* item);
+  void WalkExprForTypedArrayPattern(const Expr* e);
+  void CheckTypedArrayPattern(const Expr* e);
+  // §6.23: the module variable or net a type reference names, `x` of
+  // `type(x)`, or null where it names none or a block's declaration hides it.
+  const ModuleItem* TypeRefVariable(const Expr* ref) const;
   void ValidateReplicateTargetingArray(const ModuleDecl* decl);
   void WalkStmtsForReplicateTargetingArray(const Stmt* s);
   void CheckReplicateTargetingArrayInAssign(const Stmt* s);

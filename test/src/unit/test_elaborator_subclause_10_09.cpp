@@ -56,7 +56,7 @@ TEST(AssignmentPatternElaboration, TypeReferencePatternElaborates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  logic [15:0] x;\n"
+      "  logic [1:0][7:0] x;\n"
       "  initial x = type(x)'{8'd1, 8'd2};\n"
       "endmodule\n",
       f);

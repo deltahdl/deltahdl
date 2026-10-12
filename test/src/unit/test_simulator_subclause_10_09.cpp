@@ -181,12 +181,12 @@ TEST(AssignmentPatternSimulation, ByteTypePrefixEvaluates) {
 // §10.9: an assignment pattern expression whose prefix is a type reference
 // (type(x)'{...}) has the self-determined type of that reference and, used on
 // the right-hand side, yields the value a variable of it would hold. type(x) is
-// logic[15:0] here, so the two bytes pack MSB-first into 0x0102.
+// logic [1:0][7:0] here, so the two bytes pack MSB-first into 0x0102.
 TEST(AssignmentPatternSimulation, TypeReferencePrefixYieldsValue) {
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
-      "  logic [15:0] x;\n"
+      "  logic [1:0][7:0] x;\n"
       "  initial begin\n"
       "    x = type(x)'{8'd1, 8'd2};\n"
       "  end\n"
