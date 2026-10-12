@@ -55,9 +55,10 @@ std::vector<const ClassDecl*> ClassChainOfScopePrefix(
 // classes enclosing the declaration, outermost first: `C h;` by the bare name,
 // `p::C h;` through the package, `Outer::Inner h;` through the enclosing class.
 // A bare name is read along the chain outward and then among the unit's
-// classes; a scoped name's prefix is read the same way, then as a package, and
-// the type is the class nested in whichever answers. Null for a type that is
-// not a class.
+// classes. A scoped name's first prefix is read the same way, or as a package
+// holding the class the next name gives, and each later name is a class nested
+// in the class so far, so `A::B::C h;` walks from A however many prefixes the
+// chain has. Null for a type that is not a class.
 const ClassDecl* ClassOfDeclaredType(const DataType& dt,
                                      const std::vector<const ClassDecl*>& chain,
                                      const CompilationUnit* unit);

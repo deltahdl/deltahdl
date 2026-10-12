@@ -6,6 +6,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 namespace {
@@ -276,6 +277,28 @@ TEST(ClassScopeResolutionParsing,
   EXPECT_EQ(f->func_body_stmts[0]->kind, StmtKind::kVarDecl);
   EXPECT_EQ(f->func_body_stmts[0]->var_name, "v");
   EXPECT_EQ(f->func_body_stmts[1]->kind, StmtKind::kExprStmt);
+}
+
+// A.2.2.1 writes a class_type as a class name followed by any number of
+// `:: class_identifier` steps, and §8.23 names a class nested two levels deep
+// that way: `A::B::C` keeps A among its outer prefixes, B as the scope the
+// type is declared in and C as the type, so no step of the chain is lost.
+TEST(ClassScopeResolutionParsing, TypeNamedThroughAChainKeepsEveryPrefix) {
+  auto r = Parse(
+      "class A;\n"
+      "  class B;\n"
+      "    class C; endclass\n"
+      "  endclass\n"
+      "endclass\n"
+      "module m; A::B::C h; endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* h = FindItemByName(r.cu->modules[0]->items, "h");
+  ASSERT_NE(h, nullptr);
+  ASSERT_EQ(h->data_type.outer_scope_names.size(), 1u);
+  EXPECT_EQ(h->data_type.outer_scope_names[0], "A");
+  EXPECT_EQ(h->data_type.scope_name, "B");
+  EXPECT_EQ(h->data_type.type_name, "C");
 }
 
 }  // namespace

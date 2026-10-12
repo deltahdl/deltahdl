@@ -110,23 +110,31 @@ static const ClassDecl* ClassAmongEnclosing(
   return nullptr;
 }
 
+// The names of a named type, outermost first: each outer prefix, the scope
+// and the type, so `A::B::C` gives {A, B, C} and `C` gives {C}.
+static std::vector<std::string_view> TypeChainNames(const DataType& dt) {
+  std::vector<std::string_view> names = dt.outer_scope_names;
+  if (!dt.scope_name.empty()) names.push_back(dt.scope_name);
+  names.push_back(dt.type_name);
+  return names;
+}
+
 const ClassDecl* ClassOfDeclaredType(const DataType& dt,
                                      const std::vector<const ClassDecl*>& chain,
                                      const CompilationUnit* unit) {
   if (dt.kind != DataTypeKind::kNamed) return nullptr;
-  if (dt.scope_name.empty()) {
-    if (const ClassDecl* c = ClassAmongEnclosing(dt.type_name, chain)) return c;
-    return FindClassDecl(dt.type_name, unit);
+  const std::vector<std::string_view> kNames = TypeChainNames(dt);
+  size_t next = 1;
+  const ClassDecl* cls = ClassAmongEnclosing(kNames[0], chain);
+  if (cls == nullptr && kNames.size() > 1) {
+    cls = FindClassInPackage(kNames[0], kNames[1], unit);
+    if (cls != nullptr) next = 2;
   }
-  if (const ClassDecl* outer = ClassAmongEnclosing(dt.scope_name, chain)) {
-    return FindNestedClass(outer, dt.type_name);
+  if (cls == nullptr) cls = FindClassDecl(kNames[0], unit);
+  for (; cls != nullptr && next < kNames.size(); ++next) {
+    cls = FindNestedClass(cls, kNames[next]);
   }
-  if (const ClassDecl* in_pkg =
-          FindClassInPackage(dt.scope_name, dt.type_name, unit)) {
-    return in_pkg;
-  }
-  const ClassDecl* outer = FindClassDecl(dt.scope_name, unit);
-  return outer ? FindNestedClass(outer, dt.type_name) : nullptr;
+  return cls;
 }
 
 }  // namespace delta

@@ -96,4 +96,43 @@ TEST(ClassScopeResolutionElaboration, ScopedTypedefTakesNoModuleArrayDims) {
   EXPECT_EQ(x->width, 32u);
 }
 
+// §8.23 with §11.12: `A::B::C` names the C nested in the B nested in A,
+// walked from A, and not the C of a top-level B that the last prefix alone
+// would reach. That C derives from Base, so a handle of it fits a Base formal
+// and a formal of its own type, while a handle of the top-level B::C, which
+// derives from nothing, is reported for either.
+TEST(ClassScopeResolutionElaboration,
+     ChainOfNestedClassesIsWalkedFromItsFirstName) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class Base; endclass\n"
+      "class B;\n"
+      "  class C; endclass\n"
+      "endclass\n"
+      "class A;\n"
+      "  class B;\n"
+      "    class C extends Base; endclass\n"
+      "  endclass\n"
+      "endclass\n"
+      "module m;\n"
+      "  A::B::C h; B::C g;\n"
+      "  let lb(Base x) = 1;\n"
+      "  let lc(A::B::C x) = 1;\n"
+      "  initial begin\n"
+      "    $display(\"%0d\", lb(h) + lc(h));\n"
+      "    $display(\"%0d\", lb(g));\n"
+      "    $display(\"%0d\", lc(g));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "is not cast compatible with the type of formal",
+                             15, "11.12"));
+  for (uint32_t line : {16u, 17u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "is not cast compatible with the type of formal",
+                              line, "11.12"));
+  }
+}
+
 }  // namespace

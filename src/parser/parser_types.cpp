@@ -338,6 +338,8 @@ DataType Parser::ParseNamedType() {
       lexer_.RestorePos(saved);
       break;
     }
+    if (!dtype.scope_name.empty())
+      dtype.outer_scope_names.push_back(dtype.scope_name);
     dtype.scope_name = dtype.type_name;
     dtype.scope_param_assignment_written = assignment_written;
     dtype.type_name = Consume().text;

@@ -124,6 +124,10 @@ struct DataType {
   bool has_unsized_packed_dim = false;
   std::string_view type_name;
   std::string_view scope_name;
+  // §8.23 with A.2.2.1: the names written before scope_name in a chain of more
+  // than one prefix, outermost first, so `A::B::C` holds {A} here, B as
+  // scope_name and C as type_name. Empty for a single prefix or none.
+  std::vector<std::string_view> outer_scope_names;
   // §8.25.1: the class scope_name names was written with a
   // parameter_value_assignment, even an empty one, `C#()::T`, which leaves
   // type_params as empty as the unadorned `C::T` does.
