@@ -140,7 +140,18 @@ Expr* Parser::TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp) {
     tern->condition = lhs;
     tern->true_expr = ParseExprBp(0);
     Expect(TokenKind::kColon, Subclause("11.4.11"));
-    tern->false_expr = ParseExprBp(0);
+    // §11.3.2's Table 11-2 (printed page 272) ranks the conditional operator
+    // above -> and <-> and makes it right associative. The false expression is
+    // therefore read at the binding power of ||, the operator just above the
+    // conditional, so an implication or an equivalence after it takes the
+    // whole conditional as its left operand, and a conditional written next is
+    // one more nested to the right. Reading it at the lowest power had
+    // `a ? b : c -> d` take the implication into the false expression.
+    tern->false_expr =
+        ParseExprBp(InfixBindingPower(TokenKind::kPipePipe).first);
+    if (Check(TokenKind::kQuestion))
+      tern->false_expr =
+          TryParseSpecialInfix(tern->false_expr, CurrentToken(), 0);
     return tern;
   }
 

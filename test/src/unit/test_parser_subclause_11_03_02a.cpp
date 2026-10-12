@@ -101,6 +101,52 @@ TEST(Precedence, TernaryHigherThanImplication) {
   EXPECT_EQ(rhs->rhs->kind, ExprKind::kTernary);
 }
 
+// Table 11-2 ranks the conditional operator above -> and <->, so an
+// implication after a conditional's false expression takes the whole
+// conditional as its left operand rather than ending the false expression.
+TEST(Precedence, ImplicationAfterTernaryTakesTheTernary) {
+  auto* rhs = ParsePrecedenceRhs(
+      "module m;\n"
+      "  logic a, b, c, d, e;\n"
+      "  initial e = a ? b : c -> d;\n"
+      "endmodule\n");
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kBinary);
+  EXPECT_EQ(rhs->op, TokenKind::kArrow);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->lhs->false_expr, nullptr);
+  EXPECT_EQ(rhs->lhs->false_expr->kind, ExprKind::kIdentifier);
+}
+
+TEST(Precedence, EquivalenceAfterTernaryTakesTheTernary) {
+  auto* rhs = ParsePrecedenceRhs(
+      "module m;\n"
+      "  logic a, b, c, d, e;\n"
+      "  initial e = a ? b : c <-> d;\n"
+      "endmodule\n");
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->op, TokenKind::kLtDashGt);
+  ASSERT_NE(rhs->lhs, nullptr);
+  EXPECT_EQ(rhs->lhs->kind, ExprKind::kTernary);
+}
+
+// The conditional operator is right associative, and an operator ranked above
+// it, ||, stays inside the false expression.
+TEST(Precedence, TernaryFalseExpressionNestsToTheRight) {
+  auto* rhs = ParsePrecedenceRhs(
+      "module m;\n"
+      "  logic a, b, c, d, e, f, g;\n"
+      "  initial g = a ? b : c ? d : e || f;\n"
+      "endmodule\n");
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(rhs->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->kind, ExprKind::kTernary);
+  ASSERT_NE(rhs->false_expr->false_expr, nullptr);
+  EXPECT_EQ(rhs->false_expr->false_expr->op, TokenKind::kPipePipe);
+}
+
 TEST(Precedence, ArithShiftSamePrecedenceAsLogicShift) {
   auto* rhs =
       ParsePrecedenceRhs("module m; initial x = a <<< b >> c; endmodule\n");
