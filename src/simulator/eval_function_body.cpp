@@ -261,10 +261,13 @@ static FuncFlow ExecFuncIf(const Stmt* stmt, const FuncExecCtx& exec) {
 
 // §9.3.1: the statements of a begin-end block run in order, and control that
 // leaves one of them -- a break, a continue or a return -- leaves the block
-// with it, for the enclosing loop or the body to act on.
+// with it, for the enclosing loop or the body to act on. §11.12: an unnamed
+// block declaring a let is given a frame of its own, so the let ends with it.
 static FuncFlow ExecFuncBlock(const Stmt* stmt, const FuncExecCtx& exec) {
   bool named = !stmt->label.empty();
+  bool scoped = !named && BlockDeclaresLet(stmt);
   if (named) exec.ctx.PushStaticScope(stmt->label);
+  if (scoped) exec.ctx.PushScope();
   FuncNamedScope scope(stmt->label, exec);
   FuncFlow flow = FuncFlow::kNext;
   for (auto* c : stmt->stmts) {
@@ -272,6 +275,7 @@ static FuncFlow ExecFuncBlock(const Stmt* stmt, const FuncExecCtx& exec) {
     if (flow != FuncFlow::kNext) break;
   }
   if (named) exec.ctx.PopStaticScope(stmt->label);
+  if (scoped) exec.ctx.PopScope();
   return scope.Leave(flow);
 }
 

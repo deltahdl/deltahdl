@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -217,6 +218,13 @@ ModuleItem* FindVisibleLet(SimContext& ctx, std::string_view name) {
           ctx.FindLetDecl(InstanceLetKey(ctx.ActiveInstancePrefix(), name)))
     return own;
   return ctx.FindLetDecl(name);
+}
+
+bool BlockDeclaresLet(const Stmt* block) {
+  return std::ranges::any_of(block->stmts, [](const Stmt* s) {
+    return s->kind == StmtKind::kBlockItemDecl && s->decl_item != nullptr &&
+           s->decl_item->kind == ModuleItemKind::kLetDecl;
+  });
 }
 
 void RegisterBlockLet(const Stmt* stmt, SimContext& ctx) {

@@ -492,6 +492,10 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena);
 // where it hides a let of that name the enclosing scopes declare (§11.12).
 // Nothing for any other statement. Defined in eval_let.cpp.
 void RegisterBlockLet(const Stmt* stmt, SimContext& ctx);
+// §11.12 with §9.3.1: whether the begin-end block `block` declares a let, and
+// so needs a scope frame of its own for the let to end with the block, named
+// or not and inside a subroutine or not. Defined in eval_let.cpp.
+bool BlockDeclaresLet(const Stmt* block);
 // §11.12 with §23.9: registers `let`, a module's, under the key of the
 // instance `prefix` names; and finds the let a bare name refers to where the
 // running code stands -- one the enclosing blocks or subroutine body declare

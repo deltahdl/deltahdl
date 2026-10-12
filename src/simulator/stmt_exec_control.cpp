@@ -11,7 +11,6 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
-#include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "simulator/covergroup_instance.h"
 #include "simulator/eval_array.h"
@@ -44,17 +43,12 @@ namespace delta {
 // frame. One declaring a let (§11.12) is given a frame wherever it stands,
 // inside a subroutine too, so that the let hides an enclosing scope's only
 // inside the block rather than for the rest of the body.
-static bool DeclaresLet(const Stmt* s) {
-  return s->kind == StmtKind::kBlockItemDecl && s->decl_item != nullptr &&
-         s->decl_item->kind == ModuleItemKind::kLetDecl;
-}
-
 static std::string_view BlockFrameName(const Stmt* stmt, SimContext& ctx) {
   if (!stmt->label.empty()) return stmt->label;
-  bool in_subroutine = !ctx.CurrentFuncName().empty();
-  bool declares = std::ranges::any_of(stmt->stmts, [&](const Stmt* s) {
-    return DeclaresLet(s) || (!in_subroutine && s->kind == StmtKind::kVarDecl);
-  });
+  if (BlockDeclaresLet(stmt)) return ctx.UnnamedBlockFrameName(stmt);
+  if (!ctx.CurrentFuncName().empty()) return {};
+  bool declares = std::ranges::any_of(
+      stmt->stmts, [](const Stmt* s) { return s->kind == StmtKind::kVarDecl; });
   return declares ? ctx.UnnamedBlockFrameName(stmt) : std::string_view{};
 }
 
