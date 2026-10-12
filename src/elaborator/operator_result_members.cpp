@@ -90,7 +90,7 @@ void ReportOperatorResultMember(
                              kName),
                  Subclause("6.16"));
       return;
-    case ResultValue::kUnknown:
+    default:
       return;
   }
 }
