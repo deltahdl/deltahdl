@@ -860,7 +860,7 @@ FunctionArg Parser::ParseLetArg() {
   FunctionArg arg;
   ParseAttributes();
   if (!Match(TokenKind::kKwUntyped)) {
-    arg.data_type = ParseDataType();
+    arg.data_type = ParseDeclaredDataType();
   }
   arg.name = Expect(TokenKind::kIdentifier, Subclause("11.12")).text;
   ParseUnpackedDims(arg.unpacked_dims);

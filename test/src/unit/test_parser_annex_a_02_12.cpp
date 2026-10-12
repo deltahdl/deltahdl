@@ -4,6 +4,7 @@
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 using namespace delta;
 
@@ -87,6 +88,28 @@ TEST(LetDeclParsing, LetFormalType_Implicit) {
   ASSERT_NE(item, nullptr);
   ASSERT_EQ(item->func_args.size(), 1u);
   EXPECT_EQ(item->func_args[0].name, "a");
+}
+
+// A.2.12 let_formal_type ::= data_type_or_implicit, and A.2.2.1 lets a
+// data_type be a type_identifier behind a package_scope, so `pc::P x` is a
+// typed formal whose type is P of package pc and whose name is x.
+TEST(LetDeclParsing, LetFormalType_PackageScoped) {
+  auto r = Parse(
+      "package pc;\n"
+      "  class P; endclass\n"
+      "endpackage\n"
+      "module m;\n"
+      "  let same(pc::P x) = x;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* item =
+      FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kLetDecl);
+  ASSERT_NE(item, nullptr);
+  ASSERT_EQ(item->func_args.size(), 1u);
+  EXPECT_EQ(item->func_args[0].name, "x");
+  EXPECT_EQ(item->func_args[0].data_type.kind, DataTypeKind::kNamed);
+  EXPECT_EQ(item->func_args[0].data_type.scope_name, "pc");
+  EXPECT_EQ(item->func_args[0].data_type.type_name, "P");
 }
 
 // A.2.12 let_port_list ::= let_port_item { , let_port_item }
