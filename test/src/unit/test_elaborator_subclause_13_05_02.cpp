@@ -485,4 +485,36 @@ TEST(PassByRefValidation, RefStaticPassedAnAutomaticVariableError) {
       ReportedError(f.diag.Diagnostics(), "is passed 'g'", 7, "13.5.2"));
 }
 
+// A ref argument without the static qualifier has no static lifetime of its
+// own, so it is not passed on to a ref static one; an unpacked array whole and
+// a value of a typedef-named type are left to equivalence the walk does not
+// judge.
+TEST(PassByRefValidation, RefFormalWithoutStaticPassedToRefStaticError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef int myint;\n"
+      "  myint t;\n"
+      "  int arr [4];\n"
+      "  function automatic void f(ref static int x); endfunction\n"
+      "  function automatic void h(ref int x [4]); endfunction\n"
+      "  function automatic void g(ref int y);\n"
+      "    f(y);\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    h(arr);\n"
+      "    g(t);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "ref static argument 'x' of 'f' is passed 'y', "
+                            "which has no static lifetime",
+                            8, "13.5.2"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "is passed 'arr'", 11, "13.5.2"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "is passed 't'", 12, "13.5.2"));
+}
+
 }  // namespace

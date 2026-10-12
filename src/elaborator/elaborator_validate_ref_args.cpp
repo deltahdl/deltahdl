@@ -99,7 +99,7 @@ void CheckRefStatic(const RefBinding& b, DiagEngine& diag) {
 void CheckRefCall(const Expr* call, const RefScope& scope,
                   const FuncDecls& funcs, DiagEngine& diag) {
   auto it = funcs.find(call->callee);
-  if (it == funcs.end() || it->second == nullptr) return;
+  if (it == funcs.end()) return;
   const ModuleItem* func = it->second;
   size_t positional = call->args.size() - call->arg_names.size();
   for (size_t i = 0; i < positional && i < func->func_args.size(); ++i) {
@@ -122,14 +122,8 @@ struct RefWalk {
 
 void WalkRefExpr(const Expr* e, const RefScope& scope, const RefWalk& w) {
   if (e == nullptr) return;
-  if (e->kind == ExprKind::kCall && !e->callee.empty())
-    CheckRefCall(e, scope, w.funcs, w.diag);
-  for (const Expr* sub : {e->lhs, e->rhs, e->condition, e->true_expr,
-                          e->false_expr, e->base, e->index, e->index_end}) {
-    WalkRefExpr(sub, scope, w);
-  }
-  for (const Expr* a : e->args) WalkRefExpr(a, scope, w);
-  for (const Expr* el : e->elements) WalkRefExpr(el, scope, w);
+  if (e->kind == ExprKind::kCall) CheckRefCall(e, scope, w.funcs, w.diag);
+  ForEachExprChild(e, [&](const Expr* child) { WalkRefExpr(child, scope, w); });
 }
 
 // §6.21: a local is automatic in an automatic subroutine unless declared

@@ -194,19 +194,15 @@ void ReportConstFuncSeverity(const Expr* call, const ScopeMap& locals,
                              DiagEngine& diag, Arena& arena) {
   const bool kFatal = call->callee == "$fatal";
   const bool kError = call->callee == "$error";
-  size_t arg_start = 0;
-  if (kFatal && !call->args.empty() &&
-      call->args[0]->kind != ExprKind::kStringLiteral)
-    arg_start = 1;
+  // §20.10: $fatal's first argument, where it has any, is the finish number.
+  const size_t kArgStart = kFatal ? 1 : 0;
   std::string message =
       std::format("elaboration {}: {}",
                   ElabTaskSeverity(kFatal, kError, call->callee == "$warning"),
-                  FormatElabTaskMessage(call, arg_start, locals, arena));
+                  FormatElabTaskMessage(call, kArgStart, locals, arena));
   const SourceLoc kAt = call->range.start;
   for (const Diagnostic& d : diag.Diagnostics()) {
-    if (d.loc.file_id == kAt.file_id && d.loc.line == kAt.line &&
-        d.loc.column == kAt.column && d.message == message)
-      return;
+    if (d.message == message && d.loc.line == kAt.line) return;
   }
   if (kFatal || kError) {
     diag.Error(kAt, message, Subclause("20.10.1"));

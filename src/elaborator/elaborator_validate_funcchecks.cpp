@@ -450,16 +450,7 @@ static bool CheckConstFuncBody(
 // Whether `e` calls a subroutine, by name or through a package.
 static bool ExprCallsSubroutine(const Expr* e) {
   if (e == nullptr) return false;
-  if (e->kind == ExprKind::kCall) return true;
-  for (const Expr* sub : {e->lhs, e->rhs, e->condition, e->true_expr,
-                          e->false_expr, e->base, e->index, e->index_end}) {
-    if (ExprCallsSubroutine(sub)) return true;
-  }
-  for (const Expr* a : e->args)
-    if (ExprCallsSubroutine(a)) return true;
-  for (const Expr* el : e->elements)
-    if (ExprCallsSubroutine(el)) return true;
-  return false;
+  return e->kind == ExprKind::kCall || AnyExprChild(e, ExprCallsSubroutine);
 }
 
 // §13.4.3 bars a constant function from calling a constant function in a

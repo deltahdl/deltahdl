@@ -358,14 +358,9 @@ static bool FuncSpawnsBackgroundProcess(const ModuleItem* func) {
 static void CollectExprCallees(const Expr* e,
                                std::vector<std::string_view>& out) {
   if (e == nullptr) return;
-  if (e->kind == ExprKind::kCall && !e->callee.empty())
-    out.push_back(e->callee);
-  for (const Expr* sub : {e->lhs, e->rhs, e->condition, e->true_expr,
-                          e->false_expr, e->base, e->index, e->index_end}) {
-    CollectExprCallees(sub, out);
-  }
-  for (const Expr* a : e->args) CollectExprCallees(a, out);
-  for (const Expr* el : e->elements) CollectExprCallees(el, out);
+  if (e->kind == ExprKind::kCall) out.push_back(e->callee);
+  ForEachExprChild(e,
+                   [&](const Expr* child) { CollectExprCallees(child, out); });
 }
 
 static void CollectStmtCallees(const Stmt* s,
@@ -389,7 +384,7 @@ static bool FuncReachesBackgroundProcess(
   for (const Stmt* s : func->func_body_stmts) CollectStmtCallees(s, callees);
   for (std::string_view name : callees) {
     auto it = func_decls.find(name);
-    if (it != func_decls.end() && it->second != nullptr &&
+    if (it != func_decls.end() &&
         FuncReachesBackgroundProcess(it->second, func_decls, visited))
       return true;
   }

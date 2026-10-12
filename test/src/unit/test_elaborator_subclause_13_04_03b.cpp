@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 #include "elaborator/rtlir.h"
@@ -519,6 +520,46 @@ TEST(ConstantFunctionElaboration, ConstantCallInALocalParameterError) {
                             "parameter's initializer",
                             11, "13.4.3"));
   EXPECT_EQ(ResolvedParam(design, "Q"), 5);
+}
+
+// Each of §20.10.1's severity tasks reports while a constant function folds,
+// $fatal's first argument its finish number and $fatal and $error errors,
+// $warning and $info warnings; any other system task is ignored (§13.4.3),
+// and a call folded twice reports once.
+TEST(ConstantFunctionElaboration, EverySeverityTaskReportsWhileFolding) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function automatic int f(int n);\n"
+      "    if (n == 1) $fatal(1, \"fatal %0d\", n);\n"
+      "    if (n == 2) $warning(\"warning %0d\", n);\n"
+      "    if (n == 3) $info(\"info %0d\", n);\n"
+      "    if (n == 4) $display(\"ignored %0d\", n);\n"
+      "    if (n == 5) $error(\"error %0d\", n);\n"
+      "    return n;\n"
+      "  endfunction\n"
+      "  localparam int A = f(1);\n"
+      "  localparam int B = f(2);\n"
+      "  localparam int C = f(3);\n"
+      "  localparam int D = f(4);\n"
+      "  localparam int E = f(5);\n"
+      "  localparam int G = f(5);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "elaboration FATAL: fatal 1",
+                            3, "20.10.1"));
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "elaboration WARNING: warning 2", 4, "20.10.1"));
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), "elaboration INFO: info 3",
+                              5, "20.10.1"));
+  int error5 = 0;
+  for (const auto& d : f.diag.Diagnostics()) {
+    if (d.message.find("error 5") != std::string::npos) ++error5;
+    EXPECT_EQ(d.message.find("ignored"), std::string::npos);
+  }
+  EXPECT_EQ(error5, 1);
+  EXPECT_EQ(ResolvedParam(design, "D"), 4);
 }
 
 }  // namespace
