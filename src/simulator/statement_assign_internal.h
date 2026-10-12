@@ -247,6 +247,11 @@ const Expr* UnwrapTypedPattern(const Expr* expr);
 // statement_assign_concat.cpp.
 const Expr* UnpackedArrayTypedPattern(const Expr* expr, SimContext& ctx);
 
+// §10.9: the pattern `expr` wraps where `expr` is an assignment pattern
+// expression whose type is an unpacked array, keyed or positional; null for
+// any other expression. Defined in statement_assign_concat.cpp.
+const Expr* TypedUnpackedArrayPattern(const Expr* expr, SimContext& ctx);
+
 // §10.10: the values of the elements of the fixed-size unpacked array `name`
 // that `ai` describes, appended to `out` in the left-to-right order its
 // declaration writes them. Defined in statement_assign_pattern.cpp.
@@ -285,6 +290,33 @@ struct SubarrayRef {
 };
 void DistributeConcatToSubarray(const SubarrayRef& sub, const Expr* concat,
                                 SimContext& ctx, Arena& arena);
+
+// §7.6 with §10.9.1: stores `elems` into the leaves of `sub`, paired by their
+// left-to-right position, when there are as many of them as the subarray has
+// leaves, and stores nothing otherwise. Answers the subarray's leaf count, so
+// that the caller reports a mismatch under its own clause. Defined in
+// statement_assign_concat.cpp.
+size_t StoreSubarrayElements(const SubarrayRef& sub,
+                             const std::vector<Logic4Vec>& elems,
+                             SimContext& ctx, Arena& arena);
+
+// §7.4.4 with §7.4.5: the elements of `item` where it is an unpacked array --
+// a fixed-size array or a queue named whole, a slice, or a select of a
+// multidimensional array's leading dimensions -- appended to `out` in the
+// order its declaration writes them; false for any other item. Defined in
+// statement_assign_pattern.cpp.
+bool CollectArrayItemElements(const Expr* item, SimContext& ctx, Arena& arena,
+                              std::vector<Logic4Vec>& out);
+
+// §10.9.1 with §7.6: an item of an array pattern standing for the subarray
+// `sub` that is itself an unpacked array (CollectArrayItemElements) is
+// assigned to it as one unpacked array to another, its elements paired with
+// the subarray's by left-to-right position, and one of another size is
+// reported. False for an item that is no unpacked array, which §10.9.1
+// applies to every element of the subarray instead. Defined in
+// statement_assign_concat.cpp.
+bool CopyArrayItemToSubarray(const SubarrayRef& sub, const Expr* item,
+                             SimContext& ctx, Arena& arena);
 
 // Defined in statement_assign_concat.cpp; also used by the §11.4.14 streaming
 // unpack in statement_assign_stream.cpp, which sizes a target element that is a

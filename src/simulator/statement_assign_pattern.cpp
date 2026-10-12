@@ -16,6 +16,7 @@
 #include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_array_element_assoc.h"
 #include "simulator/eval_array_element_queue.h"
+#include "simulator/eval_array_internal.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_args_internal.h"
 #include "simulator/evaluation.h"
@@ -144,9 +145,40 @@ static void WriteScalarSubtree(const PatternDist& pd, const std::string& prefix,
   }
 }
 
+static void DistributeDimPattern(const PatternDist& pd,
+                                 const std::string& prefix, size_t d,
+                                 const Expr* pat);
+
+// §10.9.1: gives the subarray at `prefix`, from dimension `d` in, the item
+// `sub` standing for it. Braces are the subarray's own pattern or
+// concatenation, and so is a pattern typed as an unpacked array; an unpacked
+// array is copied in element for element; any other value, or no item at all,
+// reaches every leaf beneath.
+static void DistributeSubarrayItem(const PatternDist& pd,
+                                   const std::string& prefix, size_t d,
+                                   const Expr* sub) {
+  if (sub == nullptr) {
+    WriteScalarSubtree(pd, prefix, d, sub);
+    return;
+  }
+  if (sub->kind == ExprKind::kConcatenation) {
+    DistributeConcatToSubarray({pd.info, prefix, d}, sub, pd.ctx, pd.arena);
+    return;
+  }
+  const Expr* pattern = sub->kind == ExprKind::kAssignmentPattern
+                            ? sub
+                            : TypedUnpackedArrayPattern(sub, pd.ctx);
+  if (pattern != nullptr) {
+    DistributeDimPattern(pd, prefix, d, pattern);
+    return;
+  }
+  if (!CopyArrayItemToSubarray({pd.info, prefix, d}, sub, pd.ctx, pd.arena))
+    WriteScalarSubtree(pd, prefix, d, sub);
+}
+
 // §7.4.2/§10.9.1: distribute the assignment pattern `pat` across dimension `d`
-// of the subtree rooted at `prefix`. A nested pattern recurses into the next
-// dimension; a scalar at a non-last dimension broadcasts to the sub-array.
+// of the subtree rooted at `prefix`, each item of a dimension that is not the
+// last going to the subarray it stands for.
 static void DistributeDimPattern(const PatternDist& pd,
                                  const std::string& prefix, size_t d,
                                  const Expr* pat) {
@@ -163,16 +195,10 @@ static void DistributeDimPattern(const PatternDist& pd,
     std::string child = prefix + "[" + std::to_string(lo + i) + "]";
     const Expr* sub =
         SelectDimElement(pat, lo + i, descending ? (size - 1 - i) : i, pd);
-    bool is_pattern = sub && sub->kind == ExprKind::kAssignmentPattern;
     if (last)
       WriteLeaf(pd, child, sub);
-    else if (sub && sub->kind == ExprKind::kConcatenation)
-      DistributeConcatToSubarray({pd.info, child, d + 1}, sub, pd.ctx,
-                                 pd.arena);
-    else if (is_pattern)
-      DistributeDimPattern(pd, child, d + 1, sub);
     else
-      WriteScalarSubtree(pd, child, d + 1, sub);
+      DistributeSubarrayItem(pd, child, d + 1, sub);
   }
 }
 
@@ -292,6 +318,18 @@ static bool CollectNamedArrayElements(const Expr* item, SimContext& ctx,
   auto* q = ctx.FindQueue(item->text);
   if (q == nullptr) return false;
   out.insert(out.end(), q->elements.begin(), q->elements.end());
+  return true;
+}
+
+bool CollectArrayItemElements(const Expr* item, SimContext& ctx, Arena& arena,
+                              std::vector<Logic4Vec>& out) {
+  if (CollectNamedArrayElements(item, ctx, out)) return true;
+  if (item->kind != ExprKind::kSelect) return false;
+  if (CollectUnpackedSliceElements(item, ctx, arena, out)) return true;
+  std::string prefix;
+  ArrayInfo sub;
+  if (!ResolveSubarraySelect(item, ctx, arena, prefix, sub)) return false;
+  CollectArrayLeaves(prefix, sub, ctx, out);
   return true;
 }
 

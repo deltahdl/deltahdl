@@ -38,13 +38,18 @@ const Expr* UnwrapTypedPattern(const Expr* expr) {
   return expr;
 }
 
-const Expr* UnpackedArrayTypedPattern(const Expr* expr, SimContext& ctx) {
+const Expr* TypedUnpackedArrayPattern(const Expr* expr, SimContext& ctx) {
   if (expr->kind != ExprKind::kCast || expr->lhs == nullptr ||
-      expr->lhs->kind != ExprKind::kAssignmentPattern ||
-      !expr->lhs->pattern_keys.empty())
+      expr->lhs->kind != ExprKind::kAssignmentPattern)
     return nullptr;
   const ModuleItem* item = ctx.FindTypedefItem(expr->text);
   return item != nullptr && !item->unpacked_dims.empty() ? expr->lhs : nullptr;
+}
+
+const Expr* UnpackedArrayTypedPattern(const Expr* expr, SimContext& ctx) {
+  const Expr* pattern = TypedUnpackedArrayPattern(expr, ctx);
+  return pattern != nullptr && pattern->pattern_keys.empty() ? pattern
+                                                             : nullptr;
 }
 
 bool IsConcatLhs(const Expr* lhs) {
@@ -494,26 +499,43 @@ static void AppendSubarrayLeafNames(const std::string& prefix,
   }
 }
 
-void DistributeConcatToSubarray(const SubarrayRef& sub, const Expr* concat,
-                                SimContext& ctx, Arena& arena) {
+size_t StoreSubarrayElements(const SubarrayRef& sub,
+                             const std::vector<Logic4Vec>& elems,
+                             SimContext& ctx, Arena& arena) {
   std::vector<std::string> leaves;
   AppendSubarrayLeafNames(sub.prefix, sub.info, sub.dim, leaves);
-  std::vector<Logic4Vec> elems = CollectConcatElements(concat, ctx, arena);
-  if (elems.size() != leaves.size()) {
-    ctx.GetDiag().Error(
-        concat->range.start,
-        "unpacked array concatenation size mismatch: expected " +
-            std::to_string(leaves.size()) + " elements, got " +
-            std::to_string(elems.size()),
-        Subclause("10.10"));
-    return;
-  }
+  if (elems.size() != leaves.size()) return leaves.size();
   for (size_t i = 0; i < leaves.size(); ++i) {
     Variable* leaf = ctx.FindVariable(leaves[i]);
     leaf->value =
         OwnRhsWords(ResizeToWidth(elems[i], sub.info.elem_width, arena), arena);
     leaf->NotifyWatchers();
   }
+  return leaves.size();
+}
+
+bool CopyArrayItemToSubarray(const SubarrayRef& sub, const Expr* item,
+                             SimContext& ctx, Arena& arena) {
+  std::vector<Logic4Vec> elems;
+  if (!CollectArrayItemElements(item, ctx, arena, elems)) return false;
+  if (StoreSubarrayElements(sub, elems, ctx, arena) != elems.size()) {
+    ctx.GetDiag().Error(item->range.start,
+                        "array size mismatch in assignment to fixed-size array",
+                        Subclause("7.6"));
+  }
+  return true;
+}
+
+void DistributeConcatToSubarray(const SubarrayRef& sub, const Expr* concat,
+                                SimContext& ctx, Arena& arena) {
+  std::vector<Logic4Vec> elems = CollectConcatElements(concat, ctx, arena);
+  size_t count = StoreSubarrayElements(sub, elems, ctx, arena);
+  if (elems.size() == count) return;
+  ctx.GetDiag().Error(concat->range.start,
+                      "unpacked array concatenation size mismatch: expected " +
+                          std::to_string(count) + " elements, got " +
+                          std::to_string(elems.size()),
+                      Subclause("10.10"));
 }
 
 }  // namespace delta

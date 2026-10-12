@@ -3,7 +3,9 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
+#include "simulator/lowerer.h"
 
 using namespace delta;
 
@@ -409,6 +411,111 @@ TEST(ArrayLiteralSim, ABlockArrayTakesATypeKeyOfItsElementType) {
       "endmodule\n";
   EXPECT_EQ(RunAndGet(src, "i1"), 4u);
   EXPECT_EQ(RunAndGet(src, "b0"), 9u);
+}
+
+// §10.9.1: an item standing at a dimension of a multidimensional array other
+// than its last is assigned to that dimension's subarray, so an item of the
+// subarray's unpacked array type -- a typed pattern, keyed or positional, or a
+// variable of that type -- gives the subarray its elements in order, whether it
+// is positional, index-keyed or the default. Each row read one scalar instead,
+// the same value at all three leaves.
+TEST(ArrayLiteralSim, AnUnpackedArrayItemFillsItsSubarrayElementForElement) {
+  SimFixture f;
+  auto out = RunCapture(
+      "typedef int row_t [3];\n"
+      "module t;\n"
+      "  int a [2][3];\n"
+      "  int b [2][3];\n"
+      "  int c [2][3];\n"
+      "  int d [2][3];\n"
+      "  row_t r = '{1, 2, 3};\n"
+      "  initial begin\n"
+      "    a = '{default: row_t'{4, 5, 6}};\n"
+      "    b = '{default: r};\n"
+      "    c = '{0: r, default: '{7, 8, 9}};\n"
+      "    d = '{r, row_t'{default: 5}};\n"
+      "    $display(\"%p %p\", a, b);\n"
+      "    $display(\"%p %p\", c, d);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "'{'{4, 5, 6}, '{4, 5, 6}} '{'{1, 2, 3}, '{1, 2, 3}}\n"
+            "'{'{1, 2, 3}, '{7, 8, 9}} '{'{1, 2, 3}, '{5, 5, 5}}\n");
+}
+
+// §10.9.1 with §7.4.4, §7.4.5 and §7.6: a slice, a select of another array's
+// leading dimension and a queue are unpacked arrays too, so each fills the
+// subarray it stands for, its elements paired with the subarray's by their
+// left-to-right position: `e [1:0][2:0]` takes 7 at e[1][2] from g[0][0].
+TEST(ArrayLiteralSim, ASliceASubarraySelectAndAQueueFillTheirSubarrays) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int src [6];\n"
+      "  int g [2][3];\n"
+      "  int a [2][3];\n"
+      "  int b [2][3];\n"
+      "  int e [1:0][2:0];\n"
+      "  int q [$];\n"
+      "  initial begin\n"
+      "    src = '{1, 2, 3, 4, 5, 6};\n"
+      "    g = '{'{7, 8, 9}, '{10, 11, 12}};\n"
+      "    q = {13, 14, 15};\n"
+      "    a = '{src[0:2], src[3:5]};\n"
+      "    b = '{g[1], q};\n"
+      "    e = '{g[0], g[1]};\n"
+      "    $display(\"%p %p\", a, b);\n"
+      "    $display(\"%0d %0d %0d\", e[1][2], e[1][0], e[0][2]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "'{'{1, 2, 3}, '{4, 5, 6}} '{'{10, 11, 12}, '{13, 14, 15}}\n"
+            "7 9 10\n");
+}
+
+// §10.9.1: an item of a non-aggregate type is applied recursively to every
+// element of the subarray it stands for, and a select of one element of an
+// array is such an item, not an array.
+TEST(ArrayLiteralSim, AnElementSelectItemFillsEveryLeafOfItsSubarray) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int src [3];\n"
+      "  int a [2][3];\n"
+      "  initial begin\n"
+      "    src = '{1, 2, 3};\n"
+      "    a = '{default: src[1]};\n"
+      "    $display(\"%p\", a);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "'{'{2, 2, 2}, '{2, 2, 2}}\n");
+}
+
+// §10.9.1 with §7.6: a queue standing for a subarray is assigned to it as one
+// unpacked array to another, which needs as many elements as the subarray
+// holds, and a queue's size is only known as the assignment runs.
+TEST(ArrayLiteralSim, AQueueItemOfTheWrongSizeIsARuntimeError) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int q [$];\n"
+      "  int a [2][3];\n"
+      "  initial begin\n"
+      "    q = {1, 2};\n"
+      "    a = '{default: q};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "array size mismatch in assignment to fixed-size array", 6, "7.6"));
 }
 
 }  // namespace
