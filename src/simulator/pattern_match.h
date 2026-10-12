@@ -7,11 +7,13 @@
 #include "common/types.h"
 #include "lexer/token.h"
 #include "simulator/evaluation_internal.h"
+#include "simulator/scope.h"
 
 namespace delta {
 
 class Arena;
 struct Expr;
+struct Stmt;
 class SimContext;
 struct StructFieldInfo;
 struct StructTypeInfo;
@@ -136,5 +138,23 @@ void BindPatternTypes(const Expr* pred, SimContext& ctx, Arena& arena);
 // if statement in both executors.
 bool EnterIfPredicate(const Expr* cond, SimContext& ctx, Arena& arena,
                       bool& scoped);
+
+// §12.4.2: what evaluating every condition of the unique or unique0 if `stmt`
+// found: how many held, the first that did, and whether the series ends in an
+// unconditional else. §12.6.2 scopes the identifiers a condition's patterns
+// bind to its own later clauses and true arm, so the first match's frame is
+// set aside (`bound`, ScopeStack::DetachScope) while the conditions after it
+// are evaluated, `scoped` saying it holds one, for the caller to restore
+// around that true arm. Shared by the procedural and the subroutine-body
+// executors.
+struct UniqueIfChain {
+  const Stmt* first_match = nullptr;
+  int match_count = 0;
+  bool has_final_else = false;
+  bool scoped = false;
+  Scope bound;
+};
+UniqueIfChain EvalUniqueIfChain(const Stmt* stmt, SimContext& ctx,
+                                Arena& arena);
 
 }  // namespace delta

@@ -32,6 +32,13 @@ class ScopeStack {
   // it the package its bare names are read from, none for an empty name.
   void EnterSubroutineScope(std::string_view package);
   void PopScope();
+  // §12.6.2: removes the innermost frame and hands it back whole, for
+  // RestoreScope to push again. A unique if sets aside so the identifiers its
+  // first matching condition bound while it evaluates the conditions after
+  // it, which stand outside their scope, and restores them for that
+  // condition's true arm (EvalUniqueIfChain).
+  Scope DetachScope();
+  void RestoreScope(Scope frame);
   std::vector<Scope> SwapScopeStack(std::vector<Scope> new_stack);
   bool HasLocalScope() const { return !scope_stack_.empty(); }
   // §23.9: the end of the frames a bare name is looked up in, walking the

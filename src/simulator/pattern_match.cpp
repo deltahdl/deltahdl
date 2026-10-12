@@ -14,6 +14,7 @@
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "simulator/eval_call_result.h"
 #include "simulator/eval_expr_internal.h"
@@ -88,6 +89,10 @@ static void AddVariableStorage(const Expr* expr, SimContext& ctx, Arena& arena,
 PatternSubject PatternSubjectOf(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   if (expr->kind == ExprKind::kCall) return CallSubject(expr, ctx, arena);
+  // §12.6 evaluates the subject once: the indices it selects by are pinned
+  // (LhsIndexPin) for its value and for the key of its tag (ElementTagKey)
+  // alike, so `arr[i++]` advances i once and both name one element.
+  LhsIndexPin pin(expr, ctx, arena);
   PatternSubject subject;
   subject.value = EvalExpr(expr, ctx, arena);
   // §8.5 with §12.6: a class property of a tagged union type is matched against
@@ -187,8 +192,8 @@ bool MatchPattern(const Expr* pat, const PatternSubject& subject,
 }
 
 // §12.6: a pattern identifier is a variable of the type of the member it
-// binds: a real, a string, a 2-state value or an enumeration as that member
-// is (§6.12, §6.16, §6.11.2, §6.19).
+// binds: a real, a string, a 2-state value, an enumeration or a handle of a
+// class as that member is (§6.12, §6.16, §6.11.2, §6.19, §8.4).
 static void TypeBoundVariable(std::string_view name,
                               const StructFieldInfo& field, Variable& var,
                               SimContext& ctx) {
@@ -204,6 +209,9 @@ static void TypeBoundVariable(std::string_view name,
       std::ranges::find(kTwoState, field.type_kind) == std::end(kTwoState);
   if (ctx.FindEnumType(field.type_name) != nullptr) {
     ctx.SetVariableEnumType(name, field.type_name);
+  }
+  if (ctx.FindClassType(field.type_name) != nullptr) {
+    ctx.SetVariableClassType(name, field.type_name);
   }
 }
 
@@ -311,6 +319,29 @@ bool EnterIfPredicate(const Expr* cond, SimContext& ctx, Arena& arena,
   if (!scoped) return EvalExpr(cond, ctx, arena).IsTruthy();
   ctx.PushScope();
   return EvalMatchesPredicate(cond, ctx, arena);
+}
+
+UniqueIfChain EvalUniqueIfChain(const Stmt* stmt, SimContext& ctx,
+                                Arena& arena) {
+  UniqueIfChain chain;
+  for (const Stmt* cur = stmt; cur && cur->kind == StmtKind::kIf;
+       cur = cur->else_branch) {
+    bool scoped = false;
+    bool holds = EnterIfPredicate(cur->condition, ctx, arena, scoped);
+    if (holds) chain.match_count++;
+    bool first = holds && chain.first_match == nullptr;
+    if (first) chain.first_match = cur;
+    if (first && scoped) {
+      chain.scoped = true;
+      chain.bound = ctx.DetachScope();
+    } else if (scoped) {
+      ctx.PopScope();
+    }
+    if (cur->else_branch && cur->else_branch->kind != StmtKind::kIf) {
+      chain.has_final_else = true;
+    }
+  }
+  return chain;
 }
 
 }  // namespace delta

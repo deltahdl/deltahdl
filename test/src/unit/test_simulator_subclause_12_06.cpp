@@ -329,4 +329,52 @@ TEST(PatternMatchingSim, BoundRealMemberIsReal) {
   EXPECT_EQ(v->value.ToUint64(), 10u);
 }
 
+// §12.6 matches the subject's value once, so an element subject's index is
+// evaluated once: `arr[i++]` advances i once, and the value and the tag it is
+// matched against are both arr[0]'s (#6421).
+TEST(PatternMatchingSim, ElementSubjectIndexEvaluatedOnce) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+      "  VInt arr [4];\n"
+      "  int i = 0;\n"
+      "  int n = 0;\n"
+      "  initial begin\n"
+      "    arr[0] = tagged Valid 3;\n"
+      "    arr[1] = tagged Valid 5;\n"
+      "    if (arr[i++] matches tagged Valid .v) n = v;\n"
+      "    n = n * 10 + i;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "n");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 31u);
+}
+
+// §12.6 gives a pattern identifier the type of the member it binds, and a
+// class handle member binds a handle of that class, through which §8.4
+// reaches the class's methods (#6412).
+TEST(PatternMatchingSim, ClassHandleMemberBindsAHandle) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  class C;\n"
+      "    int v = 3;\n"
+      "    function int get(); return v; endfunction\n"
+      "  endclass\n"
+      "  typedef union tagged { C h; int i; } U;\n"
+      "  U u;\n"
+      "  int r = 0;\n"
+      "  initial begin\n"
+      "    automatic C c = new;\n"
+      "    u = tagged h c;\n"
+      "    if (u matches tagged h .x) r = x.get() * 10 + x.v;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 33u);
+}
+
 }  // namespace

@@ -615,4 +615,48 @@ TEST(IfMatchesSim, QualifiedIfsBindPatternIdentifiersInAFunction) {
   EXPECT_EQ(v->value.ToUint64(), 77u);
 }
 
+// §12.6.2 scopes what a predicate's pattern binds to that predicate's later
+// clauses and its own true arm. A unique if evaluates every condition, and a
+// later one stands outside an earlier one's scope: its `n` is the module's 0,
+// so only the first condition matches and no violation is reported (#6413).
+TEST(IfMatchesSim, LaterUniqueConditionReadsTheOuterName) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+      "  VInt v = tagged Valid 7;\n"
+      "  int n = 0, y;\n"
+      "  initial begin\n"
+      "    unique if (v matches tagged Valid .n) y = n;\n"
+      "    else if (n == 7) y = 100;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 7u);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// The same in a function body, which runs on the subroutine executor.
+TEST(IfMatchesSim, LaterUniqueConditionReadsTheOuterNameInAFunction) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+      "  VInt v = tagged Valid 7;\n"
+      "  int n = 0, y;\n"
+      "  function automatic int f();\n"
+      "    int r = 0;\n"
+      "    unique if (v matches tagged Valid .n) r = n;\n"
+      "    else if (n == 7) r = 100;\n"
+      "    return r;\n"
+      "  endfunction\n"
+      "  initial y = f();\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 7u);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
 }  // namespace

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <optional>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -50,49 +51,14 @@ static const Stmt* FuncFindFinalElse(const Stmt* stmt) {
   return cur->else_branch;
 }
 
-// Aggregated result of evaluating the conditions of a unique-if chain.
-struct UniqueIfScan {
-  int match_count = 0;
-  const Stmt* first_match = nullptr;
-  bool has_final_else = false;
-  // §12.6.2: whether the first match's predicate bound pattern identifiers,
-  // whose scope stays pushed for its true arm (EnterIfPredicate).
-  bool scoped = false;
-};
-
-// Evaluates every condition in the if/else-if chain in source order, recording
-// how many matched, the first match, and whether the chain ends in a final
-// else.
-static UniqueIfScan ScanUniqueIfChain(const Stmt* stmt, SimContext& ctx,
-                                      Arena& arena) {
-  UniqueIfScan scan;
-  for (const Stmt* cur = stmt; cur && cur->kind == StmtKind::kIf;
-       cur = cur->else_branch) {
-    bool scoped = false;
-    bool holds = EnterIfPredicate(cur->condition, ctx, arena, scoped);
-    bool first = holds && scan.first_match == nullptr;
-    if (holds) scan.match_count++;
-    if (first) {
-      scan.first_match = cur;
-      scan.scoped = scoped;
-    } else if (scoped) {
-      ctx.PopScope();
-    }
-    if (cur->else_branch && cur->else_branch->kind != StmtKind::kIf) {
-      scan.has_final_else = true;
-    }
-  }
-  return scan;
-}
-
 // Runs the branch selected by a unique-if scan: the first matching arm, else
 // the trailing unconditional else, reporting a no-match violation for a plain
 // `unique` chain that has no final else.
-static FuncFlow ExecFuncUniqueIfBranch(const Stmt* stmt,
-                                       const UniqueIfScan& scan,
+static FuncFlow ExecFuncUniqueIfBranch(const Stmt* stmt, UniqueIfChain& scan,
                                        CaseQualifier qual,
                                        const FuncExecCtx& exec) {
   if (scan.first_match) {
+    if (scan.scoped) exec.ctx.RestoreScope(std::move(scan.bound));
     FuncFlow r = ExecFuncStmt(scan.first_match->then_branch, exec);
     if (scan.scoped) exec.ctx.PopScope();
     return r;
@@ -116,7 +82,7 @@ static FuncFlow ExecFuncUniqueIfBranch(const Stmt* stmt,
 // independently.
 static FuncFlow ExecFuncUniqueIf(const Stmt* stmt, CaseQualifier qual,
                                  const FuncExecCtx& exec) {
-  UniqueIfScan scan = ScanUniqueIfChain(stmt, exec.ctx, exec.arena);
+  UniqueIfChain scan = EvalUniqueIfChain(stmt, exec.ctx, exec.arena);
   if (scan.match_count > 1) {
     exec.ctx.AddPendingViolation(stmt->range.start,
                                  "unique if: multiple conditions matched",

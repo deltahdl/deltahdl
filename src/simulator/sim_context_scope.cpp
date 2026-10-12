@@ -115,6 +115,16 @@ void ScopeStack::PopScope() {
   if (!scope_stack_.empty()) scope_stack_.pop_back();
 }
 
+Scope ScopeStack::DetachScope() {
+  Scope frame = std::move(scope_stack_.back());
+  scope_stack_.pop_back();
+  return frame;
+}
+
+void ScopeStack::RestoreScope(Scope frame) {
+  scope_stack_.push_back(std::move(frame));
+}
+
 std::vector<Scope> ScopeStack::SwapScopeStack(std::vector<Scope> new_stack) {
   auto old = std::move(scope_stack_);
   scope_stack_ = std::move(new_stack);

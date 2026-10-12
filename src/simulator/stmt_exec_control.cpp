@@ -137,38 +137,6 @@ ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
-struct UniqueIfResult {
-  const Stmt* first_match = nullptr;
-  int match_count = 0;
-  bool has_final_else = false;
-  bool scoped = false;
-};
-
-// §12.4.2: every condition of the chain is evaluated. §12.6.2: the first
-// matching one that binds pattern identifiers keeps the scope they were
-// created in (EnterIfPredicate) for its true arm, `result.scoped` saying so.
-static UniqueIfResult EvalUniqueIfChain(const Stmt* stmt, SimContext& ctx,
-                                        Arena& arena) {
-  UniqueIfResult result;
-  for (const Stmt* cur = stmt; cur && cur->kind == StmtKind::kIf;
-       cur = cur->else_branch) {
-    bool scoped = false;
-    bool holds = EnterIfPredicate(cur->condition, ctx, arena, scoped);
-    bool first = holds && result.first_match == nullptr;
-    if (holds) result.match_count++;
-    if (first) {
-      result.first_match = cur;
-      result.scoped = scoped;
-    } else if (scoped) {
-      ctx.PopScope();
-    }
-    if (cur->else_branch && cur->else_branch->kind != StmtKind::kIf) {
-      result.has_final_else = true;
-    }
-  }
-  return result;
-}
-
 static const Stmt* FindFinalElse(const Stmt* stmt) {
   const Stmt* cur = stmt;
   while (cur->else_branch && cur->else_branch->kind == StmtKind::kIf) {
@@ -187,6 +155,7 @@ static ExecTask ExecUniqueIf(const Stmt* stmt, CaseQualifier qual,
                             Subclause("12.4.2.1"), qual);
   }
   if (info.first_match) {
+    if (info.scoped) ctx.RestoreScope(std::move(info.bound));
     auto r = co_await ExecStmt(info.first_match->then_branch, ctx, arena);
     if (info.scoped) ctx.PopScope();
     co_return r;
