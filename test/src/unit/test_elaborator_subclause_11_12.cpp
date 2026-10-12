@@ -497,9 +497,9 @@ TEST(LetDeclElaboration, EventFormalReferencedAsAValueReported) {
 
 // §11.12, rule 2: an integral or real formal takes no actual of an unpacked
 // array, structure or union type, whether a call binds it by position or by
-// name or the declaration gives it as the default. An untyped formal, a formal
-// of the structure's own type, and actuals of integral, packed or class types
-// are left alone.
+// name or the declaration gives it as the default, nor, by §6.22.5, a class
+// handle. An untyped formal, a formal of the structure's own type, and actuals
+// of integral or packed types are left alone.
 TEST(LetDeclElaboration, ActualNotCastCompatibleWithTypedFormalReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -528,12 +528,12 @@ TEST(LetDeclElaboration, ActualNotCastCompatibleWithTypedFormalReported) {
       "  end\n"
       "endmodule\n",
       f);
-  for (uint32_t line : {13u, 16u, 17u, 18u}) {
+  for (uint32_t line : {13u, 16u, 17u, 18u, 22u}) {
     EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                               "is not cast compatible with the type of formal",
                               line, "11.12"));
   }
-  for (uint32_t line : {19u, 20u, 21u, 22u}) {
+  for (uint32_t line : {19u, 20u, 21u}) {
     EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
                                "is not cast compatible with the type of formal",
                                line, "11.12"));
@@ -626,16 +626,54 @@ TEST(LetDeclElaboration, ActualTypesAreJudgedByCastCompatibility) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
                              "is not cast compatible with the type of formal",
                              14, "11.12"));
-  // An int or a real for a structure formal, and a chandle for an int one, are
-  // no more cast compatible; a formal of a class type is not judged here.
-  for (uint32_t line : {15u, 16u, 17u}) {
+  // An int or a real for a structure formal, a chandle for an int one and an
+  // int for a class one (§6.22.5) are no more cast compatible.
+  for (uint32_t line : {15u, 16u, 17u, 18u}) {
     EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                               "is not cast compatible with the type of formal",
                               line, "11.12"));
   }
+}
+
+// §11.12 with §6.22.5, §8.12 and §8.16: a class handle fits a formal of its
+// own class, of a class it derives from, or of one derived from it, the last
+// by $cast, and a class reached through a typedef or a type named through a
+// package is left to the typedef walk; a handle of an unrelated class, a
+// class handle for an int or a string formal, and an int or a string for a
+// class formal are reported.
+TEST(LetDeclElaboration, ClassActualsAndFormalsAreJudgedByTheirHierarchy) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class B; endclass\n"
+      "class D extends B; endclass\n"
+      "class U; endclass\n"
+      "package pk; typedef int int_t; endpackage\n"
+      "module m;\n"
+      "  typedef B b_t;\n"
+      "  B b; D d; U u; b_t tb; pk::int_t pi; int i; string str;\n"
+      "  let lb(B x) = 1;\n"
+      "  let ld(D x) = 1;\n"
+      "  let lt(b_t x) = 1;\n"
+      "  let g(int x) = x;\n"
+      "  let s(string x) = x.len();\n"
+      "  initial begin\n"
+      "    $display(\"%0d\", lb(b) + lb(d) + ld(b) + lb(tb) + lt(b) + g(pi));\n"
+      "    $display(\"%0d\", lb(u));\n"
+      "    $display(\"%0d\", g(b));\n"
+      "    $display(\"%0d\", s(d));\n"
+      "    $display(\"%0d\", lb(i));\n"
+      "    $display(\"%0d\", ld(str));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
                              "is not cast compatible with the type of formal",
-                             18, "11.12"));
+                             14, "11.12"));
+  for (uint32_t line : {15u, 16u, 17u, 18u, 19u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "is not cast compatible with the type of formal",
+                              line, "11.12"));
+  }
 }
 
 // §11.12 with §6.16 and §6.24.3: a string is cast compatible with an integral

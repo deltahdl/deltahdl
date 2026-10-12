@@ -8,9 +8,11 @@
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/elaborator_validate_operations.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -262,8 +264,9 @@ struct LetActualVariable {
 // default actual, once at the let's declaration.
 class LetActualCheck {
  public:
-  LetActualCheck(const TypedefMap& typedefs, DiagEngine& diag)
-      : typedefs_(typedefs), diag_(diag) {}
+  LetActualCheck(const TypedefMap& typedefs, const CompilationUnit* unit,
+                 DiagEngine& diag)
+      : typedefs_(typedefs), unit_(unit), diag_(diag) {}
 
   void Collect(const ModuleItem* item) {
     if (item->kind == ModuleItemKind::kLetDecl) lets_[item->name] = item;
@@ -325,11 +328,40 @@ class LetActualCheck {
       Report(actual, formal);
       return;
     }
+    if (JudgedAsClasses(actual, formal, *it->second.type)) return;
     const DataType* a = TypeAtChainEnd(*it->second.type, typedefs_);
     const DataType* f = TypeAtChainEnd(written, typedefs_);
     if (a == nullptr || f == nullptr || ActualFitsFormal(*a, *f, typedefs_))
       return;
     Report(actual, formal);
+  }
+
+  // The class a type names by its bare name, null for any other type.
+  const ClassDecl* NamedClass(const DataType& t) const {
+    if (t.kind != DataTypeKind::kNamed || !t.scope_name.empty()) return nullptr;
+    return FindClassDecl(t.type_name, unit_);
+  }
+
+  // §6.22.5: a class handle is type incompatible with every type but a
+  // class's. §8.12 passes one up its hierarchy by assignment and §8.16 down it
+  // by $cast, so two class types fit where one derives from the other
+  // (IsClassDerivedFrom, which follows interface classes too). Answers whether
+  // either side names a class, the pair having then been judged here. A side
+  // whose named type is no class, a typedef's, leaves the pair to the walk
+  // through the typedefs.
+  bool JudgedAsClasses(const Expr* actual, const FunctionArg& formal,
+                       const DataType& actual_type) {
+    const ClassDecl* a = NamedClass(actual_type);
+    const ClassDecl* f = NamedClass(formal.data_type);
+    if (a == nullptr && f == nullptr) return false;
+    if ((a == nullptr && actual_type.kind == DataTypeKind::kNamed) ||
+        (f == nullptr && formal.data_type.kind == DataTypeKind::kNamed))
+      return false;
+    if (a == nullptr || f == nullptr ||
+        !(IsClassDerivedFrom(a->name, f->name, unit_) ||
+          IsClassDerivedFrom(f->name, a->name, unit_)))
+      Report(actual, formal);
+    return true;
   }
 
   void Report(const Expr* actual, const FunctionArg& formal) {
@@ -341,6 +373,7 @@ class LetActualCheck {
   }
 
   const TypedefMap& typedefs_;
+  const CompilationUnit* unit_;
   DiagEngine& diag_;
   std::unordered_map<std::string_view, const ModuleItem*> lets_;
   std::unordered_map<std::string_view, LetActualVariable> vars_;
@@ -349,7 +382,7 @@ class LetActualCheck {
 }  // namespace
 
 void ElaboratorOperationRules::CheckLetActualTypes(const ModuleDecl* decl) {
-  LetActualCheck check(typedefs_, diag_);
+  LetActualCheck check(typedefs_, unit_, diag_);
   auto collect = [&check](const ModuleItem* item) { check.Collect(item); };
   ForEachItemNested(decl->items, collect);
   check.CheckDefaults();
