@@ -417,4 +417,33 @@ TEST(ConcatenationElaboration, UnsizedInBlockArrayDeclInitAllowed) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §11.4.12: a concatenation or a multiple concatenation of operands that are
+// no strings is a vector of bits, a literal operand's among them, which has no
+// member and no built-in method.
+TEST(ConcatenationElaboration, MemberOfBitConcatenationIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int x, y, n;\n"
+      "  bit b;\n"
+      "  initial n = {x, y}.run();\n"
+      "  initial b = {3{x}}.m;\n"
+      "  initial n = {x, 8'h1, \"ab\"}.run();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'run' is no member or built-in method of the "
+                            "integral value a concatenation yields",
+                            4, "11.4.12"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'m' is no member or built-in method of the "
+                            "integral value a concatenation yields",
+                            5, "11.4.12"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'run' is no member or built-in method of the "
+                            "integral value a concatenation yields",
+                            6, "11.4.12"));
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
+}
+
 }  // namespace

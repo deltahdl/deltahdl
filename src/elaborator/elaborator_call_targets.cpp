@@ -595,7 +595,9 @@ void CheckExprCalls(const Expr* expr, const DataScope& scope, DiagEngine& diag,
   if (expr->kind == ExprKind::kMemberAccess && !expr->is_scope_resolution) {
     ReportUndeclaredMember(*expr, rule, scope, diag);
     ReportNoBuiltInMethod(*expr, scope, diag);
-    ReportOperatorResultMember(*expr, diag);
+    ReportOperatorResultMember(
+        *expr, [&scope](const Expr& e) { return ValueOf(e, 0, scope).kind; },
+        kStringMethods, diag);
   }
   if (const Expr* callee = NamedCallee(*expr)) {
     ReportIfData(callee->text, expr->range.start, scope, diag);

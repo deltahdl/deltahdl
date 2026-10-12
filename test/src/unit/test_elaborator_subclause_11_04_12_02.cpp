@@ -285,4 +285,39 @@ TEST(StringConcatAndReplication,
                             5, "11.4.12.2"));
 }
 
+// §11.4.12.2: a concatenation or a multiple concatenation with an operand of
+// the string type is a string, which has the built-in methods §6.16 lists and
+// no other.
+TEST(StringConcatAndReplication, MethodOfStringConcatenationIsChecked) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  string s, t;\n"
+      "  int n;\n"
+      "  initial n = {s, t}.run();\n"
+      "  initial n = {3{s}}.run();\n"
+      "  initial n = {\"ab\", s}.len();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'run' is not a built-in method of the string a "
+                            "concatenation yields",
+                            4, "6.16"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'run' is not a built-in method of the string a "
+                            "concatenation yields",
+                            5, "6.16"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+// An operand whose type the elaborator does not know leaves the concatenation
+// unchecked: $sformatf's string here.
+TEST(StringConcatAndReplication, ConcatenationOfUnknownOperandIsUnchecked) {
+  EXPECT_TRUE(
+      ElabOk("module top;\n"
+             "  int n;\n"
+             "  initial n = {$sformatf(\"%0d\", n)}.len();\n"
+             "endmodule\n"));
+}
+
 }  // namespace
