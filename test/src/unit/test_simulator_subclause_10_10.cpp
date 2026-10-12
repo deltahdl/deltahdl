@@ -571,4 +571,23 @@ TEST(UnpackedArrayConcatSim, ABracedPatternItemOfTheWrongSizeIsReported) {
                             3, "10.10"));
 }
 
+// §10.10 with §10.8: a continuous assignment is an assignment-like context, so
+// an unpacked array concatenation may be its source and a fixed-size unpacked
+// array variable its target, each element taking its item and following it
+// when an operand changes.
+TEST(UnpackedArrayConcatSim, ContinuousAssignmentOfConcatToFixedArray) {
+  const char* src =
+      "module t;\n"
+      "  int A[1:3]; int x = 5; int a1, a2, a3;\n"
+      "  assign A = {10, x, 30};\n"
+      "  initial begin\n"
+      "    #1 x = 7;\n"
+      "    #1 begin a1 = A[1]; a2 = A[2]; a3 = A[3]; end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "a1"), 10u);
+  EXPECT_EQ(RunAndGet(src, "a2"), 7u);
+  EXPECT_EQ(RunAndGet(src, "a3"), 30u);
+}
+
 }  // namespace
