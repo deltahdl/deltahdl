@@ -53,21 +53,26 @@ void Elaborator::ValidateContAssignIdentLhs(std::string_view name,
 }
 
 // §10.3.4 (printed page 251): a drive strength applies only to an assignment
-// to a scalar net, a net of type supply0 or supply1 excepted, so a target that
-// is a select of a vector net or a concatenation is no more one than a whole
-// vector net is.
+// to a scalar net other than one of type supply0 or supply1, so a target that
+// is a supply net or a select of one is excepted as the net is, and a select of
+// a vector net or a concatenation is no more a scalar net than a whole vector
+// net is.
 void Elaborator::ValidateContAssignDriveStrength(ModuleItem* item,
                                                  RtlirModule* mod) {
   const Expr* lhs = item->assign_lhs;
-  if (lhs->kind == ExprKind::kIdentifier && LookupLhsWidth(lhs, mod) <= 1)
-    return;
   std::string_view root = LhsBaseName(lhs);
   for (const auto& n : mod->nets) {
     if (n.name != root) continue;
-    if (n.net_type == NetType::kSupply0 || n.net_type == NetType::kSupply1)
-      return;
-    break;
+    if (n.net_type != NetType::kSupply0 && n.net_type != NetType::kSupply1)
+      break;
+    diag_.Error(item->loc,
+                "drive strength on continuous assignment does not apply to "
+                "supply0 or supply1 nets",
+                Subclause("10.3.4"));
+    return;
   }
+  if (lhs->kind == ExprKind::kIdentifier && LookupLhsWidth(lhs, mod) <= 1)
+    return;
   diag_.Error(item->loc,
               "drive strength on continuous assignment applies only to "
               "scalar nets",

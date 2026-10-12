@@ -622,18 +622,23 @@ static Direction PortExprDirection(const ModuleDecl* decl, const Expr* expr) {
   return Direction::kNone;
 }
 
-// §6.18: a typedef carries its unpacked dimensions into the type it names, so
-// a port declared through one, or through a chain of names reaching one, is an
-// unpacked array though no dimension follows its name (§10.8 lets a pattern
-// take its type from such a port).
-static bool TypedefChainIsUnpackedArray(
+// §7.4 (printed page 153): a port's type is an array where it writes a packed
+// dimension, its first one being packed_dim_left, and §6.18 has a typedef carry
+// its packed and unpacked dimensions into the type it names, so a port declared
+// through one, or through a chain of names reaching one, is an array though no
+// dimension follows its name (§10.8 lets a pattern take its type from such a
+// port).
+static bool PortTypeIsArray(
     const DataType& dtype, const TypedefMap& typedefs,
     const std::unordered_map<std::string_view, std::vector<Expr*>>&
         typedef_dims) {
+  if (dtype.packed_dim_left != nullptr) return true;
   std::vector<std::string_view> names;
   FollowTypedefs(dtype, typedefs, names);
   return std::ranges::any_of(names, [&](std::string_view name) {
-    return typedef_dims.contains(name);
+    auto it = typedefs.find(name);
+    return typedef_dims.contains(name) ||
+           (it != typedefs.end() && it->second.packed_dim_left != nullptr);
   });
 }
 
@@ -675,8 +680,8 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
         port.data_type.kind == DataTypeKind::kNamed &&
         !port.unpacked_dims.empty() &&
         td_array_dims_.contains(port.data_type.type_name);
-    rp.typedef_is_unpacked_array =
-        TypedefChainIsUnpackedArray(port.data_type, typedefs_, td_array_dims_);
+    rp.type_is_array =
+        PortTypeIsArray(port.data_type, typedefs_, td_array_dims_);
 
     if (port.is_interface_port) {
       rp.is_interface_port = true;

@@ -632,21 +632,21 @@ static bool IsPositionalLvaluePattern(const Expr* pattern) {
 
 // §10.8 (printed page 260): a port connection to an input or an output port is
 // an assignment-like context, so an untyped pattern may stand there when the
-// formal is an aggregate -- a structure, a union or an unpacked array, judged
-// as the type a typedef names (§6.18) -- from which it takes its type, and on
-// an output port, the side being assigned, it is positional with lvalue items
-// (§10.9). An inout or ref connection is no such context. A typed pattern,
-// `T'{...}`, has a type of its own and is judged as any other expression is;
-// §10.9 forbids one only in a port expression of a declaration.
+// formal is of a type §10.9 has patterns construct -- a structure, a union, or
+// a packed or unpacked array, judged as the type a typedef names (§6.18) --
+// from which it takes its type, and on an output port, the side being
+// assigned, it is positional with lvalue items (§10.9). An inout or ref
+// connection is no such context. A typed pattern, `T'{...}`, has a type of its
+// own and is judged as any other expression is; §10.9 forbids one only in a
+// port expression of a declaration.
 static bool IllegalPatternPortConnection(const Expr* conn_expr,
                                          Direction direction,
                                          const RtlirPort* port) {
   if (conn_expr->kind != ExprKind::kAssignmentPattern) return false;
   bool aggregate =
-      port != nullptr &&
-      (port->data_kind == DataTypeKind::kStruct ||
-       port->data_kind == DataTypeKind::kUnion || port->num_unpacked_dims > 0 ||
-       port->typedef_is_unpacked_array);
+      port != nullptr && (port->data_kind == DataTypeKind::kStruct ||
+                          port->data_kind == DataTypeKind::kUnion ||
+                          port->num_unpacked_dims > 0 || port->type_is_array);
   if (direction == Direction::kInput) return !aggregate;
   return direction != Direction::kOutput || !aggregate ||
          !IsPositionalLvaluePattern(conn_expr);

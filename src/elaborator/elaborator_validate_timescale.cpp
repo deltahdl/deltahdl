@@ -9,6 +9,7 @@
 #include "elaborator/class_property_cont_assign.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/declared_types.h"
+#include "elaborator/default_pattern_values.h"
 #include "elaborator/dollar_contexts.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
@@ -166,6 +167,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
   }
   CheckUnboundedParamsInQueueContexts(decl, unbounded, queues, diag_);
   CheckDollarOperands(decl, diag_);
+  CheckUntypedDefaultPatternValues(decl, diag_);
   CheckContinuousPropertyWrites(decl, class_var_types_, unit_, diag_);
   CheckInstanceLocalTypeAssignments(decl, unit_, diag_);
   CheckNettypeUses(decl, nettype_names_, diag_);

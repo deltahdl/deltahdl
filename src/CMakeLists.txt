@@ -556,6 +556,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/net_data_type.cpp
     elaborator/simple_bit_vector.cpp
     elaborator/dollar_contexts.cpp
+    elaborator/default_pattern_values.cpp
     elaborator/class_property_cont_assign.cpp
     elaborator/string_numeric_assign.cpp
     elaborator/instance_local_types.cpp

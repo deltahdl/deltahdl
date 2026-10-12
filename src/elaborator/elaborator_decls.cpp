@@ -255,13 +255,18 @@ static void ValidateVectoredScalaredNet(const DataType& dtype,
   }
 }
 
-// §10.3.1: drive strengths on a continuous assignment apply only to scalar
-// nets (and never to supply nets).
+// §10.3.4 (printed page 251): a drive strength on a continuous assignment
+// applies only to a scalar net, and the supply0 and supply1 nets, of any width,
+// are excepted from those it applies to.
 static void ValidateNetDriveStrength(const DataType& dtype, const RtlirNet& net,
                                      DiagEngine& diag, SourceLoc loc) {
-  if ((dtype.drive_strength0 != 0 || dtype.drive_strength1 != 0) &&
-      net.width > 1 && net.net_type != NetType::kSupply0 &&
-      net.net_type != NetType::kSupply1) {
+  if (dtype.drive_strength0 == 0 && dtype.drive_strength1 == 0) return;
+  if (net.net_type == NetType::kSupply0 || net.net_type == NetType::kSupply1) {
+    diag.Error(loc,
+               "drive strength on continuous assignment does not apply to "
+               "supply0 or supply1 nets",
+               Subclause("10.3.4"));
+  } else if (net.width > 1) {
     diag.Error(loc,
                "drive strength on continuous assignment applies only to "
                "scalar nets",

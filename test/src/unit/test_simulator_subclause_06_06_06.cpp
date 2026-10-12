@@ -122,15 +122,15 @@ TEST(SupplyNetE2e, Supply0VectorHoldsSupplyStrengthPerBit) {
 
 // §6.6.6 consuming §28.11: the competing driver is written with §28.11's
 // explicit drive-strength syntax rather than left at the default. Even a driver
-// declared (strong1, strong0) -- the strongest ordinary drive level -- is below
-// supply, so a strong-0 driver on a supply1 net still reads 1. Building the
-// driver from the dependency's real strength syntax exercises the
-// drive-strength parse/elaborate path through the full pipeline.
+// declared (strong0, strong1) -- the strongest ordinary drive level -- is below
+// supply, so a strong-0 driver on a supply1 net still reads 1. The driver is a
+// gate, because §10.3.4 excepts a supply net from the nets a continuous
+// assignment's strength applies to.
 TEST(SupplyNetE2e, Supply1OutranksExplicitStrongDriver) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  supply1 vdd;\n"
                       "  logic result;\n"
-                      "  assign (strong1, strong0) vdd = 1'b0;\n"
+                      "  buf (strong0, strong1) g (vdd, 1'b0);\n"
                       "  initial begin\n"
                       "    #1;\n"
                       "    result = vdd;\n"

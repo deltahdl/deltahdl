@@ -194,7 +194,8 @@ TEST(DriveStrengthElaboration, MultipleAssignsPreserveIndependentStrengths) {
 
 // §10.3.4 (printed page 251): a drive strength applies only to an assignment
 // to a scalar net, and neither a select of a vector net nor a concatenation of
-// nets is one; a supply net's select is excepted with the net.
+// nets is one; a supply net's select is excepted from those it applies to with
+// the net, and is reported as a supply net.
 TEST(DriveStrengthElaboration, DriveStrengthOnSelectOfVectorNetIsError) {
   ElabFixture f;
   Elaborate(
@@ -211,10 +212,41 @@ TEST(DriveStrengthElaboration, DriveStrengthOnSelectOfVectorNetIsError) {
                               "applies only to scalar nets",
                               line, "10.3.4"));
   }
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "drive strength on continuous assignment does "
+                            "not apply to supply0 or supply1 nets",
+                            5, "10.3.4"));
+}
+
+// §10.3.4 (printed page 251): the nets of types supply0 and supply1 are
+// excepted from the scalar nets a drive strength applies to, whatever their
+// width, and whether the strength is written on an assign or on the net
+// declaration assignment. The wire beside them keeps its strength.
+TEST(DriveStrengthElaboration, DriveStrengthOnSupplyNetIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module t;\n"
+      "  supply1 [3:0] s; supply0 z; wire w;\n"
+      "  assign (weak0, weak1) s = 4'h0;\n"
+      "  assign (weak0, weak1) z = 1'b1;\n"
+      "  supply1 (weak0, weak1) v = 1'b0;\n"
+      "  assign (weak0, weak1) w = 1'b1;\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {3u, 4u, 5u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "drive strength on continuous assignment does "
+                              "not apply to supply0 or supply1 nets",
+                              line, "10.3.4"));
+  }
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
                              "drive strength on continuous assignment "
                              "applies only to scalar nets",
-                             5, "10.3.4"));
+                             3, "10.3.4"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "drive strength on continuous assignment does "
+                             "not apply to supply0 or supply1 nets",
+                             6, "10.3.4"));
 }
 
 }  // namespace

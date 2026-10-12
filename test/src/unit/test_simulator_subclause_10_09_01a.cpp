@@ -317,12 +317,14 @@ TEST(ArrayLiteralSim, PositionalMultidimensionalValues) {
   EXPECT_EQ(arr.e11->value.ToUint64(), 4u);
 }
 
+// §10.9.1: a default whose value's type matches no subarray is applied to the
+// subarrays' own elements in turn, down to the int leaves of both dimensions.
 TEST(ArrayLiteralSim, DefaultMultidimensionalValues) {
   SimFixture f;
   Array2x2 arr = RunAndFetch2x2(
       "module m;\n"
       "  int arr [0:1][0:1];\n"
-      "  initial arr = '{default: '{default: 42}};\n"
+      "  initial arr = '{default: 42};\n"
       "endmodule\n",
       f);
   ASSERT_NE(arr.e00, nullptr);

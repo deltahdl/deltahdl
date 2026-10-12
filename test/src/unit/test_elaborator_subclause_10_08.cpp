@@ -1,8 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <initializer_list>
+#include <string_view>
 
+#include "common/diagnostic.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -85,6 +88,59 @@ TEST(AssignmentLikeContext,
              "module t;\n"
              "  inner u(.q('{8'h55, 8'h66}));\n"
              "endmodule\n"));
+}
+
+// §10.8 with §10.9 and §7.4: a packed array is a type a pattern constructs,
+// so an input port with a packed dimension, written on the port or carried by
+// its typedef or by a typedef further along the chain, is one an untyped
+// pattern takes its type from.
+TEST(AssignmentLikeContext, InputPortConnectionTypesPatternFromPackedArray) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef logic [1:0][3:0] T;\n"
+      "typedef logic [3:0] nib_t;\n"
+      "typedef nib_t [1:0] pair_t;\n"
+      "module sub(input logic [1:0][3:0] a, input T b, input pair_t c);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  sub u(.a('{4'h1, 4'h2}), .b('{4'h3, 4'h4}), .c('{4'h5, 4'h6}));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(
+      f.diag.Diagnostics(),
+      "an assignment pattern cannot be connected to this port", 7, "10.8"));
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §10.8 (printed pages 259-260): the default correspondence between a
+// `default:` value and the elements it covers is no assignment-like context,
+// so an untyped pattern there has no type, in a declaration, a procedural or
+// a continuous assignment and a subroutine alike. A typed pattern has its own,
+// and an index key's value is in such a context.
+TEST(AssignmentLikeContext, UntypedPatternAsDefaultValueRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef int row_t [0:1];\n"
+      "  int a [0:1][0:1] = '{default: '{default: 1}};\n"
+      "  int b [0:1][0:1];\n"
+      "  wire [7:0] w [0:1][0:1];\n"
+      "  assign w = '{0: '{8'h1, 8'h2}, default: '{8'h3, 8'h4}};\n"
+      "  initial b = '{default: row_t'{default: 2}};\n"
+      "  function automatic void f();\n"
+      "    b = '{0: '{3, 4}, default: '{5, 6}};\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  constexpr std::string_view kMessage =
+      "an untyped assignment pattern cannot be the value of a default key";
+  for (uint32_t line : {3u, 6u, 9u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, line, "10.8"));
+  }
+  EXPECT_EQ(std::ranges::count_if(
+                f.diag.Diagnostics(),
+                [&](const Diagnostic& d) { return d.message == kMessage; }),
+            3);
 }
 
 // §10.8: a typedef of a type no pattern can target leaves the port one the
