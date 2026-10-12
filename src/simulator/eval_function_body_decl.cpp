@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -148,6 +149,14 @@ static Logic4Vec EvalLocalInitializer(const DataType& type, const Expr* init,
           TaggedPatternMemberLayout(type, init, ctx)) {
     return EvalStructPatternValue(UnwrapTypedPattern(init->lhs), member, ctx,
                                   arena);
+  }
+  // §11.9 with §7.3.2: any other tagged initializer converts its member value
+  // to the member's type, a real member's to its real bits, as the
+  // assignment `v = tagged M x` does (EvalTaggedForLayout).
+  if (const StructTypeInfo* layout = ctx.FindStructType(type.type_name)) {
+    if (auto value = EvalTaggedForLayout(init, *layout, ctx, arena)) {
+      return *value;
+    }
   }
   return EvalExpr(init, ctx, arena);
 }

@@ -346,4 +346,57 @@ TEST(TaggedUnionSimulation, CopyingAUnionWithAStructMemberCopiesItsTag) {
             "6\n");
 }
 
+// §7.3.2 lets an unpacked tagged union hold a real member, and §11.9 builds
+// `tagged R v` with v in that member, so the member holds the real itself:
+// u.R * 4 is 10.0 for 2.5, and the integer 3 written to it is the real 3.0.
+TEST(TaggedUnionSimulation, RealMemberHoldsItsReal) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  typedef union tagged { real R; int I; } U;\n"
+                      "  U u;\n"
+                      "  int n;\n"
+                      "  initial begin\n"
+                      "    u = tagged R 2.5;\n"
+                      "    n = int'(u.R * 4);\n"
+                      "    u = tagged R 3;\n"
+                      "    n = n * 100 + int'(u.R * 4);\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "n"),
+            1012u);
+}
+
+// The same for a module variable's declaration initializer.
+TEST(TaggedUnionSimulation, RealMemberInitializerHoldsItsReal) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  typedef union tagged { real R; int I; } U;\n"
+                      "  U u = tagged R 2.5;\n"
+                      "  int n;\n"
+                      "  initial n = int'(u.R * 4);\n"
+                      "endmodule\n",
+                      "n"),
+            10u);
+}
+
+// The same through a nonblocking assignment, and through the initializer of a
+// variable declared in a block and in a function body (§6.8).
+TEST(TaggedUnionSimulation, RealMemberHoldsItsRealOnEveryWritePath) {
+  EXPECT_EQ(
+      RunAndGet("module t;\n"
+                "  typedef union tagged { real R; int I; } U;\n"
+                "  U u;\n"
+                "  int n;\n"
+                "  function automatic int f();\n"
+                "    U w = tagged R 2.5;\n"
+                "    return int'(w.R * 4);\n"
+                "  endfunction\n"
+                "  initial begin : b\n"
+                "    automatic U v = tagged R 0.5;\n"
+                "    u <= tagged R 2.5;\n"
+                "    #1 n = int'(u.R * 4) * 100 + f() * 10 + int'(v.R * 4);\n"
+                "  end\n"
+                "endmodule\n",
+                "n"),
+      1102u);
+}
+
 }  // namespace

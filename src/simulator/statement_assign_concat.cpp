@@ -144,21 +144,37 @@ static bool IsTwoStateIntegerKind(DataTypeKind kind) {
          kind == DataTypeKind::kLongint;
 }
 
-// §7.3.2 with §6.11.2: the value of the tagged expression `expr` whose member
-// in the union layout `layout` is a scalar of a 2-state type, at the member's
-// width with every x and z bit 0, as a write into that member stores it. The
-// union's storage keeps x and z for a 4-state member beside it, so the
-// conversion is the member's own. None for any other member, and none for a
-// packed union, whose value also carries the tag in its most significant bits
-// (§7.3.2) and is built with them where it is evaluated as it stands.
-static std::optional<Logic4Vec> TwoStateMemberValue(
-    const Expr* expr, const StructTypeInfo& layout, SimContext& ctx,
-    Arena& arena) {
+// Whether `kind` is one of §6.12's real types.
+static bool IsRealMemberKind(DataTypeKind kind) {
+  return kind == DataTypeKind::kReal || kind == DataTypeKind::kShortreal ||
+         kind == DataTypeKind::kRealtime;
+}
+
+// §7.3.2 with §6.11.2 and §6.12.1: the value of the tagged expression `expr`
+// whose member in the union layout `layout` is a scalar, converted to that
+// member's type as a write into the member stores it. A 2-state member's
+// value is at the member's width with every x and z bit 0, the union's
+// storage keeping x and z for a 4-state member beside it. A real member's is
+// the real the value converts to, its bits standing in the union's carrier as
+// they are, where converting the whole union value as an integral one would
+// round them away. None for any other member, and none for a packed union,
+// whose value also carries the tag in its most significant bits (§7.3.2) and
+// is built with them where it is evaluated as it stands.
+static std::optional<Logic4Vec> ScalarMemberValue(const Expr* expr,
+                                                  const StructTypeInfo& layout,
+                                                  SimContext& ctx,
+                                                  Arena& arena) {
   if (layout.is_packed) return std::nullopt;
   const StructFieldInfo* field = FindStructField(&layout, expr->rhs->text);
-  if (field == nullptr || field->nested != nullptr || field->elem_count != 0 ||
-      !IsTwoStateIntegerKind(field->type_kind))
+  if (field == nullptr || field->nested != nullptr || field->elem_count != 0)
     return std::nullopt;
+  if (IsRealMemberKind(field->type_kind)) {
+    Logic4Vec value = ConvertRealForKnownLhs(EvalExpr(expr->lhs, ctx, arena),
+                                             true, field->width, arena);
+    value.is_real = false;
+    return value;
+  }
+  if (!IsTwoStateIntegerKind(field->type_kind)) return std::nullopt;
   Logic4Vec value =
       OwnRhsWords(ResizeToWidth(EvalExpr(expr->lhs, ctx, arena, field->width),
                                 field->width, arena),
@@ -171,15 +187,15 @@ static std::optional<Logic4Vec> TwoStateMemberValue(
 // the layout `layout`, the member expression packed against the member it
 // names -- a structure pattern by that structure's layout, and a tagged
 // expression, `tagged Jmp (tagged JmpC '{2, 83})`, by the member's own union
-// layout in turn, and a scalar of a 2-state type by that type
-// (TwoStateMemberValue) -- and §11.4.11: a conditional with a known predicate
+// layout in turn, and a scalar of a 2-state or real type by that type
+// (ScalarMemberValue) -- and §11.4.11: a conditional with a known predicate
 // is the arm it selects. None for any other expression, which is evaluated as
 // it stands. Evaluated as a value alone, a nested tagged expression
 // concatenated its pattern's items at their own widths and lost the structure's
 // first member.
-static std::optional<Logic4Vec> EvalTaggedForLayout(
-    const Expr* expr, const StructTypeInfo& layout, SimContext& ctx,
-    Arena& arena) {
+std::optional<Logic4Vec> EvalTaggedForLayout(const Expr* expr,
+                                             const StructTypeInfo& layout,
+                                             SimContext& ctx, Arena& arena) {
   if (expr == nullptr) return std::nullopt;
   if (expr->kind == ExprKind::kTernary) {
     Logic4Vec cond = EvalExpr(expr->condition, ctx, arena);
@@ -192,7 +208,7 @@ static std::optional<Logic4Vec> EvalTaggedForLayout(
       expr->lhs == nullptr)
     return std::nullopt;
   const StructTypeInfo* member = TaggedMemberLayout(layout, expr->rhs->text);
-  if (member == nullptr) return TwoStateMemberValue(expr, layout, ctx, arena);
+  if (member == nullptr) return ScalarMemberValue(expr, layout, ctx, arena);
   if (expr->lhs->kind == ExprKind::kAssignmentPattern)
     return EvalStructPatternValue(expr->lhs, member, ctx, arena);
   return EvalTaggedForLayout(expr->lhs, *member, ctx, arena);

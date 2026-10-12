@@ -310,4 +310,23 @@ TEST(PatternMatchingSim, BoundVariableHasTheMembersType) {
   EXPECT_EQ(v->value.ToUint64(), 1300u);
 }
 
+// §12.6 binds a pattern identifier to the member's value with the member's
+// type, so one bound to a real member is the real it holds (#6418).
+TEST(PatternMatchingSim, BoundRealMemberIsReal) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  typedef union tagged { real R; int I; } U;\n"
+      "  U u;\n"
+      "  int r = 0;\n"
+      "  initial begin\n"
+      "    u = tagged R 2.5;\n"
+      "    if (u matches tagged R .x) r = int'(x * 4);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 10u);
+}
+
 }  // namespace

@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -449,6 +450,16 @@ uint32_t CompoundOperandWidth(TokenKind base_op, const Expr* lhs,
 // Defined in statement_assign_concat.cpp; also used by the §11.4.2 nonblocking
 // path in statement_assign_nonblocking.cpp. Evaluate the rhs with the lhs as
 // the assignment context (width and, for named patterns, struct type).
+// §11.9: the value of the tagged union expression `expr` whose union type has
+// the layout `layout`, each member expression packed against and converted to
+// the member it names; none where `expr` is no tagged expression or names no
+// member the layout converts for. Defined in statement_assign_concat.cpp; a
+// declaration's initializer is evaluated by it as an assignment's right-hand
+// side is.
+std::optional<Logic4Vec> EvalTaggedForLayout(const Expr* expr,
+                                             const StructTypeInfo& layout,
+                                             SimContext& ctx, Arena& arena);
+
 Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena);
 

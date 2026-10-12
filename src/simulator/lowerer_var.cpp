@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -727,7 +728,15 @@ void Lowerer::LowerVarInit(std::string_view name, const RtlirVariable& var,
   bool self_determined = sinfo != nullptr || var.is_real || var.is_string ||
                          var.is_event || var.is_chandle || is_stream ||
                          init->kind == ExprKind::kAssignmentPattern;
-  auto val = EvalExpr(var.init_expr, ctx_, arena_, self_determined ? 0 : width);
+  // §11.9: a tagged initializer is evaluated by the union's layout as the
+  // assignment `u = tagged M v` is, each member value converted to its
+  // member's type (EvalTaggedForLayout).
+  std::optional<Logic4Vec> tagged =
+      sinfo != nullptr ? EvalTaggedForLayout(init, *sinfo, ctx_, arena_)
+                       : std::nullopt;
+  auto val = tagged ? *tagged
+                    : EvalExpr(var.init_expr, ctx_, arena_,
+                               self_determined ? 0 : width);
   if (is_stream && width > 0) {
     val = WidenStreamPackToFixedTarget(val, width, init->range.start, ctx_,
                                        arena_);
