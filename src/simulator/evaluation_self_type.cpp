@@ -112,7 +112,7 @@ bool SimSelfSigned(const Expr* expr, SimContext& ctx) {
       return IsSignedLiteral(expr->text);
     case ExprKind::kIdentifier: {
       const Variable* var = ctx.FindVariable(expr->text);
-      return var == nullptr || var->value.is_signed || var->value.is_real;
+      return var == nullptr || var->is_signed || var->is_real;
     }
     case ExprKind::kUnary:
       return expr->op != TokenKind::kBang && !IsUnaryReductionOp(expr->op) &&
@@ -141,7 +141,7 @@ bool SimSelfReal(const Expr* expr, SimContext& ctx) {
       return true;
     case ExprKind::kIdentifier: {
       const Variable* var = ctx.FindVariable(expr->text);
-      return var != nullptr && var->value.is_real;
+      return var != nullptr && var->is_real;
     }
     case ExprKind::kBinary:
       return IsMaxWidthBinaryOp(expr->op) &&

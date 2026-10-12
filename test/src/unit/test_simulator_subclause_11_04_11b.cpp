@@ -244,11 +244,13 @@ TEST(ConditionalAmbiguousCondition, DifferentWidthBranchesCombinedToMaxWidth) {
   EXPECT_EQ(result.width, 8u);
 }
 
+// §11.4.11 with §11.4.7: a predicate with an unknown bit and no known 1 is
+// ambiguous, so both results are combined bit by bit.
 TEST(ConditionalAmbiguousCondition, MultiBitPartialXTriggersAmbiguous) {
   SimFixture f;
   auto* cv = f.ctx.CreateVariable("cond", 4);
   cv->value = MakeLogic4Vec(f.arena, 4);
-  cv->value.words[0].aval = 0b0001;
+  cv->value.words[0].aval = 0b0000;
   cv->value.words[0].bval = 0b0010;
   MakeVar(f, "t", 4, 0b1100);
   MakeVar(f, "e", 4, 0b1010);

@@ -551,17 +551,24 @@ void RecordPropertyTags(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 // target's storage was created by (TagKeyOfName, §23.9), the one a
 // declaration initializer's tag already stands under.
 static void RecordAssignedTag(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  const StructTypeInfo* layout = StructLayoutOfName(stmt->lhs->text, ctx);
+  const std::string kKey = TagKeyOfName(stmt->lhs->text, ctx);
   const Expr* source = stmt->rhs;
+  if (source != nullptr && source->kind == ExprKind::kTagged) {
+    RecordTaggedValueTags(source, kKey, layout, ctx, arena);
+    return;
+  }
+  // Only a union holds a tag; for any other target the right-hand side is
+  // not read again, a conditional's predicate among it.
+  if (layout == nullptr || !layout->is_union) return;
   while (source != nullptr && source->kind == ExprKind::kTernary) {
     const Truth kChoice = TruthOf(EvalExpr(source->condition, ctx, arena));
     if (kChoice == Truth::kAmbiguous) return;
     source = kChoice == Truth::kTrue ? source->true_expr : source->false_expr;
   }
   if (source == nullptr) return;
-  const std::string kKey = TagKeyOfName(stmt->lhs->text, ctx);
   if (source->kind == ExprKind::kTagged) {
-    RecordTaggedValueTags(source, kKey,
-                          StructLayoutOfName(stmt->lhs->text, ctx), ctx, arena);
+    RecordTaggedValueTags(source, kKey, layout, ctx, arena);
     return;
   }
   if (source->kind != ExprKind::kIdentifier) return;
@@ -809,8 +816,9 @@ static bool TryAssocAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                       Arena& arena) {
   if (TryDeconstructingPatternAssign(stmt, ctx, arena)) return true;
-  if (TryConditionalArrayAssign(stmt, ctx, arena)) return true;
-  if (TryConditionalCollectionAssign(stmt, ctx, arena)) return true;
+  if (TryConditionalArrayAssign(stmt, ctx, arena) ||
+      TryConditionalCollectionAssign(stmt, ctx, arena))
+    return true;
   // §13.4.1 with §7.6 and §7.10: `av = fa()` copies the array the call
   // returned into the array or queue it is assigned to.
   if (TryCallResultArrayAssign(stmt, ctx, arena)) return true;

@@ -259,7 +259,9 @@ TEST(StreamSliceSizeSim, ParameterAndTypedefSliceSizesPackAndUnpack) {
                        "endmodule\n",
                        f),
             "cdab ba ab\n");
-  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "slice_size for streaming operator must be positive", 12, "11.4.14.2"));
 }
 
 }  // namespace

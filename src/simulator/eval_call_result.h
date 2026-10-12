@@ -151,7 +151,7 @@ void RecordReturnedVariableTag(const Expr* returned, SimContext& ctx);
 // a call the simulator answers without running a body and for a body that
 // returned anything else.
 Logic4Vec EvalWithReturnedTag(const Expr* expr, SimContext& ctx, Arena& arena,
-                              std::string& tag);
+                              std::string& tag, uint32_t context_width = 0);
 
 // §7.3.2 with §13.4.1 and §11.9: the right-hand side of the blocking
 // assignment `stmt`, evaluated with the target as its context as

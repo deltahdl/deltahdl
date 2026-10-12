@@ -6,7 +6,6 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "elaborator/type_eval.h"
-#include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/evaluation.h"
@@ -97,6 +96,13 @@ static std::optional<Logic4Vec> NonintegralDefault(const Expr* operand,
   return StructDefault(*layout, arena);
 }
 
+static Logic4Vec RealBranchesMerged(const Logic4Vec& tv, const Logic4Vec& fv,
+                                    Arena& arena) {
+  double td = TernaryOperandToDouble(tv);
+  double fd = TernaryOperandToDouble(fv);
+  return MakeRealVec(arena, td == fd ? td : 0.0);
+}
+
 static Logic4Vec EvalTernaryUnknownCond(const Expr* expr, SimContext& ctx,
                                         Arena& arena, uint32_t context_width) {
   auto tv = EvalExpr(expr->true_expr, ctx, arena, context_width);
@@ -106,11 +112,7 @@ static Logic4Vec EvalTernaryUnknownCond(const Expr* expr, SimContext& ctx,
   // shared value is returned; otherwise the result is the default value for the
   // resulting type (Table 7-1 gives 0.0 for real), not a bit-by-bit
   // combination.
-  if (tv.is_real || fv.is_real) {
-    double td = TernaryOperandToDouble(tv);
-    double fd = TernaryOperandToDouble(fv);
-    return MakeRealVec(arena, td == fd ? td : 0.0);
-  }
+  if (tv.is_real || fv.is_real) return RealBranchesMerged(tv, fv, arena);
   bool result_signed = tv.is_signed && fv.is_signed;
   uint32_t width = (tv.width > fv.width) ? tv.width : fv.width;
   if (context_width > width) width = context_width;

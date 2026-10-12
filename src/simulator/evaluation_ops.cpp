@@ -170,6 +170,17 @@ static Logic4Vec EvalIntegralPower(const Logic4Vec& lhs, const Logic4Vec& rhs,
   result.is_signed = lhs.is_signed;
   return result;
 }
+// `**` over every word above 64 bits (EvalWideArith) and in the machine word
+// below, the base's type and the exponent's own sign given to each.
+static Logic4Vec EvalPower(const Logic4Vec& lhs, const Logic4Vec& rhs,
+                           uint32_t width, Arena& arena) {
+  if (width > 64) {
+    return EvalWideArith(TokenKind::kPower, lhs, rhs,
+                         {width, lhs.is_signed, rhs.is_signed}, arena);
+  }
+  return EvalIntegralPower(lhs, rhs, width, arena);
+}
+
 static Logic4Vec EvalSignedArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
                                  uint32_t width, Arena& arena) {
   int64_t lv = SignExtend(lhs.ToUint64(), lhs.width);
@@ -323,15 +334,11 @@ static Logic4Vec EvalBinaryArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
   // machine word the two arms below compute in: on a `logic [127:0]`,
   // 128'h1_0000_0000_0000_0000 + 128'h1 read 1, the only set bit of the first
   // operand being bit 64.
-  if (op == TokenKind::kPower && width > 64) {
-    return EvalWideArith(op, lhs, rhs, {width, lhs.is_signed, rhs.is_signed},
-                         arena);
-  }
+  if (op == TokenKind::kPower) return EvalPower(lhs, rhs, width, arena);
   if (width > 64) {
     return EvalWideArith(op, lhs, rhs, {width, lhs.is_signed && rhs.is_signed},
                          arena);
   }
-  if (op == TokenKind::kPower) return EvalIntegralPower(lhs, rhs, width, arena);
   if (lhs.is_signed && rhs.is_signed) {
     return EvalSignedArith(op, lhs, rhs, width, arena);
   }

@@ -69,10 +69,13 @@ TEST(EvalOpXZ, LogicalNotNonzero) {
   EXPECT_EQ(result.words[0].bval, 0u);
 }
 
+// §11.4.7: an operand with an unknown bit and no known 1 may be zero or not,
+// so its truth is ambiguous and `!` gives x; a known 1 bit would make it
+// nonzero whatever the unknown bits hold.
 TEST(EvalOpXZ, LogicalNotX) {
   SimFixture f;
 
-  MakeVar4(f, "ln", 4, 0b1000, 0b0100);
+  MakeVar4(f, "ln", 4, 0b0000, 0b0100);
   auto* expr = MakeUnary(f.arena, TokenKind::kBang, MakeId(f.arena, "ln"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_NE(result.words[0].bval, 0u);

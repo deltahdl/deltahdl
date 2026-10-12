@@ -430,14 +430,14 @@ Logic4Vec EvalWithReturnedAggregate(
 }
 
 Logic4Vec EvalWithReturnedTag(const Expr* expr, SimContext& ctx, Arena& arena,
-                              std::string& tag) {
+                              std::string& tag, uint32_t context_width) {
   tag.clear();
   if (expr == nullptr || expr->kind != ExprKind::kCall)
-    return EvalExpr(expr, ctx, arena);
+    return EvalExpr(expr, ctx, arena, context_width);
   auto& reg = Register();
   ++reg.evaluations;
   reg.completed.tag.clear();
-  Logic4Vec value = EvalExpr(expr, ctx, arena);
+  Logic4Vec value = EvalExpr(expr, ctx, arena, context_width);
   --reg.evaluations;
   tag = std::move(reg.completed.tag);
   reg.completed.tag.clear();
@@ -554,8 +554,11 @@ Logic4Vec EvalRhsCarryingReturnedTag(const Stmt* stmt, SimContext& ctx,
       stmt->lhs->kind != ExprKind::kIdentifier) {
     return EvalRhsWithStructContext(stmt, ctx, arena);
   }
+  // §11.6.1 sizes the call by the target as any right-hand side is, which a
+  // let instance's body takes (§11.12).
   std::string tag;
-  Logic4Vec value = EvalWithReturnedTag(stmt->rhs, ctx, arena, tag);
+  Logic4Vec value = EvalWithReturnedTag(stmt->rhs, ctx, arena, tag,
+                                        LhsContextWidth(stmt->lhs, ctx, arena));
   if (tag.empty()) return value;
   const StructTypeInfo* layout = StructLayoutOfName(stmt->lhs->text, ctx);
   if (layout == nullptr || !layout->is_union) return value;

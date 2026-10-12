@@ -62,6 +62,31 @@ bool SameAssocContents(const AssocArrayObject& a, const AssocArrayObject& b) {
   return same(a.int_data, b.int_data) && same(a.str_data, b.str_data);
 }
 
+// The queues or dynamic arrays the conditional `rhs` names, merged into
+// `queue`; false where either names none.
+bool MergeQueueOperands(QueueObject* queue, const Expr* rhs, SimContext& ctx,
+                        Arena& arena) {
+  const QueueObject* a = ctx.FindQueue(rhs->true_expr->text);
+  const QueueObject* b = ctx.FindQueue(rhs->false_expr->text);
+  if (a == nullptr || b == nullptr) return false;
+  AssignMergedQueues(queue, *a, *b, arena);
+  return true;
+}
+
+// The associative arrays the conditional `rhs` names: their shared contents
+// where they are equal, and nothing where they are not, stored in `assoc`;
+// false where either names none.
+bool MergeAssocOperands(AssocArrayObject* assoc, const Expr* rhs,
+                        SimContext& ctx) {
+  const AssocArrayObject* a = ctx.FindAssocArray(rhs->true_expr->text);
+  const AssocArrayObject* b = ctx.FindAssocArray(rhs->false_expr->text);
+  if (a == nullptr || b == nullptr) return false;
+  const bool kSame = SameAssocContents(*a, *b);
+  assoc->int_data = kSame ? a->int_data : decltype(assoc->int_data){};
+  assoc->str_data = kSame ? a->str_data : decltype(assoc->str_data){};
+  return true;
+}
+
 }  // namespace
 
 // §11.4.11 with §7.5, §7.8 and §7.10: a known predicate assigns the chosen
@@ -88,21 +113,11 @@ bool TryConditionalCollectionAssign(const Stmt* stmt, SimContext& ctx,
     ExecBlockingAssignImpl(chosen, ctx, arena);
     return true;
   }
-  if (queue != nullptr) {
-    const QueueObject* a = ctx.FindQueue(rhs->true_expr->text);
-    const QueueObject* b = ctx.FindQueue(rhs->false_expr->text);
-    if (a == nullptr || b == nullptr) return false;
-    AssignMergedQueues(queue, *a, *b, arena);
-  } else {
-    const AssocArrayObject* a = ctx.FindAssocArray(rhs->true_expr->text);
-    const AssocArrayObject* b = ctx.FindAssocArray(rhs->false_expr->text);
-    if (a == nullptr || b == nullptr) return false;
-    const bool kSame = SameAssocContents(*a, *b);
-    assoc->int_data = kSame ? a->int_data : decltype(assoc->int_data){};
-    assoc->str_data = kSame ? a->str_data : decltype(assoc->str_data){};
-  }
-  NotifyOwningVar(ctx, kTarget);
-  return true;
+  const bool kMerged = queue != nullptr
+                           ? MergeQueueOperands(queue, rhs, ctx, arena)
+                           : MergeAssocOperands(assoc, rhs, ctx);
+  if (kMerged) NotifyOwningVar(ctx, kTarget);
+  return kMerged;
 }
 
 }  // namespace delta

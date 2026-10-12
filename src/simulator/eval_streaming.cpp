@@ -244,6 +244,59 @@ static void ExpandUnionFirstMember(Variable* var, const StructTypeInfo* sinfo,
   total_width += f.width;
 }
 
+static void ExpandClassProperties(ClassObject* obj, SimContext& ctx,
+                                  std::vector<Logic4Vec>& parts,
+                                  uint32_t& total_width, Arena& arena);
+
+// The elements an array member holds from the left, a dynamic one's count
+// read off the object; an element it holds no value for streams as zeros.
+static void ExpandClassArrayMember(const ClassObject* obj,
+                                   const ClassTypeInfo::PropertyInfo& prop,
+                                   std::vector<Logic4Vec>& parts,
+                                   uint32_t& total_width, Arena& arena) {
+  const uint32_t kSize =
+      prop.is_dynamic ? ClassArraySize(obj, prop) : prop.array_size;
+  const int64_t kLo = prop.is_dynamic ? 0 : prop.array_lo;
+  for (uint32_t i = 0; i < kSize; ++i) {
+    auto it = obj->properties.find(ClassArrayElementKey(prop.name, kLo + i));
+    parts.push_back(it != obj->properties.end()
+                        ? it->second
+                        : MakeLogic4Vec(arena, prop.width));
+    total_width += prop.width;
+  }
+}
+
+// One data member of `obj`, streamed by the procedure §11.4.14.1 applies to
+// the whole: a queue's elements, an array's, a handle's object's members.
+static void ExpandClassMember(ClassObject* obj,
+                              const ClassTypeInfo::PropertyInfo& prop,
+                              SimContext& ctx, std::vector<Logic4Vec>& parts,
+                              uint32_t& total_width, Arena& arena) {
+  const std::string kName(prop.name);
+  if (auto q = obj->queue_properties.find(kName);
+      q != obj->queue_properties.end()) {
+    ExpandQueueElements(q->second, parts, total_width, arena);
+    return;
+  }
+  if (prop.IsArray()) {
+    ExpandClassArrayMember(obj, prop, parts, total_width, arena);
+    return;
+  }
+  auto it = obj->properties.find(kName);
+  if (it == obj->properties.end()) {
+    parts.push_back(MakeLogic4Vec(arena, prop.width));
+    total_width += prop.width;
+    return;
+  }
+  if (ctx.FindClassType(prop.type_name) != nullptr) {
+    if (ClassObject* member = ctx.GetClassObject(it->second.ToUint64()))
+      ExpandClassProperties(member, ctx, parts, total_width, arena);
+    return;
+  }
+  parts.push_back(it->second);
+  total_width += it->second.width;
+}
+
 // §11.4.14.1 streams a non-null class handle by streaming each of its object's
 // data members in declaration order, the procedure applied to each in turn: a
 // queue member gives its elements, an array member (§7.4.2, §7.5) the
@@ -257,40 +310,8 @@ static void ExpandClassProperties(ClassObject* obj, SimContext& ctx,
   std::reverse(chain.begin(), chain.end());
   for (auto* t : chain) {
     for (const auto& prop : t->properties) {
-      if (prop.is_static) continue;
-      const std::string kName(prop.name);
-      if (auto q = obj->queue_properties.find(kName);
-          q != obj->queue_properties.end()) {
-        ExpandQueueElements(q->second, parts, total_width, arena);
-        continue;
-      }
-      if (prop.IsArray()) {
-        const uint32_t kSize =
-            prop.is_dynamic ? ClassArraySize(obj, prop) : prop.array_size;
-        const int64_t kLo = prop.is_dynamic ? 0 : prop.array_lo;
-        for (uint32_t i = 0; i < kSize; ++i) {
-          auto it =
-              obj->properties.find(ClassArrayElementKey(prop.name, kLo + i));
-          parts.push_back(it != obj->properties.end()
-                              ? it->second
-                              : MakeLogic4Vec(arena, prop.width));
-          total_width += prop.width;
-        }
-        continue;
-      }
-      auto it = obj->properties.find(kName);
-      if (it == obj->properties.end()) {
-        parts.push_back(MakeLogic4Vec(arena, prop.width));
-        total_width += prop.width;
-        continue;
-      }
-      if (ctx.FindClassType(prop.type_name) != nullptr) {
-        if (ClassObject* member = ctx.GetClassObject(it->second.ToUint64()))
-          ExpandClassProperties(member, ctx, parts, total_width, arena);
-        continue;
-      }
-      parts.push_back(it->second);
-      total_width += it->second.width;
+      if (!prop.is_static)
+        ExpandClassMember(obj, prop, ctx, parts, total_width, arena);
     }
   }
 }

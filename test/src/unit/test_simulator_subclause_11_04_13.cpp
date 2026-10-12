@@ -6,7 +6,6 @@
 #include "builders_ast.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
-#include "helpers_eval_op.h"
 #include "helpers_lower_run.h"
 #include "helpers_queue.h"
 #include "lexer/token.h"

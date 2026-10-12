@@ -782,7 +782,7 @@ TEST(LetSim, DefaultsReadTheDeclaringScopeAndInstancesKeepTheirHistory) {
                        "  end\n"
                        "endmodule\n",
                        f),
-            "1\n0 1\n");
+            "1\n0 1\n$finish at time 31\n");
 }
 
 }  // namespace
