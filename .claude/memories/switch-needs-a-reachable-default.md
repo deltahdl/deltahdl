@@ -8,6 +8,8 @@ metadata:
   modified: 2026-10-12T06:17:37.181Z
 ---
 
+# A switch needs a reachable default
+
 A `switch` over an `enum class` that writes a `case` for every enumerator and no `default` still has an implicit default branch, and llvm-cov counts it: no input reaches it, so it is one missed branch even with every line run. Write one enumerator's case as `default:` instead.
 
 **Why:** the coverage TOTAL of missed branches may not rise above its baseline, and this miss shows only as a branch count (every line covered, one branch not), which is easy to misread as a gap in the tests.
