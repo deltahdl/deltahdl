@@ -413,9 +413,15 @@ TEST(ConditionalOperatorElaboration, UnrelatedOperandTypesReported) {
                             "the operands of a conditional operator shall be "
                             "of equivalent types",
                             16, "11.4.11"));
+  // An unpacked structure beside an int is no pair of equivalent types either.
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the operands of a conditional operator shall be "
+                            "of equivalent types",
+                            27, "11.4.11"));
   for (const auto& d : f.diag.Diagnostics()) {
     if (d.message.find("conditional op") != std::string::npos)
-      EXPECT_TRUE(d.loc.line == 15 || d.loc.line == 16) << d.loc.line;
+      EXPECT_TRUE(d.loc.line == 15 || d.loc.line == 16 || d.loc.line == 27)
+          << d.loc.line;
   }
 }
 
