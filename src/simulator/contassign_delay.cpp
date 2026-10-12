@@ -3,8 +3,13 @@
 #include <algorithm>
 #include <cstdint>
 
+#include "common/arena.h"
 #include "common/types.h"
+#include "elaborator/rtlir.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "simulator/evaluation.h"
+#include "simulator/sim_context.h"
 
 namespace delta {
 
@@ -87,6 +92,34 @@ uint64_t SelectContAssignDelay(const Logic4Vec& old_val,
     return d.fall;
   }
   return d.rise;
+}
+
+// An assignment to a concatenation is lowered as one assignment per element,
+// each fed its slice of the source, and each keeps the declaration it came
+// from as its source_item, whose target is the concatenation as written.
+ContAssignWhole WholeOfConcatElement(const RtlirContAssign& ca) {
+  const ModuleItem* item = ca.source_item;
+  if (item == nullptr || item->kind != ModuleItemKind::kContAssign ||
+      item->assign_lhs->kind != ExprKind::kConcatenation) {
+    return {};
+  }
+  return {item->assign_lhs, item->assign_rhs};
+}
+
+// §10.3.3 makes the delay the time between a change of the source and the one
+// assignment made to the target, and picks it from the source's transition as
+// a whole. Picked by each element from its own slice, `#(5, 10) {a, b}` going
+// from 8'h01 to 8'h10 gave a its rise delay and b its fall delay, and the
+// target held 8'h11 between the two.
+uint64_t SelectTransitionDelay(const ContAssignWhole& whole,
+                               const ContAssignTransition& own,
+                               const ContAssignDelays& d, SimContext& ctx,
+                               Arena& arena) {
+  if (whole.lhs == nullptr)
+    return SelectContAssignDelay(own.old_val, own.new_val, d, own.width);
+  Logic4Vec old_val = EvalExpr(whole.lhs, ctx, arena);
+  Logic4Vec new_val = EvalExpr(whole.rhs, ctx, arena, old_val.width);
+  return SelectContAssignDelay(old_val, new_val, d, old_val.width);
 }
 
 }  // namespace delta

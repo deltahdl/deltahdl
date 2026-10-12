@@ -220,4 +220,27 @@ TEST(ForceReleaseSim, ReleasingAConcatenationRestoresANetBitSelect) {
   EXPECT_EQ(RunAndGet(src, "b"), 0x55u);
 }
 
+// §10.6.2: a force overrides every driver of a net, so a net of a switch group
+// that nothing drives keeps the value forced on it when the group resolves
+// again, whole or the bits a select holds, while the bits no force holds go to
+// z. Resolved as undriven, the whole forced net and the forced bit took z.
+TEST(ForceReleaseSim, ForcedSwitchGroupMemberKeepsItsForce) {
+  const char* src =
+      "module t;\n"
+      "  wire a, b, q; wire [1:0] p; logic c = 1;\n"
+      "  tranif1 (a, b, c);\n"
+      "  tranif1 (p[0], q, c);\n"
+      "  logic r, s, z0;\n"
+      "  initial begin\n"
+      "    force a = 1'b1;\n"
+      "    force p[1] = 1'b1;\n"
+      "    #1 c = 0;\n"
+      "    #1 begin r = a; s = p[1]; z0 = (p[0] === 1'bz); end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "r"), 1u);
+  EXPECT_EQ(RunAndGet(src, "s"), 1u);
+  EXPECT_EQ(RunAndGet(src, "z0"), 1u);
+}
+
 }  // namespace

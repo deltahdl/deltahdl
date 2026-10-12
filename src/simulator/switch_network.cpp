@@ -430,20 +430,36 @@ bool CarriesItsOwnSource(const Net& net) {
 }
 
 // §6.6: a net no driver is connected to has the high-impedance value z, which
-// a net left with nothing reaching it across its switches is.
+// a net left with nothing reaching it across its switches is. §10.6.2: a force
+// overrides every driver of the net, so the bits a force holds keep its value
+// with no driver as with one -- a force on the whole net leaves no bit to set,
+// and the forced bits of a select are laid back over the z before any watcher
+// sees it. Set to z whatever was forced, `force a = 1` read z once the group
+// resolved again.
 void LeaveUndriven(Net& net, Arena& arena) {
+  Variable& var = *net.resolved;
+  if (var.WholeIsForced()) return;
   net.resolved_strength = NetStrength{};
   net.bit_strengths.clear();
-  Logic4Vec& v = net.resolved->value;
-  bool already_z = true;
+  Logic4Vec z = MakeAllHighZ(arena, var.value.width);
+  for (const auto& part : var.held_parts) {
+    const ProcContAssignWindow& window = part.window;
+    DepositBitField(z, window.dst_lo,
+                    ExtractBitField(arena, var.forced_value, window.dst_lo,
+                                    window.dst_width),
+                    window.dst_width);
+  }
+  Logic4Vec& v = var.value;
+  bool unchanged = true;
   for (uint32_t w = 0; w < v.nwords; ++w) {
     uint64_t mask = WordMaskWithinWidth(v.width, w);
-    already_z = already_z && (v.words[w].aval & mask) == 0 &&
-                (v.words[w].bval & mask) == mask;
+    unchanged = unchanged &&
+                ((v.words[w].aval ^ z.words[w].aval) & mask) == 0 &&
+                ((v.words[w].bval ^ z.words[w].bval) & mask) == 0;
   }
-  if (already_z) return;
-  v = MakeAllHighZ(arena, v.width);
-  net.resolved->NotifyWatchers();
+  if (unchanged) return;
+  v = z;
+  var.NotifyWatchers();
 }
 
 void ResolveMember(Net& member, Arena& arena, Scheduler* sched) {

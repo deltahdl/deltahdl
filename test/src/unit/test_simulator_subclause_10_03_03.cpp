@@ -676,4 +676,26 @@ TEST(AssignmentDelaySim, NetDelayAppliesToDriverOfSelect) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 11u);
 }
 
+// §10.3.3: an assignment to a concatenation is one assignment, so the whole
+// right-hand side's transition picks its delay and every element settles after
+// it. 8'h01 to 8'h10 is no transition to zero, so the rise delay carries it,
+// though the low element alone falls from 1 to 0; settled element by element,
+// the low element and the scalar q took the fall delay and lagged.
+TEST(AssignmentDelaySim, ConcatenationTargetSettlesTogether) {
+  const char* src =
+      "module t;\n"
+      "  wire [3:0] a, b; wire p, q;\n"
+      "  logic [7:0] r = 8'h01; logic [1:0] s = 2'b01;\n"
+      "  assign #(5, 10) {a, b} = r;\n"
+      "  assign #(5, 10) {p, q} = s;\n"
+      "  logic [7:0] v; logic [1:0] w;\n"
+      "  initial begin\n"
+      "    #20 begin r = 8'h10; s = 2'b10; end\n"
+      "    #6 begin v = {a, b}; w = {p, q}; end\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "v"), 0x10u);
+  EXPECT_EQ(RunAndGet(src, "w"), 2u);
+}
+
 }  // namespace

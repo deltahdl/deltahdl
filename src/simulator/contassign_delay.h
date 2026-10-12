@@ -13,6 +13,11 @@
 
 namespace delta {
 
+class Arena;
+class SimContext;
+struct Expr;
+struct RtlirContAssign;
+
 // The delays an assignment's delay expressions evaluated to: `rise` always,
 // `fall` and `decay` where the assignment wrote a second and a third.
 struct ContAssignDelays {
@@ -29,5 +34,36 @@ struct ContAssignDelays {
 uint64_t SelectContAssignDelay(const Logic4Vec& old_val,
                                const Logic4Vec& new_val,
                                const ContAssignDelays& d, uint32_t width);
+
+// §10.3.3 with §11.4.1: the target and the source of the assignment to a
+// concatenation that one element's assignment was split from
+// (EmitConcatContAssigns in src/elaborator/elaborator_cont_assign.cpp), both
+// null for every other assignment.
+struct ContAssignWhole {
+  const Expr* lhs = nullptr;
+  const Expr* rhs = nullptr;
+};
+
+// The whole assignment `ca` is an element of, read off the declaration it was
+// built from. Defined in simulator/contassign_delay.cpp.
+ContAssignWhole WholeOfConcatElement(const RtlirContAssign& ca);
+
+// One transition of a target: the value it holds, the value arriving, and how
+// many bits the two span.
+struct ContAssignTransition {
+  Logic4Vec old_val;
+  Logic4Vec new_val;
+  uint32_t width = 0;
+};
+
+// The delay `d` gives a transition of an assignment, `own` for an assignment
+// of its own; for an element of `whole`, the whole assignment's -- its target
+// as it stands and its source as it now evaluates -- so that every element
+// settles after the one delay §10.3.3 picks for the assignment. Defined in
+// simulator/contassign_delay.cpp.
+uint64_t SelectTransitionDelay(const ContAssignWhole& whole,
+                               const ContAssignTransition& own,
+                               const ContAssignDelays& d, SimContext& ctx,
+                               Arena& arena);
 
 }  // namespace delta

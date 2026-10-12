@@ -72,6 +72,9 @@ struct ContAssignParams {
   DriverStrength ds;
   ContAssignDelayExprs delays;
   uint32_t width = 0;
+  // §10.3.3: the assignment to a concatenation this one is an element of,
+  // whose transition picks the delay (SelectTransitionDelay).
+  ContAssignWhole whole;
 
   // The hierarchical prefix of the module instance this assignment was lowered
   // in, ending in a `.` and empty at the top. It is Lowerer::inst_prefix_ as it
@@ -467,9 +470,11 @@ static InertialReeval ReevalInertialContAssign(
     result.collapsed = true;
     return result;
   }
-  uint64_t ticks = SelectContAssignDelay(
-      xition.old_val, driven, loop.d,
-      ContAssignTransitionWidth(loop.drv, loop.params.width));
+  uint64_t ticks = SelectTransitionDelay(
+      loop.params.whole,
+      {xition.old_val, driven,
+       ContAssignTransitionWidth(loop.drv, loop.params.width)},
+      loop.d, loop.ctx, loop.arena);
   result.rescheduled = true;
   result.target = loop.ctx.CurrentTime() + SimTime{ticks};
   return result;
@@ -684,10 +689,13 @@ static ExecTask RunContAssignWait(const ContAssignWait& w,
   if (AnnotatedGateDelays(w.params, w.ctx, d)) delayed = true;
   Logic4Vec old_val = CurrentContAssignOldValue(w.params, drv, w.ctx, w.arena);
   Logic4Vec driven = ContAssignDrivenBits(drv, val, w.arena);
-  uint64_t ticks = delayed ? SelectContAssignDelay(
-                                 old_val, driven, d,
-                                 ContAssignTransitionWidth(drv, w.params.width))
-                           : 0;
+  uint64_t ticks = delayed
+                       ? SelectTransitionDelay(
+                             w.params.whole,
+                             {old_val, driven,
+                              ContAssignTransitionWidth(drv, w.params.width)},
+                             d, w.ctx, w.arena)
+                       : 0;
 
   // An output port's connection places its first value on the net above at
   // once and delays later ones; where a path leads to the port that value is x,
@@ -915,6 +923,7 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca, bool from_program) {
   cap.three_state_pass = ca.three_state_pass;
   cap.delays = {ca.delay, ca.delay_fall, ca.delay_decay};
   cap.width = ca.width;
+  cap.whole = WholeOfConcatElement(ca);
   cap.inst_prefix = inst_prefix_;
   cap.interconnect_load = ca.interconnect_load;
   cap.interconnect_source = ca.interconnect_source;
