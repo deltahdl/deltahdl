@@ -654,4 +654,27 @@ TEST(ClassSpecializationSim, DeclaredAndInstanceSpecializationsAreSetEarly) {
   EXPECT_EQ(RunAndGet(src, "v"), 21u);
 }
 
+// §8.25 with §8.9 and §23.9: so are those of one a method of a module's class
+// names with an actual reading the module's parameter, which each instance
+// gives a value of its own.
+TEST(ClassSpecializationSim, ModuleClassMethodSpecializationsAreSetEarly) {
+  const char* src =
+      "int g = 1;\n"
+      "class C #(int N = 0); static int s = $unit::g + N; endclass\n"
+      "module m #(parameter int P = 0);\n"
+      "  class E; static function int f(); return C#(P)::s; endfunction\n"
+      "  endclass\n"
+      "  int r;\n"
+      "  initial begin $unit::g = 2; r = E::f(); end\n"
+      "endmodule\n"
+      "module t;\n"
+      "  m #(20) a();\n"
+      "  m #(30) b();\n"
+      "  int r, v;\n"
+      "  initial #1 begin r = a.r; v = b.r; end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "r"), 21u);
+  EXPECT_EQ(RunAndGet(src, "v"), 31u);
+}
+
 }  // namespace

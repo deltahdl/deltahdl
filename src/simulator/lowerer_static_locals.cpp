@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include <string_view>
 #include <tuple>
 #include <unordered_set>
@@ -190,24 +191,34 @@ std::string_view InstanceClassScope(const ClassDecl* decl,
   return own ? prefix : std::string_view{};
 }
 
-// §10.5 with §8.6: the method static locals of the classes `decls` the module
-// of the instance `prefix` declares, made standing in that instance, whose
-// frames a call keeps under it (SimContext::StaticFrameKey). The classes are
-// the ones the instance holds (InstanceClassScope), with each class nested in
-// one (§8.23) and each specialization of one made by now (§8.25).
-void InitModuleClassMethodStatics(const std::vector<ClassDecl*>& decls,
-                                  std::string_view prefix, SimContext& ctx,
-                                  Arena& arena) {
+// The classes the instance `prefix` holds of the classes `decls` its module
+// declares (InstanceClassScope), with each class nested in one (§8.23) and
+// each specialization of one made by now (§8.25).
+std::vector<const ClassTypeInfo*> InstanceClasses(
+    const std::vector<ClassDecl*>& decls, std::string_view prefix,
+    const SimContext& ctx) {
   std::vector<ClassTypeInfo*> held = ctx.RegisteredClassTypes(true);
+  std::vector<const ClassTypeInfo*> out;
   for (const ClassDecl* decl : decls) {
     std::string_view scope = InstanceClassScope(decl, prefix, held);
     for (const ClassTypeInfo* cls : held) {
       if (cls->package.empty() && cls->instance_scope == scope &&
           OutermostClass(cls)->decl == decl) {
-        InitClassMethodStatics(cls, ctx, arena);
+        out.push_back(cls);
       }
     }
   }
+  return out;
+}
+
+// §10.5 with §8.6: the method static locals of the classes the instance
+// `prefix` holds of those `decls` its module declares, made standing in that
+// instance, whose frames a call keeps under it (SimContext::StaticFrameKey).
+void InitModuleClassMethodStatics(const std::vector<ClassDecl*>& decls,
+                                  std::string_view prefix, SimContext& ctx,
+                                  Arena& arena) {
+  for (const ClassTypeInfo* cls : InstanceClasses(decls, prefix, ctx))
+    InitClassMethodStatics(cls, ctx, arena);
 }
 
 // The process `owner`'s code runs standing in before any procedure starts:
@@ -280,23 +291,64 @@ bool IsUnspecializedGeneric(const ClassTypeInfo* cls) {
          (!cls->decl->params.empty() && cls->param_actuals == nullptr);
 }
 
-// §8.25: those the methods of every class name, each read with its class
-// running so that an actual naming one of the class's own parameters,
-// `C#(K)::s` in a method of `E#(30)`, reads that specialization's. A
-// specialization made here has methods of its own to read, so the classes are
-// gone over again until a pass makes none.
-void MakeMethodSpecializations(SimContext& ctx, Arena& arena) {
-  std::unordered_set<const ClassTypeInfo*> walked;
+// The classes a package or the compilation unit holds, whose methods' code
+// runs under that package or unit whatever instance calls it.
+std::vector<const ClassTypeInfo*> PackageClasses(const SimContext& ctx) {
+  std::vector<const ClassTypeInfo*> out;
+  for (const ClassTypeInfo* cls : ctx.RegisteredClassTypes(true)) {
+    if (!cls->package.empty()) out.push_back(cls);
+  }
+  return out;
+}
+
+// §8.25: those the methods of `classes` name that are not in `walked`, each
+// read with its class running so that an actual naming one of the class's own
+// parameters, `C#(K)::s` in a method of `E#(30)`, reads that
+// specialization's; whether any class was read.
+bool WalkMethodSpecializations(const std::vector<const ClassTypeInfo*>& classes,
+                               std::unordered_set<const ClassTypeInfo*>& walked,
+                               SimContext& ctx, Arena& arena) {
+  bool grew = false;
+  for (const ClassTypeInfo* cls : classes) {
+    if (IsUnspecializedGeneric(cls) || !walked.insert(cls).second) continue;
+    grew = true;
+    ctx.PushMethodClass(cls);
+    for (const auto& [name, func] : cls->methods)
+      MakeSubroutineSpecializations(func, nullptr, ctx, arena);
+    ctx.PopMethodClass();
+  }
+  return grew;
+}
+
+// §8.25 with §23.9: those the methods of every class name, a module's class's
+// read standing in each instance `owners` records as holding one, so that an
+// actual naming a parameter of the module, `C#(P)::s`, reads the value that
+// instance gives it, and a package's or the unit's class's standing in none.
+// A specialization made here has methods of its own to read, so the classes
+// are gone over again until a pass makes none.
+void MakeMethodSpecializations(const std::vector<StaticLocalOwner>& owners,
+                               SimContext& ctx, Arena& arena) {
+  std::vector<std::unordered_set<const ClassTypeInfo*>> walked(owners.size() +
+                                                               1);
   for (bool grew = true; grew;) {
     grew = false;
-    for (const ClassTypeInfo* cls : ctx.RegisteredClassTypes(true)) {
-      if (IsUnspecializedGeneric(cls) || !walked.insert(cls).second) continue;
-      grew = true;
-      ctx.PushMethodClass(cls);
-      for (const auto& [name, func] : cls->methods)
-        MakeSubroutineSpecializations(func, nullptr, ctx, arena);
-      ctx.PopMethodClass();
+    for (std::size_t i = 0; i < owners.size(); ++i) {
+      if (owners[i].classes == nullptr) continue;
+      Process stand_in;
+      StandInFor(owners[i], stand_in);
+      CallerStandIn in_owner(&stand_in, ctx);
+      grew =
+          WalkMethodSpecializations(
+              InstanceClasses(*owners[i].classes, owners[i].inst_prefix, ctx),
+              walked[i], ctx, arena) ||
+          grew;
     }
+    Process stand_in;
+    StandInFor(StaticLocalOwner{}, stand_in);
+    CallerStandIn in_no_instance(&stand_in, ctx);
+    grew = WalkMethodSpecializations(PackageClasses(ctx), walked.back(), ctx,
+                                     arena) ||
+           grew;
   }
 }
 
@@ -351,12 +403,14 @@ void Lowerer::MakeNamedSpecializations() {
     MakeStmtSpecializations(owner.body, ctx_, arena_);
     ctx_.PopScope();
   }
-  Process stand_in;
-  StandInFor(StaticLocalOwner{}, stand_in);
-  CallerStandIn in_no_instance(&stand_in, ctx_);
-  for (const ModuleItem* func : ctx_.OwnedSubroutines())
-    MakeSubroutineSpecializations(func, nullptr, ctx_, arena_);
-  MakeMethodSpecializations(ctx_, arena_);
+  {
+    Process stand_in;
+    StandInFor(StaticLocalOwner{}, stand_in);
+    CallerStandIn in_no_instance(&stand_in, ctx_);
+    for (const ModuleItem* func : ctx_.OwnedSubroutines())
+      MakeSubroutineSpecializations(func, nullptr, ctx_, arena_);
+  }
+  MakeMethodSpecializations(static_local_owners_, ctx_, arena_);
 }
 
 // §10.5 (printed page 256) sets a static variable's declaration initializer
