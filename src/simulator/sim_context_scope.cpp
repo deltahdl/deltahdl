@@ -26,7 +26,7 @@ namespace delta {
 // grown past the line cap.
 
 void ScopeStack::PushScope(std::string_view package) {
-  scope_stack_.push_back(Scope{{}, {}, {}, {}, package, {}, false, {}});
+  scope_stack_.push_back(Scope{{}, {}, {}, {}, package, {}, false, {}, {}});
 }
 
 // §23.9 with §26.2: the innermost frame -- a subroutine's, pushed by the
@@ -148,6 +148,7 @@ void SimContext::PushStaticScope(std::string_view func_name) {
                                {},
                                {},
                                false,
+                               {},
                                {}});
 }
 
