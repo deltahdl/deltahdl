@@ -24,6 +24,7 @@
 #include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_specify.h"
 #include "parser/ast_type.h"
@@ -249,13 +250,15 @@ void RegisterPackageParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
 // Records one typedef under the "Scope::name" key ResolveNamed in
 // src/elaborator/type_eval.cpp looks a prefixed name up by. The key is
 // arena-allocated because TypedefMap keys are string_views, which a local
-// string would leave dangling.
-void RegisterScopedTypedef(std::string_view scope_name,
-                           std::string_view type_name, const DataType& dtype,
-                           TypedefMap& typedefs, Arena& arena) {
+// string would leave dangling. Returns the key.
+std::string_view RegisterScopedTypedef(std::string_view scope_name,
+                                       std::string_view type_name,
+                                       const DataType& dtype,
+                                       TypedefMap& typedefs, Arena& arena) {
   auto* qname = arena.Create<std::string>(std::string(scope_name) +
                                           "::" + std::string(type_name));
   typedefs[*qname] = dtype;
+  return *qname;
 }
 
 // Records each package's typedefs under their qualified key. §26.3 references a
@@ -263,15 +266,22 @@ void RegisterScopedTypedef(std::string_view scope_name,
 // page 808 does in `ComplexPkg::Complex cout = ComplexPkg::mul(a, b);`, and it
 // does so whether or not the package was imported. RegisterImportItem in
 // src/elaborator/elaborator_module.cpp enters an imported typedef under its
-// bare name, which is the separate spelling an import makes legal.
-void RegisterPackageTypedefs(CompilationUnit* unit, TypedefMap& typedefs,
-                             Arena& arena) {
+// bare name, which is the separate spelling an import makes legal. §7.4.4
+// keeps an array typedef's unpacked dimensions with the type, and they are
+// recorded in `td_array_dims` under the same key, so `p::A'{...}` is counted
+// against them (§10.9.1).
+void RegisterPackageTypedefs(
+    CompilationUnit* unit, TypedefMap& typedefs,
+    std::unordered_map<std::string_view, std::vector<Expr*>>& td_array_dims,
+    Arena& arena) {
   for (auto* pkg : unit->packages) {
     for (auto* item : pkg->items) {
       if (item->kind != ModuleItemKind::kTypedef) continue;
-      RegisterScopedTypedef(pkg->name, item->name,
-                            InPackageScope(item->typedef_type, *pkg), typedefs,
-                            arena);
+      std::string_view key = RegisterScopedTypedef(
+          pkg->name, item->name, InPackageScope(item->typedef_type, *pkg),
+          typedefs, arena);
+      if (!item->unpacked_dims.empty())
+        td_array_dims[key] = item->unpacked_dims;
     }
   }
 }
@@ -496,7 +506,7 @@ void Elaborator::RegisterCuScopeItems() {
   RegisterAnonymousProgramNames(unit_, anonymous_program_names_);
   RegisterPackageParams(unit_, cu_param_scope_, arena_);
   RegisterClassParams(unit_, cu_param_scope_, arena_, diag_);
-  RegisterPackageTypedefs(unit_, typedefs_, arena_);
+  RegisterPackageTypedefs(unit_, typedefs_, td_array_dims_, arena_);
   MarkPackageStagedArrays(unit_);
   RegisterClassTypedefs(unit_, typedefs_, arena_);
   // §13.3 with §7.2.1: after the two registrations above, which are what give
