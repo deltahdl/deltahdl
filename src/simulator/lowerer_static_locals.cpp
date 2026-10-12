@@ -1,15 +1,21 @@
 #include <algorithm>
 #include <string_view>
 #include <tuple>
+#include <unordered_set>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/source_loc.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_class.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/class_specialization.h"
+#include "simulator/declared_class_key.h"
 #include "simulator/deferred_caller.h"
 #include "simulator/eval_function_hier.h"
 #include "simulator/eval_function_internal.h"
@@ -61,6 +67,20 @@ StaticFrame StaticLocalsFrame(std::string_view name, const ModuleItem* func) {
   return {name, func->is_static && !func->is_automatic};
 }
 
+// §27.4: the loop constants of `gen_block`, the generate block instance
+// declaring the subroutine whose frame is innermost, bound in that frame as a
+// call binds them (BindGenBlockConsts); nothing for a subroutine no generate
+// block declares.
+void BindOwnerGenBlockConsts(const RtlirGenBlockSubroutine* gen_block,
+                             SimContext& ctx, Arena& arena) {
+  if (gen_block == nullptr) return;
+  GenBlockSubroutineScope scope;
+  scope.consts = gen_block->gen_block_consts;
+  SubroutineTarget target;
+  target.gen_block = &scope;
+  BindGenBlockConsts(target, ctx, arena);
+}
+
 // §13.4.2: the static locals of `owner`'s subroutine, made in its static frame
 // as a call makes them (EvalFunctionCall): the frame entered with the
 // subroutine's package, and a generate block instance's subroutine with the
@@ -70,13 +90,7 @@ void InitSubroutineStatics(const StaticLocalOwner& owner, SimContext& ctx,
   const ModuleItem* func = owner.subroutine;
   ctx.PushStaticScope(func->name);
   ctx.EnterSubroutinePackage(func);
-  if (owner.gen_block != nullptr) {
-    GenBlockSubroutineScope scope;
-    scope.consts = owner.gen_block->gen_block_consts;
-    SubroutineTarget target;
-    target.gen_block = &scope;
-    BindGenBlockConsts(target, ctx, arena);
-  }
+  BindOwnerGenBlockConsts(owner.gen_block, ctx, arena);
   for (const Stmt* decl : StaticInitsOf(func)) {
     ExecFuncVarDecl(decl, StaticLocalsFrame(func->name, func), ctx, arena);
   }
@@ -195,6 +209,96 @@ void InitModuleClassMethodStatics(const std::vector<ClassDecl*>& decls,
   }
 }
 
+// The process `owner`'s code runs standing in before any procedure starts:
+// the instance and the generate block it was lowered in, and for a procedure,
+// the scopes its own process carries.
+void StandInFor(const StaticLocalOwner& owner, Process& stand_in) {
+  stand_in.stand_in = true;
+  stand_in.is_static_init = true;
+  stand_in.inst_prefix = owner.inst_prefix;
+  if (owner.gen_block != nullptr) {
+    stand_in.gen_prefixes.assign(owner.gen_block->gen_block_prefixes.begin(),
+                                 owner.gen_block->gen_block_prefixes.end());
+  }
+  if (owner.process != nullptr) {
+    stand_in.gen_prefixes = owner.process->gen_prefixes;
+    stand_in.gen_block_name = owner.process->gen_block_name;
+    stand_in.saved_scope_stack = owner.process->saved_scope_stack;
+  }
+}
+
+// §8.25: the specializations of parameterized classes `e` and the
+// expressions within it name through a class scope prefix, `C#(3)::s` or
+// `C#(3)::f()`, each made as the evaluation of the prefix makes it
+// (ScopeNamedSpecialization), with its actuals read in the running scope.
+void MakeExprSpecializations(const Expr* e, SimContext& ctx, Arena& arena) {
+  if (e == nullptr) return;
+  if (e->has_param_spec && !e->elements.empty())
+    ScopeNamedSpecialization(e, ctx, arena);
+  ForEachExprChild(e, [&](const Expr* child) {
+    MakeExprSpecializations(child, ctx, arena);
+  });
+}
+
+// §8.25: those `s` and the statements within it name, through their
+// expressions and through a local declaration of a specialization's type,
+// `C#(8) h;`, made as the declaration makes it (RecordClassParamActuals).
+void MakeStmtSpecializations(const Stmt* s, SimContext& ctx, Arena& arena) {
+  if (s == nullptr) return;
+  const DataType& type = s->var_decl_type;
+  if (s->kind == StmtKind::kVarDecl && !type.type_params.empty()) {
+    SpecializationOf(ctx.FindClassType(DeclaredClassKey(type, ctx, arena)),
+                     type.type_params, ctx, arena);
+  }
+  ForEachChildExpr(
+      s, [&](const Expr* e) { MakeExprSpecializations(e, ctx, arena); });
+  ForEachChildStmt(
+      s, [&](const Stmt* sub) { MakeStmtSpecializations(sub, ctx, arena); });
+}
+
+// §8.25: those the body of `func` names, read in a frame of its own carrying
+// its package and, for a generate block instance's subroutine, the block's
+// loop constants, as a call's frame carries them.
+void MakeSubroutineSpecializations(const ModuleItem* func,
+                                   const RtlirGenBlockSubroutine* gen_block,
+                                   SimContext& ctx, Arena& arena) {
+  ctx.PushScope();
+  ctx.EnterSubroutinePackage(func);
+  BindOwnerGenBlockConsts(gen_block, ctx, arena);
+  for (const Stmt* s : func->func_body_stmts)
+    MakeStmtSpecializations(s, ctx, arena);
+  ctx.PopScope();
+}
+
+// §8.25: a parameterized class's declaration, which is no specialization the
+// design names until a `#(...)` list or the bare name does; its methods' code
+// is the specializations' and is read under each of them. A built-in class
+// has no code to read.
+bool IsUnspecializedGeneric(const ClassTypeInfo* cls) {
+  return cls->decl == nullptr ||
+         (!cls->decl->params.empty() && cls->param_actuals == nullptr);
+}
+
+// §8.25: those the methods of every class name, each read with its class
+// running so that an actual naming one of the class's own parameters,
+// `C#(K)::s` in a method of `E#(30)`, reads that specialization's. A
+// specialization made here has methods of its own to read, so the classes are
+// gone over again until a pass makes none.
+void MakeMethodSpecializations(SimContext& ctx, Arena& arena) {
+  std::unordered_set<const ClassTypeInfo*> walked;
+  for (bool grew = true; grew;) {
+    grew = false;
+    for (const ClassTypeInfo* cls : ctx.RegisteredClassTypes(true)) {
+      if (IsUnspecializedGeneric(cls) || !walked.insert(cls).second) continue;
+      grew = true;
+      ctx.PushMethodClass(cls);
+      for (const auto& [name, func] : cls->methods)
+        MakeSubroutineSpecializations(func, nullptr, ctx, arena);
+      ctx.PopMethodClass();
+    }
+  }
+}
+
 }  // namespace
 
 void Lowerer::RecordStaticLocalSubroutines(const RtlirModule* mod) {
@@ -203,24 +307,55 @@ void Lowerer::RecordStaticLocalSubroutines(const RtlirModule* mod) {
         {.inst_prefix = inst_prefix_, .classes = &mod->class_decls});
   }
   for (const ModuleItem* func : mod->function_decls) {
-    if (!func->method_class.empty() || StaticInitsOf(func).empty() ||
-        IsGenBlockSubroutine(func, mod))
+    if (!func->method_class.empty() || IsGenBlockSubroutine(func, mod))
       continue;
-    static_local_owners_.push_back(
-        {.inst_prefix = inst_prefix_, .subroutine = func});
+    StaticLocalOwner owner{.inst_prefix = inst_prefix_, .subroutine = func};
+    specializing_code_.push_back(owner);
+    if (!StaticInitsOf(func).empty()) static_local_owners_.push_back(owner);
   }
   for (const RtlirGenBlockSubroutine& sub : mod->gen_block_subroutines) {
-    if (StaticInitsOf(sub.decl).empty()) continue;
-    static_local_owners_.push_back({.inst_prefix = inst_prefix_,
-                                    .subroutine = sub.decl,
-                                    .gen_block = &sub});
+    StaticLocalOwner owner{
+        .inst_prefix = inst_prefix_, .subroutine = sub.decl, .gen_block = &sub};
+    specializing_code_.push_back(owner);
+    if (!StaticInitsOf(sub.decl).empty()) static_local_owners_.push_back(owner);
   }
 }
 
 void Lowerer::RecordStaticLocalProcess(const Process* p, const Stmt* body) {
-  if (StaticInitsOf(body).empty()) return;
-  static_local_owners_.push_back(
-      {.inst_prefix = inst_prefix_, .process = p, .body = body});
+  StaticLocalOwner owner{
+      .inst_prefix = inst_prefix_, .process = p, .body = body};
+  specializing_code_.push_back(owner);
+  if (!StaticInitsOf(body).empty()) static_local_owners_.push_back(owner);
+}
+
+// §8.25 (printed page 204 of IEEE 1800-2023) makes each specialization a type
+// of its own, which §8.9 (printed 186) and §10.5 (printed 256) give static
+// variables set before any procedure starts. The specializations the lowering
+// met in declarations and typedefs exist by now; those the code of the
+// procedures, the subroutines and the classes' methods names are made here,
+// before InitializeStaticLocals, each standing where its code runs. Made when
+// the code first ran, `C#(3)::s` read `static int s = g;` with g as the
+// procedures had left it.
+void Lowerer::MakeNamedSpecializations() {
+  for (const StaticLocalOwner& owner : specializing_code_) {
+    Process stand_in;
+    StandInFor(owner, stand_in);
+    CallerStandIn in_owner(&stand_in, ctx_);
+    if (owner.subroutine != nullptr) {
+      MakeSubroutineSpecializations(owner.subroutine, owner.gen_block, ctx_,
+                                    arena_);
+      continue;
+    }
+    ctx_.PushScope();
+    MakeStmtSpecializations(owner.body, ctx_, arena_);
+    ctx_.PopScope();
+  }
+  Process stand_in;
+  StandInFor(StaticLocalOwner{}, stand_in);
+  CallerStandIn in_no_instance(&stand_in, ctx_);
+  for (const ModuleItem* func : ctx_.OwnedSubroutines())
+    MakeSubroutineSpecializations(func, nullptr, ctx_, arena_);
+  MakeMethodSpecializations(ctx_, arena_);
 }
 
 // §10.5 (printed page 256) sets a static variable's declaration initializer
@@ -238,18 +373,7 @@ void Lowerer::InitializeStaticLocals() {
   InitPackageClassMethodStatics(ctx_, arena_);
   for (const StaticLocalOwner& owner : static_local_owners_) {
     Process stand_in;
-    stand_in.stand_in = true;
-    stand_in.is_static_init = true;
-    stand_in.inst_prefix = owner.inst_prefix;
-    if (owner.gen_block != nullptr) {
-      stand_in.gen_prefixes.assign(owner.gen_block->gen_block_prefixes.begin(),
-                                   owner.gen_block->gen_block_prefixes.end());
-    }
-    if (owner.process != nullptr) {
-      stand_in.gen_prefixes = owner.process->gen_prefixes;
-      stand_in.gen_block_name = owner.process->gen_block_name;
-      stand_in.saved_scope_stack = owner.process->saved_scope_stack;
-    }
+    StandInFor(owner, stand_in);
     CallerStandIn in_owner(&stand_in, ctx_);
     if (owner.classes != nullptr) {
       InitModuleClassMethodStatics(*owner.classes, owner.inst_prefix, ctx_,

@@ -852,7 +852,9 @@ void Lowerer::Lower(const RtlirDesign* design) {
   RegisterClassTypeAliases(design, ctx_, arena_);
   // §10.5: a static variable's declaration initializer is set before any
   // initial or always procedure starts, the module variables it may read
-  // holding theirs by now.
+  // holding theirs by now, and so are those of every specialization the
+  // design's code names (§8.25), made first.
+  MakeNamedSpecializations();
   InitializeStaticLocals();
 
   AttachDesignClocking();

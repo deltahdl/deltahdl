@@ -152,9 +152,13 @@ class Lowerer {
   // §10.5 with §6.21: records the module subroutines and classes of `mod`,
   // and the procedure `p` runs `body` for, that declare a `static` local with
   // an initial value, and sets those values once every module is lowered and
-  // before any procedure starts. Defined in lowerer_static_locals.cpp.
+  // before any procedure starts. §8.25: records every such subroutine and
+  // procedure as code whose class scope prefixes and declarations name
+  // specializations, and makes those before the static locals are set.
+  // Defined in lowerer_static_locals.cpp.
   void RecordStaticLocalSubroutines(const RtlirModule* mod);
   void RecordStaticLocalProcess(const Process* p, const Stmt* body);
+  void MakeNamedSpecializations();
   void InitializeStaticLocals();
   void LowerContAssign(const RtlirContAssign& ca, bool from_program);
   // §28.8: links a bidirectional switch's two nets and starts the process
@@ -414,6 +418,7 @@ class Lowerer {
   std::vector<SpecifyScope> specify_scopes_;
   std::vector<AssertionSampleScope> assertion_sample_scopes_;
   std::vector<StaticLocalOwner> static_local_owners_;
+  std::vector<StaticLocalOwner> specializing_code_;
   // §17.5: the processes being lowered are a checker's, whose always_ff
   // procedures read sampled values.
   bool lowering_checker_ = false;

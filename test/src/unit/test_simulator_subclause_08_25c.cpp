@@ -583,4 +583,75 @@ TEST(ClassSim, AClassNestedInAnInstancesGenericClassIsItsOwn) {
   }
 }
 
+// §8.25 with §8.9 and §10.5: a specialization is a type the design names, made
+// with the design, so its static properties and its methods' static locals
+// are set before the procedures start, even where only a procedure's class
+// scope prefix names it.
+TEST(ClassSpecializationSim, ProcessNamedSpecializationStaticsAreSetEarly) {
+  const char* src =
+      "int g = 1;\n"
+      "class C #(int N = 0);\n"
+      "  static int s = $unit::g + N;\n"
+      "  static function int f(); static int l = $unit::g * 10 + N;\n"
+      "    return l;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int r, u;\n"
+      "  initial begin $unit::g = 2; r = C#(3)::s; u = C#(4)::f(); end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "r"), 4u);
+  EXPECT_EQ(RunAndGet(src, "u"), 14u);
+}
+
+// §8.25 with §8.9: so are those of one a subroutine's body names -- the
+// compilation unit's, a module's, a class's method, and a method of a
+// specialization, whose own parameter is the actual.
+TEST(ClassSpecializationSim, SubroutineNamedSpecializationStaticsAreSetEarly) {
+  const char* src =
+      "int g = 1;\n"
+      "class C #(int N = 0); static int s = $unit::g + N; endclass\n"
+      "class D; static function int f(); return C#(5)::s; endfunction\n"
+      "endclass\n"
+      "class E #(int K = 0);\n"
+      "  static function int f(); return C#(K)::s; endfunction\n"
+      "endclass\n"
+      "typedef E#(30) e30;\n"
+      "function int uf(); return C#(6)::s; endfunction\n"
+      "module t;\n"
+      "  int r, u, v, w;\n"
+      "  function int mf(); return C#(7)::s; endfunction\n"
+      "  initial begin\n"
+      "    $unit::g = 2; r = D::f(); u = uf(); v = mf(); w = e30::f();\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "r"), 6u);
+  EXPECT_EQ(RunAndGet(src, "u"), 7u);
+  EXPECT_EQ(RunAndGet(src, "v"), 8u);
+  EXPECT_EQ(RunAndGet(src, "w"), 31u);
+}
+
+// §8.25 with §8.9: so are those of one a procedure's local declaration names,
+// and of one whose actual is a parameter of the instance naming it.
+TEST(ClassSpecializationSim, DeclaredAndInstanceSpecializationsAreSetEarly) {
+  const char* src =
+      "int g = 1;\n"
+      "class C #(int N = 0); static int s = $unit::g + N; endclass\n"
+      "module m #(parameter int P = 0);\n"
+      "  int r;\n"
+      "  initial begin $unit::g = 2; r = C#(P)::s; end\n"
+      "endmodule\n"
+      "module t;\n"
+      "  m #(20) a();\n"
+      "  int r, v;\n"
+      "  initial begin\n"
+      "    $unit::g = 2;\n"
+      "    begin C#(8) h; h = new; r = h.s; end\n"
+      "    #1 v = a.r;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "r"), 9u);
+  EXPECT_EQ(RunAndGet(src, "v"), 21u);
+}
+
 }  // namespace
