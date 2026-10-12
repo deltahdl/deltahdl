@@ -679,10 +679,14 @@ static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx, Arena& arena,
   if (expr->op == TokenKind::kAmpAmp) return EvalLogicalAnd(expr, ctx, arena);
 
   if (expr->op == TokenKind::kAmpAmpAmp) {
-    auto lv = EvalExpr(expr->lhs, ctx, arena);
-    if (!lv.IsTruthy()) return MakeLogic4VecVal(arena, 1, 0);
-    auto rv = EvalExpr(expr->rhs, ctx, arena);
-    return MakeLogic4VecVal(arena, 1, rv.IsTruthy() ? 1 : 0);
+    // §12.6.3: a predicate of clauses can be true, false or ambiguous, an x
+    // or z filter making it ambiguous, and the conditional then combines both
+    // results (§11.4.11).
+    Truth first = TruthOf(EvalExpr(expr->lhs, ctx, arena));
+    if (first == Truth::kFalse) return TruthBit(first, arena);
+    return TruthBit(
+        ClauseConjunction(first, TruthOf(EvalExpr(expr->rhs, ctx, arena))),
+        arena);
   }
   if (expr->op == TokenKind::kPipePipe) return EvalLogicalOr(expr, ctx, arena);
   if (expr->op == TokenKind::kArrow) return EvalLogicalImpl(expr, ctx, arena);

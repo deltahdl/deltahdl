@@ -2,7 +2,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
-#include <string>
 #include <string_view>
 #include <vector>
 
@@ -11,23 +10,17 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
-#include "simulator/eval_array.h"
-#include "simulator/eval_array_class_assoc.h"
-#include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_call_result.h"
-#include "simulator/eval_class_array.h"
+#include "simulator/eval_function_body_internal.h"
 #include "simulator/eval_function_hier.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_instance_task.h"
 #include "simulator/eval_mailbox.h"
-#include "simulator/eval_member_path.h"
 #include "simulator/eval_semaphore.h"
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
-#include "simulator/foreach_dims.h"
 #include "simulator/pattern_match.h"
 #include "simulator/sim_context.h"
-#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_exec.h"
@@ -45,95 +38,7 @@ namespace delta {
 // dispatches to, and eval_function_args.cpp the argument binding and
 // write-back that surround a call.
 
-// The environment in which a subroutine body executes (§13.4): the return
-// variable that a `return` writes, the subroutine name that variable is
-// declared under, the key its static function-local variables are kept under
-// (§13.4.2, StaticLocalFrame), and the simulation/evaluation context. These
-// travel together through the entire recursive statement executor, so they
-// are bundled into one entity rather than passed field by field.
-struct FuncExecCtx {
-  Variable* ret_var;
-  std::string_view func_name;
-  std::string_view static_frame;
-  SimContext& ctx;
-  Arena& arena;
-  // The declared width of the return value, or zero where the return type has
-  // no packed width -- void, a string, a class handle, a parameterized method's
-  // type. ExecFuncReturn reads zero as "leave the expression's own vector
-  // alone".
-  uint32_t ret_width;
-  // §13.4.2: whether the subroutine is static, so a local declared with no
-  // lifetime is static storage kept between calls (ExecFuncVarDecl).
-  bool is_static_sub = false;
-  // §9.6.2: the labels of the named blocks and labeled loops the running
-  // statement stands in, innermost last, which a `disable` in the body can end.
-  std::vector<std::string_view>* named_scopes = nullptr;
-  // §13.4.1: whether the implicit variable is an unpacked array
-  // (ShapeArrayReturnVariable), which a `return` assigns rather than stores.
-  bool array_return = false;
-};
-
-// Where control goes once a statement of the body has run (§12.8): on to
-// the statement after it, out of the innermost enclosing loop (`break`), to
-// the end of the innermost enclosing loop's body (`continue`), or out of the
-// subroutine (`return`), or to the end of the named block or labeled loop a
-// `disable` named (§9.6.2), which SimContext::GetDisableTarget holds. Every
-// executor here answers one of these; a block, a conditional and a case hand
-// up whatever the statement they ran answered, a loop consumes kBreak and
-// kContinue and hands up kReturn, the block or loop a disable named consumes
-// that kDisable, and ExecFunctionBody stops at anything but kNext. Before this
-// the executors answered a bool meaning "a return ran", and a break or continue
-// reached nothing that acted on it: uvm_report_server::reset_severity_counts, a
-// `forever` over an enumeration that breaks at its last member, never ended.
-enum class FuncFlow : uint8_t { kNext, kBreak, kContinue, kReturn, kDisable };
-
-static FuncFlow ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec);
 static FuncFlow ExecFuncBlock(const Stmt* stmt, const FuncExecCtx& exec);
-
-// §12.8: a loop goes on to its next iteration when its body ran to the end or
-// reached a `continue`; a `break` or a `return` ends the iterating.
-static bool LoopGoesOn(FuncFlow flow) {
-  return flow == FuncFlow::kNext || flow == FuncFlow::kContinue;
-}
-
-// What a loop answers once it has stopped iterating, given what its body
-// answered last: a `return` leaves the subroutine and a `disable` of a scope
-// around the loop leaves the loop too, so both pass through, and a `break`, a
-// `continue` or a body that ran to the end is consumed by the loop, which is
-// then followed by the statement after it.
-static FuncFlow LoopExitFlow(FuncFlow last) {
-  if (last == FuncFlow::kReturn || last == FuncFlow::kDisable) return last;
-  return FuncFlow::kNext;
-}
-
-// §9.6.2: the named block or labeled statement `label` enters, which a
-// disable in it can end. Leave() answers what the scope hands on: a disable
-// naming this scope ends here and control goes on after it.
-class FuncNamedScope {
- public:
-  FuncNamedScope(std::string_view label, const FuncExecCtx& exec)
-      : label_(label), exec_(exec) {
-    if (!label_.empty()) exec_.named_scopes->push_back(label_);
-  }
-  ~FuncNamedScope() {
-    if (!label_.empty()) exec_.named_scopes->pop_back();
-  }
-  FuncNamedScope(const FuncNamedScope&) = delete;
-  FuncNamedScope& operator=(const FuncNamedScope&) = delete;
-
-  FuncFlow Leave(FuncFlow flow) const {
-    if (flow != FuncFlow::kDisable || label_.empty() ||
-        exec_.ctx.GetDisableTarget() != label_) {
-      return flow;
-    }
-    exec_.ctx.ClearDisableTarget();
-    return FuncFlow::kNext;
-  }
-
- private:
-  std::string_view label_;
-  const FuncExecCtx& exec_;
-};
 
 // Returns the trailing unconditional else of an if/else-if chain, or null when
 // the chain has no final else.
@@ -150,6 +55,9 @@ struct UniqueIfScan {
   int match_count = 0;
   const Stmt* first_match = nullptr;
   bool has_final_else = false;
+  // §12.6.2: whether the first match's predicate bound pattern identifiers,
+  // whose scope stays pushed for its true arm (EnterIfPredicate).
+  bool scoped = false;
 };
 
 // Evaluates every condition in the if/else-if chain in source order, recording
@@ -160,9 +68,15 @@ static UniqueIfScan ScanUniqueIfChain(const Stmt* stmt, SimContext& ctx,
   UniqueIfScan scan;
   for (const Stmt* cur = stmt; cur && cur->kind == StmtKind::kIf;
        cur = cur->else_branch) {
-    if (EvalExpr(cur->condition, ctx, arena).IsTruthy()) {
-      scan.match_count++;
-      if (!scan.first_match) scan.first_match = cur;
+    bool scoped = false;
+    bool holds = EnterIfPredicate(cur->condition, ctx, arena, scoped);
+    bool first = holds && scan.first_match == nullptr;
+    if (holds) scan.match_count++;
+    if (first) {
+      scan.first_match = cur;
+      scan.scoped = scoped;
+    } else if (scoped) {
+      ctx.PopScope();
     }
     if (cur->else_branch && cur->else_branch->kind != StmtKind::kIf) {
       scan.has_final_else = true;
@@ -179,7 +93,9 @@ static FuncFlow ExecFuncUniqueIfBranch(const Stmt* stmt,
                                        CaseQualifier qual,
                                        const FuncExecCtx& exec) {
   if (scan.first_match) {
-    return ExecFuncStmt(scan.first_match->then_branch, exec);
+    FuncFlow r = ExecFuncStmt(scan.first_match->then_branch, exec);
+    if (scan.scoped) exec.ctx.PopScope();
+    return r;
   }
   if (scan.has_final_else) {
     const Stmt* final_else = FuncFindFinalElse(stmt);
@@ -187,7 +103,7 @@ static FuncFlow ExecFuncUniqueIfBranch(const Stmt* stmt,
   } else if (qual == CaseQualifier::kUnique) {
     exec.ctx.AddPendingViolation(stmt->range.start,
                                  "unique if: no condition matched",
-                                 Subclause("12.4.2.1"));
+                                 Subclause("12.4.2.1"), qual);
   }
   return FuncFlow::kNext;
 }
@@ -204,30 +120,28 @@ static FuncFlow ExecFuncUniqueIf(const Stmt* stmt, CaseQualifier qual,
   if (scan.match_count > 1) {
     exec.ctx.AddPendingViolation(stmt->range.start,
                                  "unique if: multiple conditions matched",
-                                 Subclause("12.4.2.1"));
+                                 Subclause("12.4.2.1"), qual);
   }
   return ExecFuncUniqueIfBranch(stmt, scan, qual, exec);
 }
 
 static FuncFlow ExecFuncPriorityIf(const Stmt* stmt, const FuncExecCtx& exec) {
-  bool has_final_else = false;
   for (const Stmt* cur = stmt; cur && cur->kind == StmtKind::kIf;
        cur = cur->else_branch) {
-    if (EvalExpr(cur->condition, exec.ctx, exec.arena).IsTruthy()) {
-      return ExecFuncStmt(cur->then_branch, exec);
+    bool scoped = false;
+    if (EnterIfPredicate(cur->condition, exec.ctx, exec.arena, scoped)) {
+      FuncFlow r = ExecFuncStmt(cur->then_branch, exec);
+      if (scoped) exec.ctx.PopScope();
+      return r;
     }
-    if (cur->else_branch && cur->else_branch->kind != StmtKind::kIf) {
-      has_final_else = true;
-    }
+    if (scoped) exec.ctx.PopScope();
   }
-  if (has_final_else) {
-    const Stmt* final_else = FuncFindFinalElse(stmt);
-    if (final_else) return ExecFuncStmt(final_else, exec);
-  } else {
-    exec.ctx.AddPendingViolation(stmt->range.start,
-                                 "priority if: no condition matched",
-                                 Subclause("12.4.2.1"));
+  if (const Stmt* final_else = FuncFindFinalElse(stmt)) {
+    return ExecFuncStmt(final_else, exec);
   }
+  exec.ctx.AddPendingViolation(stmt->range.start,
+                               "priority if: no condition matched",
+                               Subclause("12.4.2.1"), CaseQualifier::kPriority);
   return FuncFlow::kNext;
 }
 
@@ -237,9 +151,9 @@ static FuncFlow ExecFuncPriorityIf(const Stmt* stmt, const FuncExecCtx& exec) {
 static FuncFlow ExecFuncPlainIf(const Stmt* stmt, const FuncExecCtx& exec) {
   bool scoped = PatternBindsIdentifiers(stmt->condition);
   if (scoped) exec.ctx.PushScope();
-  bool holds =
-      scoped ? EvalMatchesPredicate(stmt->condition, exec.ctx, exec.arena)
-             : EvalExpr(stmt->condition, exec.ctx, exec.arena).ToUint64() != 0;
+  bool holds = scoped
+                   ? EvalMatchesPredicate(stmt->condition, exec.ctx, exec.arena)
+                   : EvalExpr(stmt->condition, exec.ctx, exec.arena).IsTruthy();
   FuncFlow r = holds ? ExecFuncStmt(stmt->then_branch, exec) : FuncFlow::kNext;
   if (scoped) exec.ctx.PopScope();
   if (!holds && stmt->else_branch) r = ExecFuncStmt(stmt->else_branch, exec);
@@ -314,41 +228,11 @@ static void ExecFuncForInits(const Stmt* stmt, const FuncExecCtx& exec) {
     if (i < stmt->for_init_types.size() &&
         stmt->for_init_types[i].kind != DataTypeKind::kImplicit && init &&
         init->lhs && init->lhs->kind == ExprKind::kIdentifier) {
-      uint32_t w = DeclaredTypeWidth(stmt->for_init_types[i], exec.ctx);
-      if (w == 0) w = 32;
-      // §6.11.3: byte, shortint, int, integer and longint default to signed,
-      // so the declared type decides the loop variable's signedness as it
-      // decides any other local's. Created from the width alone, an int
-      // counter compared its negative values as huge positive ones.
-      auto* v = exec.ctx.CreateLocalVariable(
-          init->lhs->text, w,
-          DeclaredTypeIsSigned(stmt->for_init_types[i], exec.ctx));
-      // §6.11.2: the declared type decides whether the loop variable can hold
-      // an unknown at all -- a 4-state value converted automatically to a
-      // 2-state one has every unknown or high-impedance bit turned to zero --
-      // and the flag defaults to true, so an `int` counter kept the x and z its
-      // initializer read. CreateFuncLocalVar sets the same flag for an ordinary
-      // body local from the same answer.
-      v->is_4state = DeclaredTypeIs4State(stmt->for_init_types[i], exec.ctx);
-      // §10.7 sizes the right-hand side to the left-hand side, and the width
-      // the type declares reached the cell CreateLocalVariable made and was
-      // then thrown away by the store: a Logic4Vec carries its own width, so
-      // `for (int i = seed; ...)` over a `logic [7:0] seed` left i eight bits
-      // wide for every later read, step and comparison. The initializer is
-      // copied for the reason CreateFuncLocalVar copies its own (§6.8): `for
-      // (int i = n; ...)` would otherwise leave i and n one storage element,
-      // and the loop's own step is the store that shows it. The copy goes
-      // outside the resize because ResizeToWidth answers its argument
-      // untouched when the widths already match, which is precisely the
-      // aliased case, and the coercion below writes in place -- through a
-      // shared buffer it would clear the source variable's own unknown bits.
-      if (init->rhs) {
-        v->value =
-            OwnRhsWords(ResizeToWidth(EvalExpr(init->rhs, exec.ctx, exec.arena),
-                                      w, exec.arena),
-                        exec.arena);
-        if (!v->is_4state) CoerceTo2State(v->value);
-      }
+      // §12.7.1: a declared control variable is a local of the type the
+      // initialization writes, made as a body local of that type is, and its
+      // initializer is its declaration assignment (§6.8).
+      CreateFuncLocalVar(init->lhs->text, stmt->for_init_types[i], init->rhs,
+                         exec.ctx, exec.arena);
     } else if (init) {
       ExecFuncStmt(init, exec);
     }
@@ -436,159 +320,6 @@ static FuncFlow ExecFuncRepeatOrForever(const Stmt* stmt,
   }
   if (labeled) exec.ctx.PopStaticScope(stmt->label);
   return named.Leave(LoopExitFlow(flow));
-}
-
-// Resolves the iteration count for a foreach over the named array: the array's
-// element count when known, otherwise the bit width of a matching variable.
-static uint32_t ResolveForeachSize(std::string_view name, SimContext& ctx) {
-  auto* info = ctx.FindArrayInfo(name);
-  if (info) return info->size;
-  auto* var = ctx.FindVariable(name);
-  return var ? var->value.width : 0;
-}
-
-// The index values a foreach in a subroutine body steps through: the keys of
-// an associative array, §12.7.3 giving the loop variable the index type and
-// the traversal the array's own order, or `size` indices from `lo` up for any
-// other array.
-static std::vector<Logic4Vec> ForeachIndexValues(const Stmt* stmt,
-                                                 const FuncExecCtx& exec) {
-  if (auto* aa = FindAssocArrayOfBase(stmt->expr, exec.ctx, exec.arena)) {
-    return AssocIndexValues(aa, exec.arena);
-  }
-  // §12.7.3 with §7.10: a queue's one dimension holds as many elements as the
-  // queue does, whether the queue is a declared one or a property of an
-  // object (§8.5) named bare in the method or through a handle; a declared
-  // dynamic array is stored the same way and answers the same.
-  uint32_t size = 0;
-  int64_t lo = 0;
-  ClassArrayRef ref;
-  if (const QueueObject* q =
-          FindQueueOfBase(stmt->expr, exec.ctx, exec.arena)) {
-    size = static_cast<uint32_t>(q->elements.size());
-  } else if (const StructFieldInfo* member =
-                 ResolveStructArrayMember(stmt->expr, exec.ctx)) {
-    // §12.7.3 with §7.2 and §7.4.2: an unpacked array member of a structure,
-    // a property's `r.v` bare in the method among them, from the lower of its
-    // bounds.
-    size = member->elem_count;
-    lo = std::min(member->elem_left, member->elem_right);
-  } else if (ResolveClassArray(stmt->expr, exec.ctx, exec.arena, ref)) {
-    // §12.7.3 with §7.4.2 and §7.5: a fixed-size or dynamic array property
-    // (§8.5) holds its elements on the object, the declared dimension's count
-    // from its lowest index for a fixed one and the object's count from 0 for
-    // a dynamic one, which is what the loop variable steps through. Before
-    // this the property was looked up as a variable of its name, which it is
-    // not, and the loop ran no times.
-    size = ref.size;
-    lo = ref.lo;
-  } else {
-    std::string name = GetForeachArrayName(stmt->expr);
-    size = name.empty() ? 0 : ResolveForeachSize(name, exec.ctx);
-  }
-  std::vector<Logic4Vec> values;
-  values.reserve(size);
-  for (uint32_t i = 0; i < size; ++i) {
-    values.push_back(
-        MakeLogic4VecVal(exec.arena, 32, static_cast<uint64_t>(lo + i)));
-  }
-  return values;
-}
-
-// Runs the iteration loop of a foreach over the index values `keys`, pushing
-// a scope that holds the (optional) loop index variable. §12.8: a `continue`
-// goes on to the next element, a `break` leaves the loop and a `return`
-// leaves the subroutine.
-static FuncFlow ExecFuncForeachLoop(const Stmt* stmt,
-                                    const std::vector<Logic4Vec>& keys,
-                                    const AssocArrayObject* aa,
-                                    const FuncExecCtx& exec) {
-  std::string_view iter_name;
-  if (!stmt->foreach_vars.empty() && !stmt->foreach_vars[0].empty()) {
-    iter_name = stmt->foreach_vars[0];
-  }
-
-  exec.ctx.PushScope();
-  Variable* iter_var = nullptr;
-  if (!iter_name.empty()) {
-    iter_var = exec.ctx.CreateLocalVariable(iter_name, 32);
-    iter_var->is_string = aa != nullptr && aa->is_string_key;
-    iter_var->is_signed =
-        aa != nullptr && !aa->is_string_key && aa->is_index_signed;
-    // §12.7.3: the loop variable has the index type of an associative array.
-    TypeForeachIterVar(iter_name, aa, exec.ctx);
-  }
-
-  FuncFlow flow = FuncFlow::kNext;
-  for (const auto& key : keys) {
-    if (iter_var) iter_var->value = key;
-    flow = ExecFuncStmt(stmt->body, exec);
-    if (!LoopGoesOn(flow)) break;
-  }
-
-  exec.ctx.PopScope();
-  return LoopExitFlow(flow);
-}
-
-// §12.7.3: the dimensions a foreach in a subroutine body walks one named loop
-// variable per dimension, as nested loops: a declared array's or vector's
-// (DeclaredForeachDims), a property's (ClassArrayForeachDims) or a structure
-// member's (StructMemberForeachDims). None where the loop steps through
-// ForeachIndexValues, whose arrays are tried first in the same order.
-static std::vector<ForeachDim> FuncForeachDims(const Stmt* stmt,
-                                               const FuncExecCtx& exec) {
-  if (FindAssocArrayOfBase(stmt->expr, exec.ctx, exec.arena) ||
-      FindQueueOfBase(stmt->expr, exec.ctx, exec.arena)) {
-    return {};
-  }
-  if (const StructFieldInfo* member =
-          ResolveStructArrayMember(stmt->expr, exec.ctx))
-    return StructMemberForeachDims(stmt, *member);
-  ClassArrayRef ref;
-  if (ResolveClassArray(stmt->expr, exec.ctx, exec.arena, ref))
-    return ClassArrayForeachDims(stmt, ref);
-  return DeclaredForeachDims(stmt, exec.ctx);
-}
-
-// Runs a foreach over `dims` as nested loops, the last dimension varying
-// fastest and each walked from its declared left bound (SetForeachDimVars).
-static FuncFlow ExecFuncForeachDims(const Stmt* stmt,
-                                    const std::vector<ForeachDim>& dims,
-                                    const FuncExecCtx& exec) {
-  exec.ctx.PushScope();
-  std::vector<Variable*> vars = CreateForeachDimVars(dims, exec.ctx);
-  uint64_t total = ForeachCombinationCount(dims);
-  FuncFlow flow = FuncFlow::kNext;
-  for (uint64_t n = 0; n < total; ++n) {
-    SetForeachDimVars(dims, vars, n, exec.arena);
-    flow = ExecFuncStmt(stmt->body, exec);
-    if (!LoopGoesOn(flow)) break;
-  }
-  exec.ctx.PopScope();
-  return LoopExitFlow(flow);
-}
-
-// §12.7.3 makes a foreach an implicit block its label names, so §9.6.2's
-// disable of that label ends the loop and goes on after it (FuncNamedScope),
-// as it does for the other loops.
-static FuncFlow ExecFuncForeach(const Stmt* stmt, const FuncExecCtx& exec) {
-  bool labeled = !stmt->label.empty();
-  if (labeled) exec.ctx.PushStaticScope(stmt->label);
-  FuncNamedScope named(stmt->label, exec);
-  std::vector<ForeachDim> dims = FuncForeachDims(stmt, exec);
-  if (!dims.empty()) {
-    FuncFlow flow = ExecFuncForeachDims(stmt, dims, exec);
-    if (labeled) exec.ctx.PopStaticScope(stmt->label);
-    return named.Leave(flow);
-  }
-  auto* aa = FindAssocArrayOfBase(stmt->expr, exec.ctx, exec.arena);
-  std::vector<Logic4Vec> keys = ForeachIndexValues(stmt, exec);
-  FuncFlow flow = FuncFlow::kNext;
-  if (!keys.empty()) {
-    flow = ExecFuncForeachLoop(stmt, keys, aa, exec);
-  }
-  if (labeled) exec.ctx.PopStaticScope(stmt->label);
-  return named.Leave(flow);
 }
 
 // Carries out a `return <expr>;`. §13.4.1: the function definition implicitly
@@ -744,7 +475,7 @@ static FuncFlow ExecFuncRandsequence(const Stmt* stmt,
   return FuncFlow::kNext;
 }
 
-static FuncFlow ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
+FuncFlow ExecFuncStmt(const Stmt* stmt, const FuncExecCtx& exec) {
   if (!stmt) return FuncFlow::kNext;
   switch (stmt->kind) {
     case StmtKind::kReturn:

@@ -504,17 +504,42 @@ bool TaggedUnionMemberKey(const Expr* lhs, SimContext& ctx, std::string& key) {
 // set here, under the member's own key (TaggedUnionMemberKey), from the
 // member a `tagged M v` names or the one a call's body returned. Every other
 // member target, and every other right-hand side, is evaluated as it was.
+bool ElementTagKey(const Expr* select, SimContext& ctx, Arena& arena,
+                   std::string& key) {
+  if (select->kind != ExprKind::kSelect || select->base == nullptr ||
+      select->base->kind != ExprKind::kIdentifier || select->index == nullptr ||
+      select->index_end != nullptr) {
+    return false;
+  }
+  Logic4Vec index = EvalExpr(select->index, ctx, arena);
+  if (!index.IsKnown()) return false;
+  key = TagKeyOfName(select->base->text, ctx) + "[" +
+        std::to_string(index.ToUint64()) + "]";
+  return true;
+}
+
+// The key the tag of the target `lhs` stands under where it is a member of a
+// variable (TaggedUnionMemberKey) or an element of an array (ElementTagKey).
+static bool TaggedTargetKey(const Expr* lhs, SimContext& ctx, Arena& arena,
+                            std::string& key) {
+  if (lhs->kind == ExprKind::kSelect)
+    return ElementTagKey(lhs, ctx, arena, key);
+  return TaggedUnionMemberKey(lhs, ctx, key);
+}
+
 static Logic4Vec EvalRhsForTaggedMember(const Stmt* stmt, SimContext& ctx,
                                         Arena& arena) {
   bool is_call = stmt->rhs->kind == ExprKind::kCall;
   bool is_tagged =
       stmt->rhs->kind == ExprKind::kTagged && stmt->rhs->rhs != nullptr;
   std::string key;
-  if ((!is_call && !is_tagged) || !TaggedUnionMemberKey(stmt->lhs, ctx, key))
+  if ((!is_call && !is_tagged) || !TaggedTargetKey(stmt->lhs, ctx, arena, key))
     return EvalRhsWithStructContext(stmt, ctx, arena);
   std::string tag;
-  Logic4Vec value = is_call ? EvalWithReturnedTag(stmt->rhs, ctx, arena, tag)
-                            : EvalRhsWithStructContext(stmt, ctx, arena);
+  Logic4Vec value =
+      is_call ? EvalWithReturnedTag(stmt->rhs, ctx, arena, tag,
+                                    LhsContextWidth(stmt->lhs, ctx, arena))
+              : EvalRhsWithStructContext(stmt, ctx, arena);
   if (is_tagged) tag = std::string(stmt->rhs->rhs->text);
   // The tag table keeps the view it is given, so the key is interned in the
   // arena rather than left in a string that ends with this statement.
@@ -548,7 +573,10 @@ Logic4Vec EvalRhsCarryingReturnedTag(const Stmt* stmt, SimContext& ctx,
   // #4042.
   if (stmt->lhs->kind == ExprKind::kStreamingConcat)
     return PackBitStreamOperand(stmt->rhs, ctx, arena);
-  if (stmt->lhs->kind == ExprKind::kMemberAccess)
+  // §7.3.2 with §7.4: an element of an array of tagged unions holds its tag
+  // as a member does, under the key ElementTagKey forms.
+  if (stmt->lhs->kind == ExprKind::kMemberAccess ||
+      stmt->lhs->kind == ExprKind::kSelect)
     return EvalRhsForTaggedMember(stmt, ctx, arena);
   if (stmt->rhs->kind != ExprKind::kCall ||
       stmt->lhs->kind != ExprKind::kIdentifier) {

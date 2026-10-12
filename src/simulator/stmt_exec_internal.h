@@ -130,6 +130,12 @@ ExecTask ExecRepeat(const Stmt* stmt, SimContext& ctx, Arena& arena);
 // runs either loop synchronously.
 std::optional<uint64_t> LoopIterationLimit(const Stmt* stmt, SimContext& ctx,
                                            Arena& arena);
+// §12.7.2 and §9.4.5: the number of times a repeat count `count_val` gives,
+// none for a negative count or one holding an x or z bit, a real rounded to
+// the integer it converts to, and one beyond 64 bits saturated. Defined in
+// stmt_exec_control.cpp; the repeat loop and the repeat event control share
+// it.
+uint64_t RepeatIterationCount(const Logic4Vec& count_val);
 ExecTask ExecDoWhile(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
 // §16.3 immediate assertion, including its deferred forms (defined in

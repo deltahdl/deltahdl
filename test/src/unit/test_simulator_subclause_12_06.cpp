@@ -132,23 +132,26 @@ TEST(Matches, ConstantPatternNarrowerThanTheValueExtendsToItsWidth) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(Matches, WildcardXInPattern) {
+// §12.6.1 lets pattern matching ignore bits only in casez (z) and casex (x
+// and z); a `matches` clause compares every bit, so an x or a z in the
+// constant pattern matches only an x or a z in the value, never a 0 or a 1.
+TEST(Matches, XInPatternIsNoWildcard) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("wv", 4);
   var->value = MakeLogic4VecVal(f.arena, 4, 0b1010);
   auto* expr = ParseExprFrom("wv matches 4'b1x1x", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
 
-  EXPECT_EQ(result.ToUint64(), 1u);
+  EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-TEST(Matches, WildcardZInPattern) {
+TEST(Matches, ZInPatternIsNoWildcard) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("zv", 4);
   var->value = MakeLogic4VecVal(f.arena, 4, 0b1100);
   auto* expr = ParseExprFrom("zv matches 4'b1?0?", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
+  EXPECT_EQ(result.ToUint64(), 0u);
 }
 
 TEST(Matches, WildcardPatternMismatch) {
@@ -281,6 +284,36 @@ TEST(PatternMatchingSim, TaggedMemberPatternStopsAtFilterAndQuestion) {
                  "endmodule\n",
                  f),
       "22\n");
+}
+
+// §12.6 declares a pattern identifier as a variable of the member's type: a
+// real member's r is a real, so r * 4 is 10.0, and a 2-state member's b holds
+// no x, an x assigned to it reading as 0 (§6.11.2). An enumeration member's ev
+// knows its member names (§6.19.5.6).
+TEST(PatternMatchingSim, BoundVariableHasTheMembersType) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  typedef enum {A, B, C} E;\n"
+      "  typedef union tagged { real R; int I; } U;\n"
+      "  typedef union tagged { bit [3:0] Bt; int I; } U2;\n"
+      "  typedef union tagged { E En; int I; } U3;\n"
+      "  U u = tagged R 2.5;\n"
+      "  U2 u2 = tagged Bt 4'd3;\n"
+      "  U3 u3 = tagged En B;\n"
+      "  int r = 0;\n"
+      "  initial begin\n"
+      "    if (u matches tagged R .x) r += int'(x * 4);\n"
+      "    if (u2 matches tagged Bt .b) begin\n"
+      "      b = 4'bx;\n"
+      "      if (b === 4'b0000) r += 100;\n"
+      "    end\n"
+      "    if (u3 matches tagged En .ev) if (ev.name() == \"B\") r += 1000;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 1110u);
 }
 
 }  // namespace

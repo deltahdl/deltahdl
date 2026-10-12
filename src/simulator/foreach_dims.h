@@ -5,11 +5,15 @@
 #include <string_view>
 #include <vector>
 
+#include "common/types.h"
+
 namespace delta {
 
 class Arena;
+struct AssocArrayObject;
 struct ClassArrayRef;
 struct Expr;
+struct QueueObject;
 class SimContext;
 struct Stmt;
 struct StructFieldInfo;
@@ -45,6 +49,43 @@ struct ForeachDim {
 // else: a string, a queue, a dynamic or associative array, an array whose
 // elements are queues, or a name with no declared variable.
 std::vector<ForeachDim> DeclaredForeachDims(const Stmt* stmt, SimContext& ctx);
+
+// §12.7.3: the number of iterations a foreach over the array or variable
+// `name` runs, where the walk has one dimension: the array's element count,
+// a string's character count, or another variable's bit width. Zero for a name
+// no array or variable has.
+uint32_t ForeachArraySize(std::string_view name, SimContext& ctx);
+
+// §12.7.3 with §7.4, §7.8 and §7.10: the second loop variable of a foreach
+// over a queue, dynamic array or associative array whose elements are queues
+// or fixed-size arrays, `foreach (r[k, j])` over `int r[$][2]`, steps through
+// the indices of the element the first names, which is its own queue. `var`
+// is that variable, an int, null where the loop names none or the array's
+// elements are no queues; `queue` or `assoc` the array.
+struct ForeachElementDim {
+  Variable* var = nullptr;
+  const QueueObject* queue = nullptr;
+  const AssocArrayObject* assoc = nullptr;
+};
+
+// The second dimension of the foreach `stmt`, whose array is the associative
+// array `aa`, or a queue where `aa` is null; the loop variable is created in
+// the scope the caller pushed.
+ForeachElementDim ForeachElementDimOf(const Stmt* stmt,
+                                      const AssocArrayObject* aa,
+                                      SimContext& ctx, Arena& arena);
+
+// The queue of the element the outer loop's iteration `i` names, whose index
+// is `keys[i]` for an associative array.
+const QueueObject* ForeachElementQueue(const ForeachElementDim& dim,
+                                       const std::vector<Logic4Vec>& keys,
+                                       uint32_t i, Arena& arena);
+
+// The value the second loop variable takes at position `p` of the element
+// queue `element`: a fixed-size element's declared index from its left bound,
+// a queue's position itself, as an int.
+Logic4Vec ForeachElementIndex(const QueueObject& element, uint32_t p,
+                              Arena& arena);
 
 // §12.7.3 with §7.4.2 and §8.5: the named dimensions of the array property
 // `ref` names as a whole, which `stmt` walks. A property with one unpacked

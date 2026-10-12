@@ -562,4 +562,43 @@ TEST(ConditionalStatementSim, CompiledIfZRunsElseBranch) {
   EXPECT_EQ(out->value.ToUint64(), 11u);
 }
 
+// §12.4 takes an if's first branch when its condition is known and nonzero,
+// whatever its width. The function's condition has its only set bit at 100, so
+// it is true only when every word of it is read; a function body runs on its
+// own executor.
+TEST(ConditionalStatementSim, WideConditionInAFunctionReadsEveryWord) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int r;\n"
+      "  function automatic int f(logic [127:0] v);\n"
+      "    if (v) return 1;\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "  initial r = f(128'h1 << 100);\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+// A real -0.0 equals 0, so as an if's or a loop's condition it is false
+// (§12.4, §12.7.4), its set sign bit notwithstanding.
+TEST(ConditionalStatementSim, NegativeZeroRealConditionIsFalse) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  real r = -0.0;\n"
+      "  int n = 0;\n"
+      "  initial begin\n"
+      "    if (r) n += 1;\n"
+      "    while (r) begin n += 10; break; end\n"
+      "    if (r + 0.5) n += 100;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "n");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 100u);
+}
+
 }  // namespace

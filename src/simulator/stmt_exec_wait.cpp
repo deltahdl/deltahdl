@@ -303,6 +303,7 @@ ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   std::vector<Variable*> vars = WaitOrderEvents(events, ctx);
   uint64_t now = ctx.CurrentTime().ticks;
 
+  bool suspended = false;
   for (size_t i = 0; i < vars.size() && !failed; ++i) {
     if (i == 0 && vars[0] != nullptr && vars[0]->triggered_ticks == now) {
       continue;
@@ -310,9 +311,13 @@ ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     std::vector<Variable*> remaining(
         vars.begin() + static_cast<std::ptrdiff_t>(i), vars.end());
     size_t triggered = co_await WaitOrderStepAwaiter{remaining, 0};
+    suspended = true;
     // The first of the remaining events is the one expected next.
     if (triggered != 0) failed = true;
   }
+  // §12.4.2.1: resuming after suspending on a wait statement, `wait_order`
+  // among them (A.6.5), is a violation report flush point.
+  if (suspended) ctx.FlushPendingViolations();
 
   if (failed) {
     if (stmt->else_branch) {

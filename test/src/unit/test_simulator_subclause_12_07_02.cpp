@@ -411,4 +411,38 @@ TEST(LoopStatementSim, NegativeRepeatCountInsideAFunctionRunsNoTimes) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
+// §12.7.2 runs a repeat loop as many times as its count gives, and a real
+// count gives the integer it rounds to (§6.12.1): 2.6 runs three times, and
+// -1.0 runs none, a negative count running none.
+TEST(LoopStatementSim, RepeatRealCountRoundsToAnInteger) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  real r = 2.6;\n"
+      "  int n = 0;\n"
+      "  initial begin\n"
+      "    repeat (r) n++;\n"
+      "    repeat (-1.0) n += 100;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "n");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 3u);
+}
+
+// A count of 2^64 + 3 is far more than the low word's 3, so the loop is still
+// counting when $finish ends the run at time 10.
+TEST(LoopStatementSim, RepeatCountAbove64BitsIsNotCutToItsLowWord) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int n = 0;\n"
+      "  initial repeat (65'h1_0000_0000_0000_0003) #1 n++;\n"
+      "  initial #10 $finish;\n"
+      "endmodule\n",
+      f, "n");
+  ASSERT_NE(var, nullptr);
+  EXPECT_GT(var->value.ToUint64(), 3u);
+}
+
 }  // namespace

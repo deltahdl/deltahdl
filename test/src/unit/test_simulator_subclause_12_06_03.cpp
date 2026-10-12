@@ -343,4 +343,70 @@ TEST(TernaryMatchesSim, TheConsequentReadsTheBoundIdentifier) {
   EXPECT_EQ(none->value.ToUint64(), 0xFFFFFFFFu);
 }
 
+// §12.6.3: the same comparison in a conditional expression's predicate.
+TEST(TernaryMatchesSim, ConstantPatternComparesXAndZBits) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  logic [3:0] v = 4'b1010, w = 'x;\n"
+      "  int n = 0;\n"
+      "  initial begin\n"
+      "    n += (v matches 4'b1x1x) ? 1 : 0;\n"
+      "    n += (w matches 4'b0000) ? 10 : 0;\n"
+      "    n += (w matches 4'bxxxx) ? 100 : 0;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "n");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 100u);
+}
+
+// §12.6.3: a predicate whose matches clauses hold and whose filter is x is
+// ambiguous, and the conditional combines its two results bit by bit
+// (§11.4.11): 8'h0F and 8'hF0 agree on no bit, so every bit is x. The same
+// holds where the pattern binds an identifier the consequent reads.
+TEST(TernaryMatchesSim, AmbiguousClauseSequenceCombinesBothResults) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; bit [7:0] Valid; } VInt;\n"
+      "  VInt v = tagged Valid 8'h0F;\n"
+      "  logic f = 1'bx;\n"
+      "  logic [7:0] r, s;\n"
+      "  int ok = 0;\n"
+      "  initial begin\n"
+      "    r = (v matches tagged Valid .* &&& f) ? 8'h0F : 8'hF0;\n"
+      "    s = (v matches tagged Valid .n &&& f) ? n : 8'hF0;\n"
+      "    ok = (r === 8'bxxxx_xxxx) + 10 * (s === 8'bxxxx_xxxx);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "ok");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 11u);
+}
+
+// §12.6.3 gives the conditional §11.4.11's semantics, and §11.8.1 makes its
+// result unsigned where either result is: 8'd0 is unsigned, so the int -1 in n
+// zero-extends to 64 bits. Where the predicate fails, k still has its type,
+// a signed int, so the signed -8'sd1 it is paired with sign-extends.
+TEST(TernaryMatchesSim, BindingConditionalResultTypeIsBothOperands) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+      "  VInt v = tagged Valid -1;\n"
+      "  VInt w = tagged Invalid;\n"
+      "  logic [63:0] r, s;\n"
+      "  int ok = 0;\n"
+      "  initial begin\n"
+      "    r = (v matches tagged Valid .n) ? n : 8'd0;\n"
+      "    s = (w matches tagged Valid .k) ? k : -8'sd1;\n"
+      "    ok = (r == 64'h0000_0000_ffff_ffff) + 10 * (s == '1);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "ok");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 11u);
+}
+
 }  // namespace

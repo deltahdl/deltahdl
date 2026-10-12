@@ -609,6 +609,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_function_args_tagged.cpp
     simulator/eval_function_args_writeback.cpp
     simulator/eval_function_body.cpp
+    simulator/eval_function_body_foreach.cpp
     simulator/foreach_dims.cpp
     simulator/pattern_match.cpp
     simulator/pattern_type_key.cpp

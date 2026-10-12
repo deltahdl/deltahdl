@@ -27,6 +27,16 @@ Truth TruthOf(const Logic4Vec& v);
 // The one-bit 0, 1 or x a truth value is. Defined in evaluation_ops.cpp.
 Logic4Vec TruthBit(Truth t, Arena& arena);
 
+// §12.6.2 and §12.6.3: the truth of two clauses a predicate joins with `&&&`,
+// the second read only where the first is not false -- false where either is,
+// ambiguous where either is and neither is false, and true otherwise.
+inline Truth ClauseConjunction(Truth first, Truth second) {
+  if (first == Truth::kFalse || second == Truth::kFalse) return Truth::kFalse;
+  return first == Truth::kAmbiguous || second == Truth::kAmbiguous
+             ? Truth::kAmbiguous
+             : Truth::kTrue;
+}
+
 Logic4Vec ExtendVec(const Logic4Vec& v, uint32_t target_width, bool sign_ext,
                     Arena& arena);
 

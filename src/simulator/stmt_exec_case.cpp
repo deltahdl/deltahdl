@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdint>
 #include <optional>
 #include <utility>
@@ -10,6 +11,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 #include "simulator/evaluation.h"
+#include "simulator/evaluation_internal.h"
 #include "simulator/exec_task.h"
 #include "simulator/pattern_match.h"
 #include "simulator/sim_context.h"
@@ -72,19 +74,6 @@ static bool CasezMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
   return CaseDontCareMatch(sel, pat, BitIsZ);
 }
 
-static bool CaseInsideValueMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
-  if (!sel.IsKnown()) return false;
-  uint32_t nw = (sel.nwords > pat.nwords) ? sel.nwords : pat.nwords;
-  for (uint32_t i = 0; i < nw; ++i) {
-    uint64_t sa = (i < sel.nwords) ? sel.words[i].aval : 0;
-    uint64_t pa = (i < pat.nwords) ? pat.words[i].aval : 0;
-    uint64_t pb = (i < pat.nwords) ? pat.words[i].bval : 0;
-
-    if ((sa ^ pa) & ~pb) return false;
-  }
-  return true;
-}
-
 // §12.5.4: in a case-inside statement the case_expression is compared against
 // each case_item range element with the set-membership `inside` operator, the
 // case_expression being the left operand and each element the right operand. A
@@ -140,24 +129,14 @@ static bool CaseExactMatch(const Logic4Vec& sel, const Logic4Vec& pat) {
   return true;
 }
 
+// §12.6.1: wherever pattern matching compares two bits, casez ignores z bits
+// and casex x and z bits; written with case, it ignores none, so a constant
+// pattern is compared as a plain case item is (§12.5).
 static bool CaseMatchesMatch(const Logic4Vec& sel, const Logic4Vec& pat,
                              TokenKind case_kind) {
   if (case_kind == TokenKind::kKwCasex) return CasexMatch(sel, pat);
   if (case_kind == TokenKind::kKwCasez) return CasezMatch(sel, pat);
-  return CaseInsideValueMatch(sel, pat);
-}
-
-// §12.5 (printed page 321): the case expression and every case item are
-// sized to the longest of them, so an item that is an unbased unsized literal
-// (§5.7.1) sets every bit of the selector's width -- `'1` against an 8-bit
-// selector is ff -- where the bitwise extension below would zero-fill its one
-// bit. The item's own width stands where it is not the literal's.
-static Logic4Vec CaseItemValue(const Expr* pat, const Logic4Vec& sel,
-                               SimContext& ctx, Arena& arena) {
-  Logic4Vec pv = EvalExpr(pat, ctx, arena);
-  if (pv.fills_width && pv.width < sel.width)
-    return FillUnbasedUnsized(pv, sel.width, arena);
-  return pv;
+  return CaseExactMatch(sel, pat);
 }
 
 // §12.6.1: a constant pattern of a pattern-matching case compared with what it
@@ -179,7 +158,38 @@ struct CaseSubject {
   Logic4Vec sel;
   PatternSubject pattern;
   std::optional<std::vector<PatternBinding>> bound;
+  // §12.5 (printed page 321): for a plain case, casez or casex, the length
+  // every expression of the statement is evaluated at, the longest of the case
+  // expression's and the items', and whether all of them are signed, which
+  // alone makes the extension to that length a sign extension.
+  uint32_t width = 0;
+  bool all_signed = false;
 };
+
+// Sizes the plain case, casez or casex `stmt` as §12.5 sizes it.
+static void SizeCaseStatement(const Stmt* stmt, SimContext& ctx,
+                              CaseSubject& cs) {
+  cs.width = SimSelfWidth(stmt->condition, ctx);
+  cs.all_signed = SimSelfSigned(stmt->condition, ctx);
+  for (const auto& item : stmt->case_items) {
+    for (const Expr* pat : item.patterns) {
+      cs.width = std::max(cs.width, SimSelfWidth(pat, ctx));
+      cs.all_signed = cs.all_signed && SimSelfSigned(pat, ctx);
+    }
+  }
+}
+
+// An expression of a plain case, casez or casex statement evaluated at the
+// statement's length and extended to it, by sign only where every expression
+// is signed. An unbased unsized literal (§5.7.1) sets every bit of that
+// length. A real or string operand is compared as it stands.
+static Logic4Vec CaseOperandValue(const Expr* e, const CaseSubject& cs,
+                                  SimContext& ctx, Arena& arena) {
+  Logic4Vec v = EvalExpr(e, ctx, arena, cs.width);
+  if (v.is_real || v.is_string || v.width >= cs.width) return v;
+  if (v.fills_width) return FillUnbasedUnsized(v, cs.width, arena);
+  return ExtendVec(v, cs.width, cs.all_signed, arena);
+}
 
 // §12.6.1: the `&&&` filters of the item pattern `e` after its pattern
 // `pattern`, evaluated from the left and each true where it is nonzero.
@@ -232,7 +242,7 @@ static bool CasePatternMatch(CaseSubject& cs, const Expr* pat, const Stmt* stmt,
   if (stmt->case_inside) return CaseInsidePatternMatch(cs.sel, pat, ctx, arena);
   if (stmt->case_matches)
     return CaseMatchesPatternMatch(cs, pat, ctx, arena, stmt->case_kind);
-  return CaseItemMatches(cs.sel, CaseItemValue(pat, cs.sel, ctx, arena),
+  return CaseItemMatches(cs.sel, CaseOperandValue(pat, cs, ctx, arena),
                          stmt->case_kind);
 }
 
@@ -283,7 +293,7 @@ static const Stmt* SelectUniqueCaseBody(const Stmt* stmt, CaseSubject& cs,
   if (info.match_count > 1) {
     ctx.AddPendingViolation(stmt->range.start,
                             "unique case: multiple items matched",
-                            Subclause("12.5.3.1"));
+                            Subclause("12.5.3.1"), qual);
   }
   if (info.first_match_body) return info.first_match_body;
   const Stmt* default_body = FindCaseDefault(stmt);
@@ -291,7 +301,7 @@ static const Stmt* SelectUniqueCaseBody(const Stmt* stmt, CaseSubject& cs,
   if (!info.has_default && qual == CaseQualifier::kUnique) {
     ctx.AddPendingViolation(stmt->range.start,
                             "unique case: no matching item found",
-                            Subclause("12.5.3.1"));
+                            Subclause("12.5.3.1"), qual);
   }
   return nullptr;
 }
@@ -311,7 +321,7 @@ static const Stmt* SelectStandardCaseBody(const Stmt* stmt, CaseSubject& cs,
   if (qual == CaseQualifier::kPriority) {
     ctx.AddPendingViolation(stmt->range.start,
                             "priority case: no matching item found",
-                            Subclause("12.5.3.1"));
+                            Subclause("12.5.3.1"), qual);
   }
   return nullptr;
 }
@@ -322,8 +332,11 @@ CaseSelection SelectCaseItem(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (stmt->case_matches) {
     cs.pattern = PatternSubjectOf(stmt->condition, ctx, arena);
     cs.sel = cs.pattern.value;
-  } else {
+  } else if (stmt->case_inside) {
     cs.sel = EvalExpr(stmt->condition, ctx, arena);
+  } else {
+    SizeCaseStatement(stmt, ctx, cs);
+    cs.sel = CaseOperandValue(stmt->condition, cs, ctx, arena);
   }
   CaseSelection chosen;
   if (qual == CaseQualifier::kUnique || qual == CaseQualifier::kUnique0) {

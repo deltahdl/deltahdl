@@ -561,9 +561,8 @@ void RecordPropertyTags(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 // copied whole hands over the tag at each level its active members reach: the
 // source's tag under `src`, then that member's own under `src.<tag>`, and so on
 // for as long as the member's type is a union.
-static void CopyTagChain(std::string src, std::string dst,
-                         const StructTypeInfo* layout, SimContext& ctx,
-                         Arena& arena) {
+void CopyTagChain(std::string src, std::string dst,
+                  const StructTypeInfo* layout, SimContext& ctx, Arena& arena) {
   while (layout != nullptr && layout->is_union) {
     const std::string_view kTag = ctx.GetVariableTag(src);
     if (kTag.empty()) return;

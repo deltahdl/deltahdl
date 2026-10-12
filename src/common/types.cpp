@@ -57,6 +57,9 @@ bool Logic4Vec::IsKnown() const {
 }
 
 bool Logic4Vec::IsTruthy() const {
+  // §6.12: a real is zero whatever its sign bit, so -0.0 is false; a real has
+  // no x or z bit, and the bits below the sign hold its magnitude.
+  if (is_real) return (words[0].aval & ((uint64_t{1} << (width - 1)) - 1)) != 0;
   for (uint32_t i = 0; i < nwords; ++i) {
     if (words[i].aval & ~words[i].bval) {
       return true;

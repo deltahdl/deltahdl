@@ -183,6 +183,11 @@ struct Process {
     SourceLoc loc;
     std::string msg;
     std::string_view subclause;
+    // §20.11: the report's Table 20-6 assertion_type bit (unique, unique0 or
+    // priority) and the hierarchical name of the scope it was raised in, by
+    // which an assertion control selects it.
+    uint32_t type_bit = 0;
+    std::string scope;
   };
   std::vector<PendingViolation> pending_violations;
 

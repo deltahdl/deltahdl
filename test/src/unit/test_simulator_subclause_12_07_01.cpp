@@ -493,4 +493,41 @@ TEST(LoopStatementSim, ForInitWithPackageScopedTypeRuns) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
+// §12.7.1 makes a for loop's declared control variable a local of the type
+// the initialization writes. A real one steps by 0.25 and reaches 1.0 after
+// four passes; read as an integer it would never move off 0, which the bound
+// on n keeps from running for ever.
+TEST(LoopStatementSim, ForRealControlVariableIsReal) {
+  EXPECT_EQ(
+      RunAndGet("module t;\n"
+                "  int n = 0;\n"
+                "  initial\n"
+                "    for (real r = 0.0; r < 1.0 && n < 10; r = r + 0.25)\n"
+                "      n++;\n"
+                "endmodule\n",
+                "n"),
+      4u);
+}
+
+// The same in a function body, and a string control variable, which grows by
+// a character each pass until it holds three.
+TEST(LoopStatementSim, ForStringAndRealControlVariablesInAFunction) {
+  EXPECT_EQ(
+      RunAndGet("module t;\n"
+                "  int n;\n"
+                "  function automatic int f();\n"
+                "    int c = 0;\n"
+                "    for (string s = \"\"; s.len() < 3 && c < 10;\n"
+                "         s = {s, \"x\"})\n"
+                "      c++;\n"
+                "    for (real r = 0.0; r < 1.0 && c < 100; r = r + 0.25)\n"
+                "      c += 10;\n"
+                "    return c;\n"
+                "  endfunction\n"
+                "  initial n = f();\n"
+                "endmodule\n",
+                "n"),
+      43u);
+}
+
 }  // namespace

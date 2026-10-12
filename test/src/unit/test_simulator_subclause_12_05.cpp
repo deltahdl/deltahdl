@@ -667,4 +667,65 @@ TEST(CaseStatementSim, CaseTypeDerivedSignedSelectorSignExtends) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// §12.5 makes every expression of a case statement as long as the longest of
+// them before it is evaluated, so the sum of two 4-bit values keeps its carry
+// against a 5-bit item.
+TEST(CaseStatementSim, CaseExpressionEvaluatedAtTheCommonLength) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  logic [3:0] a = 4'hF, b = 4'h1;\n"
+      "  int x;\n"
+      "  initial case (a + b) 5'h10: x = 1; default: x = 2; endcase\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 1u);
+}
+
+// An unbased unsized item fills the common length, the wider item's, not the
+// case expression's alone: '1 is 16'hFFFF, which the 8-bit 8'hFF zero-extends
+// short of.
+TEST(CaseStatementSim, UnbasedUnsizedItemFillsTheCommonLength) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] s = 8'hFF;\n"
+      "  int x;\n"
+      "  initial case (s) '1: x = 1; 16'h1234: x = 2; default: x = 3; endcase\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 3u);
+}
+
+// A case expression written '1 is filled to the common length too.
+TEST(CaseStatementSim, UnbasedUnsizedCaseExpressionFillsTheCommonLength) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  int x;\n"
+      "  initial case ('1) 8'hFF: x = 1; default: x = 2; endcase\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 1u);
+}
+
+// §12.5: an unsigned expression anywhere in the statement makes every one of
+// them unsigned and zero-extended, so the signed -1 in s is 32'h0000000F
+// against the item -1's 32'hFFFFFFFF; the unsigned 4'd0 decides that.
+TEST(CaseStatementSim, OneUnsignedItemMakesEveryExpressionUnsigned) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  logic signed [3:0] s = -1;\n"
+      "  int x;\n"
+      "  initial case (s) -1: x = 1; 4'd0: x = 2; default: x = 3; endcase\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 3u);
+}
+
 }  // namespace

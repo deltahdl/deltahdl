@@ -567,4 +567,167 @@ TEST(UniqueIfViolationSim, OverlapReportNames12_4_2_1) {
                               "12.4.2.1"));
 }
 
+// §12.4.2.1 with §9.4.5: the `@(e)` of an intra-assignment timing control is
+// an event control, so resuming after suspending on it is a flush point and
+// the pending unique-if violation is dropped.
+TEST(UniqueIfViolationSim, IntraAssignmentEventFlushesPendingViolation) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  event e;\n"
+      "  initial begin\n"
+      "    unique if (1) x = 8'd1;\n"
+      "    else if (1) x = 8'd2;\n"
+      "    x = @(e) 8'd3;\n"
+      "  end\n"
+      "  initial #0 -> e;\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 3u);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// The same for an intra-assignment `repeat (n) @(e)`.
+TEST(UniqueIfViolationSim, IntraAssignmentRepeatEventFlushesPendingViolation) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  event e;\n"
+      "  initial begin\n"
+      "    unique if (1) x = 8'd1;\n"
+      "    else if (1) x = 8'd2;\n"
+      "    x = repeat (2) @(e) 8'd3;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #0 -> e;\n"
+      "    #0 -> e;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 3u);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// A.6.5 makes `wait fork` a wait statement, so resuming after it suspended on
+// a running child is a flush point (§12.4.2.1).
+TEST(UniqueIfViolationSim, WaitForkFlushesPendingViolation) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    unique if (1) x = 8'd1;\n"
+      "    else if (1) x = 8'd2;\n"
+      "    fork\n"
+      "      #0 x = 8'd5;\n"
+      "    join_none\n"
+      "    wait fork;\n"
+      "    x = 8'd3;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 3u);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// And `wait_order` (A.6.5): the process suspends until a is triggered.
+TEST(UniqueIfViolationSim, WaitOrderFlushesPendingViolation) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  event a, b;\n"
+      "  initial begin\n"
+      "    unique if (1) x = 8'd1;\n"
+      "    else if (1) x = 8'd2;\n"
+      "    wait_order (a, b) x = 8'd3;\n"
+      "    else x = 8'd4;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #0 -> a;\n"
+      "    #0 -> b;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 3u);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// §12.4.2.1 leaves violation reporting to the assertion control tasks of
+// §20.11, whose Table 20-6 gives a unique report the assertion_type bit 32. An
+// Off for that bit adds no report until an On, so only the case's is made.
+TEST(UniqueIfViolationSim, AssertControlOffStopsUniqueViolationReports) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    $assertcontrol(4, 32);\n"
+      "    unique if (0) x = 8'd1;\n"
+      "    $assertcontrol(3, 32);\n"
+      "    unique case (2'd3) 0: x = 8'd2; 1: x = 8'd3; endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(f.diag.WarningCount(), 1u);
+}
+
+// A Kill also flushes a queued report of the type it selects that has not
+// matured, the unique if's being queued for the Observed region.
+TEST(UniqueIfViolationSim, AssertControlKillFlushesQueuedViolationReport) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    unique if (0) x = 8'd1;\n"
+      "    $assertcontrol(5, 32);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// $assertoff is $assertcontrol(4, 15, 7), and 15 selects no violation report
+// type, so the unique if's report is made.
+TEST(UniqueIfViolationSim, AssertOffLeavesViolationReports) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    $assertoff;\n"
+      "    unique if (0) x = 8'd1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(f.diag.WarningCount(), 1u);
+}
+
+// An Off for unique (32) leaves unique0's reports (64) on.
+TEST(UniqueIfViolationSim, AssertControlOffForUniqueLeavesUnique0Reports) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  initial begin\n"
+      "    $assertcontrol(4, 32);\n"
+      "    unique0 if (1) x = 8'd1;\n"
+      "    else if (1) x = 8'd2;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(f.diag.WarningCount(), 1u);
+}
+
 }  // namespace

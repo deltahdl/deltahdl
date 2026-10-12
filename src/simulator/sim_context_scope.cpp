@@ -201,6 +201,14 @@ bool ScopeStack::InnermostScopeDeclares(std::string_view name) const {
   return !scope_stack_.empty() && scope_stack_.back().vars.contains(name);
 }
 
+void SimContext::PushActiveNamedScope(std::string_view name) {
+  active_scope_stack_.push_back(name);
+}
+
+const std::vector<std::string_view>& SimContext::ActiveNamedScopes() const {
+  return active_scope_stack_;
+}
+
 Variable* SimContext::CreateLocalVariable(std::string_view name, uint32_t width,
                                           bool is_signed) {
   auto* var = arena_.Create<Variable>();

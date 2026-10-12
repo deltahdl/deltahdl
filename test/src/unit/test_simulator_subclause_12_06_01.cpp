@@ -805,4 +805,126 @@ TEST(CaseMatchesItemSim, AFunctionBodyBindsTheMatchedMember) {
             37u);
 }
 
+// §12.6.1 ignores bits only for casez (z) and casex (x and z). With case,
+// a constant pattern matches when every bit equals the value's, x and z
+// included: 4'b1x00 differs from 4'b1000 in bit 2, and 4'bx010 equals itself.
+TEST(CaseMatchesItemSim, PlainCaseConstantPatternComparesEveryBit) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  logic [3:0] s = 4'b1000, t = 4'bx010;\n"
+      "  int n = 0;\n"
+      "  initial begin\n"
+      "    case (s) matches 4'b1x00: n += 1; default: ; endcase\n"
+      "    case (t) matches 4'bx010: n += 10; default: ; endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f, "n");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 10u);
+}
+
+// §12.6 matches whatever expression yields the value, a member of a
+// structure included: s.u is a tagged union whose Valid member holds 5.
+TEST(CaseMatchesItemSim, TaggedPatternAgainstAStructureMember) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+      "  typedef struct { VInt u; int k; } S;\n"
+      "  S s;\n"
+      "  int y = 0;\n"
+      "  initial begin\n"
+      "    s.u = tagged Valid 5;\n"
+      "    case (s.u) matches tagged Valid .n: y = n; default: y = -1; "
+      "endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 5u);
+}
+
+// And a structure pattern against a member that is a structure.
+TEST(CaseMatchesItemSim, StructurePatternAgainstAStructureMember) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  typedef struct { int a; int b; } P;\n"
+      "  typedef struct { P p; int k; } S;\n"
+      "  S s;\n"
+      "  int r = 0;\n"
+      "  initial begin\n"
+      "    s.p = '{3, 4};\n"
+      "    case (s.p) matches\n"
+      "      '{a: .x, b: .z}: r = x * 10 + z;\n"
+      "      default: r = -1;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 34u);
+}
+
+// §12.6.1 matches the value of a function call as of any expression, the tag
+// its body returned included.
+TEST(CaseMatchesItemSim, TaggedPatternAgainstACallResult) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+      "  function automatic VInt f(); return tagged Valid 4; endfunction\n"
+      "  int y = 0;\n"
+      "  initial case (f()) matches tagged Valid .n: y = n; default: y = -1; "
+      "endcase\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 4u);
+}
+
+// And a structure pattern against a function returning a structure.
+TEST(CaseMatchesItemSim, StructurePatternAgainstACallResult) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  typedef struct { int a; int b; } P;\n"
+      "  function automatic P g(); return '{7, 8}; endfunction\n"
+      "  int r = 0;\n"
+      "  initial case (g()) matches '{.x, .z}: r = x * 10 + z; default: r = "
+      "-1; endcase\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 78u);
+}
+
+// §12.6 binds a pattern identifier by ordinary procedural assignment, so one
+// bound to a member that is itself a tagged union keeps that member's tag,
+// and §12.6.1's Example 2 matches it in an inner case statement.
+TEST(CaseMatchesItemSim, BoundTaggedUnionKeepsItsTag) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  typedef union tagged { bit [9:0] JmpU; bit [3:0] JmpC; } J;\n"
+      "  typedef union tagged { void Nop; J Jmp; } Instr;\n"
+      "  Instr instr;\n"
+      "  int y = 0;\n"
+      "  initial begin\n"
+      "    instr = tagged Jmp (tagged JmpU 10'd7);\n"
+      "    case (instr) matches\n"
+      "      tagged Jmp .j: case (j) matches\n"
+      "                       tagged JmpU .a: y = a;\n"
+      "                       default: y = -1;\n"
+      "                     endcase\n"
+      "      default: y = -2;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 7u);
+}
+
 }  // namespace

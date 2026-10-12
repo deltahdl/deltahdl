@@ -586,4 +586,33 @@ TEST(CasezStatementSim, CasezFirstMatchWins) {
   EXPECT_EQ(RunFirstMatchWins(f, TokenKind::kKwCasez), 10u);
 }
 
+// §12.5.1 keeps §12.5's lengths and signedness: every expression is signed,
+// so s sign-extends to 8'hFF and matches.
+TEST(CasezStatementSim, AllSignedExpressionsSignExtend) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  logic signed [3:0] s = -1;\n"
+      "  int x;\n"
+      "  initial casez (s) 8'sb1111_1111: x = 1; default: x = 2; endcase\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 1u);
+}
+
+// The same for casex.
+TEST(CasexStatementSim, AllSignedExpressionsSignExtend) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  logic signed [3:0] s = -1;\n"
+      "  int x;\n"
+      "  initial casex (s) 8'sb1111_1111: x = 1; default: x = 2; endcase\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 1u);
+}
+
 }  // namespace

@@ -829,6 +829,14 @@ static void AbortProcessAttempts(Process& proc, const AssertControlCall& call,
       AbortSequencePropertyAttempts(*state);
     }
   }
+  // §20.11: a Kill also flushes the queued violation reports of the types it
+  // selects (§12.4.2.1, §12.5.3.1) that have not yet matured.
+  std::erase_if(proc.pending_violations,
+                [&](const Process::PendingViolation& v) {
+                  AssertionIdentity identity{v.type_bit, 0, v.scope, {}};
+                  return CallSelects(call, identity) &&
+                         !ctx.AssertControls().StatusOf(identity).locked;
+                });
 }
 
 void AbortKilledAttempts(const AssertControlCall& call, SimContext& ctx) {

@@ -160,25 +160,49 @@ static Logic4Vec IntegralToReal(const Logic4Vec& v, Arena& arena) {
   r.is_real = true;
   return r;
 }
+
+// One result of a conditional, `v`, given the result's type: extended to
+// `width` by sign where both results are signed, and cut to the context.
+static Logic4Vec SizeTernaryResult(Logic4Vec v, uint32_t width, bool is_signed,
+                                   uint32_t context_width, Arena& arena) {
+  if (v.is_real) return v;
+  v.is_signed = is_signed;
+  if (v.width < width) v = ExtendVec(v, width, is_signed, arena);
+  if (context_width > 0 && v.width > context_width)
+    v = ResizeToWidth(v, context_width, arena);
+  return v;
+}
+
 // §12.6.3: a conditional whose predicate binds pattern identifiers. They are
 // created in a scope that holds the predicate's later clauses and the
-// consequent (EvalMatchesPredicate), and the alternative stands outside it.
-// The operand not chosen names identifiers bound only when the predicate
-// holds, so it is not read for the result type; the chosen one is extended
-// by its own sign or truncated to the context.
+// consequent (EvalPredicateTruth), and the alternative stands outside it.
+// §11.4.11 with §11.8.1 types the result from both operands, as wide as the
+// wider and the context and signed where both are, the identifiers the
+// consequent reads typed by the members they stand for where the predicate
+// fails (BindPatternTypes). An ambiguous predicate combines the two results
+// bit by bit.
 static Logic4Vec EvalTernaryBindingPredicate(const Expr* expr, SimContext& ctx,
                                              Arena& arena,
                                              uint32_t context_width) {
   ctx.PushScope();
-  bool holds = EvalMatchesPredicate(expr->condition, ctx, arena);
-  Logic4Vec chosen;
-  if (holds) chosen = EvalExpr(expr->true_expr, ctx, arena, context_width);
+  Truth predicate = EvalPredicateTruth(expr->condition, ctx, arena);
+  if (predicate == Truth::kFalse) BindPatternTypes(expr->condition, ctx, arena);
+  const bool kSigned = SimSelfSigned(expr->true_expr, ctx) &&
+                       SimSelfSigned(expr->false_expr, ctx);
+  const uint32_t kWidth =
+      std::max({SimSelfWidth(expr->true_expr, ctx),
+                SimSelfWidth(expr->false_expr, ctx), context_width});
+  Logic4Vec tv;
+  if (predicate != Truth::kFalse) {
+    tv = SizeTernaryResult(EvalExpr(expr->true_expr, ctx, arena, context_width),
+                           kWidth, kSigned, context_width, arena);
+  }
   ctx.PopScope();
-  if (!holds) chosen = EvalExpr(expr->false_expr, ctx, arena, context_width);
-  if (chosen.is_real || context_width == 0) return chosen;
-  if (chosen.width < context_width)
-    return ExtendVec(chosen, context_width, chosen.is_signed, arena);
-  return ResizeToWidth(chosen, context_width, arena);
+  if (predicate == Truth::kTrue) return tv;
+  Logic4Vec fv =
+      SizeTernaryResult(EvalExpr(expr->false_expr, ctx, arena, context_width),
+                        kWidth, kSigned, context_width, arena);
+  return predicate == Truth::kFalse ? fv : CombineBranches(tv, fv, arena);
 }
 
 // §11.8.1 makes the conditional unsigned where either of its results is, and

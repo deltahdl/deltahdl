@@ -184,6 +184,14 @@ Logic4Vec EvalRhsCarryingReturnedTag(const Stmt* stmt, SimContext& ctx,
 // sets the same key when its update lands.
 bool TaggedUnionMemberKey(const Expr* lhs, SimContext& ctx, std::string& key);
 
+// §7.3.2 with §7.4: whether `select` names one element of a named unpacked
+// array by a known index, `arr[1]`, and in `key` what that element's tag
+// stands under: the array's key (TagKeyOfName) followed by the index in
+// brackets. The index expression is evaluated. False, with `key`
+// unspecified, for any other expression.
+bool ElementTagKey(const Expr* select, SimContext& ctx, Arena& arena,
+                   std::string& key);
+
 // §13.4.1 with §7.6 and §7.10: the blocking assignment `stmt` of a call of a
 // declared function to a queue, a dynamic array or a one-dimensional
 // fixed-size unpacked array named by a bare identifier, `av = fa()` or `qv =

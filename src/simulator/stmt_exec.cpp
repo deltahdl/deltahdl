@@ -475,7 +475,11 @@ void SpawnForkJoinNone(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 static ExecTask ExecWaitFork(SimContext& ctx) {
   auto* proc = ctx.CurrentProcess();
   if (!proc) co_return StmtResult::kDone;
+  bool suspends = proc->wait_fork_state.remaining != 0;
   co_await WaitForkAwaiter{&proc->wait_fork_state};
+  // §12.4.2.1: resuming after suspending on a wait statement, `wait fork`
+  // among them (A.6.5), is a violation report flush point.
+  if (suspends) ctx.FlushPendingViolations();
   co_return StmtResult::kDone;
 }
 
@@ -668,28 +672,18 @@ static ExecTask ExecBlockingAssignEvent(const Stmt* stmt, SimContext& ctx,
                                         Arena& arena) {
   auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
   co_await EventAwaiter{ctx, stmt->events, arena};
+  // §12.4.2.1 with §9.4.5: an intra-assignment `@(...)` is an event control,
+  // and resuming after suspending on one is a violation report flush point.
+  ctx.FlushPendingViolations();
   PerformBlockingAssign(stmt->lhs, rhs_val, ctx, arena);
   co_return StmtResult::kDone;
 }
 
+// §9.4.5: a repeat count <= 0 behaves as if there were no repeat construct,
+// the count read as a repeat loop's is (RepeatIterationCount).
 static uint64_t EvalRepeatCount(const Expr* count_expr, SimContext& ctx,
                                 Arena& arena) {
-  auto val = EvalExpr(count_expr, ctx, arena);
-  if (!val.IsKnown()) return 0;
-  uint64_t count = val.ToUint64();
-  // §9.4.5: a repeat count <= 0 behaves as if there were no repeat construct.
-  // A negative signed value narrower than 64 bits arrives zero-extended from
-  // ToUint64(), so sign-extend it before the signed comparison or e.g. a 32-bit
-  // -3 would read as a large positive count instead of bypassing the repeat.
-  if (val.is_signed && val.width > 0 && val.width < 64) {
-    uint64_t sign_bit = uint64_t{1} << (val.width - 1);
-    if (count & sign_bit) {
-      uint64_t mask = (uint64_t{1} << val.width) - 1;
-      count = count | ~mask;
-    }
-  }
-  if (val.is_signed && static_cast<int64_t>(count) <= 0) return 0;
-  return count;
+  return RepeatIterationCount(EvalExpr(count_expr, ctx, arena));
 }
 
 static ExecTask ExecBlockingAssignRepeatEvent(const Stmt* stmt, SimContext& ctx,
@@ -698,6 +692,7 @@ static ExecTask ExecBlockingAssignRepeatEvent(const Stmt* stmt, SimContext& ctx,
   uint64_t count = EvalRepeatCount(stmt->repeat_event_count, ctx, arena);
   if (count > 0) {
     co_await RepeatEventAwaiter{ctx, stmt->events, arena, count};
+    ctx.FlushPendingViolations();
   }
   PerformBlockingAssign(stmt->lhs, rhs_val, ctx, arena);
   co_return StmtResult::kDone;

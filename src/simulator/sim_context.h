@@ -32,6 +32,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "parser/ast_stmt.h"
 #include "simulator/assert_control_log.h"
 #include "simulator/class_object.h"
 #include "simulator/cover_results.h"
@@ -414,15 +415,14 @@ class SimContext : public DeclaredNameTables,
   const std::vector<Process*>& FindOutermostScopeProcesses(
       std::string_view name) const;
 
-  void PushActiveNamedScope(std::string_view name) {
-    active_scope_stack_.push_back(name);
-  }
+  void PushActiveNamedScope(std::string_view name);
   void PopActiveNamedScope() { active_scope_stack_.pop_back(); }
-  const std::vector<std::string_view>& ActiveNamedScopes() const {
-    return active_scope_stack_;
-  }
+  const std::vector<std::string_view>& ActiveNamedScopes() const;
 
-  void AddPendingViolation(SourceLoc loc, std::string msg, Subclause subclause);
+  // §12.4.2.1, §12.5.3.1: queues the report a unique, unique0 or priority
+  // statement (`qual`) raised, unless §20.11's controls of its type stop it.
+  void AddPendingViolation(SourceLoc loc, std::string msg, Subclause subclause,
+                           CaseQualifier qual = CaseQualifier::kUnique);
   void FlushPendingViolations();
   void MaturePendingViolations();
 

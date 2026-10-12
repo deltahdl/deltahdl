@@ -10,11 +10,14 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "parser/ast_stmt.h"
 #include "simulator/class_object.h"
 #include "simulator/procedural_assertion.h"
 #include "simulator/process.h"
 #include "simulator/scope.h"
+#include "simulator/scope_hier_name.h"
 #include "simulator/sim_context.h"
+#include "simulator/sva_engine_queues.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -265,11 +268,31 @@ Process* SimContext::FindProcessByHandle(uint64_t handle) const {
   return it != process_handles_.end() ? it->second : nullptr;
 }
 
+// §20.11 Table 20-6: the assertion_type bit of the violation reports a unique,
+// unique0 or priority statement generates.
+static uint32_t ViolationTypeBit(CaseQualifier qual) {
+  switch (qual) {
+    case CaseQualifier::kUnique0:
+      return static_cast<uint32_t>(AssertionTypeBit::kUnique0);
+    case CaseQualifier::kPriority:
+      return static_cast<uint32_t>(AssertionTypeBit::kPriority);
+    default:
+      return static_cast<uint32_t>(AssertionTypeBit::kUnique);
+  }
+}
+
 void SimContext::AddPendingViolation(SourceLoc loc, std::string msg,
-                                     Subclause subclause) {
+                                     Subclause subclause, CaseQualifier qual) {
+  // §20.11: an Off or a Kill that selects the report's type adds no new report
+  // to the queue until an On; one already queued is left to mature, or to the
+  // Kill's flush (AbortKilledAttempts).
+  uint32_t type_bit = ViolationTypeBit(qual);
+  std::string scope =
+      assert_controls_.NamesScopes() ? ScopeHierName(*this) : std::string();
+  if (!assert_controls_.StatusOf({type_bit, 0, scope, {}}).checking) return;
   if (current_process_) {
     current_process_->pending_violations.push_back(
-        {loc, std::move(msg), subclause.Text()});
+        {loc, std::move(msg), subclause.Text(), type_bit, std::move(scope)});
 
     auto* ev = scheduler_.GetEventPool().Acquire();
     Process* proc = current_process_;

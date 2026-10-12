@@ -420,6 +420,15 @@ bool TryUnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
 // EvalExpr reads as self-determined.
 uint32_t LhsContextWidth(const Expr* lhs, SimContext& ctx, Arena& arena);
 
+// §7.3.2: a member that is itself a tagged union holds its own tag as part of
+// its value, so a union copied whole hands over the tag at each level its
+// active members reach: the tag under `src` to `dst`, then that member's own
+// under `src.<tag>` to `dst.<tag>`, for as long as `layout` gives the member a
+// union layout. Defined in statement_assign_core.cpp; a pattern identifier
+// bound to a tagged union (§12.6) takes its tags the same way.
+void CopyTagChain(std::string src, std::string dst,
+                  const StructTypeInfo* layout, SimContext& ctx, Arena& arena);
+
 // §11.4.11: a blocking assignment of a conditional over two queues, dynamic
 // arrays or associative arrays to one of their kind; false for any other.
 // Defined in statement_assign_conditional.cpp.

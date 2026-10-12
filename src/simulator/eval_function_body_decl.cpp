@@ -175,9 +175,8 @@ static Logic4Vec SizeLocalInitializer(const Logic4Vec& val, const Variable& v,
   return ResizeToWidth(val, declared, arena);
 }
 
-static Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
-                                    const Expr* init, SimContext& ctx,
-                                    Arena& arena) {
+Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
+                             const Expr* init, SimContext& ctx, Arena& arena) {
   // A class-typed local (user class, or the built-in `process`/handle types)
   // holds a 64-bit handle and must record its class type so later method calls
   // such as `p.suspend()` dispatch -- module-scope decls do this via

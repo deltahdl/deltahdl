@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -12,6 +13,8 @@
 #include "common/types.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_type.h"
 #include "simulator/eval_call_result.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/evaluation.h"
@@ -19,12 +22,72 @@
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
+#include "simulator/statement_assign_internal.h"
 #include "simulator/variable.h"
 
 namespace delta {
 
+static const StructFieldInfo* FindMember(const StructTypeInfo& layout,
+                                         std::string_view name) {
+  for (const auto& field : layout.fields) {
+    if (field.name == name) return &field;
+  }
+  return nullptr;
+}
+
+// The member a member access `s.m` or `s.p.m` names of a variable, through
+// the layout each prefix has; null where a prefix has none.
+static const StructFieldInfo* MemberOfPath(const Expr* e, SimContext& ctx) {
+  if (e->rhs == nullptr) return nullptr;
+  const StructTypeInfo* base = nullptr;
+  if (e->lhs->kind == ExprKind::kIdentifier) {
+    base = StructLayoutOfName(e->lhs->text, ctx);
+  } else if (e->lhs->kind == ExprKind::kMemberAccess) {
+    const StructFieldInfo* outer = MemberOfPath(e->lhs, ctx);
+    base = outer != nullptr ? outer->nested : nullptr;
+  }
+  return base != nullptr ? FindMember(*base, e->rhs->text) : nullptr;
+}
+
+// §12.6.1 with §13.4.1: a call's value as a subject, the tag its body returned
+// and the layout of its return type.
+static PatternSubject CallSubject(const Expr* expr, SimContext& ctx,
+                                  Arena& arena) {
+  PatternSubject subject;
+  subject.value = EvalWithReturnedTag(expr, ctx, arena, subject.tag);
+  if (const ModuleItem* fn = ctx.FindFunction(expr->callee)) {
+    subject.layout = ctx.FindStructType(fn->return_type.type_name);
+  }
+  return subject;
+}
+
+// The layout and tag key of what `expr` names in the design's storage: a
+// variable, an element of an array, or a member of a structure or union.
+static void AddVariableStorage(const Expr* expr, SimContext& ctx, Arena& arena,
+                               PatternSubject& subject) {
+  if (expr->kind == ExprKind::kIdentifier) {
+    subject.layout = StructLayoutOfName(expr->text, ctx);
+    subject.tag_key = TagKeyOfName(expr->text, ctx);
+  } else if (expr->kind == ExprKind::kSelect) {
+    // §7.4 with §12.6: an element of an array of structures or unions has
+    // the array's element layout, and its tag stands under ElementTagKey's.
+    if (ElementTagKey(expr, ctx, arena, subject.tag_key)) {
+      subject.layout = StructLayoutOfName(subject.tag_key, ctx);
+    }
+  } else if (expr->kind == ExprKind::kMemberAccess) {
+    // §7.2 with §12.6: a member of a structure or union has the layout of its
+    // own type, and a tagged union member's tag stands under its path.
+    subject.field = MemberOfPath(expr, ctx);
+    if (subject.field != nullptr) subject.layout = subject.field->nested;
+    if (std::string key; TaggedUnionMemberKey(expr, ctx, key)) {
+      subject.tag_key = std::move(key);
+    }
+  }
+}
+
 PatternSubject PatternSubjectOf(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
+  if (expr->kind == ExprKind::kCall) return CallSubject(expr, ctx, arena);
   PatternSubject subject;
   subject.value = EvalExpr(expr, ctx, arena);
   // §8.5 with §12.6: a class property of a tagged union type is matched against
@@ -43,21 +106,8 @@ PatternSubject PatternSubjectOf(const Expr* expr, SimContext& ctx,
     subject.tag_key = std::move(key);
     return subject;
   }
-  if (expr->kind == ExprKind::kIdentifier) {
-    subject.layout = StructLayoutOfName(expr->text, ctx);
-    subject.tag_key = TagKeyOfName(expr->text, ctx);
-  } else if (std::string key; TaggedUnionMemberKey(expr, ctx, key)) {
-    subject.tag_key = std::move(key);
-  }
+  AddVariableStorage(expr, ctx, arena, subject);
   return subject;
-}
-
-static const StructFieldInfo* FindMember(const StructTypeInfo& layout,
-                                         std::string_view name) {
-  for (const auto& field : layout.fields) {
-    if (field.name == name) return &field;
-  }
-  return nullptr;
 }
 
 // The member `field` of `subject`: its bits, with its signedness, the layout of
@@ -71,6 +121,7 @@ static PatternSubject MemberSubject(const PatternSubject& subject,
       ExtractBitField(arena, subject.value, field.bit_offset, field.width);
   member.value.is_signed = field.is_signed;
   member.layout = field.nested;
+  member.field = &field;
   if (!subject.tag_key.empty())
     member.tag_key = subject.tag_key + "." + std::string(field.name);
   return member;
@@ -82,10 +133,10 @@ static PatternSubject MemberSubject(const PatternSubject& subject,
 static bool MatchTagged(const Expr* pat, const PatternSubject& subject,
                         const PatternMatchEnv& env) {
   std::string_view tag = pat->rhs->text;
-  if (subject.tag_key.empty() ||
-      env.ctx.GetVariableTag(subject.tag_key) != tag) {
-    return false;
-  }
+  std::string_view current = subject.tag_key.empty()
+                                 ? std::string_view(subject.tag)
+                                 : env.ctx.GetVariableTag(subject.tag_key);
+  if (!env.types_only && current != tag) return false;
   if (pat->lhs == nullptr) return true;
   const StructFieldInfo* field =
       subject.layout != nullptr ? FindMember(*subject.layout, tag) : nullptr;
@@ -121,7 +172,8 @@ bool MatchPattern(const Expr* pat, const PatternSubject& subject,
                   const PatternMatchEnv& env) {
   if (pat->kind == ExprKind::kIdentifier && pat->text == ".*") return true;
   if (pat->kind == ExprKind::kIdentifier && pat->is_pattern_binding) {
-    env.bindings.push_back({pat->text, subject.value, subject.layout});
+    env.bindings.push_back({pat->text, subject.value, subject.layout,
+                            subject.tag_key, subject.tag, subject.field});
     return true;
   }
   if (pat->kind == ExprKind::kTagged) return MatchTagged(pat, subject, env);
@@ -129,8 +181,30 @@ bool MatchPattern(const Expr* pat, const PatternSubject& subject,
       !subject.layout->is_union) {
     return MatchStructure(pat, subject, env);
   }
+  if (env.types_only) return true;
   return env.compare(subject.value, EvalExpr(pat, env.ctx, env.arena),
                      env.case_kind, env.arena);
+}
+
+// §12.6: a pattern identifier is a variable of the type of the member it
+// binds: a real, a string, a 2-state value or an enumeration as that member
+// is (§6.12, §6.16, §6.11.2, §6.19).
+static void TypeBoundVariable(std::string_view name,
+                              const StructFieldInfo& field, Variable& var,
+                              SimContext& ctx) {
+  static constexpr DataTypeKind kReal[] = {
+      DataTypeKind::kReal, DataTypeKind::kShortreal, DataTypeKind::kRealtime};
+  static constexpr DataTypeKind kTwoState[] = {
+      DataTypeKind::kBit, DataTypeKind::kByte, DataTypeKind::kShortint,
+      DataTypeKind::kInt, DataTypeKind::kLongint};
+  var.is_real = std::ranges::find(kReal, field.type_kind) != std::end(kReal);
+  var.value.is_real = var.is_real;
+  var.is_string = field.type_kind == DataTypeKind::kString;
+  var.is_4state =
+      std::ranges::find(kTwoState, field.type_kind) == std::end(kTwoState);
+  if (ctx.FindEnumType(field.type_name) != nullptr) {
+    ctx.SetVariableEnumType(name, field.type_name);
+  }
 }
 
 void InstallPatternBindings(const std::vector<PatternBinding>& bindings,
@@ -140,6 +214,18 @@ void InstallPatternBindings(const std::vector<PatternBinding>& bindings,
                                             binding.value.is_signed);
     var->value = binding.value;
     var->local_layout = binding.layout;
+    if (binding.field != nullptr) {
+      TypeBoundVariable(binding.name, *binding.field, *var, ctx);
+    }
+    // §7.3.2: what a tagged union identifier is bound to carries its tag, and
+    // that of each member union its active member reaches, which the bound
+    // name holds as a variable assigned the value would.
+    if (!binding.tag_key.empty()) {
+      CopyTagChain(binding.tag_key, std::string(binding.name), binding.layout,
+                   ctx, ctx.GetArena());
+    } else if (!binding.tag.empty()) {
+      ctx.SetVariableTag(binding.name, binding.tag);
+    }
   }
 }
 
@@ -156,9 +242,8 @@ bool PatternBindsIdentifiers(const Expr* expr) {
 // constant's value, and §12.6.2 matches `e matches p` the same way; the
 // narrower operand is extended to the wider's width, as §12.5's case
 // comparison is, and every word of the two is compared, not the first alone.
-// A pattern bit that is x or z is taken as matching either value -- a grant
-// §12.6.1 gives only casez and casex -- and a value bit that is x or z reads
-// as 0, as ToUint64 reads it.
+// Both value planes take part: §12.6.1 lets matching ignore bits only in
+// casez and casex, so an x or a z bit matches an x or a z bit alone.
 bool MatchesClauseValueMatch(const Logic4Vec& value, const Logic4Vec& constant,
                              TokenKind /*case_kind*/, Arena& arena) {
   uint32_t width = std::max(value.width, constant.width);
@@ -170,17 +255,19 @@ bool MatchesClauseValueMatch(const Logic4Vec& value, const Logic4Vec& constant,
                       : constant;
   uint32_t nwords = std::min(lhs.nwords, rhs.nwords);
   for (uint32_t i = 0; i < nwords; ++i) {
-    uint64_t known = lhs.words[i].aval & ~lhs.words[i].bval;
-    uint64_t mask = ~rhs.words[i].bval;
-    if ((known & mask) != (rhs.words[i].aval & mask)) return false;
+    if (lhs.words[i].aval != rhs.words[i].aval ||
+        lhs.words[i].bval != rhs.words[i].bval) {
+      return false;
+    }
   }
   return true;
 }
 
-bool EvalMatchesPredicate(const Expr* pred, SimContext& ctx, Arena& arena) {
+Truth EvalPredicateTruth(const Expr* pred, SimContext& ctx, Arena& arena) {
   if (pred->kind == ExprKind::kBinary && pred->op == TokenKind::kAmpAmpAmp) {
-    return EvalMatchesPredicate(pred->lhs, ctx, arena) &&
-           EvalMatchesPredicate(pred->rhs, ctx, arena);
+    Truth first = EvalPredicateTruth(pred->lhs, ctx, arena);
+    if (first == Truth::kFalse) return first;
+    return ClauseConjunction(first, EvalPredicateTruth(pred->rhs, ctx, arena));
   }
   if (pred->kind == ExprKind::kBinary && pred->op == TokenKind::kKwMatches) {
     std::vector<PatternBinding> bindings;
@@ -188,12 +275,42 @@ bool EvalMatchesPredicate(const Expr* pred, SimContext& ctx, Arena& arena) {
                         bindings};
     if (!MatchPattern(pred->rhs, PatternSubjectOf(pred->lhs, ctx, arena),
                       env)) {
-      return false;
+      return Truth::kFalse;
     }
     InstallPatternBindings(bindings, ctx);
-    return true;
+    return Truth::kTrue;
   }
-  return EvalExpr(pred, ctx, arena).IsTruthy();
+  return TruthOf(EvalExpr(pred, ctx, arena));
+}
+
+bool EvalMatchesPredicate(const Expr* pred, SimContext& ctx, Arena& arena) {
+  return EvalPredicateTruth(pred, ctx, arena) == Truth::kTrue;
+}
+
+void BindPatternTypes(const Expr* pred, SimContext& ctx, Arena& arena) {
+  if (pred->kind != ExprKind::kBinary) return;
+  if (pred->op == TokenKind::kAmpAmpAmp) {
+    BindPatternTypes(pred->lhs, ctx, arena);
+    BindPatternTypes(pred->rhs, ctx, arena);
+  } else if (pred->op == TokenKind::kKwMatches) {
+    std::vector<PatternBinding> bindings;
+    PatternMatchEnv env{TokenKind::kKwCase,
+                        MatchesClauseValueMatch,
+                        ctx,
+                        arena,
+                        bindings,
+                        true};
+    MatchPattern(pred->rhs, PatternSubjectOf(pred->lhs, ctx, arena), env);
+    InstallPatternBindings(bindings, ctx);
+  }
+}
+
+bool EnterIfPredicate(const Expr* cond, SimContext& ctx, Arena& arena,
+                      bool& scoped) {
+  scoped = PatternBindsIdentifiers(cond);
+  if (!scoped) return EvalExpr(cond, ctx, arena).IsTruthy();
+  ctx.PushScope();
+  return EvalMatchesPredicate(cond, ctx, arena);
 }
 
 }  // namespace delta

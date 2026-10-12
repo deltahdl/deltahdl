@@ -494,4 +494,123 @@ TEST(IfMatchesSim, AFunctionBodyReadsTheBoundIdentifiers) {
       1077u);
 }
 
+// §12.6.2: a constant pattern matches the value bit for bit, x and z included;
+// only casez and casex ignore bits (§12.6.1). 4'b1x1x is not 4'b1010, 4'b0000
+// is not an all-x value, and 4'bxxxx is.
+TEST(IfMatchesSim, ConstantPatternComparesXAndZBits) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  logic [3:0] v = 4'b1010, w = 'x;\n"
+      "  int n = 0;\n"
+      "  initial begin\n"
+      "    if (v matches 4'b1x1x) n += 1;\n"
+      "    if (w matches 4'b0000) n += 10;\n"
+      "    if (w matches 4'bxxxx) n += 100;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "n");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 100u);
+}
+
+// §12.6 matches any expression of known type, an element of an array of
+// tagged unions included, whose assignment gives the element its tag.
+TEST(IfMatchesSim, TaggedPatternAgainstAnArrayElement) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+      "  VInt arr [2];\n"
+      "  int y = 0;\n"
+      "  initial begin\n"
+      "    arr[1] = tagged Valid 9;\n"
+      "    if (arr[1] matches tagged Valid .n) y = n; else y = -1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 9u);
+}
+
+// And a structure pattern against an element of an array of structures.
+TEST(IfMatchesSim, StructurePatternAgainstAnArrayElement) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  typedef struct { int a; int b; } P;\n"
+      "  P arr [2];\n"
+      "  int r = 0;\n"
+      "  initial begin\n"
+      "    arr[1] = '{5, 6};\n"
+      "    if (arr[1] matches '{.x, .z}) r = x * 10 + z; else r = -1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 56u);
+}
+
+// §12.6.2 allows the priority and unique qualifiers on an if whose predicate
+// holds matches clauses, and the identifiers a pattern binds are in scope in
+// the later clauses and the true arm.
+TEST(IfMatchesSim, PriorityIfBindsPatternIdentifiers) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+      "  VInt v = tagged Valid 7;\n"
+      "  int y;\n"
+      "  initial begin\n"
+      "    priority if (v matches tagged Valid .n &&& n > 3) y = n;\n"
+      "    else y = 0;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 7u);
+}
+
+// A unique if evaluates every condition, and its first matching arm reads
+// what its own predicate bound.
+TEST(IfMatchesSim, UniqueIfBindsPatternIdentifiers) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+      "  VInt v = tagged Valid 7;\n"
+      "  int y;\n"
+      "  initial begin\n"
+      "    unique if (v matches tagged Invalid) y = 1;\n"
+      "    else if (v matches tagged Valid .n &&& n > 3) y = n + 10;\n"
+      "    else y = 0;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 17u);
+}
+
+// The same in a function body, which runs on the subroutine executor.
+TEST(IfMatchesSim, QualifiedIfsBindPatternIdentifiersInAFunction) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module t;\n"
+      "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+      "  VInt v = tagged Valid 7;\n"
+      "  int y;\n"
+      "  function automatic int f();\n"
+      "    int r = 0;\n"
+      "    priority if (v matches tagged Valid .n &&& n > 3) r = n;\n"
+      "    else r = 0;\n"
+      "    unique0 if (v matches tagged Valid .k) r += k * 10;\n"
+      "    return r;\n"
+      "  endfunction\n"
+      "  initial y = f();\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 77u);
+}
+
 }  // namespace

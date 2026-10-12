@@ -290,4 +290,89 @@ TEST(ForeachDimensionSim, AFunctionBodyWalksADescendingStructureMemberDown) {
   EXPECT_EQ(var->value.ToUint64(), 321u);
 }
 
+// §12.7.3 types a foreach loop variable over a fixed-size, dynamic or queue
+// array as int, which is signed: over [-2:2] it takes two negative values, and
+// over a queue i - 1 is negative at i = 0. The result folds the two counts.
+TEST(ForeachLoopVariableSim, LoopVariableOfAnArrayOrQueueIsSignedInt) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int a [-2:2];\n"
+      "  int q [$] = '{1, 2};\n"
+      "  int r = 0;\n"
+      "  initial begin\n"
+      "    foreach (a[i]) if (i < 0) r += 10;\n"
+      "    foreach (q[i]) if (i - 1 < 0) r += 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 21u);
+}
+
+// The same in a function body, which runs on the subroutine executor.
+TEST(ForeachLoopVariableSim, LoopVariableInAFunctionIsSignedInt) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int a [-2:2];\n"
+      "  int q [$] = '{1, 2};\n"
+      "  int r;\n"
+      "  function automatic int count();\n"
+      "    int c = 0;\n"
+      "    foreach (a[i]) if (i < 0) c += 10;\n"
+      "    foreach (q[i]) if (i - 1 < 0) c += 1;\n"
+      "    return c;\n"
+      "  endfunction\n"
+      "  initial r = count();\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 21u);
+}
+
+// §12.7.3 treats a string as a dynamic array of bytes, so a foreach over one
+// in a function body steps once per character: two for "ab", not sixteen.
+TEST(ForeachLoopVariableSim, ForeachOverAStringInAFunctionStepsPerCharacter) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int r;\n"
+      "  function automatic int f(string s);\n"
+      "    int c = 0;\n"
+      "    foreach (s[i]) c++;\n"
+      "    return c;\n"
+      "  endfunction\n"
+      "  initial r = f(\"ab\");\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 2u);
+}
+
+// §12.7.3 gives a foreach one loop variable per dimension it names, the
+// array's own first and then its element type's, so over a queue of
+// two-element arrays j walks each element; in a function body as in a process.
+TEST(ForeachLoopVariableSim, SecondLoopVariableOverAQueueOfArraysInAFunction) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int r [$][2];\n"
+      "  int s;\n"
+      "  function automatic int sum();\n"
+      "    int t = 0;\n"
+      "    foreach (r[k, j]) t += r[k][j] * (j + 1);\n"
+      "    return t;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    r.push_back('{1, 2});\n"
+      "    r.push_back('{3, 4});\n"
+      "    s = sum();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "s");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 16u);
+}
+
 }  // namespace

@@ -12,6 +12,8 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 #include "simulator/class_object.h"
+#include "simulator/eval_array_class_queue.h"
+#include "simulator/eval_array_element_queue.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -82,6 +84,17 @@ static std::vector<ForeachDim> NamedDims(const Stmt* stmt,
   return named;
 }
 
+uint32_t ForeachArraySize(std::string_view name, SimContext& ctx) {
+  if (const ArrayInfo* info = ctx.FindArrayInfo(name)) return info->size;
+  const Variable* var = ctx.FindVariable(name);
+  if (var == nullptr) return 0;
+  // §12.7.3: a string is treated as a dynamic array of bytes, so the loop runs
+  // once per character. The value packs eight bits per character, so the
+  // character count is the bit width divided by eight.
+  if (ctx.IsStringVariable(name)) return var->value.width / 8;
+  return var->value.width;
+}
+
 std::vector<ForeachDim> DeclaredForeachDims(const Stmt* stmt, SimContext& ctx) {
   std::string name = GetForeachArrayName(stmt->expr);
   if (name.empty() || ctx.IsStringVariable(name)) return {};
@@ -133,7 +146,10 @@ std::vector<Variable*> CreateForeachDimVars(const std::vector<ForeachDim>& dims,
                                             SimContext& ctx) {
   std::vector<Variable*> vars;
   vars.reserve(dims.size());
-  for (const auto& d : dims) vars.push_back(ctx.CreateLocalVariable(d.var, 32));
+  // §12.7.3: a loop variable over a fixed-size or dynamic array is an int.
+  for (const auto& d : dims) {
+    vars.push_back(ctx.CreateLocalVariable(d.var, 32, /*is_signed=*/true));
+  }
   return vars;
 }
 
@@ -145,7 +161,45 @@ void SetForeachDimVars(const std::vector<ForeachDim>& dims,
     n /= dims[k].size;
     vars[k]->value = MakeLogic4VecVal(
         arena, 32, static_cast<uint64_t>(dims[k].IndexAt(pos)));
+    vars[k]->value.is_signed = true;
   }
+}
+
+ForeachElementDim ForeachElementDimOf(const Stmt* stmt,
+                                      const AssocArrayObject* aa,
+                                      SimContext& ctx, Arena& arena) {
+  ForeachElementDim dim;
+  if (stmt->foreach_vars.size() < 2 || stmt->foreach_vars[1].empty())
+    return dim;
+  if (aa != nullptr) {
+    if (!aa->elements_are_queues) return dim;
+    dim.assoc = aa;
+  } else {
+    const QueueObject* q = FindQueueOfBase(stmt->expr, ctx, arena);
+    if (q == nullptr || !q->elements_are_queues) return dim;
+    dim.queue = q;
+  }
+  dim.var =
+      ctx.CreateLocalVariable(stmt->foreach_vars[1], 32, /*is_signed=*/true);
+  return dim;
+}
+
+const QueueObject* ForeachElementQueue(const ForeachElementDim& dim,
+                                       const std::vector<Logic4Vec>& keys,
+                                       uint32_t i, Arena& arena) {
+  if (dim.assoc != nullptr)
+    return AssocElementQueueAt(*dim.assoc, keys[i], arena);
+  return ElementQueueOrDefault(*dim.queue, i, arena);
+}
+
+Logic4Vec ForeachElementIndex(const QueueObject& element, uint32_t p,
+                              Arena& arena) {
+  auto size = static_cast<int64_t>(element.elements.size());
+  int64_t index = element.index_descending ? element.index_lo + size - 1 - p
+                                           : element.index_lo + p;
+  Logic4Vec value = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(index));
+  value.is_signed = true;
+  return value;
 }
 
 }  // namespace delta

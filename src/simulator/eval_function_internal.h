@@ -22,6 +22,7 @@ struct Stmt;
 class SimContext;
 class Arena;
 struct Process;
+struct Variable;
 
 // §6.11.2 names the 4-state types, logic, reg, integer and time, and gives
 // every other type no unknown values, which decides whether an unknown
@@ -42,6 +43,16 @@ struct StaticFrame {
   std::string_view name;
   bool is_static_sub = false;
 };
+
+// §6.8 with §6.21: creates the local `name` of the declared type `type` in the
+// innermost scope, with everything the type gives it -- width, signedness,
+// 2- or 4-state, real, string, event, enumeration, class handle and aggregate
+// layout -- and `init` assigned to it, or the type's default where `init` is
+// null. Defined in eval_function_body_decl.cpp, where a subroutine body's
+// declarations are made; a for loop's declared control variables (§12.7.1)
+// are made through it in both executors.
+Variable* CreateFuncLocalVar(std::string_view name, const DataType& type,
+                             const Expr* init, SimContext& ctx, Arena& arena);
 
 // §13.3 and §13.4 with §6.8: executes the variable declaration `stmt` of the
 // body of a subroutine -- the local's storage, kinds, default and
@@ -120,7 +131,6 @@ Logic4Vec EvalVcdSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
 // The subroutine argument-binding helpers are defined in
 // eval_function_args.cpp; ExecFunctionBody and the statement executor it drives
 // are defined in eval_function_body.cpp.
-struct Variable;
 struct ClassObject;
 void BindFunctionArgs(const ModuleItem* func, const Expr* expr, SimContext& ctx,
                       Arena& arena);

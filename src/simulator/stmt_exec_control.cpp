@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -16,7 +17,6 @@
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
-#include "simulator/eval_array_element_queue.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_member_path.h"
@@ -141,17 +141,26 @@ struct UniqueIfResult {
   const Stmt* first_match = nullptr;
   int match_count = 0;
   bool has_final_else = false;
+  bool scoped = false;
 };
 
+// §12.4.2: every condition of the chain is evaluated. §12.6.2: the first
+// matching one that binds pattern identifiers keeps the scope they were
+// created in (EnterIfPredicate) for its true arm, `result.scoped` saying so.
 static UniqueIfResult EvalUniqueIfChain(const Stmt* stmt, SimContext& ctx,
                                         Arena& arena) {
   UniqueIfResult result;
   for (const Stmt* cur = stmt; cur && cur->kind == StmtKind::kIf;
        cur = cur->else_branch) {
-    auto cond = EvalExpr(cur->condition, ctx, arena);
-    if (cond.IsTruthy()) {
-      result.match_count++;
-      if (!result.first_match) result.first_match = cur;
+    bool scoped = false;
+    bool holds = EnterIfPredicate(cur->condition, ctx, arena, scoped);
+    bool first = holds && result.first_match == nullptr;
+    if (holds) result.match_count++;
+    if (first) {
+      result.first_match = cur;
+      result.scoped = scoped;
+    } else if (scoped) {
+      ctx.PopScope();
     }
     if (cur->else_branch && cur->else_branch->kind != StmtKind::kIf) {
       result.has_final_else = true;
@@ -175,10 +184,12 @@ static ExecTask ExecUniqueIf(const Stmt* stmt, CaseQualifier qual,
   if (info.match_count > 1) {
     ctx.AddPendingViolation(stmt->range.start,
                             "unique if: multiple conditions matched",
-                            Subclause("12.4.2.1"));
+                            Subclause("12.4.2.1"), qual);
   }
   if (info.first_match) {
-    co_return co_await ExecStmt(info.first_match->then_branch, ctx, arena);
+    auto r = co_await ExecStmt(info.first_match->then_branch, ctx, arena);
+    if (info.scoped) ctx.PopScope();
+    co_return r;
   }
   if (info.has_final_else) {
     const Stmt* final_else = FindFinalElse(stmt);
@@ -187,33 +198,29 @@ static ExecTask ExecUniqueIf(const Stmt* stmt, CaseQualifier qual,
   if (!info.has_final_else && qual == CaseQualifier::kUnique) {
     ctx.AddPendingViolation(stmt->range.start,
                             "unique if: no condition matched",
-                            Subclause("12.4.2.1"));
+                            Subclause("12.4.2.1"), qual);
   }
   co_return StmtResult::kDone;
 }
 
 static ExecTask ExecPriorityIf(const Stmt* stmt, SimContext& ctx,
                                Arena& arena) {
-  bool has_final_else = false;
   for (const Stmt* cur = stmt; cur && cur->kind == StmtKind::kIf;
        cur = cur->else_branch) {
-    auto cond = EvalExpr(cur->condition, ctx, arena);
-    if (cond.IsTruthy()) {
-      co_return co_await ExecStmt(cur->then_branch, ctx, arena);
+    bool scoped = false;
+    if (EnterIfPredicate(cur->condition, ctx, arena, scoped)) {
+      auto r = co_await ExecStmt(cur->then_branch, ctx, arena);
+      if (scoped) ctx.PopScope();
+      co_return r;
     }
-    if (cur->else_branch && cur->else_branch->kind != StmtKind::kIf) {
-      has_final_else = true;
-    }
+    if (scoped) ctx.PopScope();
   }
-  if (has_final_else) {
-    const Stmt* final_else = FindFinalElse(stmt);
-    if (final_else) co_return co_await ExecStmt(final_else, ctx, arena);
+  if (const Stmt* final_else = FindFinalElse(stmt)) {
+    co_return co_await ExecStmt(final_else, ctx, arena);
   }
-  if (!has_final_else) {
-    ctx.AddPendingViolation(stmt->range.start,
-                            "priority if: no condition matched",
-                            Subclause("12.4.2.1"));
-  }
+  ctx.AddPendingViolation(stmt->range.start,
+                          "priority if: no condition matched",
+                          Subclause("12.4.2.1"), CaseQualifier::kPriority);
   co_return StmtResult::kDone;
 }
 
@@ -261,28 +268,19 @@ ExecTask ExecIf(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return r;
 }
 
-static void CreateForInitVars(const Stmt* stmt, SimContext& ctx) {
+static void CreateForInitVars(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   for (size_t i = 0; i < stmt->for_inits.size(); ++i) {
     if (i >= stmt->for_init_types.size()) break;
     if (stmt->for_init_types[i].kind == DataTypeKind::kImplicit) continue;
     auto* init = stmt->for_inits[i];
     if (!init || !init->lhs) continue;
-    uint32_t w = DeclaredTypeWidth(stmt->for_init_types[i], ctx);
-    if (w == 0) w = 32;
-    // §6.11.3: byte, shortint, int, integer and longint default to signed, so
-    // the declared type decides the loop variable's signedness as it decides
-    // any other local's. Created from the width alone, an int counter compared
-    // its negative values as huge positive ones.
-    auto* v = ctx.CreateLocalVariable(
-        init->lhs->text, w, DeclaredTypeIsSigned(stmt->for_init_types[i], ctx));
-    // §6.11.2: a 4-state value converted automatically to a 2-state one has
-    // every unknown or high-impedance bit turned to zero, and it is this flag
-    // that WriteVar consults to make the conversion when the initializer runs
-    // as an ordinary assignment below. It defaults to true, so an `int` counter
-    // initialized from a 4-state variable kept the unknown bits the clause
-    // converts. The width needs no such repair here: the assignment goes
-    // through WriteVar, which applies §10.7 to the cell this created.
-    v->is_4state = DeclaredTypeIs4State(stmt->for_init_types[i], ctx);
+    // §12.7.1: a declared control variable is a local of the type the
+    // initialization writes -- its width and signedness (§6.11.3), 2- or
+    // 4-state (§6.11.2), and a real, string, enumeration or class handle kind
+    // -- made as a subroutine body's local of that type is. Its initializer
+    // runs below as the ordinary assignment it is.
+    CreateFuncLocalVar(init->lhs->text, stmt->for_init_types[i], nullptr, ctx,
+                       arena);
   }
 }
 
@@ -366,7 +364,7 @@ ExecTask ExecFor(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   EnterLoopLabelScope(stmt, ctx, labeled);
   bool scoped = HasTypedForInit(stmt);
   if (scoped) ctx.PushScope();
-  CreateForInitVars(stmt, ctx);
+  CreateForInitVars(stmt, ctx, arena);
   for (auto* init : stmt->for_inits) co_await ExecStmt(init, ctx, arena);
   while (ProcessGoesOn(ctx)) {
     if (!ForConditionHolds(stmt, ctx, arena)) break;
@@ -420,12 +418,20 @@ ExecTask ExecForever(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 // expression, already evaluated once before the loop begins. An unknown or
 // high-impedance value, or a negative value of a signed expression, yields no
 // iterations.
-static uint64_t RepeatIterationCount(const Logic4Vec& count_val) {
+// §6.12.1 rounds a real count to the integer it converts to.
+uint64_t RepeatIterationCount(const Logic4Vec& count_val) {
+  if (count_val.is_real) {
+    double rounded = std::round(RealVecToDouble(count_val));
+    return rounded <= 0 ? 0 : static_cast<uint64_t>(std::min(rounded, 1.8e19));
+  }
   if (!count_val.IsKnown()) return 0;
   if (count_val.is_signed && count_val.width > 0) {
     uint32_t msb_word = (count_val.width - 1) / 64;
     uint64_t msb_mask = uint64_t{1} << ((count_val.width - 1) % 64);
     if (count_val.words[msb_word].aval & msb_mask) return 0;
+  }
+  for (uint32_t i = 1; i < count_val.nwords; ++i) {
+    if (count_val.words[i].aval != 0) return UINT64_MAX;
   }
   return count_val.ToUint64();
 }
@@ -471,16 +477,7 @@ ExecTask ExecDoWhile(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
 static uint32_t GetArraySize(const Stmt* stmt, SimContext& ctx) {
   std::string name = GetForeachArrayName(stmt->expr);
-  if (name.empty()) return 0;
-  auto* info = ctx.FindArrayInfo(name);
-  if (info) return info->size;
-  auto* var = ctx.FindVariable(name);
-  if (!var) return 0;
-  // §12.7.3: a string is treated as a dynamic array of bytes, so the loop runs
-  // once per character. The value packs eight bits per character, so the
-  // character count is the bit width divided by eight.
-  if (ctx.IsStringVariable(name)) return var->value.width / 8;
-  return var->value.width;
+  return name.empty() ? 0 : ForeachArraySize(name, ctx);
 }
 
 // §12.7.3: foreach is illegal on a wildcard-indexed associative array. Reports
@@ -605,6 +602,7 @@ static void SetForeachIterVar(Variable* iter_var, const ForeachSetup& setup,
   }
   iter_var->value =
       MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(setup.lo + i));
+  iter_var->value.is_signed = iter_var->is_signed;
 }
 
 // Creates the loop variable `iter_name` names in the scope ExecForeach
@@ -616,10 +614,12 @@ static Variable* CreateForeachIterVar(std::string_view iter_name,
   if (iter_name.empty()) return nullptr;
   Variable* iter_var = ctx.CreateLocalVariable(iter_name, 32);
   TypeForeachIterVar(iter_name, setup.aa, ctx);
-  // §7.8.4: a signed integral index type, `byte` or `bit signed [4:1]`,
-  // makes the loop variable signed, so the key -3 reads -3.
-  iter_var->is_signed = setup.aa != nullptr && !setup.aa->is_string_key &&
-                        setup.aa->is_index_signed;
+  // §12.7.3: over a fixed-size, dynamic or queue array the loop variable is
+  // an int, which is signed. §7.8.4: over an associative array a signed
+  // integral index type, `byte` or `bit signed [4:1]`, makes it signed, so the
+  // key -3 reads -3.
+  iter_var->is_signed = setup.aa == nullptr ||
+                        (!setup.aa->is_string_key && setup.aa->is_index_signed);
   return iter_var;
 }
 
@@ -661,52 +661,6 @@ static ExecTask ExecForeachDims(const Stmt* stmt, SimContext& ctx, Arena& arena,
   co_return StmtResult::kDone;
 }
 
-// §12.7.3 with §7.4, §7.8 and §7.10: the second loop variable of a foreach
-// over a queue, dynamic array or associative array whose elements are queues
-// or fixed-size arrays, `foreach (r[k, j])` over `int r[$][2]`, steps through
-// the indices of the element the first names, which is its own queue. `var`
-// is that variable, null where the loop names none or the array's elements
-// are no queues; `queue` or `assoc` the array.
-struct ForeachElementDim {
-  Variable* var = nullptr;
-  const QueueObject* queue = nullptr;
-  const AssocArrayObject* assoc = nullptr;
-};
-
-static ForeachElementDim ForeachElementDimOf(const Stmt* stmt,
-                                             const ForeachSetup& setup,
-                                             SimContext& ctx, Arena& arena) {
-  ForeachElementDim dim;
-  if (stmt->foreach_vars.size() < 2 || stmt->foreach_vars[1].empty())
-    return dim;
-  if (setup.aa != nullptr) {
-    if (!setup.aa->elements_are_queues) return dim;
-    dim.assoc = setup.aa;
-  } else {
-    const QueueObject* q = FindQueueOfBase(stmt->expr, ctx, arena);
-    if (q == nullptr || !q->elements_are_queues) return dim;
-    dim.queue = q;
-  }
-  dim.var = ctx.CreateLocalVariable(stmt->foreach_vars[1], 32);
-  return dim;
-}
-
-// The queue of the element iteration `i` of the outer loop names.
-static const QueueObject* ForeachElementQueue(const ForeachElementDim& dim,
-                                              const ForeachSetup& setup,
-                                              uint32_t i, Arena& arena) {
-  if (dim.assoc != nullptr)
-    return AssocElementQueueAt(*dim.assoc, setup.keys[i], arena);
-  return ElementQueueOrDefault(*dim.queue, i, arena);
-}
-
-// The index position `p` of the element queue `q` stands for: a fixed-size
-// element's declared index from its left bound, a queue's position itself.
-static int64_t ElementIndexAt(const QueueObject& q, uint32_t p) {
-  auto size = static_cast<int64_t>(q.elements.size());
-  return q.index_descending ? q.index_lo + size - 1 - p : q.index_lo + p;
-}
-
 // The body of the foreach `stmt` run once per index of `element`, the
 // second loop variable `var` taking each: answers what the outer loop is to
 // do next, as one run of the body would -- kBreak where the body broke out,
@@ -717,8 +671,7 @@ static ExecTask ExecForeachElement(const Stmt* stmt, SimContext& ctx,
                                    const QueueObject* element) {
   for (uint32_t p = 0; p < element->elements.size() && !ctx.StopRequested();
        ++p) {
-    var->value = MakeLogic4VecVal(
-        arena, 32, static_cast<uint64_t>(ElementIndexAt(*element, p)));
+    var->value = ForeachElementIndex(*element, p, arena);
     auto result = co_await ExecStmt(stmt->body, ctx, arena);
     if (ClassifyLoopBodyResult(result) != LoopAction::kKeepLooping)
       co_return result;
@@ -744,7 +697,7 @@ ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
   ctx.PushScope();
   Variable* iter_var = CreateForeachIterVar(iter_name, setup, ctx);
-  ForeachElementDim inner = ForeachElementDimOf(stmt, setup, ctx, arena);
+  ForeachElementDim inner = ForeachElementDimOf(stmt, setup.aa, ctx, arena);
 
   for (uint32_t i = 0; i < size && !ctx.StopRequested(); ++i) {
     SetForeachIterVar(iter_var, setup, i, arena);
@@ -752,7 +705,7 @@ ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
                       ? co_await ExecStmt(stmt->body, ctx, arena)
                       : co_await ExecForeachElement(
                             stmt, ctx, arena, inner.var,
-                            ForeachElementQueue(inner, setup, i, arena));
+                            ForeachElementQueue(inner, setup.keys, i, arena));
     auto action = ClassifyLoopBodyResult(result);
     if (action == LoopAction::kBreakLoop) break;
     if (action == LoopAction::kPropagate) {
