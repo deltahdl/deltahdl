@@ -91,7 +91,7 @@ void Lowerer::LowerParam(const RtlirParamDecl& p, std::string_view full) {
     CreateParamArray(p, full, ctx_, arena_);
     return;
   }
-  if (!p.is_resolved) return;
+  if (!p.is_resolved && !UnfoldedParamEvaluable(p, ctx_)) return;
   // §6.20.2: a parameter declared real holds a real value, so it is lowered
   // the way a real variable is -- the double's bit pattern in 64 bits, marked
   // real and registered as one. Everything that reads a real reads it from

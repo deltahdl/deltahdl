@@ -66,10 +66,10 @@ bool IsValueLiteral(const Expr* e) {
 
 // The type a context gives, followed through the typedef table to the type it
 // stands for. A name the table holds nothing for -- a class, a type parameter
-// -- a type reference, and a chain of names running through one of them twice
-// say nothing the walk can judge, and answer nullptr.
+// -- and a chain of names running through one of them twice say nothing the
+// walk can judge, and answer nullptr. A declaration written with a type
+// reference has had it resolved to the type it names by now.
 const DataType* TaggedContextWalk::Resolve(const DataType* type) const {
-  if (type->type_ref_expr != nullptr) return nullptr;
   return TypeAtChainEnd(*type, typedefs_);
 }
 
@@ -172,9 +172,12 @@ void TaggedContextWalk::CheckCast(const Expr* e) {
 // §13.5: an actual binds to a formal by position or by name, and the formal's
 // type is the context of the actual. Only a call naming a function of this
 // module by its bare name reaches one of `functions_`; a method's, a
-// hierarchical name's and a compilation unit's function are other functions.
+// hierarchical name's and a compilation unit's function are other functions,
+// and a class's `new`, which the parser writes as a call naming no callee
+// expression, is none of the module's.
 void TaggedContextWalk::CheckCallArgs(const Expr* e) {
-  if (e->lhs->kind != ExprKind::kIdentifier || !e->lhs->scope_prefix.empty())
+  if (e->lhs == nullptr || e->lhs->kind != ExprKind::kIdentifier ||
+      !e->lhs->scope_prefix.empty())
     return;
   auto it = functions_.find(e->callee);
   if (it == functions_.end()) return;

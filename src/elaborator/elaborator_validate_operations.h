@@ -139,6 +139,7 @@ class ElaboratorOperationRules : public ElaboratorData {
   void WalkExprForRealOps(const Expr* expr);
   void WalkStmtsForRealOps(const Stmt* s);
   void WalkItemsForRealOps(const std::vector<ModuleItem*>& items);
+  void WalkSubroutineForRealOps(const ModuleItem* item);
 
   // §6.24.1: size-cast width and size/signing-cast integral-operand rules, and
   // §11.7's same integral-argument rule for $signed and $unsigned.

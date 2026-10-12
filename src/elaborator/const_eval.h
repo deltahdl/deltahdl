@@ -251,6 +251,11 @@ bool IsConstantExpr(const Expr* expr, const ScopeMap& scope);
 // invoke per §13.4.3 constraint (g).
 bool IsConstantSysFunc(std::string_view name);
 
+// §5.13 with §7.12, §6.16 and §6.19.5: the member access a built-in method
+// call is written through, `q.size()` or, the parentheses dropped, `q.size`;
+// null for any other expression. Defined in const_eval_builtin_method.cpp.
+const Expr* BuiltinMethodMember(const Expr* expr);
+
 std::string LongestStaticPrefix(const Expr* expr, const ScopeMap& scope = {});
 
 // The longest static prefix of `expr` as the simulator names the object it

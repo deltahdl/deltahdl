@@ -392,7 +392,7 @@ TEST(AggregateExpr, EquivalentArraySliceInequality) {
       "  typedef logic [7:0] arr_t [0:7];\n"
       "  arr_t x, y;\n"
       "  logic neq;\n"
-      "  initial neq = (x[0:3] != y[0:3]);\n"
+      "  initial neq = (x[0:3] != y[0:4]);\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -403,6 +403,7 @@ TEST(AggregateExpr, NonEquivalentArraySliceInequalityError) {
   // Negative form: an inequality between slices of non-equivalent array types
   // is rejected just as the equality comparison is, under the same §6.22.2
   // definition of equivalent type that §11.2.2 requires the operands to meet.
+  // Slices of four and five elements are not of one shape.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -411,7 +412,7 @@ TEST(AggregateExpr, NonEquivalentArraySliceInequalityError) {
       "  arr_a x;\n"
       "  arr_b y;\n"
       "  logic neq;\n"
-      "  initial neq = (x[0:3] != y[0:3]);\n"
+      "  initial neq = (x[0:3] != y[0:4]);\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);

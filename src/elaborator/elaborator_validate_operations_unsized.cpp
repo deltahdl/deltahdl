@@ -44,9 +44,11 @@ void CheckConcatElementsForUnsized(const Expr* concat, DiagEngine& diag) {
 void ElaboratorOperationRules::WalkExprForUnsizedInConcat(const Expr* expr) {
   if (!expr) return;
   // §11.4.12.1 makes a replication a multiple concatenation, so its operands
-  // are held to the same rule as a concatenation's.
+  // are held to the same rule as a concatenation's. The replication an
+  // assignment pattern writes, '{3{0}}, is the pattern's own (§10.9.1), whose
+  // items are expressions an unpacked target takes one by one.
   if (expr->kind == ExprKind::kConcatenation ||
-      expr->kind == ExprKind::kReplicate) {
+      (expr->kind == ExprKind::kReplicate && !expr->is_pattern_replication)) {
     CheckConcatElementsForUnsized(expr, diag_);
   }
   WalkExprForUnsizedInConcat(expr->lhs);

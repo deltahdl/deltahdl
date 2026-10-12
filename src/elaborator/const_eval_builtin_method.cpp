@@ -67,6 +67,8 @@ bool IsBuiltinMethodName(std::string_view method) {
          kBuiltinMethodNames.end();
 }
 
+}  // namespace
+
 // The member access a built-in method call is written through. `q.size()`
 // parses as a call whose left operand is the access, and §5.13 makes the
 // parentheses optional -- a built-in method call with no arguments may leave
@@ -92,6 +94,8 @@ const Expr* BuiltinMethodMember(const Expr* expr) {
   if (!IsBuiltinMethodName(member->rhs->text)) return nullptr;
   return member;
 }
+
+namespace {
 
 // The variable the installed module declares under `name`, or null when no
 // ParamRangeRegistryGuard is live or that module declares no such variable. The

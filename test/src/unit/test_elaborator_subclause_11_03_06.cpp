@@ -248,7 +248,7 @@ TEST(AssignInExprElaboration, AssignmentWithinForceExpressionReported) {
 TEST(AssignInExprElaboration, AssignmentOutsideProceduralStatementReported) {
   ElabFixture f;
   ElaborateSrc(
-      "module sub(input int p); endmodule\n"
+      "module sub(input var int p); endmodule\n"
       "module m;\n"
       "  int y, z;\n"
       "  int x = (y = 1);\n"

@@ -73,7 +73,7 @@ DataTypeKind ResolvedTypeKind(const DataType& dtype,
 // ResolvedTypeKind answers the named kind for every chain that does not end
 // in a type, so a chain it resolves is followed to its end unbounded.
 const DataType* TypeAtChainEnd(const DataType& dtype,
-                             const TypedefMap& typedefs) {
+                               const TypedefMap& typedefs) {
   if (ResolvedTypeKind(dtype, typedefs) == DataTypeKind::kNamed) return nullptr;
   const DataType* type = &dtype;
   while (type->kind == DataTypeKind::kNamed)

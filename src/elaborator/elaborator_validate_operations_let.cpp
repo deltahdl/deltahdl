@@ -221,7 +221,8 @@ class LetActualCheck {
   }
 
   void CheckCall(const Expr* e) {
-    if (e->kind != ExprKind::kCall || e->lhs->kind != ExprKind::kIdentifier)
+    if (e->kind != ExprKind::kCall || e->lhs == nullptr ||
+        e->lhs->kind != ExprKind::kIdentifier)
       return;
     auto it = lets_.find(e->callee);
     if (it == lets_.end()) return;

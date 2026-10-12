@@ -616,9 +616,9 @@ TEST(BitsOfDeclaration, WideLiteralOfEachBaseCarriesItsHighBits) {
 }
 
 // §11.5.1 (printed page 296): a bit-select at or above bit 64 reads the bit
-// the digits wrote there, a part-select running off the bottom of the value
-// keeps its in-range bits at their places in the field with the bits below
-// read as 0, and a bit-select below the range reads 0.
+// the digits wrote there. A part-select running off the bottom of the value,
+// and a bit-select below its range, read x for the bits outside it, P being a
+// 4-state vector; a folded constant holds no x, so neither folds.
 TEST(BitsOfDeclaration, BitSelectAboveSixtyFourAndBelowZero) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -635,8 +635,8 @@ TEST(BitsOfDeclaration, BitSelectAboveSixtyFourAndBelowZero) {
   EXPECT_EQ(ParamValue(design, "B64"), 1);
   EXPECT_EQ(ParamValue(design, "B67"), 0);
   EXPECT_EQ(ParamValue(design, "B95"), 0);
-  EXPECT_EQ(ParamValue(design, "LOW"), 0x30);
-  EXPECT_EQ(ParamValue(design, "NEG"), 0);
+  EXPECT_TRUE(ParamUnresolved(design, "LOW"));
+  EXPECT_TRUE(ParamUnresolved(design, "NEG"));
 }
 
 // §11.4.8 combines two 96-bit operands bit by bit across all 96, and §11.4.10

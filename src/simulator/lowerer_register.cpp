@@ -178,6 +178,13 @@ void ReevaluateParamValue(const RtlirParamDecl& param, Variable* var,
   ctx.SetLoweringInstancePrefix(own);
 }
 
+bool UnfoldedParamEvaluable(const RtlirParamDecl& param, SimContext& ctx) {
+  const Expr* expr = param.override_expr != nullptr ? param.override_expr
+                                                    : param.default_value;
+  return !param.is_type_param && expr != nullptr &&
+         EveryNameHasStorage(expr, ctx);
+}
+
 uint64_t NetDecayTicks(const RtlirNet& net, const TimeScale& scale,
                        TimeUnit precision) {
   if (net.decay_is_real) {

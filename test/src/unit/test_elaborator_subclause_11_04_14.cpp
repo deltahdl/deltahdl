@@ -375,7 +375,7 @@ TEST(StreamingConcatElaboration, StreamAsInitializerOrReturnValueAccepted) {
              "    return {<< {v}};\n"
              "  endfunction\n"
              "  initial begin\n"
-             "    int z = {<< {x}};\n"
+             "    automatic int z = {<< {x}};\n"
              "  end\n"
              "endmodule\n"));
 }

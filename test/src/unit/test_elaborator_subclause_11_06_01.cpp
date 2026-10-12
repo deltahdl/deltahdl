@@ -481,7 +481,7 @@ TEST(ExpressionBitLength, SignedOperandsExtendBySignOnlyWhenAllAreSigned) {
 TEST(ExpressionBitLengthElaboration, ConstantConditionalTakesBothBranchesType) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "module t;\n"
+      "module m;\n"
       "  localparam logic [11:0] P = {4'h1, (1'b1 ? 4'hF : 8'h00)};\n"
       "  localparam int Q = 1'b1 ? 4'sb1111 : 4'd0;\n"
       "  localparam int R = 1'b1 ? 4'sb1111 : 4'sd0;\n"

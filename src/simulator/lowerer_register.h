@@ -209,6 +209,13 @@ void RegisterUnitClassVariables(const RtlirDesign* design, SimContext& ctx,
 void ReevaluateParamValue(const RtlirParamDecl& param, Variable* var,
                           SimContext& ctx, Arena& arena);
 
+// §11.5.1 with §6.20.2: whether a value parameter the elaborator's fold left
+// without a value -- a select reaching outside its vector, whose x the fold
+// cannot hold -- can take one from its expression at lowering, every name the
+// expression reads having storage by then. A type parameter holds a type, and
+// a parameter written with no value has none to take.
+bool UnfoldedParamEvaluable(const RtlirParamDecl& param, SimContext& ctx);
+
 // The storage of one declared net under `name`, the net itself and, for an
 // unpacked array of nets, a net for each element.
 void CreateDeclaredNet(std::string_view name, const RtlirNet& net,

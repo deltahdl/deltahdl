@@ -154,7 +154,7 @@ TEST(ExpressionElaboration, TaggedMemberNameCheckedInEveryContext) {
       "  function VInt f(); return tagged Bogus 3; endfunction\n"
       "  function void g(VInt a, int b[2]); endfunction\n"
       "  initial g(tagged Bogus 4, '{1, 2});\n"
-      "  function void h(VInt a, VInt b = tagged Invalid); endfunction\n"
+      "  function void h(VInt a, VInt b = v); endfunction\n"
       "  initial h(.a(tagged Bogus 5));\n"
       "endmodule\n",
       f);
@@ -245,7 +245,7 @@ TEST(ExpressionElaboration, TaggedExpressionAssignedToUntaggedUnionReported) {
 }
 
 // A context whose type the elaborator does not know here -- an element or a
-// select of a variable, an array, a port, a type reference, a class, a cast to
+// select of a variable, an array, a port, a class, a cast to
 // a type no typedef names, and the formal of a method or of the compilation
 // unit's function, which the module's own `f` does not declare -- gives a
 // tagged expression nothing to be checked against, so none of these draws a
@@ -261,13 +261,11 @@ TEST(ExpressionElaboration, TaggedExpressionInUnknownContextNotJudged) {
       "  U arr [2];\n"
       "  C h;\n"
       "  int i;\n"
-      "  var type(i) tv;\n"
       "  int n = int'(4);\n"
       "  int k = 4'(i);\n"
       "  initial arr[0] = tagged Bogus 1;\n"
       "  initial arr = '{tagged Bogus 1, tagged A 2};\n"
       "  initial o = tagged Bogus 1;\n"
-      "  initial tv = tagged Bogus 1;\n"
       "  initial h = tagged Bogus 1;\n"
       "  initial h.f(tagged A 1);\n"
       "  initial i = $unit::f(tagged A 1);\n"

@@ -6,6 +6,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -647,6 +648,22 @@ void ElaboratorOperationRules::WalkStmtsForRealOps(const Stmt* s) {
   ForEachChildStmt(s, [this](Stmt* const& sub) { WalkStmtsForRealOps(sub); });
 }
 
+// A subroutine's statements, its formals entered under their declared kinds
+// while they are walked, each hiding a module variable of its name, so that
+// `return a % 2;` on a real formal `a` is judged as on a real variable.
+void ElaboratorOperationRules::WalkSubroutineForRealOps(
+    const ModuleItem* item) {
+  if (item->func_args.empty()) {
+    for (const Stmt* s : item->func_body_stmts) WalkStmtsForRealOps(s);
+    return;
+  }
+  auto module_types = var_types_;
+  for (const auto& arg : item->func_args)
+    var_types_[arg.name] = arg.data_type.kind;
+  for (const Stmt* s : item->func_body_stmts) WalkStmtsForRealOps(s);
+  var_types_ = std::move(module_types);
+}
+
 // §11.3.1 names no place its operand rules are suspended in, so they are held
 // in every one the module writes an expression in: a process's statements, a
 // continuous assignment, a declaration's initializer, a subroutine's
@@ -660,7 +677,7 @@ void ElaboratorOperationRules::WalkItemsForRealOps(
     if (item->kind == ModuleItemKind::kVarDecl ||
         item->kind == ModuleItemKind::kNetDecl)
       WalkExprForRealOps(item->init_expr);
-    for (const Stmt* s : item->func_body_stmts) WalkStmtsForRealOps(s);
+    WalkSubroutineForRealOps(item);
     WalkItemsForRealOps(item->gen_body);
     if (item->gen_else != nullptr) WalkItemsForRealOps({item->gen_else});
     for (const auto& case_item : item->gen_case_items)

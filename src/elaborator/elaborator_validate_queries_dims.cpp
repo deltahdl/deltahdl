@@ -603,6 +603,11 @@ static bool ExprContainsHierRef(const Expr* e, const CompilationUnit* unit) {
     return ExprContainsHierRef(e->lhs->lhs, unit) ||
            AnyExprContainsHierRef(e->args, unit);
   }
+  // §5.13 lets a built-in method called with no arguments drop its
+  // parentheses, so `e.last` is the call `e.last()` and is judged as the call
+  // is, by the expression it is called on.
+  if (e->kind == ExprKind::kMemberAccess && BuiltinMethodMember(e) != nullptr)
+    return ExprContainsHierRef(e->lhs, unit);
   if (e->kind == ExprKind::kMemberAccess) return !e->is_scope_resolution;
   for (const Expr* sub :
        {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr}) {
