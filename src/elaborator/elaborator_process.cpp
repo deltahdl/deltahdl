@@ -1,7 +1,9 @@
 #include <algorithm>
+#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -331,8 +333,41 @@ static void CollectProcedureLhsPrefixes(const Stmt* body,
     CollectFuncLhsPrefixes(body, *func_map, out, scope);
 }
 
+// A prefix ending in a constant select, `v[5]` or `v[4:7]` as
+// LongestStaticPrefix spells it: the text before that select and the lowest
+// and highest addresses it reaches. Nothing for a prefix ending otherwise.
+struct TrailingSelect {
+  std::string_view base;
+  int64_t low;
+  int64_t high;
+};
+
+static std::optional<TrailingSelect> SplitTrailingSelect(std::string_view p) {
+  const size_t kOpen = p.rfind('[');
+  if (kOpen == std::string_view::npos || p.back() != ']') return std::nullopt;
+  const char* begin = p.data() + kOpen + 1;
+  const char* end = p.data() + p.size() - 1;
+  // LongestStaticPrefix writes only decimal addresses between the brackets, so
+  // the text there always reads as one, or as two around a colon.
+  TrailingSelect sel{p.substr(0, kOpen), 0, 0};
+  const std::from_chars_result kLow = std::from_chars(begin, end, sel.low);
+  sel.high = sel.low;
+  if (kLow.ptr != end) {
+    const std::from_chars_result kHigh =
+        std::from_chars(kLow.ptr + 1, end, sel.high);
+    static_cast<void>(kHigh);
+  }
+  return sel;
+}
+
 static bool PrefixesOverlap(const std::string& a, const std::string& b) {
   if (a == b) return true;
+  // §11.5.3: two constant selects of one base overlap where the addresses
+  // they reach do, `v[4:7]` and `v[5]` among them.
+  auto sa = SplitTrailingSelect(a);
+  auto sb = SplitTrailingSelect(b);
+  if (sa && sb && sa->base == sb->base)
+    return sa->low <= sb->high && sb->low <= sa->high;
   if (a.size() < b.size())
     return b.compare(0, a.size(), a) == 0 &&
            (b[a.size()] == '.' || b[a.size()] == '[');

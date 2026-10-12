@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -223,6 +225,44 @@ TEST(AssignmentWithinExpressionElaboration,
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "assignment operator within expression is illegal",
                             5, "11.3.6"));
+}
+
+// §11.3.6 bars an assignment operator from an expression within a procedural
+// continuous assignment, and force is one (§10.6.2) as assign is.
+TEST(AssignInExprElaboration, AssignmentWithinForceExpressionReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, b, c;\n"
+      "  initial force c = (a = b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment operator within expression is illegal "
+                            "in this context",
+                            3, "11.3.6"));
+}
+
+// §11.3.6 also bars one from an expression outside any procedural statement:
+// a declaration's initializer, a parameter's value and a port connection.
+TEST(AssignInExprElaboration, AssignmentOutsideProceduralStatementReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module sub(input int p); endmodule\n"
+      "module m;\n"
+      "  int y, z;\n"
+      "  int x = (y = 1);\n"
+      "  localparam int L = (2 + 1);\n"
+      "  sub u(.p((z = 2)));\n"
+      "endmodule\n",
+      f, "m");
+  for (uint32_t line : {4u, 6u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "assignment operator within expression is "
+                              "illegal in this context",
+                              line, "11.3.6"));
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
 }  // namespace

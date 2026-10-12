@@ -641,6 +641,12 @@ bool IsSimpleBitVectorType(const DataType& dtype) {
   return IsSimpleBitVectorType(dtype.kind);
 }
 
+bool IsUnpackedAggregateType(const DataType& type) {
+  return (type.kind == DataTypeKind::kStruct ||
+          type.kind == DataTypeKind::kUnion) &&
+         !type.is_packed && !type.is_soft;
+}
+
 bool IsAssignmentCompatible(const DataType& a, const DataType& b) {
   if (TypesEquivalent(a, b)) return true;
 

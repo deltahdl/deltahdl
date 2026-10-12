@@ -564,42 +564,27 @@ static bool IsIntegerAtomKind(DataTypeKind kind) {
   }
 }
 
-// §11.5.1 / §7.4.1: a packed structure or packed union presents as a single
-// contiguous vector, and §11.5.1 lists a packed structure among the operands a
-// bit-select or part-select may address. A variable of packed aggregate type is
-// therefore freely bit/part-selectable and must not be treated as a scalar,
-// even though it carries no explicit packed dimension of its own. Named types
-// are followed through the typedef map to the underlying aggregate.
-// Follows a type written as a name through the typedef map to the type it
-// stands for, so that a question about a variable's shape is asked of the type
-// it actually has. A name that resolves to nothing, and a chain long enough to
-// be circular, both yield nullptr.
-static const DataType* ResolveNamedType(const DataType& dtype,
-                                        const TypedefMap& typedefs) {
-  const DataType* d = &dtype;
-  for (int hops = 0; hops < 16 && d->kind == DataTypeKind::kNamed; ++hops) {
-    auto it = typedefs.find(d->type_name);
-    if (it == typedefs.end()) return nullptr;
-    d = &it->second;
-  }
-  return d;
-}
-
 // §6.18 with §11.5.1: whether `dtype` is a name standing for a type a select
 // may address -- one written with a packed dimension, `typedef logic [7:0] B`,
 // or an integer atom, `typedef int W` -- rather than for a scalar. A name
 // standing for nothing the table resolves answers false.
 static bool NamesVectorType(const DataType& dtype, const TypedefMap& typedefs) {
   if (dtype.kind != DataTypeKind::kNamed) return false;
-  const DataType* d = ResolveNamedType(dtype, typedefs);
+  const DataType* d = ResolvedType(dtype, typedefs);
   if (d == nullptr) return false;
   return d->packed_dim_left != nullptr || !d->extra_packed_dims.empty() ||
          d->has_unsized_packed_dim || IsIntegerAtomKind(d->kind);
 }
 
+// §11.5.1 / §7.4.1: a packed structure or packed union presents as a single
+// contiguous vector, and §11.5.1 lists a packed structure among the operands a
+// bit-select or part-select may address. A variable of packed aggregate type is
+// therefore freely bit/part-selectable and must not be treated as a scalar,
+// even though it carries no explicit packed dimension of its own. Named types
+// are followed through the typedef map to the underlying aggregate.
 static bool IsPackedAggregateVar(const DataType& dtype,
                                  const TypedefMap& typedefs) {
-  const DataType* d = ResolveNamedType(dtype, typedefs);
+  const DataType* d = ResolvedType(dtype, typedefs);
   if (!d) return false;
   return (d->kind == DataTypeKind::kStruct ||
           d->kind == DataTypeKind::kUnion) &&
@@ -613,8 +598,14 @@ static bool IsPackedAggregateVar(const DataType& dtype,
 // scalar §11.5.1 makes illegal, even though a string carries no packed
 // dimension.
 static bool IsStringVar(const DataType& dtype, const TypedefMap& typedefs) {
-  const DataType* d = ResolveNamedType(dtype, typedefs);
+  const DataType* d = ResolvedType(dtype, typedefs);
   return d != nullptr && d->kind == DataTypeKind::kString;
+}
+
+bool DeclaresScalar(const DataType& dtype, const TypedefMap& typedefs) {
+  return !IsIntegerAtomKind(dtype.kind) && !IsRealType(dtype.kind) &&
+         !IsPackedAggregateVar(dtype, typedefs) &&
+         !NamesVectorType(dtype, typedefs) && !IsStringVar(dtype, typedefs);
 }
 
 // §11.5.2 states how many addresses a select written on this declaration may
@@ -640,9 +631,10 @@ void RecordVarSelectShape(
   const DataType& dtype = item->data_type;
   const bool kIsAtom = IsIntegerAtomKind(dtype.kind);
   const bool kIsPackedAggregate = IsPackedAggregateVar(dtype, typedefs);
-  const bool kIsScalarKind = dtype.kind == DataTypeKind::kLogic ||
-                             dtype.kind == DataTypeKind::kReg ||
-                             dtype.kind == DataTypeKind::kBit;
+  // §6.7.1: a net type keyword alone, `wire w [0:3]`, declares logic elements.
+  const bool kIsScalarKind =
+      dtype.kind == DataTypeKind::kLogic || dtype.kind == DataTypeKind::kReg ||
+      dtype.kind == DataTypeKind::kBit || IsNetTypeKind(dtype.kind);
   if (!IsRealType(dtype.kind) && !kIsAtom && !kIsPackedAggregate &&
       !kIsScalarKind) {
     return;
@@ -703,11 +695,7 @@ static void RegisterVarDeclNames(const ModuleItem* item,
       tables.real_var_names.insert(item->name);
     if (item->data_type.packed_dim_left)
       tables.packed_array_vars.insert(item->name);
-    else if (!IsIntegerAtomKind(item->data_type.kind) &&
-             !IsRealType(item->data_type.kind) &&
-             !IsPackedAggregateVar(item->data_type, typedefs) &&
-             !NamesVectorType(item->data_type, typedefs) &&
-             !IsStringVar(item->data_type, typedefs))
+    else if (DeclaresScalar(item->data_type, typedefs))
       tables.scalar_var_names.insert(item->name);
   }
   if (item->data_type.kind == DataTypeKind::kNamed)

@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "helpers_lower_run.h"
@@ -92,6 +94,48 @@ TEST(InsideOperatorElaboration, UnpackedArrayInTheSetIsLegal) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §11.4.13's left operand is singular, and neither a select leaving one of an
+// array's unpacked dimensions nor a member that is an unpacked array or an
+// unpacked structure or union is; an element, a scalar member and a member of
+// a packed or class type are.
+TEST(InsideElaboration, UnpackedSubArrayOrMemberLeftOperandReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef struct { int x; } inner_t;\n"
+      "  typedef struct packed { int a; } p_t;\n"
+      "  int m [2][2];\n"
+      "  struct { int arr [2]; inner_t in; struct { int y; } nest;\n"
+      "           int s; p_t pk; } st;\n"
+      "  inner_t named;\n"
+      "  bit b;\n"
+      "  initial begin\n"
+      "    b = m[0] inside {1, 2};\n"
+      "    b = st.arr inside {1, 2};\n"
+      "    b = st.in inside {1, 2};\n"
+      "    b = st.nest inside {1, 2};\n"
+      "    b = m[0][1] inside {1, 2};\n"
+      "    b = st.s inside {1, 2};\n"
+      "    b = st.pk inside {1, 2};\n"
+      "    b = named.x inside {1, 2};\n"
+      "    b = st.in.x inside {1, 2};\n"
+      "    b = st.arr[0] inside {1, 2};\n"
+      "    b = st.zz inside {1, 2};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {10u, 11u, 12u, 13u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "the left operand of inside shall be singular",
+                              line, "11.4.13"));
+  }
+  for (uint32_t line : {14u, 15u, 16u, 17u, 18u, 19u, 20u}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                               "the left operand of inside shall be singular",
+                               line, "11.4.13"));
+  }
 }
 
 }  // namespace

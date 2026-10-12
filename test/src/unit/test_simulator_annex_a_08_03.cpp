@@ -188,8 +188,14 @@ TEST(ExpressionSim, InsideExpressionMissSimulates) {
 
 TEST(ExpressionSim, TaggedUnionExpressionSimulates) {
   EXPECT_EQ(RunAndGet("module t;\n"
+                      "  typedef union tagged { void Invalid; int Valid; } "
+                      "VInt;\n"
+                      "  VInt u;\n"
                       "  int x;\n"
-                      "  initial x = tagged Valid 42;\n"
+                      "  initial begin\n"
+                      "    u = tagged Valid 42;\n"
+                      "    x = u.Valid;\n"
+                      "  end\n"
                       "endmodule\n",
                       "x"),
             42u);

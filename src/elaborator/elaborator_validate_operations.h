@@ -100,10 +100,17 @@ class ElaboratorOperationRules : public ElaboratorData {
   void ValidateAggregateComparisons(const ModuleDecl* decl);
   void WalkExprForAggregateCompare(const Expr* expr);
   void CheckAggregateCompareOp(const Expr* expr);
+  // §6.22.2: whether two comparison operands that are unpacked arrays, each a
+  // variable named whole or a slice of one, are of equivalent types; empty
+  // where either is not such an operand. Defined in
+  // elaborator_validate_operations_aggregate.cpp.
+  std::optional<bool> ArrayOperandsEquivalent(const Expr* lhs,
+                                              const Expr* rhs) const;
   void WalkStmtsForAggregateCompare(const Stmt* s);
 
   void ValidateTypeRefComparisons(const ModuleDecl* decl);
   void WalkExprForTypeRefCompare(const Expr* expr);
+  void ReportTypeRefOperand(const Expr* operand, const Expr* op);
   void CheckTypeRefCompareOp(const Expr* expr);
   void WalkStmtsForTypeRefCompare(const Stmt* s);
 
@@ -123,14 +130,14 @@ class ElaboratorOperationRules : public ElaboratorData {
   void CheckTypeRefArgInner(const Expr* inner, SourceLoc loc);
   bool TypeRefArgUsesDynamicElement(const Expr* e) const;
 
+  // §11.9: each tagged union expression against the type its context gives
+  // it. Defined in elaborator_validate_operations_tagged.cpp.
   void ValidateTaggedUnionMembers(const ModuleDecl* decl);
-  void WalkStmtsForTaggedExpr(const Stmt* s);
-  void CheckTaggedExprMember(const Expr* lhs, const Expr* rhs);
-  void CheckTaggedMemberName(std::string_view var_name, const Expr* rhs);
 
   void ValidateRealOperatorRestrictions(const ModuleDecl* decl);
   void WalkExprForRealOps(const Expr* expr);
   void WalkStmtsForRealOps(const Stmt* s);
+  void WalkItemsForRealOps(const std::vector<ModuleItem*>& items);
 
   // §6.24.1: size-cast width and size/signing-cast integral-operand rules, and
   // §11.7's same integral-argument rule for $signed and $unsigned.
@@ -155,6 +162,7 @@ class ElaboratorOperationRules : public ElaboratorData {
   void ValidateLetScope(const ModuleDecl* decl);
   void CheckLetUsedBeforeDeclared(const ModuleDecl* decl);
   void CheckLetReferencedHierarchically(const ModuleDecl* decl);
+  void CheckLetActualTypes(const ModuleDecl* decl);
 
   void ValidateAssignInExprRestrictions(const ModuleDecl* decl);
   void WalkExprForAssignInExpr(const Expr* expr, bool in_event_or_cont);
@@ -179,6 +187,10 @@ class ElaboratorOperationRules : public ElaboratorData {
   // module's of the same name for the rest of the block (§6.21, §23.9), and
   // var_array_info_ knows the module's alone.
   std::vector<std::pair<std::string_view, bool>> block_decls_;
+  // Whether the subroutine whose statements WalkStmtsForUnsizedInConcat walks
+  // returns an unpacked array, whose returned braces are then an unpacked array
+  // concatenation (§10.10).
+  bool returns_unpacked_array_ = false;
   // §10.10.2: the declared type of each module variable, which tells whether
   // a member a target names is an unpacked array.
   std::unordered_map<std::string_view, const DataType*> concat_target_types_;
@@ -205,6 +217,10 @@ class ElaboratorOperationRules : public ElaboratorData {
   void ValidateStreamingConcatContext(const ModuleDecl* decl);
   void WalkExprForStreamingContext(const Expr* expr, bool is_valid_context);
   void WalkStmtsForStreamingContext(const Stmt* s);
+  // The declared type of each module variable, which tells whether a
+  // streaming operand named by it is an unpacked tagged union (§11.4.14.1);
+  // ValidateStreamingConcatContext fills it for the module it walks.
+  std::unordered_map<std::string_view, const DataType*> stream_operand_types_;
   void CheckStreamingSourceTargetType(const Expr* lhs, const Expr* rhs);
   void CheckStreamingUnpackSourceType(const Expr* lhs, const Expr* rhs);
 

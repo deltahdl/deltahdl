@@ -623,3 +623,30 @@ TEST(PackedRangeSelect,
   EXPECT_TRUE(q->is_resolved);
   EXPECT_EQ(q->resolved_value, 1);
 }
+
+// §11.5.1 lets a select address a vector or a packed structure, and a net whose
+// type carries its width -- a typedef of a vector, an inline packed structure,
+// a user-defined nettype -- is one, as a variable of that type is; a plain
+// scalar net is not.
+TEST(SelectElaboration, SelectOfATypedefOrPackedStructNetAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef logic [31:0] addressT;\n"
+      "  wire addressT w1;\n"
+      "  wire struct packed { logic ecc; logic [7:0] data; } memsig;\n"
+      "  nettype logic [7:0] byte_n;\n"
+      "  byte_n nb;\n"
+      "  wire s;\n"
+      "  wire y1, y2, y3, y4;\n"
+      "  assign y1 = w1[0];\n"
+      "  assign y2 = memsig[3];\n"
+      "  assign y4 = nb[0];\n"
+      "  assign y3 = s[0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select or part-select of a scalar is illegal",
+                            12, "11.5.1"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}

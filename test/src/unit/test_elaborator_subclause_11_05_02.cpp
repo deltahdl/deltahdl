@@ -504,4 +504,25 @@ TEST(ArrayAddressingElaboration, ReversedSliceInAForLoopStepNames11_5_2) {
                             "11.5.2"));
 }
 
+// §11.5.2 selects an array element with one address per unpacked dimension
+// and addresses its bits only after; an element of `wire w [0:3]` is a scalar
+// net, so a bit-select of it is a select of a scalar, as it is for a logic
+// array. An element of a vector net array has bits to select.
+TEST(ArrayAddressingElaboration, BitSelectOfAScalarNetArrayElementIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire w [0:3];\n"
+      "  wire [7:0] w8 [0:3];\n"
+      "  wire y, z;\n"
+      "  assign y = w[1][0];\n"
+      "  assign z = w8[1][0];\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select or part-select of a scalar is illegal",
+                            5, "11.5.1"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
 }  // namespace

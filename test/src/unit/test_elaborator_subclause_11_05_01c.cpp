@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -288,6 +290,54 @@ TEST(SelectElaboration, SelectOfATypedefDeclaredScalarIsIllegal) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "bit-select or part-select of a scalar is illegal",
                             5, "11.5.1"));
+}
+
+// The declaration's range and the select's bounds may be written with
+// parameters, which fold as the literals they stand for, so a reversed
+// part-select is reported whichever of them is a parameter.
+TEST(PartSelectBoundsElaboration, ReversedPartSelectWithParametersReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t #(parameter W = 8);\n"
+      "  localparam L = 0;\n"
+      "  logic [W-1:0] v;\n"
+      "  logic [7:0] u;\n"
+      "  logic [3:0] y, z;\n"
+      "  assign y = v[0:3];\n"
+      "  assign z = u[L:3];\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {6u, 7u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "part-select's first index must address a more "
+                              "significant bit than its second index",
+                              line, "11.5.1"));
+  }
+}
+
+// A bound naming a variable a procedure declares -- a loop's or a block's -- or
+// a subroutine's formal is no constant expression.
+TEST(PartSelectBoundsElaboration, BoundNamingAProceduresVariableReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] v, y;\n"
+      "  initial for (int i = 3; i < 4; i++) y = v[i:0];\n"
+      "  initial begin\n"
+      "    int k = 2;\n"
+      "    y = v[k:0];\n"
+      "  end\n"
+      "  function automatic logic [7:0] f(int n);\n"
+      "    return v[n:0];\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {3u, 6u, 9u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "non-indexed part-select bounds shall be "
+                              "constant expressions",
+                              line, "11.5.1"));
+  }
 }
 
 }  // namespace

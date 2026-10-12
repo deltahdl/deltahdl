@@ -305,9 +305,15 @@ std::optional<bool> OrderAnswers(TokenKind op, WideOrder order) {
       return order.less || order.equal;
     case TokenKind::kGtEq:
       return !order.less;
+    // §11.4.5's case equality and §11.4.6's wildcard equality differ from ==
+    // and != only over x and z bits, which a folded constant does not hold.
     case TokenKind::kEqEq:
+    case TokenKind::kEqEqEq:
+    case TokenKind::kEqEqQuestion:
       return order.equal;
     case TokenKind::kBangEq:
+    case TokenKind::kBangEqEq:
+    case TokenKind::kBangEqQuestion:
       return !order.equal;
     default:
       return std::nullopt;
@@ -467,18 +473,6 @@ bool ConstValBit(const ConstVal& v, int64_t offset) {
   if (offset < 0) return false;
   auto bit = static_cast<uint64_t>(offset);
   return ((WordAt(v, bit / 64) >> (bit % 64)) & 1) != 0;
-}
-
-uint64_t ConstValWindow(const ConstVal& v, int64_t lo) {
-  // A window below bit 0 is asked for by a part-select running off the
-  // bottom of the value, whose upper bound is in range and whose width is
-  // under 64 (SelectBitRange in const_eval.cpp), so -lo is under 64 here.
-  if (lo < 0) return WordAt(v, 0) << -lo;
-  auto start = static_cast<uint64_t>(lo);
-  uint64_t shift = start % 64;
-  uint64_t low = WordAt(v, start / 64) >> shift;
-  if (shift == 0) return low;
-  return low | (WordAt(v, start / 64 + 1) << (64 - shift));
 }
 
 bool ConstValIsNonZero(const ConstVal& v) {

@@ -161,7 +161,10 @@ void ReevaluateParamValue(const RtlirParamDecl& param, Variable* var,
   const Expr* expr = param.override_expr != nullptr ? param.override_expr
                                                     : param.default_value;
   if (expr == nullptr) return;
-  if (width <= 64 && !HoldsXZLiteral(expr)) return;
+  // An expression constant evaluation left unfolded -- a select reaching
+  // outside its vector (§11.5.1), whose x the fold cannot hold -- is evaluated
+  // here too, where the operands' state sets are known.
+  if (width <= 64 && param.is_resolved && !HoldsXZLiteral(expr)) return;
   std::string own = ctx.ActiveInstancePrefix();
   if (param.override_expr != nullptr)
     ctx.SetLoweringInstancePrefix(ctx.InstantiatingPrefix(own));

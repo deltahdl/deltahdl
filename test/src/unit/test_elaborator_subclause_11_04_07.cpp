@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <optional>
+
 #include "elaborator/const_eval.h"
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
@@ -128,6 +130,36 @@ TEST(OperatorElaboration, BinaryLogicalOrElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §11.4.7 decides && and -> by a false first operand and || by a true one,
+// and §11.3.5 leaves the second operand unevaluated then, so a second operand
+// that does not fold, a division by zero, does not keep the result from it.
+TEST(LogicalOperatorElaboration, DecidedLogicalOperatorsFoldPastTheSecond) {
+  EvalFixture f;
+  ScopeMap scope = {{"N", 0}};
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("N == 0 || 16 / N > 1", f), scope), 1);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("N != 0 && 16 / N > 1", f), scope), 0);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("N != 0 -> 16 / N > 1", f), scope), 1);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("N == 0 && 16 / N > 1", f), scope),
+            std::nullopt);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("U || 1", f), scope), std::nullopt);
+}
+
+TEST(LogicalOperatorElaboration, DecidedOrInGenerateConditionSelects) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t #(parameter int N = 0);\n"
+      "  if (N == 0 || 16 / N > 1) begin : g_a\n"
+      "    logic x;\n"
+      "  end else begin : g_b\n"
+      "    logic y;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
 }  // namespace

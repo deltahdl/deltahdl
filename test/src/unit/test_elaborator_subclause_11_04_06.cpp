@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
+#include "elaborator/const_eval.h"
 #include "fixture_elaborator.h"
+#include "fixture_evaluator.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -191,6 +195,44 @@ TEST(OperatorElaboration, WildcardNeqIncompatibleClassHandlesRejected) {
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "class handle comparison requires assignment compatible", 9, "11.4.5"));
+}
+
+// §11.2.1 allows the case equality and wildcard equality operators in a
+// constant expression. A folded constant holds no x or z, so each answers as
+// == or != does, at any width.
+TEST(WildcardEqualityElaboration, CaseAndWildcardEqualityFold) {
+  EvalFixture f;
+  const struct {
+    const char* text;
+    int64_t value;
+  } kWant[] = {{"8 === 8", 1},
+               {"8 !== 8", 0},
+               {"8 ==? 9", 0},
+               {"8 !=? 9", 1},
+               {"{8'h1, 64'h0} === {8'h1, 64'h0}", 1},
+               {"{8'h1, 64'h0} !== {8'h2, 64'h0}", 1},
+               {"{8'h1, 64'h0} ==? {8'h2, 64'h0}", 0},
+               {"{8'h1, 64'h0} !=? {8'h1, 64'h0}", 0}};
+  for (const auto& want : kWant) {
+    EXPECT_EQ(ConstEvalInt(ParseExprFrom(want.text, f)), want.value)
+        << want.text;
+  }
+}
+
+TEST(WildcardEqualityElaboration, CaseEqualityInGenerateConditionSelects) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t #(parameter int W = 8);\n"
+      "  if (W === 8) begin : g_a\n"
+      "    logic x;\n"
+      "  end else begin : g_b\n"
+      "    logic y;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
 }  // namespace

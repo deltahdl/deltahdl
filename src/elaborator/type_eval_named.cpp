@@ -70,6 +70,17 @@ DataTypeKind ResolvedTypeKind(const DataType& dtype,
   return type->kind;
 }
 
+// ResolvedTypeKind answers the named kind for every chain that does not end
+// in a type, so a chain it resolves is followed to its end unbounded.
+const DataType* ResolvedType(const DataType& dtype,
+                             const TypedefMap& typedefs) {
+  if (ResolvedTypeKind(dtype, typedefs) == DataTypeKind::kNamed) return nullptr;
+  const DataType* type = &dtype;
+  while (type->kind == DataTypeKind::kNamed)
+    type = FindNamedType(*type, typedefs);
+  return type;
+}
+
 // The same for a structure or union member's named type (§7.2.1): a member
 // written behind a qualifier, `q::pair_t Add`, was looked up by `pair_t`
 // alone, resolving to whatever a wildcard import made the bare name stand

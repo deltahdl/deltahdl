@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -334,6 +336,48 @@ TEST(StreamingOperatorElaboration,
       "streaming concatenation shall not be used as an operand of an "
       "expression other than an assignment or bit-stream cast",
       6, "11.4.14"));
+}
+
+// §11.4.14 bars a streaming concatenation as an operand of an expression
+// without a cast wherever it is written, so a declaration's initializer and a
+// subroutine's statements are held to it as a procedure's are.
+TEST(StreamingConcatElaboration,
+     OperandUseInInitializersAndSubroutinesReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int x = 3;\n"
+      "  int y = {<< {x}} + 1;\n"
+      "  function int f(int v);\n"
+      "    return {<< {v}} + 1;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    int z = {<< {x}} + 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {3u, 5u, 8u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "streaming concatenation shall not be used as "
+                              "an operand",
+                              line, "11.4.14"));
+  }
+}
+
+// An initializer and a return value are each the source of an assignment, so
+// a streaming concatenation standing as the whole of one is legal there.
+TEST(StreamingConcatElaboration, StreamAsInitializerOrReturnValueAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  int x = 3;\n"
+             "  int y = {<< {x}};\n"
+             "  function int f(int v);\n"
+             "    return {<< {v}};\n"
+             "  endfunction\n"
+             "  initial begin\n"
+             "    int z = {<< {x}};\n"
+             "  end\n"
+             "endmodule\n"));
 }
 
 }  // namespace

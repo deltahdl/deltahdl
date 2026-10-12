@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
+#include "elaborator/const_eval.h"
 #include "fixture_elaborator.h"
+#include "fixture_evaluator.h"
 
 using namespace delta;
 
@@ -175,6 +177,18 @@ TEST(Elaboration, StringLiteralHexEscapeConstantFolds) {
   auto& p = design->top_modules[0]->params[0];
   EXPECT_TRUE(p.is_resolved);
   EXPECT_EQ(p.resolved_value, 0x4142);
+}
+
+// §11.10 makes a string literal one number of all its 8-bit characters, so two
+// literals differing only in their leading character fold unequal, and a
+// select reaches the leading character above bit 63.
+TEST(StringLiteralElaboration, LongStringLiteralKeepsItsLeadingCharacters) {
+  EvalFixture f;
+  EXPECT_EQ(
+      ConstEvalInt(ParseExprFrom("\"Hello world\" == \"Xello world\"", f)), 0);
+  EXPECT_EQ(
+      ConstEvalInt(ParseExprFrom("\"Hello world\" == \"Hello world\"", f)), 1);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("\"Hello world\" >> 80", f)), 'H');
 }
 
 }  // namespace

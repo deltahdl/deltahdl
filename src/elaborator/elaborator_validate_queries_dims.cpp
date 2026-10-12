@@ -13,6 +13,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
@@ -285,6 +286,9 @@ struct PartSelectBoundsCtx {
   // declaration missing from this cannot say which bit a range reaches, so its
   // ranges go unjudged.
   const ShapeMap& shapes;
+  // The module's parameter scope, which a bound written with a parameter folds
+  // in.
+  const ScopeMap& scope;
   DiagEngine& diag;
 };
 
@@ -341,8 +345,8 @@ void CheckOnePartSelectBounds(const Expr* e,
                    Subclause("11.5.1"));
     return;
   }
-  auto msb = ConstEvalInt(e->index);
-  auto lsb = ConstEvalInt(e->index_end);
+  auto msb = ConstEvalInt(e->index, ctx.scope);
+  auto lsb = ConstEvalInt(e->index_end, ctx.scope);
   if (!msb || !lsb) return;
   bool descending = range.first >= range.second;
   // The first index shall name a more significant bit than the second. For a
@@ -415,15 +419,16 @@ void CheckPartSelectBoundsStmt(const Stmt* s, const PartSelectBoundsCtx& ctx) {
 // resolve says nothing about which bit a range reaches, so none of its
 // dimensions is kept. A declaration with no packed dimension at all fills
 // nothing and succeeds.
-bool CollectPackedDims(const DataType& type, PackedDims& out) {
+bool CollectPackedDims(const DataType& type, const ScopeMap& scope,
+                       PackedDims& out) {
   if (!type.packed_dim_left || !type.packed_dim_right) return true;
-  auto left = ConstEvalInt(type.packed_dim_left);
-  auto right = ConstEvalInt(type.packed_dim_right);
+  auto left = ConstEvalInt(type.packed_dim_left, scope);
+  auto right = ConstEvalInt(type.packed_dim_right, scope);
   if (!left || !right) return false;
   out.emplace_back(*left, *right);
   for (const auto& [extra_left, extra_right] : type.extra_packed_dims) {
-    auto next_left = ConstEvalInt(extra_left);
-    auto next_right = ConstEvalInt(extra_right);
+    auto next_left = ConstEvalInt(extra_left, scope);
+    auto next_right = ConstEvalInt(extra_right, scope);
     if (!next_left || !next_right) return false;
     out.emplace_back(*next_left, *next_right);
   }
@@ -442,7 +447,11 @@ void Elaborator::ValidatePartSelectBounds(const ModuleDecl* decl) {
     signals.insert(item->name);
     DeclaredShape shape;
     shape.unpacked_count = item->unpacked_dims.size();
-    if (!CollectPackedDims(item->data_type, shape.packed)) continue;
+    // §11.5.1 folds the declaration's range in the module's parameter scope,
+    // which ValidateModuleConstraints installs for these checks.
+    if (!CollectPackedDims(item->data_type, replicate_multiplier_scope_,
+                           shape.packed))
+      continue;
     // A declaration with no packed dimension has no word for a range to select
     // bits of, so every range written against it is a slice of an unpacked
     // dimension and belongs to §7.4.5 rather than here.
@@ -451,7 +460,17 @@ void Elaborator::ValidatePartSelectBounds(const ModuleDecl* decl) {
   }
   if (shapes.empty()) return;
 
-  PartSelectBoundsCtx ctx{signals, shapes, diag_};
+  // §11.5.1 has a non-indexed part-select's bounds be constant expressions,
+  // which a variable a process or a subroutine declares, a loop's included, or
+  // a subroutine's formal is not, any more than a module's variable is.
+  for (const auto* item : decl->items) {
+    if (IsProceduralItemKind(item->kind))
+      CollectProcLocalNames(item->body, signals);
+    for (const auto* s : item->func_body_stmts)
+      CollectProcLocalNames(s, signals);
+    for (const auto& arg : item->func_args) signals.insert(arg.name);
+  }
+  PartSelectBoundsCtx ctx{signals, shapes, replicate_multiplier_scope_, diag_};
   for (const auto* item : decl->items) {
     CheckPartSelectBoundsExpr(item->assign_lhs, ctx);
     CheckPartSelectBoundsExpr(item->assign_rhs, ctx);

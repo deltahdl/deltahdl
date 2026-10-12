@@ -655,12 +655,15 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   // select legality, exactly as RegisterVarDeclNames already decides for a
   // variable, because §11.5.2 makes an index on one an array element select
   // rather than a bit-select. Testing only the packed dimension made
-  // `wire w [3:0]` a scalar, so every `w[1]` drew §11.5.1's scalar report.
+  // `wire w [3:0]` a scalar, so every `w[1]` drew §11.5.1's scalar report. A
+  // net with no packed dimension of its own is a scalar only where its type
+  // carries none either: `wire addressT w` under `typedef logic [31:0]
+  // addressT`, a packed structure net and a nettype net are vectors.
   if (item->unpacked_dims.empty()) {
-    if (!item->data_type.packed_dim_left)
-      scalar_var_names_.insert(item->name);
-    else
+    if (item->data_type.packed_dim_left)
       packed_array_vars_.insert(item->name);
+    else if (DeclaresScalar(item->data_type, typedefs_))
+      scalar_var_names_.insert(item->name);
   }
   RtlirNet net;
   net.name = ScopedName(item->name);

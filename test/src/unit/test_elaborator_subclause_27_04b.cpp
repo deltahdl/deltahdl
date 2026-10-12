@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 
 #include "common/diagnostic.h"
@@ -548,6 +549,57 @@ TEST(GenerateElaboration, GenvarReadInItsLoopIsAccepted) {
       "endmodule\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// Footnote 44 to §11.11's Syntax 11-7 makes a genvar legal in a constant
+// primary only within a loop generate construct, so the constant expressions
+// a module writes outside every loop -- a parameter's value, a generate-if
+// condition and a generate-case selector, a declaration's dimension and a
+// continuous assignment's delay -- may not read one.
+TEST(GenerateElaboration, GenvarInConstantPositionsOutsideALoopErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  genvar i;\n"
+      "  parameter int P = i;\n"
+      "  if (i == 0) begin : g\n"
+      "    logic x;\n"
+      "  end\n"
+      "  case (i)\n"
+      "    0: begin : h logic y; end\n"
+      "  endcase\n"
+      "  logic [i:0] v;\n"
+      "  wire w; logic a;\n"
+      "  assign #i w = a;\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {3u, 4u, 7u, 10u, 12u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "genvar 'i' is referenced outside a loop "
+                              "generate scheme",
+                              line, "27.4"));
+  }
+}
+
+// Within the loop the genvar is a constant in each of those positions.
+TEST(GenerateElaboration, GenvarInConstantPositionsInsideALoopAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module top;\n"
+             "  wire [3:0] w;\n"
+             "  logic [3:0] a;\n"
+             "  for (genvar i = 0; i < 2; i++) begin : l\n"
+             "    localparam int P = i;\n"
+             "    if (i == 0) begin : g\n"
+             "      logic x;\n"
+             "    end\n"
+             "    case (i)\n"
+             "      0: begin : h logic y; end\n"
+             "      default: begin : d logic z; end\n"
+             "    endcase\n"
+             "    logic [i:0] v;\n"
+             "    assign #i w[i] = a[i];\n"
+             "  end\n"
+             "endmodule\n"));
 }
 
 }  // namespace

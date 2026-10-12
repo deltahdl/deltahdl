@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <optional>
 
 #include "elaborator/const_eval.h"
@@ -291,6 +292,18 @@ TEST(ConstEvalReal, BinaryMulReals) {
   auto val = ConstEvalReal(e);
   ASSERT_TRUE(val.has_value());
   EXPECT_DOUBLE_EQ(val.value_or(0.0), 6.0);
+}
+
+// §11.4.3 truncates a quotient toward zero and wraps a signed result at its
+// width, so the most negative 64-bit value divided by -1 is itself, and its
+// remainder by -1 is 0, as for any other dividend.
+TEST(ArithmeticOperatorElaboration, MostNegativeDividedByMinusOneWraps) {
+  EvalFixture f;
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("64'sh8000_0000_0000_0000 / -1", f)),
+            INT64_MIN);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("64'sh8000_0000_0000_0000 % -1", f)), 0);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("-7 / -1", f)), 7);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("-7 % -1", f)), 0);
 }
 
 }  // namespace

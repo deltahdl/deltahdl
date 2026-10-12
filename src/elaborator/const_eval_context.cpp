@@ -180,8 +180,21 @@ std::optional<ConstVal> ConstEvalTernaryFull(const Expr* expr,
   if (!cond) return std::nullopt;
   // §11.4.7 reads every bit of the condition, which the low word alone did
   // not for a condition wider than 64 bits.
-  const Expr* arm =
-      ConstValIsNonZero(*cond) ? expr->true_expr : expr->false_expr;
+  const bool kTrue = ConstValIsNonZero(*cond);
+  const Expr* arm = kTrue ? expr->true_expr : expr->false_expr;
+  // §11.6.1's Table 11-21 (printed page 300) sizes a conditional by the longer
+  // of its two expressions, and §11.8.1 (printed page 302) makes it unsigned
+  // where either is, so the chosen one is folded in that type as well as in the
+  // context around the conditional. Folding it in the outer context alone had
+  // `{4'h1, (1 ? 4'hF : 8'h00)}` take four bits from the conditional. An
+  // expression that does not fold leaves the context as it stands.
+  auto chosen = ConstEvalFull(arm, scope);
+  auto other = ConstEvalFull(kTrue ? expr->false_expr : expr->true_expr, scope);
+  if (chosen && other) {
+    const FoldContext kShared = SharedContext(*chosen, *other);
+    ctx = {std::max(ctx.width, kShared.width),
+           ctx.read_unsigned || kShared.read_unsigned};
+  }
   return ConstEvalFull(arm, scope, ctx);
 }
 

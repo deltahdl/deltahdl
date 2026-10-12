@@ -186,11 +186,6 @@ std::vector<uint64_t> LiteralHighWords(std::string_view text, uint32_t width);
 // Defined in const_eval_wide.cpp.
 bool ConstValBit(const ConstVal& v, int64_t offset);
 
-// The 64 bits of `v` from bit `lo` upward: bit `lo` of the value lands at bit
-// 0 of the answer. A bit below 0 or above the value's top reads 0, so a
-// negative `lo` shifts the value up by -lo. Defined in const_eval_wide.cpp.
-uint64_t ConstValWindow(const ConstVal& v, int64_t lo);
-
 // §11.6.1's Table 11-21 (printed pages 299-300): whether the binary operator
 // `op` sizes its result by its left operand alone, the right being
 // self-determined -- the four shifts, their compound assignment forms and
@@ -391,7 +386,8 @@ bool AllElementsConstant(const std::vector<Expr*>& elems,
 // is not a built-in method call and when it is one this implementation cannot
 // evaluate; the two are not distinguished, because a call that does not
 // evaluate is not one a constant expression may hold.
-std::optional<ConstVal> ConstEvalBuiltinMethodFull(const Expr* expr);
+std::optional<ConstVal> ConstEvalBuiltinMethodFull(const Expr* expr,
+                                                   const ScopeMap& scope);
 
 // §8.25.1: what a specialization's argument list says about one value
 // parameter. `supplied` records that the parameter has an answer in the

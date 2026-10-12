@@ -174,11 +174,14 @@ static Logic4Vec EvalSignedArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
       break;
     case TokenKind::kSlash:
       if (rv == 0) return MakeAllX(arena, width);
-      r = lv / rv;
+      // §11.4.3 wraps a signed result at its width, so a divisor of -1 is
+      // answered as a negation: the most negative value divided by it is the
+      // value itself, where the C++ quotient overflows.
+      r = rv == -1 ? static_cast<int64_t>(-static_cast<uint64_t>(lv)) : lv / rv;
       break;
     case TokenKind::kPercent:
       if (rv == 0) return MakeAllX(arena, width);
-      r = lv % rv;
+      r = rv == -1 ? 0 : lv % rv;
       break;
     case TokenKind::kPower:
       return EvalSignedPow(lv, rv, width, arena);

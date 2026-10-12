@@ -26,6 +26,15 @@ void RecordVarSelectShape(
     const ModuleItem* item, const TypedefMap& typedefs,
     std::unordered_map<std::string_view, VarSelectShape>& shapes);
 
+// §11.5.1: whether a declaration with no unpacked dimension and no packed
+// dimension of its own declares a scalar, which a select may not address: not
+// an integer atom, a real, a packed structure or union, a name standing for a
+// vector or an integer atom, or a string. Shared by the variable and net
+// declaration paths, a net's type being as able as a variable's to carry its
+// width in a typedef, a packed structure or a nettype. Defined in
+// elaborator_decls_var.cpp.
+bool DeclaresScalar(const DataType& dtype, const TypedefMap& typedefs);
+
 // §7.8: the set of user-defined type names an unpacked dimension may name as a
 // user-defined associative index — the typedef table and the set of class
 // names that together form the type-name resolution context.

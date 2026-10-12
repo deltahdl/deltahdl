@@ -8,9 +8,13 @@
 // required and then fold to no value, leaving the declaration silently
 // unresolved rather than either folded or reported.
 
+#include <algorithm>
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string_view>
+#include <vector>
 
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
@@ -21,25 +25,46 @@
 namespace delta {
 namespace {
 
-// The built-in methods §5.13 defines that return an integer:
-// dynamic_array.size, associative_array.num and string.len (printed page 87).
-// §6.19.5.5 adds num() on an enumeration, and §7.9 adds num() and size() on an
-// associative array, so the three names cover every one of them.
+// The built-in methods of the data types: §6.16's string methods, §6.19.5's
+// enumeration methods, and the array methods of §7.5 (dynamic arrays), §7.9
+// (associative arrays), §7.10 (queues) and §7.12 (array manipulation). A call
+// of one of them is constant only as §11.2.1 says -- no side effects, a value
+// depending on its arguments and, unless it depends on nothing else, a
+// constant identifier -- and §11.2.1 has a constant one evaluated at
+// elaboration. Routing every one of them here, rather than through
+// IsConstantExpr's argument test, is what keeps a mutating call such as
+// `q.pop_front()` or a value-reading one such as `c.next()` on a variable,
+// whose argument lists are empty and so pass that test, out of a constant
+// expression: a call this file does not evaluate is not one a constant
+// expression may hold.
 //
-// The names an earlier revision of this list also carried -- bits, dimensions,
+// The names an earlier revision of this list carried -- bits, dimensions,
 // unpacked_dimensions, left, right, low, high and increment -- name no built-in
 // method. §7.11 rules them system functions, the array query functions $left,
 // $right, $low, $high, $increment, $size, $dimensions and $unpacked_dimensions
 // (printed page 173), and §20.6.2 gives $bits the same form. A name written
 // without its $ is not one of them, so an expression spelling one is an
 // ordinary member access and is decided as one.
-//
-// The list decides nothing further on its own. What it does is route a call
-// away from IsConstantExpr's argument test, which would admit every one of
-// these because their argument lists are empty; what each returns is then
-// decided from the operand's declaration below.
+constexpr std::array<std::string_view, 53> kBuiltinMethodNames = {
+    // §6.16
+    "len", "putc", "getc", "toupper", "tolower", "compare", "icompare",
+    "substr", "atoi", "atohex", "atooct", "atobin", "atoreal", "itoa", "hextoa",
+    "octtoa", "bintoa", "realtoa",
+    // §6.19.5
+    "first", "last", "next", "prev", "num", "name",
+    // §7.5, §7.9, §7.10
+    "size", "delete", "exists", "insert", "pop_front", "pop_back", "push_front",
+    "push_back",
+    // §7.12
+    "find", "find_index", "find_first", "find_first_index", "find_last",
+    "find_last_index", "min", "max", "unique", "unique_index", "reverse",
+    "sort", "rsort", "shuffle", "sum", "product", "and", "or", "xor",
+    // §7.12.4's iterator index query and §7.12.5's array map
+    "index", "map"};
+
 bool IsBuiltinMethodName(std::string_view method) {
-  return method == "size" || method == "num" || method == "len";
+  return std::ranges::find(kBuiltinMethodNames, method) !=
+         kBuiltinMethodNames.end();
 }
 
 // The member access a built-in method call is written through. `q.size()`
@@ -59,7 +84,10 @@ const Expr* BuiltinMethodMember(const Expr* expr) {
   } else {
     return nullptr;
   }
-  if (!member->rhs || member->rhs->kind != ExprKind::kIdentifier)
+  // `p::name()` calls a subroutine of package or class p, never a built-in
+  // method, whatever it is called.
+  if (member->is_scope_resolution || !member->rhs ||
+      member->rhs->kind != ExprKind::kIdentifier)
     return nullptr;
   if (!IsBuiltinMethodName(member->rhs->text)) return nullptr;
   return member;
@@ -78,26 +106,28 @@ const RtlirVariable* RegisteredVariable(std::string_view name) {
   return nullptr;
 }
 
-// §6.19.5.5: num() returns how many elements the enumeration has (printed page
-// 124). The count is a property of the enumeration the variable was declared
-// with rather than of the value the variable holds, which is exactly what
-// §11.2.1 asks of a call admitted with a non-constant identifier: a method
-// whose result never depends on what the identifier currently holds.
+// The members of the enumeration the variable `operand` names was declared
+// with, in declaration order. §6.19.5's first(), last() and num() (printed
+// pages 123–124) answer from these alone -- the enumeration's first member, its
+// last, and how many there are -- and not from the value the variable holds,
+// which is exactly what §11.2.1 asks of a call admitted with a non-constant
+// identifier: a method whose result never depends on what the identifier
+// currently holds.
 //
-// Empty for an operand that is not a bare identifier, for a variable of no
+// Null for an operand that is not a bare identifier, for a variable of no
 // enumerated type, and for a name the installed module does not declare. A
 // declaration written `enum {red, green} c;` keys mod->enum_types by the
 // variable's own name and a declaration written through a typedef keys it by
 // the typedef's, and RtlirVariable::enum_type_name holds whichever of the two
 // it is.
-std::optional<int64_t> EnumMemberCount(const Expr* operand) {
-  if (!operand || operand->kind != ExprKind::kIdentifier) return std::nullopt;
+const std::vector<RtlirEnumMember>* EnumMembers(const Expr* operand) {
+  if (!operand || operand->kind != ExprKind::kIdentifier) return nullptr;
   const RtlirVariable* var = RegisteredVariable(operand->text);
-  if (!var || var->enum_type_name.empty()) return std::nullopt;
+  if (!var || var->enum_type_name.empty()) return nullptr;
   const RtlirModule* mod = RegisteredModule();
   auto it = mod->enum_types.find(var->enum_type_name);
-  if (it == mod->enum_types.end()) return std::nullopt;
-  return static_cast<int64_t>(it->second.size());
+  if (it == mod->enum_types.end()) return nullptr;
+  return &it->second;
 }
 
 // §6.16.1: str.len() gives the string's length, its count of characters
@@ -118,7 +148,7 @@ std::optional<int64_t> EnumMemberCount(const Expr* operand) {
 // requires the identifier itself to be a constant expression. A parameter is
 // one: §11.2.1 lists "parameters" among the operands a constant expression
 // consists of.
-std::optional<int64_t> StringParamLength(const Expr* operand) {
+std::optional<std::string_view> StringParamValue(const Expr* operand) {
   if (!operand || operand->kind != ExprKind::kIdentifier) return std::nullopt;
   const RtlirModule* mod = RegisteredModule();
   if (!mod) return std::nullopt;
@@ -131,41 +161,67 @@ std::optional<int64_t> StringParamLength(const Expr* operand) {
                                 RegisteredGenPrefixes()))
       continue;
     if (!param.is_string_value) return std::nullopt;
-    return static_cast<int64_t>(param.resolved_string.size());
+    return param.resolved_string;
   }
   return std::nullopt;
 }
 
+// §6.16.3: str.getc(i) answers the ASCII code of the character at index i, and
+// 0 for an index outside the string (printed page 115). Its prototype returns
+// `byte`, a signed 8-bit integer (§6.11.1).
+std::optional<ConstVal> StringParamChar(const Expr* call, std::string_view str,
+                                        const ScopeMap& scope) {
+  if (call->kind != ExprKind::kCall || call->args.size() != 1)
+    return std::nullopt;
+  auto index = ConstEvalInt(call->args[0], scope);
+  if (!index) return std::nullopt;
+  const bool kInside =
+      *index >= 0 && static_cast<uint64_t>(*index) < str.size();
+  const int64_t kCode =
+      kInside ? static_cast<int8_t>(str[static_cast<size_t>(*index)]) : 0;
+  return ConstVal{kCode, 8, true};
+}
+
 }  // namespace
 
-std::optional<ConstVal> ConstEvalBuiltinMethodFull(const Expr* expr) {
+std::optional<ConstVal> ConstEvalBuiltinMethodFull(const Expr* expr,
+                                                   const ScopeMap& scope) {
   const Expr* member = BuiltinMethodMember(expr);
   if (!member) return std::nullopt;
-  // §6.19.5.5 gives the prototype `function int num();`, and §5.13 and §7.9
-  // give size(), num() and len() the same empty parameter list. An argument
-  // list written on one of these names it as something other than the built-in
-  // method.
+  const std::string_view kMethod = member->rhs->text;
+  if (kMethod == "getc") {
+    auto str = StringParamValue(member->lhs);
+    if (!str) return std::nullopt;
+    return StringParamChar(expr, *str, scope);
+  }
+  // §6.16.1, §6.19.5.1, §6.19.5.2 and §6.19.5.5 give len(), first(), last() and
+  // num() an empty parameter list. An argument list written on one of them
+  // names it as something other than the built-in method.
   if (expr->kind == ExprKind::kCall && !expr->args.empty()) return std::nullopt;
-  if (member->rhs->text == "len") {
-    auto length = StringParamLength(member->lhs);
-    if (!length) return std::nullopt;
+  if (kMethod == "len") {
+    auto str = StringParamValue(member->lhs);
+    if (!str) return std::nullopt;
     // §6.16.1 gives the prototype `function int len();`, which §6.11.1 makes a
     // 32-bit signed integer.
-    return ConstVal{*length, 32, true};
+    return ConstVal{static_cast<int64_t>(str->size()), 32, true};
   }
-  // The third name IsBuiltinMethodName admits, size, stops here and is never
-  // folded. §7.5 gives size() on a dynamic array and §7.9 gives num() and
-  // size() on an associative array, and this file answers a built-in method
-  // from the declaration behind its operand: RtlirParamDecl records an
-  // integer, a real and a string, and no array, so there is no element count
-  // here to read. Leaving size unfolded is what keeps it from being answered
-  // wrongly, since a declaration this file cannot read is not one it can count.
-  if (member->rhs->text != "num") return std::nullopt;
-  auto count = EnumMemberCount(member->lhs);
-  if (!count) return std::nullopt;
-  // §6.19.5.5 declares num() as returning `int`, which §6.11.1 makes a 32-bit
-  // signed integer.
-  return ConstVal{*count, 32, true};
+  // Every other built-in method stops here unfolded, size() among them: this
+  // file answers a built-in method from the declaration behind its operand,
+  // and RtlirParamDecl records an integer, a real and a string and no array,
+  // so there is no element count to read. Leaving a method unfolded is what
+  // keeps it out of a constant expression rather than answered wrongly.
+  const std::vector<RtlirEnumMember>* members = EnumMembers(member->lhs);
+  // A.2.2.1 gives an enumeration at least one member, so front() and back()
+  // name one.
+  if (members == nullptr) return std::nullopt;
+  // §6.19.5.5 declares num() as returning `int`, a 32-bit signed integer
+  // (§6.11.1); first() and last() return the enumeration's own type, whose
+  // members' values are what the declaration gave them.
+  if (kMethod == "num")
+    return ConstVal{static_cast<int64_t>(members->size()), 32, true};
+  if (kMethod == "first") return ConstVal{members->front().value, 32, true};
+  if (kMethod == "last") return ConstVal{members->back().value, 32, true};
+  return std::nullopt;
 }
 
 std::optional<bool> BuiltinMethodCallIsConstant(const Expr* expr,
@@ -191,7 +247,7 @@ std::optional<bool> BuiltinMethodCallIsConstant(const Expr* expr,
   // What remains unfolded is a built-in method whose operand's declaration
   // carries no value the folder can read; reporting it is what tells its author
   // the value was not computed.
-  return ConstEvalBuiltinMethodFull(expr).has_value();
+  return ConstEvalBuiltinMethodFull(expr, scope).has_value();
 }
 
 }  // namespace delta

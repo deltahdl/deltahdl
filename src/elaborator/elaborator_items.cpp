@@ -724,6 +724,7 @@ void Elaborator::AddProcedure(ModuleItem* item, RtlirModule* mod,
                               RtlirProcessKind kind) {
   ElaborateProceduralConcurrentAssertions(item, mod, property_registry_, arena_,
                                           diag_);
+  ReportUnclockedLetSampledValues(item, mod, diag_);
   std::vector<ProceduralCheckerSite> sites;
   for (CheckerInstantiationInProcedure& site :
        CheckerInstantiationsIn(item->body, diag_)) {

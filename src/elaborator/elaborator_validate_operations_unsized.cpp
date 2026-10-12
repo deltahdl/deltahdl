@@ -43,7 +43,10 @@ void CheckConcatElementsForUnsized(const Expr* concat, DiagEngine& diag) {
 
 void ElaboratorOperationRules::WalkExprForUnsizedInConcat(const Expr* expr) {
   if (!expr) return;
-  if (expr->kind == ExprKind::kConcatenation) {
+  // §11.4.12.1 makes a replication a multiple concatenation, so its operands
+  // are held to the same rule as a concatenation's.
+  if (expr->kind == ExprKind::kConcatenation ||
+      expr->kind == ExprKind::kReplicate) {
     CheckConcatElementsForUnsized(expr, diag_);
   }
   WalkExprForUnsizedInConcat(expr->lhs);
@@ -227,7 +230,15 @@ void ElaboratorOperationRules::WalkStmtsForUnsizedInConcat(const Stmt* s) {
     WalkExprForUnsizedInConcat(s->rhs);
   }
   WalkExprForUnsizedInConcat(s->lhs);
-  WalkExprForUnsizedInConcat(s->expr);
+  // §13.4.1 assigns a return statement's expression to the function's result,
+  // so braces a function returning an unpacked array returns are an unpacked
+  // array concatenation (§10.10) whose items may be unsized.
+  if (s->kind == StmtKind::kReturn && returns_unpacked_array_ &&
+      s->expr->kind == ExprKind::kConcatenation) {
+    for (auto* elem : s->expr->elements) WalkExprForUnsizedInConcat(elem);
+  } else {
+    WalkExprForUnsizedInConcat(s->expr);
+  }
   WalkExprForUnsizedInConcat(s->condition);
   WalkExprForUnsizedInConcat(s->assert_expr);
   // §11.4.12 bars unsized constant numbers from a concatenation, a property of
@@ -265,6 +276,14 @@ void ElaboratorOperationRules::ValidateUnsizedInConcat(const ModuleDecl* decl) {
     if (item->kind == ModuleItemKind::kContAssign)
       CheckContAssignUnsizedInConcat(item);
     CheckVarInitUnsizedInConcat(item);
+    // §11.4.12 names no statement its rule is suspended in, a subroutine's
+    // among them, whose formals hide the module's names as a block's
+    // declarations do.
+    returns_unpacked_array_ = !item->return_array_dims.empty();
+    for (const auto& arg : item->func_args)
+      block_decls_.emplace_back(arg.name, !arg.unpacked_dims.empty());
+    for (const Stmt* s : item->func_body_stmts) WalkStmtsForUnsizedInConcat(s);
+    block_decls_.clear();
   }
   for (const auto& p : decl->params) {
     WalkExprForUnsizedInConcat(p.second);

@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -328,7 +330,11 @@ TEST(AggregateExpr, EquivalentArraySliceComparison) {
 // aggregate expression, so slices of non-equivalent array types are
 // non-equivalent operands and the report names the §6.22.2 definition they
 // fail.
-TEST(AggregateExpr, NonEquivalentArraySliceComparisonError) {
+// §6.22.2 makes two unpacked fixed-size arrays equivalent when their element
+// types are equivalent and they have the same shape, whatever typedefs they
+// were declared through: two four-element slices of logic [7:0] arrays are,
+// though the arrays are of different typedefs and sizes.
+TEST(AggregateExpr, EqualShapedSlicesOfDifferentTypedefsCompare) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -341,9 +347,39 @@ TEST(AggregateExpr, NonEquivalentArraySliceComparisonError) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "comparison of non-equivalent aggregate", 7,
-                            "6.22.2"));
+  EXPECT_FALSE(f.has_errors);
+}
+
+// Arrays of different sizes, or different element types, are not equivalent,
+// declared through a typedef or not, and a slice of a different length is not
+// equivalent to the whole array.
+TEST(AggregateExpr, NonEquivalentArrayComparisonsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int a [4], b [8];\n"
+      "  byte c [4];\n"
+      "  int d [];\n"
+      "  logic eq;\n"
+      "  int k;\n"
+      "  initial begin\n"
+      "    eq = (a == b);\n"
+      "    eq = (a != c);\n"
+      "    eq = (a == b[0:2]);\n"
+      "    eq = (a == d);\n"
+      "    eq = (a == b[4:7]);\n"
+      "    eq = (a == b[0 +: 4]);\n"
+      "    eq = (a == b[7 -: 4]);\n"
+      "    eq = (a == b[k +: 4]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {8u, 9u, 10u, 11u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "comparison of non-equivalent aggregate", line,
+                              "6.22.2"));
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 4u);
 }
 
 TEST(AggregateExpr, EquivalentArraySliceInequality) {

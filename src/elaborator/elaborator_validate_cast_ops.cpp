@@ -117,7 +117,8 @@ void ElaboratorOperationRules::WalkExprForAssignInExpr(const Expr* expr,
 void ElaboratorOperationRules::WalkStmtsForAssignInExpr(const Stmt* s) {
   if (!s) return;
 
-  if (s->kind == StmtKind::kAssign && s->rhs) {
+  // §10.6 makes both assign and force procedural continuous assignments.
+  if (s->kind == StmtKind::kAssign || s->kind == StmtKind::kForce) {
     WalkExprForAssignInExpr(s->rhs, true);
   }
   // §11.3.6 names the event expression without regard to where the event
@@ -152,7 +153,15 @@ void ElaboratorOperationRules::ValidateAssignInExprRestrictions(
     if (item->kind == ModuleItemKind::kContAssign && item->assign_rhs) {
       WalkExprForAssignInExpr(item->assign_rhs, true);
     }
+    // §11.3.6 bars an assignment operator from any expression that is not
+    // within a procedural statement: a declaration's initializer, a
+    // parameter's value and a port connection among them.
+    WalkExprForAssignInExpr(item->init_expr, true);
+    for (const auto& conn : item->inst_ports)
+      WalkExprForAssignInExpr(conn.second, true);
   }
+  for (const auto& param : decl->params)
+    WalkExprForAssignInExpr(param.second, true);
 }
 
 static std::string_view AliasNetIdent(const Expr* e) {

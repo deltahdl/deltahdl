@@ -1,6 +1,7 @@
 #include "elaborator/const_eval.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <optional>
@@ -69,10 +70,15 @@ static std::optional<int64_t> EvalBinaryArith(TokenKind op, int64_t lhs,
     case TokenKind::kSlash:
     case TokenKind::kSlashEq:
       if (rhs == 0) return std::nullopt;
+      // §11.4.3 wraps a signed result at its width, so a divisor of -1 is
+      // answered as a negation: the most negative value divided by it is the
+      // value itself, where the C++ quotient overflows.
+      if (rhs == -1) return static_cast<int64_t>(-static_cast<uint64_t>(lhs));
       return lhs / rhs;
     case TokenKind::kPercent:
     case TokenKind::kPercentEq:
       if (rhs == 0) return std::nullopt;
+      if (rhs == -1) return 0;
       return lhs % rhs;
     default:
       return std::nullopt;
@@ -113,9 +119,15 @@ static std::optional<int64_t> EvalBinaryCompare(TokenKind op, int64_t lhs,
       return static_cast<int64_t>(lhs <= rhs);
     case TokenKind::kGtEq:
       return static_cast<int64_t>(lhs >= rhs);
+    // §11.4.5's case equality and §11.4.6's wildcard equality differ from ==
+    // and != only over x and z bits, which a folded constant does not hold.
     case TokenKind::kEqEq:
+    case TokenKind::kEqEqEq:
+    case TokenKind::kEqEqQuestion:
       return static_cast<int64_t>(lhs == rhs);
     case TokenKind::kBangEq:
+    case TokenKind::kBangEqEq:
+    case TokenKind::kBangEqQuestion:
       return static_cast<int64_t>(lhs != rhs);
     case TokenKind::kAmpAmp:
       return static_cast<int64_t>(lhs != 0 && rhs != 0);
@@ -471,7 +483,7 @@ static std::string StringLiteralChars(const Expr* expr) {
 // constant expression whose value is A's characters.
 //
 // The registered module rather than a ScopeMap is what answers this, for the
-// reason StringParamLength in src/elaborator/const_eval_builtin_method.cpp
+// reason StringParamValue in src/elaborator/const_eval_builtin_method.cpp
 // gives for reading the same field: a ScopeMap maps a name to an int64_t and
 // drops RtlirParamDecl::resolved_string on the way, so a string value cannot be
 // recovered from one. Empty for a name the module declares no parameter under
@@ -570,8 +582,7 @@ std::optional<std::string> ConstEvalString(const Expr* expr) {
 // §11.10: a string literal operand is a constant number formed from the 8-bit
 // ASCII code of each character, one byte per character, packed with the first
 // character in the most-significant position. This lets a string literal fold
-// in constant expressions (e.g. a parameter/localparam initializer). The folded
-// value keeps the low 64 bits, matching the low word of the equivalent vector.
+// in constant expressions (e.g. a parameter/localparam initializer).
 std::optional<ConstVal> ConstEvalStringLiteral(const Expr* expr) {
   // §5.9: a string literal used as an operand is an integer of one 8-bit value
   // per character or escape, so its zero bytes stay; only a string drops them.
@@ -579,11 +590,53 @@ std::optional<ConstVal> ConstEvalStringLiteral(const Expr* expr) {
                    ? std::optional<std::string>(StringLiteralBytes(expr))
                    : ConstEvalString(expr);
   if (!chars) return std::nullopt;
-  uint64_t value = 0;
-  for (char c : *chars) value = (value << 8) | static_cast<uint8_t>(c);
   uint32_t width =
       chars->empty() ? 8u : static_cast<uint32_t>(chars->size()) * 8u;
-  return ConstVal{static_cast<int64_t>(value), width, false};
+  // Every character is kept, the last in the low byte of the low word, so a
+  // literal of more than eight characters has its leading ones in the words
+  // above bit 63; keeping the low 64 bits alone had "Hello world" and
+  // "Xello world" fold to one value.
+  std::vector<uint64_t> words((width + 63) / 64, 0);
+  const size_t kCount = chars->size();
+  for (size_t i = 0; i < kCount; ++i) {
+    const size_t kByte = kCount - 1 - i;
+    words[kByte / 8] |= uint64_t{static_cast<uint8_t>((*chars)[i])}
+                        << (8 * (kByte % 8));
+  }
+  return ConstValOfWords(words, width, false);
+}
+
+// §11.4.9 (printed pages 283-284): the one bit a reduction operator answers,
+// folding its operator over every bit of the operand in turn -- AND, OR and
+// XOR, and their inversions for the NAND, NOR and XNOR forms. Empty for an
+// operator that is no reduction.
+static std::optional<int64_t> ReduceConstVal(TokenKind op, const ConstVal& v) {
+  bool all = true;
+  bool any = false;
+  bool odd = false;
+  for (uint32_t i = 0; i < v.width; ++i) {
+    const bool kBit = ConstValBit(v, i);
+    all = all && kBit;
+    any = any || kBit;
+    odd = odd != kBit;
+  }
+  switch (op) {
+    case TokenKind::kAmp:
+      return all;
+    case TokenKind::kTildeAmp:
+      return !all;
+    case TokenKind::kPipe:
+      return any;
+    case TokenKind::kTildePipe:
+      return !any;
+    case TokenKind::kCaret:
+      return odd;
+    case TokenKind::kTildeCaret:
+    case TokenKind::kCaretTilde:
+      return !odd;
+    default:
+      return std::nullopt;
+  }
 }
 
 std::optional<ConstVal> ConstEvalUnaryFull(const Expr* expr,
@@ -599,6 +652,10 @@ std::optional<ConstVal> ConstEvalUnaryFull(const Expr* expr,
   // operand is set, read across every word of it.
   if (expr->op == TokenKind::kBang)
     return ConstVal{ConstValIsNonZero(*operand) ? 0 : 1, 1, false};
+  // Table 11-21 (printed page 299): a reduction answers one unsigned bit from
+  // its self-determined operand.
+  if (auto reduced = ReduceConstVal(expr->op, *operand))
+    return ConstVal{*reduced, 1, false};
   // §11.6.1's Table 11-21 (printed page 299) sizes unary `+ - ~` by their
   // operand, so a result wider than 64 bits has words the int64 fold cannot
   // hold; EvalWideUnary works those across every word and declines the rest,
@@ -654,9 +711,29 @@ static std::optional<ConstVal> EvalUnsignedDivMod(TokenKind op, int64_t lv,
   return std::nullopt;
 }
 
+// §11.4.7 (printed page 281): && and -> are decided by a first operand that is
+// false and || by one that is true, and §11.3.5 then leaves the second operand
+// unevaluated. The answer, where the first operand decides it; empty where it
+// does not, or the operator is none of the three, which then fold both
+// operands. A second operand that does not fold -- a division by zero, whose
+// x §11.4.3 has the decided result ignore -- is thereby never asked.
+static std::optional<ConstVal> FoldDecidedByFirstOperand(
+    const Expr* expr, const ScopeMap& scope) {
+  const bool kOr = expr->op == TokenKind::kPipePipe;
+  if (!kOr && expr->op != TokenKind::kAmpAmp && expr->op != TokenKind::kArrow)
+    return std::nullopt;
+  auto first = ConstEvalFull(expr->lhs, scope);
+  if (!first) return std::nullopt;
+  if (ConstValIsNonZero(*first) != kOr) return std::nullopt;
+  // A false first operand makes && false and -> true; a true one makes ||
+  // true.
+  return ConstVal{expr->op == TokenKind::kAmpAmp ? 0 : 1, 1, false};
+}
+
 std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
                                             const ScopeMap& scope,
                                             FoldContext ctx) {
+  if (auto decided = FoldDecidedByFirstOperand(expr, scope)) return decided;
   // §11.8.2 (printed pages 302-303): each operand is folded in the context
   // the expression propagates to it -- FoldBinaryOperands says which take
   // the context and which are self-determined -- before the operator is
@@ -678,8 +755,7 @@ std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
   // A result wider than 64 bits has words the int64 fold cannot hold, and a
   // comparison or a logical operator reads every bit of operands that wide;
   // EvalWideBinary works those across every word, the four multiplicative
-  // operators through const_eval_wide_arith.cpp, and declines the case
-  // equality and wildcard operators alone, which fold below on the low word.
+  // operators through const_eval_wide_arith.cpp.
   // Every shift and power goes there whatever its width, since the count and
   // the exponent are read across every word of a right operand wider than
   // the result, and a count of 64 or more is a C++ shift the int64 fold
@@ -725,36 +801,41 @@ static int64_t SelectOffset(const std::optional<PackedRange>& range,
   return range ? range->OffsetOf(index) : index;
 }
 
-// §11.5.1: an invalid bit-select address, out of bounds or holding an x or z
-// bit, reads as x for a 4-state value and 0 for a 2-state one. A folded
-// constant carries no x, so a bit outside the value reads as 0 whichever it is.
+// §11.5.1 (printed pages 295-296): a bit-select or a part-select whose
+// address falls outside the vector reads x there for a 4-state value and 0 for
+// a 2-state one. A folded constant holds no x, nor which state set its value
+// was declared with, so a select reaching outside its value is left unfolded
+// rather than answered 0: §11.5.1's NOTE 2 lets such an index be reported at
+// compile time, and a parameter it initializes is evaluated again in
+// simulation (ReevaluateParamValue in src/simulator/lowerer_register.cpp),
+// where the vector's state set is known.
+static bool InsideValue(const ConstVal& value, int64_t offset) {
+  return offset >= 0 && offset < static_cast<int64_t>(value.width);
+}
+
 // A bit at or above 64 is read through ConstVal::high_words, so `P[95]` of a
 // 96-bit parameter is the bit its digits wrote and not a bit the int64 never
 // held.
-static ConstVal SelectOneBit(const ConstVal& value, int64_t offset) {
+static std::optional<ConstVal> SelectOneBit(const ConstVal& value,
+                                            int64_t offset) {
+  if (!InsideValue(value, offset)) return std::nullopt;
   return ConstVal{ConstValBit(value, offset) ? 1 : 0, 1, false};
 }
 
-// §11.5.1: a part-select wholly outside the vector's address bounds reads as x,
-// and one partly outside reads x for its out-of-range bits. Those bits read as
-// 0 here for the reason a single out-of-bounds bit does, and the bits that are
-// in range keep the places they occupy in the selected field. The field is read
-// as the 64-bit window of the value that starts at its low end, ConstValWindow,
-// which reaches the words above bit 63 for a range at or above 64 (`P[95:64]`)
-// and shifts the value up for one running off the bottom, where the bits below
-// it are out of range and left at zero; the mask then cuts the window to the
-// field's own width.
+// The bits of a part-select keep the places they occupy in the selected field,
+// read from every word of the value, so a field of 64 bits or more folds whole
+// (`W[63:0]` of a 128-bit parameter).
 static std::optional<ConstVal> SelectBitRange(const ConstVal& value,
                                               int64_t off_a, int64_t off_b) {
-  int64_t hi = std::max(off_a, off_b);
-  int64_t lo = std::min(off_a, off_b);
-  int64_t width = hi - lo + 1;
-  if (width <= 0 || width > 63) return std::nullopt;
-  auto w = static_cast<uint32_t>(width);
-  if (hi < 0) return ConstVal{0, w, false};
-  uint64_t field_mask = ~uint64_t{0} >> (64 - width);
-  return ConstVal{static_cast<int64_t>(ConstValWindow(value, lo) & field_mask),
-                  w, false};
+  const int64_t kHi = std::max(off_a, off_b);
+  const int64_t kLo = std::min(off_a, off_b);
+  if (!InsideValue(value, kLo) || !InsideValue(value, kHi)) return std::nullopt;
+  const auto kWidth = static_cast<uint32_t>(kHi - kLo + 1);
+  std::vector<uint64_t> words((kWidth + 63) / 64, 0);
+  for (uint32_t i = 0; i < kWidth; ++i) {
+    if (ConstValBit(value, kLo + i)) words[i / 64] |= uint64_t{1} << (i % 64);
+  }
+  return ConstValOfWords(words, kWidth, false);
 }
 
 // The first parameter named `name` of the module a ParamRangeRegistryGuard
@@ -823,8 +904,13 @@ std::optional<ConstVal> ConstEvalSelectFull(const Expr* expr,
   if (expr->index_end) {
     auto end = ConstEvalFull(expr->index_end, scope);
     if (!end) return std::nullopt;
+    // §11.5.1: an indexed part-select's second expression is its width, the
+    // bits running up from the base for `+:` and down from it for `-:`.
+    int64_t last = end->value;
+    if (expr->is_part_select_plus) last = idx->value + end->value - 1;
+    if (expr->is_part_select_minus) last = idx->value - end->value + 1;
     return SelectBitRange(*base_val, SelectOffset(range, idx->value),
-                          SelectOffset(range, end->value));
+                          SelectOffset(range, last));
   }
   return SelectOneBit(*base_val, SelectOffset(range, idx->value));
 }

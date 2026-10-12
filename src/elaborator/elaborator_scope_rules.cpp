@@ -414,6 +414,52 @@ void ReportDeclInitUnresolved(const ModuleDecl* decl, Pred declared,
   ReportUnresolvedRefs(refs, declared, diag, DeclaredGenvars(decl->items));
 }
 
+// The constant expressions among `items`, outside every loop generate
+// construct, that footnote 44 to §11.11's Syntax 11-7 (printed page 307)
+// keeps a genvar out of and no walk above reads: a parameter's value, a
+// generate-if condition, a generate-case selector and its item expressions, a
+// declaration's packed and unpacked dimensions, and the delays a continuous
+// assignment or a net declaration writes. The blocks of a generate-if or a
+// generate-case are reached in turn; a loop generate's are not, a genvar being
+// a constant within one.
+void CollectGenvarConstantPositions(const std::vector<ModuleItem*>& items,
+                                    std::vector<const Expr*>& out) {
+  for (const ModuleItem* item : items) {
+    if (item->kind == ModuleItemKind::kGenerateFor) continue;
+    if (item->kind == ModuleItemKind::kParamDecl)
+      CollectBareIdents(item->init_expr, out);
+    for (const Expr* e :
+         {item->gen_cond, item->data_type.packed_dim_left,
+          item->data_type.packed_dim_right, item->assign_delay,
+          item->assign_delay_fall, item->assign_delay_decay, item->net_delay,
+          item->net_delay_fall, item->net_delay_decay})
+      CollectBareIdents(e, out);
+    for (const auto& [left, right] : item->data_type.extra_packed_dims) {
+      CollectBareIdents(left, out);
+      CollectBareIdents(right, out);
+    }
+    for (const Expr* dim : item->unpacked_dims) CollectBareIdents(dim, out);
+    CollectGenvarConstantPositions(item->gen_body, out);
+    if (item->gen_else != nullptr)
+      CollectGenvarConstantPositions({item->gen_else}, out);
+    for (const auto& case_item : item->gen_case_items) {
+      for (const Expr* pattern : case_item.patterns)
+        CollectBareIdents(pattern, out);
+      CollectGenvarConstantPositions(case_item.body, out);
+    }
+  }
+}
+
+// §27.4: reports each read of one of the module's genvars that
+// CollectGenvarConstantPositions gathers.
+void ReportGenvarConstantMisuse(const ModuleDecl* decl, DiagEngine& diag) {
+  std::vector<const Expr*> refs;
+  CollectGenvarConstantPositions(decl->items, refs);
+  ReportUnresolvedRefs(
+      refs, [](std::string_view) { return true; }, diag,
+      DeclaredGenvars(decl->items));
+}
+
 // The package import declarations a subroutine body opens with. A.2.8 admits
 // package_import_declaration as a block_item_declaration, which A.2.7's
 // tf_item_declaration takes, and the parser keeps each as a kBlockItemDecl
@@ -700,6 +746,7 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
   ReportContAssignUnresolved(decl, declared, diag_);
   ReportProcUnresolved(decl, declared, diag_);
   ReportDeclInitUnresolved(decl, declared, diag_);
+  ReportGenvarConstantMisuse(decl, diag_);
   ReportAssertionUnresolved(decl, declared, diag_);
   ReportNonConstantBoundActuals(
       decl,

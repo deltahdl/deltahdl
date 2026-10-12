@@ -502,6 +502,14 @@ inline std::string_view HierRefLeftmost(const Expr* e) {
   return {};
 }
 
+// Whether `e` is a real value: a real or a time literal (§5.8 reads a time
+// literal as a realtime value), a real variable or an element of an array of
+// reals, an arithmetic operation one of whose operands is real, or a
+// conditional either of whose results is. `var_types` is the declared kind of
+// each variable. Defined in elaborator_validate_cast_operand.cpp.
+bool IsRealValued(
+    const Expr* e,
+    const std::unordered_map<std::string_view, DataTypeKind>& var_types);
 bool ExprContainsIdent(const Expr* e, std::string_view name);
 bool ExprUsesInterconnect(const Expr* e,
                           const std::unordered_set<std::string_view>& names);

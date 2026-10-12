@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+#include <utility>
+
 #include "elaborator/let_construct.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -397,6 +401,191 @@ TEST(LetDeclElaboration, HierarchicalReferenceToALetIsIllegal) {
                             "a let shall not be referenced hierarchically", 13,
                             "11.12"));
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+// §11.12 bars every hierarchical reference to a let, and a path through an
+// instance to the let its module declares is one.
+TEST(LetElaboration, HierarchicalReferenceToAChildModulesLetReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child;\n"
+      "  let my_let(x) = !x;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child u();\n"
+      "  logic r;\n"
+      "  initial r = u.my_let(1'b0);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a let shall not be referenced hierarchically", 7,
+                            "11.12"));
+}
+
+// §11.12 asks a let be declared before its use in the scope declaring it, and
+// a generate block and a begin-end block are such scopes. A let used where an
+// earlier statement of the block declared it, and a block declaring a type and
+// no let, draw nothing.
+TEST(LetElaboration, LetUsedBeforeDeclarationInANestedScopeReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic y, z;\n"
+      "  if (1) begin : g\n"
+      "    assign y = f;\n"
+      "    let f = 1'b1;\n"
+      "  end else begin : e\n"
+      "    assign y = f2;\n"
+      "    let f2 = 1'b0;\n"
+      "  end\n"
+      "  case (1)\n"
+      "    1: begin : c\n"
+      "      assign z = f3;\n"
+      "      let f3 = 1'b1;\n"
+      "    end\n"
+      "  endcase\n"
+      "  initial begin\n"
+      "    $display(\"%0d\", h);\n"
+      "    let h = 1;\n"
+      "    $display(\"%0d\", h);\n"
+      "  end\n"
+      "  initial begin\n"
+      "    typedef int t_t;\n"
+      "    t_t k;\n"
+      "  end\n"
+      "  function automatic int fn();\n"
+      "    begin\n"
+      "      fn = q;\n"
+      "      let q = 2;\n"
+      "    end\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  for (auto [line, name] :
+       {std::pair{4u, "f"}, std::pair{7u, "f2"}, std::pair{12u, "f3"},
+        std::pair{17u, "h"}, std::pair{27u, "q"}}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::string("let '") + name + "' is used before its declaration", line,
+        "11.12"));
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "let 'h' is used before its declaration", 19,
+                             "11.12"));
+}
+
+// §11.12, rule 1: a reference to an event formal stands where an
+// event_expression may be written, which an operand of `+` is not; the
+// clocking event of a sampled value call is such a place.
+TEST(LetDeclElaboration, EventFormalReferencedAsAValueReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a;\n"
+      "  let f(event e) = e + 1;\n"
+      "  let g(event e) = $rose(a, @(e));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "event formal 'e' of a let is referenced where no "
+                            "event_expression may be written",
+                            3, "11.12"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "event formal 'e' of a let is referenced", 4,
+                             "11.12"));
+}
+
+// §11.12, rule 2: an integral or real formal takes no actual of an unpacked
+// array, structure or union type, whether a call binds it by position or by
+// name or the declaration gives it as the default. An untyped formal, a formal
+// of the structure's own type, and actuals of integral, packed or class types
+// are left alone.
+TEST(LetDeclElaboration, ActualNotCastCompatibleWithTypedFormalReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  typedef struct { int a; } s_t;\n"
+      "  typedef struct packed { int a; } p_t;\n"
+      "  s_t s; p_t p; C h; int i; int arr [2];\n"
+      "  union { int x; real y; } un;\n"
+      "  union soft { int x; byte y; } su;\n"
+      "  localparam int P = 1;\n"
+      "  let g(int x) = x;\n"
+      "  let r(real x) = x;\n"
+      "  let u(x) = x;\n"
+      "  let t(s_t x) = x.a;\n"
+      "  let d(int x = s) = x;\n"
+      "  let k(int x = 1) = x;\n"
+      "  initial begin\n"
+      "    $display(\"%0d\", g(s));\n"
+      "    $display(\"%0d\", r(.x(arr)));\n"
+      "    $display(\"%0d\", g(un));\n"
+      "    $display(\"%0d\", u(s));\n"
+      "    $display(\"%0d\", t(s));\n"
+      "    $display(\"%0d\", g(p) + g(i) + g(P) + g(3) + g(su) + k());\n"
+      "    $display(\"%0d\", g(h));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {13u, 16u, 17u, 18u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "is not cast compatible with the type of formal",
+                              line, "11.12"));
+  }
+  for (uint32_t line : {19u, 20u, 21u, 22u}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                               "is not cast compatible with the type of formal",
+                               line, "11.12"));
+  }
+}
+
+// §11.12 clocks a sampled value call in a let body as if written where the let
+// is instantiated, and its example (f) has an always_comb give `$past` no
+// clock. A let whose call names its clock, one with no sampled value call, a
+// procedure clocked by an edge and a concurrent assertion each give one.
+TEST(LetDeclElaboration, LetSampledValueWithNoInferableClockReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input clock);\n"
+      "  logic a, b;\n"
+      "  let p1(x) = $past(x);\n"
+      "  let p2 = $rose(a, @(posedge clock));\n"
+      "  let p3(x) = $bits(x) + $sampled(x);\n"
+      "  always_comb begin\n"
+      "    a1: assert (p1(a));\n"
+      "    a2: assert (p2);\n"
+      "    a3: assert (p3(a));\n"
+      "    a4: assert property (@(posedge clock) p1(a));\n"
+      "  end\n"
+      "  always @(posedge clock) begin\n"
+      "    b <= p1(a);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "no clock is inferred where let 'p1' is "
+                            "instantiated",
+                            7, "11.12"));
+  for (uint32_t line : {8u, 9u, 10u, 13u}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "no clock is inferred",
+                               line, "11.12"));
+  }
+}
+
+// A module's default clocking clocks the call where the procedure gives none.
+TEST(LetDeclElaboration, LetSampledValueClockedByDefaultClockingAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input clock);\n"
+      "  logic a;\n"
+      "  default clocking cb @(posedge clock); endclocking\n"
+      "  let p1(x) = $past(x);\n"
+      "  always_comb a1: assert (p1(a));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "no clock is inferred", 5, "11.12"));
 }
 
 }  // namespace

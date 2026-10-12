@@ -141,6 +141,11 @@ DataType InPackageScope(const DataType& type, const PackageDecl& package);
 DataTypeKind ResolvedTypeKind(const DataType& dtype,
                               const TypedefMap& typedefs);
 
+// The type `dtype` stands for at the end of its chain of typedef and nettype
+// names, as ResolvedTypeKind follows it; null where a name on the way stands
+// for nothing the table holds or the chain runs through one name twice.
+const DataType* ResolvedType(const DataType& dtype, const TypedefMap& typedefs);
+
 // The same for a structure or union member's named type (§7.2.1): a member
 // written behind a qualifier, `q::pair_t Add`, was looked up by `pair_t`
 // alone, resolving to whatever a wildcard import made the bare name stand
@@ -203,6 +208,10 @@ bool IsNetTypeKind(DataTypeKind kind);
 bool IsSimpleBitVectorType(DataTypeKind kind);
 
 bool IsSimpleBitVectorType(const DataType& dtype);
+
+// §7.2 and §7.3: whether `type` is an unpacked structure or union, which is no
+// integral value: neither declared packed nor a soft union (§7.3.1).
+bool IsUnpackedAggregateType(const DataType& type);
 
 bool TypesMatch(const DataType& a, const DataType& b);
 

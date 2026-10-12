@@ -109,6 +109,20 @@ static std::string_view TypedConstructorScopeType(const Expr* rhs) {
   return access->lhs->text;
 }
 
+// Whether `e` is a literal value: a number, a real, a string or an unbased
+// unsized literal, none of which is a class handle or null (§11.4.5).
+static bool IsValueLiteral(const Expr* e) {
+  switch (e->kind) {
+    case ExprKind::kIntegerLiteral:
+    case ExprKind::kRealLiteral:
+    case ExprKind::kStringLiteral:
+    case ExprKind::kUnbasedUnsizedLiteral:
+      return true;
+    default:
+      return false;
+  }
+}
+
 // Validates the operands of a binary expression that involves at least one
 // class-handle variable: rejects disallowed operators and, for comparisons of
 // two handles, requires assignment-compatible types.
@@ -125,6 +139,16 @@ static void CheckClassHandleBinary(
     diag.Error(e->range.start,
                "operator is not allowed on class object handles",
                Subclause("8.4"));
+  }
+
+  // §11.4.5 (printed page 279): an equality operator takes a class handle
+  // only against an operand assignment compatible with it, another handle or
+  // null; a literal value is none.
+  if (lhs_class != rhs_class && IsAllowedClassBinaryOp(e->op) &&
+      IsValueLiteral(lhs_class ? e->rhs : e->lhs)) {
+    diag.Error(e->range.start,
+               "a class handle is compared only with a class handle or null",
+               Subclause("11.4.5"));
   }
 
   if (lhs_class && rhs_class && IsAllowedClassBinaryOp(e->op)) {
@@ -167,6 +191,43 @@ static void CheckClassHandleCast(
   }
 }
 
+// §11.4.11 (printed page 286), case e): whether one class the class `a` is or
+// derives from is one the class `b` is or derives from. Where `b` derives from
+// `a` itself, or `a` names no class the unit declares -- a built-in class such
+// as mailbox -- the first step answers.
+static bool ShareABaseClass(std::string_view a, std::string_view b,
+                            const CompilationUnit* unit) {
+  if (IsClassDerivedFrom(b, a, unit)) return true;
+  for (const auto* cls = FindClassDecl(a, unit); cls != nullptr;
+       cls = FindBaseClass(cls, unit)) {
+    if (IsClassDerivedFrom(b, cls->name, unit)) return true;
+  }
+  return false;
+}
+
+// §11.4.11: a conditional whose two operands are class handles is legal where
+// one is assignment compatible with the other or both derive from a common
+// base class. Two variables of unrelated class types are neither; a null
+// operand is no variable and is legal with any handle.
+static void CheckConditionalClassOperands(
+    const Expr* e,
+    const std::unordered_map<std::string_view, std::string_view>& types,
+    const CompilationUnit* unit, DiagEngine& diag) {
+  auto first = types.find(e->true_expr->text);
+  auto second = types.find(e->false_expr->text);
+  if (e->true_expr->kind != ExprKind::kIdentifier ||
+      e->false_expr->kind != ExprKind::kIdentifier || first == types.end() ||
+      second == types.end() ||
+      ShareABaseClass(first->second, second->second, unit))
+    return;
+  diag.Error(e->range.start,
+             std::format("conditional operands of class types '{}' and '{}' "
+                         "share no base class and neither is assignment "
+                         "compatible with the other",
+                         first->second, second->second),
+             Subclause("11.4.11"));
+}
+
 static void CheckClassHandleExpr(
     const Expr* e, const std::unordered_set<std::string_view>& class_vars,
     const std::unordered_map<std::string_view, std::string_view>&
@@ -177,6 +238,8 @@ static void CheckClassHandleExpr(
   if (e->kind == ExprKind::kBinary) {
     CheckClassHandleBinary(e, class_vars, class_var_types, unit, diag);
   }
+  if (e->kind == ExprKind::kTernary)
+    CheckConditionalClassOperands(e, class_var_types, unit, diag);
 
   if (e->kind == ExprKind::kUnary &&
       IsHandleOperand(e->lhs, class_vars, class_var_types, unit)) {

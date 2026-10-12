@@ -28,6 +28,7 @@
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
+#include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
 #include "parser/ast_expr.h"
 
@@ -142,6 +143,31 @@ TEST(MinTypMaxElaboration, WidthTakesNeitherTheWidestNorTheNarrowest) {
   ASSERT_NE(e, nullptr);
   DelayModeGuard guard(DelayMode::kMax);
   EXPECT_EQ(InferExprWidth(e, {}), 16u);
+}
+
+// A.10 footnote 45 leaves a type reference the four equality operators alone,
+// so neither a unary operator nor any operand of a conditional takes one.
+TEST(TypeReferenceOperatorElaboration, UnaryAndConditionalOnTypeRefReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic r, c;\n"
+      "  initial r = !type(int);\n"
+      "  initial r = c ? type(int) : 1'b0;\n"
+      "  initial r = c ? 1'b0 : type(byte);\n"
+      "  initial r = type(int) ? 1'b1 : 1'b0;\n"
+      "  initial r = !c ? 1'b1 : 1'b0;\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {3u, 4u, 5u, 6u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "a type reference may only be used with the "
+                              "equality, inequality, and case "
+                              "equality/inequality operators",
+                              line, "6.23"));
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "a type reference may only be used", 7, "6.23"));
 }
 
 }  // namespace

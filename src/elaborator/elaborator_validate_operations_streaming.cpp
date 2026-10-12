@@ -163,6 +163,37 @@ void CheckStreamingSliceSize(const Expr* slice, DiagEngine& diag,
   }
 }
 
+// §11.4.14.1 streams an untagged union through its first-declared member and
+// a packed union as the bit-stream type it is, and names no rule for an
+// unpacked tagged union, so one is skipped with an error. Whether the type a
+// variable was declared with is such a union, written inline or through a
+// typedef.
+bool IsUnpackedTaggedUnion(const DataType* type, const TypedefMap& typedefs) {
+  if (type->kind == DataTypeKind::kNamed) {
+    auto it = typedefs.find(type->type_name);
+    if (it == typedefs.end()) return false;
+    type = &it->second;
+  }
+  return type->kind == DataTypeKind::kUnion && type->is_tagged &&
+         !type->is_packed;
+}
+
+// Reports a streaming operand that names a variable of an unpacked tagged
+// union type.
+void CheckTaggedUnionStreamOperand(
+    const Expr* elem,
+    const std::unordered_map<std::string_view, const DataType*>& types,
+    const TypedefMap& typedefs, DiagEngine& diag) {
+  if (elem->kind != ExprKind::kIdentifier) return;
+  auto it = types.find(elem->text);
+  if (it == types.end() || !IsUnpackedTaggedUnion(it->second, typedefs)) return;
+  diag.Error(elem->range.start,
+             std::format("'{}' is not a bit-stream type and cannot be a "
+                         "streaming concatenation operand",
+                         elem->text),
+             Subclause("11.4.14.1"));
+}
+
 }  // namespace
 
 void ElaboratorOperationRules::WalkExprForStreamingContext(
@@ -180,6 +211,8 @@ void ElaboratorOperationRules::WalkExprForStreamingContext(
     for (auto* elem : expr->elements) {
       CheckStreamingConcatOperand(elem, diag_, class_var_types_, var_types_,
                                   unit_);
+      CheckTaggedUnionStreamOperand(elem, stream_operand_types_, typedefs_,
+                                    diag_);
       WalkExprForStreamingContext(elem, true);
     }
 
@@ -268,7 +301,12 @@ void ElaboratorOperationRules::WalkStmtsForStreamingContext(const Stmt* s) {
     WalkExprForStreamingContext(s->lhs, false);
     WalkExprForStreamingContext(s->rhs, false);
   }
-  WalkExprForStreamingContext(s->expr, false);
+  // §13.4.1 assigns a return statement's expression to the function's result,
+  // and §6.8 a block variable's initializer to the variable, so each is the
+  // source of an assignment, where a streaming concatenation may stand whole.
+  WalkExprForStreamingContext(s->expr, s->kind == StmtKind::kReturn);
+  if (s->kind == StmtKind::kVarDecl)
+    WalkExprForStreamingContext(s->var_init, true);
   WalkExprForStreamingContext(s->condition, false);
   WalkExprForStreamingContext(s->assert_expr, false);
   // §11.4.14 confines a streaming concatenation to an assignment or a
@@ -284,11 +322,24 @@ void ElaboratorOperationRules::WalkStmtsForStreamingContext(const Stmt* s) {
 
 void ElaboratorOperationRules::ValidateStreamingConcatContext(
     const ModuleDecl* decl) {
+  stream_operand_types_.clear();
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kVarDecl)
+      stream_operand_types_[item->name] = &item->data_type;
+  }
   for (const auto* item : decl->items) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
       WalkStmtsForStreamingContext(item->body);
     }
+    // §11.4.14 holds a streaming concatenation to its contexts wherever it is
+    // written: a declaration's initializer is the source of an assignment to
+    // the declared object (§6.8, §10.3.1), and a subroutine's statements are
+    // procedural statements as a process's are.
+    if (item->kind == ModuleItemKind::kVarDecl ||
+        item->kind == ModuleItemKind::kNetDecl)
+      WalkExprForStreamingContext(item->init_expr, true);
+    for (const Stmt* s : item->func_body_stmts) WalkStmtsForStreamingContext(s);
     if (item->kind == ModuleItemKind::kContAssign) {
       WalkExprForStreamingContext(item->assign_lhs, true);
       WalkExprForStreamingContext(item->assign_rhs, true);

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 
 #include "fixture_elaborator.h"
@@ -341,6 +342,34 @@ TEST(OperatorElaboration,
       "        main : { r = (s == t); };\n"
       "      endsequence\n"
       "    end");
+}
+
+// §11.4.5 makes equality with a class handle legal only where one operand is
+// assignment compatible with the other, or is null; a literal value is
+// neither, on either side.
+TEST(EqualityOperatorElaboration, ClassHandleComparedWithLiteralReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  class C; endclass\n"
+      "  C h;\n"
+      "  bit b;\n"
+      "  initial begin\n"
+      "    b = h == 5;\n"
+      "    b = 1.5 != h;\n"
+      "    b = h === \"a\";\n"
+      "    b = h == '0;\n"
+      "    b = h == null;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {6u, 7u, 8u, 9u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "a class handle is compared only with a class "
+                              "handle or null",
+                              line, "11.4.5"));
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 4u);
 }
 
 }  // namespace

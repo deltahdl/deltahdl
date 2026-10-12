@@ -36,6 +36,14 @@ void ElaborateProceduralConcurrentAssertions(ModuleItem* procedure,
 InferredAtInstance InferredInProcedure(const ModuleItem* procedure,
                                        const RtlirModule* mod);
 
+// §11.12 with §16.9.3: a sampled value call in a let body with no clocking
+// event of its own is clocked as if written where the let is instantiated. In
+// the procedure `procedure` of `mod`, outside its concurrent assertions, that
+// is the clock the procedure gives or the default clocking behind it; an
+// instance where there is neither is reported.
+void ReportUnclockedLetSampledValues(const ModuleItem* procedure,
+                                     const RtlirModule* mod, DiagEngine& diag);
+
 // §16.17: the same for the expect statements of the task or function
 // `subroutine`, which §16.17 has appear wherever a wait statement can; a
 // subroutine gives no contextually inferred clock, so a spec that opens

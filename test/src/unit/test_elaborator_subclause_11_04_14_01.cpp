@@ -151,4 +151,37 @@ TEST(StreamExpressionConcatElaboration, ClassHandleWithPublicMembersAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §11.4.14.1 streams an untagged union through its first member, and an
+// unpacked tagged union is none of the kinds a stream_expression may be, so it
+// is skipped with an error.
+TEST(StreamExpressionConcatElaboration, UnpackedTaggedUnionOperandReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef union tagged { int a; byte b; } u_t;\n"
+      "  u_t u;\n"
+      "  bit [31:0] r;\n"
+      "  initial r = {>> {u}};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'u' is not a bit-stream type and cannot be a "
+                            "streaming concatenation operand",
+                            5, "11.4.14.1"));
+}
+
+TEST(StreamExpressionConcatElaboration, UntaggedAndPackedTaggedUnionsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  class C; int a; endclass\n"
+             "  typedef union { int a; byte b; } u_t;\n"
+             "  typedef union tagged packed { int a; int b; } p_t;\n"
+             "  u_t u;\n"
+             "  p_t p;\n"
+             "  C h;\n"
+             "  bit [95:0] r;\n"
+             "  initial r = {>> {u, p, h}};\n"
+             "endmodule\n"));
+}
+
 }  // namespace

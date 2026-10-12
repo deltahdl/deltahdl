@@ -25,7 +25,10 @@ bool IsConstantSysFunc(std::string_view name) {
       "$isunknown",
       "$isunbounded",
 
+      // §11.2.1's parenthetical names $timescale and $timeprecision, and §20.4,
+      // which it points to, defines $timeunit and $timeprecision.
       "$timescale",
+      "$timeunit",
       "$timeprecision",
 
       "$itor",

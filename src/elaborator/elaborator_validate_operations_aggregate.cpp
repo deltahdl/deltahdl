@@ -1,14 +1,20 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
+#include <optional>
 #include <string_view>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_data.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/elaborator_validate_operations.h"
 #include "elaborator/type_eval.h"
@@ -73,11 +79,13 @@ struct DeclaredName {
 using DeclaredNames = std::unordered_map<std::string_view, DeclaredName>;
 
 // The names an aggregate-operand check tells apart: the unpacked structures
-// and unions, the module's arrays of every kind (VarArrayInfo), and every
-// name in scope (DeclaredNames).
+// and unions with their types, and every name in scope (DeclaredNames), the
+// module's arrays of every kind among them.
 struct AggregateOperandNames {
   const std::unordered_set<std::string_view>& structs;
-  const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>& arrays;
+  // The type each of `structs` is declared with, at the end of its typedef
+  // chain.
+  const std::unordered_map<std::string_view, const DataType*>& struct_types;
   const DeclaredNames& declared;
   const DeclarationTypes& types;
 };
@@ -318,16 +326,53 @@ void CheckUnpackedArrayOperand(const Expr* e, const AggregateOperandNames& n,
   }
 }
 
+// §11.4.13 with §7.2: whether `e` selects, of one of the module's unpacked
+// structures or unions, a member that is no singular value -- one declared with
+// an unpacked dimension, or one of an unpacked structure or union type,
+// written in place or through a typedef.
+bool IsUnpackedMemberOperand(const Expr* e, const AggregateOperandNames& n) {
+  if (e->kind != ExprKind::kMemberAccess || !NamesIn(e->lhs, n.structs))
+    return false;
+  const auto& members = n.struct_types.at(e->lhs->text)->struct_members;
+  auto member = std::ranges::find(members, e->rhs->text, &StructMember::name);
+  if (member == members.end()) return false;
+  if (!member->unpacked_dims.empty()) return true;
+  return IsUnpackedStructOrUnion(
+      member->nested_type != nullptr
+          ? member->nested_type
+          : MemberNamedType(*member, n.types.typedefs));
+}
+
+// §11.4.11 (printed page 286): a conditional whose operands are neither
+// integral, real nor class handles takes two of equivalent types (§6.22.2),
+// which two unpacked structures declared through different typedefs are not.
+void CheckConditionalStructOperands(const Expr* e,
+                                    const AggregateOperandNames& n,
+                                    DiagEngine& diag) {
+  if (e->kind != ExprKind::kTernary || !NamesIn(e->true_expr, n.structs) ||
+      !NamesIn(e->false_expr, n.structs) ||
+      TypesEquivalent(*n.struct_types.at(e->true_expr->text),
+                      *n.struct_types.at(e->false_expr->text)))
+    return;
+  diag.Error(e->range.start,
+             "the operands of a conditional operator shall be of equivalent "
+             "types",
+             Subclause("11.4.11"));
+}
+
 // §11.4.13 makes the left operand of `inside` singular, which neither an
-// unpacked array nor an unpacked structure is; §11.3's Table 11-1 keeps an
+// unpacked array -- a name standing for one, or a select leaving one of its
+// unpacked dimensions -- nor an unpacked structure, nor such a member of one
+// is; §11.3's Table 11-1 keeps an
 // unpacked structure or union out of the operators TakesIntegralOrRealOperands
 // lists, and §7.4.6 an unpacked array (CheckUnpackedArrayOperand).
 void CheckAggregateOperandNode(const Expr* e, const AggregateOperandNames& n,
                                DiagEngine& diag) {
   CheckUnpackedArrayOperand(e, n, diag);
+  CheckConditionalStructOperands(e, n, diag);
   if (e->kind == ExprKind::kInside && e->lhs != nullptr &&
-      e->lhs->kind == ExprKind::kIdentifier &&
-      (n.arrays.count(e->lhs->text) != 0 || n.structs.count(e->lhs->text))) {
+      (UnpackedArrayOperand(e->lhs, n.declared) != nullptr ||
+       NamesIn(e->lhs, n.structs) || IsUnpackedMemberOperand(e->lhs, n))) {
     diag.Error(e->lhs->range.start,
                "the left operand of inside shall be singular",
                Subclause("11.4.13"));
@@ -426,7 +471,7 @@ void WalkStmtForAggregateOperands(const Stmt* s, const AggregateOperandNames& n,
   ForEachBlockDeclaration(s, [&](const BlockDeclaration& d) {
     DeclareBlockName(d, n.types, inner);
   });
-  AggregateOperandNames scoped{n.structs, n.arrays, inner, n.types};
+  AggregateOperandNames scoped{n.structs, n.struct_types, inner, n.types};
   WalkStmtChildrenForAggregateOperands(s, scoped, diag);
 }
 
@@ -438,13 +483,82 @@ void ElaboratorOperationRules::ValidateAggregateOperands(
       UnpackedStructVars(decl, typedefs_);
   DeclarationTypes types{typedefs_, aggregate_typedef_names_, class_names_};
   DeclaredNames declared = ModuleDeclaredNames(decl, var_array_info_, types);
-  AggregateOperandNames names{structs, var_array_info_, declared, types};
+  std::unordered_map<std::string_view, const DataType*> struct_types;
+  for (const auto* item : decl->items) {
+    if (structs.contains(item->name))
+      struct_types[item->name] = EndOfTypedefChain(item->data_type, typedefs_);
+  }
+  AggregateOperandNames names{structs, struct_types, declared, types};
   for (const auto* item : decl->items) {
     if (IsProceduralItemKind(item->kind))
       WalkStmtForAggregateOperands(item->body, names, diag_);
     if (item->kind == ModuleItemKind::kContAssign)
       WalkExprForAggregateOperands(item->assign_rhs, names, diag_);
   }
+}
+
+namespace {
+
+// §7.4.6: the number of elements a slice of an unpacked array selects, from
+// its two constant bounds or the width of an indexed form; empty where those do
+// not fold.
+std::optional<int64_t> SliceLength(const Expr* slice) {
+  if (slice->is_part_select_plus || slice->is_part_select_minus)
+    return ConstEvalInt(slice->index_end);
+  auto last = ConstEvalInt(slice->index_end);
+  return ConstEvalInt(slice->index).and_then([&last](int64_t first) {
+    return last.transform(
+        [first](int64_t end) { return std::abs(first - end) + 1; });
+  });
+}
+
+// What §6.22.2 compares of an unpacked array operand: its declaration's
+// record, which carries the element type and the kind of array, and the size
+// of each unpacked dimension, the first being a slice's own length.
+struct ArrayOperandShape {
+  const ElaboratorData::VarArrayInfo* info;
+  std::vector<std::optional<uint32_t>> dims;
+};
+
+std::optional<ArrayOperandShape> ArrayOperandShapeOf(
+    const Expr* e,
+    const std::unordered_map<std::string_view, ElaboratorData::VarArrayInfo>&
+        arrays) {
+  const bool kSlice = e->kind == ExprKind::kSelect && e->index_end != nullptr;
+  auto it = arrays.find(ExprIdent(kSlice ? e->base : e));
+  if (it == arrays.end()) return std::nullopt;
+  ArrayOperandShape shape{&it->second, it->second.unpacked_shape};
+  if (!kSlice) return shape;
+  shape.dims.resize(std::max<size_t>(shape.dims.size(), 1));
+  return SliceLength(e).transform([&shape](int64_t length) {
+    shape.dims[0] = static_cast<uint32_t>(length);
+    return shape;
+  });
+}
+
+ElementTypeInfo ElementOf(const ElaboratorData::VarArrayInfo& info) {
+  return {info.elem_type, info.elem_width, info.elem_is_signed,
+          info.elem_is_4state, info.elem_type_name};
+}
+
+}  // namespace
+
+// §6.22.2 (printed page 133): two unpacked fixed-size arrays are equivalent
+// when their element types are and they have the same shape, the same number
+// of elements in each unpacked dimension; dynamic arrays, queues and
+// associative arrays when they are the same kind of array, an associative one
+// with an equivalent index type, and their element types are equivalent.
+std::optional<bool> ElaboratorOperationRules::ArrayOperandsEquivalent(
+    const Expr* lhs, const Expr* rhs) const {
+  auto l = ArrayOperandShapeOf(lhs, var_array_info_);
+  auto r = ArrayOperandShapeOf(rhs, var_array_info_);
+  if (!l || !r) return std::nullopt;
+  const auto& li = *l->info;
+  const auto& ri = *r->info;
+  return ElementTypesEquivalent(ElementOf(li), ElementOf(ri)) &&
+         std::tie(li.is_dynamic, li.is_queue, li.is_assoc, li.assoc_index_type,
+                  l->dims) == std::tie(ri.is_dynamic, ri.is_queue, ri.is_assoc,
+                                       ri.assoc_index_type, r->dims);
 }
 
 }  // namespace delta

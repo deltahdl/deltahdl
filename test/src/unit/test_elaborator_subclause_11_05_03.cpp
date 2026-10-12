@@ -583,4 +583,42 @@ TEST(LongestStaticPrefixDriver,
       "    end");
 }
 
+// §11.5.3 keeps a select in the static prefix when its select expression is
+// constant, a part-select's range among them, so `v[7:4]` covers bits 7 to 4
+// and two always_comb procedures driving it and `v[5]` drive one bit. A
+// part-select disjoint from the other, or an indexed form ending short of it,
+// does not overlap.
+TEST(LongestStaticPrefixElaboration, OverlappingPartSelectDriversReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] v, u;\n"
+      "  logic a, b;\n"
+      "  always_comb v[7:4] = {4{a}};\n"
+      "  always_comb v[5] = b;\n"
+      "  always_comb u[3:0] = {4{a}};\n"
+      "  always_comb u[4 +: 4] = {4{b}};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "driven by multiple always_comb/always_latch/always_ff", 5, "9.2.2.2"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+TEST(LongestStaticPrefixElaboration, OverlappingIndexedPartSelectReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [7:0] v;\n"
+      "  logic a, b;\n"
+      "  always_comb v[7:4] = {4{a}};\n"
+      "  always_comb v[4 -: 4] = {4{b}};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "driven by multiple always_comb/always_latch/always_ff", 5, "9.2.2.2"));
+}
+
 }  // namespace

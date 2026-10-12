@@ -8,6 +8,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_data.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/elaborator_validate_operations.h"
 #include "parser/ast_expr.h"
@@ -468,6 +469,8 @@ void ElaboratorOperationRules::ValidateSelectOnConcatLvalue(
     if (item->kind == ModuleItemKind::kContAssign) {
       CheckSelectOnConcatLvalue(item->assign_lhs);
     }
+    for (const Stmt* s : item->func_body_stmts)
+      WalkStmtsForSelectOnConcatLvalue(s);
   }
 }
 
@@ -517,6 +520,7 @@ void ElaboratorOperationRules::ValidateReplicateLvalue(const ModuleDecl* decl) {
     if (item->kind == ModuleItemKind::kContAssign) {
       CheckReplicateLvalue(item->assign_lhs);
     }
+    for (const Stmt* s : item->func_body_stmts) WalkStmtsForReplicateLvalue(s);
   }
 }
 
@@ -537,12 +541,35 @@ namespace {
 // and, when constant, must not be negative. The multiplier is a constant
 // expression, so it is evaluated in the module parameter scope — a parameter
 // or localparam multiplier resolves the same way a literal one does.
-void CheckReplicateRepeatCount(const Expr* replicate, const ScopeMap& scope,
-                               DiagEngine& diag) {
+// §11.4.12.2: whether a replication may be a string replication, one of its
+// operands being a string variable or a string literal (§11.4.12.2's own
+// example replicates "boo " by a variable n), which a non-constant multiplier
+// is allowed for.
+bool MayReplicateAString(
+    const Expr* replicate,
+    const std::unordered_map<std::string_view, DataTypeKind>& var_types) {
+  return std::ranges::any_of(replicate->elements, [&](const Expr* e) {
+    if (e->kind == ExprKind::kStringLiteral) return true;
+    auto it = var_types.find(ExprIdent(e));
+    return it != var_types.end() && it->second == DataTypeKind::kString;
+  });
+}
+
+void CheckReplicateRepeatCount(
+    const Expr* replicate, const ScopeMap& scope,
+    const std::unordered_map<std::string_view, DataTypeKind>& var_types,
+    DiagEngine& diag) {
   const Expr* rc = replicate->repeat_count;
   if (RepeatCountHasXZ(rc)) {
     diag.Error(rc->range.start,
                "replication multiplier shall not contain x or z",
+               Subclause("11.4.12.1"));
+    return;
+  }
+  if (!IsConstantExpr(rc, scope) &&
+      !MayReplicateAString(replicate, var_types)) {
+    diag.Error(rc->range.start,
+               "replication multiplier shall be a constant expression",
                Subclause("11.4.12.1"));
     return;
   }
@@ -558,7 +585,8 @@ void ElaboratorOperationRules::WalkExprForReplicateMultiplier(
     const Expr* expr) {
   if (!expr) return;
   if (expr->kind == ExprKind::kReplicate) {
-    CheckReplicateRepeatCount(expr, replicate_multiplier_scope_, diag_);
+    CheckReplicateRepeatCount(expr, replicate_multiplier_scope_, var_types_,
+                              diag_);
   }
   WalkExprForReplicateMultiplier(expr->lhs);
   WalkExprForReplicateMultiplier(expr->rhs);
@@ -619,7 +647,10 @@ static void CheckZeroReplicateStandalone(const Expr* expr,
                "in the same concatenation",
                Subclause("11.4.12.1"));
   }
-  if (expr->kind == ExprKind::kConcatenation) {
+  // A.8.1 writes a replication's body as a concatenation, so its operands
+  // stand beside one another as a concatenation's do.
+  if (expr->kind == ExprKind::kConcatenation ||
+      expr->kind == ExprKind::kReplicate) {
     CheckZeroReplicateInConcat(expr, scope, diag);
     return;
   }

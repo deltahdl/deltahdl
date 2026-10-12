@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
+#include "elaborator/const_eval.h"
 #include "fixture_elaborator.h"
+#include "fixture_evaluator.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 
@@ -152,6 +156,40 @@ TEST(AlwaysCombExtendedSim, AlwaysCombReductionOr) {
   ASSERT_NE(y, nullptr);
 
   EXPECT_EQ(y->value.ToUint64(), 1u);
+}
+
+// §11.2.1 allows every Table 11-1 operator in a constant expression, so each
+// reduction of §11.4.9 folds, read across every bit of its operand: 4'b0100
+// has one bit set, and the 72-bit operand has its one set bit above bit 63.
+TEST(OperatorElaboration, ReductionOperatorsFoldInConstantExpressions) {
+  EvalFixture f;
+  const struct {
+    const char* text;
+    int64_t value;
+  } kWant[] = {{"&4'b0100", 0},  {"~&4'b0100", 1}, {"|4'b0100", 1},
+               {"~|4'b0100", 0}, {"^4'b0100", 1},  {"~^4'b0100", 0},
+               {"^~4'b0100", 0}, {"&4'b1111", 1},  {"|{8'h1, 64'h0}", 1}};
+  for (const auto& want : kWant) {
+    EXPECT_EQ(ConstEvalInt(ParseExprFrom(want.text, f)), want.value)
+        << want.text;
+  }
+}
+
+// A reduction folded in a generate condition selects the block it names.
+TEST(OperatorElaboration, ReductionInGenerateConditionSelectsTheBlock) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t #(parameter logic [3:0] M = 4'b0100);\n"
+      "  if (|M) begin : g_on\n"
+      "    logic x;\n"
+      "  end else begin : g_off\n"
+      "    logic y;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
 }  // namespace

@@ -446,4 +446,53 @@ TEST(ConcatenationElaboration, MemberOfBitConcatenationIsReported) {
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
+// §11.4.12 keeps unsized constants out of a concatenation, and a replication is
+// a multiple concatenation (§11.4.12.1).
+TEST(ConcatenationElaboration, UnsizedConstantInReplicationReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  logic [31:0] y;\n"
+      "  initial y = {4{1}};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unsized constant is not allowed in a "
+                            "concatenation",
+                            3, "11.4.12"));
+}
+
+// The concatenation rules hold in a function's and a task's statements as in a
+// process's: no unsized constant, no select of a concatenation as a target, no
+// replication on the left-hand side. A function returning an unpacked array
+// returns braces that are an unpacked array concatenation (§10.10).
+TEST(ConcatenationElaboration, ConcatenationRulesHeldInSubroutines) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] a, b;\n"
+      "  typedef int q_t [$];\n"
+      "  function automatic logic [7:0] f(logic [3:0] x);\n"
+      "    return {x, 1};\n"
+      "  endfunction\n"
+      "  function automatic q_t g();\n"
+      "    return {1, 2};\n"
+      "  endfunction\n"
+      "  task automatic h();\n"
+      "    {2{a}} = 8'h0;\n"
+      "    {a, b}[0] = 1'b1;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unsized constant is not allowed in a "
+                            "concatenation",
+                            5, "11.4.12"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "an assignment target cannot contain a "
+                            "replication",
+                            11, "11.4.12.1"));
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
+}
+
 }  // namespace

@@ -839,4 +839,18 @@ TEST(ArithmeticOperatorSim, RealPowerTakesASignedExponentBySign) {
   EXPECT_EQ(out, "0.5 1.5 0\n");
 }
 
+// §11.4.3 at run time: the most negative longint divided by -1 wraps to itself
+// and leaves no remainder.
+TEST(ArithmeticOperatorSim, MostNegativeLongintDividedByMinusOneWraps) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  longint a = 64'sh8000_0000_0000_0000;\n"
+      "  initial $display(\"%0d %0d %0d\", a / -1, a % -1, -longint'(7) / "
+      "-1);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "-9223372036854775808 0 7\n");
+}
+
 }  // namespace

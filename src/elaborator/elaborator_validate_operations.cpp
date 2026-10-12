@@ -1,13 +1,11 @@
 #include "elaborator/elaborator_validate_operations.h"
 
-#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "common/arena.h"
@@ -27,8 +25,6 @@
 #include "parser/ast_stmt.h"
 
 namespace delta {
-
-using TypeMap = std::unordered_map<std::string_view, DataTypeKind>;
 
 NetType DataTypeToNetType(DataTypeKind kind) {
   switch (kind) {
@@ -111,6 +107,14 @@ void ElaboratorOperationRules::CheckAggregateCompareOp(const Expr* expr) {
   auto l_name = AggregateOperandName(expr->lhs);
   auto r_name = AggregateOperandName(expr->rhs);
   if (l_name.empty() || r_name.empty()) return;
+  if (auto equivalent = ArrayOperandsEquivalent(expr->lhs, expr->rhs)) {
+    if (!*equivalent) {
+      diag_.Error(expr->range.start,
+                  "comparison of non-equivalent aggregate array types",
+                  Subclause("6.22.2"));
+    }
+    return;
+  }
   if (CheckArrayCompareOp(expr, var_named_types_,
                           fixed_unpacked_typedef_widths_, diag_)) {
     return;
@@ -307,8 +311,27 @@ std::optional<int64_t> ElaboratorOperationRules::EvalConstTypeRefCompare(
   return (matched != is_negated) ? 1 : 0;
 }
 
+// A.10 footnote 45 with §11.11 Syntax 11-7: a type_reference primary takes
+// none of the unary operators and no part of a conditional, whose predicate
+// and branches are operands as a binary operator's are. A unary operator's and
+// a conditional's operands are always written, so none is null here.
+void ElaboratorOperationRules::ReportTypeRefOperand(const Expr* operand,
+                                                    const Expr* op) {
+  if (operand->kind != ExprKind::kTypeRef) return;
+  diag_.Error(op->range.start,
+              "a type reference may only be used with the equality, "
+              "inequality, and case equality/inequality operators",
+              Subclause("6.23"));
+}
+
 void ElaboratorOperationRules::WalkExprForTypeRefCompare(const Expr* expr) {
   if (!expr) return;
+  if (expr->kind == ExprKind::kUnary) ReportTypeRefOperand(expr->lhs, expr);
+  if (expr->kind == ExprKind::kTernary) {
+    ReportTypeRefOperand(expr->condition, expr);
+    ReportTypeRefOperand(expr->true_expr, expr);
+    ReportTypeRefOperand(expr->false_expr, expr);
+  }
   if (expr->kind == ExprKind::kBinary) {
     bool is_equality =
         expr->op == TokenKind::kEqEq || expr->op == TokenKind::kBangEq ||
@@ -506,83 +529,6 @@ void ElaboratorOperationRules::ValidateTypeRefArgs(const ModuleDecl* decl) {
   }
 }
 
-// After the tagged keyword the BNF allows only a member identifier drawn from
-// the target tagged union type. Given the name of a variable whose typedef is a
-// tagged union, reject a tag name that is not declared in that union. Shared by
-// the assignment-target and declaration-initializer positions, both of which
-// supply the expression type from the target variable's declared type.
-void ElaboratorOperationRules::CheckTaggedMemberName(std::string_view var_name,
-                                                     const Expr* rhs) {
-  if (!rhs || rhs->kind != ExprKind::kTagged) return;
-  if (!rhs->rhs || rhs->rhs->kind != ExprKind::kIdentifier) return;
-
-  auto vit = var_named_types_.find(var_name);
-  if (vit == var_named_types_.end()) return;
-
-  auto tit = typedefs_.find(vit->second);
-  if (tit == typedefs_.end()) return;
-
-  const auto& dt = tit->second;
-  if (dt.kind != DataTypeKind::kUnion || !dt.is_tagged) return;
-
-  auto tag_name = rhs->rhs->text;
-  for (const auto& m : dt.struct_members) {
-    if (m.name == tag_name) return;
-  }
-
-  diag_.Error(rhs->range.start,
-              std::format("tagged union '{}' has no member named '{}'",
-                          vit->second, tag_name),
-              Subclause("11.9"));
-}
-
-void ElaboratorOperationRules::CheckTaggedExprMember(const Expr* lhs,
-                                                     const Expr* rhs) {
-  if (!lhs || lhs->kind != ExprKind::kIdentifier) return;
-  CheckTaggedMemberName(lhs->text, rhs);
-}
-
-void ElaboratorOperationRules::WalkStmtsForTaggedExpr(const Stmt* s) {
-  if (!s) return;
-  if ((s->kind == StmtKind::kBlockingAssign ||
-       s->kind == StmtKind::kNonblockingAssign) &&
-      s->lhs && s->rhs) {
-    CheckTaggedExprMember(s->lhs, s->rhs);
-  }
-  // §11.9, which §7.3.2 defers the rule to, requires the name after `tagged` to
-  // be a member of the target's tagged union type, and neither clause
-  // conditions that on the statement the assignment stands in, so this descends
-  // every link ForEachChildStmt in elaborator_validate_internal.h names. It
-  // wrote out six of the thirteen, so `u = tagged Bogus 1;` written as a fork
-  // arm or as an immediate assertion's pass action named a member that does not
-  // exist and was accepted.
-  ForEachChildStmt(s,
-                   [this](Stmt* const& sub) { WalkStmtsForTaggedExpr(sub); });
-}
-
-void ElaboratorOperationRules::ValidateTaggedUnionMembers(
-    const ModuleDecl* decl) {
-  for (const auto* item : decl->items) {
-    // §11.9: a declaration initializer is another position where the tagged
-    // expression's type is known (from the declared variable), so the member
-    // name after `tagged` must name a member of that union.
-    if (item->kind == ModuleItemKind::kVarDecl && item->init_expr) {
-      CheckTaggedMemberName(item->name, item->init_expr);
-    }
-    bool is_proc = IsProceduralItemKind(item->kind);
-    if (is_proc && item->body) {
-      WalkStmtsForTaggedExpr(item->body);
-    }
-  }
-}
-
-static bool IsRealVar(const Expr* e, const TypeMap& types) {
-  auto name = ExprIdent(e);
-  if (name.empty()) return false;
-  auto it = types.find(name);
-  return it != types.end() && IsRealType(it->second);
-}
-
 static bool IsIllegalOnReal(TokenKind op) {
   switch (op) {
     case TokenKind::kEqEqEq:
@@ -603,6 +549,18 @@ static bool IsIllegalOnReal(TokenKind op) {
     case TokenKind::kGtGtGt:
 
     case TokenKind::kPercent:
+
+    // §11.3's Table 11-1 gives the assignment operators the operand types of
+    // the operators they are formed from, so only =, +=, -=, *= and /= admit a
+    // real operand.
+    case TokenKind::kPercentEq:
+    case TokenKind::kAmpEq:
+    case TokenKind::kPipeEq:
+    case TokenKind::kCaretEq:
+    case TokenKind::kLtLtEq:
+    case TokenKind::kGtGtEq:
+    case TokenKind::kLtLtLtEq:
+    case TokenKind::kGtGtGtEq:
       return true;
     default:
       return false;
@@ -628,8 +586,8 @@ static bool IsUnaryIllegalOnReal(TokenKind op) {
 void ElaboratorOperationRules::WalkExprForRealOps(const Expr* expr) {
   if (!expr) return;
   if (expr->kind == ExprKind::kBinary) {
-    bool lhs_real = expr->lhs && IsRealVar(expr->lhs, var_types_);
-    bool rhs_real = expr->rhs && IsRealVar(expr->rhs, var_types_);
+    bool lhs_real = expr->lhs && IsRealValued(expr->lhs, var_types_);
+    bool rhs_real = expr->rhs && IsRealValued(expr->rhs, var_types_);
     if ((lhs_real || rhs_real) && IsIllegalOnReal(expr->op)) {
       // §11.3.1 states its rule as Table 11-1, which admits or bars each
       // operator separately, so the report names the operator it barred.
@@ -647,7 +605,7 @@ void ElaboratorOperationRules::WalkExprForRealOps(const Expr* expr) {
     }
   }
   if (expr->kind == ExprKind::kUnary) {
-    bool operand_real = expr->lhs && IsRealVar(expr->lhs, var_types_);
+    bool operand_real = expr->lhs && IsRealValued(expr->lhs, var_types_);
     if (operand_real && IsUnaryIllegalOnReal(expr->op)) {
       diag_.Error(expr->range.start,
                   std::format("unary operator {} is not allowed on real "
@@ -672,6 +630,7 @@ void ElaboratorOperationRules::WalkStmtsForRealOps(const Stmt* s) {
   WalkExprForRealOps(s->expr);
   WalkExprForRealOps(s->condition);
   WalkExprForRealOps(s->assert_expr);
+  WalkExprForRealOps(s->var_init);
   // §11.3.1's Table 11-1 decides which operators a real operand admits and
   // names no statement the table is suspended in, so this descends every link
   // ForEachChildStmt in elaborator_validate_internal.h names. It wrote out six
@@ -680,129 +639,30 @@ void ElaboratorOperationRules::WalkStmtsForRealOps(const Stmt* s) {
   ForEachChildStmt(s, [this](Stmt* const& sub) { WalkStmtsForRealOps(sub); });
 }
 
+// §11.3.1 names no place its operand rules are suspended in, so they are held
+// in every one the module writes an expression in: a process's statements, a
+// continuous assignment, a declaration's initializer, a subroutine's
+// statements, and each of these in the blocks of a generate construct.
+void ElaboratorOperationRules::WalkItemsForRealOps(
+    const std::vector<ModuleItem*>& items) {
+  for (const auto* item : items) {
+    if (IsProceduralItemKind(item->kind)) WalkStmtsForRealOps(item->body);
+    if (item->kind == ModuleItemKind::kContAssign)
+      WalkExprForRealOps(item->assign_rhs);
+    if (item->kind == ModuleItemKind::kVarDecl ||
+        item->kind == ModuleItemKind::kNetDecl)
+      WalkExprForRealOps(item->init_expr);
+    for (const Stmt* s : item->func_body_stmts) WalkStmtsForRealOps(s);
+    WalkItemsForRealOps(item->gen_body);
+    if (item->gen_else != nullptr) WalkItemsForRealOps({item->gen_else});
+    for (const auto& case_item : item->gen_case_items)
+      WalkItemsForRealOps(case_item.body);
+  }
+}
+
 void ElaboratorOperationRules::ValidateRealOperatorRestrictions(
     const ModuleDecl* decl) {
-  for (const auto* item : decl->items) {
-    bool is_proc = IsProceduralItemKind(item->kind);
-    if (is_proc && item->body) {
-      WalkStmtsForRealOps(item->body);
-    }
-    if (item->kind == ModuleItemKind::kContAssign && item->assign_rhs) {
-      WalkExprForRealOps(item->assign_rhs);
-    }
-  }
-}
-
-namespace {
-
-// Runs `fn` over `e` and every expression under it, the member a member
-// access selects excepted: `h.tmp` and `L0[0].L1.my_let` name `tmp` and
-// `my_let` within the scope their prefix names, not the scope written in.
-template <typename Fn>
-void ForEachExprUnder(const Expr* e, Fn& fn) {
-  if (e == nullptr) return;
-  fn(e);
-  if (e->kind == ExprKind::kMemberAccess) {
-    ForEachExprUnder(e->lhs, fn);
-    return;
-  }
-  ForEachExprChild(e,
-                   [&fn](const Expr* child) { ForEachExprUnder(child, fn); });
-}
-
-template <typename Fn>
-void ForEachExprInStmt(const Stmt* s, Fn& fn) {
-  if (s == nullptr) return;
-  ForEachChildExpr(s, [&fn](Expr* const& e) { ForEachExprUnder(e, fn); });
-  ForEachChildStmt(s, [&fn](Stmt* const& sub) { ForEachExprInStmt(sub, fn); });
-}
-
-// Every expression one module item writes: its procedure's or subroutine's
-// statements, a continuous assignment's sides and a declaration's initializer.
-template <typename Fn>
-void ForEachExprOfItem(const ModuleItem* item, Fn& fn) {
-  ForEachExprInStmt(item->body, fn);
-  for (const Stmt* s : item->func_body_stmts) ForEachExprInStmt(s, fn);
-  ForEachExprUnder(item->assign_lhs, fn);
-  ForEachExprUnder(item->assign_rhs, fn);
-  ForEachExprUnder(item->init_expr, fn);
-}
-
-// `items` and the items of every generate block among them, in turn.
-template <typename Fn>
-void ForEachItemNested(const std::vector<ModuleItem*>& items, Fn& fn) {
-  for (const ModuleItem* item : items) {
-    if (item == nullptr) continue;
-    fn(item);
-    ForEachItemNested(item->gen_body, fn);
-    if (item->gen_else != nullptr)
-      ForEachItemNested(std::vector<ModuleItem*>{item->gen_else}, fn);
-    for (const GenerateCaseItem& ci : item->gen_case_items)
-      ForEachItemNested(ci.body, fn);
-  }
-}
-
-}  // namespace
-
-// §11.12: a let is declared before it is used in its scope. A name another
-// item of the module also declares is left alone, the use then being of that
-// declaration.
-void ElaboratorOperationRules::CheckLetUsedBeforeDeclared(
-    const ModuleDecl* decl) {
-  std::unordered_map<std::string_view, size_t> let_at;
-  std::unordered_set<std::string_view> other_names;
-  for (size_t i = 0; i < decl->items.size(); ++i) {
-    const ModuleItem* item = decl->items[i];
-    if (item->kind == ModuleItemKind::kLetDecl) {
-      let_at.emplace(item->name, i);
-    } else if (!item->name.empty()) {
-      other_names.insert(item->name);
-    }
-  }
-  for (size_t i = 0; i < decl->items.size(); ++i) {
-    auto check = [&](const Expr* e) {
-      if (e->kind != ExprKind::kIdentifier) return;
-      auto it = let_at.find(e->text);
-      if (it == let_at.end() || i >= it->second || other_names.count(e->text))
-        return;
-      diag_.Error(
-          e->range.start,
-          std::format("let '{}' is used before its declaration", e->text),
-          Subclause("11.12"));
-    };
-    ForEachExprOfItem(decl->items[i], check);
-  }
-}
-
-// §11.12, example d: a let is referred to only within the scope declaring it
-// and the scopes nested in it, never through a hierarchical name, so a call
-// through a path whose last component names a let the module declares is
-// illegal.
-void ElaboratorOperationRules::CheckLetReferencedHierarchically(
-    const ModuleDecl* decl) {
-  std::unordered_set<std::string_view> lets;
-  auto collect = [&lets](const ModuleItem* item) {
-    if (item->kind == ModuleItemKind::kLetDecl) lets.insert(item->name);
-  };
-  ForEachItemNested(decl->items, collect);
-  if (lets.empty()) return;
-  auto check = [&](const Expr* e) {
-    if (e->kind != ExprKind::kCall || e->lhs == nullptr ||
-        e->lhs->kind != ExprKind::kMemberAccess || e->lhs->rhs == nullptr ||
-        !lets.count(e->lhs->rhs->text))
-      return;
-    diag_.Error(e->range.start, "a let shall not be referenced hierarchically",
-                Subclause("11.12"));
-  };
-  auto walk = [&check](const ModuleItem* item) {
-    ForEachExprOfItem(item, check);
-  };
-  ForEachItemNested(decl->items, walk);
-}
-
-void ElaboratorOperationRules::ValidateLetScope(const ModuleDecl* decl) {
-  CheckLetUsedBeforeDeclared(decl);
-  CheckLetReferencedHierarchically(decl);
+  WalkItemsForRealOps(decl->items);
 }
 
 namespace {

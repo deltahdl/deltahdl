@@ -1,9 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "elaborator/const_eval.h"
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 
@@ -362,6 +365,57 @@ TEST(ConstEval, ParameterOperandsInConstantTernary) {
   auto* var = f.ctx.FindVariable("result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 5u);
+}
+
+// §11.4.11 lets a conditional take two class handles only where one is
+// assignment compatible with the other or both derive from a common base
+// class, and otherwise asks its operands to be of equivalent types, which two
+// unpacked structures of different typedefs are not.
+TEST(ConditionalOperatorElaboration, UnrelatedOperandTypesReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class A; endclass\n"
+      "class B; endclass\n"
+      "class D extends A; endclass\n"
+      "class E extends A; endclass\n"
+      "module t;\n"
+      "  typedef struct { int x; } s1_t;\n"
+      "  typedef struct { int x; } s2_t;\n"
+      "  A a, r; B b; D d; E e;\n"
+      "  A arr [2];\n"
+      "  mailbox m1, m2;\n"
+      "  s1_t p, q; s2_t o;\n"
+      "  int i;\n"
+      "  logic s;\n"
+      "  initial begin\n"
+      "    r = s ? a : b;\n"
+      "    p = s ? q : o;\n"
+      "    r = s ? a : d;\n"
+      "    r = s ? d : e;\n"
+      "    r = s ? null : a;\n"
+      "    r = s ? a : null;\n"
+      "    r = s ? arr[0] : a;\n"
+      "    r = s ? a : arr[1];\n"
+      "    m1 = s ? m1 : m2;\n"
+      "    p = s ? q : p;\n"
+      "    i = s ? i : 1;\n"
+      "    i = s ? 1 : i;\n"
+      "    p = s ? q : i;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "conditional operands of class types 'A' and 'B' "
+                            "share no base class",
+                            15, "11.4.11"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the operands of a conditional operator shall be "
+                            "of equivalent types",
+                            16, "11.4.11"));
+  for (const auto& d : f.diag.Diagnostics()) {
+    if (d.message.find("conditional op") != std::string::npos)
+      EXPECT_TRUE(d.loc.line == 15 || d.loc.line == 16) << d.loc.line;
+  }
 }
 
 }  // namespace

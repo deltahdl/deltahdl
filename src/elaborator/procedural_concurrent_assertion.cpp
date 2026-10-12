@@ -1,5 +1,8 @@
 #include "elaborator/procedural_concurrent_assertion.h"
 
+#include <algorithm>
+#include <array>
+#include <format>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -347,6 +350,71 @@ void ElaborateProceduralConcurrentAssertions(ModuleItem* procedure,
 InferredAtInstance InferredInProcedure(const ModuleItem* procedure,
                                        const RtlirModule* mod) {
   return ContextOf(InferredProcedureClock(procedure, mod), mod).at_instance;
+}
+
+namespace {
+
+// §16.9.3: a sampled value function other than $sampled whose call gives no
+// clocking event takes the one inferred where the call is written.
+bool IsUnclockedSampledValueCall(const Expr* e) {
+  static constexpr std::array<std::string_view, 5> kNames{
+      "$past", "$rose", "$fell", "$stable", "$changed"};
+  return e->kind == ExprKind::kSystemCall && e->sampled_clock == nullptr &&
+         std::ranges::find(kNames, e->callee) != kNames.end();
+}
+
+bool HoldsUnclockedSampledValueCall(const Expr* e) {
+  if (e == nullptr) return false;
+  return IsUnclockedSampledValueCall(e) ||
+         AnyExprChild(e, [](const Expr* child) {
+           return HoldsUnclockedSampledValueCall(child);
+         });
+}
+
+// Reports each name of `lets` an expression under `e` refers to: a let
+// instance, written as a call or, with no arguments, as a bare name.
+void ReportUnclockedLetNames(const Expr* e,
+                             const std::unordered_set<std::string_view>& lets,
+                             DiagEngine& diag) {
+  if (e == nullptr) return;
+  if (e->kind == ExprKind::kIdentifier && lets.contains(e->text)) {
+    diag.Error(e->range.start,
+               std::format("no clock is inferred where let '{}' is "
+                           "instantiated for the sampled value call its body "
+                           "holds",
+                           e->text),
+               Subclause("11.12"));
+  }
+  ForEachExprChild(e, [&lets, &diag](const Expr* child) {
+    ReportUnclockedLetNames(child, lets, diag);
+  });
+}
+
+// A concurrent assertion clocks what it holds by the clock flow rules
+// (§16.13.3), its action blocks by its leading clock, so neither is walked.
+void ReportUnclockedLetInstances(
+    const Stmt* s, const std::unordered_set<std::string_view>& lets,
+    DiagEngine& diag) {
+  if (s == nullptr || IsProceduralConcurrent(s)) return;
+  ForEachChildExpr(s, [&lets, &diag](Expr* const& e) {
+    ReportUnclockedLetNames(e, lets, diag);
+  });
+  ForEachChildStmt(s, [&lets, &diag](Stmt* const& sub) {
+    ReportUnclockedLetInstances(sub, lets, diag);
+  });
+}
+
+}  // namespace
+
+void ReportUnclockedLetSampledValues(const ModuleItem* procedure,
+                                     const RtlirModule* mod, DiagEngine& diag) {
+  std::unordered_set<std::string_view> lets;
+  for (const ModuleItem* let : mod->let_decls) {
+    if (HoldsUnclockedSampledValueCall(let->init_expr)) lets.insert(let->name);
+  }
+  if (lets.empty() || !InferredInProcedure(procedure, mod).clock.empty())
+    return;
+  ReportUnclockedLetInstances(procedure->body, lets, diag);
 }
 
 void ElaborateSubroutineConcurrentAssertions(ModuleItem* subroutine,

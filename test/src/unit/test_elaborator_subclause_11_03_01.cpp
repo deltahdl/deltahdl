@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 
 #include "fixture_elaborator.h"
@@ -715,6 +716,99 @@ TEST(RealOps, IllegalOpOnRealInARandsequenceCodeBlock) {
       "        main : { c = a & b; };\n"
       "      endsequence\n"
       "    end");
+}
+
+// Table 11-1 admits only =, +=, -=, *= and /= of the assignment operators on a
+// real operand, so each integral-only one is reported on a real target.
+TEST(RealOperandElaboration, IntegralOnlyAssignmentOperatorsOnRealReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  real r;\n"
+      "  initial begin\n"
+      "    r %= 2;\n"
+      "    r &= 1;\n"
+      "    r |= 1;\n"
+      "    r ^= 1;\n"
+      "    r <<= 1;\n"
+      "    r >>= 1;\n"
+      "    r <<<= 1;\n"
+      "    r >>>= 1;\n"
+      "    r += 1.5;\n"
+      "    r /= 2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const struct {
+    const char* op;
+    uint32_t line;
+  } kWant[] = {{"'%='", 4},  {"'&='", 5},  {"'|='", 6},    {"'^='", 7},
+               {"'<<='", 8}, {"'>>='", 9}, {"'<<<='", 10}, {"'>>>='", 11}};
+  for (const auto& want : kWant) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              std::string("binary operator ") + want.op +
+                                  " is not allowed on real operands",
+                              want.line, "11.3.1"));
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 8u);
+}
+
+// A real operand need not be a real variable written by name: a real literal,
+// a real-valued subexpression and an element of a real array are each real.
+TEST(RealOperandElaboration, RealExpressionsOperandsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  real r;\n"
+      "  real ra [2];\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    x = 2.5 % 2;\n"
+      "    x = (r * 2.0) & 1;\n"
+      "    x = ~1.5;\n"
+      "    x = ra[0] << 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "binary operator '%' is not allowed on real "
+                            "operands",
+                            6, "11.3.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "binary operator '&' is not allowed on real "
+                            "operands",
+                            7, "11.3.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unary operator '~' is not allowed on real "
+                            "operands",
+                            8, "11.3.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "binary operator '<<' is not allowed on real "
+                            "operands",
+                            9, "11.3.1"));
+}
+
+// The rule holds wherever the expression is written: a declaration's
+// initializer, a subroutine's statements and the items of a generate block.
+TEST(RealOperandElaboration, RealOperatorRuleHeldInEveryScope) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  real g;\n"
+      "  int k = g % 2;\n"
+      "  function int f(real a);\n"
+      "    return a % 2;\n"
+      "  endfunction\n"
+      "  if (1) begin : b\n"
+      "    initial k = g & 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {3u, 5u, 8u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "is not allowed on real operands", line,
+                              "11.3.1"));
+  }
 }
 
 }  // namespace

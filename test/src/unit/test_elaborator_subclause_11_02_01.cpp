@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <optional>
+#include <string_view>
 
 #include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
@@ -157,7 +159,18 @@ TEST(ConstantSysFuncWhitelist, BitVectorFunctionAdmitted) {
 
 TEST(ConstantSysFuncWhitelist, TimescaleFunctionAdmitted) {
   EXPECT_TRUE(IsConstantSysFunc("$timescale"));
+  EXPECT_TRUE(IsConstantSysFunc("$timeunit"));
   EXPECT_TRUE(IsConstantSysFunc("$timeprecision"));
+}
+
+// §11.2.1 counts §20.4's timescale functions among the constant system
+// functions, so a parameter may take its value from either.
+TEST(ConstantExpressionElaboration, TimescaleFunctionsInitializeLocalparams) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  localparam int U = $timeunit;\n"
+             "  localparam int P = $timeprecision;\n"
+             "endmodule\n"));
 }
 
 TEST(ConstantSysFuncWhitelist, SformatfAdmitted) {
@@ -376,6 +389,121 @@ TEST(ConstantExpressionElaboration,
   }
   ASSERT_NE(tw, nullptr);
   EXPECT_EQ(tw->width, 4U);
+}
+
+// The value parameter `name` of the top module `design` elaborated, or null.
+const RtlirParamDecl* TopParam(const RtlirDesign* design,
+                               std::string_view name) {
+  for (const auto& param : design->top_modules[0]->params) {
+    if (param.name == name) return &param;
+  }
+  return nullptr;
+}
+
+// §11.2.1 admits a built-in method call into a constant expression only when
+// it has no side effects and its value depends on its arguments and, where the
+// identifier is constant, that identifier's value. pop_front() changes its
+// queue, and next() reads the current value of a variable that is no constant,
+// so neither is a constant expression.
+TEST(ConstantExpressionElaboration,
+     MutatingAndValueReadingMethodsAreNotConstant) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef enum {RED, GREEN, BLUE} color_t;\n"
+      "  color_t c;\n"
+      "  int q[$];\n"
+      "  typedef struct {\n"
+      "    int a = q.pop_front();\n"
+      "    int b = c.next();\n"
+      "  } s_t;\n"
+      "  s_t s;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "struct member default value must be a constant "
+                            "expression",
+                            5, "7.2.2"));
+}
+
+// §11.2.1 has a constant built-in method call evaluated at elaboration. last()
+// does not depend on the variable it is called on, so it is constant on one,
+// and getc() on a string parameter is constant with a constant index. C is
+// the last of three members and 'a' is 97, values no fold that gave up
+// reaches.
+TEST(ConstantExpressionElaboration, EnumLastAndStringGetcFold) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef enum {A, B, C} e_t;\n"
+      "  e_t e;\n"
+      "  localparam string S = \"ab\";\n"
+      "  localparam int K = 1;\n"
+      "  localparam int L = e.last();\n"
+      "  localparam int F = e.first();\n"
+      "  localparam int G = S.getc(0);\n"
+      "  localparam int H = S.getc(K);\n"
+      "  localparam int Z = S.getc(5);\n"
+      "  localparam int N = S.getc(-1);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const struct {
+    std::string_view name;
+    int64_t value;
+  } kWant[] = {{"L", 2}, {"F", 0}, {"G", 97}, {"H", 98}, {"Z", 0}, {"N", 0}};
+  for (const auto& want : kWant) {
+    const RtlirParamDecl* p = TopParam(design, want.name);
+    ASSERT_NE(p, nullptr) << want.name;
+    EXPECT_TRUE(p->is_resolved) << want.name;
+    EXPECT_EQ(p->resolved_value, want.value) << want.name;
+  }
+}
+
+// A pure built-in method this implementation does not evaluate at elaboration
+// is reported where a constant expression is required, rather than leaving the
+// declaration without a value, and so is getc() written on what is no string
+// parameter or without its one argument.
+TEST(ConstantExpressionElaboration, UnfoldedBuiltinMethodIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  localparam string S = \"ab\";\n"
+      "  localparam int X = 5;\n"
+      "  localparam int I = S.atoi();\n"
+      "  localparam int J = X.getc(0);\n"
+      "  localparam int K = S.getc;\n"
+      "  localparam int M = S.getc();\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {4u, 5u, 6u, 7u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "initializer is not a constant expression", line,
+                              "6.20.4"));
+  }
+}
+
+// §5.13 lets a built-in method with no arguments drop its parentheses, so
+// `e.first` and `e.num` are the calls `e.first()` and `e.num()`.
+TEST(ConstantExpressionElaboration, ParenthesisFreeEnumMethodsFold) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef enum {A, B, C} e_t;\n"
+      "  e_t e;\n"
+      "  localparam int F = e.last;\n"
+      "  localparam int N = e.num;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const RtlirParamDecl* last = TopParam(design, "F");
+  const RtlirParamDecl* num = TopParam(design, "N");
+  ASSERT_NE(last, nullptr);
+  ASSERT_NE(num, nullptr);
+  EXPECT_EQ(last->resolved_value, 2);
+  EXPECT_EQ(num->resolved_value, 3);
 }
 
 }  // namespace

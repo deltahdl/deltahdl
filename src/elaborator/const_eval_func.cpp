@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -110,7 +111,7 @@ static std::optional<ConstVal> ConstEvalMemberAccessFull(
   // §5.13 makes the empty parentheses optional, so `c.num` parses as a member
   // access rather than a call and is folded here as well as from the kCall arm
   // of ConstEvalFull.
-  if (auto builtin = ConstEvalBuiltinMethodFull(expr)) return builtin;
+  if (auto builtin = ConstEvalBuiltinMethodFull(expr, scope)) return builtin;
   if (expr->lhs && expr->rhs && expr->lhs->kind == ExprKind::kIdentifier &&
       expr->rhs->kind == ExprKind::kIdentifier) {
     std::string compound =
@@ -580,7 +581,8 @@ static std::optional<ConstVal> ConstEvalNode(const Expr* expr,
       // §11.2.1: a constant built-in method call (§5.13) is evaluated at
       // elaboration time. It is tried first because a built-in method is not a
       // user function and would never be found in the §13.4.3 registry below.
-      if (auto builtin = ConstEvalBuiltinMethodFull(expr)) return builtin;
+      if (auto builtin = ConstEvalBuiltinMethodFull(expr, scope))
+        return builtin;
       // §13.4.3: a call to a user-defined constant function folds at
       // elaboration time.
       return ConstEvalUserCall(expr, scope);
@@ -849,6 +851,20 @@ static StaticPrefixResult BuildSelectPrefix(const Expr* expr,
   if (!base.is_static) return {base.text, false};
   auto idx = ConstEvalInt(expr->index, spec.scope);
   if (!idx) return {base.text, false};
+  // §11.5.3: a part-select whose bounds are constant stays in the prefix
+  // whole, spelled with the addresses it covers, lower first -- `v[4:7]` for
+  // `v[7:4]` and `v[4 -: 4]` alike -- so that two prefixes of one base are
+  // compared by the bits they reach and not by their first address alone.
+  if (spec.spelling == PrefixIndexSpelling::kValue && expr->index_end) {
+    auto end = ConstEvalInt(expr->index_end, spec.scope);
+    if (!end) return {base.text, false};
+    int64_t last = *end;
+    if (expr->is_part_select_plus) last = *idx + *end - 1;
+    if (expr->is_part_select_minus) last = *idx - *end + 1;
+    return {base.text + "[" + std::to_string(std::min(*idx, last)) + ":" +
+                std::to_string(std::max(*idx, last)) + "]",
+            true};
+  }
   std::string index = spec.spelling == PrefixIndexSpelling::kStorage
                           ? std::to_string(static_cast<uint32_t>(*idx))
                           : std::to_string(*idx);

@@ -706,4 +706,46 @@ TEST(ReplicationElaboration, XMultiplierInAForLoopStepNames11_4_12_1) {
                             4, "11.4.12.1"));
 }
 
+// A replication's body is a concatenation (A.8.1), so a zero replication there
+// stands beside its other operands, and one of positive size makes it legal.
+TEST(ReplicationElaboration, ZeroReplicationInsideAReplicationBody) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] a, b;\n"
+      "  logic [7:0] y, z;\n"
+      "  assign y = {2{{0{a}}, b}};\n"
+      "  assign z = {2{{0{a}}}};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a zero replication needs a positive-size operand "
+                            "beside it in the same concatenation",
+                            5, "11.4.12.1"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+// §11.4.12.1 makes the multiplier a constant expression, and §11.4.12.2 lets a
+// string replication take one that is not.
+TEST(ReplicationElaboration, NonConstantMultiplierOfNonStringReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int n = 2;\n"
+      "  string s, r;\n"
+      "  logic [7:0] y;\n"
+      "  initial begin\n"
+      "    y = {n{4'hA}};\n"
+      "    r = {n{\"ab\"}};\n"
+      "    r = {n{s}};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "replication multiplier shall be a constant "
+                            "expression",
+                            6, "11.4.12.1"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
 }  // namespace

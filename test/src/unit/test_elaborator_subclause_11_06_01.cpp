@@ -1,13 +1,16 @@
 #include <gtest/gtest.h>
 
+#include <optional>
 #include <string>
 #include <string_view>
 
 #include "common/types.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
+#include "fixture_evaluator.h"
 #include "helpers_param_value.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
@@ -469,6 +472,33 @@ TEST(ExpressionBitLength, SignedOperandsExtendBySignOnlyWhenAllAreSigned) {
       f);
   EXPECT_EQ(ParamValue(design, "S"), -128);
   EXPECT_EQ(ParamValue(design, "M"), 128);
+}
+
+// Table 11-21 sizes a conditional expression by the longer of its two
+// expressions, and §11.8.1 makes it unsigned when either is. Folded, the
+// chosen 4-bit expression takes the conditional's 8 bits inside a
+// concatenation, and a signed one is read unsigned beside an unsigned one.
+TEST(ExpressionBitLengthElaboration, ConstantConditionalTakesBothBranchesType) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  localparam logic [11:0] P = {4'h1, (1'b1 ? 4'hF : 8'h00)};\n"
+      "  localparam int Q = 1'b1 ? 4'sb1111 : 4'd0;\n"
+      "  localparam int R = 1'b1 ? 4'sb1111 : 4'sd0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(ParamValue(design, "P"), 0x10F);
+  EXPECT_EQ(ParamValue(design, "Q"), 15);
+  EXPECT_EQ(ParamValue(design, "R"), -1);
+}
+
+// An expression of the conditional that does not fold leaves the chosen one
+// folded as it stands; the conditional folds where the chosen one does.
+TEST(ExpressionBitLengthElaboration, ConstantConditionalWithAnUnfoldedBranch) {
+  EvalFixture f;
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("1 ? 5 : U", f)), 5);
+  EXPECT_EQ(ConstEvalInt(ParseExprFrom("0 ? 5 : U", f)), std::nullopt);
 }
 
 }  // namespace

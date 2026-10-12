@@ -12,6 +12,7 @@
 #include "elaborator/elaborator_dpi_formals.h"
 #include "elaborator/elaborator_dpi_names.h"
 #include "elaborator/elaborator_dpi_signature.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/let_construct.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
@@ -733,8 +734,31 @@ static LetFormalTypeKind ClassifyLetFormalType(const DataType& dt) {
   }
 }
 
+// §11.12, rule 1: each reference to a formal of type event stands where an
+// event_expression may be written. A let body is an expression, whose only
+// such places are the clocking events of its sampled value calls (§16.9.3),
+// which the call holds apart from the expression tree; an identifier of the
+// tree naming an event formal stands anywhere else.
+static void ReportEventFormalRefs(
+    const Expr* e, const std::unordered_set<std::string_view>& events,
+    DiagEngine& diag) {
+  if (e == nullptr) return;
+  if (e->kind == ExprKind::kIdentifier && events.contains(e->text)) {
+    diag.Error(e->range.start,
+               std::format("event formal '{}' of a let is referenced where no "
+                           "event_expression may be written",
+                           e->text),
+               Subclause("11.12"));
+  }
+  ForEachExprChild(e, [&events, &diag](const Expr* child) {
+    ReportEventFormalRefs(child, events, diag);
+  });
+}
+
 void Elaborator::ValidateLetDecl(const ModuleItem* item) {
+  std::unordered_set<std::string_view> events;
   for (const auto& arg : item->func_args) {
+    if (arg.data_type.kind == DataTypeKind::kEvent) events.insert(arg.name);
     LetFormalTypeKind kind = ClassifyLetFormalType(arg.data_type);
     if (!IsLetFormalTypeAllowed(kind)) {
       diag_.Error(item->loc,
@@ -744,6 +768,7 @@ void Elaborator::ValidateLetDecl(const ModuleItem* item) {
                   Subclause("11.12"));
     }
   }
+  ReportEventFormalRefs(item->init_expr, events, diag_);
 }
 
 }  // namespace delta

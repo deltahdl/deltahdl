@@ -3,6 +3,7 @@
 #include <unordered_map>
 
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/elaborator_validate_operations.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
@@ -35,10 +36,7 @@ static DataTypeKind VarKind(
   return it == var_types.end() ? DataTypeKind::kImplicit : it->second;
 }
 
-// Whether `e` is a real value: a real or a time literal (§5.8 reads a time
-// literal as a realtime value), a real variable, an arithmetic operation one
-// of whose operands is real, or a conditional either of whose results is.
-static bool IsRealValued(
+bool IsRealValued(
     const Expr* e,
     const std::unordered_map<std::string_view, DataTypeKind>& var_types) {
   if (e->kind == ExprKind::kRealLiteral || e->kind == ExprKind::kTimeLiteral) {
@@ -46,6 +44,12 @@ static bool IsRealValued(
   }
   if (e->kind == ExprKind::kIdentifier) {
     return IsRealType(VarKind(e, var_types));
+  }
+  // An element of an array of reals (§7.4) is a real; var_types records the
+  // array under its element's kind.
+  if (e->kind == ExprKind::kSelect) {
+    auto it = var_types.find(ExprIdent(e->base));
+    return it != var_types.end() && IsRealType(it->second);
   }
   if (e->kind == ExprKind::kUnary || e->kind == ExprKind::kBinary) {
     return PropagatesReal(e->op) &&
