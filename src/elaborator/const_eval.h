@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -13,6 +12,8 @@
 
 namespace delta {
 
+class Arena;
+class DiagEngine;
 struct Expr;
 struct ModuleItem;
 struct ClassDecl;
@@ -44,14 +45,11 @@ class ConstFuncRegistryGuard {
 // §13.4.3 ignores the system task calls of a constant function but for the
 // elaboration severity tasks of §20.10.1, which report as written as module
 // items would. The folder knows no diagnostic engine, so the elaborator hands
-// it, for the duration of a guard, what to do with one: called with the task's
-// call and the locals of the function being folded. The guard restores
-// whatever handler was live before it on destruction.
-using ConstFuncSeverityHandler =
-    std::function<void(const Expr* call, const ScopeMap& locals)>;
+// it one, and the arena a message is formatted in, for the duration of a guard
+// (ReportConstFuncSeverity). The guard restores whatever was live before it.
 class ConstFuncSeverityGuard {
  public:
-  explicit ConstFuncSeverityGuard(ConstFuncSeverityHandler handler);
+  ConstFuncSeverityGuard(DiagEngine& diag, Arena& arena);
   ~ConstFuncSeverityGuard();
   ConstFuncSeverityGuard(const ConstFuncSeverityGuard&) = delete;
   ConstFuncSeverityGuard& operator=(const ConstFuncSeverityGuard&) = delete;
@@ -59,8 +57,8 @@ class ConstFuncSeverityGuard {
   ConstFuncSeverityGuard& operator=(ConstFuncSeverityGuard&&) = delete;
 
  private:
-  ConstFuncSeverityHandler handler_;
-  const ConstFuncSeverityHandler* prev_;
+  DiagEngine* prev_diag_;
+  Arena* prev_arena_;
 };
 
 // The function table a live ConstFuncRegistryGuard installed, or null when none

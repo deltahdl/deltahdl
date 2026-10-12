@@ -9,6 +9,8 @@
 #include <utility>
 #include <vector>
 
+#include "common/arena.h"
+#include "common/diagnostic.h"
 #include "common/packed_range.h"
 #include "common/types.h"
 #include "elaborator/const_eval.h"
@@ -160,15 +162,18 @@ RegisteredConstFuncs() {
 // §11.11: the min:typ:max member the folder selects. It is the typical value
 // unless a DelayModeGuard installed another, which is what src/main.cpp does
 // for the whole of an elaboration.
-static const ConstFuncSeverityHandler* g_severity_handler = nullptr;
+static DiagEngine* g_severity_diag = nullptr;
+static Arena* g_severity_arena = nullptr;
 
-ConstFuncSeverityGuard::ConstFuncSeverityGuard(ConstFuncSeverityHandler handler)
-    : handler_(std::move(handler)), prev_(g_severity_handler) {
-  g_severity_handler = &handler_;
+ConstFuncSeverityGuard::ConstFuncSeverityGuard(DiagEngine& diag, Arena& arena)
+    : prev_diag_(g_severity_diag), prev_arena_(g_severity_arena) {
+  g_severity_diag = &diag;
+  g_severity_arena = &arena;
 }
 
 ConstFuncSeverityGuard::~ConstFuncSeverityGuard() {
-  g_severity_handler = prev_;
+  g_severity_diag = prev_diag_;
+  g_severity_arena = prev_arena_;
 }
 
 static DelayMode g_delay_mode = DelayMode::kTyp;
@@ -459,16 +464,21 @@ static bool IsElabSeverityTask(std::string_view name) {
 }
 
 // §13.4.3: system task calls in a constant function are ignored but for the
-// elaboration severity tasks of §20.10.1, handed to the live
-// ConstFuncSeverityGuard's handler. Other bare
+// elaboration severity tasks of §20.10.1, reported while a
+// ConstFuncSeverityGuard stands (ReportConstFuncSeverity).
+static void ExecConstFuncSystemTask(const Expr* call, const ScopeMap& locals) {
+  if (g_severity_diag == nullptr || !IsElabSeverityTask(call->callee)) return;
+  ReportConstFuncSeverity(call, locals, *g_severity_diag, *g_severity_arena);
+}
+
+// Other bare expression statements: see ExecConstFuncExprStmt. Other bare
 // expression statements — a pre/post increment on a local, say — are
 // interpreted for their side effect; anything else abandons the fold.
 static ConstFuncFlow ExecConstFuncExprStmt(const Stmt* s, ScopeMap& locals) {
   const Expr* e = s->expr;
   if (!e) return ConstFuncFlow::kNormal;
   if (e->kind == ExprKind::kSystemCall) {
-    if (g_severity_handler != nullptr && IsElabSeverityTask(e->callee))
-      (*g_severity_handler)(e, locals);
+    ExecConstFuncSystemTask(e, locals);
     return ConstFuncFlow::kNormal;
   }
   bool is_unary =

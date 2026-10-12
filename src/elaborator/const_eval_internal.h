@@ -112,6 +112,12 @@ void SetConstFuncRealLocal(std::string_view name, double value);
 // Makes `name` no real local of the innermost frame; called only while a
 // frame stands.
 void ClearConstFuncRealLocal(std::string_view name);
+// §13.4.3 with §20.10.1: reports the elaboration severity task `call` a folded
+// constant function reached, its message formatted against the function's
+// `locals` as a module item's is against its scope, unless the same report
+// stands already. Defined in elaborator_elab_severity_task.cpp.
+void ReportConstFuncSeverity(const Expr* call, const ScopeMap& locals,
+                             DiagEngine& diag, Arena& arena);
 // Whether `type` is one of §6.12's real types.
 bool IsConstFuncRealType(const DataType& type);
 // §12.4 with §11.3.1: whether the predicate `cond` holds against `scope` -- a

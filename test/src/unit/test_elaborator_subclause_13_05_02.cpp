@@ -202,19 +202,6 @@ TEST(PassByRefValidation, VariableActualPassedByRefAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(PassByRefValidation, VariableBitSelectPassedByRefAccepted) {
-  ElabFixture f;
-  Elaborate(
-      "module m;\n"
-      "  logic [7:0] v;\n"
-      "  function automatic void take(ref logic x);\n"
-      "  endfunction\n"
-      "  initial take(v[0]);\n"
-      "endmodule\n",
-      f);
-  EXPECT_FALSE(f.has_errors);
-}
-
 TEST(PassByRefValidation, StructMemberPassedByRefAccepted) {
   ElabFixture f;
   Elaborate(

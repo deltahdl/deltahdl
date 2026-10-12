@@ -247,29 +247,18 @@ struct FunctionBodyScope {
   bool in_fork = false;
 };
 
-// §13.4.1: a void function's return carries no value, and a nonvoid
-// function's carries one. §18.17.6 and §18.17.7: a return in a randsequence
-// production code block ends the production, its expression the production's
-// value rather than the function's, so neither rule governs it; and §8.7
-// gives a class constructor no return type, so its return carries none.
-static void CheckFuncBodyReturn(const Stmt* s, const FunctionBodyScope& scope,
-                                DiagEngine& diag) {
-  if (s->kind != StmtKind::kReturn || scope.in_production_code_block) return;
-  if (s->expr && scope.is_void) {
+static void CheckFuncBodyStmtSelf(const Stmt* s, const FunctionBodyScope& scope,
+                                  DiagEngine& diag) {
+  // §18.17.6 and §18.17.7: the expression a return carries in a randsequence
+  // production code block is the production's value and not a value returned
+  // from the function, so §13.4.1's rule about a void function is not what
+  // governs it. A return without a value in a nonvoid function is §12.8's
+  // report (elaborator_validate_jump_statements.cpp).
+  if (s->kind == StmtKind::kReturn && s->expr && scope.is_void &&
+      !scope.in_production_code_block) {
     diag.Error(s->range.start, "void function returns a value",
                Subclause("13.4.1"));
   }
-  if (!s->expr && !scope.is_void && scope.func_name != "new") {
-    diag.Error(s->range.start,
-               std::format("return in nonvoid function '{}' has no value",
-                           scope.func_name),
-               Subclause("13.4.1"));
-  }
-}
-
-static void CheckFuncBodyStmtSelf(const Stmt* s, const FunctionBodyScope& scope,
-                                  DiagEngine& diag) {
-  CheckFuncBodyReturn(s, scope, diag);
   if (s->kind == StmtKind::kFork && s->join_kind != TokenKind::kKwJoinNone) {
     diag.Error(s->range.start,
                "only fork/join_none is permitted inside a function",

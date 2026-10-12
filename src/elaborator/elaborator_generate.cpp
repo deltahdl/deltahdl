@@ -930,4 +930,15 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
   close_loop();
 }
 
+// The queues and tables a design's elaboration fills, emptied before the next
+// one starts: the generate constructs pending and the defparams applied,
+// queued, rooted and written.
+void Elaborator::ResetPendingElaboration() {
+  pending_generates_.clear();
+  applied_defparams_.clear();
+  generate_defparams_.clear();
+  defparam_top_roots_.clear();
+  defparam_writer_blocks_.clear();
+}
+
 }  // namespace delta

@@ -880,16 +880,12 @@ TEST(ConstantFunctionRulesElaboration,
   EXPECT_FALSE(n->is_resolved);
 }
 
-// The direction §23.9 does carry across a generate block boundary. The clause
-// has the search for a directly referenced identifier climb until it finds an
-// item of that name or reaches the edge of a module, interface, program or
-// checker, and a generate block is not one of those boundaries, so block 'b'
-// nested inside block 'a' names block 'a''s triple and P folds to 12.
-//
-// This is the case a fresh table per block fails: block 'b' declares no
-// function of its own, so it has what it inherited or nothing.
+// §23.9 carries a name across a generate block boundary, so block 'b' nested
+// inside block 'a' names block 'a''s triple, which is no constant function
+// for being declared inside a generate block (§13.4.3, #6433): the call in
+// block 'b' is reported as the one in block 'a' would be.
 TEST(ConstantFunctionRulesElaboration,
-     ConstantFunctionOfAnEnclosingGenerateBlockFoldsInANestedBlock) {
+     ConstantCallInANestedBlockOfAnEnclosingBlocksFunctionIsReported) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -904,7 +900,11 @@ TEST(ConstantFunctionRulesElaboration,
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  EXPECT_EQ(ResolvedParam(design, "P"), 12);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function 'triple' is declared inside a generate "
+                            "block and is no constant function",
+                            6, "13.4.3"));
+  EXPECT_EQ(ResolvedParam(design, "P"), -1);
 }
 
 }  // namespace
