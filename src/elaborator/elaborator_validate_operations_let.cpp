@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <format>
 #include <string_view>
@@ -203,12 +204,50 @@ bool IsIntegralOrRealLike(const DataType& t) {
   return IsIntegralType(t.kind) || IsRealType(t.kind);
 }
 
+// §6.24.3: the built-in kinds of a bit-stream type, a string or an integral
+// type.
+bool IsBitStreamKind(DataTypeKind kind) {
+  return kind == DataTypeKind::kString || IsIntegralType(kind);
+}
+
+bool IsBitStreamType(const DataType& t, const TypedefMap& typedefs);
+
+// A member of an unpacked structure or union as IsBitStreamType asks of it:
+// its inline aggregate or enum, its built-in kind, or the type its name
+// resolves to. A name resolving to no type, a class's, is taken as one.
+bool IsBitStreamMember(const StructMember& m, const TypedefMap& typedefs) {
+  if (m.nested_type != nullptr)
+    return IsBitStreamType(*m.nested_type, typedefs);
+  if (m.type_kind != DataTypeKind::kNamed) return IsBitStreamKind(m.type_kind);
+  const DataType* named = MemberNamedType(m, typedefs);
+  const DataType* end =
+      named != nullptr ? TypeAtChainEnd(*named, typedefs) : nullptr;
+  return end == nullptr || IsBitStreamType(*end, typedefs);
+}
+
+// §6.24.3: whether `t` is a bit-stream type -- an integral, packed or string
+// type, or an unpacked structure or union whose members all are -- which an
+// explicit cast converts to or from a string (§6.16). An unpacked array of one
+// is too, but CheckActual tells arrays apart before this is asked.
+bool IsBitStreamType(const DataType& t, const TypedefMap& typedefs) {
+  if (t.kind != DataTypeKind::kStruct && t.kind != DataTypeKind::kUnion)
+    return IsBitStreamKind(t.kind);
+  if (t.is_packed || t.is_soft) return true;
+  return std::ranges::all_of(t.struct_members, [&](const StructMember& m) {
+    return IsBitStreamMember(m, typedefs);
+  });
+}
+
 // §6.22.4 as §11.12 asks it of an actual and its typed formal, both followed
-// through their typedefs. A string on either side is left alone.
-bool ActualFitsFormal(const DataType& actual, const DataType& formal) {
-  if (actual.kind == DataTypeKind::kString ||
-      formal.kind == DataTypeKind::kString)
-    return true;
+// through their typedefs. A string is cast compatible with another bit-stream
+// type (§6.16, §6.24.3) and with no real, chandle or event, for which no cast
+// is defined (§6.22.5).
+bool ActualFitsFormal(const DataType& actual, const DataType& formal,
+                      const TypedefMap& typedefs) {
+  if (actual.kind == DataTypeKind::kString)
+    return IsBitStreamType(formal, typedefs);
+  if (formal.kind == DataTypeKind::kString)
+    return IsBitStreamType(actual, typedefs);
   return IsCastCompatible(actual, formal) ||
          (IsIntegralOrRealLike(actual) && IsIntegralOrRealLike(formal));
 }
@@ -288,7 +327,8 @@ class LetActualCheck {
     }
     const DataType* a = TypeAtChainEnd(*it->second.type, typedefs_);
     const DataType* f = TypeAtChainEnd(written, typedefs_);
-    if (a == nullptr || f == nullptr || ActualFitsFormal(*a, *f)) return;
+    if (a == nullptr || f == nullptr || ActualFitsFormal(*a, *f, typedefs_))
+      return;
     Report(actual, formal);
   }
 

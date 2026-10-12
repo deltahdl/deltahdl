@@ -638,4 +638,45 @@ TEST(LetDeclElaboration, ActualTypesAreJudgedByCastCompatibility) {
                              18, "11.12"));
 }
 
+// §11.12 with §6.16 and §6.24.3: a string is cast compatible with an integral
+// or packed type, another string, and an unpacked structure or union whose
+// members all are bit-stream types, so an actual of one of these for a string
+// formal is not reported; a real is not, so a string for a real formal, a real
+// for a string one, a structure or union holding a real, and a chandle are.
+TEST(LetDeclElaboration, StringActualsAndFormalsAreJudgedAsBitStreamTypes) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  typedef logic [3:0] w_t;\n"
+      "  typedef struct { int a; string s; w_t w; C c;"
+      " struct packed { bit b; } p; enum { E0 } e; } ok_t;\n"
+      "  typedef struct { real r; } bad_t;\n"
+      "  typedef union { int a; real r; } badu_t;\n"
+      "  typedef struct packed { int a; } p_t;\n"
+      "  ok_t ok; bad_t bad; badu_t bu; p_t pk; string str; int i; real rv;"
+      " chandle ch;\n"
+      "  union soft { int x; byte y; } su;\n"
+      "  let s(string x) = x.len();\n"
+      "  let r(real x) = x;\n"
+      "  initial begin\n"
+      "    $display(\"%0d\", s(str) + s(i) + s(ok) + s(pk) + s(su));\n"
+      "    $display(\"%0d\", r(str));\n"
+      "    $display(\"%0d\", s(rv));\n"
+      "    $display(\"%0d\", s(bad));\n"
+      "    $display(\"%0d\", s(bu));\n"
+      "    $display(\"%0d\", s(ch));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "is not cast compatible with the type of formal",
+                             13, "11.12"));
+  for (uint32_t line : {14u, 15u, 16u, 17u, 18u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "is not cast compatible with the type of formal",
+                              line, "11.12"));
+  }
+}
+
 }  // namespace
