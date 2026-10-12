@@ -110,11 +110,11 @@ void TaggedContextWalk::ReportNoMember(const Expr* e, const DataType* context) {
 // other form, or of a type the walk does not know, is left alone.
 bool TaggedContextWalk::ValueFitsMember(const Expr* value,
                                         const DataType& member) const {
-  if (IsValueLiteral(value)) return !IsUnpackedAggregateType(member);
+  const bool kMemberAggregate = IsUnpackedAggregateType(member);
+  if (IsValueLiteral(value)) return !kMemberAggregate;
   const DataType* declared = TypeOfName(value);
   const DataType* type = declared != nullptr ? Resolve(declared) : nullptr;
-  if (type == nullptr ||
-      (!IsUnpackedAggregateType(member) && !IsUnpackedAggregateType(*type)))
+  if (type == nullptr || (!kMemberAggregate && !IsUnpackedAggregateType(*type)))
     return true;
   return TypesEquivalent(*type, member);
 }

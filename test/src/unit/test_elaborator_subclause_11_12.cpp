@@ -600,7 +600,8 @@ TEST(LetDeclElaboration, ActualTypesAreJudgedByCastCompatibility) {
       "  typedef struct { int a; } s_t;\n"
       "  typedef struct { int a; } t_t;\n"
       "  typedef enum {E0, E1} e_t;\n"
-      "  s_t s; t_t t; int arr [2], brr [2]; int i; e_t e; string str;\n"
+      "  s_t s; t_t t; int arr [2], brr [2]; int i; e_t e; string str;"
+      " real rv; chandle ch; class C; endclass let cl(C x) = 1;\n"
       "  let g(s_t x) = x.a;\n"
       "  let h(int x) = x;\n"
       "  let r(real x) = x; let sx(string x) = x.len();\n"
@@ -610,6 +611,10 @@ TEST(LetDeclElaboration, ActualTypesAreJudgedByCastCompatibility) {
       "    $display(\"%0d\", g(t));\n"
       "    $display(\"%0d\", h(loc));\n"
       "    $display(\"%0d\", r(i) + h(e) + h(str) + sx(i) + g(s));\n"
+      "    $display(\"%0d\", g(i));\n"
+      "    $display(\"%0d\", g(rv));\n"
+      "    $display(\"%0d\", h(ch));\n"
+      "    $display(\"%0d\", cl(i));\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -621,6 +626,16 @@ TEST(LetDeclElaboration, ActualTypesAreJudgedByCastCompatibility) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
                              "is not cast compatible with the type of formal",
                              14, "11.12"));
+  // An int or a real for a structure formal, and a chandle for an int one, are
+  // no more cast compatible; a formal of a class type is not judged here.
+  for (uint32_t line : {15u, 16u, 17u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "is not cast compatible with the type of formal",
+                              line, "11.12"));
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "is not cast compatible with the type of formal",
+                             18, "11.12"));
 }
 
 }  // namespace

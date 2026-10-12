@@ -276,8 +276,7 @@ class LetActualCheck {
   // takes any actual.
   void CheckActual(const Expr* actual, const FunctionArg& formal) {
     const DataType& written = formal.data_type;
-    if ((written.kind == DataTypeKind::kImplicit &&
-         written.packed_dim_left == nullptr) ||
+    if (written.kind == DataTypeKind::kImplicit ||
         written.kind == DataTypeKind::kEvent || actual == nullptr ||
         actual->kind != ExprKind::kIdentifier)
       return;

@@ -395,6 +395,8 @@ TEST(EqualityOperatorElaboration,
       "    b = h == s;\n"
       "    b = h == A;\n"
       "    b = h == fn();\n"
+      "    b = h == s + 1;\n"
+      "    b = h == 1 + s;\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -404,7 +406,7 @@ TEST(EqualityOperatorElaboration,
                               "handle or null",
                               line, "11.4.5"));
   }
-  for (uint32_t line : {11u, 12u, 13u, 14u, 15u}) {
+  for (uint32_t line : {11u, 12u, 13u, 14u, 15u, 16u, 17u}) {
     EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
                                "a class handle is compared only with a class "
                                "handle or null",
