@@ -603,12 +603,12 @@ const Expr* HierHead(const Expr* e) {
 using NameSet = std::unordered_set<std::string_view>;
 
 // `base` widened by `names`, built in `storage` where there are any.
-const NameSet& Widened(const NameSet& base, const NameSet& names,
+const NameSet* Widened(const NameSet* base, const NameSet& names,
                        NameSet& storage) {
   if (names.empty()) return base;
-  storage = base;
+  storage = *base;
   storage.insert(names.begin(), names.end());
-  return storage;
+  return &storage;
 }
 
 // The heads of the hierarchical names `e` holds, but for those `bound` names:
@@ -630,7 +630,7 @@ void CollectHierHeads(const Expr* e, const NameSet& bound,
   NameSet storage;
   if (e->kind == ExprKind::kTernary) {
     const NameSet& inner =
-        Widened(bound, MatchesBindingsOf(e->condition), storage);
+        *Widened(&bound, MatchesBindingsOf(e->condition), storage);
     CollectHierHeads(e->condition, inner, out);
     CollectHierHeads(e->true_expr, inner, out);
     CollectHierHeads(e->false_expr, bound, out);
@@ -638,8 +638,8 @@ void CollectHierHeads(const Expr* e, const NameSet& bound,
   }
   if (e->kind == ExprKind::kBinary && e->op == TokenKind::kAmpAmpAmp) {
     CollectHierHeads(e->lhs, bound, out);
-    CollectHierHeads(e->rhs, Widened(bound, MatchesBindingsOf(e->lhs), storage),
-                     out);
+    CollectHierHeads(e->rhs,
+                     *Widened(&bound, MatchesBindingsOf(e->lhs), storage), out);
     return;
   }
   for (const Expr* child :
@@ -661,11 +661,11 @@ void CollectStmtHierHeads(const Stmt* s, const NameSet& bound,
   std::vector<std::string_view> header = ForHeaderDeclaredNames(s);
   NameSet storage;
   const NameSet& inner =
-      Widened(bound, NameSet(header.begin(), header.end()), storage);
+      *Widened(&bound, NameSet(header.begin(), header.end()), storage);
   ForEachChildExpr(s, [&](const Expr* e) { CollectHierHeads(e, inner, out); });
   ForEachChildStmtWithBindings(s, [&](const Stmt* sub, const NameSet& names) {
     NameSet sub_storage;
-    CollectStmtHierHeads(sub, Widened(inner, names, sub_storage), out);
+    CollectStmtHierHeads(sub, *Widened(&inner, names, sub_storage), out);
   });
 }
 
