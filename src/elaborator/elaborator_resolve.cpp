@@ -315,10 +315,12 @@ static void MarkPackageStagedArrays(CompilationUnit* unit) {
 // declared inside a class scope public and reachable from outside the class,
 // through the class name. The reach over unit->classes is the one
 // RegisterClassParams already has for the same clause's parameters.
-void RegisterClassTypedefs(CompilationUnit* unit, TypedefMap& typedefs,
-                           Arena& arena) {
+void RegisterClassTypedefs(
+    CompilationUnit* unit, TypedefMap& typedefs,
+    std::unordered_map<std::string_view, std::vector<Expr*>>& td_array_dims,
+    Arena& arena) {
   for (auto* cls : unit->classes) {
-    RegisterClassTypedefKeys(cls, cls->name, typedefs, arena);
+    RegisterClassTypedefKeys(cls, cls->name, typedefs, td_array_dims, arena);
   }
 }
 
@@ -437,17 +439,22 @@ void RegisterAnonymousProgramNames(
 
 }  // namespace
 
-void RegisterClassTypedefKeys(const ClassDecl* cls, std::string_view scope,
-                              TypedefMap& typedefs, Arena& arena) {
+void RegisterClassTypedefKeys(
+    const ClassDecl* cls, std::string_view scope, TypedefMap& typedefs,
+    std::unordered_map<std::string_view, std::vector<Expr*>>& td_array_dims,
+    Arena& arena) {
   for (const auto* m : cls->members) {
     if (m->kind == ClassMemberKind::kTypedef && m->typedef_item != nullptr) {
-      RegisterScopedTypedef(scope, m->name, m->typedef_item->typedef_type,
-                            typedefs, arena);
+      std::string_view key = RegisterScopedTypedef(
+          scope, m->name, m->typedef_item->typedef_type, typedefs, arena);
+      if (!m->typedef_item->unpacked_dims.empty())
+        td_array_dims[key] = m->typedef_item->unpacked_dims;
     } else if (m->kind == ClassMemberKind::kClassDecl &&
                m->nested_class != nullptr) {
       auto* nested = arena.Create<std::string>(
           std::string(scope) + "::" + std::string(m->nested_class->name));
-      RegisterClassTypedefKeys(m->nested_class, *nested, typedefs, arena);
+      RegisterClassTypedefKeys(m->nested_class, *nested, typedefs,
+                               td_array_dims, arena);
     }
   }
 }
@@ -508,7 +515,7 @@ void Elaborator::RegisterCuScopeItems() {
   RegisterClassParams(unit_, cu_param_scope_, arena_, diag_);
   RegisterPackageTypedefs(unit_, typedefs_, td_array_dims_, arena_);
   MarkPackageStagedArrays(unit_);
-  RegisterClassTypedefs(unit_, typedefs_, arena_);
+  RegisterClassTypedefs(unit_, typedefs_, td_array_dims_, arena_);
   // §13.3 with §7.2.1: after the two registrations above, which are what give
   // the table the "pkg::T" and "Class::T" names a formal's member may be
   // written with; a package's and a compilation-unit class's subroutines are

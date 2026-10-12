@@ -358,10 +358,13 @@ bool ResolveClassScopedDeclType(DataType& dtype, const TypedefMap& typedefs,
 // each typedef of a class nested in it, at any depth, under the nested class's
 // path, "C::N::T", so a type written through its class reaches the type the
 // typedef stands for. `scope` is the key's leading part, the class's own name
-// for a class at compilation-unit scope or in a module. Defined in
-// elaborator_resolve.cpp.
-void RegisterClassTypedefKeys(const ClassDecl* cls, std::string_view scope,
-                              TypedefMap& typedefs, Arena& arena);
+// for a class at compilation-unit scope or in a module. §7.4.4 keeps an array
+// typedef's unpacked dimensions with the type, and they are recorded in
+// `td_array_dims` under the same key. Defined in elaborator_resolve.cpp.
+void RegisterClassTypedefKeys(
+    const ClassDecl* cls, std::string_view scope, TypedefMap& typedefs,
+    std::unordered_map<std::string_view, std::vector<Expr*>>& td_array_dims,
+    Arena& arena);
 
 // §8.23: a type name in use has to resolve to a type once elaboration is done.
 // Reports a declared type whose class scope prefix names a visible class that
