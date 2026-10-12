@@ -51,29 +51,37 @@ bool IsConstFuncRealType(const DataType& type) {
 }
 
 // §11.3.1: the relational, equality and logical operators take real
-// operands and give a 1-bit result, read here as the real it converts to.
-static std::optional<double> EvalRealComparison(TokenKind op, double lhs,
-                                                double rhs) {
+// operands and give a 1-bit result.
+static std::optional<bool> RealComparison(TokenKind op, double lhs,
+                                          double rhs) {
   switch (op) {
     case TokenKind::kLt:
-      return lhs < rhs ? 1.0 : 0.0;
+      return lhs < rhs;
     case TokenKind::kLtEq:
-      return lhs <= rhs ? 1.0 : 0.0;
+      return lhs <= rhs;
     case TokenKind::kGt:
-      return lhs > rhs ? 1.0 : 0.0;
+      return lhs > rhs;
     case TokenKind::kGtEq:
-      return lhs >= rhs ? 1.0 : 0.0;
+      return lhs >= rhs;
     case TokenKind::kEqEq:
-      return lhs == rhs ? 1.0 : 0.0;
+      return lhs == rhs;
     case TokenKind::kBangEq:
-      return lhs != rhs ? 1.0 : 0.0;
+      return lhs != rhs;
     case TokenKind::kAmpAmp:
-      return lhs != 0.0 && rhs != 0.0 ? 1.0 : 0.0;
+      return lhs != 0.0 && rhs != 0.0;
     case TokenKind::kPipePipe:
-      return lhs != 0.0 || rhs != 0.0 ? 1.0 : 0.0;
+      return lhs != 0.0 || rhs != 0.0;
     default:
       return std::nullopt;
   }
+}
+
+// RealComparison's result read as the real it converts to, 1.0 or 0.0.
+static std::optional<double> EvalRealComparison(TokenKind op, double lhs,
+                                                double rhs) {
+  std::optional<bool> result = RealComparison(op, lhs, rhs);
+  if (!result) return std::nullopt;
+  return static_cast<double>(*result);
 }
 
 static std::optional<double> EvalRealBinary(TokenKind op, double lhs,
