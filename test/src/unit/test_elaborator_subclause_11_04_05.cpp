@@ -372,4 +372,44 @@ TEST(EqualityOperatorElaboration, ClassHandleComparedWithLiteralReported) {
   EXPECT_EQ(f.diag.ErrorCount(), 4u);
 }
 
+// §11.4.5: an integral or real variable, and an expression over such operands,
+// is no more assignment compatible with a class handle than a literal is, so
+// comparing a handle with one is reported; null and a handle of the class are
+// not.
+TEST(EqualityOperatorElaboration,
+     ClassHandleComparedWithIntegralValueReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  class C; endclass\n"
+      "  C h, g;\n"
+      "  int i; string s; typedef enum {A} e_t;\n"
+      "  real r; function int fn(); return 0; endfunction\n"
+      "  bit b;\n"
+      "  initial begin\n"
+      "    b = h == i;\n"
+      "    b = h != i + 1;\n"
+      "    b = -r == h;\n"
+      "    b = h == null;\n"
+      "    b = h == g;\n"
+      "    b = h == s;\n"
+      "    b = h == A;\n"
+      "    b = h == fn();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {8u, 9u, 10u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "a class handle is compared only with a class "
+                              "handle or null",
+                              line, "11.4.5"));
+  }
+  for (uint32_t line : {11u, 12u, 13u, 14u, 15u}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                               "a class handle is compared only with a class "
+                               "handle or null",
+                               line, "11.4.5"));
+  }
+}
+
 }  // namespace

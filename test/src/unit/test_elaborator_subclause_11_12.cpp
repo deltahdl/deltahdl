@@ -588,4 +588,39 @@ TEST(LetDeclElaboration, LetSampledValueClockedByDefaultClockingAccepted) {
       ReportedError(f.diag.Diagnostics(), "no clock is inferred", 5, "11.12"));
 }
 
+// §11.12, rule 2, by cast compatibility (§6.22.4): an unpacked array is no
+// actual for a structure formal, a structure of another typedef none for
+// either's formal, and a structure a block declares none for an int formal;
+// an int for a real one, an enum for an int one and a structure for its own
+// type's are.
+TEST(LetDeclElaboration, ActualTypesAreJudgedByCastCompatibility) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef struct { int a; } s_t;\n"
+      "  typedef struct { int a; } t_t;\n"
+      "  typedef enum {E0, E1} e_t;\n"
+      "  s_t s; t_t t; int arr [2], brr [2]; int i; e_t e; string str;\n"
+      "  let g(s_t x) = x.a;\n"
+      "  let h(int x) = x;\n"
+      "  let r(real x) = x; let sx(string x) = x.len();\n"
+      "  initial begin\n"
+      "    automatic s_t loc;\n"
+      "    $display(\"%0d\", g(arr));\n"
+      "    $display(\"%0d\", g(t));\n"
+      "    $display(\"%0d\", h(loc));\n"
+      "    $display(\"%0d\", r(i) + h(e) + h(str) + sx(i) + g(s));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {11u, 12u, 13u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "is not cast compatible with the type of formal",
+                              line, "11.12"));
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "is not cast compatible with the type of formal",
+                             14, "11.12"));
+}
+
 }  // namespace

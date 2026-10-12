@@ -276,4 +276,34 @@ TEST(ExpressionElaboration, TaggedExpressionInUnknownContextNotJudged) {
   }
 }
 
+// §11.9 makes the value after the member name of the member's type, which an
+// unpacked structure of another typedef is not, nor a structure given to an
+// int member; a variable of the member's own structure type, and an int
+// variable given to an int member, are.
+TEST(ExpressionElaboration, TaggedMemberVariableValueCheckedAgainstMemberType) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef struct { int a, b; } pair_t;\n"
+      "  typedef struct { real r; } other_t;\n"
+      "  typedef union tagged { void None; pair_t Add; int I; } U;\n"
+      "  U u;\n"
+      "  other_t o;\n"
+      "  pair_t p;\n"
+      "  int i;\n"
+      "  initial u = tagged Add o;\n"
+      "  initial u = tagged I p;\n"
+      "  initial u = tagged Add p;\n"
+      "  initial u = tagged I i;\n"
+      "  initial u = tagged I (i + 1);\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {9u, 10u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "is not assignment compatible with its type",
+                              line, "11.9"));
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
 }  // namespace

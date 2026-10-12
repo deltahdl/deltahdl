@@ -343,17 +343,34 @@ bool IsUnpackedMemberOperand(const Expr* e, const AggregateOperandNames& n) {
           : MemberNamedType(*member, n.types.typedefs));
 }
 
+// Whether `e` names an unpacked aggregate: an unpacked structure or union
+// variable, or an unpacked array or a select leaving one of its dimensions.
+bool NamesUnpackedAggregate(const Expr* e, const AggregateOperandNames& n) {
+  return NamesIn(e, n.structs) ||
+         UnpackedArrayOperand(e, n.declared) != nullptr;
+}
+
 // §11.4.11 (printed page 286): a conditional whose operands are neither
 // integral, real nor class handles takes two of equivalent types (§6.22.2),
-// which two unpacked structures declared through different typedefs are not.
+// which two unpacked structures declared through different typedefs are not,
+// nor an unpacked aggregate and an integral value. Two arrays are compared by
+// shape where their declarations are known (ReportNonEquivalentArrayOperands).
 void CheckConditionalStructOperands(const Expr* e,
                                     const AggregateOperandNames& n,
                                     DiagEngine& diag) {
-  if (e->kind != ExprKind::kTernary || !NamesIn(e->true_expr, n.structs) ||
-      !NamesIn(e->false_expr, n.structs) ||
-      TypesEquivalent(*n.struct_types.at(e->true_expr->text),
-                      *n.struct_types.at(e->false_expr->text)))
-    return;
+  if (e->kind != ExprKind::kTernary) return;
+  const Expr* t = e->true_expr;
+  const Expr* f = e->false_expr;
+  bool differ = false;
+  if (NamesIn(t, n.structs) && NamesIn(f, n.structs)) {
+    differ = !TypesEquivalent(*n.struct_types.at(t->text),
+                              *n.struct_types.at(f->text));
+  } else {
+    differ =
+        (NamesUnpackedAggregate(t, n) && IsIntegralOperand(f, n.declared)) ||
+        (NamesUnpackedAggregate(f, n) && IsIntegralOperand(t, n.declared));
+  }
+  if (!differ) return;
   diag.Error(e->range.start,
              "the operands of a conditional operator shall be of equivalent "
              "types",

@@ -195,12 +195,32 @@ void ElaboratorOperationRules::CheckLetReferencedHierarchically(
 
 namespace {
 
-// §11.12, rule 2: a typed formal other than an event takes an actual whose
-// self-determined type is cast compatible (§6.22.4) with the formal's type. An
-// integral or real formal is cast compatible with no unpacked array,
-// structure or union, which is what the declared type of a module's variable
-// decides of an actual naming it. A default actual is checked once, at the
-// let's declaration; an actual a call binds, at the call.
+// Whether `t` is a value an integral or a real type gives: an integer type, an
+// enum, a real, or a packed structure or union, which §6.11.1 makes integral.
+bool IsIntegralOrRealLike(const DataType& t) {
+  if (t.kind == DataTypeKind::kStruct || t.kind == DataTypeKind::kUnion)
+    return t.is_packed || t.is_soft;
+  return IsIntegralType(t.kind) || IsRealType(t.kind);
+}
+
+// §6.22.4 as §11.12 asks it of an actual and its typed formal, both followed
+// through their typedefs. A string on either side is left alone.
+bool ActualFitsFormal(const DataType& actual, const DataType& formal) {
+  if (actual.kind == DataTypeKind::kString ||
+      formal.kind == DataTypeKind::kString)
+    return true;
+  return IsCastCompatible(actual, formal) ||
+         (IsIntegralOrRealLike(actual) && IsIntegralOrRealLike(formal));
+}
+
+// A variable an actual may name, as a module or a block declares it.
+struct LetActualVariable {
+  const DataType* type;
+  bool is_array;
+};
+
+// §11.12, rule 2, checked at each call of a let of the module and, for a
+// default actual, once at the let's declaration.
 class LetActualCheck {
  public:
   LetActualCheck(const TypedefMap& typedefs, DiagEngine& diag)
@@ -210,7 +230,9 @@ class LetActualCheck {
     if (item->kind == ModuleItemKind::kLetDecl) lets_[item->name] = item;
     if (item->kind == ModuleItemKind::kVarDecl ||
         item->kind == ModuleItemKind::kNetDecl)
-      vars_[item->name] = item;
+      vars_[item->name] = {&item->data_type, !item->unpacked_dims.empty()};
+    CollectBlockVariables(item->body);
+    for (const Stmt* s : item->func_body_stmts) CollectBlockVariables(s);
   }
 
   void CheckDefaults() {
@@ -235,22 +257,43 @@ class LetActualCheck {
   }
 
  private:
-  bool NamesAggregate(const Expr* actual) const {
-    if (actual == nullptr || actual->kind != ExprKind::kIdentifier)
-      return false;
-    auto it = vars_.find(actual->text);
-    if (it == vars_.end()) return false;
-    if (!it->second->unpacked_dims.empty()) return true;
-    const DataType* type = TypeAtChainEnd(it->second->data_type, typedefs_);
-    return type != nullptr && IsUnpackedAggregateType(*type);
+  // The variables a block or a subroutine body declares; one of a name some
+  // outer declaration also has stands for both, as the walk over the calls
+  // reads no scopes.
+  void CollectBlockVariables(const Stmt* s) {
+    if (s == nullptr) return;
+    if (s->kind == StmtKind::kVarDecl)
+      vars_[s->var_name] = {&s->var_decl_type, !s->var_unpacked_dims.empty()};
+    ForEachChildStmt(s,
+                     [this](Stmt* const& sub) { CollectBlockVariables(sub); });
   }
 
+  // §11.12, rule 2: a typed formal other than an event takes an actual whose
+  // self-determined type is cast compatible (§6.22.4) with its own -- an
+  // unpacked array only for a formal of one, of an element type
+  // ActualFitsFormal admits, as it admits a scalar's type -- which the
+  // declared type of a variable the actual names decides. An untyped formal
+  // takes any actual.
   void CheckActual(const Expr* actual, const FunctionArg& formal) {
-    const DataTypeKind kKind = ResolvedTypeKind(formal.data_type, typedefs_);
-    if (kKind == DataTypeKind::kImplicit ||
-        (!IsIntegralType(kKind) && !IsRealType(kKind)) ||
-        !NamesAggregate(actual))
+    const DataType& written = formal.data_type;
+    if ((written.kind == DataTypeKind::kImplicit &&
+         written.packed_dim_left == nullptr) ||
+        written.kind == DataTypeKind::kEvent || actual == nullptr ||
+        actual->kind != ExprKind::kIdentifier)
       return;
+    auto it = vars_.find(actual->text);
+    if (it == vars_.end()) return;
+    if (it->second.is_array != !formal.unpacked_dims.empty()) {
+      Report(actual, formal);
+      return;
+    }
+    const DataType* a = TypeAtChainEnd(*it->second.type, typedefs_);
+    const DataType* f = TypeAtChainEnd(written, typedefs_);
+    if (a == nullptr || f == nullptr || ActualFitsFormal(*a, *f)) return;
+    Report(actual, formal);
+  }
+
+  void Report(const Expr* actual, const FunctionArg& formal) {
     diag_.Error(actual->range.start,
                 std::format("let actual argument '{}' is not cast compatible "
                             "with the type of formal '{}'",
@@ -261,7 +304,7 @@ class LetActualCheck {
   const TypedefMap& typedefs_;
   DiagEngine& diag_;
   std::unordered_map<std::string_view, const ModuleItem*> lets_;
-  std::unordered_map<std::string_view, const ModuleItem*> vars_;
+  std::unordered_map<std::string_view, LetActualVariable> vars_;
 };
 
 }  // namespace

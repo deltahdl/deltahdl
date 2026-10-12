@@ -13,6 +13,7 @@
 #include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/std_package.h"
+#include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
@@ -109,15 +110,38 @@ static std::string_view TypedConstructorScopeType(const Expr* rhs) {
   return access->lhs->text;
 }
 
-// Whether `e` is a literal value: a number, a real, a string or an unbased
-// unsized literal, none of which is a class handle or null (§11.4.5).
-static bool IsValueLiteral(const Expr* e) {
+// The tables the class-handle checks of one module read: the names of its
+// class handle variables, the class each is declared with, and every
+// variable's declared kind.
+struct ClassHandleTables {
+  const std::unordered_set<std::string_view>& class_vars;
+  const std::unordered_map<std::string_view, std::string_view>& class_var_types;
+  const std::unordered_map<std::string_view, DataTypeKind>& var_types;
+  const CompilationUnit* unit;
+};
+
+// Whether `e` is plainly a value of an integral or real type, none of which a
+// class handle is assignment compatible with (§11.4.5): a number, a real, a
+// string or an unbased unsized literal, a variable declared with such a type,
+// or an operator over such operands.
+static bool IsPlainValue(
+    const Expr* e,
+    const std::unordered_map<std::string_view, DataTypeKind>& types) {
   switch (e->kind) {
     case ExprKind::kIntegerLiteral:
     case ExprKind::kRealLiteral:
     case ExprKind::kStringLiteral:
     case ExprKind::kUnbasedUnsizedLiteral:
       return true;
+    case ExprKind::kIdentifier: {
+      auto it = types.find(e->text);
+      return it != types.end() &&
+             (IsIntegralType(it->second) || IsRealType(it->second));
+    }
+    case ExprKind::kUnary:
+      return IsPlainValue(e->lhs, types);
+    case ExprKind::kBinary:
+      return IsPlainValue(e->lhs, types) && IsPlainValue(e->rhs, types);
     default:
       return false;
   }
@@ -126,11 +150,11 @@ static bool IsValueLiteral(const Expr* e) {
 // Validates the operands of a binary expression that involves at least one
 // class-handle variable: rejects disallowed operators and, for comparisons of
 // two handles, requires assignment-compatible types.
-static void CheckClassHandleBinary(
-    const Expr* e, const std::unordered_set<std::string_view>& class_vars,
-    const std::unordered_map<std::string_view, std::string_view>&
-        class_var_types,
-    const CompilationUnit* unit, DiagEngine& diag) {
+static void CheckClassHandleBinary(const Expr* e, const ClassHandleTables& t,
+                                   DiagEngine& diag) {
+  const auto& class_vars = t.class_vars;
+  const auto& class_var_types = t.class_var_types;
+  const CompilationUnit* unit = t.unit;
   bool lhs_class =
       e->lhs && IsHandleOperand(e->lhs, class_vars, class_var_types, unit);
   bool rhs_class =
@@ -143,9 +167,9 @@ static void CheckClassHandleBinary(
 
   // §11.4.5 (printed page 279): an equality operator takes a class handle
   // only against an operand assignment compatible with it, another handle or
-  // null; a literal value is none.
+  // null; a value of an integral or real type is none.
   if (lhs_class != rhs_class && IsAllowedClassBinaryOp(e->op) &&
-      IsValueLiteral(lhs_class ? e->rhs : e->lhs)) {
+      IsPlainValue(lhs_class ? e->rhs : e->lhs, t.var_types)) {
     diag.Error(e->range.start,
                "a class handle is compared only with a class handle or null",
                Subclause("11.4.5"));
@@ -228,16 +252,14 @@ static void CheckConditionalClassOperands(
              Subclause("11.4.11"));
 }
 
-static void CheckClassHandleExpr(
-    const Expr* e, const std::unordered_set<std::string_view>& class_vars,
-    const std::unordered_map<std::string_view, std::string_view>&
-        class_var_types,
-    const CompilationUnit* unit, DiagEngine& diag) {
+static void CheckClassHandleExpr(const Expr* e, const ClassHandleTables& t,
+                                 DiagEngine& diag) {
   if (!e) return;
+  const auto& class_vars = t.class_vars;
+  const auto& class_var_types = t.class_var_types;
+  const CompilationUnit* unit = t.unit;
 
-  if (e->kind == ExprKind::kBinary) {
-    CheckClassHandleBinary(e, class_vars, class_var_types, unit, diag);
-  }
+  if (e->kind == ExprKind::kBinary) CheckClassHandleBinary(e, t, diag);
   if (e->kind == ExprKind::kTernary)
     CheckConditionalClassOperands(e, class_var_types, unit, diag);
 
@@ -265,16 +287,10 @@ static void CheckClassHandleExpr(
     CheckClassHandleCast(e, class_vars, unit, diag);
   }
 
-  CheckClassHandleExpr(e->lhs, class_vars, class_var_types, unit, diag);
-  CheckClassHandleExpr(e->rhs, class_vars, class_var_types, unit, diag);
-  CheckClassHandleExpr(e->base, class_vars, class_var_types, unit, diag);
-  CheckClassHandleExpr(e->index, class_vars, class_var_types, unit, diag);
-  CheckClassHandleExpr(e->condition, class_vars, class_var_types, unit, diag);
-  CheckClassHandleExpr(e->true_expr, class_vars, class_var_types, unit, diag);
-  CheckClassHandleExpr(e->false_expr, class_vars, class_var_types, unit, diag);
-  for (const auto* elem : e->elements) {
-    CheckClassHandleExpr(elem, class_vars, class_var_types, unit, diag);
-  }
+  for (const Expr* child : {e->lhs, e->rhs, e->base, e->index, e->condition,
+                            e->true_expr, e->false_expr})
+    CheckClassHandleExpr(child, t, diag);
+  for (const auto* elem : e->elements) CheckClassHandleExpr(elem, t, diag);
 }
 
 // Extracts the call expression a statement evaluates (directly as an expression
@@ -815,12 +831,11 @@ void ElaboratorClassRules::WalkStmtsForClassHandleOps(const Stmt* s) {
 
   CheckUnnamedRandModeHasArgument(s, class_var_types_, unit_, diag_);
 
-  CheckClassHandleExpr(s->rhs, class_var_names_, class_var_types_, unit_,
-                       diag_);
-  CheckClassHandleExpr(s->expr, class_var_names_, class_var_types_, unit_,
-                       diag_);
-  CheckClassHandleExpr(s->condition, class_var_names_, class_var_types_, unit_,
-                       diag_);
+  const ClassHandleTables kTables{class_var_names_, class_var_types_,
+                                  var_types_, unit_};
+  CheckClassHandleExpr(s->rhs, kTables, diag_);
+  CheckClassHandleExpr(s->expr, kTables, diag_);
+  CheckClassHandleExpr(s->condition, kTables, diag_);
   // §8.4 states which operations an object handle admits and §8.26.9 which
   // ones an interface class handle admits, and neither names a statement the
   // rules are suspended in, so this descends every link ForEachChildStmt in

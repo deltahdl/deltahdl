@@ -167,4 +167,25 @@ TEST(StreamReorderingElaboration, ZeroSliceSizeNames11_4_14_2) {
                             3, "11.4.14.2"));
 }
 
+// §11.4.14.2 makes a slice_size that is a constant expression positive, and a
+// parameter named bare is one: Z of 0 is reported, W of 8 and a typedef name
+// are not.
+TEST(StreamSliceSizeElaboration, ParameterSliceSizeOfZeroReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  parameter Z = 0, W = 8;\n"
+      "  typedef logic [3:0] nib_t;\n"
+      "  logic [15:0] r;\n"
+      "  initial r = {<< Z {16'hABCD}};\n"
+      "  initial r = {<< W {16'hABCD}};\n"
+      "  initial r = {<< nib_t {16'hABCD}};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "streaming slice_size shall be a positive constant",
+                            5, "11.4.14.2"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
 }  // namespace

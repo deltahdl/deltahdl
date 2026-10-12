@@ -156,6 +156,16 @@ void ElaboratorOperationRules::WalkExprForAggregateCompare(const Expr* expr) {
       (expr->op == TokenKind::kEqEq || expr->op == TokenKind::kBangEq)) {
     CheckAggregateCompareOp(expr);
   }
+  // §11.4.11 with §6.22.2: a conditional's two array operands are of
+  // equivalent types or the conditional is illegal, as an equality's are.
+  if (expr->kind == ExprKind::kTernary &&
+      !ArrayOperandsEquivalent(expr->true_expr, expr->false_expr)
+           .value_or(true)) {
+    diag_.Error(expr->range.start,
+                "the operands of a conditional operator shall be of "
+                "equivalent types",
+                Subclause("11.4.11"));
+  }
   WalkExprForAggregateCompare(expr->lhs);
   WalkExprForAggregateCompare(expr->rhs);
   WalkExprForAggregateCompare(expr->condition);

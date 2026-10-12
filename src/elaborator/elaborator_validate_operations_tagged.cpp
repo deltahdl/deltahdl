@@ -37,6 +37,7 @@ class TaggedContextWalk {
   const DataType* TypeOfName(const Expr* target) const;
   void CheckTagged(const Expr* e, const DataType* context);
   void CheckTaggedValue(const Expr* e, const StructMember& member);
+  bool ValueFitsMember(const Expr* value, const DataType& member) const;
   void ReportNoMember(const Expr* e, const DataType* context);
   void WalkExpr(const Expr* e);
   void CheckCast(const Expr* e);
@@ -102,6 +103,22 @@ void TaggedContextWalk::ReportNoMember(const Expr* e, const DataType* context) {
 // §11.9: the expression after the member name shall have that member's type,
 // a void member taking none. A member whose type is a tagged union gives its
 // value the context a tagged expression written there is checked against.
+// §10.8 for the value of `tagged M v` (§11.9): a literal fits a member of
+// any type but an unpacked structure or union, and a variable fits one whose
+// type is equivalent to its own (§6.22.2) where either is such an aggregate,
+// two integral or real types being assignment compatible. A value of any
+// other form, or of a type the walk does not know, is left alone.
+bool TaggedContextWalk::ValueFitsMember(const Expr* value,
+                                        const DataType& member) const {
+  if (IsValueLiteral(value)) return !IsUnpackedAggregateType(member);
+  const DataType* declared = TypeOfName(value);
+  const DataType* type = declared != nullptr ? Resolve(declared) : nullptr;
+  if (type == nullptr ||
+      (!IsUnpackedAggregateType(member) && !IsUnpackedAggregateType(*type)))
+    return true;
+  return TypesEquivalent(*type, member);
+}
+
 void TaggedContextWalk::CheckTaggedValue(const Expr* e,
                                          const StructMember& member) {
   if (e->lhs == nullptr) return;
@@ -120,8 +137,7 @@ void TaggedContextWalk::CheckTaggedValue(const Expr* e,
   const DataType* type = member.nested_type ? member.nested_type : &written;
   CheckTagged(e->lhs, type);
   const DataType* resolved = Resolve(type);
-  if (resolved != nullptr && IsUnpackedAggregateType(*resolved) &&
-      IsValueLiteral(e->lhs)) {
+  if (resolved != nullptr && !ValueFitsMember(e->lhs, *resolved)) {
     diag_.Error(e->lhs->range.start,
                 std::format("value of tagged member '{}' is not assignment "
                             "compatible with its type",

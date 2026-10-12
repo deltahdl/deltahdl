@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 
 #include "elaborator/const_eval.h"
@@ -415,6 +416,44 @@ TEST(ConditionalOperatorElaboration, UnrelatedOperandTypesReported) {
   for (const auto& d : f.diag.Diagnostics()) {
     if (d.message.find("conditional op") != std::string::npos)
       EXPECT_TRUE(d.loc.line == 15 || d.loc.line == 16) << d.loc.line;
+  }
+}
+
+// §11.4.11 asks two operands that are neither integral, real nor class
+// handles to be of equivalent types (§6.22.2): unpacked arrays of different
+// sizes are not, nor is an unpacked structure or array beside an integral
+// value, on either side; arrays of one shape and element type are.
+TEST(ConditionalOperatorElaboration,
+     AggregateOperandsOfDifferentTypesReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef struct { int x; } s_t;\n"
+      "  s_t p;\n"
+      "  int a4 [4], a3 [3], b4 [4];\n"
+      "  int i;\n"
+      "  logic s;\n"
+      "  initial begin\n"
+      "    a4 = s ? a4 : a3;\n"
+      "    p = s ? p : i;\n"
+      "    p = s ? 1 : p;\n"
+      "    i = s ? a4 : 2;\n"
+      "    a4 = s ? a4 : b4;\n"
+      "    i = s ? i : 3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {8u, 9u, 10u, 11u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "the operands of a conditional operator shall "
+                              "be of equivalent types",
+                              line, "11.4.11"));
+  }
+  for (uint32_t line : {12u, 13u}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                               "the operands of a conditional operator shall "
+                               "be of equivalent types",
+                               line, "11.4.11"));
   }
 }
 
