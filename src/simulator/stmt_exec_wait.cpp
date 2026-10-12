@@ -23,6 +23,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
 #include "simulator/expr_walk.h"
+#include "simulator/process.h"
 #include "simulator/sequence_monitor.h"
 #include "simulator/sim_context.h"
 #include "simulator/stmt_exec.h"
@@ -303,6 +304,9 @@ ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   std::vector<Variable*> vars = WaitOrderEvents(events, ctx);
   uint64_t now = ctx.CurrentTime().ticks;
 
+  // The awaiter is resumed from the process that triggers the event, so the
+  // queue flushed below is this process's own, taken before it waits.
+  Process* self = ctx.CurrentProcess();
   bool suspended = false;
   for (size_t i = 0; i < vars.size() && !failed; ++i) {
     if (i == 0 && vars[0] != nullptr && vars[0]->triggered_ticks == now) {
@@ -317,7 +321,7 @@ ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   }
   // §12.4.2.1: resuming after suspending on a wait statement, `wait_order`
   // among them (A.6.5), is a violation report flush point.
-  if (suspended) ctx.FlushPendingViolations();
+  if (suspended && self != nullptr) self->pending_violations.clear();
 
   if (failed) {
     if (stmt->else_branch) {
