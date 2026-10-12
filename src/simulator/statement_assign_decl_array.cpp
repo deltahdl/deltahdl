@@ -60,8 +60,8 @@ struct BlockDimBounds {
 
 // §7.4.2: bundle for materializing the leaves of a fixed multidimensional
 // unpacked array declared in a block, keeping the recursive walk within the
-// parameter-count limit -- the same reason lowerer_var.cpp's MultiDimArray
-// exists for the declaration among a module's items.
+// parameter-count limit -- the same reason lowerer_var_multidim.cpp's
+// MultiDimArray exists for the declaration among a module's items.
 struct BlockArrayLeaves {
   const std::vector<BlockDimBounds>& dims;
   uint32_t elem_width;

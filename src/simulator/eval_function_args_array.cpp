@@ -418,11 +418,11 @@ Logic4Vec OutputFormalDefault(const DataType& type, uint32_t width,
 // A formal whose shape is not the actual's sizes keeps the actual's bounds.
 //
 // §7.7's own `fun(int a[3:1][3:1])` takes a two-dimensional actual, whose
-// elements are the leaves `b[i][j]` (CreateMultiDimLeaves in lowerer_var.cpp),
-// and §7.6 pairs them by position in every dimension. Only `b[k]`, one index
-// deep, was copied, which names no leaf, so every element of the formal read
-// the default. Every leaf is now copied, named at its position on each side
-// (ArrayElementSuffixAt).
+// elements are the leaves `b[i][j]` (CreateMultiDimLeaves in
+// lowerer_var_multidim.cpp), and §7.6 pairs them by position in every
+// dimension. Only `b[k]`, one index deep, was copied, which names no leaf, so
+// every element of the formal read the default. Every leaf is now copied, named
+// at its position on each side (ArrayElementSuffixAt).
 //
 // §13.3 (printed page 337) has an output formal copy its value out at the end
 // and nothing in at the beginning, so an output formal's element starts at

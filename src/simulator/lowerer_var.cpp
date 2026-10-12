@@ -179,180 +179,6 @@ static void InitArrayFromNamed(const RtlirVariable& var, uint32_t idx,
   target.elem->value = CoerceArrayInitItem(var, val, arena);
 }
 
-namespace {
-// §7.4.2: bundle for materializing the leaves of a fixed multidimensional
-// unpacked array, keeping the recursive walk within the parameter-count limit;
-// `in_place` writes each leaf already standing under its key rather than
-// creating one (InitArrayElements).
-struct MultiDimArray {
-  const RtlirVariable& var;
-  SimContext& ctx;
-  Arena& arena;
-  bool in_place = false;
-};
-}  // namespace
-
-// §10.9.1: array assignment patterns can use a form like replication too, each
-// replication standing for one whole dimension. A replicated item is therefore
-// not one element's value but the body of the dimension it stands for, cycled
-// across that dimension's positions -- which is what makes the clause's own
-// `'{2{'{3{y}}}}` the same as `'{'{y,y,y},'{y,y,y}}`. Null when this pattern is
-// not the replicated form.
-static const std::vector<Expr*>* ReplicateBody(const Expr* pat) {
-  if (!pat->pattern_keys.empty()) return nullptr;
-  if (pat->elements.size() != 1) return nullptr;
-  if (!pat->elements[0]->is_pattern_replication) return nullptr;
-  const auto& body = pat->elements[0]->elements;
-  return body.empty() ? nullptr : &body;
-}
-
-// §10.9.1: the braces follow the array's dimensions, so an item that is
-// itself a brace pattern is the sub-pattern of the next dimension in. Anything
-// else is a value, which is what a type or default key resolves to for a whole
-// subarray -- the clause applies those recursively, down to each element or
-// subarray, so such a value reaches every leaf beneath it.
-static bool IsDimPattern(const Expr* item) {
-  return item->kind == ExprKind::kAssignmentPattern ||
-         item->kind == ExprKind::kConcatenation;
-}
-
-// §10.9: only a brace pattern matches the array's dimensions, so only one is
-// distributed into the leaves; a typed assignment pattern expression
-// (`T'{...}`) parses as a cast wrapping one, so unwrap that first. Null for a
-// declaration with no initializer, or one whose initializer is not a pattern at
-// all.
-static const Expr* ArrayInitPattern(const Expr* init) {
-  if (!init) return nullptr;
-  if (init->kind == ExprKind::kCast && init->lhs && IsDimPattern(init->lhs))
-    return init->lhs;
-  return IsDimPattern(init) ? init : nullptr;
-}
-
-// §10.9.1's three matching rules for one element of a multidimensional array,
-// asked in the order the clause writes them: index key, then type key, then
-// default. Null when none of them covers the element -- which the clause
-// forbids, requiring one of the rules to cover every element.
-static const Expr* FindKeyedItem(const Expr* pat, uint32_t idx,
-                                 const MultiDimArray& m) {
-  if (const Expr* item = IndexKeyedItem(pat, idx, m.ctx, m.arena)) return item;
-  if (const Expr* item = TypeKeyedItem(
-          pat, SubjectOfVariableElement(m.var, m.ctx, m.arena), m.ctx))
-    return item;
-  return DefaultKeyedItem(pat);
-}
-
-// §10.9.1: the item of `pat` that fills one dimension's element at address
-// `idx`, position `pos` within that dimension. All three item forms the clause
-// admits are read here -- keyed, replicated, and positional -- so the descent
-// below meets the same three the single-dimension maker does. Null when the
-// pattern supplies nothing for this element.
-static const Expr* SelectDimItem(const Expr* pat, uint32_t idx, uint32_t pos,
-                                 const MultiDimArray& m) {
-  if (!pat->pattern_keys.empty()) return FindKeyedItem(pat, idx, m);
-  if (const auto* body = ReplicateBody(pat)) return (*body)[pos % body->size()];
-  return pos < pat->elements.size() ? pat->elements[pos] : nullptr;
-}
-
-// Materializes one leaf variable of the array under `name`, a variable of
-// the array's element type: its state-ness and signedness are the
-// declaration's (§6.11.2, §6.11.3), and its index resolves as the
-// declaration's packed dimension says (§11.5.1).
-static Variable* NewMultiDimLeaf(const MultiDimArray& m,
-                                 const std::string& name) {
-  auto* stored = m.arena.Create<std::string>(name);
-  auto* elem = m.ctx.CreateVariable(*stored, m.var.width);
-  RecordPackedRange(m.var.dtype, elem, m.ctx, m.arena);
-  elem->is_4state = m.var.is_4state;
-  elem->is_signed = m.var.is_signed;
-  elem->is_string = m.var.is_string;
-  return elem;
-}
-
-// The element variable standing under `key`, for a fill in place; null where
-// none does. Read straight from the table: the fill runs in a package's frame,
-// which SimContext::FindVariable would resolve the complete key against.
-static Variable* ExistingElement(SimContext& ctx, const std::string& key) {
-  const auto& variables = ctx.GetVariables();
-  auto found = variables.find(key);
-  return found == variables.end() ? nullptr : found->second;
-}
-
-// Gives one leaf variable of the array the value of the pattern item that
-// reached it, or §6.8 Table 6-7's default when none did -- the leaf made
-// here, or the one already standing under its key for a walk in place.
-static void CreateMultiDimLeaf(const MultiDimArray& m, const std::string& name,
-                               const Expr* item) {
-  Variable* elem =
-      m.in_place ? ExistingElement(m.ctx, name) : NewMultiDimLeaf(m, name);
-  if (elem == nullptr) return;
-  if (!item) {
-    // §6.8, Table 6-7: nothing covered this leaf, so it keeps the default
-    // initial value of its type -- the 'x CreateVariable seeded for a 4-state
-    // element (masked to the width there, which MakeAllX does not do), and '0
-    // for a 2-state one. Exactly what an uncovered leaf held before this walk
-    // carried an initializer at all.
-    if (!m.var.is_4state)
-      elem->value = MakeLogic4VecVal(m.arena, m.var.width, 0);
-    return;
-  }
-  // §10.9.1: each expression item is evaluated as though assigned to the type
-  // of its element, so the item is coerced to the element width (a no-op when
-  // they already match). §6.8 then makes the leaf a data object that stores a
-  // value of its own, so it takes its own words: a bare item name of
-  // the leaf's width is answered with that variable's Logic4Vec, ResizeToWidth
-  // hands it straight back, and without the copy every leaf of
-  // `'{2{'{3{y}}}}` would share y's storage.
-  elem->value = OwnRhsWords(
-      ResizeToWidth(EvalExpr(item, m.ctx, m.arena), m.var.width, m.arena),
-      m.arena);
-}
-
-// §7.4.2: recursively create one leaf variable per element of a fixed
-// multidimensional unpacked array, named arr[i0][i1]... in row-major order so a
-// compound select (eval_select.cpp) and a nested assignment pattern resolve to
-// it. `item` is the part of the declaration initializer that reached this
-// subtree: §10.9.1 has the braces follow the array's dimensions, so the
-// initializer is a tree of the array's own shape and the walk carries the
-// sub-pattern for the current dimension down beside the prefix it already
-// carried. This is the step the two makers of array leaves differed by -- the
-// single-dimension one applied the initializer and this one never read it, so
-// the clause's own `int n[1:2][1:3] = '{2{'{3{y}}}};` read 0 at all six leaves.
-// A leaf no item reaches keeps §6.8 Table 6-7's default, unchanged.
-static void CreateMultiDimLeaves(const MultiDimArray& m,
-                                 const std::string& prefix, size_t d,
-                                 const Expr* item) {
-  const auto& sizes = m.var.unpacked_dim_sizes;
-  if (d == sizes.size()) {
-    CreateMultiDimLeaf(m, prefix, item);
-    return;
-  }
-  const auto& dim = m.var.unpacked_dims[d];
-  // §11.5.2 counts an address from the smaller of the two bounds the
-  // declaration wrote, whichever way round it wrote them, while §10.9.1 counts
-  // a pattern's positional items from the dimension's left bound. A descending
-  // dimension therefore takes them the other way round, exactly as the
-  // single-dimension maker's pat_idx does; is_descending on the variable
-  // describes only the first dimension, so each dimension is asked its own
-  // bounds instead.
-  bool descending = dim.left > dim.right;
-  const Expr* pat = (item != nullptr && IsDimPattern(item)) ? item : nullptr;
-  for (uint32_t i = 0; i < sizes[d]; ++i) {
-    int64_t idx = dim.Low() + i;
-    // A value standing where this dimension's braces were expected is a whole
-    // subarray's value, so it passes down unchanged to every leaf beneath.
-    const Expr* sub =
-        pat ? SelectDimItem(pat, static_cast<uint32_t>(idx),
-                            descending ? (sizes[d] - 1 - i) : i, m)
-            : item;
-    // An element is named by its index's 32 bits, as every select names it
-    // (TryArrayElementSelect, BuildCompoundName) and ArrayElementKey names a
-    // one-dimensional array's, so `[-1:0]` holds [4294967295] and [0].
-    CreateMultiDimLeaves(
-        m, prefix + "[" + std::to_string(static_cast<uint32_t>(idx)) + "]",
-        d + 1, sub);
-  }
-}
-
 // §7.4.4: two dimensions or more, the bounds of every one folded.
 static bool IsMultiDimArray(const RtlirVariable& var) {
   return var.unpacked_dim_sizes.size() >= 2 &&
@@ -388,8 +214,7 @@ static bool TryCreateMultiDimArray(std::string_view name,
   }
   info.dim_sizes = var.unpacked_dim_sizes;
   ctx.RegisterArray(name, info);
-  CreateMultiDimLeaves(MultiDimArray{var, ctx, arena}, std::string(name), 0,
-                       ArrayInitPattern(var.init_expr));
+  FillMultiDimLeaves(name, var, ctx, arena, /*in_place=*/false);
   return true;
 }
 
@@ -467,12 +292,11 @@ void InitArrayElements(std::string_view name, const RtlirVariable& var,
                        SimContext& ctx, Arena& arena) {
   if (var.unpacked_size == 0) return;
   if (IsMultiDimArray(var)) {
-    CreateMultiDimLeaves(MultiDimArray{var, ctx, arena, /*in_place=*/true},
-                         std::string(name), 0, ArrayInitPattern(var.init_expr));
+    FillMultiDimLeaves(name, var, ctx, arena, /*in_place=*/true);
     return;
   }
   for (uint32_t i = 0; i < var.unpacked_size; ++i) {
-    Variable* elem = ExistingElement(ctx, ArrayElementKey(name, var, i));
+    Variable* elem = ExistingArrayElement(ctx, ArrayElementKey(name, var, i));
     if (elem != nullptr)
       FillArrayElement(var, i, {elem, ctx.GetVariableStructType(name)}, ctx,
                        arena);

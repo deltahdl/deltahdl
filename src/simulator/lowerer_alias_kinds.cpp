@@ -24,9 +24,10 @@ namespace delta {
 // of the fixed-size array `info` describes, "[1]" for a one-dimensional
 // array's second element and "[1][0]" for a two-dimensional array's, each
 // dimension's addresses counted from its low bound in declaration order, the
-// spelling CreateArrayElements and CreateMultiDimLeaves (lowerer_var.cpp) key
-// the element variables by. A one-dimensional array's extent is the lo and
-// size pair, a multidimensional array's the per-dimension vectors.
+// spelling CreateArrayElements (lowerer_var.cpp) and CreateMultiDimLeaves
+// (lowerer_var_multidim.cpp) key the element variables by. A one-dimensional
+// array's extent is the lo and size pair, a multidimensional array's the
+// per-dimension vectors.
 static void CollectElementSuffixes(const ArrayInfo& info, size_t dim,
                                    const std::string& prefix,
                                    std::vector<std::string>& out) {

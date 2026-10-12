@@ -189,7 +189,8 @@ static void DistributeDimPattern(const PatternDist& pd,
   // the pattern's positional items from its left bound, which are the same
   // bound only when the dimension ascends. `i` is therefore the address offset
   // alone, and a descending dimension takes its position the other way round,
-  // as the declaration path (CreateMultiDimLeaves in lowerer_var.cpp) does.
+  // as the declaration path (CreateMultiDimLeaves in lowerer_var_multidim.cpp)
+  // does.
   bool descending = pd.info.dim_descending[d];
   for (uint32_t i = 0; i < size; ++i) {
     std::string child = prefix + "[" + std::to_string(lo + i) + "]";

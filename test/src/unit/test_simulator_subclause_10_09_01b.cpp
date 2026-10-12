@@ -518,4 +518,76 @@ TEST(ArrayLiteralSim, AQueueItemOfTheWrongSizeIsARuntimeError) {
       "array size mismatch in assignment to fixed-size array", 6, "7.6"));
 }
 
+// §10.9.1: a declaration's initializer follows the array's dimensions as an
+// assignment does, so an item of the subarray's unpacked array type standing
+// at the first dimension -- a typed pattern, keyed or positional, or a
+// variable of that type -- gives the subarray its elements in order. Each row
+// read one scalar instead, the same value at all three leaves.
+TEST(ArrayLiteralSim, ADeclarationsUnpackedArrayItemFillsItsSubarray) {
+  SimFixture f;
+  auto out = RunCapture(
+      "typedef int row_t [3];\n"
+      "module t;\n"
+      "  row_t r = '{1, 2, 3};\n"
+      "  int a [2][3] = '{default: row_t'{4, 5, 6}};\n"
+      "  int b [2][3] = '{default: r};\n"
+      "  int c [2][3] = '{0: r, default: '{7, 8, 9}};\n"
+      "  int d [2][3] = '{r, row_t'{default: 5}};\n"
+      "  initial begin\n"
+      "    $display(\"%p %p\", a, b);\n"
+      "    $display(\"%p %p\", c, d);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "'{'{4, 5, 6}, '{4, 5, 6}} '{'{1, 2, 3}, '{1, 2, 3}}\n"
+            "'{'{1, 2, 3}, '{7, 8, 9}} '{'{1, 2, 3}, '{5, 5, 5}}\n");
+}
+
+// §10.9.1 with §7.4.4 and §7.6: in a declaration's initializer too, a slice
+// and a select of another array's leading dimension fill the subarray they
+// stand for by left-to-right position, which in `e [1:0][2:0]` puts g[0][0]'s
+// 7 at e[1][2]; an element select is no array and reaches every leaf.
+TEST(ArrayLiteralSim, ADeclarationsSliceAndSubarraySelectFillTheirSubarrays) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int src [6] = '{1, 2, 3, 4, 5, 6};\n"
+      "  int g [2][3] = '{'{7, 8, 9}, '{10, 11, 12}};\n"
+      "  int a [2][3] = '{src[0:2], src[3:5]};\n"
+      "  int b [2][3] = '{g[1], g[0]};\n"
+      "  int e [1:0][2:0] = '{g[0], g[1]};\n"
+      "  int s [2][3] = '{default: src[1]};\n"
+      "  initial begin\n"
+      "    $display(\"%p %p %p\", a, b, s);\n"
+      "    $display(\"%0d %0d %0d\", e[1][2], e[1][0], e[0][2]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "'{'{1, 2, 3}, '{4, 5, 6}} '{'{10, 11, 12}, '{7, 8, 9}} "
+            "'{'{2, 2, 2}, '{2, 2, 2}}\n"
+            "7 9 10\n");
+}
+
+// §10.9.1 with §7.6: a queue standing for a subarray in a declaration's
+// initializer is assigned to it as one unpacked array to another, which needs
+// as many elements as the subarray holds; a queue's size is only known as the
+// initializer is evaluated.
+TEST(ArrayLiteralSim, ADeclarationsQueueItemOfTheWrongSizeIsAnError) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int q [$];\n"
+      "  int a [2][3] = '{default: q};\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "array size mismatch in assignment to fixed-size array", 3, "7.6"));
+}
+
 }  // namespace

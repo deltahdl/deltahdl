@@ -381,6 +381,19 @@ void RegisterModuleSequenceDecls(const RtlirModule* mod, SimContext& ctx);
 // eval_process_methods.cpp, beside the class's methods.
 void RegisterProcessClassType(SimContext& ctx, Arena& arena);
 
+// §7.4.2 with §10.9.1: give each leaf of the fixed multidimensional unpacked
+// array `name`, which `var` declares, the value its declaration's initializer
+// gives that element, or §6.8 Table 6-7's default where it gives none. Each
+// leaf is created, or, where `in_place`, is the one already standing under
+// its key. Defined in lowerer_var_multidim.cpp.
+void FillMultiDimLeaves(std::string_view name, const RtlirVariable& var,
+                        SimContext& ctx, Arena& arena, bool in_place);
+// The element variable standing under `key`, for a fill in place; null where
+// none does. Read straight from the table: the fill runs in a package's frame,
+// which SimContext::FindVariable would resolve the complete key against.
+// Defined in lowerer_var_multidim.cpp.
+Variable* ExistingArrayElement(SimContext& ctx, const std::string& key);
+
 }  // namespace delta
 
 #endif  // DELTA_SIMULATOR_LOWERER_REGISTER_H_

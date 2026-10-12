@@ -640,6 +640,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/lowerer_var.cpp
     simulator/lowerer_var_aggregate.cpp
     simulator/lowerer_var_layout.cpp
+    simulator/lowerer_var_multidim.cpp
     simulator/sync_variable.cpp
     simulator/sdf_annotate.cpp
     simulator/sdf_annotate_entry.cpp
