@@ -20,6 +20,7 @@
 #include "elaborator/class_member_names.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/operator_result_members.h"
 #include "elaborator/std_package.h"
 #include "elaborator/type_site_lookup.h"
 #include "parser/ast_class.h"
@@ -584,15 +585,17 @@ void ReportVifCall(const Expr& call, const DataScope& scope, DiagEngine& diag) {
 
 // Each call by a plain name `expr` holds, itself included, each call through a
 // virtual interface, each select into a class property that is one, and each
-// member access naming nothing its class or its string or enumeration type
-// has, `rule` being the subclause one `expr` itself makes on a class is
-// reported under. A scope resolution, C::m or p::m, selects from no value.
+// member access naming nothing its class, its string or enumeration type or
+// the operator result it is applied to has, `rule` being the subclause one
+// `expr` itself makes on a class is reported under. A scope resolution, C::m or
+// p::m, selects from no value.
 void CheckExprCalls(const Expr* expr, const DataScope& scope, DiagEngine& diag,
                     std::string_view rule = "8.5") {
   if (expr == nullptr) return;
   if (expr->kind == ExprKind::kMemberAccess && !expr->is_scope_resolution) {
     ReportUndeclaredMember(*expr, rule, scope, diag);
     ReportNoBuiltInMethod(*expr, scope, diag);
+    ReportOperatorResultMember(*expr, diag);
   }
   if (const Expr* callee = NamedCallee(*expr)) {
     ReportIfData(callee->text, expr->range.start, scope, diag);
