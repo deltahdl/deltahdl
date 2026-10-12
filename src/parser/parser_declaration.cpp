@@ -1,3 +1,4 @@
+#include <format>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -804,7 +805,14 @@ void Parser::ParseTfPortDeclarators(ModuleItem* item, const TfPortHeader& hdr) {
     arg.data_type = hdr.dt;
     arg.name = Expect(TokenKind::kIdentifier, Subclause("13.3")).text;
     ParseUnpackedDims(arg.unpacked_dims);
+    // §13.5.3: a default argument value is allowed only with the ANSI style,
+    // so one written here, in the subroutine's body, is reported.
     if (Match(TokenKind::kEq)) {
+      diag_.Error(CurrentLoc(),
+                  std::format("default value for argument '{}' is allowed "
+                              "only in an ANSI style argument list",
+                              arg.name),
+                  Subclause("13.5.3"));
       arg.default_value = ParseExpr();
     }
     item->func_args.push_back(arg);
