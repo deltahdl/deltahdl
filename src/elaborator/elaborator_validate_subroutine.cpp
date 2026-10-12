@@ -237,7 +237,8 @@ void AddUnitAndPackageTasks(
 }  // namespace
 
 void Elaborator::ValidateTaskCallsInExpressions(const ModuleDecl* decl) {
-  TaskOperandCheck chk{{task_names_.begin(), task_names_.end()}, diag_};
+  TaskOperandCheck chk{{}, diag_};
+  for (std::string_view name : task_names_) chk.tasks.emplace(name);
   if (unit_ != nullptr) AddUnitAndPackageTasks(*unit_, func_decls_, chk.tasks);
   if (chk.tasks.empty()) return;
   WalkItemsForTaskOperands(decl->items, chk);

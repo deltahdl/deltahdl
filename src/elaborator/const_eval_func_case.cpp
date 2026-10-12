@@ -38,6 +38,23 @@ bool IsWildDigit(char c, bool with_x) {
   return c == '?' || c == 'z' || c == 'Z' || (with_x && (c == 'x' || c == 'X'));
 }
 
+// The bits the digits `digits` of a based literal, each `bits` wide, write as
+// x, z or `?` (IsWildDigit), the leftmost such digit filling every bit above
+// it.
+uint64_t DigitXzBits(std::string_view digits, unsigned bits, bool with_x) {
+  uint64_t mask = 0;
+  unsigned shift = 0;
+  bool leftmost_wild = false;
+  for (auto it = digits.rbegin(); it != digits.rend() && shift < 64; ++it) {
+    if (*it == '_' || *it == ' ') continue;
+    leftmost_wild = IsWildDigit(*it, with_x);
+    if (leftmost_wild) mask |= ((uint64_t{1} << bits) - 1) << shift;
+    shift += bits;
+  }
+  if (leftmost_wild && shift < 64) mask |= ~uint64_t{0} << shift;
+  return mask;
+}
+
 // §5.7.1: the bits of the integer literal `e` its digits write as z or `?`,
 // and as x where `with_x`; a leftmost such digit fills every bit above it, and
 // a decimal literal's one such digit every bit. A constant value holds no x or
@@ -51,24 +68,14 @@ uint64_t LiteralXzBits(const Expr* e, bool with_x) {
   if (pos < t.size() && (t[pos] == 's' || t[pos] == 'S')) ++pos;
   if (pos >= t.size()) return 0;
   const unsigned kBits = BitsPerDigit(t[pos++]);
+  std::string_view digits = t.substr(pos);
   if (kBits == 0) {
-    return std::any_of(t.begin() + static_cast<std::ptrdiff_t>(pos), t.end(),
+    return std::any_of(digits.begin(), digits.end(),
                        [&](char c) { return IsWildDigit(c, with_x); })
                ? ~uint64_t{0}
                : 0;
   }
-  uint64_t mask = 0;
-  unsigned shift = 0;
-  bool leftmost_wild = false;
-  for (size_t i = t.size(); i > pos && shift < 64; --i) {
-    char c = t[i - 1];
-    if (c == '_' || c == ' ') continue;
-    leftmost_wild = IsWildDigit(c, with_x);
-    if (leftmost_wild) mask |= ((uint64_t{1} << kBits) - 1) << shift;
-    shift += kBits;
-  }
-  if (leftmost_wild && shift < 64) mask |= ~uint64_t{0} << shift;
-  return mask;
+  return DigitXzBits(digits, kBits, with_x);
 }
 
 // §12.5: the width and signedness every operand of a case statement is
