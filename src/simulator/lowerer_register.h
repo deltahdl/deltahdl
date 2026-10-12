@@ -229,8 +229,8 @@ void RegisterModulePorts(const RtlirModule* mod, SimContext& ctx, Arena& arena);
 void RegisterModuleSubroutines(const RtlirModule* mod, SimContext& ctx);
 // §11.12 with §23.9: the lets `mod` declares, under the key of the instance
 // `prefix` names, empty for a top-level module, so that each instance's
-// references name its own (SimContext::FindVisibleLet). Defined in
-// lowerer_child.cpp.
+// references name its own (FindVisibleLet); its covergroups, held beside them,
+// under their bare names. Defined in lowerer_child.cpp.
 void RegisterModuleLets(const RtlirModule* mod, std::string_view prefix,
                         SimContext& ctx);
 // §13.3 with §23.6: the same subroutines under the instance's prefixed key,

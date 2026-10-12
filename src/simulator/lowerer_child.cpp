@@ -17,6 +17,7 @@
 #include "elaborator/rtlir_scopes.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "simulator/class_object.h"
 #include "simulator/dpi_export.h"
 #include "simulator/evaluation.h"
@@ -416,8 +417,15 @@ static void AliasChildObjectsUnderPath(const std::string& child_prefix,
 
 void RegisterModuleLets(const RtlirModule* mod, std::string_view prefix,
                         SimContext& ctx) {
-  for (auto* let_decl : mod->let_decls)
-    RegisterInstanceLet(ctx, prefix, let_decl);
+  for (auto* item : mod->let_decls) {
+    // §19.3: a covergroup, held among the lets, is a type, which
+    // CovergroupOfType and CovergroupTypeNamed find by its bare name.
+    if (item->kind == ModuleItemKind::kCovergroupDecl) {
+      ctx.RegisterLetDecl(item->name, item);
+    } else {
+      RegisterInstanceLet(ctx, prefix, item);
+    }
+  }
 }
 
 // The subroutines, imports and assertion declarations an instance's module

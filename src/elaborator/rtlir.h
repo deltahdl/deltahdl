@@ -770,22 +770,22 @@ struct RtlirModule {
   // apart from let_decls because §11.12's let is a substitution of the
   // expression its declaration writes, while an imported subroutine is a call
   // into a foreign function and carries no expression to substitute. Whatever
-  // registers a run's imports reads this; RegisterModuleSubroutines in
-  // src/simulator/lowerer_register.cpp registers let_decls and would otherwise
+  // registers a run's imports reads this; RegisterModuleLets in
+  // src/simulator/lowerer_child.cpp registers let_decls and would otherwise
   // answer an import's name with a let expansion of nothing.
   std::vector<ModuleItem*> dpi_import_decls;
   // §35.7's exported subroutines, declared in this module. §35.7 has an export
   // leave the subroutine's SystemVerilog behavior unchanged, which one held in
-  // let_decls would breach: RegisterModuleSubroutines (lowerer_register.cpp)
-  // would answer its name with a let expansion of nothing.
+  // let_decls would breach: RegisterModuleLets (lowerer_child.cpp) would
+  // answer its name with a let expansion of nothing.
   std::vector<ModuleItem*> dpi_export_decls;
   // §30.3's specify blocks, declared in this module: §30.3 places a specify
   // block inside a module declaration. What one declares -- the module paths of
   // §30.4, the PATHPULSE$ pulse limits of §30.7.1 and the §30.7.4 pulse styles
   // -- is timing data about the module rather than a name a reference resolves
   // to. They are held apart from let_decls for that reason:
-  // RegisterModuleSubroutines in src/simulator/lowerer_register.cpp registers
-  // each let_decls entry under item->name, which a specify block leaves empty,
+  // RegisterModuleLets in src/simulator/lowerer_child.cpp registers each
+  // let_decls entry by item->name, which a specify block leaves empty,
   // and RangeHasName in src/elaborator/elaborator_scope_rules_hier.cpp searches
   // let_decls by name.
   std::vector<ModuleItem*> specify_blocks;
