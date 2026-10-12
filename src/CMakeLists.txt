@@ -532,11 +532,13 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_datatype_ops.cpp
     elaborator/elaborator_validate_getpattern.cpp
     elaborator/elaborator_validate_funcbody.cpp
+    elaborator/elaborator_validate_foreach.cpp
     elaborator/elaborator_validate_funcchecks.cpp
     elaborator/elaborator_validate_hier_refs.cpp
     elaborator/elaborator_validate_interface.cpp
     elaborator/elaborator_validate_jump_statements.cpp
     elaborator/elaborator_validate_matches.cpp
+    elaborator/elaborator_validate_patterns.cpp
     elaborator/elaborator_validate_operations_arrays.cpp
     elaborator/elaborator_validate_operations_let.cpp
     elaborator/elaborator_validate_operations_aggregate.cpp

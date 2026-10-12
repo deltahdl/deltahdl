@@ -69,9 +69,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
       &Elaborator::ValidateScopeRules,
       nullptr,  // ValidateMixedAssignments
       &Elaborator::ValidateInputPortAssignments,
-      &Elaborator::ValidateMatchesPatternIntegral,
-      &Elaborator::ValidateMatchesCaseSelectorType,
-      &Elaborator::ValidateMatchesIfPredicateType,
+      &Elaborator::ValidatePatterns,
       &Elaborator::ValidateDisableTargets,
       &Elaborator::ValidateFinalTaskEnables,
       nullptr,  // ValidateProceduralNetAssign

@@ -219,4 +219,26 @@ TEST(IfMatchesElaboration, RealValueInARandsequenceWeightCodeBlockIsReported) {
                             7, "12.6.2"));
 }
 
+// §12.6.2 gives a pattern identifier of an if statement's predicate the later
+// clauses and the true arm as its scope, so the else arm reading the name
+// reads no declaration and is §23.9's unresolved reference. A later clause
+// reads a name an earlier one binds.
+TEST(IfMatchesElaboration, PatternIdentifierReadInTheElseArmIsUnresolved) {
+  SimFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+      "  VInt v; int y;\n"
+      "  initial begin\n"
+      "    if (v matches tagged Valid .n &&& n > 0) y = n;\n"
+      "    else y = n;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'n'", 6,
+                            "23.9"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
 }  // namespace

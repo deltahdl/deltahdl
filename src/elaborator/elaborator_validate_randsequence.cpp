@@ -11,8 +11,6 @@
 // continue and return together with §18.17.6's exemption from two of them.
 
 #include <format>
-#include <string_view>
-#include <unordered_map>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -149,26 +147,16 @@ void Elaborator::CheckRandsequenceNamesIn(
 // The item lists walked here are the ones no module holds: the compilation
 // unit's own, each package's, and the methods of each class declared outside
 // every design element. A class declared inside a module or a package is
-// reached through that scope's items by ForEachBodyOwningItem rather than here,
-// so no body is walked twice and no report is made twice.
-//
-// The foreach check takes an array map built from the same items, which is what
-// its dimension count is compared against; a name the map does not hold is left
-// alone, exactly as it is for a module.
+// reached through that scope's items rather than here, so no body is walked
+// twice and no report is made twice.
 void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
   if (unit_ == nullptr) return;
 
   auto run_over = [this](const std::vector<ModuleItem*>& items) {
-    std::unordered_map<std::string_view, const ModuleItem*> arrays;
-    for (const auto* item : items) {
-      if (item != nullptr && item->kind == ModuleItemKind::kVarDecl &&
-          !item->name.empty()) {
-        arrays.emplace(item->name, item);
-      }
-    }
     CheckJumpStatementsIn(items);
     CheckRandsequenceNamesIn(items);
-    CheckForeachLoopsIn(items, arrays);
+    CheckForeachLoopsIn(items);
+    CheckPatternsIn(items);
   };
 
   run_over(unit_->cu_items);
@@ -196,12 +184,18 @@ void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
   }
   ReportUnresolvedInPackageSubroutines(unit_, kNames, pkg_provided_names_,
                                        diag_);
+  // The foreach and pattern rules read the declarations in scope, so a class's
+  // own walk takes them, its properties among them, rather than its methods
+  // read as a list of the unit's subroutines.
   for (const auto* cls : unit_->classes) {
     std::vector<ModuleItem*> methods;
     ForEachClassBodyItem(cls, [&](const ModuleItem* m) {
       methods.push_back(const_cast<ModuleItem*>(m));
     });
-    run_over(methods);
+    CheckJumpStatementsIn(methods);
+    CheckRandsequenceNamesIn(methods);
+    CheckForeachLoopsInClass(cls);
+    CheckPatternsInClass(cls);
   }
 }
 

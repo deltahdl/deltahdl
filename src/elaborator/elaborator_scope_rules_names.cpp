@@ -435,14 +435,17 @@ static void CollectMatchesBindings(
 // §12.6.1: the patterns of a `case ... matches` item, each binding variables
 // the item's statement reads. A case that is not `matches` compares values
 // and binds nothing.
+static void CollectCaseItemBindings(
+    const CaseItem& ci, std::unordered_set<std::string_view>& names) {
+  for (const Expr* p : ci.patterns) {
+    ForEachPatternBinding(p, [&](const Expr* b) { names.insert(b->text); });
+  }
+}
+
 static void CollectCaseMatchesBindings(
     const Stmt* s, std::unordered_set<std::string_view>& names) {
   if (!s->case_matches) return;
-  for (const auto& ci : s->case_items) {
-    for (const Expr* p : ci.patterns) {
-      ForEachPatternBinding(p, [&](const Expr* b) { names.insert(b->text); });
-    }
-  }
+  for (const auto& ci : s->case_items) CollectCaseItemBindings(ci, names);
 }
 
 // The generated names of a `name[N]` enumeration member are spelled by no
@@ -489,22 +492,23 @@ static void CollectBlockEnumMemberNames(
 // block tree without tracking scope boundaries — that can only ever SUPPRESS a
 // diagnostic, never raise one, so a missed boundary is always safe.
 // `with_for_headers` says whether the variables a for loop's initialization
-// declares are among them.
+// declares are among them, and `with_bindings` whether the variables a
+// pattern binds are: CollectProcRhsIdents gives those the scopes §12.6.1 to
+// §12.6.3 define instead.
 static void CollectLocalNames(const Stmt* s,
                               std::unordered_set<std::string_view>& names,
-                              bool with_for_headers) {
+                              bool with_for_headers, bool with_bindings) {
   if (!s) return;
   // §12.6's patterns: those of a `case ... matches` item (§12.6.1), and those
   // under a `matches` operator in the positions CollectProcRhsIdents below
   // reads -- the statement's condition, an assignment's right side and a
-  // display task's arguments -- so that a variable a pattern declares is a
-  // local wherever the read of it is collected. The read of a variable a
-  // pattern binds is the whole of what sv-tests' §12.6 files do, and each was
-  // reported unresolved (#4353).
-  CollectCaseMatchesBindings(s, names);
-  CollectMatchesBindings(s->condition, names);
-  CollectMatchesBindings(s->rhs, names);
-  CollectMatchesBindings(SubroutineCallOfStmt(s), names);
+  // display task's arguments.
+  if (with_bindings) {
+    CollectCaseMatchesBindings(s, names);
+    CollectMatchesBindings(s->condition, names);
+    CollectMatchesBindings(s->rhs, names);
+    CollectMatchesBindings(SubroutineCallOfStmt(s), names);
+  }
   if (s->kind == StmtKind::kVarDecl && !s->var_name.empty()) {
     names.insert(s->var_name);
   }
@@ -547,18 +551,58 @@ static void CollectLocalNames(const Stmt* s,
   // same four links and never collected the read either, which is why the two
   // halves of the check are put on this list together.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
-    CollectLocalNames(sub, names, with_for_headers);
+    CollectLocalNames(sub, names, with_for_headers, with_bindings);
   });
 }
 
 void CollectProcLocalNames(const Stmt* s,
                            std::unordered_set<std::string_view>& names) {
-  CollectLocalNames(s, names, true);
+  CollectLocalNames(s, names, true, true);
 }
 
 void CollectProcReadableNames(const Stmt* s,
                               std::unordered_set<std::string_view>& names) {
-  CollectLocalNames(s, names, false);
+  CollectLocalNames(s, names, false, false);
+}
+
+// The variables the patterns of `e` bind, under each `matches` operator it
+// holds.
+static std::unordered_set<std::string_view> MatchesBindingsOf(const Expr* e) {
+  std::unordered_set<std::string_view> names;
+  CollectMatchesBindings(e, names);
+  return names;
+}
+
+// §12.6.2 and §12.6.3: the reads in `e` of a variable a pattern of `e` binds,
+// standing where the binding is in scope, put in `bound`. A pattern's
+// identifiers are in scope in the clauses of its predicate after it, joined by
+// `&&&`, and in a conditional expression's second operand, but not its third.
+// `in_scope` holds the variables bound around `e`.
+static void MarkBoundReads(const Expr* e,
+                           const std::unordered_set<std::string_view>& in_scope,
+                           std::unordered_set<const Expr*>& bound) {
+  if (e == nullptr) return;
+  if (e->kind == ExprKind::kIdentifier) {
+    if (in_scope.count(e->text) != 0) bound.insert(e);
+    return;
+  }
+  if (e->kind == ExprKind::kTernary) {
+    std::unordered_set<std::string_view> inner = in_scope;
+    inner.merge(MatchesBindingsOf(e->condition));
+    MarkBoundReads(e->condition, inner, bound);
+    MarkBoundReads(e->true_expr, inner, bound);
+    MarkBoundReads(e->false_expr, in_scope, bound);
+    return;
+  }
+  if (e->kind == ExprKind::kBinary && e->op == TokenKind::kAmpAmpAmp) {
+    std::unordered_set<std::string_view> inner = in_scope;
+    inner.merge(MatchesBindingsOf(e->lhs));
+    MarkBoundReads(e->lhs, in_scope, bound);
+    MarkBoundReads(e->rhs, inner, bound);
+    return;
+  }
+  ForEachExprChild(
+      e, [&](const Expr* child) { MarkBoundReads(child, in_scope, bound); });
 }
 
 // Collects the bare identifier reads of every procedural blocking/nonblocking
@@ -612,8 +656,30 @@ static void CollectProcRhsIdentsIn(
   }
   ForEachRandsequenceExpr(s,
                           [&](Expr* const& e) { CollectBareIdents(e, refs); });
+  std::unordered_set<const Expr*> bound;
+  MarkBoundReads(read, {}, bound);
+  MarkBoundReads(s->condition, {}, bound);
+  MarkBoundReads(s->for_cond, {}, bound);
   for (const auto* r : refs) {
-    if (locals.count(r->text) == 0) out.push_back(r);
+    if (locals.count(r->text) == 0 && bound.count(r) == 0) out.push_back(r);
+  }
+  // §12.6.2 and §12.6.1: the variables an if statement's predicate binds are
+  // in scope in its true arm and not its false arm, and those a case item's
+  // pattern binds in that item's statement alone.
+  if (s->kind == StmtKind::kIf) {
+    std::unordered_set<std::string_view> inner = locals;
+    inner.merge(MatchesBindingsOf(s->condition));
+    CollectProcRhsIdents(s->then_branch, inner, out);
+    CollectProcRhsIdents(s->else_branch, locals, out);
+    return;
+  }
+  if (s->case_matches) {
+    for (const auto& ci : s->case_items) {
+      std::unordered_set<std::string_view> inner = locals;
+      CollectCaseItemBindings(ci, inner);
+      CollectProcRhsIdents(ci.body, inner, out);
+    }
+    return;
   }
   // §6.5's declared-before-use rule is broken by the assignment wherever the
   // assignment stands, and §26.3 makes an identifier a package supplies

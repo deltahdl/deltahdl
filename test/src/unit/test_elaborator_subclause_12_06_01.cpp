@@ -224,4 +224,25 @@ TEST(CaseMatchesItemElaboration,
                             "12.6.1"));
 }
 
+// §12.6.1 gives a case item's pattern identifiers the item's filter and
+// statement as their scope, so another item's statement reading the name reads
+// no declaration and is §23.9's unresolved reference.
+TEST(CaseMatchesItemElaboration, PatternIdentifierOfAnotherItemIsUnresolved) {
+  SimFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+      "  VInt v; int y;\n"
+      "  initial case (v) matches\n"
+      "    tagged Valid .a : y = a;\n"
+      "    tagged Invalid : y = a;\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'a'", 6,
+                            "23.9"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
 }  // namespace

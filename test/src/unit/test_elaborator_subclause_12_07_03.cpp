@@ -536,4 +536,256 @@ TEST(LoopStatementElaboration,
       6, "12.7.3"));
 }
 
+// §12.7.3 caps a foreach's loop variables at its array's dimension count
+// wherever the array is declared. The arrays below are declared in a block, in
+// a function, as a function's formal and as a class property, and each foreach
+// names one loop variable more than its array has dimensions.
+TEST(LoopStatementElaboration, ForeachOverBlockLocalArrayCountsItsDimensions) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  initial begin\n"
+      "    int a [4];\n"
+      "    foreach (a[i, j, k]) ;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "foreach lists 3 loop variables but array 'a' has only 1 dimension(s)", 4,
+      "12.7.3"));
+}
+
+TEST(LoopStatementElaboration,
+     ForeachOverFunctionLocalArrayCountsItsDimensions) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void f();\n"
+      "    int a [4];\n"
+      "    foreach (a[i, j]) ;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "foreach lists 2 loop variables but array 'a' has only 1 dimension(s)", 4,
+      "12.7.3"));
+}
+
+TEST(LoopStatementElaboration, ForeachOverFormalArrayCountsItsDimensions) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  function void f(int a [4]);\n"
+      "    foreach (a[i, j]) ;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "foreach lists 2 loop variables but array 'a' has only 1 dimension(s)", 3,
+      "12.7.3"));
+}
+
+TEST(LoopStatementElaboration, ForeachOverClassPropertyCountsItsDimensions) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  class C;\n"
+      "    int a [4];\n"
+      "    function void f();\n"
+      "      foreach (a[i, j]) ;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "foreach lists 2 loop variables but array 'a' has only 1 dimension(s)", 5,
+      "12.7.3"));
+}
+
+// A class of the compilation unit, declared outside every module, has its
+// properties in scope in its methods as a module's class has.
+TEST(LoopStatementElaboration,
+     ForeachOverAUnitClassPropertyCountsItsDimensions) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C;\n"
+      "  int a [4];\n"
+      "  function void f();\n"
+      "    foreach (a[i, j]) ;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "foreach lists 2 loop variables but array 'a' has only 1 dimension(s)", 4,
+      "12.7.3"));
+}
+
+// The array a foreach names is the declaration in scope where the loop stands:
+// the block's one-dimensional a hides the module's two-dimensional a, so two
+// loop variables are one too many.
+TEST(LoopStatementElaboration, ForeachCountsTheArrayItsBlockDeclares) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int a [4][4];\n"
+      "  initial begin\n"
+      "    int a [4];\n"
+      "    foreach (a[i, j]) ;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "foreach lists 2 loop variables but array 'a' has only 1 dimension(s)", 5,
+      "12.7.3"));
+}
+
+// The other way round, the block's two-dimensional a takes two loop variables
+// though the module's a has one dimension.
+TEST(LoopStatementElaboration, ForeachOverBlockArrayHidingAModuleArrayOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int a [4];\n"
+      "  initial begin\n"
+      "    int a [4][4];\n"
+      "    foreach (a[i, j]) ;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// An array of real or string has its unpacked dimensions alone, the element
+// type having no packed dimension, so §12.7.3's count is known from the
+// declaration as it is for an integral array.
+TEST(LoopStatementElaboration, ForeachOverRealArrayCountsItsDimensions) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  real r [4];\n"
+      "  initial foreach (r[i, j]) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "foreach lists 2 loop variables but array 'r' has only 1 dimension(s)", 3,
+      "12.7.3"));
+}
+
+TEST(LoopStatementElaboration, ForeachOverStringArrayCountsItsDimensions) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  string s [2][3];\n"
+      "  initial foreach (s[i, j, k]) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "foreach lists 3 loop variables but array 's' has only 2 dimension(s)", 3,
+      "12.7.3"));
+}
+
+// An array of class handles has its unpacked dimensions alone too, a handle
+// being no packed array.
+TEST(LoopStatementElaboration, ForeachOverClassHandleArrayCountsItsDimensions) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  class C; endclass\n"
+      "  C h [4];\n"
+      "  initial foreach (h[i, j]) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "foreach lists 2 loop variables but array 'h' has only 1 dimension(s)", 4,
+      "12.7.3"));
+}
+
+// §12.7.3's loop variables are read-only, and an increment or an assignment
+// operator written inside an expression writes its operand as surely as an
+// assignment statement does (§11.4.1, §11.4.2).
+TEST(LoopStatementElaboration, ForeachLoopVarWrittenInsideAnExpressionIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int a [4]; int x;\n"
+      "  initial foreach (a[i]) begin\n"
+      "    x = i++;\n"
+      "    x = (i += 1);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const char* kMsg =
+      "foreach loop variable 'i' is read-only and cannot be assigned";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMsg, 4, "12.7.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMsg, 5, "12.7.3"));
+}
+
+// An increment written as a whole statement is reported once, not once as a
+// statement and again as an expression.
+TEST(LoopStatementElaboration, ForeachLoopVarIncrementStatementReportedOnce) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int a [4];\n"
+      "  initial foreach (a[i]) i++;\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+// A subroutine writes the actual of an output, inout or ref formal (§13.5), so
+// passing a loop variable there breaks §12.7.3's read-only rule; an input or a
+// const ref formal only reads it.
+TEST(LoopStatementElaboration, ForeachLoopVarPassedToAWritingFormalIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int a [4];\n"
+      "  task automatic t_out(output int v); v = 0; endtask\n"
+      "  task automatic t_io(inout int v); v = 0; endtask\n"
+      "  task automatic t_ref(ref int v); v = 0; endtask\n"
+      "  initial foreach (a[i]) begin\n"
+      "    t_out(i);\n"
+      "    t_io(.v(i));\n"
+      "    t_ref(i);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const char* kMsg =
+      "foreach loop variable 'i' is read-only and cannot be assigned";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMsg, 7, "12.7.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMsg, 8, "12.7.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMsg, 9, "12.7.3"));
+}
+
+TEST(LoopStatementElaboration, ForeachLoopVarPassedToAReadingFormalOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  int a [4];\n"
+      "  task automatic t_in(input int v); endtask\n"
+      "  task automatic t_cref(const ref int v); endtask\n"
+      "  int n;\n"
+      "  initial foreach (a[i]) begin\n"
+      "    t_in(i);\n"
+      "    t_cref(i);\n"
+      "    n = a.sum();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

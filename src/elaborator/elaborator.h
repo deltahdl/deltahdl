@@ -22,6 +22,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
 #include "parser/ast_specify.h"
@@ -650,17 +651,9 @@ class Elaborator : public ElaboratorClassRules {
   // continuous or procedural assignment to it inside the module is illegal.
   void ValidateInputPortAssignments(const ModuleDecl* decl);
 
-  // §12.6: only an integral expression can serve as a constant expression
-  // pattern.
-  void ValidateMatchesPatternIntegral(const ModuleDecl* decl);
-
-  // §12.6.1: the tested expression of a pattern-matching case statement shall
-  // have a known type that is the same as the type of the pattern in each item.
-  void ValidateMatchesCaseSelectorType(const ModuleDecl* decl);
-
-  // §12.6.2: in each `e matches p` clause of an if-else predicate, e and p
-  // shall have the same statically known type.
-  void ValidateMatchesIfPredicateType(const ModuleDecl* decl);
+  // §12.6 to §12.6.3: the static rules of every pattern a module's bodies
+  // write, read against the declarations in scope where it stands.
+  void ValidatePatterns(const ModuleDecl* decl);
 
   void ValidateProceduralNetAssign();
   void ValidateDynamicArrayNba(const ModuleDecl* decl);
@@ -752,9 +745,10 @@ class Elaborator : public ElaboratorClassRules {
   // pass a module's items; ValidatePerDeclarationRulesInUnitScopes below passes
   // the item lists a module does not hold.
   void CheckJumpStatementsIn(const std::vector<ModuleItem*>& items);
-  void CheckForeachLoopsIn(
-      const std::vector<ModuleItem*>& items,
-      const std::unordered_map<std::string_view, const ModuleItem*>& arrays);
+  void CheckForeachLoopsIn(const std::vector<ModuleItem*>& items);
+  void CheckForeachLoopsInClass(const ClassDecl* cls);
+  void CheckPatternsIn(const std::vector<ModuleItem*>& items);
+  void CheckPatternsInClass(const ClassDecl* cls);
   void CheckRandsequenceNamesIn(const std::vector<ModuleItem*>& items);
 
   // §3.12.1 puts a declaration outside every design element in the

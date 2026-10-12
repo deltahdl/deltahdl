@@ -104,7 +104,9 @@ TEST(AssignmentCompatibleElaboration,
 // A string is nonequivalent to an integral type and has no implicit casting
 // rule, so the return is rejected. This is the reverse direction of the
 // integral-into-string rejection above and exercises the residual (return
-// false) branch from real source. The report names §12.8 for the reason given
+// false) branch from real source. The operand is a string variable: a string
+// literal is no string value here, §5.9 making it an unsigned integer
+// constant in an assignment. The report names §12.8 for the reason given
 // above FunctionReturnRejectsIncompatibleValue.
 TEST(AssignmentCompatibleElaboration,
      FunctionReturnRejectsStringValueIntoIntegral) {
@@ -112,7 +114,8 @@ TEST(AssignmentCompatibleElaboration,
   auto* design = ElaborateSrc(
       "module top;\n"
       "  function int f();\n"
-      "    return \"nope\";\n"
+      "    string s;\n"
+      "    return s;\n"
       "  endfunction\n"
       "endmodule\n",
       f);
@@ -121,7 +124,7 @@ TEST(AssignmentCompatibleElaboration,
                             "return expression in function 'f' is not "
                             "assignment-compatible with the function's return "
                             "type",
-                            3, "12.8"));
+                            4, "12.8"));
 }
 
 // End-to-end input form built from dependency §6.22.2 syntax: the return type

@@ -5,15 +5,22 @@
 // §13.4.3's constant-function rules.
 
 #include <format>
+#include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_class_lookup.h"
+#include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_class.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -61,7 +68,7 @@ void CheckJumpRules(const Stmt* s, const JumpScope& scope, DiagEngine& diag);
 // production and the other a loop, so what fixes the reading is this comment
 // and
 // JumpStatementElaboration.BreakInARandsequenceProductionCodeBlockInsideAnOuterLoopOk
-// in test/src/unit/test_elaborator_subclause_12_08.cpp; the randsequence
+// in test/src/unit/test_elaborator_subclause_12_08a.cpp; the randsequence
 // executor is where the difference is observable.
 void CheckBreakScope(const Stmt* s, const JumpScope& scope, DiagEngine& diag) {
   if (scope.loop_depth > 0 || scope.in_production_code_block) return;
@@ -198,12 +205,14 @@ void CheckJumpRules(const Stmt* s, const JumpScope& scope, DiagEngine& diag) {
 
 // Map literal expression kinds whose type is obvious from the syntax alone
 // to the corresponding DataTypeKind. Returns kImplicit when no narrow
-// classification is possible without full expression type inference.
+// classification is possible without full expression type inference. §5.9
+// makes a string literal in an assignment an unsigned integer constant, eight
+// bits a character, so it maps to a bit vector.
 DataTypeKind ObviousLiteralKind(const Expr* e) {
   if (!e) return DataTypeKind::kImplicit;
   switch (e->kind) {
     case ExprKind::kStringLiteral:
-      return DataTypeKind::kString;
+      return DataTypeKind::kBit;
     case ExprKind::kRealLiteral:
       return DataTypeKind::kReal;
     case ExprKind::kIntegerLiteral:
@@ -215,12 +224,81 @@ DataTypeKind ObviousLiteralKind(const Expr* e) {
   }
 }
 
+// What §12.8's return check reads besides the return statement: the typedefs
+// and classes a type name may stand for, and the declared type of each name
+// the subroutine declares, its formals and the variables its body declares,
+// which no name outside the subroutine hides.
+struct ReturnCtx {
+  const TypedefMap& typedefs;
+  const CompilationUnit* unit;
+  std::unordered_map<std::string_view, const DataType*> locals;
+};
+
+// The type a return compares, as far as the check can see it: a class, or a
+// type IsAssignmentCompatible answers for, or neither where the type is not
+// one the check reads (`type.kind` is kImplicit and `cls` null).
+struct CheckedType {
+  DataType type;
+  const ClassDecl* cls = nullptr;
+  bool is_string_literal = false;
+};
+
+// The type `declared` stands for, followed through typedef names to the type
+// it was declared with. A name the typedefs do not hold is a class or a type
+// the check does not read.
+CheckedType CheckedTypeOf(const DataType& declared, const ReturnCtx& ctx) {
+  const DataType& t = LastTypeInChain(declared, ctx.typedefs);
+  CheckedType out;
+  if (t.kind != DataTypeKind::kNamed) {
+    out.type = t;
+  } else if (ctx.unit != nullptr) {
+    out.cls = ClassOfDeclaredType(t, {}, ctx.unit);
+  }
+  return out;
+}
+
+// §6.22.3: the type of a return expression as far as it is plain from the
+// source: a literal's, or the declared type of a variable or formal of the
+// subroutine named whole. A variable of an unpacked array type, a member, a
+// select, a call or an operation is not read.
+CheckedType CheckedTypeOfValue(const Expr* e, const ReturnCtx& ctx) {
+  if (e->kind == ExprKind::kIdentifier) {
+    auto it = ctx.locals.find(e->text);
+    return it == ctx.locals.end() ? CheckedType{}
+                                  : CheckedTypeOf(*it->second, ctx);
+  }
+  CheckedType out;
+  out.type.kind = ObviousLiteralKind(e);
+  out.is_string_literal = e->kind == ExprKind::kStringLiteral;
+  return out;
+}
+
+// §6.22.3 with §8.4: whether a value of `value` may be returned where `ret` is
+// the return type. A class handle fits a class it is or derives from (§8.13)
+// and no other type, and no other value fits a class; two other types fit as
+// IsAssignmentCompatible says, but for a string literal, which a string takes
+// as it is (§6.16). A type the check does not read fits anything.
+bool ReturnValueFits(const CheckedType& ret, const CheckedType& value,
+                     const CompilationUnit* unit) {
+  if (value.is_string_literal && ret.type.kind == DataTypeKind::kString)
+    return true;
+  bool ret_read = ret.type.kind != DataTypeKind::kImplicit;
+  bool value_read = value.type.kind != DataTypeKind::kImplicit;
+  if (ret.cls != nullptr) {
+    if (value.cls == nullptr) return !value_read;
+    return value.cls == ret.cls ||
+           IsClassDeclDerivedFrom(value.cls, ret.cls->name, unit);
+  }
+  if (value.cls != nullptr) return !ret_read;
+  return !ret_read || !value_read ||
+         IsAssignmentCompatible(ret.type, value.type);
+}
+
 // §12.8: a return in a function that yields a value needs an expression, and
 // one whose type fits the function. The void-with-expression case is
-// reported elsewhere; the type check here catches narrow but clearly
-// wrong mismatches (string-vs-integral, real-vs-string, etc.).
+// reported elsewhere.
 void CheckValueReturningFuncReturn(const Stmt* s, std::string_view func_name,
-                                   const DataType& return_type,
+                                   const CheckedType& ret, const ReturnCtx& ctx,
                                    DiagEngine& diag) {
   if (!s) return;
   if (s->kind == StmtKind::kReturn) {
@@ -232,24 +310,13 @@ void CheckValueReturningFuncReturn(const Stmt* s, std::string_view func_name,
                  Subclause("12.8"));
       return;
     }
-    // A return type written as a name stands for whatever the name means, and
-    // this check has no table to look one up in: `function C::T f(); return 1;`
-    // returns an int through a class-scoped typedef of int, and comparing the
-    // literal against the unresolved name reports a source that is right. An
-    // unresolved name is left alone here as it is everywhere else.
-    if (return_type.kind == DataTypeKind::kNamed) return;
-    DataTypeKind expr_kind = ObviousLiteralKind(s->expr);
-    if (expr_kind != DataTypeKind::kImplicit) {
-      DataType expr_type;
-      expr_type.kind = expr_kind;
-      if (!IsAssignmentCompatible(return_type, expr_type)) {
-        diag.Error(s->range.start,
-                   std::format("return expression in function '{}' is not "
-                               "assignment-compatible with the function's "
-                               "return type",
-                               func_name),
-                   Subclause("12.8"));
-      }
+    if (!ReturnValueFits(ret, CheckedTypeOfValue(s->expr, ctx), ctx.unit)) {
+      diag.Error(s->range.start,
+                 std::format("return expression in function '{}' is not "
+                             "assignment-compatible with the function's "
+                             "return type",
+                             func_name),
+                 Subclause("12.8"));
     }
     return;
   }
@@ -269,13 +336,31 @@ void CheckValueReturningFuncReturn(const Stmt* s, std::string_view func_name,
   // elaborator_validate_internal.h, which is the one list of the fields of Stmt
   // that hold a statement.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
-    CheckValueReturningFuncReturn(sub, func_name, return_type, diag);
+    CheckValueReturningFuncReturn(sub, func_name, ret, ctx, diag);
   });
+}
+
+// The names subroutine `item` declares with a type the return check reads
+// whole: its formals and the variables its body declares at its top level, each
+// written with no unpacked dimension.
+std::unordered_map<std::string_view, const DataType*> SubroutineLocals(
+    const ModuleItem* item) {
+  std::unordered_map<std::string_view, const DataType*> locals;
+  for (const auto& arg : item->func_args) {
+    if (arg.unpacked_dims.empty()) locals[arg.name] = &arg.data_type;
+  }
+  for (const Stmt* s : item->func_body_stmts) {
+    if (s->kind == StmtKind::kVarDecl && s->var_unpacked_dims.empty())
+      locals[s->var_name] = &s->var_decl_type;
+  }
+  return locals;
 }
 
 // §12.8 — applies the jump rules to a function/task body and, for a
 // value-returning function, also checks each return statement's expression.
-void CheckSubroutineJumpRules(const ModuleItem* item, DiagEngine& diag) {
+void CheckSubroutineJumpRules(const ModuleItem* item,
+                              const TypedefMap& typedefs,
+                              const CompilationUnit* unit, DiagEngine& diag) {
   bool is_value_returning = false;
   if (item->kind == ModuleItemKind::kFunctionDecl) {
     // §8.7: a class constructor has no return type, so a `return;` in one is
@@ -288,11 +373,12 @@ void CheckSubroutineJumpRules(const ModuleItem* item, DiagEngine& diag) {
   }
   JumpScope scope;
   scope.in_subroutine = true;
+  for (auto* s : item->func_body_stmts) CheckJumpRules(s, scope, diag);
+  if (!is_value_returning) return;
+  const ReturnCtx kCtx{typedefs, unit, SubroutineLocals(item)};
+  const CheckedType kRet = CheckedTypeOf(item->return_type, kCtx);
   for (auto* s : item->func_body_stmts) {
-    CheckJumpRules(s, scope, diag);
-    if (is_value_returning) {
-      CheckValueReturningFuncReturn(s, item->name, item->return_type, diag);
-    }
+    CheckValueReturningFuncReturn(s, item->name, kRet, kCtx, diag);
   }
 }
 
@@ -313,7 +399,7 @@ void Elaborator::CheckJumpStatementsIn(const std::vector<ModuleItem*>& items) {
     }
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl) {
-      CheckSubroutineJumpRules(item, diag_);
+      CheckSubroutineJumpRules(item, typedefs_, unit_, diag_);
     }
   });
 }

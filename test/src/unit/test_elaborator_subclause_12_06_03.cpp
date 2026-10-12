@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -19,6 +20,25 @@ TEST(TernaryMatchesElaboration, TernaryMatchesElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §12.6.3 gives a pattern identifier of a conditional expression's predicate
+// the later clauses and e2 as its scope, so e3 reading the name reads no
+// declaration and is §23.9's unresolved reference.
+TEST(TernaryMatchesElaboration,
+     PatternIdentifierReadInTheThirdOperandIsUnresolved) {
+  SimFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+      "  VInt v; int y;\n"
+      "  initial y = (v matches tagged Valid .k) ? k : k;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'k'", 4,
+                            "23.9"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
 }  // namespace

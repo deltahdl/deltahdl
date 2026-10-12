@@ -232,7 +232,7 @@ static ConstFuncFlow ExecConstFuncIf(const Stmt* s, ScopeMap& locals,
                                      int64_t& iter_budget) {
   auto cond = ConstEvalFull(s->condition, locals);
   if (!cond) return ConstFuncFlow::kAbort;
-  if (cond->value)
+  if (ConstValIsNonZero(*cond))
     return ExecConstFuncStmt(s->then_branch, locals, result_name, iter_budget);
   return ExecConstFuncStmt(s->else_branch, locals, result_name, iter_budget);
 }
@@ -245,7 +245,7 @@ static std::optional<bool> ConstFuncLoopCond(const Expr* cond,
   if (!cond) return true;
   auto v = ConstEvalFull(cond, locals);
   if (!v) return std::nullopt;
-  return v->value != 0;
+  return ConstValIsNonZero(*v);
 }
 
 // What one pass over a loop body asks the enclosing loop to do next.
@@ -276,9 +276,9 @@ static ConstFuncLoopStep ExecConstFuncLoopBody(const Stmt* body,
   return ConstFuncLoopStep::kIterate;
 }
 
-static ConstFuncFlow ExecConstFuncFor(const Stmt* s, ScopeMap& locals,
-                                      std::string_view result_name,
-                                      int64_t& iter_budget) {
+static ConstFuncFlow ExecConstFuncForLoop(const Stmt* s, ScopeMap& locals,
+                                          std::string_view result_name,
+                                          int64_t& iter_budget) {
   if (ExecConstFuncStmts(s->for_inits, locals, result_name, iter_budget) ==
       ConstFuncFlow::kAbort)
     return ConstFuncFlow::kAbort;
@@ -296,6 +296,35 @@ static ConstFuncFlow ExecConstFuncFor(const Stmt* s, ScopeMap& locals,
       return ConstFuncFlow::kAbort;
   }
   return ConstFuncFlow::kNormal;
+}
+
+// §12.7.1: a for loop that declares its control variables stands in an
+// implicit begin-end block, so each declared variable hides any local of the
+// same name for the loop's duration and the local is as it was once the loop
+// ends. A loop that returns or abandons the fold leaves nothing to restore.
+static ConstFuncFlow ExecConstFuncFor(const Stmt* s, ScopeMap& locals,
+                                      std::string_view result_name,
+                                      int64_t& iter_budget) {
+  std::vector<std::pair<std::string_view, std::optional<int64_t>>> hidden;
+  for (size_t i = 0; i < s->for_init_types.size(); ++i) {
+    if (s->for_init_types[i].kind == DataTypeKind::kImplicit) continue;
+    const Expr* lhs = s->for_inits[i]->lhs;
+    auto outer = locals.find(lhs->text);
+    hidden.emplace_back(lhs->text, outer == locals.end()
+                                       ? std::nullopt
+                                       : std::optional<int64_t>(outer->second));
+  }
+  ConstFuncFlow flow =
+      ExecConstFuncForLoop(s, locals, result_name, iter_budget);
+  if (flow != ConstFuncFlow::kNormal) return flow;
+  for (const auto& [name, outer] : hidden) {
+    if (outer) {
+      locals[name] = *outer;
+    } else {
+      locals.erase(name);
+    }
+  }
+  return flow;
 }
 
 static ConstFuncFlow ExecConstFuncWhile(const Stmt* s, ScopeMap& locals,

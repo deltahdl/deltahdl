@@ -2,6 +2,7 @@
 
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
+#include "helpers_rtlir_lookup.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -107,6 +108,29 @@ TEST(ConditionalElaboration, NestedIfElseInInitial) {
              "    end\n"
              "  end\n"
              "endmodule\n"));
+}
+
+// §12.4 takes an if's condition as true when its value is known and nonzero,
+// and §13.4.3 gives a constant function the meaning it has at run time. The
+// condition's only set bit is bit 64, so the fold reads 1 only when the
+// evaluator looks above the low 64 bits.
+TEST(ConditionalElaboration, ConstantFunctionIfReadsBitsAbove63) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function automatic int f();\n"
+      "    if (128'h1_0000_0000_0000_0000) return 1;\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "  localparam int Q = f();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* q = FindParam(design, "m", "Q");
+  ASSERT_NE(q, nullptr);
+  ASSERT_TRUE(q->is_resolved);
+  EXPECT_EQ(q->resolved_value, 1);
 }
 
 }  // namespace

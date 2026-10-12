@@ -2,6 +2,7 @@
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
@@ -180,6 +181,53 @@ TEST(LoopStatementElaboration, UntypedForInitVarReadableAfterLoop) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §12.7.1 wraps a for loop that declares its control variable in an implicit
+// begin-end block, so the loop's i hides the function's own i and leaves it
+// as it was, and §13.4.3 gives a constant function the meaning it has at run
+// time. The fold reads the outer i's 7, not the 3 the loop ends with.
+TEST(LoopStatementElaboration, ConstantFunctionForVariableHidesOuterOne) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function automatic int f(int n);\n"
+      "    int i = 7;\n"
+      "    for (int i = 0; i < n; i++) ;\n"
+      "    return i;\n"
+      "  endfunction\n"
+      "  localparam int P = f(3);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* p = FindParam(design, "m", "P");
+  ASSERT_NE(p, nullptr);
+  ASSERT_TRUE(p->is_resolved);
+  EXPECT_EQ(p->resolved_value, 7);
+}
+
+// The same rule leaves a name the function never declared undeclared once the
+// loop ends: j counts to 4 inside the loop, and the sum the loop leaves in s
+// is 0 + 1 + 2 + 3, with no j outside to read.
+TEST(LoopStatementElaboration, ConstantFunctionForVariableEndsWithLoop) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function automatic int f();\n"
+      "    int s = 0;\n"
+      "    for (int j = 0; j < 4; j++) s = s + j;\n"
+      "    return s;\n"
+      "  endfunction\n"
+      "  localparam int P = f();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* p = FindParam(design, "m", "P");
+  ASSERT_NE(p, nullptr);
+  ASSERT_TRUE(p->is_resolved);
+  EXPECT_EQ(p->resolved_value, 6);
 }
 
 }  // namespace

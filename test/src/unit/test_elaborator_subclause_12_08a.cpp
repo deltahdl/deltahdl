@@ -246,20 +246,44 @@ TEST(JumpStatementElaboration, ReturnInsideTaskOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(JumpStatementElaboration, ReturnStringLiteralFromIntFunctionIsError) {
+// §5.9 makes a string literal in an assignment an unsigned integer constant,
+// eight bits a character, so an integral or a real return type takes it as it
+// takes any integral constant.
+TEST(JumpStatementElaboration, ReturnStringLiteralFromNumericFunctionsOk) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function int compute();\n"
+      "    return \"hello\";\n"
+      "  endfunction\n"
+      "  function bit [15:0] pair();\n"
+      "    return \"hi\";\n"
+      "  endfunction\n"
+      "  function real scale();\n"
+      "    return \"a\";\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// An integral constant is still no class handle (§8.4).
+TEST(JumpStatementElaboration, ReturnStringLiteralFromClassFunctionIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
-      "  function int compute();\n"
+      "  class A; endclass\n"
+      "  function A g();\n"
       "    return \"hello\";\n"
       "  endfunction\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "return expression in function 'compute' is not "
+                            "return expression in function 'g' is not "
                             "assignment-compatible with the function's return "
                             "type",
-                            3, "12.8"));
+                            4, "12.8"));
 }
 
 TEST(JumpStatementElaboration, ReturnIntegerLiteralFromIntFunctionOk) {

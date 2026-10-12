@@ -70,9 +70,11 @@ TEST(PatternMatching, RealLiteralPatternInMatchesOperatorRejected) {
       6, "12.6"));
 }
 
-// §12.6: a string literal is not of integral type, so it is also rejected
-// when used as a constant expression pattern.
-TEST(PatternMatching, StringLiteralPatternRejected) {
+// §5.9 makes a string literal in an expression an unsigned integer constant,
+// so as a pattern it is an integral constant expression pattern. A string
+// value does not share that type, which §12.6's static check rejects; a bit
+// vector does.
+TEST(PatternMatching, StringLiteralPatternAgainstAStringValueRejected) {
   SimFixture f;
   ElaborateSrc(
       "module t;\n"
@@ -84,10 +86,22 @@ TEST(PatternMatching, StringLiteralPatternRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "only an integral expression can serve as a constant expression pattern",
-      6, "12.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a string value is matched with an integral "
+                            "constant expression pattern",
+                            6, "12.6"));
+}
+
+TEST(PatternMatching, StringLiteralPatternAgainstABitVectorAccepted) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  bit [15:0] x;\n"
+      "  initial if (x matches \"hi\") $display(\"hi\");\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 // §12.6: a constant expression pattern (11.2.1) may be a localparam, not just a
@@ -472,6 +486,278 @@ TEST(PatternVariableReads, ANameNoPatternBindsIsStillReported) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "reference to unresolved identifier 'w'", 8,
                             "23.9"));
+}
+
+// §12.6 type-checks a pattern against the value it is matched with. A tagged
+// pattern needs a tagged union value, names a member that union declares, and
+// gives a void member no member pattern.
+TEST(PatternMatching, TaggedPatternsCheckedAgainstTheTaggedUnion) {
+  SimFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+      "  VInt v; int i;\n"
+      "  initial begin\n"
+      "    if (v matches tagged Bogus .x) ;\n"
+      "    if (i matches tagged Valid .n) ;\n"
+      "    if (v matches tagged Invalid .y) ;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "tagged pattern names 'Bogus', which is not a "
+                            "member of the tagged union",
+                            5, "12.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "tagged pattern is matched against a value that is "
+                            "not a tagged union",
+                            6, "12.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "tagged pattern for void member 'Invalid' has a "
+                            "member pattern",
+                            7, "12.6"));
+}
+
+TEST(PatternMatching, TaggedPatternsFittingTheTaggedUnionAccepted) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+      "  VInt v; int y;\n"
+      "  function VInt get(); return v; endfunction\n"
+      "  initial begin\n"
+      "    if (v matches tagged Valid .n) y = n;\n"
+      "    if (get() matches tagged Valid .m) y = m;\n"
+      "    case (v) matches\n"
+      "      tagged Invalid : y = 0;\n"
+      "      tagged Valid .k : y = k;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The check descends a nested pattern against the member's own type: Jmp is a
+// tagged union of its own, whose JmpC member is a structure (§12.6.1's
+// Example 2).
+TEST(PatternMatching, NestedPatternsCheckedAgainstTheMemberType) {
+  SimFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef union tagged {\n"
+      "    struct { bit [4:0] r1, r2; } Add;\n"
+      "    union tagged {\n"
+      "      bit [9:0] JmpU;\n"
+      "      struct { bit [1:0] cc; bit [9:0] addr; } JmpC;\n"
+      "    } Jmp;\n"
+      "  } Instr;\n"
+      "  Instr instr;\n"
+      "  initial case (instr) matches\n"
+      "    tagged Add '{.r1, .r2} : ;\n"
+      "    tagged Jmp (tagged JmpC '{cc:.c, addr:.a}) : ;\n"
+      "    tagged Jmp (tagged JmpX .a) : ;\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "tagged pattern names 'JmpX', which is not a "
+                            "member of the tagged union",
+                            13, "12.6"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+// A structure pattern names members of the structure; only a pattern naming
+// its members may leave some out, so a positional one lists them all.
+TEST(PatternMatching, StructurePatternsCheckedAgainstTheStructure) {
+  SimFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef struct { int a; int b; } S;\n"
+      "  S s;\n"
+      "  initial begin\n"
+      "    if (s matches '{foo: .x}) ;\n"
+      "    if (s matches '{.x}) ;\n"
+      "    if (s matches '{.x, .y, .z}) ;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "structure pattern names 'foo', which is not a "
+                            "member of the structure",
+                            5, "12.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "structure pattern lists 1 element(s) but the "
+                            "structure has 2 member(s)",
+                            6, "12.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "structure pattern lists 3 element(s) but the "
+                            "structure has 2 member(s)",
+                            7, "12.6"));
+}
+
+TEST(PatternMatching, StructurePatternsFittingTheStructureAccepted) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef struct { int a; int b; } S;\n"
+      "  S s; int y;\n"
+      "  function S gets(); return s; endfunction\n"
+      "  initial begin\n"
+      "    if (s matches '{a: .x}) y = x;\n"
+      "    if (gets() matches '{.p, .q}) y = p;\n"
+      "    if (s matches '{.x, .y2}) y = y2;\n"
+      "    if (s.b matches 3) y = 3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A constant leaf of a pattern is a constant expression (§11.2.1); a variable
+// is none, and as a pattern it is no pattern identifier either, which is
+// written with a leading period.
+TEST(PatternMatching, VariableAsAConstantPatternRejected) {
+  SimFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int a, b;\n"
+      "  initial if (a matches b) $display(\"same\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constant expression pattern is not a constant "
+                            "expression",
+                            3, "12.6"));
+}
+
+// A parameter declared with a range and no type is integral whatever its value
+// (§6.20.2), and an operation other than an arithmetic one is left unread.
+TEST(PatternMatching, ConstantPatternsAccepted) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam int P = 4;\n"
+      "  localparam [3:0] W = 2.5;\n"
+      "  int a;\n"
+      "  initial begin\n"
+      "    if (a matches 5) ;\n"
+      "    if (a matches P) ;\n"
+      "    if (a matches P + 1) ;\n"
+      "    if (a matches W) ;\n"
+      "    if (a matches (P | 1)) ;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A constant expression pattern is integral whatever form it takes, so a real
+// or a string parameter and a real constant expression are rejected as a real
+// literal is. An untyped parameter takes its value's type (§6.20.2).
+TEST(PatternMatching, NonIntegralConstantExpressionPatternsRejected) {
+  SimFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  localparam real R = 1.5;\n"
+      "  localparam string T = \"ab\";\n"
+      "  localparam U = 2.5;\n"
+      "  int i;\n"
+      "  initial begin\n"
+      "    if (i matches R) ;\n"
+      "    if (i matches 1.5 * 2) ;\n"
+      "    if (i matches T) ;\n"
+      "    if (i matches U) ;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const char* kMsg =
+      "only an integral expression can serve as a constant expression pattern";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMsg, 7, "12.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMsg, 8, "12.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMsg, 9, "12.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMsg, 10, "12.6"));
+}
+
+// An integral parameter is an integral constant pattern, which a real value
+// cannot share a type with, in a case statement (§12.6.1) as in an if
+// statement (§12.6.2).
+TEST(PatternMatching, IntegralParameterPatternAgainstARealValueRejected) {
+  SimFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  localparam int P = 1;\n"
+      "  real r;\n"
+      "  initial begin\n"
+      "    if (r matches P) ;\n"
+      "    case (r) matches\n"
+      "      P : ;\n"
+      "      default : ;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "pattern-matching if predicate value type differs "
+                            "from the type of its integral pattern",
+                            5, "12.6.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "pattern-matching case selector type differs from "
+                            "the type of its integral pattern",
+                            6, "12.6.1"));
+}
+
+// §12.6 states its rules of every pattern wherever it is written, and a class
+// method is no exception, in a class of the compilation unit or of a module.
+TEST(PatternMatching, PatternRulesHoldInAMethodOfAUnitClass) {
+  SimFixture f;
+  ElaborateSrc(
+      "class C;\n"
+      "  typedef struct { int a; int b; } S;\n"
+      "  function void f(S s);\n"
+      "    if (s matches '{.a, .a}) ;\n"
+      "    if (s.a matches 1.5) ;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "pattern identifier 'a' is used more than once in "
+                            "a single pattern",
+                            4, "12.6"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "only an integral expression can serve as a constant expression pattern",
+      5, "12.6"));
+}
+
+TEST(PatternMatching, PatternRulesHoldInAMethodOfAModuleClass) {
+  SimFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  class C;\n"
+      "    int k;\n"
+      "    localparam int K2 = 1;\n"
+      "    function void f(int i);\n"
+      "      if (i matches 1.5) ;\n"
+      "      if (i matches k) ;\n"
+      "      if (i matches K2) ;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "only an integral expression can serve as a constant expression pattern",
+      6, "12.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "constant expression pattern is not a constant "
+                            "expression",
+                            7, "12.6"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
 }  // namespace
