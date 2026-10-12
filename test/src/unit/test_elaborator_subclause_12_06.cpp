@@ -674,12 +674,12 @@ TEST(PatternMatching, NonIntegralConstantExpressionPatternsRejected) {
       "  end\n"
       "endmodule\n",
       f);
-  const char* kMsg =
+  const char* msg =
       "only an integral expression can serve as a constant expression pattern";
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMsg, 7, "12.6"));
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMsg, 8, "12.6"));
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMsg, 9, "12.6"));
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMsg, 10, "12.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), msg, 7, "12.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), msg, 8, "12.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), msg, 9, "12.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), msg, 10, "12.6"));
 }
 
 // An integral parameter is an integral constant pattern, which a real value

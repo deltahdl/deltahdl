@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_validate_internal.h"

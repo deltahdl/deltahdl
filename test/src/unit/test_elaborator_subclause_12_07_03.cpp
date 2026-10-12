@@ -546,7 +546,7 @@ TEST(LoopStatementElaboration, ForeachOverBlockLocalArrayCountsItsDimensions) {
       "module m;\n"
       "  initial begin\n"
       "    int a [4];\n"
-      "    foreach (a[i, j, k]) ;\n"
+      "    foreach (a[i, j, k]) begin end\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -563,7 +563,7 @@ TEST(LoopStatementElaboration,
       "module m;\n"
       "  function void f();\n"
       "    int a [4];\n"
-      "    foreach (a[i, j]) ;\n"
+      "    foreach (a[i, j]) begin end\n"
       "  endfunction\n"
       "endmodule\n",
       f);
@@ -578,7 +578,7 @@ TEST(LoopStatementElaboration, ForeachOverFormalArrayCountsItsDimensions) {
   ElaborateSrc(
       "module m;\n"
       "  function void f(int a [4]);\n"
-      "    foreach (a[i, j]) ;\n"
+      "    foreach (a[i, j]) begin end\n"
       "  endfunction\n"
       "endmodule\n",
       f);
@@ -595,7 +595,7 @@ TEST(LoopStatementElaboration, ForeachOverClassPropertyCountsItsDimensions) {
       "  class C;\n"
       "    int a [4];\n"
       "    function void f();\n"
-      "      foreach (a[i, j]) ;\n"
+      "      foreach (a[i, j]) begin end\n"
       "    endfunction\n"
       "  endclass\n"
       "endmodule\n",
@@ -615,7 +615,7 @@ TEST(LoopStatementElaboration,
       "class C;\n"
       "  int a [4];\n"
       "  function void f();\n"
-      "    foreach (a[i, j]) ;\n"
+      "    foreach (a[i, j]) begin end\n"
       "  endfunction\n"
       "endclass\n"
       "module m; endmodule\n",
@@ -636,7 +636,7 @@ TEST(LoopStatementElaboration, ForeachCountsTheArrayItsBlockDeclares) {
       "  int a [4][4];\n"
       "  initial begin\n"
       "    int a [4];\n"
-      "    foreach (a[i, j]) ;\n"
+      "    foreach (a[i, j]) begin end\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -655,7 +655,7 @@ TEST(LoopStatementElaboration, ForeachOverBlockArrayHidingAModuleArrayOk) {
       "  int a [4];\n"
       "  initial begin\n"
       "    int a [4][4];\n"
-      "    foreach (a[i, j]) ;\n"
+      "    foreach (a[i, j]) begin end\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -671,7 +671,7 @@ TEST(LoopStatementElaboration, ForeachOverRealArrayCountsItsDimensions) {
   ElaborateSrc(
       "module m;\n"
       "  real r [4];\n"
-      "  initial foreach (r[i, j]) ;\n"
+      "  initial foreach (r[i, j]) begin end\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(
@@ -685,7 +685,7 @@ TEST(LoopStatementElaboration, ForeachOverStringArrayCountsItsDimensions) {
   ElaborateSrc(
       "module m;\n"
       "  string s [2][3];\n"
-      "  initial foreach (s[i, j, k]) ;\n"
+      "  initial foreach (s[i, j, k]) begin end\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(
@@ -702,7 +702,7 @@ TEST(LoopStatementElaboration, ForeachOverClassHandleArrayCountsItsDimensions) {
       "module m;\n"
       "  class C; endclass\n"
       "  C h [4];\n"
-      "  initial foreach (h[i, j]) ;\n"
+      "  initial foreach (h[i, j]) begin end\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(
@@ -725,10 +725,10 @@ TEST(LoopStatementElaboration, ForeachLoopVarWrittenInsideAnExpressionIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  const char* kMsg =
+  const char* msg =
       "foreach loop variable 'i' is read-only and cannot be assigned";
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMsg, 4, "12.7.3"));
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMsg, 5, "12.7.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), msg, 4, "12.7.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), msg, 5, "12.7.3"));
 }
 
 // An increment written as a whole statement is reported once, not once as a
@@ -741,6 +741,10 @@ TEST(LoopStatementElaboration, ForeachLoopVarIncrementStatementReportedOnce) {
       "  initial foreach (a[i]) i++;\n"
       "endmodule\n",
       f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "foreach loop variable 'i' is read-only and cannot be assigned", 3,
+      "12.7.3"));
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
@@ -762,11 +766,11 @@ TEST(LoopStatementElaboration, ForeachLoopVarPassedToAWritingFormalIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  const char* kMsg =
+  const char* msg =
       "foreach loop variable 'i' is read-only and cannot be assigned";
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMsg, 7, "12.7.3"));
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMsg, 8, "12.7.3"));
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMsg, 9, "12.7.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), msg, 7, "12.7.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), msg, 8, "12.7.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), msg, 9, "12.7.3"));
 }
 
 TEST(LoopStatementElaboration, ForeachLoopVarPassedToAReadingFormalOk) {

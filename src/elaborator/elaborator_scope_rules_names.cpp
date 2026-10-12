@@ -1,6 +1,7 @@
 #include "elaborator/elaborator_scope_rules_names.h"
 
 #include <cstddef>
+#include <initializer_list>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -617,6 +618,46 @@ static void MarkBoundReads(const Expr* e,
 // Those guards are what keep this free of false positives; an earlier version
 // took the right side only when the whole of it was one identifier, which left
 // `r = v + 0;` unchecked.
+// The reads among `refs` that no name declares: none of `locals`, and none of
+// the variables a pattern of `exprs`, the expressions they were read from,
+// binds where the read stands.
+static void KeepUndeclaredReads(
+    const std::vector<const Expr*>& refs,
+    std::initializer_list<const Expr*> exprs,
+    const std::unordered_set<std::string_view>& locals,
+    std::vector<const Expr*>& out) {
+  std::unordered_set<const Expr*> bound;
+  for (const Expr* e : exprs) MarkBoundReads(e, {}, bound);
+  for (const auto* r : refs) {
+    if (locals.count(r->text) == 0 && bound.count(r) == 0) out.push_back(r);
+  }
+}
+
+// §12.6.2 and §12.6.1: the variables an if statement's predicate binds are in
+// scope in its true arm and not its false arm, and those a case item's pattern
+// binds in that item's statement alone. So the statements below an if or a
+// `case ... matches` are walked here, each with the names in scope where it
+// stands, which is why this walk names the two arms of an if rather than take
+// them from ForEachChildStmt. Returns whether `s` was one of the two.
+static bool CollectPatternScopedReads(
+    const Stmt* s, const std::unordered_set<std::string_view>& locals,
+    std::vector<const Expr*>& out) {
+  if (s->kind == StmtKind::kIf) {
+    std::unordered_set<std::string_view> inner = locals;
+    inner.merge(MatchesBindingsOf(s->condition));
+    CollectProcRhsIdents(s->then_branch, inner, out);
+    CollectProcRhsIdents(s->else_branch, locals, out);
+    return true;
+  }
+  if (!s->case_matches) return false;
+  for (const auto& ci : s->case_items) {
+    std::unordered_set<std::string_view> inner = locals;
+    CollectCaseItemBindings(ci, inner);
+    CollectProcRhsIdents(ci.body, inner, out);
+  }
+  return true;
+}
+
 static void CollectProcRhsIdentsIn(
     const Stmt* s, const std::unordered_set<std::string_view>& locals,
     std::vector<const Expr*>& out) {
@@ -656,31 +697,8 @@ static void CollectProcRhsIdentsIn(
   }
   ForEachRandsequenceExpr(s,
                           [&](Expr* const& e) { CollectBareIdents(e, refs); });
-  std::unordered_set<const Expr*> bound;
-  MarkBoundReads(read, {}, bound);
-  MarkBoundReads(s->condition, {}, bound);
-  MarkBoundReads(s->for_cond, {}, bound);
-  for (const auto* r : refs) {
-    if (locals.count(r->text) == 0 && bound.count(r) == 0) out.push_back(r);
-  }
-  // §12.6.2 and §12.6.1: the variables an if statement's predicate binds are
-  // in scope in its true arm and not its false arm, and those a case item's
-  // pattern binds in that item's statement alone.
-  if (s->kind == StmtKind::kIf) {
-    std::unordered_set<std::string_view> inner = locals;
-    inner.merge(MatchesBindingsOf(s->condition));
-    CollectProcRhsIdents(s->then_branch, inner, out);
-    CollectProcRhsIdents(s->else_branch, locals, out);
-    return;
-  }
-  if (s->case_matches) {
-    for (const auto& ci : s->case_items) {
-      std::unordered_set<std::string_view> inner = locals;
-      CollectCaseItemBindings(ci, inner);
-      CollectProcRhsIdents(ci.body, inner, out);
-    }
-    return;
-  }
+  KeepUndeclaredReads(refs, {read, s->condition, s->for_cond}, locals, out);
+  if (CollectPatternScopedReads(s, locals, out)) return;
   // §6.5's declared-before-use rule is broken by the assignment wherever the
   // assignment stands, and §26.3 makes an identifier a package supplies
   // visible in the current scope with no package name qualifier wherever the

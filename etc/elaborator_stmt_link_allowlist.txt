@@ -45,3 +45,11 @@ src/elaborator/elaborator_process_validate.cpp
 # into the loop body it opens. Every other link it descends through
 # ForEachChildStmt.
 src/elaborator/elaborator_validate_jump_statements.cpp
+
+# CollectPatternScopedReads gives the variables a §12.6 pattern binds the scope
+# §12.6.2 gives them: an if statement's true arm and not its false arm. The two
+# arms are read with different names in scope, so the walk names each arm, and
+# ForEachChildStmt, which hands over a child with no word of which field held
+# it, cannot tell them apart. Every other statement's children it takes from
+# ForEachChildStmt.
+src/elaborator/elaborator_scope_rules_names.cpp

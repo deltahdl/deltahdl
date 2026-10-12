@@ -305,25 +305,16 @@ static ConstFuncFlow ExecConstFuncForLoop(const Stmt* s, ScopeMap& locals,
 static ConstFuncFlow ExecConstFuncFor(const Stmt* s, ScopeMap& locals,
                                       std::string_view result_name,
                                       int64_t& iter_budget) {
-  std::vector<std::pair<std::string_view, std::optional<int64_t>>> hidden;
+  std::vector<std::pair<std::string_view, int64_t>> hidden;
   for (size_t i = 0; i < s->for_init_types.size(); ++i) {
     if (s->for_init_types[i].kind == DataTypeKind::kImplicit) continue;
-    const Expr* lhs = s->for_inits[i]->lhs;
-    auto outer = locals.find(lhs->text);
-    hidden.emplace_back(lhs->text, outer == locals.end()
-                                       ? std::nullopt
-                                       : std::optional<int64_t>(outer->second));
+    auto outer = locals.find(s->for_inits[i]->lhs->text);
+    if (outer != locals.end()) hidden.emplace_back(*outer);
   }
   ConstFuncFlow flow =
       ExecConstFuncForLoop(s, locals, result_name, iter_budget);
   if (flow != ConstFuncFlow::kNormal) return flow;
-  for (const auto& [name, outer] : hidden) {
-    if (outer) {
-      locals[name] = *outer;
-    } else {
-      locals.erase(name);
-    }
-  }
+  for (const auto& [name, value] : hidden) locals[name] = value;
   return flow;
 }
 

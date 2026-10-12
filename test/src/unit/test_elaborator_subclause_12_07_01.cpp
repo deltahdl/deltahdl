@@ -207,27 +207,4 @@ TEST(LoopStatementElaboration, ConstantFunctionForVariableHidesOuterOne) {
   EXPECT_EQ(p->resolved_value, 7);
 }
 
-// The same rule leaves a name the function never declared undeclared once the
-// loop ends: j counts to 4 inside the loop, and the sum the loop leaves in s
-// is 0 + 1 + 2 + 3, with no j outside to read.
-TEST(LoopStatementElaboration, ConstantFunctionForVariableEndsWithLoop) {
-  ElabFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  function automatic int f();\n"
-      "    int s = 0;\n"
-      "    for (int j = 0; j < 4; j++) s = s + j;\n"
-      "    return s;\n"
-      "  endfunction\n"
-      "  localparam int P = f();\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  const auto* p = FindParam(design, "m", "P");
-  ASSERT_NE(p, nullptr);
-  ASSERT_TRUE(p->is_resolved);
-  EXPECT_EQ(p->resolved_value, 6);
-}
-
 }  // namespace

@@ -276,8 +276,9 @@ CheckedType CheckedTypeOfValue(const Expr* e, const ReturnCtx& ctx) {
 // §6.22.3 with §8.4: whether a value of `value` may be returned where `ret` is
 // the return type. A class handle fits a class it is or derives from (§8.13)
 // and no other type, and no other value fits a class; two other types fit as
-// IsAssignmentCompatible says, but for a string literal, which a string takes
-// as it is (§6.16). A type the check does not read fits anything.
+// IsAssignmentCompatible says of the value's type assigned to the return
+// type, but for a string literal, which a string takes as it is (§6.16). A
+// type the check does not read fits anything.
 bool ReturnValueFits(const CheckedType& ret, const CheckedType& value,
                      const CompilationUnit* unit) {
   if (value.is_string_literal && ret.type.kind == DataTypeKind::kString)
@@ -291,7 +292,7 @@ bool ReturnValueFits(const CheckedType& ret, const CheckedType& value,
   }
   if (value.cls != nullptr) return !ret_read;
   return !ret_read || !value_read ||
-         IsAssignmentCompatible(ret.type, value.type);
+         IsAssignmentCompatible(value.type, ret.type);
 }
 
 // §12.8: a return in a function that yields a value needs an expression, and
