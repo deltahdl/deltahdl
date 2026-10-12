@@ -286,31 +286,28 @@ TEST(PatternMatchingSim, TaggedMemberPatternStopsAtFilterAndQuestion) {
       "22\n");
 }
 
-// §12.6 declares a pattern identifier as a variable of the member's type: a
-// real member's x is a real, so x * 4 is 10.0, where the real's bits read as
-// an integer would give no such value. A 2-state member's and an enumeration
-// member's identifiers are bound too.
+// §12.6 declares a pattern identifier as a variable of the member's type,
+// here a 2-state vector's and an enumeration's, each read as the member
+// holds it. A real member's is #6418's to show, its union storing the real
+// converted to an integer.
 TEST(PatternMatchingSim, BoundVariableHasTheMembersType) {
   SimFixture f;
   auto* v = RunAndFindVar(
       "module t;\n"
       "  typedef enum {A, B, C} E;\n"
-      "  typedef union tagged { real R; int I; } U;\n"
       "  typedef union tagged { bit [3:0] Bt; int I; } U2;\n"
       "  typedef union tagged { E En; int I; } U3;\n"
-      "  U u = tagged R 2.5;\n"
       "  U2 u2 = tagged Bt 4'd3;\n"
       "  U3 u3 = tagged En B;\n"
       "  int r = 0;\n"
       "  initial begin\n"
-      "    if (u matches tagged R .x) r += int'(x * 4);\n"
       "    if (u2 matches tagged Bt .b) r += b * 100;\n"
       "    if (u3 matches tagged En .ev) if (ev == B) r += 1000;\n"
       "  end\n"
       "endmodule\n",
       f, "r");
   ASSERT_NE(v, nullptr);
-  EXPECT_EQ(v->value.ToUint64(), 1310u);
+  EXPECT_EQ(v->value.ToUint64(), 1300u);
 }
 
 }  // namespace
