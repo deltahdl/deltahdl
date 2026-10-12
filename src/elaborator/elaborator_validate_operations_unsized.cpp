@@ -262,9 +262,19 @@ void ElaboratorOperationRules::ValidateUnsizedInConcat(const ModuleDecl* decl) {
     if (is_proc && item->body) {
       WalkStmtsForUnsizedInConcat(item->body);
     }
+    // §10.10 with §10.8 (printed pages 264 and 259): a continuous assignment
+    // is an assignment-like context, so braces it assigns to an unpacked
+    // array are an unpacked array concatenation whose items may be unsized,
+    // as a procedural assignment's are.
     if (item->kind == ModuleItemKind::kContAssign) {
       WalkExprForUnsizedInConcat(item->assign_lhs);
-      WalkExprForUnsizedInConcat(item->assign_rhs);
+      const Expr* rhs = item->assign_rhs;
+      if (rhs->kind == ExprKind::kConcatenation &&
+          IsUnpackedArrayConcatTarget(item->assign_lhs)) {
+        for (auto* elem : rhs->elements) WalkExprForUnsizedInConcat(elem);
+      } else {
+        WalkExprForUnsizedInConcat(rhs);
+      }
     }
     CheckVarInitUnsizedInConcat(item);
   }

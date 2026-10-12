@@ -37,10 +37,12 @@
 #include "simulator/net.h"
 #include "simulator/process.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/specify.h"
 #include "simulator/specify_path_delay.h"
 #include "simulator/specify_sdf.h"
 #include "simulator/statement_assign.h"
+#include "simulator/statement_assign_internal.h"
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_exec_internal.h"
 #include "simulator/stmt_result.h"
@@ -310,6 +312,16 @@ static void ApplyContAssignToVariable(const ContAssignParams& params,
     // distribution drives instance outputs into part-selects of a parent net).
     PerformBlockingAssign(params.lhs, driven_val, ctx, arena);
     return;
+  }
+  // §10.10 with §10.8 (printed pages 264 and 259): braces a continuous
+  // assignment drives into a fixed-size unpacked array are an unpacked array
+  // concatenation, each item an element, laid into the array's elements as a
+  // procedural assignment lays them, each time an operand changes.
+  if (params.rhs->kind == ExprKind::kConcatenation) {
+    if (const ArrayInfo* info = ctx.FindArrayInfo(params.lhs->text)) {
+      DistributeConcatToArray(params.lhs->text, *info, params.rhs, ctx, arena);
+      return;
+    }
   }
   auto* var = ctx.FindVariable(params.lhs->text);
   if (var == nullptr) return;
