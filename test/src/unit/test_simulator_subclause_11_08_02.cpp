@@ -457,6 +457,7 @@ TEST(ExpressionTypePropagationSim, UnsignedOperandPropagatesItsTypeDown) {
                  "  real rv = 2.0;\n"
                  "  logic c = 1;\n"
                  "  logic [7:0] r [1:18];\n"
+                 "  logic [7:0] q1, q2, q3, q4;\n"
                  "  initial begin\n"
                  "    r[1] = (s + s) + u;\n"
                  "    r[2] = -s + u;\n"
@@ -469,19 +470,19 @@ TEST(ExpressionTypePropagationSim, UnsignedOperandPropagatesItsTypeDown) {
                  "    r[9] = {s} + s;\n"
                  "    r[10] = (s < u) + s;\n"
                  "    r[11] = (c ? s : s) + s;\n"
-                 "    r[12] = rv + s;\n"
+                 "    q1 = rv + s;\n"
                  "    r[13] = s[1:0] + s;\n"
                  "    r[14] = B + s;\n"
                  "    r[15] = (s <<< 1) + s;\n"
-                 "    r[16] = (rv + s) + u;\n"
-                 "    r[17] = (-rv) + u;\n"
-                 "    r[18] = c ? rv : u;\n"
+                 "    q2 = (rv + s) + u;\n"
+                 "    q3 = (-rv) + u;\n"
+                 "    q4 = c ? rv : u;\n"
                  "    for (int i = 1; i <= 18; i++) $write(\"%h \", r[i]);\n"
-                 "    $display;\n"
+                 "    $display(\"%h %h %h %h\", q1, q2, q3, q4);\n"
                  "  end\n"
                  "endmodule\n",
                  f),
-      "1f f2 f1 1f 10 ff 0f 10 1e 0f fe 01 12 00 fd 02 ff 02 \n");
+      "1f f2 f1 1f 10 ff 0f 10 1e 0f fe xx 12 00 fd xx xx xx 01 02 ff 02\n");
 }
 
 }  // namespace

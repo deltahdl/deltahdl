@@ -268,21 +268,27 @@ static void ExpandClassArrayMember(const ClassObject* obj,
 
 // One data member of `obj`, streamed by the procedure §11.4.14.1 applies to
 // the whole: a queue's elements, an array's, a handle's object's members.
+// A queue or array member's elements; false for a member of any other kind.
+static bool TryExpandClassCollectionMember(
+    const ClassObject* obj, const ClassTypeInfo::PropertyInfo& prop,
+    std::vector<Logic4Vec>& parts, uint32_t& total_width, Arena& arena) {
+  if (auto q = obj->queue_properties.find(std::string(prop.name));
+      q != obj->queue_properties.end()) {
+    ExpandQueueElements(q->second, parts, total_width, arena);
+    return true;
+  }
+  if (!prop.IsArray()) return false;
+  ExpandClassArrayMember(obj, prop, parts, total_width, arena);
+  return true;
+}
+
 static void ExpandClassMember(ClassObject* obj,
                               const ClassTypeInfo::PropertyInfo& prop,
                               SimContext& ctx, std::vector<Logic4Vec>& parts,
                               uint32_t& total_width, Arena& arena) {
-  const std::string kName(prop.name);
-  if (auto q = obj->queue_properties.find(kName);
-      q != obj->queue_properties.end()) {
-    ExpandQueueElements(q->second, parts, total_width, arena);
+  if (TryExpandClassCollectionMember(obj, prop, parts, total_width, arena))
     return;
-  }
-  if (prop.IsArray()) {
-    ExpandClassArrayMember(obj, prop, parts, total_width, arena);
-    return;
-  }
-  auto it = obj->properties.find(kName);
+  auto it = obj->properties.find(std::string(prop.name));
   if (it == obj->properties.end()) {
     parts.push_back(MakeLogic4Vec(arena, prop.width));
     total_width += prop.width;
