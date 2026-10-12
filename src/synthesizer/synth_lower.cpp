@@ -671,7 +671,13 @@ void SynthLower::LowerCaseStmt(const Stmt* stmt, AigGraph& aig) {
   // the item, and a selector arrives as AIG literals carrying no x or z at all.
   TokenKind item_kind =
       stmt->case_inside ? TokenKind::kKwCasex : stmt->case_kind;
-  for (const auto& ci : stmt->case_items) {
+  // §12.5 runs the first item in source order that matches. Each item's
+  // multiplexer wraps the result built so far, so the items are taken from the
+  // last back to the first, leaving the first one outermost: where two match,
+  // it decides.
+  for (auto it = stmt->case_items.rbegin(); it != stmt->case_items.rend();
+       ++it) {
+    const CaseItem& ci = *it;
     if (ci.is_default) continue;
     signal_bits_ = base_bits;
     LowerStmt(ci.body, aig);

@@ -111,4 +111,22 @@ TEST(CasezStatementSynth, CasezAgainstADecimalPatternComparesItsValue) {
       16, [](uint64_t sel) { return sel == 3 ? uint64_t{1} : uint64_t{0}; });
 }
 
+// §12.5 runs the first item in source order that matches, so where `2'b1?`
+// and `2'b11` both match sel = 3 the earlier item drives y. Built innermost
+// first, the netlist let the later item's multiplexer wrap the earlier one
+// and gave 2 there.
+TEST(CasezStatementSynth, FirstMatchingItemWins) {
+  ExpectInputSweep(
+      "module m(input logic [1:0] sel, output logic [1:0] y);\n"
+      "  always_comb begin\n"
+      "    casez (sel)\n"
+      "      2'b1?: y = 2'd1;\n"
+      "      2'b11: y = 2'd2;\n"
+      "      default: y = 2'd0;\n"
+      "    endcase\n"
+      "  end\n"
+      "endmodule\n",
+      4, [](uint64_t sel) { return sel >= 2 ? uint64_t{1} : uint64_t{0}; });
+}
+
 }  // namespace
