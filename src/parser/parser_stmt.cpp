@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
@@ -42,13 +43,22 @@ struct ParserStmtHelpers {
     }
   }
 
+  // Syntax 12-2 and Syntax 12-3 give `unique_priority` a place in front of
+  // `if` and a case keyword and nowhere else, so a qualifier `qual_loc` holds
+  // before any other statement is reported there.
   static void ApplyStmtQualifierAndAttrs(Parser& p, Stmt* stmt,
-                                         CaseQualifier qual,
+                                         CaseQualifier qual, SourceLoc qual_loc,
                                          std::vector<Attribute>& attrs) {
     if (!attrs.empty()) stmt->attrs = std::move(attrs);
-    if (qual != CaseQualifier::kNone) stmt->qualifier = qual;
-    if (qual != CaseQualifier::kNone && stmt->kind == StmtKind::kIf) {
+    if (qual == CaseQualifier::kNone) return;
+    stmt->qualifier = qual;
+    if (stmt->kind == StmtKind::kIf) {
       CheckQualifiedElseIfBranches(p, stmt);
+    } else if (stmt->kind != StmtKind::kCase) {
+      p.diag_.Error(qual_loc,
+                    "unique, unique0 and priority may qualify only an if or "
+                    "a case statement",
+                    Subclause("12.4"));
     }
   }
 
@@ -69,18 +79,31 @@ struct ParserStmtHelpers {
     return init;
   }
 
+  // Syntax 12-5's for_variable_declaration opens with `var` or a data_type: a
+  // type keyword, a name this scope knows as a type, or a type name behind a
+  // package scope (A.2.2.1), which a package name never is a known type for.
+  // The last is told from an assignment to a package's variable, `pkg::v = 0`,
+  // by what follows the scoped name, as a block item is.
+  static bool AtForLocalDecl(Parser& p) {
+    if (p.Check(TokenKind::kKwVar) || IsDataTypeKeyword(p.CurrentToken().kind))
+      return true;
+    if (!p.Check(TokenKind::kIdentifier)) return false;
+    if (p.known_types_.count(p.CurrentToken().text) != 0) return true;
+    return p.AtScopedTypeName() && !p.IsScopedCallOrAssignStmt();
+  }
+
   // A.6.8's for_variable_declaration names its data type once, before a
   // comma-separated list of `variable_identifier = expression`, and a later
   // for_variable_declaration of the same initialization names its own. An item
   // after the first that brings neither `var` nor a data type is therefore a
   // further variable of the declaration before it, and takes that data type:
-  // Parser::ParseDataType consumes nothing at such an item's identifier and
-  // answers DataTypeKind::kImplicit, which every reader of
+  // Parser::ParseDeclaredDataType consumes nothing at such an item's identifier
+  // and answers DataTypeKind::kImplicit, which every reader of
   // Stmt::for_init_types takes for an assignment rather than a declaration.
   static void ParseForLocalDeclInits(Parser& p, Stmt* stmt) {
     do {
       bool has_var = p.Match(TokenKind::kKwVar);
-      DataType type = p.ParseDataType();
+      DataType type = p.ParseDeclaredDataType();
       if (!has_var && type.kind == DataTypeKind::kImplicit &&
           !stmt->for_init_types.empty()) {
         type = stmt->for_init_types.back();
@@ -180,6 +203,7 @@ Stmt* Parser::ParseStmt() {
   }
 
   auto qual = TokenToCaseQualifier(CurrentToken().kind);
+  SourceLoc qual_loc = CurrentLoc();
   if (qual != CaseQualifier::kNone) {
     Consume();
   }
@@ -187,7 +211,8 @@ Stmt* Parser::ParseStmt() {
   Stmt* stmt = ParseStmtBody(prefix_label);
   if (stmt != nullptr) {
     ParserStmtHelpers::ApplyStmtLabel(*this, stmt, prefix_label);
-    ParserStmtHelpers::ApplyStmtQualifierAndAttrs(*this, stmt, qual, attrs);
+    ParserStmtHelpers::ApplyStmtQualifierAndAttrs(*this, stmt, qual, qual_loc,
+                                                  attrs);
   }
   return stmt;
 }
@@ -390,7 +415,8 @@ Stmt* Parser::ParseCaseStmt(TokenKind case_kind) {
   while (!Check(TokenKind::kKwEndcase) && !AtEnd()) {
     auto item_loc = CurrentLoc();
     bool is_default_here = Check(TokenKind::kKwDefault);
-    stmt->case_items.push_back(ParseCaseItem(stmt->case_inside));
+    stmt->case_items.push_back(
+        ParseCaseItem(stmt->case_inside, stmt->case_matches));
     if (is_default_here) {
       if (seen_default) {
         diag_.Error(item_loc,
@@ -400,17 +426,34 @@ Stmt* Parser::ParseCaseStmt(TokenKind case_kind) {
       seen_default = true;
     }
   }
+  // Syntax 12-3 writes each case form with `case_item { case_item }`, the
+  // pattern and inside items alike, so at least one item, default among them,
+  // stands before endcase.
+  if (stmt->case_items.empty()) {
+    diag_.Error(CurrentLoc(),
+                "case statement shall have at least one case item",
+                Subclause("12.5"));
+  }
   Expect(TokenKind::kKwEndcase, Subclause("12.5"));
   return stmt;
 }
 
-CaseItem Parser::ParseCaseItem(bool inside) {
+// Syntax 12-3: a case_item lists case_item_expressions, a case_inside_item a
+// range_list, and a case_pattern_item (`matches`) one pattern, so a comma after
+// that pattern is reported; the list is still read so the item's colon is
+// found.
+CaseItem Parser::ParseCaseItem(bool inside, bool matches) {
   CaseItem item;
   if (Match(TokenKind::kKwDefault)) {
     item.is_default = true;
     Match(TokenKind::kColon);
   } else {
     item.patterns.push_back(inside ? ParseInsideValueRange() : ParseExpr());
+    if (matches && Check(TokenKind::kComma)) {
+      diag_.Error(CurrentLoc(),
+                  "a pattern-matching case item holds one pattern, not a list",
+                  Subclause("12.6.1"));
+    }
     while (Match(TokenKind::kComma)) {
       item.patterns.push_back(inside ? ParseInsideValueRange() : ParseExpr());
     }
@@ -429,10 +472,7 @@ Stmt* Parser::ParseForStmt() {
 
   if (Check(TokenKind::kSemicolon)) {
     Consume();
-  } else if (Check(TokenKind::kKwVar) ||
-             IsDataTypeKeyword(CurrentToken().kind) ||
-             (Check(TokenKind::kIdentifier) &&
-              known_types_.count(CurrentToken().text) != 0)) {
+  } else if (ParserStmtHelpers::AtForLocalDecl(*this)) {
     // for_variable_declaration ::= [ var ] data_type variable_identifier = ...
     // (Syntax 12-5). data_type may be a user-defined (named) type, so a leading
     // identifier that names a known type begins a local declaration rather than

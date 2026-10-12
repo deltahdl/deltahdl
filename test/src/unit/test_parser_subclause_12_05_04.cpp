@@ -215,7 +215,9 @@ TEST(CaseInsideSyntaxParsing, CaseInsideWithDefault) {
   EXPECT_TRUE(HasDefaultCaseItem(stmt));
 }
 
-TEST(CaseInsideSyntaxParsing, CaseInsideEmptyNoItems) {
+// Syntax 12-3 writes every case form with at least one item, so a case
+// statement that reaches endcase with none is reported there.
+TEST(CaseInsideSyntaxParsing, CaseInsideWithNoItemsRejected) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -223,11 +225,8 @@ TEST(CaseInsideSyntaxParsing, CaseInsideEmptyNoItems) {
       "    endcase\n"
       "  end\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_TRUE(stmt->case_inside);
-  EXPECT_EQ(stmt->case_items.size(), 0u);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "case statement shall have at least one case item", 4, "12.5"));
 }
 
 }  // namespace

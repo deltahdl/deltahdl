@@ -615,7 +615,7 @@ class Parser {
   Stmt* ParseBlockStmt(std::string_view prefix_label = {});
   Stmt* ParseIfStmt();
   Stmt* ParseCaseStmt(TokenKind case_kind);
-  CaseItem ParseCaseItem(bool inside = false);
+  CaseItem ParseCaseItem(bool inside = false, bool matches = false);
   Stmt* ParseForStmt();
   Stmt* ParseWhileStmt();
   Stmt* ParseForeverStmt();

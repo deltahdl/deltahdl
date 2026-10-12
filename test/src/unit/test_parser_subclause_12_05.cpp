@@ -340,19 +340,17 @@ TEST(CaseSyntaxParsing, ConstExprCaseExpr) {
   EXPECT_NE(stmt->condition, nullptr);
 }
 
-TEST(CaseSyntaxParsing, CaseEmptyNoItems) {
+// Syntax 12-3 writes every case form with at least one item, so a case
+// statement that reaches endcase with none is reported there.
+TEST(CaseSyntaxParsing, CaseWithNoItemsRejected) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
       "    case(x) endcase\n"
       "  end\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kCase);
-  EXPECT_EQ(stmt->case_items.size(), 0u);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "case statement shall have at least one case item", 3, "12.5"));
 }
 
 TEST(CaseSyntaxParsing, CaseDefaultInMiddle) {

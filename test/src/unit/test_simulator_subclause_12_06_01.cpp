@@ -291,23 +291,6 @@ TEST(CaseMatchesItemSim, CaseMatchesXInSelectorNoMatch) {
             99u);
 }
 
-TEST(CaseMatchesItemSim, CaseMatchesCommaSeparatedPatterns) {
-  SimFixture f;
-  EXPECT_EQ(RunModule(f,
-                      "module t;\n"
-                      "  logic [7:0] sel, x;\n"
-                      "  initial begin\n"
-                      "    sel = 8'd3;\n"
-                      "    case(sel) matches\n"
-                      "      8'd1, 8'd2, 8'd3: x = 8'd10;\n"
-                      "      default: x = 8'd99;\n"
-                      "    endcase\n"
-                      "  end\n"
-                      "endmodule\n",
-                      "x"),
-            10u);
-}
-
 // §12.6.1: the expression in parentheses of a pattern-matching case statement
 // shall be evaluated exactly once. A side-effecting function supplies the
 // selector; its counter must read 1 after the whole case statement runs.
@@ -337,23 +320,6 @@ TEST(CaseMatchesItemSim, CaseMatchesSelectorEvaluatedExactlyOnce) {
   auto* x = f.ctx.FindVariable("x");
   ASSERT_NE(x, nullptr);
   EXPECT_EQ(x->value.ToUint64(), 22u);
-}
-
-TEST(CaseMatchesItemSim, CaseMatchesCommaSeparatedNoneMatch) {
-  SimFixture f;
-  EXPECT_EQ(RunModule(f,
-                      "module t;\n"
-                      "  logic [7:0] sel, x;\n"
-                      "  initial begin\n"
-                      "    sel = 8'd5;\n"
-                      "    case(sel) matches\n"
-                      "      8'd1, 8'd2, 8'd3: x = 8'd10;\n"
-                      "      default: x = 8'd99;\n"
-                      "    endcase\n"
-                      "  end\n"
-                      "endmodule\n",
-                      "x"),
-            99u);
 }
 
 // §12.6.1: during the linear search the default item is ignored; it is only

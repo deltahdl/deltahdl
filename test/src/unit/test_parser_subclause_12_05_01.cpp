@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "lexer/token.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -99,7 +100,9 @@ TEST(CasexSyntaxParsing, AlwaysCombCasexStatement) {
   ASSERT_EQ(stmt->case_items.size(), 3u);
 }
 
-TEST(CasexSyntaxParsing, CasexEmptyNoItems) {
+// Syntax 12-3 writes every case form with at least one item, so a case
+// statement that reaches endcase with none is reported there.
+TEST(CasexSyntaxParsing, CasexWithNoItemsRejected) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -107,12 +110,8 @@ TEST(CasexSyntaxParsing, CasexEmptyNoItems) {
       "    endcase\n"
       "  end\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kCase);
-  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasex);
-  EXPECT_EQ(stmt->case_items.size(), 0u);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "case statement shall have at least one case item", 4, "12.5"));
 }
 
 TEST(CasezSyntaxParsing, CasezStatement) {
@@ -215,7 +214,9 @@ TEST(CasezSyntaxParsing, AlwaysCombCasezStatement) {
   ASSERT_EQ(stmt->case_items.size(), 5u);
 }
 
-TEST(CasezSyntaxParsing, CasezEmptyNoItems) {
+// Syntax 12-3 writes every case form with at least one item, so a case
+// statement that reaches endcase with none is reported there.
+TEST(CasezSyntaxParsing, CasezWithNoItemsRejected) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -223,12 +224,8 @@ TEST(CasezSyntaxParsing, CasezEmptyNoItems) {
       "    endcase\n"
       "  end\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->kind, StmtKind::kCase);
-  EXPECT_EQ(stmt->case_kind, TokenKind::kKwCasez);
-  EXPECT_EQ(stmt->case_items.size(), 0u);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "case statement shall have at least one case item", 4, "12.5"));
 }
 
 }  // namespace

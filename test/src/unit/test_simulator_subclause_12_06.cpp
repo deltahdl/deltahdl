@@ -261,4 +261,26 @@ TEST(PatternMatchSim, IdentifierBoundToStructureMemberSelectsItsMembers) {
             "1 6\n1 6\n");
 }
 
+// Syntax 12-4 ends `tagged Valid .*` before the `&&&` filter, so the false
+// flag fails the predicate and x is 2 (§12.6.2), and `tagged Invalid` ends
+// before `?`, so the conditional on the failed match adds 20 (§12.6.3).
+TEST(PatternMatchingSim, TaggedMemberPatternStopsAtFilterAndQuestion) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+                 "  VInt v = tagged Valid 3;\n"
+                 "  logic flag = 0;\n"
+                 "  int x;\n"
+                 "  initial begin\n"
+                 "    if (v matches tagged Valid .* &&& flag) x = 1;\n"
+                 "    else x = 2;\n"
+                 "    x += v matches tagged Invalid ? 10 : 20;\n"
+                 "    $display(\"%0d\", x);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "22\n");
+}
+
 }  // namespace

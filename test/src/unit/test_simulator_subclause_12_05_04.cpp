@@ -534,21 +534,4 @@ TEST(CaseInsideStatementSim, CaseInsideNoMatchNoDefaultLeavesTargetUnchanged) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-TEST(CaseInsideStatementSim, CaseInsideEmptyNoItems) {
-  SimFixture f;
-  auto* var = RunAndFindVar(
-      "module t;\n"
-      "  logic [7:0] sel, x;\n"
-      "  initial begin\n"
-      "    sel = 8'd1;\n"
-      "    x = 8'd99;\n"
-      "    case(sel) inside\n"
-      "    endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f, "x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 99u);
-}
-
 }  // namespace

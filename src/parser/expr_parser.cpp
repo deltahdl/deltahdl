@@ -297,8 +297,13 @@ Expr* Parser::ParseTaggedExpr() {
   } else if (!Check(TokenKind::kSemicolon) && !Check(TokenKind::kComma) &&
              !Check(TokenKind::kRParen) && !Check(TokenKind::kRBrace) &&
              !Check(TokenKind::kColon) && !Check(TokenKind::kEof) &&
-             !Check(TokenKind::kAmpAmpAmp)) {
-    expr->lhs = ParseExpr();
+             !Check(TokenKind::kAmpAmpAmp) && !Check(TokenKind::kQuestion)) {
+    // Syntax 12-4: the member pattern of `tagged M p` ends where the pattern
+    // does, so it is read at the binding power a `matches` pattern is read at
+    // (TryParseSpecialInfix), short of the `&&&` filter of §12.6.1 and §12.6.2
+    // and the `?` of §12.6.3 that follow the whole pattern. A void member's
+    // pattern is omitted, so a `?` straight after the member name ends it.
+    expr->lhs = ParseExprBp(2);
   }
   return expr;
 }

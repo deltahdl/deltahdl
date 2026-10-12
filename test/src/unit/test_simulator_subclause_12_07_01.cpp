@@ -478,4 +478,19 @@ TEST(LoopStatementSim, ForWithoutExpressionRunsInFunctionBody) {
   EXPECT_EQ(out, "g=3 h=3 r=7 k=3\n");
 }
 
+// Syntax 12-5 with A.2.2.1: a for loop's variable declared with a package's
+// type runs the loop as one declared with that type written bare.
+TEST(LoopStatementSim, ForInitWithPackageScopedTypeRuns) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "package pkg; typedef int word_t; endpackage\n"
+      "module t;\n"
+      "  int n = 0;\n"
+      "  initial for (pkg::word_t i = 0; i < 4; i++) n++;\n"
+      "endmodule\n",
+      f, "n");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 4u);
+}
+
 }  // namespace

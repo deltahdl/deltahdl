@@ -164,4 +164,34 @@ TEST(LoopSyntaxParsing, ForDeclaratorWithoutTypeTakesThePackedDimension) {
   EXPECT_NE(stmt->for_init_types[1].packed_dim_left, nullptr);
 }
 
+// Syntax 12-5 lets a for loop declare its variable with any data_type, a type
+// name behind a package scope among them (A.2.2.1), so `pkg::word_t i = 0`
+// declares i of the package's type. An assignment to a package's variable,
+// `pkg::v = 0`, declares nothing and stays a plain initialization.
+TEST(LoopSyntaxParsing, ForInitWithPackageScopedTypeDeclares) {
+  auto r = Parse(
+      "package pkg; typedef int word_t; int v; endpackage\n"
+      "module m;\n"
+      "  int n;\n"
+      "  initial begin\n"
+      "    for (pkg::word_t i = 0; i < 4; i++) n++;\n"
+      "    for (pkg::v = 0; pkg::v < 2; pkg::v++) n++;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* body = InitialBody(r);
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->stmts.size(), 2u);
+  const Stmt* decl = body->stmts[0];
+  ASSERT_EQ(decl->for_init_types.size(), 1u);
+  EXPECT_EQ(decl->for_init_types[0].kind, DataTypeKind::kNamed);
+  EXPECT_EQ(decl->for_init_types[0].scope_name, "pkg");
+  EXPECT_EQ(decl->for_init_types[0].type_name, "word_t");
+  const Stmt* plain = body->stmts[1];
+  ASSERT_EQ(plain->for_inits.size(), 1u);
+  for (const auto& t : plain->for_init_types)
+    EXPECT_EQ(t.kind, DataTypeKind::kImplicit);
+}
+
 }  // namespace

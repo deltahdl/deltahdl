@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -268,6 +270,35 @@ TEST(QualifiedIfParsing, NestedQualifiedIfs) {
   auto* inner = outer->then_branch->stmts[0];
   ASSERT_NE(inner, nullptr);
   EXPECT_EQ(inner->qualifier, CaseQualifier::kUnique);
+}
+
+// Syntax 12-2 and Syntax 12-3 put `unique_priority` only in front of an if
+// and a case keyword, so each qualifier before any other statement is
+// reported where it stands, and the if and case forms are not.
+TEST(QualifiedIfParsing, QualifierBeforeAStatementThatIsNoIfOrCaseRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    priority x = 1;\n"
+      "    unique begin x = 2; end\n"
+      "    unique0 repeat (2) x++;\n"
+      "    unique if (x) x = 3;\n"
+      "    priority casez (x) 1: x = 4; default: ; endcase\n"
+      "  end\n"
+      "endmodule\n");
+  for (uint32_t line : {4u, 5u, 6u}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "unique, unique0 and priority may qualify only "
+                              "an if or a case statement",
+                              line, "12.4"));
+  }
+  for (uint32_t line : {7u, 8u}) {
+    EXPECT_FALSE(ReportedError(r.diags,
+                               "unique, unique0 and priority may qualify only "
+                               "an if or a case statement",
+                               line, "12.4"));
+  }
 }
 
 }  // namespace

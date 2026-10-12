@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_stmt.h"
 
 using namespace delta;
@@ -88,7 +89,10 @@ TEST(CaseMatchesItemParsing, CaseMatchesPattern) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(CaseMatchesItemParsing, CaseMatchesCommaSeparatedPatterns) {
+// Syntax 12-3 gives a case_pattern_item one pattern, where a plain case_item
+// takes a comma list, so the comma after the first pattern is reported and
+// the same list in a plain case is not.
+TEST(CaseMatchesItemParsing, CaseMatchesCommaSeparatedPatternsRejected) {
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -96,14 +100,18 @@ TEST(CaseMatchesItemParsing, CaseMatchesCommaSeparatedPatterns) {
       "      1, 2, 3: y = 10;\n"
       "      default: y = 0;\n"
       "    endcase\n"
+      "    case(x)\n"
+      "      1, 2, 3: y = 10;\n"
+      "      default: y = 0;\n"
+      "    endcase\n"
       "  end\n"
       "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-  auto* stmt = FirstInitialStmt(r);
-  ASSERT_NE(stmt, nullptr);
-  ASSERT_GE(stmt->case_items.size(), 1u);
-  EXPECT_EQ(stmt->case_items[0].patterns.size(), 3u);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a pattern-matching case item holds one pattern, not a list", 4,
+      "12.6.1"));
+  EXPECT_FALSE(ReportedError(
+      r.diags, "a pattern-matching case item holds one pattern, not a list", 8,
+      "12.6.1"));
 }
 
 }  // namespace

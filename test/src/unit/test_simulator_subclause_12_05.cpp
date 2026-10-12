@@ -427,21 +427,6 @@ TEST(CaseStatementSim, BlockingAssignCase) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-TEST(CaseStatementSim, CaseEmptyNoItems) {
-  SimFixture f;
-  auto* var = RunAndFindVar(
-      "module t;\n"
-      "  logic [7:0] x;\n"
-      "  initial begin\n"
-      "    x = 8'd42;\n"
-      "    case(x) endcase\n"
-      "  end\n"
-      "endmodule\n",
-      f, "x");
-  ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 42u);
-}
-
 TEST(CaseStatementSim, CaseDefaultInMiddlePosition) {
   SimFixture f;
   auto* var = RunAndFindVar(
