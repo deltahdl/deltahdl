@@ -407,4 +407,178 @@ TEST(ArrayPatternElaboration, TypeKeyCoversStructureElementsByMembers) {
                             5, "10.9.1"));
 }
 
+// §10.9.1 with §7.4: the braces match the array's dimensions, the packed ones
+// among them, so a positional pattern initializing a packed array supplies one
+// item per element of its packed dimension.
+TEST(ArrayPatternElaboration, PackedVariableInitCountedAgainstPackedDimension) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [3:0] v = '{1'b1, 1'b0};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 2 elements, but array "
+                            "dimension requires 4",
+                            2, "10.9.1"));
+}
+
+TEST(ArrayPatternElaboration, PackedPatternsMatchingTheirDimensionsElaborate) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic [3:0] v = '{1'b1, 1'b0, 1'b1, 1'b1};\n"
+             "  logic [1:0][3:0] w = '{'{1'b1, 1'b0, 1'b1, 1'b1}, 4'h2};\n"
+             "  logic [7:0] r = '{8{1'b1}};\n"
+             "  logic [3:0] d = '{default: 1'b0};\n"
+             "  logic [3:0] k = '{logic: 1'b1};\n"
+             "endmodule\n"));
+}
+
+// §10.9.1: a nested pattern stands for the next dimension in, which past the
+// outer packed dimension of `w` is its inner packed one of four elements.
+TEST(ArrayPatternElaboration, NestedPatternCountedAgainstInnerPackedDimension) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [1:0][3:0] w = '{'{1'b1, 1'b0}, 4'h2};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 2 elements, but array "
+                            "dimension requires 4",
+                            2, "10.9.1"));
+}
+
+// §10.9.1 with §7.4: past an array's unpacked dimensions its braces go on into
+// the packed dimensions of the element type.
+TEST(ArrayPatternElaboration, ElementPatternCountedAgainstPackedDimension) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [3:0] a [2] = '{'{1'b1, 1'b0, 1'b1}, 4'h0};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 3 elements, but array "
+                            "dimension requires 4",
+                            2, "10.9.1"));
+}
+
+// §10.9.1 holds a procedure's pattern to its target as a declaration's, a
+// packed array assigned by name and one a block declares alike.
+TEST(ArrayPatternElaboration, ProceduralPatternCountedAgainstPackedDimension) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [1:0][3:0] w;\n"
+      "  initial w = '{4'h1, 4'h2, 4'h3};\n"
+      "  initial begin\n"
+      "    logic [3:0] b = '{1'b1};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 3 elements, but array "
+                            "dimension requires 2",
+                            3, "10.9.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 1 elements, but array "
+                            "dimension requires 4",
+                            5, "10.9.1"));
+}
+
+// §6.18 with §7.4: a typedef carries its packed dimensions into the type it
+// names, inside those the declaration writes on it.
+TEST(ArrayPatternElaboration, TypedefPackedDimensionsCounted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef logic [3:0] nib_t;\n"
+      "  nib_t [1:0] w = '{'{1'b1, 1'b0}, 4'h0};\n"
+      "  nib_t v = '{1'b1};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 2 elements, but array "
+                            "dimension requires 4",
+                            3, "10.9.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 1 elements, but array "
+                            "dimension requires 4",
+                            4, "10.9.1"));
+}
+
+// §7.4: the unpacked dimensions of a typedef are outside its packed ones, so a
+// pattern for `row_t` stands for its two rows, not for the four bits of each,
+// whether a block declares the variable or the module declares an array of it.
+TEST(ArrayPatternElaboration, TypedefUnpackedDimensionsComeBeforePackedOnes) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  typedef logic [3:0] row_t [2];\n"
+             "  row_t a [3] = '{'{4'h1, 4'h2}, '{4'h3, 4'h4}, '{4'h5, 4'h6}};\n"
+             "  initial begin\n"
+             "    row_t r = '{4'h1, 4'h2};\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// §7.4 with §26.3: the packed dimensions written on a type named through its
+// package are counted whether or not the name resolves in the module's scope.
+TEST(ArrayPatternElaboration, PackageScopedTypePackedDimensionCounted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n"
+      "  typedef logic [3:0] nib_t;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    p::nib_t [1:0] w = '{4'h1, 4'h2, 4'h3};\n"
+      "  end\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 3 elements, but array "
+                            "dimension requires 2",
+                            6, "10.9.1"));
+}
+
+// §10.9.1: a keyed pattern for a packed array covers each element by index,
+// type or default as one for an unpacked array does.
+TEST(ArrayPatternElaboration, KeyedPackedPatternUncoveredElementError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [3:0] v = '{0: 1'b1, 1: 1'b0};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "keyed array pattern does not cover all elements",
+                            2, "10.9.1"));
+}
+
+// §10.8 makes a port connection an assignment-like context, so a pattern
+// connected to a packed array port supplies an item per element of its packed
+// dimension. A port with an unpacked dimension as well has its pattern stand
+// for that dimension first, two rows of `sa`'s port rather than four bits.
+TEST(ArrayPatternElaboration, PortConnectionCountedAgainstPackedDimension) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module sc(input logic [15:0] p);\n"
+      "endmodule\n"
+      "module sa(input logic [3:0] p [2]);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic x, y;\n"
+      "  sc u1(.p('{x, y}));\n"
+      "  sc u2(.p('{16{x}}));\n"
+      "  sa u3(.p('{4'h1, 4'h2}));\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 2 elements, but array "
+                            "dimension requires 16",
+                            7, "10.9.1"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
 }  // namespace

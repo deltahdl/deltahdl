@@ -27,13 +27,15 @@ static bool IsBlockDeclared(
 
 // §5.10 with §5.11 and §10.9.1 holds a pattern to its array wherever it is
 // written: assigned by a procedure to the module's array, `abarr = '{...}`, or
-// initializing an array a block declares. Only the module-level declaration's
-// initializer was checked, so a flat pattern for an array of structures and a
-// pattern of the wrong element count went through in both places.
+// initializing an array a block declares, a packed array (§7.4) among them.
+// Only the module-level declaration's initializer was checked, so a flat
+// pattern for an array of structures and a pattern of the wrong element count
+// went through in both places.
 void ElaboratorOperationRules::WalkStmtsForProceduralArrayPattern(
     const Stmt* s) {
   if (s == nullptr) return;
-  const ArrayPatternCheck kCheck{typedefs_, var_types_, diag_};
+  const ArrayPatternCheck kCheck{typedefs_, aggregate_typedef_names_,
+                                 var_types_, diag_};
   bool is_assign = s->kind == StmtKind::kBlockingAssign ||
                    s->kind == StmtKind::kNonblockingAssign;
   if (is_assign && s->lhs->kind == ExprKind::kIdentifier &&
@@ -44,8 +46,7 @@ void ElaboratorOperationRules::WalkStmtsForProceduralArrayPattern(
                    s->rhs->range.start);
     }
   }
-  if (s->kind == StmtKind::kVarDecl && s->var_init != nullptr &&
-      !s->var_unpacked_dims.empty()) {
+  if (s->kind == StmtKind::kVarDecl && s->var_init != nullptr) {
     kCheck.Check(s->var_init, s->var_decl_type, s->var_unpacked_dims,
                  s->var_init->range.start);
   }
@@ -125,10 +126,9 @@ void ElaboratorOperationRules::ValidateProceduralArrayPatterns(
   StructTargetTypes struct_targets;
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kVarDecl) continue;
+    pattern_target_arrays_[item->name] = item;
     if (item->unpacked_dims.empty())
       struct_targets[item->name] = &item->data_type;
-    else
-      pattern_target_arrays_[item->name] = item;
   }
   for (const auto* item : decl->items) {
     if (IsProceduralItemKind(item->kind))

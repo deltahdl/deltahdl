@@ -421,19 +421,23 @@ std::unordered_set<std::string_view> UnpackedStructVars(
     const ModuleDecl* decl, const TypedefMap& typedefs);
 
 // §5.10, §5.11 and §10.9.1: the checks an assignment pattern written for an
-// unpacked array has to pass, wherever it is written -- a declaration's
-// initializer, a block's or the module's, or the right-hand side of a
-// procedural assignment. `typedefs` resolves a structure named as the element
-// type, and `var_types` the declared kind of a name written as an element.
-// Defined in elaborator_validate.cpp.
+// array, unpacked or packed (§7.4), has to pass, wherever it is written -- a
+// declaration's initializer, a block's or the module's, the right-hand side of
+// a procedural assignment, or a port connection. `typedefs` resolves a
+// structure named as the element type and the packed dimensions a typedef
+// carries, `aggregate_typedefs` names the typedefs that stand for an unpacked
+// aggregate, and `var_types` the declared kind of a name written as an
+// element. Defined in elaborator_validate.cpp.
 struct ArrayPatternCheck {
   const TypedefMap& typedefs;
+  const std::unordered_set<std::string_view>& aggregate_typedefs;
   const std::unordered_map<std::string_view, DataTypeKind>& var_types;
   DiagEngine& diag;
 
   // Checks `pattern` against an array of `elem_type` with the unpacked
-  // dimensions `dims`, outermost first, reporting at `loc`. Nothing for an
-  // expression that is no assignment pattern.
+  // dimensions `dims`, outermost first, and then the packed dimensions of
+  // `elem_type`, reporting at `loc`. Nothing for an expression that is no
+  // assignment pattern.
   void Check(const Expr* pattern, const DataType& elem_type,
              const std::vector<Expr*>& dims, SourceLoc loc) const;
 };

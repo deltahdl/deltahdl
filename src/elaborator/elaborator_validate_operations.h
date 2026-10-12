@@ -69,12 +69,13 @@ class ElaboratorOperationRules : public ElaboratorData {
   void CheckArrayPatternElemTypeInInit(const ModuleItem* item);
   // §5.10, §5.11 and §10.9.1: the checks ArrayPatternCheck makes of a
   // module-level declaration's initializer, made of a pattern a procedure
-  // assigns to one of the module's unpacked arrays and of one initializing an
-  // unpacked array a block declares.
+  // assigns to one of the module's arrays and of one initializing an array a
+  // block declares, packed (§7.4) or unpacked.
   void ValidateProceduralArrayPatterns(const ModuleDecl* decl);
   void WalkStmtsForProceduralArrayPattern(const Stmt* s);
-  // The module's unpacked arrays by name, each with its declaration, filled by
-  // ValidateProceduralArrayPatterns for the module it walks.
+  // The module's variables by name, each with its declaration, filled by
+  // ValidateProceduralArrayPatterns for the module it walks; a pattern
+  // assigned to one is checked against the dimensions it declares.
   std::unordered_map<std::string_view, const ModuleItem*>
       pattern_target_arrays_;
   void ValidateReplicateTargetingArray(const ModuleDecl* decl);

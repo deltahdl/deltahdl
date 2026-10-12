@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <format>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -45,14 +46,61 @@ std::optional<int64_t> PositionalItemCount(const Expr* pattern) {
   return *times * static_cast<int64_t>(rep->elements.size());
 }
 
+// The number of elements the range [left:right] spans, or nothing where a
+// bound does not fold.
+static std::optional<int64_t> RangeSize(const Expr* left, const Expr* right) {
+  auto left_value = ConstEvalInt(left);
+  auto right_value = ConstEvalInt(right);
+  if (left_value && right_value)
+    return std::abs(*left_value - *right_value) + 1;
+  return std::nullopt;
+}
+
 std::optional<int64_t> ComputeDimSize(const Expr* dim) {
-  if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
-    auto left = ConstEvalInt(dim->lhs);
-    auto right = ConstEvalInt(dim->rhs);
-    if (left && right) return std::abs(*left - *right) + 1;
-    return std::nullopt;
-  }
+  if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon)
+    return RangeSize(dim->lhs, dim->rhs);
   return ConstEvalInt(dim);
+}
+
+namespace {
+// One dimension an array pattern's braces stand for (§10.9.1): the number of
+// its elements, or nothing where that does not fold or the dimension has no
+// fixed size, and whether it is one of the packed dimensions (§7.4).
+struct PatternDim {
+  std::optional<int64_t> size;
+  bool packed = false;
+};
+}  // namespace
+
+// §7.4: appends the packed dimensions `dtype` is written
+// with, outermost first.
+static void AppendPackedDims(const DataType& dtype,
+                             std::vector<PatternDim>& dims) {
+  if (dtype.packed_dim_left == nullptr) return;
+  dims.push_back(
+      {RangeSize(dtype.packed_dim_left, dtype.packed_dim_right), true});
+  for (const auto& [left, right] : dtype.extra_packed_dims)
+    dims.push_back({RangeSize(left, right), true});
+}
+
+// §7.4 with §6.18: appends the packed dimensions of an array's element type
+// `dtype`, which its braces go on into once the unpacked dimensions are spent:
+// those written on the type, then those of each typedef it names in turn. The
+// walk stops at a typedef whose name stands for an unpacked aggregate, whose
+// unpacked dimensions come before any packed one, and at a name this scope
+// does not resolve.
+static void AppendElementPackedDims(const ArrayPatternCheck& check,
+                                    const DataType& dtype,
+                                    std::vector<PatternDim>& dims) {
+  AppendPackedDims(dtype, dims);
+  std::vector<std::string_view> names;
+  FollowTypedefs(dtype, check.typedefs, names);
+  for (std::string_view name : names) {
+    auto it = check.typedefs.find(name);
+    if (it == check.typedefs.end() || check.aggregate_typedefs.contains(name))
+      return;
+    AppendPackedDims(it->second, dims);
+  }
 }
 
 // What two array pattern keys are the same key by. §10.9's array keys are
@@ -104,11 +152,9 @@ static bool TypeKeyCoversElement(std::string_view key, const DataType& elem,
 static void CheckArrayPatternCoverage(const ArrayPatternCheck& check,
                                       const Expr* pattern,
                                       const DataType& elem_type,
-                                      const Expr* dim, SourceLoc loc) {
+                                      const PatternDim& dim, SourceLoc loc) {
   const TypedefMap& typedefs = check.typedefs;
-  if (!dim) return;
-  auto dim_size = ComputeDimSize(dim);
-  if (!dim_size) return;
+  if (!dim.size) return;
 
   bool has_default = false;
   bool has_type_key = false;
@@ -131,9 +177,11 @@ static void CheckArrayPatternCoverage(const ArrayPatternCheck& check,
       // because the clause descends into each subarray, applying the same rules
       // and the type and default keys -- a key matching the leaf type covers a
       // multidimensional array at every level, which is what CreateMultiDimLeaf
-      // already does.
-      has_type_key =
-          has_type_key || TypeKeyCoversElement(key->text, elem_type, typedefs);
+      // already does. A packed dimension's element is `elem_type` with that
+      // dimension and those outside it taken off, a type `elem_type` does not
+      // describe, so a type key there is taken to cover it.
+      has_type_key = has_type_key || dim.packed ||
+                     TypeKeyCoversElement(key->text, elem_type, typedefs);
     } else if (auto identity = ArrayPatternKeyIdentity(key)) {
       index_keys.insert(*identity);
     } else {
@@ -141,7 +189,7 @@ static void CheckArrayPatternCoverage(const ArrayPatternCheck& check,
     }
   }
   if (has_default || has_type_key) return;
-  if (static_cast<int64_t>(index_keys.size()) + unidentified_keys < *dim_size) {
+  if (static_cast<int64_t>(index_keys.size()) + unidentified_keys < *dim.size) {
     check.diag.Error(loc, "keyed array pattern does not cover all elements",
                      Subclause("10.9.1"));
   }
@@ -192,58 +240,72 @@ static bool IsElementThatIsNoStruct(
   }
 }
 
-void ArrayPatternCheck::Check(const Expr* pattern, const DataType& elem_type,
-                              const std::vector<Expr*>& dims,
-                              SourceLoc loc) const {
-  if (pattern->kind != ExprKind::kAssignmentPattern) return;
-  const Expr* dim = dims[0];
-  if (!pattern->pattern_keys.empty()) {
-    CheckArrayPatternDuplicateIndices(pattern, loc, typedefs, diag);
-    CheckArrayPatternCoverage(*this, pattern, elem_type, dim, loc);
-    return;
-  }
-
-  // §5.10: an initialized array of structures nests a pattern per structure
-  // inside the array's braces. A top-level element that can be no structure
-  // makes the pattern the flat form, and that is the rule the spelling breaks
-  // rather than the element count below, which the flat form fails only when
-  // the counts happen to disagree.
-  if (IsUnpackedStructType(elem_type, typedefs)) {
-    for (const auto* e : pattern->elements) {
-      if (IsElementThatIsNoStruct(e, var_types)) {
-        diag.Error(loc,
-                   "assignment pattern for an array of structures shall nest "
-                   "a pattern per structure",
-                   Subclause("5.10"));
-        return;
-      }
+// §5.10: an initialized array of structures nests a pattern per structure
+// inside the array's braces. A top-level element that can be no structure
+// makes the pattern the flat form, and that is the rule the spelling breaks
+// rather than the element count, which the flat form fails only when the
+// counts happen to disagree. Whether the pattern was reported.
+static bool ReportsFlatStructPattern(const ArrayPatternCheck& check,
+                                     const Expr* pattern,
+                                     const DataType& elem_type, SourceLoc loc) {
+  if (!IsUnpackedStructType(elem_type, check.typedefs)) return false;
+  for (const auto* e : pattern->elements) {
+    if (IsElementThatIsNoStruct(e, check.var_types)) {
+      check.diag.Error(loc,
+                       "assignment pattern for an array of structures shall "
+                       "nest a pattern per structure",
+                       Subclause("5.10"));
+      return true;
     }
   }
+  return false;
+}
 
-  if (!dim) return;
-  auto dim_size = ComputeDimSize(dim);
-  if (!dim_size) return;
+// Checks `pattern` against the dimensions `dims`, outermost first, of an array
+// of `elem_type`.
+static void CheckPatternDims(const ArrayPatternCheck& check,
+                             const Expr* pattern, const DataType& elem_type,
+                             std::span<const PatternDim> dims, SourceLoc loc) {
+  if (pattern->kind != ExprKind::kAssignmentPattern || dims.empty()) return;
+  if (!pattern->pattern_keys.empty()) {
+    CheckArrayPatternDuplicateIndices(pattern, loc, check.typedefs, check.diag);
+    CheckArrayPatternCoverage(check, pattern, elem_type, dims[0], loc);
+    return;
+  }
+  if (ReportsFlatStructPattern(check, pattern, elem_type, loc)) return;
+  if (!dims[0].size) return;
   // §5.11: a replication operates within one dimension, so what it supplies
   // is counted against that dimension as a positional list is.
   auto count = PositionalItemCount(pattern);
-  if (count && *count != *dim_size) {
-    diag.Error(loc,
-               std::format("assignment pattern has {} elements, but array "
-                           "dimension requires {}",
-                           *count, *dim_size),
-               Subclause("10.9.1"));
+  if (count && *count != *dims[0].size) {
+    check.diag.Error(loc,
+                     std::format("assignment pattern has {} elements, but "
+                                 "array dimension requires {}",
+                                 *count, *dims[0].size),
+                     Subclause("10.9.1"));
   }
   // §10.9.1 (printed pages 261-262): the braces match the dimensions, each
   // nested pattern holding as many items as the dimension it stands for.
-  if (dims.size() < 2) return;
-  const std::vector<Expr*> kInner(dims.begin() + 1, dims.end());
-  for (const Expr* e : pattern->elements) Check(e, elem_type, kInner, loc);
+  for (const Expr* e : pattern->elements)
+    CheckPatternDims(check, e, elem_type, dims.subspan(1), loc);
+}
+
+void ArrayPatternCheck::Check(const Expr* pattern, const DataType& elem_type,
+                              const std::vector<Expr*>& dims,
+                              SourceLoc loc) const {
+  std::vector<PatternDim> pattern_dims;
+  for (const Expr* dim : dims) {
+    pattern_dims.push_back(
+        {dim == nullptr ? std::nullopt : ComputeDimSize(dim), false});
+  }
+  AppendElementPackedDims(*this, elem_type, pattern_dims);
+  CheckPatternDims(*this, pattern, elem_type, pattern_dims, loc);
 }
 
 void Elaborator::ValidateArrayInitPattern(const ModuleItem* item) {
-  if (!item->init_expr || item->unpacked_dims.empty()) return;
-  ArrayPatternCheck{typedefs_, var_types_, diag_}.Check(
-      item->init_expr, item->data_type, item->unpacked_dims, item->loc);
+  if (!item->init_expr) return;
+  ArrayPatternCheck{typedefs_, aggregate_typedef_names_, var_types_, diag_}
+      .Check(item->init_expr, item->data_type, item->unpacked_dims, item->loc);
 }
 
 std::string_view ExprIdent(const Expr* e) {
