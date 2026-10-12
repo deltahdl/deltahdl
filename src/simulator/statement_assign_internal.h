@@ -459,6 +459,12 @@ uint32_t CompoundOperandWidth(TokenKind base_op, const Expr* lhs,
 std::optional<Logic4Vec> EvalTaggedForLayout(const Expr* expr,
                                              const StructTypeInfo& layout,
                                              SimContext& ctx, Arena& arena);
+// The value of `init`, the initializer of a variable whose structure or union
+// layout is `layout` (null for none): a tagged expression evaluated by that
+// layout (EvalTaggedForLayout), and anything else at `context_width`.
+Logic4Vec EvalTaggedOrPlain(const Expr* init, const StructTypeInfo* layout,
+                            SimContext& ctx, Arena& arena,
+                            uint32_t context_width = 0);
 
 Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena);

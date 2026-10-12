@@ -214,6 +214,16 @@ std::optional<Logic4Vec> EvalTaggedForLayout(const Expr* expr,
   return EvalTaggedForLayout(expr->lhs, *member, ctx, arena);
 }
 
+Logic4Vec EvalTaggedOrPlain(const Expr* init, const StructTypeInfo* layout,
+                            SimContext& ctx, Arena& arena,
+                            uint32_t context_width) {
+  if (layout != nullptr) {
+    if (auto tagged = EvalTaggedForLayout(init, *layout, ctx, arena))
+      return *tagged;
+  }
+  return EvalExpr(init, ctx, arena, context_width);
+}
+
 Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   uint32_t ctx_width = LhsContextWidth(stmt->lhs, ctx, arena);

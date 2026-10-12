@@ -731,12 +731,8 @@ static void InitializeDeclVariable(const Stmt* stmt, const DeclaredObject& obj,
     // §11.9 with §7.3.2: a tagged initializer converts its member value to
     // the member's type, a real member's to its real bits, as the assignment
     // `u = tagged M v` does (EvalTaggedForLayout).
-    const StructTypeInfo* layout = ctx.GetVariableStructType(stmt->var_name);
-    std::optional<Logic4Vec> tagged =
-        layout != nullptr
-            ? EvalTaggedForLayout(stmt->var_init, *layout, ctx, arena)
-            : std::nullopt;
-    Logic4Vec val = tagged ? *tagged : EvalExpr(stmt->var_init, ctx, arena);
+    Logic4Vec val = EvalTaggedOrPlain(
+        stmt->var_init, ctx.GetVariableStructType(stmt->var_name), ctx, arena);
     // §11.4.14 (printed page 291): a streaming concatenation initializing a
     // fixed-size variable is left-aligned in it, widened with zero bits on
     // the right, and reported where the variable is the narrower, as
