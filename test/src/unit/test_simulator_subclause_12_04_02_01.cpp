@@ -23,8 +23,9 @@ TEST(UniqueIfViolationSim, MatureReportsImmediately) {
   proc.kind = ProcessKind::kInitial;
   f.ctx.SetCurrentProcess(&proc);
 
+  // A unique report (Table 20-6's bit 32) raised in no named scope.
   proc.pending_violations.push_back(
-      {SourceLoc{1, 3, 5}, "mature test", "12.4.2.1"});
+      {SourceLoc{1, 3, 5}, "mature test", "12.4.2.1", 32, ""});
   f.ctx.MaturePendingViolations();
 
   EXPECT_TRUE(proc.pending_violations.empty());
