@@ -832,6 +832,9 @@ StmtResult ExecBlockingAssignImpl(const Stmt* stmt, SimContext& ctx,
   if (!stmt->lhs) return StmtResult::kDone;
   if (TryDispatchSpecialBlockingAssign(stmt, ctx, arena))
     return StmtResult::kDone;
+  // §10.4.1: an element target's index is evaluated once, for the key its tag
+  // stands under and for the store alike (TaggedElementTarget).
+  LhsIndexPin pin(TaggedElementTarget(stmt), ctx, arena);
   // §7.3.2 with §11.9: a call's result reaches a tagged union target with the
   // tag its body returned, which the store below reads off no call.
   auto rhs_val = EvalRhsCarryingReturnedTag(stmt, ctx, arena);

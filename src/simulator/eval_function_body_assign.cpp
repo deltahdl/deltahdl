@@ -412,6 +412,9 @@ void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   // struct field, and everything ApplyGenericBlockingAssign writes -- so one
   // copy where the value is produced covers all of them, and no store has to
   // know.
+  // §10.4.1: an element target's index is evaluated once, for the key its tag
+  // stands under and for the store alike (TaggedElementTarget).
+  LhsIndexPin pin(TaggedElementTarget(stmt), ctx, arena);
   Logic4Vec val =
       OwnRhsWords(EvalRhsCarryingReturnedTag(stmt, ctx, arena), arena);
   if (TryFuncClassTargetWrite(stmt->lhs, val, ctx, arena)) {

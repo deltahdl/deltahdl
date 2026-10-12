@@ -524,4 +524,29 @@ TEST(BlockingAssignSim, ConcatenationTargetHandsAPropertyItsSlice) {
   EXPECT_EQ(out, "2 5 3\n1 6 12\n");
 }
 
+// §10.4.1 evaluates each expression of a blocking assignment once, its
+// target's index among them. An element of an array of tagged unions written
+// with `tagged M v` or a call's result also takes the tag the value carries,
+// and the element that tag goes to is the one the store writes: `arr[i++]`
+// advances i once and names one element for both (#6414).
+TEST(BlockingAssignSim, TaggedElementTargetIndexEvaluatedOnce) {
+  EXPECT_EQ(
+      RunAndGet("module t;\n"
+                "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+                "  VInt arr [4];\n"
+                "  int i = 0;\n"
+                "  int n;\n"
+                "  function automatic VInt f();\n"
+                "    return tagged Valid 4;\n"
+                "  endfunction\n"
+                "  initial begin\n"
+                "    arr[i++] = tagged Valid 3;\n"
+                "    arr[i++] = f();\n"
+                "    n = i * 100 + arr[0].Valid * 10 + arr[1].Valid;\n"
+                "  end\n"
+                "endmodule\n",
+                "n"),
+      234u);
+}
+
 }  // namespace

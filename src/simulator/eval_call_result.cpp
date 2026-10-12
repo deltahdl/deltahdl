@@ -527,11 +527,24 @@ static bool TaggedTargetKey(const Expr* lhs, SimContext& ctx, Arena& arena,
   return TaggedUnionMemberKey(lhs, ctx, key);
 }
 
+// Whether the right-hand side of `stmt` carries a tag to its target: a
+// `tagged M v` naming its member, or a call whose body may return one.
+static bool RhsCarriesTag(const Stmt* stmt) {
+  return stmt->rhs->kind == ExprKind::kCall ||
+         (stmt->rhs->kind == ExprKind::kTagged && stmt->rhs->rhs != nullptr);
+}
+
+const Expr* TaggedElementTarget(const Stmt* stmt) {
+  if (stmt->lhs == nullptr || stmt->rhs == nullptr ||
+      stmt->lhs->kind != ExprKind::kSelect || !RhsCarriesTag(stmt))
+    return nullptr;
+  return stmt->lhs;
+}
+
 static Logic4Vec EvalRhsForTaggedMember(const Stmt* stmt, SimContext& ctx,
                                         Arena& arena) {
   bool is_call = stmt->rhs->kind == ExprKind::kCall;
-  bool is_tagged =
-      stmt->rhs->kind == ExprKind::kTagged && stmt->rhs->rhs != nullptr;
+  bool is_tagged = !is_call && RhsCarriesTag(stmt);
   std::string key;
   if ((!is_call && !is_tagged) || !TaggedTargetKey(stmt->lhs, ctx, arena, key))
     return EvalRhsWithStructContext(stmt, ctx, arena);

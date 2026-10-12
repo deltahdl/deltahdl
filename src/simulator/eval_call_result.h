@@ -172,6 +172,15 @@ Logic4Vec EvalWithReturnedTag(const Expr* expr, SimContext& ctx, Arena& arena,
 Logic4Vec EvalRhsCarryingReturnedTag(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena);
 
+// §10.4.1: the left-hand side of the blocking assignment `stmt` where it is an
+// array element whose tag EvalRhsCarryingReturnedTag sets, `arr[k] = tagged M
+// v` or `arr[k] = f()`, and so whose index that function evaluates for the
+// tag's key (ElementTagKey); null for any other assignment. A caller pins the
+// indices of what this names (LhsIndexPin) before the right-hand side and
+// holds them through the store, so the key and the store read one evaluation
+// of `k`.
+const Expr* TaggedElementTarget(const Stmt* stmt);
+
 // Whether the member access `lhs`, `s.u` or `s.p.u`, names a tagged union
 // member of a variable, and in `key` what that member's tag stands under: the
 // key the variable's storage was created by (TagKeyOfName) followed by the
