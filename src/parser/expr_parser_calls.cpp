@@ -182,8 +182,7 @@ Expr* Parser::ParseConcatenation() {
     Expect(TokenKind::kRBrace, Subclause("11.4.12.1"));
     Expect(TokenKind::kRBrace, Subclause("11.4.12.1"));
 
-    if (AtSelectBracket()) return ParseSelectExpr(rep);
-    return rep;
+    return ParseParenMethodTail(AtSelectBracket() ? ParseSelectExpr(rep) : rep);
   }
 
   auto* cat = arena_.Create<Expr>();
@@ -195,8 +194,12 @@ Expr* Parser::ParseConcatenation() {
   }
   Expect(TokenKind::kRBrace, Subclause("11.4.12"));
 
-  if (AtSelectBracket()) return ParseSelectExpr(cat);
-  return cat;
+  // A.8.2 makes a method call's root a primary, and A.8.4 lists a
+  // concatenation and a multiple concatenation, each with an optional select,
+  // among the primaries, so a method call or a member select may follow either:
+  // `{s, " x"}.len()` calls len() on the string the concatenation yields
+  // (§11.4.12.2).
+  return ParseParenMethodTail(AtSelectBracket() ? ParseSelectExpr(cat) : cat);
 }
 
 // A.8.4 lists a cast among the primaries and A.8.6 makes a primary the root

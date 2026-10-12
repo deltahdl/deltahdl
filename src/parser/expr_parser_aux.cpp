@@ -188,7 +188,9 @@ Expr* Parser::ParseParenExpr() {
 // mintypmax_expression among the primaries, so a method is called on the handle
 // a parenthesized expression yields (§8.4), `(sel ? x : y).f()`. The call
 // takes the tail a cast's does, and a randomize_call or array_manipulation_call
-// the with clause a name's call takes.
+// the with clause a name's call takes. Parser::ParseConcatenation reads the
+// same tail after a concatenation or a multiple concatenation, the other
+// primaries A.8.4 lists that end in a bracket.
 Expr* Parser::ParseParenMethodTail(Expr* paren) {
   if (!Check(TokenKind::kDot)) return paren;
   Expr* result = ParseWithClause(ParseCastMethodTail(paren));

@@ -469,4 +469,43 @@ TEST(PrimaryParsing, MethodCalledOnSystemFunctionResult) {
   EXPECT_EQ(rhs->lhs->lhs->kind, ExprKind::kSystemCall);
 }
 
+// A.8.2 makes a method call's root a primary, and A.8.4 lists a concatenation
+// and a multiple concatenation among the primaries, so a method call may
+// follow either: len() on the string each yields (§11.4.12.2).
+TEST(PrimaryParsing, MethodCallOnConcatenation) {
+  auto r = Parse(
+      "module m;\n"
+      "  string s;\n"
+      "  int n;\n"
+      "  initial n = {s, \" x\"}.len();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  ASSERT_EQ(rhs->kind, ExprKind::kCall);
+  ASSERT_NE(rhs->lhs, nullptr);
+  ASSERT_EQ(rhs->lhs->kind, ExprKind::kMemberAccess);
+  EXPECT_EQ(rhs->lhs->rhs->text, "len");
+  EXPECT_EQ(rhs->lhs->lhs->kind, ExprKind::kConcatenation);
+}
+
+TEST(PrimaryParsing, MethodCallOnReplication) {
+  auto r = Parse(
+      "module m;\n"
+      "  string s;\n"
+      "  int n;\n"
+      "  initial n = {3{s}}.len();\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* rhs = FirstInitialRHS(r);
+  ASSERT_NE(rhs, nullptr);
+  ASSERT_EQ(rhs->kind, ExprKind::kCall);
+  ASSERT_NE(rhs->lhs, nullptr);
+  ASSERT_EQ(rhs->lhs->kind, ExprKind::kMemberAccess);
+  EXPECT_EQ(rhs->lhs->rhs->text, "len");
+  EXPECT_EQ(rhs->lhs->lhs->kind, ExprKind::kReplicate);
+}
+
 }  // namespace
