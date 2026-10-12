@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "fixture_real.h"
 #include "fixture_simulator.h"
@@ -463,6 +464,31 @@ TEST(RealConversion, StaticPropertyNegativeRealInitializerRoundsAway) {
       f, "a");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), static_cast<uint32_t>(-3));
+}
+
+// §6.12.1 converts a real assigned to an integral object, rounding to the
+// nearest, an element of an unpacked array among them, and an integral value
+// assigned to a real element to its real value.
+TEST(RealConversionSim, AssignmentToAnArrayElementConverts) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  real rv = 2.0;\n"
+                       "  logic signed [3:0] s = -1;\n"
+                       "  logic [7:0] r [1:2];\n"
+                       "  logic [7:0] x;\n"
+                       "  real ra [2];\n"
+                       "  initial begin\n"
+                       "    r[1] = rv + s;\n"
+                       "    r[2] = 2.6;\n"
+                       "    x = rv + s;\n"
+                       "    ra[0] = 3;\n"
+                       "    ra[1] = 1.25;\n"
+                       "    $display(\"%h %h %h %0.2f %0.2f\", r[1], r[2], x,\n"
+                       "             ra[0], ra[1]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "01 03 01 3.00 1.25\n");
 }
 
 }  // namespace

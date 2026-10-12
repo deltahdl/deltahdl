@@ -404,6 +404,11 @@ bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
       TryWriteClassArrayElement(lhs, rhs_val, ctx, arena))
     return true;
   if (auto* elem = TryResolveArrayElement(lhs, ctx)) {
+    // §6.12.1 converts a real assigned to an integral element, rounding, and
+    // an integral one assigned to a real element, as the scalar store does.
+    if (rhs_val.is_real || elem->is_real)
+      rhs_val = ConvertRealForKnownLhs(rhs_val, elem->is_real,
+                                       elem->value.width, arena);
     WriteVar(elem, rhs_val, arena);
     return true;
   }
