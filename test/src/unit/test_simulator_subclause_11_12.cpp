@@ -811,4 +811,26 @@ TEST(LetSim, ReferencesReachTheInnermostVisibleLet) {
       "2\n1\n3\n1 7\n5\n");
 }
 
+// §11.12 with §9.3.1: an unnamed block inside a function or a task is a scope
+// of its own, so its let hides the module's within the block and the body
+// reads the module's again once the block ends.
+TEST(LetSim, ASubroutineBlocksLetEndsWithTheBlock) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  let p = 1;\n"
+                       "  function int f();\n"
+                       "    int r;\n"
+                       "    begin let p = 3; r = p; end\n"
+                       "    return r * 10 + p;\n"
+                       "  endfunction\n"
+                       "  task t();\n"
+                       "    begin let p = 4; $display(\"%0d\", p); end\n"
+                       "    $display(\"%0d\", p);\n"
+                       "  endtask\n"
+                       "  initial begin $display(\"%0d\", f()); t(); end\n"
+                       "endmodule\n",
+                       f),
+            "31\n4\n1\n");
+}
+
 }  // namespace
