@@ -10,6 +10,7 @@
 namespace delta {
 
 struct DataType;
+struct ModuleItem;
 struct Stmt;
 struct Variable;
 
@@ -40,6 +41,11 @@ class ScopeStack {
   // body, another branch of the name tree, is not searched.
   std::vector<Scope>::const_reverse_iterator VisibleFramesEnd() const;
   Variable* FindLocalVariable(std::string_view name);
+  // §11.12: makes `let` the let `name` names in the innermost scope, the one
+  // its declaration stands in; the second finds the let a bare name names in
+  // the visible frames, innermost first, null where none declares one.
+  void DeclareLocalLet(std::string_view name, ModuleItem* let);
+  ModuleItem* FindLocalLet(std::string_view name) const;
   // §9.3.4: whether the innermost frame, the block now declaring, already
   // binds `name`, where FindLocalVariable would also find an enclosing
   // block's variable the declaration hides.

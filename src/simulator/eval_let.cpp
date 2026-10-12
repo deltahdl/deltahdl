@@ -196,13 +196,38 @@ Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call, SimContext& ctx,
   return result;
 }
 
+// The key an instance's let is registered under: no bare name and no
+// hierarchical path spells it, so neither a compilation unit's let nor an
+// instance's variable stands under it.
+static std::string InstanceLetKey(std::string_view prefix,
+                                  std::string_view name) {
+  return "let " + std::string(prefix) + std::string(name);
+}
+
+void RegisterInstanceLet(SimContext& ctx, std::string_view prefix,
+                         ModuleItem* let) {
+  ctx.RegisterLetDecl(
+      *ctx.GetArena().Create<std::string>(InstanceLetKey(prefix, let->name)),
+      let);
+}
+
+ModuleItem* FindVisibleLet(SimContext& ctx, std::string_view name) {
+  if (ModuleItem* local = ctx.FindLocalLet(name)) return local;
+  if (ModuleItem* own =
+          ctx.FindLetDecl(InstanceLetKey(ctx.ActiveInstancePrefix(), name)))
+    return own;
+  return ctx.FindLetDecl(name);
+}
+
 void RegisterBlockLet(const Stmt* stmt, SimContext& ctx) {
   ModuleItem* let = stmt->decl_item;
   if (let == nullptr || let->kind != ModuleItemKind::kLetDecl) return;
-  const ModuleItem* known = ctx.FindLetDecl(let->name);
-  if (known != nullptr && !block_lets.contains(known)) return;
   block_lets.insert(let);
-  ctx.RegisterLetDecl(let->name, let);
+  if (ctx.HasLocalScope()) {
+    ctx.DeclareLocalLet(let->name, let);
+  } else {
+    ctx.RegisterLetDecl(let->name, let);
+  }
 }
 
 }  // namespace delta

@@ -407,9 +407,6 @@ void RegisterModuleSubroutines(const RtlirModule* mod, SimContext& ctx) {
     if (!func->method_class.empty()) continue;
     ctx.RegisterFunction(func->name, func);
   }
-  for (auto* let_decl : mod->let_decls) {
-    ctx.RegisterLetDecl(let_decl->name, let_decl);
-  }
 }
 
 // §13.3 with §23.6: a task or function of a module instance is enabled by

@@ -8,6 +8,7 @@ namespace delta {
 struct ArrayInfo;
 struct AssocArrayObject;
 struct DataType;
+struct ModuleItem;
 struct QueueObject;
 struct Variable;
 
@@ -77,6 +78,9 @@ struct Scope {
   std::unordered_map<std::string_view, const DataType*> type_actuals;
   bool is_subroutine = false;
   std::unordered_map<std::string_view, std::string_view> class_types;
+  // §11.12: the lets the block or the subroutine body this frame stands for
+  // declares, each the let its name refers to within that scope.
+  std::unordered_map<std::string_view, ModuleItem*> lets;
 };
 
 }  // namespace delta

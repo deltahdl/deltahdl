@@ -488,11 +488,19 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena);
 // which case no actuals are bound).
 // §11.12: a let declared by the block item declaration `stmt` in a block or a
 // subroutine body is used after its declaration there, so it is made known as
-// the statement runs, in place of an earlier block's let of that name, whose
-// block it does not stand in (§11.12 gives each let its declaring scope's
-// name); a module's or a compilation unit's let of that name keeps its place.
+// the statement runs, in the frame of the block or the body declaring it,
+// where it hides a let of that name the enclosing scopes declare (§11.12).
 // Nothing for any other statement. Defined in eval_let.cpp.
 void RegisterBlockLet(const Stmt* stmt, SimContext& ctx);
+// §11.12 with §23.9: registers `let`, a module's, under the key of the
+// instance `prefix` names; and finds the let a bare name refers to where the
+// running code stands -- one the enclosing blocks or subroutine body declare
+// (ScopeStack::FindLocalLet), else one the running instance declares, else
+// one the compilation unit declares or an import brings in, under its bare
+// name. Defined in eval_let.cpp.
+void RegisterInstanceLet(SimContext& ctx, std::string_view prefix,
+                         ModuleItem* let);
+ModuleItem* FindVisibleLet(SimContext& ctx, std::string_view name);
 // §11.12: the value of the let instance `call` of `decl`, its body evaluated
 // at `context_width` as the parenthesized expression the expansion substitutes
 // is. Defined in eval_let.cpp.

@@ -11,6 +11,7 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "simulator/covergroup_instance.h"
 #include "simulator/eval_array.h"
@@ -38,13 +39,18 @@ namespace delta {
 // block declaring variables outside any subroutine is given one kept under
 // UnnamedBlockFrameName, so its static variables last from one activation to
 // the next and its names hide the module's only inside it. Without it, the
-// declaration replaced the module's variable of the same name. Inside a task
-// or function the declaration already lands in the subroutine's frame.
+// declaration replaced the module's variable of the same name. So is one
+// declaring a let (§11.12), whose name hides an enclosing scope's let only
+// inside it. Inside a task or function the declaration already lands in the
+// subroutine's frame.
 static std::string_view BlockFrameName(const Stmt* stmt, SimContext& ctx) {
   if (!stmt->label.empty()) return stmt->label;
   if (!ctx.CurrentFuncName().empty()) return {};
-  bool declares = std::ranges::any_of(
-      stmt->stmts, [](const Stmt* s) { return s->kind == StmtKind::kVarDecl; });
+  bool declares = std::ranges::any_of(stmt->stmts, [](const Stmt* s) {
+    return s->kind == StmtKind::kVarDecl ||
+           (s->kind == StmtKind::kBlockItemDecl && s->decl_item != nullptr &&
+            s->decl_item->kind == ModuleItemKind::kLetDecl);
+  });
   return declares ? ctx.UnnamedBlockFrameName(stmt) : std::string_view{};
 }
 

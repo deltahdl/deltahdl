@@ -414,6 +414,12 @@ static void AliasChildObjectsUnderPath(const std::string& child_prefix,
   for (std::string_view key : nets) ctx.AliasNet(under_path(key), key);
 }
 
+void RegisterModuleLets(const RtlirModule* mod, std::string_view prefix,
+                        SimContext& ctx) {
+  for (auto* let_decl : mod->let_decls)
+    RegisterInstanceLet(ctx, prefix, let_decl);
+}
+
 // The subroutines, imports and assertion declarations an instance's module
 // declares, registered for the instance whose key is `prefix`.
 static void RegisterChildInstanceDecls(const RtlirModule* mod,
@@ -423,6 +429,7 @@ static void RegisterChildInstanceDecls(const RtlirModule* mod,
   // its own body resolves (and %m composes the instance + subroutine path);
   // LowerModule registers these for the top only.
   RegisterModuleSubroutines(mod, ctx);
+  RegisterModuleLets(mod, prefix, ctx);
   // §13.3 with §23.6: and under the instance's own prefixed key, which an
   // enable by hierarchical name from another instance resolves by.
   RegisterInstanceSubroutines(mod, prefix, ctx, arena);

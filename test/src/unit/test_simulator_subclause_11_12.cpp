@@ -785,4 +785,30 @@ TEST(LetSim, DefaultsReadTheDeclaringScopeAndInstancesKeepTheirHistory) {
             "1\n0 1\n$finish at time 31\n");
 }
 
+// §11.12 gives a let the scope declaring it and §23.9 resolves a reference to
+// the innermost visible declaration: an instance reads its own module's let,
+// a block's let hides its module's within the block and no further, a name
+// the module declares no let of reaches the compilation unit's, and a fork's
+// let is read by the fork's own statements.
+TEST(LetSim, ReferencesReachTheInnermostVisibleLet) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("let p = 9;\n"
+                 "let q = 7;\n"
+                 "module child; let p = 2; initial $display(\"%0d\", p);"
+                 " endmodule\n"
+                 "module top;\n"
+                 "  let p = 1;\n"
+                 "  child u();\n"
+                 "  initial begin\n"
+                 "    #1 $display(\"%0d\", p);\n"
+                 "    begin let p = 3; $display(\"%0d\", p); end\n"
+                 "    $display(\"%0d %0d\", p, q);\n"
+                 "  end\n"
+                 "  initial #2 fork let w = 5; $display(\"%0d\", w); join\n"
+                 "endmodule\n",
+                 f),
+      "2\n1\n3\n1 7\n5\n");
+}
+
 }  // namespace

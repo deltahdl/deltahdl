@@ -719,7 +719,7 @@ static ModuleItem* FindCalledLet(const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
   if (expr->callee.empty() && IsPackageScopedCall(expr))
     return ctx.FindLetDecl(ScopedClassKey(expr->lhs, arena));
-  return ctx.FindLetDecl(expr->callee);
+  return FindVisibleLet(ctx, expr->callee);
 }
 
 // A method called on a receiver: a built-in method of its type, or a class

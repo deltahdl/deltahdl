@@ -184,6 +184,18 @@ Variable* ScopeStack::FindLocalVariable(std::string_view name) {
   return nullptr;
 }
 
+void ScopeStack::DeclareLocalLet(std::string_view name, ModuleItem* let) {
+  scope_stack_.back().lets[name] = let;
+}
+
+ModuleItem* ScopeStack::FindLocalLet(std::string_view name) const {
+  for (auto it = scope_stack_.crbegin(); it != VisibleFramesEnd(); ++it) {
+    auto found = it->lets.find(name);
+    if (found != it->lets.end()) return found->second;
+  }
+  return nullptr;
+}
+
 bool ScopeStack::InnermostScopeDeclares(std::string_view name) const {
   return !scope_stack_.empty() && scope_stack_.back().vars.contains(name);
 }

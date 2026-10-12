@@ -282,6 +282,7 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   for (const auto& var : mod->variables) LowerVar(var.name, var);
   RegisterModulePorts(mod, ctx_, arena_);
   RegisterModuleSubroutines(mod, ctx_);
+  RegisterModuleLets(mod, inst_prefix_, ctx_);
   for (auto* cls : mod->class_decls) InitClassStaticProperties(cls);
   // §23.6 with §13.3: a top-level module's subroutine enabled from a parallel
   // hierarchy is named through the top's name, `m.t1()` in the other top n,

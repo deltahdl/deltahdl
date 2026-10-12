@@ -198,7 +198,7 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
     // §11.12 — a no-argument let referenced without parentheses appears here
     // as a bare identifier. Expand its body at each use (re-evaluated, not
     // snapshotted) before falling back to class-scope resolution.
-    if (auto* let_decl = ctx.FindLetDecl(expr->text);
+    if (auto* let_decl = FindVisibleLet(ctx, expr->text);
         let_decl && let_decl->func_args.empty()) {
       return EvalLetExpansion(let_decl, expr, ctx, arena);
     }
