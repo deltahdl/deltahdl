@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
@@ -333,37 +334,24 @@ class LetActualCheck {
       Report(actual, formal);
   }
 
-  // The class `t` names: by its bare name where FindClassDecl looks, and
-  // behind a package's prefix among that package's declarations (§26.3).
-  const ClassDecl* NamedClass(const DataType& t) const {
-    if (t.kind != DataTypeKind::kNamed) return nullptr;
-    if (t.scope_name.empty()) return FindClassDecl(t.type_name, unit_);
-    const ClassDecl* found = nullptr;
-    for (const PackageDecl* pkg : unit_->packages) {
-      if (pkg->name != t.scope_name) continue;
-      for (const ModuleItem* item : pkg->items) {
-        if (item->kind == ModuleItemKind::kClassDecl &&
-            item->class_decl->name == t.type_name)
-          found = item->class_decl;
-      }
-    }
-    return found;
-  }
-
-  // An actual's type and its formal's, each where LastTypeInChain leaves it.
-  // §6.22.5: a class handle is type incompatible with every type but a
-  // class's. §8.12 passes one up its hierarchy by assignment and §8.16 down it
-  // by $cast, so two class types fit where one derives from the other
-  // (IsClassDerivedFrom, which follows interface classes too). A pair naming
-  // no class is ActualFitsFormal's.
+  // An actual's type and its formal's, each where LastTypeInChain leaves it,
+  // and the class each names as ClassOfDeclaredType finds it: by its bare
+  // name, behind its package's prefix (§26.3), or nested in the class a prefix
+  // names (§8.23). §6.22.5: a class handle is type incompatible with every
+  // type but a class's. §8.12 passes one up its hierarchy by assignment and
+  // §8.16 down it by $cast, so two class types fit where they are one class or
+  // one derives from the other (IsClassDeclDerivedFrom, which follows
+  // interface classes too); the walk starts from the class found, which a
+  // nested class's bare name would not reach. A pair naming no class is
+  // ActualFitsFormal's.
   bool SidesFit(const DataType& actual, const DataType& formal) const {
-    const ClassDecl* a = NamedClass(actual);
-    const ClassDecl* f = NamedClass(formal);
+    const ClassDecl* a = ClassOfDeclaredType(actual, {}, unit_);
+    const ClassDecl* f = ClassOfDeclaredType(formal, {}, unit_);
     if (a == nullptr && f == nullptr)
       return ActualFitsFormal(actual, formal, typedefs_);
     return a != nullptr && f != nullptr &&
-           (IsClassDerivedFrom(a->name, f->name, unit_) ||
-            IsClassDerivedFrom(f->name, a->name, unit_));
+           (a == f || IsClassDeclDerivedFrom(a, f->name, unit_) ||
+            IsClassDeclDerivedFrom(f, a->name, unit_));
   }
 
   void Report(const Expr* actual, const FunctionArg& formal) {

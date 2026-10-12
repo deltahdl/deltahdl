@@ -70,15 +70,19 @@ static bool AnyInterfaceDerivedFrom(const ClassDecl* cls, std::string_view b,
   return false;
 }
 
-bool IsClassDerivedFrom(std::string_view a, std::string_view b,
-                        const CompilationUnit* unit) {
-  if (a == b) return true;
-  for (const auto* cls = FindClassDecl(a, unit); cls;
-       cls = FindBaseClass(cls, unit)) {
+bool IsClassDeclDerivedFrom(const ClassDecl* a, std::string_view b,
+                            const CompilationUnit* unit) {
+  for (const auto* cls = a; cls; cls = FindBaseClass(cls, unit)) {
     if (cls->base_class == b) return true;
     if (AnyInterfaceDerivedFrom(cls, b, unit)) return true;
   }
   return false;
+}
+
+bool IsClassDerivedFrom(std::string_view a, std::string_view b,
+                        const CompilationUnit* unit) {
+  if (a == b) return true;
+  return IsClassDeclDerivedFrom(FindClassDecl(a, unit), b, unit);
 }
 
 static bool AreClassTypesComparable(std::string_view type_a,

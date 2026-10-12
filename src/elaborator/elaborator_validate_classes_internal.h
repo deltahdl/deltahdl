@@ -78,6 +78,14 @@ inline const ModuleItem* MethodBody(const ModuleItem* method) {
 bool IsClassDerivedFrom(std::string_view a, std::string_view b,
                         const CompilationUnit* unit);
 
+// Whether class `a`, or a class it extends, extends the class named `b` or
+// implements an interface class derived from it (§8.13, §8.26). It starts
+// from `a` itself rather than from a lookup of its name, which a class nested
+// in another (§8.23) does not answer to. Null `a` derives from nothing.
+// Defined in elaborator_validate_class_handles.cpp.
+bool IsClassDeclDerivedFrom(const ClassDecl* a, std::string_view b,
+                            const CompilationUnit* unit);
+
 // A subroutine body a scope declares, with the classes it stands inside,
 // innermost first: the class it is a method of, or defines out of block
 // (§8.24), and the classes that class is nested in (§8.23). Empty for a

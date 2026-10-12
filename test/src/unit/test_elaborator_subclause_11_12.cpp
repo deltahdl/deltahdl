@@ -718,6 +718,40 @@ TEST(LetDeclElaboration, ClassesNamedThroughTypedefsAndPackagesAreJudged) {
   }
 }
 
+// §11.12 with §8.23: a class nested in another and named through the outer
+// class's prefix is judged as that nested class, not as a class of the same
+// bare name elsewhere, so Outer::Inner deriving from Base fits a Base formal,
+// a Base handle fits an Outer::Inner formal by $cast, and a handle of the
+// unrelated top-level Inner is reported for either.
+TEST(LetDeclElaboration, NestedClassesNamedThroughTheirOuterClassAreJudged) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class Base; endclass\n"
+      "class Inner; endclass\n"
+      "class Outer;\n"
+      "  class Inner extends Base; endclass\n"
+      "endclass\n"
+      "module m;\n"
+      "  Base b; Inner ti; Outer::Inner oi;\n"
+      "  let lb(Base x) = 1;\n"
+      "  let lo(Outer::Inner x) = 1;\n"
+      "  initial begin\n"
+      "    $display(\"%0d\", lb(oi) + lo(oi) + lo(b));\n"
+      "    $display(\"%0d\", lb(ti));\n"
+      "    $display(\"%0d\", lo(ti));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "is not cast compatible with the type of formal",
+                             11, "11.12"));
+  for (uint32_t line : {12u, 13u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "is not cast compatible with the type of formal",
+                              line, "11.12"));
+  }
+}
+
 // §11.12 with §6.16 and §6.24.3: a string is cast compatible with an integral
 // or packed type, another string, and an unpacked structure or union whose
 // members all are bit-stream types, so an actual of one of these for a string
