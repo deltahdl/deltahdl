@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "builders_ast.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -253,6 +255,25 @@ TEST(ReplicationSim, OperandsEvaluatedOnceWithZeroMultiplier) {
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("i")->value.ToUint64(), 6u);
   EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 0xA5u);
+}
+
+// §11.4.12.1 joins copies of the whole inner concatenation, so an operand
+// wider than 64 bits is copied entire, and §11.4.12.2 leaves a replicated
+// string longer than eight characters untruncated.
+TEST(ReplicationSim, WideOperandsAndLongStringsAreCopiedWhole) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [99:0] w = '1;\n"
+                       "  logic [199:0] y;\n"
+                       "  string s = \"abcdefghij\", r;\n"
+                       "  initial begin\n"
+                       "    y = {2{w}};\n"
+                       "    r = {2{s}};\n"
+                       "    $display(\"%h %s\", y, r);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            std::string(50, 'f') + " abcdefghijabcdefghij\n");
 }
 
 }  // namespace

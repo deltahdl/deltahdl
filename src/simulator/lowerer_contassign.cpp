@@ -295,6 +295,18 @@ static void ApplyContAssignToNet(const ContAssignDriver& drv,
   drv.net->Resolve(arena, sched);
 }
 
+// The value a continuous assignment drives, at the target's width, a stream
+// left-aligned in it or reported narrower as §11.4.14 has a procedural
+// assignment's (WidenStreamPackToFixedTarget).
+static Logic4Vec EvalContAssignRhs(const ContAssignParams& params,
+                                   SimContext& ctx, Arena& arena) {
+  Logic4Vec value = EvalExpr(params.rhs, ctx, arena, params.width);
+  if (params.rhs->kind != ExprKind::kStreamingConcat || params.width == 0)
+    return value;
+  return WidenStreamPackToFixedTarget(value, params.width,
+                                      params.rhs->range.start, ctx, arena);
+}
+
 // True for the left-hand-side forms a continuous assignment can drive beyond a
 // bare identifier: a part-select/element select, a concatenation, an assignment
 // pattern, a streaming concatenation, or a member access. These reuse the
@@ -334,8 +346,8 @@ static void ApplyContAssignToVariable(const ContAssignParams& params,
   // then, and from what outlives the coroutine.
   if (!var->cont_assign_reevaluate) {
     var->cont_assign_reevaluate = [params, &ctx, &arena]() {
-      ApplyContAssignToVariable(
-          params, EvalExpr(params.rhs, ctx, arena, params.width), ctx, arena);
+      ApplyContAssignToVariable(params, EvalContAssignRhs(params, ctx, arena),
+                                ctx, arena);
     };
   }
   if (var->is_forced) return;
@@ -453,8 +465,7 @@ struct InertialLoopCtx {
 static InertialReeval ReevalInertialContAssign(
     const InertialLoopCtx& loop, const PendingContAssignTransition& xition) {
   InertialReeval result;
-  auto new_val =
-      EvalExpr(loop.params.rhs, loop.ctx, loop.arena, loop.params.width);
+  auto new_val = EvalContAssignRhs(loop.params, loop.ctx, loop.arena);
   if (Logic4VecEqual(new_val, xition.val)) return result;
   // The operand changed again before the pending value could propagate, so the
   // previously scheduled event is dropped.
@@ -855,7 +866,7 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
   bool evaluated_once = false;
   while (!evaluated_once || !ctx.StopRequested()) {
     evaluated_once = true;
-    auto val = EvalExpr(params.rhs, ctx, arena, params.width);
+    auto val = EvalContAssignRhs(params, ctx, arena);
     RefreshContAssignDriverBits(drv, params.lhs, ctx, arena);
 
     bool committed = false;

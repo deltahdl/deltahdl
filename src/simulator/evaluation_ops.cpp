@@ -115,10 +115,14 @@ Logic4Vec EvalUnaryOp(TokenKind op, Logic4Vec operand, Arena& arena) {
   switch (op) {
     case TokenKind::kTilde:
       return EvalUnaryNot(operand, arena);
-    case TokenKind::kBang:
-
-      if (HasUnknownBits(operand)) return MakeAllX(arena, 1);
-      return MakeLogic4VecVal(arena, 1, operand.ToUint64() == 0 ? 1 : 0);
+    case TokenKind::kBang: {
+      // §11.4.7: `!` gives 1 for a false operand, 0 for a true one and x for
+      // one whose truth is ambiguous.
+      const Truth kTruth = TruthOf(operand);
+      if (kTruth == Truth::kAmbiguous) return MakeAllX(arena, 1);
+      return TruthBit(kTruth == Truth::kTrue ? Truth::kFalse : Truth::kTrue,
+                      arena);
+    }
     case TokenKind::kMinus:
       return EvalUnaryMinus(operand, arena);
     case TokenKind::kPlus:
@@ -139,22 +143,31 @@ static uint64_t IntPow(uint64_t base, uint64_t exp) {
   return result;
 }
 
-static Logic4Vec EvalSignedPow(int64_t base, int64_t exp, uint32_t width,
-                               Arena& arena) {
-  if (exp < 0) {
-    if (base == 0) return MakeAllX(arena, width);
-    int64_t r = 0;
-    if (base == 1)
-      r = 1;
-    else if (base == -1)
-      r = (exp % 2 == 0) ? 1 : -1;
-    auto result = MakeLogic4VecVal(arena, width, static_cast<uint64_t>(r));
-    result.is_signed = true;
-    return result;
+// §11.4.3 with Table 11-4: `**` is typed by its base (§11.6.1, §11.8.1) and
+// its exponent is self-determined, so the exponent is negative by its own
+// sign alone: a base of 0 then gives x, of 1 gives 1, of a signed -1 gives 1
+// or -1 by the exponent's parity, and of any other value 0.
+static Logic4Vec EvalIntegralPower(const Logic4Vec& lhs, const Logic4Vec& rhs,
+                                   uint32_t width, Arena& arena) {
+  const int64_t kBase = lhs.is_signed ? SignExtend(lhs.ToUint64(), lhs.width)
+                                      : static_cast<int64_t>(lhs.ToUint64());
+  const int64_t kExp = rhs.is_signed ? SignExtend(rhs.ToUint64(), rhs.width)
+                                     : static_cast<int64_t>(rhs.ToUint64());
+  uint64_t r = 0;
+  if (rhs.is_signed && kExp < 0) {
+    if (kBase == 0) {
+      Logic4Vec x = MakeAllX(arena, width);
+      x.is_signed = lhs.is_signed;
+      return x;
+    }
+    if (kBase == 1) r = 1;
+    if (lhs.is_signed && kBase == -1)
+      r = static_cast<uint64_t>(kExp % 2 == 0 ? 1 : -1);
+  } else {
+    r = IntPow(static_cast<uint64_t>(kBase), static_cast<uint64_t>(kExp));
   }
-  auto r = static_cast<int64_t>(IntPow(base, exp));
-  auto result = MakeLogic4VecVal(arena, width, static_cast<uint64_t>(r));
-  result.is_signed = true;
+  Logic4Vec result = MakeLogic4VecVal(arena, width, r);
+  result.is_signed = lhs.is_signed;
   return result;
 }
 static Logic4Vec EvalSignedArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
@@ -183,8 +196,6 @@ static Logic4Vec EvalSignedArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
       if (rv == 0) return MakeAllX(arena, width);
       r = rv == -1 ? 0 : lv % rv;
       break;
-    case TokenKind::kPower:
-      return EvalSignedPow(lv, rv, width, arena);
     default:
       break;
   }
@@ -284,9 +295,6 @@ static Logic4Vec EvalUnsignedArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
       if (rv == 0) return MakeAllX(arena, width);
       result = lv % rv;
       break;
-    case TokenKind::kPower:
-      result = IntPow(lv, rv);
-      break;
     default:
       break;
   }
@@ -315,10 +323,15 @@ static Logic4Vec EvalBinaryArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
   // machine word the two arms below compute in: on a `logic [127:0]`,
   // 128'h1_0000_0000_0000_0000 + 128'h1 read 1, the only set bit of the first
   // operand being bit 64.
+  if (op == TokenKind::kPower && width > 64) {
+    return EvalWideArith(op, lhs, rhs, {width, lhs.is_signed, rhs.is_signed},
+                         arena);
+  }
   if (width > 64) {
     return EvalWideArith(op, lhs, rhs, {width, lhs.is_signed && rhs.is_signed},
                          arena);
   }
+  if (op == TokenKind::kPower) return EvalIntegralPower(lhs, rhs, width, arena);
   if (lhs.is_signed && rhs.is_signed) {
     return EvalSignedArith(op, lhs, rhs, width, arena);
   }
@@ -329,11 +342,11 @@ static Logic4Vec EvalBinaryBitwise(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
   uint32_t self_w = (lhs.width > rhs.width) ? lhs.width : rhs.width;
   uint32_t width = (context_width > self_w) ? context_width : self_w;
 
-  if (lhs.width != rhs.width) {
-    bool sign_ext = lhs.is_signed && rhs.is_signed;
-    if (lhs.width < width) lhs = ExtendVec(lhs, width, sign_ext, arena);
-    if (rhs.width < width) rhs = ExtendVec(rhs, width, sign_ext, arena);
-  }
+  // §11.8.2: each operand narrower than the result is extended to it first,
+  // by sign where both are signed (§11.4.8), equal widths included.
+  bool sign_ext = lhs.is_signed && rhs.is_signed;
+  if (lhs.width < width) lhs = ExtendVec(lhs, width, sign_ext, arena);
+  if (rhs.width < width) rhs = ExtendVec(rhs, width, sign_ext, arena);
   auto result = MakeLogic4Vec(arena, width);
   uint32_t words = result.nwords;
   for (uint32_t i = 0; i < words; ++i) {
@@ -514,22 +527,23 @@ static uint64_t ShiftCount(const Logic4Vec& rhs) {
 static constexpr uint64_t kResultX = 2;
 // §11.4.6: an x or z bit of the right operand is a wildcard at its own bit
 // position, matching whatever the left operand holds there; every other
-// position is compared as == compares it, and a left x or z at one of them
-// makes the relation unknown. EvalEqualityCompare hands the operands here
+// position is compared as == compares it: a bit known on both sides and
+// different makes the relation false whatever the others hold, and a left x
+// or z at one of them leaves it unknown only where none does, so 4'b1x00 ==?
+// 4'b0000 is 0. EvalEqualityCompare hands the operands here
 // extended to one width as §11.4.6 extends them, and every word of that width
 // takes part: reading the first word alone had two 96-bit operands differing
 // at bit 80 equal, and a wildcard at bit 80 no wildcard at all.
 static uint64_t EvalWildcardEq(Logic4Vec lhs, Logic4Vec rhs) {
   uint32_t nwords = std::min(lhs.nwords, rhs.nwords);
   bool unknown = false;
-  bool equal = true;
   for (uint32_t i = 0; i < nwords; ++i) {
-    uint64_t mask = ~rhs.words[i].bval;
-    unknown = unknown || (lhs.words[i].bval & mask) != 0;
-    equal = equal && ((lhs.words[i].aval ^ rhs.words[i].aval) & mask) == 0;
+    uint64_t compared = ~rhs.words[i].bval;
+    uint64_t known = compared & ~lhs.words[i].bval;
+    if (((lhs.words[i].aval ^ rhs.words[i].aval) & known) != 0) return 0;
+    unknown = unknown || (lhs.words[i].bval & compared) != 0;
   }
-  if (unknown) return kResultX;
-  return equal ? 1 : 0;
+  return unknown ? kResultX : 1;
 }
 // §11.4.5 (printed page 279): == and != compare their operands bit for bit,
 // the narrower extended to the wider's width before EvalEqualityOp is
@@ -572,6 +586,22 @@ static uint64_t EvalEqualityOp(TokenKind op, Logic4Vec lhs, Logic4Vec rhs) {
       return 0;
   }
 }
+Truth TruthOf(const Logic4Vec& v) {
+  if (v.is_real)
+    return RealVecToDouble(v) != 0.0 ? Truth::kTrue : Truth::kFalse;
+  bool ambiguous = false;
+  for (uint32_t i = 0; i < v.nwords; ++i) {
+    if ((v.words[i].aval & ~v.words[i].bval) != 0) return Truth::kTrue;
+    ambiguous = ambiguous || v.words[i].bval != 0;
+  }
+  return ambiguous ? Truth::kAmbiguous : Truth::kFalse;
+}
+
+Logic4Vec TruthBit(Truth t, Arena& arena) {
+  if (t == Truth::kAmbiguous) return MakeAllX(arena, 1);
+  return MakeLogic4VecVal(arena, 1, t == Truth::kTrue ? 1 : 0);
+}
+
 int64_t SignExtend(uint64_t val, uint32_t width) {
   if (width == 0 || width >= 64) return static_cast<int64_t>(val);
   uint64_t mask = uint64_t{1} << (width - 1);
@@ -596,34 +626,29 @@ std::string AssocStringKey(const Logic4Vec& val) {
   return s;
 }
 
-static uint64_t EvalRelationalOp(TokenKind op, uint64_t lv, uint64_t rv) {
-  switch (op) {
-    case TokenKind::kLt:
-      return (lv < rv) ? 1 : 0;
-    case TokenKind::kGt:
-      return (lv > rv) ? 1 : 0;
-    case TokenKind::kLtEq:
-      return (lv <= rv) ? 1 : 0;
-    case TokenKind::kGtEq:
-      return (lv >= rv) ? 1 : 0;
-    default:
-      return 0;
+// §11.4.4: -1, 0 or 1 as `lhs` is below, equal to or above `rhs`, both
+// extended to the wider's width -- by sign where both are signed -- and
+// compared over every word from the most significant down, a sign bit first
+// deciding between a negative and a nonnegative signed operand.
+static int CompareIntegral(Logic4Vec lhs, Logic4Vec rhs, Arena& arena) {
+  const uint32_t kWidth = std::max(lhs.width, rhs.width);
+  const bool kSigned = lhs.is_signed && rhs.is_signed;
+  if (lhs.width < kWidth) lhs = ExtendVec(lhs, kWidth, kSigned, arena);
+  if (rhs.width < kWidth) rhs = ExtendVec(rhs, kWidth, kSigned, arena);
+  if (kSigned) {
+    const uint32_t kTop = kWidth - 1;
+    const bool kLhsNegative = (lhs.words[kTop / 64].aval >> (kTop % 64)) & 1;
+    const bool kRhsNegative = (rhs.words[kTop / 64].aval >> (kTop % 64)) & 1;
+    if (kLhsNegative != kRhsNegative) return kLhsNegative ? -1 : 1;
   }
-}
-static uint64_t EvalSignedRelOp(TokenKind op, int64_t lv, int64_t rv) {
-  switch (op) {
-    case TokenKind::kLt:
-      return (lv < rv) ? 1 : 0;
-    case TokenKind::kGt:
-      return (lv > rv) ? 1 : 0;
-    case TokenKind::kLtEq:
-      return (lv <= rv) ? 1 : 0;
-    case TokenKind::kGtEq:
-      return (lv >= rv) ? 1 : 0;
-    default:
-      return 0;
+  for (uint32_t i = lhs.nwords; i > 0; --i) {
+    const uint64_t kL = lhs.words[i - 1].aval;
+    const uint64_t kR = rhs.words[i - 1].aval;
+    if (kL != kR) return kL < kR ? -1 : 1;
   }
+  return 0;
 }
+
 static bool IsEqualityOp(TokenKind op) {
   return op == TokenKind::kEqEq || op == TokenKind::kEqEqEq ||
          op == TokenKind::kBangEq || op == TokenKind::kBangEqEq ||
@@ -662,13 +687,12 @@ static Logic4Vec EvalRelational(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
   if (HasUnknownBits(lhs) || HasUnknownBits(rhs)) {
     return MakeAllX(arena, 1);
   }
-  if (lhs.is_signed && rhs.is_signed) {
-    int64_t lv = SignExtend(lhs.ToUint64(), lhs.width);
-    int64_t rv = SignExtend(rhs.ToUint64(), rhs.width);
-    return MakeLogic4VecVal(arena, 1, EvalSignedRelOp(op, lv, rv));
-  }
-  return MakeLogic4VecVal(arena, 1,
-                          EvalRelationalOp(op, lhs.ToUint64(), rhs.ToUint64()));
+  const int kOrder = CompareIntegral(lhs, rhs, arena);
+  bool holds = kOrder >= 0;
+  if (op == TokenKind::kLt) holds = kOrder < 0;
+  if (op == TokenKind::kGt) holds = kOrder > 0;
+  if (op == TokenKind::kLtEq) holds = kOrder <= 0;
+  return MakeLogic4VecVal(arena, 1, holds ? 1 : 0);
 }
 
 static std::string PackedToStr(const Logic4Vec& vec) {

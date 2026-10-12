@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "builders_ast.h"
 #include "common/types.h"
@@ -419,6 +420,52 @@ TEST(TernaryOperatorSim, TernaryUnaryNotCondition) {
   ASSERT_NE(var, nullptr);
 
   EXPECT_EQ(var->value.ToUint64(), 77u);
+}
+
+// §11.4.11 over dynamic arrays and queues: a known predicate assigns the
+// chosen array whole; an ambiguous one merges arrays of one element count
+// element by element, a differing element taking its type's default, and
+// gives arrays of different counts the empty array.
+TEST(ConditionalArraySim, DynamicArraysAndQueuesAreChosenOrMerged) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int d1[] = '{1, 2}, d2[] = '{1, 3}, r[];\n"
+                       "  int q1[$] = '{7, 8, 9}, q2[$] = '{4}, rq[$];\n"
+                       "  logic s = 1'bx;\n"
+                       "  initial begin\n"
+                       "    r = s ? d1 : d2;\n"
+                       "    $display(\"%0d %0d %0d\", r.size(), r[0], r[1]);\n"
+                       "    r = 1'b1 ? d1 : d2;\n"
+                       "    rq = s ? q1 : q2;\n"
+                       "    $display(\"%0d %0d\", r.size(), rq.size());\n"
+                       "    rq = 1'b0 ? q1 : q2;\n"
+                       "    $display(\"%0d %0d\", rq.size(), rq[0]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "2 1 0\n2 0\n1 4\n");
+}
+
+// §11.4.11 over associative arrays: a known predicate assigns the chosen one,
+// and an ambiguous one the shared contents where the two are equal and the
+// empty array, the default, where they are not.
+TEST(ConditionalArraySim, AssociativeArraysAreChosenOrEmptied) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int a1[int], a2[int], a3[int], r[int];\n"
+                       "  logic s = 1'bx;\n"
+                       "  initial begin\n"
+                       "    a1[0] = 1; a2[0] = 2; a3[0] = 1; r[5] = 9;\n"
+                       "    r = s ? a1 : a2;\n"
+                       "    $display(\"%0d\", r.num());\n"
+                       "    r = 1'b1 ? a1 : a2;\n"
+                       "    $display(\"%0d %0d\", r.num(), r[0]);\n"
+                       "    r = s ? a1 : a3;\n"
+                       "    $display(\"%0d %0d\", r.num(), r[0]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0\n1 1\n1 1\n");
 }
 
 }  // namespace

@@ -853,4 +853,23 @@ TEST(ArithmeticOperatorSim, MostNegativeLongintDividedByMinusOneWraps) {
   EXPECT_EQ(out, "-9223372036854775808 0 7\n");
 }
 
+// §11.4.3 with Table 11-4: `**` is typed by its base and its exponent is
+// self-determined, so a negative signed exponent gives 0 for a base above 1
+// and x for a zero base whatever the base's signedness, 1 for a base of 1, and
+// a signed base keeps the result signed. Above 64 bits the same holds.
+TEST(PowerOperatorSim, ExponentSignIsItsOwnAndResultTakesTheBasesType) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [7:0] a = 3, z = 0, o = 1;\n"
+                       "  int b = -2;\n"
+                       "  logic signed [3:0] m = -1;\n"
+                       "  logic [127:0] w = 3;\n"
+                       "  initial $display(\"%0d %b %0d %0d %0d %0d %0d\",\n"
+                       "      a ** -1, z ** -1, o ** -1, (b ** 2'd1) < 0,\n"
+                       "      m ** -3, w ** -1, w ** 2'd2);\n"
+                       "endmodule\n",
+                       f),
+            "0 xxxxxxxx 1 1 -1 0 9\n");
+}
+
 }  // namespace

@@ -553,4 +553,36 @@ TEST(StreamingConcatSim, AByteQueueFromAConcatenationStreamsItsBytes) {
   EXPECT_EQ(out, "010203 010203 0c0b0a09 08070605 04030201\n");
 }
 
+// §11.4.14.1 streams a non-null handle as its object's data members in
+// declaration order, base members first: a queue, a dynamic or fixed array
+// member its elements, a handle member its object's members and nothing when
+// null. A packed union, soft or not, is streamed whole.
+TEST(StreamingConcatSim, ClassMembersAndPackedUnionsStreamAsTheClauseSays) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  class Q; byte v; endclass\n"
+                 "  class B; byte b0; endclass\n"
+                 "  class P extends B;\n"
+                 "    int a; byte q[$]; byte d[]; byte f[2]; Q h, n;\n"
+                 "  endclass\n"
+                 "  P p;\n"
+                 "  union soft { bit [3:0] a; bit [7:0] b; } u;\n"
+                 "  bit [87:0] r;\n"
+                 "  bit [7:0] ur;\n"
+                 "  initial begin\n"
+                 "    p = new; p.b0 = 8'h0B; p.a = 1;\n"
+                 "    p.q = '{8'h11, 8'h22}; p.d = new[1]; p.d[0] = 8'h33;\n"
+                 "    p.f[0] = 8'h44; p.f[1] = 8'h55;\n"
+                 "    p.h = new; p.h.v = 8'h66;\n"
+                 "    r = {>> {p}};\n"
+                 "    u.b = 8'hA5;\n"
+                 "    ur = {>> {u}};\n"
+                 "    $display(\"%h %h\", r, ur);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "0b00000001112233445566 a5\n");
+}
+
 }  // namespace

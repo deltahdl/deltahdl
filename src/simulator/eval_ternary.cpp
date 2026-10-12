@@ -1,23 +1,28 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
+#include "simulator/class_object.h"
 #include "simulator/evaluation.h"
 #include "simulator/evaluation_internal.h"
 #include "simulator/pattern_match.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 
 namespace delta {
 
-// §11.4.11: the conditional operator. A determinate condition selects one
-// operand and leaves the other unevaluated where it could mutate state; an
-// ambiguous one combines the two bit by bit, or compares them numerically
-// where either is real.
+// §11.4.11: the conditional operator. A determinate predicate evaluates the
+// operand it selects and never the other; an ambiguous one evaluates both and
+// returns either where they are logically equal, and otherwise combines
+// integral ones bit by bit, compares real ones numerically and gives any other
+// type its Table 7-1 default.
 
 static Logic4Vec CombineBranches(Logic4Vec tv, Logic4Vec fv, Arena& arena) {
   uint32_t width = (tv.width > fv.width) ? tv.width : fv.width;
@@ -33,32 +38,6 @@ static Logic4Vec CombineBranches(Logic4Vec tv, Logic4Vec fv, Arena& arena) {
   }
   if (tv.is_real || fv.is_real) result.is_real = true;
   return result;
-}
-// §11.4.11: the unselected conditional operand shall not be evaluated. An
-// operand that could mutate state (an embedded assignment, ++/--, or a call)
-// is detected here so the determinate-condition path can skip it; a pure
-// operand is still evaluated to recover its result-type metadata.
-static bool ExprNodeIsSideEffect(const Expr* e) {
-  if (e->kind == ExprKind::kCall || e->kind == ExprKind::kSystemCall)
-    return true;
-  if (e->kind == ExprKind::kBinary &&
-      (e->op == TokenKind::kEq || IsCompoundAssignOp(e->op)))
-    return true;
-  return (e->kind == ExprKind::kUnary || e->kind == ExprKind::kPostfixUnary) &&
-         (e->op == TokenKind::kPlusPlus || e->op == TokenKind::kMinusMinus);
-}
-static bool ExprMayHaveSideEffect(const Expr* e) {
-  if (e == nullptr) return false;
-  if (ExprNodeIsSideEffect(e)) return true;
-  const Expr* children[] = {e->lhs,  e->rhs,   e->condition,  e->true_expr,
-                            e->base, e->index, e->false_expr, e->index_end};
-  for (const auto* c : children)
-    if (ExprMayHaveSideEffect(c)) return true;
-  for (const auto* a : e->args)
-    if (ExprMayHaveSideEffect(a)) return true;
-  for (const auto* el : e->elements)
-    if (ExprMayHaveSideEffect(el)) return true;
-  return false;
 }
 // Read a conditional operand as a floating-point value: a real vector holds a
 // double (or float, when 32-bit) bit pattern; an integral vector contributes
@@ -81,6 +60,43 @@ static Logic4Vec MakeRealVec(Arena& arena, double d) {
   r.is_real = true;
   return r;
 }
+// Table 7-1's default for each member of the unpacked structure `layout`:
+// x in every bit of a 4-state member, 0 in a 2-state one's.
+static Logic4Vec StructDefault(const StructTypeInfo& layout, Arena& arena) {
+  Logic4Vec value = MakeLogic4Vec(arena, layout.total_width);
+  for (const StructFieldInfo& field : layout.fields) {
+    if (!Is4stateType(field.type_kind)) continue;
+    for (uint32_t b = field.bit_offset; b < field.bit_offset + field.width;
+         ++b) {
+      value.words[b / 64].aval |= uint64_t{1} << (b % 64);
+      value.words[b / 64].bval |= uint64_t{1} << (b % 64);
+    }
+  }
+  return value;
+}
+
+// §11.4.11 with Table 7-1: the value a conditional over nonintegral operands
+// that are not logically equal gives under an ambiguous predicate -- "" for a
+// string, null for a class handle, each member's default for an unpacked
+// structure -- and nothing for integral operands, which Table 11-20 combines.
+// `operand` is the first expression, whose type the result has.
+static std::optional<Logic4Vec> NonintegralDefault(const Expr* operand,
+                                                   const Logic4Vec& value,
+                                                   SimContext& ctx,
+                                                   Arena& arena) {
+  if (value.is_string) {
+    Logic4Vec empty = StringToLogic4Vec(arena, "");
+    empty.is_string = true;
+    return empty;
+  }
+  if (operand->kind != ExprKind::kIdentifier) return std::nullopt;
+  if (!ctx.GetVariableClassType(operand->text).empty())
+    return MakeLogic4VecVal(arena, value.width, kNullClassHandle);
+  const StructTypeInfo* layout = ctx.GetVariableStructType(operand->text);
+  if (layout == nullptr || layout->is_packed) return std::nullopt;
+  return StructDefault(*layout, arena);
+}
+
 static Logic4Vec EvalTernaryUnknownCond(const Expr* expr, SimContext& ctx,
                                         Arena& arena, uint32_t context_width) {
   auto tv = EvalExpr(expr->true_expr, ctx, arena, context_width);
@@ -100,8 +116,15 @@ static Logic4Vec EvalTernaryUnknownCond(const Expr* expr, SimContext& ctx,
   if (context_width > width) width = context_width;
   if (tv.width < width) tv = ExtendVec(tv, width, result_signed, arena);
   if (fv.width < width) fv = ExtendVec(fv, width, result_signed, arena);
+  // §11.4.11 returns either operand only where their logical equality
+  // (§11.4.5) is 1 -- every bit known and equal -- so z bits the two share
+  // still go through Table 11-20 and come out x.
+  const bool kEqual =
+      !HasUnknownBits(tv) && !HasUnknownBits(fv) && EvalCaseEquality(tv, fv);
+  if (auto fallback = NonintegralDefault(expr->true_expr, tv, ctx, arena))
+    return kEqual ? tv : *fallback;
   Logic4Vec result;
-  if (EvalCaseEquality(tv, fv)) {
+  if (kEqual) {
     tv.is_signed = result_signed;
     result = tv;
   } else {
@@ -135,24 +158,6 @@ static Logic4Vec IntegralToReal(const Logic4Vec& v, Arena& arena) {
   r.is_real = true;
   return r;
 }
-// §11.4.11: the self-determined result type of a conditional operator -- the
-// two branches together decide signedness, realness, and width.
-struct TernaryResultType {
-  bool is_signed;
-  bool is_real;
-  uint32_t width;
-};
-
-// Fold the unselected branch's own type into the result type: the result is
-// signed only when both branches are, as wide as the wider branch, and real
-// when either branch is.
-static void WidenTernaryResultType(const Logic4Vec& other,
-                                   TernaryResultType& rt) {
-  rt.is_signed = rt.is_signed && other.is_signed;
-  if (other.width > rt.width) rt.width = other.width;
-  if (other.is_real) rt.is_real = true;
-}
-
 // §12.6.3: a conditional whose predicate binds pattern identifiers. They are
 // created in a scope that holds the predicate's later clauses and the
 // consequent (EvalMatchesPredicate), and the alternative stands outside it.
@@ -174,37 +179,46 @@ static Logic4Vec EvalTernaryBindingPredicate(const Expr* expr, SimContext& ctx,
   return ResizeToWidth(chosen, context_width, arena);
 }
 
+// §11.8.1 makes the conditional unsigned where either of its results is, and
+// §11.8.2 propagates that type down to both, so `c ? -s : u` negates s
+// zero-extended; a type propagated down to the conditional reaches them too.
 Logic4Vec EvalTernary(const Expr* expr, SimContext& ctx, Arena& arena,
-                      uint32_t context_width) {
+                      uint32_t context_width, bool unsigned_context) {
   if (PatternBindsIdentifiers(expr->condition))
     return EvalTernaryBindingPredicate(expr, ctx, arena, context_width);
-  auto cond = EvalExpr(expr->condition, ctx, arena);
-
-  if (HasUnknownBits(cond)) {
+  // §11.4.11 with §11.4.7: the predicate is read by its truth value, every
+  // word of it and a real by its value, so a 128-bit predicate set at bit 100
+  // is true and a real -0.0 false.
+  const Truth kPredicate = TruthOf(EvalExpr(expr->condition, ctx, arena));
+  if (kPredicate == Truth::kAmbiguous) {
     return EvalTernaryUnknownCond(expr, ctx, arena, context_width);
   }
-  // §11.4.11: a determinate condition selects exactly one expression; the
-  // other shall not be evaluated. A side-effect-free unselected expression is
-  // still evaluated so its width/signedness/realness contribute to the result
-  // type, but one that could mutate state is skipped.
-  bool cond_true = cond.ToUint64() != 0;
-  const Expr* other_expr = cond_true ? expr->false_expr : expr->true_expr;
-  auto chosen = EvalExpr(cond_true ? expr->true_expr : expr->false_expr, ctx,
-                         arena, context_width);
-  TernaryResultType rt{chosen.is_signed, chosen.is_real, chosen.width};
-  if (!ExprMayHaveSideEffect(other_expr))
-    WidenTernaryResultType(EvalExpr(other_expr, ctx, arena, context_width), rt);
+  // §11.4.11: a determinate predicate evaluates the expression it chooses and
+  // not the other, which §11.3.5 then lets neither take effect nor report. The
+  // other still gives the result its type, read from its form (§11.6.1,
+  // §11.8.1): as wide as the wider, signed where both are, real where either
+  // is.
+  const bool kChoosesFirst = kPredicate == Truth::kTrue;
+  const Expr* other_expr = kChoosesFirst ? expr->false_expr : expr->true_expr;
+  const bool kUnsigned = unsigned_context ||
+                         !SimSelfSigned(expr->true_expr, ctx) ||
+                         !SimSelfSigned(expr->false_expr, ctx);
+  auto chosen =
+      EvalExprInContext(kChoosesFirst ? expr->true_expr : expr->false_expr, ctx,
+                        arena, context_width, kUnsigned);
+  if (kUnsigned && !chosen.is_real) chosen.is_signed = false;
+  const bool kReal = chosen.is_real || SimSelfReal(other_expr, ctx);
   // §11.4.11: a real branch forces a real result type; an integral chosen
   // branch is converted to its real value before being returned.
-  if (rt.is_real) {
+  if (kReal) {
     if (!chosen.is_real) chosen = IntegralToReal(chosen, arena);
     return chosen;
   }
-  uint32_t width = std::max(rt.width, context_width);
+  uint32_t width =
+      std::max({chosen.width, SimSelfWidth(other_expr, ctx), context_width});
   Logic4Vec result = chosen.width < width
-                         ? ExtendVec(chosen, width, rt.is_signed, arena)
+                         ? ExtendVec(chosen, width, chosen.is_signed, arena)
                          : chosen;
-  result.is_signed = rt.is_signed;
   // Apply assignment-like context truncation (§10.8 conditional operands)
   if (context_width > 0 && result.width > context_width) {
     result = ResizeToWidth(result, context_width, arena);

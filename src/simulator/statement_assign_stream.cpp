@@ -21,46 +21,6 @@
 
 namespace delta {
 
-static uint32_t ParseDigitIdentifier(std::string_view text) {
-  uint32_t n = 0;
-  for (char c : text) {
-    if (c >= '0' && c <= '9') n = n * 10 + (c - '0');
-  }
-  return n > 0 ? n : 1;
-}
-
-static uint32_t TypeNameToSliceWidth(std::string_view t) {
-  if (t == "byte") return 8;
-  if (t == "shortint") return 16;
-  if (t == "int" || t == "integer") return 32;
-  if (t == "longint") return 64;
-  if (t == "real" || t == "realtime") return 64;
-  if (t == "shortreal") return 32;
-  if (t == "bit" || t == "logic" || t == "reg") return 1;
-  return 32;
-}
-
-static uint32_t StreamSliceSizeForUnpack(const Expr* size_expr, SimContext& ctx,
-                                         Arena& arena) {
-  if (!size_expr) return 1;
-  if (size_expr->kind == ExprKind::kIdentifier) {
-    if (!size_expr->text.empty() && size_expr->text[0] >= '0' &&
-        size_expr->text[0] <= '9') {
-      return ParseDigitIdentifier(size_expr->text);
-    }
-    return TypeNameToSliceWidth(size_expr->text);
-  }
-  auto val = EvalExpr(size_expr, ctx, arena).ToUint64();
-  auto sval = static_cast<int64_t>(val);
-  if (val == 0 || sval < 0) {
-    ctx.GetDiag().Error(size_expr->range.start,
-                        "slice_size for streaming operator must be positive",
-                        Subclause("11.4.14.2"));
-    return 1;
-  }
-  return static_cast<uint32_t>(val);
-}
-
 struct StreamElemInfo {
   const Expr* expr;
   uint32_t width;
@@ -303,7 +263,9 @@ static uint32_t CollectArrayWithRangeElements(
   }
   uint32_t added = 0;
   for (uint32_t i = 0; i < count; ++i) {
-    uint32_t abs_idx = ainfo->lo + start + i;
+    // §11.4.14.4: in the array's own order, from its left bound.
+    uint32_t abs_idx =
+        ainfo->lo + (ainfo->is_descending ? start + count - 1 - i : start + i);
     std::string name =
         std::string(elem->text) + "[" + std::to_string(abs_idx) + "]";
     elems.push_back({elem, ainfo->elem_width, std::move(name)});
@@ -406,6 +368,30 @@ static bool TryCollectGreedyDynamicElement(const Expr* elem, StreamEnv env,
   return true;
 }
 
+// §11.4.14.3 unpacks into an unpacked array element by element, in the order
+// §11.4.14.1 packs it, foreach's: a one-dimensional array from its left
+// bound, a multidimensional one leaf by leaf. A dynamic array is unpacked as a
+// queue is.
+static bool TryCollectFixedArrayElements(const Expr* elem, SimContext& ctx,
+                                         std::vector<StreamElemInfo>& elems,
+                                         uint32_t& added) {
+  if (elem->kind != ExprKind::kIdentifier) return false;
+  const ArrayInfo* ainfo = ctx.FindArrayInfo(elem->text);
+  if (ainfo == nullptr || ainfo->is_dynamic) return false;
+  std::vector<std::string> suffixes = MultiDimLeafSuffixes(*ainfo);
+  const bool kOneDimension = suffixes.empty();
+  for (uint32_t i = 0; kOneDimension && i < ainfo->size; ++i) {
+    const uint32_t kOffset = ainfo->is_descending ? ainfo->size - 1 - i : i;
+    suffixes.push_back("[" + std::to_string(ainfo->lo + kOffset) + "]");
+  }
+  for (const std::string& suffix : suffixes) {
+    elems.push_back(
+        {elem, ainfo->elem_width, std::string(elem->text) + suffix});
+    added += ainfo->elem_width;
+  }
+  return true;
+}
+
 static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
                                       Arena& arena,
                                       std::vector<StreamElemInfo>& elems,
@@ -418,7 +404,8 @@ static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
   bool first_dynamic_consumed = false;
   for (auto* elem : lhs->elements) {
     uint32_t added = 0;
-    if (TryCollectWithRangeElement(elem, ctx, arena, elems, added)) {
+    if (TryCollectWithRangeElement(elem, ctx, arena, elems, added) ||
+        TryCollectFixedArrayElements(elem, ctx, elems, added)) {
       total_width += added;
       continue;
     }
@@ -563,8 +550,11 @@ static void ForwardUnpackArrayWithRange(const Expr* elem, ArrayInfo* ainfo,
     count = (start < ainfo->size) ? ainfo->size - start : 0;
   }
   for (uint32_t i = 0; i < count; ++i) {
-    std::string name = std::string(elem->text) + "[" +
-                       std::to_string(ainfo->lo + start + i) + "]";
+    std::string name =
+        std::string(elem->text) + "[" +
+        std::to_string(ainfo->lo + (ainfo->is_descending ? start + count - 1 - i
+                                                         : start + i)) +
+        "]";
     auto* var = env.ctx.FindVariable(name);
     if (!var)
       var = env.ctx.CreateVariable(*env.arena.Create<std::string>(name),
@@ -578,6 +568,14 @@ static void ForwardUnpackArrayWithRange(const Expr* elem, ArrayInfo* ainfo,
 
 // Forward-unpack arm for a queue with-range element: write each selected queue
 // slot from successive stream bits, advancing `cursor`.
+// §11.4.14 casts a stream to its target's type, and §11.4.14.3 a 4-state one
+// unpacked into a 2-state target to that type: an element written into a
+// queue of a 2-state element type holds no x or z.
+static Logic4Vec AsQueueElement(const QueueObject& queue, Logic4Vec value) {
+  if (!queue.is_4state) CoerceTo2State(value);
+  return value;
+}
+
 static void ForwardUnpackQueueWithRange(const Expr* elem, QueueObject* queue,
                                         StreamEnv env, const StreamTaker& take,
                                         uint32_t& cursor) {
@@ -595,7 +593,8 @@ static void ForwardUnpackQueueWithRange(const Expr* elem, QueueObject* queue,
   queue->AllocateIdsForAppended();
   for (uint32_t i = 0; i < count; ++i) {
     Logic4Vec v = take(queue->elem_width);
-    if (start + i < queue->elements.size()) queue->elements[start + i] = v;
+    if (start + i < queue->elements.size())
+      queue->elements[start + i] = AsQueueElement(*queue, v);
     cursor += queue->elem_width;
   }
 }
@@ -670,7 +669,7 @@ static void UnpackStreamingConcatLhsForward(const Expr* lhs,
   // bytes backwards.
   Logic4Vec stream = rhs_val;
   if (lhs->op == TokenKind::kLtLt) {
-    uint32_t ss = StreamSliceSizeForUnpack(lhs->lhs, ctx, arena);
+    uint32_t ss = StreamSliceSize(lhs->lhs, ctx, arena);
     stream = ReverseStreamSlices(rhs_val, total, ss, arena);
   }
   uint32_t cursor = 0;  // bits already consumed from the MSB end
@@ -727,8 +726,9 @@ static void WriteStreamQueueElement(const StreamElemInfo& ei, size_t qpos,
   auto idx = static_cast<uint32_t>(std::stoul(idx_str));
   auto* queue = env.ctx.FindQueue(qname);
   if (queue && idx < queue->elements.size()) {
-    queue->elements[idx] = ExtractStreamBits(src.stream, bit_offset, ei.width,
-                                             src.total_width, env.arena);
+    queue->elements[idx] = AsQueueElement(
+        *queue, ExtractStreamBits(src.stream, bit_offset, ei.width,
+                                  src.total_width, env.arena));
   }
 }
 
@@ -812,7 +812,7 @@ void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
   Logic4Vec stream = BuildLeftAlignedStream(rhs_val, total_width, arena);
 
   if (lhs->op == TokenKind::kLtLt) {
-    uint32_t ss = StreamSliceSizeForUnpack(lhs->lhs, ctx, arena);
+    uint32_t ss = StreamSliceSize(lhs->lhs, ctx, arena);
     stream = ReverseStreamSlices(stream, total_width, ss, arena);
   }
 
@@ -864,8 +864,9 @@ static void PopulateQueueFromWidenedStream(QueueObject* queue,
   queue->elements.reserve(layout.n_elems);
   for (uint32_t i = 0; i < layout.n_elems; ++i) {
     uint32_t src_start = layout.total_w - (i + 1) * layout.elem_w;
-    queue->elements.push_back(
-        ExtractWidenedSlice(layout.widened, src_start, layout.elem_w, arena));
+    queue->elements.push_back(AsQueueElement(
+        *queue,
+        ExtractWidenedSlice(layout.widened, src_start, layout.elem_w, arena)));
   }
   queue->AssignFreshIds();
   ++queue->generation;

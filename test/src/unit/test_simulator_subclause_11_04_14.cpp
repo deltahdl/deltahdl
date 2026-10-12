@@ -334,4 +334,48 @@ TEST(StreamingOperatorSim,
   EXPECT_EQ(var->value.words[0].aval, uint64_t{0x00000001} << 32);
 }
 
+// §11.4.14 left-aligns a stream in a wider fixed-size target, zero bits on the
+// right, whatever names the target -- a continuous assignment's net, an array
+// element, a structure member -- and a narrower target is an error.
+TEST(StreamingConcatSim, StreamLeftAlignsInEveryFixedSizeTarget) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  wire [15:0] w;\n"
+                       "  wire [3:0] n;\n"
+                       "  bit [15:0] m [2];\n"
+                       "  struct packed { bit [15:0] f; } s;\n"
+                       "  assign w = {>> {8'hAB}};\n"
+                       "  assign n = {>> {8'hAB}};\n"
+                       "  initial begin\n"
+                       "    m[0] = {>> {8'hAB}};\n"
+                       "    s.f = {>> {8'hAB}};\n"
+                       "    #1 $display(\"%h %h %h\", w, m[0], s.f);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "ab00 ab00 ab00\n");
+  EXPECT_GE(f.diag.ErrorCount(), 1u);
+}
+
+// §11.4.14: a stream of no bits resizes a queue target to no elements, and a
+// queue of a 2-state element type holds no x or z, packed into or unpacked.
+TEST(StreamingConcatSim, EmptyStreamAndTwoStateQueueElements) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  byte a[$], b[$];\n"
+                 "  bit [7:0] q[$], u[$];\n"
+                 "  initial begin\n"
+                 "    b = '{1, 2};\n"
+                 "    b = {>> {a}};\n"
+                 "    q = {>> {8'hx1}};\n"
+                 "    u = '{0, 0};\n"
+                 "    {>> {u}} = 16'hxx01;\n"
+                 "    $display(\"%0d %h %h %h\", b.size(), q[0], u[0], u[1]);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "0 01 00 01\n");
+}
+
 }  // namespace

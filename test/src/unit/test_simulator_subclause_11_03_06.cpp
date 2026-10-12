@@ -345,4 +345,24 @@ TEST(AssignmentWithinExpression,
       {{"q", 54u}});
 }
 
+// §11.3.6: an assignment within an expression yields the right-hand side cast
+// to the left-hand side's type -- a real, an int rounded from a real, a signed
+// value -- which is what the left-hand side holds after it.
+TEST(AssignInExprSim, ValueIsTheRightHandSideCastToTheTargetsType) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  real r, y;\n"
+                       "  int i, k;\n"
+                       "  shortint s = -1;\n"
+                       "  initial begin\n"
+                       "    y = (r = 3) / 2;\n"
+                       "    k = (i = 2.7);\n"
+                       "    if ((i = s) < 0) $display(\"neg\");\n"
+                       "    $display(\"%0g %0d\", y, k);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "neg\n1.5 3\n");
+}
+
 }  // namespace

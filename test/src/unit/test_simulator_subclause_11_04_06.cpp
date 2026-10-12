@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "lexer/token.h"
@@ -600,6 +602,21 @@ TEST(OperatorSim, LogicalEqWiderThanOneWordComparesEveryWord) {
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 101u);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §11.4.6 compares the positions the right operand does not wildcard as ==
+// does, so a bit known on both sides and different makes ==? false, and !=?
+// true, though another bit of the left operand is x; where every known bit
+// agrees the x leaves the relation unknown.
+TEST(OperatorSim, WildcardEqKnownMismatchDecidesDespiteLhsX) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [3:0] a = 4'b1x00;\n"
+                       "  initial $display(\"%b %b %b %b\", a == 4'b0000,\n"
+                       "      a ==? 4'b0000, a !=? 4'b0000, a ==? 4'b1000);\n"
+                       "endmodule\n",
+                       f),
+            "0 0 1 x\n");
 }
 
 }  // namespace

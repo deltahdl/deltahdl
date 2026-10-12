@@ -713,4 +713,76 @@ TEST(LetConstructSim, ExampleBsLetReadsItsDeclarationScopesX) {
   EXPECT_EQ(out, "1\n");
 }
 
+// §11.12 gives each let the scope declaring it: two tasks' lets of one name
+// are their own, and a function's let reads that function's formal.
+TEST(LetSim, BlockLetsAreTheirScopesAndSeeTheirScopesNames) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module m;\n"
+                 "  task automatic t1(); let p = 1; $display(\"%0d\", p);"
+                 " endtask\n"
+                 "  task automatic t2(); let p = 2; $display(\"%0d\", p);"
+                 " endtask\n"
+                 "  function automatic int f(int a);\n"
+                 "    let dbl = a * 2;\n"
+                 "    return dbl;\n"
+                 "  endfunction\n"
+                 "  initial begin t1(); t2(); $display(\"%0d\", f(3)); end\n"
+                 "endmodule\n",
+                 f),
+      "1\n2\n6\n");
+}
+
+// §11.12 substitutes the actuals into the body: a call in an actual of a call
+// to the same let is no recursion, an untyped formal keeps its actual's sign,
+// a typed one takes its type -- an int is 32 bits, a byte signed -- and the
+// body is sized by the expression the instance stands in.
+TEST(LetSim, ActualsAreSubstitutedWithTheirTypes) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module m;\n"
+                 "  int v = -5;\n"
+                 "  logic [7:0] a = 8'hFF, b = 8'h01;\n"
+                 "  logic [8:0] r;\n"
+                 "  let add(x, y) = x + y;\n"
+                 "  let neg(x) = x < 0;\n"
+                 "  let w(int x) = $bits(x);\n"
+                 "  let n(byte x) = x < 0;\n"
+                 "  initial begin\n"
+                 "    r = add(a, b);\n"
+                 "    $display(\"%0d %0d %0d %0d %0d %h\", add(add(1, 2), 3),\n"
+                 "             neg(v), w(8'hFF), n(8'hFF), n(8'h01), r);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "6 1 32 1 0 100\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §11.12 resolves a let's default in the scope declaring it, so a block's own
+// `b` does not stand in for the module's, and each instance of a let whose
+// body calls $past keeps a history of its own (§16.9.3).
+TEST(LetSim, DefaultsReadTheDeclaringScopeAndInstancesKeepTheirHistory) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  logic b = 1;\n"
+                       "  let eq(x, y = b) = x == y;\n"
+                       "  logic clk = 0, a = 0, c = 1, pa, pc;\n"
+                       "  let prev(x) = $past(x);\n"
+                       "  always #5 clk = ~clk;\n"
+                       "  always @(posedge clk) begin\n"
+                       "    pa = prev(a);\n"
+                       "    pc = prev(c);\n"
+                       "  end\n"
+                       "  initial begin\n"
+                       "    automatic logic b = 0;\n"
+                       "    $display(\"%0d\", eq(1'b1));\n"
+                       "    #31 $display(\"%b %b\", pa, pc);\n"
+                       "    $finish;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1\n0 1\n");
+}
+
 }  // namespace

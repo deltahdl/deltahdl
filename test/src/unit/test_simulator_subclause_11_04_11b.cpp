@@ -509,4 +509,75 @@ TEST(ConditionalOperatorSim, UnpackedArrayOperandsYieldTheChosenArray) {
   EXPECT_EQ(out, "1 2 9 8 1 0 0001 xxxx\n");
 }
 
+// §11.4.11 with §11.4.7: the predicate is read by its truth value, every word
+// of an integral one and the value of a real one, so a 128-bit predicate set
+// at bit 100 is true, a real -0.0 false, and 4'b1x00, which has a known 1
+// bit, true.
+TEST(ConditionalOperatorSim, PredicateIsReadByItsTruthValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [127:0] c = 128'h1 << 100;\n"
+                       "  real z = -0.0;\n"
+                       "  logic [3:0] v = 4'b1x00;\n"
+                       "  initial $display(\"%0d %0d %0d\", c ? 1 : 2,\n"
+                       "                   z ? 1 : 2, v ? 1 : 2);\n"
+                       "endmodule\n",
+                       f),
+            "1 2 1\n");
+}
+
+// §11.4.11 with §11.3.5: the expression a known predicate does not choose is
+// not evaluated, so a read of a nonexistent associative entry there reports
+// nothing. It still types the result: an unchosen real makes it real, and an
+// unchosen wider operand widens the chosen one.
+TEST(ConditionalOperatorSim, UnchosenBranchIsNotEvaluated) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int aa[int];\n"
+                       "  int k = 5, r;\n"
+                       "  real rr = 1.5;\n"
+                       "  logic signed [3:0] s = -1;\n"
+                       "  logic signed [7:0] w = 0;\n"
+                       "  initial begin\n"
+                       "    r = aa.exists(k) ? aa[k] : -1;\n"
+                       "    $display(\"%0d %0.1f %h\", r, 1'b1 ? 2 : rr,\n"
+                       "             1'b1 ? s : w);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "-1 2.0 ff\n");
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §11.4.11: under an ambiguous predicate either operand is returned only where
+// the two are logically equal; z bits they share are not, and come out x by
+// Table 11-20. Strings, class handles and unpacked structures that differ take
+// their type's Table 7-1 default: "", null, and each member's own.
+TEST(ConditionalOperatorSim, AmbiguousPredicateOverOperandsNotLogicallyEqual) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("class C; endclass\n"
+                 "module t;\n"
+                 "  typedef struct { int i; logic [3:0] l; } s_t;\n"
+                 "  logic s = 1'bx;\n"
+                 "  logic [1:0] a = 2'bz0, r;\n"
+                 "  C ca = new, cb = new, cr;\n"
+                 "  string s1 = \"ab\", s2 = \"cd\", rs, re;\n"
+                 "  s_t sa = '{5, 4'h3}, sb = '{5, 4'h4}, sr, se;\n"
+                 "  initial begin\n"
+                 "    r = s ? a : a;\n"
+                 "    cr = s ? ca : cb;\n"
+                 "    rs = s ? s1 : s2;\n"
+                 "    re = s ? s1 : s1;\n"
+                 "    sr = s ? sa : sb;\n"
+                 "    se = s ? sa : sa;\n"
+                 "    $display(\"%b %0d %0d %s %0d %b %0d\", r, cr == null,\n"
+                 "             rs == \"\", re, sr.i, sr.l, se.i);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "x0 1 1 ab 0 xxxx 5\n");
+}
+
 }  // namespace

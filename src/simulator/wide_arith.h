@@ -23,6 +23,9 @@ class Arena;
 struct WideArithSpec {
   uint32_t width = 0;
   bool is_signed = false;
+  // §11.4.3: `**`'s exponent is self-determined, so whether it is negative is
+  // its own signedness's to say, apart from the base's that `is_signed` gives.
+  bool exponent_is_signed = false;
 };
 
 // Computes `op` over every word of two known operands. The caller has already

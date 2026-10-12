@@ -297,7 +297,8 @@ Logic4Vec EvalWideArith(TokenKind op, const Logic4Vec& lhs,
       // exponent's bits as a magnitude, which a negative exponent is not. A
       // zero base under a negative exponent is x in every bit (§11.4.3, Table
       // 11-4), as a division by zero is.
-      if (spec.is_signed && IsNegative(b, spec.width)) {
+      b = ToLimbs(rhs, spec.width, spec.exponent_is_signed);
+      if (spec.exponent_is_signed && IsNegative(b, spec.width)) {
         if (IsZero(a)) return MakeAllX(arena, spec.width);
         result = NegativeExponentResult(a, b, spec.width);
         break;

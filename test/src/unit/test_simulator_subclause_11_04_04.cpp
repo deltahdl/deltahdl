@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "lexer/token.h"
@@ -367,6 +369,22 @@ TEST(OperatorSim, UnsignedNetOperandsCompareUnsigned) {
       f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+// §11.4.4 compares relational operands over their whole width, so values that
+// differ only above bit 63 are ordered by those bits, and signed operands of
+// one width are ordered by their signs first.
+TEST(RelationalOperatorSim, OperandsAreComparedOverEveryWord) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  logic [127:0] a = 128'h1 << 100, b = 128'h1;\n"
+                 "  logic signed [127:0] n = -1, p = 1;\n"
+                 "  initial $display(\"%b %b %b %b %b %b\", a > b, a <= b,\n"
+                 "                   n < p, p < n, a >= a, b < a);\n"
+                 "endmodule\n",
+                 f),
+      "1 0 1 0 1 1\n");
 }
 
 }  // namespace

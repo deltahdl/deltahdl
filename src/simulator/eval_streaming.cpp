@@ -32,10 +32,14 @@ static uint32_t ParseDigitStr(std::string_view text) {
   return n;
 }
 
-static uint32_t StreamSliceSize(const Expr* size_expr, SimContext& ctx,
-                                Arena& arena) {
+// §11.4.14.2: a slice_size is a simple type, whose bit count it is, or a
+// constant integral expression, which shall be positive. A name the run holds
+// a value for -- a parameter -- is the second, read for its value; any other
+// name is a type, a typedef's among them, sized as a cast's is.
+uint32_t StreamSliceSize(const Expr* size_expr, SimContext& ctx, Arena& arena) {
   if (!size_expr) return 1;
-  if (size_expr->kind == ExprKind::kIdentifier) {
+  if (size_expr->kind == ExprKind::kIdentifier &&
+      ctx.FindVariable(size_expr->text) == nullptr) {
     uint32_t num = ParseDigitStr(size_expr->text);
     if (num > 0) return num;
     return ResolveCastWidth(size_expr->text, ctx);
@@ -150,10 +154,15 @@ static void ExpandArrayElementsSliced(std::string_view name, SimContext& ctx,
                ? MakeAllX(ctx.GetArena(), info->elem_width)
                : MakeLogic4VecVal(ctx.GetArena(), info->elem_width, 0);
   };
+  // §11.4.14.4 has the range behave as a slice and §11.4.14.1 streams an
+  // array as its foreach traverses it, from the left bound, so a descending
+  // array's range runs from its highest index down.
   uint32_t start = range.start;
   for (uint32_t i = 0; i < range.count; ++i) {
-    uint32_t abs_idx = info->lo + start + i;
-    if (start + i < info->size) {
+    const uint32_t kOffset =
+        info->is_descending ? start + range.count - 1 - i : start + i;
+    uint32_t abs_idx = info->lo + kOffset;
+    if (kOffset < info->size) {
       std::string elem_name =
           std::string(name) + "[" + std::to_string(abs_idx) + "]";
       auto* var = ctx.FindVariable(elem_name);
@@ -180,10 +189,12 @@ static void ExpandQueueElementsSliced(QueueObject* queue,
                                       StreamSliceRange range) {
   uint32_t start = range.start;
   for (uint32_t i = 0; i < range.count; ++i) {
+    // §11.4.14.4 with Table 7-1: an item past the queue's end reads as a
+    // nonexistent entry does, x for a 4-state element.
     if (start + i < queue->elements.size()) {
       parts.push_back(queue->elements[start + i]);
     } else {
-      parts.push_back(MakeLogic4Vec(arena, queue->elem_width));
+      parts.push_back(NonexistentQueueElement(queue, arena));
     }
     total_width += queue->elem_width;
   }
@@ -233,7 +244,12 @@ static void ExpandUnionFirstMember(Variable* var, const StructTypeInfo* sinfo,
   total_width += f.width;
 }
 
-static void ExpandClassProperties(ClassObject* obj,
+// §11.4.14.1 streams a non-null class handle by streaming each of its object's
+// data members in declaration order, the procedure applied to each in turn: a
+// queue member gives its elements, an array member (§7.4.2, §7.5) the
+// elements it holds from the left, a handle member its own object's members
+// and nothing where it is null, and any other member its value.
+static void ExpandClassProperties(ClassObject* obj, SimContext& ctx,
                                   std::vector<Logic4Vec>& parts,
                                   uint32_t& total_width, Arena& arena) {
   std::vector<const ClassTypeInfo*> chain;
@@ -242,14 +258,39 @@ static void ExpandClassProperties(ClassObject* obj,
   for (auto* t : chain) {
     for (const auto& prop : t->properties) {
       if (prop.is_static) continue;
-      auto it = obj->properties.find(std::string(prop.name));
-      if (it != obj->properties.end()) {
-        parts.push_back(it->second);
-        total_width += it->second.width;
-      } else {
+      const std::string kName(prop.name);
+      if (auto q = obj->queue_properties.find(kName);
+          q != obj->queue_properties.end()) {
+        ExpandQueueElements(q->second, parts, total_width, arena);
+        continue;
+      }
+      if (prop.IsArray()) {
+        const uint32_t kSize =
+            prop.is_dynamic ? ClassArraySize(obj, prop) : prop.array_size;
+        const int64_t kLo = prop.is_dynamic ? 0 : prop.array_lo;
+        for (uint32_t i = 0; i < kSize; ++i) {
+          auto it =
+              obj->properties.find(ClassArrayElementKey(prop.name, kLo + i));
+          parts.push_back(it != obj->properties.end()
+                              ? it->second
+                              : MakeLogic4Vec(arena, prop.width));
+          total_width += prop.width;
+        }
+        continue;
+      }
+      auto it = obj->properties.find(kName);
+      if (it == obj->properties.end()) {
         parts.push_back(MakeLogic4Vec(arena, prop.width));
         total_width += prop.width;
+        continue;
       }
+      if (ctx.FindClassType(prop.type_name) != nullptr) {
+        if (ClassObject* member = ctx.GetClassObject(it->second.ToUint64()))
+          ExpandClassProperties(member, ctx, parts, total_width, arena);
+        continue;
+      }
+      parts.push_back(it->second);
+      total_width += it->second.width;
     }
   }
 }
@@ -302,6 +343,15 @@ static bool TryExpandStructAggregate(const Expr* elem,
                                      StreamExpandSink& sink) {
   auto* var = sink.ctx.FindVariable(elem->text);
   if (!var) return false;
+  // §11.4.14.1 casts a bit-stream operand to a packed array of bits and
+  // appends it whole, which a packed structure or union -- a soft one too,
+  // whose members keep their own widths -- is; only an unpacked untagged
+  // union goes through its first member.
+  if (sinfo->is_packed || sinfo->is_soft) {
+    sink.parts.push_back(var->value);
+    sink.total_width += var->value.width;
+    return true;
+  }
   if (sinfo->is_union) {
     ExpandUnionFirstMember(var, sinfo, sink.parts, sink.total_width,
                            sink.arena);
@@ -325,7 +375,7 @@ static bool TryExpandClassAggregate(const Expr* elem, SimContext& ctx,
   }
   auto* obj = ctx.GetClassObject(handle);
   if (obj) {
-    ExpandClassProperties(obj, parts, total_width, arena);
+    ExpandClassProperties(obj, ctx, parts, total_width, arena);
     return true;
   }
   return false;
@@ -437,7 +487,9 @@ Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
     parts.push_back(EvalExpr(elem, ctx, arena));
     total_width += parts.back().width;
   }
-  if (total_width == 0) return MakeLogic4Vec(arena, 1);
+  // §11.4.14: a stream of no bits stays one, so a dynamically sized target is
+  // resized to no elements.
+  if (total_width == 0) return MakeLogic4Vec(arena, 0);
 
   auto concat = MakeLogic4Vec(arena, total_width);
   uint32_t bit_pos = 0;

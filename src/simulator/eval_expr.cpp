@@ -49,37 +49,26 @@ bool ExtractMethodCallParts(const Expr* expr, MethodCallParts& out) {
   return true;
 }
 
-struct ReplicateInner {
-  uint64_t aval = 0;
-  uint64_t bval = 0;
+// §11.4.12.1: the concatenation a replication repeats, its operands
+// self-determined -- an unbased unsized literal among them one bit wide
+// (§5.7.1) -- and joined as a concatenation joins them, every word of each.
+static Logic4Vec EvalReplicateInner(const Expr* expr, SimContext& ctx,
+                                    Arena& arena) {
+  std::vector<Logic4Vec> parts;
   uint32_t width = 0;
   bool is_string = false;
-};
-
-static ReplicateInner EvalReplicateInner(const Expr* expr, SimContext& ctx,
-                                         Arena& arena) {
-  ReplicateInner inner;
-  std::vector<Logic4Vec> parts;
-  // §11.4.12.1: the inner expression of a replication is self-determined, an
-  // unbased unsized literal among its operands one bit wide (§5.7.1).
   for (auto* elem : expr->elements) {
     parts.push_back(EvalExpr(elem, ctx, arena));
-    if (parts.back().is_string) inner.is_string = true;
-    inner.width += parts.back().width;
+    is_string = is_string || parts.back().is_string;
+    width += parts.back().width;
   }
-  uint32_t bit_pos = 0;
-  for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
-    // Replication copies the operand's bits verbatim, so preserve the raw
-    // 4-state encoding; ToUint64() would project unknown bits to 0.
-    uint64_t av = (it->nwords > 0) ? it->words[0].aval : 0;
-    uint64_t bv = (it->nwords > 0) ? it->words[0].bval : 0;
-    inner.aval |= av << bit_pos;
-    inner.bval |= bv << bit_pos;
-    bit_pos += it->width;
-  }
+  Logic4Vec inner = AssembleConcatParts(parts, width, arena);
+  inner.is_string = is_string;
   return inner;
 }
 
+// §11.4.12.1 joins `count` copies of the inner concatenation, the whole of it
+// each time, and §11.4.12.2 leaves a string replication untruncated.
 Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena) {
   uint32_t count = static_cast<uint32_t>(
       EvalExpr(expr->repeat_count, ctx, arena).ToUint64());
@@ -88,25 +77,9 @@ Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena) {
     return MakeLogic4Vec(arena, 0);
   }
   if (expr->elements.empty()) return MakeLogic4Vec(arena, 0);
-
-  auto inner = EvalReplicateInner(expr, ctx, arena);
-  uint32_t total_width = inner.width * count;
-  auto result = MakeLogic4Vec(arena, total_width);
-  uint32_t bit_pos = 0;
-  uint32_t ew = (inner.width > 64) ? 64 : inner.width;
-  for (uint32_t i = 0; i < count; ++i) {
-    uint32_t word = bit_pos / 64;
-    uint32_t bit = bit_pos % 64;
-    if (word < result.nwords) {
-      result.words[word].aval |= inner.aval << bit;
-      result.words[word].bval |= inner.bval << bit;
-      if (bit + ew > 64 && word + 1 < result.nwords) {
-        result.words[word + 1].aval |= inner.aval >> (64 - bit);
-        result.words[word + 1].bval |= inner.bval >> (64 - bit);
-      }
-    }
-    bit_pos += inner.width;
-  }
+  Logic4Vec inner = EvalReplicateInner(expr, ctx, arena);
+  std::vector<Logic4Vec> copies(count, inner);
+  Logic4Vec result = AssembleConcatParts(copies, inner.width * count, arena);
   result.is_string = inner.is_string;
   return result;
 }

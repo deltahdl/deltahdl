@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
@@ -234,6 +236,30 @@ TEST(StreamReordering, LeftShiftWideShortLastBlockKeepsItsSize) {
   EXPECT_EQ(var->value.words[0].aval, 0xABCDEF0123456789u);
   EXPECT_EQ(var->value.words[1].aval, 0x765432100F0FA5A5u);
   EXPECT_EQ(var->value.words[2].aval, 0xFEDCBA98u);
+}
+
+// §11.4.14.2: a slice_size names a simple type, a typedef among them, whose
+// bit count it is, or is a constant expression, a parameter's value, which
+// shall be positive; packing and unpacking read it alike.
+TEST(StreamSliceSizeSim, ParameterAndTypedefSliceSizesPackAndUnpack) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  parameter W = 8;\n"
+                       "  parameter Z = 0;\n"
+                       "  typedef logic [3:0] nib_t;\n"
+                       "  logic [15:0] r, z;\n"
+                       "  logic [7:0] a, b;\n"
+                       "  initial begin\n"
+                       "    r = {<< W {16'hABCD}};\n"
+                       "    {<< nib_t {a}} = 8'hAB;\n"
+                       "    {<< W {b}} = 8'hAB;\n"
+                       "    $display(\"%h %h %h\", r, a, b);\n"
+                       "    z = {<< Z {16'hABCD}};\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "cdab ba ab\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
 }  // namespace

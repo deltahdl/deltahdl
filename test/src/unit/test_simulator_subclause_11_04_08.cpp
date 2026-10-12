@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "builders_ast.h"
 #include "common/types.h"
@@ -494,6 +495,25 @@ TEST(BitwiseEval, BinaryXnorBothUnsignedYieldsUnsigned) {
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.ToUint64(), 0b1001u);
   EXPECT_FALSE(result.is_signed);
+}
+
+// §11.4.8 makes a bitwise result signed where both operands are, and §11.8.2
+// extends each operand to the expression's width before the operator applies,
+// by sign then, whether or not the two widths agree.
+TEST(BitwiseOperatorSim, SignedOperandsOfEqualWidthAreSignExtended) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic signed [3:0] a = -1, b = -1;\n"
+                       "  logic [3:0] u = 4'hf;\n"
+                       "  logic signed [7:0] r, q;\n"
+                       "  initial begin\n"
+                       "    r = a & b;\n"
+                       "    q = a & u;\n"
+                       "    $display(\"%h %h\", r, q);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "ff 0f\n");
 }
 
 }  // namespace

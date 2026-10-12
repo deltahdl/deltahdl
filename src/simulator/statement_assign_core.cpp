@@ -31,6 +31,7 @@
 #include "simulator/eval_semaphore.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
+#include "simulator/evaluation_internal.h"
 #include "simulator/modport_expression.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -543,6 +544,32 @@ void RecordPropertyTags(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   RecordTaggedValueTags(stmt->rhs, std::move(key), layout, ctx, arena);
 }
 
+// §11.9 with §7.3.2: the tag is part of a tagged union value, so assigning one
+// gives the target the tag of what it assigns -- a tagged expression's own, a
+// variable's copied whole, or that of the expression a conditional chooses
+// (§11.4.11), its predicate read again. It is recorded under the key the
+// target's storage was created by (TagKeyOfName, §23.9), the one a
+// declaration initializer's tag already stands under.
+static void RecordAssignedTag(const Stmt* stmt, SimContext& ctx, Arena& arena) {
+  const Expr* source = stmt->rhs;
+  while (source != nullptr && source->kind == ExprKind::kTernary) {
+    const Truth kChoice = TruthOf(EvalExpr(source->condition, ctx, arena));
+    if (kChoice == Truth::kAmbiguous) return;
+    source = kChoice == Truth::kTrue ? source->true_expr : source->false_expr;
+  }
+  if (source == nullptr) return;
+  const std::string kKey = TagKeyOfName(stmt->lhs->text, ctx);
+  if (source->kind == ExprKind::kTagged) {
+    RecordTaggedValueTags(source, kKey,
+                          StructLayoutOfName(stmt->lhs->text, ctx), ctx, arena);
+    return;
+  }
+  if (source->kind != ExprKind::kIdentifier) return;
+  const std::string_view kTag =
+      ctx.GetVariableTag(TagKeyOfName(source->text, ctx));
+  if (!kTag.empty()) ctx.SetVariableTag(*arena.Create<std::string>(kKey), kTag);
+}
+
 void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val, SimContext& ctx,
                        Arena& arena) {
   auto* var = ResolveLhsVariable(stmt->lhs, ctx);
@@ -559,14 +586,7 @@ void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val, SimContext& ctx,
     if (!var->is_4state) CoerceTo2State(var->value);
     var->NotifyWatchers();
 
-    // §11.9 with §23.9: the tag is recorded under the key the target's
-    // storage was created by (TagKeyOfName), the one a declaration
-    // initializer's tag already stands under, so both forms name one tag.
-    if (stmt->rhs && stmt->rhs->kind == ExprKind::kTagged && stmt->rhs->rhs) {
-      RecordTaggedValueTags(stmt->rhs, TagKeyOfName(stmt->lhs->text, ctx),
-                            StructLayoutOfName(stmt->lhs->text, ctx), ctx,
-                            arena);
-    }
+    RecordAssignedTag(stmt, ctx, arena);
   } else if (stmt->lhs->kind == ExprKind::kMemberAccess) {
     if (WriteStructField(stmt->lhs, rhs_val, ctx))
       RecordPropertyTags(stmt, ctx, arena);
@@ -790,6 +810,7 @@ bool TryDispatchSpecialBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                       Arena& arena) {
   if (TryDeconstructingPatternAssign(stmt, ctx, arena)) return true;
   if (TryConditionalArrayAssign(stmt, ctx, arena)) return true;
+  if (TryConditionalCollectionAssign(stmt, ctx, arena)) return true;
   // §13.4.1 with §7.6 and §7.10: `av = fa()` copies the array the call
   // returned into the array or queue it is assigned to.
   if (TryCallResultArrayAssign(stmt, ctx, arena)) return true;

@@ -19,6 +19,7 @@
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/evaluation_internal.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
@@ -242,8 +243,11 @@ Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena) {
   // the member arm below replaces it with the one its writer resolved.
   uint32_t yield_width = target_width;
   auto lhs_val = EvalExpr(expr->lhs, ctx, arena);
-  auto rhs_val = EvalExpr(expr->rhs, ctx, arena);
   auto base_op = CompoundAssignBaseOp(expr->op);
+  // §11.4.1 with §11.6.1: as CompoundOperandWidth states it, the right
+  // operand of an operator sizing by context takes the assignment's width.
+  auto rhs_val = EvalExpr(expr->rhs, ctx, arena,
+                          IsMaxWidthBinaryOp(base_op) ? target_width : 0);
   auto result = EvalBinaryOp(base_op, lhs_val, rhs_val, arena, target_width);
   if (auto* whole = WholeVariableOfMember(expr->lhs, ctx)) {
     // §10.7 sizes the value to the variable, which LhsContextWidth did not

@@ -48,7 +48,22 @@ int64_t LongintValue(const Logic4Vec& val) {
                        : static_cast<int64_t>(val.ToUint64());
 }
 
-int64_t SelectBoundValue(const Logic4Vec& val) { return LongintValue(val); }
+// Whether LongintValue reads `val`'s whole value: the words above the first
+// repeat the sign LongintValue gives it, which an unsigned value never has
+// negative. Each word is compared within the bits of the value it holds.
+static bool HeldInSixtyFourBits(const Logic4Vec& val) {
+  const int64_t kLow = LongintValue(val);
+  const uint64_t kFill = kLow < 0 ? ~uint64_t{0} : 0;
+  for (uint32_t w = 1; w < val.nwords; ++w) {
+    const uint32_t kBits = std::min<uint32_t>(64, val.width - (w * 64));
+    if (val.words[w].aval != (kFill >> (64 - kBits))) return false;
+  }
+  return val.is_signed || kLow >= 0;
+}
+
+int64_t SelectBoundValue(const Logic4Vec& val) {
+  return HeldInSixtyFourBits(val) ? LongintValue(val) : kBeyondEveryBound;
+}
 
 static uint64_t ResolveQueueIdx(const Expr* idx_expr, QueueObject* q,
                                 SimContext& ctx, Arena& arena,

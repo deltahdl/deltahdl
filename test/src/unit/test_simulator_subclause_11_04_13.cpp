@@ -76,23 +76,19 @@ TEST(EvalOp, InsideOverlappingRangesMatch) {
 // §11.4.13: the result is the OR reduction of the per-member comparisons, so a
 // definite match anywhere in the set produces 1'b1 even when another member's
 // comparison is ambiguous (x). Here `om` has an x bit that makes the first
-// comparison ambiguous, but the [0:15] range is a definite match.
+// comparison ambiguous, and the [4:4] range, which takes `<=` and `>=`
+// (§11.4.4), is ambiguous for it too; the member 4'b1000 differs from it in a
+// known bit, a definite mismatch, and 4'b0?00 is a definite match.
 TEST(EvalOpXZ, InsideOrReductionMatchOverridesAmbiguous) {
   SimFixture f;
-
-  MakeVar4(f, "om", 4, 0b0000, 0b0100);
-
-  auto* inside = f.arena.Create<Expr>();
-  inside->kind = ExprKind::kInside;
-  inside->lhs = MakeId(f.arena, "om");
-
-  inside->elements.push_back(MakeInt(f.arena, 0b0100));
-
-  inside->elements.push_back(
-      MakeRange(f.arena, MakeInt(f.arena, 0), MakeInt(f.arena, 15)));
-
-  auto result = EvalExpr(inside, f.ctx, f.arena);
-  EXPECT_EQ(result.ToUint64(), 1u);
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [3:0] om = 4'b0x00;\n"
+                       "  initial $display(\"%b %b %b\",\n"
+                       "      om inside {4'b0100, [4:4], 4'b0?00},\n"
+                       "      om inside {[4:4]}, om inside {4'b1000});\n"
+                       "endmodule\n",
+                       f),
+            "1 x 0\n");
 }
 
 // §11.4.13: the marquee do-not-care example driven through the full pipeline.
@@ -382,6 +378,66 @@ TEST(InsideOperatorSim, AnAssociativeArrayInTheSetContributesItsValues) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "1 0 1 0\n");
+}
+
+// §11.4.13 compares an integral member by ==? and a nonintegral one by ==, and
+// a range by <= and >=, each on the operands' own types: a signed range holds
+// a negative value, a real is compared as a real, two signed operands of
+// unequal widths are brought to one by sign, and every word takes part. A
+// string range is ordered as strings are.
+TEST(InsideOperatorSim, MembersAndRangesCompareOnTheOperandsTypes) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  int x = -3;\n"
+                 "  real r = 1.0;\n"
+                 "  logic signed [3:0] a = -1;\n"
+                 "  logic [127:0] w = 0;\n"
+                 "  string s = \"b\";\n"
+                 "  initial $display(\"%b %b %b %b %b %b\",\n"
+                 "      x inside {[-5:5]}, r inside {1}, a inside {-1},\n"
+                 "      w inside {{1'b1, 64'h0}}, s inside {[\"a\":\"c\"]},\n"
+                 "      x inside {[5:-5]});\n"
+                 "endmodule\n",
+                 f),
+      "1 1 1 0 1 0\n");
+}
+
+// §11.4.13: `$` is the lowest or highest value of the left operand's type,
+// a signed int's being -2**31 and 2**31-1, an unsigned one's 0 and all ones,
+// and a real's the extremes of a real.
+TEST(InsideOperatorSim, DollarBoundIsTheLeftOperandsTypeExtreme) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int x = -5;\n"
+                       "  logic [3:0] u = 9;\n"
+                       "  real r = -1.0e300;\n"
+                       "  initial $display(\"%b %b %b %b %b\",\n"
+                       "      x inside {[$:0]}, x inside {[0:$]},\n"
+                       "      u inside {[10:$]}, u inside {[$:9]},\n"
+                       "      r inside {[$:0.0]});\n"
+                       "endmodule\n",
+                       f),
+            "1 0 0 1 1\n");
+}
+
+// §11.4.13: a tolerance range is of A's type with its bounds ordered, a real A
+// keeping its fraction and an integral one truncating the tolerance: 25% of
+// 7.0 is [5.25:8.75], 7.0 +/- 1.5 is [5.5:8.5], and 25% of -7 is [-8:-6].
+TEST(InsideOperatorSim, ToleranceRangeTakesTheTypeOfItsCentre) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  real r = 8.5;\n"
+                 "  int A = -7, v = -100, w = -8, z = -5;\n"
+                 "  logic [3:0] b = 4'bx001;\n"
+                 "  initial $display(\"%b %b %b %b %b %b\",\n"
+                 "      r inside {[7.0 +%- 25]}, r inside {[7.0 +/- 1.5]},\n"
+                 "      v inside {[A +%- 25]}, w inside {[A +%- 25]},\n"
+                 "      z inside {[A +%- 25]}, 1 inside {[b +/- 1]});\n"
+                 "endmodule\n",
+                 f),
+      "1 1 0 1 0 x\n");
 }
 
 }  // namespace

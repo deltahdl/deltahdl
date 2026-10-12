@@ -357,6 +357,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/statement_assign_compound.cpp
     simulator/statement_assign_concat.cpp
     simulator/statement_assign_core.cpp
+    simulator/statement_assign_conditional.cpp
     simulator/statement_assign_object.cpp
     simulator/statement_assign_pattern.cpp
     simulator/statement_assign_array_value.cpp
@@ -634,6 +635,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_system_task_dump.cpp
     simulator/monitor_member_watch.cpp
     simulator/evaluation_ops.cpp
+    simulator/evaluation_self_type.cpp
     simulator/wide_arith.cpp
     simulator/class_specialization.cpp
     simulator/class_specialization_key.cpp

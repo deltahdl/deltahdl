@@ -697,4 +697,27 @@ TEST(StreamingWithSim, ReverseUnpackRangeReadsAnEarlierTarget) {
   EXPECT_EQ(out, "11223344 3 1 2 3 6 3\n");
 }
 
+// §11.4.14.4: a with-range past a 4-state queue's end streams the missing
+// items as nonexistent entries, x; a range over a descending array is a slice
+// of it, taken from its left bound, packing and unpacking.
+TEST(StreamWithRangeSim, MissingItemsAreXAndDescendingRangesRunLeftToRight) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [7:0] q[$];\n"
+                       "  logic [7:0] a [3:0], d [3:0];\n"
+                       "  logic [31:0] r;\n"
+                       "  logic [15:0] s;\n"
+                       "  initial begin\n"
+                       "    q = '{8'hAA, 8'hBB};\n"
+                       "    r = {>> {q with [0 +: 4]}};\n"
+                       "    a[3] = 8'h33; a[2] = 8'h22;\n"
+                       "    s = {>> {a with [3:2]}};\n"
+                       "    {>> {d with [3:2]}} = 16'h4455;\n"
+                       "    $display(\"%h %h %h %h\", r, s, d[3], d[2]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "aabbxxxx 3322 44 55\n");
+}
+
 }  // namespace

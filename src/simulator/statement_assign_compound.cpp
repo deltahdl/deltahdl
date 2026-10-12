@@ -6,6 +6,7 @@
 #include "parser/ast_stmt.h"
 #include "simulator/assoc_element.h"
 #include "simulator/evaluation.h"
+#include "simulator/evaluation_internal.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
@@ -60,9 +61,19 @@ static void CompoundAssignToMember(const Stmt* stmt, TokenKind base_op,
   WriteStructField(stmt->lhs, result, ctx);
 }
 
+uint32_t CompoundOperandWidth(TokenKind base_op, const Expr* lhs,
+                              SimContext& ctx, Arena& arena) {
+  return IsMaxWidthBinaryOp(base_op) ? LhsContextWidth(lhs, ctx, arena) : 0;
+}
+
 void ApplyCompoundAssignOp(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto base_op = CompoundAssignBaseOp(stmt->rhs->op);
-  auto actual_rhs = EvalExpr(stmt->rhs->rhs, ctx, arena);
+  // The left-hand indices are evaluated once (§11.4.1), here, before the
+  // width of the left-hand side is read for the right operand.
+  SnapshotSelectIndices(stmt->lhs, ctx, arena);
+  auto actual_rhs =
+      EvalExpr(stmt->rhs->rhs, ctx, arena,
+               CompoundOperandWidth(base_op, stmt->lhs, ctx, arena));
 
   if (stmt->lhs->kind == ExprKind::kIdentifier) {
     auto* var = ResolveLhsVariable(stmt->lhs, ctx);
@@ -74,7 +85,6 @@ void ApplyCompoundAssignOp(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       WriteVar(var, result, arena);
     }
   } else if (stmt->lhs->kind == ExprKind::kSelect) {
-    SnapshotSelectIndices(stmt->lhs, ctx, arena);
     if (auto* elem = TryResolveArrayElement(stmt->lhs, ctx)) {
       auto result = EvalBinaryOp(base_op, elem->value, actual_rhs, arena);
       WriteVar(elem, result, arena);

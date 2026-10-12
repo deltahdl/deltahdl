@@ -174,10 +174,57 @@ void SubstituteWithRanges(const Expr* lhs, Expr& rewritten, Arena& arena) {
   }
 }
 
+// The object a non-null class handle variable `e` names, or null.
+ClassObject* HandleTargetObject(const Expr* e, SimContext& ctx) {
+  if (e->kind != ExprKind::kIdentifier ||
+      ctx.GetVariableClassType(e->text).empty())
+    return nullptr;
+  const Variable* var = ctx.FindVariable(e->text);
+  return var == nullptr ? nullptr : ctx.GetClassObject(var->value.ToUint64());
+}
+
+// §11.4.14.3 unpacks a stream as the reverse of packing, and §11.4.14.1 packs
+// a non-null class handle as its object's data members in declaration order,
+// base members first, so such a target stands for those members, each a
+// property target: `{>> {h}}` for `{>> {h.a, h.b}}`.
+const Expr* ExpandHandleTargets(const Expr* lhs, SimContext& ctx,
+                                Arena& arena) {
+  std::vector<Expr*> expanded;
+  bool any = false;
+  for (Expr* e : lhs->elements) {
+    ClassObject* obj = HandleTargetObject(e, ctx);
+    if (obj == nullptr) {
+      expanded.push_back(e);
+      continue;
+    }
+    any = true;
+    std::vector<const ClassTypeInfo*> chain;
+    for (auto* t = obj->type; t != nullptr; t = t->parent) chain.push_back(t);
+    for (auto it = chain.rbegin(); it != chain.rend(); ++it) {
+      for (const auto& prop : (*it)->properties) {
+        if (prop.is_static) continue;
+        auto* member = arena.Create<Expr>();
+        member->kind = ExprKind::kMemberAccess;
+        member->lhs = e;
+        member->rhs = arena.Create<Expr>();
+        member->rhs->kind = ExprKind::kIdentifier;
+        member->rhs->text = prop.name;
+        member->range = e->range;
+        expanded.push_back(member);
+      }
+    }
+  }
+  if (!any) return lhs;
+  auto* copy = arena.Create<Expr>(*lhs);
+  copy->elements = std::move(expanded);
+  return copy;
+}
+
 }  // namespace
 
 bool TryUnpackStreamIntoProperties(const Expr* lhs, const Logic4Vec& rhs_val,
                                    SimContext& ctx, Arena& arena) {
+  lhs = ExpandHandleTargets(lhs, ctx, arena);
   bool any = false;
   for (const Expr* e : lhs->elements) any = any || IsPropertyTarget(e);
   if (!any) return false;

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "builders_ast.h"
 #include "common/types.h"
@@ -436,6 +437,51 @@ TEST(EvalSteps, RealEqualityOperandPullsIntegerPartnerIntoRealCompare) {
       "result");
   // 2.5 != 2 is true; a truncated integer comparison (2 != 2) would be false.
   EXPECT_EQ(result, 1u);
+}
+
+// §11.8.1 makes an expression unsigned where any context-determined operand is,
+// and §11.8.2 propagates that type down with the size, so a signed operand
+// beneath an unsigned one is extended by zero before its own operator runs:
+// through an operator of either width class, a unary minus and a
+// conditional's results. Operands that are all signed keep sign extension; a
+// comparison, a logical or reduction operator and a concatenation are
+// unsigned, a part-select and an enumeration name leave the value's own sign
+// to decide, and a real operand is converted with its sign.
+TEST(ExpressionTypePropagationSim, UnsignedOperandPropagatesItsTypeDown) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  typedef enum {A, B} e_t;\n"
+                 "  logic signed [3:0] s = -1;\n"
+                 "  logic [3:0] u = 1;\n"
+                 "  real rv = 2.0;\n"
+                 "  logic c = 1;\n"
+                 "  logic [7:0] r [1:18];\n"
+                 "  initial begin\n"
+                 "    r[1] = (s + s) + u;\n"
+                 "    r[2] = -s + u;\n"
+                 "    r[3] = c ? -s : u;\n"
+                 "    r[4] = (s <<< 1) + u;\n"
+                 "    r[5] = (s + 4'sd1) + 8'd0;\n"
+                 "    r[6] = (s + 1) + s;\n"
+                 "    r[7] = (!s) + s;\n"
+                 "    r[8] = (&s) + s;\n"
+                 "    r[9] = {s} + s;\n"
+                 "    r[10] = (s < u) + s;\n"
+                 "    r[11] = (c ? s : s) + s;\n"
+                 "    r[12] = rv + s;\n"
+                 "    r[13] = s[1:0] + s;\n"
+                 "    r[14] = B + s;\n"
+                 "    r[15] = (s <<< 1) + s;\n"
+                 "    r[16] = (rv + s) + u;\n"
+                 "    r[17] = (-rv) + u;\n"
+                 "    r[18] = c ? rv : u;\n"
+                 "    for (int i = 1; i <= 18; i++) $write(\"%h \", r[i]);\n"
+                 "    $display;\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "1f f2 f1 1f 10 ff 0f 10 1e 0f fe 01 12 00 fd 02 ff 02 \n");
 }
 
 }  // namespace

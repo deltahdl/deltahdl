@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "builders_ast.h"
 #include "common/types.h"
@@ -737,6 +738,36 @@ TEST(BlockingAssignSim, BlockingAssignLogicalOps) {
   ASSERT_NE(r_or, nullptr);
   EXPECT_EQ(r_and->value.ToUint64(), 0u);
   EXPECT_EQ(r_or->value.ToUint64(), 1u);
+}
+
+// §11.4.7: an operand is true where any bit is a known 1, false where every
+// bit is a known 0 and ambiguous otherwise, every word of it taking part and a
+// real by its value; `&&`, `||` and `->` evaluate the second operand only
+// where the first leaves the result open (§11.3.5).
+TEST(LogicalOperatorSim, TruthIsReadFromEveryKnownBitAndARealsValue) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module m;\n"
+                 "  logic [127:0] w = 128'h1 << 100;\n"
+                 "  logic [3:0] v = 4'b1x00, u = 4'b0x00;\n"
+                 "  real z = -0.0;\n"
+                 "  int n = 0;\n"
+                 "  function int f(); n++; return 1; endfunction\n"
+                 "  initial begin\n"
+                 "    $display(\"%b %b %b %b %b\", !w, w && 1'b1, w || 1'b0,\n"
+                 "             !z, z && 1);\n"
+                 "    $display(\"%b %b %b %b %b %b\", !v, v && 1'b1, !u,\n"
+                 "             u || 1'b0, u -> 1'b0, 1'b1 -> u);\n"
+                 "    $display(\"%b %b %b %b\", v <-> 1'b1, u <-> 1'b1,\n"
+                 "             1'b0 <-> u, 1'b0 <-> 1'b1);\n"
+                 "    if (w || f()) ;\n"
+                 "    if (v || f()) ;\n"
+                 "    if (z && f()) ;\n"
+                 "    $display(\"%0d\", n);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "0 1 1 1 0\n0 1 x x x x\n1 x x 0\n0\n");
 }
 
 }  // namespace

@@ -15,12 +15,33 @@
 #include "parser/ast_type.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/scope.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
 static thread_local std::unordered_set<std::string_view> expanding_lets;
+// The let instances whose bodies are being evaluated, innermost last.
+static thread_local std::vector<const Expr*> let_instances;
+// The lets a block or a subroutine body declares, whose declaring scope is the
+// frame their instances stand in (RegisterBlockLet).
+static thread_local std::unordered_set<const ModuleItem*> block_lets;
+
+static thread_local uint32_t call_context_width = 0;
+
+uint32_t CallContextWidth() { return call_context_width; }
+
+uint32_t SetCallContextWidth(uint32_t width) {
+  return std::exchange(call_context_width, width);
+}
+
+uint64_t CurrentLetInstance() {
+  return let_instances.empty()
+             ? 0
+             : reinterpret_cast<uint64_t>(let_instances.back());
+}
 
 static int FindLetNamedActualIndex(const FunctionArg& formal, const Expr* call,
                                    size_t positional_count) {
@@ -41,8 +62,13 @@ static Logic4Vec EvalLetActualForFormal(const FunctionArg& formal, size_t i,
   if (found >= 0 && b.call->args[static_cast<size_t>(found)]) {
     return EvalExpr(b.call->args[static_cast<size_t>(found)], b.ctx, b.arena);
   }
+  // §11.12: a default names what the scope declaring the let gives its
+  // names, not what the call's scope does: a module's let reads the module's.
   if (formal.default_value) {
-    return EvalExpr(formal.default_value, b.ctx, b.arena);
+    auto caller_scopes = b.ctx.SwapScopeStack({});
+    Logic4Vec value = EvalExpr(formal.default_value, b.ctx, b.arena);
+    b.ctx.SwapScopeStack(std::move(caller_scopes));
+    return value;
   }
   return MakeLogic4Vec(b.arena, 32);
 }
@@ -73,13 +99,16 @@ static Logic4Vec ResizeLetActualToFormal(Logic4Vec val,
                                          SimContext& ctx, Arena& arena) {
   const DataType* resolved = ctx.PackedTypeBehind(formal_type);
   const auto& dt = resolved != nullptr ? *resolved : formal_type;
-  if (dt.kind != DataTypeKind::kImplicit && dt.packed_dim_left &&
-      dt.packed_dim_right) {
-    uint32_t formal_width = EvalTypeWidth(dt);
-    if (formal_width > 0 && formal_width != val.width) {
-      val = ResizeToWidth(val, formal_width, arena);
-    }
+  // An untyped formal takes the actual as it is, its sign among it (§11.12's
+  // substitution); a typed integral one its own width and sign, an integer
+  // atom type's included, `int x` taking 8'hFF as 32 bits.
+  if (dt.kind == DataTypeKind::kImplicit && dt.packed_dim_left == nullptr)
+    return val;
+  uint32_t formal_width = EvalTypeWidth(dt);
+  if (!val.is_real && formal_width > 0 && formal_width != val.width) {
+    val = ResizeToWidth(val, formal_width, arena);
   }
+  if (!val.is_real) val.is_signed = DeclaredTypeIsSigned(dt, ctx);
   // §11.12 rule 2 / example e: casting to a 2-state typed formal drives every
   // unknown (x) or high-impedance (z) actual bit to 0. Work on a fresh copy so
   // the coercion never mutates a value shared with the actual's own storage.
@@ -124,11 +153,14 @@ static void BindLetArgs(ModuleItem* decl, const std::vector<Logic4Vec>& vals,
   for (size_t i = 0; i < formals.size(); ++i) {
     auto* var = ctx.CreateLocalVariable(formals[i].name, vals[i].width);
     var->value = vals[i];
+    var->is_signed = vals[i].is_signed;
+    var->is_real = vals[i].is_real;
+    var->is_string = vals[i].is_string;
   }
 }
 
 Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call, SimContext& ctx,
-                           Arena& arena) {
+                           Arena& arena, uint32_t context_width) {
   if (expanding_lets.count(decl->name)) {
     // §11.12: recursive let instantiations are not permitted. Report the
     // illegal self-reference rather than silently expanding it away, then
@@ -141,25 +173,35 @@ Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call, SimContext& ctx,
                         Subclause("11.12"));
     return MakeAllX(arena, 32);
   }
+  // The actuals are expressions of the call, not of the body, so a call to
+  // the let among them, `add(add(1, 2), 3)`, is no recursion: they are
+  // evaluated before the let is marked as expanding.
+  auto vals = EvalLetActuals(decl, call, ctx, arena);
   expanding_lets.insert(decl->name);
 
-  auto vals = EvalLetActuals(decl, call, ctx, arena);
-
-  auto saved_scopes = ctx.SwapScopeStack({});
+  // §11.12 resolves the body's other names in the scope declaring the let: a
+  // block's or a subroutine's let sees that frame, which its instances stand
+  // within, and a module's sees the module's names alone.
+  const bool kBlockLet = block_lets.contains(decl);
+  std::vector<Scope> saved_scopes;
+  if (!kBlockLet) saved_scopes = ctx.SwapScopeStack({});
   ctx.PushScope();
   BindLetArgs(decl, vals, ctx);
-  auto result = EvalExpr(decl->init_expr, ctx, arena);
+  let_instances.push_back(call);
+  auto result = EvalExpr(decl->init_expr, ctx, arena, context_width);
+  let_instances.pop_back();
   ctx.PopScope();
-  ctx.SwapScopeStack(std::move(saved_scopes));
+  if (!kBlockLet) ctx.SwapScopeStack(std::move(saved_scopes));
   expanding_lets.erase(decl->name);
   return result;
 }
 
 void RegisterBlockLet(const Stmt* stmt, SimContext& ctx) {
   ModuleItem* let = stmt->decl_item;
-  if (let == nullptr || let->kind != ModuleItemKind::kLetDecl ||
-      ctx.FindLetDecl(let->name) != nullptr)
-    return;
+  if (let == nullptr || let->kind != ModuleItemKind::kLetDecl) return;
+  const ModuleItem* known = ctx.FindLetDecl(let->name);
+  if (known != nullptr && !block_lets.contains(known)) return;
+  block_lets.insert(let);
   ctx.RegisterLetDecl(let->name, let);
 }
 

@@ -1,7 +1,8 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -11,91 +12,141 @@
 #include "simulator/eval_array.h"
 #include "simulator/eval_class_array.h"
 #include "simulator/evaluation.h"
+#include "simulator/evaluation_internal.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
 
 namespace delta {
 
-static uint64_t ResolveDollarBound(uint32_t width, bool lower) {
-  if (lower) return 0;
-  if (width >= 64) return ~uint64_t{0};
-  return (uint64_t{1} << width) - 1;
+namespace {
+
+// The 1, 0 or x a one-bit comparison gives, as EvalInsideElement's 1, 0 and 2.
+int ComparisonOutcome(const Logic4Vec& bit) {
+  if (!bit.IsKnown()) return 2;
+  return bit.ToUint64() != 0 ? 1 : 0;
 }
 
-static void ComputeToleranceBounds(uint64_t a, uint64_t b, TokenKind op,
-                                   uint64_t& lo, uint64_t& hi) {
-  uint64_t tol = b;
-  if (op == TokenKind::kPlusPercentMinus) tol = a * b / 100;
-  lo = (a >= tol) ? a - tol : 0;
-  hi = a + tol;
-  if (lo > hi) std::swap(lo, hi);
+// §11.6.1 with §11.8.1: a comparison of two integral operands sizes both to
+// the larger of their widths, extending by sign where both are signed; a real
+// or a string operand is compared as it stands.
+Logic4Vec Compare(TokenKind op, Logic4Vec lhs, Logic4Vec rhs, Arena& arena) {
+  if (!lhs.is_real && !rhs.is_real && !lhs.is_string && !rhs.is_string) {
+    const uint32_t kWidth = std::max(lhs.width, rhs.width);
+    const bool kSigned = lhs.is_signed && rhs.is_signed;
+    if (lhs.width < kWidth) lhs = ExtendVec(lhs, kWidth, kSigned, arena);
+    if (rhs.width < kWidth) rhs = ExtendVec(rhs, kWidth, kSigned, arena);
+  }
+  return EvalBinaryOp(op, lhs, rhs, arena, 0);
 }
 
-static int InsideMatchTolerance(uint64_t lv, const Expr* elem, SimContext& ctx,
-                                Arena& arena) {
+// §11.4.13: whether `lhs` is inclusively within [lo:hi], by `>=` and `<=` on
+// their own types. A range whose low bound is above its high one is empty.
+int WithinRange(const Logic4Vec& lhs, const Logic4Vec& lo, const Logic4Vec& hi,
+                Arena& arena) {
+  if (ComparisonOutcome(Compare(TokenKind::kGt, lo, hi, arena)) == 1) return 0;
+  const int kAbove =
+      ComparisonOutcome(Compare(TokenKind::kGtEq, lhs, lo, arena));
+  const int kBelow =
+      ComparisonOutcome(Compare(TokenKind::kLtEq, lhs, hi, arena));
+  if (kAbove == 0 || kBelow == 0) return 0;
+  return kAbove == 1 && kBelow == 1 ? 1 : 2;
+}
+
+// The real value of `v`, a real one as it is and an integral one by its sign.
+double RealOf(const Logic4Vec& v) {
+  if (v.is_real) return RealVecToDouble(v);
+  if (v.is_signed) return static_cast<double>(LongintValue(v));
+  return static_cast<double>(v.ToUint64());
+}
+
+// §11.4.13: a `$` bound stands for the lowest or the highest value of the left
+// operand's type -- the extremes of a real, the sign bit alone and every bit
+// but it for a signed integral type, and no bit and every bit for an unsigned
+// one.
+Logic4Vec DollarBound(const Logic4Vec& lhs, bool lower, Arena& arena) {
+  if (lhs.is_real) {
+    const double kMax = std::numeric_limits<double>::max();
+    return MakeRealVec(arena, lower ? -kMax : kMax, lhs.width);
+  }
+  Logic4Vec bound = MakeLogic4Vec(arena, lhs.width);
+  for (uint32_t b = 0; b < lhs.width; ++b) {
+    const bool kIsSignBit = lhs.is_signed && b == lhs.width - 1;
+    if (lower == kIsSignBit)
+      bound.words[b / 64].aval |= uint64_t{1} << (b % 64);
+  }
+  bound.is_signed = lhs.is_signed;
+  return bound;
+}
+
+// §11.4.13: [A +/- B] is [A-type(A)'(B) : A+type(A)'(B)] and [A +%- B] is
+// [A-type(A)'(A*B/100.0) : A+type(A)'(A*B/100.0)], the bounds ordered
+// whatever their signs and of A's type, a tolerance converted to an integral
+// A truncated rather than rounded: 25% of 7 is [6:8] and of -7 is [-8:-6].
+int InsideMatchTolerance(const Logic4Vec& lhs, const Expr* elem,
+                         SimContext& ctx, Arena& arena) {
   auto a_v = EvalExpr(elem->index, ctx, arena);
   auto b_v = EvalExpr(elem->index_end, ctx, arena);
   if (!a_v.IsKnown() || !b_v.IsKnown()) return 2;
-  uint64_t lo = 0;
-  uint64_t hi = 0;
-  ComputeToleranceBounds(a_v.ToUint64(), b_v.ToUint64(), elem->op, lo, hi);
-  return (lv >= lo && lv <= hi) ? 1 : 0;
+  const double kA = RealOf(a_v);
+  double tolerance = RealOf(b_v);
+  if (elem->op == TokenKind::kPlusPercentMinus)
+    tolerance = kA * tolerance / 100.0;
+  if (a_v.is_real) {
+    const double kLo = std::min(kA - tolerance, kA + tolerance);
+    const double kHi = std::max(kA - tolerance, kA + tolerance);
+    return WithinRange(lhs, MakeRealVec(arena, kLo, a_v.width),
+                       MakeRealVec(arena, kHi, a_v.width), arena);
+  }
+  const auto kTolerance = static_cast<int64_t>(tolerance);
+  const int64_t kInt = LongintValue(a_v);
+  const int64_t kLo = std::min(kInt - kTolerance, kInt + kTolerance);
+  const int64_t kHi = std::max(kInt - kTolerance, kInt + kTolerance);
+  Logic4Vec lo = MakeLogic4VecVal(arena, a_v.width, static_cast<uint64_t>(kLo));
+  Logic4Vec hi = MakeLogic4VecVal(arena, a_v.width, static_cast<uint64_t>(kHi));
+  lo.is_signed = a_v.is_signed;
+  hi.is_signed = a_v.is_signed;
+  return WithinRange(lhs, lo, hi, arena);
 }
 
-static bool IsDollarExpr(const Expr* e) {
+bool IsDollarExpr(const Expr* e) {
   return e->kind == ExprKind::kIdentifier && e->text == "$";
 }
 
-static int InsideMatchRange(Logic4Vec lhs, const Expr* elem, SimContext& ctx,
-                            Arena& arena) {
+// §11.4.13: a range is matched by `<=` and `>=`, so an x or z bit in the left
+// operand leaves the comparison ambiguous, which the OR reduction over the set
+// keeps unless another member matches.
+int InsideMatchRange(const Logic4Vec& lhs, const Expr* elem, SimContext& ctx,
+                     Arena& arena) {
   if (elem->op == TokenKind::kPlusSlashMinus ||
-      elem->op == TokenKind::kPlusPercentMinus) {
-    if (!lhs.IsKnown()) return 2;
-    return InsideMatchTolerance(lhs.ToUint64(), elem, ctx, arena);
-  }
-
-  uint64_t lo = IsDollarExpr(elem->index)
-                    ? ResolveDollarBound(lhs.width, true)
-                    : EvalExpr(elem->index, ctx, arena).ToUint64();
-  uint64_t hi = IsDollarExpr(elem->index_end)
-                    ? ResolveDollarBound(lhs.width, false)
-                    : EvalExpr(elem->index_end, ctx, arena).ToUint64();
-  if (lo > hi) return 0;
-
-  // §11.4.13: with x/z bits in the left operand the comparison ranges over
-  // every concretization of the unknown bits. ToUint64() projects those bits to
-  // 0 (the minimum); setting them to 1 gives the maximum. If the whole span
-  // lies inside [lo, hi] the membership is a definite 1; if it lies entirely
-  // outside, a definite 0; otherwise the comparison is ambiguous (x) and
-  // OR-reduces with the other set members.
-  uint64_t unknown = lhs.nwords > 0 ? lhs.words[0].bval : 0;
-  uint64_t lv_min = lhs.ToUint64();
-  uint64_t lv_max = lv_min | unknown;
-  if (lv_min >= lo && lv_max <= hi) return 1;
-  if (lv_max < lo || lv_min > hi) return 0;
-  return 2;
+      elem->op == TokenKind::kPlusPercentMinus)
+    return InsideMatchTolerance(lhs, elem, ctx, arena);
+  Logic4Vec lo = IsDollarExpr(elem->index) ? DollarBound(lhs, true, arena)
+                                           : EvalExpr(elem->index, ctx, arena);
+  Logic4Vec hi = IsDollarExpr(elem->index_end)
+                     ? DollarBound(lhs, false, arena)
+                     : EvalExpr(elem->index_end, ctx, arena);
+  return WithinRange(lhs, lo, hi, arena);
 }
 
-// Compares the left-hand expression against one singular set member, returning
-// 1 for a match, 0 for a mismatch, and 2 when the comparison is ambiguous (x).
-// Integral members use wildcard equality so an x or z bit on the member side is
-// a do-not-care, while an x or z bit that survives on the left-hand side leaves
-// the comparison ambiguous (§11.4.13, §11.4.6).
-static int CompareInsideValue(const Logic4Vec& lhs, const Logic4Vec& ev) {
-  uint64_t rhs_dc = ev.nwords > 0 ? ev.words[0].bval : 0;
-  uint64_t lhs_x = lhs.nwords > 0 ? lhs.words[0].bval : 0;
-  if (lhs_x & ~rhs_dc) return 2;
-  if (rhs_dc || lhs_x) {
-    return (((lhs.ToUint64() ^ ev.ToUint64()) & ~rhs_dc) == 0) ? 1 : 0;
-  }
-  return (lhs.ToUint64() == ev.ToUint64()) ? 1 : 0;
+// §11.4.13 with §11.4.6: an integral set member is compared by wildcard
+// equality, so its x and z bits are do-not-cares and the left operand's are
+// not, and a nonintegral one -- a real, a string -- by equality, each on the
+// operands' own widths, signedness and every word.
+int CompareInsideValue(const Logic4Vec& lhs, const Logic4Vec& ev,
+                       Arena& arena) {
+  const bool kIntegral =
+      !lhs.is_real && !ev.is_real && !lhs.is_string && !ev.is_string;
+  return ComparisonOutcome(Compare(
+      kIntegral ? TokenKind::kEqEqQuestion : TokenKind::kEqEq, lhs, ev, arena));
 }
 
-static int InsideMatchValue(Logic4Vec lhs, const Expr* elem, SimContext& ctx,
-                            Arena& arena) {
-  return CompareInsideValue(lhs, EvalExpr(elem, ctx, arena));
+int InsideMatchValue(const Logic4Vec& lhs, const Expr* elem, SimContext& ctx,
+                     Arena& arena) {
+  return CompareInsideValue(lhs, EvalExpr(elem, ctx, arena), arena);
 }
+
+}  // namespace
 
 // §11.4.13: descends every unpacked dimension of a multidimensional array set
 // member, gathering the singular per-element leaf values named arr[i0][i1]...
@@ -154,10 +205,11 @@ bool CollectUnpackedSetMembers(const Expr* elem, SimContext& ctx,
 // member. Returns 1 on the first match, 2 if any comparison was ambiguous (and
 // none matched), and 0 otherwise.
 static int MatchUnpackedSetMembers(const Logic4Vec& lhs,
-                                   const std::vector<Logic4Vec>& members) {
+                                   const std::vector<Logic4Vec>& members,
+                                   Arena& arena) {
   int result = 0;
   for (const auto& member : members) {
-    int mr = CompareInsideValue(lhs, member);
+    int mr = CompareInsideValue(lhs, member, arena);
     if (mr == 1) return 1;
     if (mr == 2) result = 2;
   }
@@ -171,7 +223,7 @@ static bool TryMatchUnpackedSetMember(const Logic4Vec& lhs, const Expr* elem,
                                       SimContext& ctx, int& out) {
   std::vector<Logic4Vec> members;
   if (!CollectUnpackedSetMembers(elem, ctx, members)) return false;
-  out = MatchUnpackedSetMembers(lhs, members);
+  out = MatchUnpackedSetMembers(lhs, members, ctx.GetArena());
   return true;
 }
 

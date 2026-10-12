@@ -338,15 +338,11 @@ static Logic4Vec EvalAssignInExpr(const Expr* expr, SimContext& ctx,
   uint32_t lhs_w = AssignExprLhsWidth(expr->lhs, ctx);
   if (lhs_w == 0) return rhs_val;
   PerformBlockingAssign(expr->lhs, rhs_val, ctx, arena);
-  // §11.3.6: a concatenation target yields an unsigned integral result whose
-  // width is the sum of its operand widths. Re-pack the value rather than
-  // forwarding the right-hand side so the result never inherits the
-  // right-hand side's signedness, even when the widths already match.
-  bool lhs_is_concat = expr->lhs->kind == ExprKind::kConcatenation;
-  if (lhs_w == rhs_val.width && !lhs_is_concat) return rhs_val;
-  uint64_t v = rhs_val.ToUint64();
-  if (lhs_w < 64) v &= (uint64_t{1} << lhs_w) - 1;
-  return MakeLogic4VecVal(arena, lhs_w, v);
+  // §11.3.6: the value is the right-hand side cast to the left-hand side's
+  // type, which is what the assignment left there -- a real, a signed value,
+  // a 2-state one, every word -- and for a concatenation target the unsigned
+  // value its operands' widths sum to, so the target is read back.
+  return EvalExpr(expr->lhs, ctx, arena);
 }
 
 static bool ArrayElementsEqual(std::string_view a, const ArrayInfo* ai,
@@ -393,64 +389,53 @@ static bool TryArrayEqualityOp(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
+// §11.4.7 with §11.3.5: each logical operator reads its operands' truth
+// values (TruthOf), and `&&`, `||` and `->` evaluate the second only where the
+// first leaves the result open: a false first operand decides `&&` and `->`,
+// a true one decides `||`.
 static Logic4Vec EvalLogicalAnd(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
-  auto l = EvalExpr(expr->lhs, ctx, arena);
-  bool l_unknown = HasUnknownBits(l);
-  if (!l_unknown && l.ToUint64() == 0) {
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
-  auto r = EvalExpr(expr->rhs, ctx, arena);
-  bool r_unknown = HasUnknownBits(r);
-  if (!r_unknown && r.ToUint64() == 0) {
-    return MakeLogic4VecVal(arena, 1, 0);
-  }
-  if (l_unknown || r_unknown) return MakeAllX(arena, 1);
-  return MakeLogic4VecVal(arena, 1, 1);
+  const Truth kLeft = TruthOf(EvalExpr(expr->lhs, ctx, arena));
+  if (kLeft == Truth::kFalse) return TruthBit(Truth::kFalse, arena);
+  const Truth kRight = TruthOf(EvalExpr(expr->rhs, ctx, arena));
+  if (kRight == Truth::kFalse) return TruthBit(Truth::kFalse, arena);
+  return TruthBit(kLeft == Truth::kTrue && kRight == Truth::kTrue
+                      ? Truth::kTrue
+                      : Truth::kAmbiguous,
+                  arena);
 }
 
 static Logic4Vec EvalLogicalOr(const Expr* expr, SimContext& ctx,
                                Arena& arena) {
-  auto l = EvalExpr(expr->lhs, ctx, arena);
-  bool l_unknown = HasUnknownBits(l);
-  if (!l_unknown && l.ToUint64() != 0) {
-    return MakeLogic4VecVal(arena, 1, 1);
-  }
-  auto r = EvalExpr(expr->rhs, ctx, arena);
-  bool r_unknown = HasUnknownBits(r);
-  if (!r_unknown && r.ToUint64() != 0) {
-    return MakeLogic4VecVal(arena, 1, 1);
-  }
-  if (l_unknown || r_unknown) return MakeAllX(arena, 1);
-  return MakeLogic4VecVal(arena, 1, 0);
+  const Truth kLeft = TruthOf(EvalExpr(expr->lhs, ctx, arena));
+  if (kLeft == Truth::kTrue) return TruthBit(Truth::kTrue, arena);
+  const Truth kRight = TruthOf(EvalExpr(expr->rhs, ctx, arena));
+  if (kRight == Truth::kTrue) return TruthBit(Truth::kTrue, arena);
+  return TruthBit(kLeft == Truth::kFalse && kRight == Truth::kFalse
+                      ? Truth::kFalse
+                      : Truth::kAmbiguous,
+                  arena);
 }
 
 static Logic4Vec EvalLogicalImpl(const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
-  auto l = EvalExpr(expr->lhs, ctx, arena);
-  bool l_unknown = HasUnknownBits(l);
-  if (!l_unknown && l.ToUint64() == 0) {
-    return MakeLogic4VecVal(arena, 1, 1);
-  }
-  auto r = EvalExpr(expr->rhs, ctx, arena);
-  bool r_unknown = HasUnknownBits(r);
-  if (!r_unknown && r.ToUint64() != 0) {
-    return MakeLogic4VecVal(arena, 1, 1);
-  }
-  if (l_unknown || r_unknown) return MakeAllX(arena, 1);
-  return MakeLogic4VecVal(arena, 1, 0);
+  const Truth kLeft = TruthOf(EvalExpr(expr->lhs, ctx, arena));
+  if (kLeft == Truth::kFalse) return TruthBit(Truth::kTrue, arena);
+  const Truth kRight = TruthOf(EvalExpr(expr->rhs, ctx, arena));
+  if (kRight == Truth::kTrue) return TruthBit(Truth::kTrue, arena);
+  return TruthBit(kLeft == Truth::kTrue && kRight == Truth::kFalse
+                      ? Truth::kFalse
+                      : Truth::kAmbiguous,
+                  arena);
 }
 
 static Logic4Vec EvalLogicalEquiv(const Expr* expr, SimContext& ctx,
                                   Arena& arena) {
-  auto l = EvalExpr(expr->lhs, ctx, arena);
-  auto r = EvalExpr(expr->rhs, ctx, arena);
-  bool l_unknown = HasUnknownBits(l);
-  bool r_unknown = HasUnknownBits(r);
-  if (l_unknown || r_unknown) return MakeAllX(arena, 1);
-  bool lv = l.ToUint64() != 0;
-  bool rv = r.ToUint64() != 0;
-  return MakeLogic4VecVal(arena, 1, (lv == rv) ? 1 : 0);
+  const Truth kLeft = TruthOf(EvalExpr(expr->lhs, ctx, arena));
+  const Truth kRight = TruthOf(EvalExpr(expr->rhs, ctx, arena));
+  if (kLeft == Truth::kAmbiguous || kRight == Truth::kAmbiguous)
+    return TruthBit(Truth::kAmbiguous, arena);
+  return TruthBit(kLeft == kRight ? Truth::kTrue : Truth::kFalse, arena);
 }
 // Operands of an identity-equality comparison, after resolving each side's
 // identifier node, bound variable, and null/event classification.
@@ -537,41 +522,6 @@ static bool TryEvalIdentityEquality(const Expr* expr, SimContext& ctx,
   return false;
 }
 
-// §11.6.1 Table 11-21: arithmetic and bitwise operators whose result width is
-// the maximum width of the two operands; both operands are context-determined.
-static bool IsMaxWidthBinaryOp(TokenKind op) {
-  switch (op) {
-    case TokenKind::kPlus:
-    case TokenKind::kMinus:
-    case TokenKind::kStar:
-    case TokenKind::kSlash:
-    case TokenKind::kPercent:
-    case TokenKind::kAmp:
-    case TokenKind::kPipe:
-    case TokenKind::kCaret:
-    case TokenKind::kTildeCaret:
-    case TokenKind::kCaretTilde:
-      return true;
-    default:
-      return false;
-  }
-}
-
-// §11.6.1: shift and power operators whose result width is the left operand's
-// width; the left operand is context-determined, the right self-determined.
-static bool IsLeftWidthBinaryOp(TokenKind op) {
-  switch (op) {
-    case TokenKind::kPower:
-    case TokenKind::kLtLt:
-    case TokenKind::kGtGt:
-    case TokenKind::kLtLtLt:
-    case TokenKind::kGtGtGt:
-      return true;
-    default:
-      return false;
-  }
-}
-
 // §11.6.1 Table 11-21: the relational and equality operators, whose two
 // operands are sized to the larger of their lengths before they are compared.
 static bool IsSizedComparisonOp(TokenKind op) {
@@ -579,55 +529,6 @@ static bool IsSizedComparisonOp(TokenKind op) {
   return op == kEqEq || op == kBangEq || op == kEqEqEq || op == kBangEqEq ||
          op == kEqEqQuestion || op == kBangEqQuestion || op == kLt ||
          op == kLtEq || op == kGt || op == kGtEq;
-}
-
-static bool IsUnaryReductionOp(TokenKind op) {
-  switch (op) {
-    case TokenKind::kAmp:
-    case TokenKind::kPipe:
-    case TokenKind::kCaret:
-    case TokenKind::kTildeAmp:
-    case TokenKind::kTildePipe:
-    case TokenKind::kTildeCaret:
-    case TokenKind::kCaretTilde:
-      return true;
-    default:
-      return false;
-  }
-}
-
-// §11.6.1: the self-determined bit length of an expression, resolving variable
-// widths through the simulation context. Returns 0 ("indeterminate") for node
-// kinds whose width cannot be derived structurally (selects, member access,
-// calls, casts, ...); callers treat 0 as "do not force-widen", so such an
-// operand keeps its own evaluated width and the result is left unchanged.
-static uint32_t SimSelfWidth(const Expr* expr, SimContext& ctx) {
-  if (!expr) return 0;
-  switch (expr->kind) {
-    case ExprKind::kIntegerLiteral:
-      return LiteralWidth(expr->text, expr->int_val);
-    case ExprKind::kUnbasedUnsizedLiteral:
-      return 1;  // §5.7.1: one bit where self-determined
-    case ExprKind::kIdentifier: {
-      auto* var = ctx.FindVariable(expr->text);
-      return var ? var->value.width : 0;
-    }
-    case ExprKind::kUnary:
-      if (expr->op == TokenKind::kBang || IsUnaryReductionOp(expr->op))
-        return 1;
-      return SimSelfWidth(expr->lhs, ctx);
-    case ExprKind::kBinary:
-      if (IsMaxWidthBinaryOp(expr->op))
-        return std::max(SimSelfWidth(expr->lhs, ctx),
-                        SimSelfWidth(expr->rhs, ctx));
-      if (IsLeftWidthBinaryOp(expr->op)) return SimSelfWidth(expr->lhs, ctx);
-      return 1;  // comparison / equality / logical -> one-bit result
-    case ExprKind::kTernary:
-      return std::max(SimSelfWidth(expr->true_expr, ctx),
-                      SimSelfWidth(expr->false_expr, ctx));
-    default:
-      return 0;
-  }
 }
 
 // §11.6.1 with §11.8.2: both operands of a relational or equality operator are
@@ -655,15 +556,28 @@ static Logic4Vec EvalSizedComparison(const Expr* expr, SimContext& ctx,
 // context) keeps a narrow operand from truncating an intermediate carry --
 // e.g. in `(a + b + 0) >> 1` the 32-bit literal 0 widens the addition's
 // context to 32 bits, preserving a+b's carry into bit 16.
+//
+// §11.8.1 makes the expression unsigned where any of its context-determined
+// operands is, and §11.8.2 propagates that type down with the size, so each
+// operand under an unsigned one is evaluated as unsigned: `(s + s) + u` over a
+// signed 4-bit s adds s zero-extended. A real operand keeps its sign, which
+// its conversion to real reads.
 static Logic4Vec EvalContextDeterminedBinary(const Expr* expr, SimContext& ctx,
                                              Arena& arena,
-                                             uint32_t context_width) {
+                                             uint32_t context_width,
+                                             bool unsigned_context) {
   if (IsMaxWidthBinaryOp(expr->op)) {
     uint32_t w = std::max({context_width, SimSelfWidth(expr->lhs, ctx),
                            SimSelfWidth(expr->rhs, ctx)});
-    return EvalBinaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena, w),
-                        EvalExpr(expr->rhs, ctx, arena, w), arena,
-                        context_width);
+    const bool kUnsigned = unsigned_context || !SimSelfSigned(expr->lhs, ctx) ||
+                           !SimSelfSigned(expr->rhs, ctx);
+    Logic4Vec lhs = EvalExprInContext(expr->lhs, ctx, arena, w, kUnsigned);
+    Logic4Vec rhs = EvalExprInContext(expr->rhs, ctx, arena, w, kUnsigned);
+    if (kUnsigned && !lhs.is_real && !rhs.is_real) {
+      lhs.is_signed = false;
+      rhs.is_signed = false;
+    }
+    return EvalBinaryOp(expr->op, lhs, rhs, arena, context_width);
   }
   if (IsLeftWidthBinaryOp(expr->op)) {
     uint32_t w = std::max(context_width, SimSelfWidth(expr->lhs, ctx));
@@ -671,7 +585,9 @@ static Logic4Vec EvalContextDeterminedBinary(const Expr* expr, SimContext& ctx,
     // before the operator is applied, so `8'd1 << 8` into a 16-bit target
     // keeps the bit the shift moves above the literal's own eight. A real
     // base of `**` carries no bits to extend.
-    Logic4Vec lhs = EvalExpr(expr->lhs, ctx, arena, w);
+    Logic4Vec lhs =
+        EvalExprInContext(expr->lhs, ctx, arena, w, unsigned_context);
+    if (unsigned_context && !lhs.is_real) lhs.is_signed = false;
     if (!lhs.is_real && lhs.width < w) lhs = ResizeToWidth(lhs, w, arena);
     return EvalBinaryOp(expr->op, lhs, EvalExpr(expr->rhs, ctx, arena), arena,
                         context_width);
@@ -749,7 +665,7 @@ static bool TryTypeRefComparison(const Expr* expr, SimContext& ctx,
 }
 
 static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx, Arena& arena,
-                                uint32_t context_width = 0) {
+                                uint32_t context_width, bool unsigned_context) {
   if (expr->op == TokenKind::kEq) return EvalAssignInExpr(expr, ctx, arena);
   {
     Logic4Vec type_ref_result;
@@ -778,7 +694,8 @@ static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx, Arena& arena,
     if (TryEvalIdentityEquality(expr, ctx, arena, identity_result))
       return identity_result;
   }
-  return EvalContextDeterminedBinary(expr, ctx, arena, context_width);
+  return EvalContextDeterminedBinary(expr, ctx, arena, context_width,
+                                     unsigned_context);
 }
 
 static Logic4Vec EvalTaggedExpr(const Expr* expr, SimContext& ctx, Arena& arena,
@@ -807,7 +724,7 @@ static Logic4Vec EvalRealOrTimeLiteral(const Expr* expr, Arena& arena) {
 // literal's 8 bits and widened afterwards, it read 00fa. A real operand is
 // not extended, and a context of 0 is a self-determined one.
 static Logic4Vec EvalUnaryExpr(const Expr* expr, SimContext& ctx, Arena& arena,
-                               uint32_t context_width) {
+                               uint32_t context_width, bool unsigned_context) {
   if (expr->op == TokenKind::kPlusPlus || expr->op == TokenKind::kMinusMinus) {
     return EvalPrefixUnary(expr, ctx, arena);
   }
@@ -816,21 +733,26 @@ static Logic4Vec EvalUnaryExpr(const Expr* expr, SimContext& ctx, Arena& arena,
     return EvalUnaryOp(expr->op, EvalExpr(expr->lhs, ctx, arena), arena);
   }
   uint32_t width = std::max(context_width, SimSelfWidth(expr->lhs, ctx));
-  Logic4Vec operand = EvalExpr(expr->lhs, ctx, arena, width);
+  Logic4Vec operand =
+      EvalExprInContext(expr->lhs, ctx, arena, width, unsigned_context);
+  // §11.8.2: an operand an unsigned type is propagated down to is extended by
+  // zero, so `-s + u` negates s's 4 bits zero-extended.
+  if (unsigned_context && !operand.is_real) operand.is_signed = false;
   if (!operand.is_real && operand.width < width)
     operand = ExtendVec(operand, width, operand.is_signed, arena);
   return EvalUnaryOp(expr->op, operand, arena);
 }
 
 static Logic4Vec EvalBinaryDispatch(const Expr* expr, SimContext& ctx,
-                                    Arena& arena, uint32_t context_width) {
+                                    Arena& arena, uint32_t context_width,
+                                    bool unsigned_context) {
   if (IsCompoundAssignOp(expr->op)) {
     return EvalCompoundAssign(expr, ctx, arena);
   }
   if (expr->op == TokenKind::kKwMatches) {
     return EvalMatches(expr, ctx, arena);
   }
-  return EvalBinaryExpr(expr, ctx, arena, context_width);
+  return EvalBinaryExpr(expr, ctx, arena, context_width, unsigned_context);
 }
 
 static Logic4Vec EvalMinTypMax(const Expr* expr, SimContext& ctx, Arena& arena,
@@ -867,8 +789,25 @@ Logic4Vec FillUnbasedUnsized(const Logic4Vec& v, uint32_t width, Arena& arena) {
   return out;
 }
 
+// §11.12: a let instance is evaluated at the width of the expression it
+// stands in, which the call hands on to its expansion (CallContextWidth); the
+// width in force before it is put back after it, a call within the call
+// having installed its own.
+static Logic4Vec EvalCallInContext(const Expr* expr, SimContext& ctx,
+                                   Arena& arena, uint32_t context_width) {
+  const uint32_t kOuter = SetCallContextWidth(context_width);
+  Logic4Vec result = EvalFunctionCall(expr, ctx, arena);
+  SetCallContextWidth(kOuter);
+  return result;
+}
+
 Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
                    uint32_t context_width) {
+  return EvalExprInContext(expr, ctx, arena, context_width, false);
+}
+
+Logic4Vec EvalExprInContext(const Expr* expr, SimContext& ctx, Arena& arena,
+                            uint32_t context_width, bool unsigned_context) {
   if (!expr) return MakeLogic4Vec(arena, 1);
 
   if (const auto* snap = ctx.FindDeferredArgSnapshot(expr)) {
@@ -895,11 +834,12 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
       if (const Logic4Vec* bound = BoundInstanceValue(expr, ctx)) return *bound;
       return EvalIdentifier(expr, ctx, arena);
     case ExprKind::kUnary:
-      return EvalUnaryExpr(expr, ctx, arena, context_width);
+      return EvalUnaryExpr(expr, ctx, arena, context_width, unsigned_context);
     case ExprKind::kBinary:
-      return EvalBinaryDispatch(expr, ctx, arena, context_width);
+      return EvalBinaryDispatch(expr, ctx, arena, context_width,
+                                unsigned_context);
     case ExprKind::kTernary:
-      return EvalTernary(expr, ctx, arena, context_width);
+      return EvalTernary(expr, ctx, arena, context_width, unsigned_context);
     case ExprKind::kConcatenation:
       return EvalConcat(expr, ctx, arena);
     case ExprKind::kReplicate:
@@ -909,7 +849,7 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
     case ExprKind::kSystemCall:
       return EvalSystemCall(expr, ctx, arena);
     case ExprKind::kCall:
-      return EvalFunctionCall(expr, ctx, arena);
+      return EvalCallInContext(expr, ctx, arena, context_width);
     case ExprKind::kPostfixUnary:
       return EvalPostfixUnary(expr, ctx, arena);
     case ExprKind::kMemberAccess:

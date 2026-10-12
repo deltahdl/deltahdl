@@ -708,4 +708,24 @@ TEST(LvalueSim, CompoundAssignExpressionWakesAnEventControlOnItsTarget) {
   EXPECT_EQ(x->value.ToUint64(), 12u);
 }
 
+// §11.4.1 makes `a op= b` the assignment `a = a op (b)`, so b is sized by the
+// assignment's width (§11.6.1) and `s += x + y` keeps the carry of x + y, as a
+// statement and as an expression; a shift's count stays self-determined.
+TEST(CompoundAssignSim, RightOperandTakesTheAssignmentsWidth) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  logic [8:0] s = 0, t = 0, v = 9'h100;\n"
+                       "  logic [7:0] x = 255, y = 1;\n"
+                       "  logic [8:0] e;\n"
+                       "  initial begin\n"
+                       "    s += x + y;\n"
+                       "    e = (t += x + y);\n"
+                       "    v >>= y + y;\n"
+                       "    $display(\"%0d %0d %0d %h\", s, t, e, v);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "256 256 256 040\n");
+}
+
 }  // namespace

@@ -762,7 +762,7 @@ static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
   // module-level names.
   if (TryEvalEnclosingInstanceCall(expr, ctx, arena, out)) return true;
   if (auto* let_decl = FindCalledLet(expr, ctx, arena)) {
-    out = EvalLetExpansion(let_decl, expr, ctx, arena);
+    out = EvalLetExpansion(let_decl, expr, ctx, arena, CallContextWidth());
     return true;
   }
   return false;

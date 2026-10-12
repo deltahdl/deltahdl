@@ -145,7 +145,11 @@ int64_t SignExtend(uint64_t val, uint32_t width);
 // 4294967294 rather than becoming -2. A bound 64 bits or wider has already
 // lost everything above bit 63 to ToUint64, and SignExtend hands such a width
 // back as a plain two's-complement cast, which is the answer every bound that
-// names a bit of a real object had before.
+// names a bit of a real object had before. A bound whose value those 64 bits
+// do not hold -- an unsigned one of 2**63 or more, or one with bits above 63
+// that are not the sign of the rest -- is beyond every object's bounds
+// (§11.5.1), and reads as kBeyondEveryBound rather than wrapping into them.
+inline constexpr int64_t kBeyondEveryBound = int64_t{1} << 62;
 int64_t SelectBoundValue(const Logic4Vec& val);
 
 // §6.24.1 with §11.8.2 — the value `val` takes cast to longint: sign-extended
@@ -410,6 +414,11 @@ Logic4Vec EvalStructPattern(const Expr* expr, const StructTypeInfo* info,
 Logic4Vec EvalStructMemberValue(const Expr* elem, const StructFieldInfo& field,
                                 SimContext& ctx, Arena& arena);
 
+// §11.4.14.2: the bit count of a streaming operator's slice_size `size_expr`,
+// 1 where none is written, the same for packing and unpacking. Defined in
+// eval_streaming.cpp.
+uint32_t StreamSliceSize(const Expr* size_expr, SimContext& ctx, Arena& arena);
+
 // §10.9.2 with §7.4 and §7.10: the value of the item `item` given to an element
 // of an array or queue whose elements are structures laid out by `layout`: a
 // pattern is packed by the layout, member by member at each member's width,
@@ -479,11 +488,26 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena);
 // which case no actuals are bound).
 // §11.12: a let declared by the block item declaration `stmt` in a block or a
 // subroutine body is used after its declaration there, so it is made known as
-// the statement runs; a let of that name already known keeps its place.
+// the statement runs, in place of an earlier block's let of that name, whose
+// block it does not stand in (§11.12 gives each let its declaring scope's
+// name); a module's or a compilation unit's let of that name keeps its place.
 // Nothing for any other statement. Defined in eval_let.cpp.
 void RegisterBlockLet(const Stmt* stmt, SimContext& ctx);
+// §11.12: the value of the let instance `call` of `decl`, its body evaluated
+// at `context_width` as the parenthesized expression the expansion substitutes
+// is. Defined in eval_let.cpp.
 Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call, SimContext& ctx,
-                           Arena& arena);
+                           Arena& arena, uint32_t context_width = 0);
+// §11.12 with §16.9.3: the let instance whose body is being evaluated, as a
+// number telling instances apart, 0 outside every let; each instance's
+// sampled value calls keep a history of their own. Defined in eval_let.cpp.
+uint64_t CurrentLetInstance();
+// §11.12: the width of the expression the call being evaluated stands in,
+// which a let instance's body is evaluated at; SetCallContextWidth installs
+// one for a call and answers the one it replaces, for the caller to put back.
+// Defined in eval_let.cpp.
+uint32_t CallContextWidth();
+uint32_t SetCallContextWidth(uint32_t width);
 
 void EmitSeverityHeader(SimContext& ctx, std::string_view prefix,
                         std::string_view msg, std::ostream& os,

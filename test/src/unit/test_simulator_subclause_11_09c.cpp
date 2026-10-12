@@ -182,4 +182,28 @@ TEST(TaggedUnionEval, NonblockingCallResultToAMemberLandsTheReturnedTag) {
   ExpectMemberTagLanded(f, 12, 14);
 }
 
+// §11.9 with §7.3.2: the tag is part of the value, so a tagged union variable
+// assigned whole, or a conditional's chosen tagged expression, gives the
+// target its tag, and a read through that member is consistent with it.
+TEST(TaggedUnionSim, AssignmentCarriesTheTagOfTheValue) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module m;\n"
+                 "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
+                 "  VInt a, b, c, d;\n"
+                 "  bit e = 1;\n"
+                 "  initial begin\n"
+                 "    a = tagged Valid 5;\n"
+                 "    b = tagged Invalid;\n"
+                 "    b = a;\n"
+                 "    c = e ? tagged Valid 7 : tagged Invalid;\n"
+                 "    d = !e ? tagged Invalid : tagged Valid 9;\n"
+                 "    $display(\"%0d %0d %0d\", b.Valid, c.Valid, d.Valid);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "5 7 9\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

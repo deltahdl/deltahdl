@@ -10,6 +10,7 @@
 #include "common/packed_range.h"
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "lexer/token.h"
 
 namespace delta {
 
@@ -418,6 +419,20 @@ bool TryUnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
 // nothing here can resolve it or because it is a zero-width part-select, which
 // EvalExpr reads as self-determined.
 uint32_t LhsContextWidth(const Expr* lhs, SimContext& ctx, Arena& arena);
+
+// §11.4.11: a blocking assignment of a conditional over two queues, dynamic
+// arrays or associative arrays to one of their kind; false for any other.
+// Defined in statement_assign_conditional.cpp.
+bool TryConditionalCollectionAssign(const Stmt* stmt, SimContext& ctx,
+                                    Arena& arena);
+
+// §11.4.1 with §11.6.1: `a op= b` is `a = a op (b)`, so where `op` sizes its
+// operands by context -- the arithmetic and bitwise operators of Table 11-21
+// -- `b` is evaluated at the width of the assignment, the left-hand side's,
+// and `s += x + y` keeps the carry of x + y; a shift's or a power's right
+// operand is self-determined, 0. Defined in statement_assign_compound.cpp.
+uint32_t CompoundOperandWidth(TokenKind base_op, const Expr* lhs,
+                              SimContext& ctx, Arena& arena);
 
 // Defined in statement_assign_concat.cpp; also used by the §11.4.2 nonblocking
 // path in statement_assign_nonblocking.cpp. Evaluate the rhs with the lhs as

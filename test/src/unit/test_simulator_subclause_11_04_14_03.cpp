@@ -688,4 +688,27 @@ TEST(StreamingUnpackSim, AnElementOfASignedQueueOrDynamicArrayIsSigned) {
   EXPECT_EQ(out, "-559038737 7 -559038737 1 -559038737 -559038737\n");
 }
 
+// §11.4.14.3 unpacks by the reverse of packing: a non-null handle target
+// fills its object's data members, and a whole fixed-size array target its
+// elements in foreach order, a multidimensional one leaf by leaf.
+TEST(StreamUnpackSim, HandleAndWholeArrayTargetsTakeTheirMembersAndElements) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  class C; bit [7:0] a, b; endclass\n"
+                       "  C h;\n"
+                       "  byte arr [2];\n"
+                       "  byte m [2][2];\n"
+                       "  initial begin\n"
+                       "    h = new;\n"
+                       "    {>> {h}} = 16'hABCD;\n"
+                       "    {>> {arr}} = 16'h1234;\n"
+                       "    {>> {m}} = 32'h01020304;\n"
+                       "    $display(\"%h %h %h %h %h %h\", h.a, h.b, arr[0],\n"
+                       "             arr[1], m[0][1], m[1][0]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "ab cd 12 34 02 03\n");
+}
+
 }  // namespace

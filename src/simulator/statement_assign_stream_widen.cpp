@@ -66,9 +66,17 @@ Logic4Vec ApplyStreamPackToTargetWidening(const Stmt* stmt, Logic4Vec rhs_val,
   if (!stmt->rhs || stmt->rhs->kind != ExprKind::kStreamingConcat) {
     return rhs_val;
   }
-  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier) {
-    return rhs_val;
+  // §11.4.14 left-aligns the stream in whatever fixed-size object the target
+  // designates, an element or bits a select names and a structure member
+  // among them, each as wide as an assignment to it is sized.
+  if (stmt->lhs->kind == ExprKind::kSelect ||
+      stmt->lhs->kind == ExprKind::kMemberAccess) {
+    const uint32_t kWidth = LhsContextWidth(stmt->lhs, ctx, arena);
+    if (kWidth == 0) return rhs_val;
+    return WidenStreamPackToFixedTarget(rhs_val, kWidth, stmt->lhs->range.start,
+                                        ctx, arena);
   }
+  if (stmt->lhs->kind != ExprKind::kIdentifier) return rhs_val;
   if (ctx.FindArrayInfo(stmt->lhs->text) || ctx.FindQueue(stmt->lhs->text) ||
       ctx.FindAssocArray(stmt->lhs->text)) {
     return rhs_val;

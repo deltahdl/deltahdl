@@ -668,9 +668,13 @@ static bool IsValueChangeFunction(std::string_view name) {
 // select indices take: the indices of every select in the argument, evaluated
 // here, folded into one number. An argument with no select answers 0, the
 // one history the site had.
+//
+// §11.12 with §16.9.3: a let's body is expanded at each of its instances, so
+// a sampled value call there is one call per instance, each with a history of
+// its own; the instance (CurrentLetInstance) is folded in first.
 static uint64_t ArgumentVariant(const Expr* arg, SimContext& ctx,
                                 Arena& arena) {
-  uint64_t variant = 0;
+  uint64_t variant = CurrentLetInstance();
   ForEachSubExpr(arg, [&](const Expr* e) {
     if (e->kind != ExprKind::kSelect || e->index == nullptr) return;
     uint64_t index = EvalExpr(e->index, ctx, arena).ToUint64();
