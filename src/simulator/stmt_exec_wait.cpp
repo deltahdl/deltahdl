@@ -291,6 +291,12 @@ ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
+// §12.4.2.1: a process that suspended on a wait statement reaches a violation
+// report flush point when it resumes, which clears its own queue.
+static void FlushWaiterViolations(Process* self, bool suspended) {
+  if (suspended && self != nullptr) self->pending_violations.clear();
+}
+
 ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto& events = stmt->wait_order_events;
   if (events.empty()) {
@@ -321,7 +327,7 @@ ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   }
   // §12.4.2.1: resuming after suspending on a wait statement, `wait_order`
   // among them (A.6.5), is a violation report flush point.
-  if (suspended && self != nullptr) self->pending_violations.clear();
+  FlushWaiterViolations(self, suspended);
 
   if (failed) {
     if (stmt->else_branch) {
