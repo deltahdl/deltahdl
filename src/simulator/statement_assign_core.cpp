@@ -556,6 +556,27 @@ void RecordPropertyTags(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   RecordTaggedValueTags(stmt->rhs, std::move(key), layout, ctx, arena);
 }
 
+// §7.3.2: a member that is itself a tagged union holds its own tag as part of
+// its value, stored under its union's key and the member's name, so a union
+// copied whole hands over the tag at each level its active members reach: the
+// source's tag under `src`, then that member's own under `src.<tag>`, and so on
+// for as long as the member's type is a union.
+static void CopyTagChain(std::string src, std::string dst,
+                         const StructTypeInfo* layout, SimContext& ctx,
+                         Arena& arena) {
+  while (layout != nullptr && layout->is_union) {
+    const std::string_view kTag = ctx.GetVariableTag(src);
+    if (kTag.empty()) return;
+    const std::string kOwnedTag(kTag);
+    ctx.SetVariableTag(*arena.Create<std::string>(dst), kOwnedTag);
+    layout = TaggedMemberLayout(*layout, kOwnedTag);
+    src += '.';
+    src += kOwnedTag;
+    dst += '.';
+    dst += kOwnedTag;
+  }
+}
+
 // §11.9 with §7.3.2: the tag is part of a tagged union value, so assigning one
 // gives the target the tag of what it assigns -- a tagged expression's own, a
 // variable's copied whole, or that of the expression a conditional chooses
@@ -584,9 +605,7 @@ static void RecordAssignedTag(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     return;
   }
   if (source->kind != ExprKind::kIdentifier) return;
-  const std::string_view kTag =
-      ctx.GetVariableTag(TagKeyOfName(source->text, ctx));
-  if (!kTag.empty()) ctx.SetVariableTag(*arena.Create<std::string>(kKey), kTag);
+  CopyTagChain(TagKeyOfName(source->text, ctx), kKey, layout, ctx, arena);
 }
 
 void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val, SimContext& ctx,

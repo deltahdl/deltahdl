@@ -287,4 +287,63 @@ TEST(TaggedUnionSimulation, NestedTaggedValueMatchesInnerTagPattern) {
             "v=10\n");
 }
 
+// §7.3.2 makes a tagged union's tag part of its value, and a member that is
+// itself a tagged union holds its own tag as part of the member's value, so
+// assigning one variable to another copies the inner tag too. b first holds
+// the other inner member, JmpU, so the inner tag it keeps after `b = a` tells
+// a copied tag from a stale one.
+TEST(TaggedUnionSimulation, CopyingAUnionCopiesItsNestedTags) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef union tagged {\n"
+                       "    struct { bit [4:0] reg1, reg2, regd; } Add;\n"
+                       "    union tagged { bit [9:0] JmpU; bit [9:0] JmpV; } "
+                       "Jmp;\n"
+                       "  } Instr;\n"
+                       "  Instr a, b;\n"
+                       "  initial begin\n"
+                       "    a = tagged Jmp (tagged JmpV 10);\n"
+                       "    b = tagged Jmp (tagged JmpU 3);\n"
+                       "    b = a;\n"
+                       "    $display(\"%p\", b);\n"
+                       "    case (b) matches\n"
+                       "      tagged Jmp (tagged JmpU .u): $display(\"u=%0d\", "
+                       "u);\n"
+                       "      tagged Jmp (tagged JmpV .v): $display(\"v=%0d\", "
+                       "v);\n"
+                       "      default: $display(\"none\");\n"
+                       "    endcase\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "'{Jmp:'{JmpV:10}}\nv=10\n");
+}
+
+// §7.3.2: a copy stops handing over tags where the active member is not a
+// union; a structure member carries no tag of its own, so d takes c's Add tag
+// and matches Add's structure pattern with c's member values.
+TEST(TaggedUnionSimulation, CopyingAUnionWithAStructMemberCopiesItsTag) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef union tagged {\n"
+                       "    struct { bit [4:0] reg1, reg2, regd; } Add;\n"
+                       "    union tagged { bit [9:0] JmpU; bit [9:0] JmpV; } "
+                       "Jmp;\n"
+                       "  } Instr;\n"
+                       "  Instr c, d;\n"
+                       "  initial begin\n"
+                       "    c = tagged Add '{5'd1, 5'd2, 5'd3};\n"
+                       "    d = tagged Jmp (tagged JmpU 3);\n"
+                       "    d = c;\n"
+                       "    case (d) matches\n"
+                       "      tagged Add '{.r1, .r2, .rd}: $display(\"%0d\", "
+                       "r1 + r2 + rd);\n"
+                       "      default: $display(\"none\");\n"
+                       "    endcase\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "6\n");
+}
+
 }  // namespace
