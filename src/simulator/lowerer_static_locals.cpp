@@ -284,11 +284,11 @@ void MakeSubroutineSpecializations(const ModuleItem* func,
 
 // §8.25: a parameterized class's declaration, which is no specialization the
 // design names until a `#(...)` list or the bare name does; its methods' code
-// is the specializations' and is read under each of them. A built-in class
-// has no code to read.
+// is the specializations' and is read under each of them. The classes read
+// are all declared (InstanceClasses, PackageClasses); a built-in class is
+// neither a package's nor an instance's.
 bool IsUnspecializedGeneric(const ClassTypeInfo* cls) {
-  return cls->decl == nullptr ||
-         (!cls->decl->params.empty() && cls->param_actuals == nullptr);
+  return !cls->decl->params.empty() && cls->param_actuals == nullptr;
 }
 
 // The classes a package or the compilation unit holds, whose methods' code
@@ -337,18 +337,19 @@ void MakeMethodSpecializations(const std::vector<StaticLocalOwner>& owners,
       Process stand_in;
       StandInFor(owners[i], stand_in);
       CallerStandIn in_owner(&stand_in, ctx);
-      grew =
-          WalkMethodSpecializations(
+      if (WalkMethodSpecializations(
               InstanceClasses(*owners[i].classes, owners[i].inst_prefix, ctx),
-              walked[i], ctx, arena) ||
-          grew;
+              walked[i], ctx, arena)) {
+        grew = true;
+      }
     }
     Process stand_in;
     StandInFor(StaticLocalOwner{}, stand_in);
     CallerStandIn in_no_instance(&stand_in, ctx);
-    grew = WalkMethodSpecializations(PackageClasses(ctx), walked.back(), ctx,
-                                     arena) ||
-           grew;
+    if (WalkMethodSpecializations(PackageClasses(ctx), walked.back(), ctx,
+                                  arena)) {
+      grew = true;
+    }
   }
 }
 
