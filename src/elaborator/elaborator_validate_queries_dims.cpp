@@ -435,6 +435,20 @@ bool CollectPackedDims(const DataType& type, const ScopeMap& scope,
   return true;
 }
 
+// §11.5.1 has a non-indexed part-select's bounds be constant expressions,
+// which a variable a process or a subroutine declares, a loop's included, or a
+// subroutine's formal is not, any more than a module's variable is: adds those
+// names of `decl` to `names`.
+void CollectProcedureNames(const ModuleDecl* decl,
+                           std::unordered_set<std::string_view>& names) {
+  for (const auto* item : decl->items) {
+    if (IsProceduralItemKind(item->kind))
+      CollectProcLocalNames(item->body, names);
+    for (const auto* s : item->func_body_stmts) CollectProcLocalNames(s, names);
+    for (const auto& arg : item->func_args) names.insert(arg.name);
+  }
+}
+
 }  // namespace
 
 void Elaborator::ValidatePartSelectBounds(const ModuleDecl* decl) {
@@ -460,16 +474,7 @@ void Elaborator::ValidatePartSelectBounds(const ModuleDecl* decl) {
   }
   if (shapes.empty()) return;
 
-  // §11.5.1 has a non-indexed part-select's bounds be constant expressions,
-  // which a variable a process or a subroutine declares, a loop's included, or
-  // a subroutine's formal is not, any more than a module's variable is.
-  for (const auto* item : decl->items) {
-    if (IsProceduralItemKind(item->kind))
-      CollectProcLocalNames(item->body, signals);
-    for (const auto* s : item->func_body_stmts)
-      CollectProcLocalNames(s, signals);
-    for (const auto& arg : item->func_args) signals.insert(arg.name);
-  }
+  CollectProcedureNames(decl, signals);
   PartSelectBoundsCtx ctx{signals, shapes, replicate_multiplier_scope_, diag_};
   for (const auto* item : decl->items) {
     CheckPartSelectBoundsExpr(item->assign_lhs, ctx);

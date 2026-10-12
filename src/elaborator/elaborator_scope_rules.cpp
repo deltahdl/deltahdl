@@ -422,23 +422,29 @@ void ReportDeclInitUnresolved(const ModuleDecl* decl, Pred declared,
 // assignment or a net declaration writes. The blocks of a generate-if or a
 // generate-case are reached in turn; a loop generate's are not, a genvar being
 // a constant within one.
+// Those constant expressions `item` writes itself, its blocks' left aside.
+void CollectItemConstantPositions(const ModuleItem* item,
+                                  std::vector<const Expr*>& out) {
+  if (item->kind == ModuleItemKind::kParamDecl)
+    CollectBareIdents(item->init_expr, out);
+  for (const Expr* e :
+       {item->gen_cond, item->data_type.packed_dim_left,
+        item->data_type.packed_dim_right, item->assign_delay,
+        item->assign_delay_fall, item->assign_delay_decay, item->net_delay,
+        item->net_delay_fall, item->net_delay_decay})
+    CollectBareIdents(e, out);
+  for (const auto& [left, right] : item->data_type.extra_packed_dims) {
+    CollectBareIdents(left, out);
+    CollectBareIdents(right, out);
+  }
+  for (const Expr* dim : item->unpacked_dims) CollectBareIdents(dim, out);
+}
+
 void CollectGenvarConstantPositions(const std::vector<ModuleItem*>& items,
                                     std::vector<const Expr*>& out) {
   for (const ModuleItem* item : items) {
     if (item->kind == ModuleItemKind::kGenerateFor) continue;
-    if (item->kind == ModuleItemKind::kParamDecl)
-      CollectBareIdents(item->init_expr, out);
-    for (const Expr* e :
-         {item->gen_cond, item->data_type.packed_dim_left,
-          item->data_type.packed_dim_right, item->assign_delay,
-          item->assign_delay_fall, item->assign_delay_decay, item->net_delay,
-          item->net_delay_fall, item->net_delay_decay})
-      CollectBareIdents(e, out);
-    for (const auto& [left, right] : item->data_type.extra_packed_dims) {
-      CollectBareIdents(left, out);
-      CollectBareIdents(right, out);
-    }
-    for (const Expr* dim : item->unpacked_dims) CollectBareIdents(dim, out);
+    CollectItemConstantPositions(item, out);
     CollectGenvarConstantPositions(item->gen_body, out);
     if (item->gen_else != nullptr)
       CollectGenvarConstantPositions({item->gen_else}, out);

@@ -104,6 +104,7 @@ class ElaboratorOperationRules : public ElaboratorData {
   // variable named whole or a slice of one, are of equivalent types; empty
   // where either is not such an operand. Defined in
   // elaborator_validate_operations_aggregate.cpp.
+  bool ReportNonEquivalentArrayOperands(const Expr* expr);
   std::optional<bool> ArrayOperandsEquivalent(const Expr* lhs,
                                               const Expr* rhs) const;
   void WalkStmtsForAggregateCompare(const Stmt* s);
@@ -180,6 +181,7 @@ class ElaboratorOperationRules : public ElaboratorData {
   bool IsUnpackedArrayConcatTarget(const Expr* lhs) const;
   void WalkExprForUnsizedInConcat(const Expr* expr);
   void WalkStmtsForUnsizedInConcat(const Stmt* s);
+  void WalkItemsOrExprForUnsizedInConcat(const Expr* e, bool is_array_concat);
   void CheckBlockVarInitUnsizedInConcat(const Stmt* s);
   // The variables the statements WalkStmtsForUnsizedInConcat or
   // WalkStmtsForProceduralArrayPattern is inside declare, innermost last, each

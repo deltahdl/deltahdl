@@ -102,19 +102,27 @@ static bool CheckArrayCompareOp(const Expr* expr, const NameMap& types,
   return true;
 }
 
+// §6.22.2 with §7.4.6: whether the operands of the comparison `expr` are two
+// unpacked arrays whose shapes ArrayOperandsEquivalent knows, reporting them
+// where they are not equivalent.
+bool ElaboratorOperationRules::ReportNonEquivalentArrayOperands(
+    const Expr* expr) {
+  auto equivalent = ArrayOperandsEquivalent(expr->lhs, expr->rhs);
+  if (!equivalent) return false;
+  if (!*equivalent) {
+    diag_.Error(expr->range.start,
+                "comparison of non-equivalent aggregate array types",
+                Subclause("6.22.2"));
+  }
+  return true;
+}
+
 void ElaboratorOperationRules::CheckAggregateCompareOp(const Expr* expr) {
   if (!expr->lhs || !expr->rhs) return;
   auto l_name = AggregateOperandName(expr->lhs);
   auto r_name = AggregateOperandName(expr->rhs);
   if (l_name.empty() || r_name.empty()) return;
-  if (auto equivalent = ArrayOperandsEquivalent(expr->lhs, expr->rhs)) {
-    if (!*equivalent) {
-      diag_.Error(expr->range.start,
-                  "comparison of non-equivalent aggregate array types",
-                  Subclause("6.22.2"));
-    }
-    return;
-  }
+  if (ReportNonEquivalentArrayOperands(expr)) return;
   if (CheckArrayCompareOp(expr, var_named_types_,
                           fixed_unpacked_typedef_widths_, diag_)) {
     return;
@@ -709,12 +717,7 @@ bool IsSigningSystemCall(const Expr* call) {
 // alone and letting signed'(2.1ns), 8'(2.1ns) and $signed(2.1ns) through while
 // the same conversions applied to a realtime variable were rejected.
 bool ElaboratorOperationRules::CastOperandIsReal(const Expr* operand) const {
-  if (!operand) return false;
-  if (operand->kind == ExprKind::kRealLiteral ||
-      operand->kind == ExprKind::kTimeLiteral) {
-    return true;
-  }
-  return IsRealVar(operand, var_types_);
+  return operand != nullptr && IsRealValued(operand, var_types_);
 }
 
 // §11.7: $signed and $unsigned shall return a one-dimensional packed array with

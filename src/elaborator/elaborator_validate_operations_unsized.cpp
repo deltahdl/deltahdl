@@ -204,6 +204,17 @@ void ElaboratorOperationRules::CheckBlockVarInitUnsizedInConcat(const Stmt* s) {
   WalkExprForUnsizedInConcat(s->var_init);
 }
 
+// An unpacked array concatenation's items are walked one by one, which may be
+// unsized (§10.10); any other expression is walked whole.
+void ElaboratorOperationRules::WalkItemsOrExprForUnsizedInConcat(
+    const Expr* e, bool is_array_concat) {
+  if (!is_array_concat) {
+    WalkExprForUnsizedInConcat(e);
+    return;
+  }
+  for (auto* elem : e->elements) WalkExprForUnsizedInConcat(elem);
+}
+
 void ElaboratorOperationRules::WalkStmtsForUnsizedInConcat(const Stmt* s) {
   if (!s) return;
   CheckBlockVarInitUnsizedInConcat(s);
@@ -224,21 +235,14 @@ void ElaboratorOperationRules::WalkStmtsForUnsizedInConcat(const Stmt* s) {
                 "array",
                 Subclause("10.10"));
   }
-  if (is_array_concat_rhs) {
-    for (auto* elem : s->rhs->elements) WalkExprForUnsizedInConcat(elem);
-  } else {
-    WalkExprForUnsizedInConcat(s->rhs);
-  }
+  WalkItemsOrExprForUnsizedInConcat(s->rhs, is_array_concat_rhs);
   WalkExprForUnsizedInConcat(s->lhs);
   // §13.4.1 assigns a return statement's expression to the function's result,
   // so braces a function returning an unpacked array returns are an unpacked
   // array concatenation (§10.10) whose items may be unsized.
-  if (s->kind == StmtKind::kReturn && returns_unpacked_array_ &&
-      s->expr->kind == ExprKind::kConcatenation) {
-    for (auto* elem : s->expr->elements) WalkExprForUnsizedInConcat(elem);
-  } else {
-    WalkExprForUnsizedInConcat(s->expr);
-  }
+  WalkItemsOrExprForUnsizedInConcat(
+      s->expr, s->kind == StmtKind::kReturn && returns_unpacked_array_ &&
+                   s->expr->kind == ExprKind::kConcatenation);
   WalkExprForUnsizedInConcat(s->condition);
   WalkExprForUnsizedInConcat(s->assert_expr);
   // §11.4.12 bars unsized constant numbers from a concatenation, a property of

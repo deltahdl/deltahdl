@@ -570,7 +570,7 @@ static bool IsIntegerAtomKind(DataTypeKind kind) {
 // standing for nothing the table resolves answers false.
 static bool NamesVectorType(const DataType& dtype, const TypedefMap& typedefs) {
   if (dtype.kind != DataTypeKind::kNamed) return false;
-  const DataType* d = ResolvedType(dtype, typedefs);
+  const DataType* d = TypeAtChainEnd(dtype, typedefs);
   if (d == nullptr) return false;
   return d->packed_dim_left != nullptr || !d->extra_packed_dims.empty() ||
          d->has_unsized_packed_dim || IsIntegerAtomKind(d->kind);
@@ -584,7 +584,7 @@ static bool NamesVectorType(const DataType& dtype, const TypedefMap& typedefs) {
 // are followed through the typedef map to the underlying aggregate.
 static bool IsPackedAggregateVar(const DataType& dtype,
                                  const TypedefMap& typedefs) {
-  const DataType* d = ResolvedType(dtype, typedefs);
+  const DataType* d = TypeAtChainEnd(dtype, typedefs);
   if (!d) return false;
   return (d->kind == DataTypeKind::kStruct ||
           d->kind == DataTypeKind::kUnion) &&
@@ -598,7 +598,7 @@ static bool IsPackedAggregateVar(const DataType& dtype,
 // scalar §11.5.1 makes illegal, even though a string carries no packed
 // dimension.
 static bool IsStringVar(const DataType& dtype, const TypedefMap& typedefs) {
-  const DataType* d = ResolvedType(dtype, typedefs);
+  const DataType* d = TypeAtChainEnd(dtype, typedefs);
   return d != nullptr && d->kind == DataTypeKind::kString;
 }
 

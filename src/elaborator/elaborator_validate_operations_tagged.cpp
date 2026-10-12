@@ -9,7 +9,6 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/elaborator_validate_operations.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -31,6 +30,9 @@ class TaggedContextWalk {
   void Run(const ModuleDecl* decl);
 
  private:
+  void Collect(const ModuleItem* item);
+  void WalkItem(const ModuleItem* item);
+  void WalkSubroutine(const ModuleItem* item);
   const DataType* Resolve(const DataType* type) const;
   const DataType* TypeOfName(const Expr* target) const;
   void CheckTagged(const Expr* e, const DataType* context);
@@ -68,7 +70,7 @@ bool IsValueLiteral(const Expr* e) {
 // say nothing the walk can judge, and answer nullptr.
 const DataType* TaggedContextWalk::Resolve(const DataType* type) const {
   if (type->type_ref_expr != nullptr) return nullptr;
-  return ResolvedType(*type, typedefs_);
+  return TypeAtChainEnd(*type, typedefs_);
 }
 
 // The declared type of a variable an assignment writes by its name, the block's
@@ -236,35 +238,48 @@ void TaggedContextWalk::WalkStmt(const Stmt* s) {
   locals_.resize(kDepth);
 }
 
+bool DeclaresAVariable(const ModuleItem* item) {
+  return item->kind == ModuleItemKind::kVarDecl ||
+         item->kind == ModuleItemKind::kNetDecl;
+}
+
+void TaggedContextWalk::Collect(const ModuleItem* item) {
+  if (DeclaresAVariable(item)) {
+    module_types_[item->name] =
+        item->unpacked_dims.empty() ? &item->data_type : nullptr;
+  }
+  if (item->kind == ModuleItemKind::kFunctionDecl)
+    functions_[item->name] = item;
+}
+
+// A subroutine's body, its formals hiding the module's names and a function's
+// return type the context of each return statement.
+void TaggedContextWalk::WalkSubroutine(const ModuleItem* item) {
+  return_type_ = item->kind == ModuleItemKind::kFunctionDecl
+                     ? &item->return_type
+                     : nullptr;
+  for (const auto& arg : item->func_args) {
+    locals_.emplace_back(arg.name,
+                         arg.unpacked_dims.empty() ? &arg.data_type : nullptr);
+  }
+  for (const Stmt* s : item->func_body_stmts) WalkStmt(s);
+  locals_.clear();
+}
+
+void TaggedContextWalk::WalkItem(const ModuleItem* item) {
+  if (DeclaresAVariable(item)) {
+    CheckTagged(item->init_expr, module_types_[item->name]);
+    WalkExpr(item->init_expr);
+  }
+  if (item->kind == ModuleItemKind::kContAssign)
+    CheckAssigned(item->assign_lhs, item->assign_rhs);
+  if (IsProceduralItemKind(item->kind)) WalkStmt(item->body);
+  WalkSubroutine(item);
+}
+
 void TaggedContextWalk::Run(const ModuleDecl* decl) {
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kVarDecl ||
-        item->kind == ModuleItemKind::kNetDecl) {
-      module_types_[item->name] =
-          item->unpacked_dims.empty() ? &item->data_type : nullptr;
-    }
-    if (item->kind == ModuleItemKind::kFunctionDecl)
-      functions_[item->name] = item;
-  }
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kVarDecl ||
-        item->kind == ModuleItemKind::kNetDecl) {
-      CheckTagged(item->init_expr, module_types_[item->name]);
-      WalkExpr(item->init_expr);
-    }
-    if (item->kind == ModuleItemKind::kContAssign)
-      CheckAssigned(item->assign_lhs, item->assign_rhs);
-    if (IsProceduralItemKind(item->kind)) WalkStmt(item->body);
-    return_type_ = item->kind == ModuleItemKind::kFunctionDecl
-                       ? &item->return_type
-                       : nullptr;
-    for (const auto& arg : item->func_args) {
-      locals_.emplace_back(
-          arg.name, arg.unpacked_dims.empty() ? &arg.data_type : nullptr);
-    }
-    for (const Stmt* s : item->func_body_stmts) WalkStmt(s);
-    locals_.clear();
-  }
+  for (const auto* item : decl->items) Collect(item);
+  for (const auto* item : decl->items) WalkItem(item);
 }
 
 }  // namespace

@@ -144,7 +144,7 @@ DataTypeKind ResolvedTypeKind(const DataType& dtype,
 // The type `dtype` stands for at the end of its chain of typedef and nettype
 // names, as ResolvedTypeKind follows it; null where a name on the way stands
 // for nothing the table holds or the chain runs through one name twice.
-const DataType* ResolvedType(const DataType& dtype, const TypedefMap& typedefs);
+const DataType* TypeAtChainEnd(const DataType& dtype, const TypedefMap& typedefs);
 
 // The same for a structure or union member's named type (§7.2.1): a member
 // written behind a qualifier, `q::pair_t Add`, was looked up by `pair_t`

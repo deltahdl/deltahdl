@@ -193,59 +193,84 @@ void ElaboratorOperationRules::CheckLetReferencedHierarchically(
   ForEachItemNested(decl->items, walk);
 }
 
+namespace {
+
 // §11.12, rule 2: a typed formal other than an event takes an actual whose
 // self-determined type is cast compatible (§6.22.4) with the formal's type. An
 // integral or real formal is cast compatible with no unpacked array,
 // structure or union, which is what the declared type of a module's variable
 // decides of an actual naming it. A default actual is checked once, at the
 // let's declaration; an actual a call binds, at the call.
-void ElaboratorOperationRules::CheckLetActualTypes(const ModuleDecl* decl) {
-  std::unordered_map<std::string_view, const ModuleItem*> lets;
-  std::unordered_map<std::string_view, const ModuleItem*> vars;
-  auto collect = [&lets, &vars](const ModuleItem* item) {
-    if (item->kind == ModuleItemKind::kLetDecl) lets[item->name] = item;
+class LetActualCheck {
+ public:
+  LetActualCheck(const TypedefMap& typedefs, DiagEngine& diag)
+      : typedefs_(typedefs), diag_(diag) {}
+
+  void Collect(const ModuleItem* item) {
+    if (item->kind == ModuleItemKind::kLetDecl) lets_[item->name] = item;
     if (item->kind == ModuleItemKind::kVarDecl ||
         item->kind == ModuleItemKind::kNetDecl)
-      vars[item->name] = item;
-  };
-  ForEachItemNested(decl->items, collect);
-  auto names_aggregate = [&](const Expr* actual) {
+      vars_[item->name] = item;
+  }
+
+  void CheckDefaults() {
+    for (const auto& entry : lets_) {
+      for (const auto& formal : entry.second->func_args)
+        CheckActual(formal.default_value, formal);
+    }
+  }
+
+  void CheckCall(const Expr* e) {
+    if (e->kind != ExprKind::kCall || e->lhs->kind != ExprKind::kIdentifier)
+      return;
+    auto it = lets_.find(e->callee);
+    if (it == lets_.end()) return;
+    const auto& formals = it->second->func_args;
+    const size_t kPositional = e->args.size() - e->arg_names.size();
+    for (size_t i = 0; i < formals.size(); ++i) {
+      const int kAt = ResolveActualArgIndex(e, i, formals[i].name, kPositional);
+      if (kAt >= 0) CheckActual(e->args[static_cast<size_t>(kAt)], formals[i]);
+    }
+  }
+
+ private:
+  bool NamesAggregate(const Expr* actual) const {
     if (actual == nullptr || actual->kind != ExprKind::kIdentifier)
       return false;
-    auto it = vars.find(actual->text);
-    if (it == vars.end()) return false;
+    auto it = vars_.find(actual->text);
+    if (it == vars_.end()) return false;
     if (!it->second->unpacked_dims.empty()) return true;
-    const DataType* type = ResolvedType(it->second->data_type, typedefs_);
+    const DataType* type = TypeAtChainEnd(it->second->data_type, typedefs_);
     return type != nullptr && IsUnpackedAggregateType(*type);
-  };
-  auto check_actual = [&](const Expr* actual, const FunctionArg& formal) {
+  }
+
+  void CheckActual(const Expr* actual, const FunctionArg& formal) {
     const DataTypeKind kKind = ResolvedTypeKind(formal.data_type, typedefs_);
     if (kKind == DataTypeKind::kImplicit ||
         (!IsIntegralType(kKind) && !IsRealType(kKind)) ||
-        !names_aggregate(actual))
+        !NamesAggregate(actual))
       return;
     diag_.Error(actual->range.start,
                 std::format("let actual argument '{}' is not cast compatible "
                             "with the type of formal '{}'",
                             actual->text, formal.name),
                 Subclause("11.12"));
-  };
-  for (const auto& entry : lets) {
-    for (const auto& formal : entry.second->func_args)
-      check_actual(formal.default_value, formal);
   }
-  auto check_call = [&](const Expr* e) {
-    if (e->kind != ExprKind::kCall || e->lhs->kind != ExprKind::kIdentifier)
-      return;
-    auto it = lets.find(e->callee);
-    if (it == lets.end()) return;
-    const auto& formals = it->second->func_args;
-    const size_t kPositional = e->args.size() - e->arg_names.size();
-    for (size_t i = 0; i < formals.size(); ++i) {
-      const int kAt = ResolveActualArgIndex(e, i, formals[i].name, kPositional);
-      if (kAt >= 0) check_actual(e->args[static_cast<size_t>(kAt)], formals[i]);
-    }
-  };
+
+  const TypedefMap& typedefs_;
+  DiagEngine& diag_;
+  std::unordered_map<std::string_view, const ModuleItem*> lets_;
+  std::unordered_map<std::string_view, const ModuleItem*> vars_;
+};
+
+}  // namespace
+
+void ElaboratorOperationRules::CheckLetActualTypes(const ModuleDecl* decl) {
+  LetActualCheck check(typedefs_, diag_);
+  auto collect = [&check](const ModuleItem* item) { check.Collect(item); };
+  ForEachItemNested(decl->items, collect);
+  check.CheckDefaults();
+  auto check_call = [&check](const Expr* e) { check.CheckCall(e); };
   auto walk = [&check_call](const ModuleItem* item) {
     ForEachExprOfItem(item, check_call);
   };
