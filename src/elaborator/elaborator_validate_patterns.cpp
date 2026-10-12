@@ -487,7 +487,7 @@ const TypedefMap& NoTypedefs() {
 // over `names`. A nested class (§8.23) is walked the same way inside it.
 void CheckPatternsInClassBody(const ClassDecl* cls, const PatternNames& names,
                               const PatternCtx& outer) {
-  const PatternCtx ctx{NoTypedefs(), outer.diag};
+  PatternCtx ctx{NoTypedefs(), outer.diag};
   PatternNames inner = names;
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kProperty) continue;

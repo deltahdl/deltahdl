@@ -384,6 +384,21 @@ void CheckSubroutineJumpRules(const ModuleItem* item,
   }
 }
 
+// The methods of the classes `items` declare and of the classes of `unit`.
+std::unordered_set<const ModuleItem*> ClassMethodsOf(
+    const std::vector<ModuleItem*>& items, const CompilationUnit* unit) {
+  std::unordered_set<const ModuleItem*> methods;
+  auto add_method = [&methods](const ModuleItem* m) { methods.insert(m); };
+  for (const auto* item : items) {
+    if (item != nullptr && item->kind == ModuleItemKind::kClassDecl)
+      ForEachClassBodyItem(item->class_decl, add_method);
+  }
+  if (unit != nullptr) {
+    for (const auto* cls : unit->classes) ForEachClassBodyItem(cls, add_method);
+  }
+  return methods;
+}
+
 }  // namespace
 
 void Elaborator::ValidateJumpStatements(const ModuleDecl* decl) {
@@ -401,16 +416,7 @@ void Elaborator::ValidateJumpStatements(const ModuleDecl* decl) {
 // compilation unit's classes, and every method defined out of its class, are
 // checked with no typedef table.
 void Elaborator::CheckJumpStatementsIn(const std::vector<ModuleItem*>& items) {
-  std::unordered_set<const ModuleItem*> methods;
-  auto add_method = [&methods](const ModuleItem* m) { methods.insert(m); };
-  for (const auto* item : items) {
-    if (item != nullptr && item->kind == ModuleItemKind::kClassDecl)
-      ForEachClassBodyItem(item->class_decl, add_method);
-  }
-  if (unit_ != nullptr) {
-    for (const auto* cls : unit_->classes)
-      ForEachClassBodyItem(cls, add_method);
-  }
+  std::unordered_set<const ModuleItem*> methods = ClassMethodsOf(items, unit_);
   static const TypedefMap kNoTypedefs;
   ForEachBodyOwningItem(items, [&](const ModuleItem* item) {
     if (IsProceduralItemKind(item->kind) && item->body) {
