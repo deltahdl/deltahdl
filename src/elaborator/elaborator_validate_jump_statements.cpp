@@ -7,6 +7,7 @@
 #include <format>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -392,15 +393,35 @@ void Elaborator::ValidateJumpStatements(const ModuleDecl* decl) {
 // §12.8 names no enclosing declaration the rule is suspended in, so every body
 // a declaration owns is walked -- ForEachBodyOwningItem in
 // elaborator_validate_internal.h is the one list of those.
+//
+// A class method's type names are read in its class first, whose typedefs may
+// hide the names of the module or the package around it, and `typedefs_`
+// holds those outer names alone. So a method's return check reads no name
+// through them: the methods of the classes `items` declare and of the
+// compilation unit's classes, and every method defined out of its class, are
+// checked with no typedef table.
 void Elaborator::CheckJumpStatementsIn(const std::vector<ModuleItem*>& items) {
-  ForEachBodyOwningItem(items, [this](const ModuleItem* item) {
+  std::unordered_set<const ModuleItem*> methods;
+  auto add_method = [&methods](const ModuleItem* m) { methods.insert(m); };
+  for (const auto* item : items) {
+    if (item != nullptr && item->kind == ModuleItemKind::kClassDecl)
+      ForEachClassBodyItem(item->class_decl, add_method);
+  }
+  if (unit_ != nullptr) {
+    for (const auto* cls : unit_->classes)
+      ForEachClassBodyItem(cls, add_method);
+  }
+  static const TypedefMap kNoTypedefs;
+  ForEachBodyOwningItem(items, [&](const ModuleItem* item) {
     if (IsProceduralItemKind(item->kind) && item->body) {
       CheckJumpRules(item->body, JumpScope{}, diag_);
       return;
     }
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl) {
-      CheckSubroutineJumpRules(item, typedefs_, unit_, diag_);
+      bool in_class = methods.count(item) != 0 || !item->method_class.empty();
+      CheckSubroutineJumpRules(item, in_class ? kNoTypedefs : typedefs_, unit_,
+                               diag_);
     }
   });
 }

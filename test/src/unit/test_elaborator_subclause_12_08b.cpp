@@ -138,4 +138,22 @@ TEST(JumpStatementElaboration, ReturnRealFromStringTypedefFunctionIsError) {
                             4, "12.8"));
 }
 
+// A class's own typedef hides a name the module declares (§8.10 with §23.9):
+// the method's t_t is string, which takes the string literal, and not the
+// module's enumeration, which would not.
+TEST(JumpStatementElaboration, ReturnTypeNamedByAClassTypedefIsTheClasssType) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  typedef enum {X, Y} t_t;\n"
+      "  class K;\n"
+      "    typedef string t_t;\n"
+      "    function t_t gets(); return \"\"; endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

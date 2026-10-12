@@ -475,10 +475,19 @@ void CheckPatternsInSubroutine(const ModuleItem* item,
   CheckPatternsInBlockStmts(item->func_body_stmts, inner, ctx);
 }
 
+// A class's typedefs may hide the names of the scope around it, which are what
+// PatternCtx::typedefs holds, so a method's types are read through no typedef
+// table.
+const TypedefMap& NoTypedefs() {
+  static const TypedefMap kNone;
+  return kNone;
+}
+
 // §8.10 -- a class's methods, with its properties and parameters in scope
 // over `names`. A nested class (§8.23) is walked the same way inside it.
 void CheckPatternsInClassBody(const ClassDecl* cls, const PatternNames& names,
-                              const PatternCtx& ctx) {
+                              const PatternCtx& outer) {
+  const PatternCtx ctx{NoTypedefs(), outer.diag};
   PatternNames inner = names;
   for (const auto* m : cls->members) {
     if (m->kind != ClassMemberKind::kProperty) continue;
@@ -523,7 +532,10 @@ void CheckPatternsInItem(const ModuleItem* item, const PatternNames& names,
     CheckPatternsInStmt(item->body, names, ctx);
   } else if (item->kind == ModuleItemKind::kFunctionDecl ||
              item->kind == ModuleItemKind::kTaskDecl) {
-    CheckPatternsInSubroutine(item, names, ctx);
+    // A method defined out of its class reads its names in the class too.
+    CheckPatternsInSubroutine(
+        item, names,
+        item->method_class.empty() ? ctx : PatternCtx{NoTypedefs(), ctx.diag});
   }
 }
 
