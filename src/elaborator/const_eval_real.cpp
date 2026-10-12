@@ -40,6 +40,10 @@ void SetConstFuncRealLocal(std::string_view name, double value) {
   (*g_real_frame)[name] = value;
 }
 
+void ClearConstFuncRealLocal(std::string_view name) {
+  g_real_frame->erase(name);
+}
+
 bool IsConstFuncRealType(const DataType& type) {
   return type.kind == DataTypeKind::kReal ||
          type.kind == DataTypeKind::kShortreal ||
@@ -60,6 +64,24 @@ static std::optional<double> EvalRealBinary(TokenKind op, double lhs,
       return lhs / rhs;
     case TokenKind::kPower:
       return std::pow(lhs, rhs);
+    // §11.3.1: the relational, equality and logical operators take real
+    // operands and give a 1-bit result, read here as the real it converts to.
+    case TokenKind::kLt:
+      return lhs < rhs ? 1.0 : 0.0;
+    case TokenKind::kLtEq:
+      return lhs <= rhs ? 1.0 : 0.0;
+    case TokenKind::kGt:
+      return lhs > rhs ? 1.0 : 0.0;
+    case TokenKind::kGtEq:
+      return lhs >= rhs ? 1.0 : 0.0;
+    case TokenKind::kEqEq:
+      return lhs == rhs ? 1.0 : 0.0;
+    case TokenKind::kBangEq:
+      return lhs != rhs ? 1.0 : 0.0;
+    case TokenKind::kAmpAmp:
+      return lhs != 0.0 && rhs != 0.0 ? 1.0 : 0.0;
+    case TokenKind::kPipePipe:
+      return lhs != 0.0 || rhs != 0.0 ? 1.0 : 0.0;
     default:
       return std::nullopt;
   }
@@ -71,6 +93,8 @@ static std::optional<double> EvalRealUnary(TokenKind op, double operand) {
       return -operand;
     case TokenKind::kPlus:
       return operand;
+    case TokenKind::kBang:
+      return operand == 0.0 ? 1.0 : 0.0;
     default:
       return std::nullopt;
   }
@@ -222,7 +246,7 @@ std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope) {
       return EvalRealBinary(expr->op, *lhs, *rhs);
     }
     case ExprKind::kTernary: {
-      auto cond = ConstEvalInt(expr->condition, scope);
+      auto cond = ConstFuncTruth(expr->condition, scope);
       if (!cond) return std::nullopt;
       return ConstEvalReal(*cond ? expr->true_expr : expr->false_expr, scope);
     }

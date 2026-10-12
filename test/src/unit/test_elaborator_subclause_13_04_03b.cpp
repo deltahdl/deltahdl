@@ -387,4 +387,72 @@ TEST(ConstantFunctionElaboration, ShortrealAndRealtimeKeepTheirValues) {
   EXPECT_EQ(ResolvedParam(design, "Q"), 6);
 }
 
+// §11.3.1 applies the relational, equality and logical operators to reals, so
+// a constant function's if, while and conditional predicates over a real fold
+// by its value (#6422): each true test adds its bit, 919 in all.
+TEST(ConstantFunctionElaboration, RealComparisonsFold) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function automatic int g();\n"
+      "    real x = 1.5;\n"
+      "    int n = 0;\n"
+      "    if (x < 2.0) n = n + 1;\n"
+      "    if (x <= 1.5) n = n + 2;\n"
+      "    if (x > 1.0) n = n + 4;\n"
+      "    if (x >= 2.0) n = n + 8;\n"
+      "    if (x == 1.5) n = n + 16;\n"
+      "    if (x != 1.5) n = n + 32;\n"
+      "    if (x > 1.0 && x < 1.2) n = n + 64;\n"
+      "    if (x < 1.0 || x > 1.2) n = n + 128;\n"
+      "    if (!(x == 0.0)) n = n + 256;\n"
+      "    while (x < 3.0) x = x + 0.5;\n"
+      "    n = n + ((x == 3.0) ? 512 : 0);\n"
+      "    return n;\n"
+      "  endfunction\n"
+      "  localparam int P = g();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ResolvedParam(design, "P"), 919);
+}
+
+// §12.7.1 lets a for loop declare a real variable, which keeps its real value
+// for the loop's run (#6423), and hands the name back afterwards to what it
+// named outside: a real the loop hid, and an integer loop variable hiding a
+// real.
+TEST(ConstantFunctionElaboration, RealForLoopVariableKeepsItsValue) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function automatic int f1();\n"
+      "    int n = 0;\n"
+      "    for (real r = 0.5; r != 2.0; r = r + 0.5) n++;\n"
+      "    return n;\n"
+      "  endfunction\n"
+      "  function automatic real f2();\n"
+      "    real r = 9.5;\n"
+      "    int n = 0;\n"
+      "    for (real r = 0.5; r < 1.0; r = r + 0.25) n++;\n"
+      "    return r + n;\n"
+      "  endfunction\n"
+      "  function automatic real f3();\n"
+      "    real k = 1.5;\n"
+      "    int n = 0;\n"
+      "    for (int k = 0; k < 2; k++) n++;\n"
+      "    return k + n;\n"
+      "  endfunction\n"
+      "  localparam int P1 = f1();\n"
+      "  localparam int P2 = f2() * 2;\n"
+      "  localparam int P3 = f3() * 2;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ResolvedParam(design, "P1"), 3);
+  EXPECT_EQ(ResolvedParam(design, "P2"), 23);
+  EXPECT_EQ(ResolvedParam(design, "P3"), 7);
+}
+
 }  // namespace

@@ -261,12 +261,23 @@ static ConstFuncFlow ExecConstFuncBlockingAssign(const Stmt* s,
   return ConstFuncFlow::kNormal;
 }
 
+std::optional<bool> ConstFuncTruth(const Expr* cond, const ScopeMap& scope) {
+  if (HasRealOperand(cond)) {
+    auto real = ConstEvalReal(cond, scope);
+    if (!real) return std::nullopt;
+    return *real != 0.0;
+  }
+  auto v = ConstEvalFull(cond, scope);
+  if (!v) return std::nullopt;
+  return ConstValIsNonZero(*v);
+}
+
 static ConstFuncFlow ExecConstFuncIf(const Stmt* s, ScopeMap& locals,
                                      std::string_view result_name,
                                      int64_t& iter_budget) {
-  auto cond = ConstEvalFull(s->condition, locals);
+  auto cond = ConstFuncTruth(s->condition, locals);
   if (!cond) return ConstFuncFlow::kAbort;
-  if (ConstValIsNonZero(*cond))
+  if (*cond)
     return ExecConstFuncStmt(s->then_branch, locals, result_name, iter_budget);
   return ExecConstFuncStmt(s->else_branch, locals, result_name, iter_budget);
 }
@@ -277,9 +288,7 @@ static ConstFuncFlow ExecConstFuncIf(const Stmt* s, ScopeMap& locals,
 static std::optional<bool> ConstFuncLoopCond(const Expr* cond,
                                              const ScopeMap& locals) {
   if (!cond) return true;
-  auto v = ConstEvalFull(cond, locals);
-  if (!v) return std::nullopt;
-  return ConstValIsNonZero(*v);
+  return ConstFuncTruth(cond, locals);
 }
 
 // What one pass over a loop body asks the enclosing loop to do next.
@@ -336,19 +345,45 @@ static ConstFuncFlow ExecConstFuncForLoop(const Stmt* s, ScopeMap& locals,
 // implicit begin-end block, so each declared variable hides any local of the
 // same name for the loop's duration and the local is as it was once the loop
 // ends. A loop that returns or abandons the fold leaves nothing to restore.
+// §12.7.1 with §6.12: a loop variable declared real is a real local for the
+// loop's run, and one of any other type no real local whatever the name was
+// outside the loop (ConstFuncRealFrame).
+static void BindLoopVarType(std::string_view name, const DataType& type) {
+  if (IsConstFuncRealType(type)) {
+    SetConstFuncRealLocal(name, 0.0);
+  } else {
+    ClearConstFuncRealLocal(name);
+  }
+}
+
+// The real binding `real` the name `name` had outside a loop, handed back.
+static void RestoreRealBinding(std::string_view name,
+                               std::optional<double> real) {
+  if (real) {
+    SetConstFuncRealLocal(name, *real);
+  } else {
+    ClearConstFuncRealLocal(name);
+  }
+}
+
 static ConstFuncFlow ExecConstFuncFor(const Stmt* s, ScopeMap& locals,
                                       std::string_view result_name,
                                       int64_t& iter_budget) {
   std::vector<std::pair<std::string_view, int64_t>> hidden;
+  std::vector<std::pair<std::string_view, std::optional<double>>> reals;
   for (size_t i = 0; i < s->for_init_types.size(); ++i) {
     if (s->for_init_types[i].kind == DataTypeKind::kImplicit) continue;
-    auto outer = locals.find(s->for_inits[i]->lhs->text);
+    std::string_view name = s->for_inits[i]->lhs->text;
+    auto outer = locals.find(name);
     if (outer != locals.end()) hidden.emplace_back(*outer);
+    reals.emplace_back(name, ConstFuncRealLocal(name));
+    BindLoopVarType(name, s->for_init_types[i]);
   }
   ConstFuncFlow flow =
       ExecConstFuncForLoop(s, locals, result_name, iter_budget);
   if (flow != ConstFuncFlow::kNormal) return flow;
   for (const auto& [name, value] : hidden) locals[name] = value;
+  for (const auto& [name, real] : reals) RestoreRealBinding(name, real);
   return flow;
 }
 

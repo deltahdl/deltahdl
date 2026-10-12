@@ -109,8 +109,16 @@ std::optional<double> ConstFuncRealLocal(std::string_view name);
 // Makes `name` a real local of the innermost frame holding `value`; called
 // only while a frame stands.
 void SetConstFuncRealLocal(std::string_view name, double value);
+// Makes `name` no real local of the innermost frame; called only while a
+// frame stands.
+void ClearConstFuncRealLocal(std::string_view name);
 // Whether `type` is one of §6.12's real types.
 bool IsConstFuncRealType(const DataType& type);
+// §12.4 with §11.3.1: whether the predicate `cond` holds against `scope` -- a
+// real one (HasRealOperand) where its real value is nonzero, any other where
+// its integer value is -- or none where it does not fold. Defined in
+// const_eval_func.cpp.
+std::optional<bool> ConstFuncTruth(const Expr* cond, const ScopeMap& scope);
 // §13.4.3: the constant function the call `call` names among those registered
 // (ConstFuncRegistryGuard), null for none. Defined in const_eval_func.cpp.
 const ModuleItem* RegisteredConstFunc(const Expr* call);
