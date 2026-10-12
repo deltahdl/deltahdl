@@ -337,4 +337,39 @@ TEST(FinalProcedureElaboration, ATaskEnabledInAFinalProcedureIsReported) {
                              "9.2.3"));
 }
 
+// A.8.2 writes a tf_call's argument list optionally, so `t;` enables t as
+// `t();` does (#6426).
+TEST(FinalProcedureElaboration, ATaskEnabledByItsBareNameIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task t; endtask\n"
+      "  final t;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "final procedure enables task 't'", 3, "9.2.3"));
+}
+
+// A task is no less a task for being declared in a package or at
+// compilation-unit scope (#6427).
+TEST(FinalProcedureElaboration, APackageOrUnitTaskEnabledIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pk; task t; endtask endpackage\n"
+      "task u; endtask\n"
+      "module m;\n"
+      "  final begin\n"
+      "    pk::t();\n"
+      "    u();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "final procedure enables task 'pk::t'", 5,
+                            "9.2.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "final procedure enables task 'u'", 6, "9.2.3"));
+}
+
 }  // namespace

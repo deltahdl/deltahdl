@@ -131,16 +131,6 @@ struct TaskOperandCheck {
   DiagEngine& diag;
 };
 
-// The name `call` names its subroutine by: the bare callee, or for a call
-// through the package scope resolution operator, `pk::t()`, which the parser
-// keeps with no callee text and the scoped name as its base, "pk::t".
-std::string CallName(const Expr* call) {
-  if (!call->callee.empty()) return std::string(call->callee);
-  const Expr* scoped = call->lhs;
-  if (scoped == nullptr || !scoped->is_scope_resolution) return {};
-  return std::string(scoped->lhs->text) + "::" + std::string(scoped->rhs->text);
-}
-
 // `root` is the expression that is the statement, the one call position that
 // is an enable.
 void WalkExprForTaskOperands(const Expr* e, const Expr* root,
@@ -232,10 +222,30 @@ void AddUnitAndPackageTasks(
 
 }  // namespace
 
+std::string CallName(const Expr* call) {
+  if (!call->callee.empty()) return std::string(call->callee);
+  const Expr* scoped = call->lhs;
+  if (scoped == nullptr || !scoped->is_scope_resolution) return {};
+  return std::string(scoped->lhs->text) + "::" + std::string(scoped->rhs->text);
+}
+
+std::string EnabledSubroutineName(const Stmt* s) {
+  if (const Expr* call = SubroutineCallOfStmt(s)) return CallName(call);
+  if (s->kind == StmtKind::kExprStmt && s->expr != nullptr &&
+      s->expr->kind == ExprKind::kIdentifier)
+    return std::string(s->expr->text);
+  return {};
+}
+
+std::unordered_set<std::string> Elaborator::ReachableTaskNames() const {
+  std::unordered_set<std::string> tasks;
+  for (std::string_view name : task_names_) tasks.emplace(name);
+  if (unit_ != nullptr) AddUnitAndPackageTasks(*unit_, func_decls_, tasks);
+  return tasks;
+}
+
 void Elaborator::ValidateTaskCallsInExpressions(const ModuleDecl* decl) {
-  TaskOperandCheck chk{{}, diag_};
-  for (std::string_view name : task_names_) chk.tasks.emplace(name);
-  if (unit_ != nullptr) AddUnitAndPackageTasks(*unit_, func_decls_, chk.tasks);
+  TaskOperandCheck chk{ReachableTaskNames(), diag_};
   if (chk.tasks.empty()) return;
   WalkItemsForTaskOperands(decl->items, chk);
 }

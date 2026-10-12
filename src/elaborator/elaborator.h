@@ -764,6 +764,12 @@ class Elaborator : public ElaboratorClassRules {
   void ApplyNetDelaysInModuleTree(RtlirModule* mod);
   void ValidateConstantFunctionCalls(const ModuleDecl* decl);
   void ValidateTaskCallsInExpressions(const ModuleDecl* decl);
+  // §13.3: the names a call written in the module names a task by -- the
+  // module's own tasks and DPI task imports (task_names_), the compilation
+  // unit's tasks no function of the module hides (§23.9), and each package's
+  // tasks under the "pk::t" a call through the package scope resolution
+  // operator names (§26.3) -- as EnabledSubroutineName spells them.
+  std::unordered_set<std::string> ReachableTaskNames() const;
   // §7.7: a dynamic array or queue may not be passed to a DPI import formal
   // that is an open array (unsized) with an output direction.
   void ValidateDpiOpenArrayArgs(const ModuleDecl* decl);

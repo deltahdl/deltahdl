@@ -1,4 +1,5 @@
 #include <format>
+#include <string>
 #include <string_view>
 #include <unordered_set>
 #include <utility>
@@ -769,13 +770,13 @@ void Elaborator::ValidateFunctionBody(const ModuleItem* item,
 // declaration allows, and §13.4 bars a function from enabling a task, so a
 // task enabled anywhere in the procedure's statements is reported.
 static void CheckFinalTaskEnables(
-    const Stmt* s, const std::unordered_set<std::string_view>& task_names,
+    const Stmt* s, const std::unordered_set<std::string>& task_names,
     DiagEngine& diag) {
   if (!s) return;
-  const Expr* call = SubroutineCallOfStmt(s);
-  if (call != nullptr && task_names.count(call->callee) != 0) {
+  std::string name = EnabledSubroutineName(s);
+  if (task_names.contains(name)) {
     diag.Error(s->range.start,
-               std::format("final procedure enables task '{}'", call->callee),
+               std::format("final procedure enables task '{}'", name),
                Subclause("9.2.3"));
   }
   ForEachChildStmt(s, [&](Stmt* const& sub) {
@@ -784,9 +785,10 @@ static void CheckFinalTaskEnables(
 }
 
 void Elaborator::ValidateFinalTaskEnables(const ModuleDecl* decl) {
+  const std::unordered_set<std::string> kTasks = ReachableTaskNames();
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kFinalBlock) {
-      CheckFinalTaskEnables(item->body, task_names_, diag_);
+      CheckFinalTaskEnables(item->body, kTasks, diag_);
     }
   }
 }

@@ -13,6 +13,7 @@
 #include <functional>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -649,5 +650,18 @@ class BodyDeclScopes {
   bool default_auto_;
   std::vector<Decl> decls_;
 };
+
+// A.8.2: the name the subroutine call `call` names its subroutine by -- the
+// bare callee, or for a call through the package scope resolution operator,
+// `pk::t()`, which the parser keeps with no callee text and the scoped name as
+// its base, "pk::t". Empty for a call naming none. Defined in
+// elaborator_validate_subroutine.cpp.
+std::string CallName(const Expr* call);
+
+// A.6.9 with A.8.2: the name the statement `s` enables a subroutine by, the
+// call it is (CallName) or the bare identifier it is, `t;`, since a tf_call's
+// argument list is optional; empty for any other statement. Defined in
+// elaborator_validate_subroutine.cpp.
+std::string EnabledSubroutineName(const Stmt* s);
 
 }  // namespace delta
