@@ -1,10 +1,10 @@
 #include <algorithm>
-#include <array>
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string_view>
+#include <vector>
 
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
@@ -17,7 +17,7 @@ namespace delta {
 namespace {
 
 uint64_t WidthMask(uint32_t width) {
-  return width == 0 || width >= 64 ? ~uint64_t{0} : (uint64_t{1} << width) - 1;
+  return width >= 64 ? ~uint64_t{0} : (uint64_t{1} << width) - 1;
 }
 
 // The bits per digit of the based literal base `base`, 0 for a decimal one.
@@ -73,7 +73,7 @@ LiteralDigits BasedDigits(std::string_view digits, unsigned bits) {
   unsigned shift = 0;
   char leftmost = '0';
   for (auto it = digits.rbegin(); it != digits.rend() && shift < 64; ++it) {
-    if (*it == '_' || *it == ' ') continue;
+    if (*it == '_') continue;
     AddDigit(*it, bits, shift, out);
     leftmost = *it;
     shift += bits;
@@ -96,7 +96,7 @@ LiteralDigits DecimalDigits(std::string_view digits) {
 // The digits of the integer literal `e` where one of them is x or z, none for
 // any other expression.
 std::optional<LiteralDigits> UnknownLiteral(const Expr* e) {
-  if (e == nullptr || e->kind != ExprKind::kIntegerLiteral) return std::nullopt;
+  if (e->kind != ExprKind::kIntegerLiteral) return std::nullopt;
   std::string_view t = e->text;
   size_t pos = t.find('\'');
   if (pos == std::string_view::npos) return std::nullopt;
@@ -125,74 +125,98 @@ uint64_t CaseBits(const ConstVal& v, const CaseOperands& ops) {
   return bits & WidthMask(ops.width);
 }
 
+// One item expression of a case statement, folded: its value, the x and z
+// bits of a literal holding them (within its own width, the bits it is
+// extended by being 0), or a case inside range's bounds (`hi` set).
+struct CaseItemValue {
+  const Stmt* body = nullptr;
+  ConstVal value{0, 32, true};
+  std::optional<ConstVal> hi;
+  uint64_t x = 0;
+  uint64_t z = 0;
+};
+
+// Every item of a case statement folded, the default's statement, and the
+// operands' width and signedness.
+struct CaseFold {
+  CaseOperands ops;
+  std::vector<CaseItemValue> items;
+  const Stmt* fallback = nullptr;
+};
+
+std::optional<ConstVal> FoldOperand(const Expr* e, const ScopeMap& locals,
+                                    CaseOperands& ops) {
+  auto v = ConstEvalFull(e, locals);
+  if (!v) return std::nullopt;
+  ops.width = std::max(ops.width, v->width);
+  ops.all_signed = ops.all_signed && v->is_signed;
+  return v;
+}
+
 // §12.5.4: `[lo:hi]` in a case inside item, a select with no base.
-bool IsInsideRange(const Expr* p) {
-  return p->kind == ExprKind::kSelect && p->index != nullptr &&
+bool IsInsideRange(const Stmt* s, const Expr* p) {
+  return s->case_inside && p->kind == ExprKind::kSelect &&
          p->index_end != nullptr;
 }
 
-std::array<const Expr*, 2> PatternOperands(const Stmt* s, const Expr* p) {
-  if (s->case_inside && IsInsideRange(p)) return {p->index, p->index_end};
-  return {p, nullptr};
+bool FoldItem(const Stmt* s, const Expr* p, const ScopeMap& locals,
+              CaseItemValue& item, CaseOperands& ops) {
+  if (IsInsideRange(s, p)) {
+    auto lo = FoldOperand(p->index, locals, ops);
+    item.hi = FoldOperand(p->index_end, locals, ops);
+    if (!lo || !item.hi) return false;
+    item.value = *lo;
+    return true;
+  }
+  auto v = FoldOperand(p, locals, ops);
+  if (!v) return false;
+  item.value = *v;
+  if (auto lit = UnknownLiteral(p)) {
+    const uint64_t kOwn = WidthMask(v->width);
+    item.value.value = static_cast<int64_t>(lit->value & kOwn);
+    item.x = lit->x & kOwn;
+    item.z = lit->z & kOwn;
+  }
+  return true;
 }
 
-bool SizeCase(const Stmt* s, const ConstVal& sel, const ScopeMap& locals,
-              CaseOperands& ops) {
-  ops = {sel.width, sel.is_signed};
+bool FoldCase(const Stmt* s, const ScopeMap& locals, CaseFold& fold) {
   for (const CaseItem& ci : s->case_items) {
+    if (ci.is_default) fold.fallback = ci.body;
     for (const Expr* p : ci.patterns) {
-      for (const Expr* e : PatternOperands(s, p)) {
-        if (e == nullptr) continue;
-        auto v = ConstEvalFull(e, locals);
-        if (!v) return false;
-        ops.width = std::max(ops.width, v->width);
-        ops.all_signed = ops.all_signed && v->is_signed;
-      }
+      CaseItemValue item;
+      item.body = ci.body;
+      if (!FoldItem(s, p, locals, item, fold.ops)) return false;
+      fold.items.push_back(item);
     }
   }
   return true;
 }
 
-std::optional<bool> InsideRangeMatches(const Expr* p, const ConstVal& sel,
-                                       const CaseOperands& ops,
-                                       const ScopeMap& locals) {
-  auto lo = ConstEvalFull(p->index, locals);
-  auto hi = ConstEvalFull(p->index_end, locals);
-  if (!lo || !hi) return std::nullopt;
-  if (ops.all_signed) return lo->value <= sel.value && sel.value <= hi->value;
-  uint64_t s = CaseBits(sel, ops);
-  return CaseBits(*lo, ops) <= s && s <= CaseBits(*hi, ops);
-}
-
-// The x and z bits of the item `lit` that match any selector bit: z and `?`
-// for casez (§12.5.1), x as well for casex and for case inside's `==?`
-// (§12.5.4, §11.4.6), and none for case.
-uint64_t IgnoredBits(const Stmt* s, const LiteralDigits& lit) {
+// The x and z bits of `item` that match any selector bit: z and `?` for casez
+// (§12.5.1), x as well for casex and for case inside's `==?` (§12.5.4,
+// §11.4.6), and none for case.
+uint64_t IgnoredBits(const Stmt* s, const CaseItemValue& item) {
   if (s->case_inside || s->case_kind == TokenKind::kKwCasex)
-    return lit.x | lit.z;
-  if (s->case_kind == TokenKind::kKwCasez) return lit.z;
+    return item.x | item.z;
+  if (s->case_kind == TokenKind::kKwCasez) return item.z;
   return 0;
 }
 
-// Whether the item `p` matches the selector `sel`. A constant selector holds
-// no x or z, so an x or z bit of the item the comparison does not ignore
-// matches none of it. An item's x and z bits are its own, within its width;
-// the bits it is extended by are 0 (§12.5).
-std::optional<bool> PatternMatches(const Stmt* s, const Expr* p,
-                                   const ConstVal& sel, const CaseOperands& ops,
-                                   const ScopeMap& locals) {
-  if (s->case_inside && IsInsideRange(p))
-    return InsideRangeMatches(p, sel, ops, locals);
-  auto item = ConstEvalFull(p, locals);
-  if (!item) return std::nullopt;
-  uint64_t ignored = 0;
-  if (auto lit = UnknownLiteral(p)) {
-    const uint64_t kOwn = WidthMask(item->width);
-    item->value = static_cast<int64_t>(lit->value & kOwn);
-    ignored = IgnoredBits(s, *lit) & kOwn;
-    if (((lit->x | lit->z) & kOwn & ~ignored) != 0) return false;
+// Whether `item` matches the selector `sel`. A constant selector holds no x
+// or z, so an x or z bit of the item the comparison does not ignore matches
+// none of it.
+bool ItemMatches(const Stmt* s, const CaseItemValue& item, const ConstVal& sel,
+                 const CaseOperands& ops) {
+  if (item.hi) {
+    if (ops.all_signed)
+      return item.value.value <= sel.value && sel.value <= item.hi->value;
+    uint64_t bits = CaseBits(sel, ops);
+    return CaseBits(item.value, ops) <= bits && bits <= CaseBits(*item.hi, ops);
   }
-  return ((CaseBits(sel, ops) ^ CaseBits(*item, ops)) & ~ignored &
+  const uint64_t kIgnored = IgnoredBits(s, item);
+  if (((item.x | item.z) & ~kIgnored) != 0) return false;
+  return ((CaseBits(sel, ops) ^ CaseBits(item.value, ops)) & ~kIgnored &
           WidthMask(ops.width)) == 0;
 }
 
@@ -200,24 +224,14 @@ std::optional<bool> PatternMatches(const Stmt* s, const Expr* p,
 
 std::optional<const Stmt*> ConstFuncCaseArm(const Stmt* s,
                                             const ScopeMap& locals) {
-  if (s->case_matches) return std::nullopt;
   auto sel = ConstEvalFull(s->condition, locals);
   if (!sel) return std::nullopt;
-  CaseOperands ops{};
-  if (!SizeCase(s, *sel, locals, ops)) return std::nullopt;
-  const Stmt* fallback = nullptr;
-  for (const CaseItem& ci : s->case_items) {
-    if (ci.is_default) {
-      fallback = ci.body;
-      continue;
-    }
-    for (const Expr* p : ci.patterns) {
-      auto matched = PatternMatches(s, p, *sel, ops, locals);
-      if (!matched) return std::nullopt;
-      if (*matched) return ci.body;
-    }
+  CaseFold fold{{sel->width, sel->is_signed}, {}, nullptr};
+  if (!FoldCase(s, locals, fold)) return std::nullopt;
+  for (const CaseItemValue& item : fold.items) {
+    if (ItemMatches(s, item, *sel, fold.ops)) return item.body;
   }
-  return fallback;
+  return fold.fallback;
 }
 
 }  // namespace delta

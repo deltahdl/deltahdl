@@ -362,4 +362,33 @@ TEST(TaskElaboration, ModuleFunctionHidesUnitTask) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// The same in an else arm of a conditional generate and in an arm of a case
+// generate (§27.5).
+TEST(TaskElaboration, TaskOperandInGenerateElseAndCaseArmsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int x;\n"
+      "  task t; endtask\n"
+      "  if (0) begin : a\n"
+      "  end else begin : b\n"
+      "    initial x = t();\n"
+      "  end\n"
+      "  case (1)\n"
+      "    1: begin : c\n"
+      "      initial x = t();\n"
+      "    end\n"
+      "  endcase\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "task 't' is enabled from a statement and "
+                            "cannot be an operand of an expression",
+                            6, "13.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "task 't' is enabled from a statement and "
+                            "cannot be an operand of an expression",
+                            10, "13.3"));
+}
+
 }  // namespace

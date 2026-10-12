@@ -196,6 +196,8 @@ TEST(ConstantFunctionElaboration, RealLocalsAndResultKeepTheirValues) {
       "    real x;\n"
       "    x++;\n"
       "    x++;\n"
+      "    x++;\n"
+      "    x--;\n"
       "    return x / 4;\n"
       "  endfunction\n"
       "  function automatic real g();\n"
@@ -286,6 +288,103 @@ TEST(ConstantFunctionElaboration, RealFormalKeepsItsValue) {
   EXPECT_FALSE(f.has_errors);
   EXPECT_EQ(ResolvedParam(design, "R"), 10);
   EXPECT_EQ(ResolvedParam(design, "S"), 3);
+}
+
+// §5.7.1's digits in every base: a hex item's letters and an underscore, an
+// octal item, upper-case X and Z, a leftmost x filling the bits above it, a
+// decimal x standing for every bit, and an item wider than 64 bits.
+TEST(ConstantFunctionElaboration, CaseItemDigitsOfEveryBaseFold) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function automatic int fh(logic [7:0] s);\n"
+      "    casez (s) 8'hA_Z: return 8; default: return 4; endcase\n"
+      "  endfunction\n"
+      "  function automatic int fo(logic [7:0] s);\n"
+      "    casex (s) 8'o2X1: return 8; default: return 4; endcase\n"
+      "  endfunction\n"
+      "  function automatic int fl(logic [3:0] s);\n"
+      "    casex (s) 4'bx0: return 8; default: return 4; endcase\n"
+      "  endfunction\n"
+      "  function automatic int fd(logic [3:0] s);\n"
+      "    casex (s) 4'dx: return 8; default: return 4; endcase\n"
+      "  endfunction\n"
+      "  function automatic int fw(longint s);\n"
+      "    casez (s)\n"
+      "      128'h0000_0000_0000_0000_0000_0000_0000_00?1: return 8;\n"
+      "      default: return 4;\n"
+      "    endcase\n"
+      "  endfunction\n"
+      "  localparam int H1 = fh(8'hA7);\n"
+      "  localparam int H2 = fh(8'hB7);\n"
+      "  localparam int O1 = fo(8'hA9);\n"
+      "  localparam int O2 = fo(8'hC1);\n"
+      "  localparam int L1 = fl(4'b1110);\n"
+      "  localparam int L2 = fl(4'b1111);\n"
+      "  localparam int D1 = fd(4'b0110);\n"
+      "  localparam int W1 = fw(64'h31);\n"
+      "  localparam int W2 = fw(64'h30);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ResolvedParam(design, "H1"), 8);
+  EXPECT_EQ(ResolvedParam(design, "H2"), 4);
+  EXPECT_EQ(ResolvedParam(design, "O1"), 8);
+  EXPECT_EQ(ResolvedParam(design, "O2"), 4);
+  EXPECT_EQ(ResolvedParam(design, "L1"), 8);
+  EXPECT_EQ(ResolvedParam(design, "L2"), 4);
+  EXPECT_EQ(ResolvedParam(design, "D1"), 8);
+  EXPECT_EQ(ResolvedParam(design, "W1"), 8);
+  EXPECT_EQ(ResolvedParam(design, "W2"), 4);
+}
+
+// A case statement whose selector, item or range bound does not fold leaves
+// the call unfolded rather than choosing an arm: `bad` holds a forever loop,
+// which the interpreter does not model.
+TEST(ConstantFunctionElaboration, CaseWithAnUnfoldedOperandDoesNotFold) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function automatic int bad();\n"
+      "    forever break;\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "  function automatic int fs(int s);\n"
+      "    case (bad()) 1: return 8; default: return 4; endcase\n"
+      "  endfunction\n"
+      "  function automatic int fi(int s);\n"
+      "    case (s) bad(): return 8; default: return 4; endcase\n"
+      "  endfunction\n"
+      "  function automatic int fr(int s);\n"
+      "    case (s) inside [0:bad()]: return 8; default: return 4; endcase\n"
+      "  endfunction\n"
+      "  localparam int S = fs(1);\n"
+      "  localparam int I = fi(1);\n"
+      "  localparam int R = fr(1);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(ResolvedParam(design, "S"), -1);
+  EXPECT_EQ(ResolvedParam(design, "I"), -1);
+  EXPECT_EQ(ResolvedParam(design, "R"), -1);
+}
+
+// shortreal and realtime are real types (§6.12) as real is.
+TEST(ConstantFunctionElaboration, ShortrealAndRealtimeKeepTheirValues) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  function automatic realtime g(shortreal a);\n"
+      "    realtime t = a;\n"
+      "    return t * 3;\n"
+      "  endfunction\n"
+      "  localparam int Q = g(0.5) * 4;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ResolvedParam(design, "Q"), 6);
 }
 
 }  // namespace

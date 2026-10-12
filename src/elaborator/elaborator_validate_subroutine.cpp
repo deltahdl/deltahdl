@@ -137,11 +137,7 @@ struct TaskOperandCheck {
 std::string CallName(const Expr* call) {
   if (!call->callee.empty()) return std::string(call->callee);
   const Expr* scoped = call->lhs;
-  if (scoped == nullptr || scoped->kind != ExprKind::kMemberAccess ||
-      !scoped->is_scope_resolution || scoped->lhs == nullptr ||
-      scoped->rhs == nullptr) {
-    return {};
-  }
+  if (scoped == nullptr || !scoped->is_scope_resolution) return {};
   return std::string(scoped->lhs->text) + "::" + std::string(scoped->rhs->text);
 }
 

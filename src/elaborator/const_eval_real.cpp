@@ -37,7 +37,7 @@ std::optional<double> ConstFuncRealLocal(std::string_view name) {
 }
 
 void SetConstFuncRealLocal(std::string_view name, double value) {
-  if (g_real_frame != nullptr) (*g_real_frame)[name] = value;
+  (*g_real_frame)[name] = value;
 }
 
 bool IsConstFuncRealType(const DataType& type) {

@@ -106,7 +106,8 @@ class ConstFuncRealFrame {
 // The value of the real local `name` of the innermost frame, none where it
 // holds no such local.
 std::optional<double> ConstFuncRealLocal(std::string_view name);
-// Makes `name` a real local of the innermost frame holding `value`.
+// Makes `name` a real local of the innermost frame holding `value`; called
+// only while a frame stands.
 void SetConstFuncRealLocal(std::string_view name, double value);
 // Whether `type` is one of §6.12's real types.
 bool IsConstFuncRealType(const DataType& type);
