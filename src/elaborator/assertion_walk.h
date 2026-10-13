@@ -106,4 +106,27 @@ bool ItemsAssign(const std::vector<SeqMatchAssign>& items,
 // first_match assigns `name`.
 bool BodyAssigns(const SeqLinearBody& body, std::string_view name);
 
+// §16.8 and §17.3: the references to a formal in a body: all of them, and
+// those a `$` actual may reach, the upper bound of a cycle delay or a
+// repetition range and an actual argument of an instance written whole.
+struct FormalReferences {
+  int all = 0;
+  int permitted = 0;
+};
+
+// Adds the references to `name` in `e` to `refs`, the arguments of the calls
+// it holds that are `name` alone as permitted ones.
+void CountFormalInExpr(const Expr* e, std::string_view name,
+                       FormalReferences& refs);
+
+// Adds the references to `name` in `body` and the bodies nested in it to
+// `refs`, its delay and repetition bounds among them, `##d` and `[*d]`
+// standing for the range [d:d], whose lower bound d is.
+void CountFormalInBody(const SeqLinearBody& body, std::string_view name,
+                       FormalReferences& refs);
+
+// Adds the references to `name` in the property tree under `node` to `refs`.
+void CountFormalInTree(const PropertyExprNode* node, std::string_view name,
+                       FormalReferences& refs);
+
 }  // namespace delta

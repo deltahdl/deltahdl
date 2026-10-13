@@ -181,4 +181,53 @@ bool BodyAssigns(const SeqLinearBody& body, std::string_view name) {
   return assigns;
 }
 
+void CountFormalInExpr(const Expr* e, std::string_view name,
+                       FormalReferences& refs) {
+  ForEachSubExpr(e, [&](const Expr* sub) {
+    refs.all += static_cast<int>(IsNameRef(sub, name));
+    if (sub->kind != ExprKind::kCall) return;
+    for (const Expr* arg : sub->args) {
+      refs.permitted += static_cast<int>(IsNameRef(arg, name));
+    }
+  });
+}
+
+namespace {
+
+void CountFormalInBounds(const SeqCycleDelay& bounds, std::string_view name,
+                         FormalReferences& refs) {
+  CountFormalInExpr(bounds.min_expr, name, refs);
+  if (bounds.max_expr == bounds.min_expr) return;
+  CountFormalInExpr(bounds.max_expr, name, refs);
+  refs.permitted += static_cast<int>(IsNameRef(bounds.max_expr, name));
+}
+
+}  // namespace
+
+void CountFormalInBody(const SeqLinearBody& body, std::string_view name,
+                       FormalReferences& refs) {
+  ForEachBody(body, [&](const SeqLinearBody& b) {
+    for (const SeqCycleDelay& delay : b.delays) {
+      CountFormalInBounds(delay, name, refs);
+    }
+    for (const SeqRepetition& rep : b.repetitions) {
+      CountFormalInBounds(rep, name, refs);
+    }
+  });
+  ForEachBodyExpr(body,
+                  [&](const Expr* e) { CountFormalInExpr(e, name, refs); });
+}
+
+void CountFormalInTree(const PropertyExprNode* node, std::string_view name,
+                       FormalReferences& refs) {
+  ForEachTreeNode(node, [&](const PropertyExprNode& n) {
+    CountFormalInExpr(n.boolean, name, refs);
+    CountFormalInExpr(n.range_min, name, refs);
+    CountFormalInExpr(n.range_max, name, refs);
+    if (n.sequence != nullptr) {
+      CountFormalInBody(n.sequence->seq_linear, name, refs);
+    }
+  });
+}
+
 }  // namespace delta

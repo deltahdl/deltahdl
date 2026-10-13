@@ -317,43 +317,6 @@ void CheckFutureGclkNesting(const Expr* call, DiagEngine& diag) {
              Subclause("16.9.4"));
 }
 
-// The variable an assignment target writes, its selects and members
-// stripped.
-const Expr* TargetRoot(const Expr* e) {
-  while (e->kind == ExprKind::kSelect || e->kind == ExprKind::kMemberAccess) {
-    e = e->kind == ExprKind::kSelect ? e->base : e->lhs;
-  }
-  return e;
-}
-
-// §16.6: whether the function `fn` writes a variable other than its own
-// formals, its locals and its result, which is a side effect; and, through
-// `keeps_state`, whether it holds a value from one call to the next, a local
-// whose declaration initializes it once where the local is static.
-bool HasSideEffect(const ModuleItem* fn, bool& keeps_state) {
-  NameSet own{fn->name};
-  for (const FunctionArg& arg : fn->func_args) own.insert(arg.name);
-  keeps_state = false;
-  ForEachProceduralStmt(fn, [&](const Stmt* s) {
-    if (s->kind != StmtKind::kVarDecl) return;
-    own.insert(s->var_name);
-    bool is_static = !fn->is_automatic || s->var_is_static;
-    if (is_static && s->var_init != nullptr) keeps_state = true;
-  });
-  bool writes = false;
-  ForEachProceduralStmt(fn, [&](const Stmt* s) {
-    if (s->kind != StmtKind::kBlockingAssign &&
-        s->kind != StmtKind::kNonblockingAssign) {
-      return;
-    }
-    const Expr* root = TargetRoot(s->lhs);
-    if (root->kind == ExprKind::kIdentifier && own.count(root->text) == 0) {
-      writes = true;
-    }
-  });
-  return writes;
-}
-
 // §16.6: a function called in a concurrent assertion takes no output, inout
 // or ref argument, is automatic or keeps no state, and has no side effect.
 void CheckAssertionFunctionCall(const Expr* call, const RuleEnv& env) {
@@ -370,12 +333,7 @@ void CheckAssertionFunctionCall(const Expr* call, const RuleEnv& env) {
                        "called in a concurrent assertion",
                    Subclause("16.6"));
   }
-  bool keeps_state = false;
-  bool side_effect = HasSideEffect(fn, keeps_state);
-  if (FunctionEligibleInAssertionExpr(fn->is_automatic, !keeps_state,
-                                      !side_effect)) {
-    return;
-  }
+  if (!FunctionIsImpure(fn)) return;
   env.diag.Error(call->range.start,
                  "function '" + std::string(fn->name) +
                      "' keeps state or has a side effect and cannot be called "

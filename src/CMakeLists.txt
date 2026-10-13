@@ -132,6 +132,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/assertion_expr_rules.cpp
     elaborator/assertion_rules.cpp
     elaborator/assertion_walk.cpp
+    elaborator/checker_actual_rules.cpp
     elaborator/local_variable_flow_rules.cpp
     elaborator/block_name_space.cpp
     elaborator/body_decl_scopes.cpp

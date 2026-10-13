@@ -243,4 +243,106 @@ TEST(ProceduralCheckerInstantiation, NotInAForkBlock) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kMessage, 11, "17.3"));
 }
 
+// §17.3: each output actual of a checker instance is a variable or net
+// lvalue: f & g is neither, while h and the concatenation {g, h} are.
+TEST(CheckerActuals, AnOutputActualThatIsNoLvalueIsReported) {
+  const char* const kReport =
+      "the output actual of the formal 'failure' of checker 'c' is neither a "
+      "variable nor a net lvalue";
+  ElabFixture f;
+  ElaborateSrc(
+      "checker c(event clk, output bit failure, output bit [1:0] both);\n"
+      "  a1: assert property (@clk 1) failure = 1'b0; else failure = 1'b1;\n"
+      "endchecker\n"
+      "module m;\n"
+      "  logic clk, f, g, h;\n"
+      "  c u1(posedge clk, f & g, h);\n"
+      "  c u2(.clk(posedge clk), .failure(f), .both({g, h}));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 6, "17.3"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "neither a variable", 7, "17.3"));
+}
+
+// §17.3: a $ actual binds an untyped formal the checker reads only as a
+// range's upper bound, an instance's actual or a nested checker's default:
+// c1's n is typed and c2 reads m as an operand, while c3, c4 and c5 use k as
+// a bound, as an instance's actual and as a nested checker's default.
+TEST(CheckerActuals, ADollarActualOnATypedOrOperandFormalIsReported) {
+  const char* const kReport =
+      "which shall be untyped and referenced only as the upper bound of a "
+      "cycle delay range";
+  ElabFixture f;
+  ElaborateSrc(
+      "checker c1(int n, event clk);\n"
+      "  a1: assert property (@clk 1 ##[1:n] 1);\n"
+      "endchecker\n"
+      "checker c2(m, event clk);\n"
+      "  a1: assert property (@clk m);\n"
+      "endchecker\n"
+      "checker c3(k, event clk);\n"
+      "  a1: assert property (@clk 1 ##[1:k] 1);\n"
+      "endchecker\n"
+      "checker c4(k, event clk);\n"
+      "  c3 inner(k, clk);\n"
+      "endchecker\n"
+      "checker c5(k, event clk);\n"
+      "  checker nested(j = k, event e = clk);\n"
+      "  endchecker\n"
+      "endchecker\n"
+      "module m;\n"
+      "  logic clk;\n"
+      "  c1 u1($, posedge clk);\n"
+      "  c2 u2($, posedge clk);\n"
+      "  c3 u3($, posedge clk);\n"
+      "  c4 u4($, posedge clk);\n"
+      "  c5 u5($, posedge clk);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 19, "17.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 20, "17.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 21, "17.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 22, "17.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 23, "17.3"));
+}
+
+// §17.3: a formal bound to an actual holding a const cast or an automatic
+// value is used in no continuous assignment and no procedural code of the
+// checker: c assigns its formal a, while d reads its formal in an assertion
+// alone.
+TEST(CheckerActuals, AConstOrAutomaticActualsFormalInAnAssignIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker c(logic a);\n"
+      "  logic b;\n"
+      "  assign b = a;\n"
+      "endchecker\n"
+      "checker d(logic a, logic clk);\n"
+      "  a1: assert property (@(posedge clk) a);\n"
+      "endchecker\n"
+      "module m;\n"
+      "  logic clk, x;\n"
+      "  always @(posedge clk) begin\n"
+      "    automatic logic v = x;\n"
+      "    c u(v);\n"
+      "    d w(v, clk);\n"
+      "  end\n"
+      "  c k(const'(x));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the formal 'a' of checker 'c', bound to an "
+                            "automatic value, is used in a continuous "
+                            "assignment or procedural code",
+                            12, "17.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "of checker 'd', bound to",
+                             13, "17.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the formal 'a' of checker 'c', bound to a const "
+                            "cast, is used in a continuous assignment or "
+                            "procedural code",
+                            15, "17.3"));
+}
+
 }  // namespace

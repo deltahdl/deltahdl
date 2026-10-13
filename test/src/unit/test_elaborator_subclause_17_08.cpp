@@ -122,4 +122,32 @@ TEST(FunctionInChecker, WritingArgumentCallOnAssignmentRhsRejected) {
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
+// §17.8 with §16.6: a function called on the right-hand side of a checker
+// variable assignment has no side effect: bump writes the checker variable
+// count, while twice writes nothing but its result.
+TEST(CheckerFunctionCalls,
+     AFunctionWithASideEffectOnTheRightHandSideIsReported) {
+  const char* const kReport =
+      "keeps state or has a side effect and cannot be called on the "
+      "right-hand side of a checker variable assignment";
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk(input logic clk, input int a);\n"
+      "  int count;\n"
+      "  int v, w;\n"
+      "  function int bump(int x);\n"
+      "    count = x;\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "  function automatic int twice(int x);\n"
+      "    return x + x;\n"
+      "  endfunction\n"
+      "  always_ff @(posedge clk) v <= bump(a);\n"
+      "  always_ff @(posedge clk) w <= twice(a);\n"
+      "endchecker\n",
+      f, "chk");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 11, "17.8"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 12, "17.8"));
+}
+
 }  // namespace

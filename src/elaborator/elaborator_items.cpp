@@ -15,6 +15,8 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "elaborator/assertion_rules.h"
+#include "elaborator/checker_actual_rules.h"
 #include "elaborator/checker_instance_binding.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
@@ -732,6 +734,8 @@ void Elaborator::AddProcedure(ModuleItem* item, RtlirModule* mod,
     ModuleDecl* child = FindModuleInScope(inst->inst_module);
     if (child == nullptr) child = PackageCheckerNamedBy(inst, mod, unit_);
     if (!AdmitProceduralCheckerInstance(inst, child, mod, diag_)) continue;
+    ValidateProceduralCheckerActuals(inst, child,
+                                     CollectItemAutomaticVarNames(item), diag_);
     ElaborateModuleInst(inst, mod);
     mod->children.back().is_procedural = true;
     mod->children.back().procedure_locals = std::move(site.locals);

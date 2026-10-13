@@ -229,7 +229,7 @@ TEST(CheckerProcedures, CheckerInitialProcedureElaborates) {
       // §17.7.1: a checker variable takes no assignment in an initial
       // procedure, though its declaration may initialize it.
       "  logic ok = 1'b0;\n"
-      "  initial $display(\"chk\");\n"
+      "  initial a0: assert (ok == 1'b0);\n"
       "endchecker\n",
       f, "chk");
   ASSERT_NE(design, nullptr);
@@ -244,10 +244,11 @@ TEST(CheckerProcedures, CheckerInitialProcedureAdmitsEventControlTiming) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk(input logic clk);\n"
-      // §17.7.1 forbids assigning a checker variable in an initial procedure,
-      // so the timing control gates a subroutine call instead. The event
-      // control is still the produced input under test.
-      "  initial @(posedge clk) $display(\"tick\");\n"
+      // §17.5 lets the event control govern only what the initial procedure
+      // may hold, an assertion among them, and §17.7.1 forbids assigning a
+      // checker variable there, so the timing control gates an immediate
+      // assertion.
+      "  initial @(posedge clk) a0: assert (clk);\n"
       "endchecker\n",
       f, "chk");
   ASSERT_NE(design, nullptr);
@@ -489,6 +490,51 @@ TEST(CheckerProcedures, DelayInCheckerInitialAssertionFailActionIsRejected) {
       "may use only an event control for timing; a delay, a cycle delay and a "
       "wait are not allowed",
       2, "17.5"));
+}
+
+// §17.5: a checker's initial procedure holds let declarations, assertions and
+// event controls alone, so an if and a subroutine call are reported, while an
+// assertion's action block, the assertion's own, may hold a call.
+TEST(CheckerProcedures, AnInitialStatementOffTheListIsReported) {
+  const char* const kReport =
+      "this statement is none of those an initial procedure of checker 'chk' "
+      "may hold";
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk(input logic a);\n"
+      "  initial begin\n"
+      "    if (a) a0: assert (a);\n"
+      "    $display(\"x\");\n"
+      "    a1: assert (a) else $display(\"bad\");\n"
+      "  end\n"
+      "endchecker\n",
+      f, "chk");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 3, "17.5"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 4, "17.5"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 5, "17.5"));
+}
+
+// §17.5: a checker's always procedure holds none of the statements the clause
+// leaves off its list, a fork among them, though a nonblocking assignment and
+// a selection are on it.
+TEST(CheckerProcedures, AnAlwaysStatementOffTheListIsReported) {
+  const char* const kReport =
+      "this statement is none of those an always procedure of checker 'chk' "
+      "may hold";
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk(input logic clk, a);\n"
+      "  bit q;\n"
+      "  always_ff @(posedge clk) begin\n"
+      "    fork\n"
+      "      q <= a;\n"
+      "    join\n"
+      "    if (a) q <= 1'b0;\n"
+      "  end\n"
+      "endchecker\n",
+      f, "chk");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 4, "17.5"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 7, "17.5"));
 }
 
 }  // namespace

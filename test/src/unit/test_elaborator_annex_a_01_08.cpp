@@ -16,7 +16,7 @@ TEST(CheckerProcedures, InitialProcedureBesideAnInitializedVariable) {
   auto* design = ElaborateSrc(
       "checker chk;\n"
       "  logic flag = 0;\n"
-      "  initial $display(\"chk\");\n"
+      "  initial a0: assert (1);\n"
       "endchecker\n",
       f, "chk");
   ASSERT_NE(design, nullptr);
@@ -69,7 +69,7 @@ TEST(CheckerProcedures, CheckerWithMultipleItemsElaborates) {
       // §17.7.1: initialized in its declaration, not assigned in the initial
       // procedure below, which the clause forbids for a checker variable.
       "  logic flag = 0;\n"
-      "  initial $display(\"chk\");\n"
+      "  initial a0: assert (1);\n"
       // §17.5: a general 'always' procedure is not among the always forms
       // permitted in a checker (only always_comb/always_latch/always_ff);
       // a general always in a checker was removed in IEEE 1800-2023.

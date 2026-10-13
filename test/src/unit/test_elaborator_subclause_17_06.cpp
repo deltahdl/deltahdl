@@ -119,4 +119,31 @@ TEST(CovergroupInChecker, InstanceInACheckerProcedureIsRejected) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
+// §17.6: a formal a covergroup of the checker references has no const actual:
+// u1 binds mode, which cp covers, to a const cast, while u2 binds a variable.
+TEST(CheckerCovergroupRules, AConstActualForACoveredFormalIsReported) {
+  const char* const kReport =
+      "the formal 'mode' of checker 'c', which a covergroup references, has a "
+      "const actual";
+  ElabFixture f;
+  ElaborateSrc(
+      "checker c(logic clk, logic [1:0] mode);\n"
+      "  covergroup cg @(posedge clk);\n"
+      "    cp: coverpoint mode;\n"
+      "    cq: coverpoint clk;\n"
+      "    cr: cross cp, cq;\n"
+      "  endgroup\n"
+      "  cg cg_1 = new();\n"
+      "endchecker\n"
+      "module m;\n"
+      "  logic clk;\n"
+      "  logic [1:0] x;\n"
+      "  c u1(clk, const'(x));\n"
+      "  c u2(clk, x);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 12, "17.6"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 13, "17.6"));
+}
+
 }  // namespace

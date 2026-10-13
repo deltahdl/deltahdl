@@ -144,60 +144,14 @@ void CheckRange(const PropertyExprNode& node, const BoundScope& scope,
              Subclause(always ? "16.12.11" : "16.12.13"));
 }
 
-// The references to a formal in a declaration: all of them, and those §16.8
-// lets a `$` actual reach, a range's upper bound and an instance's actual
-// argument written whole.
-struct References {
-  int all = 0;
-  int permitted = 0;
-};
-
-void CountIn(const Expr* e, std::string_view name, References& refs) {
-  ForEachSubExpr(e, [&](const Expr* sub) {
-    refs.all += static_cast<int>(IsNameRef(sub, name));
-    if (sub->kind != ExprKind::kCall) return;
-    for (const Expr* arg : sub->args) {
-      refs.permitted += static_cast<int>(IsNameRef(arg, name));
-    }
-  });
-}
-
-// The bounds of a cycle delay or a repetition, `##d` and `[*d]` standing for
-// the range [d:d], whose lower bound d is.
-void CountBounds(const SeqCycleDelay& bounds, std::string_view name,
-                 References& refs) {
-  CountIn(bounds.min_expr, name, refs);
-  if (bounds.max_expr == bounds.min_expr) return;
-  CountIn(bounds.max_expr, name, refs);
-  refs.permitted += static_cast<int>(IsNameRef(bounds.max_expr, name));
-}
-
-void CountBody(const SeqLinearBody& body, std::string_view name,
-               References& refs) {
-  ForEachBody(body, [&](const SeqLinearBody& b) {
-    for (const SeqCycleDelay& delay : b.delays) CountBounds(delay, name, refs);
-    for (const SeqRepetition& rep : b.repetitions) {
-      CountBounds(rep, name, refs);
-    }
-  });
-  ForEachBodyExpr(body, [&](const Expr* e) { CountIn(e, name, refs); });
-}
-
 // Whether the formal `i` of `decl` may be bound to `$`: untyped, and read
 // only as a range's upper bound or as an instance's actual.
 bool AdmitsDollar(const ModuleItem* decl, size_t i) {
   std::string_view name = decl->prop_formals[i];
-  References refs;
-  CountBody(decl->seq_linear, name, refs);
-  CountIn(decl->prop_body_expr, name, refs);
-  ForEachTreeNode(decl->prop_body_tree, [&](const PropertyExprNode& node) {
-    CountIn(node.boolean, name, refs);
-    CountIn(node.range_min, name, refs);
-    CountIn(node.range_max, name, refs);
-    if (node.sequence != nullptr) {
-      CountBody(node.sequence->seq_linear, name, refs);
-    }
-  });
+  FormalReferences refs;
+  CountFormalInBody(decl->seq_linear, name, refs);
+  CountFormalInExpr(decl->prop_body_expr, name, refs);
+  CountFormalInTree(decl->prop_body_tree, name, refs);
   return decl->prop_formal_type_kw[i] == TokenKind::kKwUntyped &&
          refs.all == refs.permitted;
 }

@@ -8,6 +8,8 @@
 
 #include "common/diagnostic.h"
 #include "elaborator/assertion_rules.h"
+#include "elaborator/checker_actual_rules.h"
+#include "elaborator/checker_procedure_rules.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
@@ -206,6 +208,8 @@ void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl,
   ValidateAssertionBoundRules(decl, kParams, diag_);
   ValidateAssertionContextRules(decl, mod, property_registry_, diag_);
   ValidateLocalVariableFlow(decl, diag_);
+  ValidateCheckerFormalDefaults(decl, diag_);
+  ValidateCheckerEnclosingRefs(decl, *unit_, diag_);
   if (sequence_names_.empty()) return;
   // §16.8 actual-argument checks need each named sequence's formals, so map the
   // sequences declared in this scope by name. A sequence instantiated across a

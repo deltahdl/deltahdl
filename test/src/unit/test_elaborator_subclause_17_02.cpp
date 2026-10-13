@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_checker_elab.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -200,6 +202,98 @@ TEST(CheckerDeclaration, CheckerInAModuleNamesTheModulesClockingBlock) {
       "endmodule\n",
       f, "top");
   EXPECT_FALSE(f.has_errors);
+}
+
+// §17.2: a default or initial value goes to a singular checker formal alone,
+// so the unpacked arrays a and b, the unpacked structure d and the unpacked
+// union e may take none, while c, a bit, and g, a packed structure, may.
+TEST(CheckerDeclaration, ANonSingularFormalTakesNoDefault) {
+  const char* const kReport = "is not singular, so it may take no default";
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk(input int a[2] = '{0, 0}, output int b[2] = '{1, 1},\n"
+      "            input bit c = 1'b1,\n"
+      "            input struct {int x;} d = '{x: 0},\n"
+      "            input union {int x;} e = '{x: 0},\n"
+      "            input struct packed {bit x;} g = '{x: 1'b0});\n"
+      "endchecker\n",
+      f, "chk");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "checker formal 'd' is not singular", 3, "17.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "checker formal 'e' is not singular", 4, "17.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 5, "17.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "checker formal 'a' is not singular", 1, "17.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "checker formal 'b' is not singular", 1, "17.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 2, "17.2"));
+}
+
+// §17.2: a checker references no member or element of a dynamic variable of
+// its enclosing scope: q is a queue, d a dynamic array, a an associative
+// array and h a class handle, while f, a fixed-size array, may be indexed.
+TEST(CheckerDeclaration, AnEnclosingDynamicVariablesElementIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; int v; endclass\n"
+      "module m;\n"
+      "  logic clk;\n"
+      "  int q[$];\n"
+      "  int d[];\n"
+      "  int a[string];\n"
+      "  C h;\n"
+      "  int fx[4];\n"
+      "  checker c;\n"
+      "    a1: assert property (@(posedge clk) q[0] == 1);\n"
+      "    a2: assert property (@(posedge clk) d[0] == 1);\n"
+      "    a3: assert property (@(posedge clk) a[\"k\"] == 1);\n"
+      "    a4: assert property (@(posedge clk) h.v == 1);\n"
+      "    a5: assert property (@(posedge clk) fx[0] == 1);\n"
+      "  endchecker\n"
+      "  c u();\n"
+      "endmodule\n",
+      f, "m");
+  auto reported = [&](const char* name, int line) {
+    return ReportedError(f.diag.Diagnostics(),
+                         std::string("references a member or element of the "
+                                     "dynamic variable '") +
+                             name + "'",
+                         line, "17.2");
+  };
+  EXPECT_TRUE(reported("q", 10));
+  EXPECT_TRUE(reported("d", 11));
+  EXPECT_TRUE(reported("a", 12));
+  EXPECT_TRUE(reported("h", 13));
+  EXPECT_FALSE(reported("fx", 14));
+}
+
+// §17.2: a checker references no element of a fork-join block of its
+// enclosing scope, as f.v is, while a begin-end block's b.w is not barred.
+TEST(CheckerDeclaration, AnEnclosingForkBlocksElementIsReported) {
+  const char* const kReport =
+      "references an element of the fork-join block 'f' of its enclosing "
+      "scope";
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  initial fork : f\n"
+      "    int v = 1;\n"
+      "  join\n"
+      "  initial begin : b\n"
+      "    int w = 1;\n"
+      "  end\n"
+      "  checker c;\n"
+      "    a1: assert property (@(posedge clk) f.v == 1);\n"
+      "    a2: assert property (@(posedge clk) b.w == 1);\n"
+      "  endchecker\n"
+      "  c u();\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 10, "17.2"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "fork-join block", 11, "17.2"));
 }
 
 }  // namespace

@@ -4,7 +4,10 @@
 // file, which the A.4.1.4 rule on a checker's instance list took past the limit
 // assert-no-oversized-source-files enforces.
 
+#include <algorithm>
+#include <array>
 #include <format>
+#include <span>
 #include <string_view>
 
 #include "common/diagnostic.h"
@@ -127,6 +130,75 @@ bool StmtContainsNonEventTimingControl(const Stmt* stmt) {
   return found;
 }
 
+// §17.5 (printed page 510): the statements a checker's initial procedure may
+// not hold, all but let declarations, the three kinds of assertion and an
+// event control; the delays, cycle delays and waits it may not hold either are
+// reported by StmtContainsNonEventTimingControl above, and a checker
+// instantiated in it by §17.3's rule.
+constexpr std::array kInitialForbidden{StmtKind::kIf,
+                                       StmtKind::kCase,
+                                       StmtKind::kFor,
+                                       StmtKind::kForeach,
+                                       StmtKind::kWhile,
+                                       StmtKind::kForever,
+                                       StmtKind::kRepeat,
+                                       StmtKind::kDoWhile,
+                                       StmtKind::kBreak,
+                                       StmtKind::kContinue,
+                                       StmtKind::kReturn,
+                                       StmtKind::kBlockingAssign,
+                                       StmtKind::kNonblockingAssign,
+                                       StmtKind::kExprStmt,
+                                       StmtKind::kFork,
+                                       StmtKind::kDisable,
+                                       StmtKind::kDisableFork,
+                                       StmtKind::kEventTrigger,
+                                       StmtKind::kNbEventTrigger,
+                                       StmtKind::kAssign,
+                                       StmtKind::kDeassign,
+                                       StmtKind::kForce,
+                                       StmtKind::kRelease,
+                                       StmtKind::kRandcase,
+                                       StmtKind::kRandsequence,
+                                       StmtKind::kExpect};
+
+// §17.5 (printed page 510): the statements a checker's always_comb,
+// always_latch or always_ff procedure may not hold, those on none of the
+// clause's lists; the timing controls §17.5 limits to always_ff are reported
+// by §9.2.2's rules on the three forms, and a blocking assignment in an
+// always_ff by §17.7.1's rule above.
+constexpr std::array kAlwaysForbidden{
+    StmtKind::kReturn,      StmtKind::kFork,         StmtKind::kDisable,
+    StmtKind::kDisableFork, StmtKind::kEventTrigger, StmtKind::kNbEventTrigger,
+    StmtKind::kAssign,      StmtKind::kDeassign,     StmtKind::kForce,
+    StmtKind::kRelease,     StmtKind::kRandcase,     StmtKind::kRandsequence,
+    StmtKind::kExpect};
+
+// Reports each statement under `s` whose kind is one of `forbidden`, `form`
+// naming the procedure. An assertion's action block is the assertion's, so
+// the walk does not descend into it.
+void ReportForbiddenStatements(const Stmt* s,
+                               std::span<const StmtKind> forbidden,
+                               std::string_view form, const ModuleDecl* decl,
+                               DiagEngine& diag) {
+  if (s == nullptr) return;
+  if (std::ranges::find(forbidden, s->kind) != forbidden.end()) {
+    diag.Error(s->range.start,
+               std::format("this statement is none of those an {} procedure "
+                           "of checker '{}' may hold",
+                           form, decl->name),
+               Subclause("17.5"));
+  }
+  if (s->kind == StmtKind::kAssertImmediate ||
+      s->kind == StmtKind::kAssumeImmediate ||
+      s->kind == StmtKind::kCoverImmediate) {
+    return;
+  }
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    ReportForbiddenStatements(sub, forbidden, form, decl, diag);
+  });
+}
+
 }  // namespace
 
 // Emits the per-item legality diagnostics that depend only on the parent decl
@@ -207,6 +279,16 @@ void CheckCheckerBodyItemRules(const ModuleItem* item, const ModuleDecl* decl,
                            "delay and a wait are not allowed",
                            decl->name),
                Subclause("17.5"));
+  }
+  if (item->kind == ModuleItemKind::kInitialBlock) {
+    ReportForbiddenStatements(item->body, kInitialForbidden, "initial", decl,
+                              diag);
+  }
+  if (item->kind == ModuleItemKind::kAlwaysCombBlock ||
+      item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+      item->kind == ModuleItemKind::kAlwaysFFBlock) {
+    ReportForbiddenStatements(item->body, kAlwaysForbidden, "always", decl,
+                              diag);
   }
   // §17.2: only further checkers may be declared inside a checker.
   if (item->kind == ModuleItemKind::kNestedModuleDecl &&

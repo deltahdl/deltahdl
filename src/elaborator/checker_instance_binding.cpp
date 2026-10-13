@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "elaborator/checker_actual_rules.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_design.h"
@@ -157,6 +158,7 @@ void CheckCheckerInstForm(const ModuleItem* item, const ModuleDecl* child,
                            item->inst_module, item->inst_name),
                Subclause("A.4.1.4"));
   }
+  ValidateCheckerActuals(item, child, diag);
 }
 
 }  // namespace delta
