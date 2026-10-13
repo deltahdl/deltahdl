@@ -324,7 +324,11 @@ ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   }
   // §12.4.2.1: resuming after suspending on a wait statement, `wait_order`
   // among them (A.6.5), is a violation report flush point.
-  if (suspended) ctx.FlushPendingViolations();
+  // §16.4.2: the same resume is a deferred assertion flush point.
+  if (suspended) {
+    ctx.FlushPendingViolations();
+    ctx.FlushPendingDeferredReports();
+  }
 
   if (failed) {
     if (stmt->else_branch) {

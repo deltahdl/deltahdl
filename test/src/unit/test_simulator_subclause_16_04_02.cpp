@@ -303,6 +303,33 @@ TEST(DeferredFlushPointsLive, WaitResumeFlushesDeferredReport) {
   EXPECT_EQ(x->value.ToUint64(), 3u);
 }
 
+// §16.4.2 (bullet 1, wait) with A.6.5: `wait_order` is a wait statement, so a
+// process resuming after suspending on one is at a flush point. The report the
+// failing `assert #0 (0)` queues is flushed when `wait_order (a)` resumes on
+// the other initial's `#0 -> a`, so flag stays 0 and x is set to 5.
+TEST(DeferredFlushPointsLive, WaitOrderResumeFlushesDeferredReport) {
+  SimFixture f;
+  auto* flag = RunAndFindVar(
+      "module t;\n"
+      "  event a;\n"
+      "  int flag = 0;\n"
+      "  logic [7:0] x;\n"
+      "  function void set_flag; flag = 1; endfunction\n"
+      "  initial begin\n"
+      "    assert #0 (0) else set_flag();\n"
+      "    wait_order (a);\n"
+      "    x = 8'd5;\n"
+      "  end\n"
+      "  initial #0 -> a;\n"
+      "endmodule\n",
+      f, "flag");
+  ASSERT_NE(flag, nullptr);
+  EXPECT_EQ(flag->value.ToUint64(), 0u);
+  auto* x = f.ctx.FindVariable("x");
+  ASSERT_NE(x, nullptr);
+  EXPECT_EQ(x->value.ToUint64(), 5u);
+}
+
 // §16.4.2 (default $error is also a pending report): the flush applies to the
 // implicit $error a failing deferred assert emits when it has no else clause.
 // The always_comb queues the default report on its first (a==1,b==1)
