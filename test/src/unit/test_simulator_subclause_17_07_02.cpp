@@ -684,4 +684,30 @@ TEST(CheckerVariableRandomization, APropertyInstanceConstrainsItsBody) {
       "  property p4; bit v; (1, v = y) |=> x == v; endproperty\n");
 }
 
+// Probe for #6567, removed with its fix: the values the solve draws and
+// the ticks the assertion fails at.
+TEST(CheckerVariableRandomization, ProbeNonconsecutiveMatchItems) {
+  SimFixture f;
+  auto* fail = RunAndFindVar(
+      "checker chk(logic clk);\n"
+      "  rand bit x, y, z;\n"
+      "  sequence s8; bit v; (y, v = x)[=1] ##1 x != v; endsequence\n"
+      "  int fail = 0;\n"
+      "  m1: assume property (@(posedge clk) s8);\n"
+      "  a1: assert property (@(posedge clk) s8) else begin\n"
+      "    fail++; $display(\"PROBE fail t=%0t\", $time); end\n"
+      "  always @(posedge clk) #1 $display(\"PROBE t=%0t x=%b y=%b\", "
+      "$time, x, y);\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  always #5 clk = ~clk;\n"
+      "  chk c(clk);\n"
+      "  initial #400 $finish;\n"
+      "endmodule\n",
+      f, "c.fail");
+  ASSERT_NE(fail, nullptr);
+  EXPECT_EQ(fail->value.ToUint64(), 99u);
+}
+
 }  // namespace
