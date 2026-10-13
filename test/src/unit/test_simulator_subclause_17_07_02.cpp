@@ -229,4 +229,227 @@ TEST(CheckerVariableRandomization, FreeVariableSatisfiesItsAssumptions) {
   EXPECT_EQ(f.ctx.FindVariable("F1.B1.fail")->value.ToUint64(), 0u);
 }
 
+// §17.7 and §17.7.2: every free variable whose declaration writes no
+// initializer starts at an unconstrained random value, a constant one
+// among them, which keeps it: k is drawn once and never solved for, while
+// r, the active variable, is solved to differ from it at every posedge.
+// k7's initializer gives it its value.
+TEST(CheckerVariableRandomization, AConstantFreeVariableKeepsItsRandomValue) {
+  SimFixture f;
+  auto* k = RunAndFindVar(
+      "checker chk(logic clk);\n"
+      "  rand const bit [31:0] k;\n"
+      "  rand const bit [7:0] k7 = 8'd7;\n"
+      "  rand bit [31:0] r;\n"
+      "  m1: assume property (@(posedge clk) r != k);\n"
+      "  bit [31:0] last;\n"
+      "  bit seen = 1'b0;\n"
+      "  int changed = 0;\n"
+      "  always_ff @(posedge clk) begin\n"
+      "    if (seen && k != last) changed <= changed + 1;\n"
+      "    last <= k;\n"
+      "    seen <= 1'b1;\n"
+      "  end\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  always #5 clk = ~clk;\n"
+      "  chk c(clk);\n"
+      "  initial #60 $finish;\n"
+      "endmodule\n",
+      f, "c.k");
+  ASSERT_NE(k, nullptr);
+  EXPECT_NE(k->value.ToUint64(), 0u);
+  EXPECT_EQ(f.ctx.FindVariable("c.k7")->value.ToUint64(), 7u);
+  EXPECT_EQ(f.ctx.FindVariable("c.last")->value.ToUint64(),
+            k->value.ToUint64());
+  EXPECT_EQ(f.ctx.FindVariable("c.changed")->value.ToUint64(), 0u);
+  EXPECT_NE(f.ctx.FindVariable("c.r")->value.ToUint64(), k->value.ToUint64());
+}
+
+// §17.7.2: a free variable a checker variable assignment writes is inactive
+// and keeps the values the assignment gives it: a toggles at each posedge in
+// step with cnt's low bit, while b, the one active variable, satisfies m1.
+// Solved for as well, a would take a random value at each posedge.
+TEST(CheckerVariableRandomization, AnAssignedFreeVariableIsNotSolvedFor) {
+  SimFixture f;
+  auto* pass = RunAndFindVar(
+      "checker chk(logic clk);\n"
+      "  rand bit a = 1'b0;\n"
+      "  rand bit b;\n"
+      "  bit [3:0] cnt = 4'd0;\n"
+      "  int pass = 0, fail = 0, bpass = 0;\n"
+      "  m1: assume property (@(posedge clk) b == 1'b1);\n"
+      "  always_ff @(posedge clk) a <= !a;\n"
+      "  always_ff @(posedge clk) cnt <= cnt + 4'd1;\n"
+      "  a1: assert property (@(posedge clk) a == cnt[0]) pass++; else "
+      "fail++;\n"
+      "  a2: assert property (@(posedge clk) b) bpass++;\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  always #5 clk = ~clk;\n"
+      "  chk c(clk);\n"
+      "  initial #100 $finish;\n"
+      "endmodule\n",
+      f, "c.pass");
+  ASSERT_NE(pass, nullptr);
+  EXPECT_EQ(pass->value.ToUint64(), 10u);
+  EXPECT_EQ(f.ctx.FindVariable("c.fail")->value.ToUint64(), 0u);
+  EXPECT_EQ(f.ctx.FindVariable("c.bpass")->value.ToUint64(), 10u);
+}
+
+// §17.7.2: with an empty assume set the active free variables take new
+// unconstrained values at every time step: r, which no assumption reads,
+// changes across the posedges, the assumption m1 reading clk alone.
+TEST(CheckerVariableRandomization, AnEmptyAssumeSetDrawsAtEveryTimeStep) {
+  SimFixture f;
+  auto* changes = RunAndFindVar(
+      "checker chk(logic clk);\n"
+      "  rand bit [7:0] r;\n"
+      "  m1: assume property (@(posedge clk) clk);\n"
+      "  int changes = 0;\n"
+      "  bit [7:0] last;\n"
+      "  always_ff @(posedge clk) begin\n"
+      "    if (r != last) changes <= changes + 1;\n"
+      "    last <= r;\n"
+      "  end\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  always #5 clk = ~clk;\n"
+      "  chk c(clk);\n"
+      "  initial #200 $finish;\n"
+      "endmodule\n",
+      f, "c.changes");
+  ASSERT_NE(changes, nullptr);
+  EXPECT_GT(changes->value.ToUint64(), 10u);
+}
+
+// §17.7.2: every clock event of the assume set triggers a solution attempt
+// held to the assumptions clocked there: v is solved to 1 at each posedge of
+// clk1 and to 0 at each posedge of clk2, the two never coinciding. m3, on
+// clk1 as well, ticks with m1 for one attempt between them.
+TEST(CheckerVariableRandomization, EachAssumptionsClockTriggersAnAttempt) {
+  SimFixture f;
+  auto* bad1 = RunAndFindVar(
+      "checker chk(logic clk1, logic clk2);\n"
+      "  rand bit v;\n"
+      "  m1: assume property (@(posedge clk1) v == 1'b1);\n"
+      "  m2: assume property (@(posedge clk2) v == 1'b0);\n"
+      "  m3: assume property (@(posedge clk1) v || !v);\n"
+      "  int bad1 = 0, bad2 = 0, good1 = 0, good2 = 0;\n"
+      "  always_ff @(posedge clk1)\n"
+      "    if (v != 1'b1) bad1 <= bad1 + 1; else good1 <= good1 + 1;\n"
+      "  always_ff @(posedge clk2)\n"
+      "    if (v != 1'b0) bad2 <= bad2 + 1; else good2 <= good2 + 1;\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk1 = 0, clk2 = 0;\n"
+      "  always #5 clk1 = ~clk1;\n"
+      "  initial begin #2; forever #5 clk2 = ~clk2; end\n"
+      "  chk c(clk1, clk2);\n"
+      "  initial #100 $finish;\n"
+      "endmodule\n",
+      f, "c.bad1");
+  ASSERT_NE(bad1, nullptr);
+  EXPECT_EQ(bad1->value.ToUint64(), 0u);
+  EXPECT_EQ(f.ctx.FindVariable("c.bad2")->value.ToUint64(), 0u);
+  EXPECT_EQ(f.ctx.FindVariable("c.good1")->value.ToUint64(), 10u);
+  EXPECT_EQ(f.ctx.FindVariable("c.good2")->value.ToUint64(), 10u);
+}
+
+// §17.7.2: an attempt seeks values with which no assumption of the set fails
+// in its time step, an implication's among them: after a tick where x is 1,
+// m1 requires x to be 0, and wherever x is 1, m2 requires y to be. The other
+// assumptions, of forms an attempt does not solve, take no part.
+TEST(CheckerVariableRandomization, AnImplicationConstrainsItsTimeStep) {
+  SimFixture f;
+  auto* fail1 = RunAndFindVar(
+      "checker chk(logic clk);\n"
+      "  rand bit x, y;\n"
+      "  int fail1 = 0, fail2 = 0, ones = 0;\n"
+      "  m1: assume property (@(posedge clk) x |=> !x);\n"
+      "  m2: assume property (@(posedge clk) x |-> y);\n"
+      "  m3: assume property (@(posedge clk) x |-> ##1 1'b1);\n"
+      "  m4: assume property (@(posedge clk) x ##1 1'b1 |-> 1'b1);\n"
+      "  m5: assume property (@(posedge clk) ##1 x |-> 1'b1);\n"
+      "  m6: assume property (@(posedge clk) x or 1'b1);\n"
+      "  m7: assume property (@(posedge clk) 1'b1 ##1 1'b1);\n"
+      "  m8: assume property (@(posedge clk) not (x && !x));\n"
+      "  a1: assert property (@(posedge clk) x |=> !x) else fail1++;\n"
+      "  a2: assert property (@(posedge clk) x |-> y) else fail2++;\n"
+      "  a3: assert property (@(posedge clk) !x) else ones++;\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  always #5 clk = ~clk;\n"
+      "  chk c(clk);\n"
+      "  initial #400 $finish;\n"
+      "endmodule\n",
+      f, "c.fail1");
+  ASSERT_NE(fail1, nullptr);
+  EXPECT_EQ(fail1->value.ToUint64(), 0u);
+  EXPECT_EQ(f.ctx.FindVariable("c.fail2")->value.ToUint64(), 0u);
+  EXPECT_GT(f.ctx.FindVariable("c.ones")->value.ToUint64(), 0u);
+}
+
+// §17.7.2: a child checker's assumptions belong to its parent's assume set
+// where, through their actuals, they read the parent's active free
+// variables: B1.u1 holds x, bound to q, at 1, so q is solved to 1.
+TEST(CheckerVariableRandomization, AChildsAssumptionConstrainsItsParent) {
+  SimFixture f;
+  auto* fail = RunAndFindVar(
+      "checker child(logic clk, bit [7:0] x);\n"
+      "  u1: assume property (@(posedge clk) x == 8'd42);\n"
+      "endchecker\n"
+      "checker parent(logic clk);\n"
+      "  rand bit [7:0] q;\n"
+      "  child B1(clk, q);\n"
+      "  int pass = 0, fail = 0;\n"
+      "  a1: assert property (@(posedge clk) q == 8'd42) pass++; else fail++;\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  always #5 clk = ~clk;\n"
+      "  parent p(clk);\n"
+      "  initial #60 $finish;\n"
+      "endmodule\n",
+      f, "p.fail");
+  ASSERT_NE(fail, nullptr);
+  EXPECT_EQ(fail->value.ToUint64(), 0u);
+  EXPECT_EQ(f.ctx.FindVariable("p.pass")->value.ToUint64(), 6u);
+}
+
+// §17.7.2 with §17.3: an assumption reading a formal whose actual holds a
+// const cast, as F1's b does, or an automatic value, as F2's b does, is left
+// out of the assume set, so q is solved by u3 alone. F3's b, under a cast
+// that is not const, keeps u4, which then contradicts u3.
+TEST(CheckerVariableRandomization, AConstCastOrAutomaticActualIsExcluded) {
+  SimFixture f;
+  auto* q1 = RunAndFindVar(
+      "checker c(logic clk, bit [7:0] a, bit [7:0] b);\n"
+      "  rand bit [7:0] q;\n"
+      "  u3: assume property (@(posedge clk) q == a);\n"
+      "  u4: assume property (@(posedge clk) q != b);\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  logic [7:0] v1 = 8'd5, v2 = 8'd5;\n"
+      "  always #5 clk = ~clk;\n"
+      "  c F1(clk, v1, const'(v2));\n"
+      "  always @(posedge clk) begin\n"
+      "    automatic bit [7:0] w = 8'd5;\n"
+      "    c F2(clk, v1, w);\n"
+      "  end\n"
+      "  c F3(clk, v1, 8'(v2));\n"
+      "  initial #30 $finish;\n"
+      "endmodule\n",
+      f, "F1.q");
+  ASSERT_NE(q1, nullptr);
+  EXPECT_EQ(q1->value.ToUint64(), 5u);
+  EXPECT_EQ(f.ctx.FindVariable("F2.q")->value.ToUint64(), 5u);
+  EXPECT_NE(f.ctx.FindVariable("F3.q")->value.ToUint64(), 5u);
+}
+
 }  // namespace

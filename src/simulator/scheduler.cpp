@@ -221,6 +221,7 @@ void Scheduler::EndSimulation() {
 // VCD dump writes for it, and execute no scheduled event.
 void Scheduler::ExecuteTimeSlot(TimeSlot& slot) {
   ExecuteRegion(slot, Region::kPreponed);
+  for (const auto& cb : time_slot_start_cbs_) cb();
 
   // §38.36.2: a cbNextSimTime callback is called before the events of the
   // next time slot, the first after the one it was registered in, and Table

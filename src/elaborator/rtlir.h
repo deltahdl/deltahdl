@@ -593,10 +593,9 @@ struct RtlirParamDecl {
   std::unordered_map<std::string_view, int64_t> defparam_value_scope;
   GenBlockPrefixes defparam_value_scopes;
   const struct RtlirModule* defparam_module = nullptr;
-  // §23.10.2 (printed page 766): the same for override_expr -- the values in
-  // scope where the instantiation stands and the instantiating module, as
-  // InstanceParamAssignments took them -- for a refold at a range a defparam
-  // later gives the parameter. Null while no instance assigned the value.
+  // §23.10.2: the same for override_expr: the scope values and module where
+  // the instantiation stands, as InstanceParamAssignments took them, for a
+  // refold at a range a later defparam gives; null while no instance set one.
   std::unordered_map<std::string_view, int64_t> override_scope;
   const struct RtlirModule* override_module = nullptr;
 };
@@ -606,8 +605,8 @@ struct RtlirPortBinding {
   Direction direction;
   Expr* connection = nullptr;
   uint32_t width = 1;
-  // The bound port's RtlirPort::port_expr, what the connection is joined to
-  // inside the instance. Null for a port without one.
+  // The bound port's RtlirPort::port_expr, which the connection joins; null
+  // for a port without one.
   Expr* port_expr = nullptr;
   // §23.3.3: no connection was written; `connection` is a default in its place.
   bool unconnected = false;
@@ -636,13 +635,14 @@ struct RtlirModuleInst {
   // the instantiating module, so the outer name space is visible to the inner
   // module; one merely instantiated here meets the §23.9 module boundary.
   bool is_nested_decl = false;
-  // §17.3: a procedural checker instance, instantiated by a statement of a
-  // procedure rather than by a module item.
+  // §17.3: a checker instance a procedure's statement makes, not an item.
   bool is_procedural = false;
   // §17.3 with §16.14.6.1: for a procedural instance, the variables the
   // procedure declares in the blocks and loops enclosing the instantiation,
   // whose value an actual reading one takes from the instance's queuing.
   std::vector<std::string_view> procedure_locals;
+  // §17.3: that procedure's automatic variables.
+  std::vector<std::string_view> procedure_automatics;
 };
 
 struct RtlirImport {
@@ -733,20 +733,20 @@ struct RtlirModule {
   // §25.5 with §37.7: an interface's modport declarations, in source order;
   // empty for every other kind of definition.
   std::vector<const ModportDecl*> modports;
-  // §16.15: the condition of the module's default disable iff declaration,
-  // which §16.14.7's $inferred_disable returns within its scope; nullptr
-  // where the module declares none.
+  // §16.15: the condition of the module's default disable iff, which
+  // §16.14.7's $inferred_disable returns within its scope; null where none.
   Expr* default_disable_iff = nullptr;
-  // §14.12: the clocking event of the default clocking of the scope a nested
-  // declaration is declared in, which extends to it where it declares none;
-  // empty for every other module.
+  // §14.12: the event of the default clocking of the scope a nested
+  // declaration stands in, which extends to it where it declares none.
   std::vector<EventExpr> inherited_default_clock;
   // §17.2 and §17.9: a checker's formals whose actual or default is an
   // elaboration-time constant, with their values, which its generate
   // constructs test (§27.5); empty for every other module.
   std::vector<std::pair<std::string_view, int64_t>> constant_formals;
-  // §17.7.2: a checker's free variables, those it declares `rand`.
+  // §17.7.2: a checker's active free variables, which its assume set solves,
+  // and those an unconstrained random value initializes.
   std::vector<std::string_view> free_variables;
+  std::vector<std::string_view> random_initial_variables;
   std::vector<ModuleItem*> function_decls;
   // §27.4 with §13.4: the subroutines declared in the module's named generate
   // block instances, each with the instance it belongs to, which

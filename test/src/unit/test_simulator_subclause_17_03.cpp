@@ -701,4 +701,38 @@ TEST(ProceduralCheckerInstance, AConstCastInTheActualIsSavedWhenQueued) {
             std::make_pair(2ull, 3ull));
 }
 
+// §17.3: a checker's output formal is assigned to its actual in the Reactive
+// region. mutex's action block sets failure at the posedge at 1; res then
+// rises in the Reactive region, so the checker obs, whose procedures run
+// there as well, reads m_seen before the module's always procedure, waiting
+// in the Active region, sets it. Assigned in the Active region, res would let
+// the module's procedure run first.
+TEST(CheckerInstanceScheduling, AnOutputIsAssignedInTheReactiveRegion) {
+  SimFixture f;
+  auto* saw = RunAndFindVar(
+      "checker mutex(logic [1:0] sig, event clock, output bit failure);\n"
+      "  assert property (@clock $onehot0(sig)) failure = 1'b0;\n"
+      "    else failure = 1'b1;\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  logic [1:0] bus = 2'b11;\n"
+      "  logic res;\n"
+      "  bit m_seen = 0;\n"
+      "  mutex check_bus(bus, posedge clk, res);\n"
+      "  always @(res) if (res) m_seen = 1;\n"
+      "  checker obs;\n"
+      "    bit saw = 1'b1;\n"
+      "    always_ff @(posedge res) saw <= m_seen;\n"
+      "  endchecker\n"
+      "  obs o();\n"
+      "  initial begin #1 clk = 1; #1 $finish; end\n"
+      "endmodule\n",
+      f, "o.saw");
+  ASSERT_NE(saw, nullptr);
+  EXPECT_EQ(f.ctx.FindVariable("res")->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("m_seen")->value.ToUint64(), 1u);
+  EXPECT_EQ(saw->value.ToUint64(), 0u);
+}
+
 }  // namespace

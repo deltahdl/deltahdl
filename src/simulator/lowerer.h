@@ -425,6 +425,11 @@ class Lowerer {
   // §17.3: the prefix of the procedural checker instance being lowered, the
   // outermost one where checkers nest, and empty outside one.
   std::string procedural_checker_root_;
+  // §17.7.2: the instance whose body is being lowered, whose actuals decide
+  // which of its assumptions its assume set holds; for a top module, one
+  // binding nothing.
+  RtlirModuleInst top_inst_;
+  const RtlirModuleInst* lowering_inst_ = &top_inst_;
   // §17.3: the actuals RecordProceduralCheckerActuals recorded, under the
   // prefix of their procedural checker instance.
   std::unordered_map<std::string, ActualsByFormal> procedural_checker_actuals_;

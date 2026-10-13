@@ -76,7 +76,9 @@ void Lowerer::LowerChildBodyUnderCheckerRoot(const RtlirModuleInst& child) {
   if (child.is_procedural && saved_root.empty()) {
     procedural_checker_root_ = inst_prefix_;
   }
+  const RtlirModuleInst* saved_inst = std::exchange(lowering_inst_, &child);
   LowerChildBody(child.resolved);
+  lowering_inst_ = saved_inst;
   procedural_checker_root_ = std::move(saved_root);
 }
 

@@ -141,6 +141,13 @@ class Scheduler {
     post_timestep_cbs_.push_back(std::move(cb));
   }
 
+  // Registers work to run as each time slot begins, once its Preponed region
+  // has sampled it and before its Pre-Active region; the callbacks run in
+  // registration order.
+  void AddTimeSlotStartCallback(std::function<void()> cb) {
+    time_slot_start_cbs_.push_back(std::move(cb));
+  }
+
   size_t IllegalPreponedScheduleCount() const {
     return illegal_preponed_schedule_count_;
   }
@@ -242,6 +249,7 @@ class Scheduler {
   SimContext* ctx_ = nullptr;
   std::map<SimTime, TimeSlot> event_calendar_;
   std::vector<std::function<void()>> post_timestep_cbs_;
+  std::vector<std::function<void()>> time_slot_start_cbs_;
   // §37.44: the processes the run has switched to, in order, and the set that
   // keeps that order free of repeats -- a process is switched to once per
   // resume and is one thread however many times it runs.

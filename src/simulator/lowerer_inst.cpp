@@ -780,7 +780,9 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
     // §10.3.3: a net delay delays every driver of the net, and an output
     // port is a driver of the net it is connected to.
     ApplyNetDeclDelayToPortDriver(arena_, ca, *port_parent_);
-    LowerContAssign(ca, from_program);
+    // §17.3: a checker's output formal is assigned to its actual as if by a
+    // continuous assignment of the Reactive region, as a program's is.
+    LowerContAssign(ca, from_program || inst.resolved->is_checker);
   }
 }
 

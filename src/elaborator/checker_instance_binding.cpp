@@ -7,14 +7,18 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "elaborator/assertion_walk.h"
 #include "elaborator/checker_actual_rules.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_design.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 #include "parser/expr_substitute.h"
 
 namespace delta {
@@ -112,11 +116,45 @@ ConstantCheckerFormals CheckerConstantFormals(const ModuleDecl* decl,
   return formals;
 }
 
-std::vector<std::string_view> CheckerFreeVariables(const ModuleDecl* decl) {
-  std::vector<std::string_view> free;
+namespace {
+
+// Each variable the assignment target `lhs` writes, through a select, a
+// member or a concatenation.
+void CollectTargets(const Expr* lhs,
+                    std::unordered_set<std::string_view>& names) {
+  if (lhs == nullptr) return;
+  if (lhs->kind == ExprKind::kIdentifier) {
+    names.insert(lhs->text);
+  } else if (lhs->kind == ExprKind::kConcatenation) {
+    for (const Expr* e : lhs->elements) CollectTargets(e, names);
+  } else if (lhs->kind == ExprKind::kSelect ||
+             lhs->kind == ExprKind::kMemberAccess) {
+    CollectTargets(lhs->kind == ExprKind::kSelect ? lhs->base : lhs->lhs,
+                   names);
+  }
+}
+
+}  // namespace
+
+CheckerFreeVariables FindCheckerFreeVariables(const ModuleDecl* decl) {
+  std::unordered_set<std::string_view> assigned;
   for (const ModuleItem* item : decl->items) {
-    if (item->kind == ModuleItemKind::kVarDecl && item->is_rand) {
-      free.push_back(item->name);
+    if (item->kind == ModuleItemKind::kContAssign) {
+      CollectTargets(item->assign_lhs, assigned);
+    }
+    ForEachProceduralStmt(item, [&](const Stmt* s) {
+      if (s->kind == StmtKind::kBlockingAssign ||
+          s->kind == StmtKind::kNonblockingAssign) {
+        CollectTargets(s->lhs, assigned);
+      }
+    });
+  }
+  CheckerFreeVariables free;
+  for (const ModuleItem* item : decl->items) {
+    if (item->kind != ModuleItemKind::kVarDecl || !item->is_rand) continue;
+    if (item->init_expr == nullptr) free.random_initial.push_back(item->name);
+    if (!item->data_type.is_const && assigned.count(item->name) == 0) {
+      free.active.push_back(item->name);
     }
   }
   return free;
