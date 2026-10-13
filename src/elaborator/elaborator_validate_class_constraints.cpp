@@ -8,6 +8,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_class_constraints.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
@@ -411,6 +412,102 @@ void ClassConstraintValidator::ValidateUniqueConstraints() {
   for (const auto* cls : AllClassDecls(unit_))
     ValidateOneClassUniqueConstraints(cls);
   ValidateInlineUniqueReceivers(unit_, diag_);
+}
+
+// 18.3: the class properties a constraint reads and where its findings go.
+struct ConstraintOperandScope {
+  std::unordered_map<std::string_view, const ClassMember*> properties;
+  const CompilationUnit* unit;
+  DiagEngine& diag;
+};
+
+// 18.3: whether `e` is plainly of a type neither integral nor real -- a cast
+// to string, a property of a type IsSolveOrderableTypeFree
+// rejects, $sformatf, which yields a string, or a conditional with such an
+// arm, whose result takes the arm's type. Any other shape is taken to be
+// integral or real, so the check never flags a legitimate constraint.
+static bool PlainlyNeitherIntegralNorReal(const Expr* e,
+                                          const ConstraintOperandScope& s) {
+  if (e->kind == ExprKind::kCast) return e->text == "string";
+  if (e->kind == ExprKind::kIdentifier) {
+    const auto kFound = s.properties.find(e->text);
+    return kFound != s.properties.end() &&
+           !IsSolveOrderableTypeFree(kFound->second->data_type, s.unit);
+  }
+  if (e->kind == ExprKind::kTernary) {
+    return PlainlyNeitherIntegralNorReal(e->true_expr, s) ||
+           PlainlyNeitherIntegralNorReal(e->false_expr, s);
+  }
+  return e->kind == ExprKind::kSystemCall && e->text == "$sformatf";
+}
+
+// 18.3: whether `e` reads a random variable of the solve -- a rand or randc
+// property of an integral or real type. A random object handle is none: its
+// object's variables are solved, never the handle.
+static bool HoldsRandomVariable(const Expr* e,
+                                const ConstraintOperandScope& s) {
+  if (e->kind == ExprKind::kIdentifier) {
+    const auto kFound = s.properties.find(e->text);
+    if (kFound == s.properties.end()) return false;
+    const ClassMember* m = kFound->second;
+    return (m->is_rand || m->is_randc) &&
+           IsSolveOrderableTypeFree(m->data_type, s.unit);
+  }
+  bool holds = false;
+  ForEachExprChild(e, [&](const Expr* child) {
+    holds = holds || HoldsRandomVariable(child, s);
+  });
+  return holds;
+}
+
+// 18.3: a constraint's operands are integral or real; a subexpression of
+// another type is allowed only where it holds no random variable. The
+// outermost such subexpression is reported, and nothing under it.
+static void CheckConstraintOperands(const Expr* e,
+                                    const ConstraintOperandScope& s) {
+  if (e == nullptr) return;
+  if (PlainlyNeitherIntegralNorReal(e, s) && HoldsRandomVariable(e, s)) {
+    s.diag.Error(e->range.start,
+                 "a constraint subexpression holding a random variable shall "
+                 "be of an integral or real type",
+                 Subclause("18.3"));
+    return;
+  }
+  ForEachExprChild(
+      e, [&](const Expr* child) { CheckConstraintOperands(child, s); });
+}
+
+static void CheckConstraintItemOperands(
+    const std::vector<ConstraintItem*>& items,
+    const ConstraintOperandScope& s) {
+  for (const ConstraintItem* item : items) {
+    CheckConstraintOperands(item->expr, s);
+    for (const Expr* e : item->exprs) CheckConstraintOperands(e, s);
+    for (const Expr* e : item->after) CheckConstraintOperands(e, s);
+    CheckConstraintItemOperands(item->body, s);
+    CheckConstraintItemOperands(item->else_body, s);
+  }
+}
+
+void ValidateInlineConstraintOperands(const Expr* call, const ClassDecl* cls,
+                                      const CompilationUnit* unit,
+                                      DiagEngine& diag) {
+  const ConstraintOperandScope kScope{BuildClassPropertyMap(cls, unit), unit,
+                                      diag};
+  CheckConstraintItemOperands(call->inline_constraint->constraint_items,
+                              kScope);
+}
+
+void ClassConstraintValidator::ValidateConstraintOperandTypes() {
+  for (const auto* cls : AllClassDecls(unit_)) {
+    const ConstraintOperandScope kScope{BuildClassPropertyMap(cls, unit_),
+                                        unit_, diag_};
+    for (const auto* m : cls->members) {
+      if (m->kind == ClassMemberKind::kConstraint) {
+        CheckConstraintItemOperands(m->constraint_items, kScope);
+      }
+    }
+  }
 }
 
 // 18.5.9: the restrictions that apply to solve...before variable ordering:

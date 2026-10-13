@@ -48,6 +48,10 @@ class ClassConstraintValidator {
   void ValidateUniqueConstraints();
   void ValidateOneClassUniqueConstraints(const ClassDecl* cls);
 
+  // 18.3: a constraint subexpression of a type neither integral nor real
+  // holds no random variable.
+  void ValidateConstraintOperandTypes();
+
   // 18.5.9: a solve...before ordering constraint may name only rand variables
   // (never randc), each integral or real, with no circular dependency.
   void ValidateSolveBeforeConstraints();
@@ -93,6 +97,13 @@ class ClassConstraintValidator {
 // nothing for a call without an inline block.
 void ValidateInlineUniqueGroups(const Expr* call, const ClassDecl* cls,
                                 const CompilationUnit* unit, DiagEngine& diag);
+
+// 18.3 with 18.7: checks the operands of the inline constraint block of
+// `call`, a randomize() with call on an object of class `cls`, as the class's
+// own constraint blocks are checked. The call has an inline block.
+void ValidateInlineConstraintOperands(const Expr* call, const ClassDecl* cls,
+                                      const CompilationUnit* unit,
+                                      DiagEngine& diag);
 
 // 18.5.4 with 18.7: checks the inline uniqueness groups of every randomize()
 // with call in the unit against the class of the object it randomizes, found

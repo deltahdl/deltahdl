@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <format>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -80,12 +81,12 @@ void CollectStdHandlesInStmt(const Stmt* s, StdCallScope& scope) {
       s, [&](Stmt* const& sub) { CollectStdHandlesInStmt(sub, scope); });
 }
 
-// The count of actuals a call passes against what a method of a std class
-// takes, reported under the subclause giving the prototype as a call of
-// `what` -- "method 'get'" or "constructor" -- of the class. Answers whether
-// the count is one the method takes.
+// The count of actuals a call passes against what a method takes, reported
+// under `subclause` as a call of `what` -- "method 'get' of class 'mailbox'"
+// or "constructor of class 'semaphore'". Answers whether the count is one the
+// method takes.
 bool CheckStdActualCount(const Expr* call, const StdMethodPrototype& method,
-                         StdPackageMember member, std::string_view what,
+                         std::string_view what, std::string_view subclause,
                          DiagEngine& diag) {
   const std::size_t kGiven = call->args.size();
   const std::size_t kLeast = LeastActualsOf(method);
@@ -93,13 +94,50 @@ bool CheckStdActualCount(const Expr* call, const StdMethodPrototype& method,
   if (kGiven <= kMost && kGiven >= kLeast) return true;
   const bool kTooMany = kGiven > kMost;
   const std::size_t kBound = kTooMany ? kMost : kLeast;
-  diag.Error(
-      call->range.start,
-      std::format("{} of class '{}' takes at {} {} argument{}; {} given", what,
-                  StdPackageMemberName(member), kTooMany ? "most" : "least",
-                  kBound, kBound == 1 ? "" : "s", kGiven),
-      Subclause(PrototypeSubclauseOfStdPackageMember(member)));
+  diag.Error(call->range.start,
+             std::format("{} takes at {} {} argument{}; {} given", what,
+                         kTooMany ? "most" : "least", kBound,
+                         kBound == 1 ? "" : "s", kGiven),
+             Subclause(subclause));
   return false;
+}
+
+// §18.6.1, §18.6.2, §18.8, §18.9 and §18.13.3 to §18.13.5: the built-in
+// methods every class has without declaring them, as a call on a handle of
+// the object takes them, each with the subclause giving it. randomize takes
+// any number of actuals, and rand_mode and constraint_mode, naming no
+// variable or constraint, take the one on/off actual of their void form.
+struct ClassBuiltinMethod {
+  StdMethodPrototype prototype;
+  std::string_view subclause;
+};
+
+const ClassBuiltinMethod* ClassBuiltinMethodNamed(std::string_view name) {
+  static const std::vector<ClassBuiltinMethod> kMethods{
+      {{"randomize", StdMethodKind::kFunction, "int", {}, false, true},
+       "18.6.1"},
+      {{"pre_randomize", StdMethodKind::kFunction, "void", {}}, "18.6.2"},
+      {{"post_randomize", StdMethodKind::kFunction, "void", {}}, "18.6.2"},
+      {{"rand_mode", StdMethodKind::kFunction, "void", {{"bit", "on_off"}}},
+       "18.8"},
+      {{"constraint_mode",
+        StdMethodKind::kFunction,
+        "void",
+        {{"bit", "on_off"}}},
+       "18.9"},
+      {{"srandom", StdMethodKind::kFunction, "void", {{"int", "seed"}}},
+       "18.13.3"},
+      {{"get_randstate", StdMethodKind::kFunction, "string", {}}, "18.13.4"},
+      {{"set_randstate",
+        StdMethodKind::kFunction,
+        "void",
+        {{"string", "state"}}},
+       "18.13.5"},
+  };
+  const auto kFound = std::ranges::find(
+      kMethods, name,
+      [](const ClassBuiltinMethod& m) { return m.prototype.name; });
+  return kFound == kMethods.end() ? nullptr : &*kFound;
 }
 
 // §G.3 through §G.7: a construction new(...) of a handle of a std class
@@ -110,7 +148,10 @@ void CheckStdConstruction(const Expr* init, StdPackageMember member,
   if (!init || init->kind != ExprKind::kCall || init->text != "new") return;
   const StdMethodPrototype* constructor = StdMethodNamed(member, "new");
   if (constructor == nullptr) return;
-  CheckStdActualCount(init, *constructor, member, "constructor", diag);
+  CheckStdActualCount(
+      init, *constructor,
+      std::format("constructor of class '{}'", StdPackageMemberName(member)),
+      PrototypeSubclauseOfStdPackageMember(member), diag);
 }
 
 // §15.4.3 through §15.4.8: the subclause giving the mailbox method `method`,
@@ -158,9 +199,10 @@ void CheckMailboxMessage(const Expr* message, const StdMethodPrototype& method,
 }
 
 // §G.3: a call obj.method(...) on a handle of a std class is checked against
-// the class's prototype -- the method shall be one the prototype declares,
-// and the actuals shall be no fewer than its formals without a default and no
-// more than its formals. The subclause cited is the one giving the prototype.
+// the class's prototype -- the method shall be one the prototype declares or
+// one every class has built in, and the actuals shall be no fewer than its
+// formals without a default and no more than its formals. The subclause cited
+// is the one giving the prototype, or the method where it is built in.
 void CheckStdMethodCall(const Expr* e, const StdCallScope& scope,
                         DiagEngine& diag) {
   if (e->kind != ExprKind::kCall || !e->lhs ||
@@ -176,18 +218,23 @@ void CheckStdMethodCall(const Expr* e, const StdCallScope& scope,
   const std::string_view kMethod = e->lhs->rhs->text;
   const std::string_view kSubclause =
       PrototypeSubclauseOfStdPackageMember(kMember);
+  const std::string kWhat =
+      std::format("method '{}' of class '{}'", kMethod, kClass);
   const StdMethodPrototype* method = StdMethodNamed(kMember, kMethod);
   if (method == nullptr) {
-    diag.Error(
-        e->range.start,
-        std::format("class '{}' declares no method '{}'", kClass, kMethod),
-        Subclause(kSubclause));
+    const ClassBuiltinMethod* builtin = ClassBuiltinMethodNamed(kMethod);
+    if (builtin == nullptr) {
+      diag.Error(
+          e->range.start,
+          std::format("class '{}' declares no method '{}'", kClass, kMethod),
+          Subclause(kSubclause));
+    } else if (!builtin->prototype.variadic) {
+      CheckStdActualCount(e, builtin->prototype, kWhat, builtin->subclause,
+                          diag);
+    }
     return;
   }
-  if (!CheckStdActualCount(e, *method, kMember,
-                           std::format("method '{}'", kMethod), diag)) {
-    return;
-  }
+  if (!CheckStdActualCount(e, *method, kWhat, kSubclause, diag)) return;
   if (kMember == StdPackageMember::kMailbox && !method->formals.empty()) {
     CheckMailboxMessage(e->args[0], *method, scope, diag);
   }

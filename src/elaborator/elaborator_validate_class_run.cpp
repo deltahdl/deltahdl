@@ -73,6 +73,7 @@ void ElaboratorClassRules::RunPreElaborationClassValidations() {
   constraints.ValidateDistConstraints();
 
   constraints.ValidateUniqueConstraints();
+  constraints.ValidateConstraintOperandTypes();
 
   constraints.ValidateSolveBeforeConstraints();
 

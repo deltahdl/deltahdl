@@ -372,6 +372,7 @@ class InlineUniqueWalk {
         e->lhs != nullptr) {
       if (const ClassDecl* cls = ReceiverClass(e, s)) {
         ValidateInlineUniqueGroups(e, cls, unit_, diag_);
+        ValidateInlineConstraintOperands(e, cls, unit_, diag_);
       }
     }
     ForEachExprChild(e, [&](const Expr* child) { VisitExpr(child, s); });
