@@ -743,32 +743,19 @@ TEST(CheckerInstanceScheduling, AnOutputIsAssignedInTheReactiveRegion) {
 TEST(CheckerInstanceScheduling, TriggeredOnASequenceFormalReadsItsActual) {
   SimFixture f;
   auto* hits = RunAndFindVar(
-      "checker chk(sequence s, logic clk);
-      "
-      "  int hits = 0;
-      "
-      "  always_ff @(posedge clk) if (s.triggered) hits <= hits + 1;
-      "
-      "endchecker
-      "
-      "module top;
-      "
-      "  logic clk = 0, a = 1, b = 1;
-      "
-      "  always #5 clk = ~clk;
-      "
-      "  sequence s_two; @(posedge clk) a ##1 a; endsequence
-      "
-      "  chk c1(s_two, clk);
-      "
-      "  chk c2(@(posedge clk) b, clk);
-      "
-      "  initial #52 $finish;
-      "
-      "endmodule
-      ",
-      f,
-      "c1.hits");
+      "checker chk(sequence s, logic clk);\n"
+      "  int hits = 0;\n"
+      "  always_ff @(posedge clk) if (s.triggered) hits <= hits + 1;\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk = 0, a = 1, b = 1;\n"
+      "  always #5 clk = ~clk;\n"
+      "  sequence s_two; @(posedge clk) a ##1 a; endsequence\n"
+      "  chk c1(s_two, clk);\n"
+      "  chk c2(@(posedge clk) b, clk);\n"
+      "  initial #52 $finish;\n"
+      "endmodule\n",
+      f, "c1.hits");
   ASSERT_NE(hits, nullptr);
   EXPECT_EQ(hits->value.ToUint64(), 4u);
   EXPECT_EQ(f.ctx.FindVariable("c2.hits")->value.ToUint64(), 5u);
