@@ -213,13 +213,14 @@ TEST(SequenceMethods, TriggeredIsSetInTheObservedRegion) {
 // §16.13.6 with §16.9.3: a sequence a method is applied to infers its clock
 // where it is used, and outside an assertion that is the default clocking:
 // e4, written with no clock, ends on posedge clk at 15, and the wait on
-// e4.triggered resumes there.
+// e4.triggered resumes there, the block that is not the default aside.
 TEST(SequenceMethods, AClocklessSequenceReadOutsideAnAssertionTakesTheDefault) {
   SimFixture f;
   std::string out = RunCapture(
       "module t;\n"
       "  bit clk, a = 1, b = 1;\n"
       "  always #5 clk = ~clk;\n"
+      "  clocking other @(negedge clk); endclocking\n"
       "  default clocking cb @(posedge clk); endclocking\n"
       "  sequence e4;\n"
       "    a ##1 b;\n"

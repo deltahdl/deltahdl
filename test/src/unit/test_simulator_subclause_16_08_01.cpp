@@ -66,6 +66,27 @@ TEST(TypedSequenceFormals, ActualIsCastToTheFormalsType) {
   EXPECT_EQ(untyped->value.ToUint64(), 2u);
 }
 
+// §16.8.1 (c): each keyword data type casts its actual so: byte'(v +
+// 9'h100) drops the ninth bit and reads 2 where v is 2, at 15 alone, where
+// uncast it would read 9'h102; longint and integer widen, logic keeps the
+// least significant bit, 0 at 15, and a packed type no keyword names alone
+// takes the actual as written.
+TEST(TypedSequenceFormals, EachKeywordTypeCastsItsActual) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      TypedSource("  sequence s_k(byte b, longint l, integer i, logic g,\n"
+                  "               logic [1:0] n);\n"
+                  "    b == 2 && l == 2 && i == 2 && g == 0 && n == 2;\n"
+                  "  endsequence\n"
+                  "  sequence rule;\n"
+                  "    @(posedge clk) s_k(v + 9'h100, v, v, v, v);\n"
+                  "  endsequence\n"),
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 15u);
+}
+
 // §16.8.1 (b): a formal of type event takes an event_expression, so
 // event_arg_example(posedge clk) is `@(posedge clk) x ##1 y`: v reads 2 at 15
 // and 1 at 25, and the sequence ends at 25.

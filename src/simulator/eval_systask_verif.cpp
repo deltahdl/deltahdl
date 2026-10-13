@@ -699,7 +699,7 @@ static bool PastGateOpen(const Expr* expr, SimContext& ctx, Arena& arena) {
 static bool ReadsEndPointMethod(const Expr* arg) {
   bool found = false;
   ForEachSubExpr(arg, [&](const Expr* e) {
-    if (e->kind == ExprKind::kMemberAccess && e->rhs != nullptr &&
+    if (e->kind == ExprKind::kMemberAccess &&
         (e->rhs->text == "triggered" || e->rhs->text == "matched")) {
       found = true;
     }
