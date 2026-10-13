@@ -6,9 +6,9 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "elaborator/class_member_names.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_class_constraints.h"
-#include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/type_eval.h"
@@ -552,31 +552,26 @@ void ValidateInlineConstraintOperands(const Expr* call, const ClassDecl* cls,
                               kScope);
 }
 
-// Whether every class `cls` extends, up to the root, is one the unit
-// declares, so that a name none of them declares is surely no member.
-static bool BasesResolve(const ClassDecl* cls, const CompilationUnit* unit) {
-  for (const ClassDecl* c = cls; !c->base_class.empty();) {
-    c = FindBaseClass(c, unit);
-    if (c == nullptr) return false;
-  }
-  return true;
-}
-
 // 18.7: a name of the inline block of a randomize() with call on an object of
 // class `cls` qualified by this binds to `cls`, and one qualified by super to
-// the class `cls` extends; it is an error where that class declares no member
-// of the name. A class whose chain reaches a base the unit does not declare,
-// a type parameter's among them, is left unjudged, as is super in a class
-// extending none, which §8.15 rules on.
+// the class `cls` extends; it is an error where that class selects no such
+// name: no member, parameter or enumeration literal of it or a class it
+// extends, nor a method §18 gives every object (SoleClassIndex). A class
+// whose chain reaches a class `classes` cannot give, a type parameter's
+// among them, is left unjudged, as is super in a class extending none, which
+// §8.15 rules on.
 static void CheckQualifiedName(const Expr* e, const ClassDecl* cls,
-                               const CompilationUnit* unit, DiagEngine& diag) {
+                               const CompilationUnit* unit,
+                               const SoleClassIndex& classes,
+                               DiagEngine& diag) {
   if (e == nullptr) return;
   if (e->kind == ExprKind::kMemberAccess &&
       (e->lhs->text == "this" || e->lhs->text == "super")) {
     const bool kSuper = e->lhs->text == "super";
     const ClassDecl* scope = kSuper ? FindBaseClass(cls, unit) : cls;
-    if (scope != nullptr && BasesResolve(scope, unit) &&
-        FindMemberInClass(scope, e->rhs->text, unit) == nullptr) {
+    std::unordered_set<std::string_view> names;
+    if (scope != nullptr && classes.SelectableNames(*scope, names) &&
+        !names.contains(e->rhs->text)) {
       diag.Error(e->range.start,
                  std::format("'{}.{}' names no member of class '{}', the "
                              "class randomize() with is called on{}",
@@ -586,16 +581,17 @@ static void CheckQualifiedName(const Expr* e, const ClassDecl* cls,
     }
   }
   ForEachExprChild(e, [&](const Expr* child) {
-    CheckQualifiedName(child, cls, unit, diag);
+    CheckQualifiedName(child, cls, unit, classes, diag);
   });
 }
 
 void ValidateInlineQualifiedNames(const Expr* call, const ClassDecl* cls,
                                   const CompilationUnit* unit,
                                   DiagEngine& diag) {
+  const SoleClassIndex kClasses(*unit);
   ForEachConstraintItemExpr(
       call->inline_constraint->constraint_items,
-      [&](const Expr* e) { CheckQualifiedName(e, cls, unit, diag); });
+      [&](const Expr* e) { CheckQualifiedName(e, cls, unit, kClasses, diag); });
 }
 
 void ClassConstraintValidator::ValidateConstraintOperandTypes() {

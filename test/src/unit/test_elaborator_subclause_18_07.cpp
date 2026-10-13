@@ -73,4 +73,26 @@ TEST(InlineConstraints, ThisAndSuperNamesTheClassesDeclareElaborate) {
              "endmodule\n"));
 }
 
+// 18.7 with 8.26: an enumeration a class declares puts its literals in the
+// class's scope, so this.BUSY, a literal of D's state_e, resolves in D, and
+// so does super.HOT, a literal of the anonymous enumeration of B's property
+// t that D extends, and the block elaborates.
+TEST(InlineConstraints, ThisAndSuperEnumLiteralsElaborate) {
+  EXPECT_TRUE(
+      ElabOk("class B;\n"
+             "  rand enum bit [1:0] {COLD, HOT} t;\n"
+             "endclass\n"
+             "class D extends B;\n"
+             "  typedef enum bit [1:0] {IDLE, BUSY} state_e;\n"
+             "  rand state_e s;\n"
+             "endclass\n"
+             "module m;\n"
+             "  initial begin\n"
+             "    static D d = new;\n"
+             "    void'(d.randomize() with { s == this.BUSY; t == super.HOT; "
+             "});\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
 }  // namespace
