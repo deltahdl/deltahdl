@@ -323,11 +323,18 @@ bool TryWriteClassPropertyBits(const Expr* lhs, const Logic4Vec& rhs_val,
 // `field` of `type` (or of a class it extends) wrote, `logic [0:31] bv`, where
 // it wrote one packed dimension spanning `width` bits; none otherwise. The
 // value a property holds on its object carries no declaration, so a select of
-// one, read or written, asks here. Defined in eval_select.cpp.
+// one, read or written, asks here. Defined in eval_select_declared_range.cpp.
 std::optional<PackedRange> PropertyDeclaredRange(const ClassTypeInfo* type,
                                                  std::string_view field,
                                                  uint32_t width,
                                                  SimContext& ctx, Arena& arena);
+
+// §13.4.1: the packed range of the return type of the function the call `base`
+// calls, where that type writes one packed dimension spanning `width` bits; a
+// call used as an implicit variable is indexed by its return type. None for
+// any other expression. Defined in eval_select_declared_range.cpp.
+std::optional<PackedRange> CalledFunctionRange(const Expr* base, uint32_t width,
+                                               SimContext& ctx, Arena& arena);
 
 // Resolve-then-write for a blocking assignment, which does both when the
 // statement executes. Returns false when the path names no storage.

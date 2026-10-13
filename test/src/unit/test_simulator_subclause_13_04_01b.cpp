@@ -445,4 +445,27 @@ TEST(FunctionReturnSim, FunctionNameWithoutParenthesesIsAScope) {
   EXPECT_EQ(v->value.ToUint64(), 1u);
 }
 
+// §13.4.1 (printed page 343): a call used as an implicit variable has the
+// function's return type and is indexed by it, so with g returning
+// bit [15:10], g()[13:10] reads bits 13 to 10 of that type and g()[15] its
+// most significant bit (#6432): 4'b1101 and 1 of 6'b101101.
+TEST(FunctionReturnSim, SelectOnACallUsesTheReturnTypesRange) {
+  SimFixture f;
+  auto* v = RunAndFindVar(
+      "module m;\n"
+      "  function bit [15:10] g(); return 6'b101101; endfunction\n"
+      "  bit [3:0] r;\n"
+      "  bit b;\n"
+      "  int n;\n"
+      "  initial begin\n"
+      "    r = g()[13:10];\n"
+      "    b = g()[15];\n"
+      "    n = r * 10 + b;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "n");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 131u);
+}
+
 }  // namespace

@@ -10,7 +10,6 @@
 #include "common/arena.h"
 #include "common/packed_range.h"
 #include "common/types.h"
-#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
@@ -601,46 +600,16 @@ static std::optional<PackedLevel> SelectBaseLevel(const Expr* base,
 // names a vector it is that vector's declared range, since which bit an address
 // reaches depends in part on the declaration, and
 // when it names a subfield of a packed multidimensional array the range of
-// the dimension that subfield is indexed by (§7.4.4); for anything else -- a
-// concatenation, a function result, a struct member -- the value carries no
-// declaration of its own and is addressed as [width-1:0]. A dimension whose
+// the dimension that subfield is indexed by (§7.4.4); a function result has
+// its return type's range (§13.4.1, CalledFunctionRange); for anything else --
+// a concatenation, a struct member -- the value carries no declaration of its
+// own and is addressed as [width-1:0]. A dimension whose
 // index selects elements rather than bits keeps the flat view too, as
 // Variable::BitSelectRange does for the outermost.
 //
 // A class property's value is held on the object without its declaration, so
 // the range its member declaration wrote -- `logic [0:31] bv` -- is read off
 // the class, where the member writes one packed dimension spanning the value.
-// The member declaration of the property `name` in `type` or a class it
-// extends, or null where none declares it.
-static const ClassMember* DeclaringMember(const ClassTypeInfo* type,
-                                          std::string_view name) {
-  for (const ClassTypeInfo* c = type; c != nullptr; c = c->parent) {
-    if (c->decl == nullptr) continue;
-    for (const ClassMember* m : c->decl->members) {
-      if (m->kind == ClassMemberKind::kProperty && m->name == name) return m;
-    }
-  }
-  return nullptr;
-}
-
-std::optional<PackedRange> PropertyDeclaredRange(const ClassTypeInfo* type,
-                                                 std::string_view field,
-                                                 uint32_t width,
-                                                 SimContext& ctx,
-                                                 Arena& arena) {
-  const ClassMember* m = DeclaringMember(type, field);
-  if (m == nullptr) return std::nullopt;
-  const DataType& dt = m->data_type;
-  if (dt.packed_dim_left == nullptr || dt.packed_dim_right == nullptr ||
-      !dt.extra_packed_dims.empty())
-    return std::nullopt;
-  PackedRange range{
-      SelectBoundValue(EvalExpr(dt.packed_dim_left, ctx, arena)),
-      SelectBoundValue(EvalExpr(dt.packed_dim_right, ctx, arena))};
-  if (range.HighIndex() - range.LowIndex() + 1 != width) return std::nullopt;
-  return range;
-}
-
 static std::optional<PackedRange> SelectedPropertyRange(const Expr* base,
                                                         uint32_t width,
                                                         SimContext& ctx,
@@ -656,6 +625,8 @@ static PackedRange SelectBaseRange(const Expr* base, uint32_t width,
   auto level = SelectBaseLevel(base, width, ctx, arena);
   if (!level) {
     if (auto range = SelectedPropertyRange(base, width, ctx, arena))
+      return *range;
+    if (auto range = CalledFunctionRange(base, width, ctx, arena))
       return *range;
     return PackedRange::Implicit(width);
   }
