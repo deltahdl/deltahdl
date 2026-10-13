@@ -508,14 +508,14 @@ TEST(CheckerVariableRandomization, AFixedDelaySequenceConstrainsLaterTicks) {
 // §17.7.2 with §16.12.3 to §16.12.8 and §16.12.16: an assumption under the
 // operators that join their operands at one tick holds the attempt to the
 // condition they make of them: if-else with and without its else, implies,
-// iff, a not over a boolean, a sequence, an implication and a nexttime, an
-// or, an and, and a case with a default.
+// iff, a not over a boolean, a sequence, two implications and a nexttime,
+// an or, an and, and a case with a default.
 TEST(CheckerVariableRandomization, AnOperatorAtOneTickConstrainsItsTick) {
-  ExpectAssumedPropertiesHold({"if (x) y else z", "if (x) y", "x implies y",
-                               "x iff y", "not (x && y)", "not (x ##1 y)",
-                               "not (x |=> y)", "x |-> not nexttime y",
-                               "x or nexttime y", "(x and nexttime y) or z",
-                               "case (x) 1'b1: y; default: z; endcase"});
+  ExpectAssumedPropertiesHold(
+      {"if (x) y else z", "if (x) y", "x implies y", "x iff y", "not (x && y)",
+       "not (x ##1 y)", "not (x |=> y)", "not (##1 x |-> y)",
+       "x |-> not nexttime y", "x or nexttime y", "(x and nexttime y) or z",
+       "case (x) 1'b1: y; default: z; endcase"});
 }
 
 // §17.7.2 with §16.12.10 to §16.12.14: an assumption under the operators
@@ -575,9 +575,10 @@ TEST(CheckerVariableRandomization, AVaryingSequenceConstrainsLaterTicks) {
 
 // §17.7.2: an assumption of a form the solution attempts do not model --
 // a named property's instance, alone or under or, a sequence or, an
-// operand on a clock of its own, and an operand repeated from zero -- is
-// left out of the assume set, which is then empty and x drawn free at every
-// time step, though m1 alone would hold it at 1.
+// operand on a clock of its own, and an operand repeated from zero, in an
+// implication or assumed alone -- is left out of the assume set, which is
+// then empty and x drawn free at every time step, though m1 alone would
+// hold it at 1.
 TEST(CheckerVariableRandomization, AnUnmodelledAssumptionTakesNoPart) {
   ExpectXDrawnFree(
       "  property p1; x; endproperty\n"
@@ -585,7 +586,8 @@ TEST(CheckerVariableRandomization, AnUnmodelledAssumptionTakesNoPart) {
       "  m2: assume property (@(posedge clk) y or p1);\n"
       "  m3: assume property (@(posedge clk) (x ##1 y or y ##1 x) |-> z);\n"
       "  m4: assume property (@(posedge clk) x |=> @(negedge clk) y);\n"
-      "  m5: assume property (@(posedge clk) x |-> y[*0:1] ##1 z);\n");
+      "  m5: assume property (@(posedge clk) x |-> y[*0:1] ##1 z);\n"
+      "  m6: assume property (@(posedge clk) x ##1 y[*0:1]);\n");
 }
 
 // §17.7.2 with §16.12.1: an assumption's attempts are held to it only

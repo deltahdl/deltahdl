@@ -80,7 +80,7 @@ class AssumeObligations {
                               std::vector<Expr*>& reads);
 
   // The condition, over the values the time step reads, under which `node`
-  // does not fail in it; nullptr where those values do not decide it.
+  // does not fail in it; nullptr where it holds under any values.
   Expr* NoFailCondition(const ObligationNode* node);
 
   // Forgets the values read so far, the active free variables having taken

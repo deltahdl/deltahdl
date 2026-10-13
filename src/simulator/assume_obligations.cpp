@@ -83,7 +83,6 @@ std::string KeyOf(const ObligationNode& node) {
 // no operand on a clock of its own, no match item, local variable or
 // throughout, and no intersect, and, or or first_match.
 bool IsPlainSequence(bool flattened, const LinearSequence& seq) {
-  auto has_clock = [](const std::vector<EventExpr>& c) { return !c.empty(); };
   auto has_items = [](const std::vector<SeqMatchAssign>& m) {
     return !m.empty();
   };
@@ -92,9 +91,7 @@ bool IsPlainSequence(bool flattened, const LinearSequence& seq) {
       static_cast<size_t>(!flattened) + seq.intersects.size() +
       seq.conjuncts.size() + seq.alternatives.size() + seq.nested.size() +
       seq.locals.size() + seq.throughouts.size() +
-      static_cast<size_t>(seq.first_match) +
-      static_cast<size_t>(
-          std::ranges::count_if(seq.operand_clocks, has_clock)) +
+      static_cast<size_t>(seq.first_match) + seq.operand_clocks.size() +
       static_cast<size_t>(std::ranges::count_if(seq.match_items, has_items)) +
       static_cast<size_t>(std::ranges::count_if(seq.repetitions, from_zero));
   return extras == 0;
@@ -515,7 +512,7 @@ Expr* AssumeObligations::ImplicationCondition(const ObligationNode* node,
 
 Expr* AssumeObligations::NoFailCondition(const ObligationNode* node) {
   Expr* cond = Condition(node, false);
-  return cond == always_ || cond == never_ ? nullptr : cond;
+  return cond == always_ ? nullptr : cond;
 }
 
 void AssumeObligations::NewTimeStep() {
@@ -545,8 +542,11 @@ bool AssumeObligations::StepSeq(const ObligationNode* node,
       return Holds(lit.first) == lit.second;
     });
     if (!taken) continue;
-    matched = matched || path.match;
-    if (!path.match) next.push_back(path.next);
+    if (path.match) {
+      matched = true;
+    } else {
+      next.push_back(path.next);
+    }
   }
   return matched;
 }
@@ -615,7 +615,8 @@ const ObligationNode* AssumeObligations::StepImplication(
 // property, accept_on as holding and reject_on as failing; otherwise its
 // operand goes on under it.
 const ObligationNode* AssumeObligations::StepAbort(const ObligationNode* node) {
-  if (Holds(node->expr)) return node->kind == Kind::kAccept ? true_ : false_;
+  const ObligationNode* aborted = node->kind == Kind::kAccept ? true_ : false_;
+  if (Holds(node->expr)) return aborted;
   const ObligationNode* operand = Step(node->operands[0]);
   if (Settled(operand)) return operand;
   return Over(node->kind, {operand}, node->expr);
