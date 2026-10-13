@@ -446,6 +446,7 @@ static bool PlainlyNeitherIntegralNorReal(const Expr* e,
 // object's variables are solved, never the handle.
 static bool HoldsRandomVariable(const Expr* e,
                                 const ConstraintOperandScope& s) {
+  if (e == nullptr) return false;
   if (e->kind == ExprKind::kIdentifier) {
     const auto kFound = s.properties.find(e->text);
     if (kFound == s.properties.end()) return false;
