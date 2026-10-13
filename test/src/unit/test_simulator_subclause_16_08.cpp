@@ -413,4 +413,37 @@ TEST(NamedSequenceInstance, APropertyClockedOnItsEventFormalTakesEither) {
   EXPECT_NE(out.find("c1=6 c2=19\n"), std::string::npos);
 }
 
+// §16.8: an actual bound to an untyped formal is cast to its self-determined
+// type before it stands for the formal, so the 4-bit `p + q`, 15 + 1, wraps
+// to 0 and `x == 0` holds at every tick, where widened to the 32 bits of the
+// 0 it would sum to 16; §16.12 has a named property's untyped formal do the
+// same.
+TEST(NamedSequenceInstance, AnUntypedFormalsActualIsSelfDetermined) {
+  std::string out = RunEventActualCase(
+      "  logic [3:0] p = 4'hF, q = 4'h1;\n"
+      "  sequence s_w(x); @(posedge clk) x == 0; endsequence\n"
+      "  property p_w(x); @(posedge clk) x == 0; endproperty\n",
+      "  cover property (s_w(p + q)) c1++;\n"
+      "  cover property (p_w(p + q)) c2++;\n");
+  EXPECT_NE(out.find("c1=10 c2=10\n"), std::string::npos) << out;
+}
+
+// §16.8: so are a unary and a conditional operator's results: the 4-bit ~p
+// is 0 where widened it is not, and `1 ? p + q : 0` is p + q's 4 bits. A real
+// keeps its type: r + 0.5 is 1.75, above 1.5 at every tick.
+TEST(NamedSequenceInstance, EveryOperatorActualIsSelfDetermined) {
+  std::string out = RunEventActualCase(
+      "  logic [3:0] p = 4'hF, q = 4'h1;\n"
+      "  real r = 1.25;\n"
+      "  sequence s_w(x); @(posedge clk) x == 0; endsequence\n"
+      "  sequence s_r(x); @(posedge clk) x > 1.5; endsequence\n"
+      "  int c3 = 0;\n",
+      "  cover property (s_w(~p)) c1++;\n"
+      "  cover property (s_w(1 ? p + q : 0)) c2++;\n"
+      "  cover property (s_r(r + 0.5)) c3++;\n"
+      "  initial #99 $display(\"c3=%0d\", c3);\n");
+  EXPECT_NE(out.find("c1=10 c2=10\n"), std::string::npos) << out;
+  EXPECT_NE(out.find("c3=10\n"), std::string::npos) << out;
+}
+
 }  // namespace

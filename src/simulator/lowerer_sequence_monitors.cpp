@@ -9,6 +9,7 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "elaborator/procedural_concurrent_assertion.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/sensitivity.h"
 #include "lexer/token.h"
@@ -268,6 +269,15 @@ class TriggeredContextClocks {
       VisitExpr(stmt->assert_expr, clock, 0);
       VisitSequence(stmt->assert_sequence, clock, 0);
       VisitTree(stmt->assert_property, clock, 0);
+    }
+    // §16.13.6 with §16.9.3: a method read in a procedure takes the clock
+    // the procedure infers (§16.14.6), after any assertion's.
+    for (const auto& proc : mod->processes) {
+      if (proc.is_concurrent_clocked) continue;
+      std::vector<EventExpr> clock = ProcessInferredClock(proc, mod);
+      if (clock.empty()) continue;
+      ForEachStmtReadExpr(proc.body,
+                          [&](const Expr* e) { VisitExpr(e, clock, 0); });
     }
   }
 

@@ -14,6 +14,7 @@
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
+#include "parser/expr_substitute.h"
 #include "simulator/class_object.h"
 #include "simulator/clocking.h"
 #include "simulator/dyn_struct_member.h"
@@ -749,6 +750,9 @@ static bool TryCastIntoDynamicStruct(const Expr* expr, const Logic4Vec& stream,
 }
 
 Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
+  // §16.8: an untyped formal's actual cast to its own self-determined type is
+  // its value with no context, its width, signedness and type its own.
+  if (IsSelfDeterminedCast(expr)) return EvalExpr(expr->lhs, ctx, arena);
   Logic4Vec stream_out;
   if (TryArrayBitStreamCast(expr, ctx, arena, stream_out)) return stream_out;
   Logic4Vec pattern_out;

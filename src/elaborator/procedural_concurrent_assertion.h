@@ -1,6 +1,9 @@
 #pragma once
 
+#include <vector>
+
 #include "elaborator/property_instance.h"
+#include "parser/ast_stmt.h"
 
 namespace delta {
 
@@ -9,6 +12,7 @@ class DiagEngine;
 struct ModuleItem;
 class PropertyRegistry;
 struct RtlirModule;
+struct RtlirProcess;
 
 // §16.14.6: the concurrent assertion statements embedded in the procedure
 // `procedure`, an initial or an always of `mod`, made ready for the run:
@@ -28,6 +32,12 @@ void ElaborateProceduralConcurrentAssertions(ModuleItem* procedure,
                                              const RtlirModule* mod,
                                              const PropertyRegistry& registry,
                                              Arena& arena, DiagEngine& diag);
+
+// §16.14.6: the clock the process `proc` of `mod` infers for what it reads
+// with none of its own, empty where the clause's requirements fail; §16.13.6
+// has a clockless sequence whose method the process reads take it.
+std::vector<EventExpr> ProcessInferredClock(const RtlirProcess& proc,
+                                            const RtlirModule* mod);
 
 // §16.14.7: what an instance written in the procedure `procedure` of `mod`
 // takes for $inferred_clock and $inferred_disable: the clock the procedure

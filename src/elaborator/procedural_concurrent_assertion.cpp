@@ -119,20 +119,23 @@ bool QualifiesAsClock(const EventExpr& ev, const RtlirModule* mod,
   return true;
 }
 
-// §16.14.6: the clock the procedure gives an assertion embedded in it that
-// opens with none, or an empty list where the requirements fail.
-std::vector<EventExpr> InferredProcedureClock(const ModuleItem* procedure,
-                                              const RtlirModule* mod) {
+// §16.14.6: the clock a procedure with the body `body` and the event control
+// `sensitivity`, `@*` where `is_star`, gives what it reads with none, an
+// assertion embedded in it among them, or an empty list where the
+// requirements fail.
+std::vector<EventExpr> InferredClockOf(
+    const Stmt* body, const std::vector<EventExpr>& sensitivity, bool is_star,
+    const RtlirModule* mod) {
   ProcedureTiming timing;
-  ScanTiming(procedure->body, timing);
+  ScanTiming(body, timing);
   if (timing.blocking) return {};
   // (b): exactly one event control, the always procedure's own or one the
   // body holds; an always_comb or always_latch infers its sensitivity and
   // holds none, and an implicit `@*` names no clock.
   const std::vector<EventExpr>* events = nullptr;
-  if (!procedure->sensitivity.empty() && !procedure->is_star_sensitivity) {
+  if (!sensitivity.empty() && !is_star) {
     if (!timing.event_controls.empty()) return {};
-    events = &procedure->sensitivity;
+    events = &sensitivity;
   } else if (timing.event_controls.size() == 1 &&
              !timing.event_controls[0]->is_star_event) {
     events = &timing.event_controls[0]->events;
@@ -141,13 +144,19 @@ std::vector<EventExpr> InferredProcedureClock(const ModuleItem* procedure,
   }
   // (c): one and only one of its event expressions qualifies.
   std::unordered_set<std::string> references;
-  CollectReferences(procedure->body, references);
+  CollectReferences(body, references);
   std::vector<EventExpr> clock;
   for (const EventExpr& ev : *events) {
     if (QualifiesAsClock(ev, mod, references)) clock.push_back(ev);
   }
   if (clock.size() != 1) return {};
   return clock;
+}
+
+std::vector<EventExpr> InferredProcedureClock(const ModuleItem* procedure,
+                                              const RtlirModule* mod) {
+  return InferredClockOf(procedure->body, procedure->sensitivity,
+                         procedure->is_star_sensitivity, mod);
 }
 
 // Whether the body of `decl` is one the run reads; a statement instantiating
@@ -345,6 +354,12 @@ void ElaborateProceduralConcurrentAssertions(ModuleItem* procedure,
   ResolveProceduralAssertions(
       assertions, ContextOf(InferredProcedureClock(procedure, mod), mod),
       registry, arena, diag);
+}
+
+std::vector<EventExpr> ProcessInferredClock(const RtlirProcess& proc,
+                                            const RtlirModule* mod) {
+  return InferredClockOf(proc.body, proc.sensitivity, proc.is_star_sensitivity,
+                         mod);
 }
 
 InferredAtInstance InferredInProcedure(const ModuleItem* procedure,

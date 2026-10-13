@@ -69,6 +69,18 @@ void AppendActualEvents(const EventExpr& ev, Expr* actual, Arena& arena,
 // instance, `u.s` (§23.6). Empty for any other expression.
 std::string InstanceDeclName(const Expr* instance);
 
+// §16.8 and §16.12: the actual `actual` an untyped formal binds as it stands
+// for the formal, cast to its own self-determined type: an operator's result,
+// the one form a context can widen (§11.6.1), enclosed in a size cast to the
+// `$bits` of the very node it casts, which IsSelfDeterminedCast recognizes;
+// any other actual, a sequence, property or event actual and every
+// variable_lvalue among them, as written.
+Expr* SelfDeterminedActual(Expr* actual, Arena& arena);
+
+// Whether the cast `cast` is one SelfDeterminedActual makes, which reads its
+// operand self-determined whatever context it stands in.
+bool IsSelfDeterminedCast(const Expr* cast);
+
 // §23.6: whether two expressions name the same object by the same spelling:
 // an identifier by its text and scope prefix, a member access, `i0.clk`, whose
 // own text is empty, by the whole path, and a select of a constant index by

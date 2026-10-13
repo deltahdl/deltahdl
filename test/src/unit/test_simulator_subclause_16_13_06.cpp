@@ -235,4 +235,31 @@ TEST(SequenceMethods, AClocklessSequenceReadOutsideAnAssertionTakesTheDefault) {
   EXPECT_NE(out.find("e4 at 15\n"), std::string::npos);
 }
 
+// §16.13.6 with §16.9.3 and §16.14.6: a clockless sequence whose method is
+// read in a procedure infers the clock that procedure gives, ahead of any
+// default clocking. The program's loop infers posedge clk, e4 ends at 15, 25
+// and 35, and the program's process, resuming after the Observed region, sees
+// each end point.
+TEST(SequenceMethods, AClocklessSequenceReadInAProcedureTakesItsClock) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "program p(input bit clk);\n"
+      "  bit a = 1, b = 1;\n"
+      "  int n = 0;\n"
+      "  sequence e4;\n"
+      "    a ##1 b;\n"
+      "  endsequence\n"
+      "  initial forever @(posedge clk) if (e4.triggered) n++;\n"
+      "  initial #41 $display(\"n=%0d\", n);\n"
+      "endprogram\n"
+      "module t;\n"
+      "  bit clk;\n"
+      "  always #5 clk = ~clk;\n"
+      "  p u(clk);\n"
+      "  initial #45 $finish;\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("n=3\n"), std::string::npos) << out;
+}
+
 }  // namespace

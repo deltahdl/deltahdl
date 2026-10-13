@@ -199,6 +199,32 @@ std::string InstanceDeclName(const Expr* instance) {
          std::string(path->rhs->text);
 }
 
+Expr* SelfDeterminedActual(Expr* actual, Arena& arena) {
+  bool is_operator = actual->kind == ExprKind::kBinary ||
+                     actual->kind == ExprKind::kUnary ||
+                     actual->kind == ExprKind::kTernary;
+  if (!is_operator || actual->property_actual != nullptr ||
+      IsEventActual(actual)) {
+    return actual;
+  }
+  auto* bits = arena.Create<Expr>();
+  bits->kind = ExprKind::kSystemCall;
+  bits->callee = "$bits";
+  bits->range = actual->range;
+  bits->args.push_back(actual);
+  auto* cast = arena.Create<Expr>();
+  cast->kind = ExprKind::kCast;
+  cast->range = actual->range;
+  cast->lhs = actual;
+  cast->rhs = bits;
+  return cast;
+}
+
+bool IsSelfDeterminedCast(const Expr* cast) {
+  return cast->rhs != nullptr && !cast->rhs->args.empty() &&
+         cast->rhs->args[0] == cast->lhs;
+}
+
 bool SamePath(const Expr* a, const Expr* b) {
   if (a == nullptr || b == nullptr || a->kind != b->kind) return false;
   if (a->kind == ExprKind::kMemberAccess) {

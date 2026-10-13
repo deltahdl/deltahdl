@@ -62,7 +62,9 @@ Expr* CastToKeywordType(Expr* actual, TokenKind type_kw, Arena& arena) {
 
 Expr* CastActualToFormal(Expr* actual, TokenKind type_kw, Arena& arena) {
   if (actual == nullptr) return actual;
-  return CastToKeywordType(actual, type_kw, arena);
+  return type_kw == TokenKind::kKwUntyped
+             ? SelfDeterminedActual(actual, arena)
+             : CastToKeywordType(actual, type_kw, arena);
 }
 
 }  // namespace delta
