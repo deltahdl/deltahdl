@@ -108,4 +108,31 @@ TEST(ProceduralClockInference, TheDefaultClockingAndAnOwnClockNeedNoContext) {
   EXPECT_TRUE(f.diag.Diagnostics().empty());
 }
 
+// §16.14.6: a procedural concurrent assertion's clocking event shall not use
+// an automatic variable: @(posedge clks[k]) reads the automatic k, while the
+// static clks alone is legal.
+TEST(ProceduralClockInference, AnAutomaticInTheClockingEventIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a;\n"
+      "  logic clks [2];\n"
+      "  always @(a) begin\n"
+      "    automatic int k = 1;\n"
+      "    a1: assert property (@(posedge clks[k]) a);\n"
+      "    a2: assert property (@(posedge clks[0]) a);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a clocking event of a procedural concurrent "
+                            "assertion may not reference an automatic variable",
+                            6, "16.14.6"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(),
+                    "a clocking event of a procedural concurrent "
+                    "assertion may not reference an automatic variable",
+                    7, "16.14.6"));
+}
+
 }  // namespace

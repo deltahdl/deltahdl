@@ -245,4 +245,28 @@ TEST(LocalVariableParsing, AChandleLocalVariableIsReported) {
   EXPECT_TRUE(ReportedError(r.diags, kMessage, 4, "16.10"));
 }
 
+// §16.10: a local variable assignment is not attached to a sequence that
+// admits an empty match: b[*0:1] admits one, while a ##1 b[*0:1] does not.
+TEST(LocalVariableParsing, AnAssignmentOnAnEmptyMatchingSequenceIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  bit clk, a, b, c;\n"
+      "  int e;\n"
+      "  property p;\n"
+      "    int x;\n"
+      "    @(posedge clk) a ##1 (b[*0:1], x = e) ##1 c[*2];\n"
+      "  endproperty\n"
+      "  property q;\n"
+      "    int x;\n"
+      "    @(posedge clk) (a ##1 b[*0:1], x = e) ##1 c[*2];\n"
+      "  endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  constexpr char kMessage[] =
+      "a local variable assignment may not be attached to a sequence that "
+      "admits an empty match";
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 6, "16.10"));
+  EXPECT_FALSE(ReportedError(r.diags, kMessage, 10, "16.10"));
+}
+
 }  // namespace

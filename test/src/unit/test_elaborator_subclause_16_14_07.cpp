@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include "elaborator/inferred_clock_disable.h"
+#include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -95,6 +97,39 @@ TEST(InferredClockDisable, ReplacementSourceFollowsInstantiationContext) {
   EXPECT_EQ(
       InferredClockReplacementSource(InstantiationContext::kCheckerInstance),
       InferredClockReplacement::kCheckerInstanceLocation);
+}
+
+// §16.14.7: $inferred_clock with no current resolved event expression where
+// the instance stands is an error: a1 writes no clock, no default clocking is
+// in scope and it stands in no procedure. With a default clocking, the same
+// instance takes the default's event.
+TEST(InferredClockDisable, AnInferredClockResolvingToNothingIsReported) {
+  const char* const kReport =
+      "$inferred_clock, the default of the formal 'clk' of 'p', has no "
+      "resolved clocking event at this instance";
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit a;\n"
+      "  property p(clk = $inferred_clock);\n"
+      "    @clk a;\n"
+      "  endproperty\n"
+      "  a1: assert property (p);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 6, "16.14.7"));
+  ElabFixture g;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit a, clk;\n"
+      "  default clocking @(posedge clk); endclocking\n"
+      "  property p(clk = $inferred_clock);\n"
+      "    @clk a;\n"
+      "  endproperty\n"
+      "  a1: assert property (p);\n"
+      "endmodule\n",
+      g);
+  EXPECT_FALSE(ReportedError(g.diag.Diagnostics(), kReport, 7, "16.14.7"));
 }
 
 }  // namespace

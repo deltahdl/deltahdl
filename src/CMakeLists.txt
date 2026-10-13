@@ -127,6 +127,11 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/assertion_body_slots.cpp
     elaborator/package_assertion_scope.cpp
     elaborator/assertion_name_rules.cpp
+    elaborator/assertion_bound_rules.cpp
+    elaborator/assertion_context_rules.cpp
+    elaborator/assertion_expr_rules.cpp
+    elaborator/assertion_rules.cpp
+    elaborator/local_variable_flow_rules.cpp
     elaborator/block_name_space.cpp
     elaborator/body_decl_scopes.cpp
     elaborator/nba_dynamic_element.cpp

@@ -165,4 +165,40 @@ TEST(ClockResolutionElaboration,
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoClockReport, 5, "16.16"));
 }
 
+// §16.16 (b)(3): a property declared outside a clocking block and
+// instantiated in one of its declarations is singly clocked on the block's
+// event: q5's negedge clk is not cb's posedge clk, while q6, written with no
+// clock, takes the block's.
+TEST(ClockResolutionElaboration,
+     AnOutsideInstanceInAClockingBlockTakesItsClock) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, b;\n"
+      "  property q5;\n"
+      "    @(negedge clk) b;\n"
+      "  endproperty\n"
+      "  property q6;\n"
+      "    b;\n"
+      "  endproperty\n"
+      "  clocking cb @(posedge clk);\n"
+      "    property q7;\n"
+      "      q5;\n"
+      "    endproperty\n"
+      "    property q8;\n"
+      "      q6;\n"
+      "    endproperty\n"
+      "  endclocking\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the instance of 'q5' in clocking block 'cb' is "
+                            "not clocked on the block's clocking event alone",
+                            10, "16.16"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "the instance of 'q6' in clocking block 'cb' is "
+                             "not clocked on the block's clocking event alone",
+                             13, "16.16"));
+}
+
 }  // namespace

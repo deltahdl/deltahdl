@@ -2,6 +2,8 @@
 
 #include "elaborator/sequence_degeneracy.h"
 #include "elaborator/sequence_match_attach.h"
+#include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -139,6 +141,73 @@ TEST(AttachSubroutineCall, ByValueInputVariableTypeMustBeAllowed) {
   EXPECT_TRUE(IsByValueInputArgumentTypeAllowed(/*type_allowed_in_16_6=*/true));
   EXPECT_FALSE(
       IsByValueInputArgumentTypeAllowed(/*type_allowed_in_16_6=*/false));
+}
+
+// §16.11: an automatic variable is not passed by reference to a subroutine
+// call attached to a sequence; by value, from an assertion in procedural
+// code, it may be.
+TEST(AttachedSubroutineCall, AnAutomaticPassedByReferenceIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a;\n"
+      "  task automatic show(ref int r);\n"
+      "  endtask\n"
+      "  task automatic shown(input int r);\n"
+      "  endtask\n"
+      "  always @(posedge clk) begin\n"
+      "    automatic int k = 3;\n"
+      "    a1: assert property ((a, show(k)) ##1 a);\n"
+      "    a2: assert property ((a, shown(k)) ##1 a);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const char* const kReport =
+      "an automatic variable may not be passed by reference";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 9, "16.11"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 10, "16.11"));
+}
+
+// §16.11: an actual holding a local variable is passed by value, which the
+// const ref formal of show does not.
+TEST(AttachedSubroutineCall, ALocalPassedByReferenceIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a;\n"
+      "  task automatic show(const ref int r);\n"
+      "  endtask\n"
+      "  sequence s;\n"
+      "    int v;\n"
+      "    (a, v = 1, show(v)) ##1 a;\n"
+      "  endsequence\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "an actual holding a local variable shall be "
+                            "passed by value",
+                            7, "16.11"));
+}
+
+// §16.11: a variable passed by value is of a type §16.6 allows, which
+// chandle is not.
+TEST(AttachedSubroutineCall, AChandlePassedByValueIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a;\n"
+      "  chandle h;\n"
+      "  function void show(input chandle c);\n"
+      "  endfunction\n"
+      "  sequence s;\n"
+      "    @(posedge clk) (a, show(h)) ##1 a;\n"
+      "  endsequence\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a variable passed by value shall be of a type an "
+                            "assertion may use",
+                            7, "16.11"));
 }
 
 }  // namespace

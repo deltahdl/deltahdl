@@ -1,11 +1,13 @@
 #include "elaborator/property_instance.h"
 
 #include <cstddef>
+#include <format>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
@@ -211,7 +213,8 @@ void FillInferredCheckerDefaults(RtlirModuleInst& inst,
 }
 
 void FillInferredDefaults(Expr* instance, const ModuleItem* decl,
-                          const InferredAtInstance& inferred, Arena& arena) {
+                          const InferredAtInstance& inferred, Arena& arena,
+                          DiagEngine* diag) {
   if (instance == nullptr || decl == nullptr || !HasInferredDefault(decl)) {
     return;
   }
@@ -225,6 +228,15 @@ void FillInferredDefaults(Expr* instance, const ModuleItem* decl,
     if (instance->args[i] != nullptr) continue;
     instance->args[i] =
         InferredActual(decl->prop_formal_inferred[i], inferred, arena);
+    if (instance->args[i] == nullptr && diag != nullptr &&
+        decl->prop_formal_inferred[i] == InferredDefault::kClock) {
+      diag->Error(instance->range.start,
+                  std::format("$inferred_clock, the default of the formal '{}' "
+                              "of '{}', has no resolved clocking event at "
+                              "this instance",
+                              decl->prop_formals[i], decl->name),
+                  Subclause("16.14.7"));
+    }
   }
 }
 

@@ -4,7 +4,9 @@
 #include "elaborator/sampled_value.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 
 using namespace delta;
 
@@ -199,6 +201,68 @@ TEST(PropertyDeclarationElaboration, FlattenAcceptsWellFormedProperty) {
   EXPECT_TRUE(fp.legal);
   EXPECT_EQ(fp.disable_iff_count, 1);
   EXPECT_TRUE(PropertyRegistry::IsAcceptableAsTopLevelConcurrent(fp));
+}
+
+// §16.12: the dependency digraph of named properties has an edge for an
+// instance in a formal's default actual, and one from a property to each
+// property an instance of it names in an actual argument: q1 reaches q2
+// through its default and q2 instantiates q1; r1 writes r2(r1), so r2
+// reaches r1 and r1 instantiates r2.
+TEST(PropertyDependencyGraph, DefaultsAndActualsAreEdges) {
+  Expr q2_ref;
+  q2_ref.kind = ExprKind::kIdentifier;
+  q2_ref.text = "q2";
+  ModuleItem q1;
+  q1.kind = ModuleItemKind::kPropertyDecl;
+  q1.name = "q1";
+  q1.prop_formals = {"x"};
+  q1.prop_formal_defaults = {&q2_ref};
+  ModuleItem q2;
+  q2.kind = ModuleItemKind::kPropertyDecl;
+  q2.name = "q2";
+  q2.prop_instance_refs = {"q1"};
+  Expr r1_ref;
+  r1_ref.kind = ExprKind::kIdentifier;
+  r1_ref.text = "r1";
+  Expr r2_call;
+  r2_call.kind = ExprKind::kCall;
+  r2_call.callee = "r2";
+  r2_call.args = {&r1_ref};
+  PropertyExprNode r1_body;
+  r1_body.boolean = &r2_call;
+  ModuleItem r1;
+  r1.kind = ModuleItemKind::kPropertyDecl;
+  r1.name = "r1";
+  r1.prop_instance_refs = {"r2"};
+  r1.prop_body_tree = &r1_body;
+  ModuleItem r2;
+  r2.kind = ModuleItemKind::kPropertyDecl;
+  r2.name = "r2";
+  PropertyRegistry reg;
+  for (const ModuleItem* item : {&q1, &q2, &r1, &r2}) reg.Register(item);
+  EXPECT_TRUE(reg.IsRecursiveProperty(&q1));
+  EXPECT_TRUE(reg.IsRecursiveProperty(&q2));
+  EXPECT_TRUE(reg.IsRecursiveProperty(&r1));
+  EXPECT_TRUE(reg.IsRecursiveProperty(&r2));
+}
+
+// §16.12: a $ actual of a named property instance follows §16.8's rule: p1
+// reads its untyped formal m as an operand.
+TEST(PropertyDollarActual, AnOperandFormalIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a, b;\n"
+      "  property p1(m);\n"
+      "    b == m;\n"
+      "  endproperty\n"
+      "  a1: assert property (@(posedge clk) a |-> p1($));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$ binds the formal 'm' of 'p1', which shall be "
+                            "untyped",
+                            6, "16.12"));
 }
 
 }  // namespace

@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -125,6 +127,97 @@ TEST(LocalVariableElaboration, LocalOfASequenceNotInstantiatedIsUnresolved) {
                             "23.9"));
   EXPECT_FALSE(
       ReportedError(f.diag.Diagnostics(), "is a local variable", 4, "16.10"));
+}
+
+// §16.10: a local variable is referenced only where an assignment reaches
+// it: x++ reads x before any; y does not flow out of the or whose b operand
+// leaves it unassigned; and the initialization of v reads u, which has none.
+TEST(LocalVariableFlow, AReferenceToAnUnassignedLocalIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a, b, c;\n"
+      "  property p1;\n"
+      "    int x;\n"
+      "    @(posedge clk) (a, x++) |-> b;\n"
+      "  endproperty\n"
+      "  property p2;\n"
+      "    int y;\n"
+      "    @(posedge clk) ((a, y = 1) or b) ##1 (c == y);\n"
+      "  endproperty\n"
+      "  sequence s3;\n"
+      "    int u, v = u + 1;\n"
+      "    a;\n"
+      "  endsequence\n"
+      "  sequence s4;\n"
+      "    int w;\n"
+      "    (a, w = 1) ##1 (c == w);\n"
+      "  endsequence\n"
+      "endmodule\n",
+      f);
+  auto reported = [&](const char* name, int line) {
+    return ReportedError(f.diag.Diagnostics(),
+                         std::string("the local variable '") + name +
+                             "' is referenced at a point where it is "
+                             "unassigned",
+                         line, "16.10");
+  };
+  EXPECT_TRUE(reported("x", 5));
+  EXPECT_TRUE(reported("y", 9));
+  EXPECT_TRUE(reported("u", 12));
+  EXPECT_FALSE(reported("w", 17));
+}
+
+// §16.10: a local passed to an instance triggered is applied to is an entire
+// actual, never part of one: v1 + 1 is not, v1 is.
+TEST(LocalVariableFlow, ALocalInsideAnActualOfTriggeredIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a, c;\n"
+      "  int data_in;\n"
+      "  sequence sub(lv);\n"
+      "    (a, lv = data_in) ##1 (lv > 0);\n"
+      "  endsequence\n"
+      "  sequence top;\n"
+      "    int v1;\n"
+      "    (c, v1 = 0) ##1 sub(v1 + 1).triggered;\n"
+      "  endsequence\n"
+      "  sequence top2;\n"
+      "    int v1;\n"
+      "    (c, v1 = 0) ##1 sub(v1).triggered;\n"
+      "  endsequence\n"
+      "endmodule\n",
+      f);
+  const char* const kReport =
+      "a local variable passed to an instance that triggered is applied to "
+      "shall be an entire actual argument";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 9, "16.10"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 13, "16.10"));
+}
+
+// §16.10: where triggered is applied to an instance and a local is the entire
+// actual of a formal, the sequence does not reference the formal before it
+// assigns it, as sub does lv.
+TEST(LocalVariableFlow, TriggeredOnASequenceReadingTheFormalFirstIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a, c;\n"
+      "  int data_in;\n"
+      "  sequence sub(lv);\n"
+      "    (a && lv > 0) ##1 (1, lv = data_in);\n"
+      "  endsequence\n"
+      "  sequence top;\n"
+      "    int v1;\n"
+      "    (c, v1 = 1) ##1 sub(v1).triggered;\n"
+      "  endsequence\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'sub' references its formal 'lv', bound to the "
+                            "local variable 'v1', before it assigns it",
+                            9, "16.10"));
 }
 
 }  // namespace

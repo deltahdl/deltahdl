@@ -5,6 +5,8 @@
 
 #include "elaborator/sampled_value.h"
 #include "elaborator/sequence_method.h"
+#include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -211,6 +213,95 @@ TEST(SequenceMethods, GeneralClockInferenceReusesSampledValueRules) {
   EXPECT_EQ(InferSampledValueClockingEvent(
                 SampledValueClockContext::kAssertionSequenceOrProperty),
             SampledValueClockInference::kFromClockFlow);
+}
+
+// §16.13.6: triggered in a disable condition applies to a sequence with an
+// explicit clocking event: s writes none, t writes @(posedge clk).
+TEST(SequenceMethods, TriggeredOfAnUnclockedSequenceInADisableIsReported) {
+  const char* const kReport =
+      "triggered of the sequence 's', which has no explicit clocking event, "
+      "may not stand in a disable condition";
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, b, c;\n"
+      "  sequence s;\n"
+      "    a ##1 b;\n"
+      "  endsequence\n"
+      "  sequence t;\n"
+      "    @(posedge clk) a ##1 b;\n"
+      "  endsequence\n"
+      "  a1: assert property (@(posedge clk) disable iff (s.triggered) c);\n"
+      "  a2: assert property (@(posedge clk) disable iff (t.triggered) c);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 9, "16.13.6"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "triggered of the sequence",
+                             10, "16.13.6"));
+}
+
+// §16.13.6: triggered outside a sequence expression applies to no sequence
+// that assigns a formal in a match item, as s does lv; inside one it may.
+TEST(SequenceMethods, TriggeredOutsideASequenceOnAnAssigningOneIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a;\n"
+      "  int v;\n"
+      "  sequence s(lv);\n"
+      "    @(posedge clk) (a, lv = 1) ##1 a;\n"
+      "  endsequence\n"
+      "  sequence t;\n"
+      "    int w;\n"
+      "    @(posedge clk) a ##1 s(w).triggered;\n"
+      "  endsequence\n"
+      "  initial wait (s(v).triggered);\n"
+      "endmodule\n",
+      f);
+  const char* const kReport =
+      "triggered may not be applied outside a sequence expression to 's'";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 11, "16.13.6"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 9, "16.13.6"));
+}
+
+// §16.13.6: no sequence depends on its own end point through triggered.
+TEST(SequenceMethods, ACycleThroughTriggeredIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a;\n"
+      "  sequence s1;\n"
+      "    @(posedge clk) a ##1 s2.triggered;\n"
+      "  endsequence\n"
+      "  sequence s2;\n"
+      "    @(posedge clk) a ##1 s1.triggered;\n"
+      "  endsequence\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the sequence 's1' depends on its own end point "
+                            "through triggered",
+                            3, "16.13.6"));
+}
+
+// §16.13.6: matched stands only in a sequence expression, not in a wait or in
+// procedural code.
+TEST(SequenceMethods, MatchedOutsideASequenceIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a, x;\n"
+      "  sequence s;\n"
+      "    @(posedge clk) a ##1 a;\n"
+      "  endsequence\n"
+      "  initial wait (s.matched);\n"
+      "  always @(posedge clk) x <= s.matched;\n"
+      "endmodule\n",
+      f);
+  const char* const kReport =
+      "matched may be used only in a sequence expression";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 6, "16.13.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 7, "16.13.6"));
 }
 
 }  // namespace

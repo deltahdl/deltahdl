@@ -7,35 +7,77 @@
 #include <unordered_set>
 #include <vector>
 
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/sampled_value.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 #include "parser/expr_substitute.h"
 
 namespace delta {
 
 namespace {
 
-using SequenceByName = std::unordered_map<std::string_view, const ModuleItem*>;
-
 // §16.8 three-color DFS body: `path` marks nodes on the current descent —
 // re-visiting one means there is a back-edge, which is exactly the cycle.
 // Only sequence-to-sequence edges count for the cycle rule.
-bool SequenceCycleDfs(const SequenceByName& by_name, const ModuleItem* node,
+bool SequenceCycleDfs(const PropertyRegistry& registry, const ModuleItem* node,
                       std::unordered_set<const ModuleItem*>& path,
                       std::unordered_set<const ModuleItem*>& done) {
   if (!path.insert(node).second) return true;
-  for (auto ref : node->prop_instance_refs) {
-    auto it = by_name.find(ref);
-    if (it == by_name.end()) continue;
-    const ModuleItem* next = it->second;
-    if (next->kind != ModuleItemKind::kSequenceDecl) continue;
+  for (auto ref : registry.DependencyRefs(node)) {
+    const ModuleItem* next = registry.Find(ref);
+    if (next == nullptr || next->kind != ModuleItemKind::kSequenceDecl) {
+      continue;
+    }
     if (done.count(next) != 0) continue;
-    if (SequenceCycleDfs(by_name, next, path, done)) return true;
+    if (SequenceCycleDfs(registry, next, path, done)) return true;
   }
   path.erase(node);
   done.insert(node);
   return false;
+}
+
+// The names `e` writes, as identifiers or as the callees of calls.
+void CollectNames(const Expr* e, std::vector<std::string_view>& out) {
+  if (e == nullptr) return;
+  if (e->kind == ExprKind::kIdentifier) out.push_back(e->text);
+  if (e->kind == ExprKind::kCall) out.push_back(e->callee);
+  ForEachExprChild(e, [&](const Expr* child) { CollectNames(child, out); });
+}
+
+// Each call `e` holds, `e` itself among them, handed to `fn`.
+template <typename Fn>
+void ForEachCall(const Expr* e, const Fn& fn) {
+  if (e == nullptr) return;
+  if (e->kind == ExprKind::kCall) fn(e);
+  ForEachExprChild(e, [&](const Expr* child) { ForEachCall(child, fn); });
+}
+
+// Each operand expression of the sequence body `body`.
+template <typename Fn>
+void ForEachBodyExpr(const SeqLinearBody& body, const Fn& fn) {
+  for (const Expr* operand : body.operands) fn(operand);
+  for (const SeqLinearBody& inner : body.intersects) {
+    ForEachBodyExpr(inner, fn);
+  }
+  for (const SeqLinearBody& inner : body.conjuncts) ForEachBodyExpr(inner, fn);
+  for (const SeqLinearBody& inner : body.alternatives) {
+    ForEachBodyExpr(inner, fn);
+  }
+}
+
+// Each expression of the property tree under `node` an instance may stand
+// in.
+template <typename Fn>
+void ForEachTreeExpr(const PropertyExprNode* node, const Fn& fn) {
+  if (node == nullptr) return;
+  fn(node->boolean);
+  if (node->sequence != nullptr)
+    ForEachBodyExpr(node->sequence->seq_linear, fn);
+  for (const PropertyExprNode* operand : node->operands) {
+    ForEachTreeExpr(operand, fn);
+  }
 }
 
 }  // namespace
@@ -63,6 +105,37 @@ void PropertyRegistry::Register(const ModuleItem* decl) {
     return;
   }
   by_name_.emplace(decl->name, decl);
+  RecordArgumentRefs(decl);
+}
+
+// §16.8 and §16.12: the edges of the dependency digraph the body scan does
+// not record: from `decl` to each declaration a formal's default actual
+// instantiates, and from the declaration each instance in `decl`'s body
+// names to each one the instance's actual arguments instantiate.
+void PropertyRegistry::RecordArgumentRefs(const ModuleItem* decl) {
+  for (const Expr* actual : decl->prop_formal_defaults) {
+    CollectNames(actual, argument_refs_[decl->name]);
+  }
+  auto record = [&](const Expr* e) {
+    ForEachCall(e, [&](const Expr* call) {
+      for (const Expr* arg : call->args) {
+        CollectNames(arg, argument_refs_[call->callee]);
+      }
+    });
+  };
+  ForEachBodyExpr(decl->seq_linear, record);
+  ForEachTreeExpr(decl->prop_body_tree, record);
+}
+
+std::vector<std::string_view> PropertyRegistry::DependencyRefs(
+    const ModuleItem* decl) const {
+  std::vector<std::string_view> refs(decl->prop_instance_refs.begin(),
+                                     decl->prop_instance_refs.end());
+  auto it = argument_refs_.find(decl->name);
+  if (it != argument_refs_.end()) {
+    refs.insert(refs.end(), it->second.begin(), it->second.end());
+  }
+  return refs;
 }
 
 void PropertyRegistry::RegisterAs(std::string_view name,
@@ -146,7 +219,7 @@ bool PropertyRegistry::HasCyclicSequenceDependency(
   // SequenceCycleDfs); `decl` is on a cycle iff that walk finds a back-edge.
   std::unordered_set<const ModuleItem*> path;
   std::unordered_set<const ModuleItem*> done;
-  return SequenceCycleDfs(by_name_, decl, path, done);
+  return SequenceCycleDfs(*this, decl, path, done);
 }
 
 bool PropertyRegistry::IsRecursiveProperty(const ModuleItem* decl) const {
@@ -158,7 +231,7 @@ bool PropertyRegistry::IsRecursiveProperty(const ModuleItem* decl) const {
   // of the property dependency digraph.
   auto push_property_callees = [&](const ModuleItem* node,
                                    std::vector<const ModuleItem*>& stack) {
-    for (auto ref : node->prop_instance_refs) {
+    for (auto ref : DependencyRefs(node)) {
       auto it = by_name_.find(ref);
       if (it == by_name_.end()) continue;
       if (it->second->kind != ModuleItemKind::kPropertyDecl) continue;
@@ -225,7 +298,7 @@ bool PropertyRegistry::ReachesRecursiveProperty(const ModuleItem* decl) const {
     stack.pop_back();
     if (!visited.insert(cur).second) continue;
     if (IsRecursiveProperty(cur)) return true;
-    for (auto ref : cur->prop_instance_refs) {
+    for (auto ref : DependencyRefs(cur)) {
       auto it = by_name_.find(ref);
       if (it == by_name_.end()) continue;
       if (it->second->kind != ModuleItemKind::kPropertyDecl) continue;

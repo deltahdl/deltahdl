@@ -760,4 +760,51 @@ TEST(GlobalClockingElab, FutureFunctionInAnAssertionActionBlockErrors) {
                             "16.9.4"));
 }
 
+// §16.9.4: no global clocking future sampled value function stands in the
+// argument of another, as $rising_gclk does in a1's $future_gclk.
+TEST(GlobalClockingFutureRules, ANestedFutureFunctionIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a, b;\n"
+      "  global clocking @(posedge clk); endclocking\n"
+      "  a1: assert property (@(posedge clk) $future_gclk(a || "
+      "$rising_gclk(b)));\n"
+      "  a2: assert property (@(posedge clk) $future_gclk(a || b));\n"
+      "endmodule\n",
+      f);
+  const char* const kReport =
+      "a global clocking future sampled value function may not stand in the "
+      "argument of $future_gclk";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 4, "16.9.4"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 5, "16.9.4"));
+}
+
+// §16.9.4: no global clocking future sampled value function stands in an
+// assertion holding a sequence match item, here one reached through the
+// instance of s; a2, whose t has none, is legal.
+TEST(GlobalClockingFutureRules, AFutureFunctionBesideAMatchItemIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a, b, c;\n"
+      "  global clocking @(posedge clk); endclocking\n"
+      "  sequence s;\n"
+      "    bit v;\n"
+      "    (a, v = a) ##1 (b == v)[->1];\n"
+      "  endsequence\n"
+      "  sequence t;\n"
+      "    a ##1 b;\n"
+      "  endsequence\n"
+      "  a1: assert property (@(posedge clk) s |=> $future_gclk(c));\n"
+      "  a2: assert property (@(posedge clk) t |=> $future_gclk(c));\n"
+      "endmodule\n",
+      f);
+  const char* const kReport =
+      "a global clocking future sampled value function may not stand in an "
+      "assertion that holds a sequence match item";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 11, "16.9.4"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 12, "16.9.4"));
+}
+
 }  // namespace

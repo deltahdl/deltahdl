@@ -10,6 +10,8 @@
 
 namespace delta {
 
+class DiagEngine;
+
 class PropertyRegistry;
 struct RtlirModule;
 struct RtlirModuleInst;
@@ -70,9 +72,12 @@ struct InferredAtInstance {
 // actual of an event formal is, an edge keyword over the signal, and each
 // whose default is $inferred_disable takes the disable condition, 1'b0 where
 // the instance is within the scope of no default disable iff; the instance is
-// written as a call from here on, its actuals holding what was inferred.
+// written as a call from here on, its actuals holding what was inferred. A
+// $inferred_clock default with no clocking event to stand for is reported to
+// `diag` where one is given, §16.14.7 making it an error.
 void FillInferredDefaults(Expr* instance, const ModuleItem* decl,
-                          const InferredAtInstance& inferred, Arena& arena);
+                          const InferredAtInstance& inferred, Arena& arena,
+                          DiagEngine* diag = nullptr);
 
 // §17.4 with §16.14.7: the same at a checker instance `inst`: each formal it
 // leaves to a $inferred_clock default is bound to the clocking event, written

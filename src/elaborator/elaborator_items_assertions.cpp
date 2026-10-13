@@ -7,6 +7,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "elaborator/assertion_rules.h"
 #include "elaborator/concurrent_assertion_expr.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
@@ -28,45 +29,6 @@
 namespace delta {
 
 namespace {
-
-// §16.14.3: a cover statement may have an optional pass statement
-// (statement_or_null), and that pass statement may hold no concurrent assert,
-// assume or cover statement. A procedural concurrent assertion is parsed as an
-// assert/assume/cover-immediate Stmt that carries is_procedural_concurrent;
-// ordinary immediate assertions leave that flag clear and remain permitted.
-// Returns the first offending statement, or nullptr when the pass statement
-// contains none.
-//
-// §16.14.3 says the pass statement holds none and names no statement the
-// prohibition is lifted in, so this descends every link ForEachChildStmt in
-// elaborator_validate_internal.h names. It wrote out nine of the thirteen, so a
-// concurrent assertion written in a randcase arm or a randsequence code block
-// was not found and the cover statement holding it elaborated clean. Two of the
-// four links it now reaches cannot hold one: A.6.8 admits in a
-// for_initialization only a list_of_variable_assignments or a
-// for_variable_declaration, and in a for_step only an operator_assignment, an
-// inc_or_dec_expression or a function_subroutine_call, so no assertion
-// statement stands in a for header. Descending them costs nothing and keeps the
-// walk from naming any link itself.
-//
-// ForEachChildStmt gives the visitor no way to stop, so the first offending
-// statement is kept in `hit` and the recursion runs only while `hit` is null.
-// That is what makes this walk report the first one in source order rather than
-// whichever link the list happens to visit last.
-const Stmt* FindConcurrentAssertionInPassStmt(const Stmt* s) {
-  if (s == nullptr) return nullptr;
-  if (s->is_procedural_concurrent && (s->kind == StmtKind::kAssertImmediate ||
-                                      s->kind == StmtKind::kAssumeImmediate ||
-                                      s->kind == StmtKind::kCoverImmediate)) {
-    return s;
-  }
-  const Stmt* hit = nullptr;
-  ForEachChildStmt(s, [&](Stmt* const& sub) {
-    if (hit) return;
-    hit = FindConcurrentAssertionInPassStmt(sub);
-  });
-  return hit;
-}
 
 // §16.6: an expression appearing in a concurrent assertion shall not reference
 // a variable of chandle type. A concurrent assertion statement
@@ -388,7 +350,7 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
   // assertion statement, so the inferred functions among the defaults are
   // replaced by what is inferred at the statement, the default clocking and
   // the default disable iff in scope.
-  FillInferredDefaults(item->assert_expr, decl, inferred, arena);
+  FillInferredDefaults(item->assert_expr, decl, inferred, arena, &diag);
   // A name declaring no property leaves the spec no instance of one, which
   // §37.50 reaches as a property spec rather than a property inst.
   if (decl == nullptr || decl->kind != ModuleItemKind::kPropertyDecl) {

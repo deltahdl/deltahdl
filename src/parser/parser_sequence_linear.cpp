@@ -1,5 +1,7 @@
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -540,6 +542,32 @@ struct ParserSeqLinearHelpers {
     return ok;
   }
 
+  // §16.10 and §16.11: no local variable assignment and no subroutine call
+  // is attached to a sequence admitting an empty match, as the group of one
+  // operand from `first` on in `body` does where it is repeated from zero:
+  // `(b[*0:1], x = e)`, not `(a ##1 b[*0:1], x = e)`.
+  static void ReportEmptyMatchItems(Parser& p, const SeqLinearBody& body,
+                                    size_t first, SourceLoc loc) {
+    if (body.operands.size() != first + 1) return;
+    const SeqRepetition& rep = body.repetitions[first];
+    if (rep.kind == SeqRepetition::Kind::kNone || rep.min_expr != nullptr ||
+        rep.min != 0) {
+      return;
+    }
+    for (bool call : {false, true}) {
+      for (const SeqMatchAssign& item : body.match_items[first]) {
+        if ((item.call != nullptr) != call) continue;
+        p.diag_.Error(loc,
+                      std::string(call ? "a subroutine call"
+                                       : "a local variable assignment") +
+                          " may not be attached to a sequence that admits an "
+                          "empty match",
+                      Subclause(call ? "16.11" : "16.10"));
+        break;
+      }
+    }
+  }
+
   // A parenthesised group, `( sequence_expr [, match_items] )`: its operands
   // are read into `body` as the outer operands are, the delay before the group
   // adding to the group's leading delay, and its match items are attached to
@@ -550,11 +578,13 @@ struct ParserSeqLinearHelpers {
     if (AheadGroupHolds(p, AtSequenceOperator)) {
       return ParseNestedGroup(p, body, before, clock);
     }
+    SourceLoc loc = p.CurrentLoc();
     p.Expect(TokenKind::kLParen, Subclause("16.10"));
     size_t first = body.operands.size();
     if (!ParseLinearSeqOperandChain(p, body, before, clock)) return false;
     if (body.operands.size() == first) return false;
     if (!ParseSequenceMatchItems(p, body.match_items.back())) return false;
+    ReportEmptyMatchItems(p, body, first, loc);
     if (!p.Match(TokenKind::kRParen)) return false;
     SeqRepetition rep;
     if (!ParseSequenceRepetition(p, rep)) return false;

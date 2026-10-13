@@ -230,4 +230,56 @@ TEST(NamedSequenceDeclaration, ParameterActualForADelayFormalIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §16.8: an instance written in a formal's default actual is an edge of the
+// dependency digraph: s1 reaches s2 through the default of x, and s2
+// instantiates s1, so the two form a cycle.
+TEST(SequenceCycleElaboration, ACycleThroughAFormalsDefaultIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a;\n"
+      "  sequence s1(x = s2);\n"
+      "    x ##1 a;\n"
+      "  endsequence\n"
+      "  sequence s2;\n"
+      "    s1 ##1 a;\n"
+      "  endsequence\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cyclic dependency among named sequences "
+                            "involving \"s1\"",
+                            3, "16.8"));
+}
+
+// §16.8: a $ actual binds an untyped formal referenced only as a range's upper
+// bound or as an instance's actual: s1's n is typed, and s2 reads m as an
+// operand, while s3 uses k as the upper bound of ##[1:k].
+TEST(SequenceDollarActual, ATypedOrOperandFormalIsReported) {
+  const char* const kReport =
+      "shall be untyped and referenced only as the upper bound of a cycle "
+      "delay range or as an actual argument of an instance";
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a, b;\n"
+      "  sequence s1(int n);\n"
+      "    a ##[1:n] b;\n"
+      "  endsequence\n"
+      "  sequence s2(m);\n"
+      "    a ##1 (b == m);\n"
+      "  endsequence\n"
+      "  sequence s3(k);\n"
+      "    a ##[1:k] b;\n"
+      "  endsequence\n"
+      "  a1: assert property (@(posedge clk) s1($));\n"
+      "  a2: assert property (@(posedge clk) s2($));\n"
+      "  a3: assert property (@(posedge clk) s3($));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 12, "16.8"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 13, "16.8"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 14, "16.8"));
+}
+
 }  // namespace

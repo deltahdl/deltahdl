@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "elaborator/assertion_rules.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
@@ -142,7 +143,7 @@ static void CollectAutomaticVarNames(
 // action call passing one of them by reference (§16.4), or a sequence event
 // written with one as an argument (§9.4.2.4), can be rejected. An automatic
 // task or function makes its formals and its non-static locals automatic.
-static std::unordered_set<std::string_view> CollectItemAutomaticVarNames(
+std::unordered_set<std::string_view> CollectItemAutomaticVarNames(
     const ModuleItem* item) {
   bool routine_is_automatic = (item->kind == ModuleItemKind::kTaskDecl ||
                                item->kind == ModuleItemKind::kFunctionDecl) &&
@@ -198,6 +199,13 @@ static void MarkSequenceClockEvents(
 
 void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl,
                                            RtlirModule* mod) {
+  // The rules of Clause 16 no single item's elaboration checks.
+  ValidateAssertionRules(decl, property_registry_, diag_);
+  const ScopeMap kParams = BuildParamScope(mod);
+  ValidateAssertionExprRules(decl, mod, kParams, property_registry_, diag_);
+  ValidateAssertionBoundRules(decl, kParams, diag_);
+  ValidateAssertionContextRules(decl, property_registry_, diag_);
+  ValidateLocalVariableFlow(decl, diag_);
   if (sequence_names_.empty()) return;
   // §16.8 actual-argument checks need each named sequence's formals, so map the
   // sequences declared in this scope by name. A sequence instantiated across a

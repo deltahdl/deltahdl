@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -63,6 +64,35 @@ TEST(SequenceExprElaboration, UnboundedDelayWithDollarElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §16.7: a cycle delay range written with parameters has its maximum no less
+// than its minimum, and a delay settled by a sequence's actual is 0 or
+// greater: [LO:HI] folds to [3:1], s(NEG) gives d the value -1, while s(LO)
+// and [HI:LO] are legal.
+TEST(CycleDelayElaboration, ParameterAndActualBoundsAreChecked) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a, b;\n"
+      "  localparam int LO = 3, HI = 1, NEG = -1;\n"
+      "  sequence s(int d);\n"
+      "    a ##d b;\n"
+      "  endsequence\n"
+      "  a1: assert property (@(posedge clk) a ##[LO:HI] b);\n"
+      "  a2: assert property (@(posedge clk) s(NEG));\n"
+      "  a3: assert property (@(posedge clk) s(LO));\n"
+      "  a4: assert property (@(posedge clk) a ##[HI:LO] b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the maximum of a cycle delay range shall be no "
+                            "less than its minimum",
+                            7, "16.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a cycle delay shall be 0 or greater", 5, "16.7"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "the maximum of a cycle delay range", 10, "16.7"));
 }
 
 }  // namespace

@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <string_view>
 #include <unordered_map>
+#include <vector>
 
 #include "elaborator/sampled_value.h"
 #include "parser/ast_expr.h"
@@ -45,6 +46,12 @@ class PropertyRegistry {
   void RegisterAs(std::string_view name, const ModuleItem* decl);
 
   const ModuleItem* Find(std::string_view name) const;
+
+  // §16.8 and §16.12: the names of the declarations `decl` depends on, the
+  // instances its body writes and, beside them, the instances written in the
+  // default actual of one of its formals and those written in an actual
+  // argument of an instance of `decl` in a registered declaration's body.
+  std::vector<std::string_view> DependencyRefs(const ModuleItem* decl) const;
 
   // §16.8 and §16.12: the declaration an instance names, by its bare name,
   // written as an identifier or called, or, §26.3, by "pk::name" where it is
@@ -96,6 +103,12 @@ class PropertyRegistry {
 
  private:
   std::unordered_map<std::string_view, const ModuleItem*> by_name_;
+  // The dependencies DependencyRefs adds to a declaration's own, by the
+  // declaration's name.
+  std::unordered_map<std::string_view, std::vector<std::string_view>>
+      argument_refs_;
+
+  void RecordArgumentRefs(const ModuleItem* decl);
 };
 
 }  // namespace delta

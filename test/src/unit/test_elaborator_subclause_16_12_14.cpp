@@ -2,6 +2,8 @@
 
 #include "elaborator/abort_property.h"
 #include "elaborator/sampled_value.h"
+#include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -131,6 +133,52 @@ TEST(AbortProperty, AbortConditionRejectsAllForbiddenReferencesAtOnce) {
   EXPECT_FALSE(AbortConditionContentIsLegal(
       /*references_local_variable=*/true, /*references_triggered_method=*/true,
       /*references_matched_method=*/true));
+}
+
+// §16.12.14: an abort condition references no local variable and neither
+// sequence method: the condition v == 1 reads the local v of p, and
+// s.triggered a sequence method; c reads neither.
+TEST(AbortConditionRules, ALocalOrSequenceMethodIsReported) {
+  const char* const kReport =
+      "an abort condition may not reference a local variable or the sequence "
+      "methods triggered and matched";
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, b, c;\n"
+      "  sequence s;\n"
+      "    @(posedge clk) a ##1 b;\n"
+      "  endsequence\n"
+      "  property p;\n"
+      "    int v;\n"
+      "    @(posedge clk) (1, v = b) |-> accept_on (v == 1) a;\n"
+      "  endproperty\n"
+      "  a1: assert property (@(posedge clk) reject_on (s.triggered) a);\n"
+      "  a2: assert property (@(posedge clk) reject_on (c) a);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 8, "16.12.14"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 10, "16.12.14"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 11, "16.12.14"));
+}
+
+// §16.12.14: a sampled value function other than $sampled in an abort
+// condition gives its clocking event explicitly.
+TEST(AbortConditionRules, AnUnclockedSampledValueCallIsReported) {
+  const char* const kReport =
+      "$rose in an abort condition shall have its clocking event specified "
+      "explicitly";
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, c;\n"
+      "  a1: assert property (@(posedge clk) accept_on ($rose(c)) a);\n"
+      "  a2: assert property (@(posedge clk)\n"
+      "    accept_on ($rose(c, @(posedge clk))) a);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 3, "16.12.14"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 5, "16.12.14"));
 }
 
 }  // namespace

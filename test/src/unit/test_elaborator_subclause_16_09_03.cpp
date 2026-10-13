@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include "elaborator/sampled_value.h"
+#include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -154,6 +156,131 @@ TEST(SampledValueFunctions, DisableConditionAndClockExprRequireExplicitClock) {
   EXPECT_EQ(InferSampledValueClockingEvent(
                 SampledValueClockContext::kDisableConditionOrClockExpression),
             SampledValueClockInference::kRequiresExplicitClock);
+}
+
+// §16.9.3: the argument expressions of a sampled value function read no local
+// variable and no matched: $stable(v) reads the local v of s, $rose(t.matched)
+// the matched of t; $stable(a) reads neither.
+TEST(SampledValueRules, ALocalOrMatchedInAnArgumentIsReported) {
+  const char* const kReport =
+      "may not reference a local variable or the sequence method matched";
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a;\n"
+      "  sequence t;\n"
+      "    @(posedge clk) a;\n"
+      "  endsequence\n"
+      "  sequence s;\n"
+      "    int v;\n"
+      "    @(posedge clk) (1, v = a) ##1 $stable(v);\n"
+      "  endsequence\n"
+      "  a1: assert property (@(posedge clk) $rose(t.matched));\n"
+      "  a2: assert property (@(posedge clk) $stable(a));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 8, "16.9.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 10, "16.9.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 11, "16.9.3"));
+}
+
+// §16.9.3: $past's number_of_ticks is an elaboration-time constant of 1 or
+// greater: the parameter Z folds to 0, the variable k folds to nothing, and
+// the parameter N folds to 2.
+TEST(SampledValueRules, APastNumberOfTicksIsAConstantOfOneOrMore) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  parameter int Z = 0;\n"
+      "  parameter int N = 2;\n"
+      "  logic clk, a, b;\n"
+      "  int k;\n"
+      "  a1: assert property (@(posedge clk) $past(a, Z) == b);\n"
+      "  a2: assert property (@(posedge clk) $past(a, k) == b);\n"
+      "  a3: assert property (@(posedge clk) $past(a, N) == b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the number_of_ticks of $past shall be 1 or "
+                            "greater",
+                            6, "16.9.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the number_of_ticks of $past shall be an "
+                            "elaboration-time constant expression",
+                            7, "16.9.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "number_of_ticks of $past",
+                             8, "16.9.3"));
+}
+
+// §16.9.3: an automatic variable may stand in $past's expression1 but not in
+// its expression2, the gating expression.
+TEST(SampledValueRules, AnAutomaticInPastsGateIsReported) {
+  const char* const kReport =
+      "an automatic variable may not stand in the clocking event or the "
+      "expression2 of $past";
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, b;\n"
+      "  always @(posedge clk) begin\n"
+      "    automatic logic g = a;\n"
+      "    a1: assert property ($past(b, 1, g) == a);\n"
+      "    a2: assert property ($past(g, 1, b) == a);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 5, "16.9.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 6, "16.9.3"));
+}
+
+// §16.9.3: outside an assertion, a sampled value function with no clocking
+// event of its own takes the clock the procedure infers or the default
+// clocking; an initial procedure infers none, so with no default clocking
+// $rose there is illegal, and with one it is clocked by it.
+TEST(SampledValueRules, AnUnclockedCallWithNoneInferableIsReported) {
+  const char* const kReport = "$rose has no clocking event";
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  initial begin\n"
+      "    b = $rose(a);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 4, "16.9.3"));
+  ElabFixture g;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, b;\n"
+      "  default clocking @(posedge clk); endclocking\n"
+      "  initial begin\n"
+      "    b = $rose(a);\n"
+      "  end\n"
+      "endmodule\n",
+      g);
+  EXPECT_FALSE(ReportedError(g.diag.Diagnostics(), kReport, 5, "16.9.3"));
+}
+
+// §16.9.3: in a disable condition a sampled value function other than
+// $sampled gives its clocking event explicitly.
+TEST(SampledValueRules, AnUnclockedCallInADisableConditionIsReported) {
+  const char* const kReport =
+      "in a disable condition or a clocking event shall have its clocking "
+      "event specified explicitly";
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, rst, a;\n"
+      "  a1: assert property (@(posedge clk) disable iff ($fell(rst)) a);\n"
+      "  a2: assert property (@(posedge clk)\n"
+      "    disable iff ($fell(rst, @(posedge clk))) a);\n"
+      "  a3: assert property (@(posedge clk) disable iff ($sampled(rst)) a);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 3, "16.9.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 5, "16.9.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 6, "16.9.3"));
 }
 
 }  // namespace

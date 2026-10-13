@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include "elaborator/always_range.h"
+#include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -85,6 +87,26 @@ TEST(AlwaysRange, NonIntegerBoundIsRejected) {
   non_integer.value = 1;
   AlwaysRange range{MakeAlwaysBound(0), non_integer};
   EXPECT_FALSE(IsAlwaysRangeWellFormed(range, /*strong=*/false));
+}
+
+// §16.12.11: the bounds of a ranged always written as parameters are
+// non-negative, the minimum no greater than the maximum: [LO:HI] folds to
+// [4:2], while [HI:LO] is legal.
+TEST(AlwaysRangeElaboration, AParameterRangeIsChecked) {
+  const char* const kReport =
+      "always range bounds shall be non-negative integer constant "
+      "expressions, the minimum no greater than the maximum";
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a;\n"
+      "  localparam int LO = 4, HI = 2;\n"
+      "  a1: assert property (@(posedge clk) always [LO:HI] a);\n"
+      "  a2: assert property (@(posedge clk) always [HI:LO] a);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 4, "16.12.11"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 5, "16.12.11"));
 }
 
 }  // namespace

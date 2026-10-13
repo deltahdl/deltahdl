@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -47,6 +48,22 @@ TEST(SequenceMatchItem, IncOrDecExpressionMatchItemParses) {
               "  endproperty\n"
               "  assert property (p1);\n"
               "endmodule\n"));
+}
+
+// §16.11: a subroutine call is not attached to a sequence that admits an
+// empty match, as b[*0:1] does.
+TEST(SequenceMatchItem, ACallOnAnEmptyMatchingSequenceIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  bit clk, a, b, c;\n"
+      "  a2: assert property (@(posedge clk)\n"
+      "    a ##1 (b[*0:1], $display(\"hit\")) ##1 c);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a subroutine call may not be attached to a "
+                            "sequence that admits an empty match",
+                            4, "16.11"));
 }
 
 }  // namespace

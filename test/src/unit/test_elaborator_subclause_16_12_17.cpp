@@ -480,4 +480,28 @@ TEST(RecursivePropertyRestrictions, AbortOperatorsAllowedInRecursiveProperty) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §16.12.17 Restriction 1: the negation of a recursive property cannot be
+// asserted, and no strong operator may stand over one, whether the operator
+// is written in a property declaration or in the assertion statement itself;
+// the recursive property asserted plainly is legal.
+TEST(RecursivePropertyRestrictions, NotInAnAssertionStatementIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  bit clk, a;\n"
+      "  property prop_always(p);\n"
+      "    p and (1'b1 |=> prop_always(p));\n"
+      "  endproperty\n"
+      "  a1: assert property (@(posedge clk) not prop_always(a));\n"
+      "  a2: assert property (@(posedge clk) s_eventually prop_always(a));\n"
+      "  a3: assert property (@(posedge clk) prop_always(a));\n"
+      "endmodule\n",
+      f);
+  const char* const kReport =
+      "\"prop_always\", which reaches a recursive property (Restriction 1)";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 6, "16.12.17"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 7, "16.12.17"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 8, "16.12.17"));
+}
+
 }  // namespace

@@ -3,6 +3,8 @@
 #include "elaborator/multiclock_endpoint.h"
 #include "elaborator/sequence_composition.h"
 #include "elaborator/sequence_method.h"
+#include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -62,6 +64,36 @@ TEST(SequenceComposition, TriggeredEndingClockMatchesContextClock) {
 // activate the triggered method.
 TEST(SequenceComposition, EmptyMatchDoesNotActivateTriggered) {
   EXPECT_FALSE(EmptyMatchActivatesSequenceMethod());
+}
+
+// §16.9.11: the ending clock of a sequence triggered is applied to is the
+// clock of its context: e1 ends on posedge clk, which rule's posedge sysclk
+// is not, while e2 ends on posedge sysclk.
+TEST(TriggeredEndingClock, AnEndingClockOtherThanTheContextsIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, sysclk, a, b;\n"
+      "  sequence e1;\n"
+      "    @(posedge clk) a ##1 b;\n"
+      "  endsequence\n"
+      "  sequence e2;\n"
+      "    @(posedge sysclk) a ##1 b;\n"
+      "  endsequence\n"
+      "  sequence rule;\n"
+      "    @(posedge sysclk) a ##1 e1.triggered;\n"
+      "  endsequence\n"
+      "  sequence rule2;\n"
+      "    @(posedge sysclk) a ##1 e2.triggered;\n"
+      "  endsequence\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the ending clock of 'e1' differs from the clock "
+                            "of the context its triggered stands in",
+                            10, "16.9.11"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "the ending clock of 'e2'",
+                             13, "16.9.11"));
 }
 
 }  // namespace

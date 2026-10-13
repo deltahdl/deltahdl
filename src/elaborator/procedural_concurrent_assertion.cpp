@@ -282,7 +282,7 @@ void SubstituteInstance(Stmt* stmt, const PropertyRegistry& registry,
       seq != nullptr
           ? seq
           : InstantiatedDecl(instance, ModuleItemKind::kPropertyDecl, registry),
-      here, arena);
+      here, arena, &diag);
   if (seq != nullptr) {
     stmt->assert_property = arena.Create<PropertyExprNode>();
     stmt->assert_property->kind = PropertyExprNode::Kind::kSequence;
