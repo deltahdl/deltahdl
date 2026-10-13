@@ -9,6 +9,7 @@
 #include "elaborator/class_method_reads.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"

@@ -430,12 +430,6 @@ void CollectProceduralRoots(const std::vector<ModuleItem*>& items,
 std::vector<const ModuleDecl*> EnclosingDecls(const CompilationUnit* unit,
                                               const ModuleDecl* decl);
 
-// §14.11 (printed page 361): reports each cycle delay of `decl`'s procedural
-// code whose count folds, against `scope`, to a negative constant. Defined in
-// elaborator_validate_clocking_signals.cpp.
-void ValidateCycleDelayCounts(const ModuleDecl* decl, const ScopeMap& scope,
-                              DiagEngine& diag);
-
 // Defined in elaborator_validate.cpp.
 std::optional<int64_t> ComputeDimSize(const Expr* dim);
 

@@ -400,6 +400,12 @@ std::string_view NestedClassKey(const DataType& dtype,
 // a default clocking. Defined in elaborator_validate_clocking.cpp.
 void ValidatePackageCycleDelays(const CompilationUnit* unit, DiagEngine& diag);
 
+// §14.11 (printed page 361): reports each cycle delay of `decl`'s procedural
+// code whose count folds, against `scope`, to a negative constant. Defined in
+// elaborator_validate_clocking_signals.cpp.
+void ValidateCycleDelayCounts(const ModuleDecl* decl, const ScopeMap& scope,
+                              DiagEngine& diag);
+
 // §26.3 (printed page 808): the key the simulator holds a package's class
 // under, `p::C`, when `dtype` is written `p::C` and the package `p` declares a
 // class named `C`; empty for any other type. The package scope resolution
