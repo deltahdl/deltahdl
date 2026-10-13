@@ -14,6 +14,7 @@
 #include "elaborator/assertion_body_slots.h"
 #include "elaborator/assertion_rules.h"
 #include "elaborator/assertion_walk.h"
+#include "elaborator/checker_procedure_rules.h"
 #include "elaborator/concurrent_assertion_expr.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_helpers.h"
@@ -27,6 +28,7 @@
 #include "elaborator/sequence_degeneracy.h"
 #include "elaborator/sequence_match_attach.h"
 #include "elaborator/sequence_match_class.h"
+#include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -315,6 +317,87 @@ void CheckFutureGclkNesting(const Expr* call, DiagEngine& diag) {
              Subclause("16.9.4"));
 }
 
+// The variable an assignment target writes, its selects and members
+// stripped.
+const Expr* TargetRoot(const Expr* e) {
+  while (e->kind == ExprKind::kSelect || e->kind == ExprKind::kMemberAccess) {
+    e = e->kind == ExprKind::kSelect ? e->base : e->lhs;
+  }
+  return e;
+}
+
+// §16.6: whether the function `fn` writes a variable other than its own
+// formals, its locals and its result, which is a side effect; and, through
+// `keeps_state`, whether it holds a value from one call to the next, a local
+// whose declaration initializes it once where the local is static.
+bool HasSideEffect(const ModuleItem* fn, bool& keeps_state) {
+  NameSet own{fn->name};
+  for (const FunctionArg& arg : fn->func_args) own.insert(arg.name);
+  keeps_state = false;
+  ForEachProceduralStmt(fn, [&](const Stmt* s) {
+    if (s->kind != StmtKind::kVarDecl) return;
+    own.insert(s->var_name);
+    bool is_static = !fn->is_automatic || s->var_is_static;
+    if (is_static && s->var_init != nullptr) keeps_state = true;
+  });
+  bool writes = false;
+  ForEachProceduralStmt(fn, [&](const Stmt* s) {
+    if (s->kind != StmtKind::kBlockingAssign &&
+        s->kind != StmtKind::kNonblockingAssign) {
+      return;
+    }
+    const Expr* root = TargetRoot(s->lhs);
+    if (root->kind == ExprKind::kIdentifier && own.count(root->text) == 0) {
+      writes = true;
+    }
+  });
+  return writes;
+}
+
+// §16.6: a function called in a concurrent assertion takes no output, inout
+// or ref argument, is automatic or keeps no state, and has no side effect.
+void CheckAssertionFunctionCall(const Expr* call, const RuleEnv& env) {
+  auto it = env.subroutines.find(call->callee);
+  if (it == env.subroutines.end() ||
+      it->second->kind != ModuleItemKind::kFunctionDecl) {
+    return;
+  }
+  const ModuleItem* fn = it->second;
+  if (HasArgumentWrittenBack(fn)) {
+    env.diag.Error(call->range.start,
+                   "function '" + std::string(fn->name) +
+                       "' has an output, inout or ref argument and cannot be "
+                       "called in a concurrent assertion",
+                   Subclause("16.6"));
+  }
+  bool keeps_state = false;
+  bool side_effect = HasSideEffect(fn, keeps_state);
+  if (FunctionEligibleInAssertionExpr(fn->is_automatic, !keeps_state,
+                                      !side_effect)) {
+    return;
+  }
+  env.diag.Error(call->range.start,
+                 "function '" + std::string(fn->name) +
+                     "' keeps state or has a side effect and cannot be called "
+                     "in a concurrent assertion",
+                 Subclause("16.6"));
+}
+
+// §16.6: an increment or a decrement evaluated in a concurrent assertion is a
+// side effect, which a sequence match item assigning a local variable alone
+// may have.
+void CheckIncOrDec(const Expr* e, DiagEngine& diag) {
+  bool inc_or_dec =
+      (e->kind == ExprKind::kUnary || e->kind == ExprKind::kPostfixUnary) &&
+      (e->op == TokenKind::kPlusPlus || e->op == TokenKind::kMinusMinus);
+  if (!inc_or_dec) return;
+  diag.Error(e->range.start,
+             "an increment or decrement in a concurrent assertion expression "
+             "is a side effect, allowed only in a sequence match item "
+             "assigning a local variable",
+             Subclause("16.6"));
+}
+
 // The rules on each subexpression of the root `e` standing at `site`.
 void CheckSubexpressions(const Expr* e, const Site& site, const RuleEnv& env) {
   if (e == nullptr) return;
@@ -332,7 +415,9 @@ void CheckSubexpressions(const Expr* e, const Site& site, const RuleEnv& env) {
   if (e->kind == ExprKind::kCall) {
     const ModuleItem* seq = InstantiatedDecl(e, env.sequences);
     if (seq != nullptr) CheckLocalActuals(e, seq, site, env);
+    if (site.in_assertion) CheckAssertionFunctionCall(e, env);
   }
+  if (site.in_assertion) CheckIncOrDec(e, env.diag);
   ForEachExprChild(
       e, [&](const Expr* child) { CheckSubexpressions(child, site, env); });
 }
@@ -430,8 +515,12 @@ void CheckMatchItems(const std::vector<SeqMatchAssign>& items, const Site& site,
                      const RuleEnv& env) {
   for (const SeqMatchAssign& item : items) {
     CheckRoot(item.rhs, site, env);
-    CheckRoot(item.call, site, env);
-    if (item.call != nullptr && item.call->kind == ExprKind::kCall) {
+    // §16.11: a subroutine attached to a sequence may have side effects, so
+    // its arguments are checked as the assertion's expressions and the call
+    // by §16.11's own rules.
+    if (item.call == nullptr) continue;
+    for (const Expr* arg : item.call->args) CheckRoot(arg, site, env);
+    if (item.call->kind == ExprKind::kCall) {
       CheckAttachedCall(item.call, site, env);
     }
   }

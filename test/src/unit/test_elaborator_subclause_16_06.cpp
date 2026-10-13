@@ -185,4 +185,87 @@ TEST(ConcurrentAssertionBooleanExpr,
       DisableConditionRefAllowed(DisableConditionRefKind::kMatchedMethod));
 }
 
+// §16.6: a function called in a concurrent assertion takes no output, inout
+// or ref argument; peek writes n back, while look's const ref is allowed.
+TEST(AssertionFunctionCalls, AFunctionWritingAnArgumentBackIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a;\n"
+      "  int seen;\n"
+      "  function automatic bit peek(input bit x, output int n);\n"
+      "    n = 1;\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "  function automatic bit look(const ref logic x);\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "  a1: assert property (@(posedge clk) peek(a, seen));\n"
+      "  a2: assert property (@(posedge clk) look(a));\n"
+      "endmodule\n",
+      f);
+  const char* const kReport =
+      "has an output, inout or ref argument and cannot be called in a "
+      "concurrent assertion";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 11, "16.6"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 12, "16.6"));
+}
+
+// §16.6: a function called in a concurrent assertion is automatic or keeps
+// no state, and has no side effect: tally writes count, and keep holds n from
+// one call to the next, while pure is automatic and writes its own local.
+TEST(AssertionFunctionCalls, AFunctionWithStateOrASideEffectIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a;\n"
+      "  int count;\n"
+      "  function bit tally(bit x);\n"
+      "    count = count + 1;\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "  function bit keep(bit x);\n"
+      "    int n = 0;\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "  function automatic bit pure(bit x);\n"
+      "    bit y;\n"
+      "    y = !x;\n"
+      "    return !y;\n"
+      "  endfunction\n"
+      "  a1: assert property (@(posedge clk) tally(a));\n"
+      "  a2: assert property (@(posedge clk) keep(a));\n"
+      "  a3: assert property (@(posedge clk) pure(a));\n"
+      "endmodule\n",
+      f);
+  const char* const kReport =
+      "keeps state or has a side effect and cannot be called in a concurrent "
+      "assertion";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 17, "16.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 18, "16.6"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 19, "16.6"));
+}
+
+// §16.6: an increment or decrement in a concurrent assertion expression is a
+// side effect; one in a match item assigning a local variable is allowed.
+TEST(AssertionFunctionCalls, AnIncrementInAnAssertionExpressionIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a;\n"
+      "  int n;\n"
+      "  a1: assert property (@(posedge clk) n++ < 10);\n"
+      "  sequence s;\n"
+      "    int x;\n"
+      "    @(posedge clk) (a, x = 0) ##1 (a, x++);\n"
+      "  endsequence\n"
+      "endmodule\n",
+      f);
+  const char* const kReport =
+      "an increment or decrement in a concurrent assertion expression is a "
+      "side effect";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 4, "16.6"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 7, "16.6"));
+}
+
 }  // namespace

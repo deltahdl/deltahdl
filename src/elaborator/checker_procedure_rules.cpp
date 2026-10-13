@@ -46,24 +46,6 @@ void WalkForCovergroupInstances(const Stmt* s, const NameSet& covergroups,
   });
 }
 
-// §16.6's kinds of argument, which §17.8 applies to a function called on a
-// checker variable's right-hand side; a formal written without a direction
-// takes the one before it, the first input (§13.3).
-bool HasArgumentWrittenBack(const ModuleItem* fn) {
-  Direction dir = Direction::kInput;
-  for (const FunctionArg& arg : fn->func_args) {
-    if (arg.direction != Direction::kNone) dir = arg.direction;
-    FunctionArgKind kind = FunctionArgKind::kInput;
-    if (dir == Direction::kOutput) kind = FunctionArgKind::kOutput;
-    if (dir == Direction::kInout) kind = FunctionArgKind::kInout;
-    if (dir == Direction::kRef) {
-      kind = arg.is_const ? FunctionArgKind::kConstRef : FunctionArgKind::kRef;
-    }
-    if (!FunctionArgKindAllowedInAssertionExpr(kind)) return true;
-  }
-  return false;
-}
-
 // §17.8: each call in `e` of one of the functions `writers` names.
 void ReportWritingCalls(const Expr* e, const NameSet& writers,
                         DiagEngine& diag) {
@@ -92,6 +74,24 @@ void WalkForWritingCalls(const Stmt* s, const NameSet& writers,
 }
 
 }  // namespace
+
+// §16.6's kinds of argument, which §17.8 applies to a function called on a
+// checker variable's right-hand side; a formal written without a direction
+// takes the one before it, the first input (§13.3).
+bool HasArgumentWrittenBack(const ModuleItem* fn) {
+  Direction dir = Direction::kInput;
+  for (const FunctionArg& arg : fn->func_args) {
+    if (arg.direction != Direction::kNone) dir = arg.direction;
+    FunctionArgKind kind = FunctionArgKind::kInput;
+    if (dir == Direction::kOutput) kind = FunctionArgKind::kOutput;
+    if (dir == Direction::kInout) kind = FunctionArgKind::kInout;
+    if (dir == Direction::kRef) {
+      kind = arg.is_const ? FunctionArgKind::kConstRef : FunctionArgKind::kRef;
+    }
+    if (!FunctionArgKindAllowedInAssertionExpr(kind)) return true;
+  }
+  return false;
+}
 
 void ValidateCheckerProcedureCovergroups(const ModuleDecl* decl,
                                          DiagEngine& diag) {

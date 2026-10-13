@@ -18,4 +18,9 @@ void ValidateCheckerProcedureCovergroups(const ModuleDecl* decl,
 // checker declarations.
 void ValidateCheckerAssignmentCalls(const ModuleDecl* decl, DiagEngine& diag);
 
+// §16.6: whether the function `fn` has an output, inout or non-const ref
+// formal, whose actual it writes back; a formal written without a direction
+// takes the one before it, the first input (§13.3).
+bool HasArgumentWrittenBack(const ModuleItem* fn);
+
 }  // namespace delta
