@@ -199,6 +199,22 @@ void ReportForbiddenStatements(const Stmt* s,
   });
 }
 
+// §17.5: the statements of a checker's initial or always procedure `item`
+// that are on none of the clause's lists for it.
+void CheckProcedureStatements(const ModuleItem* item, const ModuleDecl* decl,
+                              DiagEngine& diag) {
+  if (item->kind == ModuleItemKind::kInitialBlock) {
+    ReportForbiddenStatements(item->body, kInitialForbidden, "initial", decl,
+                              diag);
+  }
+  if (item->kind == ModuleItemKind::kAlwaysCombBlock ||
+      item->kind == ModuleItemKind::kAlwaysLatchBlock ||
+      item->kind == ModuleItemKind::kAlwaysFFBlock) {
+    ReportForbiddenStatements(item->body, kAlwaysForbidden, "always", decl,
+                              diag);
+  }
+}
+
 }  // namespace
 
 // Emits the per-item legality diagnostics that depend only on the parent decl
@@ -280,16 +296,7 @@ void CheckCheckerBodyItemRules(const ModuleItem* item, const ModuleDecl* decl,
                            decl->name),
                Subclause("17.5"));
   }
-  if (item->kind == ModuleItemKind::kInitialBlock) {
-    ReportForbiddenStatements(item->body, kInitialForbidden, "initial", decl,
-                              diag);
-  }
-  if (item->kind == ModuleItemKind::kAlwaysCombBlock ||
-      item->kind == ModuleItemKind::kAlwaysLatchBlock ||
-      item->kind == ModuleItemKind::kAlwaysFFBlock) {
-    ReportForbiddenStatements(item->body, kAlwaysForbidden, "always", decl,
-                              diag);
-  }
+  CheckProcedureStatements(item, decl, diag);
   // §17.2: only further checkers may be declared inside a checker.
   if (item->kind == ModuleItemKind::kNestedModuleDecl &&
       item->nested_module_decl &&

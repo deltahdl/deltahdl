@@ -77,7 +77,9 @@ void ForEachProceduralOrAssignExpr(const ModuleDecl* decl,
 FormalReferences CheckerReferences(const ModuleDecl* decl,
                                    std::string_view name) {
   FormalReferences refs;
+  // A clocked boolean assertion keeps its expression in assert_expr alone.
   ForEachConcurrentAssertion(decl, [&](const Stmt* s) {
+    CountFormalInExpr(s->assert_expr, name, refs);
     CountFormalInTree(s->assert_property, name, refs);
   });
   for (const ModuleItem* item : decl->items) {
@@ -182,8 +184,10 @@ bool IsDynamicVariable(const ModuleItem* item,
 // sequences and properties, its procedures and its continuous assignments.
 void ForEachCheckerExpr(const ModuleDecl* decl,
                         const std::function<void(const Expr*)>& fn) {
-  ForEachConcurrentAssertion(
-      decl, [&](const Stmt* s) { ForEachTreeExpr(s->assert_property, fn); });
+  ForEachConcurrentAssertion(decl, [&](const Stmt* s) {
+    fn(s->assert_expr);
+    ForEachTreeExpr(s->assert_property, fn);
+  });
   for (const ModuleItem* item : decl->items) {
     ForEachBodyExpr(item->seq_linear, fn);
     fn(item->prop_body_expr);
