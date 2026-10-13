@@ -9,7 +9,7 @@ namespace {
 TEST(SyncEventElab, WaitForClockingSignalChangeElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  clocking cb @(posedge clk);\n"
+             "  logic ack; clocking cb @(posedge clk);\n"
              "    input ack;\n"
              "  endclocking\n"
              "  initial @(cb.ack) $display(\"ack\");\n"
