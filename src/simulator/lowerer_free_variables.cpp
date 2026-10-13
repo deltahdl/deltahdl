@@ -265,6 +265,7 @@ void CollectAssumptions(const RtlirModule* mod, const std::string& prefix,
 void Lowerer::LowerFreeVariableSolver(const RtlirModule* mod) {
   if (!mod->random_initial_variables.empty()) {
     std::vector<Expr*> initial;
+    initial.reserve(mod->random_initial_variables.size());
     for (std::string_view name : mod->random_initial_variables) {
       initial.push_back(NameExpr(name, arena_));
     }
