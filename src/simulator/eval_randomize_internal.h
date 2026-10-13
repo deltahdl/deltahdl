@@ -353,14 +353,14 @@ TokenKind MirrorComparison(TokenKind op);
 // with the key the handle is kept under; null handles left out.
 std::vector<std::pair<std::string, ClassObject*>> ActiveRandObjectMembers(
     const ClassObject* obj, SimContext& ctx);
-// 18.5.8 with 18.6.2: gathers into `out` the tree of active random objects
-// `obj` heads, each under the path `prefix` names it by, calling each one's
+// 18.5.8 with 18.6.2: the tree of active random objects `obj` heads, `obj`
+// first, each under the path it is named by, calling each one's
 // pre_randomize() for the call `expr` before reading its handles, so the
 // members the tree takes are the ones pre_randomize() left in place.
-void CollectActiveRandomObjects(
-    ClassObject* obj, const std::string& prefix, const Expr* expr,
-    SimContext& ctx, Arena& arena, std::vector<JointObject>& out,
-    std::unordered_set<const ClassObject*>& visited);
+std::vector<JointObject> CollectActiveRandomObjects(ClassObject* obj,
+                                                    const Expr* expr,
+                                                    SimContext& ctx,
+                                                    Arena& arena);
 // 18.5.8: randomizes the active random object tree `objects`, the root
 // first, as one solve; 18.5.13.1: `inline_block`, the constraint member of
 // the call's with clause or null, is applied to the root with the highest

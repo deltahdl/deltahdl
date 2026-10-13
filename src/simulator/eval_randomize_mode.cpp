@@ -277,8 +277,7 @@ static bool RandomizeCall(const Expr* expr, ClassObject* obj,
     InvokePreRandomize(obj, expr, ctx, arena);
     objects.push_back({obj, ""});
   } else {
-    std::unordered_set<const ClassObject*> visited;
-    CollectActiveRandomObjects(obj, "", expr, ctx, arena, objects, visited);
+    objects = CollectActiveRandomObjects(obj, expr, ctx, arena);
   }
   // 18.5.8: the plain randomize() form randomizes the object together with all
   // of its active random object members as a single whole, so global

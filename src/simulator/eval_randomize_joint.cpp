@@ -30,18 +30,32 @@ namespace delta {
 // referential graph terminates. 18.6.2: each object's pre_randomize() runs
 // before its handles are read, so an object it allocates or replaces is the
 // one the tree takes.
-void CollectActiveRandomObjects(
-    ClassObject* obj, const std::string& prefix, const Expr* expr,
-    SimContext& ctx, Arena& arena, std::vector<JointObject>& out,
-    std::unordered_set<const ClassObject*>& visited) {
+//
+// The randomize() call the tree is gathered for, and the tree so far.
+struct TreeWalk {
+  const Expr* expr;
+  SimContext& ctx;
+  Arena& arena;
+  std::vector<JointObject> out = {};
+  std::unordered_set<const ClassObject*> visited = {};
+};
+
+void GatherTree(ClassObject* obj, const std::string& prefix, TreeWalk& walk) {
   if (!obj || !obj->type) return;
-  if (!visited.insert(obj).second) return;
-  InvokePreRandomize(obj, expr, ctx, arena);
-  out.push_back({obj, prefix});
-  for (const auto& [key, sub] : ActiveRandObjectMembers(obj, ctx)) {
-    CollectActiveRandomObjects(sub, prefix + key + ".", expr, ctx, arena, out,
-                               visited);
-  }
+  if (!walk.visited.insert(obj).second) return;
+  InvokePreRandomize(obj, walk.expr, walk.ctx, walk.arena);
+  walk.out.push_back({obj, prefix});
+  for (const auto& [key, sub] : ActiveRandObjectMembers(obj, walk.ctx))
+    GatherTree(sub, prefix + key + ".", walk);
+}
+
+std::vector<JointObject> CollectActiveRandomObjects(ClassObject* obj,
+                                                    const Expr* expr,
+                                                    SimContext& ctx,
+                                                    Arena& arena) {
+  TreeWalk walk{expr, ctx, arena};
+  GatherTree(obj, "", walk);
+  return std::move(walk.out);
 }
 
 // 18.5.8: resolve a constraint operand to the path-qualified name of a joint
@@ -438,11 +452,11 @@ void AddTreeConstraintMember(const ClassMember* m, ObjectSolve& part,
   global.name = m->name;
   local.constraint_exprs.clear();
   local.constraint_soft_exprs.clear();
-  for (const Expr* rel : m->constraint_exprs) {
+  for (Expr* rel : m->constraint_exprs) {
     (ReachesAnotherObject(rel, scope, own) ? global : local)
         .constraint_exprs.push_back(rel);
   }
-  for (const Expr* rel : m->constraint_soft_exprs) {
+  for (Expr* rel : m->constraint_soft_exprs) {
     (ReachesAnotherObject(rel, scope, own) ? global : local)
         .constraint_soft_exprs.push_back(rel);
   }
