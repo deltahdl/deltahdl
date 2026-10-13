@@ -154,4 +154,66 @@ TEST(InlineConstraintsRun, AForeachIteratesAMultidimensionalCallersArray) {
   EXPECT_EQ(out, "0\n");
 }
 
+// 18.7: a dotted name of the block resolves downwards starting in the class
+// of the object being randomized before the scope containing the call, so
+// h.v reads the C's handle h, whose v is 9, though the module declares an
+// h whose v is 2: on every one of 4 calls the C's x is 9.
+TEST(InlineConstraintsRun, ADottedNameResolvesItsHeadInTheObjectFirst) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class Box;\n"
+      "  bit [3:0] v;\n"
+      "endclass\n"
+      "class C;\n"
+      "  rand bit [3:0] x;\n"
+      "  Box h = new;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int held = 0;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    static Box h = new;\n"
+      "    c.h.v = 9;\n"
+      "    h.v = 2;\n"
+      "    repeat (4)\n"
+      "      if (c.randomize() with { x == h.v; } == 1 && c.x == 9) held++;\n"
+      "    $display(\"%0d\", held);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4\n");
+}
+
+// 18.7: in a restricted block only the listed names resolve into the class
+// of the object being randomized, so with x alone listed the head of h.v
+// resolves in the scope containing the call, the module's h whose v is 2,
+// though the C declares an h whose v is 9: on every one of 4 calls the C's
+// x is 2.
+TEST(InlineConstraintsRun, ARestrictedBlocksUnlistedHeadResolvesInTheCaller) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class Box;\n"
+      "  bit [3:0] v;\n"
+      "endclass\n"
+      "class C;\n"
+      "  rand bit [3:0] x;\n"
+      "  Box h = new;\n"
+      "endclass\n"
+      "module t;\n"
+      "  int held = 0;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    static Box h = new;\n"
+      "    c.h.v = 9;\n"
+      "    h.v = 2;\n"
+      "    repeat (4)\n"
+      "      if (c.randomize() with (x) { x == h.v; } == 1 && c.x == 2)\n"
+      "        held++;\n"
+      "    $display(\"%0d\", held);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4\n");
+}
+
 }  // namespace

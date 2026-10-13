@@ -166,6 +166,9 @@ struct RandomizeCtx {
   // 18.5.8: in a joint solve, the variables of the tree this object's
   // relations reach; null otherwise.
   JointVarScope* joint = nullptr;
+  // 18.7.1: the receiver of the randomize() with call, which local::
+  // qualifies to name the object's own members (InlineReceiverName).
+  std::string inline_receiver = {};
 };
 
 // §18.4: the random variables of the elements of each rand dynamic array
@@ -219,8 +222,9 @@ bool TryJointRelation(const Expr* rel, std::vector<RandInfo>& rands,
 // member of it the relation `rel` names, `p.hi`, is rewritten as the
 // part-select of the bits the member occupies, `p[7:4]`, which the solver
 // reads off the variable; a rand member of a rand unpacked structure,
-// `h1.addr`, is rewritten as the identifier of its own variable. Defined in
-// eval_randomize_membership.cpp.
+// `h1.addr`, is rewritten as the identifier of its own variable, and so is a
+// random variable named through the receiver of a randomize() with call,
+// `local::obj.x` (18.7.1). Defined in eval_randomize_membership.cpp.
 const Expr* PackedMembersAsSelects(const Expr* rel,
                                    std::vector<RandInfo>& rands,
                                    RandomizeCtx& rc);
@@ -458,6 +462,22 @@ void BindCallersMembers(const Expr* expr, ClassObject* obj, SimContext& ctx,
 // the variable's value; defined in eval_randomize_inline.cpp.
 void BindCallersVariables(const Expr* expr, ClassObject* obj, SimContext& ctx,
                           Arena& arena);
+// 18.7.1: each local::-qualified name the inline block of the randomize()
+// call `expr` reads, read in the scope containing the call and bound as a
+// local of the scope the caller pushed, named by its qualified path
+// (eval_randomize_inline.cpp).
+void BindLocalQualifiedNames(const Expr* expr, SimContext& ctx, Arena& arena);
+// 18.7: the head of each dotted name of the inline block of `expr` that the
+// object being randomized `obj` declares and a variable visible from the call
+// would otherwise answer, bound as a local of the scope the caller pushed
+// holding the object's handle (eval_randomize_inline.cpp).
+void BindObjectHandleHeads(const Expr* expr, ClassObject* obj, SimContext& ctx,
+                           Arena& arena);
+// 18.7.1: the receiver of the randomize() with call `call` as the caller
+// names it, `obj` of obj.randomize() with, which local::obj binds to the
+// scope of the randomized object's class; empty for a call with no receiver
+// written (eval_randomize.cpp).
+std::string InlineReceiverName(const Expr* call);
 
 struct InlineRandomizeCall {
   const Expr* expr;

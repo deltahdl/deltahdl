@@ -705,6 +705,13 @@ static bool TryLocalScopeQualifier(std::string& resolved, SimContext& ctx,
                                    Arena& arena, Logic4Vec& out) {
   constexpr std::string_view kLocalScopePrefix = "local.";
   if (!std::string_view(resolved).starts_with(kLocalScopePrefix)) return false;
+  // 18.7.1: the value the randomize() with call read for the name in its
+  // calling scope as it began (BindLocalQualifiedNames), which no local a
+  // trial binds for a random variable of the object can hide.
+  if (const Variable* bound = ctx.FindLocalVariable(resolved)) {
+    out = bound->value;
+    return true;
+  }
   resolved = resolved.substr(kLocalScopePrefix.size());
   constexpr std::string_view kThisPrefix = "this.";
   ClassObject* caller = ctx.ConstraintCallerThis();

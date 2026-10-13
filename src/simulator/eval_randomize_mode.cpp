@@ -394,9 +394,13 @@ bool TryEvalRandomizeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   InlineRandomArgs args = CollectInlineRandomArgs(expr);
   // 18.7: the members of the caller's own object that the inline block
   // names are bound as locals for the call, in a scope of their own.
+  // 18.7.1: the local::-qualified names are read first, while every name
+  // resolves as it does in the calling scope.
   ctx.PushScope();
+  BindLocalQualifiedNames(expr, ctx, arena);
   BindCallersMembers(expr, obj, ctx, arena);
   BindCallersVariables(expr, obj, ctx, arena);
+  BindObjectHandleHeads(expr, obj, ctx, arena);
   bool solved = RandomizeCall(expr, obj, args, ctx, arena);
   ctx.PopScope();
   out = MakeLogic4VecVal(arena, 32, solved ? 1 : 0);

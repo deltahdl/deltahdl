@@ -180,6 +180,23 @@ Expr* StructMemberVariable(const Expr* n, std::vector<RandInfo>& rands,
                                             : nullptr;
 }
 
+// §18.7.1: given obj.randomize() with, local::obj binds to the scope of the
+// class of the object being randomized, so a random variable of it named
+// through local::obj, `local::obj.x`, is that variable, `x`; null for any
+// other expression.
+Expr* ReceiverMemberVariable(const Expr* n, std::vector<RandInfo>& rands,
+                             RandomizeCtx& rc) {
+  if (rc.inline_receiver.empty() || n->kind != ExprKind::kMemberAccess)
+    return nullptr;
+  const std::string kHead = "local." + rc.inline_receiver + ".";
+  std::string path = HierarchicalReferenceName(n);
+  if (!path.starts_with(kHead)) return nullptr;
+  std::string member = path.substr(kHead.size());
+  return FindRand(rands, member) != nullptr
+             ? IdentifierExpr(member, n, rc.arena)
+             : nullptr;
+}
+
 // §18.4: the part-select, `p[7:4]`, of the bits a member of a rand packed
 // structure, `p.hi`, occupies; null for any other expression.
 Expr* PackedMemberSelect(const Expr* n, std::vector<RandInfo>& rands,
@@ -209,6 +226,7 @@ const Expr* PackedMembersAsSelects(const Expr* rel,
       [&](const Expr* n) -> Expr* {
         if (Expr* member = StructMemberVariable(n, rands, rc.arena))
           return member;
+        if (Expr* member = ReceiverMemberVariable(n, rands, rc)) return member;
         return PackedMemberSelect(n, rands, rc);
       },
       rc.arena);

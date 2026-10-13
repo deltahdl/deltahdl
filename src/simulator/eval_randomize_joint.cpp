@@ -545,6 +545,7 @@ bool RandomizeObjectTree(SimContext& ctx, Arena& arena, const Expr* expr,
   ConstraintSolver solver(seed);
   std::vector<ObjectSolve> parts =
       TreeParts(objects, inline_block, solver, ctx, arena);
+  parts.front().rc->inline_receiver = InlineReceiverName(expr);
   BindJointScopes(parts);
 
   // 18.5.13.1: the solver ranks soft priority by the order the blocks are

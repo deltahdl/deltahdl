@@ -533,6 +533,11 @@ std::vector<std::pair<std::string, ClassObject*>> ActiveRandObjectMembers(
   return held;
 }
 
+std::string InlineReceiverName(const Expr* call) {
+  if (call->lhs->kind != ExprKind::kMemberAccess) return {};
+  return HierarchicalReferenceName(call->lhs->lhs);
+}
+
 bool SolveObject(ObjectSolve& part, const InlineRandomizeCall& call,
                  SimContext& ctx, Arena& arena) {
   ClassObject* obj = part.obj;
@@ -545,6 +550,7 @@ bool SolveObject(ObjectSolve& part, const InlineRandomizeCall& call,
   RandomizeCtx& rc = *part.rc;
   rc.solver = &solver;
   rc.inline_block = call.inline_block;
+  rc.inline_receiver = InlineReceiverName(call.expr);
 
   std::vector<RandInfo>& rands = part.rands;
   CollectRandVariables(obj->type, ctx, rands);

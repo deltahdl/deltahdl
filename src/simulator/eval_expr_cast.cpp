@@ -194,13 +194,30 @@ static Logic4Vec CastRealConversion(const Logic4Vec& inner,
   return MakeRealVec(arena, d, target_width);
 }
 
+// The key the type tables hold the typedef `name` under as a declaration in
+// the class `cls` would name it: that class's, or that of a class enclosing
+// it or one it extends, and the bare name where none of them declares it.
+static std::string ClassScopedTypeKey(const ClassTypeInfo* cls,
+                                      std::string_view name, SimContext& ctx) {
+  for (; cls != nullptr; cls = cls->enclosing) {
+    for (const ClassTypeInfo* c = cls; c != nullptr; c = c->parent) {
+      std::string key = std::string(c->name) + "::" + std::string(name);
+      if (ctx.FindTypeWidth(key) > 0) return key;
+    }
+  }
+  return std::string(name);
+}
+
 // §6.24.1 with A.2.2.1: the key the type tables hold a named casting type
 // under. A casting type written behind a class or a package, `C::T'(v)` or
 // `p::S'(v)` (§8.23, §26.3), stands in the cast's rhs as a scope resolution
 // and is held under "C::T"; a bare name inside a method names the running
 // class's typedef, or that of a class enclosing it or one it extends, as it
-// would in a declaration there, held under that class's key. Empty for a cast
-// that names no type this way.
+// would in a declaration there, held under that class's key. §18.7.1: a type
+// written behind local::, in the inline block of a randomize() with call,
+// names the type of the scope containing the call, bypassing the class of
+// the object being randomized that runs while the block is evaluated. Empty
+// for a cast that names no type this way.
 static std::string CastTypeKey(const Expr* expr, SimContext& ctx) {
   const Expr* rhs = expr->rhs;
   if (expr->text.empty()) {
@@ -209,16 +226,14 @@ static std::string CastTypeKey(const Expr* expr, SimContext& ctx) {
         rhs->rhs == nullptr || rhs->lhs->kind != ExprKind::kIdentifier ||
         rhs->rhs->kind != ExprKind::kIdentifier)
       return {};
+    if (rhs->lhs->text == "local") {
+      const ClassObject* caller = ctx.ConstraintCallerThis();
+      return ClassScopedTypeKey(caller != nullptr ? caller->type : nullptr,
+                                rhs->rhs->text, ctx);
+    }
     return std::string(rhs->lhs->text) + "::" + std::string(rhs->rhs->text);
   }
-  for (const ClassTypeInfo* cls = ctx.CurrentMethodClass(); cls != nullptr;
-       cls = cls->enclosing) {
-    for (const ClassTypeInfo* c = cls; c != nullptr; c = c->parent) {
-      std::string key = std::string(c->name) + "::" + std::string(expr->text);
-      if (ctx.FindTypeWidth(key) > 0) return key;
-    }
-  }
-  return std::string(expr->text);
+  return ClassScopedTypeKey(ctx.CurrentMethodClass(), expr->text, ctx);
 }
 
 // §6.24.1: what a variable of the casting type is, which the cast's result
