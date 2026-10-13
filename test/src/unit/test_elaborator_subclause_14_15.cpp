@@ -19,7 +19,7 @@ TEST(SyncEventElab, WaitForClockingSignalChangeElaborates) {
 TEST(SyncEventElab, CompoundEventElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  clocking dom @(posedge clk);\n"
+             "  logic sig1, sig2; clocking dom @(posedge clk);\n"
              "    input sig1, sig2;\n"
              "  endclocking\n"
              "  initial @(posedge dom.sig1 or dom.sig2) $display(\"or\");\n"
@@ -29,7 +29,7 @@ TEST(SyncEventElab, CompoundEventElaborates) {
 TEST(SyncEventElab, InoutSyncEventElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  clocking cb @(posedge clk);\n"
+             "  logic data; clocking cb @(posedge clk);\n"
              "    inout data;\n"
              "  endclocking\n"
              "  initial @(cb.data) $display(\"inout\");\n"

@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <format>
+#include <string_view>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -11,7 +15,7 @@ TEST(ClockingBlockElab, UnnamedNonDefaultBlockError) {
   ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
-             "  clocking @(posedge clk);\n"
+             "  logic data; clocking @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"
              "endmodule\n",
@@ -24,7 +28,7 @@ TEST(ClockingBlockElab, UnnamedNonDefaultBlockError) {
 TEST(ClockingBlockElab, UnnamedDefaultBlockOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  default clocking @(posedge clk);\n"
+             "  logic data; default clocking @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"
              "endmodule\n"));
@@ -515,6 +519,159 @@ TEST(ClockingBlockElab, ReadFromOutputClockvarInAssertionActionBlockError) {
              f));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "read from output clockvar 'cb.data'", 8, "14.3"));
+}
+
+// §14.3 forbids reading an output clockvar wherever the read stands, so a
+// condition, an event control and the base of a select each break it as the
+// right-hand side of an assignment does.
+TEST(ClockingBlockElab, ReadFromOutputClockvarOutsideAnAssignmentError) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  logic clk;\n"
+             "  logic [7:0] data, r;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    output data;\n"
+             "  endclocking\n"
+             "  initial begin\n"
+             "    if (cb.data) r = 1;\n"
+             "    @(cb.data);\n"
+             "    r = cb.data[0];\n"
+             "    case (cb.data) default: ; endcase\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  for (uint32_t line : {8u, 9u, 10u, 11u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "read from output clockvar 'cb.data'", line,
+                              "14.3"));
+  }
+}
+
+// §14.16 lets a drive name a bit-select or slice of a clockvar, so writing
+// one of an input clockvar writes that input clockvar, which §14.3 forbids.
+TEST(ClockingBlockElab, WriteToSelectOfInputClockvarError) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  logic clk;\n"
+             "  logic [3:0] data;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    input data;\n"
+             "  endclocking\n"
+             "  initial begin\n"
+             "    cb.data[0] <= 1'b1;\n"
+             "    cb.data[3:2] <= 2'b01;\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "write to input clockvar 'cb.data'", 8, "14.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "write to input clockvar 'cb.data'", 9, "14.3"));
+}
+
+// §14.3's direction rules hold for the clockvar in any procedural code, so a
+// task, a function and a generate block's process are bound by them as an
+// initial procedure is.
+TEST(ClockingBlockElab, ClockvarDirectionInSubroutineAndGenerateError) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  logic clk;\n"
+             "  logic [7:0] i, o, r;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    input i;\n"
+             "    output o;\n"
+             "  endclocking\n"
+             "  task t; cb.i <= 1; endtask\n"
+             "  function void fn; r = cb.o; endfunction\n"
+             "  if (1) begin : g\n"
+             "    initial cb.i <= 2;\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "write to input clockvar 'cb.i'", 8, "14.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "read from output clockvar 'cb.o'", 9, "14.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "write to input clockvar 'cb.i'", 11, "14.3"));
+}
+
+// §14.3: a clocking item written without an expression names a signal of the
+// scope enclosing the block, so a name that scope does not declare names no
+// clocking signal.
+TEST(ClockingBlockElab, ClockingSignalNamingNothingError) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  logic clk, d;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    input d, nosuch;\n"
+             "  endclocking\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "clocking signal 'nosuch' names no net or variable",
+                            3, "14.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "clocking signal 'd' names no net or variable", 3,
+                             "14.3"));
+}
+
+// §14.3 asks for a signal of the enclosing scope, which a port, a declaration
+// below the block and a declaration of the module a nested module is declared
+// in all are.
+TEST(ClockingBlockElab, ClockingSignalsOfTheEnclosingScopeOk) {
+  EXPECT_TRUE(
+      ElabOk("module m(input logic clk, input logic p);\n"
+             "  clocking cb @(posedge clk);\n"
+             "    input p, late;\n"
+             "  endclocking\n"
+             "  logic late, outer;\n"
+             "  module inner;\n"
+             "    clocking ic @(posedge clk);\n"
+             "      input outer;\n"
+             "    endclocking\n"
+             "  endmodule\n"
+             "  inner u();\n"
+             "endmodule\n"));
+}
+
+// §14.3 with §6.21: an element of a dynamically sized array or a queue, a
+// member of a class object and a variable of an automatic task may be
+// referenced only in procedural code, so no clocking signal designates one.
+// An element of a fixed-size array is static and may.
+TEST(ClockingBlockElab, ClockingSignalOnAProceduralOnlyVariableError) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  class C; int f; endclass\n"
+             "  logic clk;\n"
+             "  int d[];\n"
+             "  int q[$];\n"
+             "  int fa[4];\n"
+             "  C h;\n"
+             "  task automatic t; int v; endtask\n"
+             "  clocking cb @(posedge clk);\n"
+             "    input a = d[0];\n"
+             "    input b = q[1];\n"
+             "    input c = fa[2];\n"
+             "    input e = h.f;\n"
+             "    input g = t.v;\n"
+             "  endclocking\n"
+             "endmodule\n",
+             f));
+  for (std::string_view sig : {"'a'", "'b'", "'e'", "'g'"}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::format("clocking signal {} designates a variable", sig), 9,
+        "14.3"));
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "clocking signal 'c' designates a variable", 9,
+                             "14.3"));
 }
 
 }  // namespace

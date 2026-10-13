@@ -484,6 +484,10 @@ class ElaboratorData {
 
   struct ClockingSignalInfo {
     Direction direction;
+    // §14.16.2: the variables the clockvar's clocking signal names, which no
+    // continuous assignment, procedural continuous assignment or primitive
+    // may write while the clockvar is an output or inout.
+    std::vector<std::string_view> associated;
   };
   std::unordered_map<std::string_view,
                      std::unordered_map<std::string_view, ClockingSignalInfo>>

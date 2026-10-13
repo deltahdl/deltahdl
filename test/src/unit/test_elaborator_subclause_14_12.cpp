@@ -11,10 +11,10 @@ TEST(DefaultClockingElab, DuplicateDefaultClockingErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  default clocking cb1 @(posedge clk1);\n"
+      "  logic a; default clocking cb1 @(posedge clk1);\n"
       "    input a;\n"
       "  endclocking\n"
-      "  default clocking cb2 @(posedge clk2);\n"
+      "  logic b; default clocking cb2 @(posedge clk2);\n"
       "    input b;\n"
       "  endclocking\n"
       "endmodule\n",
@@ -138,6 +138,34 @@ TEST(DefaultClockingElab, DuplicateDefaultViaMixedInlineAndAssignmentErrors) {
                             "only one default clocking block is allowed per "
                             "scope",
                             7, "14.12"));
+}
+
+// §14.12's Example 2: a nested module names, as its default clocking, a
+// clocking block its enclosing module declares. A name no enclosing module
+// declares as a clocking block is still reported.
+TEST(DefaultClockingElab, NestedModuleNamesEnclosingClockingBlock) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module processor;\n"
+             "  logic clk1;\n"
+             "  clocking busA @(posedge clk1); endclocking\n"
+             "  module cpu;\n"
+             "    default clocking busA;\n"
+             "    initial ##5 $display(\"x\");\n"
+             "  endmodule\n"
+             "  module bad;\n"
+             "    default clocking nosuch;\n"
+             "  endmodule\n"
+             "  cpu u();\n"
+             "  bad b();\n"
+             "endmodule\n",
+             f));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "default clocking \"busA\" does not name", 5,
+                             "14.12"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default clocking \"nosuch\" does not name", 9,
+                            "14.12"));
 }
 
 }  // namespace

@@ -11,7 +11,7 @@ TEST(ClockingBlockElab, PlainBlockElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  clocking cb @(posedge clk);\n"
+      "  logic data, ack; clocking cb @(posedge clk);\n"
       "    input data;\n"
       "    output ack;\n"
       "  endclocking\n"
@@ -25,7 +25,7 @@ TEST(ClockingBlockElab, MultipleDirectionGroups) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  clocking cb @(posedge clk);\n"
+      "  logic a, b, c; clocking cb @(posedge clk);\n"
       "    input a;\n"
       "    output b;\n"
       "    inout c;\n"
@@ -40,7 +40,7 @@ TEST(ClockingBlockElab, DefaultSkewElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  clocking cb @(posedge clk);\n"
+      "  logic data; clocking cb @(posedge clk);\n"
       "    default input #1 output #2;\n"
       "    input data;\n"
       "  endclocking\n"
@@ -54,10 +54,10 @@ TEST(ClockingBlockElab, MultipleBlocksElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  clocking cb1 @(posedge clk1);\n"
+      "  logic data; clocking cb1 @(posedge clk1);\n"
       "    input data;\n"
       "  endclocking\n"
-      "  clocking cb2 @(posedge clk2);\n"
+      "  logic ack; clocking cb2 @(posedge clk2);\n"
       "    output ack;\n"
       "  endclocking\n"
       "endmodule\n",
@@ -70,7 +70,7 @@ TEST(ClockingBlockElab, AssertionItemDeclElaborates) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  clocking cb @(posedge clk);\n"
+      "  logic data; clocking cb @(posedge clk);\n"
       "    input data;\n"
       "    property p;\n"
       "      data;\n"
@@ -89,7 +89,7 @@ TEST(ClockingBlockElab, EdgeKeywordInSkewElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  clocking cb @(posedge clk);\n"
+      "  logic data; clocking cb @(posedge clk);\n"
       "    input edge data;\n"
       "  endclocking\n"
       "endmodule\n",
@@ -102,7 +102,7 @@ TEST(ClockingSkewElab, SkewVariationsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  clocking cb @(posedge clk);\n"
+      "  logic data, ack, ready; clocking cb @(posedge clk);\n"
       "    input #1step data;\n"
       "    output negedge #1 ack;\n"
       "    input posedge ready;\n"
@@ -116,7 +116,7 @@ TEST(ClockingSkewElab, SkewVariationsElaborate) {
 TEST(ClockingSkewElab, ExplicitZeroInputSkewElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  clocking cb @(posedge clk);\n"
+             "  logic data; clocking cb @(posedge clk);\n"
              "    input #0 data;\n"
              "  endclocking\n"
              "endmodule\n"));
@@ -125,7 +125,7 @@ TEST(ClockingSkewElab, ExplicitZeroInputSkewElaborates) {
 TEST(ClockingSkewElab, ExplicitZeroOutputSkewElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  clocking cb @(posedge clk);\n"
+             "  logic ack; clocking cb @(posedge clk);\n"
              "    output #0 ack;\n"
              "  endclocking\n"
              "endmodule\n"));
@@ -135,7 +135,7 @@ TEST(ClockingSkewElab, ParameterAsSkewElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  parameter SKEW = 3;\n"
-             "  clocking cb @(posedge clk);\n"
+             "  logic data; clocking cb @(posedge clk);\n"
              "    input #SKEW data;\n"
              "  endclocking\n"
              "endmodule\n"));
@@ -144,7 +144,7 @@ TEST(ClockingSkewElab, ParameterAsSkewElaborates) {
 TEST(ClockingSkewElab, InputOutputCombinedSkewElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  clocking cb @(posedge clk);\n"
+             "  logic data; clocking cb @(posedge clk);\n"
              "    input #5 output #6 data;\n"
              "  endclocking\n"
              "endmodule\n"));
@@ -153,7 +153,7 @@ TEST(ClockingSkewElab, InputOutputCombinedSkewElaborates) {
 TEST(CycleDelayElab, WithDefaultClockingElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  default clocking cb @(posedge clk);\n"
+             "  logic data; default clocking cb @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"
              "  initial begin\n"
@@ -165,7 +165,7 @@ TEST(CycleDelayElab, WithDefaultClockingElaborates) {
 TEST(CycleDelayElab, ParenthesizedExprWithDefaultClocking) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  default clocking cb @(posedge clk);\n"
+             "  logic data; default clocking cb @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"
              "  initial begin\n"
@@ -177,7 +177,7 @@ TEST(CycleDelayElab, ParenthesizedExprWithDefaultClocking) {
 TEST(CycleDelayElab, ZeroCycleDelayWithDefaultClocking) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  default clocking cb @(posedge clk);\n"
+             "  logic data; default clocking cb @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"
              "  initial begin\n"
@@ -189,7 +189,7 @@ TEST(CycleDelayElab, ZeroCycleDelayWithDefaultClocking) {
 TEST(DefaultClockingElab, InlineDefaultClockingElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  default clocking cb @(posedge clk);\n"
+             "  logic data; default clocking cb @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"
              "endmodule\n"));
@@ -198,7 +198,7 @@ TEST(DefaultClockingElab, InlineDefaultClockingElaborates) {
 TEST(DefaultClockingElab, UnnamedDefaultClockingElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  default clocking @(posedge clk);\n"
+             "  logic data; default clocking @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"
              "endmodule\n"));
@@ -207,7 +207,7 @@ TEST(DefaultClockingElab, UnnamedDefaultClockingElaborates) {
 TEST(DefaultClockingElab, ReferenceFormElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  clocking cb @(posedge clk);\n"
+             "  logic data; clocking cb @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"
              "  default clocking cb;\n"
@@ -265,7 +265,7 @@ TEST(GlobalClockingElab, GlobalAndDefaultCoexist) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  global clocking gc @(posedge clk); endclocking\n"
-             "  default clocking dc @(posedge clk);\n"
+             "  logic data; default clocking dc @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"
              "endmodule\n"));
@@ -274,7 +274,7 @@ TEST(GlobalClockingElab, GlobalAndDefaultCoexist) {
 TEST(SyncDriveElab, SimpleClockingDriveElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  clocking cb @(posedge clk);\n"
+             "  logic data; clocking cb @(posedge clk);\n"
              "    output data;\n"
              "  endclocking\n"
              "  initial cb.data <= 8'hFF;\n"
@@ -284,7 +284,7 @@ TEST(SyncDriveElab, SimpleClockingDriveElaborates) {
 TEST(SyncDriveElab, DriveWithCycleDelayElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  clocking cb @(posedge clk);\n"
+             "  logic data; clocking cb @(posedge clk);\n"
              "    output data;\n"
              "  endclocking\n"
              "  initial cb.data <= ##2 8'hFF;\n"
@@ -294,7 +294,7 @@ TEST(SyncDriveElab, DriveWithCycleDelayElaborates) {
 TEST(SyncDriveElab, InoutClockvarDriveElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  clocking cb @(posedge clk);\n"
+             "  logic data; clocking cb @(posedge clk);\n"
              "    inout data;\n"
              "  endclocking\n"
              "  initial cb.data <= 8'hAB;\n"
@@ -304,7 +304,7 @@ TEST(SyncDriveElab, InoutClockvarDriveElaborates) {
 TEST(SyncDriveElab, MultipleDrivesToSameOutputElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  clocking cb @(posedge clk);\n"
+             "  logic nibble; clocking cb @(posedge clk);\n"
              "    output nibble;\n"
              "  endclocking\n"
              "  initial begin\n"
@@ -318,7 +318,7 @@ TEST(ClockingBlockElab, ClockingBlockInProgramElaborates) {
   ElabFixture f;
   ElaborateSrc(
       "program test(input logic clk);\n"
-      "  clocking cb @(posedge clk);\n"
+      "  logic data; clocking cb @(posedge clk);\n"
       "    input data;\n"
       "  endclocking\n"
       "endprogram\n",
@@ -329,7 +329,7 @@ TEST(ClockingBlockElab, ClockingBlockInProgramElaborates) {
 TEST(ClockingBlockElab, SequenceDeclInBlockElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  clocking cb @(posedge clk);\n"
+             "  logic data; clocking cb @(posedge clk);\n"
              "    input data;\n"
              "    sequence s;\n"
              "      data;\n"
@@ -342,7 +342,7 @@ TEST(DefaultClockingElab, DefaultClockingInProgramElaborates) {
   ElabFixture f;
   ElaborateSrc(
       "program test(input logic clk);\n"
-      "  default clocking cb @(posedge clk);\n"
+      "  logic data; default clocking cb @(posedge clk);\n"
       "    input data;\n"
       "  endclocking\n"
       "endprogram\n",
@@ -363,7 +363,7 @@ TEST(GlobalClockingElab, GlobalClockingInProgramElaborates) {
 TEST(CycleDelayElab, CycleDelayIdentifierWithDefaultClocking) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  default clocking cb @(posedge clk);\n"
+             "  logic data; default clocking cb @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"
              "  initial begin\n"

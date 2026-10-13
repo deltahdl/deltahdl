@@ -9,7 +9,7 @@ namespace {
 TEST(ClockingBlockEventElab, AlwaysAtBlockNameElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  clocking dram @(posedge phi1);\n"
+             "  logic data, address; clocking dram @(posedge phi1);\n"
              "    input data;\n"
              "    output negedge #1 address;\n"
              "  endclocking\n"
@@ -21,7 +21,7 @@ TEST(ClockingBlockEventElab, AlwaysAtBlockNameElaborates) {
 TEST(ClockingBlockEventElab, PosedgeAndBlockEventBothElaborate) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  clocking dram @(posedge phi1);\n"
+             "  logic data; clocking dram @(posedge phi1);\n"
              "    input data;\n"
              "  endclocking\n"
              "  always @(posedge phi1) $display(\"clock\");\n"
@@ -32,7 +32,7 @@ TEST(ClockingBlockEventElab, PosedgeAndBlockEventBothElaborate) {
 TEST(ClockingBlockEventElab, InitialBlockWaitsOnEventElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  clocking cb @(posedge clk);\n"
+             "  logic v; clocking cb @(posedge clk);\n"
              "    input v;\n"
              "  endclocking\n"
              "  initial begin\n"

@@ -403,6 +403,39 @@ void ForEachExprChild(const Expr* e, Fn&& fn) {
   });
 }
 
+// One statement tree written in a module, together with the item that holds
+// it. The location is the item's, which is where a report about the whole
+// tree stands.
+struct ProceduralRoot {
+  const ModuleItem* item = nullptr;
+  const Stmt* body = nullptr;
+};
+
+// Every statement tree of `items`: each process's body, each statement of a
+// task or function body (func_body_stmts holds a vector rather than the single
+// body a process holds), and those of every item a generate construct holds in
+// gen_body, gen_else->gen_body and each entry of gen_case_items. The clocking
+// rules of Clause 14 are stated against the module, interface, checker or
+// program rather than against a process, so a walk that reads ModuleItem::body
+// off the module's items alone misses a subroutine's and a generate block's.
+// With `skip_defaulted` set, a generate body that declares its own default
+// clocking is left out (§14.12). Defined in elaborator_validate_clocking.cpp.
+void CollectProceduralRoots(const std::vector<ModuleItem*>& items,
+                            std::vector<ProceduralRoot>& out,
+                            bool skip_defaulted = false);
+
+// §23.4: the module, interface, program and checker declarations `decl` is
+// nested in, innermost first; empty for a declaration nested in none. Defined
+// in elaborator_validate_clocking_signals.cpp.
+std::vector<const ModuleDecl*> EnclosingDecls(const CompilationUnit* unit,
+                                              const ModuleDecl* decl);
+
+// §14.11 (printed page 361): reports each cycle delay of `decl`'s procedural
+// code whose count folds, against `scope`, to a negative constant. Defined in
+// elaborator_validate_clocking_signals.cpp.
+void ValidateCycleDelayCounts(const ModuleDecl* decl, const ScopeMap& scope,
+                              DiagEngine& diag);
+
 // Defined in elaborator_validate.cpp.
 std::optional<int64_t> ComputeDimSize(const Expr* dim);
 

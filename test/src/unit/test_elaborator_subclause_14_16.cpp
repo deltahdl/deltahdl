@@ -32,7 +32,7 @@ TEST(SyncDriveElab, WriteToInputClockvarErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  clocking cb @(posedge clk);\n"
+      "  logic data; clocking cb @(posedge clk);\n"
       "    input data;\n"
       "  endclocking\n"
       "  initial cb.data <= 8'hFF;\n"
@@ -364,6 +364,43 @@ TEST(SyncDriveElab, ContinuousOrBlockingWriteToAClockvarErrors) {
                             "not by a blocking assignment", 9, "14.16"));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
                              "not by a blocking assignment", 10, "14.16"));
+}
+
+// §14.16 writes a clockvar by the synchronous drive alone and exempts no
+// procedural code, so a blocking write, a drive with an intra-assignment
+// delay and a force are as illegal in a task or a generate block's process as
+// in an initial procedure.
+TEST(SyncDriveElab, DriveFormInSubroutineAndGenerateErrors) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  logic clk;\n"
+             "  logic [7:0] q;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    output q;\n"
+             "  endclocking\n"
+             "  task t;\n"
+             "    cb.q = 1;\n"
+             "    cb.q <= #4 2;\n"
+             "    force cb.q = 3;\n"
+             "  endtask\n"
+             "  if (1) begin : g\n"
+             "    initial cb.q = 4;\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "not by a blocking assignment", 8, "14.16"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "intra-assignment delay (#) is not a legal "
+                            "synchronous drive",
+                            9, "14.16"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "procedural continuous assignment (assign/force) "
+                            "to a clocking output variable",
+                            10, "14.16"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "not by a blocking assignment", 13, "14.16"));
 }
 
 }  // namespace

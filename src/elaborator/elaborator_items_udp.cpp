@@ -734,6 +734,8 @@ void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
   ValidateValueParams(decl, mod);
   ValidateLhsPatternWidths(decl, mod);
   ValidateClockvarAccess(decl);
+  ValidateClockingSignalTargets(decl);
+  ValidateCycleDelayCounts(decl, BuildParamScope(mod), diag_);
   ValidateCycleDelayDefaultClocking(decl);
   ValidateIntraAssignCycleDelay(decl);
   ValidateDuplicateDefaultClocking(decl);

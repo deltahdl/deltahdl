@@ -9,7 +9,7 @@ namespace {
 TEST(SignalMultiBlockElab, SameSignalInTwoBlocksElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  clocking cb1 @(posedge clk);\n"
+             "  logic data; clocking cb1 @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"
              "  clocking cb2 @(negedge clk);\n"
@@ -21,7 +21,7 @@ TEST(SignalMultiBlockElab, SameSignalInTwoBlocksElaborates) {
 TEST(SignalMultiBlockElab, SameSignalDifferentDirectionsElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  clocking cb1 @(posedge clk);\n"
+             "  logic data; clocking cb1 @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"
              "  clocking cb2 @(posedge clk);\n"
@@ -33,10 +33,10 @@ TEST(SignalMultiBlockElab, SameSignalDifferentDirectionsElaborates) {
 TEST(SignalMultiBlockElab, SharedClockBlocksElaborate) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  clocking cb1 @(posedge clk);\n"
+             "  logic a; clocking cb1 @(posedge clk);\n"
              "    input a;\n"
              "  endclocking\n"
-             "  clocking cb2 @(posedge clk);\n"
+             "  logic b; clocking cb2 @(posedge clk);\n"
              "    input b;\n"
              "  endclocking\n"
              "endmodule\n"));
@@ -47,7 +47,7 @@ TEST(SignalMultiBlockElab, SharedClockBlocksElaborate) {
 TEST(SignalMultiBlockElab, InoutSignalInTwoBlocksElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  clocking cb1 @(posedge clk);\n"
+             "  logic data; clocking cb1 @(posedge clk);\n"
              "    inout data;\n"
              "  endclocking\n"
              "  clocking cb2 @(negedge clk);\n"
@@ -61,7 +61,7 @@ TEST(SignalMultiBlockElab, InoutSignalInTwoBlocksElaborates) {
 TEST(SignalMultiBlockElab, SameOutputSignalInTwoBlocksElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  clocking cb1 @(posedge clk);\n"
+             "  logic data; clocking cb1 @(posedge clk);\n"
              "    output data;\n"
              "  endclocking\n"
              "  clocking cb2 @(negedge clk);\n"

@@ -255,4 +255,36 @@ TEST(SyncDriveSignalsElab, ProceduralBlockingAssignToOutputSignalOk) {
              "endmodule\n"));
 }
 
+// §14.16.2 forbids a continuous assignment to the variable an output clockvar
+// is associated with, which §14.5 makes the signal the clockvar's expression
+// names, each variable of a concatenation among them, rather than any
+// variable of the clockvar's name.
+TEST(SyncDriveSignalsElab, AssociatedVariableIsTheExpressionsSignal) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  logic clk, v, o, a, b;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    output o = v;\n"
+             "    output w = {a, b};\n"
+             "  endclocking\n"
+             "  assign v = 1'b1;\n"
+             "  assign o = 1'b0;\n"
+             "  assign b = 1'b1;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "continuous assignment to clocking output "
+                            "variable 'v'",
+                            7, "14.16.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "continuous assignment to clocking output "
+                             "variable 'o'",
+                             8, "14.16.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "continuous assignment to clocking output "
+                            "variable 'b'",
+                            9, "14.16.2"));
+}
+
 }  // namespace

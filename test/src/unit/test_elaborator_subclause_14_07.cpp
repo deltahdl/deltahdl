@@ -9,7 +9,7 @@ namespace {
 TEST(ClockingScopeElab, ClockingInModuleElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  clocking cb @(posedge clk);\n"
+             "  logic data; clocking cb @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"
              "endmodule\n"));
@@ -21,7 +21,7 @@ TEST(ClockingScopeElab, ClockingInProgramElaborates) {
   ElabFixture f;
   ElaborateSrc(
       "program p(input clk);\n"
-      "  clocking cb @(posedge clk);\n"
+      "  logic data; clocking cb @(posedge clk);\n"
       "    input data;\n"
       "  endclocking\n"
       "endprogram\n",
@@ -56,7 +56,7 @@ TEST(ClockingScopeElab, ClockingInInterfaceElaborates) {
 TEST(ClockingScopeElab, DotAccessToClockvarElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  clocking dom @(posedge clk);\n"
+             "  logic sig; clocking dom @(posedge clk);\n"
              "    input sig;\n"
              "  endclocking\n"
              "  initial begin\n"
@@ -68,10 +68,10 @@ TEST(ClockingScopeElab, DotAccessToClockvarElaborates) {
 TEST(ClockingScopeElab, MultipleBlocksSameModuleElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  clocking cb1 @(posedge clk);\n"
+             "  logic a; clocking cb1 @(posedge clk);\n"
              "    input a;\n"
              "  endclocking\n"
-             "  clocking cb2 @(negedge clk);\n"
+             "  logic b; clocking cb2 @(negedge clk);\n"
              "    output b;\n"
              "  endclocking\n"
              "endmodule\n"));
@@ -83,13 +83,13 @@ TEST(ClockingScopeElab, SameBlockNameAcrossInstantiatedScopesElaborates) {
   // instantiates without the two colliding during elaboration.
   EXPECT_TRUE(
       ElabOk("module sub;\n"
-             "  clocking cb @(posedge clk);\n"
+             "  logic data; clocking cb @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"
              "endmodule\n"
              "module top;\n"
              "  sub u_sub();\n"
-             "  clocking cb @(posedge clk);\n"
+             "  logic data; clocking cb @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"
              "endmodule\n"));
@@ -105,7 +105,7 @@ TEST(ClockingScopeElab, PerInstanceCopyWhenModuleInstantiatedTwice) {
   // different module scopes.
   EXPECT_TRUE(
       ElabOk("module leaf;\n"
-             "  clocking cb @(posedge clk);\n"
+             "  logic data; clocking cb @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"
              "endmodule\n"
@@ -118,7 +118,7 @@ TEST(ClockingScopeElab, PerInstanceCopyWhenModuleInstantiatedTwice) {
 TEST(ClockingScopeElab, StaticLifetimeInModule) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
-             "  clocking cb @(posedge clk);\n"
+             "  logic data; clocking cb @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"
              "  initial begin\n"

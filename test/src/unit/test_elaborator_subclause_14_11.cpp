@@ -29,7 +29,7 @@ TEST(CycleDelayElab, WithDefaultClockingNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  default clocking cb @(posedge clk);\n"
+      "  logic data; default clocking cb @(posedge clk);\n"
       "    input data;\n"
       "  endclocking\n"
       "  initial begin\n"
@@ -51,7 +51,7 @@ TEST(CycleDelayElab, WithReferenceFormDefaultClockingNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  clocking cb @(posedge clk);\n"
+      "  logic data; clocking cb @(posedge clk);\n"
       "    input data;\n"
       "  endclocking\n"
       "  default clocking cb;\n"
@@ -95,7 +95,7 @@ TEST(CycleDelayElab, ProgramScopeWithDefaultClockingNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "program p;\n"
-      "  default clocking cb @(posedge clk);\n"
+      "  logic data; default clocking cb @(posedge clk);\n"
       "    input data;\n"
       "  endclocking\n"
       "  initial begin\n"
@@ -137,7 +137,7 @@ TEST(CycleDelayElab, InterfaceScopeWithDefaultClockingNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "interface intf;\n"
-      "  default clocking cb @(posedge clk);\n"
+      "  logic data; default clocking cb @(posedge clk);\n"
       "    input data;\n"
       "  endclocking\n"
       "  initial begin\n"
@@ -199,7 +199,7 @@ TEST(CycleDelayElab, CheckerInitialCycleDelayRejectedWithDefaultClocking) {
   auto* design = ElaborateSrc(
       "module top;\n"
       "  checker chk;\n"
-      "    default clocking cb @(posedge clk);\n"
+      "    logic data; default clocking cb @(posedge clk);\n"
       "      input data;\n"
       "    endclocking\n"
       "    initial begin\n"
@@ -248,7 +248,7 @@ TEST(CycleDelayElab, IntraAssignBlockingCycleDelayErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  default clocking cb @(posedge clk);\n"
+      "  logic data; default clocking cb @(posedge clk);\n"
       "    output data;\n"
       "  endclocking\n"
       "  initial begin\n"
@@ -268,7 +268,7 @@ TEST(CycleDelayElab, IntraAssignNonblockingCycleDelayErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  default clocking cb @(posedge clk);\n"
+      "  logic data; default clocking cb @(posedge clk);\n"
       "    output data;\n"
       "  endclocking\n"
       "  initial begin\n"
@@ -290,7 +290,7 @@ TEST(CycleDelayElab, NestedIntraAssignCycleDelayErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  default clocking cb @(posedge clk);\n"
+      "  logic data; default clocking cb @(posedge clk);\n"
       "    output data;\n"
       "  endclocking\n"
       "  initial begin\n"
@@ -315,7 +315,7 @@ TEST(CycleDelayElab, IntraAssignBitSelectLhsCycleDelayErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  default clocking cb @(posedge clk);\n"
+      "  logic data; default clocking cb @(posedge clk);\n"
       "    output data;\n"
       "  endclocking\n"
       "  logic [7:0] a, b;\n"
@@ -337,7 +337,7 @@ TEST(CycleDelayElab, IntraAssignPartSelectLhsCycleDelayErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  default clocking cb @(posedge clk);\n"
+      "  logic data; default clocking cb @(posedge clk);\n"
       "    output data;\n"
       "  endclocking\n"
       "  logic [7:0] a, b;\n"
@@ -360,7 +360,7 @@ TEST(CycleDelayElab, IntraAssignConcatLhsCycleDelayErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  default clocking cb @(posedge clk);\n"
+      "  logic data; default clocking cb @(posedge clk);\n"
       "    output data;\n"
       "  endclocking\n"
       "  logic [3:0] a, b;\n"
@@ -404,7 +404,7 @@ TEST(CycleDelayElab, SynchronousDriveWithCycleDelayNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  default clocking cb @(posedge clk);\n"
+      "  logic data; default clocking cb @(posedge clk);\n"
       "    output data;\n"
       "  endclocking\n"
       "  initial begin\n"
@@ -474,7 +474,7 @@ TEST(CycleDelayElab, IntraAssignCycleDelayInTaskErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  default clocking cb @(posedge clk);\n"
+      "  logic data; default clocking cb @(posedge clk);\n"
       "    output data;\n"
       "  endclocking\n"
       "  task t;\n"
@@ -500,7 +500,7 @@ TEST(CycleDelayElab, IntraAssignCycleDelayInFunctionErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  default clocking cb @(posedge clk);\n"
+      "  logic data; default clocking cb @(posedge clk);\n"
       "    output data;\n"
       "  endclocking\n"
       "  function void fn();\n"
@@ -525,7 +525,7 @@ TEST(CycleDelayElab, SynchronousDriveInTaskNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  default clocking cb @(posedge clk);\n"
+      "  logic data; default clocking cb @(posedge clk);\n"
       "    output data;\n"
       "  endclocking\n"
       "  logic d;\n"
@@ -777,6 +777,67 @@ TEST(CycleDelayElab, DriveThroughAnInterfaceClockingBlockPathTakesACycleDelay) {
   EXPECT_FALSE(ReportedError(
       f.diag.Diagnostics(),
       "cycle delay (##) is not a legal intra-assignment delay", 13, "14.11"));
+}
+
+// §14.11 gives a cycle delay a non-negative integer value, so one that folds
+// to a negative constant, written as a literal or through a parameter, and on
+// a statement or a synchronous drive alike, is reported; zero is a count.
+TEST(CycleDelayElab, NegativeConstantCycleDelayErrors) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  logic clk;\n"
+             "  logic [7:0] q;\n"
+             "  parameter int P = -2;\n"
+             "  default clocking cb @(posedge clk);\n"
+             "    output q;\n"
+             "  endclocking\n"
+             "  initial ##(-1) $display(\"a\");\n"
+             "  initial ##(P) $display(\"b\");\n"
+             "  initial cb.q <= ##(P) 1;\n"
+             "  initial ##(P + 2) $display(\"c\");\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cycle delay (##) value is negative (-1)", 8,
+                            "14.11"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cycle delay (##) value is negative (-2)", 9,
+                            "14.11"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cycle delay (##) value is negative (-2)", 10,
+                            "14.11"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "cycle delay (##) value", 11,
+                             "14.11"));
+}
+
+// §14.12 makes a default clocking valid in the nested modules of the module
+// that declares it, so a cycle delay in a nested module with none of its own
+// counts its enclosing module's.
+TEST(CycleDelayElab, NestedModuleTakesTheEnclosingDefaultClocking) {
+  EXPECT_TRUE(
+      ElabOk("module top;\n"
+             "  logic clk;\n"
+             "  default clocking cb @(posedge clk); endclocking\n"
+             "  module inner;\n"
+             "    initial ##2 $display(\"x\");\n"
+             "  endmodule\n"
+             "  inner u();\n"
+             "endmodule\n"));
+}
+
+// §14.12 makes a default clocking valid in the scope holding it, and a
+// generate block is one, so a cycle delay written in it has a default clocking
+// though the module declares none.
+TEST(CycleDelayElab, GenerateBlockDefaultClockingCountsInIt) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic clk;\n"
+             "  if (1) begin : g\n"
+             "    default clocking cb @(posedge clk); endclocking\n"
+             "    initial ##2 $display(\"x\");\n"
+             "  end\n"
+             "endmodule\n"));
 }
 
 }  // namespace

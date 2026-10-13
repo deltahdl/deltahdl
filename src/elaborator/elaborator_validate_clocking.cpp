@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -6,7 +7,6 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -170,6 +170,32 @@ static void CheckClockingSkew(const Expr* delay, const ScopeMap& skew_scope,
   CheckClockingSkewRealValue(delay, skew_scope, role, diag);
 }
 
+// The variables `e` names as a clocking signal: a name, the variable a select
+// is taken of, and each such variable of a concatenation. A hierarchical name
+// names a variable of another scope and none of this one.
+static void CollectAssociatedSignals(const Expr* e,
+                                     std::vector<std::string_view>& out) {
+  if (e->kind == ExprKind::kIdentifier) {
+    out.push_back(e->text);
+  } else if (e->kind == ExprKind::kSelect) {
+    CollectAssociatedSignals(e->base, out);
+  }
+  for (const Expr* elem : e->elements) CollectAssociatedSignals(elem, out);
+}
+
+// §14.3 with §14.5: the clocking signal of a clockvar is the signal of its own
+// name, unless the item binds an expression, whose signals it is then.
+static std::vector<std::string_view> AssociatedSignals(
+    const ClockingSignalDecl& sig) {
+  std::vector<std::string_view> out;
+  if (sig.hier_expr == nullptr) {
+    out.push_back(sig.name);
+  } else {
+    CollectAssociatedSignals(sig.hier_expr, out);
+  }
+  return out;
+}
+
 void Elaborator::ValidateClockingBlock(ModuleItem* item,
                                        const RtlirModule* mod) {
   // §14.3: only an actual clocking_declaration is subject to the naming rule;
@@ -204,7 +230,7 @@ void Elaborator::ValidateClockingBlock(ModuleItem* item,
   if (!item->name.empty()) {
     auto& sigs = clocking_signals_[item->name];
     for (const auto& sig : item->clocking_signals) {
-      sigs[sig.name] = {sig.direction};
+      sigs[sig.name] = {sig.direction, AssociatedSignals(sig)};
     }
   }
 }
@@ -345,91 +371,6 @@ void Elaborator::ValidateRecursivePropertyArguments(const ModuleItem* item) {
   }
 }
 
-namespace {
-
-// Report a clockvar direction violation for a member-access expression `e`: a
-// write (lvalue) to an input clockvar or a read from an output clockvar.
-// (Templated so the private nested info type need not be named here.)
-template <typename ClockingSignalMap>
-void CheckClockvarMemberAccessDirection(
-    const Expr* e, bool is_lvalue, const ClockingSignalMap& clocking_signals,
-    DiagEngine& diag) {
-  if (e->kind != ExprKind::kMemberAccess || !e->lhs ||
-      e->lhs->kind != ExprKind::kIdentifier) {
-    return;
-  }
-  auto block_it = clocking_signals.find(e->lhs->text);
-  if (block_it == clocking_signals.end()) return;
-  std::string_view member;
-  if (e->rhs && e->rhs->kind == ExprKind::kIdentifier) {
-    member = e->rhs->text;
-  } else if (!e->text.empty()) {
-    member = e->text;
-  }
-  if (member.empty()) return;
-  auto sig_it = block_it->second.find(member);
-  if (sig_it == block_it->second.end()) return;
-  if (is_lvalue && sig_it->second.direction == Direction::kInput) {
-    diag.Error(
-        e->range.start,
-        std::format("write to input clockvar '{}.{}'", e->lhs->text, member),
-        Subclause("14.3"));
-  }
-  if (!is_lvalue && sig_it->second.direction == Direction::kOutput) {
-    diag.Error(
-        e->range.start,
-        std::format("read from output clockvar '{}.{}'", e->lhs->text, member),
-        Subclause("14.3"));
-  }
-}
-
-}  // namespace
-
-void Elaborator::CheckClockvarAccessExpr(const Expr* e, bool is_lvalue) {
-  if (!e) return;
-  CheckClockvarMemberAccessDirection(e, is_lvalue, clocking_signals_, diag_);
-
-  if (!is_lvalue) {
-    CheckClockvarAccessExpr(e->lhs, false);
-    CheckClockvarAccessExpr(e->rhs, false);
-    CheckClockvarAccessExpr(e->condition, false);
-    CheckClockvarAccessExpr(e->true_expr, false);
-    CheckClockvarAccessExpr(e->false_expr, false);
-    for (auto* arg : e->args) CheckClockvarAccessExpr(arg, false);
-    for (auto* elem : e->elements) CheckClockvarAccessExpr(elem, false);
-  }
-}
-
-void Elaborator::WalkStmtsForClockvarAccess(const Stmt* s) {
-  if (!s) return;
-  if (s->kind == StmtKind::kBlockingAssign ||
-      s->kind == StmtKind::kNonblockingAssign) {
-    CheckClockvarAccessExpr(s->lhs, true);
-    CheckClockvarAccessExpr(s->rhs, false);
-  } else {
-    CheckClockvarAccessExpr(s->expr, false);
-    CheckClockvarAccessExpr(s->rhs, false);
-  }
-  // §14.3 states the input and output clockvar rules of a clocking block and
-  // names no statement a clockvar access is exempt in, so this descends every
-  // link ForEachChildStmt in elaborator_validate_internal.h names. It wrote out
-  // six of the thirteen, and an access in any of the other seven -- a fork arm,
-  // a for initialization or step, a randcase item, either arm of an assertion
-  // action block, or a randsequence production -- was never looked at.
-  ForEachChildStmt(
-      s, [this](Stmt* const& sub) { WalkStmtsForClockvarAccess(sub); });
-}
-
-void Elaborator::ValidateClockvarAccess(const ModuleDecl* decl) {
-  if (clocking_signals_.empty()) return;
-  for (const auto* item : decl->items) {
-    bool is_proc = IsProceduralItemKind(item->kind);
-    if (is_proc && item->body) {
-      WalkStmtsForClockvarAccess(item->body);
-    }
-  }
-}
-
 static bool HasCycleDelay(const Stmt* s) {
   if (!s) return false;
   if (s->kind == StmtKind::kCycleDelay) return true;
@@ -454,35 +395,16 @@ static bool HasCycleDelay(const Stmt* s) {
   return found;
 }
 
-// One statement tree written in a module, together with the item that holds it.
-// The location is the item's, which is where a report about the whole tree
-// stands.
-struct ProceduralRoot {
-  const ModuleItem* item = nullptr;
-  const Stmt* body = nullptr;
-};
-
-// Every statement tree of `items`, including those a generate construct or a
-// subroutine holds rather than a process.
-//
-// §14.11 (printed page 361) makes a cycle delay with no default clocking in the
-// enclosing module, interface, checker or program a compile-time error, and
-// §14.12 (printed page 361) makes one clocking block the default for every
-// cycle delay in a module, interface, program or checker. Neither rule is
-// stated against a process, and neither is the rule keeping cycle delays out of
-// intra-assignment delays. So a ## written in a generate block or in a task or
-// function body of a module is judged by the same default clocking as one
-// written in an always block beside it, and a walk that reads ModuleItem::body
-// off the items of the module reaches only the last of those.
-//
-// A generate construct holds its items in gen_body, in gen_else->gen_body and
-// in the body of each entry of gen_case_items, which is the shape
-// ValidateConstFuncCallsInGenerate walks in
-// src/elaborator/elaborator_validate_funcchecks.cpp. A task or a function
-// holds a vector of statements in func_body_stmts rather than the single body a
-// process holds, so each of those is a root of its own.
-static void CollectProceduralRoots(const std::vector<ModuleItem*>& items,
-                                   std::vector<ProceduralRoot>& out);
+// Whether `items` declare a default clocking, inline or by naming a block.
+static bool DeclaresDefaultClocking(const std::vector<ModuleItem*>& items) {
+  for (const auto* item : items) {
+    if (item->kind == ModuleItemKind::kClockingBlock &&
+        item->is_default_clocking) {
+      return true;
+    }
+  }
+  return false;
+}
 
 // The statements of a task or function body, each a root of its own.
 static void CollectSubroutineRoots(const ModuleItem* item,
@@ -492,19 +414,34 @@ static void CollectSubroutineRoots(const ModuleItem* item,
   }
 }
 
+// The roots of the items of one generate body. §14.12 (printed page 362)
+// makes a default clocking valid in the scope that holds it, and a generate
+// block is one, so where `skip_defaulted` is set a body that declares its own
+// default clocking is left out: every cycle delay in it has one.
+static void CollectGenerateBodyRoots(const std::vector<ModuleItem*>& body,
+                                     std::vector<ProceduralRoot>& out,
+                                     bool skip_defaulted) {
+  if (skip_defaulted && DeclaresDefaultClocking(body)) return;
+  CollectProceduralRoots(body, out, skip_defaulted);
+}
+
 // The roots of every item a generate construct holds, in its then body, its
 // else body and each of its case arms.
 static void CollectGenerateRoots(const ModuleItem* item,
-                                 std::vector<ProceduralRoot>& out) {
-  CollectProceduralRoots(item->gen_body, out);
-  if (item->gen_else) CollectProceduralRoots(item->gen_else->gen_body, out);
+                                 std::vector<ProceduralRoot>& out,
+                                 bool skip_defaulted) {
+  CollectGenerateBodyRoots(item->gen_body, out, skip_defaulted);
+  if (item->gen_else) {
+    CollectGenerateBodyRoots(item->gen_else->gen_body, out, skip_defaulted);
+  }
   for (const auto& ci : item->gen_case_items) {
-    CollectProceduralRoots(ci.body, out);
+    CollectGenerateBodyRoots(ci.body, out, skip_defaulted);
   }
 }
 
-static void CollectProceduralRoots(const std::vector<ModuleItem*>& items,
-                                   std::vector<ProceduralRoot>& out) {
+void CollectProceduralRoots(const std::vector<ModuleItem*>& items,
+                            std::vector<ProceduralRoot>& out,
+                            bool skip_defaulted) {
   for (const auto* item : items) {
     switch (item->kind) {
       case ModuleItemKind::kAlwaysBlock:
@@ -522,12 +459,24 @@ static void CollectProceduralRoots(const std::vector<ModuleItem*>& items,
       case ModuleItemKind::kGenerateIf:
       case ModuleItemKind::kGenerateCase:
       case ModuleItemKind::kGenerateFor:
-        CollectGenerateRoots(item, out);
+        CollectGenerateRoots(item, out, skip_defaulted);
         break;
       default:
         break;
     }
   }
+}
+
+// `decl` followed by the declarations enclosing it, innermost first. §14.12
+// (printed page 362) makes a default clocking valid in the scope that holds it
+// and in the module, interface and checker declarations nested in that scope,
+// and Example 2 there has a nested module name its enclosing module's
+// clocking block, so both questions below are asked of this chain.
+static std::vector<const ModuleDecl*> DeclAndEnclosing(
+    const CompilationUnit* unit, const ModuleDecl* decl) {
+  std::vector<const ModuleDecl*> scopes = EnclosingDecls(unit, decl);
+  scopes.insert(scopes.begin(), decl);
+  return scopes;
 }
 
 // Reports each item of `roots` that writes a ##, once per item.
@@ -546,17 +495,11 @@ static void ReportCycleDelayRoots(const std::vector<ProceduralRoot>& roots,
 }
 
 void Elaborator::ValidateCycleDelayDefaultClocking(const ModuleDecl* decl) {
-  bool has_default = false;
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kClockingBlock &&
-        item->is_default_clocking) {
-      has_default = true;
-      break;
-    }
+  for (const ModuleDecl* scope : DeclAndEnclosing(unit_, decl)) {
+    if (DeclaresDefaultClocking(scope->items)) return;
   }
-  if (has_default) return;
   std::vector<ProceduralRoot> roots;
-  CollectProceduralRoots(decl->items, roots);
+  CollectProceduralRoots(decl->items, roots, true);
   ReportCycleDelayRoots(roots, diag_);
 }
 
@@ -666,11 +609,12 @@ void Elaborator::ValidateDuplicateDefaultClocking(const ModuleDecl* decl) {
 
 namespace {
 
-// §14.12: true when some inline clocking block (carrying an @(event)) other
-// than `target` shares its name, so `target` names a real clocking block.
-bool DefaultClockingNamesBlock(const ModuleDecl* decl,
+// §14.12: true when some inline clocking block (carrying an @(event)) of
+// `scope` other than `target` shares its name, so `target` names a real
+// clocking block.
+bool DefaultClockingNamesBlock(const ModuleDecl* scope,
                                const ModuleItem* target) {
-  for (const auto* other : decl->items) {
+  for (const auto* other : scope->items) {
     if (other == target) continue;
     if (other->kind == ModuleItemKind::kClockingBlock &&
         !other->clocking_event.empty() && other->name == target->name) {
@@ -693,7 +637,11 @@ void Elaborator::ValidateDefaultClockingReference(const ModuleDecl* decl) {
     if (!item->is_default_clocking) continue;
     if (!item->clocking_event.empty()) continue;  // inline declaration form
     if (item->name.empty()) continue;
-    if (!DefaultClockingNamesBlock(decl, item)) {
+    const std::vector<const ModuleDecl*> kScopes =
+        DeclAndEnclosing(unit_, decl);
+    if (std::ranges::none_of(kScopes, [item](const ModuleDecl* scope) {
+          return DefaultClockingNamesBlock(scope, item);
+        })) {
       diag_.Error(item->loc,
                   "default clocking \"" + std::string(item->name) +
                       "\" does not name a clocking block",
@@ -751,14 +699,16 @@ void Elaborator::ValidateContAssignToClockvar(const ModuleDecl* decl) {
 }
 
 bool Elaborator::IsOutputClockvarSignal(std::string_view name) const {
-  // §14.16.2: a clocking output/inout is implicitly tied to a same-named signal
-  // in the enclosing scope (§14.3). Match the bare variable name against the
-  // output/inout clockvar members collected across every clocking block.
+  // §14.16.2: a variable is associated with an output or inout clockvar when
+  // it is the clockvar's clocking signal, which ValidateClockingBlock recorded
+  // for each clockvar of every clocking block.
   for (const auto& [block_name, sigs] : clocking_signals_) {
-    auto it = sigs.find(name);
-    if (it != sigs.end() && (it->second.direction == Direction::kOutput ||
-                             it->second.direction == Direction::kInout)) {
-      return true;
+    for (const auto& [clockvar, info] : sigs) {
+      if ((info.direction == Direction::kOutput ||
+           info.direction == Direction::kInout) &&
+          std::ranges::find(info.associated, name) != info.associated.end()) {
+        return true;
+      }
     }
   }
   return false;
@@ -893,18 +843,17 @@ void CheckSyncDriveProcContAssign(
 
 }  // namespace
 
-void Elaborator::WalkStmtsForSyncDriveForm(const Stmt* s) {
+namespace {
+
+void WalkStmtsForSyncDriveForm(
+    const Stmt* s, const ClockvarPredicate& targets_writable,
+    const OutputClockvarNamePredicate& is_output_clockvar, DiagEngine& diag) {
   if (!s) return;
-  const ClockvarPredicate kTargetsWritable = [this](const Expr* e) {
-    return ExprTargetsWritableClockvar(e);
-  };
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign) {
-    CheckSyncDriveAssign(s, kTargetsWritable, diag_);
+    CheckSyncDriveAssign(s, targets_writable, diag);
   } else if (s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign) {
-    const OutputClockvarNamePredicate kIsOutputClockvar =
-        [this](std::string_view name) { return IsOutputClockvarSignal(name); };
-    CheckSyncDriveProcContAssign(s, kTargetsWritable, kIsOutputClockvar, diag_);
+    CheckSyncDriveProcContAssign(s, targets_writable, is_output_clockvar, diag);
   }
   // §14.16 and §14.16.2 state the form a synchronous drive takes and name no
   // statement the form is not required in, so this descends every link
@@ -912,15 +861,28 @@ void Elaborator::WalkStmtsForSyncDriveForm(const Stmt* s) {
   // of the thirteen, so a malformed drive in a fork arm, a randcase item, an
   // assertion action block or a randsequence production reached neither
   // CheckSyncDriveAssign nor CheckSyncDriveProcContAssign.
-  ForEachChildStmt(
-      s, [this](Stmt* const& sub) { WalkStmtsForSyncDriveForm(sub); });
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    WalkStmtsForSyncDriveForm(sub, targets_writable, is_output_clockvar, diag);
+  });
 }
 
+}  // namespace
+
+// §14.16 and §14.16.2 exempt no procedural code from the form of a synchronous
+// drive, so a task or function body and a process in a generate block are
+// walked with the module's own processes (CollectProceduralRoots).
 void Elaborator::ValidateSyncDriveForm(const ModuleDecl* decl) {
   if (clocking_signals_.empty()) return;
-  for (const auto* item : decl->items) {
-    bool is_proc = IsProceduralItemKind(item->kind);
-    if (is_proc && item->body) WalkStmtsForSyncDriveForm(item->body);
+  const ClockvarPredicate kTargetsWritable = [this](const Expr* e) {
+    return ExprTargetsWritableClockvar(e);
+  };
+  const OutputClockvarNamePredicate kIsOutputClockvar =
+      [this](std::string_view name) { return IsOutputClockvarSignal(name); };
+  std::vector<ProceduralRoot> roots;
+  CollectProceduralRoots(decl->items, roots);
+  for (const auto& root : roots) {
+    WalkStmtsForSyncDriveForm(root.body, kTargetsWritable, kIsOutputClockvar,
+                              diag_);
   }
 }
 

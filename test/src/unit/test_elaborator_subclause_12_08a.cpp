@@ -667,7 +667,7 @@ TEST(JumpStatementElaboration, BreakAfterACycleDelayIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
-      "  default clocking cb @(posedge clk);\n"
+      "  logic data; default clocking cb @(posedge clk);\n"
       "    input data;\n"
       "  endclocking\n"
       "  initial ##1 break;\n"

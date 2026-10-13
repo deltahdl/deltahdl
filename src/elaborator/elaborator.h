@@ -880,7 +880,7 @@ class Elaborator : public ElaboratorClassRules {
   void WalkStmtsForClockvarAccess(const Stmt* s);
   void CheckClockvarAccessExpr(const Expr* e, bool is_lvalue);
   void ValidateSyncDriveForm(const ModuleDecl* decl);
-  void WalkStmtsForSyncDriveForm(const Stmt* s);
+  void ValidateClockingSignalTargets(const ModuleDecl* decl);
   bool ExprTargetsWritableClockvar(const Expr* e) const;
 
   // §14.16.2: true when `name` is a plain variable associated with an output
