@@ -70,11 +70,8 @@ bool IsAssocIndexDim(const Expr* dim, SimContext& ctx) {
 // self-determined, which is the default this spec carries.
 //
 // A packed dimension on the index -- §7.8's `int aa[bit[3:0]]`, whose index is
-// four bits rather than one -- is not read here. That form reaches this path
-// only in a subroutine or a class, and the elaborator answers it for every
-// module-level declaration; the width it would give is the product of the
-// declared dimensions, which the dimension expression carries in its own
-// elements.
+// four bits rather than one -- is read by AssocIndexSpec, from the dimension
+// expression's own elements.
 AssocArraySpec AssocIndexSpecOfType(const DataType& index_type,
                                     bool elem_4state, SimContext& ctx) {
   AssocArraySpec spec;
@@ -110,6 +107,22 @@ AssocArraySpec AssocIndexSpec(const Expr* dim, bool elem_4state,
   // to 255 rather than -128 to 127.
   if (dim->op == TokenKind::kKwUnsigned) spec.is_index_signed = false;
   if (dim->op == TokenKind::kKwSigned) spec.is_index_signed = true;
+  // §7.8 with A.2.2.1: an integer_vector_type index carries its packed
+  // dimensions, `[bit [79:0]]` keying by 80 bits rather than one, the width
+  // the product of the dimensions' sizes as the elaborator gives a
+  // module-level declaration's; a class property's and a subroutine's reach
+  // the run unanswered.
+  if (!dim->elements.empty()) {
+    uint32_t width = 1;
+    for (const Expr* packed : dim->elements) {
+      auto msb = static_cast<int64_t>(
+          EvalExpr(packed->lhs, ctx, ctx.GetArena()).ToUint64());
+      auto lsb = static_cast<int64_t>(
+          EvalExpr(packed->rhs, ctx, ctx.GetArena()).ToUint64());
+      width *= static_cast<uint32_t>(std::abs(msb - lsb) + 1);
+    }
+    spec.index_width = width;
+  }
   return spec;
 }
 

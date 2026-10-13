@@ -469,4 +469,33 @@ TEST(IntegralIndexAssocArraySimulation, IndexIsKeyedAndOrderedByItsWholeValue) {
             "36893488147419103232\n");
 }
 
+// §7.8.4 with §7.8 and A.2.2.1: an index type written with packed
+// dimensions keys by their whole width wherever the array is declared: a
+// class property and an automatic variable of a function indexed by
+// `bit [79:0]` hold indices differing only above bit 63 as two entries.
+// Keyed by the keyword's one bit, both held one entry under the key 1.
+TEST(IntegralIndexAssocArraySimulation, APackedIndexKeysAClassPropertyWhole) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  bit [7:0] m[bit [79:0]];\n"
+      "endclass\n"
+      "module t;\n"
+      "  function automatic int count();\n"
+      "    bit [7:0] a[bit [79:0]];\n"
+      "    a[80'h1_0000_0000_0000_0005] = 2; a[5] = 1;\n"
+      "    return a.num() * 100 + a[5] * 10 + a[80'h1_0000_0000_0000_0005];\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    c.m[80'h1_0000_0000_0000_0005] = 2;\n"
+      "    c.m[5] = 1;\n"
+      "    $display(\"%0d %0d %0d %0d\", c.m.num(), c.m[5],\n"
+      "             c.m[80'h1_0000_0000_0000_0005], count());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 1 2 212\n");
+}
+
 }  // namespace
