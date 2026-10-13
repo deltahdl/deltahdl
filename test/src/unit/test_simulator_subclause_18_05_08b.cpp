@@ -387,6 +387,41 @@ TEST(GlobalConstraintsRun, AnOrderingOverAnotherObjectsVariableHoldsInTheTree) {
   EXPECT_EQ(out, "1 0\n");
 }
 
+// §18.5.8 with §18.5.6: an implication whose antecedent reaches the object
+// under the handle left imposes its consequent as a relation of its own, so
+// with left.s ordered first and set near half the time, a 32-bit d is drawn
+// as 0 on every call with it set, which a d tried at random against the
+// whole implication would never be.
+TEST(GlobalConstraintsRun,
+     AnImplicationReachingAnotherObjectImposesItsConsequent) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class Leaf;\n"
+      "  rand bit s;\n"
+      "endclass\n"
+      "class B;\n"
+      "  rand Leaf left;\n"
+      "  rand bit [31:0] d;\n"
+      "  constraint c { left.s -> d == 0; }\n"
+      "  constraint order { solve left.s before d; }\n"
+      "  function new(); left = new; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int set = 0, wrong = 0;\n"
+      "  initial begin\n"
+      "    static B o = new;\n"
+      "    repeat (32) begin\n"
+      "      if (o.randomize() != 1) wrong++;\n"
+      "      if (o.left.s) set++;\n"
+      "      if (o.left.s && o.d != 0) wrong++;\n"
+      "    end\n"
+      "    $display(\"%0d %0d\", set >= 8 && set <= 24, wrong);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 0\n");
+}
+
 // §18.5.8 with §7.4.6: a relation over the random variable of an object an
 // element of a rand array of handles holds, arr[1].y, ties x to the arr[1].y
 // the call draws, on every one of 4 calls, rather than to the one held

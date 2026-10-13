@@ -337,9 +337,38 @@ bool TryJointSetMembership(const Expr* rel, JointVarScope& scope,
   return true;
 }
 
+ConstraintExpr BuildJointRelation(const Expr* rel, JointVarScope& scope,
+                                  RandomizeCtx& rc, bool fold);
+
+// 18.5.6: `a -> b` as the solver's implication, its consequent built over
+// the joint variables as a relation of its own and imposed where the
+// antecedent, evaluated over the trial values, holds. The consequent's
+// bounds hold only where the antecedent does, so none of them folds the
+// variable's domain. A consequent the solver would try as a whole is left
+// to be tried with its antecedent, unless it derives one variable from the
+// others; false then, and for any other shape.
+bool TryJointImplication(const Expr* rel, JointVarScope& scope,
+                         RandomizeCtx& rc, ConstraintExpr& out) {
+  if (rel->kind != ExprKind::kBinary || rel->op != TokenKind::kArrow)
+    return false;
+  ConstraintExpr consequent =
+      BuildJointRelation(rel->rhs, scope, rc, /*fold=*/false);
+  if (consequent.kind == ConstraintKind::kCustom && !consequent.derive_fn)
+    return false;
+  out.kind = ConstraintKind::kImplication;
+  out.ref_vars.assign(scope.names.begin(), scope.names.end());
+  out.cond_fn = [antecedent = rel->lhs, &scope,
+                 &rc](const std::unordered_map<std::string, int64_t>& vals) {
+    return EvalJointTrial(antecedent, scope.owner, scope.rands, rc, vals)
+        .IsTruthy();
+  };
+  out.sub_constraints.push_back(std::move(consequent));
+  return true;
+}
+
 // 18.5.8: translate one relation of an object's constraint for the joint solve.
-// Any relation the comparison fast path above does not take becomes a custom
-// joint constraint checked against trial values.
+// Any relation the shapes above do not take becomes a custom joint constraint
+// checked against trial values.
 ConstraintExpr BuildJointRelation(const Expr* rel, JointVarScope& scope,
                                   RandomizeCtx& rc, bool fold) {
   ConstraintExpr out;
@@ -364,14 +393,15 @@ ConstraintExpr BuildJointRelation(const Expr* rel, JointVarScope& scope,
         BuildJointRelation(rel->rhs, scope, rc, fold));
     return out;
   }
-  ConstraintExpr out_custom = MakeJointCustomConstraint(rel, scope, rc);
+  if (!TryJointImplication(rel, scope, rc, out))
+    out = MakeJointCustomConstraint(rel, scope, rc);
   // 18.5.12: an implication's antecedent is its constraint guard, resolved
   // before the relation is imposed; a subexpression over a joint variable is
   // RANDOM, any other evaluated over the state in the owner's scope.
   AttachConstraintGuard(
       rel, [&scope](const Expr* e) { return RefsJointVar(e, scope.names); },
-      scope.owner, rc, out_custom);
-  return out_custom;
+      scope.owner, rc, out);
+  return out;
 }
 
 bool IsJointVariable(const std::string& name, const RandomizeCtx& rc) {
