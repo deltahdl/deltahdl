@@ -565,7 +565,7 @@ class Elaborator : public ElaboratorClassRules {
 
   void WalkStmtsForVirtualInterfaceOps(const Stmt* s);
 
-  // §15.5.5.3: restrict the operators allowed on event variables.
+  // §15.5: the operators an event takes, and the operands that are events.
   void ValidateEventOps(const ModuleDecl* decl);
 
   // Annex D.3: $getpattern stands as the whole right-hand side of a

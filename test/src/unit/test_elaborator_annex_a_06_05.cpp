@@ -209,7 +209,7 @@ TEST(TimingControlElaboration, WaitOrderInInitialElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
-      "  logic a, b, c;\n"
+      "  event a, b, c;\n"
       "  initial begin\n"
       "    wait_order(a, b, c) ;\n"
       "  end\n"

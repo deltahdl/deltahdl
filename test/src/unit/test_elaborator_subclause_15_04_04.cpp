@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -69,6 +70,28 @@ TEST(MailboxTryPutElaborator, TryPutWithObjectHandleArg) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §15.4.4: a message is a singular expression, which a variable of an
+// unpacked structure type, named through a typedef and declared in the
+// procedure, is not (§6.4).
+TEST(MailboxTryPutElaborator, TryPutOfAnUnpackedStructIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef struct { int x; real y; } s_t;\n"
+      "  mailbox mb = new;\n"
+      "  initial begin\n"
+      "    s_t s;\n"
+      "    int ok;\n"
+      "    ok = mb.try_put(s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "message of mailbox method 'try_put' is of an unpacked aggregate type", 7,
+      "15.4.4"));
 }
 
 }  // namespace

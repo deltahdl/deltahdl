@@ -912,6 +912,7 @@ void Elaborator::WalkStmtsForEventOps(const Stmt* s) {
 }
 
 void Elaborator::ValidateEventOps(const ModuleDecl* decl) {
+  ReportNonEventOperands(decl, var_types_, diag_);
   bool has_event = false;
   for (const auto& [name, kind] : var_types_) {
     if (kind == DataTypeKind::kEvent) {

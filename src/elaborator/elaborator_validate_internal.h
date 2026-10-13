@@ -691,4 +691,11 @@ std::string CallName(const Expr* call);
 // elaborator_validate_subroutine.cpp.
 std::string EnabledSubroutineName(const Stmt* s);
 
+// §15.5.1 and §15.5.4: reports a trigger's target and a wait_order operand
+// that the kinds the module's variables and nets are declared with, `kinds`,
+// give a type other than event. Defined in
+// elaborator_validate_event_operands.cpp.
+void ReportNonEventOperands(const ModuleDecl* decl, const TypeMap& kinds,
+                            DiagEngine& diag);
+
 }  // namespace delta
