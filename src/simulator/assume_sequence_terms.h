@@ -86,9 +86,22 @@ class ConditionBuilder {
 struct SeqTerm;
 enum class SeqTermKind : uint8_t;
 
-// §16.10: the values of the local variables of one attempt, shared among
-// the attempts holding the same values.
-struct SeqLocals;
+// §16.10: the values of the local variables `decls` declares for one
+// attempt, each with a literal of its value under its name, which the
+// expressions reading the locals read in their place.
+struct LocalValues {
+  const std::vector<SeqLocalDecl>* decls = nullptr;
+  std::vector<Logic4Vec> values;
+  ActualsByFormal literals;
+};
+
+// §16.10: the match items of each of `items` performed in turn on
+// `locals`, `lvar = rhs` or `lvar op= rhs` assigning the local `lvar`
+// declares at its width; an item naming no local of `decls`, a subroutine
+// call (§16.11) among them, assigns none.
+void PerformMatchItems(
+    const std::vector<const std::vector<SeqMatchAssign>*>& items,
+    LocalValues& locals, SimContext& ctx, Arena& arena);
 
 // One way an attempt goes at a tick: the expressions it reads there, each
 // with the truth it needs; the term it goes on in from the next tick,
@@ -98,7 +111,7 @@ struct SeqWay {
   std::vector<std::pair<Expr*, bool>> literals;
   const SeqTerm* next = nullptr;
   std::vector<const std::vector<SeqMatchAssign>*> items;
-  const SeqLocals* locals = nullptr;
+  const LocalValues* locals = nullptr;
 };
 
 // §17.7.2: the terms of the sequences an assume set's assumptions read.
@@ -128,6 +141,11 @@ class SeqTerms {
   // values read at the time step.
   const SeqTerm* Take(const SeqWay& way);
 
+  // The values `values` of the locals `decls` declares, shared among the
+  // attempts holding the same.
+  const LocalValues* Locals(std::vector<Logic4Vec> values,
+                            const std::vector<SeqLocalDecl>* decls);
+
  private:
   struct Builder;
 
@@ -137,9 +155,7 @@ class SeqTerms {
   const SeqTerm* PairedNext(SeqTermKind kind, const SeqTerm* a,
                             const SeqTerm* b);
   const SeqTerm* Wait(uint32_t lo, uint32_t hi, const SeqTerm* x, int clock);
-  const SeqTerm* Bind(const SeqLocals* locals, const SeqTerm* x);
-  const SeqLocals* Locals(std::vector<Logic4Vec> values,
-                          const std::vector<SeqLocalDecl>* decls);
+  const SeqTerm* Bind(const LocalValues* locals, const SeqTerm* x);
   bool Nullable(const SeqTerm* term);
   int FirstClock(const SeqTerm* term);
 
@@ -160,16 +176,13 @@ class SeqTerms {
   void ExpandGoto(const SeqTerm* term, std::vector<SeqWay>& out);
   void ExpandBind(const SeqTerm* term, uint32_t ticked, bool anchor,
                   std::vector<SeqWay>& out);
-  Expr* UnderLocals(Expr* e, const SeqLocals* locals);
-  void Assign(const SeqMatchAssign& item,
-              const std::vector<SeqLocalDecl>& decls,
-              std::vector<Logic4Vec>& values, ActualsByFormal& literals);
+  Expr* UnderLocals(Expr* e, const LocalValues* locals);
 
   SimContext& ctx_;
   Arena& arena_;
   ConditionBuilder& conditions_;
   std::map<std::string, std::unique_ptr<SeqTerm>> terms_;
-  std::map<std::string, std::unique_ptr<SeqLocals>> locals_;
+  std::map<std::string, std::unique_ptr<LocalValues>> locals_;
   std::vector<std::unique_ptr<LinearSequence>> sequences_;
   const SeqTerm* match_ = nullptr;
 };

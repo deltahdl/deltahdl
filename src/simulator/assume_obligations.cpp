@@ -20,6 +20,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/property_attempts.h"
 #include "simulator/sequence_flatten.h"
+#include "simulator/sequence_locals.h"
 
 namespace delta {
 
@@ -29,8 +30,9 @@ namespace delta {
 // (§16.12.7), overlapping where `n` is set; nexttime `n` ticks on
 // (§16.12.10); unbounded always (§16.12.11); until and until_with
 // (§16.12.12); unbounded s_eventually (§16.12.13); the aborts over the
-// condition `expr` (§16.12.14); and an instance of the named property
-// `decl` (§16.12.17).
+// condition `expr` (§16.12.14); an instance of the named property `decl`
+// (§16.12.17); and a property under the values `locals` of its local
+// variables (§16.10, §16.13.7).
 enum class ObligationKind : uint8_t {
   kBool,
   kSeq,
@@ -47,6 +49,7 @@ enum class ObligationKind : uint8_t {
   kAccept,
   kReject,
   kInstance,
+  kLocals,
 };
 
 struct ObligationNode {
@@ -65,6 +68,7 @@ struct ObligationNode {
   const ModuleItem* decl = nullptr;
   const ObligationScope* scope = nullptr;
   const ObligationScope* outer = nullptr;
+  const LocalValues* locals = nullptr;
   // The conditions under which the node does not fail at a tick and under
   // which it holds by it, by the clocks that ticked, each read once; and an
   // instance's expansion.
@@ -84,11 +88,11 @@ std::string Id(const void* p) {
 }
 
 std::string KeyOf(const ObligationNode& node) {
-  std::string key = std::to_string(static_cast<int>(node.kind)) + ':' +
-                    Id(node.expr) + ':' + std::to_string(node.n) + ':' +
-                    std::to_string(node.clock) + ':' +
-                    std::to_string(static_cast<int>(node.fresh)) + ':' +
-                    Id(node.decl) + ':' + Id(node.scope);
+  std::string key =
+      std::to_string(static_cast<int>(node.kind)) + ':' + Id(node.expr) + ':' +
+      std::to_string(node.n) + ':' + std::to_string(node.clock) + ':' +
+      std::to_string(static_cast<int>(node.fresh)) + ':' + Id(node.decl) + ':' +
+      Id(node.scope) + ':' + Id(node.locals);
   for (const ObligationNode* op : node.operands) key += ',' + Id(op);
   for (const SeqTerm* term : node.terms) key += ';' + Id(term);
   return key;
@@ -164,6 +168,18 @@ const ObligationNode* AssumeObligations::Junction(
   return Over(kind, std::move(kept));
 }
 
+// §16.10: `inner` read under the locals' values `locals`; a node owing
+// nothing more reads none.
+const ObligationNode* AssumeObligations::WithLocals(
+    const LocalValues* locals, const ObligationNode* inner) {
+  if (Settled(inner)) return inner;
+  ObligationNode node;
+  node.kind = Kind::kLocals;
+  node.operands = {inner};
+  node.locals = locals;
+  return Intern(std::move(node));
+}
+
 const ObligationNode* AssumeObligations::Next(uint32_t ticks,
                                               const ObligationNode* a,
                                               int clock) {
@@ -232,6 +248,14 @@ const ObligationNode* AssumeObligations::Expansion(const ObligationNode* node,
   const ObligationNode* built =
       Build(decl->prop_body_tree, clock, inner, reads);
   expanding_.erase(decl);
+  // §16.13.7: each attempt holds copies of the property's locals of its
+  // own, begun at their initial values.
+  if (built != nullptr && !decl->prop_locals.empty()) {
+    built =
+        WithLocals(terms_.Locals(InitialLocals(decl->prop_locals, ctx_, arena_),
+                                 &decl->prop_locals),
+                   built);
+  }
   node->expansion = built != nullptr ? built : true_;
   return built;
 }
@@ -281,7 +305,6 @@ const ObligationNode* AssumeObligations::BuildBool(Expr* e, int clock,
 const ObligationNode* AssumeObligations::BuildInstance(
     Expr* e, const ModuleItem* decl, int clock, const ObligationScope& scope,
     std::vector<Expr*>& reads) {
-  if (!decl->prop_locals.empty()) return nullptr;
   const ObligationScope* base = scope.base != nullptr ? scope.base : &scope;
   std::string key = Id(decl) + ':' + Id(base);
   for (const Expr* arg : e->args) key += ',' + Id(arg);
@@ -525,6 +548,8 @@ Expr* AssumeObligations::ConditionOf(const ObligationNode* node, bool decided) {
     case Kind::kInstance:
       Expansion(node, reads);
       return Condition(node->expansion, decided);
+    case Kind::kLocals:
+      return UnderLocals(Condition(ops[0], decided), node->locals);
     default:
       return Condition(Expand(node), decided);
   }
@@ -559,6 +584,9 @@ void AssumeObligations::NewTimeStep() {
 }
 
 bool AssumeObligations::Holds(Expr* e) {
+  for (auto frame = frames_.rbegin(); frame != frames_.rend(); ++frame) {
+    e = SubstituteFormals(e, frame->first->literals, arena_);
+  }
   auto found = values_.find(e);
   if (found != values_.end()) return found->second;
   bool value = EvalExpr(e, ctx_, arena_).IsTruthy();
@@ -581,6 +609,9 @@ bool AssumeObligations::StepSeq(const ObligationNode* node,
         return Holds(lit.first) == lit.second;
       });
       if (!taken) continue;
+      for (auto& frame : frames_) {
+        PerformMatchItems(way.items, frame.second, ctx_, arena_);
+      }
       if (way.next == nullptr) {
         matched = true;
       } else {
@@ -598,6 +629,9 @@ const ObligationNode* AssumeObligations::Step(const ObligationNode* node,
 }
 
 const ObligationNode* AssumeObligations::StepNode(const ObligationNode* node) {
+  // Under a property's locals, a step reads values and assigns locals of
+  // the attempt the frame is for, which no other attempt shares.
+  if (!frames_.empty()) return StepOperator(node);
   auto key = std::make_pair(node, ticked_);
   auto found = stepped_.find(key);
   if (found != stepped_.end()) return found->second;
@@ -640,9 +674,30 @@ const ObligationNode* AssumeObligations::StepOperator(
     case Kind::kInstance:
       Expansion(node, reads);
       return StepNode(node->expansion);
+    case Kind::kLocals:
+      return StepLocals(node);
     default:
       return StepNode(Expand(node));
   }
+}
+
+// §16.10: the property under its locals steps with its expressions reading
+// the attempt's values and its match items assigning them, and goes on
+// under the values they leave.
+const ObligationNode* AssumeObligations::StepLocals(
+    const ObligationNode* node) {
+  frames_.emplace_back(node->locals, *node->locals);
+  const ObligationNode* inner = StepNode(node->operands[0]);
+  LocalValues after = std::move(frames_.back().second);
+  frames_.pop_back();
+  return WithLocals(terms_.Locals(std::move(after.values), after.decls), inner);
+}
+
+// A condition read under the locals' values `locals`; one met under any
+// values stands as it is, so that it still puts no condition on the solve.
+Expr* AssumeObligations::UnderLocals(Expr* cond, const LocalValues* locals) {
+  if (cond == conditions_.Always()) return cond;
+  return SubstituteFormals(cond, locals->literals, arena_);
 }
 
 // §16.12.7: each match of the antecedent at this tick begins an attempt of

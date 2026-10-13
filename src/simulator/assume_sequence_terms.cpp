@@ -47,13 +47,6 @@ enum class SeqTermKind : uint8_t {
   kBind,
 };
 
-struct SeqLocals {
-  std::vector<Logic4Vec> values;
-  const std::vector<SeqLocalDecl>* decls = nullptr;
-  // Each local's name with a literal of its value.
-  ActualsByFormal literals;
-};
-
 struct SeqTerm {
   SeqTermKind kind = SeqTermKind::kMatch;
   Expr* expr = nullptr;
@@ -64,7 +57,7 @@ struct SeqTerm {
   int clock = 0;
   uint8_t flags = 0;
   std::vector<const SeqTerm*> operands;
-  const SeqLocals* locals = nullptr;
+  const LocalValues* locals = nullptr;
   // The ways read at a tick, by the clocks that ticked and the anchor.
   mutable std::map<uint64_t, std::vector<SeqWay>> ways;
 };
@@ -215,7 +208,7 @@ const SeqTerm* SeqTerms::Wait(uint32_t lo, uint32_t hi, const SeqTerm* x,
   return Make(Kind::kWait, {x}, {.lo = lo, .hi = hi, .clock = clock});
 }
 
-const SeqTerm* SeqTerms::Bind(const SeqLocals* locals, const SeqTerm* x) {
+const SeqTerm* SeqTerms::Bind(const LocalValues* locals, const SeqTerm* x) {
   SeqTerm term;
   term.kind = Kind::kBind;
   term.operands = {x};
@@ -223,12 +216,12 @@ const SeqTerm* SeqTerms::Bind(const SeqLocals* locals, const SeqTerm* x) {
   return Intern(std::move(term));
 }
 
-const SeqLocals* SeqTerms::Locals(std::vector<Logic4Vec> values,
-                                  const std::vector<SeqLocalDecl>* decls) {
+const LocalValues* SeqTerms::Locals(std::vector<Logic4Vec> values,
+                                    const std::vector<SeqLocalDecl>* decls) {
   std::string key = KeyOf(values, decls);
   auto& slot = locals_[key];
   if (slot == nullptr) {
-    slot = std::make_unique<SeqLocals>();
+    slot = std::make_unique<LocalValues>();
     for (size_t i = 0; i < values.size(); ++i) {
       slot->literals[(*decls)[i].name] = LiteralOfValue(values[i], arena_);
     }
@@ -257,7 +250,7 @@ int SeqTerms::FirstClock(const SeqTerm* term) {
   }
 }
 
-Expr* SeqTerms::UnderLocals(Expr* e, const SeqLocals* locals) {
+Expr* SeqTerms::UnderLocals(Expr* e, const LocalValues* locals) {
   return SubstituteFormals(e, locals->literals, arena_);
 }
 
@@ -506,7 +499,7 @@ void SeqTerms::ExpandGoto(const SeqTerm* term, std::vector<SeqWay>& out) {
 // value the attempt holds for it.
 void SeqTerms::ExpandBind(const SeqTerm* term, uint32_t ticked, bool anchor,
                           std::vector<SeqWay>& out) {
-  const SeqLocals* locals = term->locals;
+  const LocalValues* locals = term->locals;
   for (const SeqWay& way : Ways(term->operands[0], ticked, anchor)) {
     SeqWay bound;
     for (const auto& [e, value] : way.literals) {
@@ -519,49 +512,45 @@ void SeqTerms::ExpandBind(const SeqTerm* term, uint32_t ticked, bool anchor,
   }
 }
 
-// §16.10: one match item, `lvar = rhs` or `lvar op= rhs`, assigning the
-// attempt's value of the local at the local's width.
-void SeqTerms::Assign(const SeqMatchAssign& item,
-                      const std::vector<SeqLocalDecl>& decls,
-                      std::vector<Logic4Vec>& values,
-                      ActualsByFormal& literals) {
-  for (size_t i = 0; i < decls.size(); ++i) {
-    // A subroutine call (§16.11) names no local.
-    if (decls[i].name != item.lvar) continue;
-    Logic4Vec rhs =
-        EvalExpr(SubstituteFormals(item.rhs, literals, arena_), ctx_, arena_);
-    if (item.op != TokenKind::kEq) {
-      rhs = EvalBinaryOp(CompoundAssignBaseOp(item.op), values[i], rhs, arena_);
+void PerformMatchItems(
+    const std::vector<const std::vector<SeqMatchAssign>*>& items,
+    LocalValues& locals, SimContext& ctx, Arena& arena) {
+  const std::vector<SeqLocalDecl>& decls = *locals.decls;
+  for (const std::vector<SeqMatchAssign>* group : items) {
+    for (const SeqMatchAssign& item : *group) {
+      for (size_t i = 0; i < decls.size(); ++i) {
+        if (decls[i].name != item.lvar) continue;
+        Logic4Vec& value = locals.values[i];
+        Logic4Vec rhs = EvalExpr(
+            SubstituteFormals(item.rhs, locals.literals, arena), ctx, arena);
+        if (item.op != TokenKind::kEq) {
+          rhs = EvalBinaryOp(CompoundAssignBaseOp(item.op), value, rhs, arena);
+        }
+        bool is_signed = value.is_signed;
+        value = ResizeToWidth(OwnRhsWords(rhs, arena), value.width, arena);
+        value.is_signed = is_signed;
+        locals.literals[decls[i].name] = LiteralOfValue(value, arena);
+      }
     }
-    bool is_signed = values[i].is_signed;
-    values[i] =
-        ResizeToWidth(OwnRhsWords(rhs, arena_), values[i].width, arena_);
-    values[i].is_signed = is_signed;
-    literals[decls[i].name] = LiteralOfValue(values[i], arena_);
   }
 }
 
 const SeqTerm* SeqTerms::Take(const SeqWay& way) {
   if (way.locals == nullptr) return way.next;
-  std::vector<Logic4Vec> values = way.locals->values;
-  const std::vector<SeqLocalDecl>& decls = *way.locals->decls;
-  ActualsByFormal literals = way.locals->literals;
-  for (const std::vector<SeqMatchAssign>* items : way.items) {
-    for (const SeqMatchAssign& item : *items) {
-      Assign(item, decls, values, literals);
-    }
-  }
-  return Bind(Locals(std::move(values), &decls), way.next->operands[0]);
+  LocalValues locals = *way.locals;
+  PerformMatchItems(way.items, locals, ctx_, arena_);
+  return Bind(Locals(std::move(locals.values), locals.decls),
+              way.next->operands[0]);
 }
 
 // §16.7 to §16.10 and §16.13.1: a flattened sequence read into terms: its
 // `or` operands, each the `and` of its chain's `intersect` groups, each the
 // `intersect` of chains, a chain being its operands under their delays and
-// repetitions, under a throughout spanning it whole, and a nested operand
-// a sequence of its own; each operand on the clock it names or the one
-// flowing to it. `failures` counts the uses of forms the terms do not
-// read: a throughout over part of a chain, or match items on a
-// repeated operand.
+// repetitions, under the throughouts spanning parts of it, and a nested
+// operand a sequence of its own; each operand on the clock it names or the
+// one flowing to it. `failures` counts the uses of forms the terms do not
+// read: match items on a repeated operand, and locals of a nested
+// sequence's own.
 struct SeqTerms::Builder {
   SeqTerms& terms;
   const ObligationScope& scope;
@@ -604,39 +593,63 @@ struct SeqTerms::Builder {
     return all;
   }
 
-  // §16.9.9: a throughout guards the chain from `lead` ticks before its
-  // first operand is read to its match.
-  const SeqTerm* Chain(const LinearSequence& s, int clock) {
-    const SeqTerm* chain = Range(s, 0, clock);
+  // A part of a chain, and how many ticks before its first operand the
+  // interval of a throughout beginning there begins.
+  struct Part {
+    const SeqTerm* term = nullptr;
     uint32_t lead = 0;
-    if (!s.throughouts.empty()) {
-      const SeqThroughout& guard = s.throughouts[0];
-      int spans_part = static_cast<int>(s.throughouts.size() != 1) +
-                       static_cast<int>(guard.first != 0) +
-                       static_cast<int>(guard.last + 1 != s.operands.size());
-      failures += spans_part;
-      lead = guard.lead;
-      int first = terms.FirstClock(chain);
-      chain =
-          terms.Make(Kind::kThroughout, {terms.Wait(lead, lead, chain, first)},
-                     {.expr = Read(guard.cond), .clock = first});
-    }
+  };
+
+  const SeqTerm* Chain(const LinearSequence& s, int clock) {
+    Part part = Range(s, 0, s.operands.size() - 1, 0, clock);
     const SeqCycleDelay& d = s.delays[0];
-    return terms.Wait(d.min - lead, Shorter(d.max, lead), chain,
-                      terms.FirstClock(chain));
+    return terms.Wait(d.min - part.lead, Shorter(d.max, part.lead), part.term,
+                      terms.FirstClock(part.term));
   }
 
   static uint32_t Shorter(uint32_t bound, uint32_t by) {
     return bound == kUnbounded ? kUnbounded : bound - by;
   }
 
-  // The chain's operands from `i` to its last.
-  const SeqTerm* Range(const LinearSequence& s, size_t i, int clock) {
-    const SeqTerm* head = Item(s, i, clock);
-    if (i + 1 == s.operands.size()) return head;
-    const SeqCycleDelay& d = s.delays[i + 1];
-    return terms.Make(Kind::kThen, {head, Range(s, i + 1, clock)},
-                      {.lo = d.min, .hi = d.max});
+  // §16.9.9: the first throughout from the one numbered `from` on that
+  // begins at operand `i`; the count of throughouts where none does.
+  static size_t SpanAt(const LinearSequence& s, size_t i, size_t from) {
+    for (size_t k = from; k < s.throughouts.size(); ++k) {
+      if (s.throughouts[k].first == i) return k;
+    }
+    return s.throughouts.size();
+  }
+
+  // The chain's operands from `i` to `j`. §16.9.9: a throughout beginning
+  // at `i`, the first from the one numbered `from` on, guards its span from
+  // `lead` ticks before its first operand is read to its last operand's
+  // match, the delay before the span shortened by those ticks; a further
+  // one beginning there is read inside it.
+  Part Range(const LinearSequence& s, size_t i, size_t j, size_t from,
+             int clock) {
+    Part head;
+    size_t last = i;
+    size_t span = SpanAt(s, i, from);
+    if (span < s.throughouts.size()) {
+      const SeqThroughout& guard = s.throughouts[span];
+      Part inner = Range(s, i, guard.last, span + 1, clock);
+      int first = terms.FirstClock(inner.term);
+      uint32_t wait = guard.lead - inner.lead;
+      head.term = terms.Make(Kind::kThroughout,
+                             {terms.Wait(wait, wait, inner.term, first)},
+                             {.expr = Read(guard.cond), .clock = first});
+      head.lead = guard.lead;
+      last = guard.last;
+    } else {
+      head.term = Item(s, i, clock);
+    }
+    if (last == j) return head;
+    Part rest = Range(s, last + 1, j, 0, clock);
+    const SeqCycleDelay& d = s.delays[last + 1];
+    head.term =
+        terms.Make(Kind::kThen, {head.term, rest.term},
+                   {.lo = d.min - rest.lead, .hi = Shorter(d.max, rest.lead)});
+    return head;
   }
 
   // §16.9.2: the operand at `i` under its repetition, a boolean or a nested
@@ -665,10 +678,17 @@ struct SeqTerms::Builder {
     }
     const LinearSequence* nested = NestedOperand(s, i);
     const SeqTerm* base =
-        nested != nullptr ? Body(*nested, own) : Bool(s, i, own, items);
+        nested != nullptr ? Nested(*nested, own) : Bool(s, i, own, items);
     if (!repeated) return base;
     return terms.Make(Kind::kRepeat, {base, base},
                       {.lo = rep.min, .hi = rep.max, .flags = nullable});
+  }
+
+  // §16.10: a nested sequence declaring locals of its own is not read, the
+  // attempt's locals being the outer sequence's.
+  const SeqTerm* Nested(const LinearSequence& s, int clock) {
+    failures += static_cast<int>(s.locals.size());
+    return Body(s, clock);
   }
 
   const SeqTerm* Bool(const LinearSequence& s, size_t i, int clock,
@@ -688,10 +708,6 @@ const SeqTerm* SeqTerms::Begin(const ModuleItem* item, int clock,
   auto seq = std::make_unique<LinearSequence>();
   if (!FlattenLinearSequence(item, ctx_, arena_, *seq)) return nullptr;
   bool has_locals = !seq->locals.empty();
-  size_t composite = seq->alternatives.size() + seq->conjuncts.size() +
-                     seq->intersects.size() + seq->nested.size() +
-                     static_cast<size_t>(seq->first_match);
-  if (has_locals && composite != 0) return nullptr;
   Builder builder{*this, scope, reads};
   const SeqTerm* term = builder.Body(*seq, clock);
   if (builder.failures != 0) return nullptr;

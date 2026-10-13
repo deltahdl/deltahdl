@@ -71,6 +71,8 @@ class AssumeObligations {
   const ObligationNode* Not(const ObligationNode* a);
   const ObligationNode* Junction(
       ObligationKind kind, const std::vector<const ObligationNode*>& operands);
+  const ObligationNode* WithLocals(const LocalValues* locals,
+                                   const ObligationNode* inner);
   const ObligationNode* Next(uint32_t ticks, const ObligationNode* a,
                              int clock);
   const ObligationNode* Over(ObligationKind kind,
@@ -124,6 +126,8 @@ class AssumeObligations {
   const ObligationNode* StepOperator(const ObligationNode* node);
   const ObligationNode* StepImplication(const ObligationNode* node);
   const ObligationNode* StepAbort(const ObligationNode* node);
+  const ObligationNode* StepLocals(const ObligationNode* node);
+  Expr* UnderLocals(Expr* cond, const LocalValues* locals);
 
   SimContext& ctx_;
   Arena& arena_;
@@ -144,6 +148,10 @@ class AssumeObligations {
   std::map<const Expr*, bool> values_;
   std::map<std::pair<const ObligationNode*, uint32_t>, const ObligationNode*>
       stepped_;
+  // §16.10: the locals of the properties being stepped, innermost last:
+  // the values their expressions read, and the values their match items
+  // leave.
+  std::vector<std::pair<const LocalValues*, LocalValues>> frames_;
 };
 
 }  // namespace delta
