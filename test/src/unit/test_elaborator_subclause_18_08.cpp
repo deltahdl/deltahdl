@@ -587,4 +587,49 @@ TEST(RandModeNamedVariable,
                             9, "18.8"));
 }
 
+// 18.8: the query form, rand_mode() with no argument, takes a singular
+// variable only, so naming the whole unpacked array arr is an error; the
+// query has to select one element of it by its index.
+TEST(RandModeNamedVariable, QueryOnAWholeUnpackedArrayRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class Packet;\n"
+             "  rand bit [3:0] arr[4];\n"
+             "endclass\n"
+             "module m;\n"
+             "  Packet p;\n"
+             "  int r;\n"
+             "  initial begin\n"
+             "    p = new;\n"
+             "    r = p.arr.rand_mode();\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "rand_mode() with no argument queries one "
+                            "variable, so the unpacked array 'arr' needs one "
+                            "element selected by its index",
+                            9, "18.8"));
+}
+
+// 18.8: the query form on a singular variable, x, and on one element of an
+// unpacked array, arr[1], is legal, as is the void form on the whole array.
+TEST(RandModeNamedVariable, QueryOnAScalarOrAnElementAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class Packet;\n"
+             "  rand bit [3:0] x;\n"
+             "  rand bit [3:0] arr[4];\n"
+             "endclass\n"
+             "module m;\n"
+             "  Packet p;\n"
+             "  int r;\n"
+             "  initial begin\n"
+             "    p = new;\n"
+             "    p.arr.rand_mode(0);\n"
+             "    r = p.x.rand_mode();\n"
+             "    r = p.arr[1].rand_mode();\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
 }  // namespace

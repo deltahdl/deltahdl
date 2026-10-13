@@ -412,26 +412,19 @@ static void CheckNamedConstraintModeExists(
              Subclause("18.9"));
 }
 
-// 18.8: report whether *cls* or any of its base classes declares a data member
-// named *var_name*, distinguishing a random variable (rand/randc) from any
-// other member. 'found' is set when a member of that name exists at all;
-// 'is_rand' when it is declared rand or randc. The most-derived declaration of
-// the name decides, matching the visibility a rand_mode() call resolves.
-static void ClassHierarchyRandVariableStatus(const ClassDecl* cls,
-                                             std::string_view var_name,
-                                             const CompilationUnit* unit,
-                                             bool& found, bool& is_rand) {
-  found = false;
-  is_rand = false;
+// 18.8: the data member named *var_name* that *cls* or one of its base
+// classes declares, the most-derived declaration of the name deciding, as the
+// visibility a rand_mode() call resolves; null where none declares one.
+static const ClassMember* FindHierarchyProperty(const ClassDecl* cls,
+                                                std::string_view var_name,
+                                                const CompilationUnit* unit) {
   for (const auto* c = cls; c; c = FindBaseClass(c, unit)) {
     for (const auto* m : c->members) {
-      if (m->kind == ClassMemberKind::kProperty && m->name == var_name) {
-        found = true;
-        is_rand = m->is_rand || m->is_randc;
-        return;  // most-derived declaration of the name wins
-      }
+      if (m->kind == ClassMemberKind::kProperty && m->name == var_name)
+        return m;
     }
   }
+  return nullptr;
 }
 
 // Matches the named form obj.random_variable.rand_mode(...) of a call
@@ -458,6 +451,23 @@ static const Expr* MatchNamedRandModePrefix(const Stmt* s) {
   return prefix;
 }
 
+// 18.8: the query form of rand_mode(), `call` written with no argument,
+// takes a singular variable only, so where the random variable `var` that
+// `prefix` names, obj.arr, is declared with an unpacked dimension the query has
+// to select one element of it by its index, obj.arr[2].rand_mode(); naming the
+// whole array is an error.
+static void CheckRandModeQueryIsSingular(const Expr* prefix, const Expr& call,
+                                         const ClassMember& var,
+                                         DiagEngine& diag) {
+  if (!call.args.empty() || var.unpacked_dims.empty()) return;
+  diag.Error(prefix->rhs->range.start,
+             std::format("rand_mode() with no argument queries one variable, "
+                         "so the unpacked array '{}' needs one element "
+                         "selected by its index",
+                         prefix->rhs->text),
+             Subclause("18.8"));
+}
+
 // 18.8: a rand_mode() call is a compile-time error when the variable it names
 // is missing from the object's class hierarchy, or is there but neither rand
 // nor randc. This applies to the named form obj.random_variable.rand_mode(...);
@@ -480,12 +490,13 @@ static void CheckNamedRandModeVariableExists(
   const auto* cls = FindClassDecl(it->second, unit);
   if (!cls || cls->is_interface) return;
 
-  bool found = false;
-  bool is_rand = false;
-  ClassHierarchyRandVariableStatus(cls, var_name, unit, found, is_rand);
-  if (is_rand) return;
+  const ClassMember* var = FindHierarchyProperty(cls, var_name, unit);
+  if (var != nullptr && (var->is_rand || var->is_randc)) {
+    CheckRandModeQueryIsSingular(prefix, *ExtractCallFromStmt(s), *var, diag);
+    return;
+  }
 
-  if (!found) {
+  if (var == nullptr) {
     diag.Error(prefix->rhs->range.start,
                std::format("random variable '{}' does not exist in the "
                            "hierarchy of class '{}'",
