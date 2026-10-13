@@ -710,4 +710,28 @@ TEST(CheckerVariableRandomization, ProbeNonconsecutiveMatchItems) {
   EXPECT_EQ(fail->value.ToUint64(), 99u);
 }
 
+// Probe for #6567, removed with its fix: the scope randomize call held to
+// the conditions the failing tick's solve was held to.
+TEST(CheckerVariableRandomization, ProbeDisjunctionSolve) {
+  SimFixture f;
+  auto* bad = RunAndFindVar(
+      "module top;\n"
+      "  bit x, y;\n"
+      "  int bad = 0, fails = 0, ok;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 200; i++) begin\n"
+      "      x = 1; y = 1;\n"
+      "      ok = std::randomize(x, y) with { (x != 1'b1) || (!y || !y);\n"
+      "                                      !y || y || y; };\n"
+      "      if (!ok) fails++;\n"
+      "      if (x == 1 && y == 1) bad++;\n"
+      "    end\n"
+      "    $display(\"PROBE2 fails=%0d bad=%0d\", fails, bad);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top.bad");
+  ASSERT_NE(bad, nullptr);
+  EXPECT_EQ(bad->value.ToUint64(), 99u);
+}
+
 }  // namespace
