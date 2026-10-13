@@ -133,6 +133,8 @@ bool AddRandStructMembers(const ClassMember* m, const ClassTypeInfo* level,
 
 // State threaded through the randomize() build helpers; bundled to keep helper
 // parameter lists small.
+struct JointVarScope;
+
 struct RandomizeCtx {
   ClassObject* obj;
   SimContext& ctx;
@@ -161,6 +163,9 @@ struct RandomizeCtx {
   // 18.5.8: the path the solver names this object's variables under, empty
   // but in a joint solve, where each object of the tree has its own.
   std::string solver_prefix = {};
+  // 18.5.8: in a joint solve, the variables of the tree this object's
+  // relations reach; null otherwise.
+  JointVarScope* joint = nullptr;
 };
 
 // §18.4: the random variables of the elements of each rand dynamic array
@@ -181,16 +186,31 @@ struct JointObject {
   std::string prefix;
 };
 
-// 18.5.8: the joint solve's variable set as one object's constraints see it --
-// the object whose scope a relation is evaluated in, the path prefix its
-// members are named under in the shared solver, the shared list of joint random
-// variables, and the set of their qualified solver names.
+// 18.5.8: the joint solve's variable set as one object's constraints see it:
+// the object whose scope a relation is evaluated in, and each random variable
+// of the tree under that object's prefix, named within the prefix, `v` for its
+// own and `left.v` for one it reaches through its handle `left`, with the
+// object holding it and the set of those names.
 struct JointVarScope {
-  ClassObject* owner;
-  const std::string& prefix;
-  std::vector<RandInfo>& rands;
-  const std::unordered_set<std::string>& names;
+  ClassObject* owner = nullptr;
+  std::vector<RandInfo> rands = {};
+  std::unordered_set<std::string> names = {};
 };
+
+// 18.5.8: whether `name`, read within the object of `rc`, names a random
+// variable of the tree `rc` is solved with, its own or one it reaches
+// through a handle; false outside a joint solve (eval_randomize_joint.cpp).
+bool IsJointVariable(const std::string& name, const RandomizeCtx& rc);
+// 18.5.8: the name within the object of `rc` of the random variable of the
+// tree the operand `e` names, `v`, `left.v` or `arr[1].y`; empty outside a
+// joint solve or for any other operand (eval_randomize_joint.cpp).
+std::string JointVariableName(const Expr* e, const RandomizeCtx& rc);
+// 18.5.8: `rel`, a relation of the object of `rc` reaching a random variable
+// of another object of the tree, built into `out` over the variables of the
+// tree the object reaches; false for a relation over the object's own
+// variables alone, or outside a joint solve (eval_randomize_joint.cpp).
+bool TryJointRelation(const Expr* rel, std::vector<RandInfo>& rands,
+                      RandomizeCtx& rc, bool fold, ConstraintExpr& out);
 
 // A copy of an expression with the nodes `rewrite` answers for replaced by
 // its answer, the others copied over their rewritten children; a node the
@@ -455,6 +475,8 @@ struct ObjectSolve {
   std::unique_ptr<RandomizeCtx> rc = nullptr;
   std::vector<RandInfo> rands = {};
   std::unique_ptr<ConstraintSolver> solver = nullptr;
+  // 18.5.8: in a joint solve, the variables of the tree the object reaches.
+  JointVarScope joint = {};
 };
 
 // 18.6.1: solves the object of `part` alone under the call `call`, leaving

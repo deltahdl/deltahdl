@@ -720,6 +720,44 @@ void Parser::CheckForeachConstraintHeader(ClassMember* member) {
                              foreach_loc);
 }
 
+namespace {
+
+// One constraint_primary of a solve_before_list as its tokens are read: the
+// entry so far, whether a '.' or '::' qualifier was seen, whether a trailing
+// '()' was, and whether nothing but identifiers and '.' was.
+struct SolveBeforeEntryScan {
+  ConstraintSolveBeforeEntry entry;
+  bool qualified = false;
+  bool method = false;
+  bool dotted = true;
+};
+
+void ScanSolveBeforeToken(const Token& t, SolveBeforeEntryScan& scan) {
+  switch (t.kind) {
+    case TokenKind::kIdentifier:
+      if (!scan.entry.name.empty())
+        scan.entry.handles.push_back(scan.entry.name);
+      scan.entry.name = t.text;
+      break;
+    case TokenKind::kDot:
+      scan.qualified = true;
+      break;
+    case TokenKind::kColonColon:
+      scan.qualified = true;
+      scan.dotted = false;
+      break;
+    case TokenKind::kLParen:
+      scan.method = true;
+      scan.dotted = false;
+      break;
+    default:
+      scan.dotted = false;
+      break;
+  }
+}
+
+}  // namespace
+
 // 18.5.9: scan one solve_before_list,
 //   solve_before_list ::= constraint_primary { , constraint_primary }
 //   constraint_primary ::= [ implicit_class_handle . | class_scope ]
@@ -729,28 +767,21 @@ void Parser::CheckForeachConstraintHeader(ClassMember* member) {
 // qualifier (a '.' or '::') or an array-method call ('()', allowed only for an
 // array built-in such as size()) is not a simple local variable; the elaborator
 // uses that flag to confine the rand/integral restrictions to ordinary
-// variables. The list ends at 'before', ';', or the constraint block's '}'.
+// variables. A primary of identifiers joined by '.' alone keeps the handles
+// it passes through, which the simulator reads it by in a joint solve
+// (18.5.8). The list ends at 'before', ';', or the constraint block's '}'.
 void Parser::ParseSolveBeforeList(
     std::vector<ConstraintSolveBeforeEntry>& out) {
   while (!AtEnd()) {
-    ConstraintSolveBeforeEntry entry;
-    bool qualified = false;  // a '.' or '::' qualifier was seen
-    bool method = false;     // a trailing '()' was seen
+    SolveBeforeEntryScan scan;
     while (!Check(TokenKind::kComma) && !Check(TokenKind::kKwBefore) &&
            !Check(TokenKind::kSemicolon) && !Check(TokenKind::kRBrace) &&
            !AtEnd()) {
-      Token t = Consume();
-      if (t.kind == TokenKind::kIdentifier) {
-        entry.name = t.text;
-      } else if (t.kind == TokenKind::kDot ||
-                 t.kind == TokenKind::kColonColon) {
-        qualified = true;
-      } else if (t.kind == TokenKind::kLParen) {
-        method = true;
-      }
+      ScanSolveBeforeToken(Consume(), scan);
     }
-    entry.is_simple = !qualified && !method;
-    if (!entry.name.empty()) out.push_back(entry);
+    scan.entry.is_simple = !scan.qualified && !scan.method;
+    if (!scan.dotted) scan.entry.handles.clear();
+    if (!scan.entry.name.empty()) out.push_back(scan.entry);
     if (!Match(TokenKind::kComma)) break;
   }
 }

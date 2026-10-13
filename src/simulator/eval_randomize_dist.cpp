@@ -1,5 +1,6 @@
 #include <cstdint>
 #include <string>
+#include <utility>
 
 #include "common/types.h"
 #include "lexer/token.h"
@@ -58,13 +59,14 @@ void ToleranceEnds(const DistBound& centre, const DistBound& tol, bool relative,
 
 // 18.5.3: translate a captured "expression dist { dist_list }" into a kDist
 // solver constraint. The distribution names the single variable it weights, so
-// the target must be a plain identifier; each item's value/range bounds and its
+// the target must be a plain identifier, or in a joint solve a variable of
+// the tree (18.5.8); each item's value/range bounds and its
 // weight are constant expressions, folded here both to the integers an
 // integral variable is drawn from and to the reals a real one is, the solver
 // reading whichever its variable takes. A range keeps its per_element flag so
 // the solver spreads a ':=' weight across the range, and an item with no
-// explicit weight keeps the DistWeight default weight of 1. Returns false for a
-// non-identifier target, leaving the distribution unbuilt.
+// explicit weight keeps the DistWeight default weight of 1. Returns false for
+// any other target, leaving the distribution unbuilt.
 // 18.5.3: a weight read as the unsigned value of its whole expression, held
 // to the largest uint64_t where a word above the lowest is set, so that no
 // nonzero weight reads as zero.
@@ -77,10 +79,15 @@ static uint64_t DistWeightValue(const Logic4Vec& v) {
 
 bool BuildDistConstraint(const ConstraintDistRef& ref, RandomizeCtx& rc,
                          ConstraintExpr& out) {
-  if (ref.target == nullptr || ref.target->kind != ExprKind::kIdentifier)
-    return false;
+  if (ref.target == nullptr) return false;
+  // 18.5.8: in a joint solve, a target reaching another object's variable
+  // through a handle, `left.v`, weights that variable.
+  std::string name = ref.target->kind == ExprKind::kIdentifier
+                         ? std::string(ref.target->text)
+                         : JointVariableName(ref.target, rc);
+  if (name.empty()) return false;
   out.kind = ConstraintKind::kDist;
-  out.var_name = std::string(ref.target->text);
+  out.var_name = std::move(name);
   ConstraintEvalScope scope(rc.obj, rc.ctx);
   for (const auto& item : ref.items) {
     DistWeight w;

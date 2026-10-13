@@ -260,4 +260,161 @@ TEST(GlobalConstraintsRun, AMembersUniquenessAndGuardsHoldInTheTree) {
             "4\n");
 }
 
+// §18.5.8 with §18.5.7.1: a foreach constraint of an object two levels into
+// the tree whose relations reach the object under its handle l ties each
+// element to the l.v the call draws, on every one of 4 calls, rather than
+// to the l.v held before it.
+TEST(GlobalConstraintsRun, AForeachReachingAnotherObjectHoldsInTheTree) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class Leaf;\n"
+      "  rand bit [3:0] v;\n"
+      "endclass\n"
+      "class Mid;\n"
+      "  rand Leaf l;\n"
+      "  rand bit [3:0] a[2];\n"
+      "  constraint c { foreach (a[i]) a[i] == l.v + i; }\n"
+      "  function new(); l = new; endfunction\n"
+      "endclass\n"
+      "class Top;\n"
+      "  rand Mid m;\n"
+      "  function new(); m = new; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int held = 0;\n"
+      "  initial begin\n"
+      "    static Top o = new;\n"
+      "    repeat (4)\n"
+      "      if (o.randomize() == 1 && o.m.a[0] == o.m.l.v &&\n"
+      "          o.m.a[1] == o.m.l.v + 1) held++;\n"
+      "    $display(\"%0d\", held);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4\n");
+}
+
+// §18.5.8 with §18.5.3: a dist whose target is the random variable of the
+// object under the handle left weights that variable, so on every one of 4
+// calls left.v takes the only value of nonzero weight.
+TEST(GlobalConstraintsRun, ADistOnAnotherObjectsVariableHoldsInTheTree) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class Leaf;\n"
+      "  rand bit [1:0] v;\n"
+      "endclass\n"
+      "class A;\n"
+      "  rand Leaf left;\n"
+      "  constraint c { left.v dist { 0 := 0, 1 := 0, 2 := 1, 3 := 0 }; }\n"
+      "  function new(); left = new; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int held = 0;\n"
+      "  initial begin\n"
+      "    static A a = new;\n"
+      "    repeat (4)\n"
+      "      if (a.randomize() == 1 && a.left.v == 2) held++;\n"
+      "    $display(\"%0d\", held);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4\n");
+}
+
+// §18.5.8 with §18.5.4: a uniqueness constraint naming the random variable
+// of the object under the handle left among its members keeps it apart from
+// the others, so on every one of 4 calls the four 2-bit members are
+// pairwise distinct.
+TEST(GlobalConstraintsRun,
+     AUniquenessOverAnotherObjectsVariableHoldsInTheTree) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class Leaf;\n"
+      "  rand bit [1:0] v;\n"
+      "endclass\n"
+      "class A;\n"
+      "  rand Leaf left;\n"
+      "  rand bit [1:0] p, q, r;\n"
+      "  constraint u { unique { p, q, r, left.v }; }\n"
+      "  function new(); left = new; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int held = 0;\n"
+      "  initial begin\n"
+      "    static A a = new;\n"
+      "    repeat (4)\n"
+      "      if (a.randomize() == 1 && a.p != a.q && a.p != a.r &&\n"
+      "          a.q != a.r && a.left.v != a.p && a.left.v != a.q &&\n"
+      "          a.left.v != a.r) held++;\n"
+      "    $display(\"%0d\", held);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4\n");
+}
+
+// §18.5.8 with §18.5.9: solve left.s before d has the random variable of the
+// object under the handle left chosen first, 0 or 1 with equal probability,
+// so over 32 calls it is set near half the time, which a 4-bit d drawn with
+// it, the implication leaving s set in one of 17 legal combinations, would
+// leave near 2; and d is zero on every call with it set.
+TEST(GlobalConstraintsRun, AnOrderingOverAnotherObjectsVariableHoldsInTheTree) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class Leaf;\n"
+      "  rand bit s;\n"
+      "endclass\n"
+      "class B;\n"
+      "  rand Leaf left;\n"
+      "  rand bit [3:0] d;\n"
+      "  constraint c { left.s -> d == 0; }\n"
+      "  constraint order { solve left.s before d; }\n"
+      "  function new(); left = new; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int set = 0, wrong = 0;\n"
+      "  initial begin\n"
+      "    static B o = new;\n"
+      "    repeat (32) begin\n"
+      "      void'(o.randomize());\n"
+      "      if (o.left.s) set++;\n"
+      "      if (o.left.s && o.d != 0) wrong++;\n"
+      "    end\n"
+      "    $display(\"%0d %0d\", set >= 8 && set <= 24, wrong);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 0\n");
+}
+
+// §18.5.8 with §7.4.6: a relation over the random variable of an object an
+// element of a rand array of handles holds, arr[1].y, ties x to the arr[1].y
+// the call draws, on every one of 4 calls, rather than to the one held
+// before it.
+TEST(GlobalConstraintsRun, ARelationOverAnElementsObjectHoldsInTheTree) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class Cell;\n"
+      "  rand bit [3:0] y;\n"
+      "endclass\n"
+      "class Grid;\n"
+      "  rand Cell arr[];\n"
+      "  rand bit [4:0] x;\n"
+      "  constraint c { x == arr[1].y + 1; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int held = 0;\n"
+      "  initial begin\n"
+      "    static Grid g = new;\n"
+      "    g.arr = new[2];\n"
+      "    g.arr[0] = new; g.arr[1] = new;\n"
+      "    repeat (4)\n"
+      "      if (g.randomize() == 1 && g.x == g.arr[1].y + 1) held++;\n"
+      "    $display(\"%0d\", held);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4\n");
+}
+
 }  // namespace

@@ -15,6 +15,7 @@
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/constraint_solver.h"
+#include "simulator/eval_class_array.h"
 #include "simulator/eval_randomize_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -58,65 +59,75 @@ std::vector<JointObject> CollectActiveRandomObjects(ClassObject* obj,
   return std::move(walk.out);
 }
 
-// 18.5.8: resolve a constraint operand to the path-qualified name of a joint
-// rand variable, or an empty string when the operand is not one (a state
-// variable, whose present value the solver reads as fixed). A bare identifier
-// names a rand member of the constraint's own object -- prefix + id. A
-// one-level handle.field member access names a rand member of a nested object
-// reached through the owner's rand handle -- prefix + handle + "." + field.
-// Only names present in the joint set qualify; everything else is a constant.
-std::string ResolveJointOperand(const Expr* e, const std::string& prefix,
-                                const std::unordered_set<std::string>& names) {
+// 18.5.8: the path an operand names from the object whose relation it is
+// in: a bare identifier as written, a select of an array at a literal index,
+// `arr[1]`, by the key its element is held under, and a member of either
+// through a handle, `left.v` or `arr[1].y`, as the path to the handle, a dot
+// and the member; empty for any other form.
+std::string OperandPath(const Expr* e) {
   if (e == nullptr) return {};
-  if (e->kind == ExprKind::kIdentifier) {
-    std::string q = prefix + std::string(e->text);
-    return names.count(q) != 0 ? q : std::string{};
+  if (e->kind == ExprKind::kIdentifier) return std::string(e->text);
+  if (e->kind == ExprKind::kSelect && e->index_end == nullptr &&
+      e->base != nullptr && e->base->kind == ExprKind::kIdentifier &&
+      e->index != nullptr && e->index->kind == ExprKind::kIntegerLiteral) {
+    return ClassArrayElementKey(e->base->text,
+                                static_cast<int64_t>(e->index->int_val));
   }
-  if (e->kind == ExprKind::kMemberAccess && e->lhs != nullptr &&
-      e->lhs->kind == ExprKind::kIdentifier && e->rhs != nullptr &&
-      e->rhs->kind == ExprKind::kIdentifier) {
-    std::string q =
-        prefix + std::string(e->lhs->text) + "." + std::string(e->rhs->text);
-    return names.count(q) != 0 ? q : std::string{};
+  if (e->kind != ExprKind::kMemberAccess || e->is_scope_resolution ||
+      e->rhs == nullptr || e->rhs->kind != ExprKind::kIdentifier) {
+    return {};
   }
-  return {};
+  std::string handle = OperandPath(e->lhs);
+  if (handle.empty()) return {};
+  return handle + "." + std::string(e->rhs->text);
+}
+
+// 18.5.8: resolve a constraint operand to the name of a joint rand variable
+// within the constraint's object, or an empty string when the operand is not
+// one (a state variable, whose present value the solver reads as fixed).
+std::string ResolveJointOperand(const Expr* e,
+                                const std::unordered_set<std::string>& names) {
+  std::string q = OperandPath(e);
+  return names.count(q) != 0 ? q : std::string{};
 }
 
 // 18.5.8: true when an expression references any joint rand variable, so it is
-// not a solve-time constant. A member access is resolved as a whole -- its
-// field identifier is never treated as a bare-identifier operand, so a nested
-// `.v` is not confused with a same-named variable of the constraint's own
-// object.
-bool RefsJointVar(const Expr* e, const std::string& prefix,
-                  const std::unordered_set<std::string>& names) {
+// not a solve-time constant. An operand naming one is resolved as a whole --
+// the field of a member access is never treated as a bare-identifier operand,
+// so a nested `.v` is not confused with a same-named variable of the
+// constraint's own object.
+bool RefsJointVar(const Expr* e, const std::unordered_set<std::string>& names) {
   if (e == nullptr) return false;
+  if (!ResolveJointOperand(e, names).empty()) return true;
   if (e->kind == ExprKind::kIdentifier || e->kind == ExprKind::kMemberAccess)
-    return !ResolveJointOperand(e, prefix, names).empty();
-  if (RefsJointVar(e->lhs, prefix, names)) return true;
-  if (RefsJointVar(e->rhs, prefix, names)) return true;
-  if (RefsJointVar(e->base, prefix, names)) return true;
+    return false;
+  if (RefsJointVar(e->lhs, names)) return true;
+  if (RefsJointVar(e->rhs, names)) return true;
+  if (RefsJointVar(e->base, names)) return true;
   for (const Expr* a : e->args)
-    if (RefsJointVar(a, prefix, names)) return true;
+    if (RefsJointVar(a, names)) return true;
   return false;
 }
 
-// 18.5.8: collect the qualified names of the joint variables an expression
-// references (for the priority/ordered passes; the flat pass checks every
-// constraint regardless). A member access is taken atomically so its field is
-// not walked as a separate identifier.
-void CollectJointRefs(const Expr* e, const std::string& prefix,
+// 18.5.8: collect the names of the joint variables an expression references
+// (for the priority/ordered passes; the flat pass checks every constraint
+// regardless). An operand naming one is taken whole so a member access's
+// field is not walked as a separate identifier.
+void CollectJointRefs(const Expr* e,
                       const std::unordered_set<std::string>& names,
                       std::vector<std::string>& out) {
   if (e == nullptr) return;
-  if (e->kind == ExprKind::kIdentifier || e->kind == ExprKind::kMemberAccess) {
-    std::string q = ResolveJointOperand(e, prefix, names);
-    if (!q.empty()) out.push_back(q);
+  std::string q = ResolveJointOperand(e, names);
+  if (!q.empty()) {
+    out.push_back(q);
     return;
   }
-  CollectJointRefs(e->lhs, prefix, names, out);
-  CollectJointRefs(e->rhs, prefix, names, out);
-  CollectJointRefs(e->base, prefix, names, out);
-  for (const Expr* a : e->args) CollectJointRefs(a, prefix, names, out);
+  if (e->kind == ExprKind::kIdentifier || e->kind == ExprKind::kMemberAccess)
+    return;
+  CollectJointRefs(e->lhs, names, out);
+  CollectJointRefs(e->rhs, names, out);
+  CollectJointRefs(e->base, names, out);
+  for (const Expr* a : e->args) CollectJointRefs(a, names, out);
 }
 
 // 18.5.8: build a custom joint constraint. A global constraint relates random
@@ -201,7 +212,7 @@ Logic4Vec EvalJointTrial(const Expr* e, ClassObject* owner,
 // with the comparison as read from that side and `name` with the variable;
 // nullptr where neither side is, or the relation is no comparison, or an
 // inequality, which bounds nothing.
-const Expr* DerivedJointSide(const Expr* rel, const JointVarScope& scope,
+const Expr* DerivedJointSide(const Expr* rel, JointVarScope& scope,
                              ConstraintKind& cmp, std::string& name) {
   if (rel->kind != ExprKind::kBinary || rel->lhs == nullptr ||
       rel->rhs == nullptr || rel->op == TokenKind::kBangEq ||
@@ -210,10 +221,10 @@ const Expr* DerivedJointSide(const Expr* rel, const JointVarScope& scope,
   }
   for (const Expr* side : {rel->lhs, rel->rhs}) {
     const Expr* other = side == rel->lhs ? rel->rhs : rel->lhs;
-    std::string q = ResolveJointOperand(side, scope.prefix, scope.names);
+    std::string q = ResolveJointOperand(side, scope.names);
     if (q.empty()) continue;
     std::vector<std::string> refs;
-    CollectJointRefs(other, scope.prefix, scope.names, refs);
+    CollectJointRefs(other, scope.names, refs);
     if (std::find(refs.begin(), refs.end(), q) != refs.end()) continue;
     if (side == rel->rhs) ComparisonKind(MirrorComparison(rel->op), cmp);
     name = q;
@@ -222,12 +233,11 @@ const Expr* DerivedJointSide(const Expr* rel, const JointVarScope& scope,
   return nullptr;
 }
 
-ConstraintExpr MakeJointCustomConstraint(const Expr* rel,
-                                         const JointVarScope& scope,
+ConstraintExpr MakeJointCustomConstraint(const Expr* rel, JointVarScope& scope,
                                          RandomizeCtx& rc) {
   ConstraintExpr ce;
   ce.kind = ConstraintKind::kCustom;
-  CollectJointRefs(rel, scope.prefix, scope.names, ce.ref_vars);
+  CollectJointRefs(rel, scope.names, ce.ref_vars);
   std::vector<RandInfo>* jr = &scope.rands;
   ClassObject* owner = scope.owner;
   ce.eval_fn = [rel, owner, jr,
@@ -243,7 +253,7 @@ ConstraintExpr MakeJointCustomConstraint(const Expr* rel,
     const Expr* other = derived == rel->lhs ? rel->rhs : rel->lhs;
     ce.var_name = name;
     ce.derive_cmp = cmp;
-    ce.co_var_name = ResolveJointOperand(other, scope.prefix, scope.names);
+    ce.co_var_name = ResolveJointOperand(other, scope.names);
     ce.derive_fn = [other, owner, jr, name,
                     &rc](const std::unordered_map<std::string, int64_t>& vals) {
       Logic4Vec value = EvalJointTrial(other, owner, *jr, rc, vals);
@@ -261,23 +271,22 @@ ConstraintExpr MakeJointCustomConstraint(const Expr* rel,
 // is also how a global constraint against a state variable (rule c) is handled,
 // its held value folded in as the constant. False means the relation ties two
 // joint variables together, or is not a plain comparison.
-bool TryJointComparison(const Expr* rel, const JointVarScope& scope,
-                        RandomizeCtx& rc, ConstraintExpr& out, bool fold) {
+bool TryJointComparison(const Expr* rel, JointVarScope& scope, RandomizeCtx& rc,
+                        ConstraintExpr& out, bool fold) {
   if (rel == nullptr || rel->kind != ExprKind::kBinary || rel->lhs == nullptr ||
       rel->rhs == nullptr)
     return false;
   ConstraintKind kind = ConstraintKind::kEqual;
   if (!ComparisonKind(rel->op, kind)) return false;
-  std::string lname = ResolveJointOperand(rel->lhs, scope.prefix, scope.names);
-  std::string rname = ResolveJointOperand(rel->rhs, scope.prefix, scope.names);
+  std::string lname = ResolveJointOperand(rel->lhs, scope.names);
+  std::string rname = ResolveJointOperand(rel->rhs, scope.names);
   std::string vname;
   const Expr* const_side = nullptr;
   bool mirror = false;
-  if (!lname.empty() && !RefsJointVar(rel->rhs, scope.prefix, scope.names)) {
+  if (!lname.empty() && !RefsJointVar(rel->rhs, scope.names)) {
     vname = lname;
     const_side = rel->rhs;
-  } else if (!rname.empty() &&
-             !RefsJointVar(rel->lhs, scope.prefix, scope.names)) {
+  } else if (!rname.empty() && !RefsJointVar(rel->lhs, scope.names)) {
     vname = rname;
     const_side = rel->lhs;
     mirror = true;
@@ -307,14 +316,14 @@ bool TryJointComparison(const Expr* rel, const JointVarScope& scope,
 // and items free of joint variables, as the set membership the solver draws
 // a member of, the items evaluated in the owner's scope; false for any
 // other shape.
-bool TryJointSetMembership(const Expr* rel, const JointVarScope& scope,
+bool TryJointSetMembership(const Expr* rel, JointVarScope& scope,
                            RandomizeCtx& rc, ConstraintExpr& out) {
   if (rel == nullptr || rel->kind != ExprKind::kInside || rel->lhs == nullptr)
     return false;
-  std::string name = ResolveJointOperand(rel->lhs, scope.prefix, scope.names);
+  std::string name = ResolveJointOperand(rel->lhs, scope.names);
   if (name.empty()) return false;
   for (const Expr* item : rel->elements)
-    if (RefsJointVar(item, scope.prefix, scope.names)) return false;
+    if (RefsJointVar(item, scope.names)) return false;
   std::vector<int64_t> values;
   rc.ctx.PushScope();
   bool enumerated =
@@ -331,7 +340,7 @@ bool TryJointSetMembership(const Expr* rel, const JointVarScope& scope,
 // 18.5.8: translate one relation of an object's constraint for the joint solve.
 // Any relation the comparison fast path above does not take becomes a custom
 // joint constraint checked against trial values.
-ConstraintExpr BuildJointRelation(const Expr* rel, const JointVarScope& scope,
+ConstraintExpr BuildJointRelation(const Expr* rel, JointVarScope& scope,
                                   RandomizeCtx& rc, bool fold) {
   ConstraintExpr out;
   if (TryJointComparison(rel, scope, rc, out, fold)) return out;
@@ -360,111 +369,48 @@ ConstraintExpr BuildJointRelation(const Expr* rel, const JointVarScope& scope,
   // before the relation is imposed; a subexpression over a joint variable is
   // RANDOM, any other evaluated over the state in the owner's scope.
   AttachConstraintGuard(
-      rel,
-      [&scope](const Expr* e) {
-        return RefsJointVar(e, scope.prefix, scope.names);
-      },
+      rel, [&scope](const Expr* e) { return RefsJointVar(e, scope.names); },
       scope.owner, rc, out_custom);
   return out_custom;
 }
 
-// 18.5.8: the relations of an object's constraint that reach another object
-// of the tree, translated into the shared solver over the joint variables;
-// the object's own relations are translated by the per-object machinery
-// under the object's prefix (AddTreeConstraintMember).
-//
-// 18.5.13.2: each 'disable soft' directive of the block, naming the joint
-// variable of the object's member, ahead of the block's own soft
-// constraints; 18.5.13: each soft constraint, its inner relation translated
-// without folding the draw domain and wrapped in a kSoft the solver honors
-// where it can and discards, by its priority (18.5.13.1), where it cannot.
-void AddJointSoftConstraints(const ClassMember* m, const JointVarScope& scope,
-                             RandomizeCtx& rc, ConstraintBlock& block) {
-  for (const auto& ref : m->constraint_disable_soft_refs) {
-    ConstraintExpr ce;
-    ce.kind = ConstraintKind::kDisableSoft;
-    ce.var_name = scope.prefix + std::string(ref.name);
-    block.constraints.push_back(std::move(ce));
-  }
-  for (const Expr* rel : m->constraint_soft_exprs) {
-    auto inner = std::make_unique<ConstraintExpr>(
-        BuildJointRelation(rel, scope, rc, /*fold=*/false));
-    ConstraintExpr sc;
-    sc.kind = ConstraintKind::kSoft;
-    sc.var_name = inner->var_name;
-    sc.ref_vars = inner->ref_vars;
-    sc.inner = inner.get();
-    rc.soft_inners.push_back(std::move(inner));
-    block.constraints.push_back(std::move(sc));
-  }
+bool IsJointVariable(const std::string& name, const RandomizeCtx& rc) {
+  return rc.joint != nullptr && rc.joint->names.count(name) != 0;
 }
 
-void AddJointConstraintBlock(const ClassMember* m, ClassObject* obj,
-                             const JointVarScope& scope, RandomizeCtx& rc,
-                             ConstraintSolver& solver) {
-  ConstraintBlock block;
-  block.name = std::string(m->name);
-  // 18.9: a block turned off by constraint_mode() is not considered, so its
-  // relations fold no bound into the variables' domains.
-  block.enabled = IsObjectConstraintActive(obj, m->name);
-  for (const Expr* rel : m->constraint_exprs) {
-    block.constraints.push_back(
-        BuildJointRelation(rel, scope, rc, /*fold=*/block.enabled));
-  }
-  AddJointSoftConstraints(m, scope, rc, block);
-  solver.AddConstraintBlock(block);
+std::string JointVariableName(const Expr* e, const RandomizeCtx& rc) {
+  std::string name = OperandPath(e);
+  return IsJointVariable(name, rc) ? name : std::string{};
 }
 
 // 18.5.8: whether `e` reaches a random variable of another object of the
 // tree through a handle, `left.v`, which the per-object machinery would read
 // as a state variable; a member access naming one of the object's own
 // variables, a member of its rand structure, does not.
-bool ReachesAnotherObject(const Expr* e, const JointVarScope& scope,
-                          const std::unordered_set<std::string>& own) {
+bool ReachesAnotherObject(const Expr* e, std::vector<RandInfo>& own,
+                          const RandomizeCtx& rc) {
   if (e == nullptr || e->kind == ExprKind::kIdentifier) return false;
   if (e->kind == ExprKind::kMemberAccess) {
-    std::string q = ResolveJointOperand(e, scope.prefix, scope.names);
-    return !q.empty() && own.count(q) == 0;
+    std::string name = JointVariableName(e, rc);
+    return !name.empty() && FindRand(own, name) == nullptr;
   }
   for (const Expr* sub :
        {e->lhs, e->rhs, e->base, e->condition, e->true_expr, e->false_expr}) {
-    if (ReachesAnotherObject(sub, scope, own)) return true;
+    if (ReachesAnotherObject(sub, own, rc)) return true;
   }
   for (const auto* list : {&e->args, &e->elements}) {
     for (const Expr* sub : *list)
-      if (ReachesAnotherObject(sub, scope, own)) return true;
+      if (ReachesAnotherObject(sub, own, rc)) return true;
   }
   return false;
 }
 
-// 18.5.8: the constraint `m` of the object of `part`, its relations over the
-// object's own variables built by the per-object machinery under the
-// object's prefix, so that every form a constraint takes is kept, and those
-// reaching another object of the tree built over the joint variables in a
-// block of the same name just after.
-void AddTreeConstraintMember(const ClassMember* m, ObjectSolve& part,
-                             const JointVarScope& scope, RandomizeCtx& joint_rc,
-                             ConstraintSolver& solver) {
-  std::unordered_set<std::string> own;
-  for (const auto& ri : part.rands) own.insert(part.prefix + ri.name);
-  ClassMember local = *m;
-  ClassMember global;
-  global.name = m->name;
-  local.constraint_exprs.clear();
-  local.constraint_soft_exprs.clear();
-  for (Expr* rel : m->constraint_exprs) {
-    (ReachesAnotherObject(rel, scope, own) ? global : local)
-        .constraint_exprs.push_back(rel);
-  }
-  for (Expr* rel : m->constraint_soft_exprs) {
-    (ReachesAnotherObject(rel, scope, own) ? global : local)
-        .constraint_soft_exprs.push_back(rel);
-  }
-  solver.SetNameScope(part.prefix);
-  AddConstraintMember(&local, part.rands, *part.rc, solver);
-  solver.SetNameScope("");
-  if (!global.constraint_exprs.empty() || !global.constraint_soft_exprs.empty())
-    AddJointConstraintBlock(&global, part.obj, scope, joint_rc, solver);
+bool TryJointRelation(const Expr* rel, std::vector<RandInfo>& rands,
+                      RandomizeCtx& rc, bool fold, ConstraintExpr& out) {
+  if (rc.joint == nullptr || !ReachesAnotherObject(rel, rands, rc))
+    return false;
+  out = BuildJointRelation(rel, *rc.joint, rc, fold);
+  return true;
 }
 
 // 18.5.13.1: the objects of the tree in the order their constraints take soft
@@ -527,21 +473,26 @@ std::vector<ObjectSolve> TreeParts(const std::vector<JointObject>& objects,
   return parts;
 }
 
-// 18.5.8: every random variable of the tree by its name in the shared
-// solver, with the object holding it, as the relations reaching across
-// objects read and write them.
-std::vector<RandInfo> JointRands(const std::vector<ObjectSolve>& parts) {
-  std::vector<RandInfo> out;
-  for (const auto& part : parts) {
-    for (RandInfo ri : part.rands) {
-      ri.member = ri.name;
-      ri.owner = part.obj;
-      ri.name = part.prefix + ri.name;
-      ri.var.name = ri.name;
-      out.push_back(std::move(ri));
+// 18.5.8: for each object of the tree, every random variable of the tree
+// under its prefix, named within the prefix, with the object holding it, as
+// the object's relations reaching across objects read and write them.
+void BindJointScopes(std::vector<ObjectSolve>& parts) {
+  for (auto& part : parts) {
+    part.joint.owner = part.obj;
+    for (const auto& held : parts) {
+      if (!held.prefix.starts_with(part.prefix)) continue;
+      const std::string kPath = held.prefix.substr(part.prefix.size());
+      for (RandInfo ri : held.rands) {
+        ri.member = ri.name;
+        ri.owner = held.obj;
+        ri.name = kPath + ri.name;
+        ri.var.name = ri.name;
+        part.joint.names.insert(ri.name);
+        part.joint.rands.push_back(std::move(ri));
+      }
     }
+    part.rc->joint = &part.joint;
   }
-  return out;
 }
 
 // 18.6.2: each object's solved values written back, and only then each
@@ -564,21 +515,20 @@ bool RandomizeObjectTree(SimContext& ctx, Arena& arena, const Expr* expr,
   ConstraintSolver solver(seed);
   std::vector<ObjectSolve> parts =
       TreeParts(objects, inline_block, solver, ctx, arena);
-  std::vector<RandInfo> joint_rands = JointRands(parts);
-  std::unordered_set<std::string> names;
-  for (const auto& ri : joint_rands) names.insert(ri.name);
-  RandomizeCtx joint_rc{root, ctx, arena};
-  joint_rc.solver = &solver;
+  BindJointScopes(parts);
 
   // 18.5.13.1: the solver ranks soft priority by the order the blocks are
   // added, so the objects are added in that order, and the inline block,
   // which outranks every constraint of the class being randomized, last.
+  // 18.5.8: each object's constraints are built as for the object alone
+  // under its prefix, a relation reaching another object of the tree over
+  // the variables the object reaches.
   for (ObjectSolve* part : InSoftPriorityOrder(parts, ctx)) {
-    const JointVarScope kScope{part->obj, part->prefix, joint_rands, names};
+    solver.SetNameScope(part->prefix);
     for (const ClassMember* m : ConstraintMembersInOrder(part->obj->type))
-      AddTreeConstraintMember(m, *part, kScope, joint_rc, solver);
+      AddConstraintMember(m, part->rands, *part->rc, solver);
     if (part == &parts.front() && inline_block != nullptr)
-      AddTreeConstraintMember(inline_block, *part, kScope, joint_rc, solver);
+      AddConstraintMember(inline_block, part->rands, *part->rc, solver);
   }
   for (auto& part : parts) {
     solver.SetNameScope(part.prefix);

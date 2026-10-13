@@ -659,8 +659,12 @@ static ConstraintExpr TranslateUnguarded(const Expr* rel,
 
 // 18.5.12: an implication's antecedent is its constraint guard, resolved
 // before the relation is imposed, however the relation itself is built.
+// 18.5.8: a relation reaching another object of a joint solve is built over
+// the variables of the tree the object reaches.
 ConstraintExpr TranslateRelation(const Expr* rel, std::vector<RandInfo>& rands,
                                  RandomizeCtx& rc, bool fold) {
+  ConstraintExpr joint;
+  if (TryJointRelation(rel, rands, rc, fold, joint)) return joint;
   rel = ResolveArraySizes(rel, rc);
   rel = PackedMembersAsSelects(rel, rands, rc);
   ConstraintExpr ce = TranslateUnguarded(rel, rands, rc, fold);

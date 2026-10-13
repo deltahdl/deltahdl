@@ -56,6 +56,10 @@ struct ConstraintForeachRef {
 struct ConstraintSolveBeforeEntry {
   std::string_view name;
   bool is_simple = true;
+  // 18.5.8: the handles a primary written as a member reached through
+  // handles alone, `left.v`, passes through, in order; empty for any other
+  // form.
+  std::vector<std::string_view> handles;
 };
 
 // 18.5.9: a 'solve solve_before_list before solve_before_list ;' ordering

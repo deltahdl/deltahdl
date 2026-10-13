@@ -54,9 +54,14 @@ static void AddSoftConstraints(const ClassMember* m,
     bool gated = rel->kind == ExprKind::kBinary &&
                  rel->op == TokenKind::kArrow && rel->lhs != nullptr &&
                  rel->rhs != nullptr;
-    auto inner = std::make_unique<ConstraintExpr>(
-        gated ? SoftImplication(rel, rands, rc)
-              : TranslateRelation(rel, rands, rc, /*fold=*/false));
+    // 18.5.8: an implication reaching another object of a joint solve is
+    // built over the variables of the tree, its antecedent with it.
+    auto inner = std::make_unique<ConstraintExpr>();
+    if (!gated) {
+      *inner = TranslateRelation(rel, rands, rc, /*fold=*/false);
+    } else if (!TryJointRelation(rel, rands, rc, /*fold=*/false, *inner)) {
+      *inner = SoftImplication(rel, rands, rc);
+    }
     ConstraintExpr sc;
     sc.kind = ConstraintKind::kSoft;
     sc.var_name = inner->var_name;
@@ -138,6 +143,11 @@ static void AddUniqueMember(const Expr* item, std::vector<RandInfo>& rands,
              item->base->kind == ExprKind::kIdentifier &&
              item->index != nullptr) {
     AddUniqueSelect(item, rands, rc, out);
+  } else if (item->kind == ExprKind::kMemberAccess) {
+    // 18.5.8: in a joint solve, a member reaching another object's variable
+    // through a handle, `left.v`, is that variable.
+    std::string name = JointVariableName(item, rc);
+    if (!name.empty()) out.push_back(std::move(name));
   }
 }
 
@@ -156,30 +166,42 @@ static void AddUniqueConstraints(const ClassMember* m,
 
 // 18.5.9: lower each 'solve before_list before after_list' ordering into the
 // solver's variable ordering. Only a simple local entry that resolves to an
-// active rand variable participates; a qualified reference or an array.size()
-// method -- which the scalar solver does not model as its own drawable variable
-// -- is left out, mirroring the lenient treatment of unresolved references in
-// the uniqueness lowering. The ordering only reweights the probability of the
-// legal combinations and never removes a solution, so dropping an unresolved
-// entry merely relaxes the order rather than losing a solution.
-// The entries of one side of a solve...before list that resolve to an active
-// rand variable the scalar solver draws.
+// active rand variable participates, or in a joint solve an entry reaching
+// another object's variable through handles (18.5.8); any other qualified
+// reference or an array.size() method -- which the scalar solver does not
+// model as its own drawable variable -- is left out, mirroring the lenient
+// treatment of unresolved references in the uniqueness lowering. The ordering
+// only reweights the probability of the legal combinations and never removes a
+// solution, so dropping an unresolved entry merely relaxes the order rather
+// than losing a solution. The entries of one side of a solve...before list that
+// resolve to an active rand variable the scalar solver draws, `left.v` naming
+// the variable of the tree it reaches.
 static std::vector<std::string> ResolveOrderedNames(
     const std::vector<ConstraintSolveBeforeEntry>& entries,
-    std::vector<RandInfo>& rands) {
+    std::vector<RandInfo>& rands, const RandomizeCtx& rc) {
   std::vector<std::string> names;
-  for (const auto& e : entries)
-    if (e.is_simple && FindRand(rands, e.name))
+  for (const auto& e : entries) {
+    if (e.is_simple && FindRand(rands, e.name)) {
       names.push_back(std::string(e.name));
+      continue;
+    }
+    if (e.handles.empty()) continue;
+    std::string path;
+    for (std::string_view handle : e.handles) path += std::string(handle) + ".";
+    path += e.name;
+    if (IsJointVariable(path, rc)) names.push_back(std::move(path));
+  }
   return names;
 }
 
 static void AddSolveBeforeOrderings(const ClassMember* m,
                                     std::vector<RandInfo>& rands,
+                                    const RandomizeCtx& rc,
                                     ConstraintSolver& solver) {
   for (const auto& ref : m->constraint_solve_before_refs) {
-    std::vector<std::string> before = ResolveOrderedNames(ref.before, rands);
-    std::vector<std::string> after = ResolveOrderedNames(ref.after, rands);
+    std::vector<std::string> before =
+        ResolveOrderedNames(ref.before, rands, rc);
+    std::vector<std::string> after = ResolveOrderedNames(ref.after, rands, rc);
     if (!before.empty() && !after.empty()) solver.AddSolveBefore(before, after);
   }
 }
@@ -256,7 +278,7 @@ void AddConstraintMember(const ClassMember* m, std::vector<RandInfo>& rands,
   AddSoftConstraints(m, rands, rc, block);
   AddSoftDistConstraints(m, rc, block);
   AddUniqueConstraints(m, rands, rc, block);
-  AddSolveBeforeOrderings(m, rands, solver);
+  AddSolveBeforeOrderings(m, rands, rc, solver);
   AddFunctionArgPriorities(m, rands, solver);
 
   solver.AddConstraintBlock(block);

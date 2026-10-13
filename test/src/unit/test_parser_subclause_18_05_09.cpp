@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <string_view>
+#include <vector>
+
 #include "fixture_parser.h"
+#include "parser/ast_class.h"
 
 using namespace delta;
 
@@ -111,6 +115,31 @@ TEST(SolveBeforeOrdering, IndexedSelectPrimaryAccepted) {
       "  constraint k { solve q[0] before n; }\n"
       "endclass\n");
   EXPECT_FALSE(r.has_errors);
+}
+
+// 18.5.9 with 18.5.8: an ordering primary of identifiers joined by '.' alone
+// keeps the handles it passes through, in order, which a joint solve reads
+// it by; a class_scope, a method call or a select leaves none.
+TEST(SolveBeforeOrdering, ADottedPrimaryKeepsItsHandles) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand int q[4];\n"
+      "  rand int n;\n"
+      "  constraint k { solve l.m.v, C::n, q.size(), q[0] before n; }\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  const ClassMember* block = nullptr;
+  for (const ClassMember* m : r.cu->classes[0]->members)
+    if (m->kind == ClassMemberKind::kConstraint) block = m;
+  ASSERT_NE(block, nullptr);
+  ASSERT_EQ(block->constraint_solve_before_refs.size(), 1U);
+  const auto& before = block->constraint_solve_before_refs[0].before;
+  ASSERT_EQ(before.size(), 4U);
+  EXPECT_EQ(before[0].name, "v");
+  EXPECT_EQ(before[0].handles, (std::vector<std::string_view>{"l", "m"}));
+  EXPECT_TRUE(before[1].handles.empty());
+  EXPECT_TRUE(before[2].handles.empty());
+  EXPECT_TRUE(before[3].handles.empty());
 }
 
 }  // namespace
