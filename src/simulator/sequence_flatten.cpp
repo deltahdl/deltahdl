@@ -88,6 +88,20 @@ bool NamesAny(const Expr* expr, const Names& names) {
   return named;
 }
 
+// Whether every name `expr` reads is a variable of the scope, a parameter
+// among them, rather than a formal of an enclosing property the expansion
+// of an instance has yet to bind.
+bool NamesOnlyVariables(const Expr* expr, SimContext& ctx) {
+  bool declared = true;
+  ForEachSubExpr(expr, [&](const Expr* e) {
+    if (e->kind == ExprKind::kIdentifier &&
+        ctx.FindVariable(e->text) == nullptr) {
+      declared = false;
+    }
+  });
+  return declared;
+}
+
 // The value a delay bound or a repetition count written as an expression takes
 // once the actuals an instance binds stand for the formals it names: `$` for
 // no upper bound, or the elaboration-time constant §16.8 requires of it,
@@ -115,19 +129,14 @@ void ResolveDelayBound(uint32_t& bound, Expr*& expr,
   bound = static_cast<uint32_t>(value.ToUint64());
 }
 
-SeqCycleDelay ResolveDelay(SeqCycleDelay delay, const ActualsByFormal& actuals,
-                           SimContext& ctx, Arena& arena) {
-  ResolveDelayBound(delay.min, delay.min_expr, actuals, ctx, arena);
-  ResolveDelayBound(delay.max, delay.max_expr, actuals, ctx, arena);
-  return delay;
-}
-
-// §16.9.2: a repetition's count, its bounds read as a delay's are.
-SeqRepetition ResolveRepetition(SeqRepetition rep,
-                                const ActualsByFormal& actuals, SimContext& ctx,
-                                Arena& arena) {
-  static_cast<SeqCycleDelay&>(rep) = ResolveDelay(rep, actuals, ctx, arena);
-  return rep;
+// §16.7 and §16.9.2: a delay's bounds and a repetition's count, each settled
+// as above.
+template <typename Bounds>
+Bounds ResolveBounds(Bounds bounds, const ActualsByFormal& actuals,
+                     SimContext& ctx, Arena& arena) {
+  ResolveDelayBound(bounds.min, bounds.min_expr, actuals, ctx, arena);
+  ResolveDelayBound(bounds.max, bounds.max_expr, actuals, ctx, arena);
+  return bounds;
 }
 
 // §16.7: `##a` before an instance whose body opens with `##b` is a delay of
@@ -147,8 +156,7 @@ SeqCycleDelay AddDelays(const SeqCycleDelay& before,
 // The parser keeps the named actuals after the positional ones with their
 // names beside.
 ActualsByFormal BindInstanceActuals(const ModuleItem* decl,
-                                    const Expr* instance, SimContext& ctx,
-                                    Arena& arena) {
+                                    const Expr* instance, Arena& arena) {
   ActualsByFormal actuals = BindActualsWithDefaults(
       decl->prop_formals, decl->prop_formal_defaults, instance);
   for (size_t i = 0;
@@ -156,8 +164,8 @@ ActualsByFormal BindInstanceActuals(const ModuleItem* decl,
        ++i) {
     auto it = actuals.find(decl->prop_formals[i]);
     if (it == actuals.end()) continue;
-    it->second = CastActualToFormal(it->second, decl->prop_formal_type_kw[i],
-                                    ctx, arena);
+    it->second =
+        CastActualToFormal(it->second, decl->prop_formal_type_kw[i], arena);
   }
   return actuals;
 }
@@ -468,10 +476,10 @@ bool AppendInstanceOperand(const Expansion& x, size_t j, LinearSequence& out) {
   SimContext& ctx = x.ctx;
   Arena& arena = x.arena;
   Expr* operand = SubstituteFormals(body.operands[j], actuals, arena);
-  SeqCycleDelay delay = ResolveDelay(body.delays[j], actuals, ctx, arena);
+  SeqCycleDelay delay = ResolveBounds(body.delays[j], actuals, ctx, arena);
   if (j == 0) delay = AddDelays(op.before, delay);
   SeqRepetition repetition =
-      ResolveRepetition(body.repetitions[j], actuals, ctx, arena);
+      ResolveBounds(body.repetitions[j], actuals, ctx, arena);
   // §16.13.1 and §16.13.3: an operand of the instantiated body is evaluated
   // on the clock it names, else on the declaration's own, else on the one
   // flowing into the instance.
@@ -508,8 +516,7 @@ bool AppendInstanceOperand(const Expansion& x, size_t j, LinearSequence& out) {
 // spliced into the chain is.
 bool AppendNestedOperand(const InstanceOperand& op, const LinearSequence& body,
                          SimContext& ctx, Arena& arena, LinearSequence& out) {
-  ActualsByFormal actuals =
-      BindInstanceActuals(op.inner, op.instance, ctx, arena);
+  ActualsByFormal actuals = BindInstanceActuals(op.inner, op.instance, arena);
   AdoptInstanceClock(body, actuals, arena, out);
   size_t first = out.operands.size();
   Expr* operand = arena.Create<Expr>(*op.instance);
@@ -533,8 +540,7 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
       !body.intersects.empty()) {
     return AppendNestedOperand(op, body, ctx, arena, out);
   }
-  ActualsByFormal actuals =
-      BindInstanceActuals(op.inner, op.instance, ctx, arena);
+  ActualsByFormal actuals = BindInstanceActuals(op.inner, op.instance, arena);
   // The operands already flattened number the instance, each instance adding
   // at least one, so the locals of two instances of one sequence differ.
   Renaming renaming{static_cast<int>(out.operands.size()) + 1, out, arena};
@@ -803,10 +809,14 @@ bool FlattenLinearSequence(const ModuleItem* seq, SimContext& ctx, Arena& arena,
   // parameter `##P` or `a[*N]` among them, and is evaluated there; one naming
   // a formal of the sequence itself is the instance's to settle.
   ForEachBound(out, [&](uint32_t& bound, Expr*& expr) {
-    if (expr == nullptr || NamesAny(expr, seq->prop_formals)) return;
+    if (expr == nullptr || NamesAny(expr, seq->prop_formals) ||
+        !NamesOnlyVariables(expr, ctx)) {
+      return;
+    }
     Logic4Vec value = EvalExpr(expr, ctx, arena);
+    if (!value.IsKnown()) return;
     expr = nullptr;
-    if (value.IsKnown()) bound = static_cast<uint32_t>(value.ToUint64());
+    bound = static_cast<uint32_t>(value.ToUint64());
   });
   return true;
 }
@@ -848,9 +858,9 @@ SubstitutedOperand SubstituteOperand(const LinearSequence& body, size_t j,
                                      const ActualsByFormal& actuals,
                                      SimContext& ctx, Arena& arena) {
   return {SubstituteFormals(body.operands[j], actuals, arena),
-          ResolveDelay(body.delays[j], actuals, ctx, arena),
+          ResolveBounds(body.delays[j], actuals, ctx, arena),
           SubstituteMatchItems(body.match_items[j], actuals, arena),
-          ResolveRepetition(body.repetitions[j], actuals, ctx, arena),
+          ResolveBounds(body.repetitions[j], actuals, ctx, arena),
           OperandClock(body, j)};
 }
 

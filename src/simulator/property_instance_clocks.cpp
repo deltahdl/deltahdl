@@ -61,7 +61,7 @@ void WalkInstance(const Expr* boolean, const ActualsByFormal& actuals,
   Expr* instance = SubstituteFormals(boolean, actuals, w.arena);
   const ModuleItem* decl = InstantiatedProperty(instance, w.ctx);
   if (decl == nullptr) return;
-  ActualsByFormal inner = BindInstanceActuals(decl, instance, w.ctx, w.arena);
+  ActualsByFormal inner = BindInstanceActuals(decl, instance, w.arena);
   Number(w, SubstituteClock(decl->prop_clock, inner, w.arena));
   WalkNode(decl->prop_body_tree, inner, true, w, depth + 1);
 }

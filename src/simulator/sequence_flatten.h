@@ -139,8 +139,7 @@ std::vector<EventExpr> SubstituteClock(const std::vector<EventExpr>& clock,
                                        Arena& arena);
 
 ActualsByFormal BindInstanceActuals(const ModuleItem* decl,
-                                    const Expr* instance, SimContext& ctx,
-                                    Arena& arena);
+                                    const Expr* instance, Arena& arena);
 
 // §F.4.1: a copy of the flattened `body` with the actuals substituted for
 // the formals in its operands, the bounds of its delays, its match items
