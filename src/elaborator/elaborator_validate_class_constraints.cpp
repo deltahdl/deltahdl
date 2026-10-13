@@ -380,6 +380,47 @@ static void ValidateOneUniqueConstraintMember(
   }
 }
 
+// 18.5.4: the type of the leaf elements the member `mem` of a uniqueness group
+// denotes -- the property's declared type, which is also the element type of
+// an unpacked array and of a slice of one -- or null where the class text does
+// not make it plain: a qualified or unresolved name, a type given by name, or
+// a select of a property with no unpacked dimension, a part of a packed value.
+static const DataType* UniqueMemberLeafType(
+    const Expr* mem,
+    const std::unordered_map<std::string_view, const ClassMember*>&
+        properties) {
+  const auto kFound = properties.find(UniqueMemberBaseName(mem));
+  if (kFound == properties.end()) return nullptr;
+  const ClassMember* m = kFound->second;
+  const bool kPackedPart =
+      mem->kind == ExprKind::kSelect && m->unpacked_dims.empty();
+  if (kPackedPart || m->data_type.kind == DataTypeKind::kNamed) return nullptr;
+  return &m->data_type;
+}
+
+// 18.5.4: the members of a uniqueness group are all of equivalent type
+// (6.22.2). Each member whose leaf type is plain is compared with the first
+// such member, and the first that differs is reported.
+static void ValidateUniqueGroupTypes(
+    const std::vector<Expr*>& group,
+    const std::unordered_map<std::string_view, const ClassMember*>& properties,
+    DiagEngine& diag) {
+  const DataType* first = nullptr;
+  for (const Expr* mem : group) {
+    const DataType* type = UniqueMemberLeafType(mem, properties);
+    if (type == nullptr) continue;
+    if (first == nullptr) {
+      first = type;
+    } else if (!TypesEquivalent(*first, *type)) {
+      diag.Error(mem->range.start,
+                 "the members of a uniqueness constraint shall be of "
+                 "equivalent types",
+                 Subclause("18.5.4"));
+      return;
+    }
+  }
+}
+
 // Checks every member of each uniqueness group `block` holds.
 static void ValidateUniqueGroups(
     const ClassMember* block,
@@ -388,6 +429,7 @@ static void ValidateUniqueGroups(
   for (const auto& group : block->constraint_unique_refs) {
     for (const Expr* mem : group)
       ValidateOneUniqueConstraintMember(mem, properties, unit, diag);
+    ValidateUniqueGroupTypes(group, properties, diag);
   }
 }
 

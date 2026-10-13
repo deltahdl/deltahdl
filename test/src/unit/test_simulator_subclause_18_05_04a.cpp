@@ -124,12 +124,14 @@ TEST(ConstraintUnique, InlineRandGroupThroughMethodHandleSolves) {
 
 // 18.5.4: a uniqueness group's members must all have equivalent types. A byte
 // and an int differ in width and so are not of equivalent type; the group is
-// illegal and randomization fails.
+// illegal and randomization fails. The int is given by a typedef name, whose
+// type the elaborator leaves to the solve, which finds the two inequivalent.
 TEST(ConstraintUnique, InequivalentTypeMembersFail) {
   const char* src =
+      "typedef int int_t;\n"
       "class C;\n"
       "  rand byte a;\n"
-      "  rand int b;\n"
+      "  rand int_t b;\n"
       "  constraint u { unique {a, b}; }\n"
       "endclass\n"
       "module t;\n"

@@ -678,4 +678,45 @@ TEST(UniqueMemberForms, InlineReceiverNamingNothingGetsNoUniquenessReport) {
       "18.5.4"));
 }
 
+// 18.5.4: the members of a uniqueness group are all of equivalent type. A byte
+// and an int differ in width, so the int is reported, in a class's block and
+// in an inline block alike.
+TEST(UniqueMemberForms, InequivalentMemberTypesRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  rand byte a;\n"
+             "  rand int b;\n"
+             "  constraint u { unique {a, b}; }\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c = new;\n"
+             "  initial void'(c.randomize() with { unique {b, a}; });\n"
+             "endmodule\n",
+             f));
+  constexpr char kMessage[] =
+      "the members of a uniqueness constraint shall be of equivalent types";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 4, "18.5.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 8, "18.5.4"));
+}
+
+// 18.5.4 with 6.22.2: a byte, the leaf elements of a byte array and of a slice
+// of it, and a signed 8-bit vector are all equivalent, so their group is
+// accepted. A member whose type the class text does not make plain -- a
+// select into a packed vector, a type given by name -- is left alone.
+TEST(UniqueMemberForms, EquivalentMemberTypesAccepted) {
+  EXPECT_TRUE(
+      ElabOk("typedef int int_t;\n"
+             "class C;\n"
+             "  rand byte b;\n"
+             "  rand byte arr[5];\n"
+             "  rand bit signed [7:0] s8;\n"
+             "  rand bit [7:0] x;\n"
+             "  rand int_t n;\n"
+             "  constraint u { unique {b, arr[2:3], arr, s8}; }\n"
+             "  constraint v { unique {b, x[3:0]}; unique {n, b}; }\n"
+             "endclass\n"
+             "module m; endmodule\n"));
+}
+
 }  // namespace
