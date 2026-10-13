@@ -538,9 +538,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
     mod->constant_formals = CheckerConstantFormals(
         decl, std::exchange(pending_checker_actuals_, {}),
         BuildParamScope(mod));
-    CheckerFreeVariables free = FindCheckerFreeVariables(decl);
-    mod->free_variables = std::move(free.active);
-    mod->random_initial_variables = std::move(free.random_initial);
+    SetCheckerFreeVariables(decl, mod);
     checker_tree_actuals_[mod] =
         std::exchange(pending_checker_tree_actuals_, {});
   }

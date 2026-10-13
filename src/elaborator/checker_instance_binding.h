@@ -68,16 +68,10 @@ ConstantCheckerFormals CheckerConstantFormals(const ModuleDecl* decl,
                                               const BoundCheckerFormals& bound,
                                               const ScopeMap& scope);
 
-// §17.7.2: of the free variables of a checker, those it declares `rand`, the
-// active ones, neither `const` nor written by a checker variable assignment
-// (§17.7.1), and those whose declarations write no initializer, which an
-// unconstrained random value initializes.
-struct CheckerFreeVariables {
-  std::vector<std::string_view> active;
-  std::vector<std::string_view> random_initial;
-};
-
-// §17.7.2: the free variables of the checker `decl`.
-CheckerFreeVariables FindCheckerFreeVariables(const ModuleDecl* decl);
+// §17.7.2: records in `mod` the free variables of the checker `decl`, those
+// it declares `rand`: the active ones, neither `const` nor written by a
+// checker variable assignment (§17.7.1), and those whose declarations write
+// no initializer, which an unconstrained random value initializes.
+void SetCheckerFreeVariables(const ModuleDecl* decl, RtlirModule* mod);
 
 }  // namespace delta

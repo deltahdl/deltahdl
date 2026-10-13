@@ -134,9 +134,9 @@ void CollectTargets(const Expr* lhs,
   }
 }
 
-}  // namespace
-
-CheckerFreeVariables FindCheckerFreeVariables(const ModuleDecl* decl) {
+// §17.7.1: the variables the checker variable assignments of `decl` write.
+std::unordered_set<std::string_view> AssignedCheckerVariables(
+    const ModuleDecl* decl) {
   std::unordered_set<std::string_view> assigned;
   for (const ModuleItem* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
@@ -149,15 +149,23 @@ CheckerFreeVariables FindCheckerFreeVariables(const ModuleDecl* decl) {
       }
     });
   }
-  CheckerFreeVariables free;
+  return assigned;
+}
+
+}  // namespace
+
+void SetCheckerFreeVariables(const ModuleDecl* decl, RtlirModule* mod) {
+  const std::unordered_set<std::string_view> kAssigned =
+      AssignedCheckerVariables(decl);
   for (const ModuleItem* item : decl->items) {
     if (item->kind != ModuleItemKind::kVarDecl || !item->is_rand) continue;
-    if (item->init_expr == nullptr) free.random_initial.push_back(item->name);
-    if (!item->data_type.is_const && assigned.count(item->name) == 0) {
-      free.active.push_back(item->name);
+    if (item->init_expr == nullptr) {
+      mod->random_initial_variables.push_back(item->name);
+    }
+    if (!item->data_type.is_const && kAssigned.count(item->name) == 0) {
+      mod->free_variables.push_back(item->name);
     }
   }
-  return free;
 }
 
 // A.4.1 writes four instantiation forms, and three of them are one form under

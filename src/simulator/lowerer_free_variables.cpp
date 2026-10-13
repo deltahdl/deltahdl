@@ -208,7 +208,7 @@ std::unordered_set<std::string> BarredFormals(const RtlirModuleInst& self) {
       if ((sub->kind == ExprKind::kCast && sub->text == "const") ||
           (sub->kind == ExprKind::kIdentifier &&
            automatics.count(sub->text) != 0)) {
-        barred.emplace(binding.port_name);
+        barred.insert(std::string(binding.port_name));
       }
     });
   }
@@ -276,14 +276,14 @@ void Lowerer::LowerFreeVariableSolver(const RtlirModule* mod) {
   std::vector<AssumeSetMember> candidates;
   CollectAssumptions(mod, inst_prefix_, *lowering_inst_, arena_, candidates);
   auto* set = arena_.Create<AssumeSet>();
-  const std::unordered_set<std::string> kActive(mod->free_variables.begin(),
-                                                mod->free_variables.end());
-  for (AssumeSetMember& m : candidates) {
-    if (ReadsAny(m, kActive)) set->members.push_back(std::move(m));
-  }
+  std::unordered_set<std::string> active;
   for (std::string_view name : mod->free_variables) {
+    active.emplace(name);
     set->args.push_back(NameExpr(name, arena_));
     ctx_.AssertionSamples().ExcludeFromSampling(ctx_.FindVariable(name));
+  }
+  for (AssumeSetMember& m : candidates) {
+    if (ReadsAny(m, active)) set->members.push_back(std::move(m));
   }
   set->scope = arena_.Create<Process>();
   set->scope->inst_prefix = inst_prefix_;
