@@ -1,4 +1,6 @@
 #include <cstddef>
+#include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -105,12 +107,14 @@ void Parser::CaptureConstraintRelation(ClassMember* member) {
 // constraint block, recording the named random variable. Called from the token
 // scan with the current token at 'disable'; it consumes through the primary but
 // leaves the terminating ';' for the outer scan (which resets the
-// relation-start state on it). Only a bare 'identifier ;' primary is recorded —
-// that is a variable the scalar solver draws — so a qualified or array/method
-// primary (a.x, arr.size()) is consumed but left unrecorded, making the
-// directive a no-op on references the solver does not model, as the uniqueness
-// and ordering lowerings do. When the variable is recorded, the simulator
-// builds a kDisableSoft solver directive that discards the lower-priority soft
+// relation-start state on it). A bare 'identifier ;' primary is recorded --
+// a variable the scalar solver draws -- and so is the size of an array, which
+// 18.4 lets appear here as its size method, a.size() or a.size, recorded under
+// the name the simulator gives the size, "a.size". Any other qualified primary
+// (a.x) is consumed but left unrecorded, making the directive a no-op on
+// references the solver does not model, as the uniqueness and ordering
+// lowerings do. When the variable is recorded, the simulator builds a
+// kDisableSoft solver directive that discards the lower-priority soft
 // constraints referencing it.
 void Parser::CaptureDisableSoftConstraint(ClassMember* member) {
   Consume();  // 'disable'
@@ -120,9 +124,16 @@ void Parser::CaptureDisableSoftConstraint(ClassMember* member) {
   if (Check(TokenKind::kIdentifier)) {
     Token id = CurrentToken();
     Consume();
+    std::string_view name = id.text;
+    if (Match(TokenKind::kDot) && CurrentToken().text == "size") {
+      Consume();
+      if (Match(TokenKind::kLParen)) Match(TokenKind::kRParen);
+      const std::string kKey = std::string(id.text) + ".size";
+      name = {arena_.AllocString(kKey.data(), kKey.size()), kKey.size()};
+    }
     if (Check(TokenKind::kSemicolon) && member != nullptr) {
       ConstraintSoftVarRef ref;
-      ref.name = id.text;
+      ref.name = name;
       ref.loc = id.loc;
       member->constraint_disable_soft_refs.push_back(ref);
     }

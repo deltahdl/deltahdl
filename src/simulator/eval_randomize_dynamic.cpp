@@ -148,9 +148,6 @@ bool FoldHardSizeRelations(const std::vector<Expr*>& rels, RandInfo& size,
 }
 
 // 18.4 with 18.5.13: whether a soft relation of `rels` names the size `size`.
-// A soft relation the solve keeps constrains the size as a hard one does,
-// though it is never folded into the domain, the solve being free to
-// discard it.
 bool SoftRelationNamesSize(const std::vector<Expr*>& rels, const RandInfo& size,
                            RandomizeCtx& rc) {
   return std::ranges::any_of(rels, [&](const Expr* rel) {
@@ -158,33 +155,58 @@ bool SoftRelationNamesSize(const std::vector<Expr*>& rels, const RandInfo& size,
   });
 }
 
-// 18.4: whether the block `m` constrains the size `size`, hard relations
-// folded over it as FoldHardSizeRelations does.
-bool BlockConstrainsSize(const ClassMember* m, RandInfo& size,
-                         std::vector<RandInfo>& rands, RandomizeCtx& rc,
-                         int64_t& largest) {
-  const bool kHard =
-      FoldHardSizeRelations(m->constraint_exprs, size, rands, rc, largest);
-  return SoftRelationNamesSize(m->constraint_soft_exprs, size, rc) || kHard;
+// What the constraint blocks read so far say of one array's size: whether a
+// hard relation names it, whether a soft relation names it that no disable
+// soft of higher priority discards, and the largest size a set membership
+// admits.
+struct SizeReading {
+  bool hard = false;
+  bool soft = false;
+  int64_t largest = kMaxDynamicElements;
+};
+
+// 18.4: reads the block `m` for the size `size`, hard relations folded over
+// it as FoldHardSizeRelations does. 18.5.13.2: a block's disable soft on the
+// size discards the soft relations of the blocks before it, never its own;
+// a kept soft relation constrains the size as a hard one does, though it is
+// never folded into the domain, the solve being free to discard it.
+void ReadBlockSize(const ClassMember* m, RandInfo& size,
+                   std::vector<RandInfo>& rands, RandomizeCtx& rc,
+                   SizeReading& reading) {
+  if (FoldHardSizeRelations(m->constraint_exprs, size, rands, rc,
+                            reading.largest)) {
+    reading.hard = true;
+  }
+  if (std::ranges::any_of(m->constraint_disable_soft_refs,
+                          [&size](const ConstraintSoftVarRef& ref) {
+                            return ref.name == size.name;
+                          })) {
+    reading.soft = false;
+  }
+  if (SoftRelationNamesSize(m->constraint_soft_exprs, size, rc)) {
+    reading.soft = true;
+  }
 }
 
 // 18.4: folds the size constraints of each active constraint block, and of
-// the call's inline block (18.7), over the size variable `size`; false where
-// none constrains the size, which leaves the array its size.
+// the call's inline block (18.7), the last in priority, over the size
+// variable `size`; false where none constrains the size, or only soft ones
+// all discarded, which leaves the array its size.
 bool FoldSizeConstraints(RandInfo& size, std::vector<RandInfo>& rands,
                          RandomizeCtx& rc) {
-  bool constrained = false;
-  int64_t largest = kMaxDynamicElements;
+  SizeReading reading;
   for (const ClassMember* m : ConstraintMembersInOrder(rc.obj->type)) {
     if (!IsObjectConstraintActive(rc.obj, m->name)) continue;
-    if (BlockConstrainsSize(m, size, rands, rc, largest)) constrained = true;
+    ReadBlockSize(m, size, rands, rc, reading);
   }
-  if (rc.inline_block != nullptr &&
-      BlockConstrainsSize(rc.inline_block, size, rands, rc, largest)) {
-    constrained = true;
+  if (rc.inline_block != nullptr) {
+    ReadBlockSize(rc.inline_block, size, rands, rc, reading);
   }
-  if (constrained) FoldBound(size, ConstraintKind::kLessEqual, largest);
-  return constrained;
+  const bool kConstrained = reading.hard || reading.soft;
+  if (kConstrained) {
+    FoldBound(size, ConstraintKind::kLessEqual, reading.largest);
+  }
+  return kConstrained;
 }
 
 // A rand member declared as a dynamic array or a queue: its declaration, the

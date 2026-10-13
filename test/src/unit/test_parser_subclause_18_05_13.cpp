@@ -57,4 +57,28 @@ TEST(SoftConstraintParsing, HardAndSoftInSameBlockSeparated) {
   EXPECT_EQ(m->constraint_soft_exprs.size(), 1u);
 }
 
+// 18.4 with 18.5.13.2: the size of an array may be the operand of disable
+// soft, written as its size method with or without the parentheses; the
+// directive is recorded under the name the simulator gives the size, while a
+// member of an object, h.v, is still left unrecorded.
+TEST(SoftConstraintParsing, DisableSoftOnAnArraysSizeIsRecorded) {
+  auto r = Parse(
+      "class D;\n"
+      "  rand int v;\n"
+      "endclass\n"
+      "class C;\n"
+      "  rand int a[];\n"
+      "  rand int b[$];\n"
+      "  rand D h;\n"
+      "  constraint c { disable soft a.size(); disable soft b.size;\n"
+      "                 disable soft h.v; }\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  const auto* m = FindConstraint(r.cu->classes.back(), "c");
+  ASSERT_NE(m, nullptr);
+  ASSERT_EQ(m->constraint_disable_soft_refs.size(), 2u);
+  EXPECT_EQ(m->constraint_disable_soft_refs[0].name, "a.size");
+  EXPECT_EQ(m->constraint_disable_soft_refs[1].name, "b.size");
+}
+
 }  // namespace

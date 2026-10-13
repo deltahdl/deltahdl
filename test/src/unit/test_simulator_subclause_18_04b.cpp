@@ -605,4 +605,35 @@ TEST(RandQueueRun, AnInlineSizeConstraintResizesTheArray) {
   EXPECT_EQ(out, "4 5 5 3\n");
 }
 
+// §18.4 with §18.5.13.2: disable soft on an array's size discards the soft
+// size constraints of lower priority, and a size constrained by nothing else
+// leaves the array its size, two and three elements here; a soft size
+// constraint of higher priority, the inline block's, is kept and resizes it.
+TEST(RandQueueRun, DisableSoftOnTheSizeLeavesTheArrayItsSize) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  rand bit [3:0] a[];\n"
+      "  rand bit [3:0] b[];\n"
+      "  rand bit [3:0] x;\n"
+      "  constraint c1 { soft a.size() == 6; soft b.size() == 5; soft x == 1; "
+      "}\n"
+      "  constraint c2 { disable soft a.size(); disable soft b.size;\n"
+      "                  disable soft x; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    static C o = new;\n"
+      "    o.a = new[2];\n"
+      "    o.b = new[3];\n"
+      "    void'(o.randomize());\n"
+      "    $write(\"%0d %0d \", o.a.size(), o.b.size());\n"
+      "    void'(o.randomize() with { soft a.size() == 4; });\n"
+      "    $display(\"%0d\", o.a.size());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 3 4\n");
+}
+
 }  // namespace
