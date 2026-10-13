@@ -682,6 +682,23 @@ static Expr* LocalPortExpr(const RtlirPortBinding& binding,
 // the instance for its assertions to take a delay bound written as a formal's
 // name, an event, a sequence or a property from, each of the last three
 // reading its names in `parent_prefix`, the scope instantiating the checker.
+// §17.3 with §16.9.11: the end point a checker reads `triggered` on its
+// formal through, registered for `actual` under its full name: the end point
+// the lowering gave the sequence actual `connection`, or that of the named
+// sequence of the instantiating scope `connection` names alone. None where
+// the actual is neither.
+static void RegisterActualEndPoint(const Expr* connection, const Expr* actual,
+                                   const std::string& parent_prefix,
+                                   SimContext& ctx, Arena& arena) {
+  std::string ep_name(ctx.FindSequenceInstanceEndpoint(connection));
+  if (ep_name.empty() && connection->kind == ExprKind::kIdentifier) {
+    ep_name = "__seq_" + std::string(connection->text);
+  }
+  const auto* key = arena.Create<std::string>(parent_prefix + ep_name);
+  if (ctx.FindVariable(*key) == nullptr) return;
+  ctx.RegisterSequenceInstanceEndpoint(actual, *key);
+}
+
 static void RecordCheckerActuals(const RtlirModuleInst& inst,
                                  const std::string& parent_prefix,
                                  const std::string& inst_prefix,
@@ -689,8 +706,13 @@ static void RecordCheckerActuals(const RtlirModuleInst& inst,
   if (!inst.resolved->is_checker) return;
   ActualsByFormal actuals;
   for (const RtlirPortBinding& binding : inst.port_bindings) {
-    actuals[binding.port_name] =
+    Expr* actual =
         ActualInInstantiatingScope(binding.connection, parent_prefix, arena);
+    actuals[binding.port_name] = actual;
+    if (binding.connection != nullptr) {
+      RegisterActualEndPoint(binding.connection, actual, parent_prefix, ctx,
+                             arena);
+    }
   }
   ctx.RegisterCheckerActuals(inst_prefix, std::move(actuals));
 }

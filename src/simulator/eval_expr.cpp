@@ -1,6 +1,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "common/arena.h"
@@ -10,6 +11,7 @@
 #include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
+#include "parser/expr_substitute.h"
 #include "simulator/assoc_element.h"
 #include "simulator/class_event_property.h"
 #include "simulator/class_object.h"
@@ -628,6 +630,26 @@ static bool TryInstanceTriggered(const Expr* expr, SimContext& ctx,
   return true;
 }
 
+// §17.3 with §16.9.11: `triggered` or `matched` applied to a sequence formal
+// of the checker instance being evaluated reads the end point of the actual
+// the instance binds to it, which the lowering registered under its full
+// name; false where the name is no such formal.
+static bool TryCheckerFormalEndPoint(const Expr* expr, SimContext& ctx,
+                                     Arena& arena, Logic4Vec& out) {
+  if (expr->lhs == nullptr || expr->rhs == nullptr ||
+      expr->lhs->kind != ExprKind::kIdentifier) {
+    return false;
+  }
+  const ActualsByFormal* actuals =
+      ctx.CheckerActuals(ctx.ActiveInstancePrefix());
+  if (actuals == nullptr) return false;
+  auto it = actuals->find(expr->lhs->text);
+  if (it == actuals->end()) return false;
+  std::string_view ep_name = ctx.FindSequenceInstanceEndpoint(it->second);
+  return !ep_name.empty() &&
+         TryEndPointMethod(ep_name, expr->rhs->text, ctx, arena, out);
+}
+
 // The member selects that are no read of a member of a value: a sequence's
 // end point (§16.9.11), an array reduction or ordering method with a with
 // clause (§7.12), a parameter of a parameterized class scope (§8.25.1), and a
@@ -637,6 +659,7 @@ static bool TryInstanceTriggered(const Expr* expr, SimContext& ctx,
 static bool TryMemberSelectThatIsNoRead(const Expr* expr, SimContext& ctx,
                                         Arena& arena, Logic4Vec& out) {
   if (TryInstanceTriggered(expr, ctx, arena, out)) return true;
+  if (TryCheckerFormalEndPoint(expr, ctx, arena, out)) return true;
   if (TryHierarchicalSequenceMethod(expr, ctx, arena, out)) return true;
   if (TryEvalArrayReductionWithClause(expr, ctx, arena, out)) return true;
   // §7.12.2: a bare-member sort()/rsort() carrying a with clause (parenthesis-

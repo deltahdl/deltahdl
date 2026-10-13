@@ -156,10 +156,10 @@ std::vector<TriggeredInstance> TriggeredInstances(const RtlirModule* mod,
 
 // §16.13.6: the sequence actuals the module's bodies pass to instances,
 // `e2_with_arg(@(posedge sysclk) $rose(a) ##1 b ##1 c)`, each carried by
-// the identifier standing in the argument's place, in its sequence bodies
-// and its procedures, each once. A method the instantiated body applies to
-// the formal, `subseq.triggered`, reads the end point of the actual's own
-// monitor.
+// the identifier standing in the argument's place, in its sequence bodies,
+// its procedures and its instances' connections, each once. A method the
+// instantiated body applies to the formal, `subseq.triggered`, reads the end
+// point of the actual's own monitor.
 std::vector<const Expr*> SequenceActuals(const RtlirModule* mod) {
   std::vector<const Expr*> actuals;
   std::unordered_set<const Expr*> seen;
@@ -177,6 +177,13 @@ std::vector<const Expr*> SequenceActuals(const RtlirModule* mod) {
   for (const auto& proc : mod->processes) {
     ForEachStmtReadExpr(proc.body,
                         [&](const Expr* e) { ForEachSubExpr(e, collect); });
+  }
+  // §17.3: a checker instance's sequence actual, whose end point the checker
+  // reads through `triggered` on the formal bound to it.
+  for (const RtlirModuleInst& child : mod->children) {
+    for (const RtlirPortBinding& binding : child.port_bindings) {
+      ForEachSubExpr(binding.connection, collect);
+    }
   }
   return actuals;
 }

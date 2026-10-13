@@ -735,4 +735,43 @@ TEST(CheckerInstanceScheduling, AnOutputIsAssignedInTheReactiveRegion) {
   EXPECT_EQ(saw->value.ToUint64(), 0u);
 }
 
+// §17.3 with §16.9.11: `triggered` applied to a checker's sequence formal
+// reads the end point of its actual, a named sequence of the instantiating
+// module or a sequence expression: s_two, a high at two posedges running,
+// first ends at 15, and the expression, b at a posedge, at 5. Each count is
+// of the posedges up to 52 where the end point is reached.
+TEST(CheckerInstanceScheduling, TriggeredOnASequenceFormalReadsItsActual) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      "checker chk(sequence s, logic clk);
+      "
+      "  int hits = 0;
+      "
+      "  always_ff @(posedge clk) if (s.triggered) hits <= hits + 1;
+      "
+      "endchecker
+      "
+      "module top;
+      "
+      "  logic clk = 0, a = 1, b = 1;
+      "
+      "  always #5 clk = ~clk;
+      "
+      "  sequence s_two; @(posedge clk) a ##1 a; endsequence
+      "
+      "  chk c1(s_two, clk);
+      "
+      "  chk c2(@(posedge clk) b, clk);
+      "
+      "  initial #52 $finish;
+      "
+      "endmodule
+      ",
+      f,
+      "c1.hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 4u);
+  EXPECT_EQ(f.ctx.FindVariable("c2.hits")->value.ToUint64(), 5u);
+}
+
 }  // namespace
