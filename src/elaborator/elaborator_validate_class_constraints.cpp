@@ -1,4 +1,5 @@
 #include <format>
+#include <functional>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -7,6 +8,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_class_constraints.h"
+#include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/type_eval.h"
@@ -520,16 +522,25 @@ static void CheckConstraintOperands(const Expr* e,
       e, [&](const Expr* child) { CheckConstraintOperands(child, s); });
 }
 
+// Each expression the constraint items `items` hold, those of the sets they
+// govern included.
+static void ForEachConstraintItemExpr(
+    const std::vector<ConstraintItem*>& items,
+    const std::function<void(const Expr*)>& fn) {
+  for (const ConstraintItem* item : items) {
+    fn(item->expr);
+    for (const Expr* e : item->exprs) fn(e);
+    for (const Expr* e : item->after) fn(e);
+    ForEachConstraintItemExpr(item->body, fn);
+    ForEachConstraintItemExpr(item->else_body, fn);
+  }
+}
+
 static void CheckConstraintItemOperands(
     const std::vector<ConstraintItem*>& items,
     const ConstraintOperandScope& s) {
-  for (const ConstraintItem* item : items) {
-    CheckConstraintOperands(item->expr, s);
-    for (const Expr* e : item->exprs) CheckConstraintOperands(e, s);
-    for (const Expr* e : item->after) CheckConstraintOperands(e, s);
-    CheckConstraintItemOperands(item->body, s);
-    CheckConstraintItemOperands(item->else_body, s);
-  }
+  ForEachConstraintItemExpr(
+      items, [&s](const Expr* e) { CheckConstraintOperands(e, s); });
 }
 
 void ValidateInlineConstraintOperands(const Expr* call, const ClassDecl* cls,
@@ -539,6 +550,52 @@ void ValidateInlineConstraintOperands(const Expr* call, const ClassDecl* cls,
                                       diag};
   CheckConstraintItemOperands(call->inline_constraint->constraint_items,
                               kScope);
+}
+
+// Whether every class `cls` extends, up to the root, is one the unit
+// declares, so that a name none of them declares is surely no member.
+static bool BasesResolve(const ClassDecl* cls, const CompilationUnit* unit) {
+  for (const ClassDecl* c = cls; !c->base_class.empty();) {
+    c = FindBaseClass(c, unit);
+    if (c == nullptr) return false;
+  }
+  return true;
+}
+
+// 18.7: a name of the inline block of a randomize() with call on an object of
+// class `cls` qualified by this binds to `cls`, and one qualified by super to
+// the class `cls` extends; it is an error where that class declares no member
+// of the name. A class whose chain reaches a base the unit does not declare,
+// a type parameter's among them, is left unjudged, as is super in a class
+// extending none, which §8.15 rules on.
+static void CheckQualifiedName(const Expr* e, const ClassDecl* cls,
+                               const CompilationUnit* unit, DiagEngine& diag) {
+  if (e == nullptr) return;
+  if (e->kind == ExprKind::kMemberAccess &&
+      (e->lhs->text == "this" || e->lhs->text == "super")) {
+    const bool kSuper = e->lhs->text == "super";
+    const ClassDecl* scope = kSuper ? FindBaseClass(cls, unit) : cls;
+    if (scope != nullptr && BasesResolve(scope, unit) &&
+        FindMemberInClass(scope, e->rhs->text, unit) == nullptr) {
+      diag.Error(e->range.start,
+                 std::format("'{}.{}' names no member of class '{}', the "
+                             "class randomize() with is called on{}",
+                             e->lhs->text, e->rhs->text, scope->name,
+                             kSuper ? " extends" : ""),
+                 Subclause("18.7"));
+    }
+  }
+  ForEachExprChild(e, [&](const Expr* child) {
+    CheckQualifiedName(child, cls, unit, diag);
+  });
+}
+
+void ValidateInlineQualifiedNames(const Expr* call, const ClassDecl* cls,
+                                  const CompilationUnit* unit,
+                                  DiagEngine& diag) {
+  ForEachConstraintItemExpr(
+      call->inline_constraint->constraint_items,
+      [&](const Expr* e) { CheckQualifiedName(e, cls, unit, diag); });
 }
 
 void ClassConstraintValidator::ValidateConstraintOperandTypes() {

@@ -105,6 +105,14 @@ void ValidateInlineConstraintOperands(const Expr* call, const ClassDecl* cls,
                                       const CompilationUnit* unit,
                                       DiagEngine& diag);
 
+// 18.7: reports each name of the inline constraint block of `call`, a
+// randomize() with call on an object of class `cls`, qualified by this or
+// super that the class it binds to declares no member of. The call has an
+// inline block.
+void ValidateInlineQualifiedNames(const Expr* call, const ClassDecl* cls,
+                                  const CompilationUnit* unit,
+                                  DiagEngine& diag);
+
 // 18.5.4 with 18.7: checks the inline uniqueness groups of every randomize()
 // with call in the unit against the class of the object it randomizes, found
 // from the static type of the receiver in the scope the call stands in.
