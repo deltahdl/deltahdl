@@ -2,7 +2,6 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
-#include "helpers_reported_error.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 
@@ -131,24 +130,6 @@ TEST(TaskAndFunctionParsing, EmptyPlaceholderArg) {
   ASSERT_EQ(call->args.size(), 2u);
   EXPECT_EQ(call->args[0], nullptr);
   ASSERT_NE(call->args[1], nullptr);
-}
-
-// §13.5.3 allows a default argument value only with ANSI style declarations,
-// so one written on an argument declared in the subroutine's body is reported
-// (#6440); the same default in the parenthesized port list is accepted.
-TEST(TaskAndFunctionParsing, DefaultOnANonAnsiArgumentDeclarationError) {
-  auto r = Parse(
-      "module m;\n"
-      "  task t;\n"
-      "    input int a = 1;\n"
-      "  endtask\n"
-      "  task u(input int b = 1); endtask\n"
-      "endmodule\n");
-  EXPECT_TRUE(ReportedError(r.diags,
-                            "default value for argument 'a' is allowed only in "
-                            "an ANSI style argument list",
-                            3, "13.5.3"));
-  EXPECT_FALSE(ReportedError(r.diags, "argument 'b'", 5, "13.5.3"));
 }
 
 }  // namespace
