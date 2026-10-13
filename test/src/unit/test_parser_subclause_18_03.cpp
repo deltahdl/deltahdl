@@ -41,6 +41,18 @@ TEST(ConstraintFourState, FourStateLiteralRejected) {
       r.diags, "4-state value is not allowed in a constraint", 3, "18.3"));
 }
 
+// 18.3 with 5.7.1: a question mark is a z digit, so a literal that spells its
+// z bits with it holds a 4-state value all the same.
+TEST(ConstraintFourState, QuestionMarkDigitRejected) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand bit [3:0] x;\n"
+      "  constraint c { x == 4'b10??; }\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "4-state value is not allowed in a constraint", 3, "18.3"));
+}
+
 // A constraint that uses only 2-state values and 2-state operators is legal.
 TEST(ConstraintFourState, TwoStateConstraintAccepted) {
   auto r = Parse(

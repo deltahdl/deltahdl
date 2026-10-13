@@ -539,10 +539,10 @@ void Parser::CheckDistSet() {
 // and 4-state equality operators (=== and !==) inside a constraint, and 18.5
 // forbids operators with side effects (++ and --). Both subclauses constrain
 // the same constraint_expression construct, so the checks share one scan of
-// the constraint block body.
+// the constraint block body. 5.7.1 makes '?' another spelling of the z digit.
 static bool LiteralHasFourStateDigit(std::string_view text) {
   for (char c : text) {
-    if (c == 'x' || c == 'X' || c == 'z' || c == 'Z') return true;
+    if (c == 'x' || c == 'X' || c == 'z' || c == 'Z' || c == '?') return true;
   }
   return false;
 }
