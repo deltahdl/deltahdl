@@ -734,8 +734,10 @@ void Elaborator::AddProcedure(ModuleItem* item, RtlirModule* mod,
     ModuleDecl* child = FindModuleInScope(inst->inst_module);
     if (child == nullptr) child = PackageCheckerNamedBy(inst, mod, unit_);
     if (!AdmitProceduralCheckerInstance(inst, child, mod, diag_)) continue;
-    ValidateProceduralCheckerActuals(inst, child,
-                                     CollectItemAutomaticVarNames(item), diag_);
+    if (child != nullptr) {
+      ValidateProceduralCheckerActuals(
+          inst, child, CollectItemAutomaticVarNames(item), diag_);
+    }
     ElaborateModuleInst(inst, mod);
     mod->children.back().is_procedural = true;
     mod->children.back().procedure_locals = std::move(site.locals);
