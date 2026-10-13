@@ -142,7 +142,7 @@ void CollectDottedHeads(const Expr* e, std::vector<std::string_view>& out) {
 }
 
 // The value of the local::-qualified name `e`, spelled `path`, read in the
-// scope containing the call: a property of the class of the method making
+// scope containing the call: a property of the object of the method making
 // the call where no variable answers its bare name, and otherwise the name
 // as that scope resolves it, `super` and `this` naming the method's own.
 Logic4Vec LocalQualifiedValue(const Expr* e, const std::string& path,
@@ -150,7 +150,7 @@ Logic4Vec LocalQualifiedValue(const Expr* e, const std::string& path,
   std::string_view name = std::string_view(path).substr(kLocalPrefix.size());
   ClassObject* self = ctx.CurrentThis();
   if (self != nullptr && name.find('.') == std::string_view::npos &&
-      ctx.FindVariable(name) == nullptr && ClassScopeDeclares(name, ctx)) {
+      ctx.FindVariable(name) == nullptr) {
     return self->GetProperty(name, arena);
   }
   return EvalExpr(e, ctx, arena);

@@ -694,34 +694,25 @@ static bool TryObjectMemberRead(const Expr* expr, SimContext& ctx, Arena& arena,
 // §18.7.1: a name qualified by local:: — the local::x used to steer an inline
 // randomize()...with constraint from the calling scope — bypasses the
 // randomized object's class scope and resolves in the scope containing the
-// method call, which is exactly the scope this expression is evaluated in.
-// `local` is a reserved keyword and cannot name any declaration, so a leading
-// "local." segment can only be that qualifier: it is dropped from `resolved`,
-// so local::x denotes the same declaration an unqualified x written in this
-// scope would. local::this binds to the scope containing the call, whose
-// `this` the constraint evaluation keeps aside while the randomized object
-// stands in scope as `this`; true with `out` read through it.
+// method call. The call reads each such name of its block in that scope as
+// it begins and binds the value as a local named by the qualified path
+// (BindLocalQualifiedNames), which no local a trial binds for a random
+// variable of the object can hide; true with `out` read from it. That read
+// is this expression evaluated in the calling scope itself, where `local` is
+// a reserved keyword that cannot name any declaration: the leading "local."
+// segment is dropped from `resolved`, so local::x denotes the same
+// declaration an unqualified x written there would, local::this and
+// local::super that scope's own.
 static bool TryLocalScopeQualifier(std::string& resolved, SimContext& ctx,
-                                   Arena& arena, Logic4Vec& out) {
+                                   Logic4Vec& out) {
   constexpr std::string_view kLocalScopePrefix = "local.";
   if (!std::string_view(resolved).starts_with(kLocalScopePrefix)) return false;
-  // 18.7.1: the value the randomize() with call read for the name in its
-  // calling scope as it began (BindLocalQualifiedNames), which no local a
-  // trial binds for a random variable of the object can hide.
   if (const Variable* bound = ctx.FindLocalVariable(resolved)) {
     out = bound->value;
     return true;
   }
   resolved = resolved.substr(kLocalScopePrefix.size());
-  constexpr std::string_view kThisPrefix = "this.";
-  ClassObject* caller = ctx.ConstraintCallerThis();
-  if (caller == nullptr ||
-      !std::string_view(resolved).starts_with(kThisPrefix)) {
-    return false;
-  }
-  out = ResolveClassFieldChain(caller, nullptr,
-                               resolved.substr(kThisPrefix.size()), ctx, arena);
-  return true;
+  return false;
 }
 
 // Whether the path `expr` starts at no variable or array, so a select after it
@@ -766,7 +757,7 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (TryEvalCovergroupOptionRead(expr, ctx, arena, out)) return out;
 
   auto resolved = HierarchicalReferenceName(expr);
-  if (TryLocalScopeQualifier(resolved, ctx, arena, out)) return out;
+  if (TryLocalScopeQualifier(resolved, ctx, out)) return out;
   if (auto* var = FindReferencedVariable(expr, resolved, ctx, arena)) {
     return ReadReferencedVariable(*var, ctx);
   }
