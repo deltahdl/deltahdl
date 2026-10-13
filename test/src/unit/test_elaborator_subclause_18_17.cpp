@@ -336,4 +336,45 @@ TEST(RandsequenceProductionNames, VoidProductionNameReadIsUnresolved) {
                             LineHolding(src, "r = a"), "23.9"));
 }
 
+// §18.17.7: a return in a production that returns a value shall specify an
+// expression, so `return;` in the code block of the int production num is
+// reported, at the return.
+TEST(RandsequenceProductionReturns,
+     AReturnWithNoValueInAnIntProductionIsReported) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module t;\n"
+             "  initial begin\n"
+             "    randsequence (main)\n"
+             "      main : num { $display(\"%0d\", num); } ;\n"
+             "      int num : { return; } ;\n"
+             "    endsequence\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return in production 'num', which returns a "
+                            "value, gives no value to return",
+                            5, "18.17.7"));
+}
+
+// §18.17.7: a production given no return type, or void, returns no value, so
+// `return;` there merely ends it (§18.17.6); and a return carrying a value in
+// the int production num, or in its weight code block, is what the clause
+// asks for. The source elaborates.
+TEST(RandsequenceProductionReturns,
+     ValueLessReturnsInVoidProductionsElaborate) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  initial begin\n"
+             "    randsequence (main)\n"
+             "      main : num a b ;\n"
+             "      int num : { return 3; } := 1 { return 4; } ;\n"
+             "      void a : { return; } ;\n"
+             "      b : { return; } ;\n"
+             "    endsequence\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
 }  // namespace

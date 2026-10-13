@@ -23,6 +23,7 @@
 #include "elaborator/nettype_uses.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -72,6 +73,50 @@ void CheckProductionItem(const RsProductionItem& item, const NameSet& declared,
              Subclause("18.17"));
 }
 
+// §18.17.7: a return in the code of the production `production`, which
+// returns a value, shall specify an expression. Reports each return in `s`
+// that gives none. A randsequence written inside it has productions of its
+// own, which its own check reads.
+void CheckValueLessReturns(const Stmt* s, const RsProduction& production,
+                           DiagEngine& diag) {
+  if (s == nullptr || s->kind == StmtKind::kRandsequence) return;
+  if (s->kind == StmtKind::kReturn && s->expr == nullptr) {
+    diag.Error(s->range.start,
+               std::format("return in production '{}', which returns a value, "
+                           "gives no value to return",
+                           production.name),
+               Subclause("18.17.7"));
+  }
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    CheckValueLessReturns(sub, production, diag);
+  });
+}
+
+// The code blocks of the rule `rule` of `production`: those standing among its
+// production items and the one following its weight.
+void CheckRuleReturns(const RsRule& rule, const RsProduction& production,
+                      DiagEngine& diag) {
+  for (const RsProd& prod : rule.prods) {
+    for (const Stmt* s : prod.code_stmts)
+      CheckValueLessReturns(s, production, diag);
+  }
+  for (const Stmt* s : rule.weight_code)
+    CheckValueLessReturns(s, production, diag);
+}
+
+// §18.17.7: the productions of `s` that return a value, a type other than
+// void declared for them, checked for returns that give none.
+void CheckProductionReturns(const Stmt* s, DiagEngine& diag) {
+  for (const RsProduction& production : s->rs_productions) {
+    if (!production.has_return_type ||
+        production.return_type.kind == DataTypeKind::kVoid) {
+      continue;
+    }
+    for (const RsRule& rule : production.rules)
+      CheckRuleReturns(rule, production, diag);
+  }
+}
+
 // Resolves every production identifier one randsequence statement writes.
 void CheckRandsequence(const Stmt* s, DiagEngine& diag) {
   NameSet declared = DeclaredProductions(s);
@@ -94,6 +139,7 @@ void CheckRandsequence(const Stmt* s, DiagEngine& diag) {
   ForEachRandsequenceItem(s, [&](const RsProductionItem& item) {
     CheckProductionItem(item, declared, diag);
   });
+  CheckProductionReturns(s, diag);
 }
 
 // Walks one statement subtree, resolving the production identifiers of every
