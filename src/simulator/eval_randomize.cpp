@@ -593,14 +593,13 @@ std::unordered_map<std::string, bool>& RandModesOf(ClassObject* obj,
 
 void SetObjectRandActive(ClassObject* obj, std::string_view name, bool active) {
   auto& modes = RandModesOf(obj, name);
-  std::string prefix = std::string(name) + "[";
-  for (auto it = modes.begin(); it != modes.end();) {
-    if (it->first.compare(0, prefix.size(), prefix) == 0) {
-      it = modes.erase(it);
-    } else {
-      ++it;
-    }
-  }
+  // 18.8: a call on an array, a subarray or a structure sets every element or
+  // member under it, so the states set on any of those before are dropped.
+  std::erase_if(modes, [name](const auto& entry) {
+    const std::string& key = entry.first;
+    return key.size() > name.size() && key.starts_with(name) &&
+           (key[name.size()] == '[' || key[name.size()] == '.');
+  });
   modes[std::string(name)] = active;
 }
 

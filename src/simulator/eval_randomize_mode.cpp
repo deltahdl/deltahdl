@@ -57,6 +57,42 @@ bool ExtractConstraintModeParts(const Expr* expr, std::string_view& obj_name,
   return false;
 }
 
+// 18.8: the random variable `obj.v` a rand_mode() receiver `recv` names a
+// part of, through selects of elements and members of structures below it:
+// `obj.arr[1][2]` and `obj.s.a` name parts of obj's arr and s. Null where
+// `recv` is `obj.v` itself or no such path.
+static const Expr* VariablePathRoot(const Expr* recv) {
+  const Expr* e = recv;
+  while (e->kind == ExprKind::kSelect ||
+         (e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution &&
+          e->lhs->kind != ExprKind::kIdentifier)) {
+    e = e->kind == ExprKind::kSelect ? e->base : e->lhs;
+  }
+  if (e == recv || e->kind != ExprKind::kMemberAccess ||
+      e->is_scope_resolution) {
+    return nullptr;
+  }
+  return e;
+}
+
+// 18.8: the key the solver's variable for the part `path` of the random
+// variable `name` carries, `root` being the access that names the variable:
+// each element selected by its index, `arr[1][2]`, and each structure
+// member by its name, `s.a`.
+static std::string VariablePathKey(const Expr* path, const Expr* root,
+                                   std::string_view name, SimContext& ctx,
+                                   Arena& arena) {
+  if (path == root) return std::string(name);
+  if (path->kind == ExprKind::kSelect) {
+    auto index =
+        static_cast<int64_t>(EvalExpr(path->index, ctx, arena).ToUint64());
+    return ClassArrayElementKey(
+        VariablePathKey(path->base, root, name, ctx, arena), index);
+  }
+  return VariablePathKey(path->lhs, root, name, ctx, arena) + "." +
+         std::string(path->rhs->text);
+}
+
 // 18.8: match a rand_mode() method call and pull out the object handle name
 // and, for the named form obj.random_variable.rand_mode(...), the variable
 // name. The no-name form obj.rand_mode(...) leaves var_name empty. Returns
@@ -73,15 +109,12 @@ bool ExtractRandModeParts(const Expr* expr, std::string_view& obj_name,
   if (!recv) return false;
   element = nullptr;
   // 18.8: the element form, object.array[index].rand_mode(...), names one
-  // element of an unpacked array member; the select is handed back for the
-  // caller to evaluate its index.
-  if (recv->kind == ExprKind::kSelect && recv->index != nullptr &&
-      recv->index_end == nullptr && recv->base != nullptr &&
-      recv->base->kind == ExprKind::kMemberAccess && recv->base->lhs &&
-      recv->base->lhs->kind == ExprKind::kIdentifier && recv->base->rhs &&
-      recv->base->rhs->kind == ExprKind::kIdentifier) {
-    obj_name = recv->base->lhs->text;
-    var_name = recv->base->rhs->text;
+  // element of an unpacked array member, and a path below it one element of
+  // a multidimensional array or one member of a structure; the path is
+  // handed back for the caller to key.
+  if (const Expr* root = VariablePathRoot(recv)) {
+    obj_name = root->lhs->text;
+    var_name = root->rhs->text;
     element = recv;
     return true;
   }
@@ -179,15 +212,19 @@ bool IsObjectRandActive(const ClassObject* obj, std::string_view name) {
   const ClassTypeInfo* owner = StaticRandOwner(obj, name);
   const auto& modes =
       owner != nullptr ? owner->static_rand_active : obj->rand_active;
-  auto it = modes.find(std::string(name));
-  if (it != modes.end()) return it->second;
-  // 18.5.7/18.8: an element of a rand member declared as an array, and the
-  // size of one declared as a dynamic array, is named by its key, while
-  // rand_mode() is called on the member, so each takes the member's state.
-  auto bracket = name.find_first_of("[.");
-  if (bracket == std::string_view::npos) return true;
-  auto base = modes.find(std::string(name.substr(0, bracket)));
-  return base == modes.end() ? true : base->second;
+  // 18.5.7/18.8: an element of a rand member declared as an array, the size
+  // of one declared as a dynamic array, and a member of a rand structure are
+  // named by their keys, `arr[1][2]`, `q.size` and `s.a`, while rand_mode()
+  // can be called on the element, on each subarray or structure holding it,
+  // or on the member: each takes the state of the nearest of those set.
+  std::string key(name);
+  for (;;) {
+    auto it = modes.find(key);
+    if (it != modes.end()) return it->second;
+    auto cut = key.find_last_of("[.");
+    if (cut == std::string::npos) return true;
+    key.resize(cut);
+  }
 }
 
 // 18.6.2: randomize() runs post_randomize() only once the new random values are
@@ -770,6 +807,20 @@ bool ResolveExprModeTarget(const Expr* expr, std::string_view method,
   return true;
 }
 
+// 18.8: whether the path of `t` passes a member of an object a class handle
+// holds, `obj.h.x`, rather than of a structure, `obj.s.a`, so that it names a
+// variable of the object the handle refers to.
+bool PathThroughHandle(const ModeTarget& t, SimContext& ctx) {
+  bool member = false;
+  for (const Expr* e = t.element; e->kind != ExprKind::kMemberAccess ||
+                                  e->lhs->kind != ExprKind::kIdentifier;
+       e = e->kind == ExprKind::kSelect ? e->base : e->lhs) {
+    member = member || e->kind == ExprKind::kMemberAccess;
+  }
+  return member &&
+         FindNamedProperty(t.obj->type, ctx, t.name, nullptr) == nullptr;
+}
+
 // The target of a rand_mode() or constraint_mode() call: through a handle's
 // name, `h.x.rand_mode(0)` or `p::h.x.rand_mode(0)`, the object the name holds,
 // and through any other receiver the object its value refers to
@@ -793,6 +844,11 @@ bool ResolveModeTarget(const Expr* expr, std::string_view method,
   MethodCallParts parts;
   parts.var_name = obj_name;
   out.obj = ResolveRandomizeTarget(ctx, parts);
+  if (named && out.obj != nullptr && out.element != nullptr &&
+      PathThroughHandle(out, ctx)) {
+    out = {};
+    return ResolveExprModeTarget(expr, method, ctx, arena, out);
+  }
   return out.obj != nullptr;
 }
 
@@ -860,9 +916,9 @@ bool TryEvalObjectRandMode(const Expr* expr, SimContext& ctx, Arena& arena,
   // one the solver's variable for it carries.
   std::string element_key;
   if (element != nullptr) {
-    auto index =
-        static_cast<int64_t>(EvalExpr(element->index, ctx, arena).ToUint64());
-    element_key = ClassArrayElementKey(var_name, index);
+    const Expr* root = VariablePathRoot(element);
+    element_key = VariablePathKey(
+        element, root != nullptr ? root : element->base, var_name, ctx, arena);
     var_name = element_key;
   }
 

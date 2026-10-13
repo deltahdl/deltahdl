@@ -255,4 +255,73 @@ TEST(RandModeRun, ACallsNullResultIsReported) {
                             12, "8.4"));
 }
 
+// 18.8: rand_mode() can name one member of a rand unpacked structure, so
+// with s.a off it keeps 5 over 8 calls and queries 0, and turning the whole
+// structure back on turns the member on again.
+TEST(RandModeRun, AStructureMemberIsNamedByItsMember) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  rand struct { rand bit [3:0] a; rand bit [3:0] b; } s;\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    c.s.a = 5;\n"
+      "    c.s.a.rand_mode(0);\n"
+      "    repeat (8) void'(c.randomize());\n"
+      "    $display(\"%0d %0d\", c.s.a, c.s.a.rand_mode());\n"
+      "    c.s.rand_mode(1);\n"
+      "    $display(\"%0d\", c.s.a.rand_mode());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "5 0\n1\n");
+}
+
+// 18.8: an element of a multidimensional array is named by its indices, so
+// with arr[1][2] off it keeps 7 over 8 calls and queries 0.
+TEST(RandModeRun, AnElementOfAMultidimensionalArrayIsNamedByItsIndices) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  rand bit [3:0] arr[2][3];\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    c.arr[1][2] = 7;\n"
+      "    c.arr[1][2].rand_mode(0);\n"
+      "    repeat (8) void'(c.randomize());\n"
+      "    $display(\"%0d %0d\", c.arr[1][2], c.arr[1][2].rand_mode());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "7 0\n");
+}
+
+// 18.8: naming a subarray of a multidimensional array, arr[1], leaves out
+// the index of its second dimension, so every element of the subarray is
+// turned off and keeps 7 over 8 calls, and each queries 0.
+TEST(RandModeRun, ASubarrayTurnsEveryElementOfItOff) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  rand bit [3:0] arr[2][3];\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    foreach (c.arr[i, j]) c.arr[i][j] = 7;\n"
+      "    c.arr[1].rand_mode(0);\n"
+      "    repeat (8) void'(c.randomize());\n"
+      "    $display(\"%0d %0d %0d %0d\", c.arr[1][0], c.arr[1][1], "
+      "c.arr[1][2],\n"
+      "             c.arr[1][0].rand_mode());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "7 7 7 0\n");
+}
+
 }  // namespace
