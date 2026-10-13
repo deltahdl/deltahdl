@@ -684,4 +684,43 @@ TEST(CheckerVariableRandomization, APropertyInstanceConstrainsItsBody) {
       "  property p4; bit v; (1, v = y) |=> x == v; endproperty\n");
 }
 
+// Probe for #6567, removed with its fix: which forms of the block the solve
+// loses.
+TEST(CheckerVariableRandomization, ProbeDisjunctionForms) {
+  SimFixture f;
+  auto* bad = RunAndFindVar(
+      "module top;\n"
+      "  bit x, y;\n"
+      "  int bad_A = 0, bad_B = 0, bad_C = 0, bad_D = 0, bad_E = 0, bad_F = "
+      "0;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 200; i++) begin x = 1; y = 1;\n"
+      "      void'(std::randomize(x, y) with { (x != 1'b1) || (!y || !y); });\n"
+      "      if (x == 1 && y == 1) bad_A++; end\n"
+      "    for (int i = 0; i < 200; i++) begin x = 1; y = 1;\n"
+      "      void'(std::randomize(x, y) with { (x != 1'b1) || !y; });\n"
+      "      if (x == 1 && y == 1) bad_B++; end\n"
+      "    for (int i = 0; i < 200; i++) begin x = 1; y = 1;\n"
+      "      void'(std::randomize(x, y) with { !(x && y); });\n"
+      "      if (x == 1 && y == 1) bad_C++; end\n"
+      "    for (int i = 0; i < 200; i++) begin x = 1; y = 1;\n"
+      "      void'(std::randomize(x, y) with { (x != 1'b1) || (!y || !y); !y "
+      "|| y || y; });\n"
+      "      if (x == 1 && y == 1) bad_D++; end\n"
+      "    for (int i = 0; i < 200; i++) begin x = 1; y = 1;\n"
+      "      void'(std::randomize(x, y) with { !y || y || y; (x != 1'b1) || "
+      "(!y || !y); });\n"
+      "      if (x == 1 && y == 1) bad_E++; end\n"
+      "    for (int i = 0; i < 200; i++) begin x = 1; y = 1;\n"
+      "      void'(std::randomize(x, y) with { x != 1'b1 || y != 1'b1; });\n"
+      "      if (x == 1 && y == 1) bad_F++; end\n"
+      "    $display(\"PROBE3 A=%0d B=%0d C=%0d D=%0d E=%0d F=%0d\", bad_A, "
+      "bad_B, bad_C, bad_D, bad_E, bad_F);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top.bad_A");
+  ASSERT_NE(bad, nullptr);
+  EXPECT_EQ(bad->value.ToUint64(), 99u);
+}
+
 }  // namespace
