@@ -18,6 +18,8 @@
 #include "parser/ast_type.h"
 #include "parser/expr_substitute.h"
 #include "simulator/evaluation.h"
+#include "simulator/expr_walk.h"
+#include "simulator/sequence_actual_cast.h"
 #include "simulator/sim_context.h"
 
 namespace delta {
@@ -28,53 +30,6 @@ namespace {
 // an error the elaborator reports; the flattening stops descending here so a
 // cycle it is handed all the same ends the instance rather than the run.
 constexpr int kMaxInstanceDepth = 16;
-
-// §16.8.1 (c): an actual bound to a formal of a keyword data type is cast to
-// that type before it is substituted, so an 8-bit actual passed to a `bit`
-// formal is truncated and a `bit` passed to a `byte` formal extended. A `$`,
-// an event actual and an untyped formal's actual are substituted as they are.
-Expr* CastActual(Expr* actual, TokenKind type_kw, Arena& arena) {
-  if (actual == nullptr || type_kw == TokenKind::kEof) return actual;
-  if (IsEventActual(actual)) return actual;
-  if (actual->kind == ExprKind::kIdentifier && actual->text == "$") {
-    return actual;
-  }
-  std::string_view type_name;
-  switch (type_kw) {
-    case TokenKind::kKwBit:
-      type_name = "bit";
-      break;
-    case TokenKind::kKwLogic:
-      type_name = "logic";
-      break;
-    case TokenKind::kKwReg:
-      type_name = "reg";
-      break;
-    case TokenKind::kKwByte:
-      type_name = "byte";
-      break;
-    case TokenKind::kKwShortint:
-      type_name = "shortint";
-      break;
-    case TokenKind::kKwInt:
-      type_name = "int";
-      break;
-    case TokenKind::kKwLongint:
-      type_name = "longint";
-      break;
-    case TokenKind::kKwInteger:
-      type_name = "integer";
-      break;
-    default:
-      return actual;
-  }
-  auto* cast = arena.Create<Expr>();
-  cast->kind = ExprKind::kCast;
-  cast->text = type_name;
-  cast->range = actual->range;
-  cast->lhs = actual;
-  return cast;
-}
 
 // §16.10 over the match items of one operand: the right-hand sides read the
 // actuals as the operands do, and an assigned local named after a formal --
@@ -120,20 +75,37 @@ std::string_view RenamedLocal(std::string_view name, int instance,
   return {arena.AllocString(renamed.data(), renamed.size()), renamed.size()};
 }
 
-// The value a delay bound written as a formal's name takes from its actual:
-// `$` for no upper bound, or the elaboration-time constant §16.8 requires of
-// it, evaluated here as a parameter or a literal is. An actual that answers no
-// known value leaves the bound as it was, which is the parser's default of 1.
-void ResolveDelayBound(uint32_t& bound, std::string_view& formal,
+// Whether `expr` reads a name one of `names` holds, a formal's.
+template <typename Names>
+bool NamesAny(const Expr* expr, const Names& names) {
+  bool named = false;
+  ForEachSubExpr(expr, [&](const Expr* e) {
+    if (e->kind != ExprKind::kIdentifier) return;
+    for (const auto& name : names) {
+      if (e->text == name) named = true;
+    }
+  });
+  return named;
+}
+
+// The value a delay bound or a repetition count written as an expression takes
+// once the actuals an instance binds stand for the formals it names: `$` for
+// no upper bound, or the elaboration-time constant §16.8 requires of it,
+// evaluated here as a parameter or a literal is. A bound naming no formal the
+// actuals bind is left for an enclosing scope's to settle, a checker's formal
+// among them (§17.3), and one that answers no known value leaves the bound as
+// it was, which is the parser's default of 1.
+void ResolveDelayBound(uint32_t& bound, Expr*& expr,
                        const ActualsByFormal& actuals, SimContext& ctx,
                        Arena& arena) {
-  if (formal.empty()) return;
-  auto it = actuals.find(formal);
-  if (it == actuals.end() || it->second == nullptr) return;
-  // A name no actual here binds is left for an enclosing scope's to settle,
-  // a checker's formal among them (§17.3).
-  formal = {};
-  const Expr* actual = it->second;
+  if (expr == nullptr) return;
+  std::vector<std::string_view> formals;
+  for (const auto& [formal, actual] : actuals) {
+    if (actual != nullptr) formals.push_back(formal);
+  }
+  if (!NamesAny(expr, formals)) return;
+  const Expr* actual = SubstituteFormals(expr, actuals, arena);
+  expr = nullptr;
   if (actual->kind == ExprKind::kIdentifier && actual->text == "$") {
     bound = SeqCycleDelay::kUnbounded;
     return;
@@ -145,9 +117,17 @@ void ResolveDelayBound(uint32_t& bound, std::string_view& formal,
 
 SeqCycleDelay ResolveDelay(SeqCycleDelay delay, const ActualsByFormal& actuals,
                            SimContext& ctx, Arena& arena) {
-  ResolveDelayBound(delay.min, delay.min_formal, actuals, ctx, arena);
-  ResolveDelayBound(delay.max, delay.max_formal, actuals, ctx, arena);
+  ResolveDelayBound(delay.min, delay.min_expr, actuals, ctx, arena);
+  ResolveDelayBound(delay.max, delay.max_expr, actuals, ctx, arena);
   return delay;
+}
+
+// §16.9.2: a repetition's count, its bounds read as a delay's are.
+SeqRepetition ResolveRepetition(SeqRepetition rep,
+                                const ActualsByFormal& actuals, SimContext& ctx,
+                                Arena& arena) {
+  static_cast<SeqCycleDelay&>(rep) = ResolveDelay(rep, actuals, ctx, arena);
+  return rep;
 }
 
 // §16.7: `##a` before an instance whose body opens with `##b` is a delay of
@@ -167,7 +147,8 @@ SeqCycleDelay AddDelays(const SeqCycleDelay& before,
 // The parser keeps the named actuals after the positional ones with their
 // names beside.
 ActualsByFormal BindInstanceActuals(const ModuleItem* decl,
-                                    const Expr* instance, Arena& arena) {
+                                    const Expr* instance, SimContext& ctx,
+                                    Arena& arena) {
   ActualsByFormal actuals = BindActualsWithDefaults(
       decl->prop_formals, decl->prop_formal_defaults, instance);
   for (size_t i = 0;
@@ -175,7 +156,8 @@ ActualsByFormal BindInstanceActuals(const ModuleItem* decl,
        ++i) {
     auto it = actuals.find(decl->prop_formals[i]);
     if (it == actuals.end()) continue;
-    it->second = CastActual(it->second, decl->prop_formal_type_kw[i], arena);
+    it->second = CastActualToFormal(it->second, decl->prop_formal_type_kw[i],
+                                    ctx, arena);
   }
   return actuals;
 }
@@ -488,6 +470,8 @@ bool AppendInstanceOperand(const Expansion& x, size_t j, LinearSequence& out) {
   Expr* operand = SubstituteFormals(body.operands[j], actuals, arena);
   SeqCycleDelay delay = ResolveDelay(body.delays[j], actuals, ctx, arena);
   if (j == 0) delay = AddDelays(op.before, delay);
+  SeqRepetition repetition =
+      ResolveRepetition(body.repetitions[j], actuals, ctx, arena);
   // §16.13.1 and §16.13.3: an operand of the instantiated body is evaluated
   // on the clock it names, else on the declaration's own, else on the one
   // flowing into the instance.
@@ -501,21 +485,19 @@ bool AppendInstanceOperand(const Expansion& x, size_t j, LinearSequence& out) {
     AddNested(out, body.operands[j],
               SubstituteLinearSequence(*nested, actuals, ctx, arena));
     AppendOperand(
-        {body.operands[j], delay, std::move(items), body.repetitions[j], clock},
-        out);
+        {body.operands[j], delay, std::move(items), repetition, clock}, out);
     return true;
   }
   if (const ModuleItem* bound = SequenceActualOf(operand, ctx)) {
-    if (!ExpandInstance({bound, operand, delay, body.repetitions[j], clock},
-                        ctx, arena, out, x.depth + 1)) {
+    if (!ExpandInstance({bound, operand, delay, repetition, clock}, ctx, arena,
+                        out, x.depth + 1)) {
       return false;
     }
     auto& last_items = out.match_items.back();
     last_items.insert(last_items.end(), items.begin(), items.end());
     return true;
   }
-  AppendOperand({operand, delay, std::move(items), body.repetitions[j], clock},
-                out);
+  AppendOperand({operand, delay, std::move(items), repetition, clock}, out);
   return true;
 }
 
@@ -526,7 +508,8 @@ bool AppendInstanceOperand(const Expansion& x, size_t j, LinearSequence& out) {
 // spliced into the chain is.
 bool AppendNestedOperand(const InstanceOperand& op, const LinearSequence& body,
                          SimContext& ctx, Arena& arena, LinearSequence& out) {
-  ActualsByFormal actuals = BindInstanceActuals(op.inner, op.instance, arena);
+  ActualsByFormal actuals =
+      BindInstanceActuals(op.inner, op.instance, ctx, arena);
   AdoptInstanceClock(body, actuals, arena, out);
   size_t first = out.operands.size();
   Expr* operand = arena.Create<Expr>(*op.instance);
@@ -550,7 +533,8 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
       !body.intersects.empty()) {
     return AppendNestedOperand(op, body, ctx, arena, out);
   }
-  ActualsByFormal actuals = BindInstanceActuals(op.inner, op.instance, arena);
+  ActualsByFormal actuals =
+      BindInstanceActuals(op.inner, op.instance, ctx, arena);
   // The operands already flattened number the instance, each instance adding
   // at least one, so the locals of two instances of one sequence differ.
   Renaming renaming{static_cast<int>(out.operands.size()) + 1, out, arena};
@@ -775,24 +759,25 @@ int OperandClockIndex(const LinearSequence& body, size_t pos) {
 
 namespace {
 
-// §17.3: a delay bound written as the name of a formal of the checker the
-// sequence stands in takes that formal's actual, `##n` with n bound to 2
-// being `##2` and `##[1:n]` with n bound to `$` being `##[1:$]`, as a sequence
-// formal's bound takes its actual (§16.8).
-void ResolveCheckerFormalDelays(LinearSequence& seq,
-                                const ActualsByFormal& actuals, SimContext& ctx,
-                                Arena& arena) {
+// Each bound of a delay and of a repetition count of `seq` and of the
+// sequences under it, handed to `fn` with the expression it is written as,
+// null where it is a literal or settled.
+void ForEachBound(LinearSequence& seq,
+                  const std::function<void(uint32_t&, Expr*&)>& fn) {
   for (SeqCycleDelay& delay : seq.delays) {
-    delay = ResolveDelay(delay, actuals, ctx, arena);
+    fn(delay.min, delay.min_expr);
+    fn(delay.max, delay.max_expr);
+  }
+  for (SeqRepetition& rep : seq.repetitions) {
+    fn(rep.min, rep.min_expr);
+    fn(rep.max, rep.max_expr);
   }
   for (auto* list : {&seq.intersects, &seq.conjuncts, &seq.alternatives}) {
-    for (LinearSequence& inner : *list) {
-      ResolveCheckerFormalDelays(inner, actuals, ctx, arena);
-    }
+    for (LinearSequence& inner : *list) ForEachBound(inner, fn);
   }
   for (auto& entry : seq.nested) {
     LinearSequence inner = *entry.second;
-    ResolveCheckerFormalDelays(inner, actuals, ctx, arena);
+    ForEachBound(inner, fn);
     entry.second = std::make_shared<const LinearSequence>(std::move(inner));
   }
 }
@@ -802,12 +787,28 @@ void ResolveCheckerFormalDelays(LinearSequence& seq,
 bool FlattenLinearSequence(const ModuleItem* seq, SimContext& ctx, Arena& arena,
                            LinearSequence& out) {
   out = LinearSequence{};
-  bool flattened = Flatten(seq, ctx, arena, out, 0);
+  if (!Flatten(seq, ctx, arena, out, 0)) return false;
+  // §17.3: a bound naming a formal of the checker the sequence stands in
+  // takes that formal's actual, `##n` with n bound to 2 being `##2` and
+  // `##[1:n]` with n bound to `$` being `##[1:$]`, as a sequence formal's
+  // bound takes its actual (§16.8).
   if (const ActualsByFormal* checker =
           ctx.CheckerActuals(ctx.ActiveInstancePrefix())) {
-    ResolveCheckerFormalDelays(out, *checker, ctx, arena);
+    ForEachBound(out, [&](uint32_t& bound, Expr*& expr) {
+      ResolveDelayBound(bound, expr, *checker, ctx, arena);
+    });
   }
-  return flattened;
+  // §16.7 and §16.9.2: a bound left an expression after that is an
+  // elaboration-time constant of the scope the sequence is declared in, a
+  // parameter `##P` or `a[*N]` among them, and is evaluated there; one naming
+  // a formal of the sequence itself is the instance's to settle.
+  ForEachBound(out, [&](uint32_t& bound, Expr*& expr) {
+    if (expr == nullptr || NamesAny(expr, seq->prop_formals)) return;
+    Logic4Vec value = EvalExpr(expr, ctx, arena);
+    expr = nullptr;
+    if (value.IsKnown()) bound = static_cast<uint32_t>(value.ToUint64());
+  });
+  return true;
 }
 
 ActualsByFormal CheckerTreeActuals(const std::string& inst_prefix,
@@ -849,7 +850,8 @@ SubstitutedOperand SubstituteOperand(const LinearSequence& body, size_t j,
   return {SubstituteFormals(body.operands[j], actuals, arena),
           ResolveDelay(body.delays[j], actuals, ctx, arena),
           SubstituteMatchItems(body.match_items[j], actuals, arena),
-          body.repetitions[j], OperandClock(body, j)};
+          ResolveRepetition(body.repetitions[j], actuals, ctx, arena),
+          OperandClock(body, j)};
 }
 
 // The substituted operand appended to `out`, or, where it references a

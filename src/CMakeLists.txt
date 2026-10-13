@@ -307,6 +307,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/eval_randomize_struct.cpp
     simulator/eval_instance_task.cpp
     simulator/eval_static_method.cpp
+    simulator/sequence_actual_cast.cpp
     simulator/sequence_flatten.cpp
     simulator/sequence_local_flow.cpp
     simulator/sequence_locals.cpp

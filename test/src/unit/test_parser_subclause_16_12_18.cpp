@@ -139,8 +139,8 @@ TEST(TypedPropertyFormalParsing, DataTypeFormalEndsPropertyRun) {
 
 // §16.12.18 by way of §16.8.1: the type a formal is declared with is
 // recorded by its keyword for every formal the keyword reaches, `property`,
-// `sequence` and `event` as themselves, so that an instance's actuals are
-// cast and read as the types say.
+// `sequence` and `event` as themselves and an untyped formal as `untyped`,
+// so that an instance's actuals are cast and read as the types say.
 TEST(TypedPropertyFormalParsing, TheTypeKeywordOfEachFormalIsRecorded) {
   auto r = Parse(
       "module m;\n"
@@ -158,7 +158,7 @@ TEST(TypedPropertyFormalParsing, TheTypeKeywordOfEachFormalIsRecorded) {
   EXPECT_EQ(item->prop_formal_type_kw[2], TokenKind::kKwEvent);
   EXPECT_EQ(item->prop_formal_type_kw[3], TokenKind::kKwSequence);
   EXPECT_EQ(item->prop_formal_type_kw[4], TokenKind::kKwProperty);
-  EXPECT_EQ(item->prop_formal_type_kw[5], TokenKind::kEof);
+  EXPECT_EQ(item->prop_formal_type_kw[5], TokenKind::kKwUntyped);
 }
 
 // §16.12.18: the actual for a formal of type property may be a

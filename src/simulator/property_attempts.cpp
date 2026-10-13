@@ -423,7 +423,7 @@ bool ExpandInstance(const PropertyExprNode* node, NodeState& state,
                     StepContext& sc) {
   const ModuleItem* decl = InstantiatedProperty(node->boolean, sc.ctx);
   if (decl == nullptr) return false;
-  ActualsByFormal actuals = BindInstanceActuals(decl, node->boolean, sc.arena);
+  auto actuals = BindInstanceActuals(decl, node->boolean, sc.ctx, sc.arena);
   CaptureLocalFormals(decl, actuals, sc);
   PropertyExprNode* body =
       SubstituteTree(decl->prop_body_tree, actuals, sc.arena);

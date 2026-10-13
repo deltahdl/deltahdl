@@ -264,4 +264,24 @@ TEST(AssertionClockSim, ActionBlockPercentMNamesTheAssertion) {
   EXPECT_EQ(out, "m.base_rule1, passing\n");
 }
 
+// §16.5.2 with §9.4.2.4: a sequence may be an assertion's clocking event, and
+// the assertion is then clocked at the sequence's end points. seq1 ends at
+// every rise of clk, so C2 behaves as a cover clocked on posedge clk does,
+// covered at 5, 15 and 25.
+TEST(AssertionClockSim, ASequenceClocksTheAssertionAtItsEndPoints) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module m;\n"
+      "  logic clk = 0, mycond = 1;\n"
+      "  always #5 clk = ~clk;\n"
+      "  sequence seq1;\n"
+      "    @(posedge clk) 1;\n"
+      "  endsequence\n"
+      "  C2: cover property (@seq1 mycond) $display(\"C2 %0t\", $time);\n"
+      "  initial #30 $finish;\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("C2 5\nC2 15\nC2 25\n"), std::string::npos);
+}
+
 }  // namespace

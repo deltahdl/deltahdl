@@ -68,6 +68,7 @@ std::string SequenceSource(const std::string& body, const std::string& gnt_from,
          "  logic gnt = 0;\n"
          "  int hits = 0;\n"
          "  int last = 0;\n"
+         "  localparam int P = 4;\n"
          "  always #5 clk = ~clk;\n"
          "  sequence s;\n"
          "    @(posedge clk) " +
@@ -162,6 +163,21 @@ TEST(CycleDelayConcat, StarRangeIncludesTheSameTick) {
   ASSERT_NE(hits, nullptr);
   EXPECT_EQ(hits->value.ToUint64(), 1u);
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 15u);
+}
+
+// §16.7: a cycle delay's constant_primary, and each bound of a range, is a
+// constant expression, a parameter or one built from it among them, so with P
+// at 4 `req ##P gnt`, `req ##(P) gnt` and `req ##[P:P+1] gnt` all end at 55,
+// four ticks after req's 15, where gnt holds alone.
+TEST(CycleDelayConcat, AParameterBoundIsItsValue) {
+  for (const char* body :
+       {"req ##P gnt", "req ##(P) gnt", "req ##[P:P+1] gnt"}) {
+    SimFixture f;
+    auto* hits = RunAndFindVar(SequenceSource(body, "50", "10"), f, "hits");
+    ASSERT_NE(hits, nullptr) << body;
+    EXPECT_EQ(hits->value.ToUint64(), 1u) << body;
+    EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 55u) << body;
+  }
 }
 
 }  // namespace

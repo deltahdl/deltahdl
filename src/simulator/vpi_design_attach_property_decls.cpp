@@ -138,7 +138,7 @@ void MakeFormalTypespec(const ModuleItem& decl, size_t index, VpiObject* formal,
   }
   const TokenKind kKeyword = decl.prop_formal_type_kw[index];
   int kind = 0;
-  if (kKeyword != TokenKind::kEof) {
+  if (kKeyword != TokenKind::kEof && kKeyword != TokenKind::kKwUntyped) {
     kind = FormalTypespecKind(kKeyword);
   } else if (type != nullptr) {
     kind = VpiTypespecKind(type->kind);

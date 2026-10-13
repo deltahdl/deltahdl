@@ -408,4 +408,26 @@ TEST(ConcurrentAssertionSampling,
   EXPECT_EQ(f.ctx.FindVariable("fail")->value.ToUint64(), 2u);
 }
 
+// §16.5.1: a past value of the `triggered` method is the one in the Postponed
+// region of the past tick. a0's pass statement triggers e in the Reactive
+// region of every tick, after c1 is evaluated in the Observed region, so
+// e.triggered is 0 there and 1 by the Postponed region: $past(e.triggered)
+// holds at the ticks of 15, 25 and 35, and at 5 reads the default 0.
+TEST(ConcurrentAssertionSampling, APastTriggeredIsItsPostponedValue) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      "module m;\n"
+      "  logic clk = 0;\n"
+      "  event e;\n"
+      "  int hits = 0;\n"
+      "  always #5 clk = ~clk;\n"
+      "  a0: assert property (@(posedge clk) 1) -> e;\n"
+      "  c1: cover property (@(posedge clk) $past(e.triggered)) hits++;\n"
+      "  initial #42 $finish;\n"
+      "endmodule\n",
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 3u);
+}
+
 }  // namespace

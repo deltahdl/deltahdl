@@ -222,6 +222,7 @@ std::string RepetitionSource(const std::string& body,
          "  logic c = 0;\n"
          "  int hits = 0;\n"
          "  int last = 0;\n"
+         "  localparam int N = 3, M = 4;\n"
          "  always #5 clk = ~clk;\n"
          "  sequence rule;\n"
          "    @(posedge clk) " +
@@ -373,6 +374,49 @@ TEST(SequenceRepetition, ConsecutiveRepetitionOfASequenceUnrolls) {
   ASSERT_NE(hits, nullptr);
   EXPECT_EQ(hits->value.ToUint64(), 1u);
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 95u);
+}
+
+// §16.9.2: a repetition's count is a constant expression, a parameter among
+// them. a holds throughout and b at the tick of 35 alone, so `a[*N] ##1 b`
+// with N at 3 ends at 35, from a's run at 5, 15 and 25, while `a[*M] ##1 b`
+// with M at 4 needs a run from before time 0 and never ends.
+TEST(SequenceRepetition, AParameterCountIsItsValue) {
+  const char* const kDrive =
+      "    a = 1;\n"
+      "    #30 b = 1;\n"
+      "    #10 b = 0;\n";
+  SimFixture f;
+  auto* hits =
+      RunAndFindVar(RepetitionSource("a[*N] ##1 b", kDrive), f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 35u);
+  SimFixture g;
+  auto* none =
+      RunAndFindVar(RepetitionSource("a[*M] ##1 b", kDrive), g, "hits");
+  ASSERT_NE(none, nullptr);
+  EXPECT_EQ(none->value.ToUint64(), 0u);
+}
+
+// §16.9.2 with §16.8: a count may name a formal of the sequence, which the
+// instance's actual settles: s(3) ends at 35 as `a[*3] ##1 b` does.
+TEST(SequenceRepetition, AFormalCountTakesItsActual) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      "module t;\n"
+      "  logic clk = 0, a = 1, b = 0;\n"
+      "  int hits = 0, last = 0;\n"
+      "  always #5 clk = ~clk;\n"
+      "  sequence s(int k);\n"
+      "    @(posedge clk) a[*k] ##1 b;\n"
+      "  endsequence\n"
+      "  initial begin #30 b = 1; #10 b = 0; #40 $finish; end\n"
+      "  c1: cover property (s(3)) begin hits++; last = $time; end\n"
+      "endmodule\n",
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 35u);
 }
 
 }  // namespace

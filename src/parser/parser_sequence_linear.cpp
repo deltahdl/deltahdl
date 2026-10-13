@@ -61,16 +61,18 @@ struct ParserSeqLinearHelpers {
 
   // A delay of exactly 0 ticks, written with no formal's name.
   static bool IsNoDelay(const SeqCycleDelay& delay) {
-    return delay.min == 0 && delay.max == 0 && delay.min_formal.empty() &&
-           delay.max_formal.empty();
+    return delay.min == 0 && delay.max == 0 && delay.min_expr == nullptr &&
+           delay.max_expr == nullptr;
   }
 
   // One bound of §16.7's cycle_delay_range as the linear monitor reads it: an
-  // integer literal, `$` where the caller admits it, or the name of a formal
-  // argument the instantiation supplies (§16.8). Returns false for any other
-  // form, which leaves the sequence without a monitor as before.
-  static bool ParseSeqDelayBound(Parser& p, uint32_t& val,
-                                 std::string_view& formal, bool dollar) {
+  // integer literal, `$` where the caller admits it, or a constant expression
+  // kept for the instantiation and the elaboration-time constants to settle
+  // (§16.8): a name, a parenthesized constant_primary, or, between brackets,
+  // any constant_expression. Returns false for any other form, which leaves
+  // the sequence without a monitor as before.
+  static bool ParseSeqDelayBound(Parser& p, uint32_t& val, Expr*& expr,
+                                 bool dollar, bool bracketed) {
     if (p.Check(TokenKind::kIntLiteral)) {
       val = ParseSeqDelayLiteral(p);
       return true;
@@ -79,11 +81,27 @@ struct ParserSeqLinearHelpers {
       val = SeqCycleDelay::kUnbounded;
       return true;
     }
-    if (p.Check(TokenKind::kIdentifier)) {
-      formal = p.Consume().text;
+    if (p.Check(TokenKind::kIdentifier) && !bracketed) {
+      Token tok = p.Consume();
+      expr = p.arena_.Create<Expr>();
+      expr->kind = ExprKind::kIdentifier;
+      expr->text = tok.text;
+      expr->range.start = tok.loc;
       return true;
     }
-    return false;
+    // The syntax was checked as the body was scanned (§16.7), so a bound
+    // read here is one the parse admitted.
+    if (!bracketed && !p.Match(TokenKind::kLParen)) return false;
+    expr = p.ParseExpr();
+    if (!bracketed) p.Match(TokenKind::kRParen);
+    return true;
+  }
+
+  // §16.7 and §16.9.2: whether a range's bounds are in order, a bound written
+  // as an expression left to the elaborator's check.
+  static bool BoundsOrdered(const SeqCycleDelay& bounds) {
+    return bounds.min_expr != nullptr || bounds.max_expr != nullptr ||
+           bounds.max >= bounds.min;
   }
 
   // §16.7's cycle_delay_range after its `##`: a constant_primary N for [N:N], a
@@ -92,11 +110,11 @@ struct ParserSeqLinearHelpers {
   static bool ParseLinearSeqCycleDelay(Parser& p, SeqCycleDelay& delay) {
     delay = SeqCycleDelay{};
     if (!p.Check(TokenKind::kLBracket)) {
-      if (!ParseSeqDelayBound(p, delay.min, delay.min_formal, false)) {
+      if (!ParseSeqDelayBound(p, delay.min, delay.min_expr, false, false)) {
         return false;
       }
       delay.max = delay.min;
-      delay.max_formal = delay.min_formal;
+      delay.max_expr = delay.min_expr;
       return true;
     }
     p.Consume();  // '['
@@ -110,16 +128,14 @@ struct ParserSeqLinearHelpers {
       delay.max = SeqCycleDelay::kUnbounded;
       return p.Match(TokenKind::kRBracket);
     }
-    if (!ParseSeqDelayBound(p, delay.min, delay.min_formal, false)) {
+    if (!ParseSeqDelayBound(p, delay.min, delay.min_expr, false, true)) {
       return false;
     }
     if (!p.Match(TokenKind::kColon)) return false;
-    if (!ParseSeqDelayBound(p, delay.max, delay.max_formal, true)) {
+    if (!ParseSeqDelayBound(p, delay.max, delay.max_expr, true, true)) {
       return false;
     }
-    bool ordered = !delay.min_formal.empty() || !delay.max_formal.empty() ||
-                   delay.max >= delay.min;
-    return ordered && p.Match(TokenKind::kRBracket);
+    return BoundsOrdered(delay) && p.Match(TokenKind::kRBracket);
   }
 
   static uint32_t ParseSeqDelayLiteral(Parser& p) {
@@ -398,7 +414,8 @@ struct ParserSeqLinearHelpers {
   // upper bound of `$` unbounded. Returns false where the brackets hold
   // anything else; `rep` stays kNone where no repetition follows.
   // The count inside a repetition's brackets after its operator: `n`,
-  // `min:max` or `min:$`, or nothing for `[*]`.
+  // `min:max` or `min:$`, each bound read as a delay's is, or nothing for
+  // `[*]`.
   static bool ParseRepetitionCount(Parser& p, SeqRepetition& rep) {
     if (p.Match(TokenKind::kRBracket)) {
       if (rep.kind != SeqRepetition::Kind::kConsecutive) return false;
@@ -406,17 +423,18 @@ struct ParserSeqLinearHelpers {
       rep.max = SeqCycleDelay::kUnbounded;
       return true;
     }
-    std::string_view formal;
-    if (!ParseSeqDelayBound(p, rep.min, formal, false) || !formal.empty()) {
+    if (!ParseSeqDelayBound(p, rep.min, rep.min_expr, false, true)) {
       return false;
     }
     rep.max = rep.min;
+    rep.max_expr = rep.min_expr;
     if (p.Match(TokenKind::kColon)) {
-      if (!ParseSeqDelayBound(p, rep.max, formal, true) || !formal.empty()) {
+      rep.max_expr = nullptr;
+      if (!ParseSeqDelayBound(p, rep.max, rep.max_expr, true, true)) {
         return false;
       }
     }
-    return rep.max >= rep.min && p.Match(TokenKind::kRBracket);
+    return BoundsOrdered(rep) && p.Match(TokenKind::kRBracket);
   }
 
   static bool ParseSequenceRepetition(Parser& p, SeqRepetition& rep) {
@@ -444,12 +462,14 @@ struct ParserSeqLinearHelpers {
   // as the clause has it, `(a ##2 b)[*3]` being `(a ##2 b) ##1 (a ##2 b) ##1
   // (a ##2 b)`: the group's operands from `first` on are appended again
   // `count - 1` times, the copy's first operand a tick after the last. A
-  // range or an unbounded count on a group is not read.
+  // range, an unbounded count or a count written as an expression on a group
+  // is not read.
   static bool UnrollGroupRepetition(SeqLinearBody& body, size_t first,
                                     const SeqRepetition& rep) {
     if (rep.kind == SeqRepetition::Kind::kNone) return true;
     if (rep.kind != SeqRepetition::Kind::kConsecutive) return false;
     if (rep.min != rep.max || rep.min == 0) return false;
+    if (rep.max_expr != nullptr) return false;
     // §16.13.1: a group naming a clock of its own is not unrolled.
     if (!body.clocks.empty()) return false;
     size_t n = body.operands.size() - first;
@@ -458,10 +478,7 @@ struct ParserSeqLinearHelpers {
       for (size_t i = 0; i < n; ++i) {
         body.operands.push_back(body.operands[first + i]);
         SeqCycleDelay delay = body.delays[first + i];
-        if (i == 0) {
-          delay.min = 1;
-          delay.max = 1;
-        }
+        if (i == 0) delay = SeqCycleDelay{};
         body.delays.push_back(delay);
         body.match_items.push_back(body.match_items[first + i]);
         body.repetitions.push_back(body.repetitions[first + i]);

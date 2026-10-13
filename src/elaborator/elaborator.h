@@ -837,7 +837,7 @@ class Elaborator : public ElaboratorClassRules {
   void DefaultPackageTaskFuncLifetimes();
   void ValidatePackageValueParams();
 
-  void ValidateSequenceEventArgs(const ModuleDecl* decl);
+  void ValidateSequenceEventArgs(const ModuleDecl* decl, RtlirModule* mod);
 
   void ValidateClockingBlock(ModuleItem* item, const RtlirModule* mod);
 

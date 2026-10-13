@@ -440,7 +440,12 @@ struct SequencePortScan {
       clock_default_allowed = false;
     }
     item->prop_formals.push_back(name_tok.text);
-    item->prop_formal_type_kw.push_back(carry_type_kw);
+    // §16.8: an untyped formal, written `untyped` or with no type in force, is
+    // recorded as `untyped`, apart from a type the keyword alone does not name,
+    // whose actual §16.8 casts otherwise.
+    bool untyped = carry_type_kw == TokenKind::kEof && clock_default_allowed;
+    item->prop_formal_type_kw.push_back(untyped ? TokenKind::kKwUntyped
+                                                : carry_type_kw);
     // §16.8.2: whether this formal is a local variable formal argument, which
     // §16.10 keeps out of the sequence's clocking events.
     item->prop_formal_is_local.push_back(item_saw_local);

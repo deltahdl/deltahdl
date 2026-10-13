@@ -210,4 +210,28 @@ TEST(SequenceMethods, TriggeredIsSetInTheObservedRegion) {
   EXPECT_EQ(f.ctx.FindVariable("waited_hits")->value.ToUint64(), 2u);
 }
 
+// §16.13.6 with §16.9.3: a sequence a method is applied to infers its clock
+// where it is used, and outside an assertion that is the default clocking:
+// e4, written with no clock, ends on posedge clk at 15, and the wait on
+// e4.triggered resumes there.
+TEST(SequenceMethods, AClocklessSequenceReadOutsideAnAssertionTakesTheDefault) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  bit clk, a = 1, b = 1;\n"
+      "  always #5 clk = ~clk;\n"
+      "  default clocking cb @(posedge clk); endclocking\n"
+      "  sequence e4;\n"
+      "    a ##1 b;\n"
+      "  endsequence\n"
+      "  initial begin\n"
+      "    wait (e4.triggered);\n"
+      "    $display(\"e4 at %0t\", $time);\n"
+      "    $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("e4 at 15\n"), std::string::npos);
+}
+
 }  // namespace

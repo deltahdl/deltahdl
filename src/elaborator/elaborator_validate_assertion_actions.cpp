@@ -11,6 +11,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -181,7 +182,22 @@ static void WalkItemForSequenceEvents(
   for (Stmt* s : bodies) WalkStmtsForSequenceEvents(s, kCtx);
 }
 
-void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl) {
+// §16.5.2 with §9.4.2.4: a sequence named as a concurrent assertion's clocking
+// event clocks the assertion at its end points, as it wakes an event control,
+// so an event of `clock` naming a sequence of the scope is marked one.
+static void MarkSequenceClockEvents(
+    std::vector<EventExpr>& clock,
+    const std::unordered_set<std::string_view>& seq_names) {
+  for (EventExpr& ev : clock) {
+    if (ev.signal != nullptr && ev.signal->kind == ExprKind::kIdentifier &&
+        seq_names.count(ev.signal->text) != 0) {
+      ev.is_sequence_event = true;
+    }
+  }
+}
+
+void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl,
+                                           RtlirModule* mod) {
   if (sequence_names_.empty()) return;
   // §16.8 actual-argument checks need each named sequence's formals, so map the
   // sequences declared in this scope by name. A sequence instantiated across a
@@ -194,6 +210,14 @@ void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl) {
   }
   for (const auto* item : decl->items) {
     WalkItemForSequenceEvents(item, sequence_names_, seq_decls, diag_);
+  }
+  // The processes hold their own copies of the clocks, made as the items were
+  // elaborated, which a sequence declared after its assertion follows.
+  for (RtlirProcess& proc : mod->processes) {
+    MarkSequenceClockEvents(proc.sensitivity, sequence_names_);
+    if (proc.is_concurrent_clocked) {
+      MarkSequenceClockEvents(proc.body->assert_clock, sequence_names_);
+    }
   }
 }
 

@@ -329,12 +329,14 @@ struct AssertionInstanceArg {
   SourceLoc loc;
 };
 
+// §16.7: a cycle delay's bounds, `$` kept as kUnbounded, and a bound written
+// as a constant expression kept until an instance or the scope settles it.
 struct SeqCycleDelay {
   static constexpr uint32_t kUnbounded = UINT32_MAX;
   uint32_t min = 1;
   uint32_t max = 1;
-  std::string_view min_formal;
-  std::string_view max_formal;
+  Expr* min_expr = nullptr;
+  Expr* max_expr = nullptr;
 };
 
 // §16.10: one assignment of a sequence_match_item, `lvar = rhs` or
@@ -380,12 +382,10 @@ struct SeqLocalDecl {
 // §16.9.2: the repetition written after an operand of a linear body: none,
 // consecutive `[*min:max]` on a Boolean or a group, goto `[->min:max]` or
 // nonconsecutive `[=min:max]` on a Boolean, the count an exact `[*n]` being
-// [n:n], `[*]` [0:$] and `[+]` [1:$], `$` kept as SeqCycleDelay::kUnbounded.
-struct SeqRepetition {
+// [n:n], `[*]` [0:$] and `[+]` [1:$], its bounds held as a delay's are.
+struct SeqRepetition : SeqCycleDelay {
   enum class Kind : uint8_t { kNone, kConsecutive, kGoto, kNonconsecutive };
   Kind kind = Kind::kNone;
-  uint32_t min = 1;
-  uint32_t max = 1;
 };
 
 // §16.9.9: `exp throughout seq` inside a chain, `(exp)[*0:$] intersect seq`,

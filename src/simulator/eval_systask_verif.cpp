@@ -16,6 +16,7 @@
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/expr_walk.h"
+#include "simulator/scheduler.h"
 #include "simulator/scope_hier_name.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -692,6 +693,39 @@ static bool PastGateOpen(const Expr* expr, SimContext& ctx, Arena& arena) {
   return EvalSampledArg(expr->args[2], ctx, arena).IsTruthy();
 }
 
+// §16.5.1: whether `arg` reads an event's or a sequence's `triggered`, or a
+// sequence's `matched`, a past value of which a sampled value function takes
+// from the Postponed region of the past tick.
+static bool ReadsEndPointMethod(const Expr* arg) {
+  bool found = false;
+  ForEachSubExpr(arg, [&](const Expr* e) {
+    if (e->kind == ExprKind::kMemberAccess && e->rhs != nullptr &&
+        (e->rhs->text == "triggered" || e->rhs->text == "matched")) {
+      found = true;
+    }
+  });
+  return found;
+}
+
+// §16.5.1: this tick's entry in the history of `site` becomes the value
+// `arg` has in the Postponed region of the tick, read in the process and the
+// scopes the call is evaluated in, over the one recorded in the Observed
+// region.
+static void RecordPostponedSample(const Expr* arg, const SampleSite& site,
+                                  uint32_t ticks, SimContext& ctx,
+                                  Arena& arena) {
+  PendingReportScope scope = PendingReportScope::Capture(ctx);
+  auto* ev = ctx.GetScheduler().GetEventPool().Acquire();
+  ev->callback = [arg, site, ticks, scope, &ctx, &arena]() {
+    PendingReportScope saved;
+    scope.Install(ctx, saved);
+    Logic4Vec value = EvalSampledArg(arg, ctx, arena);
+    ctx.AssertionSamples().RecordTick(site, value, ticks, arena);
+    PendingReportScope::Restore(ctx, saved);
+  };
+  ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kPostponed, ev);
+}
+
 static Logic4Vec EvalPastOrValueChange(const Expr* expr, SimContext& ctx,
                                        Arena& arena, std::string_view name,
                                        const Logic4Vec& now_val) {
@@ -717,6 +751,9 @@ static Logic4Vec EvalPastOrValueChange(const Expr* expr, SimContext& ctx,
   // the site is evaluated in it, and the value asked for is read behind it.
   if (!is_past || PastGateOpen(expr, ctx, arena)) {
     samples.RecordTick(site, now_val, ticks, arena);
+    if (ReadsEndPointMethod(expr->args[0])) {
+      RecordPostponedSample(expr->args[0], site, ticks, ctx, arena);
+    }
   }
   const Logic4Vec* past = samples.PastValue(site, ticks);
   Logic4Vec prev_val = past != nullptr

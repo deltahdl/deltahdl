@@ -250,7 +250,10 @@ struct PropertyPortScan {
       }
     }
     item->prop_formals.push_back(name_tok.text);
-    item->prop_formal_type_kw.push_back(carry_type_kw);
+    // §16.12 with §16.8: an untyped formal is recorded as `untyped`.
+    bool untyped = carry_type_kw == TokenKind::kEof && carry_type == nullptr;
+    item->prop_formal_type_kw.push_back(untyped ? TokenKind::kKwUntyped
+                                                : carry_type_kw);
     item->prop_formal_types.push_back(carry_type);
     item->prop_formal_is_local.push_back(local_run);
     item->prop_formal_is_property.push_back(property_run);
