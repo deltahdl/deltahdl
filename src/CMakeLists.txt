@@ -527,6 +527,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_class_lookup.cpp
     elaborator/elaborator_validate_class_constraint_methods.cpp
     elaborator/elaborator_validate_class_handles.cpp
+    elaborator/elaborator_validate_rand_mode_names.cpp
     elaborator/elaborator_validate_class_inheritance.cpp
     elaborator/elaborator_validate_class_overrides.cpp
     elaborator/elaborator_validate_class_members.cpp

@@ -632,4 +632,67 @@ TEST(RandModeNamedVariable, QueryOnAScalarOrAnElementAccepted) {
              "endmodule\n"));
 }
 
+// 18.8: rand_mode() can name one member of an unpacked structure, and naming
+// a member the structure lacks is an error, as naming a variable the class
+// lacks is.
+TEST(RandModeNamedVariable, AStructureMemberTheStructureLacksIsRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class Packet;\n"
+             "  rand struct { rand bit [3:0] a; } s;\n"
+             "endclass\n"
+             "module m;\n"
+             "  Packet p;\n"
+             "  initial begin\n"
+             "    p = new;\n"
+             "    p.s.nosuch.rand_mode(0);\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the structure 's' has no member 'nosuch'", 8,
+                            "18.8"));
+}
+
+// 18.8: a member of an unpacked structure that is declared neither rand nor
+// randc is no random variable, so naming it in rand_mode() is an error.
+TEST(RandModeNamedVariable, ANonRandStructureMemberIsRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class Packet;\n"
+             "  rand struct { rand bit [3:0] a; bit [3:0] b; } s;\n"
+             "endclass\n"
+             "module m;\n"
+             "  Packet p;\n"
+             "  initial begin\n"
+             "    p = new;\n"
+             "    p.s.b.rand_mode(0);\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "member 'b' of the structure 's' is not declared "
+                            "rand or randc, so rand_mode() cannot be applied "
+                            "to it",
+                            8, "18.8"));
+}
+
+// 18.8: naming a rand member of a rand unpacked structure, and querying it,
+// is legal.
+TEST(RandModeNamedVariable, ARandStructureMemberIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class Packet;\n"
+             "  rand struct { rand bit [3:0] a; randc bit [1:0] c; } s;\n"
+             "endclass\n"
+             "module m;\n"
+             "  Packet p;\n"
+             "  int r;\n"
+             "  initial begin\n"
+             "    p = new;\n"
+             "    p.s.a.rand_mode(0);\n"
+             "    r = p.s.c.rand_mode();\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
 }  // namespace
