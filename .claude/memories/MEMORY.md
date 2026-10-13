@@ -96,6 +96,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 - [Solve what the session finds](solving-what-a-session-finds.md) — file what a session finds as issues of one indivisible problem each; solve one now only if the work in hand cannot go on without it.
 - [What does not get filed](what-does-not-get-filed.md) — nothing the commit in hand fixes, nothing an open issue already covers.
+- [Searching for an existing report before filing](searching-for-an-existing-report-before-filing.md) — grep all of src/ and test/ for the rule's own words before filing "not reported"; a neighbouring clause or another subsystem may already report it.
 - [One indivisible problem per issue](one-indivisible-problem-per-issue.md) — one defect, one fix per issue; an issue found holding two is split there and then.
 - [Research lives in issues](research-lives-in-issues.md) — a plan that outlives the session, and each finding it yields, is filed as it arises; the task list and scratchpad are not durable.
 - [Issues have no fixed form](issues-have-no-fixed-form.md) — no house style; write each so a fresh session can act on it alone.
