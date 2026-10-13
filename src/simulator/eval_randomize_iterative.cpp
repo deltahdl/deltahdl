@@ -413,25 +413,68 @@ bool StateArrayElements(std::string_view name, RandomizeCtx& rc,
   return true;
 }
 
-// §18.5.7.1: the characters of a string a foreach iterates, a dynamic array
-// of bytes indexed from 0: the object's string property `name`, or, §18.7, a
-// string of the scope containing an inline constraint's call. A select of one
-// is left as written, read as the state value the character is. False where
+// §18.5.7.1: the text of a string a foreach iterates, a dynamic array of
+// bytes indexed from 0: the object's string property `name`, or, §18.7, a
+// string of the scope containing an inline constraint's call. False where
 // `name` is no string.
-bool StringElements(std::string_view name, RandomizeCtx& rc,
-                    IteratedElements& out) {
+bool StringText(std::string_view name, RandomizeCtx& rc, std::string& out) {
   const auto* prop = rc.obj->type->FindProperty(name);
-  Logic4Vec value;
   if (prop != nullptr && prop->is_string) {
-    value = rc.obj->GetProperty(name, rc.arena);
+    out = Logic4VecToString(rc.obj->GetProperty(name, rc.arena));
   } else if (rc.ctx.IsStringVariable(name)) {
-    value = rc.ctx.FindVariable(name)->value;
+    out = Logic4VecToString(rc.ctx.FindVariable(name)->value);
   } else {
     return false;
   }
-  out.lo = 0;
-  out.count = static_cast<uint32_t>(Logic4VecToString(value).size());
   return true;
+}
+
+Expr* CharacterInstance(const Expr* e, const ForeachInstance& inst,
+                        const std::string& text);
+
+// §18.5.7.1: a select of the iterated string whose instanced index reads as
+// a literal, as the value of the character there, the state value it is, or
+// 0 past the end (§6.16); null for an index over a name.
+Expr* CharacterSelect(const Expr* e, const ForeachInstance& inst,
+                      const std::string& text) {
+  Expr* index = CharacterInstance(e->index, inst, text);
+  if (!IsLiteralExpr(index)) return nullptr;
+  const uint64_t kAt = EvalExpr(index, inst.rc.ctx, inst.rc.arena).ToUint64();
+  const int64_t kChar =
+      kAt < text.size() ? static_cast<unsigned char>(text[kAt]) : 0;
+  return IndexLiteral(kChar, e, inst.rc.arena);
+}
+
+// §18.5.7.1: `e` as one instance of a constraint_set iterating a string reads
+// it: the loop variable as the index and a select of the string as the
+// character's value.
+Expr* CharacterInstance(const Expr* e, const ForeachInstance& inst,
+                        const std::string& text) {
+  return RewriteExpr(
+      e,
+      [&inst, &text](const Expr* n) -> Expr* {
+        if (n->kind == ExprKind::kIdentifier && n->text == inst.loop_var)
+          return IndexLiteral(inst.index, n, inst.rc.arena);
+        return SelectsArray(n, inst) ? CharacterSelect(n, inst, text) : nullptr;
+      },
+      inst.rc.arena);
+}
+
+// §18.5.7.1: the relations of `ref` instanced over the characters of `text`,
+// made for each randomize() call afresh, since the string's characters are
+// state values that change between calls.
+std::vector<Expr*> StringForeachInstances(const ConstraintForeachRef& ref,
+                                          const std::string& text,
+                                          RandomizeCtx& rc) {
+  std::vector<Expr*> out;
+  const auto kCount = static_cast<uint32_t>(text.size());
+  for (uint32_t i = 0; i < kCount; ++i) {
+    const ForeachInstance kInst{
+        ref.loop_vars.front(), ref.array_name, i, 0, kCount, rc};
+    for (const Expr* rel : ref.body)
+      out.push_back(CharacterInstance(rel, kInst, text));
+  }
+  return out;
 }
 
 // 18.5.7.2: the operand a reduction method named `method` joins the elements
@@ -630,9 +673,9 @@ struct Iterated {
 };
 
 // The elements the foreach `ref` iterates over the array property `array`,
-// or, where `array` is null, over a rand queue, a string (§18.5.7.1) or,
-// §18.7, an array of the scope containing an inline constraint's call, into
-// `out`; false where it names none of them.
+// or, where `array` is null, over a rand queue or, §18.7, an array of the
+// scope containing an inline constraint's call, into `out`; false where it
+// names none of them.
 bool IteratedOf(const ConstraintForeachRef& ref,
                 const ClassTypeInfo::PropertyInfo* array,
                 std::vector<RandInfo>& rands, RandomizeCtx& rc, Iterated& out) {
@@ -649,7 +692,6 @@ bool IteratedOf(const ConstraintForeachRef& ref,
                             out.element_array)) {
     return true;
   }
-  if (StringElements(ref.array_name, rc, out.elems)) return true;
   return StateArrayElements(ref.array_name, rc, out.elems);
 }
 
@@ -676,6 +718,11 @@ void AddForeachConstraint(const ConstraintForeachRef& ref,
       ref.loop_vars.size() >= 2) {
     AppendStateMultiForeachInstances(ref, *state, rc, instances);
     AddInstances(instances, rands, rc, block);
+    return;
+  }
+  std::string text;
+  if (StringText(ref.array_name, rc, text)) {
+    AddInstances(StringForeachInstances(ref, text, rc), rands, rc, block);
     return;
   }
   Iterated it;

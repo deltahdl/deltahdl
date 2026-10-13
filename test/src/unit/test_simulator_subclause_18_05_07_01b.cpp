@@ -315,15 +315,17 @@ TEST(ForeachConstraintRun, TwoLoopVariablesIterateBothDimensions) {
 }
 
 // §18.5.7.1: a foreach iterates a string as a dynamic array of bytes indexed
-// from 0, so b avoids each character of the object's "AB", leaving it 67, and,
-// in an inline block, each character of the calling scope's "A", leaving 66.
+// from 0, so b avoids each character of the object's "AB", leaving it 67, a
+// select past the end reading 0, and, in an inline block, each character of
+// the calling scope's "A", leaving 66.
 TEST(ForeachConstraintRun, AForeachIteratesTheCharactersOfAString) {
   SimFixture f;
   std::string out = RunCapture(
       "class C;\n"
       "  string s = \"AB\";\n"
       "  rand byte b;\n"
-      "  constraint c { foreach (s[i]) b != s[i]; b inside {65, 66, 67}; }\n"
+      "  constraint c { foreach (s[i]) b != s[i] && b != s[i + 1];\n"
+      "                 b inside {65, 66, 67}; }\n"
       "endclass\n"
       "class D;\n"
       "  rand byte b;\n"
