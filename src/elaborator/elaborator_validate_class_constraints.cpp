@@ -438,7 +438,7 @@ static bool PlainlyNeitherIntegralNorReal(const Expr* e,
     return PlainlyNeitherIntegralNorReal(e->true_expr, s) ||
            PlainlyNeitherIntegralNorReal(e->false_expr, s);
   }
-  return e->kind == ExprKind::kSystemCall && e->text == "$sformatf";
+  return e->kind == ExprKind::kSystemCall && e->callee == "$sformatf";
 }
 
 // 18.3: whether `e` reads a random variable of the solve -- a rand or randc
