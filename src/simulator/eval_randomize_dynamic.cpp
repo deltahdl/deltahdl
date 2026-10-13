@@ -18,6 +18,7 @@
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_class_array.h"
+#include "simulator/eval_format_internal.h"
 #include "simulator/eval_randomize_internal.h"
 #include "simulator/sim_context_types.h"
 
@@ -196,8 +197,12 @@ void AddAssocElements(const ClassMember* m, const ClassTypeInfo* level,
     elem.var.name = elem.name;
     rands.push_back(std::move(elem));
   };
+  // §7.8.4: an integral index is kept whole, so the element is named by
+  // the decimal numeral of every word of it, two indices differing above
+  // bit 63 being two elements.
   for (const auto& [key, value] : aa.int_data) {
-    add(ClassArrayElementKey(m->name, key.Low()));
+    add(std::string(m->name) + "[" +
+        FormatDecimalDigits(key.ToSignedVec(rc.arena)) + "]");
     rands.back().int_key = key;
   }
   for (const auto& [key, value] : aa.str_data) {

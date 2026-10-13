@@ -471,4 +471,31 @@ TEST(RandPackedStructRun, ARandDynamicMemberHasItsElementsRandomized) {
   EXPECT_EQ(out, "1 4 0 1\n");
 }
 
+// §18.4 with §7.8.4: the elements of a rand associative array are named by
+// their whole index, so two entries whose 80-bit indices differ only above
+// bit 63 are two random variables, each held to its own instance of the
+// foreach: the entry at 2**64 + 5 is drawn 2 and the one at 5 is drawn 1.
+// Named by the low 64 bits, they were one variable held to the relation
+// for the key 5.
+TEST(RandQueueRun, AnAssociativeArrayElementIsNamedByItsWholeIndex) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  rand bit [7:0] m[bit [79:0]];\n"
+      "  constraint c { foreach (m[k]) m[k] == (k >> 64) + 1; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    c.m[80'h1_0000_0000_0000_0005] = 0; c.m[5] = 0;\n"
+      "    ok = c.randomize();\n"
+      "    $display(\"%0d %0d %0d %0d\", ok, c.m.num(),\n"
+      "             c.m[5], c.m[80'h1_0000_0000_0000_0005]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 2 1 2\n");
+}
+
 }  // namespace
