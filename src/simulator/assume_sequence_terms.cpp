@@ -559,14 +559,14 @@ const SeqTerm* SeqTerms::Take(const SeqWay& way) {
 // `intersect` of chains, a chain being its operands under their delays and
 // repetitions, under a throughout spanning it whole, and a nested operand
 // a sequence of its own; each operand on the clock it names or the one
-// flowing to it. `failed` is set where the sequence uses a form the terms
-// do not read: a throughout over part of a chain, or match items on a
+// flowing to it. `failures` counts the uses of forms the terms do not
+// read: a throughout over part of a chain, or match items on a
 // repeated operand.
 struct SeqTerms::Builder {
   SeqTerms& terms;
   const ObligationScope& scope;
   std::vector<Expr*>& reads;
-  bool failed = false;
+  int failures = 0;
 
   Expr* Read(Expr* e) {
     Expr* read = scope.rewrite(e);
@@ -611,8 +611,10 @@ struct SeqTerms::Builder {
     uint32_t lead = 0;
     if (!s.throughouts.empty()) {
       const SeqThroughout& guard = s.throughouts[0];
-      failed |= (s.throughouts.size() != 1) | (guard.first != 0) |
-                (guard.last + 1 != s.operands.size());
+      int spans_part = static_cast<int>(s.throughouts.size() != 1) +
+                       static_cast<int>(guard.first != 0) +
+                       static_cast<int>(guard.last + 1 != s.operands.size());
+      failures += spans_part;
       lead = guard.lead;
       int first = terms.FirstClock(chain);
       chain =
@@ -645,7 +647,9 @@ struct SeqTerms::Builder {
     const SeqRepetition& rep = s.repetitions[i];
     const std::vector<SeqMatchAssign>& items = s.match_items[i];
     bool repeated = rep.kind != SeqRepetition::Kind::kNone;
-    failed |= !items.empty() & repeated;
+    int repeated_items =
+        static_cast<int>(!items.empty()) * static_cast<int>(repeated);
+    failures += repeated_items;
     auto nullable = static_cast<uint8_t>((rep.min == 0) * kNullable);
     if (rep.kind == SeqRepetition::Kind::kGoto ||
         rep.kind == SeqRepetition::Kind::kNonconsecutive) {
@@ -690,7 +694,7 @@ const SeqTerm* SeqTerms::Begin(const ModuleItem* item, int clock,
   if (has_locals && composite != 0) return nullptr;
   Builder builder{*this, scope, reads};
   const SeqTerm* term = builder.Body(*seq, clock);
-  if (builder.failed) return nullptr;
+  if (builder.failures != 0) return nullptr;
   if (has_locals) {
     term = Bind(Locals(InitialLocals(seq->locals, ctx_, arena_), &seq->locals),
                 term);
