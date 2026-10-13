@@ -286,4 +286,32 @@ TEST(WaitOrderSim, ClassEventPropertiesAreWaitedOnInOrder) {
   EXPECT_EQ(var->value.ToUint64(), 120u);
 }
 
+// §15.5.4 with §4.5: the statements after a wait_order run as the process that
+// waited, so the unique-if violation they raise is queued on the waiter, and
+// its resumption from @(b) discards it (§12.4.2.1). The triggering process
+// fires a and b with no flush point between them; resumed inside it, the
+// waiter queued the report there, where nothing discarded it.
+TEST(WaitOrderSim, StatementsAfterTheWaitRunAsTheWaiter) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  event a, b;\n"
+      "  int y;\n"
+      "  initial begin\n"
+      "    wait_order (a);\n"
+      "    unique if (1) y = 1; else if (1) y = 2;\n"
+      "    @(b);\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1;\n"
+      "    -> a;\n"
+      "    -> b;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 1u);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
 }  // namespace

@@ -622,7 +622,7 @@ class SimContext : public DeclaredNameTables,
   bool IsEventTriggered(std::string_view name) const;
 
   void RegisterClassType(std::string_view name, ClassTypeInfo* info);
-  ClassTypeInfo* FindClassType(std::string_view name);
+  ClassTypeInfo* FindClassType(std::string_view name) const;
   // §8.25: while `scope`, an instance's prefix, is set, RegisterClassType
   // holds classes as that instance's own, under it, and FindClassType tries
   // the running code's instance's first; returns the scope set before.

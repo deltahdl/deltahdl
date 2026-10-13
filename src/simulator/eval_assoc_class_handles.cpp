@@ -10,6 +10,7 @@
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_class_array_handles.h"
+#include "simulator/eval_class_sync.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -49,9 +50,9 @@ AssocArrayObject* HandleArrayOfSelect(const Expr* sel, SimContext& ctx,
     class_type = ctx.GetVariableClassType(sel->base->text);
   // §15.3 and §15.4: the built-in semaphore and mailbox are classes whose
   // handles an associative array may hold (NewContainedSyncObject).
-  bool is_builtin_sync = class_type == "semaphore" || class_type == "mailbox";
   if (class_type.empty() ||
-      (ctx.FindClassType(class_type) == nullptr && !is_builtin_sync)) {
+      (ctx.FindClassType(class_type) == nullptr &&
+       BuiltinSyncKindOf(class_type, ctx) == SyncKind::kNone)) {
     return nullptr;
   }
   return aa;

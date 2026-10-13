@@ -44,19 +44,19 @@
 
 namespace delta {
 
-// §15.3 (printed page 372) and §15.4 (printed 374): the built-in
-// synchronization class the package variable `item` is declared with,
-// `semaphore` or `mailbox`, which the parser leaves as a named type of that
-// spelling, the spelling CreateSyncObjectForVar (sync_variable.cpp)
-// recognizes a module's by. Empty for an item of any other
-// type.
-static std::string_view PackageSyncObjectType(const ModuleItem* item) {
-  if (item->kind != ModuleItemKind::kVarDecl ||
-      item->data_type.kind != DataTypeKind::kNamed)
-    return {};
+// §15.3 (printed page 372) and §15.4 (printed 374) with §15.2: the built-in
+// class, `semaphore` or `mailbox`, the package variable `item` is declared
+// with, as CreateSyncObjectForVar (sync_variable.cpp) knows a module's; empty
+// for any other type and for a class of that name whose record `key` holds.
+static std::string_view PackageSyncObjectType(const ModuleItem* item,
+                                              std::string_view key,
+                                              const SimContext& ctx) {
   std::string_view name = item->data_type.type_name;
-  if (name == "semaphore" || name == "mailbox") return name;
-  return {};
+  if (item->kind != ModuleItemKind::kVarDecl ||
+      item->data_type.kind != DataTypeKind::kNamed ||
+      !ctx.GetVariableClassType(key).empty())
+    return {};
+  return name == "semaphore" || name == "mailbox" ? name : std::string_view();
 }
 
 // §8.3 (printed page 180) with §8.4 (printed 181-182): whether the package
@@ -68,7 +68,7 @@ static bool PackageItemIsHandle(const ModuleItem* item, std::string_view qname,
                                 SimContext& ctx) {
   if (item->kind != ModuleItemKind::kVarDecl) return false;
   return !ctx.GetVariableClassType(qname).empty() ||
-         !PackageSyncObjectType(item).empty();
+         !PackageSyncObjectType(item, qname, ctx).empty();
 }
 
 // The default a package variable with no initializer holds: §6.8's Table 6-7
@@ -445,7 +445,7 @@ static void CreatePackageSyncObject(std::string_view type,
 // semaphore's or a mailbox's item whatever its initializer.
 static bool InitPackageSyncObject(const ModuleItem* item, std::string_view key,
                                   SimContext& ctx, Arena& arena) {
-  std::string_view type = PackageSyncObjectType(item);
+  std::string_view type = PackageSyncObjectType(item, key, ctx);
   if (type.empty()) return false;
   const Expr* init = item->init_expr;
   if (init->kind != ExprKind::kCall || init->text != "new") return true;
@@ -568,7 +568,7 @@ static std::string_view CreatePackageDataItem(const ModuleItem* item,
   // takes the default each member's declaration writes.
   if (item->init_expr == nullptr)
     ApplyVariableLayoutDefaults(*qname, var, ctx, arena);
-  std::string_view sync_type = PackageSyncObjectType(item);
+  std::string_view sync_type = PackageSyncObjectType(item, *qname, ctx);
   if (!sync_type.empty()) {
     CreatePackageSyncObject(sync_type, *qname, ctx);
     return *qname;

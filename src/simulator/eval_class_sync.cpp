@@ -47,6 +47,15 @@ static std::string_view TypeTargetFor(std::string_view name,
   return ctx.FindTypeTarget(name);
 }
 
+SyncKind BuiltinSyncKindOf(std::string_view name, const SimContext& ctx) {
+  SyncKind kind = SyncKind::kNone;
+  if (name == "semaphore") kind = SyncKind::kSemaphore;
+  if (name == "mailbox") kind = SyncKind::kMailbox;
+  if (kind == SyncKind::kNone || ctx.FindClassType(name) != nullptr)
+    return SyncKind::kNone;
+  return kind;
+}
+
 // §6.18 (printed page 118 of IEEE 1800-2023): a typedef name stands for
 // the type it was declared with, which may be another typedef name, and §26.3
 // reaches a package's under `p::name`, the key the run records it by. The
@@ -60,8 +69,8 @@ SyncKind SyncKindOfType(const DataType& type, std::string_view package,
           ? std::string(type.type_name)
           : std::string(type.scope_name) + "::" + std::string(type.type_name);
   for (size_t steps = 0; steps <= ctx.TypeTargetCount(); ++steps) {
-    if (name == "semaphore") return SyncKind::kSemaphore;
-    if (name == "mailbox") return SyncKind::kMailbox;
+    SyncKind kind = BuiltinSyncKindOf(name, ctx);
+    if (kind != SyncKind::kNone) return kind;
     std::string_view target = TypeTargetFor(name, package, ctx);
     if (target.empty()) return SyncKind::kNone;
     name = std::string(target);

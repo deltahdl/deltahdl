@@ -65,9 +65,10 @@ static void CreateMailboxForVar(std::string_view name, const RtlirVariable& var,
 // handle held, and a procedural one HoldSyncVariable.
 void CreateSyncObjectForVar(std::string_view name, const RtlirVariable& var,
                             Variable* v, SimContext& ctx, Arena& arena) {
-  if (var.class_type_name == "semaphore") {
+  SyncKind kind = BuiltinSyncKindOf(var.class_type_name, ctx);
+  if (kind == SyncKind::kSemaphore) {
     CreateSemaphoreForVar(name, var, v, ctx, arena);
-  } else if (var.class_type_name == "mailbox") {
+  } else if (kind == SyncKind::kMailbox) {
     CreateMailboxForVar(name, var, v, ctx, arena);
   } else if (var.covergroup != nullptr) {
     CreateCovergroupForVar(name, var, v, ctx, arena);

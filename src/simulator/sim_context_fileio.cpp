@@ -607,7 +607,7 @@ ClassTypeInfo* SimContext::ExactClassType(std::string_view name) {
 // §26.7 with Syntax 26-5: `std::` before a built-in class's name reaches the
 // same declaration the bare name does, and §26.7 lets no user package be
 // called std, so a `std::` head is dropped before the table is asked.
-ClassTypeInfo* SimContext::FindClassType(std::string_view name) {
+ClassTypeInfo* SimContext::FindClassType(std::string_view name) const {
   constexpr std::string_view kStdScope = "std::";
   if (name.substr(0, kStdScope.size()) == kStdScope)
     name = name.substr(kStdScope.size());

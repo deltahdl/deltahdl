@@ -174,8 +174,12 @@ void CollectMethodReceiverReads(const Expr* cond,
 
 // §15.5.4: one step of a wait_order, the wait for the next of the events
 // still to come, `events`, to be triggered; answers the position among them
-// of the one that was.
+// of the one that was. §4.5: the waiting process resumes as itself, as an
+// event control's does (EventAwaiter::ResumeMaybeReactive); resumed inside the
+// process that triggered the event, the statements after the wait_order
+// queued their violation reports, among other per-process state, on that one.
 struct WaitOrderStepAwaiter {
+  SimContext& ctx;
   const std::vector<Variable*>& events;
   size_t triggered = 0;
 
@@ -184,13 +188,15 @@ struct WaitOrderStepAwaiter {
   void await_suspend(std::coroutine_handle<> h) {
     auto done = std::make_shared<bool>(false);
     auto* out = &triggered;
+    auto* ctx_ptr = &ctx;
+    Process* proc = ctx.CurrentProcess();
     for (size_t k = 0; k < events.size(); ++k) {
       if (events[k] == nullptr) continue;
-      events[k]->AddWatcher([h, k, out, done]() mutable {
+      events[k]->AddWatcher([h, k, out, done, ctx_ptr, proc]() mutable {
         if (*done) return true;
         *done = true;
         *out = k;
-        h.resume();
+        EventAwaiter::ResumeMaybeReactive(h, proc, *ctx_ptr);
         return true;
       });
     }
@@ -291,12 +297,6 @@ ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
-// §12.4.2.1: a process that suspended on a wait statement reaches a violation
-// report flush point when it resumes, which clears its own queue.
-static void FlushWaiterViolations(Process* self, bool suspended) {
-  if (suspended && self != nullptr) self->pending_violations.clear();
-}
-
 ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   auto& events = stmt->wait_order_events;
   if (events.empty()) {
@@ -310,9 +310,6 @@ ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   std::vector<Variable*> vars = WaitOrderEvents(events, ctx);
   uint64_t now = ctx.CurrentTime().ticks;
 
-  // The awaiter is resumed from the process that triggers the event, so the
-  // queue flushed below is this process's own, taken before it waits.
-  Process* self = ctx.CurrentProcess();
   bool suspended = false;
   for (size_t i = 0; i < vars.size() && !failed; ++i) {
     if (i == 0 && vars[0] != nullptr && vars[0]->triggered_ticks == now) {
@@ -320,14 +317,14 @@ ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     }
     std::vector<Variable*> remaining(
         vars.begin() + static_cast<std::ptrdiff_t>(i), vars.end());
-    size_t triggered = co_await WaitOrderStepAwaiter{remaining, 0};
+    size_t triggered = co_await WaitOrderStepAwaiter{ctx, remaining, 0};
     suspended = true;
     // The first of the remaining events is the one expected next.
     if (triggered != 0) failed = true;
   }
   // §12.4.2.1: resuming after suspending on a wait statement, `wait_order`
   // among them (A.6.5), is a violation report flush point.
-  FlushWaiterViolations(self, suspended);
+  if (suspended) ctx.FlushPendingViolations();
 
   if (failed) {
     if (stmt->else_branch) {

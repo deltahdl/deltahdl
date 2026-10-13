@@ -50,6 +50,13 @@ class SimContext;
 // own, the key the run records a package's typedef by; a formal's type,
 // declared in no package the run names, is followed with none.
 enum class SyncKind : uint8_t { kNone, kSemaphore, kMailbox };
+
+// §15.2: the built-in class the type name `name` denotes, `semaphore` or
+// `mailbox`, which stand in the std package (§26.7) and so are hidden by a
+// class of the same name the design declares where the name is read; kNone
+// for any other name and for a name such a class takes.
+SyncKind BuiltinSyncKindOf(std::string_view name, const SimContext& ctx);
+
 SyncKind SyncKindOfType(const DataType& type, std::string_view package,
                         const SimContext& ctx);
 SyncKind SyncKindOfType(const DataType& type, const SimContext& ctx);

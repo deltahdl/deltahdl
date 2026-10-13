@@ -128,7 +128,7 @@ Logic4Vec ConstructElementObject(const Expr* rhs, std::string_view class_type,
                                  SimContext& ctx, Arena& arena) {
   // §15.3.1 and §15.4.1: an element of a container of semaphores or mailboxes
   // is given the built-in object `new` builds (NewContainedSyncObject).
-  if (class_type == "semaphore" || class_type == "mailbox") {
+  if (BuiltinSyncKindOf(class_type, ctx) != SyncKind::kNone) {
     return NewContainedSyncObject(rhs, class_type, ctx, arena);
   }
   if (rhs->lhs != nullptr && rhs->lhs->kind == ExprKind::kIdentifier) {
