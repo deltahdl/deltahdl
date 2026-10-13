@@ -196,9 +196,12 @@ ObligationScope ScopeOf(const ObligationRewrite& rewrite,
           }};
 }
 
+// §16.13: the clocks of the assumption `proc` evaluates, its leading clock
+// first, which the statement keeps apart from the clocks its operands name
+// that the process also wakes on.
 std::shared_ptr<PropertyClocks> ClocksLedBy(const RtlirProcess& proc) {
   auto clocks = std::make_shared<PropertyClocks>();
-  clocks->clocks.push_back(proc.sensitivity);
+  clocks->clocks.push_back(proc.body->assert_clock);
   return clocks;
 }
 

@@ -575,21 +575,30 @@ TEST(CheckerVariableRandomization, AVaryingSequenceConstrainsLaterTicks) {
   ExpectAssumedPropertiesHold({"x |-> ##[1:2] y", "x |-> ##[1:$] y",
                                "x |-> y[*2]", "x |-> y[*1:$] ##1 z",
                                "x |-> y[->1] ##1 z", "x |-> y[=1] ##1 z",
-                               "x ##[0:1] y |-> z"});
+                               "x |-> y[->2:3] ##1 z", "x ##[0:1] y |-> z"});
 }
 
-// §17.7.2: an assumption of a form the solution attempts do not model --
-// an instance of a property declaring local variables, and a sequence
-// whose locals stand under or -- is left out of the assume set, which is
-// then empty and x drawn free at every time step, though either alone
-// would hold it at its earlier value of y.
+// §17.7.2: an assumption of a form the solution attempts do not model is
+// left out of the assume set, which is then empty and x drawn free at every
+// time step: an instance of a property declaring local variables, alone,
+// under or and as a consequent; a sequence whose locals stand under or; a
+// throughout over part of a chain, alone, as an antecedent and as a
+// property's body; and match items on a repeated operand.
 TEST(CheckerVariableRandomization, AnUnmodelledAssumptionTakesNoPart) {
   ExpectXDrawnFree(
       "  property p1; bit v; (1, v = y) |=> x == v; endproperty\n"
       "  sequence s2; bit v; ((1, v = y) ##1 x == v) or (y ##1 x == y);\n"
       "  endsequence\n"
+      "  sequence s3; bit v; (y, v = x)[*2] ##1 x == v; endsequence\n"
+      "  property p4; x ##1 (z throughout y ##1 y); endproperty\n"
       "  m1: assume property (@(posedge clk) p1);\n"
-      "  m2: assume property (@(posedge clk) s2);\n");
+      "  m2: assume property (@(posedge clk) s2);\n"
+      "  m3: assume property (@(posedge clk) y or p1);\n"
+      "  m4: assume property (@(posedge clk) y |-> p1);\n"
+      "  m5: assume property (@(posedge clk) x ##1 (z throughout y ##1 y));\n"
+      "  m6: assume property (@(posedge clk) (x ##1 (z throughout y)) |-> z);\n"
+      "  m7: assume property (@(posedge clk) p4);\n"
+      "  m8: assume property (@(posedge clk) s3);\n");
 }
 
 // §17.7.2 with §16.12.1: an assumption's attempts are held to it only
@@ -629,46 +638,56 @@ TEST(CheckerVariableRandomization, AnEmptyMatchConstrainsItsNeighbours) {
 
 // §17.7.2 with §16.9.5 to §16.9.10: an assumption over sequences joined by
 // or, and, intersect, first_match, throughout and within holds the attempt
-// to every way of each operand that may still match.
+// to every way of each operand that may still match, a group repeated
+// among them.
 TEST(CheckerVariableRandomization, ASequenceOperatorConstrainsLaterTicks) {
   ExpectAssumedPropertiesHold(
       {"(x ##1 y or y ##1 x) |-> z", "(x ##1 y and y) |-> z",
        "(x ##[1:2] y intersect z ##1 1'b1) |-> y",
        "first_match(x ##[1:2] y) |-> z", "z throughout (x ##1 y) |-> ##1 y",
-       "(x ##1 y) within (z ##3 z) |-> y", "x |-> (y ##1 z)[*2]"});
+       "(x ##1 y) within (z ##3 z) |-> y", "x |-> (y ##1 z)[*2]",
+       "x |-> (y or z ##1 y)[*1:2] ##1 z"});
 }
 
 // §17.7.2 with §16.10: an assumption over a sequence assigning a local
 // variable reads it later at the value the attempt assigned: y is solved
-// to the value x had the tick before, and, through a compound assignment
-// summing x over two ticks, to whether exactly one of them held.
+// to the value x had the tick before; through a compound assignment
+// summing x over two ticks, to whether exactly one of them held; and z to
+// the parity of two locals one operand assigns.
 TEST(CheckerVariableRandomization, ALocalVariableCarriesItsValue) {
   ExpectAssumedPropertiesHold(
-      {"s1", "s2"},
+      {"s1", "s2", "s3"},
       "  sequence s1; bit v; (1, v = x) ##1 (y == v); endsequence\n"
+      "  sequence s3; bit v; bit w; (1, v = x, w = y) ##1 (z == (v ^ w));\n"
+      "  endsequence\n"
       "  sequence s2; bit [1:0] v; (1, v = x) ##1 (1, v += x) ##1 "
       "(y == (v == 2'd1)); endsequence\n");
 }
 
 // §17.7.2 with §16.13: an assumption whose operands name a clock of their
 // own holds each attempt to them at the ticks of that clock, which are
-// clock events of the assume set too: a consequent, a sequence's operand,
-// an if-else, a nexttime and an abort on the negedge.
+// clock events of the assume set too: m2 holds y at 0 at each posedge, so
+// only the attempts at the negedges can give it the values the negedge
+// operands need -- a consequent, a sequence's operand, an if-else, a
+// nexttime, an abort, a repetition, a goto and a throughout.
 TEST(CheckerVariableRandomization, AnOperandOnItsOwnClockConstrainsItsTicks) {
-  ExpectAssumedPropertiesHold({"x |=> @(negedge clk) y",
-                               "x ##1 @(negedge clk) y |-> z",
-                               "x |-> @(negedge clk) (if (y) z else !z)",
-                               "x |-> @(negedge clk) nexttime y",
-                               "x |-> @(negedge clk) accept_on (y) z"});
+  ExpectAssumedPropertiesHold(
+      {"x |=> @(negedge clk) y", "x ##1 @(negedge clk) y |-> z",
+       "x |-> @(negedge clk) (if (y) z else !z)",
+       "x |-> @(negedge clk) nexttime y",
+       "x |-> @(negedge clk) accept_on (z) y", "x |-> @(negedge clk) y[*2]",
+       "x |-> @(negedge clk) y[->1] ##1 z",
+       "x |-> @(negedge clk) (z throughout y ##1 y)"},
+      "  m2: assume property (@(posedge clk) !y);\n");
 }
 
 // §17.7.2 with §16.12.17: an assumption instantiating a named property
-// holds the attempt to the declaration's body with the actuals in the
-// formals' places, a recursive property expanded a tick at a time, and one
-// declared with a clock read on it.
+// holds the attempt to the declaration's body with the actuals, bound by
+// position or by name, in the formals' places, a recursive property
+// expanded a tick at a time, and one declared with a clock read on it.
 TEST(CheckerVariableRandomization, APropertyInstanceConstrainsItsBody) {
   ExpectAssumedPropertiesHold(
-      {"p1(x, y)", "p2", "p3"},
+      {"p1(x, y)", "p1(.a(x), .b(y))", "p2", "p3"},
       "  property p1(a, b); a |-> ##1 b; endproperty\n"
       "  property p2; x and nexttime p2; endproperty\n"
       "  property p3; @(posedge clk) x |-> z; endproperty\n");
