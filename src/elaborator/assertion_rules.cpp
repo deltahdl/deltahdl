@@ -1,5 +1,6 @@
 #include "elaborator/assertion_rules.h"
 
+#include <algorithm>
 #include <format>
 #include <functional>
 #include <string>
@@ -13,6 +14,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/property_rewrite.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/expr_substitute.h"
@@ -105,6 +107,59 @@ const std::vector<EventExpr>& DeclaredClock(const ModuleItem* decl) {
                                                      : decl->prop_clock;
 }
 
+// The names `e` writes, as identifiers or as callees, added to `out` once
+// each.
+void CollectNames(const Expr* e, std::vector<std::string_view>& out) {
+  if (e == nullptr) return;
+  std::string_view name = e->kind == ExprKind::kCall         ? e->callee
+                          : e->kind == ExprKind::kIdentifier ? e->text
+                                                             : "";
+  if (!name.empty() && std::ranges::find(out, name) == out.end()) {
+    out.push_back(name);
+  }
+  ForEachExprChild(e, [&](const Expr* child) { CollectNames(child, out); });
+}
+
+void CollectTreeNames(const PropertyExprNode* node,
+                      std::vector<std::string_view>& out) {
+  if (node == nullptr) return;
+  CollectNames(node->boolean, out);
+  if (node->sequence != nullptr) {
+    for (const Expr* operand : node->sequence->seq_linear.operands) {
+      CollectNames(operand, out);
+    }
+  }
+  for (const PropertyExprNode* operand : node->operands) {
+    CollectTreeNames(operand, out);
+  }
+}
+
+// The names the body of the sequence or property declaration `decl` writes,
+// among which its instances stand: the body scan records an instance written
+// with an argument list, and the parsed body one written as a bare name.
+std::vector<std::string_view> BodyNames(const ModuleItem* decl) {
+  std::vector<std::string_view> names;
+  for (std::string_view ref : decl->prop_instance_refs) {
+    if (std::ranges::find(names, ref) == names.end()) names.push_back(ref);
+  }
+  CollectNames(decl->prop_body_expr, names);
+  CollectTreeNames(decl->prop_body_tree, names);
+  for (const Expr* operand : decl->seq_linear.operands) {
+    CollectNames(operand, names);
+  }
+  return names;
+}
+
+// Whether the declaration `decl` is clocked on `block_clock` alone: written
+// with that one event, or with none, so taking it.
+bool ClockedOnAlone(const ModuleItem* decl, const EventExpr& block_clock) {
+  const std::vector<EventExpr>& clock = DeclaredClock(decl);
+  return decl->decl_clock_event_count <= 1 &&
+         (clock.empty() ||
+          (clock.size() == 1 && clock[0].edge == block_clock.edge &&
+           SamePath(clock[0].signal, block_clock.signal)));
+}
+
 // §16.16 (b)(3): an instance, in a declaration of the clocking block `block`,
 // of a named sequence or property declared outside it is singly clocked, on
 // an event identical to the block's; one declared with no clock takes the
@@ -114,17 +169,13 @@ void CheckClockingBlockInstances(
     const std::unordered_map<std::string_view, const ModuleItem*>& outside,
     DiagEngine& diag) {
   if (block->clocking_event.size() != 1) return;
-  const EventExpr& kBlockClock = block->clocking_event[0];
+  const EventExpr& block_clock = block->clocking_event[0];
   for (const ModuleItem* inner : block->clocking_decls) {
-    for (std::string_view name : inner->prop_instance_refs) {
+    for (std::string_view name : BodyNames(inner)) {
       auto it = outside.find(name);
-      if (it == outside.end()) continue;
-      const std::vector<EventExpr>& kClock = DeclaredClock(it->second);
-      bool same = it->second->decl_clock_event_count <= 1 &&
-                  (kClock.empty() ||
-                   (kClock.size() == 1 && kClock[0].edge == kBlockClock.edge &&
-                    SamePath(kClock[0].signal, kBlockClock.signal)));
-      if (same) continue;
+      if (it == outside.end() || ClockedOnAlone(it->second, block_clock)) {
+        continue;
+      }
       diag.Error(inner->loc,
                  std::format("the instance of '{}' in clocking block '{}' is "
                              "not clocked on the block's clocking event alone",

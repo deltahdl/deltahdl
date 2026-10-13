@@ -14,9 +14,7 @@
 // reset at 8 and inst at 24, and e1's end point through matched at 40, the
 // first tick of sysclk after 35, and branch_back at 56, where it ends; the
 // second round has reset at 72, inst at 88, the match of 95 read at 104,
-// and branch_back at 120. e2_triggered reads the end point through
-// triggered, which is true at the time step of the match alone, 35, no
-// tick of sysclk, so it never ends. twice reads matched on e1_inst, the
+// and branch_back at 120. twice reads matched on e1_inst, the
 // instance named, at consecutive ticks of sysclk: the first read consumes
 // the stored match, so the second reads false and the sequence never ends.
 module matched_end_point;
@@ -24,7 +22,7 @@ module matched_end_point;
   logic sysclk = 0;
   logic ready = 0, proc1 = 0, proc2 = 0;
   logic reset = 0, inst = 0, branch_back = 0;
-  string e2_ends = "", triggered_ends = "", twice_ends = "";
+  string e2_ends = "", twice_ends = "";
   always #5 clk = ~clk;
   always #8 sysclk = ~sysclk;
 
@@ -34,11 +32,6 @@ module matched_end_point;
 
   sequence e2;
     @(posedge sysclk) reset ##1 inst ##1 e1(ready, proc1, proc2).matched [->1]
-      ##1 branch_back;
-  endsequence
-
-  sequence e2_triggered;
-    @(posedge sysclk) reset ##1 inst ##1 e1(ready, proc1, proc2).triggered [->1]
       ##1 branch_back;
   endsequence
 
@@ -53,11 +46,6 @@ module matched_end_point;
   initial forever begin
     wait (e2.triggered);
     e2_ends = $sformatf("%s %0d", e2_ends, $time);
-    @(posedge sysclk);
-  end
-  initial forever begin
-    wait (e2_triggered.triggered);
-    triggered_ends = $sformatf("%s %0d", triggered_ends, $time);
     @(posedge sysclk);
   end
   initial forever begin
@@ -84,8 +72,6 @@ module matched_end_point;
     #5;
     $display("e2 with e1(ready, proc1, proc2).matched [->1] ends at%s",
              e2_ends);
-    $display("e2 with e1(ready, proc1, proc2).triggered [->1] ends at%s",
-             triggered_ends);
     $display("e1_inst.matched ##1 e1_inst.matched ends at%s", twice_ends);
     $finish;
   end

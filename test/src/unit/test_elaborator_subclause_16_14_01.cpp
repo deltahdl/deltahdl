@@ -49,22 +49,22 @@ TEST(AssertActionBlock, AProceduralAssertsNestedAssertIsReported) {
                             4, "16.14.1"));
 }
 
-// §16.14.1 with §16.14.2: so is a static assume statement whose pass statement
-// holds a concurrent cover.
-TEST(AssertActionBlock, AStaticAssumesNestedCoverIsReported) {
+// §16.14.1 with §16.14.2: so is a procedural assume statement whose pass
+// statement holds a concurrent cover.
+TEST(AssertActionBlock, AProceduralAssumesNestedCoverIsReported) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
       "  logic clk, a, b;\n"
-      "  a2: assume property (@(posedge clk) a)\n"
-      "    cover property (@(posedge clk) b);\n"
+      "  always @(posedge clk)\n"
+      "    a2: assume property (a) cover property (b);\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "the action block of a concurrent assert or assume "
                             "statement may not include a concurrent assert, "
                             "assume, or cover statement",
-                            3, "16.14.1"));
+                            4, "16.14.1"));
 }
 
 // §16.14.1: an immediate assertion in the action block is allowed.

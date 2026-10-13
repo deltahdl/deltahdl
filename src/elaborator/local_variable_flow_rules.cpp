@@ -66,11 +66,18 @@ const ModuleItem* SequenceOf(const Expr* e, const SequenceMap& sequences) {
 }
 
 // Whether a match item of `body` assigns `name`.
+bool ItemsAssign(const std::vector<SeqMatchAssign>& items,
+                 std::string_view name) {
+  for (const SeqMatchAssign& item : items) {
+    if (!item.init && item.lvar == name) return true;
+  }
+  return false;
+}
+
 bool BodyAssigns(const SeqLinearBody& body, std::string_view name) {
+  if (ItemsAssign(body.first_match_items, name)) return true;
   for (const auto& items : body.match_items) {
-    for (const SeqMatchAssign& item : items) {
-      if (!item.init && item.lvar == name) return true;
-    }
+    if (ItemsAssign(items, name)) return true;
   }
   for (const auto* nested :
        {&body.intersects, &body.conjuncts, &body.alternatives}) {
@@ -206,6 +213,13 @@ void FlowBody(const SeqLinearBody& body, NameSet& assigned, Flow& flow) {
     FlowBody(alternative, own, flow);
     std::erase_if(assigned,
                   [&](std::string_view name) { return own.count(name) == 0; });
+  }
+  // §16.9.8: the match items of first_match run at the end of its match.
+  if (!body.first_match_items.empty()) {
+    const Expr* first = body.operands.empty() ? nullptr : body.operands[0];
+    FlowMatchItems(body.first_match_items,
+                   first != nullptr ? first->range.start : SourceLoc{},
+                   assigned, flow);
   }
 }
 

@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "elaborator/assertion_body_slots.h"
 #include "elaborator/assertion_rules.h"
 #include "elaborator/concurrent_assertion_expr.h"
@@ -274,11 +275,18 @@ void CheckLocalActuals(const Expr* call, const ModuleItem* seq,
 }
 
 // Whether a match item of `body` assigns one of `formals`.
+bool ItemsAssignAny(const std::vector<SeqMatchAssign>& items,
+                    const NameSet& names) {
+  for (const SeqMatchAssign& item : items) {
+    if (!item.init && names.count(item.lvar) != 0) return true;
+  }
+  return false;
+}
+
 bool AssignsAny(const SeqLinearBody& body, const NameSet& formals) {
+  if (ItemsAssignAny(body.first_match_items, formals)) return true;
   for (const auto& items : body.match_items) {
-    for (const SeqMatchAssign& item : items) {
-      if (!item.init && formals.count(item.lvar) != 0) return true;
-    }
+    if (ItemsAssignAny(items, formals)) return true;
   }
   for (const auto* nested :
        {&body.intersects, &body.conjuncts, &body.alternatives}) {
@@ -474,18 +482,47 @@ void CheckAttachedCall(const Expr* call, const Site& site, const RuleEnv& env) {
 
 // The expressions of a sequence body, its intersects, conjuncts and
 // alternatives included.
-void CheckBody(const SeqLinearBody& body, const Site& site,
-               const RuleEnv& env) {
-  for (const Expr* operand : body.operands) CheckRoot(operand, site, env);
-  for (const auto& items : body.match_items) {
+// §16.10 and §16.11: no match item is attached to a sequence that admits an
+// empty match, as the parser marks those of `(b[*0:1], x = e)`; the
+// operand at `loc` carries `items`.
+void CheckEmptyMatchItems(const std::vector<SeqMatchAssign>& items,
+                          SourceLoc loc, DiagEngine& diag) {
+  for (bool call : {false, true}) {
     for (const SeqMatchAssign& item : items) {
-      CheckRoot(item.rhs, site, env);
-      CheckRoot(item.call, site, env);
-      if (item.call != nullptr && item.call->kind == ExprKind::kCall) {
-        CheckAttachedCall(item.call, site, env);
-      }
+      if (!item.on_empty_match || (item.call != nullptr) != call) continue;
+      diag.Error(loc,
+                 std::string(call ? "a subroutine call"
+                                  : "a local variable assignment") +
+                     " may not be attached to a sequence that admits an "
+                     "empty match",
+                 Subclause(call ? "16.11" : "16.10"));
+      break;
     }
   }
+}
+
+void CheckMatchItems(const std::vector<SeqMatchAssign>& items, const Site& site,
+                     const RuleEnv& env) {
+  for (const SeqMatchAssign& item : items) {
+    CheckRoot(item.rhs, site, env);
+    CheckRoot(item.call, site, env);
+    if (item.call != nullptr && item.call->kind == ExprKind::kCall) {
+      CheckAttachedCall(item.call, site, env);
+    }
+  }
+}
+
+void CheckBody(const SeqLinearBody& body, const Site& site,
+               const RuleEnv& env) {
+  for (size_t i = 0; i < body.operands.size(); ++i) {
+    CheckRoot(body.operands[i], site, env);
+    if (i < body.match_items.size() && body.operands[i] != nullptr) {
+      CheckEmptyMatchItems(body.match_items[i], body.operands[i]->range.start,
+                           env.diag);
+    }
+  }
+  for (const auto& items : body.match_items) CheckMatchItems(items, site, env);
+  CheckMatchItems(body.first_match_items, site, env);
   for (const SeqThroughout& guard : body.throughouts) {
     CheckRoot(guard.cond, site, env);
   }
@@ -547,6 +584,20 @@ NameSet DeclLocals(const ModuleItem* decl) {
 bool AssignedOnEveryMatch(const SeqLinearBody& body, std::string_view name,
                           const RuleEnv& env);
 
+// Whether `operand` instantiates a named sequence binding `name` whole to
+// one of its inout or output local variable formal arguments.
+bool InstanceAssigns(const Expr* operand, std::string_view name,
+                     const RuleEnv& env) {
+  if (operand == nullptr || operand->kind != ExprKind::kCall) return false;
+  const ModuleItem* seq = NamedSequence(operand, env);
+  if (seq == nullptr) return false;
+  std::vector<Direction> dirs = LocalFormalDirections(seq);
+  for (size_t j = 0; j < dirs.size() && j < operand->args.size(); ++j) {
+    if (IsOutward(dirs[j]) && IsName(operand->args[j], name)) return true;
+  }
+  return false;
+}
+
 // Whether every match of operand `i` of `body` assigns `name`: by a match
 // item written with it, or as the actual of an inout or output local
 // variable formal of the sequence it instantiates; an operand repeated from
@@ -560,21 +611,10 @@ bool OperandAssigns(const SeqLinearBody& body, size_t i, std::string_view name,
       return false;
     }
   }
-  if (i < body.match_items.size()) {
-    for (const SeqMatchAssign& item : body.match_items[i]) {
-      if (item.lvar == name && !item.init) return true;
-    }
-  }
-  const Expr* operand = body.operands[i];
-  const ModuleItem* seq = operand != nullptr && operand->kind == ExprKind::kCall
-                              ? NamedSequence(operand, env)
-                              : nullptr;
-  if (seq == nullptr) return false;
-  std::vector<Direction> dirs = LocalFormalDirections(seq);
-  for (size_t j = 0; j < dirs.size() && j < operand->args.size(); ++j) {
-    if (IsOutward(dirs[j]) && IsName(operand->args[j], name)) return true;
-  }
-  return false;
+  const NameSet kName{name};
+  return (i < body.match_items.size() &&
+          ItemsAssignAny(body.match_items[i], kName)) ||
+         InstanceAssigns(body.operands[i], name, env);
 }
 
 // Whether `name` is assigned at the completion of every match of `body`:
@@ -582,7 +622,7 @@ bool OperandAssigns(const SeqLinearBody& body, size_t i, std::string_view name,
 // with, and in every alternative of a top-level or.
 bool AssignedOnEveryMatch(const SeqLinearBody& body, std::string_view name,
                           const RuleEnv& env) {
-  bool assigned = false;
+  bool assigned = ItemsAssignAny(body.first_match_items, NameSet{name});
   for (size_t i = 0; i < body.operands.size() && !assigned; ++i) {
     assigned = OperandAssigns(body, i, name, env);
   }
@@ -690,15 +730,19 @@ void CheckProcedure(const ModuleItem* item, const RtlirModule* mod,
   });
   bool unclocked = !IsProceduralItemKind(item->kind) ||
                    InferredInProcedure(item, mod).clock.empty();
-  for (const Stmt* body : bodies) {
-    ForEachStmtReadExpr(body, [&](const Expr* e) {
-      if (e == nullptr || assertion_exprs.count(e) != 0) return;
-      CheckSubexpressions(e, procedural, env);
-      if (unclocked && DefaultClockingEvent(mod).empty()) {
-        CheckUnclockedCall(e, env);
-      }
-    });
-  }
+  bool no_clock = unclocked && DefaultClockingEvent(mod).empty();
+  auto visit = [&](const Expr* e) {
+    if (e == nullptr || assertion_exprs.count(e) != 0) return;
+    CheckSubexpressions(e, procedural, env);
+    if (no_clock) CheckUnclockedCall(e, env);
+  };
+  for (const Stmt* body : bodies) ForEachStmtReadExpr(body, visit);
+  // ForEachStmtReadExpr leaves out a wait's condition, a level-sensitive
+  // timing control, which the procedure evaluates as an expression all the
+  // same.
+  ForEachProceduralStmt(item, [&](const Stmt* s) {
+    if (s->kind == StmtKind::kWait) visit(s->condition);
+  });
 }
 
 }  // namespace

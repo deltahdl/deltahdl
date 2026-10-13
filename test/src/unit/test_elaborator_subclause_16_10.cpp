@@ -220,4 +220,29 @@ TEST(LocalVariableFlow, TriggeredOnASequenceReadingTheFormalFirstIsReported) {
                             9, "16.10"));
 }
 
+// §16.10: a local variable assignment is not attached to a sequence that
+// admits an empty match: b[*0:1] admits one, while a ##1 b[*0:1] does not.
+TEST(LocalVariableFlow, AnAssignmentOnAnEmptyMatchingSequenceIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a, b, c;\n"
+      "  int e;\n"
+      "  sequence s;\n"
+      "    int x;\n"
+      "    @(posedge clk) a ##1 (b[*0:1], x = e) ##1 c[*2];\n"
+      "  endsequence\n"
+      "  sequence t;\n"
+      "    int x;\n"
+      "    @(posedge clk) (a ##1 b[*0:1], x = e) ##1 c[*2];\n"
+      "  endsequence\n"
+      "endmodule\n",
+      f);
+  const char* const kReport =
+      "a local variable assignment may not be attached to a sequence that "
+      "admits an empty match";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 6, "16.10"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 10, "16.10"));
+}
+
 }  // namespace

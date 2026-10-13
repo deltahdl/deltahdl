@@ -210,4 +210,22 @@ TEST(AttachedSubroutineCall, AChandlePassedByValueIsReported) {
                             7, "16.11"));
 }
 
+// §16.11: a subroutine call is not attached to a sequence that admits an
+// empty match, as b[*0:1] does.
+TEST(AttachedSubroutineCall, ACallOnAnEmptyMatchingSequenceIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a, b, c;\n"
+      "  sequence s;\n"
+      "    @(posedge clk) a ##1 (b[*0:1], $display(\"hit\")) ##1 c;\n"
+      "  endsequence\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a subroutine call may not be attached to a "
+                            "sequence that admits an empty match",
+                            4, "16.11"));
+}
+
 }  // namespace

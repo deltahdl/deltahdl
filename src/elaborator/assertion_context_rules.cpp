@@ -4,6 +4,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -228,6 +229,19 @@ struct TriggeredGraph {
   std::unordered_map<const ModuleItem*, std::vector<const ModuleItem*>> all;
 };
 
+// The sequences the body of `seq` applies triggered to.
+std::vector<const ModuleItem*> TriggeredTargets(const ModuleItem* seq,
+                                                const SequenceMap& sequences) {
+  std::vector<const ModuleItem*> targets;
+  auto collect = [&](const Expr* sub) {
+    const ModuleItem* target = TriggeredSequence(sub, sequences);
+    if (target != nullptr) targets.push_back(target);
+    return false;
+  };
+  ForEachBodyExpr(seq->seq_linear, [&](const Expr* e) { ExprAny(e, collect); });
+  return targets;
+}
+
 TriggeredGraph BuildTriggeredGraph(const SequenceMap& sequences,
                                    const PropertyRegistry& registry) {
   TriggeredGraph graph;
@@ -237,16 +251,9 @@ TriggeredGraph BuildTriggeredGraph(const SequenceMap& sequences,
       auto it = sequences.find(ref);
       if (it != sequences.end()) all.push_back(it->second);
     }
-    ForEachBodyExpr(seq->seq_linear, [&](const Expr* e) {
-      ExprAny(e, [&](const Expr* sub) {
-        const ModuleItem* target = TriggeredSequence(sub, sequences);
-        if (target != nullptr) {
-          graph.triggered[seq].push_back(target);
-          all.push_back(target);
-        }
-        return false;
-      });
-    });
+    std::vector<const ModuleItem*> targets = TriggeredTargets(seq, sequences);
+    all.insert(all.end(), targets.begin(), targets.end());
+    graph.triggered[seq] = std::move(targets);
   }
   return graph;
 }

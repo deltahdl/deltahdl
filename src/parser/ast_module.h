@@ -339,20 +339,20 @@ struct SeqCycleDelay {
   Expr* max_expr = nullptr;
 };
 
-// §16.10: one assignment of a sequence_match_item, `lvar = rhs` or
-// `lvar op= rhs`, executed when the operand it stands with holds, or, where
-// `init` is set, before that operand is evaluated: §16.8.2's initialization
-// assignment of a local variable formal argument at the beginning of an
-// attempt of the instance.
+// §16.10: one assignment of a sequence_match_item, `lvar = rhs` or `lvar op=
+// rhs`, executed when the operand it stands with holds or, where `init` is
+// set, before that operand is evaluated: §16.8.2's initialization assignment
+// of a local variable formal argument at the start of an attempt.
 struct SeqMatchAssign {
   std::string_view lvar;
   TokenKind op = TokenKind::kEq;
   Expr* rhs = nullptr;
   bool init = false;
-  // §16.11: a subroutine call attached to the sequence in place of an
-  // assignment, executed at each end point in the Reactive region with its
-  // by-value arguments as they read at the match; `lvar` and `rhs` are unset
-  // where this is.
+  // §16.10 and §16.11: written in a group that admits an empty match.
+  bool on_empty_match = false;
+  // §16.11: a subroutine call attached in place of an assignment, executed at
+  // each end point in the Reactive region with its by-value arguments as they
+  // read at the match; `lvar` and `rhs` are unset where this is.
   Expr* call = nullptr;
   // §16.10 and §16.13.7: where `lvar` names a local of a named property, the
   // literal standing for the attempt's copy of it, which the property's other
