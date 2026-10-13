@@ -1,0 +1,154 @@
+#pragma once
+
+#include <cstdint>
+#include <functional>
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "common/types.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
+#include "parser/expr_substitute.h"
+#include "simulator/sequence_flatten.h"
+
+namespace delta {
+
+class Arena;
+class SimContext;
+
+// Rewrites an expression an assumption reads into the terms of the checker
+// whose free variables it constrains: a child checker's formal into its
+// actual (§17.7.2).
+using ObligationRewrite = std::function<Expr*(Expr*)>;
+
+// Numbers a clocking event among those an assumption is evaluated on, the
+// leading clock 0 (§16.13).
+using ClockNumbering = std::function<int(const std::vector<EventExpr>&)>;
+
+// §16.13: the number of `clock`, its expressions rewritten by `rewrite`,
+// among the clocks `clocks` numbers; `inherited` where it is empty, the
+// clock flowing to it.
+int NumberClock(const std::vector<EventExpr>& clock, int inherited,
+                const ObligationRewrite& rewrite, const ClockNumbering& clocks);
+
+// Conditions over the values a time step reads, built from expressions with
+// the conditions met under any values and under none folded away.
+class ConditionBuilder {
+ public:
+  explicit ConditionBuilder(Arena& arena);
+
+  Expr* Always() const { return always_; }
+  Expr* Never() const { return never_; }
+  Expr* Not(Expr* a);
+  Expr* And(Expr* a, Expr* b);
+  Expr* Or(Expr* a, Expr* b);
+  // `a && b`, or `a || b` where `conjunction` is unset.
+  Expr* Join(Expr* a, Expr* b, bool conjunction);
+  // The conjunction of `literals`, each expression read as its truth or,
+  // where it is paired with false, its negation.
+  Expr* AllOf(const std::vector<std::pair<Expr*, bool>>& literals);
+
+ private:
+  Arena& arena_;
+  Expr* always_ = nullptr;
+  Expr* never_ = nullptr;
+};
+
+// §17.7.2: what one attempt of a sequence still has to match, from the tick
+// it is read at on: a residual of §16.7 to §16.10's operators over boolean
+// operands, each operand on the clock numbered `clock` (§16.13.1). Terms are
+// shared, so that attempts owing the same are one term.
+struct SeqTerm;
+enum class SeqTermKind : uint8_t;
+
+// §16.10: the values of the local variables of one attempt, shared among
+// the attempts holding the same values.
+struct SeqLocals;
+
+// One way an attempt goes at a tick: the expressions it reads there, each
+// with the truth it needs; the term it goes on in from the next tick,
+// nullptr where it matches at this tick; and the match items of the
+// operands it matched, performed on the attempt's locals `locals`.
+struct SeqWay {
+  std::vector<std::pair<Expr*, bool>> literals;
+  const SeqTerm* next = nullptr;
+  std::vector<const std::vector<SeqMatchAssign>*> items;
+  const SeqLocals* locals = nullptr;
+};
+
+// §17.7.2: the terms of the sequences an assume set's assumptions read.
+class SeqTerms {
+ public:
+  SeqTerms(SimContext& ctx, Arena& arena, ConditionBuilder& conditions);
+  ~SeqTerms();
+  SeqTerms(const SeqTerms&) = delete;
+  SeqTerms& operator=(const SeqTerms&) = delete;
+
+  // The term an attempt of the sequence `item` begins in, its operands on
+  // `clock` where they name no clock of their own and each expression it
+  // reads passed through `rewrite` and appended to `reads`; nullptr where it
+  // uses a form the terms do not read. `clock_out` is set to the number of
+  // the clock flowing out of its end (§16.13.3).
+  const SeqTerm* Begin(const ModuleItem* item, int clock,
+                       const ObligationRewrite& rewrite,
+                       const ClockNumbering& clocks, std::vector<Expr*>& reads,
+                       int& clock_out);
+
+  // The ways of the attempts in `term` at a tick, the clocks that ticked at
+  // it a bit each in `ticked`; `anchor` where the tick is the one the term
+  // was begun at, from which the delays before its operands count.
+  const std::vector<SeqWay>& Ways(const SeqTerm* term, uint32_t ticked,
+                                  bool anchor);
+
+  // The term the way `way` goes on in, its match items performed on the
+  // values read at the time step.
+  const SeqTerm* Take(const SeqWay& way);
+
+ private:
+  struct Builder;
+
+  const SeqTerm* Intern(SeqTerm term);
+  const SeqTerm* Make(SeqTermKind kind, std::vector<const SeqTerm*> operands,
+                      Expr* expr = nullptr, uint32_t lo = 0, uint32_t hi = 0,
+                      uint32_t count = 0, int clock = 0, uint8_t flags = 0);
+  const SeqTerm* Wait(uint32_t lo, uint32_t hi, const SeqTerm* x, int clock);
+  const SeqTerm* Bind(const SeqLocals* locals, const SeqTerm* x);
+  const SeqLocals* Locals(std::vector<Logic4Vec> values,
+                          const std::vector<SeqLocalDecl>* decls);
+  bool Nullable(const SeqTerm* term);
+  int FirstClock(const SeqTerm* term);
+
+  void Expand(const SeqTerm* term, uint32_t ticked, bool anchor,
+              std::vector<SeqWay>& out);
+  void ExpandWait(const SeqTerm* term, uint32_t ticked, bool anchor,
+                  std::vector<SeqWay>& out);
+  void ExpandThen(const SeqTerm* term, uint32_t ticked, bool anchor,
+                  std::vector<SeqWay>& out);
+  void ExpandPair(const SeqTerm* term, uint32_t ticked, bool anchor,
+                  std::vector<SeqWay>& out);
+  void ExpandFirstMatch(const SeqTerm* term, uint32_t ticked, bool anchor,
+                        std::vector<SeqWay>& out);
+  void ExpandRepeat(const SeqTerm* term, uint32_t ticked, bool anchor,
+                    std::vector<SeqWay>& out);
+  void ExpandGoto(const SeqTerm* term, std::vector<SeqWay>& out);
+  void ExpandBind(const SeqTerm* term, uint32_t ticked, bool anchor,
+                  std::vector<SeqWay>& out);
+  Expr* UnderLocals(Expr* e, const SeqLocals* locals);
+  void Assign(const SeqMatchAssign& item,
+              const std::vector<SeqLocalDecl>& decls,
+              std::vector<Logic4Vec>& values, ActualsByFormal& literals);
+
+  SimContext& ctx_;
+  Arena& arena_;
+  ConditionBuilder& conditions_;
+  std::map<std::string, std::unique_ptr<SeqTerm>> terms_;
+  std::map<std::string, std::unique_ptr<SeqLocals>> locals_;
+  std::vector<std::unique_ptr<LinearSequence>> sequences_;
+  const SeqTerm* match_ = nullptr;
+};
+
+}  // namespace delta

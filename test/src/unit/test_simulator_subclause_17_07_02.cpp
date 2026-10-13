@@ -456,13 +456,15 @@ TEST(CheckerVariableRandomization, AConstCastOrAutomaticActualIsExcluded) {
 }
 
 // A checker whose free variables x, y and z the assumption m1 of `property`
-// constrains, the assertion a1 of the same property counting its failures
-// before the run ends, where attempts still in flight are decided whatever
-// the values, and `ones` the posedges at which x is 1, over 40 posedges of
-// clk.
-std::string AssumedPropertySource(const std::string& property) {
+// constrains, the declarations `decls` beside, the assertion a1 of the same
+// property counting its failures before the run ends, where attempts still
+// in flight are decided whatever the values, and `ones` the posedges at
+// which x is 1, over 40 posedges of clk.
+std::string AssumedPropertySource(const std::string& property,
+                                  const std::string& decls) {
   return "checker chk(logic clk);\n"
-         "  rand bit x, y, z;\n"
+         "  rand bit x, y, z;\n" +
+         decls +
          "  int fail = 0, ones = 0;\n"
          "  m1: assume property (@(posedge clk) " +
          property +
@@ -480,15 +482,18 @@ std::string AssumedPropertySource(const std::string& property) {
          "endmodule\n";
 }
 
-// §17.7.2: under each of `properties` assumed, no attempt of the property
-// fails, while x is still 1 at some posedges, so that the obligations the
-// property sets are met rather than never raised. Left out of the solution
-// attempts, as a form they did not solve, each property failed.
-void ExpectAssumedPropertiesHold(const std::vector<std::string>& properties) {
+// §17.7.2: under each of `properties` assumed, the declarations `decls`
+// beside, no attempt of the property fails, while x is still 1 at some
+// posedges, so that the obligations the property sets are met rather than
+// never raised. Left out of the solution attempts, as a form they did not
+// solve, each property failed.
+void ExpectAssumedPropertiesHold(const std::vector<std::string>& properties,
+                                 const std::string& decls = "") {
   for (const std::string& property : properties) {
     SCOPED_TRACE(property);
     SimFixture f;
-    auto* fail = RunAndFindVar(AssumedPropertySource(property), f, "c.fail");
+    auto* fail =
+        RunAndFindVar(AssumedPropertySource(property, decls), f, "c.fail");
     ASSERT_NE(fail, nullptr);
     EXPECT_EQ(fail->value.ToUint64(), 0u);
     EXPECT_GT(f.ctx.FindVariable("c.ones")->value.ToUint64(), 0u);
@@ -574,20 +579,17 @@ TEST(CheckerVariableRandomization, AVaryingSequenceConstrainsLaterTicks) {
 }
 
 // §17.7.2: an assumption of a form the solution attempts do not model --
-// a named property's instance, alone or under or, a sequence or, an
-// operand on a clock of its own, and an operand repeated from zero, in an
-// implication or assumed alone -- is left out of the assume set, which is
-// then empty and x drawn free at every time step, though m1 alone would
-// hold it at 1.
+// an instance of a property declaring local variables, and a sequence
+// whose locals stand under or -- is left out of the assume set, which is
+// then empty and x drawn free at every time step, though either alone
+// would hold it at its earlier value of y.
 TEST(CheckerVariableRandomization, AnUnmodelledAssumptionTakesNoPart) {
   ExpectXDrawnFree(
-      "  property p1; x; endproperty\n"
+      "  property p1; bit v; (1, v = y) |=> x == v; endproperty\n"
+      "  sequence s2; bit v; ((1, v = y) ##1 x == v) or (y ##1 x == y);\n"
+      "  endsequence\n"
       "  m1: assume property (@(posedge clk) p1);\n"
-      "  m2: assume property (@(posedge clk) y or p1);\n"
-      "  m3: assume property (@(posedge clk) (x ##1 y or y ##1 x) |-> z);\n"
-      "  m4: assume property (@(posedge clk) x |=> @(negedge clk) y);\n"
-      "  m5: assume property (@(posedge clk) x |-> y[*0:1] ##1 z);\n"
-      "  m6: assume property (@(posedge clk) x ##1 y[*0:1]);\n");
+      "  m2: assume property (@(posedge clk) s2);\n");
 }
 
 // §17.7.2 with §16.12.1: an assumption's attempts are held to it only
@@ -615,6 +617,61 @@ TEST(CheckerVariableRandomization, ADisabledAssumptionHoldsNoAttempt) {
   ASSERT_NE(zeros, nullptr);
   EXPECT_GT(zeros->value.ToUint64(), 0u);
   EXPECT_EQ(f.ctx.FindVariable("c.fail")->value.ToUint64(), 0u);
+}
+
+// §17.7.2 with §16.9.2.1: an operand repeated from zero may match empty,
+// the delays on either side of it joined less a tick: first in a
+// consequent, last in one, and last in a sequence assumed alone.
+TEST(CheckerVariableRandomization, AnEmptyMatchConstrainsItsNeighbours) {
+  ExpectAssumedPropertiesHold({"x |-> y[*0:1] ##1 z", "x |-> z ##[1:2] y[*0:1]",
+                               "x ##1 y[*0:1] ##1 z"});
+}
+
+// §17.7.2 with §16.9.5 to §16.9.10: an assumption over sequences joined by
+// or, and, intersect, first_match, throughout and within holds the attempt
+// to every way of each operand that may still match.
+TEST(CheckerVariableRandomization, ASequenceOperatorConstrainsLaterTicks) {
+  ExpectAssumedPropertiesHold(
+      {"(x ##1 y or y ##1 x) |-> z", "(x ##1 y and y) |-> z",
+       "(x ##[1:2] y intersect z ##1 1'b1) |-> y",
+       "first_match(x ##[1:2] y) |-> z", "z throughout (x ##1 y) |-> ##1 y",
+       "(x ##1 y) within (z ##3 z) |-> y", "x |-> (y ##1 z)[*2]"});
+}
+
+// §17.7.2 with §16.10: an assumption over a sequence assigning a local
+// variable reads it later at the value the attempt assigned: y is solved
+// to the value x had the tick before, and to its double through a compound
+// assignment.
+TEST(CheckerVariableRandomization, ALocalVariableCarriesItsValue) {
+  ExpectAssumedPropertiesHold(
+      {"s1", "s2"},
+      "  sequence s1; bit v; (1, v = x) ##1 (y == v); endsequence\n"
+      "  sequence s2; bit [1:0] v; (1, v = x) ##1 (1, v += x) ##1 "
+      "({z, y} == v); endsequence\n");
+}
+
+// §17.7.2 with §16.13: an assumption whose operands name a clock of their
+// own holds each attempt to them at the ticks of that clock, which are
+// clock events of the assume set too: a consequent, a sequence's operand,
+// an if-else, a nexttime and an abort on the negedge.
+TEST(CheckerVariableRandomization, AnOperandOnItsOwnClockConstrainsItsTicks) {
+  ExpectAssumedPropertiesHold({"x |=> @(negedge clk) y",
+                               "x ##1 @(negedge clk) y |-> z",
+                               "x |-> @(negedge clk) (if (y) z else !z)",
+                               "x |-> @(negedge clk) nexttime y",
+                               "x |-> @(negedge clk) accept_on (y) z"});
+}
+
+// §17.7.2 with §16.12.17: an assumption instantiating a named property
+// holds the attempt to the declaration's body with the actuals in the
+// formals' places, a recursive property expanded a tick at a time, and one
+// declared with a clock read on it.
+TEST(CheckerVariableRandomization, APropertyInstanceConstrainsItsBody) {
+  ExpectAssumedPropertiesHold(
+      {"p1(x, y)", "p2", "p3"},
+      "  property p1(a, b); a |-> ##1 b; endproperty\n"
+      "  property p2; x and nexttime p2; endproperty\n"
+      "  property p3; @(posedge clk) x |-> z; endproperty\n");
 }
 
 }  // namespace

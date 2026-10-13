@@ -320,7 +320,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/sequence_locals.cpp
     simulator/checker_actuals.cpp
     simulator/assume_obligations.cpp
-    simulator/assume_obligation_sequences.cpp
+    simulator/assume_sequence_terms.cpp
     simulator/lowerer_free_variables.cpp
     simulator/sequence_monitor.cpp
     simulator/eval_systask.cpp

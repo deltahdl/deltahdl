@@ -1,7 +1,9 @@
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <map>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -17,11 +19,13 @@
 #include "parser/expr_substitute.h"
 #include "simulator/assertion_read_names.h"
 #include "simulator/assume_obligations.h"
+#include "simulator/assume_sequence_terms.h"
 #include "simulator/awaiters_event_control.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/expr_walk.h"
 #include "simulator/lowerer.h"
 #include "simulator/process.h"
+#include "simulator/property_clocks.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sva_engine_sampling.h"
@@ -31,13 +35,17 @@ namespace delta {
 namespace {
 
 // One assumption of a checker instance's assume set, written in the terms of
-// the instance whose free variables it constrains: the clock it is evaluated
-// on, in the scope `clock_prefix` names; the obligation each of its attempts
-// begins with and those of its attempts in flight; and its disable
-// condition.
+// the instance whose free variables it constrains: the scope `clock_prefix`
+// names, in which its leading clock is read; the clocks it is evaluated
+// on, the leading one first and the others in the instance's terms, with
+// the time step each last ticked at and the ones that ticked at this one,
+// a bit each; the obligation each of its attempts begins with and those of
+// its attempts in flight; and its disable condition.
 struct AssumeSetMember {
   std::string clock_prefix;
-  std::vector<EventExpr> clock;
+  std::shared_ptr<PropertyClocks> clocks;
+  std::vector<SimTime> ticked_at;
+  uint32_t ticked = 0;
   const ObligationNode* begin = nullptr;
   std::vector<const ObligationNode*> live;
   Expr* disable = nullptr;
@@ -75,10 +83,15 @@ Expr* RandomizeCall(const std::vector<Expr*>& args, ClassMember* constraints,
   return call;
 }
 
+// §16.13: the clocks of each member that ticked at this time step; and
 // §16.12.1: the members that ticked and whose disable condition holds drop
 // their attempts in flight and begin none.
-void DropDisabled(AssumeSet& set) {
+void ReadTicks(AssumeSet& set, SimTime now) {
   for (AssumeSetMember& m : set.members) {
+    m.ticked = 0;
+    for (size_t k = 0; k < m.ticked_at.size(); ++k) {
+      if (m.ticked_at[k] == now) m.ticked |= 1u << k;
+    }
     if (m.fired && m.disable != nullptr && set.obligations.Holds(m.disable)) {
       m.live.clear();
       m.fired = false;
@@ -93,9 +106,10 @@ Expr* SolveFor(AssumeSet& set, Arena& arena) {
   std::vector<Expr*> key;
   for (AssumeSetMember& m : set.members) {
     if (!m.fired) continue;
-    m.live.push_back(m.begin);
+    // §16.13: an attempt begins at a tick of the leading clock.
+    if ((m.ticked & 1u) != 0) m.live.push_back(m.begin);
     for (const ObligationNode* node : m.live) {
-      Expr* cond = set.obligations.NoFailCondition(node);
+      Expr* cond = set.obligations.NoFailCondition(node, m.ticked);
       if (cond != nullptr) key.push_back(cond);
     }
   }
@@ -118,7 +132,7 @@ void StepMembers(AssumeSet& set) {
     if (!m.fired) continue;
     std::vector<const ObligationNode*> live;
     for (const ObligationNode* node : m.live) {
-      const ObligationNode* next = set.obligations.Step(node);
+      const ObligationNode* next = set.obligations.Step(node, m.ticked);
       if (!set.obligations.Settled(next)) live.push_back(next);
     }
     std::ranges::sort(live);
@@ -137,7 +151,7 @@ void AttemptSolution(AssumeSet& set, SimContext& ctx, Arena& arena) {
   ctx.SetCurrentProcess(set.scope);
   ctx.AssertionSamples().SetEvaluatingProperty(true);
   set.obligations.NewTimeStep();
-  DropDisabled(set);
+  ReadTicks(set, ctx.CurrentTime());
   Logic4Vec drawn;
   TryEvalScopeRandomizeCall(SolveFor(set, arena), ctx, arena, drawn);
   StepMembers(set);
@@ -159,16 +173,33 @@ void RequestSolutionAttempt(AssumeSet& set, SimContext& ctx, Arena& arena) {
                                    event);
 }
 
-// §17.7.2: the clock of the assumption `set.members[i]` is one of the clock
-// events of the assume set, each of which triggers a solution attempt.
-SimCoroutine MakeAssumeClockCoroutine(AssumeSet& set, size_t i, SimContext& ctx,
-                                      Arena& arena) {
+// §17.7.2: each clock `k` of the assumption `set.members[i]` is one of the
+// clock events of the assume set, each of which triggers a solution
+// attempt.
+SimCoroutine MakeAssumeClockCoroutine(AssumeSet& set, size_t i, size_t k,
+                                      SimContext& ctx, Arena& arena) {
   AssumeSetMember& m = set.members[i];
   while (!ctx.StopRequested()) {
-    co_await EventAwaiter{ctx, m.clock, arena};
+    co_await EventAwaiter{ctx, m.clocks->clocks[k], arena};
+    m.ticked_at[k] = ctx.CurrentTime();
     m.fired = true;
     RequestSolutionAttempt(set, ctx, arena);
   }
+}
+
+// §16.13: the numbering of the clocks an assumption is evaluated on, among
+// `clocks`, the leading clock its first.
+ObligationScope ScopeOf(const ObligationRewrite& rewrite,
+                        const std::shared_ptr<PropertyClocks>& clocks) {
+  return {rewrite, [clocks](const std::vector<EventExpr>& clock) {
+            return ClockIndexOf(*clocks, clock);
+          }};
+}
+
+std::shared_ptr<PropertyClocks> ClocksLedBy(const RtlirProcess& proc) {
+  auto clocks = std::make_shared<PropertyClocks>();
+  clocks->clocks.push_back(proc.sensitivity);
+  return clocks;
 }
 
 std::unordered_set<std::string> ReadNames(const std::vector<Expr*>& reads) {
@@ -229,7 +260,8 @@ std::vector<Candidate> CollectAssumptions(const RtlirModule* mod,
       continue;
     }
     Candidate c{&proc, prefix, [](Expr* e) { return e; }, {}};
-    if (obligations.Begin(proc.body, c.rewrite, c.reads) != nullptr) {
+    if (obligations.Begin(proc.body, ScopeOf(c.rewrite, ClocksLedBy(proc)),
+                          c.reads) != nullptr) {
       out.push_back(std::move(c));
     }
   }
@@ -264,9 +296,11 @@ void AddMembers(const std::vector<Candidate>& candidates,
     if (!ReadsAny(c.reads, active)) continue;
     AssumeSetMember m;
     m.clock_prefix = c.clock_prefix;
-    m.clock = c.proc->sensitivity;
+    m.clocks = ClocksLedBy(*c.proc);
     std::vector<Expr*> reads;
-    m.begin = set.obligations.Begin(c.proc->body, c.rewrite, reads);
+    m.begin = set.obligations.Begin(c.proc->body, ScopeOf(c.rewrite, m.clocks),
+                                    reads);
+    m.ticked_at.assign(m.clocks->clocks.size(), PropertyClocks::kNever);
     Expr* disable = c.proc->body->assert_disable_iff;
     if (disable != nullptr) m.disable = c.rewrite(disable);
     set.members.push_back(std::move(m));
@@ -321,14 +355,18 @@ void Lowerer::LowerFreeVariableSolver(const RtlirModule* mod) {
     return;
   }
   for (size_t i = 0; i < set->members.size(); ++i) {
-    auto* p = arena_.Create<Process>();
-    p->kind = ProcessKind::kAlways;
-    p->id = next_id_++;
-    p->home_region = Region::kActive;
-    p->inst_prefix = set->members[i].clock_prefix;
-    p->rng_seed = ctx_.DrawSeedForChild();
-    p->coro = MakeAssumeClockCoroutine(*set, i, ctx_, arena_).Release();
-    ScheduleProcess(p, ctx_);
+    // The leading clock is read in the scope of the checker declaring the
+    // assumption, the others, rewritten, in this instance's.
+    for (size_t k = 0; k < set->members[i].ticked_at.size(); ++k) {
+      auto* p = arena_.Create<Process>();
+      p->kind = ProcessKind::kAlways;
+      p->id = next_id_++;
+      p->home_region = Region::kActive;
+      p->inst_prefix = k == 0 ? set->members[i].clock_prefix : inst_prefix_;
+      p->rng_seed = ctx_.DrawSeedForChild();
+      p->coro = MakeAssumeClockCoroutine(*set, i, k, ctx_, arena_).Release();
+      ScheduleProcess(p, ctx_);
+    }
   }
 }
 

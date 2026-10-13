@@ -1,20 +1,22 @@
 #include "simulator/assume_obligations.h"
 
 #include <algorithm>
-#include <array>
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "common/arena.h"
-#include "common/types.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/expr_substitute.h"
+#include "simulator/assume_sequence_terms.h"
 #include "simulator/evaluation.h"
 #include "simulator/property_attempts.h"
 #include "simulator/sequence_flatten.h"
@@ -22,11 +24,13 @@
 namespace delta {
 
 // §16.12's operators as an obligation holds them: a boolean, the constants
-// among them, a sequence (§16.12.2), not, and and or over operands, if-else
-// over `expr`, an implication of a sequence (§16.12.7), overlapping where
-// `n` is set, nexttime `n` ticks on (§16.12.10), unbounded always
-// (§16.12.11), until and until_with (§16.12.12), unbounded s_eventually
-// (§16.12.13), and the aborts over the condition `expr` (§16.12.14).
+// among them; the sequences an attempt may be in (§16.12.2); not, and and
+// or over operands; if-else over `expr`; an implication of a sequence
+// (§16.12.7), overlapping where `n` is set; nexttime `n` ticks on
+// (§16.12.10); unbounded always (§16.12.11); until and until_with
+// (§16.12.12); unbounded s_eventually (§16.12.13); the aborts over the
+// condition `expr` (§16.12.14); and an instance of the named property
+// `decl` (§16.12.17).
 enum class ObligationKind : uint8_t {
   kBool,
   kSeq,
@@ -42,69 +46,59 @@ enum class ObligationKind : uint8_t {
   kEventually,
   kAccept,
   kReject,
+  kInstance,
 };
 
 struct ObligationNode {
   ObligationKind kind = ObligationKind::kBool;
   Expr* expr = nullptr;
   uint32_t n = 0;
+  // §16.13: the number of the clock the node is evaluated on; and, for the
+  // sequences, whether the tick read is the one they were begun at.
+  int clock = 0;
+  bool fresh = false;
   std::vector<const ObligationNode*> operands;
-  const LinearSequence* seq = nullptr;
-  std::vector<SeqObligationState> states;
+  std::vector<const SeqTerm*> terms;
+  const ModuleItem* decl = nullptr;
+  const ObligationScope* scope = nullptr;
   // The conditions under which the node does not fail at a tick and under
-  // which it holds by it, and a sequence's ways at a tick, each read once.
-  mutable std::array<Expr*, 2> conditions = {nullptr, nullptr};
-  mutable bool paths_read = false;
-  mutable std::vector<SeqObligationPath> paths;
+  // which it holds by it, by the clocks that ticked, each read once; and an
+  // instance's expansion.
+  mutable std::map<uint64_t, Expr*> conditions;
+  mutable const ObligationNode* expansion = nullptr;
 };
 
 namespace {
 
 using Kind = ObligationKind;
 
-std::string KeyOf(const ObligationNode& node) {
-  auto id = [](const void* p) {
-    return std::to_string(reinterpret_cast<uintptr_t>(p));
-  };
-  std::string key = std::to_string(static_cast<int>(node.kind)) + ':' +
-                    id(node.expr) + ':' + std::to_string(node.n) + ':' +
-                    id(node.seq);
-  for (const ObligationNode* op : node.operands) key += ',' + id(op);
-  for (const SeqObligationState& s : node.states) {
-    key += ';' + std::to_string(s.op) + '/' + std::to_string(s.lo) + '/' +
-           std::to_string(s.hi) + '/' + std::to_string(s.count) + '/' +
-           std::to_string(static_cast<int>(s.phase));
-  }
-  return key;
+// The clock of the constants, which hold or fail at every time step.
+constexpr int kEveryClock = 32;
+
+std::string Id(const void* p) {
+  return std::to_string(reinterpret_cast<uintptr_t>(p));
 }
 
-// §16.12.2: a sequence `flattened` reads whose operands are booleans under
-// cycle delays and repetitions alone, none of them repeated from zero, with
-// no operand on a clock of its own, no match item, local variable or
-// throughout, and no intersect, and, or or first_match.
-bool IsPlainSequence(bool flattened, const LinearSequence& seq) {
-  auto has_items = [](const std::vector<SeqMatchAssign>& m) {
-    return !m.empty();
-  };
-  auto from_zero = [](const SeqRepetition& r) { return r.min == 0; };
-  auto extras =
-      static_cast<size_t>(!flattened) + seq.intersects.size() +
-      seq.conjuncts.size() + seq.alternatives.size() + seq.nested.size() +
-      seq.locals.size() + seq.throughouts.size() +
-      static_cast<size_t>(seq.first_match) + seq.operand_clocks.size() +
-      static_cast<size_t>(std::ranges::count_if(seq.match_items, has_items)) +
-      static_cast<size_t>(std::ranges::count_if(seq.repetitions, from_zero));
-  return extras == 0;
+std::string KeyOf(const ObligationNode& node) {
+  std::string key = std::to_string(static_cast<int>(node.kind)) + ':' +
+                    Id(node.expr) + ':' + std::to_string(node.n) + ':' +
+                    std::to_string(node.clock) + ':' +
+                    std::to_string(static_cast<int>(node.fresh)) + ':' +
+                    Id(node.decl) + ':' + Id(node.scope);
+  for (const ObligationNode* op : node.operands) key += ',' + Id(op);
+  for (const SeqTerm* term : node.terms) key += ';' + Id(term);
+  return key;
 }
 
 }  // namespace
 
 AssumeObligations::AssumeObligations(SimContext& ctx, Arena& arena)
-    : ctx_(ctx), arena_(arena) {
-  always_ = LiteralOfValue(MakeLogic4VecVal(arena, 1, 1), arena);
-  never_ = LiteralOfValue(MakeLogic4VecVal(arena, 1, 0), arena);
-  true_ = Leaf(Kind::kBool, always_);
-  false_ = Leaf(Kind::kBool, never_);
+    : ctx_(ctx),
+      arena_(arena),
+      conditions_(arena),
+      terms_(ctx, arena, conditions_) {
+  true_ = Leaf(conditions_.Always(), kEveryClock);
+  false_ = Leaf(conditions_.Never(), kEveryClock);
 }
 
 AssumeObligations::~AssumeObligations() = default;
@@ -118,23 +112,20 @@ const ObligationNode* AssumeObligations::Intern(ObligationNode node) {
   return slot.get();
 }
 
-const ObligationNode* AssumeObligations::Leaf(Kind kind, Expr* e) {
-  ObligationNode node;
-  node.kind = kind;
-  node.expr = e;
-  return Intern(std::move(node));
+const ObligationNode* AssumeObligations::Leaf(Expr* e, int clock) {
+  return Over(Kind::kBool, {}, e, 0, clock);
 }
 
-const ObligationNode* AssumeObligations::Seq(
-    const LinearSequence* seq, std::vector<SeqObligationState> states) {
-  std::ranges::sort(states);
-  auto [first, last] = std::ranges::unique(states);
-  states.erase(first, last);
-  if (states.empty()) return false_;
+const ObligationNode* AssumeObligations::Seq(std::vector<const SeqTerm*> terms,
+                                             bool fresh) {
+  std::ranges::sort(terms);
+  auto [first, last] = std::ranges::unique(terms);
+  terms.erase(first, last);
+  if (terms.empty()) return false_;
   ObligationNode node;
   node.kind = Kind::kSeq;
-  node.seq = seq;
-  node.states = std::move(states);
+  node.terms = std::move(terms);
+  node.fresh = fresh;
   return Intern(std::move(node));
 }
 
@@ -169,36 +160,33 @@ const ObligationNode* AssumeObligations::Junction(
   return Over(kind, std::move(kept));
 }
 
-const ObligationNode* AssumeObligations::If(Expr* cond,
-                                            const ObligationNode* then_node,
-                                            const ObligationNode* else_node) {
-  return Over(Kind::kIf, {then_node, else_node}, cond);
-}
-
 const ObligationNode* AssumeObligations::Next(uint32_t ticks,
-                                              const ObligationNode* a) {
+                                              const ObligationNode* a,
+                                              int clock) {
   if (ticks == 0) return a;
-  return Over(Kind::kNext, {a}, nullptr, ticks);
+  return Over(Kind::kNext, {a}, nullptr, ticks, clock);
 }
 
 const ObligationNode* AssumeObligations::Over(
-    Kind kind, std::vector<const ObligationNode*> operands, Expr* e,
-    uint32_t n) {
+    Kind kind, std::vector<const ObligationNode*> operands, Expr* e, uint32_t n,
+    int clock) {
   ObligationNode node;
   node.kind = kind;
   node.operands = std::move(operands);
   node.expr = e;
   node.n = n;
+  node.clock = clock;
   return Intern(std::move(node));
 }
 
 // §16.12.11 to §16.12.13: the operators that carry an obligation to later
-// ticks, read as what they owe at this tick and from the next on: `always
-// p` as `p and nexttime always p`, `p until q` as `q or (p and nexttime (p
-// until q))`, until_with as `(p and q) or (p and nexttime (p until_with
-// q))`, and `s_eventually p` as `p or nexttime s_eventually p`.
+// ticks of their clock, read as what they owe at this tick and from the
+// next on: `always p` as `p and nexttime always p`, `p until q` as `q or (p
+// and nexttime (p until q))`, until_with as `(p and q) or (p and nexttime
+// (p until_with q))`, and `s_eventually p` as `p or nexttime s_eventually
+// p`.
 const ObligationNode* AssumeObligations::Expand(const ObligationNode* node) {
-  const ObligationNode* later = Next(1, node);
+  const ObligationNode* later = Next(1, node, node->clock);
   const ObligationNode* p = node->operands[0];
   switch (node->kind) {
     case Kind::kAlways:
@@ -214,61 +202,110 @@ const ObligationNode* AssumeObligations::Expand(const ObligationNode* node) {
   }
 }
 
+// §16.12.17: an instance stands for the declaration's body with the actuals
+// in the formals' places, on the clock the declaration names or the one
+// flowing to the instance; an instance met while its own declaration is
+// being expanded is expanded when it is read, so that a recursive property
+// is expanded a tick at a time and its expansions, sharing the instance,
+// are one node. Where the body is of a form the obligations do not model,
+// it puts no condition on the time step.
+const ObligationNode* AssumeObligations::Expansion(const ObligationNode* node,
+                                                   std::vector<Expr*>& reads) {
+  if (node->expansion != nullptr) return node->expansion;
+  const ModuleItem* decl = node->decl;
+  ActualsByFormal actuals = BindInstanceActuals(decl, node->expr, arena_);
+  PropertyExprNode* body =
+      SubstituteTree(decl->prop_body_tree, actuals, arena_);
+  int clock =
+      NumberClock(SubstituteClock(decl->prop_clock, actuals, arena_),
+                  node->clock, node->scope->rewrite, node->scope->clocks);
+  expanding_.insert(decl);
+  const ObligationNode* built = Build(body, clock, *node->scope, reads);
+  expanding_.erase(decl);
+  node->expansion = built != nullptr ? built : true_;
+  return built;
+}
+
 // An elaboration-time constant (§16.12.10 to §16.12.13), `fallback` where
 // none was written.
 uint32_t AssumeObligations::ConstantOf(Expr* e, uint32_t fallback,
-                                       const ObligationRewrite& rewrite) {
+                                       const ObligationScope& scope) {
   if (e == nullptr) return fallback;
-  return static_cast<uint32_t>(EvalExpr(rewrite(e), ctx_, arena_).ToUint64());
+  return static_cast<uint32_t>(
+      EvalExpr(scope.rewrite(e), ctx_, arena_).ToUint64());
 }
 
 const ObligationNode* AssumeObligations::Begin(const Stmt* body,
-                                               const ObligationRewrite& rewrite,
+                                               ObligationScope scope,
                                                std::vector<Expr*>& reads) {
+  scopes_.push_back(std::make_unique<ObligationScope>(std::move(scope)));
+  const ObligationScope& held = *scopes_.back();
   if (body->assert_property != nullptr) {
-    return Build(body->assert_property, rewrite, reads);
+    return Build(body->assert_property, 0, held, reads);
   }
+  int clock_out = 0;
   const ObligationNode* node =
       body->assert_sequence != nullptr
-          ? BuildSequence(body->assert_sequence, rewrite, reads)
-          : BuildBool(body->assert_expr, rewrite, reads);
+          ? BuildSequence(body->assert_sequence, 0, held, reads, clock_out)
+          : BuildBool(body->assert_expr, 0, held, reads);
   if (node == nullptr || !body->assert_negated) return node;
   return Not(node);
 }
 
-// A boolean the property reads, or nullptr where the operand instantiates a
-// named property (§16.12.17).
-const ObligationNode* AssumeObligations::BuildBool(
-    Expr* e, const ObligationRewrite& rewrite, std::vector<Expr*>& reads) {
-  if (InstantiatedProperty(e, ctx_) != nullptr) return nullptr;
-  Expr* read = rewrite(e);
+// A boolean the property reads, or the named property the operand
+// instantiates (§16.12.17).
+const ObligationNode* AssumeObligations::BuildBool(Expr* e, int clock,
+                                                   const ObligationScope& scope,
+                                                   std::vector<Expr*>& reads) {
+  if (const ModuleItem* decl = InstantiatedProperty(e, ctx_)) {
+    return BuildInstance(e, decl, clock, scope, reads);
+  }
+  Expr* read = scope.rewrite(e);
   reads.push_back(read);
-  return Leaf(Kind::kBool, read);
+  return Leaf(read, clock);
+}
+
+// §16.12.17: an instance of `decl`, expanded where it is met unless its
+// declaration is being expanded, and nullptr where the declaration holds
+// local variables or a body of a form the obligations do not model.
+const ObligationNode* AssumeObligations::BuildInstance(
+    Expr* e, const ModuleItem* decl, int clock, const ObligationScope& scope,
+    std::vector<Expr*>& reads) {
+  if (!decl->prop_locals.empty()) return nullptr;
+  std::string key = Id(decl) + ':' + Id(&scope);
+  for (const Expr* arg : e->args) key += ',' + Id(arg);
+  for (std::string_view name : e->arg_names) key += ';' + std::string(name);
+  Expr*& first = instances_[key];
+  if (first == nullptr) first = e;
+  ObligationNode node;
+  node.kind = Kind::kInstance;
+  node.expr = first;
+  node.clock = clock;
+  node.decl = decl;
+  node.scope = &scope;
+  const ObligationNode* instance = Intern(std::move(node));
+  if (expanding_.count(decl) != 0) return instance;
+  if (Expansion(instance, reads) == nullptr) return nullptr;
+  return instance;
 }
 
 const ObligationNode* AssumeObligations::BuildSequence(
-    const ModuleItem* item, const ObligationRewrite& rewrite,
-    std::vector<Expr*>& reads) {
-  auto seq = std::make_unique<LinearSequence>();
-  bool flattened = FlattenLinearSequence(item, ctx_, arena_, *seq);
-  if (!IsPlainSequence(flattened, *seq)) return nullptr;
-  for (Expr*& operand : seq->operands) {
-    operand = rewrite(operand);
-    reads.push_back(operand);
-  }
-  const LinearSequence* held = seq.get();
-  sequences_.push_back(std::move(seq));
-  return Seq(held, {SeqObligationStart(*held)});
+    const ModuleItem* item, int clock, const ObligationScope& scope,
+    std::vector<Expr*>& reads, int& clock_out) {
+  const SeqTerm* term =
+      terms_.Begin(item, clock, scope.rewrite, scope.clocks, reads, clock_out);
+  if (term == nullptr) return nullptr;
+  return Seq({term}, true);
 }
 
 // Each operand of `node` built in turn into `out`; false where one is of a
 // form the obligations do not model.
-bool AssumeObligations::BuildOperands(const PropertyExprNode* node,
-                                      const ObligationRewrite& rewrite,
+bool AssumeObligations::BuildOperands(const PropertyExprNode* node, int clock,
+                                      const ObligationScope& scope,
                                       std::vector<Expr*>& reads,
                                       std::vector<const ObligationNode*>& out) {
   for (const PropertyExprNode* operand : node->operands) {
-    const ObligationNode* built = Build(operand, rewrite, reads);
+    const ObligationNode* built = Build(operand, clock, scope, reads);
     if (built == nullptr) return false;
     out.push_back(built);
   }
@@ -279,21 +316,23 @@ bool AssumeObligations::BuildOperands(const PropertyExprNode* node,
 // ranges, a bounded range being the and, or for eventually the or, of the
 // operand at each tick it covers.
 const ObligationNode* AssumeObligations::BuildRange(
-    const PropertyExprNode* node, const ObligationNode* operand,
-    const ObligationRewrite& rewrite) {
+    const PropertyExprNode* node, const ObligationNode* operand, int clock,
+    const ObligationScope& scope) {
   if (node->kind == PropertyExprNode::Kind::kNexttime) {
-    return Next(ConstantOf(node->boolean, 1, rewrite), operand);
+    return Next(ConstantOf(node->boolean, 1, scope), operand, clock);
   }
   bool always = node->kind == PropertyExprNode::Kind::kAlways;
-  uint32_t lo = ConstantOf(node->range_min, 0, rewrite);
+  uint32_t lo = ConstantOf(node->range_min, 0, scope);
   if (node->range_unbounded) {
     return Next(lo,
-                Over(always ? Kind::kAlways : Kind::kEventually, {operand}));
+                Over(always ? Kind::kAlways : Kind::kEventually, {operand},
+                     nullptr, 0, clock),
+                clock);
   }
-  uint32_t hi = ConstantOf(node->range_max, 0, rewrite);
+  uint32_t hi = ConstantOf(node->range_max, 0, scope);
   std::vector<const ObligationNode*> ticks;
   ticks.reserve(hi - lo + 1);
-  for (uint32_t t = lo; t <= hi; ++t) ticks.push_back(Next(t, operand));
+  for (uint32_t t = lo; t <= hi; ++t) ticks.push_back(Next(t, operand, clock));
   return Junction(always ? Kind::kAnd : Kind::kOr, ticks);
 }
 
@@ -302,43 +341,50 @@ const ObligationNode* AssumeObligations::BuildRange(
 // item is selected.
 const ObligationNode* AssumeObligations::BuildCase(
     const PropertyExprNode* node,
-    const std::vector<const ObligationNode*>& items,
-    const ObligationRewrite& rewrite, std::vector<Expr*>& reads) {
-  Expr* selector = rewrite(node->boolean);
+    const std::vector<const ObligationNode*>& items, int clock,
+    const ObligationScope& scope, std::vector<Expr*>& reads) {
+  Expr* selector = scope.rewrite(node->boolean);
   reads.push_back(selector);
   const ObligationNode* result = true_;
   for (size_t i = 0; i < node->case_values.size(); ++i) {
     if (node->case_values[i].empty()) result = items[i];
   }
   for (size_t i = node->case_values.size(); i-- > 0;) {
-    Expr* matches = never_;
+    Expr* matches = conditions_.Never();
     for (Expr* value : node->case_values[i]) {
       auto* eq = arena_.Create<Expr>();
       eq->kind = ExprKind::kBinary;
       eq->op = TokenKind::kEqEqEq;
       eq->lhs = selector;
-      eq->rhs = rewrite(value);
+      eq->rhs = scope.rewrite(value);
       reads.push_back(eq->rhs);
-      matches = OrExpr(matches, eq);
+      matches = conditions_.Or(matches, eq);
     }
-    if (matches != never_) result = If(matches, items[i], result);
+    if (matches != conditions_.Never()) {
+      result = Over(Kind::kIf, {items[i], result}, matches, 0, clock);
+    }
   }
   return result;
 }
 
 const ObligationNode* AssumeObligations::Build(const PropertyExprNode* node,
-                                               const ObligationRewrite& rewrite,
+                                               int clock,
+                                               const ObligationScope& scope,
                                                std::vector<Expr*>& reads) {
   using P = PropertyExprNode::Kind;
-  if (!node->clock.empty()) return nullptr;
+  int own = NumberClock(node->clock, clock, scope.rewrite, scope.clocks);
   if (node->kind == P::kBoolean) {
-    return BuildBool(node->boolean, rewrite, reads);
+    return BuildBool(node->boolean, own, scope, reads);
   }
+  int clock_out = own;
   if (node->kind == P::kSequence) {
-    return BuildSequence(node->sequence, rewrite, reads);
+    return BuildSequence(node->sequence, own, scope, reads, clock_out);
+  }
+  if (node->kind == P::kImplication) {
+    return BuildImplication(node, own, scope, reads);
   }
   std::vector<const ObligationNode*> ops;
-  if (!BuildOperands(node, rewrite, reads, ops)) return nullptr;
+  if (!BuildOperands(node, own, scope, reads, ops)) return nullptr;
   switch (node->kind) {
     case P::kNot:
       return Not(ops[0]);
@@ -354,17 +400,15 @@ const ObligationNode* AssumeObligations::Build(const PropertyExprNode* node,
                        Junction(Kind::kAnd, {Not(ops[0]), Not(ops[1])})});
     case P::kUntil:
       return Over(node->range_unbounded ? Kind::kUntilWith : Kind::kUntil,
-                  std::move(ops));
+                  std::move(ops), nullptr, 0, own);
     case P::kNexttime:
     case P::kAlways:
     case P::kEventually:
-      return BuildRange(node, ops[0], rewrite);
-    case P::kImplication:
-      return BuildImplication(node, ops[0], rewrite, reads);
+      return BuildRange(node, ops[0], own, scope);
     case P::kCase:
-      return BuildCase(node, ops, rewrite, reads);
+      return BuildCase(node, ops, own, scope, reads);
     default:
-      return BuildConditional(node, std::move(ops), rewrite, reads);
+      return BuildConditional(node, std::move(ops), own, scope, reads);
   }
 }
 
@@ -372,82 +416,47 @@ const ObligationNode* AssumeObligations::Build(const PropertyExprNode* node,
 // written, and an abort, over the condition they read.
 const ObligationNode* AssumeObligations::BuildConditional(
     const PropertyExprNode* node, std::vector<const ObligationNode*> ops,
-    const ObligationRewrite& rewrite, std::vector<Expr*>& reads) {
-  Expr* cond = rewrite(node->boolean);
+    int clock, const ObligationScope& scope, std::vector<Expr*>& reads) {
+  Expr* cond = scope.rewrite(node->boolean);
   reads.push_back(cond);
   if (node->kind == PropertyExprNode::Kind::kIfElse) {
-    return If(cond, ops[0], ops.size() > 1 ? ops[1] : true_);
+    return Over(Kind::kIf, {ops[0], ops.size() > 1 ? ops[1] : true_}, cond, 0,
+                clock);
   }
   return Over(node->accept ? Kind::kAccept : Kind::kReject, std::move(ops),
-              cond);
+              cond, 0, clock);
 }
 
 // §16.12.7: an implication whose antecedent is a sequence the obligations
-// model, overlapping where it is `|->`.
+// model, overlapping where it is `|->`, its consequent on the clock flowing
+// out of the antecedent (§16.13.3).
 const ObligationNode* AssumeObligations::BuildImplication(
-    const PropertyExprNode* node, const ObligationNode* consequent,
-    const ObligationRewrite& rewrite, std::vector<Expr*>& reads) {
+    const PropertyExprNode* node, int clock, const ObligationScope& scope,
+    std::vector<Expr*>& reads) {
+  int clock_out = clock;
   const ObligationNode* antecedent =
-      BuildSequence(node->sequence, rewrite, reads);
+      BuildSequence(node->sequence, clock, scope, reads, clock_out);
   if (antecedent == nullptr) return nullptr;
+  const ObligationNode* consequent =
+      Build(node->operands[0], clock_out, scope, reads);
+  if (consequent == nullptr) return nullptr;
   return Over(Kind::kImplication, {antecedent, consequent}, nullptr,
-              node->strong ? 0 : 1);
+              node->strong ? 0 : 1, clock);
 }
 
-Expr* AssumeObligations::NotExpr(Expr* a) {
-  if (a == always_) return never_;
-  if (a == never_) return always_;
-  auto* e = arena_.Create<Expr>();
-  e->kind = ExprKind::kUnary;
-  e->op = TokenKind::kBang;
-  e->lhs = a;
-  return e;
+bool AssumeObligations::Ticked(int clock) const {
+  return clock >= kEveryClock || ((ticked_ >> clock) & 1u) != 0;
 }
 
-// `a && b`, or `a || b` where `conjunction` is unset, a constant operand
-// folded away.
-Expr* AssumeObligations::JoinExpr(Expr* a, Expr* b, bool conjunction) {
-  Expr* unit = conjunction ? always_ : never_;
-  Expr* zero = conjunction ? never_ : always_;
-  if (a == zero || b == zero) return zero;
-  if (a == unit) return b;
-  if (b == unit) return a;
-  auto* e = arena_.Create<Expr>();
-  e->kind = ExprKind::kBinary;
-  e->op = conjunction ? TokenKind::kAmpAmp : TokenKind::kPipePipe;
-  e->lhs = a;
-  e->rhs = b;
-  return e;
-}
-
-Expr* AssumeObligations::AndExpr(Expr* a, Expr* b) {
-  return JoinExpr(a, b, true);
-}
-
-Expr* AssumeObligations::OrExpr(Expr* a, Expr* b) {
-  return JoinExpr(a, b, false);
-}
-
-const std::vector<SeqObligationPath>& AssumeObligations::PathsOf(
-    const ObligationNode* node) {
-  if (!node->paths_read) {
-    node->paths = SeqObligationPaths(*node->seq, node->states);
-    node->paths_read = true;
-  }
-  return node->paths;
-}
-
-// The condition under which an attempt of the sequence `node` matches at
-// this tick, or, `match` unset, goes on past it.
+// The condition under which an attempt in one of the sequences `node` holds
+// matches at this tick, or, `match` unset, goes on past it.
 Expr* AssumeObligations::SeqCondition(const ObligationNode* node, bool match) {
-  Expr* any = never_;
-  for (const SeqObligationPath& path : PathsOf(node)) {
-    if (path.match != match) continue;
-    Expr* all = always_;
-    for (const auto& [operand, value] : path.literals) {
-      all = AndExpr(all, value ? operand : NotExpr(operand));
+  Expr* any = conditions_.Never();
+  for (const SeqTerm* term : node->terms) {
+    for (const SeqWay& way : terms_.Ways(term, ticked_, node->fresh)) {
+      if ((way.next == nullptr) != match) continue;
+      any = conditions_.Or(any, conditions_.AllOf(way.literals));
     }
-    any = OrExpr(any, all);
   }
   return any;
 }
@@ -456,40 +465,55 @@ Expr* AssumeObligations::SeqCondition(const ObligationNode* node, bool match) {
 // `decided` is set, under which it holds by this tick and owes nothing
 // more.
 Expr* AssumeObligations::Condition(const ObligationNode* node, bool decided) {
-  Expr*& memo = node->conditions[decided ? 1 : 0];
-  if (memo == nullptr) memo = ConditionOf(node, decided);
-  return memo;
+  uint64_t key =
+      (static_cast<uint64_t>(ticked_) << 1) | static_cast<uint64_t>(decided);
+  auto found = node->conditions.find(key);
+  if (found != node->conditions.end()) return found->second;
+  Expr* cond = ConditionOf(node, decided);
+  node->conditions[key] = cond;
+  return cond;
 }
 
 Expr* AssumeObligations::ConditionOf(const ObligationNode* node, bool decided) {
   const auto& ops = node->operands;
   bool conjunction = node->kind == Kind::kAnd;
-  Expr* all = conjunction ? always_ : never_;
+  Expr* all = conjunction ? conditions_.Always() : conditions_.Never();
+  // §16.13: an operand whose clock has not ticked is not read yet, so it
+  // neither fails nor holds.
+  Expr* pending = decided ? conditions_.Never() : conditions_.Always();
+  Expr* own = Ticked(node->clock) ? node->expr : conditions_.Never();
+  std::vector<Expr*> reads;
   switch (node->kind) {
     case Kind::kBool:
-      return node->expr;
+      return Ticked(node->clock) ? node->expr : pending;
     case Kind::kSeq:
-      return OrExpr(SeqCondition(node, true),
-                    decided ? never_ : SeqCondition(node, false));
+      return conditions_.Or(SeqCondition(node, true),
+                            decided ? pending : SeqCondition(node, false));
     case Kind::kNot:
-      return NotExpr(Condition(ops[0], !decided));
+      return conditions_.Not(Condition(ops[0], !decided));
     case Kind::kAnd:
     case Kind::kOr:
       for (const ObligationNode* op : ops) {
-        all = JoinExpr(all, Condition(op, decided), conjunction);
+        all = conditions_.Join(all, Condition(op, decided), conjunction);
       }
       return all;
     case Kind::kIf:
-      return OrExpr(AndExpr(node->expr, Condition(ops[0], decided)),
-                    AndExpr(NotExpr(node->expr), Condition(ops[1], decided)));
+      if (!Ticked(node->clock)) return pending;
+      return conditions_.Or(
+          conditions_.And(node->expr, Condition(ops[0], decided)),
+          conditions_.And(conditions_.Not(node->expr),
+                          Condition(ops[1], decided)));
     case Kind::kNext:
-      return decided ? never_ : always_;
+      return pending;
     case Kind::kImplication:
       return ImplicationCondition(node, decided);
     case Kind::kAccept:
-      return OrExpr(node->expr, Condition(ops[0], decided));
+      return conditions_.Or(own, Condition(ops[0], decided));
     case Kind::kReject:
-      return AndExpr(NotExpr(node->expr), Condition(ops[0], decided));
+      return conditions_.And(conditions_.Not(own), Condition(ops[0], decided));
+    case Kind::kInstance:
+      Expansion(node, reads);
+      return Condition(node->expansion, decided);
     default:
       return Condition(Expand(node), decided);
   }
@@ -503,16 +527,19 @@ Expr* AssumeObligations::ImplicationCondition(const ObligationNode* node,
                                               bool decided) {
   const ObligationNode* antecedent = node->operands[0];
   const ObligationNode* consequent = node->operands[1];
-  Expr* begun =
-      Condition(node->n != 0 ? consequent : Next(1, consequent), decided);
-  Expr* now = OrExpr(NotExpr(SeqCondition(antecedent, true)), begun);
+  Expr* begun = Condition(
+      node->n != 0 ? consequent : Next(1, consequent, node->clock), decided);
+  Expr* now =
+      conditions_.Or(conditions_.Not(SeqCondition(antecedent, true)), begun);
   if (!decided) return now;
-  return AndExpr(NotExpr(SeqCondition(antecedent, false)), now);
+  return conditions_.And(conditions_.Not(SeqCondition(antecedent, false)), now);
 }
 
-Expr* AssumeObligations::NoFailCondition(const ObligationNode* node) {
+Expr* AssumeObligations::NoFailCondition(const ObligationNode* node,
+                                         uint32_t ticked) {
+  ticked_ = ticked;
   Expr* cond = Condition(node, false);
-  return cond == always_ ? nullptr : cond;
+  return cond == conditions_.Always() ? nullptr : cond;
 }
 
 void AssumeObligations::NewTimeStep() {
@@ -532,61 +559,78 @@ bool AssumeObligations::Settled(const ObligationNode* node) const {
   return node == true_ || node == false_;
 }
 
-// The ways of the sequence `node` taken at this tick, `next` collecting the
-// states they go on in; true where one matches.
+// The ways of the sequences `node` holds taken at this tick, `next`
+// collecting the terms they go on in; true where one matches.
 bool AssumeObligations::StepSeq(const ObligationNode* node,
-                                std::vector<SeqObligationState>& next) {
+                                std::vector<const SeqTerm*>& next) {
   bool matched = false;
-  for (const SeqObligationPath& path : PathsOf(node)) {
-    bool taken = std::ranges::all_of(path.literals, [&](const auto& lit) {
-      return Holds(lit.first) == lit.second;
-    });
-    if (!taken) continue;
-    if (path.match) {
-      matched = true;
-    } else {
-      next.push_back(path.next);
+  for (const SeqTerm* term : node->terms) {
+    for (const SeqWay& way : terms_.Ways(term, ticked_, node->fresh)) {
+      bool taken = std::ranges::all_of(way.literals, [&](const auto& lit) {
+        return Holds(lit.first) == lit.second;
+      });
+      if (!taken) continue;
+      if (way.next == nullptr) {
+        matched = true;
+      } else {
+        next.push_back(terms_.Take(way));
+      }
     }
   }
   return matched;
 }
 
-const ObligationNode* AssumeObligations::Step(const ObligationNode* node) {
-  auto found = stepped_.find(node);
+const ObligationNode* AssumeObligations::Step(const ObligationNode* node,
+                                              uint32_t ticked) {
+  ticked_ = ticked;
+  return StepNode(node);
+}
+
+const ObligationNode* AssumeObligations::StepNode(const ObligationNode* node) {
+  auto key = std::make_pair(node, ticked_);
+  auto found = stepped_.find(key);
   if (found != stepped_.end()) return found->second;
   const ObligationNode* result = StepOperator(node);
-  stepped_[node] = result;
+  stepped_[key] = result;
   return result;
 }
 
 const ObligationNode* AssumeObligations::StepOperator(
     const ObligationNode* node) {
   const auto& ops = node->operands;
-  std::vector<SeqObligationState> next;
+  std::vector<const SeqTerm*> next;
   std::vector<const ObligationNode*> stepped;
+  std::vector<Expr*> reads;
+  bool ticked = Ticked(node->clock);
   switch (node->kind) {
     case Kind::kBool:
+      if (!ticked) return node;
       return Holds(node->expr) ? true_ : false_;
     case Kind::kSeq:
-      return StepSeq(node, next) ? true_ : Seq(node->seq, std::move(next));
+      return StepSeq(node, next) ? true_ : Seq(std::move(next), false);
     case Kind::kNot:
-      return Not(Step(ops[0]));
+      return Not(StepNode(ops[0]));
     case Kind::kAnd:
     case Kind::kOr:
       stepped.reserve(ops.size());
-      for (const ObligationNode* op : ops) stepped.push_back(Step(op));
+      for (const ObligationNode* op : ops) stepped.push_back(StepNode(op));
       return Junction(node->kind, stepped);
     case Kind::kIf:
-      return Step(ops[Holds(node->expr) ? 0 : 1]);
+      if (!ticked) return node;
+      return StepNode(ops[Holds(node->expr) ? 0 : 1]);
     case Kind::kNext:
-      return Next(node->n - 1, ops[0]);
+      if (!ticked) return node;
+      return Next(node->n - 1, ops[0], node->clock);
     case Kind::kImplication:
       return StepImplication(node);
     case Kind::kAccept:
     case Kind::kReject:
       return StepAbort(node);
+    case Kind::kInstance:
+      Expansion(node, reads);
+      return StepNode(node->expansion);
     default:
-      return Step(Expand(node));
+      return StepNode(Expand(node));
   }
 }
 
@@ -595,31 +639,29 @@ const ObligationNode* AssumeObligations::StepOperator(
 // antecedent goes on while it can match again.
 const ObligationNode* AssumeObligations::StepImplication(
     const ObligationNode* node) {
-  const ObligationNode* antecedent = node->operands[0];
   const ObligationNode* consequent = node->operands[1];
-  std::vector<SeqObligationState> next;
+  std::vector<const SeqTerm*> next;
   const ObligationNode* begun = true_;
-  if (StepSeq(antecedent, next)) {
-    begun = node->n != 0 ? Step(consequent) : consequent;
+  if (StepSeq(node->operands[0], next)) {
+    begun = node->n != 0 ? StepNode(consequent) : consequent;
   }
   const ObligationNode* rest = true_;
   if (!next.empty()) {
-    rest = Over(Kind::kImplication,
-                {Seq(antecedent->seq, std::move(next)), consequent}, nullptr,
-                node->n);
+    rest = Over(Kind::kImplication, {Seq(std::move(next), false), consequent},
+                nullptr, node->n, node->clock);
   }
   return Junction(Kind::kAnd, {begun, rest});
 }
 
-// §16.12.14: an abort whose condition holds at this tick decides the
-// property, accept_on as holding and reject_on as failing; otherwise its
-// operand goes on under it.
+// §16.12.14: an abort whose condition holds at a tick of its clock decides
+// the property, accept_on as holding and reject_on as failing; otherwise
+// its operand goes on under it.
 const ObligationNode* AssumeObligations::StepAbort(const ObligationNode* node) {
   const ObligationNode* aborted = node->kind == Kind::kAccept ? true_ : false_;
-  if (Holds(node->expr)) return aborted;
-  const ObligationNode* operand = Step(node->operands[0]);
+  if (Ticked(node->clock) && Holds(node->expr)) return aborted;
+  const ObligationNode* operand = StepNode(node->operands[0]);
   if (Settled(operand)) return operand;
-  return Over(node->kind, {operand}, node->expr);
+  return Over(node->kind, {operand}, node->expr, 0, node->clock);
 }
 
 }  // namespace delta
