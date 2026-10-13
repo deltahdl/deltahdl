@@ -288,9 +288,10 @@ TEST(WaitOrderSim, ClassEventPropertiesAreWaitedOnInOrder) {
 
 // §15.5.4 with §4.5: the statements after a wait_order run as the process that
 // waited, so the unique-if violation they raise is queued on the waiter, and
-// its resumption from @(b) discards it (§12.4.2.1). The triggering process
-// fires a and b with no flush point between them; resumed inside it, the
-// waiter queued the report there, where nothing discarded it.
+// its resumption from @(b) discards it (§12.4.2.1). The trigger of a wakes the
+// waiter in the active region, before the triggering process's #0 lets it
+// trigger b; resumed without its own process current, the waiter queued the
+// report elsewhere, where its @(b) never discarded it.
 TEST(WaitOrderSim, StatementsAfterTheWaitRunAsTheWaiter) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -303,9 +304,8 @@ TEST(WaitOrderSim, StatementsAfterTheWaitRunAsTheWaiter) {
       "    @(b);\n"
       "  end\n"
       "  initial begin\n"
-      "    #1;\n"
-      "    -> a;\n"
-      "    -> b;\n"
+      "    #0 -> a;\n"
+      "    #0 -> b;\n"
       "  end\n"
       "endmodule\n",
       f, "y");
