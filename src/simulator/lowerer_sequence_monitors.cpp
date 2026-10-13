@@ -171,6 +171,17 @@ std::vector<const Expr*> SequenceActuals(const RtlirModule* mod) {
     }
     actuals.push_back(e);
   };
+  // §16.7: a clocked boolean, `@(posedge clk) b`, is a sequence of one
+  // operand, though the property reading keeps it as a boolean.
+  auto collect_connection = [&](const Expr* e) {
+    if (e->property_actual != nullptr &&
+        e->property_actual->kind == PropertyExprNode::Kind::kBoolean &&
+        !e->property_actual->clock.empty() && seen.insert(e).second) {
+      actuals.push_back(e);
+      return;
+    }
+    collect(e);
+  };
   for (const auto* seq : mod->sequence_decls) {
     ForEachBodyExpr(seq->seq_linear, collect);
   }
@@ -182,7 +193,7 @@ std::vector<const Expr*> SequenceActuals(const RtlirModule* mod) {
   // reads through `triggered` on the formal bound to it.
   for (const RtlirModuleInst& child : mod->children) {
     for (const RtlirPortBinding& binding : child.port_bindings) {
-      ForEachSubExpr(binding.connection, collect);
+      ForEachSubExpr(binding.connection, collect_connection);
     }
   }
   return actuals;
@@ -190,10 +201,23 @@ std::vector<const Expr*> SequenceActuals(const RtlirModule* mod) {
 
 // §16.13.6: the sequence_expr an actual carries as a declaration of its
 // own, on the clock the actual opens with, `@(posedge sysclk)`, where it
-// opens with one.
+// opens with one; a clocked boolean's is the one operand it reads.
 ModuleItem* ActualAsSequence(const Expr* holder, std::string_view name,
                              Arena& arena) {
-  auto* seq = arena.Create<ModuleItem>(*holder->property_actual->sequence);
+  const PropertyExprNode* tree = holder->property_actual;
+  ModuleItem* seq = nullptr;
+  if (tree->sequence != nullptr) {
+    seq = arena.Create<ModuleItem>(*tree->sequence);
+  } else {
+    seq = arena.Create<ModuleItem>();
+    SeqCycleDelay none;
+    none.min = 0;
+    none.max = 0;
+    seq->seq_linear.operands.push_back(tree->boolean);
+    seq->seq_linear.delays.push_back(none);
+    seq->seq_linear.match_items.emplace_back();
+    seq->seq_linear.repetitions.emplace_back();
+  }
   seq->kind = ModuleItemKind::kSequenceDecl;
   seq->loc = holder->range.start;
   seq->name = name;
