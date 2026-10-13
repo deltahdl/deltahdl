@@ -512,25 +512,35 @@ void SeqTerms::ExpandBind(const SeqTerm* term, uint32_t ticked, bool anchor,
   }
 }
 
+namespace {
+
+// §16.10: the match item `item` performed on `locals`.
+void PerformMatchItem(const SeqMatchAssign& item, LocalValues& locals,
+                      SimContext& ctx, Arena& arena) {
+  const std::vector<SeqLocalDecl>& decls = *locals.decls;
+  for (size_t i = 0; i < decls.size(); ++i) {
+    if (decls[i].name != item.lvar) continue;
+    Logic4Vec& value = locals.values[i];
+    Logic4Vec rhs = EvalExpr(
+        SubstituteFormals(item.rhs, locals.literals, arena), ctx, arena);
+    if (item.op != TokenKind::kEq) {
+      rhs = EvalBinaryOp(CompoundAssignBaseOp(item.op), value, rhs, arena);
+    }
+    bool is_signed = value.is_signed;
+    value = ResizeToWidth(OwnRhsWords(rhs, arena), value.width, arena);
+    value.is_signed = is_signed;
+    locals.literals[decls[i].name] = LiteralOfValue(value, arena);
+  }
+}
+
+}  // namespace
+
 void PerformMatchItems(
     const std::vector<const std::vector<SeqMatchAssign>*>& items,
     LocalValues& locals, SimContext& ctx, Arena& arena) {
-  const std::vector<SeqLocalDecl>& decls = *locals.decls;
   for (const std::vector<SeqMatchAssign>* group : items) {
     for (const SeqMatchAssign& item : *group) {
-      for (size_t i = 0; i < decls.size(); ++i) {
-        if (decls[i].name != item.lvar) continue;
-        Logic4Vec& value = locals.values[i];
-        Logic4Vec rhs = EvalExpr(
-            SubstituteFormals(item.rhs, locals.literals, arena), ctx, arena);
-        if (item.op != TokenKind::kEq) {
-          rhs = EvalBinaryOp(CompoundAssignBaseOp(item.op), value, rhs, arena);
-        }
-        bool is_signed = value.is_signed;
-        value = ResizeToWidth(OwnRhsWords(rhs, arena), value.width, arena);
-        value.is_signed = is_signed;
-        locals.literals[decls[i].name] = LiteralOfValue(value, arena);
-      }
+      PerformMatchItem(item, locals, ctx, arena);
     }
   }
 }
