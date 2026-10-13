@@ -220,6 +220,11 @@ Expr* SelfDeterminedActual(Expr* actual, Arena& arena) {
   return cast;
 }
 
+Expr* CastUntypedActual(Expr* actual, TokenKind type_kw, Arena& arena) {
+  return type_kw == TokenKind::kKwUntyped ? SelfDeterminedActual(actual, arena)
+                                          : actual;
+}
+
 bool IsSelfDeterminedCast(const Expr* cast) {
   return cast->rhs != nullptr && !cast->rhs->args.empty() &&
          cast->rhs->args[0] == cast->lhs;

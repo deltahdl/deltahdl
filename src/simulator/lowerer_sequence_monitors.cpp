@@ -10,6 +10,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "elaborator/procedural_concurrent_assertion.h"
+#include "elaborator/property_instance.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/sensitivity.h"
 #include "lexer/token.h"
@@ -365,16 +366,6 @@ class TriggeredContextClocks {
   std::unordered_map<const Expr*, std::vector<EventExpr>> by_instance_;
 };
 
-// §14.12: the clocking event of the default clocking of `mod`, else the
-// default a nested declaration inherits, which is empty where the scope has
-// none.
-const std::vector<EventExpr>* DefaultClockingEvent(const RtlirModule* mod) {
-  for (const ModuleItem* item : mod->clocking_blocks) {
-    if (item->is_default_clocking) return &item->clocking_event;
-  }
-  return &mod->inherited_default_clock;
-}
-
 }  // namespace
 
 // §16.13.6/§9.4.4: spawn a monitor process for one named sequence whose
@@ -498,9 +489,12 @@ void Lowerer::LowerSequenceMonitors(const RtlirModule* mod) {
   }
   // §16.13.6 with §16.9.3: a clockless sequence no assertion reads takes the
   // clock its methods are read under outside one, the default clocking's.
+  // §14.12: the default clocking of the scope, DefaultClockingEvent
+  // (property_instance.cpp), empty where it has none.
+  const std::vector<EventExpr> kDefaultClock = DefaultClockingEvent(mod);
   auto lower_named = [&](const ModuleItem* seq) {
     const std::vector<EventExpr>* clock = context.FirstClockOf(seq->name);
-    if (clock == nullptr) clock = DefaultClockingEvent(mod);
+    if (clock == nullptr) clock = &kDefaultClock;
     LowerNamedSequenceMonitor(seq, clock, context.FurtherClocksOf(seq->name));
   };
   std::vector<const ModuleItem*> waiting(mod->sequence_decls.begin(),

@@ -20,7 +20,6 @@
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/semantic_leading_clocks.h"
 #include "elaborator/sequence_match_class.h"
-#include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -430,10 +429,8 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
     }
     // §16.12 with §16.8: an untyped formal's actual is cast to its own
     // self-determined type before it stands for the formal.
-    bool untyped = i < decl->prop_formal_type_kw.size() &&
-                   decl->prop_formal_type_kw[i] == TokenKind::kKwUntyped;
     actuals[decl->prop_formals[i]] =
-        untyped ? SelfDeterminedActual(args[i], arena) : args[i];
+        CastUntypedActual(args[i], decl->prop_formal_type_kw[i], arena);
   }
   auto* stmt = NewInstanceStmt(item, arena);
   GiveInstanceBody(stmt, item->assert_expr, decl, actuals, arena);

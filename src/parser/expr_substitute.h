@@ -7,6 +7,7 @@
 
 #include "common/arena.h"
 #include "common/source_loc.h"
+#include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 
@@ -76,6 +77,11 @@ std::string InstanceDeclName(const Expr* instance);
 // any other actual, a sequence, property or event actual and every
 // variable_lvalue among them, as written.
 Expr* SelfDeterminedActual(Expr* actual, Arena& arena);
+
+// The actual `actual` bound to a formal recorded with the type keyword
+// `type_kw`: SelfDeterminedActual's cast where the formal is untyped, and
+// `actual` itself otherwise.
+Expr* CastUntypedActual(Expr* actual, TokenKind type_kw, Arena& arena);
 
 // Whether the cast `cast` is one SelfDeterminedActual makes, which reads its
 // operand self-determined whatever context it stands in.
