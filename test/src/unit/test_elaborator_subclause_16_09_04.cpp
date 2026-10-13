@@ -797,7 +797,7 @@ TEST(GlobalClockingFutureRules, AFutureFunctionBesideAMatchItemIsReported) {
       "    a ##1 b;\n"
       "  endsequence\n"
       "  a1: assert property (@(posedge clk) s |=> $future_gclk(c));\n"
-      "  a2: assert property (@(posedge clk) t |=> $future_gclk(c));\n"
+      "  a2: assert property (@(posedge clk) t ##1 t |=> $future_gclk(c));\n"
       "endmodule\n",
       f);
   const char* const kReport =

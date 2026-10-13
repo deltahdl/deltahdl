@@ -1,18 +1,17 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <initializer_list>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <unordered_set>
 
 #include "common/diagnostic.h"
 #include "elaborator/always_range.h"
 #include "elaborator/assertion_rules.h"
+#include "elaborator/assertion_walk.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_helpers.h"
-#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/nexttime_index.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
@@ -24,13 +23,12 @@ namespace delta {
 namespace {
 
 using NameSet = std::unordered_set<std::string_view>;
-using SequenceMap = std::unordered_map<std::string_view, const ModuleItem*>;
 
 // The module's named sequences and properties by name, the diagnostics sink,
 // and the declarations whose instance is being followed, so a cyclic
 // instantiation, which §16.8 makes illegal on its own account, ends the walk.
 struct BoundEnv {
-  const SequenceMap& sequences;
+  const NamedDecls& decls;
   DiagEngine& diag;
   std::unordered_set<const ModuleItem*> active;
 };
@@ -42,7 +40,7 @@ struct BoundEnv {
 // bounds that name a formal, with the formals bound to the instance's
 // folded actuals in `values` beside the parameters. Every bound is so
 // checked once, in the place its value is settled. A bound written as an
-// integer literal is the parser's to check.
+// integer literal, negated or not, is the parser's to check.
 struct BoundScope {
   const ScopeMap& values;
   const NameSet& formals;
@@ -50,11 +48,9 @@ struct BoundScope {
 };
 
 bool IsLiteralBound(const Expr* e) {
-  if (e != nullptr && e->kind == ExprKind::kUnary &&
-      e->op == TokenKind::kMinus) {
-    e = e->lhs;
-  }
-  return e != nullptr && e->kind == ExprKind::kIntegerLiteral;
+  const Expr* magnitude =
+      e->kind == ExprKind::kUnary && e->op == TokenKind::kMinus ? e->lhs : e;
+  return magnitude->kind == ExprKind::kIntegerLiteral;
 }
 
 bool Checks(const Expr* e, const BoundScope& scope) {
@@ -62,10 +58,13 @@ bool Checks(const Expr* e, const BoundScope& scope) {
          ExprMentionsAny(e, scope.formals) == scope.formals_only;
 }
 
+// A bound's value: the expression's folded, else the literal's, `$` having
+// none.
 std::optional<int64_t> Fold(const Expr* e, uint32_t value,
                             const BoundScope& scope) {
-  if (e != nullptr) return ConstEvalInt(e, scope.values);
-  if (value == SeqCycleDelay::kUnbounded) return std::nullopt;
+  if (e != nullptr || value == SeqCycleDelay::kUnbounded) {
+    return ConstEvalInt(e, scope.values);
+  }
   return value;
 }
 
@@ -77,12 +76,12 @@ void CheckDelay(const SeqCycleDelay& delay, const BoundScope& scope,
     return;
   }
   const Expr* at = delay.min_expr != nullptr ? delay.min_expr : delay.max_expr;
-  std::optional<int64_t> lo = Fold(delay.min_expr, delay.min, scope);
-  std::optional<int64_t> hi = Fold(delay.max_expr, delay.max, scope);
-  if ((lo.has_value() && *lo < 0) || (hi.has_value() && *hi < 0)) {
+  int64_t lo = Fold(delay.min_expr, delay.min, scope).value_or(0);
+  int64_t hi = Fold(delay.max_expr, delay.max, scope).value_or(INT64_MAX);
+  if (std::min(lo, hi) < 0) {
     diag.Error(at->range.start, "a cycle delay shall be 0 or greater",
                Subclause("16.7"));
-  } else if (lo.has_value() && hi.has_value() && *hi < *lo) {
+  } else if (hi < lo) {
     diag.Error(at->range.start,
                "the maximum of a cycle delay range shall be no less than "
                "its minimum",
@@ -92,32 +91,23 @@ void CheckDelay(const SeqCycleDelay& delay, const BoundScope& scope,
 
 void CheckBodyDelays(const SeqLinearBody& body, const BoundScope& scope,
                      DiagEngine& diag) {
-  for (const SeqCycleDelay& delay : body.delays) {
-    CheckDelay(delay, scope, diag);
-  }
-  for (const SeqLinearBody& inner : body.intersects) {
-    CheckBodyDelays(inner, scope, diag);
-  }
-  for (const SeqLinearBody& inner : body.conjuncts) {
-    CheckBodyDelays(inner, scope, diag);
-  }
-  for (const SeqLinearBody& inner : body.alternatives) {
-    CheckBodyDelays(inner, scope, diag);
-  }
+  ForEachBody(body, [&](const SeqLinearBody& b) {
+    for (const SeqCycleDelay& delay : b.delays) CheckDelay(delay, scope, diag);
+  });
 }
 
 // §16.12.10: the index of nexttime and s_nexttime is a non-negative integer
 // constant expression.
-void CheckNexttime(const PropertyExprNode* node, const BoundScope& scope,
+void CheckNexttime(const PropertyExprNode& node, const BoundScope& scope,
                    DiagEngine& diag) {
-  if (!Checks(node->boolean, scope)) return;
-  std::optional<int64_t> index = ConstEvalInt(node->boolean, scope.values);
+  if (!Checks(node.boolean, scope)) return;
+  std::optional<int64_t> index = ConstEvalInt(node.boolean, scope.values);
   NexttimeIndex folded;
   folded.is_constant = index.has_value();
   folded.is_integer = index.has_value();
   folded.value = index.value_or(0);
   if (IsNexttimeIndexWellFormed(folded)) return;
-  diag.Error(node->boolean->range.start,
+  diag.Error(node.boolean->range.start,
              "the index of nexttime shall be a non-negative integer constant "
              "expression",
              Subclause("16.12.10"));
@@ -136,132 +126,87 @@ AlwaysRangeBound FoldedBound(const Expr* e, const BoundScope& scope) {
 // non-negative integer constant expressions, the minimum no greater than
 // the maximum. A `$` maximum is the parser's to judge, so it is read here as
 // one a weak operator allows.
-void CheckRange(const PropertyExprNode* node, const BoundScope& scope,
+void CheckRange(const PropertyExprNode& node, const BoundScope& scope,
                 DiagEngine& diag) {
-  if (node->range_min == nullptr ||
-      (!Checks(node->range_min, scope) && !Checks(node->range_max, scope))) {
+  if (!Checks(node.range_min, scope) && !Checks(node.range_max, scope)) {
     return;
   }
   AlwaysRange range;
-  range.min = FoldedBound(node->range_min, scope);
-  range.max = node->range_max != nullptr ? FoldedBound(node->range_max, scope)
-                                         : MakeAlwaysDollar();
+  range.min = FoldedBound(node.range_min, scope);
+  range.max = node.range_unbounded ? MakeAlwaysDollar()
+                                   : FoldedBound(node.range_max, scope);
   if (IsAlwaysRangeWellFormed(range, false)) return;
-  bool always = node->kind == PropertyExprNode::Kind::kAlways;
-  diag.Error(node->range_min->range.start,
+  bool always = node.kind == PropertyExprNode::Kind::kAlways;
+  diag.Error(node.range_min->range.start,
              std::string(always ? "always" : "eventually") +
                  " range bounds shall be non-negative integer constant "
                  "expressions, the minimum no greater than the maximum",
              Subclause(always ? "16.12.11" : "16.12.13"));
 }
 
-bool IsName(const Expr* e, std::string_view name) {
-  return e != nullptr && e->kind == ExprKind::kIdentifier && e->text == name;
-}
+// The references to a formal in a declaration: all of them, and those §16.8
+// lets a `$` actual reach, a range's upper bound and an instance's actual
+// argument written whole.
+struct References {
+  int all = 0;
+  int permitted = 0;
+};
 
-bool Mentions(const Expr* e, std::string_view name) {
-  if (e == nullptr) return false;
-  return IsName(e, name) || AnyExprChild(e, [&](const Expr* child) {
-           return Mentions(child, name);
-         });
-}
-
-// Whether `e` reads `name` other than as a whole actual argument of an
-// instance.
-bool ReadsOtherwise(const Expr* e, std::string_view name) {
-  if (e == nullptr) return false;
-  if (IsName(e, name)) return true;
-  if (e->kind != ExprKind::kCall) {
-    return AnyExprChild(
-        e, [&](const Expr* child) { return ReadsOtherwise(child, name); });
-  }
-  for (const Expr* arg : e->args) {
-    if (!IsName(arg, name) && ReadsOtherwise(arg, name)) return true;
-  }
-  return ReadsOtherwise(e->lhs, name);
-}
-
-// Whether the bounds of a cycle delay or a repetition read `name` other than
-// as the whole upper bound of a range, `##d` and `[*d]` standing for the
-// range [d:d] whose lower bound d is.
-bool BoundReadsOtherwise(const SeqCycleDelay& bounds, std::string_view name) {
-  return Mentions(bounds.min_expr, name) ||
-         (!IsName(bounds.max_expr, name) && Mentions(bounds.max_expr, name));
-}
-
-bool BoundsReadOtherwise(const SeqLinearBody& body, std::string_view name) {
-  for (const SeqCycleDelay& delay : body.delays) {
-    if (BoundReadsOtherwise(delay, name)) return true;
-  }
-  for (const SeqRepetition& rep : body.repetitions) {
-    if (BoundReadsOtherwise(rep, name)) return true;
-  }
-  return false;
-}
-
-bool ExprsReadOtherwise(const SeqLinearBody& body, std::string_view name) {
-  for (const Expr* operand : body.operands) {
-    if (ReadsOtherwise(operand, name)) return true;
-  }
-  for (const auto& items : body.match_items) {
-    for (const SeqMatchAssign& item : items) {
-      if (ReadsOtherwise(item.rhs, name) || ReadsOtherwise(item.call, name)) {
-        return true;
-      }
+void CountIn(const Expr* e, std::string_view name, References& refs) {
+  ForEachSubExpr(e, [&](const Expr* sub) {
+    refs.all += static_cast<int>(IsNameRef(sub, name));
+    if (sub->kind != ExprKind::kCall) return;
+    for (const Expr* arg : sub->args) {
+      refs.permitted += static_cast<int>(IsNameRef(arg, name));
     }
-  }
-  for (const SeqThroughout& guard : body.throughouts) {
-    if (ReadsOtherwise(guard.cond, name)) return true;
-  }
-  return false;
+  });
 }
 
-bool BodyReadsOtherwise(const SeqLinearBody& body, std::string_view name) {
-  if (BoundsReadOtherwise(body, name) || ExprsReadOtherwise(body, name)) {
-    return true;
-  }
-  for (const auto* nested :
-       {&body.intersects, &body.conjuncts, &body.alternatives}) {
-    for (const SeqLinearBody& inner : *nested) {
-      if (BodyReadsOtherwise(inner, name)) return true;
+// The bounds of a cycle delay or a repetition, `##d` and `[*d]` standing for
+// the range [d:d], whose lower bound d is.
+void CountBounds(const SeqCycleDelay& bounds, std::string_view name,
+                 References& refs) {
+  CountIn(bounds.min_expr, name, refs);
+  if (bounds.max_expr == bounds.min_expr) return;
+  CountIn(bounds.max_expr, name, refs);
+  refs.permitted += static_cast<int>(IsNameRef(bounds.max_expr, name));
+}
+
+void CountBody(const SeqLinearBody& body, std::string_view name,
+               References& refs) {
+  ForEachBody(body, [&](const SeqLinearBody& b) {
+    for (const SeqCycleDelay& delay : b.delays) CountBounds(delay, name, refs);
+    for (const SeqRepetition& rep : b.repetitions) {
+      CountBounds(rep, name, refs);
     }
-  }
-  return false;
-}
-
-bool TreeReadsOtherwise(const PropertyExprNode* node, std::string_view name) {
-  if (node == nullptr) return false;
-  if (ReadsOtherwise(node->boolean, name) || Mentions(node->range_min, name) ||
-      Mentions(node->range_max, name) ||
-      (node->sequence != nullptr &&
-       BodyReadsOtherwise(node->sequence->seq_linear, name))) {
-    return true;
-  }
-  for (const PropertyExprNode* operand : node->operands) {
-    if (TreeReadsOtherwise(operand, name)) return true;
-  }
-  return false;
-}
-
-// The actual bound to the formal `i` of `decl` by the instance `call`, or by
-// the formal's default.
-const Expr* ActualOf(const Expr* call, const ModuleItem* decl, size_t i) {
-  const Expr* actual = i < call->args.size() ? call->args[i] : nullptr;
-  if (actual == nullptr && i < decl->prop_formal_defaults.size()) {
-    actual = decl->prop_formal_defaults[i];
-  }
-  return actual;
+  });
+  ForEachBodyExpr(body, [&](const Expr* e) { CountIn(e, name, refs); });
 }
 
 // Whether the formal `i` of `decl` may be bound to `$`: untyped, and read
 // only as a range's upper bound or as an instance's actual.
 bool AdmitsDollar(const ModuleItem* decl, size_t i) {
   std::string_view name = decl->prop_formals[i];
-  bool untyped = i < decl->prop_formal_type_kw.size() &&
-                 decl->prop_formal_type_kw[i] == TokenKind::kKwUntyped;
-  return untyped && !BodyReadsOtherwise(decl->seq_linear, name) &&
-         !TreeReadsOtherwise(decl->prop_body_tree, name) &&
-         !ReadsOtherwise(decl->prop_body_expr, name);
+  References refs;
+  CountBody(decl->seq_linear, name, refs);
+  CountIn(decl->prop_body_expr, name, refs);
+  ForEachTreeNode(decl->prop_body_tree, [&](const PropertyExprNode& node) {
+    CountIn(node.boolean, name, refs);
+    CountIn(node.range_min, name, refs);
+    CountIn(node.range_max, name, refs);
+    if (node.sequence != nullptr) {
+      CountBody(node.sequence->seq_linear, name, refs);
+    }
+  });
+  return decl->prop_formal_type_kw[i] == TokenKind::kKwUntyped &&
+         refs.all == refs.permitted;
+}
+
+// The actual bound to the formal `i` of `decl` by the instance `call`, or by
+// the formal's default.
+const Expr* ActualOf(const Expr* call, const ModuleItem* decl, size_t i) {
+  const Expr* actual = i < call->args.size() ? call->args[i] : nullptr;
+  return actual != nullptr ? actual : decl->prop_formal_defaults[i];
 }
 
 // §16.8, and §16.12 for a property: a formal of `decl` bound to `$`, by the
@@ -273,9 +218,8 @@ void CheckDollarActuals(const Expr* call, const ModuleItem* decl,
   const char* clause =
       decl->kind == ModuleItemKind::kSequenceDecl ? "16.8" : "16.12";
   for (size_t i = 0; i < decl->prop_formals.size(); ++i) {
-    if (!IsName(ActualOf(call, decl, i), "$") || AdmitsDollar(decl, i)) {
+    if (!IsNameRef(ActualOf(call, decl, i), "$") || AdmitsDollar(decl, i))
       continue;
-    }
     diag.Error(call->range.start,
                "$ binds the formal '" + std::string(decl->prop_formals[i]) +
                    "' of '" + std::string(decl->name) +
@@ -288,22 +232,6 @@ void CheckDollarActuals(const Expr* call, const ModuleItem* decl,
 
 void CheckOperand(const Expr* e, const BoundScope& scope, BoundEnv& env);
 
-void CheckBodyOperands(const SeqLinearBody& body, const BoundScope& scope,
-                       BoundEnv& env) {
-  for (const Expr* operand : body.operands) {
-    CheckOperand(operand, scope, env);
-  }
-  for (const SeqLinearBody& inner : body.intersects) {
-    CheckBodyOperands(inner, scope, env);
-  }
-  for (const SeqLinearBody& inner : body.conjuncts) {
-    CheckBodyOperands(inner, scope, env);
-  }
-  for (const SeqLinearBody& inner : body.alternatives) {
-    CheckBodyOperands(inner, scope, env);
-  }
-}
-
 // §16.7 and §16.8: an instance of a named sequence settles the bounds its
 // declaration writes with a formal; they are checked with each formal bound
 // to the instance's actual, folded in the scope the instance stands in.
@@ -311,73 +239,57 @@ void CheckInstance(const Expr* call, const ModuleItem* seq,
                    const BoundScope& outer, BoundEnv& env) {
   CheckDollarActuals(call, seq, env.diag);
   ScopeMap values = outer.values;
-  NameSet formals;
+  const NameSet kFormals(seq->prop_formals.begin(), seq->prop_formals.end());
   for (size_t i = 0; i < seq->prop_formals.size(); ++i) {
-    formals.insert(seq->prop_formals[i]);
-    const Expr* actual = ActualOf(call, seq, i);
-    if (actual == nullptr) continue;
-    std::optional<int64_t> value = ConstEvalInt(actual, outer.values);
+    std::optional<int64_t> value =
+        ConstEvalInt(ActualOf(call, seq, i), outer.values);
     if (value.has_value()) values[seq->prop_formals[i]] = *value;
   }
-  if (formals.empty() || !env.active.insert(seq).second) return;
-  const BoundScope kInner{values, formals, true};
+  if (!env.active.insert(seq).second) return;
+  const BoundScope kInner{values, kFormals, true};
   CheckBodyDelays(seq->seq_linear, kInner, env.diag);
-  CheckBodyOperands(seq->seq_linear, kInner, env);
+  ForEachBodyExpr(seq->seq_linear,
+                  [&](const Expr* e) { CheckOperand(e, kInner, env); });
   env.active.erase(seq);
 }
 
 void CheckOperand(const Expr* e, const BoundScope& scope, BoundEnv& env) {
-  if (e == nullptr) return;
-  if (e->kind == ExprKind::kCall) {
-    auto it = env.sequences.find(e->callee);
-    if (it != env.sequences.end()) {
-      CheckInstance(e, it->second, scope, env);
-    }
-  }
-  ForEachExprChild(e,
-                   [&](const Expr* child) { CheckOperand(child, scope, env); });
+  ForEachSubExpr(e, [&](const Expr* sub) {
+    const ModuleItem* decl = InstantiatedDecl(sub, env.decls);
+    if (decl != nullptr) CheckInstance(sub, decl, scope, env);
+  });
 }
 
 void CheckSequenceItem(const ModuleItem* seq, const BoundScope& scope,
                        BoundEnv& env) {
-  if (seq == nullptr) return;
   CheckBodyDelays(seq->seq_linear, scope, env.diag);
-  CheckBodyOperands(seq->seq_linear, scope, env);
+  ForEachBodyExpr(seq->seq_linear,
+                  [&](const Expr* e) { CheckOperand(e, scope, env); });
 }
 
 void CheckTree(const PropertyExprNode* node, const BoundScope& scope,
                BoundEnv& env) {
-  if (node == nullptr) return;
-  using Kind = PropertyExprNode::Kind;
-  if (node->kind == Kind::kNexttime) {
-    CheckNexttime(node, scope, env.diag);
-  } else if (node->kind == Kind::kAlways || node->kind == Kind::kEventually) {
-    CheckRange(node, scope, env.diag);
-  } else {
-    CheckOperand(node->boolean, scope, env);
-  }
-  CheckSequenceItem(node->sequence, scope, env);
-  for (const PropertyExprNode* operand : node->operands) {
-    CheckTree(operand, scope, env);
-  }
-}
-
-void CheckAssertion(const Stmt* s, const BoundScope& scope, BoundEnv& env) {
-  CheckTree(s->assert_property, scope, env);
-  CheckSequenceItem(s->assert_sequence, scope, env);
+  ForEachTreeNode(node, [&](const PropertyExprNode& n) {
+    using Kind = PropertyExprNode::Kind;
+    if (n.kind == Kind::kNexttime) {
+      CheckNexttime(n, scope, env.diag);
+    } else if (n.kind == Kind::kAlways || n.kind == Kind::kEventually) {
+      CheckRange(n, scope, env.diag);
+    } else {
+      CheckOperand(n.boolean, scope, env);
+    }
+    if (n.sequence != nullptr) CheckSequenceItem(n.sequence, scope, env);
+  });
 }
 
 }  // namespace
 
 void ValidateAssertionBoundRules(const ModuleDecl* decl, const ScopeMap& params,
                                  DiagEngine& diag) {
-  const SequenceMap kNamed = NamedDeclsByName(decl, true);
+  const NamedDecls kNamed = NamedDeclsByName(decl, true);
   BoundEnv env{kNamed, diag, {}};
   for (const ModuleItem* item : decl->items) {
-    if (item->kind != ModuleItemKind::kSequenceDecl &&
-        item->kind != ModuleItemKind::kPropertyDecl) {
-      continue;
-    }
+    if (kNamed.count(item->name) == 0) continue;
     const NameSet kFormals(item->prop_formals.begin(),
                            item->prop_formals.end());
     const BoundScope kOwn{params, kFormals, false};
@@ -386,8 +298,12 @@ void ValidateAssertionBoundRules(const ModuleDecl* decl, const ScopeMap& params,
   }
   const NameSet kNone;
   const BoundScope kModule{params, kNone, false};
-  ForEachConcurrentAssertion(
-      decl, [&](const Stmt* s) { CheckAssertion(s, kModule, env); });
+  ForEachConcurrentAssertion(decl, [&](const Stmt* s) {
+    CheckTree(s->assert_property, kModule, env);
+    if (s->assert_sequence != nullptr) {
+      CheckSequenceItem(s->assert_sequence, kModule, env);
+    }
+  });
 }
 
 }  // namespace delta

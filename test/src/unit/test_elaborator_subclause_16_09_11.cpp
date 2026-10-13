@@ -96,4 +96,40 @@ TEST(TriggeredEndingClock, AnEndingClockOtherThanTheContextsIsReported) {
                              13, "16.9.11"));
 }
 
+// §16.9.11: e4 ends on negedge sysclk, not the context's posedge sysclk; e5,
+// multiclocked, ends on posedge sysclk, and e3, with no clock of its own,
+// takes the context's.
+TEST(TriggeredEndingClock, TheEndingClockIsTheLastClockTheSequenceWrites) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, sysclk, a, b;\n"
+      "  sequence e3;\n"
+      "    a ##1 b;\n"
+      "  endsequence\n"
+      "  sequence e4;\n"
+      "    @(negedge sysclk) a ##1 b;\n"
+      "  endsequence\n"
+      "  sequence e5;\n"
+      "    @(posedge clk) a ##1 @(posedge sysclk) b;\n"
+      "  endsequence\n"
+      "  sequence rule3;\n"
+      "    @(posedge sysclk) a ##1 e3.triggered;\n"
+      "  endsequence\n"
+      "  sequence rule4;\n"
+      "    @(posedge sysclk) a ##1 e4.triggered;\n"
+      "  endsequence\n"
+      "  sequence rule5;\n"
+      "    @(posedge sysclk) a ##1 e5.triggered;\n"
+      "  endsequence\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "the ending clock of 'e3'",
+                             13, "16.9.11"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "the ending clock of 'e4'",
+                            16, "16.9.11"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "the ending clock of 'e5'",
+                             19, "16.9.11"));
+}
+
 }  // namespace

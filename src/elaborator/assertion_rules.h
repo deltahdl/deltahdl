@@ -1,8 +1,6 @@
 #pragma once
 
-#include <functional>
 #include <string_view>
-#include <unordered_map>
 #include <unordered_set>
 
 #include "elaborator/const_eval.h"
@@ -22,21 +20,6 @@ struct Stmt;
 // `static`.
 std::unordered_set<std::string_view> CollectItemAutomaticVarNames(
     const ModuleItem* item);
-
-// Each statement of the procedure or the subroutine `item`, the statements
-// nested in them among them, handed to `fn`; none for any other item.
-void ForEachProceduralStmt(const ModuleItem* item,
-                           const std::function<void(const Stmt*)>& fn);
-
-// Each concurrent assertion statement of the module `decl`, at module level
-// or in a procedure or a subroutine, handed to `fn`.
-void ForEachConcurrentAssertion(const ModuleDecl* decl,
-                                const std::function<void(const Stmt*)>& fn);
-
-// The named sequences the module `decl` declares, and its named properties
-// where `with_properties`, by name.
-std::unordered_map<std::string_view, const ModuleItem*> NamedDeclsByName(
-    const ModuleDecl* decl, bool with_properties);
 
 // §16.14.1 and §16.14.3: the first concurrent assert, assume or cover statement
 // the statement `s` holds, `s` itself among them, in source order; null where

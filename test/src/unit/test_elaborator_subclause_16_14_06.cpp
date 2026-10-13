@@ -121,6 +121,7 @@ TEST(ProceduralClockInference, AnAutomaticInTheClockingEventIsReported) {
       "    automatic int k = 1;\n"
       "    a1: assert property (@(posedge clks[k]) a);\n"
       "    a2: assert property (@(posedge clks[0]) a);\n"
+      "    a3: assert property (@(posedge clks[0] iff k == 1) a);\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -128,6 +129,10 @@ TEST(ProceduralClockInference, AnAutomaticInTheClockingEventIsReported) {
                             "a clocking event of a procedural concurrent "
                             "assertion may not reference an automatic variable",
                             6, "16.14.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a clocking event of a procedural concurrent "
+                            "assertion may not reference an automatic variable",
+                            8, "16.14.6"));
   EXPECT_FALSE(
       ReportedError(f.diag.Diagnostics(),
                     "a clocking event of a procedural concurrent "

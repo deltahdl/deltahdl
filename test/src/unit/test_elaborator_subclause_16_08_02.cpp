@@ -78,6 +78,21 @@ TEST(LocalFormalElaboration, AnOutputUnassignedByAMatchIsReported) {
       "  sequence sub2(local output int o);\n"
       "    (a, o = 1) or (b, o = 2);\n"
       "  endsequence\n"
+      "  sequence sub3(local output int o);\n"
+      "    sub2(o);\n"
+      "  endsequence\n"
+      "  sequence sub4(local output int o);\n"
+      "    (a, o = 1)[*0:1] ##1 b;\n"
+      "  endsequence\n"
+      "  sequence sub5(local output int o);\n"
+      "    (a, o = 1)[*1:2];\n"
+      "  endsequence\n"
+      "  sequence sub6(local output int o);\n"
+      "    (a, o = 1) and b;\n"
+      "  endsequence\n"
+      "  sequence sub7(local output int o);\n"
+      "    a and (b, o = 2);\n"
+      "  endsequence\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
@@ -86,6 +101,16 @@ TEST(LocalFormalElaboration, AnOutputUnassignedByAMatchIsReported) {
                             3, "16.8.2"));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "of 'sub2' is unassigned", 6,
                              "16.8.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "of 'sub3' is unassigned", 9,
+                             "16.8.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "of 'sub4' is unassigned", 12,
+                            "16.8.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "of 'sub5' is unassigned",
+                             15, "16.8.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "of 'sub6' is unassigned",
+                             18, "16.8.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "of 'sub7' is unassigned",
+                             21, "16.8.2"));
 }
 
 // §16.8.2: an instance of a sequence with an inout or output local variable
@@ -121,6 +146,11 @@ TEST(LocalFormalElaboration, TriggeredOfAnInstanceWithAnInputLocalIsReported) {
       "    @(posedge clk) a ##1 (x == 1);\n"
       "  endsequence\n"
       "  initial wait (sub(1).triggered);\n"
+      "  sequence sub2(local inout int y);\n"
+      "    @(posedge clk) (a, y += 1);\n"
+      "  endsequence\n"
+      "  int v;\n"
+      "  initial wait (sub2(v).triggered);\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
@@ -128,6 +158,11 @@ TEST(LocalFormalElaboration, TriggeredOfAnInstanceWithAnInputLocalIsReported) {
                             "'sub', which has an input or inout local variable "
                             "formal argument",
                             6, "16.8.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "triggered may not be applied to an instance of "
+                            "'sub2', which has an input or inout local "
+                            "variable formal argument",
+                            11, "16.8.2"));
 }
 
 // §16.8.2: the actual of an input local variable formal argument references

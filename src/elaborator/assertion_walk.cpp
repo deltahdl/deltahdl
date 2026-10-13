@@ -1,0 +1,184 @@
+#include "elaborator/assertion_walk.h"
+
+#include <cstddef>
+#include <functional>
+#include <initializer_list>
+#include <string_view>
+#include <unordered_set>
+#include <vector>
+
+#include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_validate_internal.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
+
+namespace delta {
+
+void ForEachProceduralStmt(const ModuleItem* item,
+                           const std::function<void(const Stmt*)>& fn) {
+  std::function<void(const Stmt*)> visit = [&](const Stmt* s) {
+    if (s == nullptr) return;
+    fn(s);
+    ForEachChildStmt(s, [&](Stmt* const& sub) { visit(sub); });
+  };
+  for (const Stmt* s : item->func_body_stmts) visit(s);
+  if (IsProceduralItemKind(item->kind)) visit(item->body);
+}
+
+void ForEachConcurrentAssertion(const ModuleDecl* decl,
+                                const std::function<void(const Stmt*)>& fn) {
+  for (const ModuleItem* item : decl->items) {
+    if (item->body != nullptr && item->body->is_concurrent_clocked &&
+        !IsProceduralItemKind(item->kind)) {
+      fn(item->body);
+    }
+    ForEachProceduralStmt(item, [&](const Stmt* s) {
+      if (s->is_procedural_concurrent) fn(s);
+    });
+  }
+}
+
+NamedDecls NamedDeclsByName(const ModuleDecl* decl, bool with_properties) {
+  NamedDecls named;
+  for (const ModuleItem* item : decl->items) {
+    if (item->kind == ModuleItemKind::kSequenceDecl ||
+        (with_properties && item->kind == ModuleItemKind::kPropertyDecl)) {
+      named[item->name] = item;
+    }
+  }
+  return named;
+}
+
+void ForEachSubExpr(const Expr* e, const std::function<void(const Expr*)>& fn) {
+  if (e == nullptr) return;
+  fn(e);
+  ForEachExprChild(e, [&](const Expr* child) { ForEachSubExpr(child, fn); });
+}
+
+bool AnySubExpr(const Expr* e, const std::function<bool(const Expr*)>& pred) {
+  if (e == nullptr) return false;
+  return pred(e) || AnyExprChild(e, [&](const Expr* child) {
+           return AnySubExpr(child, pred);
+         });
+}
+
+void ForEachBody(const SeqLinearBody& body,
+                 const std::function<void(const SeqLinearBody&)>& fn) {
+  fn(body);
+  for (const auto* nested :
+       {&body.intersects, &body.conjuncts, &body.alternatives}) {
+    for (const SeqLinearBody& inner : *nested) ForEachBody(inner, fn);
+  }
+}
+
+void ForEachBodyExpr(const SeqLinearBody& body,
+                     const std::function<void(const Expr*)>& fn) {
+  ForEachBody(body, [&](const SeqLinearBody& b) {
+    for (const Expr* operand : b.operands) fn(operand);
+    for (const auto& items : b.match_items) {
+      for (const SeqMatchAssign& item : items) {
+        fn(item.rhs);
+        fn(item.call);
+      }
+    }
+    for (const SeqMatchAssign& item : b.first_match_items) {
+      fn(item.rhs);
+      fn(item.call);
+    }
+    for (const SeqThroughout& guard : b.throughouts) fn(guard.cond);
+  });
+}
+
+void ForEachTreeNode(const PropertyExprNode* node,
+                     const std::function<void(const PropertyExprNode&)>& fn) {
+  if (node == nullptr) return;
+  fn(*node);
+  for (const PropertyExprNode* operand : node->operands) {
+    ForEachTreeNode(operand, fn);
+  }
+}
+
+void ForEachTreeExpr(const PropertyExprNode* node,
+                     const std::function<void(const Expr*)>& fn) {
+  ForEachTreeNode(node, [&](const PropertyExprNode& n) {
+    fn(n.boolean);
+    if (n.sequence != nullptr) ForEachBodyExpr(n.sequence->seq_linear, fn);
+  });
+}
+
+const ModuleItem* InstantiatedDecl(const Expr* e, const NamedDecls& decls) {
+  std::string_view name = e->kind == ExprKind::kCall ? e->callee : e->text;
+  auto it = decls.find(name);
+  return it == decls.end() ? nullptr : it->second;
+}
+
+bool IsNameRef(const Expr* e, std::string_view name) {
+  return e != nullptr && e->kind == ExprKind::kIdentifier && e->text == name;
+}
+
+bool IsLocalRef(const Expr* e,
+                const std::unordered_set<std::string_view>& locals) {
+  return e != nullptr && e->kind == ExprKind::kIdentifier &&
+         locals.count(e->text) != 0;
+}
+
+bool RepeatedFromZero(const SeqLinearBody& body, size_t i) {
+  const SeqRepetition& rep = body.repetitions[i];
+  return rep.kind != SeqRepetition::Kind::kNone && rep.min_expr == nullptr &&
+         rep.min == 0;
+}
+
+std::string_view SequenceMethodOf(const Expr* e) {
+  if (e->kind != ExprKind::kMemberAccess) return {};
+  std::string_view method = e->rhs->text;
+  return method == "triggered" || method == "matched" ? method : "";
+}
+
+std::vector<Direction> LocalFormalDirections(const ModuleItem* seq) {
+  std::vector<Direction> dirs(seq->prop_formals.size(), Direction::kNone);
+  auto next = seq->prop_seq_local_lvar_directions.begin();
+  for (size_t i = 0; i < dirs.size(); ++i) {
+    if (!seq->prop_formal_is_local[i]) continue;
+    bool written = next != seq->prop_seq_local_lvar_directions.end();
+    dirs[i] = written ? *next++ : Direction::kInput;
+  }
+  return dirs;
+}
+
+bool EventsMention(const std::vector<EventExpr>& events,
+                   const std::unordered_set<std::string_view>& names) {
+  for (const EventExpr& ev : events) {
+    if (ExprMentionsAny(ev.signal, names) ||
+        ExprMentionsAny(ev.iff_condition, names)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool IsOutward(Direction dir) {
+  return dir == Direction::kInout || dir == Direction::kOutput;
+}
+
+bool ItemsAssign(const std::vector<SeqMatchAssign>& items,
+                 std::string_view name) {
+  for (const SeqMatchAssign& item : items) {
+    if (item.lvar == name) return true;
+  }
+  return false;
+}
+
+bool BodyAssigns(const SeqLinearBody& body, std::string_view name) {
+  bool assigns = false;
+  ForEachBody(body, [&](const SeqLinearBody& b) {
+    if (ItemsAssign(b.first_match_items, name)) assigns = true;
+    for (const auto& items : b.match_items) {
+      if (ItemsAssign(items, name)) assigns = true;
+    }
+  });
+  return assigns;
+}
+
+}  // namespace delta

@@ -1,17 +1,14 @@
 #include "elaborator/assertion_rules.h"
 
-#include <algorithm>
 #include <format>
-#include <functional>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
-#include "elaborator/elaborator_helpers.h"
+#include "elaborator/assertion_walk.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/property_rewrite.h"
 #include "parser/ast_expr.h"
@@ -88,16 +85,11 @@ void CheckActionBlock(const Stmt* pass, const Stmt* fail, SourceLoc loc,
 void CheckClockAutomatics(
     const Stmt* s, const std::unordered_set<std::string_view>& automatics,
     DiagEngine& diag) {
-  for (const EventExpr& ev : s->assert_clock) {
-    if (ExprMentionsAny(ev.signal, automatics) ||
-        ExprMentionsAny(ev.iff_condition, automatics)) {
-      diag.Error(s->range.start,
-                 "a clocking event of a procedural concurrent assertion may "
-                 "not reference an automatic variable",
-                 Subclause("16.14.6"));
-      return;
-    }
-  }
+  if (!EventsMention(s->assert_clock, automatics)) return;
+  diag.Error(s->range.start,
+             "a clocking event of a procedural concurrent assertion may not "
+             "reference an automatic variable",
+             Subclause("16.14.6"));
 }
 
 // The clock a sequence or property declaration writes itself, empty where
@@ -107,47 +99,21 @@ const std::vector<EventExpr>& DeclaredClock(const ModuleItem* decl) {
                                                      : decl->prop_clock;
 }
 
-// The names `e` writes, as identifiers or as callees, added to `out` once
-// each.
-void CollectNames(const Expr* e, std::vector<std::string_view>& out) {
-  if (e == nullptr) return;
-  std::string_view name = e->kind == ExprKind::kCall         ? e->callee
-                          : e->kind == ExprKind::kIdentifier ? e->text
-                                                             : "";
-  if (!name.empty() && std::ranges::find(out, name) == out.end()) {
-    out.push_back(name);
-  }
-  ForEachExprChild(e, [&](const Expr* child) { CollectNames(child, out); });
-}
-
-void CollectTreeNames(const PropertyExprNode* node,
-                      std::vector<std::string_view>& out) {
-  if (node == nullptr) return;
-  CollectNames(node->boolean, out);
-  if (node->sequence != nullptr) {
-    for (const Expr* operand : node->sequence->seq_linear.operands) {
-      CollectNames(operand, out);
-    }
-  }
-  for (const PropertyExprNode* operand : node->operands) {
-    CollectTreeNames(operand, out);
-  }
-}
-
-// The names the body of the sequence or property declaration `decl` writes,
-// among which its instances stand: the body scan records an instance written
-// with an argument list, and the parsed body one written as a bare name.
-std::vector<std::string_view> BodyNames(const ModuleItem* decl) {
-  std::vector<std::string_view> names;
-  for (std::string_view ref : decl->prop_instance_refs) {
-    if (std::ranges::find(names, ref) == names.end()) names.push_back(ref);
-  }
-  CollectNames(decl->prop_body_expr, names);
-  CollectTreeNames(decl->prop_body_tree, names);
-  for (const Expr* operand : decl->seq_linear.operands) {
-    CollectNames(operand, names);
-  }
-  return names;
+// The declarations of `outside` the body of the sequence or property
+// declaration `decl` instantiates, written as calls or as bare names.
+std::vector<const ModuleItem*> InstancesInBody(const ModuleItem* decl,
+                                               const NamedDecls& outside) {
+  std::vector<const ModuleItem*> found;
+  auto note = [&](const Expr* e) {
+    ForEachSubExpr(e, [&](const Expr* sub) {
+      const ModuleItem* named = InstantiatedDecl(sub, outside);
+      if (named != nullptr) found.push_back(named);
+    });
+  };
+  note(decl->prop_body_expr);
+  ForEachTreeExpr(decl->prop_body_tree, note);
+  ForEachBodyExpr(decl->seq_linear, note);
+  return found;
 }
 
 // Whether the declaration `decl` is clocked on `block_clock` alone: written
@@ -164,22 +130,17 @@ bool ClockedOnAlone(const ModuleItem* decl, const EventExpr& block_clock) {
 // of a named sequence or property declared outside it is singly clocked, on
 // an event identical to the block's; one declared with no clock takes the
 // block's. `outside` holds the declarations of the module by name.
-void CheckClockingBlockInstances(
-    const ModuleItem* block,
-    const std::unordered_map<std::string_view, const ModuleItem*>& outside,
-    DiagEngine& diag) {
+void CheckClockingBlockInstances(const ModuleItem* block,
+                                 const NamedDecls& outside, DiagEngine& diag) {
   if (block->clocking_event.size() != 1) return;
   const EventExpr& block_clock = block->clocking_event[0];
   for (const ModuleItem* inner : block->clocking_decls) {
-    for (std::string_view name : BodyNames(inner)) {
-      auto it = outside.find(name);
-      if (it == outside.end() || ClockedOnAlone(it->second, block_clock)) {
-        continue;
-      }
+    for (const ModuleItem* named : InstancesInBody(inner, outside)) {
+      if (ClockedOnAlone(named, block_clock)) continue;
       diag.Error(inner->loc,
                  std::format("the instance of '{}' in clocking block '{}' is "
                              "not clocked on the block's clocking event alone",
-                             name, block->name),
+                             named->name, block->name),
                  Subclause("16.16"));
     }
   }
@@ -246,47 +207,10 @@ void CheckProceduralAssertions(const ModuleItem* item,
 
 }  // namespace
 
-void ForEachProceduralStmt(const ModuleItem* item,
-                           const std::function<void(const Stmt*)>& fn) {
-  std::function<void(const Stmt*)> visit = [&](const Stmt* s) {
-    if (s == nullptr) return;
-    fn(s);
-    ForEachChildStmt(s, [&](Stmt* const& sub) { visit(sub); });
-  };
-  for (const Stmt* s : item->func_body_stmts) visit(s);
-  if (IsProceduralItemKind(item->kind)) visit(item->body);
-}
-
-void ForEachConcurrentAssertion(const ModuleDecl* decl,
-                                const std::function<void(const Stmt*)>& fn) {
-  for (const ModuleItem* item : decl->items) {
-    if (item->body != nullptr && item->body->is_concurrent_clocked &&
-        !IsProceduralItemKind(item->kind)) {
-      fn(item->body);
-    }
-    ForEachProceduralStmt(item, [&](const Stmt* s) {
-      if (s->is_procedural_concurrent) fn(s);
-    });
-  }
-}
-
-std::unordered_map<std::string_view, const ModuleItem*> NamedDeclsByName(
-    const ModuleDecl* decl, bool with_properties) {
-  std::unordered_map<std::string_view, const ModuleItem*> named;
-  for (const ModuleItem* item : decl->items) {
-    if (item->kind == ModuleItemKind::kSequenceDecl ||
-        (with_properties && item->kind == ModuleItemKind::kPropertyDecl)) {
-      named[item->name] = item;
-    }
-  }
-  return named;
-}
-
 void ValidateAssertionRules(const ModuleDecl* decl,
                             const PropertyRegistry& registry,
                             DiagEngine& diag) {
-  const std::unordered_map<std::string_view, const ModuleItem*> kDeclared =
-      NamedDeclsByName(decl, true);
+  const NamedDecls kDeclared = NamedDeclsByName(decl, true);
   for (const ModuleItem* item : decl->items) {
     if (item->kind == ModuleItemKind::kClockingBlock) {
       CheckClockingBlockInstances(item, kDeclared, diag);

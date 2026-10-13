@@ -275,11 +275,26 @@ TEST(SequenceDollarActual, ATypedOrOperandFormalIsReported) {
       "  a1: assert property (@(posedge clk) s1($));\n"
       "  a2: assert property (@(posedge clk) s2($));\n"
       "  a3: assert property (@(posedge clk) s3($));\n"
+      "  sequence s4(k, j);\n"
+      "    a ##[j:$] b ##[1:k] b;\n"
+      "  endsequence\n"
+      "  sequence s5(x, m = $);\n"
+      "    a ##[1:m] x;\n"
+      "  endsequence\n"
+      "  sequence s6(k);\n"
+      "    a ##1 s3(k);\n"
+      "  endsequence\n"
+      "  a4: assert property (@(posedge clk) s4($, 1));\n"
+      "  a5: assert property (@(posedge clk) s5(b));\n"
+      "  a6: assert property (@(posedge clk) s6($));\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 12, "16.8"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 13, "16.8"));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 14, "16.8"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 24, "16.8"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 25, "16.8"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 26, "16.8"));
 }
 
 }  // namespace

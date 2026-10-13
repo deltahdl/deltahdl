@@ -233,9 +233,13 @@ TEST(SequenceMethods, TriggeredOfAnUnclockedSequenceInADisableIsReported) {
       "  endsequence\n"
       "  a1: assert property (@(posedge clk) disable iff (s.triggered) c);\n"
       "  a2: assert property (@(posedge clk) disable iff (t.triggered) c);\n"
+      "  event ev;\n"
+      "  a3: assert property (@(posedge clk) disable iff (ev.triggered) c);\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 9, "16.13.6"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "triggered of the sequence",
+                             12, "16.13.6"));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "triggered of the sequence",
                              10, "16.13.6"));
 }
@@ -276,12 +280,24 @@ TEST(SequenceMethods, ACycleThroughTriggeredIsReported) {
       "  sequence s2;\n"
       "    @(posedge clk) a ##1 s1.triggered;\n"
       "  endsequence\n"
+      "  sequence s3;\n"
+      "    @(posedge clk) a ##1 s4.triggered;\n"
+      "  endsequence\n"
+      "  sequence s4;\n"
+      "    @(posedge clk) s5 ##1 s5;\n"
+      "  endsequence\n"
+      "  sequence s5;\n"
+      "    @(posedge clk) a;\n"
+      "  endsequence\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "the sequence 's1' depends on its own end point "
                             "through triggered",
                             3, "16.13.6"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "the sequence 's3' depends on its own end point",
+                             9, "16.13.6"));
 }
 
 // §16.13.6: matched stands only in a sequence expression, not in a wait or in

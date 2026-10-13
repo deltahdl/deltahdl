@@ -198,6 +198,7 @@ TEST(SampledValueRules, APastNumberOfTicksIsAConstantOfOneOrMore) {
       "  a1: assert property (@(posedge clk) $past(a, Z) == b);\n"
       "  a2: assert property (@(posedge clk) $past(a, k) == b);\n"
       "  a3: assert property (@(posedge clk) $past(a, N) == b);\n"
+      "  a4: assert property (@(posedge clk) $past(a, , b) == b);\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
@@ -210,6 +211,8 @@ TEST(SampledValueRules, APastNumberOfTicksIsAConstantOfOneOrMore) {
                             7, "16.9.3"));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "number_of_ticks of $past",
                              8, "16.9.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "number_of_ticks of $past",
+                             9, "16.9.3"));
 }
 
 // §16.9.3: an automatic variable may stand in $past's expression1 but not in
@@ -226,11 +229,16 @@ TEST(SampledValueRules, AnAutomaticInPastsGateIsReported) {
       "    automatic logic g = a;\n"
       "    a1: assert property ($past(b, 1, g) == a);\n"
       "    a2: assert property ($past(g, 1, b) == a);\n"
+      "    a3: assert property ($rose(b, @(posedge g)));\n"
       "  end\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 5, "16.9.3"));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 6, "16.9.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "an automatic variable may not stand in the "
+                            "clocking event or the expression2 of $rose",
+                            7, "16.9.3"));
 }
 
 // §16.9.3: outside an assertion, a sampled value function with no clocking

@@ -187,6 +187,10 @@ TEST(LocalVariableFlow, ALocalInsideAnActualOfTriggeredIsReported) {
       "    int v1;\n"
       "    (c, v1 = 0) ##1 sub(v1).triggered;\n"
       "  endsequence\n"
+      "  sequence top3;\n"
+      "    int v1;\n"
+      "    (c, v1 = 0) ##1 sub(v1 + 1).matched;\n"
+      "  endsequence\n"
       "endmodule\n",
       f);
   const char* const kReport =
@@ -194,6 +198,11 @@ TEST(LocalVariableFlow, ALocalInsideAnActualOfTriggeredIsReported) {
       "shall be an entire actual argument";
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 9, "16.10"));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 13, "16.10"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a local variable passed to an instance that "
+                            "matched is applied to shall be an entire actual "
+                            "argument",
+                            17, "16.13.5"));
 }
 
 // §16.10: where triggered is applied to an instance and a local is the entire
@@ -212,12 +221,20 @@ TEST(LocalVariableFlow, TriggeredOnASequenceReadingTheFormalFirstIsReported) {
       "    int v1;\n"
       "    (c, v1 = 1) ##1 sub(v1).triggered;\n"
       "  endsequence\n"
+      "  sequence top2;\n"
+      "    int v1;\n"
+      "    (c, v1 = 1) ##1 sub(v1).matched;\n"
+      "  endsequence\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "'sub' references its formal 'lv', bound to the "
                             "local variable 'v1', before it assigns it",
                             9, "16.10"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'sub' references its formal 'lv', bound to the "
+                            "local variable 'v1', before it assigns it",
+                            13, "16.13.5"));
 }
 
 // §16.10: a local variable assignment is not attached to a sequence that

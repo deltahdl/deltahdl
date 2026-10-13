@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
@@ -12,6 +13,7 @@
 #include "common/source_loc.h"
 #include "elaborator/assertion_body_slots.h"
 #include "elaborator/assertion_rules.h"
+#include "elaborator/assertion_walk.h"
 #include "elaborator/concurrent_assertion_expr.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_helpers.h"
@@ -71,14 +73,6 @@ bool IsSampledValueFunction(const Expr* e) {
          n == "$changed" || n == "$past";
 }
 
-// The sequence method, `triggered` or `matched`, `e` applies, empty where it
-// applies none.
-std::string_view SequenceMethodOf(const Expr* e) {
-  if (e->kind != ExprKind::kMemberAccess || e->rhs == nullptr) return {};
-  std::string_view method = e->rhs->text;
-  return method == "triggered" || method == "matched" ? method : "";
-}
-
 bool ReadsMatched(const Expr* e) {
   if (e == nullptr) return false;
   if (SequenceMethodOf(e) == "matched") return true;
@@ -129,15 +123,11 @@ void CheckPastTicks(const Expr* call, const RuleEnv& env) {
 // in its expression2 or in the clocking event of a sampled value function.
 void CheckSampledAutomatics(const Expr* call, const Site& site,
                             DiagEngine& diag) {
+  if (site.automatics == nullptr) return;
   bool in_gate = call->callee == "$past" && call->args.size() > 2 &&
-                 MentionsAny(call->args[2], site.automatics);
-  bool in_clock = false;
-  if (call->sampled_clock != nullptr) {
-    for (const EventExpr& ev : *call->sampled_clock) {
-      in_clock = in_clock || MentionsAny(ev.signal, site.automatics) ||
-                 MentionsAny(ev.iff_condition, site.automatics);
-    }
-  }
+                 ExprMentionsAny(call->args[2], *site.automatics);
+  bool in_clock = call->sampled_clock != nullptr &&
+                  EventsMention(*call->sampled_clock, *site.automatics);
   if (!in_gate && !in_clock) return;
   diag.Error(call->range.start,
              "an automatic variable may not stand in the clocking event or "
@@ -166,13 +156,10 @@ void CheckSampledClock(const Expr* call, const Site& site, DiagEngine& diag) {
 // §16.13.6: `triggered` in a disable condition applies to a sequence with an
 // explicit clocking event, none being inferred there.
 void CheckDisableTriggered(const Expr* e, const RuleEnv& env) {
-  if (e->lhs == nullptr) return;
-  std::string_view name =
-      e->lhs->kind == ExprKind::kCall ? e->lhs->callee : e->lhs->text;
-  auto it = env.sequences.find(name);
-  if (it == env.sequences.end() || !it->second->seq_clock.empty()) return;
+  const ModuleItem* seq = InstantiatedDecl(e->lhs, env.sequences);
+  if (seq == nullptr || !seq->seq_clock.empty()) return;
   env.diag.Error(e->range.start,
-                 "triggered of the sequence '" + std::string(name) +
+                 "triggered of the sequence '" + std::string(seq->name) +
                      "', which has no explicit clocking event, may not stand "
                      "in a disable condition",
                  Subclause("16.13.6"));
@@ -197,40 +184,6 @@ void CheckAbortCondition(const Expr* root, const Site& site, DiagEngine& diag) {
              Subclause("16.12.14"));
 }
 
-bool IsName(const Expr* e, std::string_view name) {
-  return e != nullptr && e->kind == ExprKind::kIdentifier && e->text == name;
-}
-
-// §16.8.2: the direction of each formal of `seq` declared a local variable
-// formal argument, input where none is written; kNone for any other formal.
-std::vector<Direction> LocalFormalDirections(const ModuleItem* seq) {
-  std::vector<Direction> dirs(seq->prop_formals.size(), Direction::kNone);
-  size_t next = 0;
-  for (size_t i = 0; i < dirs.size() && i < seq->prop_formal_is_local.size();
-       ++i) {
-    if (!seq->prop_formal_is_local[i]) continue;
-    Direction dir = next < seq->prop_seq_local_lvar_directions.size()
-                        ? seq->prop_seq_local_lvar_directions[next]
-                        : Direction::kInput;
-    ++next;
-    dirs[i] = dir == Direction::kNone ? Direction::kInput : dir;
-  }
-  return dirs;
-}
-
-bool IsOutward(Direction dir) {
-  return dir == Direction::kInout || dir == Direction::kOutput;
-}
-
-const ModuleItem* NamedSequence(const Expr* e, const RuleEnv& env) {
-  if (e == nullptr) return nullptr;
-  std::string_view name = e->kind == ExprKind::kCall         ? e->callee
-                          : e->kind == ExprKind::kIdentifier ? e->text
-                                                             : "";
-  auto it = env.sequences.find(name);
-  return it == env.sequences.end() ? nullptr : it->second;
-}
-
 // §16.8.2: the actual of an inout or output local variable formal is, in its
 // entirety, a reference to a local variable in scope at the instance, no
 // local variable is the actual of two of them, and an instance of a sequence
@@ -240,14 +193,12 @@ void CheckLocalActuals(const Expr* call, const ModuleItem* seq,
   std::vector<Direction> dirs = LocalFormalDirections(seq);
   NameSet bound;
   bool outward = false;
-  for (size_t i = 0; i < dirs.size(); ++i) {
+  size_t written = std::min(dirs.size(), call->args.size());
+  for (size_t i = 0; i < written; ++i) {
     if (!IsOutward(dirs[i])) continue;
     outward = true;
-    const Expr* actual = i < call->args.size() ? call->args[i] : nullptr;
-    bool local = actual != nullptr && actual->kind == ExprKind::kIdentifier &&
-                 site.locals != nullptr &&
-                 site.locals->count(actual->text) != 0;
-    if (!local) {
+    const Expr* actual = call->args[i];
+    if (!IsLocalRef(actual, *site.locals)) {
       env.diag.Error(call->range.start,
                      "the actual of the inout or output local variable formal "
                      "'" +
@@ -274,35 +225,12 @@ void CheckLocalActuals(const Expr* call, const ModuleItem* seq,
   }
 }
 
-// Whether a match item of `body` assigns one of `formals`.
-bool ItemsAssignAny(const std::vector<SeqMatchAssign>& items,
-                    const NameSet& names) {
-  for (const SeqMatchAssign& item : items) {
-    if (!item.init && names.count(item.lvar) != 0) return true;
-  }
-  return false;
-}
-
-bool AssignsAny(const SeqLinearBody& body, const NameSet& formals) {
-  if (ItemsAssignAny(body.first_match_items, formals)) return true;
-  for (const auto& items : body.match_items) {
-    if (ItemsAssignAny(items, formals)) return true;
-  }
-  for (const auto* nested :
-       {&body.intersects, &body.conjuncts, &body.alternatives}) {
-    for (const SeqLinearBody& inner : *nested) {
-      if (AssignsAny(inner, formals)) return true;
-    }
-  }
-  return false;
-}
-
 // §16.8.2: triggered and matched apply to no instance of a sequence with an
 // input or inout local variable formal argument.
 void CheckLocalFormalsOfMethod(const Expr* e, const ModuleItem* seq,
                                const RuleEnv& env) {
   for (Direction dir : LocalFormalDirections(seq)) {
-    if (dir != Direction::kInput && dir != Direction::kInout) continue;
+    if (dir == Direction::kNone || dir == Direction::kOutput) continue;
     env.diag.Error(e->range.start,
                    std::string(SequenceMethodOf(e)) +
                        " may not be applied to an instance of '" +
@@ -319,11 +247,10 @@ void CheckLocalFormalsOfMethod(const Expr* e, const ModuleItem* seq,
 // never a proper subexpression of one.
 void CheckLocalsInMethodActuals(const Expr* e, const Site& site,
                                 const RuleEnv& env) {
-  const Expr* call = e->lhs;
-  if (call == nullptr || call->kind != ExprKind::kCall) return;
-  for (const Expr* arg : call->args) {
-    bool whole = arg != nullptr && arg->kind == ExprKind::kIdentifier;
-    if (whole || !MentionsAny(arg, site.locals)) continue;
+  for (const Expr* arg : e->lhs->args) {
+    if (!MentionsAny(arg, site.locals) || arg->kind == ExprKind::kIdentifier) {
+      continue;
+    }
     bool matched = SequenceMethodOf(e) == "matched";
     env.diag.Error(arg->range.start,
                    "a local variable passed to an instance that " +
@@ -340,14 +267,17 @@ void CheckMethodContext(const Expr* e, const ModuleItem* seq, const Site& site,
                         const RuleEnv& env) {
   bool matched = SequenceMethodOf(e) == "matched";
   bool in_sequence = site.in_assertion && site.place == Place::kOperand;
-  if (matched && !in_sequence && site.place != Place::kAbort) {
+  if (matched && !in_sequence) {
     env.diag.Error(e->range.start,
                    "matched may be used only in a sequence expression",
                    Subclause("16.13.6"));
   }
   if (matched || site.in_assertion || seq == nullptr) return;
-  const NameSet kFormals(seq->prop_formals.begin(), seq->prop_formals.end());
-  if (!AssignsAny(seq->seq_linear, kFormals)) return;
+  bool assigns = false;
+  for (std::string_view formal : seq->prop_formals) {
+    if (BodyAssigns(seq->seq_linear, formal)) assigns = true;
+  }
+  if (!assigns) return;
   env.diag.Error(e->range.start,
                  "triggered may not be applied outside a sequence expression "
                  "to '" +
@@ -357,7 +287,7 @@ void CheckMethodContext(const Expr* e, const ModuleItem* seq, const Site& site,
 }
 
 void CheckMethodOperand(const Expr* e, const Site& site, const RuleEnv& env) {
-  const ModuleItem* seq = NamedSequence(e->lhs, env);
+  const ModuleItem* seq = InstantiatedDecl(e->lhs, env.sequences);
   CheckMethodContext(e, seq, site, env);
   if (seq == nullptr) return;
   CheckLocalFormalsOfMethod(e, seq, env);
@@ -366,22 +296,17 @@ void CheckMethodOperand(const Expr* e, const Site& site, const RuleEnv& env) {
 
 bool IsFutureGclkCall(const Expr* e) {
   GlobalClockingSampledFunction fn{};
-  return e != nullptr && e->kind == ExprKind::kSystemCall &&
-         ClassifyGlobalClockingSampledFunction(e->callee, fn) &&
+  return ClassifyGlobalClockingSampledFunction(e->callee, fn) &&
          IsGlobalClockingFutureFunction(fn);
-}
-
-bool HoldsFutureGclk(const Expr* e) {
-  return e != nullptr &&
-         (IsFutureGclkCall(e) ||
-          AnyExprChild(e, [](const Expr* c) { return HoldsFutureGclk(c); }));
 }
 
 // §16.9.4: no global clocking future sampled value function stands in the
 // argument of another.
 void CheckFutureGclkNesting(const Expr* call, DiagEngine& diag) {
   bool nested = false;
-  for (const Expr* arg : call->args) nested = nested || HoldsFutureGclk(arg);
+  for (const Expr* arg : call->args) {
+    if (AnySubExpr(arg, IsFutureGclkCall)) nested = true;
+  }
   if (GlobalClockingFutureFunctionNestingAllowed(nested)) return;
   diag.Error(call->range.start,
              "a global clocking future sampled value function may not stand "
@@ -405,7 +330,7 @@ void CheckSubexpressions(const Expr* e, const Site& site, const RuleEnv& env) {
   if (!SequenceMethodOf(e).empty()) CheckMethodOperand(e, site, env);
   if (IsFutureGclkCall(e)) CheckFutureGclkNesting(e, env.diag);
   if (e->kind == ExprKind::kCall) {
-    const ModuleItem* seq = NamedSequence(e, env);
+    const ModuleItem* seq = InstantiatedDecl(e, env.sequences);
     if (seq != nullptr) CheckLocalActuals(e, seq, site, env);
   }
   ForEachExprChild(
@@ -453,9 +378,9 @@ void CheckAttachedCall(const Expr* call, const Site& site, const RuleEnv& env) {
   auto it = env.subroutines.find(call->callee);
   if (it == env.subroutines.end()) return;
   const std::vector<FunctionArg>& formals = it->second->func_args;
-  for (size_t i = 0; i < formals.size() && i < call->args.size(); ++i) {
+  size_t written = std::min(formals.size(), call->args.size());
+  for (size_t i = 0; i < written; ++i) {
     const Expr* arg = call->args[i];
-    if (arg == nullptr) continue;
     SubroutineArgPassing passing = PassingOf(formals[i]);
     if (!IsLocalVarArgPassingLegal(MentionsAny(arg, site.locals), passing)) {
       ReportAttachedArg(call, arg,
@@ -516,10 +441,8 @@ void CheckBody(const SeqLinearBody& body, const Site& site,
                const RuleEnv& env) {
   for (size_t i = 0; i < body.operands.size(); ++i) {
     CheckRoot(body.operands[i], site, env);
-    if (i < body.match_items.size() && body.operands[i] != nullptr) {
-      CheckEmptyMatchItems(body.match_items[i], body.operands[i]->range.start,
-                           env.diag);
-    }
+    CheckEmptyMatchItems(body.match_items[i], body.operands[i]->range.start,
+                         env.diag);
   }
   for (const auto& items : body.match_items) CheckMatchItems(items, site, env);
   CheckMatchItems(body.first_match_items, site, env);
@@ -573,9 +496,7 @@ NameSet DeclLocals(const ModuleItem* decl) {
   for (const SeqLocalDecl& local : decl->prop_locals) locals.insert(local.name);
   locals.insert(decl->prop_seq_assert_vars.begin(),
                 decl->prop_seq_assert_vars.end());
-  for (size_t i = 0;
-       i < decl->prop_formals.size() && i < decl->prop_formal_is_local.size();
-       ++i) {
+  for (size_t i = 0; i < decl->prop_formals.size(); ++i) {
     if (decl->prop_formal_is_local[i]) locals.insert(decl->prop_formals[i]);
   }
   return locals;
@@ -588,12 +509,12 @@ bool AssignedOnEveryMatch(const SeqLinearBody& body, std::string_view name,
 // one of its inout or output local variable formal arguments.
 bool InstanceAssigns(const Expr* operand, std::string_view name,
                      const RuleEnv& env) {
-  if (operand == nullptr || operand->kind != ExprKind::kCall) return false;
-  const ModuleItem* seq = NamedSequence(operand, env);
+  const ModuleItem* seq = InstantiatedDecl(operand, env.sequences);
   if (seq == nullptr) return false;
   std::vector<Direction> dirs = LocalFormalDirections(seq);
-  for (size_t j = 0; j < dirs.size() && j < operand->args.size(); ++j) {
-    if (IsOutward(dirs[j]) && IsName(operand->args[j], name)) return true;
+  size_t written = std::min(dirs.size(), operand->args.size());
+  for (size_t j = 0; j < written; ++j) {
+    if (IsOutward(dirs[j]) && IsNameRef(operand->args[j], name)) return true;
   }
   return false;
 }
@@ -604,16 +525,8 @@ bool InstanceAssigns(const Expr* operand, std::string_view name,
 // zero has a match that assigns nothing.
 bool OperandAssigns(const SeqLinearBody& body, size_t i, std::string_view name,
                     const RuleEnv& env) {
-  if (i < body.repetitions.size()) {
-    const SeqRepetition& rep = body.repetitions[i];
-    if (rep.kind != SeqRepetition::Kind::kNone && rep.min_expr == nullptr &&
-        rep.min == 0) {
-      return false;
-    }
-  }
-  const NameSet kName{name};
-  return (i < body.match_items.size() &&
-          ItemsAssignAny(body.match_items[i], kName)) ||
+  if (RepeatedFromZero(body, i)) return false;
+  return ItemsAssign(body.match_items[i], name) ||
          InstanceAssigns(body.operands[i], name, env);
 }
 
@@ -622,7 +535,7 @@ bool OperandAssigns(const SeqLinearBody& body, size_t i, std::string_view name,
 // with, and in every alternative of a top-level or.
 bool AssignedOnEveryMatch(const SeqLinearBody& body, std::string_view name,
                           const RuleEnv& env) {
-  bool assigned = ItemsAssignAny(body.first_match_items, NameSet{name});
+  bool assigned = ItemsAssign(body.first_match_items, name);
   for (size_t i = 0; i < body.operands.size() && !assigned; ++i) {
     assigned = OperandAssigns(body, i, name, env);
   }

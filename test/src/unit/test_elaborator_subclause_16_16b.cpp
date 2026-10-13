@@ -201,4 +201,41 @@ TEST(ClockResolutionElaboration,
                              13, "16.16"));
 }
 
+// §16.16 (b)(3): so is an outside sequence on another signal's edge, s9, and
+// an outside property clocked twice, q11, while q10, on the block's own
+// event, is legal.
+TEST(ClockResolutionElaboration, AnOutsideInstanceOnAnotherClockIsReported) {
+  const char* const kReport =
+      "is not clocked on the block's clocking event alone";
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, clk2, b;\n"
+      "  sequence s9;\n"
+      "    @(posedge clk2) b;\n"
+      "  endsequence\n"
+      "  property q10;\n"
+      "    @(posedge clk) b;\n"
+      "  endproperty\n"
+      "  property q11;\n"
+      "    @(posedge clk) b |=> @(negedge clk) b;\n"
+      "  endproperty\n"
+      "  clocking cb @(posedge clk);\n"
+      "    property q12;\n"
+      "      s9;\n"
+      "    endproperty\n"
+      "    property q13;\n"
+      "      q10;\n"
+      "    endproperty\n"
+      "    property q14;\n"
+      "      q11;\n"
+      "    endproperty\n"
+      "  endclocking\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 13, "16.16"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 16, "16.16"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 19, "16.16"));
+}
+
 }  // namespace
