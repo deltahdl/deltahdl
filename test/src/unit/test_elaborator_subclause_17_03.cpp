@@ -244,7 +244,8 @@ TEST(ProceduralCheckerInstantiation, NotInAForkBlock) {
 }
 
 // §17.3: each output actual of a checker instance is a variable or net
-// lvalue: f & g is neither, while h and the concatenation {g, h} are.
+// lvalue: f & g is neither, while h, the concatenation {g, h}, the element
+// arr[0] and the member st.x are, and u4 leaves `both` unconnected.
 TEST(CheckerActuals, AnOutputActualThatIsNoLvalueIsReported) {
   const char* const kReport =
       "the output actual of the formal 'failure' of checker 'c' is neither a "
@@ -258,8 +259,16 @@ TEST(CheckerActuals, AnOutputActualThatIsNoLvalueIsReported) {
       "  logic clk, f, g, h;\n"
       "  c u1(posedge clk, f & g, h);\n"
       "  c u2(.clk(posedge clk), .failure(f), .both({g, h}));\n"
+      "  logic arr [2];\n"
+      "  struct packed { logic x; logic y; } st;\n"
+      "  c u3(posedge clk, arr[0], st);\n"
+      "  c u4(posedge clk, st.x);\n"
       "endmodule\n",
       f);
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "neither a variable", 10, "17.3"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "neither a variable", 11, "17.3"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 6, "17.3"));
   EXPECT_FALSE(
       ReportedError(f.diag.Diagnostics(), "neither a variable", 7, "17.3"));

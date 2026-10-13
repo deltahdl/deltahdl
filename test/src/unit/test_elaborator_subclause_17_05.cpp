@@ -506,12 +506,16 @@ TEST(CheckerProcedures, AnInitialStatementOffTheListIsReported) {
       "    if (a) a0: assert (a);\n"
       "    $display(\"x\");\n"
       "    a1: assert (a) else $display(\"bad\");\n"
+      "    m1: assume (a) else $display(\"bad\");\n"
+      "    c1: cover (a) $display(\"hit\");\n"
       "  end\n"
       "endchecker\n",
       f, "chk");
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 3, "17.5"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 4, "17.5"));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 5, "17.5"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 6, "17.5"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 7, "17.5"));
 }
 
 // §17.5: a checker's always procedure holds none of the statements the clause

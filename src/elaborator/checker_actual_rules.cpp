@@ -54,8 +54,8 @@ bool IsLvalue(const Expr* e) {
          e->kind == ExprKind::kMemberAccess;
 }
 
-// Each expression a procedure of `decl` reads, a wait's condition among
-// them, and each side of its continuous assignments.
+// Each expression a procedure of `decl` reads, and each side of its
+// continuous assignments.
 void ForEachProceduralOrAssignExpr(const ModuleDecl* decl,
                                    const std::function<void(const Expr*)>& fn) {
   for (const ModuleItem* item : decl->items) {
@@ -63,11 +63,9 @@ void ForEachProceduralOrAssignExpr(const ModuleDecl* decl,
       fn(item->assign_lhs);
       fn(item->assign_rhs);
     }
-    if (!IsProceduralItemKind(item->kind)) continue;
-    ForEachStmtReadExpr(item->body, fn);
-    ForEachProceduralStmt(item, [&](const Stmt* s) {
-      if (s->kind == StmtKind::kWait) fn(s->condition);
-    });
+    // §17.5 admits no wait in a checker procedure, so the conditions
+    // ForEachStmtReadExpr leaves out are none a checker holds.
+    if (IsProceduralItemKind(item->kind)) ForEachStmtReadExpr(item->body, fn);
   }
 }
 

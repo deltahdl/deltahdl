@@ -320,11 +320,9 @@ void CheckFutureGclkNesting(const Expr* call, DiagEngine& diag) {
 // §16.6: a function called in a concurrent assertion takes no output, inout
 // or ref argument, is automatic or keeps no state, and has no side effect.
 void CheckAssertionFunctionCall(const Expr* call, const RuleEnv& env) {
+  // A call in an expression names a function, a task being no expression.
   auto it = env.subroutines.find(call->callee);
-  if (it == env.subroutines.end() ||
-      it->second->kind != ModuleItemKind::kFunctionDecl) {
-    return;
-  }
+  if (it == env.subroutines.end()) return;
   const ModuleItem* fn = it->second;
   if (HasArgumentWrittenBack(fn)) {
     env.diag.Error(call->range.start,
