@@ -16,6 +16,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -203,10 +204,12 @@ static ExecTask ExecRsProdIf(const Stmt* stmt, const RsProd& prod,
   co_return StmtResult::kDone;
 }
 
+static uint64_t RepeatCount(const RsProd& prod, SimContext& ctx, Arena& arena);
+
 static ExecTask ExecRsProdRepeat(const Stmt* stmt, const RsProd& prod,
                                  SimContext& ctx, Arena& arena,
                                  RuleValueCapture* cap) {
-  auto count = EvalExpr(prod.repeat_count, ctx, arena).ToUint64();
+  uint64_t count = RepeatCount(prod, ctx, arena);
   // §20.2: $finish makes the simulator exit and hands control back to the
   // host operating system, so the iterations after the one that ran it do not
   // generate. SimContext::RequestFinish raises the stop the process loops guard
@@ -314,9 +317,18 @@ static bool WeightIsNegative(const Logic4Vec& v) {
   return ((v.words[top / 64].aval >> (top % 64)) & 1ULL) != 0;
 }
 
+// A value the clause requires to come out as a known integral value of zero
+// or more, as its reports name it, with the clause requiring it.
+struct NonNegativeRule {
+  std::string_view what;
+  std::string_view noun;
+  Subclause rule;
+};
+
 // §18.17.1: an rs_weight_specification has to come out as an integral value of
-// zero or more. Returns the weight to draw against, reporting a value that is
-// not one and counting it as zero.
+// zero or more, and §18.17.4 a repeat production's count likewise. Returns the
+// value to use, reporting one that is not such a value and counting it as
+// zero.
 //
 // Zero is what a reported weight counts as, because it is the one value that
 // cannot decide the draw. A negative weight read through ToUint64 arrived as
@@ -324,34 +336,49 @@ static bool WeightIsNegative(const Logic4Vec& v) {
 // 18446744073709551615 and made b unreachable, and the total then wrapped to
 // zero and SelectRule returned the first rule outright. An unknown weight was
 // already zero there -- ToUint64 reads x and z alike as 0 -- so for that one
-// nothing changes but the report.
+// nothing changes but the report. A reported repeat count generates its
+// production no times, where a negative one read through ToUint64 repeated it
+// some 2^64 times.
 //
 // The run carries on afterwards, as it does after every other error the
 // simulator raises while executing; §18.17.1 says nothing about what follows
 // one, and stopping the generation would take the rest of the statement's
 // reports with it.
-static uint64_t WeightOrReport(const Logic4Vec& val, const Expr* weight,
-                               SimContext& ctx) {
+static uint64_t NonNegativeOrReport(const Logic4Vec& val, const Expr* e,
+                                    const NonNegativeRule& rule,
+                                    SimContext& ctx) {
   if (!val.IsKnown()) {
-    ctx.GetDiag().Error(weight->range.start,
-                        "randsequence rule weight has unknown bits; a weight "
-                        "needs a known integral value of zero or more",
-                        Subclause("18.17.1"));
+    ctx.GetDiag().Error(
+        e->range.start,
+        std::format("randsequence {} has unknown bits; {} needs a known "
+                    "integral value of zero or more",
+                    rule.what, rule.noun),
+        rule.rule);
     return 0;
   }
   if (WeightIsNegative(val)) {
     ctx.GetDiag().Error(
-        weight->range.start,
-        "randsequence rule weight is negative; a weight needs a "
-        "known integral value of zero or more",
-        Subclause("18.17.1"));
+        e->range.start,
+        std::format("randsequence {} is negative; {} needs a known integral "
+                    "value of zero or more",
+                    rule.what, rule.noun),
+        rule.rule);
     return 0;
   }
   return val.ToUint64();
 }
 
+static uint64_t RepeatCount(const RsProd& prod, SimContext& ctx, Arena& arena) {
+  constexpr NonNegativeRule kRepeatCount{"repeat count", "a repeat count",
+                                         Subclause("18.17.4")};
+  return NonNegativeOrReport(EvalExpr(prod.repeat_count, ctx, arena),
+                             prod.repeat_count, kRepeatCount, ctx);
+}
+
 static const RsRule& SelectRule(const RsProduction& production, SimContext& ctx,
                                 Arena& arena) {
+  constexpr NonNegativeRule kRuleWeight{"rule weight", "a weight",
+                                        Subclause("18.17.1")};
   if (production.rules.size() <= 1) return production.rules[0];
   std::vector<uint64_t> weights;
   weights.reserve(production.rules.size());
@@ -359,7 +386,8 @@ static const RsRule& SelectRule(const RsProduction& production, SimContext& ctx,
   for (const auto& rule : production.rules) {
     uint64_t w = 1;
     if (rule.weight) {
-      w = WeightOrReport(EvalExpr(rule.weight, ctx, arena), rule.weight, ctx);
+      w = NonNegativeOrReport(EvalExpr(rule.weight, ctx, arena), rule.weight,
+                              kRuleWeight, ctx);
     }
     weights.push_back(w);
     total_weight += w;
@@ -384,16 +412,20 @@ static const RsRule& SelectRule(const RsProduction& production, SimContext& ctx,
 
 // 18.17.5: the optional weight following the rand join keywords states, as a
 // real value, how strongly the remaining length of each operand sequence biases
-// which sequence advances next. The standard constrains it to [0.0, 1.0], so
-// clamp any out of range value to that interval, and use the neutral 0.5 when
-// the expression is omitted.
+// which sequence advances next. It shall be a real number in [0.0, 1.0], so a
+// value outside that interval is reported and then taken as the nearer end of
+// it, as a weight §18.17.1 does not allow is reported and taken as zero; the
+// neutral 0.5 stands for an omitted expression.
 static double EvalRandJoinBias(Expr* expr, SimContext& ctx, Arena& arena) {
   if (!expr) return 0.5;
   auto v = EvalExpr(expr, ctx, arena);
   double f = v.is_real ? RealVecToDouble(v) : static_cast<double>(v.ToUint64());
-  if (f < 0.0) f = 0.0;
-  if (f > 1.0) f = 1.0;
-  return f;
+  if (f >= 0.0 && f <= 1.0) return f;
+  ctx.GetDiag().Error(expr->range.start,
+                      "rand join expression lies outside 0.0 to 1.0; it needs "
+                      "a real number in that range",
+                      Subclause("18.17.5"));
+  return f < 0.0 ? 0.0 : 1.0;
 }
 
 namespace {

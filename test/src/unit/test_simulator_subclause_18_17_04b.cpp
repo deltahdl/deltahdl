@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -73,6 +74,56 @@ TEST(RepeatProductionRun, ABreakInTheRepeatedProductionEndsTheWholeBlock) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "3 1\n");
+}
+
+// 18.17.4: the repeat expression shall come out as a non-negative integral
+// value, so a negative count, -1 held in a signed int, is reported, and the
+// production is generated no times rather than some 2^64 times.
+TEST(RepeatProductionRun, ANegativeCountIsReportedAndGeneratesNothing) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int n = -1, k = 0;\n"
+      "  initial begin\n"
+      "    randsequence (main)\n"
+      "      main : repeat (n) tick ;\n"
+      "      tick : { k++; } ;\n"
+      "    endsequence\n"
+      "    $display(\"%0d\", k);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "randsequence repeat count is negative; a repeat "
+                            "count needs a known integral value of zero or "
+                            "more",
+                            5, "18.17.4"));
+}
+
+// 18.17.4: a count with unknown bits is no integral value either, so it is
+// reported, and the production is generated no times.
+TEST(RepeatProductionRun, AnUnknownCountIsReportedAndGeneratesNothing) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic [3:0] n = 4'bx01x;\n"
+      "  int k = 0;\n"
+      "  initial begin\n"
+      "    randsequence (main)\n"
+      "      main : repeat (n) tick ;\n"
+      "      tick : { k++; } ;\n"
+      "    endsequence\n"
+      "    $display(\"%0d\", k);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "randsequence repeat count has unknown bits; a "
+                            "repeat count needs a known integral value of "
+                            "zero or more",
+                            6, "18.17.4"));
 }
 
 }  // namespace

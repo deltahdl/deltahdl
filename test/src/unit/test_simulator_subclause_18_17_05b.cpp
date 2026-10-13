@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -130,6 +131,32 @@ TEST(RandJoinRun, NonterminalsAreInterleavedToDepthOne) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "1\n");
+}
+
+// 18.17.5: the expression following rand join shall be a real number in 0.0
+// to 1.0, so 2.0 is reported; both operand sequences are still generated.
+TEST(RandJoinRun, AnExpressionOutsideZeroToOneIsReported) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int k = 0;\n"
+      "  initial begin\n"
+      "    randsequence (top)\n"
+      "      top : rand join (2.0) s1 s2 ;\n"
+      "      s1 : a b ;\n"
+      "      s2 : a b ;\n"
+      "      a : { k++; } ;\n"
+      "      b : { k++; } ;\n"
+      "    endsequence\n"
+      "    $display(\"%0d\", k);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "rand join expression lies outside 0.0 to 1.0; it "
+                            "needs a real number in that range",
+                            5, "18.17.5"));
 }
 
 }  // namespace
