@@ -182,6 +182,16 @@ static void CheckScopedMemberVisibility(const Expr* e, const AccessSite& site,
   }
 }
 
+// Whether every class `cls` extends, up to the root, is one the unit
+// declares, so that a name none of them declares is surely no member.
+static bool BasesKnown(const ClassDecl* cls, const CompilationUnit* unit) {
+  for (const ClassDecl* c = cls; !c->base_class.empty();) {
+    c = FindBaseClass(c, unit);
+    if (c == nullptr) return false;
+  }
+  return true;
+}
+
 // 18.11: naming a property in randomize()'s inline argument list changes that
 // property's random mode. The random mode of a local or protected member may
 // only be changed where the caller can reach that member. When randomize() is
@@ -201,7 +211,16 @@ static void CheckRandomizeArgItemVisibility(const Expr* arg,
   // What is rejected here is a change of random mode rather than a read.
   const OwnedMember kFound = FindMemberAndOwner(cls, arg->text, unit);
   const ClassMember* m = kFound.member;
-  if (m && m->is_local && !site.SeesLocal(kFound.owner)) {
+  // §18.11: the arguments are resolved in the object's class and limited to
+  // the names of its properties, null aside, which names none; a class whose
+  // chain reaches a base the unit does not declare is left unjudged.
+  if (m == nullptr && arg->text != "null" && BasesKnown(cls, unit)) {
+    diag.Error(arg->range.start,
+               std::format("'{}' is no property of class '{}', so randomize() "
+                           "cannot name it as a random variable",
+                           arg->text, cls->name),
+               Subclause("18.11"));
+  } else if (m && m->is_local && !site.SeesLocal(kFound.owner)) {
     diag.Error(arg->range.start,
                "cannot change random mode of local member from outside "
                "its class",

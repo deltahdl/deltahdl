@@ -101,4 +101,48 @@ TEST(InlineRandomControlVisibility, LocalMemberArgAcceptedWithinClassScope) {
              "endmodule\n"));
 }
 
+// §18.11: randomize()'s arguments are resolved in the class of the object
+// and are limited to the names of its properties, so naming a variable of
+// the calling scope that the class does not declare is an error.
+TEST(InlineRandomControlVisibility, ANameNoPropertyOfTheClassIsRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  rand bit [3:0] x;\n"
+             "endclass\n"
+             "module m;\n"
+             "  int nosuch;\n"
+             "  initial begin\n"
+             "    C obj;\n"
+             "    obj = new;\n"
+             "    void'(obj.randomize(nosuch));\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'nosuch' is no property of class 'C', so "
+                            "randomize() cannot name it as a random variable",
+                            9, "18.11"));
+}
+
+// §18.11: a property the class inherits is a property of the object, and
+// randomize(null) names no variable at all, so both calls elaborate.
+TEST(InlineRandomControlVisibility, AnInheritedPropertyAndNullAreAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class B;\n"
+             "  bit [3:0] y;\n"
+             "endclass\n"
+             "class C extends B;\n"
+             "  rand bit [3:0] x;\n"
+             "endclass\n"
+             "module m;\n"
+             "  initial begin\n"
+             "    C obj;\n"
+             "    obj = new;\n"
+             "    void'(obj.randomize(y));\n"
+             "    void'(obj.randomize(null));\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
 }  // namespace
