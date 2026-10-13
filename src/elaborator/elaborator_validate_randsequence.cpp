@@ -11,6 +11,9 @@
 // continue and return together with §18.17.6's exemption from two of them.
 
 #include <format>
+#include <string_view>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -21,6 +24,8 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/net_data_type.h"
 #include "elaborator/nettype_uses.h"
+#include "elaborator/return_value_fit.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
@@ -74,51 +79,101 @@ void CheckProductionItem(const RsProductionItem& item, const NameSet& declared,
 }
 
 // §18.17.7: a return in the code of the production `production`, which
-// returns a value, shall specify an expression. Reports each return in `s`
-// that gives none. A randsequence written inside it has productions of its
-// own, which its own check reads.
-void CheckValueLessReturns(const Stmt* s, const RsProduction& production,
-                           DiagEngine& diag) {
-  if (s == nullptr || s->kind == StmtKind::kRandsequence) return;
-  if (s->kind == StmtKind::kReturn && s->expr == nullptr) {
+// returns a value of `ret`, shall specify an expression, and one of the correct
+// type, as a return in a nonvoid function does (§12.8).
+void CheckReturnValue(const Stmt* s, const RsProduction& production,
+                      const CheckedType& ret, const ReturnCtx& ctx,
+                      DiagEngine& diag) {
+  if (s->expr == nullptr) {
     diag.Error(s->range.start,
                std::format("return in production '{}', which returns a value, "
                            "gives no value to return",
                            production.name),
                Subclause("18.17.7"));
+    return;
+  }
+  if (ReturnValueFits(ret, CheckedTypeOfValue(s->expr, ctx), ctx.unit)) return;
+  diag.Error(s->range.start,
+             std::format("return expression in production '{}' is not "
+                         "assignment-compatible with the production's return "
+                         "type",
+                         production.name),
+             Subclause("18.17.7"));
+}
+
+// Checks each return in `s`, a statement of a code block of `production`. A
+// randsequence written inside it has productions of its own, which its own
+// check reads.
+void CheckProductionReturns(const Stmt* s, const RsProduction& production,
+                            const CheckedType& ret, const ReturnCtx& ctx,
+                            DiagEngine& diag) {
+  if (s == nullptr || s->kind == StmtKind::kRandsequence) return;
+  if (s->kind == StmtKind::kReturn) {
+    CheckReturnValue(s, production, ret, ctx, diag);
+    return;
   }
   ForEachChildStmt(s, [&](Stmt* const& sub) {
-    CheckValueLessReturns(sub, production, diag);
+    CheckProductionReturns(sub, production, ret, ctx, diag);
   });
+}
+
+// The names a return in the code block `block` of `production` is read
+// against, with the type each is declared with: the production's formal
+// arguments (§18.17.7) and the variables the block declares at its top level,
+// which hide a formal of the same name, each written with no unpacked
+// dimension.
+std::unordered_map<std::string_view, const DataType*> CodeBlockLocals(
+    const RsProduction& production, const std::vector<Stmt*>& block) {
+  std::unordered_map<std::string_view, const DataType*> locals;
+  for (const auto& port : production.ports) {
+    if (port.unpacked_dims.empty()) locals[port.name] = &port.data_type;
+  }
+  for (const Stmt* s : block) {
+    if (s->kind == StmtKind::kVarDecl && s->var_unpacked_dims.empty())
+      locals[s->var_name] = &s->var_decl_type;
+  }
+  return locals;
+}
+
+// The returns of one code block of `production`, its type names read through
+// the typedefs and classes `outer` holds.
+void CheckCodeBlockReturns(const std::vector<Stmt*>& block,
+                           const RsProduction& production,
+                           const ReturnCtx& outer, DiagEngine& diag) {
+  const ReturnCtx kCtx{outer.typedefs, outer.unit,
+                       CodeBlockLocals(production, block)};
+  const CheckedType kRet = CheckedTypeOf(production.return_type, kCtx);
+  for (const Stmt* s : block)
+    CheckProductionReturns(s, production, kRet, kCtx, diag);
 }
 
 // The code blocks of the rule `rule` of `production`: those standing among its
 // production items and the one following its weight.
 void CheckRuleReturns(const RsRule& rule, const RsProduction& production,
-                      DiagEngine& diag) {
-  for (const RsProd& prod : rule.prods) {
-    for (const Stmt* s : prod.code_stmts)
-      CheckValueLessReturns(s, production, diag);
-  }
-  for (const Stmt* s : rule.weight_code)
-    CheckValueLessReturns(s, production, diag);
+                      const ReturnCtx& outer, DiagEngine& diag) {
+  for (const RsProd& prod : rule.prods)
+    CheckCodeBlockReturns(prod.code_stmts, production, outer, diag);
+  CheckCodeBlockReturns(rule.weight_code, production, outer, diag);
 }
 
 // §18.17.7: the productions of `s` that return a value, a type other than
-// void declared for them, checked for returns that give none.
-void CheckProductionReturns(const Stmt* s, DiagEngine& diag) {
+// void declared for them, checked for returns that give no value or one of
+// another type.
+void CheckValueReturningProductions(const Stmt* s, const ReturnCtx& outer,
+                                    DiagEngine& diag) {
   for (const RsProduction& production : s->rs_productions) {
     if (!production.has_return_type ||
         production.return_type.kind == DataTypeKind::kVoid) {
       continue;
     }
     for (const RsRule& rule : production.rules)
-      CheckRuleReturns(rule, production, diag);
+      CheckRuleReturns(rule, production, outer, diag);
   }
 }
 
 // Resolves every production identifier one randsequence statement writes.
-void CheckRandsequence(const Stmt* s, DiagEngine& diag) {
+void CheckRandsequence(const Stmt* s, const ReturnCtx& outer,
+                       DiagEngine& diag) {
   NameSet declared = DeclaredProductions(s);
   // §18.17: the keyword may take an optional production name in its parentheses
   // naming the top-level production, and with none the first production is the
@@ -139,7 +194,7 @@ void CheckRandsequence(const Stmt* s, DiagEngine& diag) {
   ForEachRandsequenceItem(s, [&](const RsProductionItem& item) {
     CheckProductionItem(item, declared, diag);
   });
-  CheckProductionReturns(s, diag);
+  CheckValueReturningProductions(s, outer, diag);
 }
 
 // Walks one statement subtree, resolving the production identifiers of every
@@ -151,11 +206,12 @@ void CheckRandsequence(const Stmt* s, DiagEngine& diag) {
 // through that list and checked against its own productions, which is what
 // §18.17 asks for: each statement creates a scope, and the identifiers of the
 // inner one are local to the inner scope.
-void CheckRandsequenceNames(const Stmt* s, DiagEngine& diag) {
+void CheckRandsequenceNames(const Stmt* s, const ReturnCtx& outer,
+                            DiagEngine& diag) {
   if (!s) return;
-  if (s->kind == StmtKind::kRandsequence) CheckRandsequence(s, diag);
+  if (s->kind == StmtKind::kRandsequence) CheckRandsequence(s, outer, diag);
   ForEachChildStmt(
-      s, [&](Stmt* const& sub) { CheckRandsequenceNames(sub, diag); });
+      s, [&](Stmt* const& sub) { CheckRandsequenceNames(sub, outer, diag); });
 }
 
 }  // namespace
@@ -168,17 +224,26 @@ void Elaborator::ValidateRandsequenceProductionNames(const ModuleDecl* decl) {
 // a declaration owns is walked -- ForEachBodyOwningItem in
 // elaborator_validate_internal.h is the one list of those, and a class method
 // arrives as the kFunctionDecl or kTaskDecl item it is.
+//
+// A production's return type in a class method is read with no typedef table,
+// for the reason Elaborator::CheckJumpStatementsIn gives of a method's own
+// return type: the class's typedefs, which `typedefs_` lacks, may hide the
+// outer names it holds.
 void Elaborator::CheckRandsequenceNamesIn(
     const std::vector<ModuleItem*>& items) {
-  ForEachBodyOwningItem(items, [this](const ModuleItem* item) {
+  std::unordered_set<const ModuleItem*> methods = ClassMethodsOf(items, unit_);
+  static const TypedefMap kNoTypedefs;
+  ForEachBodyOwningItem(items, [&](const ModuleItem* item) {
+    bool in_class = methods.count(item) != 0 || !item->method_class.empty();
+    const ReturnCtx kOuter{in_class ? kNoTypedefs : typedefs_, unit_, {}};
     if (IsProceduralItemKind(item->kind)) {
-      CheckRandsequenceNames(item->body, diag_);
+      CheckRandsequenceNames(item->body, kOuter, diag_);
       return;
     }
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl) {
       for (const auto* s : item->func_body_stmts) {
-        CheckRandsequenceNames(s, diag_);
+        CheckRandsequenceNames(s, kOuter, diag_);
       }
     }
   });

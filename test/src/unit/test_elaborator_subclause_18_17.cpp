@@ -377,4 +377,74 @@ TEST(RandsequenceProductionReturns,
              "endmodule\n"));
 }
 
+// §18.17.7: a return in a production that returns a value gives an expression
+// of the production's type, as one in a nonvoid function does. num returns an
+// int, and the class handle c its code block declares is not
+// assignment-compatible with int, so its return is reported, at the return.
+TEST(RandsequenceProductionReturns,
+     AClassHandleReturnedFromAnIntProductionIsReported) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C; endclass\n"
+             "module t;\n"
+             "  initial begin\n"
+             "    randsequence (main)\n"
+             "      main : num ;\n"
+             "      int num : { C c = new; return c; } ;\n"
+             "    endsequence\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return expression in production 'num' is not "
+                            "assignment-compatible with the production's "
+                            "return type",
+                            6, "18.17.7"));
+}
+
+// §18.17.7 with §8.13: mk returns a handle of class C, which an integer is not
+// assignment-compatible with, so the return of 5 in mk's weight code block is
+// reported, at the return.
+TEST(RandsequenceProductionReturns,
+     AnIntegerReturnedFromAClassProductionIsReported) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C; endclass\n"
+             "module t;\n"
+             "  initial begin\n"
+             "    randsequence (main)\n"
+             "      main : mk ;\n"
+             "      C mk : { } := 1 {\n"
+             "        return 5; } ;\n"
+             "    endsequence\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return expression in production 'mk' is not "
+                            "assignment-compatible with the production's "
+                            "return type",
+                            7, "18.17.7"));
+}
+
+// §18.17.7: the int formal v of num is an int, the handle d of class D, which
+// extends C, fits the production mk returning C (§8.13), and the string s that
+// the code block of name declares fits that string production. The source
+// elaborates.
+TEST(RandsequenceProductionReturns, ReturnsOfTheProductionsTypeElaborate) {
+  EXPECT_TRUE(
+      ElabOk("class C; endclass\n"
+             "class D extends C; endclass\n"
+             "module t;\n"
+             "  initial begin\n"
+             "    randsequence (main)\n"
+             "      main : num(2) mk name ;\n"
+             "      int num (int v) : { return v; } ;\n"
+             "      C mk : { D d = new; return d; } ;\n"
+             "      string name : { string s = \"x\"; return s; } ;\n"
+             "    endsequence\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
 }  // namespace
