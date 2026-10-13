@@ -117,7 +117,7 @@ static void CheckNamedRandModeVariableExists(
 // member; nullptr otherwise.
 static const Expr* MatchRandModeMemberPath(const Expr& call) {
   const Expr* callee = call.lhs;
-  if (callee->kind != ExprKind::kMemberAccess ||
+  if (callee == nullptr || callee->kind != ExprKind::kMemberAccess ||
       callee->rhs->text != "rand_mode") {
     return nullptr;
   }
@@ -170,11 +170,12 @@ static void CheckRandModeStructMember(
 }
 
 void CheckRandModeVariableNames(
-    const Expr& call,
+    const Expr* call,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
     const CompilationUnit* unit, DiagEngine& diag) {
-  CheckNamedRandModeVariableExists(call, var_types, unit, diag);
-  CheckRandModeStructMember(call, var_types, unit, diag);
+  if (call == nullptr) return;
+  CheckNamedRandModeVariableExists(*call, var_types, unit, diag);
+  CheckRandModeStructMember(*call, var_types, unit, diag);
 }
 
 }  // namespace delta

@@ -743,8 +743,8 @@ void ElaboratorClassRules::WalkStmtsForClassHandleOps(const Stmt* s) {
 
   CheckUnnamedConstraintModeHasArgument(s, class_var_types_, unit_, diag_);
 
-  if (const Expr* call = ExtractCallFromStmt(s))
-    CheckRandModeVariableNames(*call, class_var_types_, unit_, diag_);
+  CheckRandModeVariableNames(ExtractCallFromStmt(s), class_var_types_, unit_,
+                             diag_);
 
   CheckUnnamedRandModeHasArgument(s, class_var_types_, unit_, diag_);
 

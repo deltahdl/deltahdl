@@ -142,13 +142,14 @@ std::unordered_set<std::string_view> CollectMethodLocalNames(
     const ModuleItem* method);
 
 // Defined in elaborator_validate_rand_mode_names.cpp: §18.8's compile-time
-// checks of the random variable the rand_mode() call `call` names, through
+// checks of the random variable the rand_mode() call `call`, where a
+// statement holds one, names, through
 // the object handle whose class `var_types` records -- that it exists in the
 // class hierarchy and is rand or randc, that the query form names one
 // variable, and that a structure member named is one the structure declares
 // rand or randc.
 void CheckRandModeVariableNames(
-    const Expr& call,
+    const Expr* call,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
     const CompilationUnit* unit, DiagEngine& diag);
 
