@@ -314,4 +314,38 @@ TEST(ForeachConstraintRun, TwoLoopVariablesIterateBothDimensions) {
   EXPECT_EQ(out, "1 0 13\n");
 }
 
+// §18.5.7.1: a foreach iterates a string as a dynamic array of bytes indexed
+// from 0, so b avoids each character of the object's "AB", leaving it 67, and,
+// in an inline block, each character of the calling scope's "A", leaving 66.
+TEST(ForeachConstraintRun, AForeachIteratesTheCharactersOfAString) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  string s = \"AB\";\n"
+      "  rand byte b;\n"
+      "  constraint c { foreach (s[i]) b != s[i]; b inside {65, 66, 67}; }\n"
+      "endclass\n"
+      "class D;\n"
+      "  rand byte b;\n"
+      "  constraint c { b inside {65, 66}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  string u = \"A\";\n"
+      "  int cs = 0, ds = 0;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    static D d = new;\n"
+      "    repeat (10) begin\n"
+      "      void'(c.randomize());\n"
+      "      if (c.b == 67) cs++;\n"
+      "      void'(d.randomize() with { foreach (u[j]) b != u[j]; });\n"
+      "      if (d.b == 66) ds++;\n"
+      "    end\n"
+      "    $display(\"%0d %0d\", cs, ds);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "10 10\n");
+}
+
 }  // namespace

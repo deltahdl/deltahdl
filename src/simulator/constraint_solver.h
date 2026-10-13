@@ -82,7 +82,9 @@ enum class ArrayReductionOp : uint8_t {
 // ':/').
 struct DistWeight {
   int64_t value = 0;
-  uint32_t weight = 1;
+  // 18.5.3: the weight's unsigned value, held to the largest uint64_t where it
+  // is wider, so that no nonzero weight reads as zero.
+  uint64_t weight = 1;
   int64_t lo = 0;
   int64_t hi = 0;
   double real_value = 0.0;

@@ -413,6 +413,27 @@ bool StateArrayElements(std::string_view name, RandomizeCtx& rc,
   return true;
 }
 
+// §18.5.7.1: the characters of a string a foreach iterates, a dynamic array
+// of bytes indexed from 0: the object's string property `name`, or, §18.7, a
+// string of the scope containing an inline constraint's call. A select of one
+// is left as written, read as the state value the character is. False where
+// `name` is no string.
+bool StringElements(std::string_view name, RandomizeCtx& rc,
+                    IteratedElements& out) {
+  const auto* prop = rc.obj->type->FindProperty(name);
+  Logic4Vec value;
+  if (prop != nullptr && prop->is_string) {
+    value = rc.obj->GetProperty(name, rc.arena);
+  } else if (rc.ctx.IsStringVariable(name)) {
+    value = rc.ctx.FindVariable(name)->value;
+  } else {
+    return false;
+  }
+  out.lo = 0;
+  out.count = static_cast<uint32_t>(Logic4VecToString(value).size());
+  return true;
+}
+
 // 18.5.7.2: the operand a reduction method named `method` joins the elements
 // by; false for a name that is no reduction method.
 bool ReductionOp(std::string_view method, ArrayReductionOp& out) {
@@ -609,9 +630,9 @@ struct Iterated {
 };
 
 // The elements the foreach `ref` iterates over the array property `array`,
-// or, where `array` is null, over a rand queue or, §18.7, an array of the
-// scope containing an inline constraint's call, into `out`; false where it
-// names none of them.
+// or, where `array` is null, over a rand queue, a string (§18.5.7.1) or,
+// §18.7, an array of the scope containing an inline constraint's call, into
+// `out`; false where it names none of them.
 bool IteratedOf(const ConstraintForeachRef& ref,
                 const ClassTypeInfo::PropertyInfo* array,
                 std::vector<RandInfo>& rands, RandomizeCtx& rc, Iterated& out) {
@@ -628,6 +649,7 @@ bool IteratedOf(const ConstraintForeachRef& ref,
                             out.element_array)) {
     return true;
   }
+  if (StringElements(ref.array_name, rc, out.elems)) return true;
   return StateArrayElements(ref.array_name, rc, out.elems);
 }
 

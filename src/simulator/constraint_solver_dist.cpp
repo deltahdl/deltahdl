@@ -25,11 +25,19 @@ constexpr size_t kNoItem = SIZE_MAX;
 // constraints exclude. A single value, or a range or default weighted with
 // ':/', contributes its weight as a whole, as does every range of a real
 // variable, whose elements are not counted.
+// The sum and the product of two weights, held to the largest uint64_t where
+// they overflow it: the weights keep their order of size there, and no
+// nonzero weight wraps to zero.
+uint64_t SaturatingAdd(uint64_t a, uint64_t b) {
+  return a > UINT64_MAX - b ? UINT64_MAX : a + b;
+}
+
 uint64_t DistItemWeight(const DistWeight& w, bool is_real) {
   if (w.is_range && w.per_element && !is_real) {
     int64_t size = w.hi - w.lo + 1;
     if (size <= 0) return 0;
-    return static_cast<uint64_t>(w.weight) * static_cast<uint64_t>(size);
+    const auto kCount = static_cast<uint64_t>(size);
+    return w.weight > UINT64_MAX / kCount ? UINT64_MAX : w.weight * kCount;
   }
   return w.weight;
 }
@@ -43,13 +51,14 @@ int64_t DistItemRepresentative(const DistWeight& w) {
 size_t SelectDistItem(const std::vector<DistWeight>& weights, bool is_real,
                       std::mt19937& rng) {
   uint64_t total = 0;
-  for (const auto& w : weights) total += DistItemWeight(w, is_real);
+  for (const auto& w : weights)
+    total = SaturatingAdd(total, DistItemWeight(w, is_real));
   if (total == 0) return kNoItem;
   std::uniform_int_distribution<uint64_t> select(0, total - 1);
   uint64_t pick = select(rng);
   uint64_t accum = 0;
   for (size_t i = 0; i < weights.size(); ++i) {
-    accum += DistItemWeight(weights[i], is_real);
+    accum = SaturatingAdd(accum, DistItemWeight(weights[i], is_real));
     if (pick < accum) return i;
   }
   return weights.size() - 1;

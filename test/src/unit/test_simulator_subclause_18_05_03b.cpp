@@ -245,4 +245,37 @@ TEST(SetMembershipRun, ARealInsideAToleranceRangeIsDrawnWithinIt) {
   EXPECT_EQ(out, "0\n");
 }
 
+// §18.5.3: a weight is read as the unsigned value of its whole expression, so a
+// weight of 2^32 outweighs a weight of 1 rather than reading as 0, one wider
+// than 64 bits outweighs it too, a := range of the largest 64-bit weight
+// outweighs a single value, and a wide weight of 0 still excludes its value.
+TEST(DistributionRun, AWeightIsItsWholeUnsignedValue) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  rand bit [1:0] x, y, z, w;\n"
+      "  constraint cx { x dist { 1 := 64'h1_0000_0000, 2 := 1 }; }\n"
+      "  constraint cy { y dist { 1 := 65'h1_0000_0000_0000_0000, 2 := 1 }; }\n"
+      "  constraint cz { z dist { 1 := 65'd0, 2 := 65'd3 }; }\n"
+      "  constraint cw { w dist { [0:2] := 64'hffff_ffff_ffff_ffff, 3 := 1 }; "
+      "}\n"
+      "endclass\n"
+      "module t;\n"
+      "  int xs = 0, ys = 0, zs = 0, ws = 0;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    repeat (20) begin\n"
+      "      void'(c.randomize());\n"
+      "      if (c.x == 1) xs++;\n"
+      "      if (c.y == 1) ys++;\n"
+      "      if (c.z == 2) zs++;\n"
+      "      if (c.w != 3) ws++;\n"
+      "    end\n"
+      "    $display(\"%0d %0d %0d %0d\", xs, ys, zs, ws);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "20 20 20 20\n");
+}
+
 }  // namespace

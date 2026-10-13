@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <string>
 
+#include "common/types.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
@@ -64,6 +65,16 @@ void ToleranceEnds(const DistBound& centre, const DistBound& tol, bool relative,
 // the solver spreads a ':=' weight across the range, and an item with no
 // explicit weight keeps the DistWeight default weight of 1. Returns false for a
 // non-identifier target, leaving the distribution unbuilt.
+// 18.5.3: a weight read as the unsigned value of its whole expression, held
+// to the largest uint64_t where a word above the lowest is set, so that no
+// nonzero weight reads as zero.
+static uint64_t DistWeightValue(const Logic4Vec& v) {
+  for (uint32_t i = 1; i < v.nwords; ++i) {
+    if (v.words[i].aval != 0) return UINT64_MAX;
+  }
+  return v.ToUint64();
+}
+
 bool BuildDistConstraint(const ConstraintDistRef& ref, RandomizeCtx& rc,
                          ConstraintExpr& out) {
   if (ref.target == nullptr || ref.target->kind != ExprKind::kIdentifier)
@@ -77,8 +88,7 @@ bool BuildDistConstraint(const ConstraintDistRef& ref, RandomizeCtx& rc,
     w.is_range = item.is_range;
     w.per_element = item.per_element;
     if (item.weight != nullptr)
-      w.weight = static_cast<uint32_t>(
-          EvalExpr(item.weight, rc.ctx, rc.arena).ToUint64());
+      w.weight = DistWeightValue(EvalExpr(item.weight, rc.ctx, rc.arena));
     if (item.is_range && item.tolerance != nullptr) {
       ToleranceEnds(EvalDistBound(item.lo, rc),
                     EvalDistBound(item.tolerance, rc), item.tolerance_relative,
