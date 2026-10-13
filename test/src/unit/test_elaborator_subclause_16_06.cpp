@@ -213,7 +213,7 @@ TEST(AssertionFunctionCalls, AFunctionWritingAnArgumentBackIsReported) {
 
 // §16.6: a function called in a concurrent assertion is automatic or keeps
 // no state, and has no side effect: tally writes count, and keep holds n from
-// one call to the next, while pure is automatic and writes its own local.
+// one call to the next, while clean is automatic and writes its own local.
 TEST(AssertionFunctionCalls, AFunctionWithStateOrASideEffectIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -228,14 +228,14 @@ TEST(AssertionFunctionCalls, AFunctionWithStateOrASideEffectIsReported) {
       "    int n = 0;\n"
       "    return x;\n"
       "  endfunction\n"
-      "  function automatic bit pure(bit x);\n"
+      "  function automatic bit clean(bit x);\n"
       "    bit y;\n"
       "    y = !x;\n"
       "    return !y;\n"
       "  endfunction\n"
       "  a1: assert property (@(posedge clk) tally(a));\n"
       "  a2: assert property (@(posedge clk) keep(a));\n"
-      "  a3: assert property (@(posedge clk) pure(a));\n"
+      "  a3: assert property (@(posedge clk) clean(a));\n"
       "endmodule\n",
       f);
   const char* const kReport =
