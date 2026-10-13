@@ -141,13 +141,19 @@ void FlowStep(const SeqLinearBody& body, size_t i, NameSet& assigned,
   if (RepeatedFromZero(body, i)) assigned = std::move(before);
 }
 
-// §16.10 with Annex F.5.4: the operands of `body` in order; the operands it
-// is conjoined or intersected with run from where it starts, a local flows
+// §16.10 with Annex F.5.4: the operands of `body` in order, a throughout's
+// condition read where its operands begin; the operands it is conjoined or
+// intersected with run from where it starts, a local flows
 // out of a top-level or only where every alternative assigns it, and the
 // match items of first_match run at the end of its match.
 void FlowBody(const SeqLinearBody& body, NameSet& assigned, Flow& flow) {
   const NameSet kStart = assigned;
   for (size_t i = 0; i < body.operands.size(); ++i) {
+    // §16.9.9: a throughout's condition holds at every tick of the
+    // operands it governs, so reads what is assigned where they begin.
+    for (const SeqThroughout& guard : body.throughouts) {
+      if (guard.first == i) CheckReads(guard.cond, assigned, flow);
+    }
     FlowStep(body, i, assigned, flow);
   }
   for (const auto* joined : {&body.conjuncts, &body.intersects}) {

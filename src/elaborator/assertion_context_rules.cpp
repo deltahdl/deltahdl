@@ -9,7 +9,11 @@
 #include "elaborator/assertion_rules.h"
 #include "elaborator/assertion_walk.h"
 #include "elaborator/global_clocking_sampled_value.h"
+#include "elaborator/procedural_concurrent_assertion.h"
+#include "elaborator/property_instance.h"
 #include "elaborator/property_rewrite.h"
+#include "elaborator/rtlir.h"
+#include "elaborator/sensitivity.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -207,9 +211,26 @@ void CheckTriggeredCycles(const ModuleDecl* decl, const NamedDecls& sequences,
   }
 }
 
+// §16.9.11 with §16.14.6: in a procedure whose clock is inferred, each
+// triggered its expressions read, a wait's condition among them, is applied
+// to a sequence ending on that clock.
+void CheckProcedureEndingClocks(const ModuleItem* item, const RtlirModule* mod,
+                                const NamedDecls& sequences, DiagEngine& diag) {
+  if (!IsProceduralItemKind(item->kind)) return;
+  const Clock kClock = InferredInProcedure(item, mod).clock;
+  auto check = [&](const Expr* e) {
+    CheckEndingClocks(e, kClock, sequences, diag);
+  };
+  ForEachStmtReadExpr(item->body, check);
+  ForEachProceduralStmt(item, [&](const Stmt* s) {
+    if (s->kind == StmtKind::kWait) check(s->condition);
+  });
+}
+
 }  // namespace
 
 void ValidateAssertionContextRules(const ModuleDecl* decl,
+                                   const RtlirModule* mod,
                                    const PropertyRegistry& registry,
                                    DiagEngine& diag) {
   const NamedDecls kSequences = NamedDeclsByName(decl, false);
@@ -223,6 +244,7 @@ void ValidateAssertionContextRules(const ModuleDecl* decl,
       CheckTreeEndingClocks(item->prop_body_tree, item->prop_clock, kSequences,
                             diag);
     }
+    CheckProcedureEndingClocks(item, mod, kSequences, diag);
   }
   ForEachConcurrentAssertion(decl, [&](const Stmt* s) {
     CheckFutureGclkWithMatchItems(s, kSequences, diag);

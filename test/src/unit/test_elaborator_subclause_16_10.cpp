@@ -262,4 +262,31 @@ TEST(LocalVariableFlow, AnAssignmentOnAnEmptyMatchingSequenceIsReported) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 10, "16.10"));
 }
 
+// §16.10 with §16.9.9: a throughout's condition holds at every tick of the
+// sequence it governs, so reads x before (b, x = 1) assigns it; y, assigned
+// before the throughout, may be read there.
+TEST(LocalVariableFlow,
+     AThroughoutConditionReadingAnUnassignedLocalIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a, b;\n"
+      "  sequence s;\n"
+      "    int x;\n"
+      "    @(posedge clk) (x > 0) throughout (a ##1 (b, x = 1));\n"
+      "  endsequence\n"
+      "  sequence t;\n"
+      "    int y;\n"
+      "    @(posedge clk) (a, y = 1) ##1 (y > 0) throughout (a ##1 b);\n"
+      "  endsequence\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the local variable 'x' is referenced at a point "
+                            "where it is unassigned",
+                            5, "16.10"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "the local variable 'y'", 9,
+                             "16.10"));
+}
+
 }  // namespace

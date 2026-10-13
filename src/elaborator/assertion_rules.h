@@ -61,9 +61,11 @@ void ValidateAssertionBoundRules(const ModuleDecl* decl, const ScopeMap& params,
 // whole the module `decl` declares, its named sequences and properties in
 // `registry`: a global clocking future sampled value function stands in no
 // assertion holding a sequence match item, a sequence triggered is applied to
-// ends on the clock of the context the method stands in, and no sequence
-// depends on its own end point through triggered.
+// ends on the clock of the context the method stands in, a procedure's being
+// the clock `mod` infers for it, and no sequence depends on its own end point
+// through triggered.
 void ValidateAssertionContextRules(const ModuleDecl* decl,
+                                   const RtlirModule* mod,
                                    const PropertyRegistry& registry,
                                    DiagEngine& diag);
 

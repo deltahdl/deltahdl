@@ -204,7 +204,7 @@ void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl,
   const ScopeMap kParams = BuildParamScope(mod);
   ValidateAssertionExprRules(decl, mod, kParams, property_registry_, diag_);
   ValidateAssertionBoundRules(decl, kParams, diag_);
-  ValidateAssertionContextRules(decl, property_registry_, diag_);
+  ValidateAssertionContextRules(decl, mod, property_registry_, diag_);
   ValidateLocalVariableFlow(decl, diag_);
   if (sequence_names_.empty()) return;
   // §16.8 actual-argument checks need each named sequence's formals, so map the

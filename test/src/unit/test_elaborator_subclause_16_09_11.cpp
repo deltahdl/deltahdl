@@ -132,4 +132,25 @@ TEST(TriggeredEndingClock, TheEndingClockIsTheLastClockTheSequenceWrites) {
                              19, "16.9.11"));
 }
 
+// §16.9.11 with §16.14.6: in a procedure, the context's clock is the one the
+// procedure infers: e1 ends on posedge clk, not the posedge sysclk of the
+// first always, while the second always is clocked by posedge clk.
+TEST(TriggeredEndingClock, ATriggeredInAProcedureMeetsItsInferredClock) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, sysclk, a, b, x, y;\n"
+      "  sequence e1;\n"
+      "    @(posedge clk) a ##1 b;\n"
+      "  endsequence\n"
+      "  always @(posedge sysclk) x <= e1.triggered;\n"
+      "  always @(posedge clk) y <= e1.triggered;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "the ending clock of 'e1'", 6,
+                            "16.9.11"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "the ending clock of 'e1'",
+                             7, "16.9.11"));
+}
+
 }  // namespace
