@@ -1,7 +1,5 @@
 #include <format>
 #include <string_view>
-#include <unordered_map>
-#include <unordered_set>
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator_validate_internal.h"

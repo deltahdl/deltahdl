@@ -21,7 +21,7 @@ TEST(BuiltinClassRedefinitionElab,
       "  endclass\n"
       "  semaphore s = new(1, 2, 3);\n"
       "  initial begin\n"
-      "    semaphore t = new(4, 5, 6);\n"
+      "    automatic semaphore t = new(4, 5, 6);\n"
       "    t = new(7, 8, 9);\n"
       "  end\n"
       "endmodule\n",
