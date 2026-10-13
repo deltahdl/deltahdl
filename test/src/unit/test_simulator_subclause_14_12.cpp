@@ -119,4 +119,33 @@ TEST(DefaultClockingSim, ANestedCheckersAssertionTakesTheDefaultClock) {
   EXPECT_EQ(f.ctx.FindVariable("c.fail")->value.ToUint64(), 2u);
 }
 
+// §14.12 (printed page 362) extends a default clocking to the modules declared
+// in its scope, so n, declared in o with none of its own, counts o's posedges:
+// its `##1` from time 1 ends at 5. m's default, on the negedge, was lowered
+// after o's, and n's instance, with no default recorded under its own prefix,
+// took that last one lowered and ran on at 10.
+TEST(DefaultClockingSim, ANestedModuleCountsItsEnclosingModulesDefault) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module o(input logic clk);\n"
+      "  default clocking co @(posedge clk); endclocking\n"
+      "  module n;\n"
+      "    initial begin #1 ##1; $display(\"n %0t\", $time); end\n"
+      "  endmodule\n"
+      "  n un();\n"
+      "endmodule\n"
+      "module m(input logic clk);\n"
+      "  default clocking cm @(negedge clk); endclocking\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  always #5 clk = ~clk;\n"
+      "  o uo(clk);\n"
+      "  m um(clk);\n"
+      "  initial #20 $finish;\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "n 5\n$finish at time 20\n");
+}
+
 }  // namespace

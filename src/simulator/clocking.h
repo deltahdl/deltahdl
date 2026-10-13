@@ -239,9 +239,10 @@ class ClockingManager {
   // §14.12 (printed page 361): a default clocking is the default within its
   // own module, interface, program or checker, so each instance keeps its own,
   // under the prefix its names carry, and a cycle delay reads the one of the
-  // instance its process runs in; the last one set stands for a scope that
-  // declared none. One default for the design let the last instance lowered
-  // clock every `##`.
+  // instance its process runs in. A nested declaration's instance that has
+  // none takes the nearest enclosing instance's, and the last one set stands
+  // for any other scope that declared none. One default for the design let
+  // the last instance lowered clock every `##`.
   void SetScopeDefaultClocking(std::string_view inst_prefix,
                                std::string_view name) {
     scope_default_clocking_[std::string(inst_prefix)] = name;

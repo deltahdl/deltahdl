@@ -125,8 +125,17 @@ const ClockingBlock* ClockingManager::Find(std::string_view name) const {
 
 std::string_view ClockingManager::DefaultClockingFor(
     const SimContext& ctx) const {
-  auto it = scope_default_clocking_.find(ctx.ActiveInstancePrefix());
-  return it != scope_default_clocking_.end() ? it->second : default_clocking_;
+  const std::string kPrefix = ctx.ActiveInstancePrefix();
+  auto it = scope_default_clocking_.find(kPrefix);
+  if (it != scope_default_clocking_.end()) return it->second;
+  // §14.12 (printed page 362): a nested module, interface or checker that
+  // declares no default clocking takes the one of the scope it is declared
+  // in, so its instance's default is the nearest enclosing instance's.
+  for (const std::string& scope : ctx.NestedDeclOuterScopes(kPrefix)) {
+    it = scope_default_clocking_.find(scope);
+    if (it != scope_default_clocking_.end()) return it->second;
+  }
+  return default_clocking_;
 }
 
 const ClockingBlock* ClockingManager::FindInScope(std::string_view name,
