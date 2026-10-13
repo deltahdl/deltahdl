@@ -6,7 +6,6 @@
 
 #include <format>
 #include <string_view>
-#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -239,16 +238,17 @@ void CheckValueReturningFuncReturn(const Stmt* s, std::string_view func_name,
   // else is left unreached by stopping here.
   if (s->kind == StmtKind::kRandsequence) return;
 
-  // §23.9: a begin-end block is a scope, and the variables it declares hide
-  // the names of the same spelling around it, so its statements read their
-  // names through a table its own declarations are entered into. A fork-join
-  // block is a scope too, but §9.3.2 forbids a return anywhere inside one.
-  ReturnCtx block_ctx{ctx.typedefs, ctx.unit, {}};
-  if (s->kind == StmtKind::kBlock) {
-    block_ctx.locals = ctx.locals;
-    EnterDeclaredLocals(s->stmts, block_ctx.locals);
+  // §23.9 makes a begin-end block a scope, and §12.7.1 and §12.7.3 make a
+  // loop's variables local to the loop. The names declared there hide the
+  // names of the same spelling around them, so the statements under one read
+  // their names through a table those declarations are entered into.
+  const bool kOpens = OpensScope(s);
+  ReturnCtx scope_ctx{ctx.typedefs, ctx.unit, {}};
+  if (kOpens) {
+    scope_ctx.locals = ctx.locals;
+    EnterScopeLocals(s, scope_ctx.locals);
   }
-  const ReturnCtx& inner = s->kind == StmtKind::kBlock ? block_ctx : ctx;
+  const ReturnCtx& inner = kOpens ? scope_ctx : ctx;
 
   // Every other link comes from ForEachChildStmt in
   // elaborator_validate_internal.h, which is the one list of the fields of Stmt
@@ -258,24 +258,36 @@ void CheckValueReturningFuncReturn(const Stmt* s, std::string_view func_name,
   });
 }
 
-// The names subroutine `item` declares with a type the return check reads
-// whole: its formals and the variables its body declares at its top level, each
-// written with no unpacked dimension.
-std::unordered_map<std::string_view, const DataType*> SubroutineLocals(
-    const ModuleItem* item) {
-  std::unordered_map<std::string_view, const DataType*> locals;
-  for (const auto& arg : item->func_args) {
-    if (arg.unpacked_dims.empty()) locals[arg.name] = &arg.data_type;
-  }
+// The names in scope at the top level of subroutine `item`'s body: `outer`,
+// the names around the subroutine, under its formals and the variables its
+// body declares at its top level.
+DeclaredLocals SubroutineLocals(const ModuleItem* item,
+                                const DeclaredLocals& outer) {
+  DeclaredLocals locals = outer;
+  for (const auto& arg : item->func_args)
+    locals[arg.name] = {&arg.data_type, &arg.unpacked_dims};
   EnterDeclaredLocals(item->func_body_stmts, locals);
   return locals;
 }
 
+// The unpacked arrays `items` declare, the variables of a module, a package or
+// a compilation unit that a foreach in one of its subroutines may walk. Its
+// other variables are left out, since §12.8's check reads no name declared
+// outside the subroutine as a returned value.
+DeclaredLocals ScopeArrays(const std::vector<ModuleItem*>& items) {
+  DeclaredLocals arrays;
+  for (const auto* item : items) {
+    if (item != nullptr && item->kind == ModuleItemKind::kVarDecl &&
+        !item->unpacked_dims.empty())
+      arrays[item->name] = {&item->data_type, &item->unpacked_dims};
+  }
+  return arrays;
+}
+
 // §12.8 — applies the jump rules to a function/task body and, for a
 // value-returning function, also checks each return statement's expression.
-void CheckSubroutineJumpRules(const ModuleItem* item,
-                              const TypedefMap& typedefs,
-                              const CompilationUnit* unit, DiagEngine& diag) {
+void CheckSubroutineJumpRules(const ModuleItem* item, const ReturnCtx& outer,
+                              DiagEngine& diag) {
   bool is_value_returning = false;
   if (item->kind == ModuleItemKind::kFunctionDecl) {
     // §8.7: a class constructor has no return type, so a `return;` in one is
@@ -290,7 +302,8 @@ void CheckSubroutineJumpRules(const ModuleItem* item,
   scope.in_subroutine = true;
   for (auto* s : item->func_body_stmts) CheckJumpRules(s, scope, diag);
   if (!is_value_returning) return;
-  const ReturnCtx kCtx{typedefs, unit, SubroutineLocals(item)};
+  const ReturnCtx kCtx{outer.typedefs, outer.unit,
+                       SubroutineLocals(item, outer.locals)};
   const CheckedType kRet = CheckedTypeOf(item->return_type, kCtx);
   for (auto* s : item->func_body_stmts) {
     CheckValueReturningFuncReturn(s, item->name, kRet, kCtx, diag);
@@ -312,10 +325,13 @@ void Elaborator::ValidateJumpStatements(const ModuleDecl* decl) {
 // holds those outer names alone. So a method's return check reads no name
 // through them: the methods of the classes `items` declare and of the
 // compilation unit's classes, and every method defined out of its class, are
-// checked with no typedef table.
+// checked with no typedef table, and with none of the arrays of the scope
+// around the class either, which a property of the class may hide.
 void Elaborator::CheckJumpStatementsIn(const std::vector<ModuleItem*>& items) {
   std::unordered_set<const ModuleItem*> methods = ClassMethodsOf(items, unit_);
   static const TypedefMap kNoTypedefs;
+  const ReturnCtx kScope{typedefs_, unit_, ScopeArrays(items)};
+  const ReturnCtx kClass{kNoTypedefs, unit_, {}};
   ForEachBodyOwningItem(items, [&](const ModuleItem* item) {
     if (IsProceduralItemKind(item->kind) && item->body) {
       CheckJumpRules(item->body, JumpScope{}, diag_);
@@ -324,8 +340,7 @@ void Elaborator::CheckJumpStatementsIn(const std::vector<ModuleItem*>& items) {
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl) {
       bool in_class = methods.count(item) != 0 || !item->method_class.empty();
-      CheckSubroutineJumpRules(item, in_class ? kNoTypedefs : typedefs_, unit_,
-                               diag_);
+      CheckSubroutineJumpRules(item, in_class ? kClass : kScope, diag_);
     }
   });
 }

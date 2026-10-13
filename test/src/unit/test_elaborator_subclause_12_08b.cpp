@@ -219,4 +219,104 @@ TEST(JumpStatementElaboration, ReturnOfAnArrayANestedBlockDeclaresElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// A variable a for loop's initialization declares is local to the loop
+// (§12.7.1), so it hides the formal of its name, and a return inside the loop
+// gives the loop's class handle, which the class function takes. A for loop
+// that assigns the formal declares nothing.
+TEST(JumpStatementElaboration, ReturnOfANameAForLoopDeclaresReadsTheLoopsType) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  class A; endclass\n"
+      "  function automatic A f(int v);\n"
+      "    for (A v = null; v != null; ) return v;\n"
+      "    for (v = 0; v < 2; v++) ;\n"
+      "    return null;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(JumpStatementElaboration, ReturnOfAnIntAForLoopDeclaresIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  class A; endclass\n"
+      "  function automatic A f(A v);\n"
+      "    for (int v = 0; v < 2; v++) return v;\n"
+      "    return null;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return expression in function 'f' is not "
+                            "assignment-compatible with the function's return "
+                            "type",
+                            4, "12.8"));
+}
+
+// A foreach loop variable is local to the loop and hides the formal of its
+// name (§12.7.3). Over a fixed-size, a dynamic or a queue dimension, unpacked
+// or packed, it is an int, which the class function does not take. The
+// module's array is walked as the function's own are, and a loop variable
+// left out stands for no dimension.
+TEST(JumpStatementElaboration, ReturnOfAnIntIndexedForeachVariableIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  class A; endclass\n"
+      "  int fx[4];\n"
+      "  function automatic A f(A v);\n"
+      "    int dyn[];\n"
+      "    int q[$];\n"
+      "    int grid[2][3];\n"
+      "    bit [3:0] bits;\n"
+      "    foreach (fx[v]) return v;\n"
+      "    foreach (dyn[v]) return v;\n"
+      "    foreach (q[v]) return v;\n"
+      "    foreach (grid[, v]) return v;\n"
+      "    foreach (bits[v]) return v;\n"
+      "    return null;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  for (int line = 9; line <= 13; ++line) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "return expression in function 'f' is not "
+                              "assignment-compatible with the function's "
+                              "return type",
+                              line, "12.8"))
+        << line;
+  }
+}
+
+// Over an associative dimension a foreach loop variable has the index type,
+// here a byte, and a typedef's dimensions, a member's and those of a variable
+// the function cannot see are not plain from the declarations in scope; each
+// loop variable still hides the class formal, so none is read as one.
+TEST(JumpStatementElaboration, ForeachVariableOfAnUnreadDimensionHidesFormal) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  class A; endclass\n"
+      "  class H; int arr[4]; endclass\n"
+      "  typedef int row_t[4];\n"
+      "  bit [3:0] mod_bits;\n"
+      "  function automatic int f(A v, H h);\n"
+      "    int by_key[byte];\n"
+      "    row_t row;\n"
+      "    foreach (by_key[v]) return v;\n"
+      "    foreach (row[v]) return v;\n"
+      "    foreach (h.arr[v]) return v;\n"
+      "    foreach (mod_bits[v]) return v;\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

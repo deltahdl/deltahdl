@@ -20,25 +20,47 @@ namespace delta {
 // randsequence production that returns a value, each naming the other's rule as
 // the one it follows, so the two checks read one type comparison.
 
+// A name in scope where a return stands: the type it was declared with and the
+// unpacked dimensions written after it, none for a variable that is not an
+// unpacked array. An unpacked array is a type the check does not read, but its
+// dimensions tell the type of a foreach loop variable over it (§12.7.3).
+struct DeclaredLocal {
+  const DataType* type;
+  const std::vector<Expr*>* unpacked;
+};
+using DeclaredLocals = std::unordered_map<std::string_view, DeclaredLocal>;
+
 // What the check reads besides the return statement: the typedefs and classes
-// a type name may stand for, and the declared type of each name the subroutine
-// or production declares, its formals and the variables its body declares,
-// which no name outside it hides.
+// a type name may stand for, and each name in scope the check knows the
+// declaration of. A name it holds no entry for is one whose type it does not
+// read.
 struct ReturnCtx {
   const TypedefMap& typedefs;
   const CompilationUnit* unit;
-  std::unordered_map<std::string_view, const DataType*> locals;
+  DeclaredLocals locals;
 };
 
 // Enters into `locals` the variables declared among `items`, the items of a
 // subroutine body, of a randsequence code block or of a begin-end block, over
 // the names already there: §23.9 makes a begin-end block a scope of its own,
-// whose declarations hide the names of the same spelling around it. A variable
-// written with an unpacked dimension is a type the check does not read, so it
-// hides an outer name without standing for a type of its own.
-void EnterDeclaredLocals(
-    const std::vector<Stmt*>& items,
-    std::unordered_map<std::string_view, const DataType*>& locals);
+// whose declarations hide the names of the same spelling around it.
+void EnterDeclaredLocals(const std::vector<Stmt*>& items,
+                         DeclaredLocals& locals);
+
+// Whether the statements directly under `s` stand in a scope of its own: a
+// begin-end block (§23.9), and a for loop or a foreach loop, whose loop
+// variables are local to the loop (§12.7.1, §12.7.3). A fork-join block is a
+// scope too, but neither §12.8's nor §18.17.7's check reaches a return inside
+// one, which §9.3.2 forbids.
+bool OpensScope(const Stmt* s);
+
+// Enters into `locals` the names scope-opening statement `s` declares over the
+// names around it. A for loop's declared variable stands for its declared
+// type. A foreach loop variable is an int over a fixed-size, dynamic or queue
+// dimension and has the index type over an associative one (§12.7.3), so where
+// the dimension it walks is not plainly one of the first three in `locals`,
+// the loop variable hides the outer name without standing for a type.
+void EnterScopeLocals(const Stmt* s, DeclaredLocals& locals);
 
 // The type a return compares, as far as the check can see it: a class, or a
 // type IsAssignmentCompatible answers for, or neither where the type is not
@@ -55,8 +77,9 @@ struct CheckedType {
 CheckedType CheckedTypeOf(const DataType& declared, const ReturnCtx& ctx);
 
 // §6.22.3: the type of a return expression as far as it is plain from the
-// source: a literal's, or the declared type of a name `ctx.locals` holds,
-// named whole. A member, a select, a call or an operation is not read.
+// source: a literal's, or the declared type of a name `ctx.locals` holds that
+// is not an unpacked array, named whole. A member, a select, a call or an
+// operation is not read.
 CheckedType CheckedTypeOfValue(const Expr* e, const ReturnCtx& ctx);
 
 // §6.22.3 with §8.4: whether a value of `value` may be returned where `ret` is

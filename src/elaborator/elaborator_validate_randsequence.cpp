@@ -11,8 +11,6 @@
 // continue and return together with §18.17.6's exemption from two of them.
 
 #include <format>
-#include <string_view>
-#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -118,20 +116,15 @@ void CheckProductionReturns(const Stmt* s, const RsProduction& production,
 }
 
 // The names a return in the code block `block` of `production` is read
-// against, with the type each is declared with: the production's formal
-// arguments (§18.17.7) and the variables the block declares at its top level,
-// which hide a formal of the same name, each written with no unpacked
-// dimension.
-std::unordered_map<std::string_view, const DataType*> CodeBlockLocals(
-    const RsProduction& production, const std::vector<Stmt*>& block) {
-  std::unordered_map<std::string_view, const DataType*> locals;
-  for (const auto& port : production.ports) {
-    if (port.unpacked_dims.empty()) locals[port.name] = &port.data_type;
-  }
-  for (const Stmt* s : block) {
-    if (s->kind == StmtKind::kVarDecl && s->var_unpacked_dims.empty())
-      locals[s->var_name] = &s->var_decl_type;
-  }
+// against, with the declaration of each: the production's formal arguments
+// (§18.17.7) and the variables the block declares at its top level, which hide
+// a formal of the same name.
+DeclaredLocals CodeBlockLocals(const RsProduction& production,
+                               const std::vector<Stmt*>& block) {
+  DeclaredLocals locals;
+  for (const auto& port : production.ports)
+    locals[port.name] = {&port.data_type, &port.unpacked_dims};
+  EnterDeclaredLocals(block, locals);
   return locals;
 }
 

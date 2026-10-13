@@ -5,8 +5,8 @@
 
 #include "elaborator/return_value_fit.h"
 
+#include <cstddef>
 #include <string_view>
-#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -46,6 +46,70 @@ DataTypeKind ObviousLiteralKind(const Expr* e) {
   }
 }
 
+// The unpacked dimensions of a variable written with none: a for loop's
+// declared variable and a foreach loop variable.
+const std::vector<Expr*>* NoUnpackedDims() {
+  static const std::vector<Expr*> kNone;
+  return &kNone;
+}
+
+// §12.7.1: the variables the initialization of for loop `s` declares, each
+// with the data type written before it. Stmt::for_init_types holds
+// DataTypeKind::kImplicit for an item that assigns a variable declared outside
+// the loop rather than declaring one; Parser::ParseForLocalDeclInits and
+// Parser::ParseForPlainInits push one type for each item. An item with no
+// left-hand side is one the parser could not read as an assignment.
+void EnterForLocals(const Stmt* s, DeclaredLocals& locals) {
+  for (size_t i = 0; i < s->for_init_types.size(); ++i) {
+    const Stmt* init = s->for_inits[i];
+    if (s->for_init_types[i].kind == DataTypeKind::kImplicit ||
+        init->lhs == nullptr)
+      continue;
+    locals[init->lhs->text] = {&s->for_init_types[i], NoUnpackedDims()};
+  }
+}
+
+// §12.7.3: whether the dimension the `rank`th loop variable of a foreach over
+// `array` walks is a fixed-size, dynamic or queue dimension, the ones over
+// which the loop variable is an int. Its unpacked dimensions come first, then
+// the packed dimensions of its type. Parser::ParseUnpackedDims writes a dynamic
+// dimension as null and every associative one as an identifier, its index
+// type or `*`, which a parameter naming a fixed size is too, so an identifier
+// other than a queue's `$` is not plainly any of the three.
+bool WalksIntIndexedDim(const DeclaredLocal& array, size_t rank) {
+  if (rank >= array.unpacked->size())
+    return array.type->kind != DataTypeKind::kNamed;
+  const Expr* dim = (*array.unpacked)[rank];
+  return dim == nullptr || dim->kind != ExprKind::kIdentifier ||
+         dim->text == "$";
+}
+
+// §12.7.3: the loop variables of foreach loop `s`, each an int where the
+// dimension it walks is plainly one an int indexes and otherwise a name whose
+// type the check does not read. The array's entry is copied before any loop
+// variable is entered, since a loop variable may share its name and the array
+// is read in the scope around the loop.
+void EnterForeachLocals(const Stmt* s, DeclaredLocals& locals) {
+  static const DataType kLoopIndex = [] {
+    DataType t;
+    t.kind = DataTypeKind::kInt;
+    return t;
+  }();
+  DeclaredLocal array{nullptr, nullptr};
+  if (s->expr->kind == ExprKind::kIdentifier) {
+    auto it = locals.find(s->expr->text);
+    if (it != locals.end()) array = it->second;
+  }
+  for (size_t i = 0; i < s->foreach_vars.size(); ++i) {
+    std::string_view var = s->foreach_vars[i];
+    if (var.empty()) continue;
+    if (array.type != nullptr && WalksIntIndexedDim(array, i))
+      locals[var] = {&kLoopIndex, NoUnpackedDims()};
+    else
+      locals.erase(var);
+  }
+}
+
 }  // namespace
 
 CheckedType CheckedTypeOf(const DataType& declared, const ReturnCtx& ctx) {
@@ -59,23 +123,35 @@ CheckedType CheckedTypeOf(const DataType& declared, const ReturnCtx& ctx) {
   return out;
 }
 
-void EnterDeclaredLocals(
-    const std::vector<Stmt*>& items,
-    std::unordered_map<std::string_view, const DataType*>& locals) {
+void EnterDeclaredLocals(const std::vector<Stmt*>& items,
+                         DeclaredLocals& locals) {
   for (const Stmt* s : items) {
-    if (s->kind != StmtKind::kVarDecl) continue;
-    if (s->var_unpacked_dims.empty())
-      locals[s->var_name] = &s->var_decl_type;
-    else
-      locals.erase(s->var_name);
+    if (s->kind == StmtKind::kVarDecl)
+      locals[s->var_name] = {&s->var_decl_type, &s->var_unpacked_dims};
+  }
+}
+
+bool OpensScope(const Stmt* s) {
+  return s->kind == StmtKind::kBlock || s->kind == StmtKind::kFor ||
+         s->kind == StmtKind::kForeach;
+}
+
+void EnterScopeLocals(const Stmt* s, DeclaredLocals& locals) {
+  if (s->kind == StmtKind::kBlock) {
+    EnterDeclaredLocals(s->stmts, locals);
+  } else if (s->kind == StmtKind::kFor) {
+    EnterForLocals(s, locals);
+  } else {
+    EnterForeachLocals(s, locals);
   }
 }
 
 CheckedType CheckedTypeOfValue(const Expr* e, const ReturnCtx& ctx) {
   if (e->kind == ExprKind::kIdentifier) {
     auto it = ctx.locals.find(e->text);
-    return it == ctx.locals.end() ? CheckedType{}
-                                  : CheckedTypeOf(*it->second, ctx);
+    if (it == ctx.locals.end() || !it->second.unpacked->empty())
+      return CheckedType{};
+    return CheckedTypeOf(*it->second.type, ctx);
   }
   CheckedType out;
   out.type.kind = ObviousLiteralKind(e);
