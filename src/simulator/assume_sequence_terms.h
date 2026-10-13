@@ -29,6 +29,27 @@ using ObligationRewrite = std::function<Expr*(Expr*)>;
 // leading clock 0 (§16.13).
 using ClockNumbering = std::function<int(const std::vector<EventExpr>&)>;
 
+// The terms an assumption is read in: the rewrite of its expressions into
+// the terms of the checker whose free variables it constrains, and the
+// numbering of its clocks; `base`, where it is set, the terms the
+// assumption itself is read in, of which these are a named property's
+// body's (§16.12.17).
+struct ObligationScope {
+  ObligationRewrite rewrite;
+  ClockNumbering clocks;
+  const ObligationScope* base = nullptr;
+};
+
+// The fields of a sequence term other than its kind and operands.
+struct SeqTermShape {
+  Expr* expr = nullptr;
+  uint32_t lo = 0;
+  uint32_t hi = 0;
+  uint32_t count = 0;
+  int clock = 0;
+  uint8_t flags = 0;
+};
+
 // §16.13: the number of `clock`, its expressions rewritten by `rewrite`,
 // among the clocks `clocks` numbers; `inherited` where it is empty, the
 // clock flowing to it.
@@ -88,14 +109,13 @@ class SeqTerms {
   SeqTerms(const SeqTerms&) = delete;
   SeqTerms& operator=(const SeqTerms&) = delete;
 
-  // The term an attempt of the sequence `item` begins in, its operands on
-  // `clock` where they name no clock of their own and each expression it
-  // reads passed through `rewrite` and appended to `reads`; nullptr where it
-  // uses a form the terms do not read. `clock_out` is set to the number of
+  // The term an attempt of the sequence `item` begins in, read in `scope`,
+  // its operands on `clock` where they name no clock of their own and each
+  // expression it reads appended to `reads`; nullptr where it uses a form
+  // the terms do not read. `clock_out` is set to the number of
   // the clock flowing out of its end (§16.13.3).
   const SeqTerm* Begin(const ModuleItem* item, int clock,
-                       const ObligationRewrite& rewrite,
-                       const ClockNumbering& clocks, std::vector<Expr*>& reads,
+                       const ObligationScope& scope, std::vector<Expr*>& reads,
                        int& clock_out);
 
   // The ways of the attempts in `term` at a tick, the clocks that ticked at
@@ -113,8 +133,9 @@ class SeqTerms {
 
   const SeqTerm* Intern(SeqTerm term);
   const SeqTerm* Make(SeqTermKind kind, std::vector<const SeqTerm*> operands,
-                      Expr* expr = nullptr, uint32_t lo = 0, uint32_t hi = 0,
-                      uint32_t count = 0, int clock = 0, uint8_t flags = 0);
+                      const SeqTermShape& shape = {});
+  const SeqTerm* PairedNext(SeqTermKind kind, const SeqTerm* a,
+                            const SeqTerm* b);
   const SeqTerm* Wait(uint32_t lo, uint32_t hi, const SeqTerm* x, int clock);
   const SeqTerm* Bind(const SeqLocals* locals, const SeqTerm* x);
   const SeqLocals* Locals(std::vector<Logic4Vec> values,
@@ -130,6 +151,8 @@ class SeqTerms {
                   std::vector<SeqWay>& out);
   void ExpandPair(const SeqTerm* term, uint32_t ticked, bool anchor,
                   std::vector<SeqWay>& out);
+  void ExpandThroughout(const SeqTerm* term, uint32_t ticked, bool anchor,
+                        std::vector<SeqWay>& out);
   void ExpandFirstMatch(const SeqTerm* term, uint32_t ticked, bool anchor,
                         std::vector<SeqWay>& out);
   void ExpandRepeat(const SeqTerm* term, uint32_t ticked, bool anchor,

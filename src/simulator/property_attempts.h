@@ -5,9 +5,7 @@
 #include <vector>
 
 #include "common/arena.h"
-#include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
-#include "parser/expr_substitute.h"
 #include "simulator/instance_bindings.h"
 
 namespace delta {
@@ -73,18 +71,6 @@ const ModuleItem* InstantiatedProperty(const Expr* instance, SimContext& ctx);
 void ForEachPropertyActual(
     const Expr* instance,
     const std::function<void(const PropertyExprNode*)>& fn);
-
-// §F.4.1: a copy of the tree under `node` with the actuals substituted for
-// the formals in every expression it holds, a sequence shared with the
-// original; §16.12.18: a boolean operand naming a formal whose actual is a
-// sequence_expr or a property_expr stands for a copy of the actual.
-PropertyExprNode* SubstituteTree(const PropertyExprNode* node,
-                                 const ActualsByFormal& actuals, Arena& arena);
-
-// §16.12.18: the trees the sequence and property actuals of the instance
-// `instance` carry, substituted in place as the expression around them was.
-void SubstituteActualProperties(Expr* instance, const ActualsByFormal& actuals,
-                                Arena& arena);
 
 // The end of the run: each attempt still in flight is decided with its
 // sequence operands still in flight read as §16.12.2 has them, a strong one

@@ -197,23 +197,22 @@ const SeqTerm* SeqTerms::Intern(SeqTerm term) {
 }
 
 const SeqTerm* SeqTerms::Make(Kind kind, std::vector<const SeqTerm*> operands,
-                              Expr* expr, uint32_t lo, uint32_t hi,
-                              uint32_t count, int clock, uint8_t flags) {
+                              const SeqTermShape& shape) {
   SeqTerm term;
   term.kind = kind;
   term.operands = std::move(operands);
-  term.expr = expr;
-  term.lo = lo;
-  term.hi = hi;
-  term.count = count;
-  term.clock = clock;
-  term.flags = flags;
+  term.expr = shape.expr;
+  term.lo = shape.lo;
+  term.hi = shape.hi;
+  term.count = shape.count;
+  term.clock = shape.clock;
+  term.flags = shape.flags;
   return Intern(std::move(term));
 }
 
 const SeqTerm* SeqTerms::Wait(uint32_t lo, uint32_t hi, const SeqTerm* x,
                               int clock) {
-  return Make(Kind::kWait, {x}, nullptr, lo, hi, 0, clock);
+  return Make(Kind::kWait, {x}, {.lo = lo, .hi = hi, .clock = clock});
 }
 
 const SeqTerm* SeqTerms::Bind(const SeqLocals* locals, const SeqTerm* x) {
@@ -339,20 +338,26 @@ void SeqTerms::Expand(const SeqTerm* term, uint32_t ticked, bool anchor,
       ExpandBind(term, ticked, anchor, out);
       return;
     case Kind::kThroughout:
-      for (SeqWay way : Ways(term->operands[0], ticked, anchor)) {
-        if (Ticked(ticked, term->clock)) {
-          way.literals.emplace_back(term->expr, true);
-        }
-        if (way.next != nullptr) {
-          way.next = Make(Kind::kThroughout, {way.next}, term->expr, 0, 0, 0,
-                          term->clock);
-        }
-        out.push_back(std::move(way));
-      }
+      ExpandThroughout(term, ticked, anchor, out);
       return;
     default:
       out.push_back({{}, nullptr, {}});
       return;
+  }
+}
+
+// §16.9.9: the condition holds at every tick of its clock the guarded
+// sequence reads, the one it matches at among them.
+void SeqTerms::ExpandThroughout(const SeqTerm* term, uint32_t ticked,
+                                bool anchor, std::vector<SeqWay>& out) {
+  bool reads = Ticked(ticked, term->clock);
+  for (SeqWay way : Ways(term->operands[0], ticked, anchor)) {
+    if (reads) way.literals.emplace_back(term->expr, true);
+    if (way.next != nullptr) {
+      way.next = Make(Kind::kThroughout, {way.next},
+                      {.expr = term->expr, .clock = term->clock});
+    }
+    out.push_back(std::move(way));
   }
 }
 
@@ -391,7 +396,7 @@ void SeqTerms::ExpandThen(const SeqTerm* term, uint32_t ticked, bool anchor,
     if (way.next != nullptr) {
       out.push_back(
           {way.literals,
-           Make(Kind::kThen, {way.next, b}, nullptr, term->lo, term->hi),
+           Make(Kind::kThen, {way.next, b}, {.lo = term->lo, .hi = term->hi}),
            way.items});
       continue;
     }
@@ -422,16 +427,24 @@ void SeqTerms::ExpandPair(const SeqTerm* term, uint32_t ticked, bool anchor,
   const std::vector<SeqWay>& right = Ways(term->operands[1], ticked, anchor);
   for (const SeqWay& a : left) {
     for (const SeqWay& b : right) {
+      // Exactly one of the two matched: an intersect has no way on.
+      bool one_matched = (a.next == nullptr) != (b.next == nullptr);
+      if (one_matched && !conjunction) continue;
       SeqWay way = Joined(a, b);
-      if (a.next != nullptr && b.next != nullptr) {
-        way.next = Make(term->kind, {a.next, b.next});
-      } else if (a.next != b.next) {
-        if (!conjunction) continue;
-        way.next = a.next != nullptr ? a.next : b.next;
-      }
+      way.next = PairedNext(term->kind, a.next, b.next);
       out.push_back(std::move(way));
     }
   }
+}
+
+// The term a pair goes on in where its operands go on in `a` and `b`,
+// nullptr for one that matched: both on together, the one left alone, or
+// none where both matched.
+const SeqTerm* SeqTerms::PairedNext(Kind kind, const SeqTerm* a,
+                                    const SeqTerm* b) {
+  if (a == nullptr) return b;
+  if (b == nullptr) return a;
+  return Make(kind, {a, b});
 }
 
 // §16.9.8: the attempt ends at the first tick it matches at, every match
@@ -463,19 +476,20 @@ void SeqTerms::ExpandRepeat(const SeqTerm* term, uint32_t ticked, bool anchor,
   if (term->hi == 0) return;
   for (const SeqWay& way : Ways(term->operands[1], ticked, anchor)) {
     if (way.next != nullptr) {
-      out.push_back({way.literals,
-                     Make(Kind::kRepeat, {body, way.next}, nullptr, term->lo,
-                          term->hi, term->count),
-                     way.items});
+      out.push_back(
+          {way.literals,
+           Make(Kind::kRepeat, {body, way.next},
+                {.lo = term->lo, .hi = term->hi, .count = term->count}),
+           way.items});
       continue;
     }
     uint32_t done = term->count + 1;
     if (done >= term->lo) out.push_back(way);
     if (term->hi != kUnbounded && done >= term->hi) continue;
-    out.push_back(
-        {way.literals,
-         Make(Kind::kRepeat, {body, body}, nullptr, term->lo, term->hi, done),
-         way.items});
+    out.push_back({way.literals,
+                   Make(Kind::kRepeat, {body, body},
+                        {.lo = term->lo, .hi = term->hi, .count = done}),
+                   way.items});
   }
 }
 
@@ -493,8 +507,13 @@ void SeqTerms::ExpandGoto(const SeqTerm* term, std::vector<SeqWay>& out) {
   out.push_back({{{e, false}}, term, {}});
   uint32_t done = term->count + 1;
   auto counted = [&](uint8_t flags) {
-    return Make(Kind::kGoto, {}, e, term->lo, term->hi, done, term->clock,
-                flags);
+    return Make(Kind::kGoto, {},
+                {.expr = e,
+                 .lo = term->lo,
+                 .hi = term->hi,
+                 .count = done,
+                 .clock = term->clock,
+                 .flags = flags});
   };
   if (term->hi == kUnbounded || done < term->hi) {
     out.push_back({{{e, true}}, counted(term->flags), {}});
@@ -668,7 +687,7 @@ struct SeqTerms::Builder {
           terms.Make(Kind::kThroughout,
                      {terms.Wait(guard.lead - inner.lead,
                                  guard.lead - inner.lead, inner.term, first)},
-                     Read(guard.cond), 0, 0, 0, first);
+                     {.expr = Read(guard.cond), .clock = first});
       head.lead = guard.lead;
       last = guard.last;
     } else {
@@ -678,8 +697,9 @@ struct SeqTerms::Builder {
     Part rest = Range(s, last + 1, j, clock, used);
     if (rest.term == nullptr) return {};
     const SeqCycleDelay& d = s.delays[last + 1];
-    head.term = terms.Make(Kind::kThen, {head.term, rest.term}, nullptr,
-                           d.min - rest.lead, Shorter(d.max, rest.lead));
+    head.term =
+        terms.Make(Kind::kThen, {head.term, rest.term},
+                   {.lo = d.min - rest.lead, .hi = Shorter(d.max, rest.lead)});
     return head;
   }
 
@@ -699,13 +719,18 @@ struct SeqTerms::Builder {
       uint8_t flags = rep.kind == SeqRepetition::Kind::kNonconsecutive
                           ? kNonconsecutive
                           : 0;
-      return terms.Make(Kind::kGoto, {}, Read(s.operands[i]), rep.min, rep.max,
-                        0, own, flags);
+      return terms.Make(Kind::kGoto, {},
+                        {.expr = Read(s.operands[i]),
+                         .lo = rep.min,
+                         .hi = rep.max,
+                         .clock = own,
+                         .flags = flags});
     }
     const SeqTerm* base =
         nested != nullptr ? Body(*nested, own) : Bool(s, i, own, items);
     if (base == nullptr || !repeated) return base;
-    return terms.Make(Kind::kRepeat, {base, base}, nullptr, rep.min, rep.max);
+    return terms.Make(Kind::kRepeat, {base, base},
+                      {.lo = rep.min, .hi = rep.max});
   }
 
   const SeqTerm* Bool(const LinearSequence& s, size_t i, int clock,
@@ -720,8 +745,7 @@ struct SeqTerms::Builder {
 };
 
 const SeqTerm* SeqTerms::Begin(const ModuleItem* item, int clock,
-                               const ObligationRewrite& rewrite,
-                               const ClockNumbering& clocks,
+                               const ObligationScope& scope,
                                std::vector<Expr*>& reads, int& clock_out) {
   auto seq = std::make_unique<LinearSequence>();
   if (!FlattenLinearSequence(item, ctx_, arena_, *seq)) return nullptr;
@@ -730,7 +754,7 @@ const SeqTerm* SeqTerms::Begin(const ModuleItem* item, int clock,
                      seq->intersects.size() + seq->nested.size() +
                      static_cast<size_t>(seq->first_match);
   if (has_locals && composite != 0) return nullptr;
-  Builder builder{*this, rewrite, clocks, reads, has_locals};
+  Builder builder{*this, scope.rewrite, scope.clocks, reads, has_locals};
   const SeqTerm* term = builder.Body(*seq, clock);
   if (term == nullptr) return nullptr;
   if (has_locals) {

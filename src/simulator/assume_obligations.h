@@ -26,14 +26,6 @@ class SimContext;
 struct ObligationNode;
 enum class ObligationKind : uint8_t;
 
-// The terms an assumption is read in: the rewrite of its expressions into
-// the terms of the checker whose free variables it constrains, and the
-// numbering of its clocks.
-struct ObligationScope {
-  ObligationRewrite rewrite;
-  ClockNumbering clocks;
-};
-
 // §17.7.2: the obligations of the assumptions of one assume set. A solution
 // attempt is held to the conditions under which no obligation in flight
 // fails in its time step, and once the active free variables take their

@@ -59,8 +59,12 @@ struct ObligationNode {
   bool fresh = false;
   std::vector<const ObligationNode*> operands;
   std::vector<const SeqTerm*> terms;
+  // §16.12.17: an instance's declaration, the terms of the assumption it
+  // stands in, and the terms of the first body it was met in, which its
+  // actuals are read in.
   const ModuleItem* decl = nullptr;
   const ObligationScope* scope = nullptr;
+  const ObligationScope* outer = nullptr;
   // The conditions under which the node does not fail at a tick and under
   // which it holds by it, by the clocks that ticked, each read once; and an
   // instance's expansion.
@@ -202,25 +206,31 @@ const ObligationNode* AssumeObligations::Expand(const ObligationNode* node) {
   }
 }
 
-// §16.12.17: an instance stands for the declaration's body with the actuals
-// in the formals' places, on the clock the declaration names or the one
-// flowing to the instance; an instance met while its own declaration is
-// being expanded is expanded when it is read, so that a recursive property
-// is expanded a tick at a time and its expansions, sharing the instance,
-// are one node. Where the body is of a form the obligations do not model,
-// it puts no condition on the time step.
+// §16.12.17: an instance stands for the declaration's body read with the
+// actuals in the formals' places, its sequences' operands among them, on
+// the clock the declaration names or the one flowing to the instance; an
+// instance met while its own declaration is being expanded is expanded
+// when it is read, so that a recursive property is expanded a tick at a
+// time and its expansions, sharing the instance, are one node. Where the
+// body is of a form the obligations do not model, it puts no condition on
+// the time step.
 const ObligationNode* AssumeObligations::Expansion(const ObligationNode* node,
                                                    std::vector<Expr*>& reads) {
   if (node->expansion != nullptr) return node->expansion;
   const ModuleItem* decl = node->decl;
+  const ObligationScope* outer = node->outer;
   ActualsByFormal actuals = BindInstanceActuals(decl, node->expr, arena_);
-  PropertyExprNode* body =
-      SubstituteTree(decl->prop_body_tree, actuals, arena_);
+  scopes_.push_back(std::make_unique<ObligationScope>(ObligationScope{
+      [rewrite = outer->rewrite, actuals, &arena = arena_](Expr* e) {
+        return rewrite(SubstituteFormals(e, actuals, arena));
+      },
+      outer->clocks, node->scope}));
+  const ObligationScope& inner = *scopes_.back();
   int clock =
-      NumberClock(SubstituteClock(decl->prop_clock, actuals, arena_),
-                  node->clock, node->scope->rewrite, node->scope->clocks);
+      NumberClock(decl->prop_clock, node->clock, inner.rewrite, inner.clocks);
   expanding_.insert(decl);
-  const ObligationNode* built = Build(body, clock, *node->scope, reads);
+  const ObligationNode* built =
+      Build(decl->prop_body_tree, clock, inner, reads);
   expanding_.erase(decl);
   node->expansion = built != nullptr ? built : true_;
   return built;
@@ -272,7 +282,8 @@ const ObligationNode* AssumeObligations::BuildInstance(
     Expr* e, const ModuleItem* decl, int clock, const ObligationScope& scope,
     std::vector<Expr*>& reads) {
   if (!decl->prop_locals.empty()) return nullptr;
-  std::string key = Id(decl) + ':' + Id(&scope);
+  const ObligationScope* base = scope.base != nullptr ? scope.base : &scope;
+  std::string key = Id(decl) + ':' + Id(base);
   for (const Expr* arg : e->args) key += ',' + Id(arg);
   for (std::string_view name : e->arg_names) key += ';' + std::string(name);
   Expr*& first = instances_[key];
@@ -282,7 +293,8 @@ const ObligationNode* AssumeObligations::BuildInstance(
   node.expr = first;
   node.clock = clock;
   node.decl = decl;
-  node.scope = &scope;
+  node.scope = base;
+  node.outer = &scope;
   const ObligationNode* instance = Intern(std::move(node));
   if (expanding_.count(decl) != 0) return instance;
   if (Expansion(instance, reads) == nullptr) return nullptr;
@@ -292,8 +304,7 @@ const ObligationNode* AssumeObligations::BuildInstance(
 const ObligationNode* AssumeObligations::BuildSequence(
     const ModuleItem* item, int clock, const ObligationScope& scope,
     std::vector<Expr*>& reads, int& clock_out) {
-  const SeqTerm* term =
-      terms_.Begin(item, clock, scope.rewrite, scope.clocks, reads, clock_out);
+  const SeqTerm* term = terms_.Begin(item, clock, scope, reads, clock_out);
   if (term == nullptr) return nullptr;
   return Seq({term}, true);
 }

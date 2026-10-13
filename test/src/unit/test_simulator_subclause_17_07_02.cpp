@@ -640,14 +640,14 @@ TEST(CheckerVariableRandomization, ASequenceOperatorConstrainsLaterTicks) {
 
 // §17.7.2 with §16.10: an assumption over a sequence assigning a local
 // variable reads it later at the value the attempt assigned: y is solved
-// to the value x had the tick before, and to its double through a compound
-// assignment.
+// to the value x had the tick before, and, through a compound assignment
+// summing x over two ticks, to whether exactly one of them held.
 TEST(CheckerVariableRandomization, ALocalVariableCarriesItsValue) {
   ExpectAssumedPropertiesHold(
       {"s1", "s2"},
       "  sequence s1; bit v; (1, v = x) ##1 (y == v); endsequence\n"
       "  sequence s2; bit [1:0] v; (1, v = x) ##1 (1, v += x) ##1 "
-      "({z, y} == v); endsequence\n");
+      "(y == (v == 2'd1)); endsequence\n");
 }
 
 // §17.7.2 with §16.13: an assumption whose operands name a clock of their
