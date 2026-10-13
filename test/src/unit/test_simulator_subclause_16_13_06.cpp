@@ -243,7 +243,7 @@ TEST(SequenceMethods, AClocklessSequenceReadOutsideAnAssertionTakesTheDefault) {
 TEST(SequenceMethods, AClocklessSequenceReadInAProcedureTakesItsClock) {
   SimFixture f;
   std::string out = RunCapture(
-      "program p(input bit clk);\n"
+      "program p(input logic clk);\n"
       "  bit a = 1, b = 1;\n"
       "  int n = 0;\n"
       "  sequence e4;\n"
