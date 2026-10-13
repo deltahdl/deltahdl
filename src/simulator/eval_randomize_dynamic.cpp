@@ -117,28 +117,71 @@ RandInfo SizeVariable(std::string_view array, const ClassTypeInfo* level) {
   return size;
 }
 
-// 18.4: folds the active size constraints over the size variable `size`,
-// which each relation of an active constraint block naming the size method
-// is translated against, a comparison folding its domain and a set
-// membership bounding it by its largest member; false where no active block
-// constrains the size, which leaves the array its size.
+// 18.4: `rel` with each size method resolved to its variable, where it then
+// names the size `size`; null where it does not.
+const Expr* SizeRelation(const Expr* rel, const RandInfo& size,
+                         RandomizeCtx& rc) {
+  const Expr* resolved = ResolveArraySizes(rel, rc);
+  return RefsNamedRandVar(resolved, size.name) ? resolved : nullptr;
+}
+
+// 18.4: folds the hard relations `rels` that name the size `size` over it,
+// each translated against it, a comparison folding its domain and a set
+// membership bounding `largest` by its largest member. Answers whether any
+// names it.
+bool FoldHardSizeRelations(const std::vector<Expr*>& rels, RandInfo& size,
+                           std::vector<RandInfo>& rands, RandomizeCtx& rc,
+                           int64_t& largest) {
+  bool named = false;
+  for (const Expr* rel : rels) {
+    const Expr* resolved = SizeRelation(rel, size, rc);
+    if (resolved == nullptr) continue;
+    named = true;
+    ConstraintExpr ce = TranslateRelation(resolved, rands, rc, /*fold=*/true);
+    if (ce.kind == ConstraintKind::kSetMembership && ce.var_name == size.name &&
+        !ce.set_values.empty()) {
+      largest = std::min(largest, *std::max_element(ce.set_values.begin(),
+                                                    ce.set_values.end()));
+    }
+  }
+  return named;
+}
+
+// 18.4 with 18.5.13: whether a soft relation of `rels` names the size `size`.
+// A soft relation the solve keeps constrains the size as a hard one does,
+// though it is never folded into the domain, the solve being free to
+// discard it.
+bool SoftRelationNamesSize(const std::vector<Expr*>& rels, const RandInfo& size,
+                           RandomizeCtx& rc) {
+  return std::ranges::any_of(rels, [&](const Expr* rel) {
+    return SizeRelation(rel, size, rc) != nullptr;
+  });
+}
+
+// 18.4: whether the block `m` constrains the size `size`, hard relations
+// folded over it as FoldHardSizeRelations does.
+bool BlockConstrainsSize(const ClassMember* m, RandInfo& size,
+                         std::vector<RandInfo>& rands, RandomizeCtx& rc,
+                         int64_t& largest) {
+  const bool kHard =
+      FoldHardSizeRelations(m->constraint_exprs, size, rands, rc, largest);
+  return SoftRelationNamesSize(m->constraint_soft_exprs, size, rc) || kHard;
+}
+
+// 18.4: folds the size constraints of each active constraint block, and of
+// the call's inline block (18.7), over the size variable `size`; false where
+// none constrains the size, which leaves the array its size.
 bool FoldSizeConstraints(RandInfo& size, std::vector<RandInfo>& rands,
                          RandomizeCtx& rc) {
   bool constrained = false;
   int64_t largest = kMaxDynamicElements;
   for (const ClassMember* m : ConstraintMembersInOrder(rc.obj->type)) {
     if (!IsObjectConstraintActive(rc.obj, m->name)) continue;
-    for (const Expr* rel : m->constraint_exprs) {
-      const Expr* resolved = ResolveArraySizes(rel, rc);
-      if (!RefsNamedRandVar(resolved, size.name)) continue;
-      ConstraintExpr ce = TranslateRelation(resolved, rands, rc, /*fold=*/true);
-      constrained = true;
-      if (ce.kind == ConstraintKind::kSetMembership &&
-          ce.var_name == size.name && !ce.set_values.empty()) {
-        largest = std::min(largest, *std::max_element(ce.set_values.begin(),
-                                                      ce.set_values.end()));
-      }
-    }
+    if (BlockConstrainsSize(m, size, rands, rc, largest)) constrained = true;
+  }
+  if (rc.inline_block != nullptr &&
+      BlockConstrainsSize(rc.inline_block, size, rands, rc, largest)) {
+    constrained = true;
   }
   if (constrained) FoldBound(size, ConstraintKind::kLessEqual, largest);
   return constrained;
@@ -399,6 +442,8 @@ void WriteBackSolved(ClassObject* obj, std::vector<RandInfo>& rands,
   }
   WriteQueues(obj, queues);
   WriteStructDynamicElements(obj, struct_elements, arena);
+  for (const auto& [array, size] : sizes)
+    DropDroppedElementModes(RandModesOf(obj, array), array, size);
 }
 
 }  // namespace delta

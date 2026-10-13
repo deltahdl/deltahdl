@@ -153,6 +153,10 @@ struct RandomizeCtx {
   // and a local made per evaluation is arena storage the run never gets
   // back (eval_randomize_custom.cpp).
   std::unordered_map<std::string, Variable*> trial_locals = {};
+  // 18.7: the inline block of the randomize() with call, read with the
+  // class's own blocks where they decide whether an array is resized (18.4);
+  // null for a call without one.
+  const ClassMember* inline_block = nullptr;
 };
 
 // §18.4: the random variables of the elements of each rand dynamic array
@@ -432,6 +436,10 @@ bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
                      std::unordered_set<const ClassObject*>& visited);
 void SetObjectConstraintActive(ClassObject* obj, std::string_view name,
                                bool active);
+// §18.8: the rand_mode() states of `obj` that the random variable `name`
+// reads, its declaring class's where it is static and the object's otherwise.
+std::unordered_map<std::string, bool>& RandModesOf(ClassObject* obj,
+                                                   std::string_view name);
 void SetObjectRandActive(ClassObject* obj, std::string_view name, bool active);
 
 }  // namespace delta

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "common/types.h"
@@ -29,6 +30,13 @@ std::string ClassArrayElementKey(std::string_view name, int64_t index);
 // randomize() that constrains the size solve it as a variable of that name
 // and a foreach read it as the state variable it is there (18.5.7.1).
 std::string ClassArraySizeKey(std::string_view name);
+
+// §18.4: a resize to `size` elements drops the rand_mode the elements of the
+// array `member` from index `size` up were each given on their own, held in
+// `modes` under each element's key, so an element added there later is
+// active, as every new element is.
+void DropDroppedElementModes(std::unordered_map<std::string, bool>& modes,
+                             std::string_view member, int64_t size);
 
 // The array property named `name` on the class chain of `type`, or null where
 // the chain declares none of that name or the property is no array.

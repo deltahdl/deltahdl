@@ -3,9 +3,11 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <numeric>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -28,6 +30,16 @@ namespace delta {
 
 std::string ClassArrayElementKey(std::string_view name, int64_t index) {
   return std::string(name) + "[" + std::to_string(index) + "]";
+}
+
+void DropDroppedElementModes(std::unordered_map<std::string, bool>& modes,
+                             std::string_view member, int64_t size) {
+  const std::string kPrefix = std::string(member) + "[";
+  std::erase_if(modes, [&](const auto& entry) {
+    return entry.first.starts_with(kPrefix) &&
+           std::strtoll(entry.first.c_str() + kPrefix.size(), nullptr, 10) >=
+               size;
+  });
 }
 
 std::string ClassArraySizeKey(std::string_view name) {
@@ -580,6 +592,11 @@ bool TryClassArrayNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       rhs->args.size() > 1 && ResolveClassArray(rhs->args[1], ctx, arena, init);
   ResizeClassArray(ref, static_cast<uint32_t>(size), has_init ? &init : nullptr,
                    ctx, arena);
+  // §18.4: a static array's rand_mode states are its declaring class's.
+  DropDroppedElementModes(ref.static_owner != nullptr
+                              ? ref.static_owner->static_rand_active
+                              : ref.obj->rand_active,
+                          ref.prop->name, size);
   return true;
 }
 

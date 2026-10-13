@@ -559,6 +559,7 @@ bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
   ConstraintSolver solver(seed);
   RandomizeCtx rc{obj, ctx, arena};
   rc.solver = &solver;
+  rc.inline_block = call.inline_block;
 
   std::vector<RandInfo> rands;
   CollectRandVariables(obj->type, ctx, rands);
@@ -609,10 +610,15 @@ void SetObjectConstraintActive(ClassObject* obj, std::string_view name,
 // 18.8: a call on an array member without an index affects all of its
 // elements, so the states its elements were given on their own are dropped
 // for the member's.
-void SetObjectRandActive(ClassObject* obj, std::string_view name, bool active) {
+std::unordered_map<std::string, bool>& RandModesOf(ClassObject* obj,
+                                                   std::string_view name) {
   // §18.8: a static variable's state is held by its declaring class.
   const ClassTypeInfo* owner = StaticRandOwner(obj, name);
-  auto& modes = owner != nullptr ? owner->static_rand_active : obj->rand_active;
+  return owner != nullptr ? owner->static_rand_active : obj->rand_active;
+}
+
+void SetObjectRandActive(ClassObject* obj, std::string_view name, bool active) {
+  auto& modes = RandModesOf(obj, name);
   std::string prefix = std::string(name) + "[";
   for (auto it = modes.begin(); it != modes.end();) {
     if (it->first.compare(0, prefix.size(), prefix) == 0) {

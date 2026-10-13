@@ -498,4 +498,111 @@ TEST(RandQueueRun, AnAssociativeArrayElementIsNamedByItsWholeIndex) {
   EXPECT_EQ(out, "1 2 1 2\n");
 }
 
+// §18.4 with §18.8: a resize by randomize() keeps the rand_mode of each
+// element it retains and makes each element it adds active, so the element at
+// index 2, turned off, dropped by a shrink and added back by a regrow, is
+// active again, while the retained element 0 and the scalar b stay off.
+TEST(RandQueueRun, AnElementAddedBackByRandomizeIsActive) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  rand int a[];\n"
+      "  rand int b;\n"
+      "  int n = 3;\n"
+      "  constraint c { a.size() == n; foreach (a[i]) a[i] inside {[1:9]};\n"
+      "                 b inside {[1:9]}; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    static C o = new;\n"
+      "    void'(o.randomize());\n"
+      "    o.b.rand_mode(0);\n"
+      "    o.a[0].rand_mode(0);\n"
+      "    o.a[2].rand_mode(0);\n"
+      "    o.n = 2;\n"
+      "    void'(o.randomize());\n"
+      "    o.n = 3;\n"
+      "    void'(o.randomize());\n"
+      "    $display(\"%0d %0d %0d\", o.a[0].rand_mode(), o.a[2].rand_mode(),\n"
+      "             o.b.rand_mode());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 1 0\n");
+}
+
+// §18.4 with §18.8: a resize by new[] does the same, for a static rand array,
+// whose modes its class holds, as for one of the object's own.
+TEST(RandQueueRun, AnElementAddedBackByNewIsActive) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  rand int a[];\n"
+      "  static rand int s[];\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    static C o = new;\n"
+      "    o.a = new[3];\n"
+      "    o.s = new[3];\n"
+      "    o.a[0].rand_mode(0);\n"
+      "    o.a[2].rand_mode(0);\n"
+      "    o.s[2].rand_mode(0);\n"
+      "    o.a = new[2];\n"
+      "    o.s = new[2];\n"
+      "    o.a = new[3];\n"
+      "    o.s = new[3];\n"
+      "    $display(\"%0d %0d %0d\", o.a[0].rand_mode(), o.a[2].rand_mode(),\n"
+      "             o.s[2].rand_mode());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 1 1\n");
+}
+
+// §18.4 with §18.5.13: a soft constraint that is kept constrains the size as a
+// hard one does, so the array of two elements is resized to the six it asks.
+TEST(RandQueueRun, AKeptSoftSizeConstraintResizesTheArray) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  rand bit [3:0] a[];\n"
+      "  constraint c { soft a.size() == 6; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    static C o = new;\n"
+      "    o.a = new[2];\n"
+      "    void'(o.randomize());\n"
+      "    $display(\"%0d\", o.a.size());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "6\n");
+}
+
+// §18.4 with §18.7: a size constraint of an inline block, hard or soft,
+// resizes the array as one of the class's own blocks does, and an inline
+// block naming no size leaves the array its size.
+TEST(RandQueueRun, AnInlineSizeConstraintResizesTheArray) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  rand bit [3:0] a[];\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    static C o = new;\n"
+      "    void'(o.randomize() with { a.size() == 4; });\n"
+      "    $write(\"%0d \", o.a.size());\n"
+      "    void'(o.randomize() with { soft a.size() == 5; });\n"
+      "    $write(\"%0d \", o.a.size());\n"
+      "    void'(o.randomize() with { a[0] == 3; });\n"
+      "    $display(\"%0d %0d\", o.a.size(), o.a[0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4 5 5 3\n");
+}
+
 }  // namespace
