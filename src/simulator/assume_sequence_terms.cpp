@@ -559,8 +559,7 @@ const SeqTerm* SeqTerms::Take(const SeqWay& way) {
 // repetitions, under the throughouts spanning parts of it, and a nested
 // operand a sequence of its own; each operand on the clock it names or the
 // one flowing to it. `failures` counts the uses of forms the terms do not
-// read: match items on a repeated operand, and locals of a nested
-// sequence's own.
+// read: match items on a goto or nonconsecutive repetition's operand.
 struct SeqTerms::Builder {
   SeqTerms& terms;
   const ObligationScope& scope;
@@ -664,20 +663,19 @@ struct SeqTerms::Builder {
 
   // §16.9.2: the operand at `i` under its repetition, a boolean or a nested
   // sequence, on the clock it names or `clock`; one that may repeat zero
-  // times may match empty.
+  // times may match empty, and a consecutive one performs its match items
+  // at each repetition's match.
   const SeqTerm* Item(const LinearSequence& s, size_t i, int clock) {
     int own = ClockOf(OperandClock(s, i), clock);
     const SeqRepetition& rep = s.repetitions[i];
     const std::vector<SeqMatchAssign>& items = s.match_items[i];
     bool repeated = rep.kind != SeqRepetition::Kind::kNone;
-    int repeated_items =
-        static_cast<int>(!items.empty()) * static_cast<int>(repeated);
-    failures += repeated_items;
     auto nullable = static_cast<uint8_t>((rep.min == 0) * kNullable);
     if (rep.kind == SeqRepetition::Kind::kGoto ||
         rep.kind == SeqRepetition::Kind::kNonconsecutive) {
       auto nonconsecutive = static_cast<uint8_t>(
           (rep.kind == SeqRepetition::Kind::kNonconsecutive) * kNonconsecutive);
+      failures += static_cast<int>(items.size());
       return terms.Make(
           Kind::kGoto, {},
           {.expr = Read(s.operands[i]),
@@ -688,17 +686,10 @@ struct SeqTerms::Builder {
     }
     const LinearSequence* nested = NestedOperand(s, i);
     const SeqTerm* base =
-        nested != nullptr ? Nested(*nested, own) : Bool(s, i, own, items);
+        nested != nullptr ? Body(*nested, own) : Bool(s, i, own, items);
     if (!repeated) return base;
     return terms.Make(Kind::kRepeat, {base, base},
                       {.lo = rep.min, .hi = rep.max, .flags = nullable});
-  }
-
-  // §16.10: a nested sequence declaring locals of its own is not read, the
-  // attempt's locals being the outer sequence's.
-  const SeqTerm* Nested(const LinearSequence& s, int clock) {
-    failures += static_cast<int>(s.locals.size());
-    return Body(s, clock);
   }
 
   const SeqTerm* Bool(const LinearSequence& s, size_t i, int clock,
@@ -712,19 +703,37 @@ struct SeqTerms::Builder {
   }
 };
 
+namespace {
+
+// §16.10: the locals the flattened sequence `s` declares and those its
+// operands' and nested sequences' bodies declare, each under the name of
+// its own the flattening gave it.
+void CollectLocals(const LinearSequence& s, std::vector<SeqLocalDecl>& out) {
+  out.insert(out.end(), s.locals.begin(), s.locals.end());
+  for (const auto* list : {&s.alternatives, &s.conjuncts, &s.intersects}) {
+    for (const LinearSequence& inner : *list) CollectLocals(inner, out);
+  }
+  for (const auto& entry : s.nested) CollectLocals(*entry.second, out);
+}
+
+}  // namespace
+
 const SeqTerm* SeqTerms::Begin(const ModuleItem* item, int clock,
                                const ObligationScope& scope,
                                std::vector<Expr*>& reads, int& clock_out) {
   auto seq = std::make_unique<LinearSequence>();
   if (!FlattenLinearSequence(item, ctx_, arena_, *seq)) return nullptr;
-  bool has_locals = !seq->locals.empty();
   Builder builder{*this, scope, reads};
   const SeqTerm* term = builder.Body(*seq, clock);
   if (builder.failures != 0) return nullptr;
-  if (has_locals) {
-    term = Bind(Locals(InitialLocals(seq->locals, ctx_, arena_), &seq->locals),
-                term);
+  // §16.10: an attempt's copies of every local of the sequence, a nested
+  // sequence's among them, begun with the attempt.
+  auto decls = std::make_unique<std::vector<SeqLocalDecl>>();
+  CollectLocals(*seq, *decls);
+  if (!decls->empty()) {
+    term = Bind(Locals(InitialLocals(*decls, ctx_, arena_), decls.get()), term);
   }
+  local_decls_.push_back(std::move(decls));
   clock_out = builder.ClockOf(seq->clock_out, clock);
   sequences_.push_back(std::move(seq));
   return term;

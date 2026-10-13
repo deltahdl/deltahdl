@@ -184,6 +184,7 @@ class SeqTerms {
   std::map<std::string, std::unique_ptr<SeqTerm>> terms_;
   std::map<std::string, std::unique_ptr<LocalValues>> locals_;
   std::vector<std::unique_ptr<LinearSequence>> sequences_;
+  std::vector<std::unique_ptr<std::vector<SeqLocalDecl>>> local_decls_;
   const SeqTerm* match_ = nullptr;
 };
 
