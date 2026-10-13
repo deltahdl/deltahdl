@@ -8,6 +8,8 @@ metadata:
   modified: 2026-10-13T00:25:00.815Z
 ---
 
+# Searching for an existing report before filing
+
 Before filing an issue that says deltahdl does not report something, search the whole of `src/` and `test/src/unit/` for words the rule itself uses (e.g. `ANSI`, `non-void`, `return`), not only for diagnostics tagged with the clause being reconciled. A rule is often already enforced under a neighbouring clause (§12.8 for §13.4.1's return-value rule) or in a different subsystem than the one first looked at (the elaborator rather than the parser for §13.5.3's ANSI-only defaults).
 
 **Why:** fixing a rule that is already reported adds a second diagnostic for one construct, which breaks the existing tests of the first and costs a red run and a revert.
