@@ -1,12 +1,13 @@
 #pragma once
 
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace delta {
 
 class DiagEngine;
-struct CompilationUnit;
+struct TypeShapeTables;
 struct ModuleDecl;
 struct ModuleItem;
 
@@ -29,11 +30,14 @@ void ValidateProceduralCheckerActuals(
     const std::unordered_set<std::string_view>& automatics, DiagEngine& diag);
 
 // §17.2: a checker the module `decl` declares references no member or
-// element of a dynamic variable `decl` declares, an array of a dynamically
-// sized dimension or a handle of one of the classes of `unit`, and no element
-// of a fork-join block of `decl`'s procedures.
-void ValidateCheckerEnclosingRefs(const ModuleDecl* decl,
-                                  const CompilationUnit& unit,
-                                  DiagEngine& diag);
+// element of a dynamic variable `decl` declares, an array of a dimension that
+// is not fixed-size or a handle of a class, judged by `tables`, and no element
+// of a fork-join block of `decl`'s procedures. §17.8: nor does it call, on the
+// right-hand side of a checker variable assignment, one of the functions
+// `funcs` that writes an argument back, keeps state or has a side effect.
+void ValidateCheckerEnclosingRefs(
+    const ModuleDecl* decl, const TypeShapeTables& tables,
+    const std::unordered_map<std::string_view, const ModuleItem*>& funcs,
+    DiagEngine& diag);
 
 }  // namespace delta

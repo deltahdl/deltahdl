@@ -14,6 +14,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/net_data_type.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
@@ -209,7 +210,8 @@ void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl,
   ValidateAssertionContextRules(decl, mod, property_registry_, diag_);
   ValidateLocalVariableFlow(decl, diag_);
   ValidateCheckerFormalDefaults(decl, diag_);
-  ValidateCheckerEnclosingRefs(decl, *unit_, diag_);
+  const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
+  ValidateCheckerEnclosingRefs(decl, kShapeTables, func_decls_, diag_);
   if (sequence_names_.empty()) return;
   // §16.8 actual-argument checks need each named sequence's formals, so map the
   // sequences declared in this scope by name. A sequence instantiated across a

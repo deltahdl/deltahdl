@@ -1,7 +1,6 @@
 #include "elaborator/checker_actual_rules.h"
 
 #include <algorithm>
-#include <array>
 #include <cstddef>
 #include <functional>
 #include <string>
@@ -11,11 +10,10 @@
 
 #include "common/diagnostic.h"
 #include "elaborator/assertion_walk.h"
-#include "elaborator/queue_dim.h"
+#include "elaborator/checker_procedure_rules.h"
+#include "elaborator/net_data_type.h"
 #include "elaborator/sensitivity.h"
-#include "parser/ast_class.h"
 #include "parser/ast_covergroup.h"
-#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -162,19 +160,13 @@ void CheckTaintedFormalUse(const ModuleItem* item, const ModuleDecl* checker,
 }
 
 // §6.21: whether the variable `item` declares is dynamic, an array with a
-// dynamically sized dimension, `[]`, a queue's `[$]`, an associative array's
-// `[*]` or a keyword index, or a handle of one of the classes `classes`.
-bool IsDynamicVariable(const ModuleItem* item,
-                       const std::unordered_set<std::string_view>& classes) {
-  static constexpr std::array<std::string_view, 9> kIndexes{
-      "*",        "string",  "int", "integer", "byte",
-      "shortint", "longint", "bit", "logic"};
+// dimension that is not fixed-size, a dynamic array's `[]`, a queue's `[$]`
+// or an associative array's index, or a handle of a class `tables` names.
+bool IsDynamicVariable(const ModuleItem* item, const TypeShapeTables& tables) {
   bool handle = item->data_type.kind == DataTypeKind::kNamed &&
-                classes.count(item->data_type.type_name) != 0;
-  return handle || std::ranges::any_of(item->unpacked_dims, [](const Expr* d) {
-           return d == nullptr || IsQueueDim(d) ||
-                  (d->kind == ExprKind::kIdentifier &&
-                   std::ranges::find(kIndexes, d->text) != kIndexes.end());
+                tables.class_names.count(item->data_type.type_name) != 0;
+  return handle || std::ranges::any_of(item->unpacked_dims, [&](const Expr* d) {
+           return !IsFixedSizeUnpackedDim(d, tables);
          });
 }
 
@@ -231,6 +223,37 @@ void CheckEnclosingRefs(const ModuleDecl* checker, NameSet dynamic,
   });
 }
 
+// §17.8 with §16.6: each call, on the right-hand side of a checker
+// variable assignment in the checker `checker`, of a function `funcs` names
+// that the checker does not declare again, which writes an argument back,
+// keeps state or has a side effect.
+void CheckOutsideFunctionCalls(const ModuleDecl* checker, NamedDecls funcs,
+                               DiagEngine& diag) {
+  for (const ModuleItem* item : checker->items) funcs.erase(item->name);
+  auto check = [&](const Expr* e) {
+    if (e->kind != ExprKind::kCall) return;
+    auto it = funcs.find(e->callee);
+    if (it == funcs.end()) return;
+    if (!HasArgumentWrittenBack(it->second) && !FunctionIsImpure(it->second)) {
+      return;
+    }
+    diag.Error(e->range.start,
+               "function '" + std::string(e->callee) +
+                   "' writes an argument back, keeps state or has a side "
+                   "effect and cannot be called on the right-hand side of a "
+                   "checker variable assignment",
+               Subclause("17.8"));
+  };
+  for (const ModuleItem* item : checker->items) {
+    ForEachProceduralStmt(item, [&](const Stmt* s) {
+      if (s->kind == StmtKind::kBlockingAssign ||
+          s->kind == StmtKind::kNonblockingAssign) {
+        ForEachSubExpr(s->rhs, check);
+      }
+    });
+  }
+}
+
 }  // namespace
 
 void ValidateCheckerActuals(const ModuleItem* item, const ModuleDecl* checker,
@@ -273,15 +296,13 @@ void ValidateProceduralCheckerActuals(
 }
 
 void ValidateCheckerEnclosingRefs(const ModuleDecl* decl,
-                                  const CompilationUnit& unit,
-                                  DiagEngine& diag) {
-  NameSet classes;
-  for (const ClassDecl* cls : unit.classes) classes.insert(cls->name);
+                                  const TypeShapeTables& tables,
+                                  const NamedDecls& funcs, DiagEngine& diag) {
   NameSet dynamic;
   NameSet forks;
   for (const ModuleItem* item : decl->items) {
     if (item->kind == ModuleItemKind::kVarDecl &&
-        IsDynamicVariable(item, classes)) {
+        IsDynamicVariable(item, tables)) {
       dynamic.insert(item->name);
     }
     ForEachProceduralStmt(item, [&](const Stmt* s) {
@@ -296,6 +317,7 @@ void ValidateCheckerEnclosingRefs(const ModuleDecl* decl,
       continue;
     }
     CheckEnclosingRefs(nested, dynamic, forks, diag);
+    CheckOutsideFunctionCalls(nested, funcs, diag);
   }
 }
 

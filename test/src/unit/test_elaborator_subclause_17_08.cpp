@@ -150,4 +150,39 @@ TEST(CheckerFunctionCalls,
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 12, "17.8"));
 }
 
+// §17.8: the rule holds for a function declared outside the checker: bump,
+// the enclosing module's, has a side effect and peek writes an argument
+// back, while twice does neither.
+TEST(CheckerFunctionCalls, AnOutsideFunctionOnTheRightHandSideIsChecked) {
+  const char* const kReport =
+      "writes an argument back, keeps state or has a side effect and cannot "
+      "be called on the right-hand side of a checker variable assignment";
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int count;\n"
+      "  function int bump(int x);\n"
+      "    count = count + 1;\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "  function automatic int peek(input int x, output int y);\n"
+      "    y = x;\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "  function automatic int twice(int x);\n"
+      "    return x + x;\n"
+      "  endfunction\n"
+      "  checker c(logic clk, int a);\n"
+      "    int v, w, z, out;\n"
+      "    always_ff @(posedge clk) v <= bump(a);\n"
+      "    always_ff @(posedge clk) w <= peek(a, out);\n"
+      "    always_ff @(posedge clk) z <= twice(a);\n"
+      "  endchecker\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 16, "17.8"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 17, "17.8"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 18, "17.8"));
+}
+
 }  // namespace

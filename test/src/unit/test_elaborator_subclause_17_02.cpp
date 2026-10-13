@@ -296,4 +296,36 @@ TEST(CheckerDeclaration, AnEnclosingForkBlocksElementIsReported) {
       ReportedError(f.diag.Diagnostics(), "fork-join block", 11, "17.2"));
 }
 
+// §17.2: an associative array indexed by a typedef and a handle of a class a
+// package declares are dynamic variables too, so a checker references an
+// element or a member of neither.
+TEST(CheckerDeclaration, ATypedefIndexAndAPackageClassAreDynamic) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n"
+      "  class C; int v; endclass\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import p::*;\n"
+      "  typedef int idx_t;\n"
+      "  logic clk;\n"
+      "  int a[idx_t];\n"
+      "  C h;\n"
+      "  checker c;\n"
+      "    a1: assert property (@(posedge clk) a[0] == 1);\n"
+      "    a2: assert property (@(posedge clk) h.v == 1);\n"
+      "  endchecker\n"
+      "  c u();\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "references a member or element of the dynamic "
+                            "variable 'a'",
+                            11, "17.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "references a member or element of the dynamic "
+                            "variable 'h'",
+                            12, "17.2"));
+}
+
 }  // namespace
