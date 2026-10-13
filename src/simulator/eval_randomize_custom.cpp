@@ -64,9 +64,8 @@ Logic4Vec EvalBound(const Expr* e, const std::vector<std::string>& names,
   rc.ctx.PushScope();
   for (const auto& n : names) {
     auto it = vals.find(n);
-    const RandVariable* var =
-        rc.solver != nullptr ? rc.solver->FindVariable(n) : nullptr;
-    bool real = var != nullptr && var->is_real;
+    // Every name bound is one of the solve's random variables.
+    bool real = rc.solver != nullptr && rc.solver->FindVariable(n)->is_real;
     Variable* local = TrialLocal(n, real, rc);
     if (real) {
       local->value = MakeRealVec(rc.arena, rc.solver->GetRealValue(n), 64);

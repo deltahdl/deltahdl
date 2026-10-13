@@ -17,7 +17,6 @@
 #include "simulator/eval_class_array.h"
 #include "simulator/eval_randomize_internal.h"
 #include "simulator/evaluation.h"
-#include "simulator/sequence_flatten.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
@@ -298,17 +297,12 @@ IteratedElements ElementsOf(const ClassTypeInfo::PropertyInfo& array,
 
 // §18.4: the key the associative array element `ri` of the array `array` is
 // held under, as a literal standing where `like` does: a string literal for
-// a string index, and an integer one otherwise, an int where the key fits
-// in 64 bits and, §7.8.4, a literal of every word of it where it does not.
+// a string index, an integer one otherwise.
 Expr* AssocKeyLiteral(const RandInfo& ri, std::string_view array,
                       const Expr* like, Arena& arena) {
   bool string_key =
       ri.name.size() > array.size() + 1 && ri.name[array.size() + 1] == '"';
-  if (!string_key) {
-    bool fits = AssocIndex(ri.int_key.Low()) == ri.int_key;
-    return fits ? IndexLiteral(ri.int_key.Low(), like, arena)
-                : LiteralOfValue(ri.int_key.ToSignedVec(arena), arena);
-  }
+  if (!string_key) return IndexLiteral(ri.int_key.Low(), like, arena);
   std::string text = "\"" + ri.str_key + "\"";
   auto* literal = arena.Create<Expr>();
   literal->kind = ExprKind::kStringLiteral;
