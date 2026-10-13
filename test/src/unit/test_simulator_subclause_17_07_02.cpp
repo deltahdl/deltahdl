@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <vector>
+
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "simulator/checker_instance_scheduling.h"
@@ -362,7 +365,7 @@ TEST(CheckerVariableRandomization, EachAssumptionsClockTriggersAnAttempt) {
 // §17.7.2: an attempt seeks values with which no assumption of the set fails
 // in its time step, an implication's among them: after a tick where x is 1,
 // m1 requires x to be 0, and wherever x is 1, m2 requires y to be. The other
-// assumptions, of forms an attempt does not solve, take no part.
+// assumptions hold under any values and so put no condition on it.
 TEST(CheckerVariableRandomization, AnImplicationConstrainsItsTimeStep) {
   SimFixture f;
   auto* fail1 = RunAndFindVar(
@@ -450,6 +453,166 @@ TEST(CheckerVariableRandomization, AConstCastOrAutomaticActualIsExcluded) {
   EXPECT_EQ(q1->value.ToUint64(), 5u);
   EXPECT_EQ(f.ctx.FindVariable("F2.q")->value.ToUint64(), 5u);
   EXPECT_NE(f.ctx.FindVariable("F3.q")->value.ToUint64(), 5u);
+}
+
+// A checker whose free variables x, y and z the assumption m1 of `property`
+// constrains, the assertion a1 of the same property counting its failures
+// before the run ends, where attempts still in flight are decided whatever
+// the values, and `ones` the posedges at which x is 1, over 40 posedges of
+// clk.
+std::string AssumedPropertySource(const std::string& property) {
+  return "checker chk(logic clk);\n"
+         "  rand bit x, y, z;\n"
+         "  int fail = 0, ones = 0;\n"
+         "  m1: assume property (@(posedge clk) " +
+         property +
+         ");\n"
+         "  a1: assert property (@(posedge clk) " +
+         property +
+         ") else if ($time < 400) fail++;\n"
+         "  always_ff @(posedge clk) if (x) ones <= ones + 1;\n"
+         "endchecker\n"
+         "module top;\n"
+         "  logic clk = 0;\n"
+         "  always #5 clk = ~clk;\n"
+         "  chk c(clk);\n"
+         "  initial #400 $finish;\n"
+         "endmodule\n";
+}
+
+// §17.7.2: under each of `properties` assumed, no attempt of the property
+// fails, while x is still 1 at some posedges, so that the obligations the
+// property sets are met rather than never raised. Left out of the solution
+// attempts, as a form they did not solve, each property failed.
+void ExpectAssumedPropertiesHold(const std::vector<std::string>& properties) {
+  for (const std::string& property : properties) {
+    SCOPED_TRACE(property);
+    SimFixture f;
+    auto* fail = RunAndFindVar(AssumedPropertySource(property), f, "c.fail");
+    ASSERT_NE(fail, nullptr);
+    EXPECT_EQ(fail->value.ToUint64(), 0u);
+    EXPECT_GT(f.ctx.FindVariable("c.ones")->value.ToUint64(), 0u);
+  }
+}
+
+// §17.7.2 with §16.7 and §16.12.7: an assumption over sequences of booleans
+// under fixed delays holds each attempt still in flight to the operand it
+// reads at the time step: a consequent's later operand, an antecedent of
+// two operands, ##0 among them, a leading delay, a nonoverlapped
+// implication and a sequence assumed alone.
+TEST(CheckerVariableRandomization, AFixedDelaySequenceConstrainsLaterTicks) {
+  ExpectAssumedPropertiesHold({"x |-> ##1 y", "x ##1 y |-> z", "x |=> ##2 y",
+                               "x ##0 y |-> ##1 z", "##1 x |-> y", "x ##1 y"});
+}
+
+// §17.7.2 with §16.12.3 to §16.12.8 and §16.12.16: an assumption under the
+// operators that join their operands at one tick holds the attempt to the
+// condition they make of them: if-else with and without its else, implies,
+// iff, a not over a boolean, a sequence, an implication and a nexttime, an
+// or, an and, and a case with a default.
+TEST(CheckerVariableRandomization, AnOperatorAtOneTickConstrainsItsTick) {
+  ExpectAssumedPropertiesHold({"if (x) y else z", "if (x) y", "x implies y",
+                               "x iff y", "not (x && y)", "not (x ##1 y)",
+                               "not (x |=> y)", "x |-> not nexttime y",
+                               "x or nexttime y", "(x and nexttime y) or z",
+                               "case (x) 1'b1: y; default: z; endcase"});
+}
+
+// §17.7.2 with §16.12.10 to §16.12.14: an assumption under the operators
+// that carry an obligation to later ticks holds the attempt to what each
+// owes at the time step: nexttime with and without its count, always over a
+// range and unbounded, weak eventually over a range, until, until_with, and
+// the aborts.
+TEST(CheckerVariableRandomization, ATemporalOperatorConstrainsLaterTicks) {
+  ExpectAssumedPropertiesHold({"nexttime x", "x |-> nexttime [2] y",
+                               "always [1:2] x", "always (x and nexttime y)",
+                               "x |-> eventually [0:1] y", "x until y",
+                               "x until_with y", "accept_on (z) x |-> ##1 y",
+                               "reject_on (z) x |-> ##1 y"});
+}
+
+// The checker items `assumptions` leave x free: drawn at every posedge, it
+// is 0 at some of them and 1 at others.
+void ExpectXDrawnFree(const std::string& assumptions) {
+  SimFixture f;
+  auto* ones = RunAndFindVar(
+      "checker chk(logic clk);\n"
+      "  rand bit x, y, z;\n"
+      "  int ones = 0, zeros = 0;\n" +
+          assumptions +
+          "  always_ff @(posedge clk)\n"
+          "    if (x) ones <= ones + 1; else zeros <= zeros + 1;\n"
+          "endchecker\n"
+          "module top;\n"
+          "  logic clk = 0;\n"
+          "  always #5 clk = ~clk;\n"
+          "  chk c(clk);\n"
+          "  initial #400 $finish;\n"
+          "endmodule\n",
+      f, "c.ones");
+  ASSERT_NE(ones, nullptr);
+  EXPECT_GT(ones->value.ToUint64(), 0u);
+  EXPECT_GT(f.ctx.FindVariable("c.zeros")->value.ToUint64(), 0u);
+}
+
+// §17.7.2 with §16.12.13: s_eventually fails at no time step, so assumed it
+// leaves x free.
+TEST(CheckerVariableRandomization, AnEventualityLeavesItsTickFree) {
+  ExpectXDrawnFree("  m1: assume property (@(posedge clk) s_eventually x);\n");
+}
+
+// §17.7.2 with §16.7 and §16.9.2: an assumption over sequences whose
+// matches span a varying number of ticks holds the attempt to the operands
+// every way of going on reads at the time step: a delay over a range,
+// bounded and not, consecutive repetition, bounded and not, goto and
+// nonconsecutive repetition, and a range in an antecedent.
+TEST(CheckerVariableRandomization, AVaryingSequenceConstrainsLaterTicks) {
+  ExpectAssumedPropertiesHold({"x |-> ##[1:2] y", "x |-> ##[1:$] y",
+                               "x |-> y[*2]", "x |-> y[*1:$] ##1 z",
+                               "x |-> y[->1] ##1 z", "x |-> y[=1] ##1 z",
+                               "x ##[0:1] y |-> z"});
+}
+
+// §17.7.2: an assumption of a form the solution attempts do not model --
+// a named property's instance, alone or under or, a sequence or, an
+// operand on a clock of its own, and an operand repeated from zero -- is
+// left out of the assume set, which is then empty and x drawn free at every
+// time step, though m1 alone would hold it at 1.
+TEST(CheckerVariableRandomization, AnUnmodelledAssumptionTakesNoPart) {
+  ExpectXDrawnFree(
+      "  property p1; x; endproperty\n"
+      "  m1: assume property (@(posedge clk) p1);\n"
+      "  m2: assume property (@(posedge clk) y or p1);\n"
+      "  m3: assume property (@(posedge clk) (x ##1 y or y ##1 x) |-> z);\n"
+      "  m4: assume property (@(posedge clk) x |=> @(negedge clk) y);\n"
+      "  m5: assume property (@(posedge clk) x |-> y[*0:1] ##1 z);\n");
+}
+
+// §17.7.2 with §16.12.1: an assumption's attempts are held to it only
+// while its disable condition is false: x, free while rst is 1, is 0 at
+// some of those posedges, and solved to 1 once rst falls, so that a1 never
+// fails. Held to m1 regardless, x would be 1 throughout.
+TEST(CheckerVariableRandomization, ADisabledAssumptionHoldsNoAttempt) {
+  SimFixture f;
+  auto* zeros = RunAndFindVar(
+      "checker chk(logic clk, logic rst);\n"
+      "  rand bit x;\n"
+      "  int zeros = 0, fail = 0;\n"
+      "  m1: assume property (@(posedge clk) disable iff (rst) x);\n"
+      "  a1: assert property (@(posedge clk) disable iff (rst) x) else "
+      "fail++;\n"
+      "  always_ff @(posedge clk) if (rst && !x) zeros <= zeros + 1;\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk = 0, rst = 1;\n"
+      "  always #5 clk = ~clk;\n"
+      "  chk c(clk, rst);\n"
+      "  initial begin #200 rst = 0; #200 $finish; end\n"
+      "endmodule\n",
+      f, "c.zeros");
+  ASSERT_NE(zeros, nullptr);
+  EXPECT_GT(zeros->value.ToUint64(), 0u);
+  EXPECT_EQ(f.ctx.FindVariable("c.fail")->value.ToUint64(), 0u);
 }
 
 }  // namespace
