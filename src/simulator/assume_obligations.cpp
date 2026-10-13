@@ -227,9 +227,7 @@ const ObligationNode* AssumeObligations::Expand(const ObligationNode* node) {
 // the clock the declaration names or the one flowing to the instance; an
 // instance met while its own declaration is being expanded is expanded
 // when it is read, so that a recursive property is expanded a tick at a
-// time and its expansions, sharing the instance, are one node. Where the
-// body is of a form the obligations do not model, it puts no condition on
-// the time step.
+// time and its expansions, sharing the instance, are one node.
 const ObligationNode* AssumeObligations::Expansion(const ObligationNode* node,
                                                    std::vector<Expr*>& reads) {
   if (node->expansion != nullptr) return node->expansion;
@@ -250,13 +248,13 @@ const ObligationNode* AssumeObligations::Expansion(const ObligationNode* node,
   expanding_.erase(decl);
   // §16.13.7: each attempt holds copies of the property's locals of its
   // own, begun at their initial values.
-  if (built != nullptr && !decl->prop_locals.empty()) {
+  if (!decl->prop_locals.empty()) {
     built =
         WithLocals(terms_.Locals(InitialLocals(decl->prop_locals, ctx_, arena_),
                                  &decl->prop_locals),
                    built);
   }
-  node->expansion = built != nullptr ? built : true_;
+  node->expansion = built;
   return built;
 }
 
@@ -282,7 +280,7 @@ const ObligationNode* AssumeObligations::Begin(const Stmt* body,
       body->assert_sequence != nullptr
           ? BuildSequence(body->assert_sequence, 0, held, reads, clock_out)
           : BuildBool(body->assert_expr, 0, held, reads);
-  if (node == nullptr || !body->assert_negated) return node;
+  if (!body->assert_negated) return node;
   return Not(node);
 }
 
@@ -300,8 +298,7 @@ const ObligationNode* AssumeObligations::BuildBool(Expr* e, int clock,
 }
 
 // §16.12.17: an instance of `decl`, expanded where it is met unless its
-// declaration is being expanded, and nullptr where the declaration holds
-// local variables or a body of a form the obligations do not model.
+// declaration is being expanded.
 const ObligationNode* AssumeObligations::BuildInstance(
     Expr* e, const ModuleItem* decl, int clock, const ObligationScope& scope,
     std::vector<Expr*>& reads) {
@@ -319,8 +316,7 @@ const ObligationNode* AssumeObligations::BuildInstance(
   node.scope = base;
   node.outer = &scope;
   const ObligationNode* instance = Intern(std::move(node));
-  if (expanding_.count(decl) != 0) return instance;
-  if (Expansion(instance, reads) == nullptr) return nullptr;
+  if (expanding_.count(decl) == 0) Expansion(instance, reads);
   return instance;
 }
 
@@ -328,22 +324,19 @@ const ObligationNode* AssumeObligations::BuildSequence(
     const ModuleItem* item, int clock, const ObligationScope& scope,
     std::vector<Expr*>& reads, int& clock_out) {
   const SeqTerm* term = terms_.Begin(item, clock, scope, reads, clock_out);
-  if (term == nullptr) return nullptr;
+  // A sequence the flattening does not read puts no condition on the solve.
+  if (term == nullptr) return true_;
   return Seq({term}, true);
 }
 
-// Each operand of `node` built in turn into `out`; false where one is of a
-// form the obligations do not model.
-bool AssumeObligations::BuildOperands(const PropertyExprNode* node, int clock,
+// Each operand of `node` built in turn into `out`.
+void AssumeObligations::BuildOperands(const PropertyExprNode* node, int clock,
                                       const ObligationScope& scope,
                                       std::vector<Expr*>& reads,
                                       std::vector<const ObligationNode*>& out) {
   for (const PropertyExprNode* operand : node->operands) {
-    const ObligationNode* built = Build(operand, clock, scope, reads);
-    if (built == nullptr) return false;
-    out.push_back(built);
+    out.push_back(Build(operand, clock, scope, reads));
   }
-  return true;
 }
 
 // §16.12.10 to §16.12.13: nexttime, always and eventually over their
@@ -418,7 +411,7 @@ const ObligationNode* AssumeObligations::Build(const PropertyExprNode* node,
     return BuildImplication(node, own, scope, reads);
   }
   std::vector<const ObligationNode*> ops;
-  if (!BuildOperands(node, own, scope, reads, ops)) return nullptr;
+  BuildOperands(node, own, scope, reads, ops);
   switch (node->kind) {
     case P::kNot:
       return Not(ops[0]);
@@ -470,10 +463,8 @@ const ObligationNode* AssumeObligations::BuildImplication(
   int clock_out = clock;
   const ObligationNode* antecedent =
       BuildSequence(node->sequence, clock, scope, reads, clock_out);
-  if (antecedent == nullptr) return nullptr;
   const ObligationNode* consequent =
       Build(node->operands[0], clock_out, scope, reads);
-  if (consequent == nullptr) return nullptr;
   return Over(Kind::kImplication, {antecedent, consequent}, nullptr,
               node->strong ? 0 : 1, clock);
 }

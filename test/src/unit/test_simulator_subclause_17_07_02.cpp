@@ -578,22 +578,6 @@ TEST(CheckerVariableRandomization, AVaryingSequenceConstrainsLaterTicks) {
                                "x |-> y[->2:3] ##1 z", "x ##[0:1] y |-> z"});
 }
 
-// §17.7.2: an assumption of a form the solution attempts do not model --
-// match items on a goto repetition's operand, in a sequence assumed alone
-// or as an antecedent, and in a property assumed alone, under or and as a
-// consequent -- is left out of the assume set, which is then empty and x
-// drawn free at every time step.
-TEST(CheckerVariableRandomization, AnUnmodelledAssumptionTakesNoPart) {
-  ExpectXDrawnFree(
-      "  sequence s3; bit v; (y, v = x)[->2] ##1 x == v; endsequence\n"
-      "  property p6; bit v; (y, v = x)[->2] |=> x == v; endproperty\n"
-      "  m1: assume property (@(posedge clk) s3);\n"
-      "  m2: assume property (@(posedge clk) p6);\n"
-      "  m3: assume property (@(posedge clk) y or p6);\n"
-      "  m4: assume property (@(posedge clk) y |-> p6);\n"
-      "  m5: assume property (@(posedge clk) s3 |-> z);\n");
-}
-
 // §17.7.2 with §16.12.1: an assumption's attempts are held to it only
 // while its disable condition is false: x, free while rst is 1, is 0 at
 // some of those posedges, and solved to 1 once rst falls, so that a1 never
@@ -649,10 +633,11 @@ TEST(CheckerVariableRandomization, ASequenceOperatorConstrainsLaterTicks) {
 // summing x over two ticks, to whether exactly one of them held; z to the
 // parity of two locals one operand assigns; y through a local assigned
 // under or and under and, the first nested in another sequence too; and x
-// to differ from the local a repeated operand assigns at each repetition.
+// to differ from the local a repeated operand assigns at each repetition,
+// consecutive, goto and nonconsecutive.
 TEST(CheckerVariableRandomization, ALocalVariableCarriesItsValue) {
   ExpectAssumedPropertiesHold(
-      {"s1", "s2", "s3", "s4", "s5", "x ##1 s4", "s6"},
+      {"s1", "s2", "s3", "s4", "s5", "x ##1 s4", "s6", "s7", "s8"},
       "  sequence s1; bit v; (1, v = x) ##1 (y == v); endsequence\n"
       "  sequence s3; bit v; bit w; (1, v = x, w = y) ##1 (z == (v ^ w));\n"
       "  endsequence\n"
@@ -661,6 +646,8 @@ TEST(CheckerVariableRandomization, ALocalVariableCarriesItsValue) {
       "  sequence s5; bit v; ((1, v = x) ##1 y == v) and (z ##2 1'b1);\n"
       "  endsequence\n"
       "  sequence s6; bit v; (y, v = x)[*2] ##1 x != v; endsequence\n"
+      "  sequence s7; bit v; (y, v = x)[->2] ##1 x != v; endsequence\n"
+      "  sequence s8; bit v; (y, v = x)[=1] ##1 x != v; endsequence\n"
       "  sequence s2; bit [1:0] v; (1, v = x) ##1 (1, v += x) ##1 "
       "(y == (v == 2'd1)); endsequence\n");
 }

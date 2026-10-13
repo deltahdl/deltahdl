@@ -124,9 +124,9 @@ class SeqTerms {
 
   // The term an attempt of the sequence `item` begins in, read in `scope`,
   // its operands on `clock` where they name no clock of their own and each
-  // expression it reads appended to `reads`; nullptr where it uses a form
-  // the terms do not read. `clock_out` is set to the number of
-  // the clock flowing out of its end (§16.13.3).
+  // expression it reads appended to `reads`; nullptr where the flattening
+  // does not read it. `clock_out` is set to the number of the clock
+  // flowing out of its end (§16.13.3).
   const SeqTerm* Begin(const ModuleItem* item, int clock,
                        const ObligationScope& scope, std::vector<Expr*>& reads,
                        int& clock_out);

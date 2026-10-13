@@ -475,23 +475,24 @@ void SeqTerms::ExpandGoto(const SeqTerm* term, std::vector<SeqWay>& out) {
   }
   out.push_back({{{e, false}}, term, {}});
   uint32_t done = term->count + 1;
+  // §16.10: the operand's match items are performed at each tick it holds.
   auto counted = [&](uint8_t flags) {
-    return Make(Kind::kGoto, {},
-                {.expr = e,
-                 .lo = term->lo,
-                 .hi = term->hi,
-                 .count = done,
-                 .clock = term->clock,
-                 .flags = flags});
+    SeqTerm next = *term;
+    next.ways.clear();
+    next.count = done;
+    next.flags = flags;
+    return Intern(std::move(next));
   };
   // An unbounded count is kUnbounded, which no count reaches.
   if (done < term->hi) {
-    out.push_back({{{e, true}}, counted(term->flags & kNonconsecutive), {}});
+    out.push_back(
+        {{{e, true}}, counted(term->flags & kNonconsecutive), {term->items}});
   }
   if (done < term->lo) return;
-  out.push_back({{{e, true}}, nullptr, {}});
+  out.push_back({{{e, true}}, nullptr, {term->items}});
   if ((term->flags & kNonconsecutive) != 0) {
-    out.push_back({{{e, true}}, counted(kNonconsecutive | kTail), {}});
+    out.push_back(
+        {{{e, true}}, counted(kNonconsecutive | kTail), {term->items}});
   }
 }
 
@@ -558,13 +559,11 @@ const SeqTerm* SeqTerms::Take(const SeqWay& way) {
 // `intersect` of chains, a chain being its operands under their delays and
 // repetitions, under the throughouts spanning parts of it, and a nested
 // operand a sequence of its own; each operand on the clock it names or the
-// one flowing to it. `failures` counts the uses of forms the terms do not
-// read: match items on a goto or nonconsecutive repetition's operand.
+// one flowing to it.
 struct SeqTerms::Builder {
   SeqTerms& terms;
   const ObligationScope& scope;
   std::vector<Expr*>& reads;
-  int failures = 0;
 
   Expr* Read(Expr* e) {
     Expr* read = scope.rewrite(e);
@@ -675,14 +674,15 @@ struct SeqTerms::Builder {
         rep.kind == SeqRepetition::Kind::kNonconsecutive) {
       auto nonconsecutive = static_cast<uint8_t>(
           (rep.kind == SeqRepetition::Kind::kNonconsecutive) * kNonconsecutive);
-      failures += static_cast<int>(items.size());
-      return terms.Make(
-          Kind::kGoto, {},
-          {.expr = Read(s.operands[i]),
-           .lo = rep.min,
-           .hi = rep.max,
-           .clock = own,
-           .flags = static_cast<uint8_t>(nonconsecutive | nullable)});
+      SeqTerm term;
+      term.kind = Kind::kGoto;
+      term.expr = Read(s.operands[i]);
+      term.items = &items;
+      term.lo = rep.min;
+      term.hi = rep.max;
+      term.clock = own;
+      term.flags = static_cast<uint8_t>(nonconsecutive | nullable);
+      return terms.Intern(std::move(term));
     }
     const LinearSequence* nested = NestedOperand(s, i);
     const SeqTerm* base =
@@ -725,7 +725,6 @@ const SeqTerm* SeqTerms::Begin(const ModuleItem* item, int clock,
   if (!FlattenLinearSequence(item, ctx_, arena_, *seq)) return nullptr;
   Builder builder{*this, scope, reads};
   const SeqTerm* term = builder.Body(*seq, clock);
-  if (builder.failures != 0) return nullptr;
   // §16.10: an attempt's copies of every local of the sequence, a nested
   // sequence's among them, begun with the attempt.
   auto decls = std::make_unique<std::vector<SeqLocalDecl>>();

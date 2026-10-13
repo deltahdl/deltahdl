@@ -40,8 +40,8 @@ class AssumeObligations {
   AssumeObligations& operator=(const AssumeObligations&) = delete;
 
   // The obligation an attempt of the concurrent assumption `body` begins
-  // with, read in `scope`, each expression it reads appended to `reads`;
-  // nullptr where its property uses a form the obligations do not model.
+  // with, read in `scope`, each expression it reads appended to `reads`; a
+  // sequence the flattening does not read puts no condition on the solve.
   const ObligationNode* Begin(const Stmt* body, ObligationScope scope,
                               std::vector<Expr*>& reads);
 
@@ -91,7 +91,7 @@ class AssumeObligations {
   const ObligationNode* BuildInstance(Expr* e, const ModuleItem* decl,
                                       int clock, const ObligationScope& scope,
                                       std::vector<Expr*>& reads);
-  bool BuildOperands(const PropertyExprNode* node, int clock,
+  void BuildOperands(const PropertyExprNode* node, int clock,
                      const ObligationScope& scope, std::vector<Expr*>& reads,
                      std::vector<const ObligationNode*>& out);
   const ObligationNode* BuildSequence(const ModuleItem* item, int clock,

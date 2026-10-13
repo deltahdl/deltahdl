@@ -249,8 +249,7 @@ struct Candidate {
 // §17.7.2: the assumptions of the checker `mod`, lowered under `prefix`, and
 // those of its child checkers, each in `mod`'s terms, a child's formals
 // replaced by its actuals; of them, one that reads a formal the instance
-// `self` binds to a const cast or an automatic value is left out, and so is
-// one of a form the obligations do not model.
+// `self` binds to a const cast or an automatic value is left out.
 std::vector<Candidate> CollectAssumptions(const RtlirModule* mod,
                                           const std::string& prefix,
                                           const RtlirModuleInst& self,
@@ -263,10 +262,9 @@ std::vector<Candidate> CollectAssumptions(const RtlirModule* mod,
       continue;
     }
     Candidate c{&proc, prefix, [](Expr* e) { return e; }, {}};
-    if (obligations.Begin(proc.body, ScopeOf(c.rewrite, ClocksLedBy(proc)),
-                          c.reads) != nullptr) {
-      out.push_back(std::move(c));
-    }
+    obligations.Begin(proc.body, ScopeOf(c.rewrite, ClocksLedBy(proc)),
+                      c.reads);
+    out.push_back(std::move(c));
   }
   // §17.2: a checker instantiates no other kind of definition.
   for (const RtlirModuleInst& child : mod->children) {
