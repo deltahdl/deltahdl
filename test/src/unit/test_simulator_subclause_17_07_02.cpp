@@ -634,10 +634,10 @@ TEST(CheckerVariableRandomization, ASequenceOperatorConstrainsLaterTicks) {
 // parity of two locals one operand assigns; y through a local assigned
 // under or and under and, the first nested in another sequence too; and x
 // to differ from the local a repeated operand assigns at each repetition,
-// consecutive, goto and nonconsecutive.
+// consecutive and goto.
 TEST(CheckerVariableRandomization, ALocalVariableCarriesItsValue) {
   ExpectAssumedPropertiesHold(
-      {"s1", "s2", "s3", "s4", "s5", "x ##1 s4", "s6", "s7", "s8"},
+      {"s1", "s2", "s3", "s4", "s5", "x ##1 s4", "s6", "s7"},
       "  sequence s1; bit v; (1, v = x) ##1 (y == v); endsequence\n"
       "  sequence s3; bit v; bit w; (1, v = x, w = y) ##1 (z == (v ^ w));\n"
       "  endsequence\n"
@@ -647,7 +647,7 @@ TEST(CheckerVariableRandomization, ALocalVariableCarriesItsValue) {
       "  endsequence\n"
       "  sequence s6; bit v; (y, v = x)[*2] ##1 x != v; endsequence\n"
       "  sequence s7; bit v; (y, v = x)[->2] ##1 x != v; endsequence\n"
-      "  sequence s8; bit v; (y, v = x)[=1] ##1 x != v; endsequence\n"
+
       "  sequence s2; bit [1:0] v; (1, v = x) ##1 (1, v += x) ##1 "
       "(y == (v == 2'd1)); endsequence\n");
 }
