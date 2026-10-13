@@ -52,17 +52,21 @@ Variable* TrialLocal(const std::string& n, bool real, RandomizeCtx& rc) {
 }
 
 // Evaluates `e` with each name in `names` bound to its value in `vals`, a
-// rand variable as a local so the expression reads the trial value. A name
-// `vals` lacks is a real variable's (18.4.1), whose draw the solver keeps
-// among its real values, so the local is the real drawn there and an
-// expression over it reads the real (18.5.5).
+// rand variable as a local so the expression reads the trial value. A real
+// variable's (18.4.1) draw the solver keeps among its real values, so its
+// local is the real drawn there and an expression over it reads the real
+// (18.5.5); an integral variable `vals` lacks, not yet drawn while another
+// variable's values are enumerated, reads 0, and its local stays integral
+// for the trials after.
 Logic4Vec EvalBound(const Expr* e, const std::vector<std::string>& names,
                     RandomizeCtx& rc,
                     const std::unordered_map<std::string, int64_t>& vals) {
   rc.ctx.PushScope();
   for (const auto& n : names) {
     auto it = vals.find(n);
-    bool real = it == vals.end() && rc.solver != nullptr;
+    const RandVariable* var =
+        rc.solver != nullptr ? rc.solver->FindVariable(n) : nullptr;
+    bool real = var != nullptr && var->is_real;
     Variable* local = TrialLocal(n, real, rc);
     if (real) {
       local->value = MakeRealVec(rc.arena, rc.solver->GetRealValue(n), 64);

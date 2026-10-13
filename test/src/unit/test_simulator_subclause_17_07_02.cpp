@@ -634,10 +634,10 @@ TEST(CheckerVariableRandomization, ASequenceOperatorConstrainsLaterTicks) {
 // parity of two locals one operand assigns; y through a local assigned
 // under or and under and, the first nested in another sequence too; and x
 // to differ from the local a repeated operand assigns at each repetition,
-// consecutive and goto.
+// consecutive, goto and nonconsecutive.
 TEST(CheckerVariableRandomization, ALocalVariableCarriesItsValue) {
   ExpectAssumedPropertiesHold(
-      {"s1", "s2", "s3", "s4", "s5", "x ##1 s4", "s6", "s7"},
+      {"s1", "s2", "s3", "s4", "s5", "x ##1 s4", "s6", "s7", "s8"},
       "  sequence s1; bit v; (1, v = x) ##1 (y == v); endsequence\n"
       "  sequence s3; bit v; bit w; (1, v = x, w = y) ##1 (z == (v ^ w));\n"
       "  endsequence\n"
@@ -647,6 +647,7 @@ TEST(CheckerVariableRandomization, ALocalVariableCarriesItsValue) {
       "  endsequence\n"
       "  sequence s6; bit v; (y, v = x)[*2] ##1 x != v; endsequence\n"
       "  sequence s7; bit v; (y, v = x)[->2] ##1 x != v; endsequence\n"
+      "  sequence s8; bit v; (y, v = x)[=1] ##1 x != v; endsequence\n"
 
       "  sequence s2; bit [1:0] v; (1, v = x) ##1 (1, v += x) ##1 "
       "(y == (v == 2'd1)); endsequence\n");
@@ -682,45 +683,6 @@ TEST(CheckerVariableRandomization, APropertyInstanceConstrainsItsBody) {
       "  property p2; x and nexttime p2; endproperty\n"
       "  property p3; @(posedge clk) x |-> z; endproperty\n"
       "  property p4; bit v; (1, v = y) |=> x == v; endproperty\n");
-}
-
-// Probe for #6567, removed with its fix: which forms of the block the solve
-// loses.
-TEST(CheckerVariableRandomization, ProbeDisjunctionForms) {
-  SimFixture f;
-  auto* bad = RunAndFindVar(
-      "module top;\n"
-      "  bit x, y;\n"
-      "  int bad_A = 0, bad_B = 0, bad_C = 0, bad_D = 0, bad_E = 0, bad_F = "
-      "0;\n"
-      "  initial begin\n"
-      "    for (int i = 0; i < 200; i++) begin x = 1; y = 1;\n"
-      "      void'(std::randomize(x, y) with { (x != 1'b1) || (!y || !y); });\n"
-      "      if (x == 1 && y == 1) bad_A++; end\n"
-      "    for (int i = 0; i < 200; i++) begin x = 1; y = 1;\n"
-      "      void'(std::randomize(x, y) with { (x != 1'b1) || !y; });\n"
-      "      if (x == 1 && y == 1) bad_B++; end\n"
-      "    for (int i = 0; i < 200; i++) begin x = 1; y = 1;\n"
-      "      void'(std::randomize(x, y) with { !(x && y); });\n"
-      "      if (x == 1 && y == 1) bad_C++; end\n"
-      "    for (int i = 0; i < 200; i++) begin x = 1; y = 1;\n"
-      "      void'(std::randomize(x, y) with { (x != 1'b1) || (!y || !y); !y "
-      "|| y || y; });\n"
-      "      if (x == 1 && y == 1) bad_D++; end\n"
-      "    for (int i = 0; i < 200; i++) begin x = 1; y = 1;\n"
-      "      void'(std::randomize(x, y) with { !y || y || y; (x != 1'b1) || "
-      "(!y || !y); });\n"
-      "      if (x == 1 && y == 1) bad_E++; end\n"
-      "    for (int i = 0; i < 200; i++) begin x = 1; y = 1;\n"
-      "      void'(std::randomize(x, y) with { x != 1'b1 || y != 1'b1; });\n"
-      "      if (x == 1 && y == 1) bad_F++; end\n"
-      "    $display(\"PROBE3 A=%0d B=%0d C=%0d D=%0d E=%0d F=%0d\", bad_A, "
-      "bad_B, bad_C, bad_D, bad_E, bad_F);\n"
-      "  end\n"
-      "endmodule\n",
-      f, "top.bad_A");
-  ASSERT_NE(bad, nullptr);
-  EXPECT_EQ(bad->value.ToUint64(), 99u);
 }
 
 }  // namespace

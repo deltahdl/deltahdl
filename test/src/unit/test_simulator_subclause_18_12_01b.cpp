@@ -165,4 +165,30 @@ TEST(ScopeRandomizeRun, APropertyNamedInAMethodIsRandomized) {
   EXPECT_EQ(out, "0 1\n");
 }
 
+// 18.12.1 with 18.5: every relation of the block holds of the values a
+// successful call draws, a disjunction among them beside a relation over
+// y alone, whose values the solve enumerates before x is drawn; 200 calls
+// never leave x and y both 1. Bound as a real while y's values were
+// enumerated, x read its integral draw as a real ever after, and the
+// disjunction held of x == 1, y == 1 in about a quarter of the calls.
+TEST(ScopeRandomizeWithRun, ADisjunctionHoldsBesideARelationOverOneVariable) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  bit x, y;\n"
+      "  int bad = 0, fails = 0;\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 200; i++) begin\n"
+      "      x = 1; y = 1;\n"
+      "      if (std::randomize(x, y) with { (x != 1'b1) || (!y || !y);\n"
+      "                                      !y || y || y; } != 1) fails++;\n"
+      "      if (x == 1 && y == 1) bad++;\n"
+      "    end\n"
+      "    $display(\"%0d %0d\", fails, bad);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 0\n");
+}
+
 }  // namespace
