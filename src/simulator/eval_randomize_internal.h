@@ -7,6 +7,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -157,6 +158,9 @@ struct RandomizeCtx {
   // class's own blocks where they decide whether an array is resized (18.4);
   // null for a call without one.
   const ClassMember* inline_block = nullptr;
+  // 18.5.8: the path the solver names this object's variables under, empty
+  // but in a joint solve, where each object of the tree has its own.
+  std::string solver_prefix = {};
 };
 
 // §18.4: the random variables of the elements of each rand dynamic array
@@ -325,11 +329,11 @@ void FoldRealBound(RandInfo& ri, ConstraintKind kind, double c);
 // is no rand variable folds nothing.
 void FoldComparison(std::vector<RandInfo>& rands, std::string_view name,
                     ConstraintKind kind, const Logic4Vec& cv, int64_t c);
-// 18.6.1: the value the solver drew for `ri` as the member holds it, 18.4.1
-// a real as the real it is and 6.11.3 an integral one in the member's
-// declared signedness.
+// 18.6.1: the value the solver drew for `ri`, named under `prefix`, as the
+// member holds it, 18.4.1 a real as the real it is and 6.11.3 an integral
+// one in the member's declared signedness.
 Logic4Vec SolvedValue(const RandInfo& ri, const ConstraintSolver& solver,
-                      Arena& arena);
+                      const std::string& prefix, Arena& arena);
 bool IsObjectConstraintActive(const ClassObject* obj, std::string_view name);
 // §18.8: the class declaring the random variable `name` of `obj`, an
 // element or the size named by its member's key, where the declaration is
@@ -344,14 +348,24 @@ void CollectRandObjectMembers(const ClassTypeInfo* type, SimContext& ctx,
 
 TokenKind MirrorComparison(TokenKind op);
 
+// §18.4 with §18.8: each object the active rand object-handle members of
+// `obj` hold, a member's own or, for an array of handles, each element's,
+// with the key the handle is kept under; null handles left out.
+std::vector<std::pair<std::string, ClassObject*>> ActiveRandObjectMembers(
+    const ClassObject* obj, SimContext& ctx);
+// 18.5.8 with 18.6.2: gathers into `out` the tree of active random objects
+// `obj` heads, each under the path `prefix` names it by, calling each one's
+// pre_randomize() for the call `expr` before reading its handles, so the
+// members the tree takes are the ones pre_randomize() left in place.
 void CollectActiveRandomObjects(
-    ClassObject* obj, const std::string& prefix, SimContext& ctx,
-    std::vector<JointObject>& out,
+    ClassObject* obj, const std::string& prefix, const Expr* expr,
+    SimContext& ctx, Arena& arena, std::vector<JointObject>& out,
     std::unordered_set<const ClassObject*>& visited);
 // 18.5.8: randomizes the active random object tree `objects`, the root
 // first, as one solve; 18.5.13.1: `inline_block`, the constraint member of
 // the call's with clause or null, is applied to the root with the highest
-// soft priority.
+// soft priority. 18.6.2: post_randomize() runs on each object once every
+// value is written.
 bool RandomizeObjectTree(SimContext& ctx, Arena& arena, const Expr* expr,
                          const std::vector<JointObject>& objects,
                          const ClassMember* inline_block);
@@ -397,7 +411,8 @@ void InvokePreRandomize(ClassObject* obj, const Expr* expr, SimContext& ctx,
 ClassObject* ResolveRandomizeTarget(SimContext& ctx,
                                     const MethodCallParts& parts);
 void WriteBackSolved(ClassObject* obj, std::vector<RandInfo>& rands,
-                     ConstraintSolver& solver, Arena& arena);
+                     const ConstraintSolver& solver, const std::string& prefix,
+                     Arena& arena);
 
 bool ExtractConstraintModeParts(const Expr* expr, std::string_view& obj_name,
                                 std::string_view& constraint_name);
@@ -431,9 +446,35 @@ struct InlineRandomizeCall {
   bool null_checker;
 };
 
-bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
-                     const InlineRandomizeCall& call,
-                     std::unordered_set<const ClassObject*>& visited);
+// One object of a randomize() call: the path its variables are named under
+// in the solver, the context its relations are built in, its random
+// variables, and, where it is solved on its own, its solver.
+struct ObjectSolve {
+  ClassObject* obj = nullptr;
+  std::string prefix = {};
+  std::unique_ptr<RandomizeCtx> rc = nullptr;
+  std::vector<RandInfo> rands = {};
+  std::unique_ptr<ConstraintSolver> solver = nullptr;
+};
+
+// 18.6.1: solves the object of `part` alone under the call `call`, leaving
+// the solve on `part` for the values to be written back from; whether it
+// solved.
+bool SolveObject(ObjectSolve& part, const InlineRandomizeCall& call,
+                 SimContext& ctx, Arena& arena);
+// 18.6.2 with 18.6.3: solves each of `objects` on its own, the first under
+// `call` and the others as its random object members, and only when every
+// one solves writes all their values back and then runs their
+// post_randomize(); whether all solved.
+bool RandomizeEachObject(const std::vector<JointObject>& objects,
+                         const InlineRandomizeCall& call, SimContext& ctx,
+                         Arena& arena);
+// 18.8 with 18.11: each of `rands` added to `solver`, an inactive one, or
+// under an argument list `inline_random` one it does not name, as a state
+// variable holding its present value.
+void PrepareRandVariables(ClassObject* obj, std::vector<RandInfo>& rands,
+                          const std::unordered_set<std::string>* inline_random,
+                          ConstraintSolver& solver);
 void SetObjectConstraintActive(ClassObject* obj, std::string_view name,
                                bool active);
 // §18.8: the rand_mode() states of `obj` that the random variable `name`

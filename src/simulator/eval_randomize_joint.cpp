@@ -11,10 +11,10 @@
 #include "common/types.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
+#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "simulator/class_object.h"
 #include "simulator/constraint_solver.h"
-#include "simulator/eval_function_internal.h"
 #include "simulator/eval_randomize_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -27,54 +27,20 @@ namespace delta {
 // contains through a rand class-handle member that is itself active (18.8) and
 // non-null; recurse so the definition reaches the whole tree of active random
 // objects. The visited set breaks handle cycles so a self- or mutually
-// referential graph terminates.
+// referential graph terminates. 18.6.2: each object's pre_randomize() runs
+// before its handles are read, so an object it allocates or replaces is the
+// one the tree takes.
 void CollectActiveRandomObjects(
-    ClassObject* obj, const std::string& prefix, SimContext& ctx,
-    std::vector<JointObject>& out,
+    ClassObject* obj, const std::string& prefix, const Expr* expr,
+    SimContext& ctx, Arena& arena, std::vector<JointObject>& out,
     std::unordered_set<const ClassObject*>& visited) {
   if (!obj || !obj->type) return;
   if (!visited.insert(obj).second) return;
+  InvokePreRandomize(obj, expr, ctx, arena);
   out.push_back({obj, prefix});
-
-  std::vector<std::string> handles;
-  CollectRandObjectMembers(obj->type, ctx, handles);
-  for (const auto& name : handles) {
-    // 18.8: an inactive rand handle is not one of the object's active random
-    // variables, so the object it references is not part of the active set.
-    if (!IsObjectRandActive(obj, name)) continue;
-    auto it = obj->properties.find(name);
-    if (it == obj->properties.end()) continue;
-    uint64_t handle = it->second.ToUint64();
-    if (handle == kNullClassHandle) continue;
-    ClassObject* sub = ctx.GetClassObject(handle);
-    if (!sub) continue;
-    CollectActiveRandomObjects(sub, prefix + name + ".", ctx, out, visited);
-  }
-}
-
-// 18.5.8 rule c: gather the active random variables of every object in the tree
-// into one joint table. Each object's own rand/randc data members are given a
-// path-qualified solver name so members that share a plain name on different
-// objects never collide. The solver domain matters here for a reason of its
-// own: a value drawn to satisfy a custom global constraint is checked at full
-// width, so a domain wider than the member turns the write-back truncation into
-// the difference between a satisfying and a violating assignment. Renaming a
-// collected variable does not change the type it was declared with, so the
-// domain CollectRandVariables bound from that type carries over untouched --
-// re-deriving it here would only be a second copy of the same rule, free to
-// drift from the one the standard states.
-void CollectJointRandVariables(const std::vector<JointObject>& objects,
-                               SimContext& ctx, std::vector<RandInfo>& out) {
-  for (const auto& jo : objects) {
-    std::vector<RandInfo> local;
-    CollectRandVariables(jo.obj->type, ctx, local);
-    for (auto& ri : local) {
-      ri.member = ri.name;
-      ri.owner = jo.obj;
-      ri.name = jo.prefix + ri.name;
-      ri.var.name = ri.name;
-      out.push_back(std::move(ri));
-    }
+  for (const auto& [key, sub] : ActiveRandObjectMembers(obj, ctx)) {
+    CollectActiveRandomObjects(sub, prefix + key + ".", expr, ctx, arena, out,
+                               visited);
   }
 }
 
@@ -388,14 +354,11 @@ ConstraintExpr BuildJointRelation(const Expr* rel, const JointVarScope& scope,
   return out_custom;
 }
 
-// 18.5.8 rule b: select the active constraints of every object in the tree.
-// Each object's constraint blocks are collected the same way as for a single
-// object (a same-named derived block replaces an inherited one) and translated
-// into the shared solver. Only relational constraint expressions are carried
-// through the joint path; the tree cases that arise relate simple relational
-// and equality constraints, so dist/soft/foreach constraints on a nested object
-// are left to the per-object path and not reached here.
-// One constraint member of one class level, translated into a solver block.
+// 18.5.8: the relations of an object's constraint that reach another object
+// of the tree, translated into the shared solver over the joint variables;
+// the object's own relations are translated by the per-object machinery
+// under the object's prefix (AddTreeConstraintMember).
+//
 // 18.5.13.2: each 'disable soft' directive of the block, naming the joint
 // variable of the object's member, ahead of the block's own soft
 // constraints; 18.5.13: each soft constraint, its inner relation translated
@@ -438,25 +401,56 @@ void AddJointConstraintBlock(const ClassMember* m, ClassObject* obj,
   solver.AddConstraintBlock(block);
 }
 
-// Whether a constraint member has a body the joint solve acts on.
-bool JointConstraintContributes(const ClassMember* m) {
-  return !m->constraint_exprs.empty() || !m->constraint_soft_exprs.empty() ||
-         !m->constraint_disable_soft_refs.empty();
+// 18.5.8: whether `e` reaches a random variable of another object of the
+// tree through a handle, `left.v`, which the per-object machinery would read
+// as a state variable; a member access naming one of the object's own
+// variables, a member of its rand structure, does not.
+bool ReachesAnotherObject(const Expr* e, const JointVarScope& scope,
+                          const std::unordered_set<std::string>& own) {
+  if (e == nullptr || e->kind == ExprKind::kIdentifier) return false;
+  if (e->kind == ExprKind::kMemberAccess) {
+    std::string q = ResolveJointOperand(e, scope.prefix, scope.names);
+    return !q.empty() && own.count(q) == 0;
+  }
+  for (const Expr* sub :
+       {e->lhs, e->rhs, e->base, e->condition, e->true_expr, e->false_expr}) {
+    if (ReachesAnotherObject(sub, scope, own)) return true;
+  }
+  for (const auto* list : {&e->args, &e->elements}) {
+    for (const Expr* sub : *list)
+      if (ReachesAnotherObject(sub, scope, own)) return true;
+  }
+  return false;
 }
 
-// 18.5.8 rule b: the active constraints of one object of the tree, its
-// class levels added base first (18.5.13.1: a derived class's constraints
-// have higher soft priority than its superclasses'), a same-named derived
-// block replacing the inherited one (18.5.2).
-void CollectJointConstraints(const JointObject& jo,
-                             std::vector<RandInfo>& rands,
-                             const std::unordered_set<std::string>& names,
-                             RandomizeCtx& rc, ConstraintSolver& solver) {
-  const JointVarScope kScope{jo.obj, jo.prefix, rands, names};
-  for (const ClassMember* m : ConstraintMembersInOrder(jo.obj->type)) {
-    if (JointConstraintContributes(m))
-      AddJointConstraintBlock(m, jo.obj, kScope, rc, solver);
+// 18.5.8: the constraint `m` of the object of `part`, its relations over the
+// object's own variables built by the per-object machinery under the
+// object's prefix, so that every form a constraint takes is kept, and those
+// reaching another object of the tree built over the joint variables in a
+// block of the same name just after.
+void AddTreeConstraintMember(const ClassMember* m, ObjectSolve& part,
+                             const JointVarScope& scope, RandomizeCtx& joint_rc,
+                             ConstraintSolver& solver) {
+  std::unordered_set<std::string> own;
+  for (const auto& ri : part.rands) own.insert(part.prefix + ri.name);
+  ClassMember local = *m;
+  ClassMember global;
+  global.name = m->name;
+  local.constraint_exprs.clear();
+  local.constraint_soft_exprs.clear();
+  for (const Expr* rel : m->constraint_exprs) {
+    (ReachesAnotherObject(rel, scope, own) ? global : local)
+        .constraint_exprs.push_back(rel);
   }
+  for (const Expr* rel : m->constraint_soft_exprs) {
+    (ReachesAnotherObject(rel, scope, own) ? global : local)
+        .constraint_soft_exprs.push_back(rel);
+  }
+  solver.SetNameScope(part.prefix);
+  AddConstraintMember(&local, part.rands, *part.rc, solver);
+  solver.SetNameScope("");
+  if (!global.constraint_exprs.empty() || !global.constraint_soft_exprs.empty())
+    AddJointConstraintBlock(&global, part.obj, scope, joint_rc, solver);
 }
 
 // 18.5.13.1: the objects of the tree in the order their constraints take soft
@@ -468,155 +462,137 @@ void CollectJointConstraints(const JointObject& jo,
 void SoftPriorityOrder(ClassObject* obj, SimContext& ctx,
                        std::vector<ClassObject*>& out,
                        std::unordered_set<const ClassObject*>& on_path) {
-  if (obj == nullptr || obj->type == nullptr || !on_path.insert(obj).second)
-    return;
-  std::vector<std::string> handles;
-  CollectRandObjectMembers(obj->type, ctx, handles);
-  for (const auto& name : handles) {
-    if (!IsObjectRandActive(obj, name)) continue;
-    auto it = obj->properties.find(name);
-    if (it == obj->properties.end()) continue;
-    SoftPriorityOrder(ctx.GetClassObject(it->second.ToUint64()), ctx, out,
-                      on_path);
-  }
+  if (!on_path.insert(obj).second) return;
+  for (const auto& [key, sub] : ActiveRandObjectMembers(obj, ctx))
+    SoftPriorityOrder(sub, ctx, out, on_path);
   on_path.erase(obj);
   auto seen = std::find(out.begin(), out.end(), obj);
   if (seen != out.end()) out.erase(seen);
   out.push_back(obj);
 }
 
-// The objects of `objects` in soft-priority order, each with its prefix.
-std::vector<const JointObject*> InSoftPriorityOrder(
-    const std::vector<JointObject>& objects, SimContext& ctx) {
+// The parts of the tree in soft-priority order.
+std::vector<ObjectSolve*> InSoftPriorityOrder(std::vector<ObjectSolve>& parts,
+                                              SimContext& ctx) {
   std::vector<ClassObject*> ordered;
   std::unordered_set<const ClassObject*> on_path;
-  SoftPriorityOrder(objects.front().obj, ctx, ordered, on_path);
-  std::vector<const JointObject*> out;
+  SoftPriorityOrder(parts.front().obj, ctx, ordered, on_path);
+  std::vector<ObjectSolve*> out;
   for (ClassObject* obj : ordered) {
-    for (const auto& jo : objects) {
-      if (jo.obj == obj) {
-        out.push_back(&jo);
-        break;
-      }
+    auto part =
+        std::find_if(parts.begin(), parts.end(),
+                     [obj](const ObjectSolve& p) { return p.obj == obj; });
+    if (part != parts.end()) out.push_back(&*part);
+  }
+  return out;
+}
+
+// 18.5.8 rule c: each object of the tree with its random variables, gathered
+// as for the object alone in a context reading the shared solver under the
+// object's prefix; the root's with the call's inline block, which can size
+// its arrays (18.4).
+std::vector<ObjectSolve> TreeParts(const std::vector<JointObject>& objects,
+                                   const ClassMember* inline_block,
+                                   ConstraintSolver& solver, SimContext& ctx,
+                                   Arena& arena) {
+  // The relations built over an object's variables may hold on to its
+  // list, so the parts are never moved once built.
+  std::vector<ObjectSolve> parts;
+  parts.reserve(objects.size());
+  for (const auto& jo : objects) {
+    ObjectSolve& part = parts.emplace_back();
+    part.obj = jo.obj;
+    part.prefix = jo.prefix;
+    part.rc = std::make_unique<RandomizeCtx>(RandomizeCtx{jo.obj, ctx, arena});
+    part.rc->solver = &solver;
+    part.rc->solver_prefix = jo.prefix;
+    if (parts.size() == 1) part.rc->inline_block = inline_block;
+    CollectRandVariables(jo.obj->type, ctx, part.rands);
+    AddDynamicArrayVariables(part.rands, *part.rc);
+  }
+  return parts;
+}
+
+// 18.5.8: every random variable of the tree by its name in the shared
+// solver, with the object holding it, as the relations reaching across
+// objects read and write them.
+std::vector<RandInfo> JointRands(const std::vector<ObjectSolve>& parts) {
+  std::vector<RandInfo> out;
+  for (const auto& part : parts) {
+    for (RandInfo ri : part.rands) {
+      ri.member = ri.name;
+      ri.owner = part.obj;
+      ri.name = part.prefix + ri.name;
+      ri.var.name = ri.name;
+      out.push_back(std::move(ri));
     }
   }
   return out;
 }
 
-// 18.5.8: randomize the whole active random object tree as one problem. A
-// single solver holds every active random variable (rule c) and every active
-// constraint (rule b) of every active random object (rule a), so global
-// constraints that relate variables from different objects are solved
-// simultaneously. The result is written back to each object, and 18.6.2's
-// pre/post_randomize() fire on the object and on each of its random object
-// members.
-// 18.4.2: continue a randc member's cyclic permutation across calls through its
-// persistent history, per object (or per class for a static randc).
-void BindJointRandcHistory(RandInfo& ri) {
-  if (ri.var.qualifier != RandQualifier::kRandc) return;
-  std::shared_ptr<std::unordered_set<int64_t>>* slot =
-      (ri.is_static && ri.level) ? &ri.level->static_randc_history[ri.member]
-                                 : &ri.owner->randc_history[ri.member];
-  if (!*slot) *slot = std::make_shared<std::unordered_set<int64_t>>();
-  ri.var.shared_randc_state = *slot;
-  std::shared_ptr<std::vector<int64_t>>* domain =
-      (ri.is_static && ri.level) ? &ri.level->static_randc_domain[ri.member]
-                                 : &ri.owner->randc_domain[ri.member];
-  if (!*domain) *domain = std::make_shared<std::vector<int64_t>>();
-  ri.var.shared_randc_domain = *domain;
-}
-
-// Hand each joint random variable to the solver. 18.8 / 18.5.8 rule c: a
-// variable made inactive by rand_mode() is not randomized; it holds its current
-// value as a state constant that a global constraint solved alongside it sees
-// as a fixed operand.
-void PrepareJointRandVariables(std::vector<RandInfo>& rands,
-                               ConstraintSolver& solver) {
-  for (auto& ri : rands) {
-    ri.var.CollapseEmptyDomain();
-    BindJointRandcHistory(ri);
-    if (!IsObjectRandActive(ri.owner, ri.member)) {
-      auto pit = ri.owner->properties.find(ri.member);
-      if (pit != ri.owner->properties.end())
-        ri.var.value = static_cast<int64_t>(pit->second.ToUint64());
-      ri.var.enabled = false;
-    }
-    solver.AddVariable(ri.var);
+// 18.6.2: each object's solved values written back, and only then each
+// one's post_randomize(), so each reads every object at its new values.
+void CommitParts(std::vector<ObjectSolve>& parts,
+                 const ConstraintSolver* shared, const Expr* expr,
+                 SimContext& ctx, Arena& arena) {
+  for (auto& part : parts) {
+    const ConstraintSolver& solver = shared != nullptr ? *shared : *part.solver;
+    WriteBackSolved(part.obj, part.rands, solver, part.prefix, arena);
   }
-}
-
-// 18.6.2: pre_randomize() runs on the object and on all of its random object
-// members before any new value is computed, and so before the constraints are
-// translated, a state variable one writes being what they read. Each is
-// resolved on its dynamic class so an override is reached and an absent one
-// inherits the base method.
-void InvokeJointPreRandomize(const std::vector<JointObject>& objects,
-                             const Expr* expr, SimContext& ctx, Arena& arena) {
-  for (const auto& jo : objects) {
-    const ClassTypeInfo* owner = nullptr;
-    if (ModuleItem* pre = jo.obj->ResolveMethodForType("pre_randomize",
-                                                       jo.obj->type, &owner)) {
-      ctx.PushMethodClass(owner);
-      ExecInstanceMethodCall(pre, jo.obj, expr, ctx, arena);
-      ctx.PopMethodClass();
-    }
-  }
-}
-
-// Write each solved value back to the object that owns the variable. 18.6.3: as
-// in the single-object path, a static random variable's drawn value belongs in
-// the class-wide shared cell so every instance observes it; a per-object write
-// would shadow that shared storage.
-void WriteBackJointSolved(std::vector<RandInfo>& rands,
-                          const ConstraintSolver& solver, Arena& arena) {
-  for (auto& ri : rands) {
-    Logic4Vec lv = SolvedValue(ri, solver, arena);
-    if (ri.is_static && ri.level != nullptr) {
-      ri.level->static_properties[ri.member] = lv;
-      continue;
-    }
-    ri.owner->properties[ri.member] = lv;
-    if (ri.level != nullptr)
-      ri.owner->properties[std::string(ri.level->name) + "::" + ri.member] = lv;
-  }
+  for (auto& part : parts) InvokePostRandomize(part.obj, expr, ctx, arena);
 }
 
 bool RandomizeObjectTree(SimContext& ctx, Arena& arena, const Expr* expr,
                          const std::vector<JointObject>& objects,
                          const ClassMember* inline_block) {
   ClassObject* root = objects.front().obj;
-  InvokeJointPreRandomize(objects, expr, ctx, arena);
   auto seed = static_cast<uint32_t>(ctx.ObjectRng(root)());
   ConstraintSolver solver(seed);
-  RandomizeCtx rc{root, ctx, arena};
-  rc.solver = &solver;
-
-  std::vector<RandInfo> rands;
-  CollectJointRandVariables(objects, ctx, rands);
+  std::vector<ObjectSolve> parts =
+      TreeParts(objects, inline_block, solver, ctx, arena);
+  std::vector<RandInfo> joint_rands = JointRands(parts);
   std::unordered_set<std::string> names;
-  for (const auto& ri : rands) names.insert(ri.name);
+  for (const auto& ri : joint_rands) names.insert(ri.name);
+  RandomizeCtx joint_rc{root, ctx, arena};
+  joint_rc.solver = &solver;
 
   // 18.5.13.1: the solver ranks soft priority by the order the blocks are
   // added, so the objects are added in that order, and the inline block,
   // which outranks every constraint of the class being randomized, last.
-  for (const JointObject* jo : InSoftPriorityOrder(objects, ctx))
-    CollectJointConstraints(*jo, rands, names, rc, solver);
-  if (inline_block != nullptr) {
-    const JointVarScope kRootScope{root, objects.front().prefix, rands, names};
-    AddJointConstraintBlock(inline_block, root, kRootScope, rc, solver);
+  for (ObjectSolve* part : InSoftPriorityOrder(parts, ctx)) {
+    const JointVarScope kScope{part->obj, part->prefix, joint_rands, names};
+    for (const ClassMember* m : ConstraintMembersInOrder(part->obj->type))
+      AddTreeConstraintMember(m, *part, kScope, joint_rc, solver);
+    if (part == &parts.front() && inline_block != nullptr)
+      AddTreeConstraintMember(inline_block, *part, kScope, joint_rc, solver);
   }
-
-  PrepareJointRandVariables(rands, solver);
-
-  bool solved = solver.SolveWith({});
-  if (solved) {
-    WriteBackJointSolved(rands, solver, arena);
-    // 18.6.2: post_randomize() runs after the new values are written back, so
-    // each object's post_randomize() reads its members at their solved values.
-    for (const auto& jo : objects)
-      InvokePostRandomize(jo.obj, expr, ctx, arena);
+  for (auto& part : parts) {
+    solver.SetNameScope(part.prefix);
+    PrepareRandVariables(part.obj, part.rands, nullptr, solver);
   }
-  return solved;
+  solver.SetNameScope("");
+  if (!solver.SolveWith({})) return false;
+  CommitParts(parts, &solver, expr, ctx, arena);
+  return true;
+}
+
+bool RandomizeEachObject(const std::vector<JointObject>& objects,
+                         const InlineRandomizeCall& call, SimContext& ctx,
+                         Arena& arena) {
+  std::vector<ObjectSolve> parts;
+  parts.reserve(objects.size());
+  for (const auto& jo : objects) {
+    ObjectSolve& part = parts.emplace_back();
+    part.obj = jo.obj;
+    // The inline block and the argument list are the root's alone.
+    InlineRandomizeCall own =
+        parts.size() == 1
+            ? call
+            : InlineRandomizeCall{call.expr, nullptr, nullptr, false};
+    if (!SolveObject(part, own, ctx, arena)) return false;
+  }
+  CommitParts(parts, nullptr, call.expr, ctx, arena);
+  return true;
 }
 
 }  // namespace delta

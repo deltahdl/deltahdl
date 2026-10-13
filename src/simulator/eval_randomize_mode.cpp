@@ -265,14 +265,21 @@ InlineRandomArgs CollectInlineRandomArgs(const Expr* expr) {
 
 // The randomize() call `expr` on `obj` under the argument list `args`,
 // solved jointly with the object's active random object members where the
-// call admits it and on the object alone otherwise; whether it solved.
+// call admits it and each object on its own otherwise; whether it solved.
 static bool RandomizeCall(const Expr* expr, ClassObject* obj,
                           const InlineRandomArgs& args, SimContext& ctx,
                           Arena& arena) {
-  const std::unordered_set<std::string>& inline_random = args.names;
-  bool has_inline_list = args.has_list;
-  bool null_checker = args.null_checker;
-  std::unordered_set<const ClassObject*> visited;
+  std::vector<JointObject> objects;
+  if (args.null_checker) {
+    // 18.11.1: under randomize(null) nothing is randomized, so a rand
+    // object-handle member is a state variable and the object it references
+    // is left untouched.
+    InvokePreRandomize(obj, expr, ctx, arena);
+    objects.push_back({obj, ""});
+  } else {
+    std::unordered_set<const ClassObject*> visited;
+    CollectActiveRandomObjects(obj, "", expr, ctx, arena, objects, visited);
+  }
   // 18.5.8: the plain randomize() form randomizes the object together with all
   // of its active random object members as a single whole, so global
   // constraints relating variables from different objects are solved
@@ -280,21 +287,17 @@ static bool RandomizeCall(const Expr* expr, ClassObject* obj,
   // the root object, solve the tree jointly, an inline (with) block applied
   // to the root (18.5.13.1). The argument-list form (18.11), the null
   // checker (18.11.1) and a with clause restricting the variables it names
-  // (18.7) keep the per-object path.
-  if (!null_checker && !has_inline_list && !expr->with_has_parens) {
-    std::vector<JointObject> objects;
-    CollectActiveRandomObjects(obj, "", ctx, objects, visited);
-    if (objects.size() > 1) {
-      return RandomizeObjectTree(ctx, arena, expr, objects,
-                                 expr->inline_constraint);
-    }
-    visited.clear();
+  // (18.7) solve each object on its own.
+  if (!args.null_checker && !args.has_list && !expr->with_has_parens &&
+      objects.size() > 1) {
+    return RandomizeObjectTree(ctx, arena, expr, objects,
+                               expr->inline_constraint);
   }
   const std::unordered_set<std::string>* active_set =
-      (null_checker || has_inline_list) ? &inline_random : nullptr;
-  return RandomizeObject(
-      obj, ctx, arena,
-      {expr, expr->inline_constraint, active_set, null_checker}, visited);
+      (args.null_checker || args.has_list) ? &args.names : nullptr;
+  return RandomizeEachObject(
+      objects, {expr, expr->inline_constraint, active_set, args.null_checker},
+      ctx, arena);
 }
 
 namespace {

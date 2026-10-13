@@ -172,4 +172,68 @@ TEST(PrePostRandomizeRun, AStateWrittenByPreRandomizeIsWhatTheCallReads) {
   EXPECT_EQ(out, "0 5\n");
 }
 
+// §18.6.2: randomize() computes and assigns the new values of the object and
+// of its random object members before it calls post_randomize() on any of
+// them, the restricted with (x) form included, so the Root's
+// post_randomize() reads the Leaf's y as drawn above 10, not the 0 it held.
+TEST(PrePostRandomizeRun, PostRandomizeReadsTheMembersNewValues) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class Leaf;\n"
+      "  rand bit [7:0] y;\n"
+      "  constraint c { y > 10; }\n"
+      "endclass\n"
+      "class Root;\n"
+      "  rand bit [7:0] x;\n"
+      "  rand Leaf leaf;\n"
+      "  int seen = -1;\n"
+      "  function void post_randomize(); seen = leaf.y; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok;\n"
+      "  initial begin\n"
+      "    static Root r = new;\n"
+      "    r.leaf = new;\n"
+      "    ok = r.randomize() with (x) { x > 0; };\n"
+      "    $display(\"%0d %0d\", ok, r.seen == r.leaf.y && r.leaf.y > 10);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1\n");
+}
+
+// §18.6.2 with §18.5.8: the random object members are the ones the object
+// holds once its pre_randomize() has run, so an Item the Holder's
+// pre_randomize() allocates on each call is solved with the Holder, its y
+// equal to x, and its post_randomize() reads that y.
+TEST(PrePostRandomizeRun, AMemberPreRandomizeAllocatesIsSolvedWithTheObject) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class Item;\n"
+      "  rand bit [7:0] y;\n"
+      "  int post_y = -1;\n"
+      "  function void post_randomize(); post_y = y; endfunction\n"
+      "endclass\n"
+      "class Holder;\n"
+      "  rand bit [7:0] x;\n"
+      "  rand Item item;\n"
+      "  constraint c { x > 0; item.y == x; }\n"
+      "  function void pre_randomize(); item = new; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int bad = 0;\n"
+      "  initial begin\n"
+      "    static Holder h = new;\n"
+      "    repeat (4) begin\n"
+      "      if (h.randomize() != 1 || h.item.y != h.x ||\n"
+      "          h.item.post_y != h.item.y)\n"
+      "        bad++;\n"
+      "    end\n"
+      "    $display(\"%0d\", bad);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0\n");
+}
+
 }  // namespace

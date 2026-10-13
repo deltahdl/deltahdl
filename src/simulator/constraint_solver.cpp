@@ -103,45 +103,10 @@ int64_t RandVariable::ValueFromBits(uint64_t bits) const {
 
 ConstraintSolver::ConstraintSolver(uint32_t seed) : rng_(seed) {}
 
-void ConstraintSolver::AddVariable(const RandVariable& var) {
-  variables_[var.name] = var;
-}
-
 const RandVariable* ConstraintSolver::FindVariable(
     std::string_view name) const {
   auto it = variables_.find(std::string(name));
   return it == variables_.end() ? nullptr : &it->second;
-}
-
-void ConstraintSolver::AddConstraintBlock(const ConstraintBlock& block) {
-  blocks_.push_back(block);
-}
-
-void ConstraintSolver::AddSolveBefore(const std::vector<std::string>& before,
-                                      const std::vector<std::string>& after) {
-  // 18.5.9: 'solve before_list before after_list' constrains every variable of
-  // the first list to be solved ahead of every variable of the second, so
-  // record the cross product of ordering edges.
-  for (const auto& b : before) {
-    for (const auto& a : after) {
-      solve_before_edges_.emplace_back(b, a);
-    }
-  }
-}
-
-void ConstraintSolver::AddFunctionArgPriority(
-    const std::vector<std::string>& higher,
-    const std::vector<std::string>& lower) {
-  // 18.5.11: every higher-priority variable is solved before every variable of
-  // the constraint that used it as a function argument, so record the cross
-  // product of priority edges. A variable that is both higher- and lower-named
-  // (it depends on itself) would form a degenerate cycle, which the cycle check
-  // catches and reports.
-  for (const auto& h : higher) {
-    for (const auto& l : lower) {
-      function_arg_priority_edges_.emplace_back(h, l);
-    }
-  }
 }
 
 void ConstraintSolver::SetRandMode(std::string_view name, bool enabled) {

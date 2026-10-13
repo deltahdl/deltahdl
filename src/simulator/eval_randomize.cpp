@@ -470,10 +470,9 @@ static void BindRandcHistory(ClassObject* obj, RandInfo& ri) {
 // treats it as a state variable, holding its current value constant. That value
 // is seeded and the variable disabled, so the solve leaves it untouched while
 // still evaluating any constraint that relates to it.
-static void PrepareRandVariables(
-    ClassObject* obj, std::vector<RandInfo>& rands,
-    const std::unordered_set<std::string>* inline_random,
-    ConstraintSolver& solver) {
+void PrepareRandVariables(ClassObject* obj, std::vector<RandInfo>& rands,
+                          const std::unordered_set<std::string>* inline_random,
+                          ConstraintSolver& solver) {
   for (auto& ri : rands) {
     ri.var.CollapseEmptyDomain();
     BindRandcHistory(obj, ri);
@@ -495,7 +494,7 @@ static void PrepareRandVariables(
 
 // The keys the handles the rand object-handle member `name` of `obj` holds
 // are kept under: its own name, or, §18.4, those of the elements an array of
-// handles holds, up to the size the solve left it.
+// handles holds.
 static std::vector<std::string> HandleKeys(const ClassObject* obj,
                                            const std::string& name) {
   const auto* array = FindClassArrayProperty(obj->type, name);
@@ -519,77 +518,46 @@ static ClassObject* HeldObject(const ClassObject* obj, const std::string& key,
   return handle == kNullClassHandle ? nullptr : ctx.GetClassObject(handle);
 }
 
-// 18.6.1: recurse into each non-null rand object-handle member so its own
-// random members are randomized as well.
-//
-// 18.8: rand_mode() on a rand object-handle member changes only that handle's
-// mode. An inactive handle is not one of the object's active random variables,
-// so randomize() does not recurse into the object it references; the referenced
-// object's own variable modes are left as they are (only reached by randomizing
-// that object directly).
-static bool RandomizeRandObjectMembers(
-    ClassObject* obj, SimContext& ctx, Arena& arena, const Expr* expr,
-    std::unordered_set<const ClassObject*>& visited) {
+std::vector<std::pair<std::string, ClassObject*>> ActiveRandObjectMembers(
+    const ClassObject* obj, SimContext& ctx) {
   std::vector<std::string> object_members;
   CollectRandObjectMembers(obj->type, ctx, object_members);
-  bool solved = true;
+  std::vector<std::pair<std::string, ClassObject*>> held;
   for (const auto& name : object_members) {
     if (!IsObjectRandActive(obj, name)) continue;
-    for (const auto& key : HandleKeys(obj, name)) {
-      ClassObject* sub = HeldObject(obj, key, ctx);
-      if (sub != nullptr &&
-          !RandomizeObject(sub, ctx, arena, {expr, nullptr, nullptr, false},
-                           visited))
-        solved = false;
+    for (auto& key : HandleKeys(obj, name)) {
+      if (ClassObject* sub = HeldObject(obj, key, ctx))
+        held.emplace_back(std::move(key), sub);
     }
   }
-  return solved;
+  return held;
 }
 
-bool RandomizeObject(ClassObject* obj, SimContext& ctx, Arena& arena,
-                     const InlineRandomizeCall& call,
-                     std::unordered_set<const ClassObject*>& visited) {
-  if (!obj || !obj->type) return false;
-  if (!visited.insert(obj).second) return true;
-  InvokePreRandomize(obj, call.expr, ctx, arena);
-
+bool SolveObject(ObjectSolve& part, const InlineRandomizeCall& call,
+                 SimContext& ctx, Arena& arena) {
+  ClassObject* obj = part.obj;
   // 18.6.3: seed from the object's own RNG so randomize() draws a fresh result
   // each call while staying reproducible from the object's starting state.
   auto seed = static_cast<uint32_t>(ctx.ObjectRng(obj)());
-  ConstraintSolver solver(seed);
-  RandomizeCtx rc{obj, ctx, arena};
+  part.solver = std::make_unique<ConstraintSolver>(seed);
+  ConstraintSolver& solver = *part.solver;
+  part.rc = std::make_unique<RandomizeCtx>(RandomizeCtx{obj, ctx, arena});
+  RandomizeCtx& rc = *part.rc;
   rc.solver = &solver;
   rc.inline_block = call.inline_block;
 
-  std::vector<RandInfo> rands;
+  std::vector<RandInfo>& rands = part.rands;
   CollectRandVariables(obj->type, ctx, rands);
   AddDynamicArrayVariables(rands, rc);
   if (call.inline_random != nullptr)
     PromoteInlineRandomVariables(obj, ctx, *call.inline_random, rands);
   CollectConstraintBlocks(obj->type, rands, rc, solver);
   // The inline block is applied only to the object named in the call, not to
-  // its rand sub-objects, so it is dropped on the recursive descent below.
+  // its rand sub-objects, which are solved without it.
   if (call.inline_block != nullptr)
     AddInlineConstraintBlock(call, rands, rc, solver);
   PrepareRandVariables(obj, rands, call.inline_random, solver);
-
-  bool solved = solver.SolveWith({});
-  // 18.6.2: post_randomize() must observe the new values as assigned to the
-  // object, so write the solved values back first and only then invoke it. The
-  // solver's pre hook already fired before the compute; post is sequenced here,
-  // after the writeback, rather than inside the solve.
-  if (solved) {
-    WriteBackSolved(obj, rands, solver, arena);
-    InvokePostRandomize(obj, call.expr, ctx, arena);
-  }
-
-  // 18.11.1: under randomize(null) nothing is randomized, so a rand
-  // object-handle member is a state variable and the object it references is
-  // left untouched -- do not recurse into it.
-  if (!call.null_checker &&
-      !RandomizeRandObjectMembers(obj, ctx, arena, call.expr, visited))
-    solved = false;
-  return solved;
+  return solver.SolveWith({});
 }
 
 // 18.9 / Table 18-4: record a block's active (ON) or inactive (OFF) state for
@@ -788,13 +756,13 @@ ClassObject* ResolveRandomizeTarget(SimContext& ctx,
 }
 
 Logic4Vec SolvedValue(const RandInfo& ri, const ConstraintSolver& solver,
-                      Arena& arena) {
+                      const std::string& prefix, Arena& arena) {
   if (ri.var.is_real) {
     // 18.4.1: the real drawn is written back as the real it is.
-    return MakeRealVec(arena, solver.GetRealValue(ri.name),
+    return MakeRealVec(arena, solver.GetRealValue(prefix + ri.name),
                        ri.var.width == 32 ? 32 : 64);
   }
-  int64_t v = solver.GetValue(ri.name);
+  int64_t v = solver.GetValue(prefix + ri.name);
   Logic4Vec lv =
       MakeLogic4VecVal(arena, ri.var.width, static_cast<uint64_t>(v));
   // 6.11.3: the member's declared signedness belongs to the value stored in

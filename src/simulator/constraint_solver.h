@@ -416,6 +416,10 @@ class ConstraintSolver {
  public:
   explicit ConstraintSolver(uint32_t seed = 0);
 
+  // 18.5.8: names what is added after it under `prefix`, the path of the
+  // object of a joint solve whose relations are being added.
+  void SetNameScope(std::string prefix);
+
   void AddVariable(const RandVariable& var);
 
   // The variable added under `name`, or null where none was: what a relation
@@ -876,6 +880,7 @@ class ConstraintSolver {
       const std::unordered_set<std::string>& committed) const;
 
   std::mt19937 rng_;
+  std::string name_scope_;
   std::unordered_map<std::string, RandVariable> variables_;
   std::vector<ConstraintBlock> blocks_;
   std::unordered_map<std::string, int64_t> values_;

@@ -8,6 +8,46 @@ using namespace delta;
 
 namespace {
 
+// A Root holding a rand Leaf, each kept above 10 and at or below a ceiling
+// a test can drop to make it infeasible, and each counting its
+// post_randomize() calls.
+const char* const kRootAndLeaf =
+    "class Leaf;\n"
+    "  rand bit [7:0] y;\n"
+    "  int ceiling = 255;\n"
+    "  int post_calls = 0;\n"
+    "  constraint c { y > 10; y <= ceiling; }\n"
+    "  function void post_randomize(); post_calls++; endfunction\n"
+    "endclass\n"
+    "class Root;\n"
+    "  rand bit [7:0] x;\n"
+    "  rand Leaf leaf;\n"
+    "  int ceiling = 255;\n"
+    "  int post_calls = 0;\n"
+    "  constraint c { x > 10; x <= ceiling; }\n"
+    "  function void post_randomize(); post_calls++; endfunction\n"
+    "endclass\n";
+
+// Runs `body` on a Root r holding a Leaf, both at 0, and displays the call's
+// result, then r.x, r.leaf.y and both post_randomize() counts.
+std::string RunRootAndLeaf(const std::string& body) {
+  SimFixture f;
+  return RunCapture(std::string(kRootAndLeaf) +
+                        "module t;\n"
+                        "  int ok;\n"
+                        "  initial begin\n"
+                        "    static Root r = new;\n"
+                        "    r.leaf = new;\n" +
+                        body +
+                        "    ok = r.randomize() with (x) { x < 50; };\n"
+                        "    $display(\"%0d %0d %0d %0d %0d\", ok, r.x, "
+                        "r.leaf.y, r.post_calls,\n"
+                        "             r.leaf.post_calls);\n"
+                        "  end\n"
+                        "endmodule\n",
+                    f);
+}
+
 // 18.6.3: a static random variable has one copy for the whole class, so each
 // randomize() call changes it for every instance: over 32 rounds of a call on
 // each of two Shared, both read the same v after every call, and a call on the
@@ -106,6 +146,21 @@ TEST(RandomizationBehaviorRun, ObjectsSeededAlikeDrawAlike) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "8 1\n");
+}
+
+// §18.6.3: a randomize() that fails leaves every random variable as it was
+// and calls no post_randomize(), its random object members' failure being
+// its own: the Leaf held at or below 0 cannot be solved, so the Root keeps
+// its x at 0 and neither post_randomize() runs, on the restricted with (x)
+// form as on the plain one.
+TEST(RandomizationBehaviorRun, AMembersFailureLeavesTheObjectAsItWas) {
+  EXPECT_EQ(RunRootAndLeaf("    r.leaf.ceiling = 0;\n"), "0 0 0 0 0\n");
+}
+
+// §18.6.3: likewise the Root held at or below 0 cannot be solved, so its
+// Leaf keeps its y at 0 and neither post_randomize() runs.
+TEST(RandomizationBehaviorRun, AnObjectsFailureLeavesItsMembersAsTheyWere) {
+  EXPECT_EQ(RunRootAndLeaf("    r.ceiling = 0;\n"), "0 0 0 0 0\n");
 }
 
 }  // namespace

@@ -444,16 +444,19 @@ void WriteStructDynamicElements(
 // 18.6.1: write each solved value back to the object, keeping the bare and
 // scoped ("Class::name") property aliases in sync so member reads see it. A
 // dynamic array's size is written under its key, which sizes the array
-// (18.4), ahead of its elements.
+// (18.4), ahead of its elements. 18.5.8: the solver names the variables
+// under `prefix`.
 void WriteBackSolved(ClassObject* obj, std::vector<RandInfo>& rands,
-                     ConstraintSolver& solver, Arena& arena) {
+                     const ConstraintSolver& solver, const std::string& prefix,
+                     Arena& arena) {
   std::unordered_map<std::string, int64_t> sizes;
   std::unordered_map<std::string, std::vector<Logic4Vec>> queues;
   std::vector<std::pair<const RandInfo*, Logic4Vec>> struct_elements;
   for (auto& ri : rands) {
-    if (ri.var.is_array_size) sizes[ri.array_base] = solver.GetValue(ri.name);
+    if (ri.var.is_array_size)
+      sizes[ri.array_base] = solver.GetValue(prefix + ri.name);
     if (BeyondDrawnSize(ri, sizes)) continue;
-    Logic4Vec lv = SolvedValue(ri, solver, arena);
+    Logic4Vec lv = SolvedValue(ri, solver, prefix, arena);
     if (ri.dyn_field != nullptr) {
       struct_elements.emplace_back(&ri, lv);
     } else if (!ri.in_queue) {

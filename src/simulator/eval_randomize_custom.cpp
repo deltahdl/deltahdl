@@ -42,8 +42,9 @@ Variable* TrialLocal(const std::string& n, bool real, RandomizeCtx& rc) {
     rc.ctx.BindLocalVariable(n, it->second);
     return it->second;
   }
-  const RandVariable* var =
-      rc.solver != nullptr && !real ? rc.solver->FindVariable(n) : nullptr;
+  const RandVariable* var = rc.solver != nullptr && !real
+                                ? rc.solver->FindVariable(rc.solver_prefix + n)
+                                : nullptr;
   uint32_t width = real ? 64 : var != nullptr ? std::max(var->width, 32u) : 32;
   bool is_signed = !real && (var == nullptr || var->is_signed);
   Variable* local = rc.ctx.CreateLocalVariable(n, width, is_signed);
@@ -65,10 +66,12 @@ Logic4Vec EvalBound(const Expr* e, const std::vector<std::string>& names,
   for (const auto& n : names) {
     auto it = vals.find(n);
     // Every name bound is one of the solve's random variables.
-    bool real = rc.solver != nullptr && rc.solver->FindVariable(n)->is_real;
+    bool real = rc.solver != nullptr &&
+                rc.solver->FindVariable(rc.solver_prefix + n)->is_real;
     Variable* local = TrialLocal(n, real, rc);
     if (real) {
-      local->value = MakeRealVec(rc.arena, rc.solver->GetRealValue(n), 64);
+      local->value = MakeRealVec(
+          rc.arena, rc.solver->GetRealValue(rc.solver_prefix + n), 64);
       continue;
     }
     SetLocalWords(local->value, it != vals.end() ? it->second : 0);
@@ -167,7 +170,8 @@ const Expr* AddendSide(const Expr* rel, std::vector<RandInfo>& rands,
 
 int64_t HeldToVariable(int64_t v, const std::string& name, RandomizeCtx& rc) {
   const RandVariable* var =
-      rc.solver != nullptr ? rc.solver->FindVariable(name) : nullptr;
+      rc.solver != nullptr ? rc.solver->FindVariable(rc.solver_prefix + name)
+                           : nullptr;
   if (var == nullptr || var->width >= 64) return v;
   auto bits = static_cast<uint64_t>(v) & ((uint64_t{1} << var->width) - 1);
   return var->is_signed ? SignExtend(bits, var->width)

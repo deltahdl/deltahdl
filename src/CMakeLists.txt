@@ -603,6 +603,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/constraint_solver_propagate.cpp
     simulator/constraint_solver_randc.cpp
     simulator/constraint_solver_repair.cpp
+    simulator/constraint_solver_scope.cpp
     simulator/constraint_solver_sizes.cpp
     simulator/constraint_solver_soft.cpp
     simulator/constraint_solver_solve.cpp
