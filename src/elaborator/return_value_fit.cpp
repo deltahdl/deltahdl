@@ -5,6 +5,8 @@
 
 #include "elaborator/return_value_fit.h"
 
+#include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -16,6 +18,7 @@
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 
 namespace delta {
@@ -54,6 +57,18 @@ CheckedType CheckedTypeOf(const DataType& declared, const ReturnCtx& ctx) {
     out.cls = ClassOfDeclaredType(t, {}, ctx.unit);
   }
   return out;
+}
+
+void EnterDeclaredLocals(
+    const std::vector<Stmt*>& items,
+    std::unordered_map<std::string_view, const DataType*>& locals) {
+  for (const Stmt* s : items) {
+    if (s->kind != StmtKind::kVarDecl) continue;
+    if (s->var_unpacked_dims.empty())
+      locals[s->var_name] = &s->var_decl_type;
+    else
+      locals.erase(s->var_name);
+  }
 }
 
 CheckedType CheckedTypeOfValue(const Expr* e, const ReturnCtx& ctx) {

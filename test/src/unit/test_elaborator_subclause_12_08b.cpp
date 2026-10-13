@@ -156,4 +156,67 @@ TEST(JumpStatementElaboration, ReturnTypeNamedByAClassTypedefIsTheClasssType) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// A begin-end block is a scope of its own (§23.9), so a variable it declares
+// hides the formal of the same name, and a return inside it gives the
+// block's variable. Here that is the class handle, which the class function
+// takes, and not the int formal, which it would not.
+TEST(JumpStatementElaboration,
+     ReturnOfANameANestedBlockHidesReadsTheBlocksType) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  class A; endclass\n"
+      "  function automatic A f(int v);\n"
+      "    begin\n"
+      "      A v = new;\n"
+      "      return v;\n"
+      "    end\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(JumpStatementElaboration, ReturnOfAnIntANestedBlockDeclaresIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  class A; endclass\n"
+      "  function automatic A f(A v);\n"
+      "    begin\n"
+      "      int v = 1;\n"
+      "      return v;\n"
+      "    end\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return expression in function 'f' is not "
+                            "assignment-compatible with the function's return "
+                            "type",
+                            6, "12.8"));
+}
+
+// A nested block's unpacked array hides the class formal of its name too, so
+// the return gives the array the function's array type takes, and no class
+// handle.
+TEST(JumpStatementElaboration, ReturnOfAnArrayANestedBlockDeclaresElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  class A; endclass\n"
+      "  typedef int pair_t[2];\n"
+      "  function automatic pair_t f(A v);\n"
+      "    begin\n"
+      "      int v[2];\n"
+      "      return v;\n"
+      "    end\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

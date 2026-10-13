@@ -10,6 +10,7 @@
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 
 namespace delta {
@@ -28,6 +29,16 @@ struct ReturnCtx {
   const CompilationUnit* unit;
   std::unordered_map<std::string_view, const DataType*> locals;
 };
+
+// Enters into `locals` the variables declared among `items`, the items of a
+// subroutine body, of a randsequence code block or of a begin-end block, over
+// the names already there: §23.9 makes a begin-end block a scope of its own,
+// whose declarations hide the names of the same spelling around it. A variable
+// written with an unpacked dimension is a type the check does not read, so it
+// hides an outer name without standing for a type of its own.
+void EnterDeclaredLocals(
+    const std::vector<Stmt*>& items,
+    std::unordered_map<std::string_view, const DataType*>& locals);
 
 // The type a return compares, as far as the check can see it: a class, or a
 // type IsAssignmentCompatible answers for, or neither where the type is not

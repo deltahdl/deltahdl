@@ -239,11 +239,22 @@ void CheckValueReturningFuncReturn(const Stmt* s, std::string_view func_name,
   // else is left unreached by stopping here.
   if (s->kind == StmtKind::kRandsequence) return;
 
+  // §23.9: a begin-end block is a scope, and the variables it declares hide
+  // the names of the same spelling around it, so its statements read their
+  // names through a table its own declarations are entered into. A fork-join
+  // block is a scope too, but §9.3.2 forbids a return anywhere inside one.
+  ReturnCtx block_ctx{ctx.typedefs, ctx.unit, {}};
+  if (s->kind == StmtKind::kBlock) {
+    block_ctx.locals = ctx.locals;
+    EnterDeclaredLocals(s->stmts, block_ctx.locals);
+  }
+  const ReturnCtx& inner = s->kind == StmtKind::kBlock ? block_ctx : ctx;
+
   // Every other link comes from ForEachChildStmt in
   // elaborator_validate_internal.h, which is the one list of the fields of Stmt
   // that hold a statement.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
-    CheckValueReturningFuncReturn(sub, func_name, ret, ctx, diag);
+    CheckValueReturningFuncReturn(sub, func_name, ret, inner, diag);
   });
 }
 
@@ -256,10 +267,7 @@ std::unordered_map<std::string_view, const DataType*> SubroutineLocals(
   for (const auto& arg : item->func_args) {
     if (arg.unpacked_dims.empty()) locals[arg.name] = &arg.data_type;
   }
-  for (const Stmt* s : item->func_body_stmts) {
-    if (s->kind == StmtKind::kVarDecl && s->var_unpacked_dims.empty())
-      locals[s->var_name] = &s->var_decl_type;
-  }
+  EnterDeclaredLocals(item->func_body_stmts, locals);
   return locals;
 }
 
