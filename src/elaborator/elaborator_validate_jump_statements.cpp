@@ -258,18 +258,16 @@ DeclaredLocals SubroutineLocals(const ModuleItem* item,
   return locals;
 }
 
-// The unpacked arrays `items` declare, the variables of a module, a package or
-// a compilation unit that a foreach in one of its subroutines may walk. Its
-// other variables are left out, since §12.8's check reads no name declared
-// outside the subroutine as a returned value.
-DeclaredLocals ScopeArrays(const std::vector<ModuleItem*>& items) {
-  DeclaredLocals arrays;
+// The variables `items` declare, those of a module, a package or a compilation
+// unit, which §23.9's outward search finds for a name one of its subroutines
+// uses without declaring it.
+DeclaredLocals ScopeVariables(const std::vector<ModuleItem*>& items) {
+  DeclaredLocals variables;
   for (const auto* item : items) {
-    if (item != nullptr && item->kind == ModuleItemKind::kVarDecl &&
-        !item->unpacked_dims.empty())
-      arrays[item->name] = {&item->data_type, &item->unpacked_dims};
+    if (item != nullptr && item->kind == ModuleItemKind::kVarDecl)
+      variables[item->name] = {&item->data_type, &item->unpacked_dims};
   }
-  return arrays;
+  return variables;
 }
 
 // §12.8 — applies the jump rules to a function/task body and, for a
@@ -313,12 +311,12 @@ void Elaborator::ValidateJumpStatements(const ModuleDecl* decl) {
 // holds those outer names alone. So a method's return check reads no name
 // through them: the methods of the classes `items` declare and of the
 // compilation unit's classes, and every method defined out of its class, are
-// checked with no typedef table, and with none of the arrays of the scope
+// checked with no typedef table, and with none of the variables of the scope
 // around the class either, which a property of the class may hide.
 void Elaborator::CheckJumpStatementsIn(const std::vector<ModuleItem*>& items) {
   std::unordered_set<const ModuleItem*> methods = ClassMethodsOf(items, unit_);
   static const TypedefMap kNoTypedefs;
-  const ReturnCtx kScope{typedefs_, unit_, ScopeArrays(items)};
+  const ReturnCtx kScope{typedefs_, unit_, ScopeVariables(items)};
   const ReturnCtx kClass{kNoTypedefs, unit_, {}};
   ForEachBodyOwningItem(items, [&](const ModuleItem* item) {
     if (IsProceduralItemKind(item->kind) && item->body) {

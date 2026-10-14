@@ -319,4 +319,43 @@ TEST(JumpStatementElaboration, ForeachVariableOfAnUnreadDimensionHidesFormal) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// A name the function does not declare is found in the module around it
+// (§23.9), so the return gives the module's int, which the class function does
+// not take.
+TEST(JumpStatementElaboration, ReturnOfAModuleVariableIsCheckedAgainstType) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  class A; endclass\n"
+      "  int g;\n"
+      "  function automatic A f();\n"
+      "    return g;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return expression in function 'f' is not "
+                            "assignment-compatible with the function's return "
+                            "type",
+                            5, "12.8"));
+}
+
+// The function's own declaration hides the module's variable of its name, so
+// the return gives the function's class handle.
+TEST(JumpStatementElaboration, AFunctionsDeclarationHidesAModuleVariable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  class A; endclass\n"
+      "  int g;\n"
+      "  function automatic A f();\n"
+      "    A g = new;\n"
+      "    return g;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
