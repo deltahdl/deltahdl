@@ -82,9 +82,14 @@ inline constexpr int64_t kDefaultMaxGenerateIterations = 262144;
 // inside every block around it. At namespace scope because
 // elaborator_defparam.cpp judges a target against it from a function outside
 // the class.
+//
+// An element of an array of instances confines it as a generate block does:
+// `element` is then the element's module, which ApplyDefparamsRecursively
+// has made the element's own, and `steps` is empty.
 struct DefparamWriterBlock {
   RtlirModule* holder;
   HierPath steps;
+  const RtlirModule* element = nullptr;
 };
 using DefparamWriterBlocks =
     std::unordered_map<const RtlirModule*, DefparamWriterBlock>;
@@ -621,6 +626,39 @@ class ElaboratorData {
   // refuse a module-level statement whose top-rooted name reaches outside
   // that block as a statement written in the block is refused.
   DefparamWriterBlocks defparam_writer_blocks_;
+  // §23.10.1 with §23.3.3.5: gives `elem`, an element of an instance array
+  // of `parent`, a module tree of its own where it shares one with another
+  // element (PushInstanceArray elaborates the array's module once), so that a
+  // defparam reaching through the element changes it alone. Each module of the
+  // tree is copied once, with the defparams and the generate constructs still
+  // pending for it. IsolateArrayElements does so for each element `mod`
+  // holds, where the design writes a defparam at all (WritesDefparams).
+  // Defined in elaborator_defparam_isolate.cpp.
+  void IsolateArrayElement(const RtlirModule& parent, RtlirModuleInst& elem,
+                           Arena& arena);
+  void IsolateArrayElements(RtlirModule& mod, Arena& arena,
+                            const CompilationUnit& unit);
+  bool WritesDefparams(const CompilationUnit& unit);
+  std::optional<bool> declares_defparams_;
+  // §23.10.1 with §23.10.2: applies the assignment `path = value` of a defparam
+  // written in `mod`, under the generate block instances `writer`, to a
+  // parameter a named block declares, recording the initializer on the
+  // reached instance's module (RtlirModule::block_param_overrides). False
+  // where the path reaches no such parameter. Defined in
+  // elaborator_defparam.cpp.
+  struct BlockParamDefparam {
+    Expr* value;
+    const ScopeMap& scope;
+    SourceLoc loc;
+    DiagEngine& diag;
+    Arena& arena;
+  };
+  bool ApplyBlockParamDefparam(RtlirModule* mod, const HierPath& writer,
+                               const HierPath& path,
+                               const BlockParamDefparam& d);
+  RtlirModule* CopyModuleTree(
+      RtlirModule* mod, Arena& arena,
+      std::unordered_map<const RtlirModule*, RtlirModule*>& copies);
   // §23.8: the top-level modules of the design being elaborated, which are
   // the roots a defparam's hierarchical name is read from once its leading
   // step names no scope of the writing module. Filled once the tops exist and

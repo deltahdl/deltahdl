@@ -172,8 +172,8 @@ TEST(DefparamElaboration, DefparamInGenerateBlockCannotEscapeScope) {
   EXPECT_TRUE(u->params[0].is_resolved);
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(),
-                    "defparam inside a generate block reaches a parameter "
-                    "outside that block",
+                    "defparam inside a generate block or an array of instances "
+                    "reaches a parameter outside that hierarchy",
                     6, "23.10.1"));
 }
 
@@ -225,8 +225,8 @@ TEST(DefparamElaboration, DefparamInGenerateCannotTargetSiblingScope) {
   EXPECT_EQ(u->params[0].resolved_value, 5);
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(),
-                    "defparam inside a generate block reaches a parameter "
-                    "outside that block",
+                    "defparam inside a generate block or an array of instances "
+                    "reaches a parameter outside that hierarchy",
                     8, "23.10.1"));
 }
 

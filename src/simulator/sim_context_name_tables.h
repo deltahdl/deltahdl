@@ -168,6 +168,12 @@ class DeclaredNameTables {
   // `name` must outlive the context.
   void RegisterBlockVariable(std::string_view name);
   bool IsBlockVariable(std::string_view name) const;
+  // §23.10.1 with §23.10.2: the initializer a defparam gives the parameter
+  // `decl` a named block declares, in the instance `prefix` names
+  // (Lowerer::LowerParams); null where no defparam redefines it there.
+  void RegisterBlockParamOverride(std::string_view prefix, const Stmt* decl,
+                                  Expr* init);
+  Expr* BlockParamOverride(std::string_view prefix, const Stmt* decl) const;
 
   // §26.3 with §13.4: the package a subroutine was declared in, whose
   // variables its body reads by their bare names, and the package's own
@@ -494,6 +500,8 @@ class DeclaredNameTables {
   std::unordered_set<std::string_view> imported_names_;
   // §37.12: see RegisterBlockVariable.
   std::unordered_set<std::string_view> block_variables_;
+  // §23.10.1: see RegisterBlockParamOverride.
+  std::map<std::pair<std::string, const Stmt*>, Expr*> block_param_overrides_;
   // §26.3 with §13.4: see RegisterSubroutinePackage.
   std::unordered_map<const ModuleItem*, std::string_view> subroutine_packages_;
   // §13.4.2: see RegisterStaticFrameOwner.

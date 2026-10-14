@@ -289,6 +289,9 @@ void Parser::ParseBlockVarDecls(std::vector<Stmt*>& stmts) {
       s->var_name = param->name;
       s->var_init = param->init_expr;
       s->var_is_param = true;
+      // §23.10.1: the declaration says whether a defparam may redefine it, a
+      // localparam or a type parameter being refused one.
+      s->decl_item = param;
       s->attrs = attrs;
       stmts.push_back(s);
     }

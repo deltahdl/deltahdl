@@ -289,13 +289,14 @@ TEST(DefparamElaboration, WidensAnInstanceOverrideGivenInThePortList) {
 }
 
 // Whether the §23.10.1 report a defparam reaching outside its generate block
-// gets was made at `line`.
+// or its element of an array of instances gets was made at `line`.
 ::testing::AssertionResult EscapeReportedAt(const ElabFixture& f,
                                             uint32_t line) {
-  return ReportedError(f.diag.Diagnostics(),
-                       "defparam inside a generate block reaches a parameter "
-                       "outside that block",
-                       line, "23.10.1");
+  return ReportedError(
+      f.diag.Diagnostics(),
+      "defparam inside a generate block or an array of instances "
+      "reaches a parameter outside that hierarchy",
+      line, "23.10.1");
 }
 
 // §23.10.1 (printed page 764) forbids a defparam statement in a hierarchy in
@@ -395,6 +396,91 @@ TEST(DefparamElaboration, ModuleUnderAGenerateBlockReachesItsSibling) {
   ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->resolved_value, 5);
   EXPECT_FALSE(f.has_errors);
+}
+
+// §23.10.1 (printed page 764) forbids a defparam statement in a hierarchy in
+// or under an array of instances from changing a parameter outside that
+// hierarchy, as it does under a generate block. cel's `defparam top.u[1].c.P`
+// stands in u[0] as well as in u[1]: in u[1] it stays inside and is applied,
+// and in u[0] it reaches into u[1] and is refused. Nothing confined a
+// statement written in an array element, so the u[0] copy was applied too.
+TEST(DefparamElaboration, ModuleInAnInstanceArrayElementCannotEscapeIt) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module c;\n"
+      "  parameter int P = 1;\n"
+      "endmodule\n"
+      "module cel;\n"
+      "  c c();\n"
+      "  defparam top.u[1].c.P = 5;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  cel u[0:1]();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(EscapeReportedAt(f, 6));
+}
+
+// A statement in one element naming a parameter inside that same element,
+// `defparam c.P` read from where cel stands, is applied in each element.
+TEST(DefparamElaboration, ModuleInAnInstanceArrayElementReachesItsOwnChild) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module c;\n"
+      "  parameter int P = 1;\n"
+      "endmodule\n"
+      "module cel;\n"
+      "  c c();\n"
+      "  defparam c.P = 5;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  cel u[0:1]();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  const auto* p = FindParam(design, "c", "P");
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(p->resolved_value, 5);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §23.10.1 refuses a defparam on a local parameter, and a localparam a named
+// block declares is one as a module's is.
+TEST(DefparamElaboration, NamedBlockLocalparamTakesNoDefparam) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module c;\n"
+      "  initial begin : blk\n"
+      "    localparam L = 3;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  defparam u.blk.L = 6;\n"
+      "  c u();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "defparam cannot override a local parameter", 7,
+                            "23.10.1"));
+}
+
+// A block parameter's defparam whose right-hand side does not fold to a
+// constant is left alone and reported as having no constant value.
+TEST(DefparamElaboration, NamedBlockParameterDefparamNeedsAConstant) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module c;\n"
+      "  initial begin : blk\n"
+      "    parameter Q = 3;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  defparam u.blk.Q = $time;\n"
+      "  c u();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "defparam value is not constant", 7, "23.10.1"));
 }
 
 }  // namespace

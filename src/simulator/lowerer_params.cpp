@@ -38,6 +38,12 @@ void Lowerer::LowerParams(const RtlirModule* mod) {
     ctx_.Vcd().MarkVcdParameter(*full);
     LowerParam(p, *full);
   }
+  // §23.10.1 with §23.10.2: the defparams that redefine a parameter of one of
+  // this instance's named blocks, read when the block's declaration runs.
+  for (const auto& redefined : mod->block_param_overrides) {
+    ctx_.RegisterBlockParamOverride(inst_prefix_, redefined.decl,
+                                    redefined.init);
+  }
 }
 
 // §6.20.1 (printed page 124) with §6.20.2: a parameter declared with unpacked

@@ -172,8 +172,8 @@ TEST(DefparamSupport, DefparamInGenerateBlockCannotReachOutThroughTheTop) {
       f, "top");
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(),
-                    "defparam inside a generate block reaches a parameter "
-                    "outside that block",
+                    "defparam inside a generate block or an array of instances "
+                    "reaches a parameter outside that hierarchy",
                     5, "23.10.1"));
 }
 

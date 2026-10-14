@@ -181,6 +181,18 @@ bool DeclaredNameTables::IsBlockVariable(std::string_view name) const {
   return block_variables_.count(name) != 0;
 }
 
+void DeclaredNameTables::RegisterBlockParamOverride(std::string_view prefix,
+                                                    const Stmt* decl,
+                                                    Expr* init) {
+  block_param_overrides_[{std::string(prefix), decl}] = init;
+}
+
+Expr* DeclaredNameTables::BlockParamOverride(std::string_view prefix,
+                                             const Stmt* decl) const {
+  auto it = block_param_overrides_.find({std::string(prefix), decl});
+  return it == block_param_overrides_.end() ? nullptr : it->second;
+}
+
 void DeclaredNameTables::RegisterSubroutinePackage(const ModuleItem* subroutine,
                                                    std::string_view pkg) {
   subroutine_packages_[subroutine] = pkg;

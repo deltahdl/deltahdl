@@ -436,6 +436,16 @@ static Expr* BoundLiteral(Arena& arena, uint32_t bound) {
 
 const Stmt* DeclParameterTypedByValue(const Stmt* stmt, SimContext& ctx,
                                       Arena& arena) {
+  // §23.10.1 with §23.10.2: a defparam may give the parameter an initializer
+  // of its own in the running instance, read in place of the declaration's.
+  Expr* redefined = stmt->var_is_param ? ctx.BlockParamOverride(
+                                             ctx.ActiveInstancePrefix(), stmt)
+                                       : nullptr;
+  if (redefined != nullptr) {
+    auto* copy = arena.Create<Stmt>(*stmt);
+    copy->var_init = redefined;
+    stmt = copy;
+  }
   const DataType& type = stmt->var_decl_type;
   if (!stmt->var_is_param || stmt->var_init == nullptr ||
       type.kind != DataTypeKind::kImplicit || type.packed_dim_left != nullptr) {

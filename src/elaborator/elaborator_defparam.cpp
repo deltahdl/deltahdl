@@ -13,6 +13,7 @@
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_data.h"
+#include "elaborator/elaborator_defparam_walk.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
@@ -92,88 +93,6 @@ static bool RhsContainsHierarchicalRef(const Expr* e) {
   return AnyListChildContainsHierarchicalRef(e);
 }
 
-// True when a step of a path a source wrote names the same generate block
-// instance a step recorded on a declaration does.
-static bool SameHierStep(const HierStep& written, const HierStep& recorded) {
-  if (written.name != recorded.name) return false;
-  if (written.has_index != recorded.has_index) return false;
-  return !written.has_index || written.index == recorded.index;
-}
-
-// Whether the first `prefix.size()` steps of `path` are `prefix`'s.
-static bool PathStartsWith(const HierPath& path, const HierPath& prefix) {
-  if (path.size() < prefix.size()) return false;
-  for (size_t i = 0; i < prefix.size(); ++i) {
-    if (!SameHierStep(prefix[i], path[i])) return false;
-  }
-  return true;
-}
-
-// The instance `mod` holds as `name` inside exactly the generate block
-// instances `blocks` names, or nullptr when it holds no such thing.
-static const RtlirModuleInst* ChildUnderBlocks(RtlirModule* mod,
-                                               std::string_view name,
-                                               const HierPath& blocks) {
-  for (auto& child : mod->children) {
-    if (!child.resolved) continue;
-    if (child.simple_inst_name != name) continue;
-    if (child.gen_block_path.size() != blocks.size()) continue;
-    if (PathStartsWith(child.gen_block_path, blocks)) return &child;
-  }
-  return nullptr;
-}
-
-// One instance a path descends into: the module the step left and the
-// instance it entered, whose gen_block_path says which generate block
-// instances of that module it stands in.
-struct PathDescent {
-  RtlirModule* from;
-  const RtlirModuleInst* inst;
-};
-
-// Follows every step of `path` but the last down the instance hierarchy from
-// `root`, starting inside the generate block instances `writer` names. Returns
-// the module the last step is declared in, or nullptr when no such module was
-// elaborated.
-//
-// A step names a generate block instance or a module instance, and §23.6 makes
-// it exactly one of the two: each node of the hierarchical name tree is a scope
-// of its own for identifiers, and a module holds its blocks and its instances
-// in one scope, so no step can name both. Reading a step as an instance first
-// is therefore a decision rather than a guess, and a step that names no
-// instance is a block: it is remembered and the instance it qualifies is looked
-// for one step further on.
-//
-// A step carrying an instance select is never read as an instance. §23.6 admits
-// one over an instance array as well as over a loop generate block, but nothing
-// records which element of an array a child is, so such a step would match
-// every element alike.
-//
-// Every instance the walk entered is appended to `descents`, for the
-// §23.10.1 judgement of where the target stands.
-static RtlirModule* DescendDefparamPath(RtlirModule* root, const HierPath& path,
-                                        const HierPath& writer,
-                                        std::vector<PathDescent>& descents) {
-  RtlirModule* cur = root;
-  HierPath blocks = writer;
-  for (size_t i = 0; i + 1 < path.size(); ++i) {
-    const RtlirModuleInst* next =
-        path[i].has_index ? nullptr
-                          : ChildUnderBlocks(cur, path[i].name, blocks);
-    if (next != nullptr) {
-      descents.push_back({cur, next});
-      cur = next->resolved;
-      blocks.clear();
-      continue;
-    }
-    blocks.push_back(path[i]);
-  }
-  // Leftover steps named generate block instances that nothing was instantiated
-  // in, so the path reached a scope rather than a module and names no
-  // parameter.
-  return blocks.empty() ? cur : nullptr;
-}
-
 RtlirParamDecl* Elaborator::ResolveDefparamSteps(RtlirModule* root,
                                                  const HierPath& path,
                                                  const HierPath& writer,
@@ -181,7 +100,11 @@ RtlirParamDecl* Elaborator::ResolveDefparamSteps(RtlirModule* root,
   if (path.size() < 2) return nullptr;
 
   std::vector<PathDescent> descents;
-  RtlirModule* cur = DescendDefparamPath(root, path, writer, descents);
+  RtlirModule* cur =
+      DescendDefparamPath(root, path, writer, descents,
+                          [this](RtlirModule& parent, RtlirModuleInst& elem) {
+                            IsolateArrayElement(parent, elem, arena_);
+                          });
   if (!cur) return nullptr;
 
   auto param_name = path.back().name;
@@ -192,29 +115,6 @@ RtlirParamDecl* Elaborator::ResolveDefparamSteps(RtlirModule* root,
     }
   }
   return nullptr;
-}
-
-// §23.10.1 (printed page 764): whether the parameter `steps` reaches from the
-// top-level module `root` stands outside the generate block instance
-// `blocks` records for `writer`, the module whose statement names it -- the
-// clause forbids a statement in a hierarchy in or under a generate block
-// instance from changing a parameter value outside that hierarchy. Inside it
-// is a target the walk reaches by leaving the block's holder into an instance
-// standing in that block or in one nested in it; a target the walk reaches
-// without passing the holder, the holder's own parameter among them, is
-// outside. False for a writer under no block.
-static bool EscapesWriterBlock(const DefparamWriterBlocks& blocks,
-                               const RtlirModule* writer, RtlirModule* root,
-                               const HierPath& steps) {
-  auto it = blocks.find(writer);
-  if (it == blocks.end()) return false;
-  std::vector<PathDescent> descents;
-  DescendDefparamPath(root, steps, {}, descents);
-  for (const auto& descent : descents) {
-    if (descent.from != it->second.holder) continue;
-    return !PathStartsWith(descent.inst->gen_block_path, it->second.steps);
-  }
-  return true;
 }
 
 // §23.8: a hierarchical name whose leading step names no scope of the module
@@ -634,7 +534,13 @@ void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
     if (param == nullptr && site.path.empty()) {
       param = ResolveDefparamFromTop(path, rooted);
     }
-    if (!param) continue;
+    if (!param) {
+      BlockParamDefparam block{val_expr, scope, site.item->loc, diag_, arena_};
+      if (ApplyBlockParamDefparam(mod, site.path, path, block)) {
+        applied_defparams_.insert(key);
+      }
+      continue;
+    }
     RtlirModule* target_mod = rooted.target_mod;
     DefparamOverride ovr{param, val_expr, scope, site.item->loc};
     DefparamAppliedRecord rec{applied_defparams_, key};
@@ -762,14 +668,19 @@ void Elaborator::CheckEarlyResolutionAmbiguity(
 }
 
 // §23.10.1 (printed page 764): records on `blocks` the generate block
-// instance `child`, an instance of `parent`, stands in or under -- the
-// blocks of `parent` its gen_block_path names, or the block `parent` itself
-// stands under where it names none. Nothing for a child under no block.
+// instance or the element of an array of instances `child`, an instance of
+// `parent`, stands in or under -- the element `child` itself is, the blocks of
+// `parent` its gen_block_path names, or what `parent` itself stands under
+// where it is neither. Nothing for a child under no block and in no array.
 static void NoteInstanceBlock(DefparamWriterBlocks& blocks, RtlirModule* parent,
                               const RtlirModuleInst& child) {
   if (child.resolved == nullptr) return;
+  if (!child.array.name.empty()) {
+    blocks[child.resolved] = {parent, {}, child.resolved};
+    return;
+  }
   if (!child.gen_block_path.empty()) {
-    blocks[child.resolved] = {parent, child.gen_block_path};
+    blocks[child.resolved] = {parent, child.gen_block_path, nullptr};
     return;
   }
   auto it = blocks.find(parent);
@@ -780,6 +691,11 @@ static void NoteInstanceBlock(DefparamWriterBlocks& blocks, RtlirModule* parent,
 
 void Elaborator::ApplyDefparamsRecursively(RtlirModule* mod) {
   if (!mod) return;
+  // §23.10.1 with §23.6: the elements of an array `mod` holds are given
+  // modules of their own before any defparam is applied here or below, so
+  // the module whose statements are being applied is never copied away from
+  // the element holding it while they are.
+  IsolateArrayElements(*mod, arena_, *unit_);
   if (auto* decl = FindModule(mod->name)) {
     ApplyDefparams(mod, decl);
   }
@@ -818,8 +734,8 @@ void Elaborator::ReportUnresolvedDefparamSite(RtlirModule* mod,
                             ResolveDefparamFromTop(path, any) != nullptr);
     if (reaches) {
       diag_.Error(site.item->loc,
-                  "defparam inside a generate block reaches a parameter "
-                  "outside that block",
+                  "defparam inside a generate block or an array of instances "
+                  "reaches a parameter outside that hierarchy",
                   Subclause("23.10.1"));
       continue;
     }

@@ -229,6 +229,9 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/annex_f_future.cpp
     elaborator/annex_f_derived_forms.cpp
     elaborator/elaborator_defparam.cpp
+    elaborator/elaborator_defparam_isolate.cpp
+    elaborator/elaborator_defparam_block.cpp
+    elaborator/elaborator_defparam_walk.cpp
     elaborator/elaborator_gates.cpp
     elaborator/elaborator_validate_delays.cpp
     elaborator/elaborator_net_delay.cpp
