@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/source_loc.h"
 #include "common/types.h"
 #include "elaborator/global_clocking_sampled_value.h"
 #include "elaborator/type_eval.h"
@@ -157,11 +158,10 @@ static void ScheduleDeferredAction(const Stmt* action, bool is_final_deferred,
 // pending reports.
 static void ScheduleDeferredSeverityReport(bool is_final_deferred,
                                            std::string_view assertion_label,
-                                           uint32_t line, SimContext& ctx) {
-  SchedulePendingReport(
-      is_final_deferred, assertion_label, ctx, [line, &ctx]() {
-        EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr, line);
-      });
+                                           SourceLoc loc, SimContext& ctx) {
+  SchedulePendingReport(is_final_deferred, assertion_label, ctx, [loc, &ctx]() {
+    EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr, loc);
+  });
 }
 
 // If this assertion is deferred, schedules its pass/fail action in the
@@ -414,15 +414,15 @@ AssertionStatus AssertionControlStatus(const Stmt* stmt, SimContext& ctx) {
 static void ReportDefaultAssertionFailure(const Stmt* stmt, SimContext& ctx) {
   ctx.IncrementAssertionFailCount();
   if (!AssertionControlStatus(stmt, ctx).fail_action) return;
-  // §20.10: the tool-specific message carries the line of the statement, as
-  // it carries a severity task's own line.
-  uint32_t line = stmt->range.start.line;
+  // §20.10: the tool-specific message carries the file and line of the
+  // statement, as it carries a severity task's own.
+  SourceLoc loc = stmt->range.start;
   if (stmt->is_deferred) {
-    ScheduleDeferredSeverityReport(stmt->is_final_deferred, stmt->label, line,
+    ScheduleDeferredSeverityReport(stmt->is_final_deferred, stmt->label, loc,
                                    ctx);
     return;
   }
-  EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr, line);
+  EmitSeverityHeader(ctx, "ERROR", "Assertion failed.", std::cerr, loc);
 }
 
 // §16.5.1's mode raised around one evaluation of a concurrent assertion's
@@ -591,10 +591,19 @@ static SimCoroutine PropertyTreeFinalCoroutine(const Stmt* stmt,
   PendingReportScope::Restore(ctx, saved);
 }
 
+// §20.11: the attempts `instances` begin at this tick, none where Off or Kill
+// has stopped the assertion's checking. Off leaves an attempt already under
+// way to run on to its verdict, and Kill has aborted every one.
+static AttemptInstances BegunAttempts(const Stmt* stmt,
+                                      const AttemptInstances& instances,
+                                      SimContext& ctx) {
+  if (AssertionControlStatus(stmt, ctx).checking) return instances;
+  return {};
+}
+
 static void ExecPropertyTreeTick(const Stmt* stmt,
                                  const AttemptInstances& instances,
                                  SimContext& ctx, Arena& arena) {
-  if (!AssertionControlStatus(stmt, ctx).checking) return;
   Process* proc = ctx.CurrentProcess();
   if (proc == nullptr) return;
   PropertyTreeState*& state = proc->property_tree_states[stmt];
@@ -614,8 +623,8 @@ static void ExecPropertyTreeTick(const Stmt* stmt,
   auto& samples = ctx.AssertionSamples();
   bool outer_evaluating_property = samples.EvaluatingProperty();
   samples.SetEvaluatingProperty(true);
-  PropertyTick tick =
-      AdvancePropertyTree(*state, disabled, instances, ctx, arena);
+  PropertyTick tick = AdvancePropertyTree(
+      *state, disabled, BegunAttempts(stmt, instances, ctx), ctx, arena);
   samples.SetEvaluatingProperty(outer_evaluating_property);
   for (uint32_t i = 0; i < tick.attempted; ++i) {
     RecordConcurrentCoverAttempt(stmt, ctx);
@@ -632,7 +641,6 @@ static void ExecPropertyTreeTick(const Stmt* stmt,
 static void ExecSequencePropertyTick(const Stmt* stmt,
                                      const AttemptInstances& instances,
                                      SimContext& ctx, Arena& arena) {
-  if (!AssertionControlStatus(stmt, ctx).checking) return;
   Process* proc = ctx.CurrentProcess();
   if (proc == nullptr) return;
   SequencePropertyState*& state = proc->sequence_property_states[stmt];
@@ -645,7 +653,8 @@ static void ExecSequencePropertyTick(const Stmt* stmt,
       RegisterStrongAttemptsFinal(stmt, state, ctx, arena);
     }
   }
-  for (size_t i = 0; i < instances.size(); ++i) {
+  AttemptInstances begun = BegunAttempts(stmt, instances, ctx);
+  for (size_t i = 0; i < begun.size(); ++i) {
     RecordConcurrentCoverAttempt(stmt, ctx);
   }
   SequenceTick tick;
@@ -655,7 +664,7 @@ static void ExecSequencePropertyTick(const Stmt* stmt,
   // match of it counted; a property, a cover property's among them, holds
   // at the first.
   tick.every_match = stmt->cover_sequence;
-  tick.instances = instances;
+  tick.instances = begun;
   auto& samples = ctx.AssertionSamples();
   bool outer_evaluating_property = samples.EvaluatingProperty();
   samples.SetEvaluatingProperty(true);

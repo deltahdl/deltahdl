@@ -8,4 +8,4 @@ cover property global_clocking_sampled_values (line 48): attempted 10, succeeded
 cover property global_clocking_sampled_values (line 49): attempted 10, succeeded 2, succeeded vacuously 0
 cover property global_clocking_sampled_values (line 50): attempted 10, succeeded 3, succeeded vacuously 0
 cover property global_clocking_sampled_values (line 51): attempted 10, succeeded 7, succeeded vacuously 0
-[90] ERROR global_clocking_sampled_values.a1 (line 45): sig is not stable
+[90] ERROR global_clocking_sampled_values.a1 (test/src/e2e/global_clocking_sampled_values.sv:45): sig is not stable

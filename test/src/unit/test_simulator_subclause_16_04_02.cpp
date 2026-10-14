@@ -560,7 +560,7 @@ TEST(DeferredFlushPointsLive, ActionBlockArgumentsAreEvaluatedOnEveryFailure) {
             "initial: after the writes of 64 and 0\n"
             "b1: failing pass with opcode 0\n"
             "initial: after the write of 0\n"
-            "[1] INFO t.b1.a1 (line 13): Error on operation of type 0\n");
+            "[1] INFO t.b1.a1 (<test>:13): Error on operation of type 0\n");
 }
 
 // The same example with the function's formal named apart from the module's
@@ -602,7 +602,7 @@ TEST(DeferredFlushPointsLive,
             "initial: after the writes of 64 and 0\n"
             "b1: failing pass with opcode 0\n"
             "initial: after the write of 0\n"
-            "[1] INFO t.b1.a1 (line 13): Error on operation of type 0\n");
+            "[1] INFO t.b1.a1 (<test>:13): Error on operation of type 0\n");
 }
 
 }  // namespace

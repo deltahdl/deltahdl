@@ -54,6 +54,33 @@ void VpiCallAssertionRoutine(vpi_assertion_callback_func* cb_rtn,
          static_cast<PLI_BYTE8*>(args.user_data));
 }
 
+// §20.11: what an assertion control task selects the assertion `obj` by. Its
+// kind gives its Table 20-6 assertion_type bit -- concurrent, or a simple,
+// observed deferred or final deferred immediate assertion -- and its Table 20-7
+// directive_type bit; a restrict has none (§16.14.4).
+AssertionControlTarget ControlTargetOf(const VpiObject& obj) {
+  struct KindBits {
+    int type;
+    uint32_t type_bit;
+    uint32_t directive_bit;
+  };
+  static constexpr KindBits kKinds[] = {
+      {vpiAssert, 1, 1},          {vpiCover, 1, 2},
+      {vpiAssume, 1, 4},          {vpiRestrict, 1, 0},
+      {vpiImmediateAssert, 2, 1}, {vpiImmediateCover, 2, 2},
+      {vpiImmediateAssume, 2, 4}};
+  AssertionControlTarget target;
+  for (const KindBits& kind : kKinds) {
+    if (kind.type != obj.type) continue;
+    target.type_bit = kind.type_bit;
+    target.directive_bit = kind.directive_bit;
+  }
+  if (obj.is_deferred) target.type_bit = obj.is_final ? 8 : 4;
+  if (obj.parent != nullptr) target.scope = obj.parent->full_name;
+  target.full_name = obj.full_name;
+  return target;
+}
+
 }  // namespace
 
 VpiHandle VpiRegisterAssertionCb(VpiHandle assertion, int reason,
@@ -79,6 +106,7 @@ VpiHandle VpiRegisterAssertionCb(VpiHandle assertion, int reason,
       },
       user_data);
   if (placed == 0) return nullptr;
+  api.NoteControlTarget(assertion->name, ControlTargetOf(*assertion));
 
   return GetGlobalVpiContext().CreateAssertionCallbackObject(placed);
 }

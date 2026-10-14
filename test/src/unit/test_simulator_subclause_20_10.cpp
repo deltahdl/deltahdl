@@ -422,4 +422,17 @@ TEST(SeveritySystemTaskSim, WarningLeavesTheRunWithNoRuntimeError) {
   EXPECT_FALSE(f.ctx.HasRuntimeErrors());
 }
 
+// §20.10 with §22.13: the message names the file the call stands in and its
+// line, as `__FILE__ and `__LINE__ would there; the source of a test fixture
+// is registered as <test>.
+TEST(SeveritySystemTaskSim, MessageNamesTheFileAndLineOfTheCall) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial\n"
+                       "    $info(\"here\");\n"
+                       "endmodule\n",
+                       f),
+            "[0] INFO t (<test>:3): here\n");
+}
+
 }  // namespace

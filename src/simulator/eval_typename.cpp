@@ -8,6 +8,7 @@
 // decimals (g), and white space reduced to a single space between identifiers
 // and keywords (h).
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <map>
@@ -18,6 +19,7 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
@@ -25,6 +27,7 @@
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/evaluation_internal.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
 
@@ -341,6 +344,127 @@ std::string TypenameOfElement(const Expr* arg, SimContext& ctx, Arena& arena) {
   return writer.OfType(member->data_type, "", name);
 }
 
+// §20.6.1 with §11.6.1 and §11.8.1: the self-determined type of an operand of
+// an operator expression, a concatenation or a select -- its width, its
+// signedness and whether it is 4-state -- where its form gives one. `known` is
+// false for a form this does not read.
+struct SelfType {
+  uint32_t width = 0;
+  bool is_signed = false;
+  bool four_state = false;
+  bool known = false;
+};
+
+SelfType SelfTypeOf(const Expr* e, SimContext& ctx, Arena& arena);
+
+// A variable named whole whose declaration writes an integral type: neither an
+// unpacked array, a real nor a string.
+SelfType SelfTypeOfName(const Expr* e, SimContext& ctx) {
+  const Variable* var = ctx.FindVariable(e->text);
+  if (var == nullptr || var->is_real || var->is_string ||
+      !var->declared_unpacked.empty()) {
+    return {};
+  }
+  return {var->value.width, var->is_signed, var->is_4state, true};
+}
+
+// §11.8.1: a bit-select or a part-select of a vector is unsigned whatever the
+// vector is, one bit wide or as wide as the range it selects (§11.5.1).
+SelfType SelfTypeOfSelect(const Expr* e, SimContext& ctx, Arena& arena) {
+  if (e->base == nullptr || e->base->kind != ExprKind::kIdentifier) return {};
+  SelfType vector = SelfTypeOfName(e->base, ctx);
+  if (!vector.known) return {};
+  uint32_t width = 1;
+  if (e->index_end != nullptr) {
+    auto end =
+        static_cast<int64_t>(EvalExpr(e->index_end, ctx, arena).ToUint64());
+    if (e->is_part_select_plus || e->is_part_select_minus) {
+      width = static_cast<uint32_t>(end);
+    } else {
+      auto start =
+          static_cast<int64_t>(EvalExpr(e->index, ctx, arena).ToUint64());
+      width =
+          static_cast<uint32_t>((start > end ? start - end : end - start) + 1);
+    }
+  }
+  return {width, false, vector.four_state, true};
+}
+
+// §11.4.12 with §11.8.1: a concatenation is unsigned and as wide as its
+// operands together.
+SelfType SelfTypeOfConcat(const Expr* e, SimContext& ctx, Arena& arena) {
+  SelfType whole{0, false, false, true};
+  for (const Expr* element : e->elements) {
+    SelfType part = SelfTypeOf(element, ctx, arena);
+    if (!part.known) return {};
+    whole.width += part.width;
+    whole.four_state = whole.four_state || part.four_state;
+  }
+  return whole;
+}
+
+// §11.6.1 Table 11-21 with §11.8.1: a logical negation or a reduction is one
+// unsigned bit; any other unary operator is its operand's type.
+SelfType SelfTypeOfUnary(const Expr* e, SimContext& ctx, Arena& arena) {
+  SelfType operand = SelfTypeOf(e->lhs, ctx, arena);
+  if (!operand.known) return {};
+  if (e->op == TokenKind::kBang || IsUnaryReductionOp(e->op)) {
+    return {1, false, operand.four_state, true};
+  }
+  return operand;
+}
+
+// §11.6.1 Table 11-21 with §11.8.1: an arithmetic or bitwise operator is as
+// wide as its wider operand and signed where both are, a shift or a power is
+// its left operand's type, and any other is one unsigned bit; each is 4-state
+// where an operand is.
+SelfType SelfTypeOfBinary(const Expr* e, SimContext& ctx, Arena& arena) {
+  SelfType left = SelfTypeOf(e->lhs, ctx, arena);
+  SelfType right = SelfTypeOf(e->rhs, ctx, arena);
+  if (!left.known || !right.known) return {};
+  bool four_state = left.four_state || right.four_state;
+  if (IsMaxWidthBinaryOp(e->op)) {
+    return {std::max(left.width, right.width),
+            left.is_signed && right.is_signed, four_state, true};
+  }
+  if (IsLeftWidthBinaryOp(e->op)) {
+    return {left.width, left.is_signed, four_state, true};
+  }
+  return {1, false, four_state, true};
+}
+
+SelfType SelfTypeOf(const Expr* e, SimContext& ctx, Arena& arena) {
+  switch (e->kind) {
+    case ExprKind::kIdentifier:
+      return SelfTypeOfName(e, ctx);
+    case ExprKind::kSelect:
+      return SelfTypeOfSelect(e, ctx, arena);
+    case ExprKind::kConcatenation:
+      return SelfTypeOfConcat(e, ctx, arena);
+    case ExprKind::kUnary:
+      return SelfTypeOfUnary(e, ctx, arena);
+    case ExprKind::kBinary:
+      return SelfTypeOfBinary(e, ctx, arena);
+    default:
+      return {};
+  }
+}
+
+// §20.6.1: the self-determined type of an expression, written as a vector of
+// its width, `bit` where every operand is 2-state and `logic` where one is
+// 4-state, and `real` where an operand makes it real (§11.4.11); empty where a
+// part of it has a form SelfTypeOf does not read.
+std::string TypenameOfOperation(const Expr* arg, SimContext& ctx,
+                                Arena& arena) {
+  if (SimSelfReal(arg, ctx)) return "real";
+  SelfType type = SelfTypeOf(arg, ctx, arena);
+  if (!type.known) return {};
+  std::string text = type.four_state ? "logic" : "bit";
+  if (type.is_signed) text += " signed";
+  if (type.width > 1) text += "[" + std::to_string(type.width - 1) + ":0]";
+  return text;
+}
+
 }  // namespace
 
 Logic4Vec EvalTypename(const Expr* expr, SimContext& ctx, Arena& arena) {
@@ -354,6 +478,7 @@ Logic4Vec EvalTypename(const Expr* expr, SimContext& ctx, Arena& arena) {
   std::string text = arg->kind == ExprKind::kIdentifier
                          ? TypenameOfIdentifier(arg->text, ctx, arena)
                          : TypenameOfElement(arg, ctx, arena);
+  if (text.empty()) text = TypenameOfOperation(arg, ctx, arena);
   if (!text.empty()) return StringToLogic4Vec(arena, text);
   return EvalTypenameOfExpression(expr, ctx, arena);
 }

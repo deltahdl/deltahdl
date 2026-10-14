@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -81,6 +82,16 @@ using AssertionPlacedCallback =
 // §39.4.2 a handle returned when an assertion callback is placed. 0 models the
 // NULL handle returned when a placement is in error.
 using AssertionCallbackHandle = uint64_t;
+
+// §20.11: what an assertion control task selects an assertion by -- the Table
+// 20-6 assertion_type bit and Table 20-7 directive_type bit of its kind, the
+// scope it stands in and its full name.
+struct AssertionControlTarget {
+  uint32_t type_bit = 0;
+  uint32_t directive_bit = 0;
+  std::string scope;
+  std::string full_name;
+};
 
 constexpr int kCbAssertionStart = 601;
 constexpr int kCbAssertionSuccess = 602;
@@ -288,6 +299,17 @@ class AssertionApi {
   // matured or been flushed.
   uint32_t PendingAssertionReportCount(std::string_view assertion) const;
 
+  // §20.11 with Table 20-8: the assertions callbacks were placed on through the
+  // VPI, under the name the placement keys each by, for an assertion control
+  // task naming scopes or assertions to raise its callbacks on those it
+  // selects.
+  void NoteControlTarget(std::string_view assertion,
+                         AssertionControlTarget target);
+  const std::map<std::string, AssertionControlTarget, std::less<>>&
+  ControlTargets() const {
+    return control_targets_;
+  }
+
  private:
   struct CbEntry {
     int reason = 0;
@@ -307,6 +329,7 @@ class AssertionApi {
     void* user_data = nullptr;
   };
   std::vector<PlacedCb> placed_callbacks_;
+  std::map<std::string, AssertionControlTarget, std::less<>> control_targets_;
   AssertionCallbackHandle next_callback_handle_ = 1;
 
   // §39.4.2.1 deferred delivery for assertions referring to global clocking

@@ -163,6 +163,11 @@ bool AssertionApi::RemoveAssertionCallback(AssertionCallbackHandle handle) {
   return placed_callbacks_.size() != before;
 }
 
+void AssertionApi::NoteControlTarget(std::string_view assertion,
+                                     AssertionControlTarget target) {
+  control_targets_.insert_or_assign(std::string(assertion), std::move(target));
+}
+
 uint32_t AssertionApi::PlacedCallbackCount() const {
   return static_cast<uint32_t>(placed_callbacks_.size());
 }

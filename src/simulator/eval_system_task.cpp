@@ -12,6 +12,8 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/packed_range.h"
+#include "common/source_loc.h"
+#include "common/source_mgr.h"
 #include "common/types.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
@@ -476,15 +478,20 @@ void ExecDisplayWrite(const Expr* expr, SimContext& ctx, Arena& arena) {
 }
 
 void EmitSeverityHeader(SimContext& ctx, std::string_view prefix,
-                        std::string_view msg, std::ostream& os, uint32_t line) {
+                        std::string_view msg, std::ostream& os, SourceLoc loc) {
   // §20.10: the tool-specific message reports the severity plus the required
   // call-site information -- the simulation time, the hierarchical scope of the
-  // call, and its source line (the `__LINE__ equivalent, see §22.13). A line of
-  // 0 marks a call site with no recorded source location.
+  // call, and its file name and line (the `__FILE__ and `__LINE__ equivalents,
+  // see §22.13). A line of 0 marks a call site with no recorded source
+  // location.
   std::string scope = ScopeHierName(ctx);
+  uint32_t line = loc.line;
   os << "[" << ctx.CurrentTime().ticks << "] " << prefix;
   if (!scope.empty()) os << " " << scope;
-  if (line != 0) os << " (line " << line << ")";
+  if (line != 0) {
+    os << " (" << ctx.GetDiag().Sources().FilePath(loc.file_id) << ":" << line
+       << ")";
+  }
   if (!msg.empty()) os << ": " << msg;
   os << "\n";
   ctx.SetLastSeverity(prefix, msg, ctx.CurrentTime(), scope, line);
@@ -518,9 +525,9 @@ void ExecSeverityTask(const Expr* expr, SimContext& ctx, Arena& arena,
   for (size_t i = start_idx; i < expr->args.size(); ++i) {
     AppendDisplayArg(expr, i, ctx, arena, out);
   }
-  // §20.10: report the source line of the call, matching the `__LINE__ the
-  // preprocessor would produce here (§22.13).
-  EmitSeverityHeader(ctx, prefix, msg, os, expr->range.start.line);
+  // §20.10: report the source file and line of the call, matching the
+  // `__FILE__ and `__LINE__ the preprocessor would produce here (§22.13).
+  EmitSeverityHeader(ctx, prefix, msg, os, expr->range.start);
 }
 
 Logic4Vec EvalDeferredPrint(const Expr* expr, SimContext& ctx, Arena& arena) {

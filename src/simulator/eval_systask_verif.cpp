@@ -1,5 +1,7 @@
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -12,6 +14,7 @@
 #include "parser/assertion_control_task.h"
 #include "parser/ast_expr.h"
 #include "simulator/assert_control_log.h"
+#include "simulator/assertion_api.h"
 #include "simulator/coverage_control.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
@@ -21,9 +24,12 @@
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/stmt_exec_assertion_internal.h"
+#include "simulator/sv_vpi_user.h"
 #include "simulator/sva_engine_queues.h"
 #include "simulator/sva_engine_sampling.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_globals.h"
 
 namespace delta {
 
@@ -497,6 +503,57 @@ static std::vector<std::string> ScopeItemNames(const Expr* item,
   return names;
 }
 
+// Table 20-8: the callbacks an assertion control task raises, by its
+// control_type: the assertion system callback (§39.4.1) of a call naming no
+// scope or assertion, and the assertion callbacks (§39.4.2) a call naming some
+// raises on each assertion it selects, Kill raising a reset before its disable.
+// The row of a control_type Table 20-5 does not list raises none.
+namespace {
+struct ControlCallbacks {
+  int system;
+  int first;
+  int second;
+};
+constexpr ControlCallbacks kControlCallbacks[] = {
+    {0, 0, 0},
+    {cbAssertionSysLock, cbAssertionLock, 0},
+    {cbAssertionSysUnlock, cbAssertionUnlock, 0},
+    {cbAssertionSysOn, cbAssertionEnable, 0},
+    {cbAssertionSysOff, cbAssertionDisable, 0},
+    {cbAssertionSysKill, cbAssertionReset, cbAssertionDisable},
+    {cbAssertionSysEnablePassAction, cbAssertionEnablePassAction, 0},
+    {cbAssertionSysDisablePassAction, cbAssertionDisablePassAction, 0},
+    {cbAssertionSysEnableFailAction, cbAssertionEnableFailAction, 0},
+    {cbAssertionSysDisableFailAction, cbAssertionDisableFailAction, 0},
+    {cbAssertionSysEnableNonvacuousAction, cbAssertionEnableNonvacuousAction,
+     0},
+    {cbAssertionSysDisableVacuousAction, cbAssertionDisableVacuousAction, 0}};
+}  // namespace
+
+// Table 20-8: raise the callbacks of `call`. The assertions it may select are
+// those an application placed callbacks on, the only ones a callback reaches.
+static void RaiseControlCallbacks(const AssertControlCall& call,
+                                  SimContext& ctx) {
+  if (call.control_type >= std::size(kControlCallbacks)) return;
+  const ControlCallbacks& raised = kControlCallbacks[call.control_type];
+  if (call.scopes.empty()) {
+    GetGlobalVpiContext().DispatchCallbacks(raised.system);
+    return;
+  }
+  AssertionApi& api = GetGlobalAssertionApi();
+  for (const auto& [name, target] : api.ControlTargets()) {
+    if (!CallSelects(call, {target.type_bit, target.directive_bit, target.scope,
+                            target.full_name})) {
+      continue;
+    }
+    for (int reason : {raised.first, raised.second}) {
+      if (reason != 0) {
+        api.DeliverAssertionEvent(name, reason, ctx.CurrentTime().ticks, {});
+      }
+    }
+  }
+}
+
 // §20.11: an assertion control system task, recorded in the terms of the
 // $assertcontrol call it is or expands to (Syntax 20-12): control_type, then
 // assertion_type and directive_type, defaulting to 255 and 7, then levels,
@@ -536,6 +593,7 @@ static void ApplyAssertionControlTask(const Expr* expr, SimContext& ctx,
   if (call.control_type == static_cast<uint32_t>(AssertControlType::kKill)) {
     AbortKilledAttempts(call, ctx);
   }
+  RaiseControlCallbacks(call, ctx);
   ctx.AssertControls().Apply(std::move(call));
 }
 

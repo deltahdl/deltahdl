@@ -101,15 +101,29 @@ Logic4Vec EvalTimeSysCall(SimContext& ctx, Arena& arena,
   return MakeLogic4VecVal(arena, 64, ctx.CurrentTime().ticks);
 }
 
-// Extract the design-element name an argument to $timeunit/$timeprecision
-// refers to. Bare $root/$unit are modeled by the parser as argument-less
-// system calls; an ordinary hierarchical reference is an identifier.
-static std::string_view TimescaleArgName(const Expr* arg) {
-  if (arg->kind == ExprKind::kSystemCall) return arg->callee;
+// Extract the design-element name an argument to $timeunit, $timeprecision or
+// $printtimescale refers to. Bare $root/$unit are modeled by the parser as
+// argument-less system calls and a simple name as an identifier; a
+// hierarchical name, §20.4.1's own b_dat.c1, is a chain of member accesses,
+// rebuilt into the dotted path the lowerer registers the instance under.
+static std::string TimescaleArgName(const Expr* arg) {
+  if (arg->kind == ExprKind::kSystemCall) return std::string(arg->callee);
+  if (arg->kind == ExprKind::kMemberAccess) return FlattenHierPath(arg);
   if (arg->kind == ExprKind::kIdentifier) {
-    return arg->scope_prefix.empty() ? arg->text : arg->scope_prefix;
+    return std::string(arg->scope_prefix.empty() ? arg->text
+                                                 : arg->scope_prefix);
   }
   return {};
+}
+
+// The time scale of the design element `target` names: a module or an
+// instance, or else a package, which §3.2 counts among the design elements and
+// the lowerer registers under its name and "::" (§3.14.2.2); null where it
+// names neither.
+static const TimeScale* FindNamedTimeScale(const SimContext& ctx,
+                                           const std::string& target) {
+  if (const TimeScale* found = ctx.FindScopeTimeScale(target)) return found;
+  return ctx.FindScopeTimeScale(target + "::");
 }
 
 // §20.4.1: $timeunit and $timeprecision return the time unit or precision of a
@@ -124,10 +138,10 @@ Logic4Vec EvalTimescaleQuery(const Expr* expr, SimContext& ctx, Arena& arena,
   if (!expr->args.empty() && expr->args[0] != nullptr) {
     // $root is the time scope of the simulation time unit (§3.14.3), which
     // the lowerer registers beside the design elements'.
-    std::string_view target = TimescaleArgName(expr->args[0]);
+    std::string target = TimescaleArgName(expr->args[0]);
     if (target == "$unit") {
       scale = &ctx.CompUnitTimeScale();
-    } else if (const TimeScale* found = ctx.FindScopeTimeScale(target)) {
+    } else if (const TimeScale* found = FindNamedTimeScale(ctx, target)) {
       scale = found;
     }
   }
@@ -218,13 +232,13 @@ std::string BuildPrinttimescaleReport(const Expr* expr, SimContext& ctx) {
     // $root names the time scope of the simulation time unit, whose unit and
     // precision are both the global precision (§3.14.3), registered by the
     // lowerer beside the design elements'.
-    std::string_view target = TimescaleArgName(expr->args[0]);
+    std::string target = TimescaleArgName(expr->args[0]);
     if (target == "$unit") {
       scale = &ctx.CompUnitTimeScale();
       name = "$unit";
     } else {
-      name = std::string(target);
-      if (const TimeScale* found = ctx.FindScopeTimeScale(target))
+      name = target;
+      if (const TimeScale* found = FindNamedTimeScale(ctx, target))
         scale = found;
     }
   } else {

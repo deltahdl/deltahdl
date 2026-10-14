@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 #include <iterator>
 #include <string>
 #include <vector>
@@ -692,6 +693,31 @@ TEST_F(VpiAssertionCallbackEntry, TheDefaultModelStandsWhereNoneWasInstalled) {
   AssertionApi& fallback = GetGlobalAssertionApi();
   EXPECT_NE(&fallback, &api_);
   EXPECT_EQ(&GetGlobalAssertionApi(), &fallback);
+}
+
+// §20.11 with Table 20-8: a placement records what an assertion control task
+// selects the assertion by. An observed deferred immediate assertion is of
+// Table 20-6's bit 4 and a final deferred one of bit 8, each with the Table
+// 20-7 bit of its directive, so a control naming either reaches its callbacks.
+TEST_F(VpiAssertionCallbackEntry, APlacementRecordsWhatAControlSelectsBy) {
+  VpiHandle observed = vpi_ctx_.CreateAssertion(kA, vpiImmediateAssert);
+  observed->is_deferred = true;
+  VpiHandle final_cover = vpi_ctx_.CreateAssertion(kB, vpiImmediateCover);
+  final_cover->is_deferred = true;
+  final_cover->is_final = true;
+  for (VpiHandle assertion : {observed, final_cover}) {
+    ASSERT_NE(
+        vpi_register_assertion_cb(VpiHandleOf(assertion), cbAssertionDisable,
+                                  &RecordAssertionCall, nullptr),
+        nullptr);
+  }
+
+  const auto& targets = api_.ControlTargets();
+  ASSERT_EQ(targets.size(), 2u);
+  EXPECT_EQ(targets.at(kA).type_bit, 4u);
+  EXPECT_EQ(targets.at(kA).directive_bit, 1u);
+  EXPECT_EQ(targets.at(kB).type_bit, 8u);
+  EXPECT_EQ(targets.at(kB).directive_bit, 2u);
 }
 
 }  // namespace

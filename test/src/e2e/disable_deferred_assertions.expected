@@ -7,8 +7,8 @@ at 60: c is ff again, so a2's failure is reported
 at 70: d is 0, and the disable of inner leaves a4 reported
 at 80: e is 0, and the disable of t_check leaves a5 reported
 $finish at time 90
-[20] ERROR disable_deferred_assertions.b1.a1 (line 14): Sorry
-[40] ERROR disable_deferred_assertions.b2.a2 (line 28): a2: a and b are not both 1
-[60] ERROR disable_deferred_assertions.b2.a2 (line 28): a2: a and b are not both 1
-[70] ERROR disable_deferred_assertions.b4.inner.a4 (line 42): a4: d is 0
-[80] ERROR disable_deferred_assertions.b5.t_check.a5 (line 50): a5: e is 0
+[20] ERROR disable_deferred_assertions.b1.a1 (test/src/e2e/disable_deferred_assertions.sv:14): Sorry
+[40] ERROR disable_deferred_assertions.b2.a2 (test/src/e2e/disable_deferred_assertions.sv:28): a2: a and b are not both 1
+[60] ERROR disable_deferred_assertions.b2.a2 (test/src/e2e/disable_deferred_assertions.sv:28): a2: a and b are not both 1
+[70] ERROR disable_deferred_assertions.b4.inner.a4 (test/src/e2e/disable_deferred_assertions.sv:42): a4: d is 0
+[80] ERROR disable_deferred_assertions.b5.t_check.a5 (test/src/e2e/disable_deferred_assertions.sv:50): a5: e is 0

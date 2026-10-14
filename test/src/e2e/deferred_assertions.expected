@@ -13,4 +13,4 @@ $finish at time 11
 cover deferred_assertions (line 65): evaluated 1, succeeded 1
 cover deferred_assertions.zero (line 80): evaluated 1, succeeded 1
 cover deferred_assertions.never (line 79): evaluated 1, succeeded 0
-[10] ERROR deferred_assertions (line 73): Assertion failed.
+[10] ERROR deferred_assertions (test/src/e2e/deferred_assertions.sv:73): Assertion failed.

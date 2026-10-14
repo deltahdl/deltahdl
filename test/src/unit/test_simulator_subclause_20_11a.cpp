@@ -710,6 +710,40 @@ TEST(AssertControlSim, AssertKillAbortsASequenceInFlight) {
   EXPECT_EQ(out, "f=7\n");
 }
 
+// §20.11: Off begins no new attempt but leaves one already under way to run on
+// to its verdict. The attempt begun at the rise of 5 is in flight when
+// $assertoff runs at 6 and fails at 25, `b` never being high; the rises of 15
+// and later begin none, so nothing else fails.
+TEST(AssertControlSim, AssertOffLetsAnImplicationInFlightFinish) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic clk = 0;\n"
+                       "  initial repeat (10) #5 clk = ~clk;\n"
+                       "  bit a = 1, b = 0;\n"
+                       "  assert property (@(posedge clk) a |-> ##2 b)\n"
+                       "    else $display(\"fail %0d\", $time);\n"
+                       "  initial #6 $assertoff;\n"
+                       "endmodule\n",
+                       f),
+            "fail 25\n");
+}
+
+// The same for a sequential property: the attempt of `1 ##2 b` begun at 5
+// finishes failing at 25 under Off, and no later one begins.
+TEST(AssertControlSim, AssertOffLetsASequenceInFlightFinish) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic clk = 0;\n"
+                       "  initial repeat (10) #5 clk = ~clk;\n"
+                       "  bit b = 0;\n"
+                       "  assert property (@(posedge clk) 1 ##2 b)\n"
+                       "    else $display(\"fail %0d\", $time);\n"
+                       "  initial #6 $assertoff;\n"
+                       "endmodule\n",
+                       f),
+            "fail 25\n");
+}
+
 // §16.9.4 puts the attempt of an assertion naming a future sampled value
 // function in flight until the global clocking tick after its own. Each
 // attempt of `$rising_gclk(b)` fails there, `b` never rising; the kill at 7

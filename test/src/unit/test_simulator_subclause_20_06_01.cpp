@@ -319,4 +319,64 @@ TEST(TypenameSim, AClassHandleIsOfItsScopedClass) {
             "$unit::R\n");
 }
 
+// §20.6.1 with §11.6.1 and §11.8.1: an expression's type is its
+// self-determined result's. A sum is as wide as its wider operand, a
+// concatenation as its operands together, and a part-select as its range,
+// each unsigned and here 2-state; `logic` alone is what an expression answered
+// before.
+TEST(TypenameSim, AnExpressionIsOfItsSelfDeterminedType) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  bit [7:0] a;\n"
+                       "  bit [3:0] b;\n"
+                       "  initial begin\n"
+                       "    $display(\"%s\", $typename(a + b));\n"
+                       "    $display(\"%s\", $typename({a, b}));\n"
+                       "    $display(\"%s\", $typename(a[5:2]));\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "bit[7:0]\nbit[11:0]\nbit[3:0]\n");
+}
+
+// §20.6.1 with §11.8.1: a 4-state operand makes the result 4-state, a result
+// is signed only where its operands are, a comparison, a logical negation and
+// a bit-select are one unsigned bit, a shift takes its left operand's type,
+// an indexed part-select is as wide as its width, and a real operand makes the
+// result real (§11.4.11).
+TEST(TypenameSim, AnExpressionTakesItsStateSignAndWidthFromItsOperands) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [3:0] l;\n"
+                       "  bit [3:0] b;\n"
+                       "  bit [7:0] a;\n"
+                       "  int i;\n"
+                       "  byte s;\n"
+                       "  real r;\n"
+                       "  initial begin\n"
+                       "    $display(\"%s\", $typename(l & b));\n"
+                       "    $display(\"%s\", $typename(i + s));\n"
+                       "    $display(\"%s\", $typename(~s));\n"
+                       "    $display(\"%s\", $typename(l == b));\n"
+                       "    $display(\"%s\", $typename(!b));\n"
+                       "    $display(\"%s\", $typename(a << b));\n"
+                       "    $display(\"%s\", $typename(a[3+:2]));\n"
+                       "    $display(\"%s\", $typename(a[0]));\n"
+                       "    $display(\"%s\", $typename(a + r));\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "logic[3:0]\nbit signed[31:0]\nbit signed[7:0]\nlogic\nbit\n"
+            "bit[7:0]\nbit[1:0]\nbit\nreal\n");
+}
+
+// An operand naming no declaration gives the expression no type to write, and
+// $typename falls back to the answer it gives any argument it cannot type.
+TEST(UtilitySystemTaskTest, TypenameOfAnExpressionOverAnUnknownNameFallsBack) {
+  SimFixture f;
+  auto* expr = ParseExprFrom("$typename(no_such_var + 1)", f);
+  auto result = EvalExpr(expr, f.ctx, f.arena);
+  EXPECT_EQ(DecodeAsciiBytes(result), "logic");
+}
+
 }  // namespace

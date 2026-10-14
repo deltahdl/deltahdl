@@ -4,4 +4,4 @@ a ##1 b ##1 c failed at 55
 wait_for 9: ok=1 at 95
 wait_for 30: ok=0 at 205
 $finish at time 205
-[65] ERROR expect_statement (line 47): Assertion failed.
+[65] ERROR expect_statement (test/src/e2e/expect_statement.sv:47): Assertion failed.

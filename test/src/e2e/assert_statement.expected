@@ -4,4 +4,4 @@ env_prop passes 5 fails 1
 null_fail passes 7 of 8 ticks
 reactive: pass statements saw the tick's Active write at 8 of 8 ticks
 $finish at time 80
-[65] ERROR assert_statement.no_else (line 39): Assertion failed.
+[65] ERROR assert_statement.no_else (test/src/e2e/assert_statement.sv:39): Assertion failed.
