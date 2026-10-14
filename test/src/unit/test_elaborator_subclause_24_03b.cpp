@@ -125,4 +125,25 @@ TEST(AnonymousProgramHierRef, PathReachingAModuleVariableIsLegal) {
       ReportedError(f.diag.Diagnostics(), kProgramSignalRef, 3, "24.3"));
 }
 
+// §24.3 bars every hierarchical reference from an anonymous program to another
+// program scope, and the name of a subroutine it calls is one. In a module a
+// call's name is §24.5's rather than §24.3's, and the walk set it aside here as
+// well, so a task call into q, with or without its parentheses, went
+// unreported while a function call in an expression was refused.
+TEST(AnonymousProgramHierRef, TaskCallIntoAnotherProgramIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "program q; task automatic t; endtask initial #2; endprogram\n"
+      "program;\n"
+      "  task u; q.t(); endtask\n"
+      "  task w; q.t; endtask\n"
+      "endprogram\n"
+      "module top; endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kProgramSignalRef, 3, "24.3"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kProgramSignalRef, 4, "24.3"));
+}
+
 }  // namespace

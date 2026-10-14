@@ -166,6 +166,42 @@ TEST(AnonymousProgramNameSpaceSharing,
                             4, "24.6"));
 }
 
+// §24.6 shares the whole name space of the package, so a variable declared
+// beside the anonymous program collides with the function the program declares
+// as a second subroutine would. Only a task, a function, a class and a
+// covergroup were compared on either side, so the variable passed unreported.
+TEST(AnonymousProgramNameSpaceSharing,
+     AnonymousProgramFunctionAndPackageVariableSameNameIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pk;\n"
+      "  program; function int f(); return 7; endfunction endprogram\n"
+      "  int f;\n"
+      "endpackage\n"
+      "module top; endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'f' declared in anonymous program collides with "
+                            "name in surrounding package",
+                            3, "24.6"));
+}
+
+// The compilation-unit scope is shared the same way, and a variable declared
+// there after the anonymous program's task is the declaration reported.
+TEST(AnonymousProgramNameSpaceSharing,
+     AnonymousProgramTaskAndCompilationUnitVariableSameNameIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "program; task g; endtask endprogram\n"
+      "int g;\n"
+      "module top; endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'g' declared in anonymous program collides with "
+                            "name in surrounding package",
+                            2, "24.6"));
+}
+
 // §24.6: a covergroup is likewise an anonymous_program_item, and likewise
 // shares the name space. It reaches the check by a different item kind from the
 // class above, so neither case stands for the other.

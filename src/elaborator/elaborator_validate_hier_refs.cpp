@@ -52,11 +52,16 @@ static void CollectHierPathComponents(const Expr* e,
 // `scope`, is also followed down the instances it names, and reaches a program
 // where one of them is a program instance: `top.qi.v` reaches the program
 // instance qi of module top, a name no first component gives away.
+// `every_reference` is set for an anonymous program, which §24.3 bars from any
+// hierarchical reference to another program scope, the name of a subroutine it
+// calls included. Outside every program the call's name is §24.5's subject, so
+// only the arguments the call is handed are §24.3's.
 struct ProgramScopes {
   std::unordered_set<std::string_view> names;
   std::unordered_set<std::string_view> locals;
   const CompilationUnit* unit = nullptr;
   const ModuleDecl* scope = nullptr;
+  bool every_reference = false;
 
   void Shadow(std::string_view name) {
     names.erase(name);
@@ -107,17 +112,24 @@ static bool PathReachesProgram(const Expr* e, const ProgramScopes& scopes) {
   return false;
 }
 
+// True when the hierarchical name `e` reaches a program scope: its first
+// component is a program instance or nested program of the scope and no nested
+// scope declares it again, or the design path it spells steps through one.
+static bool PathNamesProgram(const Expr* e, const ProgramScopes& scopes) {
+  auto leftmost = HierRefLeftmost(e);
+  return !leftmost.empty() && scopes.locals.count(leftmost) == 0 &&
+         (scopes.names.count(leftmost) != 0 ||
+          (scopes.unit != nullptr && PathReachesProgram(e, scopes)));
+}
+
 static bool ExprRefersToProgram(const Expr* e, const ProgramScopes& scopes) {
   if (!e) return false;
-  if (e->kind == ExprKind::kMemberAccess) {
-    auto leftmost = HierRefLeftmost(e);
-    if (!leftmost.empty() && scopes.locals.count(leftmost) == 0 &&
-        (scopes.names.count(leftmost) != 0 ||
-         (scopes.unit != nullptr && PathReachesProgram(e, scopes))))
-      return true;
-  }
-  return AnyExprChild(
-      e, [&](const Expr* c) { return ExprRefersToProgram(c, scopes); });
+  if (e->kind == ExprKind::kMemberAccess && PathNamesProgram(e, scopes))
+    return true;
+  bool skip_callee = e->kind == ExprKind::kCall && !scopes.every_reference;
+  return AnyExprChild(e, [&](const Expr* c) {
+    return (!skip_callee || c != e->lhs) && ExprRefersToProgram(c, scopes);
+  });
 }
 
 static void ReportProgramSignalRef(SourceLoc loc, DiagEngine& diag) {
@@ -172,7 +184,8 @@ static void WalkStmtsForProgramRef(const Stmt* s, ProgramScopes scopes,
   // this report reaches. ForEachChildExpr and ForEachChildStmt in
   // elaborator_validate_internal.h state those positions once for the whole
   // elaborator.
-  const Expr* call = SubroutineEnableOfStmt(s);
+  const Expr* call =
+      scopes.every_reference ? nullptr : SubroutineEnableOfStmt(s);
   ForEachChildExpr(s, [&](Expr* const& e) {
     if ((call == nullptr || e != s->expr) && ExprRefersToProgram(e, scopes))
       ReportProgramSignalRef(s->range.start, diag);
@@ -321,6 +334,7 @@ void Elaborator::ValidateAnonymousProgramHierRefs() {
   // instance through the design, `top.qi.v`, which ProgramScopes follows.
   ProgramScopes scopes;
   scopes.unit = unit_;
+  scopes.every_reference = true;
   for (const auto* p : unit_->programs) {
     if (!p->name.empty() && !p->is_extern) scopes.names.insert(p->name);
   }
@@ -425,39 +439,36 @@ void Elaborator::ValidateHierRefToAutomatic(const ModuleDecl* decl) {
       diag_);
 }
 
-static bool IsProgramSubroutineCallExpr(
-    const Expr* e, const std::unordered_set<std::string_view>& program_names) {
+static bool IsProgramSubroutineCallExpr(const Expr* e,
+                                        const ProgramScopes& scopes) {
   if (!e || e->kind != ExprKind::kCall) return false;
   const Expr* callee = e->lhs;
-  if (!callee || callee->kind != ExprKind::kMemberAccess) return false;
-  auto leftmost = HierRefLeftmost(callee);
-  return !leftmost.empty() && program_names.count(leftmost) > 0;
+  return callee != nullptr && callee->kind == ExprKind::kMemberAccess &&
+         PathNamesProgram(callee, scopes);
 }
 
-static void WalkExprForProgramCall(
-    const Expr* e, const std::unordered_set<std::string_view>& program_names,
-    DiagEngine& diag, SourceLoc loc) {
+static void WalkExprForProgramCall(const Expr* e, const ProgramScopes& scopes,
+                                   DiagEngine& diag, SourceLoc loc) {
   if (!e) return;
-  if (IsProgramSubroutineCallExpr(e, program_names)) {
+  if (IsProgramSubroutineCallExpr(e, scopes)) {
     diag.Error(loc,
                "calling a program subroutine from within a design module is "
                "not permitted",
                Subclause("24.5"));
   }
-  WalkExprForProgramCall(e->lhs, program_names, diag, loc);
-  WalkExprForProgramCall(e->rhs, program_names, diag, loc);
-  WalkExprForProgramCall(e->condition, program_names, diag, loc);
-  WalkExprForProgramCall(e->true_expr, program_names, diag, loc);
-  WalkExprForProgramCall(e->false_expr, program_names, diag, loc);
-  WalkExprForProgramCall(e->base, program_names, diag, loc);
-  WalkExprForProgramCall(e->index, program_names, diag, loc);
-  WalkExprForProgramCall(e->index_end, program_names, diag, loc);
-  WalkExprForProgramCall(e->with_expr, program_names, diag, loc);
-  WalkExprForProgramCall(e->repeat_count, program_names, diag, loc);
-  for (auto* arg : e->args)
-    WalkExprForProgramCall(arg, program_names, diag, loc);
+  WalkExprForProgramCall(e->lhs, scopes, diag, loc);
+  WalkExprForProgramCall(e->rhs, scopes, diag, loc);
+  WalkExprForProgramCall(e->condition, scopes, diag, loc);
+  WalkExprForProgramCall(e->true_expr, scopes, diag, loc);
+  WalkExprForProgramCall(e->false_expr, scopes, diag, loc);
+  WalkExprForProgramCall(e->base, scopes, diag, loc);
+  WalkExprForProgramCall(e->index, scopes, diag, loc);
+  WalkExprForProgramCall(e->index_end, scopes, diag, loc);
+  WalkExprForProgramCall(e->with_expr, scopes, diag, loc);
+  WalkExprForProgramCall(e->repeat_count, scopes, diag, loc);
+  for (auto* arg : e->args) WalkExprForProgramCall(arg, scopes, diag, loc);
   for (auto* elem : e->elements)
-    WalkExprForProgramCall(elem, program_names, diag, loc);
+    WalkExprForProgramCall(elem, scopes, diag, loc);
 }
 
 // §24.5 bars calling a program subroutine, and a program subroutine is one
@@ -481,36 +492,34 @@ static void WalkExprForProgramCall(
 // WalkExprForProgramCall keeps the set by reference: an expression declares
 // nothing, so the narrowing this walk has already done is the whole of what it
 // needs, and it is passed the narrowed set from here.
-static void WalkStmtForProgramCall(
-    const Stmt* s, std::unordered_set<std::string_view> program_names,
-    DiagEngine& diag) {
+static void WalkStmtForProgramCall(const Stmt* s, ProgramScopes scopes,
+                                   DiagEngine& diag) {
   if (!s) return;
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     if (sub != nullptr && sub->kind == StmtKind::kVarDecl)
-      program_names.erase(sub->var_name);
+      scopes.Shadow(sub->var_name);
   });
   auto loc = s->range.start;
   // A.6.9 lets a task enable stand without its parentheses, `pi.t;`, which
   // leaves the statement a bare hierarchical name rather than a call.
   if (const Expr* call = SubroutineEnableOfStmt(s);
       call != nullptr && call->kind == ExprKind::kMemberAccess &&
-      program_names.count(HierRefLeftmost(call)) != 0)
+      PathNamesProgram(call, scopes))
     diag.Error(loc,
                "calling a program subroutine from within a design module is "
                "not permitted",
                Subclause("24.5"));
-  WalkExprForProgramCall(s->lhs, program_names, diag, loc);
-  WalkExprForProgramCall(s->rhs, program_names, diag, loc);
-  WalkExprForProgramCall(s->expr, program_names, diag, loc);
-  WalkExprForProgramCall(s->condition, program_names, diag, loc);
+  WalkExprForProgramCall(s->lhs, scopes, diag, loc);
+  WalkExprForProgramCall(s->rhs, scopes, diag, loc);
+  WalkExprForProgramCall(s->expr, scopes, diag, loc);
+  WalkExprForProgramCall(s->condition, scopes, diag, loc);
   // §24.5 makes a call of a program subroutine from a design module an error
   // and names no position the call is allowed in, so every position a statement
   // holds a statement in is one this report reaches. ForEachChildStmt in
   // elaborator_validate_internal.h states those positions once for the whole
   // elaborator.
-  ForEachChildStmt(s, [&](Stmt* const& sub) {
-    WalkStmtForProgramCall(sub, program_names, diag);
-  });
+  ForEachChildStmt(
+      s, [&](Stmt* const& sub) { WalkStmtForProgramCall(sub, scopes, diag); });
 }
 
 // §23.9 makes a task and a function scopes of their own, so a formal argument
@@ -521,16 +530,16 @@ static void WalkStmtForProgramCall(
 // subroutine is read, rather than where its statements are. This is
 // WalkSubroutineBodyForProgramRef above with the §24.5 walk in place of the
 // §24.3 one.
-static void WalkSubroutineBodyForProgramCall(
-    const ModuleItem* item, std::unordered_set<std::string_view> program_names,
-    DiagEngine& diag) {
-  for (const auto& arg : item->func_args) program_names.erase(arg.name);
+static void WalkSubroutineBodyForProgramCall(const ModuleItem* item,
+                                             ProgramScopes scopes,
+                                             DiagEngine& diag) {
+  for (const auto& arg : item->func_args) scopes.Shadow(arg.name);
   for (const auto* s : item->func_body_stmts) {
     if (s != nullptr && s->kind == StmtKind::kVarDecl)
-      program_names.erase(s->var_name);
+      scopes.Shadow(s->var_name);
   }
   for (const auto* s : item->func_body_stmts) {
-    WalkStmtForProgramCall(s, program_names, diag);
+    WalkStmtForProgramCall(s, scopes, diag);
   }
 }
 
@@ -735,24 +744,27 @@ void Elaborator::ValidateProgramWideSpaceAccessInPackageAndCuScopes() {
 // declares is reached exactly as a task of the module is. This is
 // CheckClassMethodsForProgramRef with the §24.5 walk in place of the §24.3 one,
 // and it reads a class nested in a class the same way.
-static void CheckClassMethodsForProgramCall(
-    const ClassDecl* cls,
-    const std::unordered_set<std::string_view>& program_names,
-    DiagEngine& diag) {
+static void CheckClassMethodsForProgramCall(const ClassDecl* cls,
+                                            const ProgramScopes& scopes,
+                                            DiagEngine& diag) {
   if (cls == nullptr) return;
   for (const auto* member : cls->members) {
     if (member == nullptr) continue;
     if (member->method != nullptr)
-      WalkSubroutineBodyForProgramCall(member->method, program_names, diag);
+      WalkSubroutineBodyForProgramCall(member->method, scopes, diag);
     if (member->kind == ClassMemberKind::kClassDecl)
-      CheckClassMethodsForProgramCall(member->nested_class, program_names,
-                                      diag);
+      CheckClassMethodsForProgramCall(member->nested_class, scopes, diag);
   }
 }
 
 void Elaborator::ValidateProgramSubroutineCall(const ModuleDecl* decl) {
-  if (program_inst_names_.empty()) return;
   if (decl->decl_kind == ModuleDeclKind::kProgram) return;
+  if (program_inst_names_.empty() && !UnitDeclaresNamedProgram(unit_)) return;
+  // §24.3 instantiates a top-level program implicitly under its declaration
+  // name, which no instance of this module holds, so a call is matched by the
+  // path its name spells as well as by its first component, as
+  // ValidateHierRefIntoProgram matches a reference.
+  const ProgramScopes kScopes{program_inst_names_, {}, unit_, decl};
   // No name is erased at module level, where the walk below erases the names a
   // block declares, for the reason ValidateHierRefIntoProgram above states:
   // program_inst_names_ holds instance and nested-program names of this very
@@ -761,14 +773,12 @@ void Elaborator::ValidateProgramSubroutineCall(const ModuleDecl* decl) {
   // reach. Only a scope below the module can hold that other subroutine.
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
-      WalkExprForProgramCall(item->assign_lhs, program_inst_names_, diag_,
-                             item->loc);
-      WalkExprForProgramCall(item->assign_rhs, program_inst_names_, diag_,
-                             item->loc);
+      WalkExprForProgramCall(item->assign_lhs, kScopes, diag_, item->loc);
+      WalkExprForProgramCall(item->assign_rhs, kScopes, diag_, item->loc);
     }
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body)
-      WalkStmtForProgramCall(item->body, program_inst_names_, diag_);
+      WalkStmtForProgramCall(item->body, kScopes, diag_);
     // §24.5 makes a call of a program subroutine from a design module an error
     // and names no position the call may stand in. A task or a function this
     // module declares is within the design module, so a call written there is
@@ -777,9 +787,8 @@ void Elaborator::ValidateProgramSubroutineCall(const ModuleDecl* decl) {
     // statements living in func_body_stmts.
     if (item->kind == ModuleItemKind::kTaskDecl ||
         item->kind == ModuleItemKind::kFunctionDecl)
-      WalkSubroutineBodyForProgramCall(item, program_inst_names_, diag_);
-    CheckClassMethodsForProgramCall(item->class_decl, program_inst_names_,
-                                    diag_);
+      WalkSubroutineBodyForProgramCall(item, kScopes, diag_);
+    CheckClassMethodsForProgramCall(item->class_decl, kScopes, diag_);
   }
 }
 

@@ -784,12 +784,22 @@ bool DeclaredBefore(const SharedNameDecl& a, const SharedNameDecl& b) {
   return a.loc.column < b.loc.column;
 }
 
+// An item of the anonymous program declares a name of the shared space where
+// it is one of A.1.11's kinds; an item beside the program does where §3.13
+// counts it a name of the package or compilation-unit scope, since §24.6 makes
+// a variable, a parameter or a type declared there as much the program's
+// collision as a subroutine is.
+bool JoinsSharedNameSpace(const ModuleItem* item) {
+  return item->from_anonymous_program ? DeclaresSharedAnonymousProgramName(item)
+                                      : DeclaresACuScopeName(item);
+}
+
 std::vector<SharedNameDecl> SharedNameDecls(
     const std::vector<ModuleItem*>& items) {
   std::vector<SharedNameDecl> out;
   for (const auto* item : items) {
     if (item->name.empty()) continue;
-    if (!DeclaresSharedAnonymousProgramName(item)) continue;
+    if (!JoinsSharedNameSpace(item)) continue;
     out.push_back({item->name, item->loc, item->from_anonymous_program});
   }
   return out;

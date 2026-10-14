@@ -38,8 +38,6 @@ TEST(ProgramSubroutineCall, ModuleCallingProgramFunctionIsError) {
       "  initial x = p.pfunc();\n"
       "endmodule\n",
       f, "top");
-  // The source also draws the §24.3 hierarchical-reference report; this names
-  // the §24.5 call rule the test is written for.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "calling a program subroutine from within a design "
                             "module is not permitted",
@@ -506,6 +504,48 @@ TEST(ProgramSubroutineCall, ModuleEnablingProgramTaskWithoutParensIsError) {
                             "calling a program subroutine from within a design "
                             "module is not permitted",
                             6, "24.5"));
+}
+
+// §24.3 instantiates a top-level program implicitly under its declaration
+// name, so `p.t()` in a module reaches a program the module never instantiates,
+// and §24.5 bars the call all the same. The check knew only the program
+// instances of the calling module, and let this call run.
+TEST(ProgramSubroutineCall, ModuleCallingTopLevelProgramTaskIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "program p;\n"
+      "  task automatic t; $display(\"t\"); endtask\n"
+      "  initial #2;\n"
+      "endprogram\n"
+      "module top;\n"
+      "  initial #1 p.t();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "calling a program subroutine from within a design "
+                            "module is not permitted",
+                            6, "24.5"));
+}
+
+// A function of a top-level program called in an expression is §24.5's call as
+// well, and its name is a subroutine's rather than a program signal's, so the
+// §24.3 signal report, which alone refused this call, is not given beside it.
+TEST(ProgramSubroutineCall, ModuleCallingTopLevelProgramFunctionIsOneError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "program p;\n"
+      "  function int f(); return 7; endfunction\n"
+      "  initial #2;\n"
+      "endprogram\n"
+      "module top;\n"
+      "  initial #1 $display(\"%0d\", p.f());\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "calling a program subroutine from within a design "
+                            "module is not permitted",
+                            6, "24.5"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
 }  // namespace
