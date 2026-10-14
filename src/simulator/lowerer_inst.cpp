@@ -625,7 +625,7 @@ bool Lowerer::LowerArrayPortBinding(const RtlirModuleInst& inst,
     ca.lhs = input ? local_elem : conn_elem;
     ca.rhs = input ? conn_elem : local_elem;
     ca.width = port->width;
-    LowerContAssign(ca, from_program);
+    LowerContAssign(ca, from_program && !input);
   }
   return true;
 }
@@ -821,7 +821,10 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
       NameInterconnectPath(
           {inst_prefix_, inst_seg, binding.port_name, binding.connection}, ca);
       RecordInputPortSource(binding, port_name, inst_prefix_, ctx_);
-      LowerContAssign(ca, from_program);
+      // §24.3.2: an input port net of a program is driven as soon as the
+      // design expression connected to it changes; only the program's own
+      // code runs in the reactive region set.
+      LowerContAssign(ca, false);
       continue;
     }
 

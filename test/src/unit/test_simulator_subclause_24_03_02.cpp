@@ -239,4 +239,56 @@ TEST(ProgramPortConnectionSim, OutputPortWriteInTheLastStepReachesTheDesign) {
   EXPECT_EQ(f.ctx.CurrentTime().ticks, 4u);
 }
 
+// §24.3.2 with §24.3.1: a program's input port net is driven by the design
+// expression connected to it as soon as that changes, not in the Reactive
+// region where the program's own code runs. A sequence the program declares,
+// clocked by the port, is evaluated in the Observed region of the tick, so the
+// program process waking on the same tick in the Reactive region sees it end
+// at 15, 25 and 35.
+TEST(ProgramPortConnectionSim,
+     InputPortFollowsTheDesignBeforeTheObservedRegion) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("program p(input logic clk);\n"
+                 "  bit a = 1, b = 1;\n"
+                 "  int n = 0;\n"
+                 "  sequence e4;\n"
+                 "    a ##1 b;\n"
+                 "  endsequence\n"
+                 "  initial forever @(posedge clk) if (e4.triggered) n++;\n"
+                 "  initial #41 $display(\"n=%0d\", n);\n"
+                 "endprogram\n"
+                 "module t;\n"
+                 "  bit clk;\n"
+                 "  always #5 clk = ~clk;\n"
+                 "  p u(clk);\n"
+                 "  initial #45 $finish;\n"
+                 "endmodule\n",
+                 f),
+      "n=3\n$finish at time 45\n");
+}
+
+// §24.3.2: a program's unpacked-array input port carries the design array
+// connected to it, element by element, and its unpacked-array output port
+// carries back what the program's code writes: the program reads d[1], 6,
+// and writes 7 into o[0], which the design reads as os[0].
+TEST(ProgramPortConnectionSim, ArrayPortsCarryValuesBothWays) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("program p(input logic clk, input int d[2],\n"
+                 "          output int o[2]);\n"
+                 "  initial begin @(posedge clk) o[0] = d[1] + 1; #3; end\n"
+                 "endprogram\n"
+                 "module t;\n"
+                 "  bit clk;\n"
+                 "  int ds[2] = '{5, 6};\n"
+                 "  int os[2];\n"
+                 "  p u(clk, ds, os);\n"
+                 "  initial #5 clk = 1;\n"
+                 "  initial #6 $display(\"os=%0d\", os[0]);\n"
+                 "endmodule\n",
+                 f),
+      "os=7\n");
+}
+
 }  // namespace
