@@ -21,9 +21,7 @@ namespace {
 
 using Covergroups = std::unordered_map<std::string_view, const CovergroupDecl*>;
 
-bool IsNew(const Expr* e) {
-  return e != nullptr && e->kind == ExprKind::kCall && e->text == "new";
-}
+bool IsNew(const Expr* e) { return e != nullptr && e->text == "new"; }
 
 // A call of `new` building an instance of `cg`, with the number of its
 // positional actuals, the nets of the scope and where the reports go.
@@ -79,9 +77,7 @@ void CheckFormal(const NewCall& nc, size_t i) {
   const FunctionArg& formal = nc.cg.formals[i];
   int index = ActualIndex(nc, i, formal.name);
   const Expr* actual =
-      index >= 0 && static_cast<size_t>(index) < nc.call->args.size()
-          ? nc.call->args[static_cast<size_t>(index)]
-          : nullptr;
+      index >= 0 ? nc.call->args[static_cast<size_t>(index)] : nullptr;
   if (actual == nullptr) {
     if (formal.default_value != nullptr) return;
     nc.diag.Error(nc.call->range.start,
@@ -130,7 +126,7 @@ struct ModuleUses {
 // The covergroup the variable `name` is an instance of; null for any other
 // name.
 const CovergroupDecl* InstanceOf(const Expr* e, const ModuleUses& uses) {
-  if (e == nullptr || e->kind != ExprKind::kIdentifier) return nullptr;
+  if (e->kind != ExprKind::kIdentifier) return nullptr;
   auto it = uses.instances.find(e->text);
   return it != uses.instances.end() ? it->second : nullptr;
 }
@@ -139,7 +135,7 @@ const CovergroupDecl* InstanceOf(const Expr* e, const ModuleUses& uses) {
 // none is read through an instance, `c.lo`.
 void CheckFormalRead(const Expr* e, const ModuleUses& uses) {
   const CovergroupDecl* cg = InstanceOf(e->lhs, uses);
-  if (cg == nullptr || e->rhs == nullptr) return;
+  if (cg == nullptr) return;
   std::string_view name = e->rhs->text;
   if (FindCovergroupFormal(*cg, name) == nullptr || IsItemName(*cg, name)) {
     return;
@@ -156,14 +152,13 @@ void CheckFormalRead(const Expr* e, const ModuleUses& uses) {
 void CheckItemMethod(const Expr* call, const ModuleUses& uses) {
   const Expr* access = call->lhs;
   if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
-      access->rhs == nullptr || access->lhs == nullptr ||
       access->lhs->kind != ExprKind::kMemberAccess) {
     return;
   }
   std::string_view method = access->rhs->text;
   const CovergroupDecl* cg = InstanceOf(access->lhs->lhs, uses);
   if ((method != "sample" && method != "set_inst_name") || cg == nullptr ||
-      access->lhs->rhs == nullptr || !IsItemName(*cg, access->lhs->rhs->text)) {
+      !IsItemName(*cg, access->lhs->rhs->text)) {
     return;
   }
   uses.diag.Error(call->range.start,

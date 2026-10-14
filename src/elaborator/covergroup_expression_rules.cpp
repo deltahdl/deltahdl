@@ -95,14 +95,14 @@ void CheckNames(const Expr* e, const Names& free, const ExprSite& site) {
   CollectBareIdents(e, reads);
   for (const Expr* read : reads) {
     if (free.contains(read->text)) continue;
-    if (FindCovergroupFormal(site.cg, read->text) != nullptr) {
-      if (!IsRefCovergroupFormal(site.cg, read->text)) continue;
+    if (IsRefCovergroupFormal(site.cg, read->text)) {
       site.diag.Error(read->range.start,
                       std::format("'{}' is a ref formal of covergroup '{}' and "
                                   "cannot be read in a covergroup_expression",
                                   read->text, site.cg.name),
                       Subclause("19.5"));
-    } else if (site.ctx.non_constant(read->text)) {
+    } else if (FindCovergroupFormal(site.cg, read->text) == nullptr &&
+               site.ctx.non_constant(read->text)) {
       site.diag.Error(read->range.start,
                       std::format("'{}' is no constant and cannot be read in a "
                                   "covergroup_expression",

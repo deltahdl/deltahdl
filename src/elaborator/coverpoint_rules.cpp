@@ -52,9 +52,7 @@ void CheckDataType(const CoverPointDecl& cp, const CovergroupContext& ctx,
 // §19.5: a coverpoint covers an integral or real expression.
 void CheckExpression(const CoverPointDecl& cp, const CovergroupDecl& cg,
                      const CovergroupContext& ctx, DiagEngine& diag) {
-  if (cp.expr == nullptr || !NeitherIntegralNorReal(KindIn(cp.expr, cg, ctx))) {
-    return;
-  }
+  if (!NeitherIntegralNorReal(KindIn(cp.expr, cg, ctx))) return;
   diag.Error(cp.expr->range.start,
              "a coverpoint covers an integral or real expression, and this "
              "expression is neither",

@@ -114,13 +114,16 @@ TEST(CovergroupNewActuals, ActualBindingNoFormalIsError) {
 }
 
 // §19.3 with §13.5.2: a covergroup's ref formal is passed a variable, so an
-// expression, a literal and a net are errors as its actual.
+// expression, a literal and a net are errors as its actual; an element of an
+// array and a member of a structure are variables.
 TEST(CovergroupNewActuals, RefFormalGivenNoVariableIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module t;\n"
       "  wire w;\n"
       "  int v;\n"
+      "  int arr[2];\n"
+      "  struct {int f;} s;\n"
       "  covergroup cg (ref int x);\n"
       "    coverpoint x;\n"
       "  endgroup\n"
@@ -128,9 +131,11 @@ TEST(CovergroupNewActuals, RefFormalGivenNoVariableIsError) {
       "  cg b = new(5);\n"
       "  cg c = new(w);\n"
       "  cg d = new(v);\n"
+      "  cg e = new(arr[1]);\n"
+      "  cg g = new(s.f);\n"
       "endmodule\n",
       f);
-  for (uint32_t line : {7u, 8u, 9u}) {
+  for (uint32_t line : {9u, 10u, 11u}) {
     EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                               "the actual of ref formal 'x' of covergroup 'cg' "
                               "is no variable",
@@ -140,27 +145,33 @@ TEST(CovergroupNewActuals, RefFormalGivenNoVariableIsError) {
 }
 
 // §19.3: the formals of a covergroup are visible within its declaration
-// alone, so reading one through an instance is an error.
+// alone, so reading one through an instance is an error, in a continuous
+// assignment, in a procedure and before a method call alike.
 TEST(CovergroupFormals, FormalReadThroughAnInstanceIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module t;\n"
       "  int v, w;\n"
+      "  wire [3:0] u;\n"
       "  covergroup cg (int lo);\n"
       "    cp: coverpoint v { bins b = {[lo:9]}; }\n"
       "  endgroup\n"
       "  cg c = new(3);\n"
+      "  assign u = c.lo;\n"
       "  initial begin\n"
       "    w = c.lo;\n"
       "    c.sample();\n"
+      "    c.lo.sample();\n"
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "'lo' is a formal of covergroup 'cg', which is not "
-                            "visible through instance 'c'",
-                            8, "19.3"));
-  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+  for (uint32_t line : {8u, 10u, 12u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "'lo' is a formal of covergroup 'cg', which is "
+                              "not visible through instance 'c'",
+                              line, "19.3"));
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
 }  // namespace

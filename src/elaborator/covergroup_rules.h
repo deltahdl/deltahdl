@@ -38,12 +38,11 @@ void ValidateCovergroup(const CovergroupDecl& cg, const CovergroupContext& ctx,
                         DiagEngine& diag);
 
 // The tables of a module its covergroups read (§19.3): the declarations
-// `values` holds, and the names `const_names` and `const_var_names` hold of
-// its parameters and const variables, the constants among them.
+// `values` holds, and the names `const_names` holds of its parameters and
+// const variables, the constants among them.
 struct ModuleCovergroupTables {
   const ValueScope& values;
   const std::unordered_set<std::string_view>& const_names;
-  const std::unordered_set<std::string_view>& const_var_names;
 };
 
 // The covergroups a module declares, checked by ValidateCovergroup and for a

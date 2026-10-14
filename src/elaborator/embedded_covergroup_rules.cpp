@@ -1,5 +1,7 @@
 #include "elaborator/embedded_covergroup_rules.h"
 
+#include <algorithm>
+#include <array>
 #include <cstdint>
 #include <format>
 #include <functional>
@@ -13,8 +15,8 @@
 #include "elaborator/covergroup_instance_rules.h"
 #include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_scope_rules_names.h"
+#include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
-#include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_covergroup.h"
 #include "parser/ast_expr.h"
@@ -111,45 +113,31 @@ bool AnyStmt(const Stmt* s, const std::function<bool(const Stmt*)>& pred) {
   return found;
 }
 
-// The name an assignment `s` writes, `v` or `this.v`; empty for any other
-// statement.
-std::string_view AssignedName(const Stmt* s) {
-  if ((s->kind != StmtKind::kBlockingAssign &&
-       s->kind != StmtKind::kNonblockingAssign) ||
-      s->lhs == nullptr) {
-    return {};
-  }
-  const Expr* lhs = s->lhs;
-  if (lhs->kind == ExprKind::kMemberAccess && lhs->lhs != nullptr &&
-      lhs->lhs->kind == ExprKind::kIdentifier && lhs->lhs->text == "this" &&
-      lhs->rhs != nullptr) {
-    return lhs->rhs->text;
-  }
-  return lhs->kind == ExprKind::kIdentifier ? lhs->text : std::string_view{};
+// Whether `s` builds the covergroup `cg` of `cls`, assigning it a `new`.
+bool BuildsCovergroupAt(const Stmt* s, const ClassDecl* cls,
+                        std::string_view cg) {
+  return OwnPropertyAssigned(s, cls) == cg && s->rhs->text == "new";
 }
 
-bool IsNew(const Expr* e) {
-  return e != nullptr && e->kind == ExprKind::kCall && e->text == "new";
+bool AssignsTo(const Stmt* s, const ClassDecl* cls, std::string_view name) {
+  return AnyStmt(
+      s, [&](const Stmt* t) { return OwnPropertyAssigned(t, cls) == name; });
 }
 
-bool AssignsTo(const Stmt* s, std::string_view name) {
-  return AnyStmt(s, [name](const Stmt* t) { return AssignedName(t) == name; });
+bool BuildsCovergroup(const Stmt* s, const ClassDecl* cls,
+                      std::string_view cg) {
+  return AnyStmt(s,
+                 [&](const Stmt* t) { return BuildsCovergroupAt(t, cls, cg); });
 }
 
-bool BuildsCovergroup(const Stmt* s, std::string_view cg) {
-  return AnyStmt(s, [cg](const Stmt* t) {
-    return AssignedName(t) == cg && IsNew(t->rhs);
-  });
-}
-
-// §19.3: each `new` the constructor statements `stmts` build an instance of
-// the covergroup `cg` with.
-void CheckConstructorNews(const std::vector<Stmt*>& stmts,
+// §19.3: each `new` the constructor statements `stmts` of `cls` build an
+// instance of the covergroup `cg` with.
+void CheckConstructorNews(const std::vector<Stmt*>& stmts, const ClassDecl* cls,
                           const CovergroupDecl& cg, DiagEngine& diag) {
   const CovergroupDeclared kNoNets = [](std::string_view) { return false; };
   for (const Stmt* s : stmts) {
     AnyStmt(s, [&](const Stmt* t) {
-      if (AssignedName(t) == cg.name && IsNew(t->rhs)) {
+      if (BuildsCovergroupAt(t, cls, cg.name)) {
         CheckCovergroupNewActuals(t->rhs, cg, kNoNets, diag);
       }
       return false;
@@ -161,32 +149,33 @@ void CheckConstructorNews(const std::vector<Stmt*>& stmts,
 // statement building a covergroup that reads it.
 enum class InitOrder : uint8_t { kUnknown, kInitFirst, kNewFirst, kTogether };
 
-bool IsLoopOrJoinNone(const Stmt* s) {
-  switch (s->kind) {
-    case StmtKind::kFor:
-    case StmtKind::kForeach:
-    case StmtKind::kWhile:
-    case StmtKind::kForever:
-    case StmtKind::kRepeat:
-    case StmtKind::kDoWhile:
-      return true;
-    default:
-      return s->kind == StmtKind::kFork &&
-             s->join_kind == TokenKind::kKwJoinNone;
-  }
-}
+// The looping statements, and fork, which in a constructor is fork-join_none:
+// a function holds no other fork (§13.4).
+constexpr std::array<StmtKind, 7> kRepeatedOrForked = {
+    StmtKind::kFor,    StmtKind::kForeach, StmtKind::kWhile, StmtKind::kForever,
+    StmtKind::kRepeat, StmtKind::kDoWhile, StmtKind::kFork};
 
-// The order in which the statements `stmts` initialize `constant` and build
-// the covergroup `cg`: by the first statement doing either, a sequential block
-// doing both being read in turn.
-InitOrder OrderIn(const std::vector<Stmt*>& stmts, std::string_view constant,
-                  std::string_view cg) {
+// A class whose constructor is read, with the names of an instance constant
+// of it and of a covergroup it builds.
+struct CtorOrder {
+  const ClassDecl* cls;
+  std::string_view constant;
+  std::string_view cg;
+};
+
+// The order in which the statements `stmts` initialize the constant and build
+// the covergroup `order` names: by the first statement doing either, a
+// sequential block doing both being read in turn.
+InitOrder OrderIn(const std::vector<Stmt*>& stmts, const CtorOrder& order) {
   for (const Stmt* s : stmts) {
-    bool init = AssignsTo(s, constant);
-    bool built = BuildsCovergroup(s, cg);
+    bool init = AssignsTo(s, order.cls, order.constant);
+    bool built = BuildsCovergroup(s, order.cls, order.cg);
     if (init && built) {
-      if (IsLoopOrJoinNone(s)) return InitOrder::kTogether;
-      return s->kind == StmtKind::kBlock ? OrderIn(s->stmts, constant, cg)
+      if (std::ranges::find(kRepeatedOrForked, s->kind) !=
+          kRepeatedOrForked.end()) {
+        return InitOrder::kTogether;
+      }
+      return s->kind == StmtKind::kBlock ? OrderIn(s->stmts, order)
                                          : InitOrder::kUnknown;
     }
     if (init) return InitOrder::kInitFirst;
@@ -195,24 +184,36 @@ InitOrder OrderIn(const std::vector<Stmt*>& stmts, std::string_view constant,
   return InitOrder::kUnknown;
 }
 
+// A covergroup `cg` the class `cls` embeds, the unit holding the classes
+// `cls` may extend, and where the reports go.
+struct ClassSite {
+  const ClassDecl* cls;
+  const CovergroupDecl& cg;
+  const CompilationUnit* unit;
+  DiagEngine& diag;
+};
+
 // Whether `name` is an instance constant of `cls`: a const property declared
 // without an initializer, which the constructor assigns (§8.19).
 bool IsInstanceConstant(const ClassDecl* cls, std::string_view name,
                         const CompilationUnit* unit) {
   const ClassMember* m = FindMemberInClass(cls, name, unit);
-  return m != nullptr && m->kind == ClassMemberKind::kProperty && m->is_const &&
-         m->init_expr == nullptr && !m->is_static;
+  return m != nullptr && m->is_const && m->init_expr == nullptr;
 }
 
 // §19.5: each instance constant `read` of the class, read by the covergroup
 // `cg`, is initialized in the constructor `ctor` before the statement
 // building `cg`, and not in the same looping statement or fork-join_none.
-void CheckInstanceConstant(const Expr* read, const CovergroupDecl& cg,
-                           const ModuleItem* ctor, DiagEngine& diag) {
+void CheckInstanceConstant(const Expr* read, const ClassSite& site,
+                           const ModuleItem* ctor) {
+  const CovergroupDecl& cg = site.cg;
+  DiagEngine& diag = site.diag;
   const std::vector<Stmt*>& stmts = ctor->func_body_stmts;
-  InitOrder order = OrderIn(stmts, read->text, cg.name);
+  InitOrder order = OrderIn(stmts, {site.cls, read->text, cg.name});
   bool assigned = false;
-  for (const Stmt* s : stmts) assigned = assigned || AssignsTo(s, read->text);
+  for (const Stmt* s : stmts) {
+    assigned = assigned || AssignsTo(s, site.cls, read->text);
+  }
   if (order == InitOrder::kNewFirst && assigned) {
     diag.Error(read->range.start,
                std::format("instance constant '{}', which covergroup '{}' "
@@ -234,22 +235,10 @@ void CheckInstanceConstant(const Expr* read, const CovergroupDecl& cg,
 // The constructor `cls` declares; null where it declares none.
 const ModuleItem* Constructor(const ClassDecl* cls) {
   for (const ClassMember* m : cls->members) {
-    if (m->kind == ClassMemberKind::kMethod && m->method != nullptr &&
-        m->method->name == "new") {
-      return m->method;
-    }
+    if (m->name == "new") return m->method;
   }
   return nullptr;
 }
-
-// A covergroup `cg` the class `cls` embeds, the unit holding the classes
-// `cls` may extend, and where the reports go.
-struct ClassSite {
-  const ClassDecl* cls;
-  const CovergroupDecl& cg;
-  const CompilationUnit* unit;
-  DiagEngine& diag;
-};
 
 // §19.4 with §8.18: a covergroup of a class covers no property local to a
 // class it extends, the name `name` read at `loc` among them.
@@ -258,7 +247,7 @@ void CheckBaseLocal(const ClassSite& site, std::string_view name,
   if (IsFormalOf(site.cg, name)) return;
   OwnedMember found = FindMemberAndOwner(site.cls, name, site.unit);
   if (found.member == nullptr || !found.member->is_local ||
-      found.owner == nullptr || found.owner == site.cls) {
+      found.owner == site.cls) {
     return;
   }
   site.diag.Error(
@@ -277,7 +266,7 @@ void CheckCovergroupOfClass(const ClassSite& site, const ModuleItem* ctor) {
     CheckBaseLocal(site, read->text, read->range.start);
     if (ctor != nullptr && !IsFormalOf(site.cg, read->text) &&
         IsInstanceConstant(site.cls, read->text, site.unit)) {
-      CheckInstanceConstant(read, site.cg, ctor, site.diag);
+      CheckInstanceConstant(read, site, ctor);
     }
   }
   for (const CoverageSpecOrOption& item : site.cg.items) {
@@ -295,14 +284,12 @@ void CheckEmbeddedCovergroupUses(const ClassDecl* cls,
                                  DiagEngine& diag) {
   const ModuleItem* ctor = Constructor(cls);
   for (const ClassMember* m : cls->members) {
-    if (m->kind != ClassMemberKind::kCovergroup || m->covergroup == nullptr) {
-      continue;
-    }
+    if (m->kind != ClassMemberKind::kCovergroup) continue;
     CheckCovergroupOfClass({cls, *m->covergroup, unit, diag}, ctor);
     // §19.4.1: a derived covergroup has its base's formals, which its own
     // declaration does not list.
     if (ctor != nullptr && m->covergroup->extends_base.empty()) {
-      CheckConstructorNews(ctor->func_body_stmts, *m->covergroup, diag);
+      CheckConstructorNews(ctor->func_body_stmts, cls, *m->covergroup, diag);
     }
   }
 }

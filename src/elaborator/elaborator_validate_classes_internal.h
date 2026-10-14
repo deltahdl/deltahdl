@@ -74,6 +74,11 @@ inline const ModuleItem* MethodBody(const ModuleItem* method) {
                                               : method;
 }
 
+// Defined in elaborator_validate_class_consts.cpp: the property of `cls` the
+// assignment `s` writes, named `k`, `this.k` or `C::k` with C the class itself
+// (§8.11, §8.23); empty where `s` is no assignment or writes no such name.
+std::string_view OwnPropertyAssigned(const Stmt* s, const ClassDecl* cls);
+
 // Defined in elaborator_validate_class_handles.cpp.
 bool IsClassDerivedFrom(std::string_view a, std::string_view b,
                         const CompilationUnit* unit);

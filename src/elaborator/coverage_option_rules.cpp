@@ -56,7 +56,7 @@ void CheckMember(const CoverageOption& option, DiagEngine& diag) {
 // §19.7, Table 19-1, and §19.7.1, Table 19-3: a weight is a non-negative
 // integral value.
 void CheckWeight(const CoverageOption& option, DiagEngine& diag) {
-  if (option.member != "weight" || option.value == nullptr) return;
+  if (option.member != "weight") return;
   std::optional<int64_t> weight = ConstEvalInt(option.value);
   if (!weight.has_value() || *weight >= 0) return;
   diag.Error(option.value->range.start,
@@ -91,11 +91,12 @@ void CheckTypeOptionCalls(const Expr* e, const CoverageOption& option,
   });
 }
 
-// §19.7.1: a type option is set with a constant expression.
+// §19.7.1: a type option is set with a constant expression. The parser
+// reports a formal of the covergroup there.
 void CheckTypeOptionValue(const CoverageOption& option,
                           const CovergroupDecl& cg,
                           const CovergroupContext& ctx, DiagEngine& diag) {
-  if (!option.is_type_option || option.value == nullptr) return;
+  if (!option.is_type_option) return;
   std::vector<const Expr*> reads;
   CollectBareIdents(option.value, reads);
   for (const Expr* read : reads) {
@@ -128,7 +129,7 @@ void CollectItemOptions(const CoverageSpecOrOption& item,
         options.push_back(&bins.option);
       }
     }
-  } else if (item.kind == CoverageSpecKind::kCoverCross) {
+  } else {
     for (const CrossBodyItem& body : item.cover_cross->body) {
       if (body.kind == CrossBodyItemKind::kOption) {
         options.push_back(&body.option);

@@ -41,6 +41,9 @@ struct ValueScope {
   ValueIterator iterator = {};
 };
 
+// The kind of value a type written as `kind` gives, a name aside.
+ValueKind KindOfTypeKind(DataTypeKind kind);
+
 // The kind of value the expression `e` gives, as far as its form and the
 // declarations `scope` holds tell: a literal by its own kind; a variable, the
 // iterator, an element select, a member select, a cast or a function call by

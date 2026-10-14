@@ -70,7 +70,8 @@ ValueKind FindKind(std::span<const KindByName> table, std::string_view name) {
   return it != table.end() ? it->second : ValueKind::kUnknown;
 }
 
-// The kind of value a type written as `kind` gives, a name aside.
+}  // namespace
+
 ValueKind KindOfTypeKind(DataTypeKind kind) {
   if (kind == DataTypeKind::kString) return ValueKind::kString;
   if (IsRealType(kind)) return ValueKind::kReal;
@@ -80,6 +81,8 @@ ValueKind KindOfTypeKind(DataTypeKind kind) {
   }
   return ValueKind::kUnknown;
 }
+
+namespace {
 
 // The kind of value a type left as the name `name` gives: a class handle has
 // none of the operators, and a typedef gives what it stands for.

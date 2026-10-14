@@ -759,8 +759,7 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
   // covergroups are checked against the same predicate.
   const ValueScope kValues{var_types_,  var_named_types_, var_array_info_,
                            func_decls_, typedefs_,        class_names_};
-  ValidateModuleCovergroups(decl, {kValues, const_names_, const_var_names_},
-                            declared, diag_);
+  ValidateModuleCovergroups(decl, {kValues, const_names_}, declared, diag_);
   ValidateCovergroupTypeCalls(
       decl,
       [this, mod](std::string_view n) {

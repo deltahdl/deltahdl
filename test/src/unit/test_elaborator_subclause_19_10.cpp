@@ -25,6 +25,7 @@ TEST(OptionMembers, NameTheStructureDoesNotDeclareIsError) {
       "  endgroup\n"
       "  cg c = new;\n"
       "  initial c.option.baz = 2;\n"
+      "  initial cg::type_option.qux = 3;\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "option has no member 'foo'",
@@ -38,7 +39,9 @@ TEST(OptionMembers, NameTheStructureDoesNotDeclareIsError) {
                             9, "19.10"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "option has no member 'baz'",
                             12, "19.10"));
-  EXPECT_EQ(f.diag.ErrorCount(), 5u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type_option has no member 'qux'", 13, "19.10"));
+  EXPECT_EQ(f.diag.ErrorCount(), 6u);
 }
 
 }  // namespace

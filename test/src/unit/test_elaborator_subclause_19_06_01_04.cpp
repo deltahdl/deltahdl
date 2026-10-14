@@ -74,20 +74,26 @@ TEST(CrossSetExpression, DifferentNamedTypeRequiresCast) {
 }
 
 // §19.6.1.4: a cross_set_expression has the cross's CrossQueueType, a queue
-// of structures, so a queue of int or of string elements is an error.
-TEST(CrossSetExpression, QueueOfIntegralOrStringElementsIsError) {
+// of structures, so a queue of int, string or real elements is an error and a
+// queue of structures is not.
+TEST(CrossSetExpression, QueueOfIntegralRealOrStringElementsIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
       "  bit [1:0] a, b;\n"
       "  int q[$] = '{1, 2, 3};\n"
       "  string s[$] = '{\"x\"};\n"
+      "  real r[$];\n"
+      "  typedef struct {bit [1:0] a; bit [1:0] b;} pair_t;\n"
+      "  pair_t ok[$];\n"
       "  covergroup cg;\n"
       "    coverpoint a;\n"
       "    coverpoint b;\n"
       "    X: cross a, b {\n"
       "      bins one = q;\n"
       "      bins two = s;\n"
+      "      bins three = r;\n"
+      "      bins four = ok;\n"
       "    }\n"
       "  endgroup\n"
       "endmodule\n",
@@ -95,12 +101,16 @@ TEST(CrossSetExpression, QueueOfIntegralOrStringElementsIsError) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "the cross_set_expression 'q' of bin 'one' is no "
                             "queue of the cross's CrossValType",
-                            9, "19.6.1.4"));
+                            12, "19.6.1.4"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "the cross_set_expression 's' of bin 'two' is no "
                             "queue of the cross's CrossValType",
-                            10, "19.6.1.4"));
-  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+                            13, "19.6.1.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the cross_set_expression 'r' of bin 'three' is no "
+                            "queue of the cross's CrossValType",
+                            14, "19.6.1.4"));
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
 }  // namespace

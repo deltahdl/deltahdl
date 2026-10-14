@@ -63,33 +63,47 @@ TEST(TypeOptionWrites, ClassMemberNamedTypeOptionIsAssignable) {
 }
 
 // §19.7.1: a type option is set with a constant expression, so a module
-// variable or a call of a function reading one is an error there, while a
-// parameter and a function reading only a parameter are not.
+// variable, a call of a function reading one and a call of a system function
+// that is no constant one are errors there, while a parameter, a function
+// reading only a parameter or its arguments and $clog2 are not. A formal of
+// the covergroup is the parser's to report, once.
 TEST(TypeOptionValues, NonConstantValueIsError) {
   ElabFixture f;
-  ElaborateSrc(
+  ElaborateSrcAllowingParseErrors(
+      "function automatic int uf(int x); return x; endfunction\n"
       "module m;\n"
       "  bit [1:0] a;\n"
       "  int w = 3;\n"
       "  parameter int P = 2;\n"
       "  function int f(); return w; endfunction\n"
       "  function int g(); return P; endfunction\n"
-      "  covergroup cg;\n"
+      "  covergroup cg (int k);\n"
       "    type_option.weight = w;\n"
       "    ca: coverpoint a { type_option.goal = f(); }\n"
       "    cb: coverpoint a { type_option.weight = P + g(); }\n"
+      "    cc: coverpoint a { type_option.weight = k; }\n"
+      "    cd: coverpoint a { type_option.goal = $urandom(); }\n"
+      "    ce: coverpoint a { type_option.weight = $clog2(4) + uf(1); }\n"
       "  endgroup\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "type option 'weight' is set with 'w', which is no "
                             "constant",
-                            8, "19.7.1"));
+                            9, "19.7.1"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "type option 'goal' is set with a call of 'f', "
                             "which is no constant function call",
-                            9, "19.7.1"));
-  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+                            10, "19.7.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a type option is set with a constant expression; "
+                            "covergroup formal 'k' is not one",
+                            12, "19.7.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type option 'goal' is set with a call of "
+                            "'$urandom', which is no constant function call",
+                            13, "19.7.1"));
+  EXPECT_EQ(f.diag.ErrorCount(), 4u);
 }
 
 }  // namespace

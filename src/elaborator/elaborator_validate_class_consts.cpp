@@ -81,6 +81,11 @@ static std::string_view OwnPropertyTargetName(const Expr* lhs,
   return lhs->lhs->text == self ? lhs->rhs->text : std::string_view{};
 }
 
+std::string_view OwnPropertyAssigned(const Stmt* s, const ClassDecl* cls) {
+  return IsAssignStmt(s) ? OwnPropertyTargetName(s->lhs, cls)
+                         : std::string_view{};
+}
+
 static void WalkStmtsForConstClassProp(const Stmt* s,
                                        const ConstClassProps& props,
                                        bool in_constructor, DiagEngine& diag) {

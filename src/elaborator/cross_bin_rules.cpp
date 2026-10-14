@@ -58,7 +58,7 @@ void CheckMatches(const SelectExpression& s, const CrossSite& site) {
 // name selects through; empty for any other select expression.
 std::string_view NameSelected(const SelectExpression& s) {
   if (s.kind == SelectExpressionKind::kCrossIdentifier) return s.cross_name;
-  if (s.kind == SelectExpressionKind::kCrossSet && s.expr != nullptr &&
+  if (s.kind == SelectExpressionKind::kCrossSet &&
       s.expr->kind == ExprKind::kIdentifier) {
     return s.expr->text;
   }
@@ -66,11 +66,12 @@ std::string_view NameSelected(const SelectExpression& s) {
 }
 
 // §19.6.1.2: a cross_identifier names the enclosing cross alone; §19.6.1.4:
-// an array a cross_set_expression names holds no integral, real or string
-// elements, which no CrossValType structure is.
+// a cross_set_expression is a queue of CrossValType structures, so a name of
+// an integral, real or string value, or of an array of such elements, is
+// none.
 void CheckNameSelected(const SelectExpression& s, const CrossSite& site) {
   std::string_view name = NameSelected(s);
-  if (name.empty() || name == site.cross.label) return;
+  if (name.empty()) return;
   if (site.cross_labels.contains(name)) {
     if (!CrossIdentifierSelectIsLegal(name, site.cross.label)) {
       site.diag.Error(s.loc,
@@ -81,10 +82,9 @@ void CheckNameSelected(const SelectExpression& s, const CrossSite& site) {
     }
     return;
   }
-  std::optional<DataTypeKind> element = site.ctx.type_of(name);
-  if (!site.ctx.arrays.kind_of(name).has_value() || !element.has_value() ||
-      (!IsIntegralType(*element) && !IsRealType(*element) &&
-       *element != DataTypeKind::kString)) {
+  DataTypeKind element = site.ctx.type_of(name).value_or(DataTypeKind::kVoid);
+  if (!IsIntegralType(element) && !IsRealType(element) &&
+      element != DataTypeKind::kString) {
     return;
   }
   site.diag.Error(s.loc,

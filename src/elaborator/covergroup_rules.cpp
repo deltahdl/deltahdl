@@ -174,7 +174,7 @@ class CovergroupScope {
 // whose expression is real, is a coverpoint of a real expression.
 bool IsRealCoverpoint(const CoverPointDecl& cp, const CovergroupScope& scope) {
   if (cp.has_data_type) return IsRealType(cp.data_type.kind);
-  return cp.expr != nullptr && scope.IsReal(cp.expr);
+  return scope.IsReal(cp.expr);
 }
 
 // §19.5.1, §19.5.1.1, §19.5.2 and §19.5.4: the rules a bin `bins` of a real
@@ -186,8 +186,7 @@ void CheckRealBin(const BinsOrOptions& bins, DiagEngine& diag) {
                "be declared as an array",
                Subclause("19.5.1"));
   }
-  if (bins.with_expr != nullptr ||
-      bins.kind == BinsOrOptionsKind::kCoverPointWith) {
+  if (bins.with_expr != nullptr) {
     diag.Error(bins.loc,
                "a bin of a real coverpoint takes no 'with' expression",
                Subclause("19.5.1.1"));
@@ -306,7 +305,7 @@ bool ElementsAssignable(DataTypeKind coverpoint, DataTypeKind element) {
 std::optional<DataTypeKind> CoverpointKind(const CoverPointDecl& cp,
                                            const CovergroupScope& scope) {
   if (cp.has_data_type) return cp.data_type.kind;
-  if (cp.expr != nullptr && cp.expr->kind == ExprKind::kIdentifier) {
+  if (cp.expr->kind == ExprKind::kIdentifier) {
     return scope.TypeOf(cp.expr->text);
   }
   return std::nullopt;
@@ -652,7 +651,7 @@ struct ClassCovergroupScope {
   // declares one.
   const DataType* VariableType(std::string_view name) const {
     if (const ClassMember* m = FindMemberInClass(cls, name, unit)) {
-      return m->kind == ClassMemberKind::kProperty ? &m->data_type : nullptr;
+      return &m->data_type;
     }
     const ModuleItem* item =
         ItemNamed(scope_items, name, ModuleItemKind::kVarDecl);
@@ -673,8 +672,7 @@ struct ClassCovergroupScope {
   // constant, a parameter or a const property or variable being one.
   bool NonConstant(std::string_view name) const {
     if (const ClassMember* m = FindMemberInClass(cls, name, unit)) {
-      return m->kind == ClassMemberKind::kProperty && !m->is_const &&
-             !m->is_param && !m->data_type.is_const;
+      return !m->is_const && !m->is_param;
     }
     const ModuleItem* item =
         ItemNamed(scope_items, name, ModuleItemKind::kVarDecl);
@@ -685,7 +683,7 @@ struct ClassCovergroupScope {
   // or else a function of `scope_items`.
   const ModuleItem* Function(std::string_view name) const {
     if (const ClassMember* m = FindMemberInClass(cls, name, unit)) {
-      return m->kind == ClassMemberKind::kMethod ? m->method : nullptr;
+      return m->method;
     }
     return ItemNamed(scope_items, name, ModuleItemKind::kFunctionDecl);
   }
@@ -722,15 +720,10 @@ const FunctionArg* FindCovergroupFormal(const CovergroupDecl& cg,
 
 ValueKind KindOfDeclaredType(const DataType& type,
                              const CovergroupDeclared& is_class) {
-  if (IsRealType(type.kind)) return ValueKind::kReal;
-  if (IsIntegralType(type.kind)) return ValueKind::kIntegral;
-  if (type.kind == DataTypeKind::kString) return ValueKind::kString;
-  if (type.kind == DataTypeKind::kChandle ||
-      type.kind == DataTypeKind::kEvent ||
-      (type.kind == DataTypeKind::kNamed && is_class(type.type_name))) {
+  if (type.kind == DataTypeKind::kNamed && is_class(type.type_name)) {
     return ValueKind::kOther;
   }
-  return ValueKind::kUnknown;
+  return KindOfTypeKind(type.kind);
 }
 
 bool IsRefCovergroupFormal(const CovergroupDecl& cg, std::string_view name) {
@@ -744,10 +737,8 @@ bool IsRefCovergroupFormal(const CovergroupDecl& cg, std::string_view name) {
 
 std::string_view CoverpointName(const CoverPointDecl& cp) {
   if (!cp.label.empty()) return cp.label;
-  if (cp.expr != nullptr && cp.expr->kind == ExprKind::kIdentifier) {
-    return cp.expr->text;
-  }
-  return {};
+  return cp.expr->kind == ExprKind::kIdentifier ? cp.expr->text
+                                                : std::string_view{};
 }
 
 void ValidateCovergroup(const CovergroupDecl& cg, const CovergroupContext& ctx,
@@ -797,8 +788,7 @@ void ValidateModuleCovergroups(const ModuleDecl* decl,
       // variable, is no constant.
       [&](std::string_view name) {
         return values.var_types.contains(name) &&
-               !tables.const_names.contains(name) &&
-               !tables.const_var_names.contains(name);
+               !tables.const_names.contains(name);
       },
       [&](std::string_view name) -> const ModuleItem* {
         auto it = values.functions.find(name);
