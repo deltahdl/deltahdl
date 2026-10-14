@@ -575,6 +575,7 @@ void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
   // does, so the record stands before the initializer is evaluated.
   if (!var.enum_type_name.empty() && var.dtype) {
     RegisterEnumForCast(name, var);
+    ctx_.SetStorageEnumType(v, var.enum_type_name);
   }
   // §27.4: a declaration in a loop generate block reads the instance's loop
   // index in its initializer, a semaphore's `new(i + 1)` among them.

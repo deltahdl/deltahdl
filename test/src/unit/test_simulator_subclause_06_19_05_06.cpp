@@ -630,4 +630,23 @@ TEST(EnumNameMethod, ATypedefOfAnEnumTypedefHasItsEnumerationsMethods) {
   EXPECT_EQ(out, "N 2 Y\n");
 }
 
+// §6.19.5.6 with §23.6: an enumerated variable reached by a hierarchical name
+// from another module has its methods there: N and the member after it. The
+// select was read as one through a class handle, which it is not, so name()
+// answered "".
+TEST(EnumNameMethod, AnEnumVariableReachedHierarchicallyHasItsMethods) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module sub;\n"
+      "  initial #1 $display(\"%s %s\", t.c.name(), t.c.next().name());\n"
+      "endmodule\n"
+      "module t;\n"
+      "  typedef enum {Y, N, M} choice;\n"
+      "  choice c = N;\n"
+      "  sub s();\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "N M\n");
+}
+
 }  // namespace

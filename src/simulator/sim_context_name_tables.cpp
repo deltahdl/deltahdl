@@ -290,6 +290,18 @@ const EnumTypeInfo* DeclaredNameTables::GetVariableEnumType(
   return FindEnumType(it->second);
 }
 
+void DeclaredNameTables::SetStorageEnumType(const Variable* var,
+                                            std::string_view type_name) {
+  storage_enum_types_[var] = type_name;
+}
+
+const EnumTypeInfo* DeclaredNameTables::GetStorageEnumType(
+    const Variable* var) const {
+  auto it = storage_enum_types_.find(var);
+  if (it == storage_enum_types_.end()) return nullptr;
+  return FindEnumType(it->second);
+}
+
 static bool DeclaresMember(const EnumTypeInfo& info, std::string_view member) {
   for (const EnumMemberInfo& m : info.members) {
     if (m.name == member) return true;

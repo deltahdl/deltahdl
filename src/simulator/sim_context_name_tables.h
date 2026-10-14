@@ -220,6 +220,11 @@ class DeclaredNameTables {
   void SetVariableEnumType(std::string_view var_name,
                            std::string_view type_name);
   const EnumTypeInfo* GetVariableEnumType(std::string_view var_name) const;
+  // §6.19.5 with §23.6: the enumeration a variable was declared with, by its
+  // storage, for a reference that reaches the variable by a hierarchical name
+  // and so spells none of the names var_enum_types_ is keyed by.
+  void SetStorageEnumType(const Variable* var, std::string_view type_name);
+  const EnumTypeInfo* GetStorageEnumType(const Variable* var) const;
   // §6.19: a member literal is an expression of the enumeration that declares
   // it, so the methods of §6.19.5 are called on it, `IDLE.next()` or
   // `P::RED.name()`. The registered enumeration whose members hold `member`:
@@ -522,6 +527,7 @@ class DeclaredNameTables {
 
   std::unordered_map<std::string_view, EnumTypeInfo> enum_types_;
   std::unordered_map<std::string_view, std::string_view> var_enum_types_;
+  std::unordered_map<const Variable*, std::string_view> storage_enum_types_;
 
   std::unordered_map<std::string_view, StructTypeInfo> struct_types_;
   std::unordered_map<std::string_view, std::string_view> var_struct_types_;

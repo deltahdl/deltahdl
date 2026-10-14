@@ -484,8 +484,14 @@ static const EnumTypeInfo* EnumTypeOfMemberAccess(const Expr* e,
     if (ReturnsTheEnumType(e->rhs->text)) {
       if (const auto* info = EnumTypeOfExpr(e->lhs, ctx, arena)) return info;
     }
-    return EnumTypeOfClassMember(ClassBehindHandle(e->lhs, ctx, arena),
-                                 e->rhs->text, ctx);
+    if (const auto* info = EnumTypeOfClassMember(
+            ClassBehindHandle(e->lhs, ctx, arena), e->rhs->text, ctx))
+      return info;
+    // §23.6: a variable another module declares, reached by a hierarchical
+    // name, `t.c`, which is no select through a class handle; its storage
+    // carries the enumeration it was declared with.
+    return ctx.GetStorageEnumType(
+        ctx.FindVariable(HierarchicalReferenceName(e)));
   }
   if (e->lhs->kind != ExprKind::kIdentifier) return nullptr;
   return EnumTypeOfScopedName(e->lhs->text, e->rhs->text, ctx);
