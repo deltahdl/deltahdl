@@ -289,6 +289,11 @@ class Preprocessor {
                                SourceLoc loc, std::string& expanded,
                                std::string_view& rest);
   std::string ExpandInlineConditionals(std::string_view line, SourceLoc loc);
+  // §22.6: reads one line of a block of text a conditional directive ignores,
+  // carrying the comment and string state the next line opens in and reporting
+  // a string literal it leaves open, which §5.9 forbids there as anywhere.
+  // Defined in preprocessor_inline_cond.cpp.
+  void NoteIgnoredLine(std::string_view line, SourceLoc loc);
   std::string ExpandInlineMacros(std::string_view line, uint32_t file_id,
                                  uint32_t line_num);
   std::string ExpandSubstitutedBody(std::string_view body, uint32_t file_id,
@@ -774,6 +779,9 @@ class Preprocessor {
   // §5.9: a quoted_string whose newline a backslash escapes runs on into the
   // next line, so it too is carried (CopyContinuedQuotedString).
   bool in_continued_string_ = false;
+  // §22.6 with §5.9: the same, for a string a backslash continues from one
+  // line of an ignored block of text to the next (NoteIgnoredLine).
+  bool in_ignored_string_ = false;
   ProtectEnvelopeState protect_envelopes_;
   ProtectKeywordScope protect_keywords_;
   // The viewports written since the envelope in force opened. §34.5.32.2 has

@@ -464,3 +464,36 @@ TEST(Preprocessor, UnclosedInlineIfdefExpressionIsReported) {
                             "malformed ifdef_macro_expression '(A a `endif ;",
                             1, "22.6"));
 }
+
+// §22.6 (printed page 714): a block of text a conditional directive ignores
+// still follows the lexical conventions of Clause 5, and §5.9 keeps a string
+// literal on its line unless a backslash continues it, so one left open at the
+// end of an ignored line is reported.
+TEST(Preprocessor, UnterminatedStringInAnIgnoredBlockIsReported) {
+  PreprocFixture f;
+  Preprocess(
+      "`ifdef NOT_DEFINED\n"
+      "  \"unterminated\n"
+      "`endif\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "unterminated string literal",
+                            2, "22.6"));
+}
+
+// §22.6: an ignored block holding only well-formed tokens draws no report,
+// however little they would parse, and neither does a string that a backslash
+// continues onto the next ignored line, one with an escaped quote in it, or a
+// triple-quoted string spanning two lines.
+TEST(Preprocessor, WellFormedIgnoredBlockIsNotReported) {
+  PreprocFixture f;
+  Preprocess(
+      "`ifdef NOT_DEFINED\n"
+      "  wire = = ;\n"
+      "  \"continued \\\n"
+      "  here\" \"with \\\" quote\" \\escaped\"id \"x\"\n"
+      "  x = \"\"\"multi\n"
+      "  line\"\"\" y;\n"
+      "`endif\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}

@@ -216,4 +216,59 @@ std::string Preprocessor::ExpandInlineConditionals(std::string_view line,
   return result;
 }
 
+// §5.9 inside a string of an ignored line: an escape takes the character after
+// its backslash with it, a backslash ending the line continues the string onto
+// the next one, and a quote closes it. Returns the index past what was read.
+static size_t StepInsideIgnoredString(std::string_view text, size_t i,
+                                      bool& open, bool& continued) {
+  if (text[i] == '\\') {
+    continued = i + 1 == text.size();
+    return i + 2;
+  }
+  if (text[i] == '"') open = false;
+  return i + 1;
+}
+
+// Outside a string: a backslash opens an escaped identifier (§5.6.1), which
+// runs to white space and opens no string whatever it holds; a quote opens a
+// string. A triple quote opens a string StripComments carries across lines
+// itself, so nothing after it on the line is read; npos says so.
+static size_t StepOutsideIgnoredString(std::string_view text, size_t i,
+                                       bool& open) {
+  if (text.substr(i, 3) == "\"\"\"") return std::string_view::npos;
+  if (text[i] == '\\') {
+    while (i < text.size() &&
+           !std::isspace(static_cast<unsigned char>(text[i])))
+      ++i;
+    return i;
+  }
+  if (text[i] == '"') open = true;
+  return i + 1;
+}
+
+// §22.6 (printed page 714): a block of text the compiler ignores still follows
+// the lexical conventions of Clause 5, so the string literals of an ignored
+// line are read as §5.9 has them read anywhere, and one left open at the end
+// of the line with no backslash continuing it is reported.
+void Preprocessor::NoteIgnoredLine(std::string_view line, SourceLoc loc) {
+  bool line_opens_in_triple = in_triple_string_;
+  std::string text = StripComments(line, in_block_comment_, in_triple_string_);
+  if (line_opens_in_triple) return;
+  bool open = in_ignored_string_;
+  bool continued = false;
+  size_t i = 0;
+  while (i < text.size()) {
+    continued = false;
+    i = open ? StepInsideIgnoredString(text, i, open, continued)
+             : StepOutsideIgnoredString(text, i, open);
+  }
+  in_ignored_string_ = open && continued;
+  if (open && !continued) {
+    diag_.Error(loc,
+                "unterminated string literal in a block of text a conditional "
+                "compilation directive ignores",
+                Subclause("22.6"));
+  }
+}
+
 }  // namespace delta

@@ -904,7 +904,7 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
   // Inside an ignored block nothing is emitted, but track an opening block
   // comment so a later in-comment directive stays hidden (22.6).
   ops.note_ignored_line = [&](std::string_view line) {
-    StripComments(line, in_block_comment_, in_triple_string_);
+    NoteIgnoredLine(line, {file_id, line_num, 1});
   };
   ops.mark_output = [&] { return MarkOutput(output); };
   // The lines just ended are this file's, at the number this frame is on.

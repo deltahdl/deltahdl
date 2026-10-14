@@ -400,6 +400,40 @@ size_t Preprocessor::ExpandInlineFunctionMacro(const MacroDef& def,
   return advance;
 }
 
+// §22.4 (printed page 705): whether `before`, the text ahead of an `include on
+// its line, holds nothing but white space and block comments -- the only text
+// that may share the directive's line.
+static bool OnlyBlankOrBlockComments(std::string_view before) {
+  size_t i = 0;
+  while (i < before.size()) {
+    if (std::isspace(static_cast<unsigned char>(before[i]))) {
+      ++i;
+      continue;
+    }
+    if (before.substr(i, 2) != "/*") return false;
+    size_t end = before.find("*/", i + 2);
+    if (end == std::string_view::npos) return false;
+    i = end + 2;
+  }
+  return true;
+}
+
+// The report a usage of `name`, no macro of that name being defined, draws
+// where it stands after `before` on its line: §22.5.1 makes a usage of an
+// undefined macro an error, a compiler directive's name being none, and §22.4
+// lets only white space or a comment stand before an `include.
+static void ReportUnexpandedName(std::string_view name, std::string_view before,
+                                 SourceLoc loc, DiagEngine& diag) {
+  if (!IsCompilerDirective(name)) {
+    diag.Error(loc, "undefined macro '" + std::string(name) + "'",
+               Subclause("22.5.1"));
+  } else if (name == "include" && !OnlyBlankOrBlockComments(before)) {
+    diag.Error(loc,
+               "only white space or a comment may precede `include on its line",
+               Subclause("22.4"));
+  }
+}
+
 size_t Preprocessor::ExpandSingleInlineMacro(std::string_view line, size_t pos,
                                              uint32_t file_id,
                                              uint32_t line_num,
@@ -423,11 +457,8 @@ size_t Preprocessor::ExpandSingleInlineMacro(std::string_view line, size_t pos,
     // here from a macro body, since ExpandSubstitutedBody evaluates it before
     // this expander runs. This branch also catches line-leading undefined
     // macros, which fall through to the inline expander as ordinary text.
-    if (!IsCompilerDirective(name)) {
-      diag_.Error({file_id, line_num, 1},
-                  "undefined macro '" + std::string(name) + "'",
-                  Subclause("22.5.1"));
-    }
+    ReportUnexpandedName(name, line.substr(0, pos), {file_id, line_num, 1},
+                         diag_);
     result.append(line.substr(pos, i - pos));
     return i;
   }

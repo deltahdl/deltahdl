@@ -714,3 +714,21 @@ TEST(Preprocessor, UnclosedIncludeFileNameIsReported) {
         << c.directive;
   }
 }
+
+// §22.4 (printed page 705): only white space or a comment may appear on the
+// same line as the `include directive, before it as much as after its file
+// name, so a declaration ahead of it on the line is reported.
+TEST(Preprocessor, Include_TextBeforeDirective_Error) {
+  PreprocFixture f;
+  Preprocess("wire a; `include \"/dev/null\"\n", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "may precede `include on its line", 1, "22.4"));
+}
+
+// §22.4: a block comment is one of the two things that may stand before the
+// directive on its line.
+TEST(Preprocessor, Include_BlockCommentBeforeDirective_OK) {
+  PreprocFixture f;
+  Preprocess("/* lead */ `include \"/dev/null\"\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
