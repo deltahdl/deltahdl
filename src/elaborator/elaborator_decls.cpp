@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <optional>
@@ -756,7 +757,20 @@ static void SetEnumTypeInfo(const ModuleItem* item, RtlirVariable& var,
     return;
   }
   if (item->data_type.kind != DataTypeKind::kNamed) return;
-  const DataType* bound = FindNamedType(item->data_type, typedefs);
+  // §6.18: a typedef naming another typedef denotes the type that one names,
+  // so `typedef choice alias_t;` is the enumeration `choice` declares, and the
+  // enumeration is keyed by the typedef whose declaration writes it rather
+  // than by the name the variable was declared with. Each step follows one
+  // name, so the walk is bounded by the table as LastTypeInChain's is.
+  const DataType* named = &item->data_type;
+  const DataType* bound = FindNamedType(*named, typedefs);
+  for (std::size_t steps = 0;
+       bound != nullptr && bound->kind == DataTypeKind::kNamed &&
+       steps < typedefs.size();
+       ++steps) {
+    named = bound;
+    bound = FindNamedType(*named, typedefs);
+  }
   if (bound != nullptr && bound->kind == DataTypeKind::kEnum) {
     // §8.23 and §26.3: a typedef named through a scope, `C::e_t en` or
     // `P::c_t v`, is the key "C::e_t" the design's typedef table holds it
@@ -764,11 +778,10 @@ static void SetEnumTypeInfo(const ModuleItem* item, RtlirVariable& var,
     // (RtlirDesign::type_enums); the bare name alone named an enumeration of
     // the module, which such a variable's is not.
     var.enum_type_name =
-        item->data_type.scope_name.empty()
-            ? item->data_type.type_name
-            : *arena.Create<std::string>(
-                  std::string(item->data_type.scope_name) +
-                  "::" + std::string(item->data_type.type_name));
+        named->scope_name.empty()
+            ? named->type_name
+            : *arena.Create<std::string>(std::string(named->scope_name) +
+                                         "::" + std::string(named->type_name));
 
     var.dtype = arena.Create<DataType>(*bound);
   }

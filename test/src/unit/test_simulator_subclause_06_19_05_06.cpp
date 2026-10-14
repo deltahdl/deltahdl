@@ -610,4 +610,24 @@ TEST(EnumNameMethod, AnInlineEnumClassPropertyHasItsEnumerationsMethods) {
   EXPECT_EQ(out, "x3 4\nx3 4\n");
 }
 
+// §6.19.5.6 with §6.18: a typedef naming an enumerated typedef denotes the same
+// enumeration, so a variable declared through it has its methods: N of two
+// values, and so does one declared through a chain of two such typedefs. The
+// variable recorded the name it was declared with, which declares no
+// enumeration, so name() answered "" and num() 0.
+TEST(EnumNameMethod, ATypedefOfAnEnumTypedefHasItsEnumerationsMethods) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef enum {Y, N} choice;\n"
+      "  typedef choice alias_t;\n"
+      "  typedef alias_t alias2_t;\n"
+      "  alias_t d = N;\n"
+      "  alias2_t e = Y;\n"
+      "  initial $display(\"%s %0d %s\", d.name(), d.num(), e.name());\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "N 2 Y\n");
+}
+
 }  // namespace
