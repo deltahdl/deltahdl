@@ -434,4 +434,18 @@ TEST(UnpackedArrayPortElaboration, ScalarInterfaceOnAnInterfaceArrayPortFails) {
                             "23.3.3.5"));
 }
 
+// The array an interface array port's actual names is found among the
+// instantiating module's items whatever declarations come before it, so the
+// connection matches and nothing is reported.
+TEST(UnpackedArrayPortElaboration, InterfaceArrayAfterDeclarationsMatches) {
+  EXPECT_TRUE(
+      ElabOk("interface ifc; logic a; endinterface\n"
+             "module user(ifc p[2]); endmodule\n"
+             "module top;\n"
+             "  logic v;\n"
+             "  ifc ia[2]();\n"
+             "  user u(ia);\n"
+             "endmodule\n"));
+}
+
 }  // namespace
