@@ -515,6 +515,19 @@ static Direction TokenToDirection(TokenKind kind) {
   }
 }
 
+// The subclause whose syntax footnote requires a list after an ansi header's
+// package import, for the kind of design element the header opens.
+static const char* HeaderImportSubclause(ModuleDeclKind kind) {
+  switch (kind) {
+    case ModuleDeclKind::kProgram:
+      return "24.3";
+    case ModuleDeclKind::kInterface:
+      return "25.3";
+    default:
+      return "23.2.1";
+  }
+}
+
 void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
   const size_t kFirstSite = time_literals_.size();
   SourceLoc import_loc;
@@ -528,16 +541,15 @@ void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
       decl.items[i]->import_item.is_header = true;
     }
   }
-  // The footnote is the module header's in §23.2.1 and the program header's
-  // in §24.3 (Syntax 24-1 footnote 1).
+  // The footnote is the module header's in §23.2.1, the program header's in
+  // §24.3 (Syntax 24-1 footnote 1) and the interface header's in §25.3
+  // (Syntax 25-1 footnote 1).
   if (has_header_import && !Check(TokenKind::kHash) &&
       !Check(TokenKind::kLParen)) {
-    diag_.Error(
-        import_loc,
-        "package_import_declaration in ansi header must be followed "
-        "by parameter_port_list or list_of_port_declarations",
-        Subclause(decl.decl_kind == ModuleDeclKind::kProgram ? "24.3"
-                                                             : "23.2.1"));
+    diag_.Error(import_loc,
+                "package_import_declaration in ansi header must be followed "
+                "by parameter_port_list or list_of_port_declarations",
+                Subclause(HeaderImportSubclause(decl.decl_kind)));
   }
   if (Check(TokenKind::kHash)) {
     Consume();

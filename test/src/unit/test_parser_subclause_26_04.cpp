@@ -146,12 +146,13 @@ TEST(InterfaceParsing, AnsiHeaderPackageImportRequiresPortList) {
       "package pkg; endpackage\n"
       "interface ifc import pkg::*;\n"
       "endinterface\n");
-  // §23.2.1 is the subclause the shared ansi-header report names.
+  // The shared ansi-header report cites §25.3 for an interface header, where
+  // Syntax 25-1 footnote 1 states the requirement.
   EXPECT_TRUE(ReportedError(r.diags,
                             "package_import_declaration in ansi header must be "
                             "followed by parameter_port_list or "
                             "list_of_port_declarations",
-                            2, "23.2.1"));
+                            2, "25.3"));
 }
 
 TEST(ModuleHeaderDefinition, AnsiHeaderPackageImportFollowedByEmptyPortList) {
