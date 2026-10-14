@@ -762,14 +762,13 @@ TEST(ProgramDeclaration, AnsiHeaderPackageImportWithoutPortListFails) {
       "endpackage\n"
       "program prg import pkg::*;\n"
       "endprogram\n");
-  // The three ansi headers share one report, filed under §23.2.1 by
-  // Parser::ParseParamsPortsAndSemicolon in src/parser/parser_port.cpp rather
-  // than under this file's §24.3.
+  // The three ansi headers share one report, which for a program header cites
+  // §24.3, where Syntax 24-1 footnote 1 states the requirement.
   EXPECT_TRUE(ReportedError(r.diags,
                             "package_import_declaration in ansi header must be "
                             "followed by parameter_port_list or "
                             "list_of_port_declarations",
-                            4, "23.2.1"));
+                            4, "24.3"));
 }
 
 TEST(ProgramDeclaration, AnsiHeaderPackageImportWithPortListSucceeds) {

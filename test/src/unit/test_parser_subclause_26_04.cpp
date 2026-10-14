@@ -77,12 +77,13 @@ TEST(ProgramDeclaration, AnsiHeaderPackageImportRequiresPortList) {
       "package pkg; endpackage\n"
       "program prg import pkg::*;\n"
       "endprogram\n");
-  // Every ansi header shares one report, and §23.2.1 is the subclause it names.
+  // Every ansi header shares one report, which for a program header cites
+  // §24.3, where Syntax 24-1 footnote 1 states the requirement.
   EXPECT_TRUE(ReportedError(r.diags,
                             "package_import_declaration in ansi header must be "
                             "followed by parameter_port_list or "
                             "list_of_port_declarations",
-                            2, "23.2.1"));
+                            2, "24.3"));
 }
 
 // Syntax 26-3 lists program_nonansi_header among the headers that may carry a

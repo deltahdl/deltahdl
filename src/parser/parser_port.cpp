@@ -528,12 +528,16 @@ void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
       decl.items[i]->import_item.is_header = true;
     }
   }
+  // The footnote is the module header's in §23.2.1 and the program header's
+  // in §24.3 (Syntax 24-1 footnote 1).
   if (has_header_import && !Check(TokenKind::kHash) &&
       !Check(TokenKind::kLParen)) {
-    diag_.Error(import_loc,
-                "package_import_declaration in ansi header must be followed "
-                "by parameter_port_list or list_of_port_declarations",
-                Subclause("23.2.1"));
+    diag_.Error(
+        import_loc,
+        "package_import_declaration in ansi header must be followed "
+        "by parameter_port_list or list_of_port_declarations",
+        Subclause(decl.decl_kind == ModuleDeclKind::kProgram ? "24.3"
+                                                             : "23.2.1"));
   }
   if (Check(TokenKind::kHash)) {
     Consume();
