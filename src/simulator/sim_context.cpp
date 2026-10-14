@@ -216,9 +216,20 @@ Variable* FindUnderNamedScopes(
   return nullptr;
 }
 
-}  // namespace
+// `name` declared in the running instance, keyed under its prefix, or else
+// reached through the named blocks in force (FindUnderNamedScopes).
+Variable* FindUnderInstanceOrNamedScopes(
+    const std::unordered_map<std::string_view, Variable*>& variables,
+    const std::string& prefix, const std::vector<std::string_view>& scopes,
+    std::string_view name) {
+  if (!prefix.empty()) {
+    auto it = variables.find(prefix + std::string(name));
+    if (it != variables.end()) return it->second;
+  }
+  return FindUnderNamedScopes(variables, prefix, scopes, name);
+}
 
-// §27.4: resolves `name` against the generate block instances}  // namespace
+}  // namespace
 
 // §27.4: resolves `name` against the generate block instances the running
 // process is in, if it is in any. `inst_prefix` is the process's
@@ -369,14 +380,9 @@ Variable* SimContext::FindVariable(std::string_view name) {
   // ahead of a like-named one in the enclosing module.
   if (auto* in_block = FindInGenerateBlock(prefix, name)) return in_block;
 
-  if (!prefix.empty()) {
-    std::string prefixed = prefix + std::string(name);
-    auto it = variables_.find(prefixed);
-    if (it != variables_.end()) return it->second;
-  }
-  if (auto* in_named =
-          FindUnderNamedScopes(variables_, prefix, ActiveNamedScopes(), name)) {
-    return in_named;
+  if (auto* in_scope = FindUnderInstanceOrNamedScopes(
+          variables_, prefix, ActiveNamedScopes(), name)) {
+    return in_scope;
   }
   // §23.4: a module declared inside the one instantiating it sees the outer
   // module's name space and may use any name declared there, so the boundary
