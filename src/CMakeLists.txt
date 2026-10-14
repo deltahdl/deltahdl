@@ -45,6 +45,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     preprocessor/protect_region_lines.cpp
     preprocessor/protect_viewport.cpp
     preprocessor/preprocessor.cpp
+    preprocessor/preprocessor_active_line.cpp
     preprocessor/preprocessor_lines.cpp
     preprocessor/preprocessor_inline.cpp
     preprocessor/preprocessor_design_element.cpp

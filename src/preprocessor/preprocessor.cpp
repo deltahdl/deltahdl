@@ -641,34 +641,6 @@ ActiveLineSplit ClassifyActiveLine(std::string_view stripped) {
   return {ActiveLineSplit::Kind::kPlainText, 0};
 }
 
-// Callbacks for emitting one comment-stripped, conditional-stack-active line
-// (22.2). expand_and_emit fully expands ordinary text; emit_directive_or_text
-// runs a fragment as a directive or, failing that, expands it as text. They are
-// supplied by ProcessSource because the underlying work touches private state.
-struct ActiveLineEmit {
-  std::function<void(std::string_view)> expand_and_emit;
-  std::function<void(std::string_view)> emit_directive_or_text;
-};
-
-// Emit an already comment-stripped active line, routing it per its split kind.
-static void EmitActiveLine(std::string_view view, const ActiveLineEmit& emit,
-                           std::string& output) {
-  ActiveLineSplit split = ClassifyActiveLine(view);
-  switch (split.kind) {
-    case ActiveLineSplit::Kind::kLeadingDirective:
-      if (split.split_pos > 0) output.append(view.substr(0, split.split_pos));
-      emit.emit_directive_or_text(view.substr(split.split_pos));
-      return;
-    case ActiveLineSplit::Kind::kMidLineDirective:
-      emit.expand_and_emit(view.substr(0, split.split_pos));
-      emit.emit_directive_or_text(view.substr(split.split_pos));
-      return;
-    default:  // ActiveLineSplit::Kind::kPlainText, the one kind left
-      emit.expand_and_emit(view);
-      return;
-  }
-}
-
 // Callbacks the line loop uses to act on each physical source line. Each wraps
 // private Preprocessor work so the loop itself can live as a free function.
 struct PreprocLoopOps {
@@ -874,6 +846,12 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
   emit.emit_directive_or_text = [&](std::string_view fragment) {
     if (!ProcessDirective(fragment, file_id, line_num, depth, output))
       emit.expand_and_emit(fragment);
+  };
+  emit.report_text_before_include = [&] {
+    diag_.Error(
+        {file_id, line_num, 1},
+        "only white space or a comment may precede `include on its line",
+        Subclause("22.4"));
   };
 
   PreprocLoopOps ops;

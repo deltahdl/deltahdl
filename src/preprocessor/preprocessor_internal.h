@@ -35,6 +35,23 @@ std::pair<std::string_view, std::string_view> SplitTimescaleArg(
     std::string_view s);
 ActiveLineSplit ClassifyActiveLine(std::string_view stripped);
 
+// Callbacks for emitting one comment-stripped, conditional-stack-active line
+// (22.2). expand_and_emit fully expands ordinary text; emit_directive_or_text
+// runs a fragment as a directive or, failing that, expands it as text;
+// report_text_before_include reports an `include standing after a language
+// element on its line (22.4). They are supplied by ProcessSource because the
+// underlying work touches private state.
+struct ActiveLineEmit {
+  std::function<void(std::string_view)> expand_and_emit;
+  std::function<void(std::string_view)> emit_directive_or_text;
+  std::function<void()> report_text_before_include;
+};
+
+// Emits an already comment-stripped active line, routing it per its split
+// kind. Defined in preprocessor_active_line.cpp.
+void EmitActiveLine(std::string_view view, const ActiveLineEmit& emit,
+                    std::string& output);
+
 bool StartsWithDirective(std::string_view line, std::string_view dir);
 
 // Per-line scan position over the source buffer driven by the preprocessing
