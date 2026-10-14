@@ -98,6 +98,18 @@ static void CheckExternPortMatch(const ModuleDecl* mod,
   }
 }
 
+// Whether the value parameters at position `i` of `mod` and of its extern
+// declaration are both written with a type and the two types differ. The
+// parser records a type beside every parameter of a header (param_types).
+static bool ValueParamTypesDiffer(const ModuleDecl* mod,
+                                  const ModuleDecl* extern_decl, size_t i) {
+  const DataType& mt = mod->param_types.at(i);
+  const DataType& et = extern_decl->param_types.at(i);
+  if (mt.kind == DataTypeKind::kImplicit || et.kind == DataTypeKind::kImplicit)
+    return false;
+  return !ExternPortTypesEquivalent(mt, et);
+}
+
 // §23.5: checks the parameter list of the actual module against the extern
 // declaration by name, position, and parameter kind (type vs. value). Reports
 // the first mismatch found.
@@ -137,6 +149,18 @@ static void CheckExternParamMatch(const ModuleDecl* mod,
                  std::format("{} '{}' parameter '{}' at position {} "
                              "does not match the parameter kind of the "
                              "extern declaration",
+                             ElementWord(mod), mod->name, mp_name, i),
+                 Subclause("23.5"));
+      break;
+    }
+    // A value parameter's type is the data type it is declared with (§6.20.2);
+    // one written with no type takes its value's, so only two written types
+    // are compared, by the rule ports are.
+    if (!mp_is_type && ValueParamTypesDiffer(mod, extern_decl, i)) {
+      diag.Error(mod->range.start,
+                 std::format("{} '{}' parameter '{}' at position {} is "
+                             "declared with a data type not equivalent to the "
+                             "extern declaration's",
                              ElementWord(mod), mod->name, mp_name, i),
                  Subclause("23.5"));
       break;

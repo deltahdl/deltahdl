@@ -10,6 +10,7 @@
 namespace delta {
 
 class DiagEngine;
+struct ModuleItem;
 struct Stmt;
 
 // A named block's label with where its block begins.
@@ -23,6 +24,13 @@ using BlockLabel = std::pair<std::string_view, SourceLoc>;
 // written under an if, a loop or a timing control stand in the name space the
 // statement does.
 void CollectNameSpaceLabels(const Stmt* s, std::vector<BlockLabel>& out);
+
+// §23.6: the names the module-level concurrent assertions among `items` put
+// into the module's name space, appended to `out`: a labelled one's label,
+// and an unlabelled one's named action blocks, each a scope of the module, as
+// the clause's Example 3 has `top.m_i.B3.d`.
+void CollectAssertionNameSpaceLabels(const std::vector<ModuleItem*>& items,
+                                     std::vector<BlockLabel>& out);
 
 // §3.13 (f): one block name space, the statement list `stmts` of a block or of
 // a function or task body, unifies its variables and parameters, its

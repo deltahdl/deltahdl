@@ -1,6 +1,8 @@
 
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -86,6 +88,30 @@ TEST(ImplicitNamedPortConnectionSimulation,
       f, "q");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0x3Cu);
+}
+
+// §23.3.2.3: a `.name` connection is in error only where the name is neither
+// declared nor imported, so one names a package variable an explicit import
+// brings in, and one a wildcard import does, the connection itself being the
+// reference that imports the candidate (§26.3); each port reads its value.
+TEST(ImplicitNamedPortConnectionSimulation, ConnectionReachesAnImportedName) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package p;\n"
+                 "  logic [7:0] a = 8'h3C;\n"
+                 "  logic [7:0] b = 8'h5A;\n"
+                 "endpackage\n"
+                 "module child(input logic [7:0] a, input logic [7:0] b);\n"
+                 "  initial #1 $display(\"%h %h\", a, b);\n"
+                 "endmodule\n"
+                 "module top;\n"
+                 "  import p::a;\n"
+                 "  import p::*;\n"
+                 "  child u0(.a, .b);\n"
+                 "endmodule\n",
+                 f),
+      "3c 5a\n");
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace

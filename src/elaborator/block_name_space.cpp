@@ -1,6 +1,8 @@
 #include "elaborator/block_name_space.h"
 
+#include <algorithm>
 #include <format>
+#include <iterator>
 #include <string_view>
 #include <unordered_set>
 #include <utility>
@@ -23,6 +25,28 @@ void CollectNameSpaceLabels(const Stmt* s, std::vector<BlockLabel>& out) {
   }
   ForEachChildStmt(s,
                    [&](Stmt* const& sub) { CollectNameSpaceLabels(sub, out); });
+}
+
+// §16.14: the five concurrent assertion statements a module item can be.
+static bool IsConcurrentAssertionItem(ModuleItemKind kind) {
+  static constexpr ModuleItemKind kKinds[] = {
+      ModuleItemKind::kAssertProperty, ModuleItemKind::kAssumeProperty,
+      ModuleItemKind::kCoverProperty, ModuleItemKind::kCoverSequence,
+      ModuleItemKind::kRestrictProperty};
+  return std::ranges::find(kKinds, kind) != std::end(kKinds);
+}
+
+void CollectAssertionNameSpaceLabels(const std::vector<ModuleItem*>& items,
+                                     std::vector<BlockLabel>& out) {
+  for (const auto* item : items) {
+    if (!IsConcurrentAssertionItem(item->kind)) continue;
+    if (!item->name.empty()) {
+      out.emplace_back(item->name, item->loc);
+      continue;
+    }
+    CollectNameSpaceLabels(item->assert_pass_stmt, out);
+    CollectNameSpaceLabels(item->assert_fail_stmt, out);
+  }
 }
 
 // The user-defined type a block's typedef declares, or empty for any other

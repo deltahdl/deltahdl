@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
@@ -240,6 +242,79 @@ TEST(ImplicitNamedPortConnectionElaboration,
       f, "top");
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "requires signal 'iface' to be declared", 7,
+                            "23.3.2.3"));
+}
+
+// §23.3.2.3 with §6.22.2: the declarations either side of the implicit
+// connection have equivalent data types, so an int port joined to a 4-state
+// unsigned vector of its width, and a signed port joined to an unsigned vector
+// of its width, are each reported, while a 4-state net port joined to a logic
+// vector, a 2-state port to a bit vector and an output to a wire are not.
+TEST(ImplicitNamedPortConnectionElaboration,
+     SameWidthButNonEquivalentTypesAreReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child(input var int a, input var logic signed [7:0] b,\n"
+      "             input logic [7:0] c, input var bit [3:0] d,\n"
+      "             output logic [7:0] e);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [31:0] a;\n"
+      "  logic [7:0] b, c;\n"
+      "  bit [3:0] d;\n"
+      "  wire [7:0] e;\n"
+      "  child u0(.a, .b, .c, .d, .e);\n"
+      "endmodule\n",
+      f);
+  const char* message = "differ in signing or in their number of states";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "'.a' requires equivalent",
+                            10, "23.3.2.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "'.b' requires equivalent",
+                            10, "23.3.2.3"));
+  for (const char* port : {"'.c'", "'.d'", "'.e'"}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), port, 10, "23.3.2.3"))
+        << port;
+  }
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, 10, "23.3.2.3"));
+}
+
+// §23.3.2.3: a `.name` connection to a variable a package import brings into
+// the instantiating module is no error, from an explicit import or a wildcard
+// one alike, whichever of the packages declares it; a name imported only
+// inside a generate block is not visible at module level (§26.3 with §27.5),
+// and a `.name` connection to it stays an error.
+TEST(ImplicitNamedPortConnectionElaboration, ImportedNamesAreDeclared) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n"
+      "  logic a, b;\n"
+      "endpackage\n"
+      "package q;\n"
+      "  logic c;\n"
+      "endpackage\n"
+      "package r;\n"
+      "  logic e;\n"
+      "endpackage\n"
+      "module child(input logic a, input logic b, input logic c,\n"
+      "             input logic e);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  import p::a;\n"
+      "  import q::*;\n"
+      "  import p::*;\n"
+      "  if (1) begin : g\n"
+      "    import r::e;\n"
+      "  end\n"
+      "  child u0(.a, .b, .c, .e);\n"
+      "endmodule\n",
+      f);
+  for (const char* name : {"'a'", "'b'", "'c'"}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                               std::string("requires signal ") + name, 20,
+                               "23.3.2.3"))
+        << name;
+  }
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "requires signal 'e'", 20,
                             "23.3.2.3"));
 }
 

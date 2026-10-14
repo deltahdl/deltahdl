@@ -5,6 +5,7 @@
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_port_connection_elab.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 
@@ -241,6 +242,34 @@ TEST(WildcardPortConnectionElaboration, MixedStylesInSameParent) {
              "  child u2(.a, .b);\n"
              "  child u3(.*);\n"
              "endmodule\n"));
+}
+
+// §23.3.2.4 with §6.22.2: a `.*` connection is the implicit `.name` one of
+// every port, so its declarations too have equivalent data types: a shortint
+// port is not joined to a 16-bit logic vector, nor a byte port to an unsigned
+// one, while an integer port is joined to a signed 32-bit logic vector,
+// which is equivalent to it.
+TEST(WildcardPortConnectionElaboration,
+     SameWidthButNonEquivalentTypesAreReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module leaf(input var shortint p, input var byte q,\n"
+      "            input var integer r);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic signed [15:0] p;\n"
+      "  bit [7:0] q;\n"
+      "  logic signed [31:0] r;\n"
+      "  leaf l(.*);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'.p' requires equivalent data types", 8,
+                            "23.3.2.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'.q' requires equivalent data types", 8,
+                            "23.3.2.4"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "'.r'", 8, "23.3.2.4"));
 }
 
 }  // namespace

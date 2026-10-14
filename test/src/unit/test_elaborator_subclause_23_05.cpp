@@ -329,4 +329,31 @@ TEST(ExternModuleElaboration, MatchingTypeParamNoError) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §23.5: the extern declaration and the module match in parameter types, so
+// a value parameter declared int in the one and logic [3:0] in the other is
+// reported; written with the same type in both, or with no type in one of
+// them, where the parameter takes its value's type (§6.20.2), it is not.
+TEST(ExternModuleElaboration, ValueParamTypeMismatchErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "extern module a #(parameter int size = 8) (input logic [7:0] x);\n"
+      "module a #(parameter logic [3:0] size = 8) (input logic [7:0] x);\n"
+      "endmodule\n"
+      "extern module b #(parameter int w = 8, parameter n = 2) ();\n"
+      "module b #(parameter int w = 8, parameter int n = 2) ();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [7:0] x;\n"
+      "  a ua(x);\n"
+      "  b ub();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'a' parameter 'size' at position 0 is "
+                            "declared with a data type not equivalent",
+                            2, "23.5"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "module 'b' parameter", 5, "23.5"));
+}
+
 }  // namespace

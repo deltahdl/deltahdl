@@ -118,14 +118,6 @@ static std::string_view SignalNettypeName(std::string_view name,
   return {};
 }
 
-// §23.3.3: when both the internal port and the external connection are
-// user-defined nettypes, they shall be of matching nettypes so that the two
-// nets can merge into a single simulated net; a mismatch is an error. Matching
-// follows §6.22.6 -- a nettype matches itself and any renaming alias of it,
-// i.e. their canonical (source) nettype names are equal. Only this both-sided
-// case is checked here: a one-sided user-defined nettype is governed by the
-// mode/data-type rules elsewhere in §23.3.3, and differences between built-in
-// net types by the collapsing rules of §23.3.3.7.
 // §23.3.3: the user-defined nettype a child port is declared with, or an empty
 // view when the port is not declared with one.
 static std::string_view InternalPortNettype(
@@ -142,18 +134,63 @@ static std::string_view InternalPortNettype(
   return {};
 }
 
+// The port of `child_ports` named `name`, or null when the child declares no
+// such port.
+static const RtlirPort* FindPortByName(
+    const std::vector<RtlirPort>& child_ports, std::string_view name) {
+  for (const auto& p : child_ports) {
+    if (p.name == name) return &p;
+  }
+  return nullptr;
+}
+
+// §23.3.3: where only one side of a port connection is of a user-defined
+// nettype, the port is an input or an output and the two sides have matching
+// data types. An inout facing an external nettype net is reported where the
+// connection is checked (CheckDirectionalConnectionLegality); the internal side
+// is reported here. The data types are compared by width, signing and number
+// of states, the facts PortAndSignalDiffer reads.
+static void CheckOneSidedNettypePort(const PortBindCtx& ctx,
+                                     const RtlirModuleInst& inst,
+                                     const RtlirPortBinding& binding,
+                                     std::string_view nettype,
+                                     bool nettype_is_internal) {
+  if (nettype_is_internal && binding.direction == Direction::kInout) {
+    ctx.diag.Error(ctx.item->loc,
+                   std::format("inout port '{}' of user-defined nettype '{}' "
+                               "is connected to no net of that nettype; a "
+                               "port with a nettype on one side only shall be "
+                               "an input or an output",
+                               binding.port_name, nettype),
+                   Subclause("23.3.3"));
+    return;
+  }
+  const RtlirPort* port =
+      FindPortByName(inst.resolved->ports, binding.port_name);
+  if (port == nullptr ||
+      !PortAndSignalDiffer(*port, binding.connection->text, ctx.parent_mod)) {
+    return;
+  }
+  ctx.diag.Error(ctx.item->loc,
+                 std::format("port '{}' joins user-defined nettype '{}' to a "
+                             "connection whose data type does not match it",
+                             binding.port_name, nettype),
+                 Subclause("23.3.3"));
+}
+
 // §23.3.3: when both the internal port and the external connection are
 // user-defined nettypes, they shall be of matching nettypes so that the two
-// nets can merge into a single simulated net; a mismatch is an error. Only this
-// both-sided case is checked here: a one-sided user-defined nettype is governed
-// by the mode/data-type rules elsewhere in §23.3.3, and differences between
-// built-in net types by the collapsing rules of §23.3.3.7.
+// nets can merge into a single simulated net; a mismatch is an error. Matching
+// follows §6.22.6 -- a nettype matches itself and any renaming alias of it,
+// i.e. their canonical (source) nettype names are equal. A connection with a
+// nettype on one side only is CheckOneSidedNettypePort's, and differences
+// between built-in net types are §23.3.3.7's collapsing rules.
 static void CheckMatchingNettypePorts(
     const PortBindCtx& ctx, const ModuleDecl* child_decl,
     const RtlirModuleInst& inst,
     const std::unordered_map<std::string_view, std::string_view>&
         nettype_canonical) {
-  if (!child_decl) return;
+  if (!child_decl || !inst.resolved) return;
 
   for (const auto& binding : inst.port_bindings) {
     const Expr* conn = binding.connection;
@@ -161,12 +198,16 @@ static void CheckMatchingNettypePorts(
 
     std::string_view internal_nettype =
         InternalPortNettype(child_decl, binding.port_name, nettype_canonical);
-    if (internal_nettype.empty()) continue;
-
-    // External side: the connected signal is a user-defined nettype net.
     std::string_view external_nettype =
         SignalNettypeName(conn->text, ctx.parent_mod);
-    if (external_nettype.empty()) continue;
+    if (internal_nettype.empty() != external_nettype.empty()) {
+      bool internal = !internal_nettype.empty();
+      CheckOneSidedNettypePort(ctx, inst, binding,
+                               internal ? internal_nettype : external_nettype,
+                               internal);
+      continue;
+    }
+    if (internal_nettype.empty()) continue;
 
     if (!NettypesMatch(internal_nettype, external_nettype, nettype_canonical)) {
       ctx.diag.Error(
@@ -178,16 +219,6 @@ static void CheckMatchingNettypePorts(
           Subclause("23.3.3"));
     }
   }
-}
-
-// The port of `child_ports` named `name`, or null when the child declares no
-// such port.
-static const RtlirPort* FindPortByName(
-    const std::vector<RtlirPort>& child_ports, std::string_view name) {
-  for (const auto& p : child_ports) {
-    if (p.name == name) return &p;
-  }
-  return nullptr;
 }
 
 // Retype the instantiation-side net `name` to `type`.

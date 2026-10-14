@@ -170,6 +170,30 @@ TEST(PortKindDataTypeDirection, RefPortElaboratesAsVariable) {
   EXPECT_TRUE(port.is_var);
 }
 
+// §23.2.2.3: a ref port is always a variable, so one written with a net type
+// is reported, in the ANSI header and in a non-ANSI body declaration alike,
+// while a ref port of a variable type in the same design is not.
+TEST(PortKindDataTypeDirection, RefPortDeclaredWithANetTypeIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(ref wire logic x, ref logic y);\n"
+      "endmodule\n"
+      "module n(z);\n"
+      "  ref tri logic z;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic a, b, c;\n"
+      "  m u1(a, b);\n"
+      "  n u2(c);\n"
+      "endmodule\n",
+      f, "top");
+  const char* message = "is declared with a net type; a ref port is a variable";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, 1, "23.2.2.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, 3, "23.2.2.3"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "ref port 'y'", 1, "23.2.2.3"));
+}
+
 // §23.2.2.3 makes an input or inout with no port kind a net, and §6.7.1 gives
 // a net only a 4-state integral type or an unpacked aggregate of such types,
 // so `input string s`, `input real r` and `inout event e` each declare an

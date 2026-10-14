@@ -1,6 +1,8 @@
 
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -81,6 +83,30 @@ TEST(WildcardPortConnectionSimulation,
       f, "c");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 7u);
+}
+
+// §23.3.2.4: `.*` connects each port whose name exists in the instantiating
+// scope, a variable an explicit import brings in among them, while a name only
+// a wildcard import could supply is no sufficient reference and the port takes
+// its default.
+TEST(WildcardPortConnectionSimulation,
+     ExplicitImportIsConnectedAndWildcardIsNot) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  logic [7:0] sig = 8'h5A;\n"
+                       "  logic [7:0] wc = 8'h77;\n"
+                       "endpackage\n"
+                       "module child(input logic [7:0] sig = 8'h11,\n"
+                       "             input logic [7:0] wc = 8'h22);\n"
+                       "  initial #1 $display(\"%h %h\", sig, wc);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  import p::sig;\n"
+                       "  import p::*;\n"
+                       "  child u0(.*);\n"
+                       "endmodule\n",
+                       f),
+            "5a 22\n");
 }
 
 }  // namespace

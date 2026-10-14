@@ -317,6 +317,7 @@ void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
       CheckNestedBlockNameSpaces(item->body, diag_);
     }
   }
+  CollectAssertionNameSpaceLabels(decl->items, labels);
   for (const auto& [label, loc] : labels) DeclareInModuleNameSpace(label, loc);
   // §3.12.1 (printed page 56) has an import written at compilation-unit
   // scope stand for the module too, as the read-side check honours it, and

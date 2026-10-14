@@ -132,15 +132,8 @@ void CheckImplicitNamedPortNetTypes(const PortBindCtx& ctx,
                                     std::string_view port_name,
                                     const Expr* conn_expr,
                                     const RtlirPort* port_it) {
-  uint32_t sig_width = FindSignalWidth(conn_expr->text, ctx.parent_mod);
-  if (sig_width != 0 && sig_width != port_it->width) {
-    ctx.diag.Error(ctx.item->loc,
-                   std::format("implicit named port connection '.{}' requires "
-                               "equivalent data types (port width {}, "
-                               "signal width {})",
-                               port_name, port_it->width, sig_width),
-                   Subclause("23.3.2.3"));
-  }
+  ReportNonEquivalentImplicitConnection(ctx.diag, ctx.item->loc, "named",
+                                        *port_it, ctx.parent_mod, "23.3.2.3");
 
   NetType pnet = PortNetType(port_it->type_kind);
   if (pnet == NetType::kNone) return;
@@ -550,6 +543,7 @@ void Elaborator::PrepareExplicitConnNet(const PortBindScope& scope,
            .empty();
   if (bind.is_implicit) {
     if (!IsNameDeclared(conn_expr->text, scope.parent_mod) &&
+        !ImportBringsInSignal(scope.parent_mod, unit_, conn_expr->text, true) &&
         !names_interface) {
       diag_.Error(
           scope.item->loc,
@@ -806,15 +800,8 @@ void Elaborator::BindWildcardDeclaredPort(const PortBindScope& scope,
       diag_,      item,       parent_mod,          nettype_net_names_,
       var_types_, net_names_, interconnect_names_, interface_inst_types_};
 
-  uint32_t sig_width = FindSignalWidth(port.name, parent_mod);
-  if (sig_width != 0 && sig_width != port.width) {
-    diag_.Error(item->loc,
-                std::format("implicit .* port connection '.{}' requires "
-                            "equivalent data types (port width {}, "
-                            "signal width {})",
-                            port.name, port.width, sig_width),
-                Subclause("23.3.2.4"));
-  }
+  ReportNonEquivalentImplicitConnection(diag_, item->loc, ".*", port,
+                                        parent_mod, "23.3.2.4");
   NetType pnet = PortNetType(port.type_kind);
   if (pnet != NetType::kNone) {
     NetType snet = FindSignalNetType(port.name, parent_mod);
@@ -884,7 +871,8 @@ void Elaborator::BindOneWildcardPort(const PortBindScope& scope,
       expr->text = port.name;
       binding.connection = expr;
     }
-  } else if (IsNameDeclared(port.name, parent_mod)) {
+  } else if (IsNameDeclared(port.name, parent_mod) ||
+             ImportBringsInSignal(parent_mod, unit_, port.name, false)) {
     BindWildcardDeclaredPort(scope, port, binding);
   } else if (port.default_value) {
     binding.connection = port.default_value;

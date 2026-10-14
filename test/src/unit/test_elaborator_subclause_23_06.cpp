@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -628,6 +630,43 @@ TEST(HierarchicalNameElaboration,
                             "hierarchical reference into a checker is not "
                             "permitted",
                             8, "23.6"));
+}
+
+// §23.6 Example 3: a module-level assertion is a scope of the module under its
+// label, and an unlabelled one's named action block is a scope of the module
+// itself, so another module-level name equal to either is a redeclaration
+// (§23.9). A named action block under a labelled assertion is a scope of the
+// label instead, and clashes with nothing at module level; nor does an
+// unlabelled cover's named pass block that no other name shares.
+TEST(HierarchicalNameElaboration, AssertionScopesTakeModuleLevelNames) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  logic clk = 0, a = 0, b = 0;\n"
+      "  assert property (@(posedge clk) a |-> b) else begin : B3\n"
+      "    static bit d;\n"
+      "  end\n"
+      "  initial begin : B3\n"
+      "  end\n"
+      "  A1: assert property (@(posedge clk) a);\n"
+      "  logic A1;\n"
+      "  A2: assert property (@(posedge clk) a) else begin : B4\n"
+      "  end\n"
+      "  initial begin : B4\n"
+      "  end\n"
+      "  cover property (@(posedge clk) a) begin : B5\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'B3'", 3, "23.9"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'A1'", 8, "23.9"));
+  for (uint32_t line : {10u, 12u, 14u}) {
+    EXPECT_FALSE(
+        ReportedError(f.diag.Diagnostics(), "redeclaration", line, "23.9"))
+        << line;
+  }
 }
 
 }  // namespace

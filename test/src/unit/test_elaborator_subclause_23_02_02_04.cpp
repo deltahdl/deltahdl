@@ -84,4 +84,46 @@ TEST(DefaultPortValueElaboration, OmittedInputUsesDefaultNamedConn) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §23.2.2.4: a default value is a constant expression of the module that
+// declares the port, so one reading that module's variable is reported, at
+// the port, an integral or a real one alike, while defaults built from its
+// parameters, a localparam of its body, a package's parameter, an enumeration
+// literal and a constant system function are all constant and are not.
+TEST(DefaultPortValueElaboration, NonConstantDefaultIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pk;\n"
+      "  parameter int PP = 6;\n"
+      "  typedef enum {E0, E1, E2} e_t;\n"
+      "endpackage\n"
+      "module sub import pk::*; #(parameter int W = 8)\n"
+      "  (input var int a = v, input var int b = $clog2(W) + pk::PP,\n"
+      "   input var e_t e = E2, input var int g = L, input var real q = v,\n"
+      "   output int y);\n"
+      "  int v = 3;\n"
+      "  localparam int L = 7;\n"
+      "  assign y = a;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  int v = 9;\n"
+      "  int y;\n"
+      "  sub s(.y(y));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value of port 'a' is not a constant "
+                            "expression",
+                            6, "23.2.2.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default value of port 'q' is not a constant "
+                            "expression",
+                            7, "23.2.2.4"));
+  for (const char* port : {"'b'", "'e'", "'g'"}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), port, 6, "23.2.2.4"))
+        << port;
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), port, 7, "23.2.2.4"))
+        << port;
+  }
+}
+
 }  // namespace

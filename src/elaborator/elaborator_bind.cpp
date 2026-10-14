@@ -16,6 +16,9 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_module_inst_internal.h"
+#include "elaborator/elaborator_port_binding_internal.h"
+#include "elaborator/elaborator_scope_rules_names.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_design.h"
@@ -148,6 +151,88 @@ static void ReportUnmatchedBindTargets(const BindWalkState& ctx,
   }
 }
 
+// §23.11: whether the dotted name `e`, read from `mod`, passes through an
+// instance a bind put there: its leading names are instances one below the
+// other, and one of them was bound.
+static bool DottedNameCrossesBind(const Expr* e, const RtlirModule* mod) {
+  std::vector<std::string_view> steps;
+  const Expr* head = e;
+  while (head->kind == ExprKind::kMemberAccess && !head->is_scope_resolution) {
+    steps.push_back(head->rhs->text);
+    head = head->lhs;
+  }
+  if (head->kind != ExprKind::kIdentifier) return false;
+  steps.push_back(head->text);
+  for (size_t i = steps.size(); i-- > 1 && mod != nullptr;) {
+    auto child = std::ranges::find_if(mod->children, [&](const auto& c) {
+      return c.simple_inst_name == steps[i];
+    });
+    if (child == mod->children.end()) return false;
+    if (child->is_bound) return true;
+    mod = child->resolved;
+  }
+  return false;
+}
+
+// §23.11: whether some dotted name within `e` crosses a bind (above).
+static bool ExprCrossesBind(const Expr* e, const RtlirModule* mod) {
+  if (e == nullptr) return false;
+  if (e->kind == ExprKind::kMemberAccess) return DottedNameCrossesBind(e, mod);
+  bool found = false;
+  ForEachExprChild(e, [&](const Expr* child) {
+    found = found || ExprCrossesBind(child, mod);
+  });
+  return found;
+}
+
+// The packed range a declaration in a module's body writes, the constant
+// expressions there a hierarchical name can reach a bind instance's parameter
+// from; a parameter's value is held to §6.20.2's rule against any hierarchical
+// reference already.
+static std::vector<const Expr*> ItemConstantExprs(const ModuleItem* item) {
+  if (item->kind != ModuleItemKind::kVarDecl &&
+      item->kind != ModuleItemKind::kNetDecl) {
+    return {};
+  }
+  std::vector<const Expr*> exprs{item->data_type.packed_dim_left,
+                                 item->data_type.packed_dim_right};
+  for (const auto& [left, right] : item->data_type.extra_packed_dims) {
+    exprs.push_back(left);
+    exprs.push_back(right);
+  }
+  return exprs;
+}
+
+// §23.11: a bind instance's parameters reached by a hierarchical name are no
+// constant outside the instance; reported where a module's packed range
+// reaches one. `find_module` answers a module's declaration.
+static void ReportBindParamsInConstants(
+    const std::vector<RtlirModule*>& tops,
+    const std::function<const ModuleDecl*(std::string_view)>& find_module,
+    DiagEngine& diag) {
+  std::vector<const RtlirModule*> pending(tops.begin(), tops.end());
+  std::unordered_set<const RtlirModule*> seen;
+  while (!pending.empty()) {
+    const RtlirModule* mod = pending.back();
+    pending.pop_back();
+    if (mod == nullptr || !seen.insert(mod).second) continue;
+    for (const auto& child : mod->children) pending.push_back(child.resolved);
+    const ModuleDecl* decl = find_module(mod->name);
+    if (decl == nullptr) continue;
+    for (const ModuleItem* item : decl->items) {
+      for (const Expr* e : ItemConstantExprs(item)) {
+        if (!ExprCrossesBind(e, mod)) continue;
+        diag.Error(item->loc,
+                   "a parameter of an instance a bind made is reached by "
+                   "a hierarchical name where a constant expression is "
+                   "required",
+                   Subclause("23.11"));
+        break;
+      }
+    }
+  }
+}
+
 void Elaborator::ApplyBindDirectives(const std::vector<RtlirModule*>& tops) {
   std::vector<BindDirectiveSite> binds = CollectBindDirectives(unit_);
   if (binds.empty()) return;
@@ -156,6 +241,8 @@ void Elaborator::ApplyBindDirectives(const std::vector<RtlirModule*>& tops) {
     if (top) WalkForBind(top, std::string(top->name), false, ctx);
   }
   ReportUnmatchedBindTargets(ctx, unit_, diag_);
+  ReportBindParamsInConstants(
+      tops, [this](std::string_view name) { return FindModule(name); }, diag_);
 }
 
 // §23.11 with §23.8: whether `target`, a bind target instance, names the
@@ -254,17 +341,49 @@ static bool TargetHasSignal(const RtlirModule* target, std::string_view name) {
   return false;
 }
 
+// §26.3: whether the target reads `name` somewhere, in a continuous
+// assignment or a procedure, which is what imports a wildcard candidate.
+static bool TargetReferencesName(const RtlirModule* target,
+                                 std::string_view name) {
+  if (std::ranges::any_of(target->assigns, [name](const RtlirContAssign& ca) {
+        return ExprContainsIdent(ca.lhs, name) ||
+               ExprContainsIdent(ca.rhs, name);
+      })) {
+    return true;
+  }
+  std::vector<const Expr*> reads;
+  for (const auto& proc : target->processes) {
+    CollectProcRhsIdents(proc.body, {}, reads);
+  }
+  return std::ranges::any_of(
+      reads, [name](const Expr* read) { return read->text == name; });
+}
+
+// §23.11: a bound instance sees what is declared in or imported into its
+// target, a wildcard candidate once the target has imported it by a reference
+// and never through the bind itself.
+static bool TargetSeesSignal(const RtlirModule* target,
+                             const CompilationUnit* unit,
+                             std::string_view name) {
+  return TargetHasSignal(target, name) ||
+         ImportBringsInSignal(target, unit, name, false) ||
+         (ImportBringsInSignal(target, unit, name, true) &&
+          TargetReferencesName(target, name));
+}
+
 // Every identifier port connection in the bind instantiation must name a signal
 // declared in the target scope. Returns false (after reporting) on the first
-// connection that refers to an undeclared signal.
-static bool ValidateBindPortConnections(const BindDirective* bd,
-                                        const ModuleItem* item,
-                                        const RtlirModule* target,
-                                        DiagEngine& diag) {
-  for (const auto& [pname, conn_expr] : item->inst_ports) {
+// connection that refers to an undeclared signal. An ordered connection is
+// reported by the name of the port of `bound` it stands at.
+static bool ValidateBindPortConnections(
+    const BindDirective* bd, const ModuleItem* item, const RtlirModule* target,
+    const ModuleDecl* bound, const CompilationUnit* unit, DiagEngine& diag) {
+  for (size_t i = 0; i < item->inst_ports.size(); ++i) {
+    auto [pname, conn_expr] = item->inst_ports[i];
     if (!conn_expr || conn_expr->kind != ExprKind::kIdentifier) continue;
+    if (pname.empty() && i < bound->ports.size()) pname = bound->ports[i].name;
     auto name = conn_expr->text;
-    if (!TargetHasSignal(target, name)) {
+    if (!TargetSeesSignal(target, unit, name)) {
       diag.Error(bd->loc,
                  std::format("bind port connection '{}' references "
                              "undeclared signal '{}' in target scope '{}'",
@@ -376,7 +495,10 @@ void Elaborator::ApplyBindInstance(BindDirective* bd, RtlirModule* target) {
     return;
   }
 
-  if (!ValidateBindPortConnections(bd, item, target, diag_)) return;
+  if (!ValidateBindPortConnections(bd, item, target, child_decl, unit_,
+                                   diag_)) {
+    return;
+  }
 
   // §23.11: a bind_instantiation admits the full range of instantiation syntax,
   // so any parameter overrides written on it must take effect. Per the same

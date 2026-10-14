@@ -1,6 +1,8 @@
 
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -103,6 +105,46 @@ TEST(DefaultPortValueSimulation, DefaultEvaluatedInDefiningModuleScope) {
       f, "result");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
+}
+
+// §23.2.2.4 with §6.12: a real port's default is a constant expression of
+// the module declaring the port, folded as a real, so a real parameter of that
+// module scaled by a real keeps its fraction, and an integer parameter plus a
+// real fraction does too.
+TEST(DefaultPortValueSimulation, RealDefaultReadsTheDefiningModulesParameter) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module sub #(parameter real R = 2.5, parameter int K = "
+                       "3)\n"
+                       "  (input var real r = R * 2.0,\n"
+                       "   input var real rk = K + 0.25);\n"
+                       "  initial #1 $display(\"%f %f\", r, rk);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  sub s();\n"
+                       "endmodule\n",
+                       f),
+            "5.000000 3.250000\n");
+}
+
+// §23.2.2.4 with §11.6.1: a default wider than 64 bits keeps every bit, one
+// written as an expression of literals, one reading a parameter of the module
+// declaring the port, and a signed one whose sign extends through them all.
+TEST(DefaultPortValueSimulation, DefaultWiderThan64BitsKeepsEveryBit) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(
+                "module sub #(parameter logic signed [127:0] P = "
+                "128'sh1 << 99)\n"
+                "  (input var logic [127:0] w = 128'hF0 << 100,\n"
+                "   input var logic [127:0] v = P | 128'h3,\n"
+                "   input var logic signed [127:0] s = P - (128'sh1 << 100));\n"
+                "  initial #1 $display(\"%h %h %h %0d\", w, v, s, s < 0);\n"
+                "endmodule\n"
+                "module top;\n"
+                "  sub u();\n"
+                "endmodule\n",
+                f),
+            "00000f00000000000000000000000000 00000008000000000000000000000003 "
+            "fffffff8000000000000000000000000 1\n");
 }
 
 }  // namespace

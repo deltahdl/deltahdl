@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_module.h"
@@ -111,5 +112,32 @@ void CheckInterfacePortsConnected(const PortBindCtx& ctx,
 // continuous assignment, connected to a net of `parent`, is coerced to inout.
 // Defined in elaborator_port_binding_checks.cpp.
 void CoerceDrivenInputPorts(RtlirModuleInst& inst, const RtlirModule* parent);
+
+// §26.3: whether an import `mod` writes at its own level brings in a variable
+// or a net named `name` from the package it names: an explicit import of the
+// name, or -- where `wildcard_counts`, the reference asking being enough to
+// import a candidate -- a wildcard import of a package declaring it. Defined in
+// elaborator_port_binding_checks.cpp.
+bool ImportBringsInSignal(const RtlirModule* mod, const CompilationUnit* unit,
+                          std::string_view name, bool wildcard_counts);
+
+// §6.22.2: whether the instantiating module's signal `name` and `port` differ
+// in width, in signing or in their number of states, the facts that tell
+// equivalent integral types apart. False where the module declares no such
+// signal. Defined in elaborator_port_binding_checks.cpp.
+bool PortAndSignalDiffer(const RtlirPort& port, std::string_view name,
+                         const RtlirModule* parent);
+
+// §23.3.2.3 and §23.3.2.4: the declarations either side of an implicit
+// connection, `form` naming it in the report ("named" for `.name`, ".*" for
+// a wildcard), have equivalent data types, which §6.22.2 makes, for the
+// integral types such a connection joins, the same width, the same signing
+// and the same number of states; a mismatch is reported at `loc` under `rule`.
+// Defined in elaborator_port_binding_checks.cpp.
+void ReportNonEquivalentImplicitConnection(DiagEngine& diag, SourceLoc loc,
+                                           std::string_view form,
+                                           const RtlirPort& port,
+                                           const RtlirModule* parent,
+                                           std::string_view rule);
 
 }  // namespace delta

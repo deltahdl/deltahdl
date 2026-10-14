@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <format>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -194,8 +195,10 @@ static void DiagnoseMissingNonAnsiPortDirection(const PortDecl& port,
 }
 
 // §23.2.2.1: validate the per-port type constraints that do not block building
-// the RtlirPort: interconnect ports may not be signed, and inout ports may not
-// carry a variable data type.
+// the RtlirPort: interconnect ports may not be signed, inout ports may not
+// carry a variable data type, and a ref port is a variable whatever its
+// header spells -- §23.2.2.3 says so where it sets the default port kinds,
+// and Syntax 23-3 gives a non-ANSI ref declaration a variable_port_type alone.
 static void DiagnosePortTypeConstraints(const PortDecl& port, bool port_is_var,
                                         DiagEngine& diag) {
   // Interconnect is an untyped generic connection, so it carries no signedness
@@ -213,6 +216,13 @@ static void DiagnosePortTypeConstraints(const PortDecl& port, bool port_is_var,
                            "inout port '{}'",
                            port.name),
                Subclause("23.3.3.2"));
+  }
+  if (port.direction == Direction::kRef && !port_is_var) {
+    diag.Error(port.loc,
+               std::format("ref port '{}' is declared with a net type; a ref "
+                           "port is a variable",
+                           port.name),
+               Subclause("23.2.2.3"));
   }
 }
 
@@ -456,6 +466,16 @@ static RtlirPort ElaborateOnePort(const ModuleDecl* decl, const PortDecl& port,
   if (port.default_value) {
     ValidatePortAssignment(port, port_is_var, decl->is_non_ansi_ports,
                            ctx.typedefs, ctx.diag);
+    // §23.2.2.4: a default value is a constant expression of the module
+    // that declares the port; a variable of its own is none, and left
+    // standing it would be read in the instantiating module instead.
+    if (!IsConstantExpr(port.default_value, ctx.param_scope)) {
+      ctx.diag.Error(port.loc,
+                     std::format("default value of port '{}' is not a "
+                                 "constant expression",
+                                 port.name),
+                     Subclause("23.2.2.4"));
+    }
   }
 
   DiagnosePortTypeConstraints(port, port_is_var, ctx.diag);
@@ -485,7 +505,7 @@ static RtlirPort ElaborateOnePort(const ModuleDecl* decl, const PortDecl& port,
 // already includes the compilation-unit scope and any per-instance parameter
 // overrides) and capture the resolved constant as a literal, so it is not
 // re-resolved in the instantiating scope when later used as a port connection.
-static void FoldPortConstant(Arena& arena, const ScopeMap& scope,
+static void FoldPortConstant(Arena& arena, const ScopeMap& scope, bool is_real,
                              Expr*& value) {
   if (value == nullptr) return;
   // A literal is already scope-independent, so leave it untouched; this also
@@ -496,11 +516,36 @@ static void FoldPortConstant(Arena& arena, const ScopeMap& scope,
       value->kind == ExprKind::kStringLiteral) {
     return;
   }
+  // §6.12: a real port's default is folded as a real, so `R * 2.0` keeps the
+  // fraction an integer fold would drop.
+  if (is_real) {
+    auto r = ConstEvalReal(value, scope);
+    if (!r) return;
+    auto* lit = arena.Create<Expr>();
+    lit->kind = ExprKind::kRealLiteral;
+    lit->real_val = *r;
+    value = lit;
+    return;
+  }
   auto v = ConstEvalInt(value, scope);
   if (!v) return;
   auto* lit = arena.Create<Expr>();
   lit->kind = ExprKind::kIntegerLiteral;
   lit->int_val = static_cast<uint64_t>(*v);
+  // §11.6.1: a value past 64 bits keeps every bit, written as a sized hex
+  // literal the simulator rebuilds whole from its digits (EvalIntLiteral).
+  auto full = ConstEvalFull(value, scope);
+  if (full && !full->high_words.empty()) {
+    std::string text =
+        std::format("{}'{}h", full->width, full->is_signed ? "s" : "");
+    for (auto word = full->high_words.rbegin(); word != full->high_words.rend();
+         ++word) {
+      text += std::format("{:016x}", *word);
+    }
+    text += std::format("{:016x}", static_cast<uint64_t>(full->value));
+    lit->text = std::string_view(arena.AllocString(text.data(), text.size()),
+                                 text.size());
+  }
   value = lit;
 }
 
@@ -508,8 +553,11 @@ static void FoldPortConstant(Arena& arena, const ScopeMap& scope,
 // scope (§23.2.2.2), so it is folded the same way for the simulator to read.
 static void FoldPortDefaultValue(Arena& arena, const ScopeMap& scope,
                                  RtlirPort& rp) {
-  FoldPortConstant(arena, scope, rp.default_value);
-  FoldPortConstant(arena, scope, rp.init_value);
+  bool is_real = rp.data_kind == DataTypeKind::kReal ||
+                 rp.data_kind == DataTypeKind::kShortreal ||
+                 rp.data_kind == DataTypeKind::kRealtime;
+  FoldPortConstant(arena, scope, is_real, rp.default_value);
+  FoldPortConstant(arena, scope, is_real, rp.init_value);
 }
 
 // §23.2.3: port declarations can be based on parameter declarations. In the
@@ -673,7 +721,12 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
     // §37.3.3: where the port declaration stands, which the port object
     // reports through vpiLineNo and vpiFile.
     rp.loc = port.loc;
-    FoldPortDefaultValue(arena_, param_scope, rp);
+    // §6.20.2: a real parameter's value is the registered module's, which a
+    // real default reads (ConstEvalReal).
+    {
+      ParamRangeRegistryGuard registry(mod);
+      FoldPortDefaultValue(arena_, param_scope, rp);
+    }
     // §7.4.4: an array port written on a typedef name that writes unpacked
     // dimensions of its own, `output mem_type ba [0:1]` under
     // `typedef bsix mem_type [0:3]`, has arrays for its elements.

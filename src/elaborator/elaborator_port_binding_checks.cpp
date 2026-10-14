@@ -16,6 +16,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_port_binding_internal.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
@@ -322,6 +323,93 @@ static std::optional<ConnectedShape> ConnectedArrayShape(
     shape.sizes[dim++] = SliceWidth(*it, scope);
   }
   return shape;
+}
+
+// The signing and the number of states of the instantiating module's signal
+// `name`, a net being 4-state (§6.7.1); no value where it declares neither a
+// variable nor a net so named.
+struct SignalSigning {
+  bool is_signed;
+  bool is_4state;
+};
+
+static std::optional<SignalSigning> FindSignalSigning(std::string_view name,
+                                                      const RtlirModule* mod) {
+  for (const auto& var : mod->variables) {
+    if (var.name == name) return SignalSigning{var.is_signed, var.is_4state};
+  }
+  for (const auto& net : mod->nets) {
+    if (net.name == name) return SignalSigning{net.is_signed, true};
+  }
+  return std::nullopt;
+}
+
+// Whether the instantiating module's signal `name` differs from `port` in
+// signing or in its number of states; false where it declares no such signal.
+static bool SigningOrStatesDiffer(const RtlirPort& port, std::string_view name,
+                                  const RtlirModule* parent) {
+  auto signal = FindSignalSigning(name, parent);
+  if (!signal) return false;
+  DataTypeKind kind = port.data_kind != DataTypeKind::kImplicit
+                          ? port.data_kind
+                          : port.type_kind;
+  bool port_4state = !port.is_var || Is4stateType(kind);
+  return signal->is_signed != port.is_signed ||
+         signal->is_4state != port_4state;
+}
+
+bool PortAndSignalDiffer(const RtlirPort& port, std::string_view name,
+                         const RtlirModule* parent) {
+  uint32_t sig_width = FindSignalWidth(name, parent);
+  return (sig_width != 0 && sig_width != port.width) ||
+         SigningOrStatesDiffer(port, name, parent);
+}
+
+void ReportNonEquivalentImplicitConnection(DiagEngine& diag, SourceLoc loc,
+                                           std::string_view form,
+                                           const RtlirPort& port,
+                                           const RtlirModule* parent,
+                                           std::string_view rule) {
+  uint32_t sig_width = FindSignalWidth(port.name, parent);
+  if (sig_width != 0 && sig_width != port.width) {
+    diag.Error(loc,
+               std::format("implicit {} port connection '.{}' requires "
+                           "equivalent data types (port width {}, signal "
+                           "width {})",
+                           form, port.name, port.width, sig_width),
+               Subclause(rule));
+    return;
+  }
+  if (!SigningOrStatesDiffer(port, port.name, parent)) return;
+  diag.Error(loc,
+             std::format("implicit {} port connection '.{}' requires "
+                         "equivalent data types (the port and the signal "
+                         "differ in signing or in their number of states)",
+                         form, port.name),
+             Subclause(rule));
+}
+
+// §26.3: whether package `pkg_name` declares a variable or a net `name`.
+static bool PackageDeclaresSignal(const CompilationUnit* unit,
+                                  std::string_view pkg_name,
+                                  std::string_view name) {
+  auto declares = [name](const ModuleItem* item) {
+    return (item->kind == ModuleItemKind::kVarDecl ||
+            item->kind == ModuleItemKind::kNetDecl) &&
+           item->name == name;
+  };
+  return std::ranges::any_of(unit->packages, [&](const PackageDecl* pkg) {
+    return pkg->name == pkg_name && std::ranges::any_of(pkg->items, declares);
+  });
+}
+
+bool ImportBringsInSignal(const RtlirModule* mod, const CompilationUnit* unit,
+                          std::string_view name, bool wildcard_counts) {
+  return std::ranges::any_of(mod->imports, [&](const RtlirImport& imp) {
+    bool names_it = imp.is_wildcard ? wildcard_counts : imp.item_name == name;
+    return names_it && imp.scope_prefix.empty() &&
+           PackageDeclaresSignal(unit, imp.package_name, name);
+  });
 }
 
 void Elaborator::ValidateUnpackedArrayPorts(const RtlirModuleInst& inst,
