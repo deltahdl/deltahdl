@@ -252,17 +252,21 @@ TEST(DottedNameElaboration, SelectThroughAnIntegralOrRealVariableIsReported) {
       "  int x;\n"
       "  real r;\n"
       "  logic [7:0] v [2];\n"
+      "  shortreal sr;\n"
+      "  realtime rt;\n"
       "  initial begin\n"
       "    x.run();\n"
       "    $display(r.h);\n"
       "    v[0].go();\n"
+      "    $display(sr.h, rt.h);\n"
       "  end\n"
       "endmodule\n",
       f);
   const char* noun = "built-in method of the integral or real value";
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), noun, 6, "23.7"));
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), noun, 7, "23.7"));
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), noun, 8, "23.7"));
+  for (int line : {8, 9, 10, 11}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), noun, line, "23.7"))
+        << line;
+  }
 }
 
 // §18.8: a random property of a class has rand_mode, an integral one among

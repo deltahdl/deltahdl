@@ -351,4 +351,52 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
                             6, "23.3.3.5"));
 }
 
+// §23.3.3.5 with §7.4: a descending part-select keeps its dimension at its
+// width as an ascending one does, and a slice whose bounds do not fold to
+// constants leaves that dimension's size unknown, so only the count of
+// dimensions is matched against the port's.
+TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
+     DescendingAndUnfoldedSlicesConnectToAMatchingPort) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module sa(input logic [3:0] p [2]);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  int i, j, w;\n"
+      "  logic [3:0] r [4];\n"
+      "  sa u1(.p(r[2-:2]));\n"
+      "  sa u2(.p(r[i:j]));\n"
+      "  sa u3(.p(r[1+:w]));\n"
+      "  sa u4(.p(r[1:j]));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "dimension 0 has size", 6,
+                             "23.3.3.5"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "dimension 0 has size", 7,
+                             "23.3.3.5"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "dimension 0 has size", 8,
+                             "23.3.3.5"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "dimension 0 has size", 9,
+                             "23.3.3.5"));
+}
+
+// §23.3.3.5: a select reaching past an array's unpacked dimensions into its
+// element's bits names no unpacked array at all.
+TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
+     SelectPastTheUnpackedDimensionsIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module sa(input logic [3:0] p [2]);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [3:0] r [4];\n"
+      "  sa u1(.p(r[1][0]));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array port 'p' requires a matching "
+                            "unpacked array connection",
+                            5, "23.3.3.5"));
+}
+
 }  // namespace
