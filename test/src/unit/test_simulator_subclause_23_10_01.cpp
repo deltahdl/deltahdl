@@ -388,4 +388,48 @@ TEST(DefparamSimulation, AnIsolatedElementKeepsItsGenerateBlocksDefparam) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §23.10.1: a defparam gives the parameter its value for the whole instance,
+// so a declaration the parameter sizes is as wide as the new value makes it:
+// all-ones in the variable data is fff, read inside the instance and through a
+// hierarchical name, and the net w is 12 bits as well. The parameter took the
+// value, but both declarations kept the width the default gave them, ff and 8.
+TEST(DefparamSimulation, ADefparamResizesADeclarationItsParameterSizes) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module mm #(DWIDTH = 8)();\n"
+          "  logic [DWIDTH-1:0] data;\n"
+          "  wire [DWIDTH-1:0] w;\n"
+          "  initial begin data = '1; #1 $display(\"%h\", data); end\n"
+          "endmodule\n"
+          "module top;\n"
+          "  mm d();\n"
+          "  defparam d.DWIDTH = 12;\n"
+          "  initial #2 $display(\"%0d %0d %0d\", d.DWIDTH, $bits(d.data),\n"
+          "                       $bits(d.w));\n"
+          "endmodule\n",
+          f),
+      "fff\n12 12 12\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
+// The same holds for an interface instance, whose declarations a defparam
+// sizes as a module's.
+TEST(DefparamSimulation, ADefparamResizesAnInterfacesDeclaration) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "interface ifc #(DWIDTH = 8);\n"
+          "  logic [DWIDTH-1:0] data;\n"
+          "endinterface\n"
+          "module top;\n"
+          "  ifc d();\n"
+          "  defparam d.DWIDTH = 12;\n"
+          "  initial begin d.data = '1; #1 $display(\"%h\", d.data); end\n"
+          "endmodule\n",
+          f),
+      "fff\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

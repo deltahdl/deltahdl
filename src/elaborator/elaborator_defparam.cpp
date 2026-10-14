@@ -351,6 +351,29 @@ void Elaborator::RefoldChildOverrides(RtlirModule* mod,
   }
 }
 
+// §23.10.1: a defparam gives the parameter its value for the whole instance, so
+// a declaration the parameter sizes, `logic [W-1:0] data`, is as wide as the
+// value now in force makes it, as it is when an instantiation's override is in
+// force while the instance is elaborated. A variable a loop generate block
+// declares reads that block's index as well (§27.4). A net carries no such
+// index, so one a generate block declares, named under the block's scope,
+// keeps the width it was elaborated with.
+static void ResizeParamSizedDecls(RtlirModule* mod, const TypedefMap& typedefs,
+                                  const ScopeMap& scope) {
+  for (auto& var : mod->variables) {
+    if (var.dtype == nullptr) continue;
+    ScopeMap var_scope = scope;
+    for (const auto& [name, value] : var.gen_block_consts)
+      var_scope[name] = value;
+    var.width = EvalTypeWidth(*var.dtype, typedefs, var_scope);
+  }
+  for (auto& net : mod->nets) {
+    if (net.dtype == nullptr || net.name.find('.') != std::string_view::npos)
+      continue;
+    net.width = EvalTypeWidth(*net.dtype, typedefs, scope);
+  }
+}
+
 void Elaborator::RecomputeDependentParams(RtlirModule* mod) {
   if (!mod) return;
   ParamRangeRegistryGuard param_range_guard(mod);
@@ -370,6 +393,7 @@ void Elaborator::RecomputeDependentParams(RtlirModule* mod) {
       RecordResolvedHighWords(p, p.default_value, scope);
     }
   }
+  ResizeParamSizedDecls(mod, kTypedefs, BuildParamScope(mod, {}));
   RefoldChildOverrides(mod, BuildParamScope(mod, {}));
 }
 
