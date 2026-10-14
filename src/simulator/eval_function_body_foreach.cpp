@@ -171,12 +171,12 @@ static FuncFlow ExecFuncForeachDims(const Stmt* stmt,
 // as it does for the other loops.
 FuncFlow ExecFuncForeach(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
-  if (labeled) exec.ctx.PushStaticScope(stmt->label);
+  if (labeled) exec.ctx.PushStaticScope(exec.ctx.StmtFrameName(stmt));
   FuncNamedScope named(stmt->label, exec);
   std::vector<ForeachDim> dims = FuncForeachDims(stmt, exec);
   if (!dims.empty()) {
     FuncFlow flow = ExecFuncForeachDims(stmt, dims, exec);
-    if (labeled) exec.ctx.PopStaticScope(stmt->label);
+    if (labeled) exec.ctx.PopStaticScope(exec.ctx.StmtFrameName(stmt));
     return named.Leave(flow);
   }
   auto* aa = FindAssocArrayOfBase(stmt->expr, exec.ctx, exec.arena);
@@ -185,7 +185,7 @@ FuncFlow ExecFuncForeach(const Stmt* stmt, const FuncExecCtx& exec) {
   if (!keys.empty()) {
     flow = ExecFuncForeachLoop(stmt, keys, aa, exec);
   }
-  if (labeled) exec.ctx.PopStaticScope(stmt->label);
+  if (labeled) exec.ctx.PopStaticScope(exec.ctx.StmtFrameName(stmt));
   return named.Leave(flow);
 }
 

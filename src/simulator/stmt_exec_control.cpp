@@ -37,22 +37,22 @@
 namespace delta {
 
 // §6.21 with §9.3.1: a block declares variables of a scope of its own,
-// named or not. A named block's frame is kept under its label; an unnamed
-// block declaring variables outside any subroutine is given one kept under
-// UnnamedBlockFrameName, so its static variables last from one activation to
-// the next and its names hide the module's only inside it. Without it, the
-// declaration replaced the module's variable of the same name. Inside a task
-// or function a variable's declaration already lands in the subroutine's
-// frame. One declaring a let (§11.12) is given a frame wherever it stands,
-// inside a subroutine too, so that the let hides an enclosing scope's only
-// inside the block rather than for the rest of the body.
+// named or not. A named block's frame, and an unnamed block's declaring
+// variables outside any subroutine, is kept under StmtFrameName, so its
+// static variables last from one activation to the next and its names hide
+// the module's only inside it. Without it, the declaration replaced the
+// module's variable of the same name. Inside a task or function a variable's
+// declaration already lands in the subroutine's frame. One declaring a let
+// (§11.12) is given a frame wherever it stands, inside a subroutine too, so
+// that the let hides an enclosing scope's only inside the block rather than
+// for the rest of the body.
 static std::string_view BlockFrameName(const Stmt* stmt, SimContext& ctx) {
-  if (!stmt->label.empty()) return stmt->label;
-  if (BlockDeclaresLet(stmt)) return ctx.UnnamedBlockFrameName(stmt);
+  if (!stmt->label.empty() || BlockDeclaresLet(stmt))
+    return ctx.StmtFrameName(stmt);
   if (!ctx.CurrentFuncName().empty()) return {};
   bool declares = std::ranges::any_of(
       stmt->stmts, [](const Stmt* s) { return s->kind == StmtKind::kVarDecl; });
-  return declares ? ctx.UnnamedBlockFrameName(stmt) : std::string_view{};
+  return declares ? ctx.StmtFrameName(stmt) : std::string_view{};
 }
 
 // Pushes the frame BlockFrameName gives `stmt`, and for a named block the
@@ -245,7 +245,7 @@ static ExecTask ExecPlainIf(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
 ExecTask ExecIf(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
-  if (labeled) ctx.PushStaticScope(stmt->label);
+  if (labeled) ctx.PushStaticScope(ctx.StmtFrameName(stmt));
   auto qual = stmt->qualifier;
   StmtResult r = StmtResult::kDone;
   if (qual == CaseQualifier::kUnique || qual == CaseQualifier::kUnique0) {
@@ -255,7 +255,7 @@ ExecTask ExecIf(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   } else {
     r = co_await ExecPlainIf(stmt, ctx, arena);
   }
-  if (labeled) ctx.PopStaticScope(stmt->label);
+  if (labeled) ctx.PopStaticScope(ctx.StmtFrameName(stmt));
   co_return r;
 }
 
@@ -295,7 +295,7 @@ static bool HasTypedForInit(const Stmt* stmt) {
 static void EnterLoopLabelScope(const Stmt* stmt, SimContext& ctx,
                                 bool labeled) {
   if (!labeled) return;
-  ctx.PushStaticScope(stmt->label);
+  ctx.PushStaticScope(ctx.StmtFrameName(stmt));
   ctx.RegisterNamedScope(stmt->label, ctx.CurrentProcess());
 }
 
@@ -303,7 +303,7 @@ static void ExitLoopLabelScope(const Stmt* stmt, SimContext& ctx,
                                bool labeled) {
   if (!labeled) return;
   ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
-  ctx.PopStaticScope(stmt->label);
+  ctx.PopStaticScope(ctx.StmtFrameName(stmt));
 }
 
 static void TeardownForScopes(const Stmt* stmt, SimContext& ctx, bool scoped,
@@ -375,33 +375,33 @@ ExecTask ExecFor(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
 ExecTask ExecWhile(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
-  if (labeled) ctx.PushStaticScope(stmt->label);
+  if (labeled) ctx.PushStaticScope(ctx.StmtFrameName(stmt));
   while (ProcessGoesOn(ctx)) {
     auto cond = EvalExpr(stmt->condition, ctx, arena);
     if (!cond.IsTruthy()) break;
     auto result = co_await ExecStmt(stmt->body, ctx, arena);
     if (result == StmtResult::kBreak) break;
     if (result != StmtResult::kDone && result != StmtResult::kContinue) {
-      if (labeled) ctx.PopStaticScope(stmt->label);
+      if (labeled) ctx.PopStaticScope(ctx.StmtFrameName(stmt));
       co_return result;
     }
   }
-  if (labeled) ctx.PopStaticScope(stmt->label);
+  if (labeled) ctx.PopStaticScope(ctx.StmtFrameName(stmt));
   co_return StmtResult::kDone;
 }
 
 ExecTask ExecForever(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
-  if (labeled) ctx.PushStaticScope(stmt->label);
+  if (labeled) ctx.PushStaticScope(ctx.StmtFrameName(stmt));
   while (ProcessGoesOn(ctx)) {
     auto result = co_await ExecStmt(stmt->body, ctx, arena);
     if (result == StmtResult::kBreak) break;
     if (result != StmtResult::kDone && result != StmtResult::kContinue) {
-      if (labeled) ctx.PopStaticScope(stmt->label);
+      if (labeled) ctx.PopStaticScope(ctx.StmtFrameName(stmt));
       co_return result;
     }
   }
-  if (labeled) ctx.PopStaticScope(stmt->label);
+  if (labeled) ctx.PopStaticScope(ctx.StmtFrameName(stmt));
   co_return StmtResult::kDone;
 }
 
@@ -435,34 +435,34 @@ std::optional<uint64_t> LoopIterationLimit(const Stmt* stmt, SimContext& ctx,
 
 ExecTask ExecRepeat(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
-  if (labeled) ctx.PushStaticScope(stmt->label);
+  if (labeled) ctx.PushStaticScope(ctx.StmtFrameName(stmt));
   uint64_t count = RepeatIterationCount(EvalExpr(stmt->condition, ctx, arena));
   for (uint64_t i = 0; i < count && ProcessGoesOn(ctx); ++i) {
     auto result = co_await ExecStmt(stmt->body, ctx, arena);
     if (result == StmtResult::kBreak) break;
     if (result != StmtResult::kDone && result != StmtResult::kContinue) {
-      if (labeled) ctx.PopStaticScope(stmt->label);
+      if (labeled) ctx.PopStaticScope(ctx.StmtFrameName(stmt));
       co_return result;
     }
   }
-  if (labeled) ctx.PopStaticScope(stmt->label);
+  if (labeled) ctx.PopStaticScope(ctx.StmtFrameName(stmt));
   co_return StmtResult::kDone;
 }
 
 ExecTask ExecDoWhile(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
-  if (labeled) ctx.PushStaticScope(stmt->label);
+  if (labeled) ctx.PushStaticScope(ctx.StmtFrameName(stmt));
   do {
     auto result = co_await ExecStmt(stmt->body, ctx, arena);
     if (result == StmtResult::kBreak) break;
     if (result != StmtResult::kDone && result != StmtResult::kContinue) {
-      if (labeled) ctx.PopStaticScope(stmt->label);
+      if (labeled) ctx.PopStaticScope(ctx.StmtFrameName(stmt));
       co_return result;
     }
     auto cond = EvalExpr(stmt->condition, ctx, arena);
     if (!cond.IsTruthy()) break;
   } while (ProcessGoesOn(ctx));
-  if (labeled) ctx.PopStaticScope(stmt->label);
+  if (labeled) ctx.PopStaticScope(ctx.StmtFrameName(stmt));
   co_return StmtResult::kDone;
 }
 

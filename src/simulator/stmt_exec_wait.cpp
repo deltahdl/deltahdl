@@ -256,7 +256,7 @@ static void CollectClockvarReads(const Expr* cond, SimContext& ctx,
 
 ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
-  if (labeled) ctx.PushStaticScope(stmt->label);
+  if (labeled) ctx.PushStaticScope(ctx.StmtFrameName(stmt));
   std::unordered_set<std::string> reads;
   CollectExprReads(stmt->condition, reads);
   CollectClockvarReads(stmt->condition, ctx, reads);
@@ -290,10 +290,10 @@ ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   }
   if (stmt->body) {
     auto r = co_await ExecStmt(stmt->body, ctx, arena);
-    if (labeled) ctx.PopStaticScope(stmt->label);
+    if (labeled) ctx.PopStaticScope(ctx.StmtFrameName(stmt));
     co_return r;
   }
-  if (labeled) ctx.PopStaticScope(stmt->label);
+  if (labeled) ctx.PopStaticScope(ctx.StmtFrameName(stmt));
   co_return StmtResult::kDone;
 }
 

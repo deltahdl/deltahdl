@@ -26,6 +26,9 @@
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
+#include "simulator/stmt_exec_internal.h"
+#include "simulator/vcd_dump_state.h"
+#include "simulator/vcd_writer.h"
 
 namespace delta {
 
@@ -353,6 +356,42 @@ void MakeMethodSpecializations(const std::vector<StaticLocalOwner>& owners,
   }
 }
 
+// A static declaration of a variable, which every declaration in a
+// procedure's block is unless written `automatic` (§6.21).
+bool IsBlockStaticDecl(const Stmt* s) {
+  return s != nullptr && s->kind == StmtKind::kVarDecl && !s->var_is_automatic;
+}
+
+// §6.21 with §23.6: the static variables of the named begin-end and fork
+// blocks of `s`, each made in the frame its block keeps between activations
+// (StmtFrameName) with the block's named scopes entered, so that the
+// declaration binds it under its hierarchical name (BindNamedBlockVariable)
+// and, when the block runs, finds it there and stands in it. A randsequence's
+// code blocks are automatic scopes (§18.17) and keep none.
+void MakeNamedBlockStatics(const Stmt* s, SimContext& ctx, Arena& arena) {
+  if (s == nullptr || s->kind == StmtKind::kRandsequence) return;
+  bool named = !s->label.empty() &&
+               (s->kind == StmtKind::kBlock || s->kind == StmtKind::kFork);
+  if (named) {
+    ctx.PushStaticScope(ctx.StmtFrameName(s));
+    ctx.PushActiveNamedScope(s->label);
+    // §21.7.2.3: a dump opens a named parallel block's scope as a fork.
+    if (s->kind == StmtKind::kFork)
+      ctx.Vcd().SetVcdScopeKind(ActiveNamedScopePath(ctx), VcdScopeKind::kFork);
+  }
+  ForEachChildStmt(s, [&](const Stmt* sub) {
+    if (named && IsBlockStaticDecl(sub)) {
+      ExecVarDeclImpl(sub, ctx, arena);
+    } else {
+      MakeNamedBlockStatics(sub, ctx, arena);
+    }
+  });
+  if (named) {
+    ctx.PopActiveNamedScope();
+    ctx.PopStaticScope(ctx.StmtFrameName(s));
+  }
+}
+
 }  // namespace
 
 void Lowerer::RecordStaticLocalSubroutines(const RtlirModule* mod) {
@@ -423,7 +462,11 @@ void Lowerer::MakeNamedSpecializations() {
 // the frame of the declaration's own for a procedure's (ExecVarDeclImpl) --
 // so that the declaration finds it there when it runs and leaves its value as
 // it is. Made when the declaration first ran, `static int s = g;` read a g
-// the procedures had changed by then.
+// the procedures had changed by then. The static variables of a procedure's
+// named blocks are made last, each under its hierarchical name as well, so
+// that `inner.x = 3`, written before the block `inner` has run, lands in the
+// variable the block then reads (§6.21 and §23.6); made when the block first
+// ran, the write found no variable and was lost.
 void Lowerer::InitializeStaticLocals() {
   InitOwnedSubroutineStatics(ctx_, arena_);
   InitPackageClassMethodStatics(ctx_, arena_);
@@ -443,6 +486,15 @@ void Lowerer::InitializeStaticLocals() {
     ctx_.PushScope();
     for (const Stmt* decl : StaticInitsOf(owner.body))
       ExecVarDeclImpl(decl, ctx_, arena_);
+    ctx_.PopScope();
+  }
+  for (const StaticLocalOwner& owner : specializing_code_) {
+    if (owner.body == nullptr) continue;
+    Process stand_in;
+    StandInFor(owner, stand_in);
+    CallerStandIn in_owner(&stand_in, ctx_);
+    ctx_.PushScope();
+    MakeNamedBlockStatics(owner.body, ctx_, arena_);
     ctx_.PopScope();
   }
 }

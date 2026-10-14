@@ -346,7 +346,7 @@ CaseSelection SelectCaseItem(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
 ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool labeled = !stmt->label.empty();
-  if (labeled) ctx.PushStaticScope(stmt->label);
+  if (labeled) ctx.PushStaticScope(ctx.StmtFrameName(stmt));
   CaseSelection chosen = SelectCaseItem(stmt, ctx, arena);
   StmtResult r = StmtResult::kDone;
   if (chosen.body != nullptr) {
@@ -360,7 +360,7 @@ ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     r = co_await ExecStmt(chosen.body, ctx, arena);
     if (scoped) ctx.PopScope();
   }
-  if (labeled) ctx.PopStaticScope(stmt->label);
+  if (labeled) ctx.PopStaticScope(ctx.StmtFrameName(stmt));
   co_return r;
 }
 

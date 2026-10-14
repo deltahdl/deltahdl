@@ -83,10 +83,13 @@ class ScopeStack {
   void PushFuncName(std::string_view name);
   void PopFuncName();
   std::string_view CurrentFuncName() const;
-  // §6.21: the name the frame of `block`, an unnamed block, is kept under
-  // between activations, as a named block's is under its label; made once
-  // per block from where it begins, so no label or subroutine name spells it.
-  std::string_view UnnamedBlockFrameName(const Stmt* block);
+  // §6.21 with §9.3.4: the name the frame of `stmt`, a block or a labelled
+  // statement, is kept under between activations; made once per statement
+  // from where it begins, so neither a subroutine's name nor another
+  // statement's label spells it. Kept under the label alone, a frame was
+  // shared by every labelled statement of the instance with that label, and
+  // `d.b.c` took over `a.b.c`.
+  std::string_view StmtFrameName(const Stmt* stmt);
   // The active subroutine call chain, outermost frame first. Used to report the
   // call stack for $stacktrace (§20.17.2).
   const std::vector<std::string_view>& FuncNameStack() const {
@@ -107,7 +110,7 @@ class ScopeStack {
       static_frames_;
   std::vector<std::string_view> func_name_stack_;
   std::vector<std::string_view> processless_frame_owners_;
-  std::unordered_map<const Stmt*, std::string> unnamed_block_frames_;
+  std::unordered_map<const Stmt*, std::string> stmt_frames_;
 };
 
 }  // namespace delta

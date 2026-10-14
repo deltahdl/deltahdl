@@ -128,14 +128,14 @@ static FuncFlow ExecFuncPlainIf(const Stmt* stmt, const FuncExecCtx& exec) {
 
 static FuncFlow ExecFuncIf(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
-  if (labeled) exec.ctx.PushStaticScope(stmt->label);
+  if (labeled) exec.ctx.PushStaticScope(exec.ctx.StmtFrameName(stmt));
   auto qual = stmt->qualifier;
   FuncFlow r =
       (qual == CaseQualifier::kUnique || qual == CaseQualifier::kUnique0)
           ? ExecFuncUniqueIf(stmt, qual, exec)
       : qual == CaseQualifier::kPriority ? ExecFuncPriorityIf(stmt, exec)
                                          : ExecFuncPlainIf(stmt, exec);
-  if (labeled) exec.ctx.PopStaticScope(stmt->label);
+  if (labeled) exec.ctx.PopStaticScope(exec.ctx.StmtFrameName(stmt));
   return r;
 }
 
@@ -146,7 +146,7 @@ static FuncFlow ExecFuncIf(const Stmt* stmt, const FuncExecCtx& exec) {
 static FuncFlow ExecFuncBlock(const Stmt* stmt, const FuncExecCtx& exec) {
   bool named = !stmt->label.empty();
   bool scoped = !named && BlockDeclaresLet(stmt);
-  if (named) exec.ctx.PushStaticScope(stmt->label);
+  if (named) exec.ctx.PushStaticScope(exec.ctx.StmtFrameName(stmt));
   if (scoped) exec.ctx.PushScope();
   FuncNamedScope scope(stmt->label, exec);
   FuncFlow flow = FuncFlow::kNext;
@@ -154,7 +154,7 @@ static FuncFlow ExecFuncBlock(const Stmt* stmt, const FuncExecCtx& exec) {
     flow = ExecFuncStmt(c, exec);
     if (flow != FuncFlow::kNext) break;
   }
-  if (named) exec.ctx.PopStaticScope(stmt->label);
+  if (named) exec.ctx.PopStaticScope(exec.ctx.StmtFrameName(stmt));
   if (scoped) exec.ctx.PopScope();
   return scope.Leave(flow);
 }
@@ -224,14 +224,14 @@ static FuncFlow ExecFuncForLoop(const Stmt* stmt, const FuncExecCtx& exec) {
 
 static FuncFlow ExecFuncFor(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
-  if (labeled) exec.ctx.PushStaticScope(stmt->label);
+  if (labeled) exec.ctx.PushStaticScope(exec.ctx.StmtFrameName(stmt));
   FuncNamedScope named(stmt->label, exec);
   bool scoped = ForInitNeedsScope(stmt);
   if (scoped) exec.ctx.PushScope();
   ExecFuncForInits(stmt, exec);
   FuncFlow flow = ExecFuncForLoop(stmt, exec);
   if (scoped) exec.ctx.PopScope();
-  if (labeled) exec.ctx.PopStaticScope(stmt->label);
+  if (labeled) exec.ctx.PopStaticScope(exec.ctx.StmtFrameName(stmt));
   return named.Leave(flow);
 }
 
@@ -240,7 +240,7 @@ static FuncFlow ExecFuncFor(const Stmt* stmt, const FuncExecCtx& exec) {
 // subroutine.
 static FuncFlow ExecFuncWhile(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
-  if (labeled) exec.ctx.PushStaticScope(stmt->label);
+  if (labeled) exec.ctx.PushStaticScope(exec.ctx.StmtFrameName(stmt));
   FuncNamedScope named(stmt->label, exec);
   FuncFlow flow = FuncFlow::kNext;
   while (stmt->condition &&
@@ -248,7 +248,7 @@ static FuncFlow ExecFuncWhile(const Stmt* stmt, const FuncExecCtx& exec) {
     flow = ExecFuncStmt(stmt->body, exec);
     if (!LoopGoesOn(flow)) break;
   }
-  if (labeled) exec.ctx.PopStaticScope(stmt->label);
+  if (labeled) exec.ctx.PopStaticScope(exec.ctx.StmtFrameName(stmt));
   return named.Leave(LoopExitFlow(flow));
 }
 
@@ -257,7 +257,7 @@ static FuncFlow ExecFuncWhile(const Stmt* stmt, const FuncExecCtx& exec) {
 // as after a body that ran to the end.
 static FuncFlow ExecFuncDoWhile(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
-  if (labeled) exec.ctx.PushStaticScope(stmt->label);
+  if (labeled) exec.ctx.PushStaticScope(exec.ctx.StmtFrameName(stmt));
   FuncNamedScope named(stmt->label, exec);
   FuncFlow flow = FuncFlow::kNext;
   do {
@@ -265,7 +265,7 @@ static FuncFlow ExecFuncDoWhile(const Stmt* stmt, const FuncExecCtx& exec) {
     if (!LoopGoesOn(flow)) break;
   } while (stmt->condition &&
            EvalExpr(stmt->condition, exec.ctx, exec.arena).IsTruthy());
-  if (labeled) exec.ctx.PopStaticScope(stmt->label);
+  if (labeled) exec.ctx.PopStaticScope(exec.ctx.StmtFrameName(stmt));
   return named.Leave(LoopExitFlow(flow));
 }
 
@@ -275,7 +275,7 @@ static FuncFlow ExecFuncDoWhile(const Stmt* stmt, const FuncExecCtx& exec) {
 static FuncFlow ExecFuncRepeatOrForever(const Stmt* stmt,
                                         const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
-  if (labeled) exec.ctx.PushStaticScope(stmt->label);
+  if (labeled) exec.ctx.PushStaticScope(exec.ctx.StmtFrameName(stmt));
   FuncNamedScope named(stmt->label, exec);
   std::optional<uint64_t> limit =
       LoopIterationLimit(stmt, exec.ctx, exec.arena);
@@ -284,7 +284,7 @@ static FuncFlow ExecFuncRepeatOrForever(const Stmt* stmt,
     flow = ExecFuncStmt(stmt->body, exec);
     if (!LoopGoesOn(flow)) break;
   }
-  if (labeled) exec.ctx.PopStaticScope(stmt->label);
+  if (labeled) exec.ctx.PopStaticScope(exec.ctx.StmtFrameName(stmt));
   return named.Leave(LoopExitFlow(flow));
 }
 
@@ -403,7 +403,7 @@ static FuncFlow ExecFuncImmediateAssert(const Stmt* stmt,
 // from the body.
 static FuncFlow ExecFuncCase(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
-  if (labeled) exec.ctx.PushStaticScope(stmt->label);
+  if (labeled) exec.ctx.PushStaticScope(exec.ctx.StmtFrameName(stmt));
   CaseSelection chosen = SelectCaseItem(stmt, exec.ctx, exec.arena);
   bool scoped = !chosen.bindings.empty();
   if (scoped) {
@@ -412,7 +412,7 @@ static FuncFlow ExecFuncCase(const Stmt* stmt, const FuncExecCtx& exec) {
   }
   FuncFlow flow = ExecFuncStmt(chosen.body, exec);
   if (scoped) exec.ctx.PopScope();
-  if (labeled) exec.ctx.PopStaticScope(stmt->label);
+  if (labeled) exec.ctx.PopStaticScope(exec.ctx.StmtFrameName(stmt));
   return flow;
 }
 

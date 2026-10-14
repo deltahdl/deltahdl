@@ -267,11 +267,13 @@ std::string_view ScopeStack::CurrentFuncName() const {
                                   : func_name_stack_.back();
 }
 
-std::string_view ScopeStack::UnnamedBlockFrameName(const Stmt* block) {
-  auto [it, inserted] = unnamed_block_frames_.try_emplace(block);
+std::string_view ScopeStack::StmtFrameName(const Stmt* stmt) {
+  auto [it, inserted] = stmt_frames_.try_emplace(stmt);
   if (inserted) {
-    const SourceLoc& at = block->range.start;
-    it->second = std::format("block@{}:{}:{}", at.file_id, at.line, at.column);
+    const SourceLoc& at = stmt->range.start;
+    std::string_view label = stmt->label.empty() ? "block" : stmt->label;
+    it->second =
+        std::format("{}@{}:{}:{}", label, at.file_id, at.line, at.column);
   }
   return it->second;
 }

@@ -378,7 +378,7 @@ static ExecTask AwaitForkJoin(ForkJoinState* state) {
 // ending only where the block was not disabled.
 static void EnterForkLabelScope(const Stmt* stmt, SimContext& ctx,
                                 Arena& arena) {
-  ctx.PushStaticScope(stmt->label);
+  ctx.PushStaticScope(ctx.StmtFrameName(stmt));
   ctx.PushActiveNamedScope(stmt->label);
   // §21.7.2.3: a dump opens a named parallel block's scope as a fork.
   ctx.Vcd().SetVcdScopeKind(ActiveNamedScopePath(ctx), VcdScopeKind::kFork);
@@ -391,7 +391,7 @@ static void ExitForkLabelScope(const Stmt* stmt, SimContext& ctx, Arena& arena,
   if (ended) SampleAtBlockEvent(stmt->label, false, ctx, arena);
   ctx.UnregisterNamedScope(stmt->label, ctx.CurrentProcess());
   ctx.PopActiveNamedScope();
-  ctx.PopStaticScope(stmt->label);
+  ctx.PopStaticScope(ctx.StmtFrameName(stmt));
 }
 
 static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
@@ -453,14 +453,14 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 void SpawnForkJoinNone(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt || stmt->join_kind != TokenKind::kKwJoinNone) return;
   bool labeled = !stmt->label.empty();
-  if (labeled) ctx.PushStaticScope(stmt->label);
+  if (labeled) ctx.PushStaticScope(ctx.StmtFrameName(stmt));
 
   uint32_t process_count = 0;
   for (auto* s : stmt->fork_stmts) {
     if (!IsForkBlockItemDecl(s)) process_count++;
   }
   if (process_count == 0) {
-    if (labeled) ctx.PopStaticScope(stmt->label);
+    if (labeled) ctx.PopStaticScope(ctx.StmtFrameName(stmt));
     return;
   }
 
@@ -473,7 +473,7 @@ void SpawnForkJoinNone(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       spawning_proc ? &spawning_proc->wait_fork_state : nullptr;
   SpawnForkChildren(stmt, ctx, arena, spawning_proc,
                     {state, parent_wfs, spawning_proc});
-  if (labeled) ctx.PopStaticScope(stmt->label);
+  if (labeled) ctx.PopStaticScope(ctx.StmtFrameName(stmt));
 }
 
 static ExecTask ExecWaitFork(SimContext& ctx) {

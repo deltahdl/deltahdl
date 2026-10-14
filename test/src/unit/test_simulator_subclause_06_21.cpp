@@ -284,4 +284,74 @@ TEST(ScopeAndLifetimeSimulation, AnUnnamedBlocksStaticVariableKeepsItsValue) {
   EXPECT_EQ(val, 3u);
 }
 
+// §6.21 with §23.6: a named block's static variable is allocated before
+// simulation starts, so a write through its hierarchical name before the block
+// has run lands in the variable the block then reads. Made when the block
+// first ran, the write found no variable and r read 0.
+TEST(ScopeAndLifetimeSimulation, ANamedBlocksStaticVariableExistsBeforeItRuns) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int r;\n"
+      "  initial begin : outer\n"
+      "    inner.x = 3;\n"
+      "    begin : inner\n"
+      "      int x;\n"
+      "      r = x;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 3u);
+}
+
+// The same for a named fork's variable, written from a sibling fork before
+// the fork declaring it has begun, as §23.6's mod_1 and mod_2 example does.
+TEST(ScopeAndLifetimeSimulation, ANamedForksStaticVariableExistsBeforeItRuns) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    fork : mod_1\n"
+      "      int y;\n"
+      "      mod_2.y = 5;\n"
+      "    join\n"
+      "    fork : mod_2\n"
+      "      int y;\n"
+      "      r = y;\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 5u);
+}
+
+// §6.21 with §9.3.4: two blocks labelled b, one in each of two named blocks,
+// declare two static variables. Kept in one frame under the label, the second
+// block's c was the first's, so d.b.c read 11 and a.b.c read 11 too.
+TEST(ScopeAndLifetimeSimulation, BlocksSharingALabelKeepVariablesOfTheirOwn) {
+  const char* src =
+      "module t;\n"
+      "  int ra, rd;\n"
+      "  initial begin : a\n"
+      "    begin : b\n"
+      "      int c;\n"
+      "      c = c + 1;\n"
+      "    end\n"
+      "  end\n"
+      "  initial begin : d\n"
+      "    #1;\n"
+      "    begin : b\n"
+      "      int c;\n"
+      "      c = c + 10;\n"
+      "    end\n"
+      "  end\n"
+      "  initial #2 begin\n"
+      "    ra = a.b.c;\n"
+      "    rd = d.b.c;\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunAndGet(src, "ra"), 1u);
+  EXPECT_EQ(RunAndGet(src, "rd"), 10u);
+}
+
 }  // namespace
