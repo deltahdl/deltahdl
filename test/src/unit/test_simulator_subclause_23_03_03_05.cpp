@@ -289,4 +289,25 @@ TEST(UnpackedArraySimulation, ElementsReadWithTheirDeclaredSignedness) {
             "9 9 -9\n");
 }
 
+// §23.3.3.5 with §23.3.3.4: an interface port declared as an array is
+// connected to an array of interface instances of its shape, each element
+// matched left index to left index: p[1] to ia[3], p[2] to ia[2], reading 3
+// and 1. The connection was refused as no unpacked array, and the port's
+// elements were joined to nothing.
+TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
+     AnInterfaceArrayPortTakesAnInterfaceInstanceArray) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface ifc; logic [1:0] a; endinterface\n"
+                       "module user(ifc p[1:2]);\n"
+                       "  initial #1 $display(\"%0d %0d\", p[1].a, p[2].a);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  ifc ia[3:2]();\n"
+                       "  initial begin ia[3].a = 3; ia[2].a = 1; end\n"
+                       "  user u(ia);\n"
+                       "endmodule\n",
+                       f),
+            "3 1\n");
+}
+
 }  // namespace

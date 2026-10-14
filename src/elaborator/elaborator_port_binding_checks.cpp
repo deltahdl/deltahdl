@@ -327,6 +327,55 @@ static std::optional<ConnectedShape> ConnectedArrayShape(
   return shape;
 }
 
+// The size of one dimension of an instance array: its two bounds, or a size,
+// `ia[2]`, written as the left alone (§23.3.2); 0 where a bound does not fold,
+// which matches any size.
+static uint32_t InstanceArrayDimSize(const Expr* left, const Expr* right,
+                                     const ScopeMap& scope) {
+  auto l = ConstEvalInt(left, scope);
+  if (!l) return 0;
+  int64_t size = *l;
+  if (right != nullptr) {
+    auto r = ConstEvalInt(right, scope);
+    if (!r) return 0;
+    size = std::abs(*l - *r) + 1;
+  }
+  return size > 0 ? static_cast<uint32_t>(size) : 0;
+}
+
+// The instantiation in `parent` that declares the array of instances `name`,
+// or null.
+static const ModuleItem* InstanceArrayItem(std::string_view name,
+                                           const ModuleDecl* parent) {
+  if (parent == nullptr) return nullptr;
+  for (const ModuleItem* inst : parent->items) {
+    if (inst->kind == ModuleItemKind::kModuleInst && inst->inst_name == name &&
+        !inst->inst_dims.empty()) {
+      return inst;
+    }
+  }
+  return nullptr;
+}
+
+// §23.3.3.4 with §23.3.3.5: an interface port declared as an array, `ifc p[2]`,
+// is connected to an array of interface instances, `ifc ia[2]()`, whose shape
+// is the instantiation's own range list. No value where the connection names
+// no instance array the module declares.
+static std::optional<ConnectedShape> InterfaceInstanceArrayShape(
+    const Expr* connection, const ModuleDecl* parent, const ScopeMap& scope) {
+  if (connection == nullptr || connection->kind != ExprKind::kIdentifier) {
+    return std::nullopt;
+  }
+  const ModuleItem* inst = InstanceArrayItem(connection->text, parent);
+  if (inst == nullptr) return std::nullopt;
+  ConnectedShape shape;
+  for (const auto& [left, right] : inst->inst_dims) {
+    shape.sizes.push_back(InstanceArrayDimSize(left, right, scope));
+  }
+  shape.num_dims = static_cast<uint32_t>(shape.sizes.size());
+  return shape;
+}
+
 // The signing and the number of states of the instantiating module's signal
 // `name`, a net being 4-state (§6.7.1); no value where it declares neither a
 // variable nor a net so named.
@@ -436,8 +485,11 @@ void Elaborator::ValidateUnpackedArrayPorts(const RtlirModuleInst& inst,
       continue;
     CheckUnpackedArrayPortBinding(
         diag_, item, binding, port_it,
-        ConnectedArrayShape(binding.connection, var_array_info_,
-                            net_array_info_, scope));
+        port_it->is_interface_port
+            ? InterfaceInstanceArrayShape(binding.connection,
+                                          FindModule(parent_mod->name), scope)
+            : ConnectedArrayShape(binding.connection, var_array_info_,
+                                  net_array_info_, scope));
   }
 }
 

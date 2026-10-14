@@ -25,18 +25,6 @@
 
 namespace delta {
 
-// Returns the identifier naming the connected interface instance/port for a
-// binding connection, or an empty view for a non-identifier expression.
-static std::string_view ConnectionInterfaceName(const Expr* conn) {
-  if (!conn) return {};
-  if (conn->kind == ExprKind::kIdentifier) return conn->text;
-  if (conn->kind == ExprKind::kMemberAccess && conn->lhs &&
-      conn->lhs->kind == ExprKind::kIdentifier) {
-    return conn->lhs->text;
-  }
-  return {};
-}
-
 // True when `name` is declared as an interface in the compilation unit.
 static bool NameIsInterface(std::string_view name,
                             const CompilationUnit* unit) {
@@ -70,7 +58,7 @@ static void CheckOneNamedInterfacePort(const PortBindCtx& ctx,
       break;
     }
   }
-  std::string_view conn_name = ConnectionInterfaceName(conn);
+  std::string_view conn_name = ConnectedInterfaceName(conn);
   if (conn_name.empty()) return;
 
   bool found = false;

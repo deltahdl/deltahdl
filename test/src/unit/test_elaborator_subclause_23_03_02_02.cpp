@@ -57,11 +57,12 @@ TEST(NamedPortConnectionElaboration, PortBindingPortMismatch) {
   auto* mod = design->top_modules[0];
   ASSERT_EQ(mod->children.size(), 1);
 
-  // The bogus connection, and a, which it leaves unconnected and which as a
-  // net port takes 'z (§23.3.3.3).
-  ASSERT_EQ(mod->children[0].port_bindings.size(), 2);
-  EXPECT_EQ(mod->children[0].port_bindings[1].port_name, "a");
-  EXPECT_GT(f.diag.WarningCount(), 0u);
+  // §23.3.2.2 makes the bogus connection an error that binds nothing, so the
+  // one binding is a, which it leaves unconnected and which as a net port
+  // takes 'z (§23.3.3.3).
+  ASSERT_EQ(mod->children[0].port_bindings.size(), 1);
+  EXPECT_EQ(mod->children[0].port_bindings[0].port_name, "a");
+  EXPECT_GT(f.diag.ErrorCount(), 0u);
 }
 
 TEST(NamedPortConnectionElaboration, EmptyNamedPortDoesNotUseDefault) {
@@ -226,10 +227,11 @@ TEST(NamedPortConnectionElaboration, ReversedOrderBindsCorrectly) {
   EXPECT_TRUE(found_b);
 }
 
-// §23.3.2.2: the port_name must be a port the module declaration names. A named
-// connection whose port_name names no port of the instantiated module breaches
-// that, and the report naming it carries the subclause, so a caller learns
-// which rule was enforced without matching the wording of the message.
+// §23.3.2.2: the port_name shall be a port the module declaration names. A
+// named connection whose port_name names no port of the instantiated module
+// breaches that requirement, so it is an error, and the report naming it
+// carries the subclause, so a caller learns which rule was enforced without
+// matching the wording of the message.
 TEST(NamedPortConnectionElaboration, PortNameNamesNoPortNames23_3_2_2) {
   ElabFixture f;
   ElaborateSrc(
@@ -240,8 +242,8 @@ TEST(NamedPortConnectionElaboration, PortNameNamesNoPortNames23_3_2_2) {
       "  child c1(.nope(x));\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), "not found on module", 5,
-                              "23.3.2.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "not found on module", 5,
+                            "23.3.2.2"));
 }
 
 // §23.3.2.2 (printed page 744): a port may be connected only once in an

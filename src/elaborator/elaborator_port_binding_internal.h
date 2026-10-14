@@ -102,6 +102,12 @@ void CheckRefPortsConnected(DiagEngine& diag,
                             const std::vector<RtlirPort>& child_ports,
                             const RtlirModuleInst& inst,
                             const ModuleItem* item);
+// The interface instance or interface port an interface port's actual names,
+// or empty for an actual that names neither: an identifier, a modport of one,
+// `i.mp`, and an element of an array of interface instances, `ia[0]`, which
+// §23.3.3.4 connects as an interface instance (§23.3.2 makes each element of an
+// array of instances an instance of its own), named by its array.
+std::string_view ConnectedInterfaceName(const Expr* conn);
 std::string_view ResolveConnectedInterfaceType(const PortBindCtx& ctx,
                                                std::string_view conn_name,
                                                bool& found);

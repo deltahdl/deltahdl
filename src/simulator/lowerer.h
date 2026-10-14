@@ -384,9 +384,17 @@ class Lowerer {
                              const std::string& inst_seg, bool from_program);
   bool TryAliasInterfacePort(const RtlirModuleInst& inst,
                              const RtlirPortBinding& binding);
+  bool AliasInterfaceArrayPort(const RtlirModuleInst& inst,
+                               const RtlirPortBinding& binding,
+                               const RtlirPort& port,
+                               const std::string& port_key);
+  void AliasInterfacePortTo(const RtlirModuleInst& inst,
+                            const RtlirPortBinding& binding,
+                            const RtlirModule* ifc, const std::string& port_key,
+                            const std::string& instance);
   std::string ConnectedInstanceKey(std::string_view name) const;
   const RtlirModule* ConnectedInterface(const RtlirPort& port, const Expr* conn,
-                                        const Expr*& instance) const;
+                                        std::string& instance) const;
   void RegisterModportExpressions(const RtlirPort& port, const Expr* conn,
                                   const RtlirModule* ifc,
                                   const std::string& port_key,

@@ -188,16 +188,35 @@ static std::string_view PortStorageName(const RtlirPortBinding& binding) {
   return binding.port_name;
 }
 
+// §23.3.2 with §23.3.3.4: an element of an array of interface instances,
+// `ia[0]`, is an interface instance of its own, connected to an interface port
+// as one; the elaborator names it by the array and the index (§23.6).
+static bool IsInstanceElement(const Expr* conn) {
+  return conn->kind == ExprKind::kSelect && conn->base != nullptr &&
+         conn->base->kind == ExprKind::kIdentifier && conn->index != nullptr &&
+         conn->index->kind == ExprKind::kIntegerLiteral &&
+         conn->index_end == nullptr;
+}
+
+// The name the instance `head` denotes is stored under: its identifier, or the
+// array's name with the element's index, `ia[0]`.
+static std::string InstanceNameOf(const Expr* head) {
+  if (head->kind == ExprKind::kIdentifier) return std::string(head->text);
+  return std::string(head->base->text) + "[" +
+         std::to_string(head->index->int_val) + "]";
+}
+
 // §25.5 (printed page 787): a connection names the modport through the
 // interface instance's hierarchy, `P pi(s.tb)`, which restricts the port
 // to the modport's list without naming another instance, so the port shares
-// the members of `s`. Returns the identifier naming the connected interface
+// the members of `s`. Returns the expression naming the connected interface
 // instance, or null where the connection names none.
 static const Expr* ConnectedInterfaceInstance(const Expr* conn,
                                               std::string_view type_name,
                                               const CompilationUnit* cu) {
   if (conn == nullptr) return nullptr;
-  if (conn->kind == ExprKind::kIdentifier) return conn;
+  if (conn->kind == ExprKind::kIdentifier || IsInstanceElement(conn))
+    return conn;
   if (conn->kind != ExprKind::kMemberAccess || conn->lhs == nullptr ||
       conn->lhs->kind != ExprKind::kIdentifier || conn->rhs == nullptr ||
       conn->rhs->kind != ExprKind::kIdentifier || cu == nullptr) {
@@ -237,12 +256,13 @@ std::string Lowerer::ConnectedInstanceKey(std::string_view name) const {
   return through_port.empty() ? key : std::string(through_port);
 }
 
-// The identifier at the head of an interface port's connection: the instance
-// itself, `sb`, or the instance a modport connection names, `sb` of `sb.mp`;
-// null for a connection of any other shape.
+// The expression at the head of an interface port's connection: the instance
+// itself, `sb` or the element `sb[1]`, or the instance a modport connection
+// names, `sb` of `sb.mp`; null for a connection of any other shape.
 static const Expr* ConnectedInstanceHead(const Expr* conn) {
   if (conn == nullptr) return nullptr;
-  if (conn->kind == ExprKind::kIdentifier) return conn;
+  if (conn->kind == ExprKind::kIdentifier || IsInstanceElement(conn))
+    return conn;
   if (conn->kind == ExprKind::kMemberAccess && conn->lhs != nullptr &&
       conn->lhs->kind == ExprKind::kIdentifier) {
     return conn->lhs;
@@ -258,17 +278,16 @@ static const Expr* ConnectedInstanceHead(const Expr* conn) {
 // where the connection names no instance of a known interface.
 const RtlirModule* Lowerer::ConnectedInterface(const RtlirPort& port,
                                                const Expr* conn,
-                                               const Expr*& instance) const {
+                                               std::string& instance) const {
   std::string_view type_name = port.interface_type_name;
-  if (type_name.empty()) {
-    instance = ConnectedInstanceHead(conn);
-    if (instance == nullptr) return nullptr;
-    type_name = ctx_.FindInstanceType(ConnectedInstanceKey(instance->text));
-  } else {
-    instance =
-        ConnectedInterfaceInstance(conn, type_name, design_->compilation_unit);
-    if (instance == nullptr) return nullptr;
-  }
+  const Expr* head = type_name.empty()
+                         ? ConnectedInstanceHead(conn)
+                         : ConnectedInterfaceInstance(
+                               conn, type_name, design_->compilation_unit);
+  if (head == nullptr) return nullptr;
+  instance = InstanceNameOf(head);
+  if (type_name.empty())
+    type_name = ctx_.FindInstanceType(ConnectedInstanceKey(instance));
   auto it = design_->all_modules.find(type_name);
   return it != design_->all_modules.end() ? it->second : nullptr;
 }
@@ -393,20 +412,66 @@ bool Lowerer::TryAliasInterfacePort(const RtlirModuleInst& inst,
                                     const RtlirPortBinding& binding) {
   const RtlirPort* port = FindChildPort(inst, binding.port_name);
   if (!port || !port->is_interface_port) return false;
-  const Expr* instance = nullptr;
+  std::string port_key = inst_prefix_ + std::string(inst.inst_name) + "." +
+                         std::string(binding.port_name);
+  if (port->unpacked_dims.size() == 1) {
+    return AliasInterfaceArrayPort(inst, binding, *port, port_key);
+  }
+  std::string instance;
   const RtlirModule* ifc =
       ConnectedInterface(*port, binding.connection, instance);
   if (ifc == nullptr) return false;
+  AliasInterfacePortTo(inst, binding, ifc, port_key, instance);
+  return true;
+}
 
-  std::string port_key = inst_prefix_ + std::string(inst.inst_name) + "." +
-                         std::string(binding.port_name);
-  std::string instance_key = ConnectedInstanceKey(instance->text);
+// §23.3.3.5 with §23.3.3.4: an interface port declared as an array, `ifc p[2]`,
+// connected to an array of interface instances, `ia`, joins each of its
+// elements to the array's element at the same position counted from the left
+// bound, left index to left index, as a scalar interface port is joined to its
+// instance. Each element of the array is an instance the parent holds, which
+// records the array it belongs to (InstArrayElement).
+bool Lowerer::AliasInterfaceArrayPort(const RtlirModuleInst& inst,
+                                      const RtlirPortBinding& binding,
+                                      const RtlirPort& port,
+                                      const std::string& port_key) {
+  const Expr* conn = binding.connection;
+  if (conn == nullptr || conn->kind != ExprKind::kIdentifier ||
+      port_parent_ == nullptr) {
+    return false;
+  }
+  const RtlirUnpackedDim& dim = port.unpacked_dims[0];
+  int64_t step = dim.left <= dim.right ? 1 : -1;
+  for (const RtlirModuleInst& element : port_parent_->children) {
+    if (element.array.name != conn->text || element.resolved == nullptr) {
+      continue;
+    }
+    int64_t position = element.array.index - element.array.left;
+    if (position < 0) position = -position;
+    if (position >= static_cast<int64_t>(dim.Size())) continue;
+    std::string port_element =
+        port_key + "[" + std::to_string(dim.left + (step * position)) + "]";
+    AliasInterfacePortTo(inst, binding, element.resolved, port_element,
+                         std::string(element.inst_name));
+  }
+  return true;
+}
+
+// §25.3.2: joins the interface port keyed `port_key` to the instance named
+// `instance`, an instance of `ifc`.
+void Lowerer::AliasInterfacePortTo(const RtlirModuleInst& inst,
+                                   const RtlirPortBinding& binding,
+                                   const RtlirModule* ifc,
+                                   const std::string& port_key,
+                                   const std::string& instance) {
+  const RtlirPort* port = FindChildPort(inst, binding.port_name);
+  std::string instance_key = ConnectedInstanceKey(instance);
   BindPortToInstance(port_key, instance_key, ctx_, arena_);
   RegisterExportedSubroutines(inst, binding.port_name, ifc, instance_key);
   RegisterModportExpressions(*port, binding.connection, ifc, port_key,
                              instance_key);
   std::string port_prefix = port_key + ".";
-  std::string conn_prefix = inst_prefix_ + std::string(instance->text) + ".";
+  std::string conn_prefix = inst_prefix_ + instance + ".";
   AliasVariableMembers(ifc, port_prefix, conn_prefix, ctx_, arena_);
   // A net shares one storage between its net-map entry (driver resolution)
   // and its variable-map entry (value reads). Alias both, like LowerAliases,
@@ -435,7 +500,6 @@ bool Lowerer::TryAliasInterfacePort(const RtlirModuleInst& inst,
     ctx_.AcquireClockingManager().AddBlockAlias(*alias, target);
     ctx_.AliasVariable(*alias, target);
   }
-  return true;
 }
 
 // §32.4.4: a hierarchical name the way an SDF file writes it. The design spells

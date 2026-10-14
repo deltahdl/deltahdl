@@ -399,4 +399,39 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
                             5, "23.3.3.5"));
 }
 
+// §23.3.3.5: an interface port declared as an array takes an array of
+// interface instances of the same size in each dimension, and one of another
+// size is an error naming the two sizes.
+TEST(UnpackedArrayPortElaboration, InterfaceArrayOfAnotherSizeIsAnError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc; logic a; endinterface\n"
+      "module user(ifc p[2]); endmodule\n"
+      "module top;\n"
+      "  ifc ia[1:3]();\n"
+      "  user u(ia);\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "dimension 0 has size 2 but connection has size 3",
+                            5, "23.3.3.5"));
+}
+
+// A single interface instance names no array, so it cannot be the actual of
+// an interface port declared as an array.
+TEST(UnpackedArrayPortElaboration, ScalarInterfaceOnAnInterfaceArrayPortFails) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc; logic a; endinterface\n"
+      "module user(ifc p[2]); endmodule\n"
+      "module top;\n"
+      "  ifc i();\n"
+      "  user u(i);\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "requires a matching unpacked array connection", 5,
+                            "23.3.3.5"));
+}
+
 }  // namespace

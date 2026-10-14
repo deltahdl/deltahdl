@@ -135,7 +135,9 @@ TEST(ModuleInstantiationElaboration, InstanceArrayElaborates) {
   EXPECT_FALSE(design->top_modules[0]->children.empty());
 }
 
-TEST(ModuleInstantiationElaboration, PortConnectionsToPortlessModuleWarns) {
+// §23.3.2.2: a module with no ports declares no name a named connection may
+// give, so connecting one is an error.
+TEST(ModuleInstantiationElaboration, PortConnectionsToPortlessModuleFail) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child; endmodule\n"
@@ -146,7 +148,8 @@ TEST(ModuleInstantiationElaboration, PortConnectionsToPortlessModuleWarns) {
       f);
   ASSERT_NE(design, nullptr);
   ASSERT_EQ(design->top_modules[0]->children.size(), 1u);
-  EXPECT_GT(f.diag.WarningCount(), 0u);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "port 'a' not found", 4, "23.3.2.2"));
 }
 
 TEST(ModuleInstantiationElaboration, EmptyParensOnPortlessModuleElaborates) {

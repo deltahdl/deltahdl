@@ -203,14 +203,7 @@ void CheckOneInterfacePortConnected(const PortBindCtx& ctx,
                    Subclause("23.3.3.4"));
     return;
   }
-  std::string_view conn_name;
-  if (conn->kind == ExprKind::kIdentifier) {
-    conn_name = conn->text;
-  } else if (conn->kind == ExprKind::kMemberAccess && conn->lhs &&
-             conn->lhs->kind == ExprKind::kIdentifier && conn->rhs &&
-             conn->rhs->kind == ExprKind::kIdentifier) {
-    conn_name = conn->lhs->text;
-  }
+  std::string_view conn_name = ConnectedInterfaceName(conn);
 
   bool found = false;
   std::string_view conn_ifc_type =
@@ -456,6 +449,22 @@ void CheckRefPortsConnected(DiagEngine& diag,
   }
 }
 
+std::string_view ConnectedInterfaceName(const Expr* conn) {
+  if (conn == nullptr) return {};
+  if (conn->kind == ExprKind::kIdentifier) return conn->text;
+  if (conn->kind == ExprKind::kMemberAccess && conn->lhs != nullptr &&
+      conn->lhs->kind == ExprKind::kIdentifier && conn->rhs != nullptr &&
+      conn->rhs->kind == ExprKind::kIdentifier) {
+    return conn->lhs->text;
+  }
+  if (conn->kind == ExprKind::kSelect && conn->base != nullptr &&
+      conn->base->kind == ExprKind::kIdentifier && conn->index != nullptr &&
+      conn->index_end == nullptr) {
+    return conn->base->text;
+  }
+  return {};
+}
+
 // Interface type named by `conn_name`; `found` reports whether it is known.
 std::string_view ResolveConnectedInterfaceType(const PortBindCtx& ctx,
                                                std::string_view conn_name,
@@ -583,14 +592,15 @@ bool Elaborator::ResolveExplicitTarget(const PortBindScope& scope, size_t index,
   }
 
   const RtlirPort* port = bind.child_port;
+  // §23.3.2.2: a named connection's port_name shall be one the instantiated
+  // module's declaration gives, and §25.4 holds an interface to its port list
+  // the same way, so a name it does not declare is an error and binds nothing.
   if (!port) {
-    diag_.Warning(item->loc,
-                  std::format("port '{}' not found on module '{}'",
-                              bind.port_name, inst.module_name),
-                  Subclause("23.3.2.2"));
-    binding.direction = Direction::kInput;
-    binding.width = 1;
-    return true;
+    diag_.Error(item->loc,
+                std::format("port '{}' not found on module '{}'",
+                            bind.port_name, inst.module_name),
+                Subclause("23.3.2.2"));
+    return false;
   }
 
   binding.direction = port->direction;

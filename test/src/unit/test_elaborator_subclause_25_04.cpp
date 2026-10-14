@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_type.h"
 
 using namespace delta;
@@ -72,12 +73,9 @@ TEST(InterfacePorts, PortListNameConnectsWithoutWarning) {
 }
 
 // §25.4 rejecting half: `req` is declared inside the interface but is NOT in
-// its port list, so it cannot be connected externally. The elaborator, matching
-// an external named connection only against the interface's port list, flags
-// the
-// `.req` connection as a non-port target while the sibling `.clk` (a real port)
-// stays clean — exhibiting the port-list-vs-internal-net distinction. The
-// connection is diagnosed but not fatal, so the design still elaborates.
+// its port list, so it cannot be connected externally. A named connection
+// giving it names no port of the interface, which §23.3.2.2 makes an error,
+// while the sibling `.clk`, a real port, is accepted.
 TEST(InterfacePorts, InternalNetNotConnectableExternally) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -90,8 +88,10 @@ TEST(InterfacePorts, InternalNetNotConnectableExternally) {
       "endmodule\n",
       f, "top");
   ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  EXPECT_GE(f.diag.WarningCount(), 1u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "port 'req' not found", 6,
+                            "23.3.2.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "port 'clk' not found", 6,
+                             "23.3.2.2"));
 }
 
 // §25.4 (i1 example): the input, output, and inout wires of an interface port

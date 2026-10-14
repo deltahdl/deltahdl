@@ -411,9 +411,9 @@ TEST(NonAnsiStylePortDeclarations,
       "endmodule\n",
       f, "top");
   ASSERT_NE(design, nullptr);
-  EXPECT_GT(f.diag.WarningCount(), 0u)
-      << "a concatenation implicit port has no name and cannot be "
-         "name-connected";
+  // §23.3.2.2 makes the named connection to no port an error.
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "port 'a' not found", 6, "23.3.2.2"));
 }
 
 // §23.2.2.1 (negative): a part-select implicit port carries no port name, so a
@@ -433,8 +433,8 @@ TEST(NonAnsiStylePortDeclarations, ImplicitPartSelectPortNotConnectableByName) {
       "endmodule\n",
       f, "top");
   ASSERT_NE(design, nullptr);
-  EXPECT_GT(f.diag.WarningCount(), 0u)
-      << "a part-select implicit port has no name and cannot be name-connected";
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "port 'a' not found", 6, "23.3.2.2"));
 }
 
 // §23.2.2.1 (negative): the same holds for a bit-select implicit port; it too
@@ -451,8 +451,8 @@ TEST(NonAnsiStylePortDeclarations, ImplicitBitSelectPortNotConnectableByName) {
       "endmodule\n",
       f, "top");
   ASSERT_NE(design, nullptr);
-  EXPECT_GT(f.diag.WarningCount(), 0u)
-      << "a bit-select implicit port has no name and cannot be name-connected";
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "port 'a' not found", 6, "23.3.2.2"));
 }
 
 // §23.2.2.1 (positive contrast): the fix must not strip the name from a simple
