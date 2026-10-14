@@ -6,14 +6,15 @@
 
 #include <format>
 #include <string_view>
-#include <unordered_set>
 #include <vector>
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/return_value_fit.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_class.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
@@ -272,8 +273,16 @@ DeclaredLocals ScopeVariables(const std::vector<ModuleItem*>& items) {
 
 // §12.8 — applies the jump rules to a function/task body and, for a
 // value-returning function, also checks each return statement's expression.
+//
+// `outer` holds the names around the subroutine. Where `enum_check_reads_outer`
+// is set, §6.19.3's check, ValidateEnumReturns in
+// elaborator_validate_enum_assign.cpp, reports a name the function does not
+// declare returned from a function returning an enumeration, naming the cast it
+// needs. So such a function's returns read none of the names around it here,
+// and each is reported once. That check reads no class method, so a method's
+// returns read its class's properties whatever it returns.
 void CheckSubroutineJumpRules(const ModuleItem* item, const ReturnCtx& outer,
-                              DiagEngine& diag) {
+                              bool enum_check_reads_outer, DiagEngine& diag) {
   bool is_value_returning = false;
   if (item->kind == ModuleItemKind::kFunctionDecl) {
     // §8.7: a class constructor has no return type, so a `return;` in one is
@@ -289,15 +298,12 @@ void CheckSubroutineJumpRules(const ModuleItem* item, const ReturnCtx& outer,
   for (auto* s : item->func_body_stmts) CheckJumpRules(s, scope, diag);
   if (!is_value_returning) return;
   const CheckedType kRet = CheckedTypeOf(item->return_type, outer);
-  // §6.19.3's check, ValidateEnumReturns in
-  // elaborator_validate_enum_assign.cpp, reports a name the function does not
-  // declare returned from a function returning an enumeration, naming the cast
-  // it needs. So such a function's returns read none of the names around it
-  // here, and each is reported once.
-  const bool kEnumReturn = kRet.type.kind == DataTypeKind::kEnum;
+  const bool kOuterLeftToEnumCheck =
+      enum_check_reads_outer && kRet.type.kind == DataTypeKind::kEnum;
   const ReturnCtx kCtx{
       outer.typedefs, outer.unit,
-      SubroutineLocals(item, kEnumReturn ? DeclaredLocals{} : outer.locals)};
+      SubroutineLocals(
+          item, kOuterLeftToEnumCheck ? DeclaredLocals{} : outer.locals)};
   for (auto* s : item->func_body_stmts) {
     CheckValueReturningFuncReturn(s, item->name, kRet, kCtx, diag);
   }
@@ -318,13 +324,14 @@ void Elaborator::ValidateJumpStatements(const ModuleDecl* decl) {
 // holds those outer names alone. So a method's return check reads no name
 // through them: the methods of the classes `items` declare and of the
 // compilation unit's classes, and every method defined out of its class, are
-// checked with no typedef table, and with none of the variables of the scope
-// around the class either, which a property of the class may hide.
+// checked with no typedef table. Such a method reads its class's properties,
+// those of the class declaring it or of the class an out-of-block definition
+// names (§8.24), and none of the variables of the scope around the class,
+// which a property of a base class the check does not find may hide.
 void Elaborator::CheckJumpStatementsIn(const std::vector<ModuleItem*>& items) {
-  std::unordered_set<const ModuleItem*> methods = ClassMethodsOf(items, unit_);
+  const ClassMethods kMethods = ClassMethodsOf(items, unit_);
   static const TypedefMap kNoTypedefs;
   const ReturnCtx kScope{typedefs_, unit_, ScopeVariables(items)};
-  const ReturnCtx kClass{kNoTypedefs, unit_, {}};
   ForEachBodyOwningItem(items, [&](const ModuleItem* item) {
     if (IsProceduralItemKind(item->kind) && item->body) {
       CheckJumpRules(item->body, JumpScope{}, diag_);
@@ -332,8 +339,16 @@ void Elaborator::CheckJumpStatementsIn(const std::vector<ModuleItem*>& items) {
     }
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl) {
-      bool in_class = methods.count(item) != 0 || !item->method_class.empty();
-      CheckSubroutineJumpRules(item, in_class ? kClass : kScope, diag_);
+      const auto kMethod = kMethods.find(item);
+      if (kMethod == kMethods.end() && item->method_class.empty()) {
+        CheckSubroutineJumpRules(item, kScope, true, diag_);
+        return;
+      }
+      const ClassDecl* cls = kMethod != kMethods.end()
+                                 ? kMethod->second
+                                 : FindClassDecl(item->method_class, unit_);
+      const ReturnCtx kClass{kNoTypedefs, unit_, ClassProperties(cls, unit_)};
+      CheckSubroutineJumpRules(item, kClass, false, diag_);
     }
   });
 }

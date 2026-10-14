@@ -8,10 +8,10 @@
 #include <cstddef>
 #include <functional>
 #include <string_view>
-#include <unordered_set>
 #include <vector>
 
 #include "elaborator/elaborator_class_lookup.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/type_eval.h"
@@ -189,18 +189,48 @@ bool ReturnValueFits(const CheckedType& ret, const CheckedType& value,
          IsAssignmentCompatible(value.type, ret.type);
 }
 
-std::unordered_set<const ModuleItem*> ClassMethodsOf(
-    const std::vector<ModuleItem*>& items, const CompilationUnit* unit) {
-  std::unordered_set<const ModuleItem*> methods;
-  auto add_method = [&methods](const ModuleItem* m) { methods.insert(m); };
+namespace {
+
+// Enters each method the body of `cls` declares into `methods` with `cls`, and
+// those of the classes nested in it (§8.23) with their own class.
+void EnterClassMethods(const ClassDecl* cls, ClassMethods& methods) {
+  if (cls == nullptr) return;
+  for (const auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kMethod && m->method != nullptr) {
+      methods[m->method] = cls;
+    } else if (m->kind == ClassMemberKind::kClassDecl) {
+      EnterClassMethods(m->nested_class, methods);
+    }
+  }
+}
+
+}  // namespace
+
+ClassMethods ClassMethodsOf(const std::vector<ModuleItem*>& items,
+                            const CompilationUnit* unit) {
+  ClassMethods methods;
   for (const auto* item : items) {
     if (item != nullptr && item->kind == ModuleItemKind::kClassDecl)
-      ForEachClassBodyItem(item->class_decl, add_method);
+      EnterClassMethods(item->class_decl, methods);
   }
   if (unit != nullptr) {
-    for (const auto* cls : unit->classes) ForEachClassBodyItem(cls, add_method);
+    for (const auto* cls : unit->classes) EnterClassMethods(cls, methods);
   }
   return methods;
+}
+
+DeclaredLocals ClassProperties(const ClassDecl* cls,
+                               const CompilationUnit* unit) {
+  std::vector<const ClassDecl*> chain;
+  for (; cls != nullptr; cls = FindBaseClass(cls, unit)) chain.push_back(cls);
+  DeclaredLocals properties;
+  for (auto it = chain.rbegin(); it != chain.rend(); ++it) {
+    for (const ClassMember* m : (*it)->members) {
+      if (m->kind == ClassMemberKind::kProperty && !m->is_param)
+        properties[m->name] = {&m->data_type, &m->unpacked_dims};
+    }
+  }
+  return properties;
 }
 
 }  // namespace delta

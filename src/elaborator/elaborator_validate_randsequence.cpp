@@ -11,7 +11,6 @@
 // continue and return together with §18.17.6's exemption from two of them.
 
 #include <format>
-#include <unordered_set>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -225,10 +224,10 @@ void Elaborator::ValidateRandsequenceProductionNames(const ModuleDecl* decl) {
 // outer names it holds.
 void Elaborator::CheckRandsequenceNamesIn(
     const std::vector<ModuleItem*>& items) {
-  std::unordered_set<const ModuleItem*> methods = ClassMethodsOf(items, unit_);
+  const ClassMethods kMethods = ClassMethodsOf(items, unit_);
   static const TypedefMap kNoTypedefs;
   ForEachBodyOwningItem(items, [&](const ModuleItem* item) {
-    bool in_class = methods.count(item) != 0 || !item->method_class.empty();
+    bool in_class = kMethods.count(item) != 0 || !item->method_class.empty();
     const ReturnCtx kOuter{in_class ? kNoTypedefs : typedefs_, unit_, {}};
     if (IsProceduralItemKind(item->kind)) {
       CheckRandsequenceNames(item->body, kOuter, diag_);

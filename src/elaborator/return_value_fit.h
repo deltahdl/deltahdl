@@ -3,7 +3,6 @@
 #include <functional>
 #include <string_view>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "elaborator/type_eval.h"
@@ -92,11 +91,19 @@ CheckedType CheckedTypeOfValue(const Expr* e, const ReturnCtx& ctx);
 bool ReturnValueFits(const CheckedType& ret, const CheckedType& value,
                      const CompilationUnit* unit);
 
-// The methods of the classes `items` declare and of the classes of `unit`. A
-// method's type names are read in its class first, whose typedefs may hide the
-// names of the module or the package around it, so the return check reads a
-// method's names through no table of those outer names.
-std::unordered_set<const ModuleItem*> ClassMethodsOf(
-    const std::vector<ModuleItem*>& items, const CompilationUnit* unit);
+// The methods of the classes `items` declare and of the classes of `unit`, each
+// with the class whose body declares it. A method's type names are read in its
+// class first, whose typedefs may hide the names of the module or the package
+// around it, so the return check reads a method's names through no table of
+// those outer names.
+using ClassMethods = std::unordered_map<const ModuleItem*, const ClassDecl*>;
+ClassMethods ClassMethodsOf(const std::vector<ModuleItem*>& items,
+                            const CompilationUnit* unit);
+
+// The properties a method of `cls` finds by a name it does not declare itself:
+// those of `cls` and of each class it extends (§8.13), a class's own over the
+// inherited ones of the same name, which it hides. None for a null `cls`.
+DeclaredLocals ClassProperties(const ClassDecl* cls,
+                               const CompilationUnit* unit);
 
 }  // namespace delta

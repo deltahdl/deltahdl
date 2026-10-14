@@ -358,4 +358,115 @@ TEST(JumpStatementElaboration, AFunctionsDeclarationHidesAModuleVariable) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// A name a class method does not declare is found among its class's properties
+// (§8.4), so the return gives the property's int, which the method's class
+// return type does not take.
+TEST(JumpStatementElaboration, ReturnOfAClassPropertyIsCheckedAgainstType) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  class A; endclass\n"
+      "  class B;\n"
+      "    int count;\n"
+      "    function A get();\n"
+      "      return count;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return expression in function 'get' is not "
+                            "assignment-compatible with the function's return "
+                            "type",
+                            6, "12.8"));
+}
+
+// A property the class inherits is found too (§8.13).
+TEST(JumpStatementElaboration,
+     ReturnOfAnInheritedPropertyIsCheckedAgainstType) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  class A; endclass\n"
+      "  class P; int total; endclass\n"
+      "  class D extends P;\n"
+      "    function A first(); return total; endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return expression in function 'first' is not "
+                            "assignment-compatible with the function's return "
+                            "type",
+                            5, "12.8"));
+}
+
+// A method defined outside its class's body reads that class's properties as
+// one written inside it does (§8.24).
+TEST(JumpStatementElaboration,
+     ReturnOfAPropertyFromAnOutOfBlockMethodIsChecked) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  class A; endclass\n"
+      "  class C;\n"
+      "    int size;\n"
+      "    extern function A pick();\n"
+      "  endclass\n"
+      "  function A C::pick();\n"
+      "    return size;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return expression in function 'pick' is not "
+                            "assignment-compatible with the function's return "
+                            "type",
+                            8, "12.8"));
+}
+
+// §6.19.3's check of a value returned from a function returning an enumeration
+// reads no class method, so the property's int is reported here, not taken by
+// the enumeration without a cast.
+TEST(JumpStatementElaboration, ReturnOfAPropertyFromAnEnumMethodIsChecked) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  class E;\n"
+      "    int level;\n"
+      "    function enum {LOW, HIGH} grade();\n"
+      "      return level;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return expression in function 'grade' is not "
+                            "assignment-compatible with the function's return "
+                            "type",
+                            5, "12.8"));
+}
+
+// A class's own property hides an inherited one of its name, and the method's
+// own declaration hides a property, so each return gives a class handle.
+TEST(JumpStatementElaboration, ANearerDeclarationHidesAClassProperty) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  class A; endclass\n"
+      "  class P; int item; int slot; endclass\n"
+      "  class D extends P;\n"
+      "    A item;\n"
+      "    function A own(); return item; endfunction\n"
+      "    function A local_one();\n"
+      "      A slot = new;\n"
+      "      return slot;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
