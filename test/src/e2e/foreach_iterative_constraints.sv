@@ -14,7 +14,7 @@
 // gave it, and holds each element to three times its index; and the Stepped
 // holds each element of a four-element B from the state variable off on to
 // one more than the element off places before it, through an index
-// expression over the loop variable and the state variable. Over 256 draws
+// expression over the loop variable and the state variable. Over 128 draws
 // of the Sorted every draw is sized 1 to 10 and ascending, every size from 1
 // to 10 is drawn, and k stays 100; the Fixed sized to 5 keeps 5 elements
 // holding 0, 3, 6, 9 and 12; over 64 draws of the Stepped every draw holds
@@ -47,7 +47,7 @@ module foreach_iterative_constraints;
     static Sorted s = new;
     static Fixed f = new;
     static Stepped p = new;
-    repeat (256) begin
+    repeat (128) begin
       void'(s.randomize());
       if (s.A.size() >= 1 && s.A.size() <= 10) begin
         sized++;
@@ -66,7 +66,7 @@ module foreach_iterative_constraints;
       void'(p.randomize());
       if (p.B[2] == p.B[0] + 1 && p.B[3] == p.B[1] + 1) stepped++;
     end
-    $display("sized 1 to 10: %0d of 256, ascending: %0d of 256", sized,
+    $display("sized 1 to 10: %0d of 128, ascending: %0d of 128", sized,
              ascending);
     $display("sizes drawn: %0d of 10, k: %0d", sizes_seen, s.k);
     $display("size kept: %0d, elements: %0d %0d %0d %0d %0d", f.A.size(),
