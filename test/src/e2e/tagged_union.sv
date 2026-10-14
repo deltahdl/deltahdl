@@ -7,8 +7,8 @@ module tagged_union;
   VInt a;
   initial begin
     a = tagged Valid 42;
-    $display("%0d", a);
+    $display("%0d", a.Valid);
     a = tagged Invalid;
-    $display("%0d", a);
+    $display("%0d", a matches tagged Invalid ? 1 : 0);
   end
 endmodule

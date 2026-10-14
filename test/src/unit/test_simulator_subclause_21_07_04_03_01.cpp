@@ -253,8 +253,8 @@ TEST_F(ExtendedVcdStateCharacterSim, OutputWithTwoActiveDriversIsLowercase) {
       "  assign lo = 1'b0;\n"
       "endmodule\n"
       "module t;\n"
-      "  wire a, b;\n"
-      "  s k1(.hi(a), .lo(b));\n"
+      "  wire wa, wb;\n"
+      "  s k1(.hi(wa), .lo(wb));\n"
       "  initial $dumpports;\n"
       "endmodule\n");
   EXPECT_EQ(PortStateCharsFor(content, "0"), "h") << content;
@@ -269,12 +269,12 @@ TEST_F(ExtendedVcdStateCharacterSim, InputWithTwoActiveDriversIsLowercase) {
       "module s(input hi, input lo);\n"
       "endmodule\n"
       "module t;\n"
-      "  wire a, b;\n"
-      "  assign a = 1'b1;\n"
-      "  assign a = 1'b1;\n"
-      "  assign b = 1'b0;\n"
-      "  assign b = 1'b0;\n"
-      "  s k1(.hi(a), .lo(b));\n"
+      "  wire wa, wb;\n"
+      "  assign wa = 1'b1;\n"
+      "  assign wa = 1'b1;\n"
+      "  assign wb = 1'b0;\n"
+      "  assign wb = 1'b0;\n"
+      "  s k1(.hi(wa), .lo(wb));\n"
       "  initial $dumpports;\n"
       "endmodule\n");
   EXPECT_EQ(PortStateCharsFor(content, "0"), "u") << content;
