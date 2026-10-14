@@ -690,8 +690,7 @@ TEST(SysTask, BareUnpackedNonByteArrayIsIllegal) {
   LowerAndRun(design, f);
   std::cout.rdbuf(old_buf);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "unformatted unpacked-array argument", 5,
-                            "21.2.1.1"));
+                            "unformatted unpacked argument", 5, "21.2.1.1"));
   // No numeric value is emitted for the rejected argument.
   EXPECT_EQ(captured.str().find('2'), std::string::npos);
 }
@@ -745,8 +744,7 @@ TEST(SysTask, BareUnpackedNonByteArrayNames21_2_1_1) {
   LowerAndRun(design, f);
   std::cout.rdbuf(saved);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "unformatted unpacked-array argument", 5,
-                            "21.2.1.1"));
+                            "unformatted unpacked argument", 5, "21.2.1.1"));
 }
 
 // §21.2.1.1: the same subclause decides which argument each format

@@ -28,19 +28,12 @@ namespace {
 //   Claim 4 (strength range). Strengths 7..5 are "strong"; strengths 4..1 are
 //     "weak" -- the partition Claim 3 compares.
 //
-// Only Claim 1 is reachable through this simulator. The port value change is
-// emitted by VcdWriter::WritePortValueChange (src/simulator/vcd_writer.cpp),
-// which reads a single resolved 4-state value per bit through LogicBitToChar
-// (only 0/1/x/z) and takes the two strength components from the resolved
-// strength of the net behind the port (Net::resolved_strength), falling back
-// to strong for a driven port with no net and no resolved strength and to
-// highz for a high-impedance one. The VcdSignal model keeps no record of drive
-// direction, of separate input versus output contributions, or of a
-// per-driver strength. So Claims 2-4, which all require decomposing a port
-// into an input driver and an output driver and comparing their strength
-// ranges, cannot be exercised: the conflict characters d/u/l/h (and the
-// direction-tagged 0/1 conflict semantics) are unreachable here, exactly as the
-// dependency subclause §21.7.4.3.1 established for the character vocabulary.
+// Claims 2 to 4 decompose an inout port into its input end, the drivers outside
+// its instance, and its output end, those inside, which the writer reads from
+// the origin each continuous-assignment driver records on the net
+// (Net::driver_origins); InoutEndsPickTheConflictCharacter in
+// test_simulator_subclause_21_07_04_03_01.cpp observes them, beside the
+// character vocabulary of §21.7.4.3.1 they resolve to.
 //
 // These tests observe Claim 1 through the production path. Each of the three
 // driver kinds §21.7.4.3.2 admits is built from real source syntax, elaborated,

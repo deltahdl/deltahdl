@@ -227,6 +227,9 @@ struct QueueObject {
   // an element reads signed however the value written into it was typed:
   // `push_back(u)` of an unsigned u into `int q[$]` stores an int.
   bool is_signed = false;
+  // §21.2.1.1 and §21.2.1.7: the element type the declaration names, so that
+  // a queue or dynamic array of byte prints as the characters it spells.
+  DataTypeKind elem_type_kind = DataTypeKind::kImplicit;
   int32_t max_size = -1;
   uint32_t generation = 0;
   // §8.4: whether the element type is a class, so that each element is a

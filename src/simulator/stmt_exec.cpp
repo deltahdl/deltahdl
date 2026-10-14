@@ -33,6 +33,8 @@
 #include "simulator/statement_assign.h"
 #include "simulator/stmt_exec_internal.h"
 #include "simulator/stmt_result.h"
+#include "simulator/vcd_dump_state.h"
+#include "simulator/vcd_writer.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_design_attach.h"
 #include "simulator/vpi_globals.h"
@@ -378,6 +380,8 @@ static void EnterForkLabelScope(const Stmt* stmt, SimContext& ctx,
                                 Arena& arena) {
   ctx.PushStaticScope(stmt->label);
   ctx.PushActiveNamedScope(stmt->label);
+  // §21.7.2.3: a dump opens a named parallel block's scope as a fork.
+  ctx.Vcd().SetVcdScopeKind(ActiveNamedScopePath(ctx), VcdScopeKind::kFork);
   ctx.RegisterNamedScope(stmt->label, ctx.CurrentProcess());
   SampleAtBlockEvent(stmt->label, true, ctx, arena);
 }

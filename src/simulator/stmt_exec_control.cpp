@@ -12,6 +12,7 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "simulator/covergroup_instance.h"
 #include "simulator/eval_array.h"
@@ -30,6 +31,8 @@
 #include "simulator/stmt_exec.h"
 #include "simulator/stmt_exec_internal.h"
 #include "simulator/stmt_result.h"
+#include "simulator/vcd_dump_state.h"
+#include "simulator/vcd_writer.h"
 
 namespace delta {
 
@@ -85,10 +88,23 @@ static void TeardownBlockScope(const Stmt* stmt, SimContext& ctx, Arena& arena,
 
 // A named block is a scope of the hierarchy, and so is a task or function,
 // which stands under its module rather than under the blocks of the process
-// calling it; the path therefore starts at the innermost subroutine.
-void BindNamedBlockVariable(std::string_view name, SimContext& ctx) {
+// calling it; the path therefore starts at the innermost subroutine. §21.7.2.3:
+// each level's kind is recorded under the path reaching it, for the $scope a
+// dump opens there -- a task or a function where the level is a subroutine, a
+// named sequential block where it is a block no fork marked parallel.
+static void RecordVcdScopeKind(const std::string& path, std::string_view level,
+                               SimContext& ctx) {
+  if (const ModuleItem* sub = ctx.FindFunction(level)) {
+    ctx.Vcd().SetVcdScopeKind(path, sub->kind == ModuleItemKind::kTaskDecl
+                                        ? VcdScopeKind::kTask
+                                        : VcdScopeKind::kFunction);
+  } else if (ctx.Vcd().GetVcdScopeKind(path) != VcdScopeKind::kFork) {
+    ctx.Vcd().SetVcdScopeKind(path, VcdScopeKind::kBegin);
+  }
+}
+
+std::string ActiveNamedScopePath(SimContext& ctx) {
   const std::vector<std::string_view>& scopes = ctx.ActiveNamedScopes();
-  if (scopes.empty()) return;
   size_t first = 0;
   for (size_t i = scopes.size(); i-- > 0;) {
     if (ctx.FindFunction(scopes[i]) != nullptr) {
@@ -98,10 +114,16 @@ void BindNamedBlockVariable(std::string_view name, SimContext& ctx) {
   }
   std::string path = ctx.ActiveInstancePrefix();
   for (size_t i = first; i < scopes.size(); ++i) {
+    if (i > first) path += '.';
     path += scopes[i];
-    path += '.';
+    RecordVcdScopeKind(path, scopes[i], ctx);
   }
-  path += name;
+  return path;
+}
+
+void BindNamedBlockVariable(std::string_view name, SimContext& ctx) {
+  if (ctx.ActiveNamedScopes().empty()) return;
+  std::string path = ActiveNamedScopePath(ctx) + "." + std::string(name);
   ctx.AliasVariable(*ctx.GetArena().Create<std::string>(std::move(path)), name);
 }
 

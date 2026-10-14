@@ -32,7 +32,9 @@ struct FormatArgs {
   // argument is not an unpacked aggregate; 1 means it is one whose elements
   // are not of type byte (an integer format specifier consuming it is
   // rejected, and %s rejects it too); 2 means it is an unpacked array of
-  // byte, which %s renders through the precomputed string below.
+  // byte, which %s renders through the precomputed string below; 3 means it
+  // is an unpacked struct or union, which only %u and %z among the integer
+  // specifiers take.
   const std::vector<char>& agg_flags;
   // §21.2.1.7: per-argument character rendering of an unpacked array of byte,
   // elements taken from the left bound to the right bound. Precomputed by the
@@ -738,6 +740,10 @@ static bool RejectIntegerSpecOnAggregate(char norm, FormatArgs& args) {
   if (!is_integer_spec || args.vi >= args.agg_flags.size() ||
       args.agg_flags[args.vi] == 0)
     return false;
+  // §21.2.1.1 (printed page 657): %u and %z are defined on an unpacked struct
+  // or union.
+  if (args.agg_flags[args.vi] == 3 && (norm == 'u' || norm == 'z'))
+    return false;
   if (args.ctx != nullptr) {
     args.ctx->GetDiag().Error(
         args.loc,
@@ -757,7 +763,7 @@ static bool RejectIntegerSpecOnAggregate(char norm, FormatArgs& args) {
 static bool AppendStringSpecOnAggregate(char norm, FormatArgs& args,
                                         std::string& out) {
   if (norm != 's' || args.vi >= args.agg_flags.size() ||
-      args.agg_flags[args.vi] == 0)
+      args.agg_flags[args.vi] == 0 || args.agg_flags[args.vi] == 3)
     return false;
   if (args.agg_flags[args.vi] == 2 && args.vi < args.s_fmts.size()) {
     out += args.s_fmts[args.vi];

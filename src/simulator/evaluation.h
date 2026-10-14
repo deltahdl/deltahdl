@@ -656,8 +656,9 @@ struct DisplayFormatOpts {
   // §21.2.1.1 / §21.2.1.7: one flag per positional value argument classifying
   // it as an unpacked aggregate: 0 = not one, 1 = one whose elements are not
   // of type byte (integer specifiers and %s reject it), 2 = an unpacked array
-  // of byte (%s renders it through arg_byte_strings). A null pointer means
-  // the caller supplied no type information.
+  // of byte (%s renders it through arg_byte_strings), 3 = an unpacked struct
+  // or union (integer specifiers but %u and %z reject it). A null pointer
+  // means the caller supplied no type information.
   const std::vector<char>* arg_unpacked_agg = nullptr;
   // §21.2.1.7: one string per positional value argument holding the character
   // rendering of an unpacked array of byte, elements ordered from the left

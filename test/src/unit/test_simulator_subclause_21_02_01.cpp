@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -362,6 +363,40 @@ TEST(IoDisplayWriteSim, StringLiteralIsThePendingPercentSValue) {
                        "endmodule\n",
                        f),
             ":  a:\n:abcdef:\n:a:\n:   xy:\n:  a:\n:  a:\n");
+}
+
+// §21.2.1 (printed page 655) with §21.2.1.1: an expression argument follows a
+// string literal for each of its format specifications but %m, %l and %%, so
+// a literal with two conversions and one argument after it is reported, as
+// §21.3.3 has $sformat report a shortfall, and the run goes on.
+TEST(IoDisplayWriteSim, LiteralWithMoreConversionsThanArgumentsIsReported) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int a = 5;\n"
+      "  initial begin\n"
+      "    $display(\"%0d %h\", a);\n"
+      "    $display(\"next\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "more format specifications than arguments", 4,
+                              "21.2.1"));
+  EXPECT_NE(out.find("next"), std::string::npos);
+}
+
+// §21.2.1: %m, %l and %% take no argument, so a literal whose one other
+// conversion has its argument draws no report.
+TEST(IoDisplayWriteSim, ConversionsTakingNoArgumentAreNotCounted) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  int a = 5;\n"
+      "  initial $display(\"%0d %m %l %%\", a);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
 }  // namespace

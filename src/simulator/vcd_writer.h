@@ -155,6 +155,9 @@ struct VcdSignal {
   // settled -- Net::resolved_strength. Null for an object that is not a net,
   // which has no drive strength at all.
   const Net* net = nullptr;
+  // §21.7.4.3.1: for an input port, the net the parent connected to it, whose
+  // drivers are the port's test-fixture side; null otherwise.
+  const Net* source_net = nullptr;
   // §21.7.5: a member of an unpacked structure is dumped as its own object even
   // though the model holds the whole structure in one value. bit_offset is
   // where this member's bits start within that value, and width is how many it
@@ -221,6 +224,8 @@ struct VcdSignalSpec {
   // own name within the $scope it is declared in. Empty where that is `name`
   // itself; `name` stays the hierarchical name $dumpvars selects on.
   std::string_view ref_name = {};
+  // §21.7.4.3.1: for an input port, the net the parent connected to it.
+  const Net* source_net = nullptr;
 };
 
 // The §21.7.2.2 value character of one bit of a dumped object: 0, 1, x or z,
@@ -228,6 +233,10 @@ struct VcdSignalSpec {
 // §21.7.4.3 port records in vcd_writer_port.cpp start from the same four values
 // before §21.7.4.3.1 respells them for the port's direction.
 char VcdBitChar(const VcdSignal& sig, int32_t bit);
+// §21.7.4.2 (Syntax 21-28): the extended file's $var declaration of the port
+// `sig`, declared under the reference `name`. Defined in vcd_writer_port.cpp.
+void WritePortVarDecl(std::ostream& ofs, const VcdSignal& sig,
+                      std::string_view name);
 
 class VcdWriter {
  public:

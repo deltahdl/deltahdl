@@ -224,6 +224,22 @@ TEST(StringFormat, ByteArrayDescendingRangePrintsLeftBoundFirst) {
   EXPECT_EQ(out, "dcba\n");
 }
 
+// §21.2.1.7 (printed page 663): the argument of %s may be an unpacked array
+// of byte, a queue or a dynamic array as much as a fixed-size one, and its
+// characters run from index 0, its left bound, upward.
+TEST(StringFormat, ByteQueueAndDynamicArrayPrintTheirCharacters) {
+  auto out = RunSim(
+      "module t;\n"
+      "  byte q[$] = {8'h68, 8'h69};\n"
+      "  byte d[] = '{8'h6f, 8'h6b};\n"
+      "  initial begin\n"
+      "    #1;\n"
+      "    $display(\"%s %s\", q, d);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(out, "hi ok\n");
+}
+
 // §21.2.1.7 C1 (operand type): a 4-state integer operand takes the same
 // 8-bit-group reading as a 2-state bit vector. The 32-bit integer holding
 // 0x4869 has two high zero bytes, which are leading and therefore absent

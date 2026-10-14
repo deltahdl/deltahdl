@@ -26,6 +26,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
+#include "simulator/vcd_dump_state.h"
 
 namespace delta {
 
@@ -35,6 +36,25 @@ namespace delta {
 // its direction and width. That vector is what is created for it, once however
 // many ports select from it; a port with a name is created under the name.
 // Nothing for a port that is neither.
+// §21.7.4.2 (printed page 699): a concatenated port appears in an extended
+// VCD file as separate entries, one per object it names, each facing the
+// port's way; the objects are the module's own, declared from its body, so
+// only their direction is recorded here, under the instance's prefix.
+static void RecordConcatPortDirections(const std::string& prefix,
+                                       const Expr* expr, Direction direction,
+                                       SimContext& ctx, Arena& arena) {
+  while (expr != nullptr && expr->kind == ExprKind::kSelect) expr = expr->base;
+  if (expr == nullptr) return;
+  if (expr->kind == ExprKind::kConcatenation) {
+    for (const Expr* element : expr->elements)
+      RecordConcatPortDirections(prefix, element, direction, ctx, arena);
+    return;
+  }
+  if (expr->kind != ExprKind::kIdentifier) return;
+  ctx.Vcd().SetVcdPortDirection(
+      *arena.Create<std::string>(prefix + std::string(expr->text)), direction);
+}
+
 void CreatePortStorage(const std::string& prefix, const RtlirPort& port,
                        SimContext& ctx, Arena& arena) {
   if (!port.name.empty()) {
@@ -45,6 +65,10 @@ void CreatePortStorage(const std::string& prefix, const RtlirPort& port,
   }
   const Expr* root = port.port_expr;
   while (root != nullptr && root->kind == ExprKind::kSelect) root = root->base;
+  if (root != nullptr && root->kind == ExprKind::kConcatenation) {
+    RecordConcatPortDirections(prefix, root, port.direction, ctx, arena);
+    return;
+  }
   if (root == nullptr || root->kind != ExprKind::kIdentifier ||
       port.selected_width == 0) {
     return;
@@ -783,6 +807,12 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
       // between.
       NameInterconnectPath(
           {inst_prefix_, inst_seg, binding.port_name, binding.connection}, ca);
+      // §21.7.4.3.1: the drivers of the signal connected to an input are its
+      // test-fixture side, which an extended VCD record of the port counts.
+      if (binding.connection->kind == ExprKind::kIdentifier) {
+        ctx_.Vcd().SetVcdPortSource(
+            port_name, inst_prefix_ + std::string(binding.connection->text));
+      }
       LowerContAssign(ca, from_program);
       continue;
     }

@@ -170,4 +170,17 @@ void EmitFinishDiagnostic(SimContext& ctx, std::string_view task, int64_t level,
 // eval_systask_bits.cpp.
 Logic4Vec EvalBits(const Expr* expr, SimContext& ctx, Arena& arena);
 
+// §21.2.1.1 and §21.3.4.3: what kind of unpacked aggregate an identifier
+// argument of a display or scan task names, which decides the format
+// specifiers it takes.
+enum class UnpackedAggregateKind : uint8_t {
+  kNone,       // no unpacked aggregate
+  kByteArray,  // an unpacked array of byte: fixed-size, dynamic or a queue
+  kArray,      // any other unpacked array, associative arrays among them
+  kStruct,     // an unpacked struct or union
+};
+// Defined in eval_system_task.cpp.
+UnpackedAggregateKind ClassifyUnpackedAggregate(const Expr* arg,
+                                                SimContext& ctx);
+
 }  // namespace delta

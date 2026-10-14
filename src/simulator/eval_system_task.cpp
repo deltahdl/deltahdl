@@ -1,4 +1,5 @@
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -18,7 +19,9 @@
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "simulator/deferred_caller.h"
+#include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_internal.h"
+#include "simulator/eval_systask_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
 #include "simulator/probabilistic_distribution.h"
@@ -272,60 +275,96 @@ static char DefaultRadixForDisplayWriteTask(std::string_view callee) {
   }
 }
 
-// §21.2.1.1: a bare argument (one with no governing format specifier) that is
-// an unpacked array of byte is displayed as the character string its element
-// bytes spell out, taken in index order. Each element's low byte contributes
-// one character; a zero byte carries no character, matching the way a string
-// value renders. The per-element variables are named "arr[idx]" by the lowerer,
-// the same layout the %p renderer walks.
-static std::string FormatUnpackedByteArrayAsString(std::string_view name,
-                                                   const ArrayInfo& ai,
-                                                   SimContext& ctx) {
+// §21.2.1.1 and §21.2.1.7: the characters an unpacked array of byte spells,
+// from its left bound to its right bound -- index 0 upward for a queue or a
+// dynamic array, the declared left bound first for a fixed-size array, so a
+// descending [3:0] runs from index 3 down. A zero element carries no
+// character, as a zero byte of a string-typed value carries none.
+static std::string ByteArrayText(std::string_view name, SimContext& ctx) {
   std::string out;
-  for (uint32_t i = 0; i < ai.size; ++i) {
-    uint32_t idx = ai.lo + i;
-    std::string elem_name = std::string(name) + "[" + std::to_string(idx) + "]";
-    Variable* elem = ctx.FindVariable(elem_name);
-    if (elem == nullptr) continue;
-    char c = static_cast<char>(elem->value.ToUint64() & 0xFF);
+  auto add = [&out](const Logic4Vec& v) {
+    char c = static_cast<char>(v.ToUint64() & 0xFF);
     if (c != 0) out += c;
+  };
+  // A queue and a dynamic array are both held as a QueueObject.
+  if (const QueueObject* q = ctx.FindQueue(name)) {
+    for (const Logic4Vec& v : q->elements) add(v);
+    return out;
   }
-  return out;
-}
-
-// §21.2.1.7: render an unpacked array of byte as the character string its
-// elements spell, ordered from the left bound of the declaration to the right
-// bound. An ascending range [0:3] walks index 0 upward; a descending range
-// [3:0] has its left bound at the highest index, so the walk runs downward.
-// A zero element carries no character, the same way a zero byte in a
-// string-typed value carries none.
-static std::string FormatByteArrayLeftBoundFirst(std::string_view name,
-                                                 const ArrayInfo& ai,
-                                                 SimContext& ctx) {
-  std::string out;
+  const ArrayInfo& ai = *ctx.FindArrayInfo(name);
   for (uint32_t i = 0; i < ai.size; ++i) {
     uint32_t idx = ai.is_descending ? ai.lo + ai.size - 1 - i : ai.lo + i;
     std::string elem_name = std::string(name) + "[" + std::to_string(idx) + "]";
-    Variable* elem = ctx.FindVariable(elem_name);
-    if (elem == nullptr) continue;
-    char c = static_cast<char>(elem->value.ToUint64() & 0xFF);
-    if (c != 0) out += c;
+    if (Variable* elem = ctx.FindVariable(elem_name)) add(elem->value);
   }
   return out;
 }
 
-// §21.2.1.1 / §21.2.1.7: classify a display/write argument that names a
-// fixed-size unpacked aggregate (an unpacked array). The integer format
-// specifiers may not be applied to such an argument; %s admits it only when
-// its elements are of type byte. Returns 0 for anything else, 1 for an
-// aggregate of non-byte elements, and 2 for an unpacked array of byte.
-// Queues, dynamic, and associative arrays are handled by their own machinery
-// and are left out here.
-static char ClassifyUnpackedAggregateArg(const Expr* arg, SimContext& ctx) {
-  if (arg == nullptr || arg->kind != ExprKind::kIdentifier) return 0;
-  const ArrayInfo* ai = ctx.FindArrayInfo(arg->text);
-  if (ai == nullptr || ai->is_queue || ai->is_dynamic) return 0;
-  return ai->elem_type_kind == DataTypeKind::kByte ? 2 : 1;
+UnpackedAggregateKind ClassifyUnpackedAggregate(const Expr* arg,
+                                                SimContext& ctx) {
+  if (arg == nullptr || arg->kind != ExprKind::kIdentifier)
+    return UnpackedAggregateKind::kNone;
+  auto of_elements = [](DataTypeKind kind) {
+    return kind == DataTypeKind::kByte ? UnpackedAggregateKind::kByteArray
+                                       : UnpackedAggregateKind::kArray;
+  };
+  if (const QueueObject* q = ctx.FindQueue(arg->text))
+    return of_elements(q->elem_type_kind);
+  if (ctx.FindAssocArray(arg->text) != nullptr)
+    return UnpackedAggregateKind::kArray;
+  if (const ArrayInfo* ai = ctx.FindArrayInfo(arg->text))
+    return of_elements(ai->elem_type_kind);
+  const StructTypeInfo* st = StructLayoutOfName(arg->text, ctx);
+  return st != nullptr && !st->is_packed ? UnpackedAggregateKind::kStruct
+                                         : UnpackedAggregateKind::kNone;
+}
+
+// §21.2.1.1 / §21.2.1.7: the aggregate mark the formatter reads for one
+// argument (DisplayFormatOpts::arg_unpacked_agg): 0 for none, 1 for an
+// unpacked array of non-byte elements, 2 for an unpacked array of byte and 3
+// for an unpacked struct or union.
+static char UnpackedAggregateMark(UnpackedAggregateKind kind) {
+  switch (kind) {
+    case UnpackedAggregateKind::kArray:
+      return 1;
+    case UnpackedAggregateKind::kByteArray:
+      return 2;
+    case UnpackedAggregateKind::kStruct:
+      return 3;
+    default:
+      return 0;
+  }
+}
+
+// §21.2.1.1 (printed page 657): %u and %z apply to an unpacked struct as
+// though performed on each member in declaration order, and to an unpacked
+// union as though performed on its first member alone, each written in 32-bit
+// units with the least significant first. The value those two take is laid out
+// here so: each member in whole 32-bit units of its own, the first lowest.
+static Logic4Vec UnformattedLayout(const Logic4Vec& val,
+                                   const StructTypeInfo& st, Arena& arena) {
+  size_t count =
+      st.is_union ? std::min<size_t>(1, st.fields.size()) : st.fields.size();
+  auto units_of = [](uint32_t width) { return (width + 31) / 32 * 32; };
+  uint32_t total = 0;
+  for (size_t m = 0; m < count; ++m) total += units_of(st.fields[m].width);
+  Logic4Vec out = MakeLogic4Vec(arena, std::max<uint32_t>(total, 1));
+  uint32_t base = 0;
+  for (size_t m = 0; m < count; ++m) {
+    const StructFieldInfo& field = st.fields[m];
+    for (uint32_t k = 0; k < field.width; ++k) {
+      uint32_t from = field.bit_offset + k;
+      uint32_t to = base + k;
+      if (from / 64 >= val.nwords) break;
+      uint64_t bit = uint64_t{1} << (to % 64);
+      if ((val.words[from / 64].aval >> (from % 64)) & 1)
+        out.words[to / 64].aval |= bit;
+      if ((val.words[from / 64].bval >> (from % 64)) & 1)
+        out.words[to / 64].bval |= bit;
+    }
+    base += units_of(field.width);
+  }
+  return out;
 }
 
 // §21.2: the per-argument renderings a format template consumes alongside the
@@ -362,37 +401,41 @@ static DisplayArgRenderings CollectDisplayArgs(const Expr* expr, size_t& i,
     PercentVArg pv = ClassifyPercentVArg(val_arg, ctx, arena);
     r.v_fmts.push_back(BuildFormatV(pv));
     r.nonscalar_nets.push_back(NonScalarNetArgFlag(pv));
-    char agg = ClassifyUnpackedAggregateArg(val_arg, ctx);
-    r.agg_flags.push_back(agg);
+    UnpackedAggregateKind agg = ClassifyUnpackedAggregate(val_arg, ctx);
+    r.agg_flags.push_back(UnpackedAggregateMark(agg));
+    // Of the specifiers an unpacked struct or union takes, %p reads the form
+    // built above and %u and %z read this value, laid out member by member.
+    if (agg == UnpackedAggregateKind::kStruct) {
+      r.vals.back() =
+          UnformattedLayout(v, *StructLayoutOfName(val_arg->text, ctx), arena);
+    }
     // §21.2.1.7: an unpacked array of byte governed by %s prints its element
-    // characters from the left bound to the right bound. The element variables
-    // live here, so the string is precomputed and threaded to the formatter
+    // characters from the left bound to the right bound. The elements live
+    // here, so the string is precomputed and threaded to the formatter
     // alongside the value.
-    r.byte_strings.push_back(
-        agg == 2 ? FormatByteArrayLeftBoundFirst(
-                       val_arg->text, *ctx.FindArrayInfo(val_arg->text), ctx)
-                 : std::string());
+    r.byte_strings.push_back(agg == UnpackedAggregateKind::kByteArray
+                                 ? ByteArrayText(val_arg->text, ctx)
+                                 : std::string());
   }
   return r;
 }
 
-// §21.2.1.1: a bare argument that is a fixed-size unpacked array is handled by
-// its element type. An unpacked array of byte prints as a character string; any
-// other unpacked aggregate has no unformatted rendering and is illegal.
-// (Queues, dynamic, and associative arrays are left to their own handling.)
-// False means the argument is not such an array and renders normally.
+// §21.2.1.1 (printed page 656): a bare argument -- one no format specification
+// governs -- that is an unpacked array of byte prints as the character string
+// it spells; any other unpacked argument has no unformatted rendering and is
+// illegal. False means the argument is no unpacked aggregate and renders
+// normally.
 static bool AppendUnpackedArrayArg(const Expr* arg, SimContext& ctx,
                                    std::string& output) {
-  if (arg->kind != ExprKind::kIdentifier) return false;
-  const ArrayInfo* ai = ctx.FindArrayInfo(arg->text);
-  if (ai == nullptr || ai->is_queue || ai->is_dynamic) return false;
-  if (ai->elem_type_kind == DataTypeKind::kByte) {
-    output += FormatUnpackedByteArrayAsString(arg->text, *ai, ctx);
+  UnpackedAggregateKind agg = ClassifyUnpackedAggregate(arg, ctx);
+  if (agg == UnpackedAggregateKind::kNone) return false;
+  if (agg == UnpackedAggregateKind::kByteArray) {
+    output += ByteArrayText(arg->text, ctx);
   } else {
     ctx.GetDiag().Error(
         arg->range.start,
-        "unformatted unpacked-array argument to a display or write task "
-        "is illegal unless its elements are of type byte",
+        "unformatted unpacked argument to a display or write task is illegal "
+        "unless it is an unpacked array of byte",
         Subclause("21.2.1.1"));
   }
   return true;
@@ -421,6 +464,17 @@ static void AppendDisplayArg(const Expr* expr, size_t& i, SimContext& ctx,
   if (arg->kind == ExprKind::kStringLiteral) {
     std::string fmt = ExtractFormatString(arg);
     DisplayArgRenderings r = CollectDisplayArgs(expr, i, fmt, ctx, arena);
+    // §21.2.1 (printed page 655): an expression follows the literal for each
+    // conversion that takes one. A shortfall is reported as §21.3.3 has
+    // $sformat report its own, and a conversion left without one prints
+    // nothing.
+    if (r.vals.size() < CountFormatConversions(fmt)) {
+      ctx.GetDiag().Warning(arg->range.start,
+                            std::string(expr->callee) +
+                                ": a string literal has more format "
+                                "specifications than arguments after it",
+                            Subclause("21.2.1"));
+    }
     out.text += FormatDisplay(fmt, r.vals,
                               {.p_fmts = &r.p_fmts,
                                .v_fmts = &r.v_fmts,

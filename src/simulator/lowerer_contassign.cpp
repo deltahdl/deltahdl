@@ -33,6 +33,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
 #include "simulator/lowerer.h"
+#include "simulator/lowerer_contassign_driver.h"
 #include "simulator/module_path_delay.h"
 #include "simulator/net.h"
 #include "simulator/process.h"
@@ -115,50 +116,6 @@ struct ContAssignParams {
   bool path_delayed_at_connection = false;
 };
 
-// Identifies the driver slot that a continuous assignment writes to. Per IEEE
-// 1800 §10.3, a continuous assignment drives a single net (or variable) through
-// one driver; `net` is the resolved net (null when the target is a variable),
-// `driver_idx` is that driver's slot within the net, and `first` is true on the
-// initial commit, when the driver slot must be appended rather than
-// overwritten.
-struct ContAssignDriver {
-  Net* net = nullptr;
-  size_t driver_idx = 0;
-  bool first = true;
-  // §10.3.2: which bits of `net` this assignment drives. A bare identifier
-  // drives the whole net; a select drives the bits §11.5.1 gives its indices
-  // and high impedance everywhere else, so that §28.12 combines it with the
-  // net's other sources the way it combines any two. `lo` counts from the least
-  // significant end of the net's storage, and a width of zero with `partial`
-  // set is the select that addresses no bit of the net at all -- an index out
-  // of range, or one carrying x or z -- which §11.5.1 gives no effect and which
-  // therefore drives nothing.
-  bool partial = false;
-  uint32_t lo = 0;
-  uint32_t width = 0;
-  // §11.5.1's second answer for a select that is only partly in range: a
-  // partially out-of-range part-select, when written, changes only the bits
-  // that are in range, which names both the bits of the net that are
-  // written -- `lo` and `width` -- and the bits of the value those bits take.
-  // `src_lo` is where in the value they begin: it counts the select's own low
-  // bits that fall below the net, so it is zero for a select wholly inside the
-  // net and for one running off the high end, whose landing bits are the
-  // value's least significant ones, and positive for one running off the low
-  // end. §11.5.1 reads `a[1 -: 4]` on a `tri0 [7:0] a` as `a[1:-2]`, whose most
-  // significant end is index 1, so `a[1]` takes the value's bit 3 and `a[0]`
-  // its bit 2 and `assign a[1 -: 4] = 4'b1101` must leave `a` at 8'h03; driving
-  // the value's low two bits left it at 8'h01.
-  uint32_t src_lo = 0;
-};
-
-// The value a continuous-assignment driver contributes to net resolution: the
-// driven logic value paired with the driver strength selected for it (IEEE 1800
-// §10.3, §28.x driver strengths).
-struct ContAssignDrivenValue {
-  const Logic4Vec& value;
-  DriverStrength strength;
-};
-
 static ContAssignDelays BuildContAssignDelays(const ContAssignDelayExprs& exprs,
                                               SimContext& ctx, Arena& arena) {
   ContAssignDelays d;
@@ -238,61 +195,6 @@ static DriverStrength ComputeEffectiveDriverStrength(
     return ThreeStateGateStrength(params, effective_ds, ctx, ctx.GetArena());
   }
   return effective_ds;
-}
-
-// The value this assignment contributes to its net's resolution, over the
-// net's full width.
-//
-// §10.7: the left-hand side's size is the context the right-hand expression is
-// sized in, and a right-hand side of fewer bits is padded out to that size,
-// sign-extended where it is signed. For a bare identifier the left-hand side is
-// the net, so the value is extended to it -- pushed as it stands it would drive
-// the low bits and leave every bit above them to resolve as undriven.
-//
-// For a select the left-hand side is the selected bits, so the padding context
-// is their width, and the driver is that value in place with high impedance
-// around it. §28.12 then resolves each bit against the net's other sources, and
-// the bits this assignment does not name are decided without it -- which is
-// what a source driving part of a net is.
-//
-// A select running off the low end of the net does not land the value's low
-// bits: §11.5.1 gives the bits that are in range the value's bits at and above
-// `src_lo`. The padding context is then `src_lo + drv.width`, the number of the
-// select's own bits at and below the ones that land, and the deposit takes its
-// source from `src_lo`. The select's bits above those are discarded either way.
-static Logic4Vec ContAssignDriverValue(const ContAssignDriver& drv,
-                                       const Logic4Vec& value, Arena& arena) {
-  uint32_t net_width = drv.net->resolved->value.width;
-  if (!drv.partial) return ResizeToWidth(value, net_width, arena);
-  Logic4Vec out = MakeAllHighZ(arena, net_width);
-  if (drv.width > 0) {
-    Logic4Vec sized = ResizeToWidth(value, drv.src_lo + drv.width, arena);
-    DepositBitField(out, drv.lo,
-                    ExtractBitField(arena, sized, drv.src_lo, drv.width),
-                    drv.width);
-  }
-  return out;
-}
-
-static void ApplyContAssignToNet(const ContAssignDriver& drv,
-                                 const ContAssignDrivenValue& driven,
-                                 Scheduler* sched, Arena& arena) {
-  // ApplyContAssignToNet is the net's half of the same step
-  // ApplyContAssignToVariable takes for a variable target.
-  auto value = ContAssignDriverValue(drv, driven.value, arena);
-  if (drv.first) {
-    drv.net->drivers.push_back(value);
-    drv.net->driver_strengths.push_back(driven.strength);
-  } else {
-    drv.net->drivers[drv.driver_idx] = value;
-    drv.net->driver_strengths[drv.driver_idx] = driven.strength;
-  }
-  // §28.16.2.1: when this update leaves a trireg net with only high-impedance
-  // drivers it enters the charge storage state, and Resolve arms the charge
-  // decay process by scheduling the transition to x on the scheduler. Pass the
-  // scheduler through so a driver turning off actually starts that process at
-  // run time (a null scheduler would silently drop it).
-  drv.net->Resolve(arena, sched);
 }
 
 // The value a continuous assignment drives, at the target's width, a stream
@@ -559,6 +461,9 @@ static ContAssignDriver MakeContAssignDriver(const Expr* lhs, SimContext& ctx) {
   }
   drv.driver_idx = drv.net ? drv.net->drivers.size() : 0;
   drv.first = true;
+  // §21.7.4.3.2: the instance the assignment stands in.
+  if (const Process* proc = ctx.CurrentProcess())
+    drv.origin = proc->inst_prefix;
   return drv;
 }
 

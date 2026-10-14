@@ -105,6 +105,11 @@ ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena);
 // `tk.inner.w`, under the instance's prefix -- so another process reaches it.
 // Defined in stmt_exec_control.cpp.
 void BindNamedBlockVariable(std::string_view name, SimContext& ctx);
+// The hierarchical path of the named scopes the running statement stands in,
+// from its innermost subroutine, under the instance's prefix -- `b1.f1` or
+// `tk.inner` -- recording each level's §21.7.2.3 scope kind on the way.
+// Defined in stmt_exec_control.cpp.
+std::string ActiveNamedScopePath(SimContext& ctx);
 ExecTask ExecIf(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena);
 // §12.5: the body of the item the case statement `stmt` selects, its case

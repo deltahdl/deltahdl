@@ -48,6 +48,12 @@ struct Net {
   Variable* resolved = nullptr;
   std::vector<Logic4Vec> drivers;
   std::vector<DriverStrength> driver_strengths;
+  // §21.7.4.3.2: the hierarchical prefix of the instance each driver stands
+  // in, slot for slot with `drivers` where a continuous assignment recorded
+  // one (ApplyContAssignToNet), so a dumped inout port can tell its input end,
+  // the drivers outside its instance, from its output end, those inside. A
+  // slot past the end, or one no assignment filled, records no instance.
+  std::vector<std::string_view> driver_origins;
   NetStrength resolved_strength;
 
   // §21.2.1.4: the strength of each bit of this net, indexed from the least

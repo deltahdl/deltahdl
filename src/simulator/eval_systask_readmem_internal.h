@@ -51,6 +51,7 @@ bool EnumValueInRange(const EnumTypeInfo* info, const Logic4Vec& v);
 bool IsMemFileSpace(char c);
 bool SkipMemFileComment(const std::string& content, size_t n, size_t& pos);
 std::string ScanMemFileToken(const std::string& content, size_t n, size_t& pos);
+bool CheckMemFileToken(const ReadmemEnv& env, const std::string& tok);
 
 // §21.4 / §D.14: loads `content`, text in the §21.4 load-file grammar, into
 // the memory `mn` names -- a bare unpacked array, a partially indexed

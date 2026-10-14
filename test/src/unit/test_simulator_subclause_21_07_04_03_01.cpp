@@ -25,15 +25,14 @@ namespace {
 //     (both active with 1), ? unknown, F three-state, and the input/output
 //     conflict combinations A/a/B/b/C/c/f.
 //
-// The simulator resolves every port to one 4-state value and does not separate
-// an input contribution from an output one or count how many drivers are
-// active, so the characters that describe those -- the conflict resolutions
-// A/a/B/b/C/c/f and the multi-driver d/u/l/h -- are unreachable here. Which
-// list the other four come from is a property of the declaration rather than of
-// the resolved value, and the declared direction is recorded, so a port
-// declared input reports D/U/N/Z, one declared output L/H/X/T, and an object
-// no port declaration covers -- a module-body net or variable, or an inout,
-// which is both ends at once -- reports 0/1/?/F.
+// Which list a port's characters come from is a property of its declaration
+// rather than of its resolved value, so a port declared input reports
+// D/U/N/Z, one declared output L/H/X/T, and an object no port declaration
+// covers -- a module-body net or variable -- 0/1/?/F. Two or more active
+// drivers on an input's test-fixture side or an output's device side turn
+// D/U and L/H into d/u and l/h, and an inout, both ends at once, is read from
+// the drivers at each end: the conflict characters of §21.7.4.3.2 and the
+// A/a/B/b/C/c/f pairings of the unknown-direction list.
 //
 // These tests observe the writer applying those two reachable definitions
 // through the production path. The state character is a function of the port's
@@ -213,6 +212,125 @@ TEST_F(ExtendedVcdStateCharacterSim, UnknownValueSelectsTheUnknownCharacter) {
       "  end\n"
       "endmodule\n");
   EXPECT_EQ(PortStateChars(content), "?") << content;
+}
+
+}  // namespace
+// §21.7.4.2 (printed page 699): a concatenated port appears as separate
+// entries, so the objects `{A, b}` names are two ports of their own, and
+// §21.7.4.3.1 writes each with its direction's characters -- U and D for the
+// inputs here -- as it does the named input ci. Registration is in name
+// order, giving u.A code 0, u.b code 1 and u.ci code 2.
+TEST_F(ExtendedVcdStateCharacterSim, ConcatenatedPortMembersAreInputPorts) {
+  auto content = RunPortVcd(
+      "module addbit({A, b}, ci);\n"
+      "  input A, b, ci;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic x, y, z;\n"
+      "  addbit u({x, y}, z);\n"
+      "  initial begin\n"
+      "    x = 1'b1; y = 1'b0; z = 1'b1;\n"
+      "    $dumpports;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_NE(content.find("$var port 1 <0 A $end"), std::string::npos)
+      << content;
+  EXPECT_NE(content.find("$var port 1 <1 b $end"), std::string::npos)
+      << content;
+  EXPECT_EQ(PortStateCharsFor(content, "0"), "U") << content;
+  EXPECT_EQ(PortStateCharsFor(content, "1"), "D") << content;
+  EXPECT_EQ(PortStateCharsFor(content, "2"), "U") << content;
+}
+
+// §21.7.4.3.1 (printed pages 700-701): an output port driven by two or more
+// active drivers inside the device reports l for low and h for high, rather
+// than L and H. Registration is in name order: k1.hi code 0, k1.lo code 1.
+TEST_F(ExtendedVcdStateCharacterSim, OutputWithTwoActiveDriversIsLowercase) {
+  auto content = RunPortVcd(
+      "module s(output hi, output lo);\n"
+      "  assign hi = 1'b1;\n"
+      "  assign hi = 1'b1;\n"
+      "  assign lo = 1'b0;\n"
+      "  assign lo = 1'b0;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  wire a, b;\n"
+      "  s k1(.hi(a), .lo(b));\n"
+      "  initial $dumpports;\n"
+      "endmodule\n");
+  EXPECT_EQ(PortStateCharsFor(content, "0"), "h") << content;
+  EXPECT_EQ(PortStateCharsFor(content, "1"), "l") << content;
+}
+
+// §21.7.4.3.1: an input port whose test-fixture side has two or more active
+// drivers reports d for low and u for high. Registration is in name order:
+// k1.hi code 0, k1.lo code 1.
+TEST_F(ExtendedVcdStateCharacterSim, InputWithTwoActiveDriversIsLowercase) {
+  auto content = RunPortVcd(
+      "module s(input hi, input lo);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  wire a, b;\n"
+      "  assign a = 1'b1;\n"
+      "  assign a = 1'b1;\n"
+      "  assign b = 1'b0;\n"
+      "  assign b = 1'b0;\n"
+      "  s k1(.hi(a), .lo(b));\n"
+      "  initial $dumpports;\n"
+      "endmodule\n");
+  EXPECT_EQ(PortStateCharsFor(content, "0"), "u") << content;
+  EXPECT_EQ(PortStateCharsFor(content, "1"), "d") << content;
+}
+
+// §21.7.4.3.1 and §21.7.4.3.2 (printed page 701): an inout port's input end is
+// what the test fixture drives and its output end what the device drives.
+// Ends at one value are resolved by strength range -- the same range gives 1,
+// a strong input over a weak output u, a weak input under a strong output h --
+// and ends at different values take the unknown-direction character naming
+// the pair, input first: A for 0 and 1, B for 1 and 0, C for x and 0, c for x
+// and 1, a for 0 and x, b for 1 and x, ? for x and x. An end of two drivers at
+// 0 and 1 is at x, and with one end alone active the resolved value's own
+// unknown-direction character stands. Registration is in name order, ka.p to
+// kk.p taking codes 0 to 10.
+TEST_F(ExtendedVcdStateCharacterSim, InoutEndsPickTheConflictCharacter) {
+  auto content = RunPortVcd(
+      "module m1(inout p); assign p = 1'b1; endmodule\n"
+      "module m0(inout p); assign p = 1'b0; endmodule\n"
+      "module mx(inout p); assign p = 1'bx; endmodule\n"
+      "module mw(inout p); assign (weak0, weak1) p = 1'b1; endmodule\n"
+      "module t;\n"
+      "  wire wa, wb, wc, wd, we, wf, wg, wh, wi, wj, wk;\n"
+      "  assign wa = 1'b0;\n"
+      "  assign wb = 1'b1;\n"
+      "  assign (weak0, weak1) wc = 1'b1;\n"
+      "  assign wd = 1'b1;\n"
+      "  assign we = 1'b1;\n"
+      "  assign wf = 1'b0;\n"
+      "  assign wf = 1'b1;\n"
+      "  assign wg = 1'bx;\n"
+      "  assign wh = 1'b0;\n"
+      "  assign wi = 1'b1;\n"
+      "  assign wj = 1'bx;\n"
+      "  m1 ka(.p(wa));\n"
+      "  mw kb(.p(wb));\n"
+      "  m1 kc(.p(wc));\n"
+      "  m1 kd(.p(wd));\n"
+      "  m0 ke(.p(we));\n"
+      "  m0 kf(.p(wf));\n"
+      "  m1 kg(.p(wg));\n"
+      "  mx kh(.p(wh));\n"
+      "  mx ki(.p(wi));\n"
+      "  mx kj(.p(wj));\n"
+      "  m1 kk(.p(wk));\n"
+      "  initial $dumpports;\n"
+      "endmodule\n");
+  const char* kExpected[] = {"A", "u", "h", "1", "B", "C",
+                             "c", "a", "b", "?", "1"};
+  for (int code = 0; code < 11; ++code) {
+    EXPECT_EQ(PortStateCharsFor(content, std::to_string(code)), kExpected[code])
+        << code << "\n"
+        << content;
+  }
 }
 
 }  // namespace

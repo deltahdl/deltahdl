@@ -144,6 +144,7 @@ void Lowerer::LowerVarAggregate(std::string_view name,
     auto* q = ctx_.CreateQueue(name, var.is_event ? 64 : var.width,
                                var.queue_max_size, var.is_4state);
     q->is_signed = var.is_signed;
+    q->elem_type_kind = var.elem_type_kind;
     q->holds_events = var.is_event;
     // §8.4: a queue of a class type holds handles, so `q[i].v` names a
     // property of the object an element refers to (TryEvalQueueElementMember
@@ -160,6 +161,7 @@ void Lowerer::LowerVarAggregate(std::string_view name,
     // x/z-to-0 memory-load coercion on it, and it governs 2-state defaults.
     auto* q = ctx_.CreateQueue(name, var.width, /*max_size=*/-1, var.is_4state);
     q->is_signed = var.is_signed;
+    q->elem_type_kind = var.elem_type_kind;
     q->elements_are_queues = var.elements_are_queues;
     ApplyElementShape(q, var.element);
     LowerDynArrayInit(q, var);

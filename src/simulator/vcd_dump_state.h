@@ -137,6 +137,17 @@ struct VcdDumpState {
   // §21.7.2.3: the design's packages, each a top-level scope of the dump.
   void MarkVcdPackage(std::string_view name);
   bool IsVcdPackage(std::string_view name) const;
+  // §21.7.2.3: the kind of each scope below a module that a dumped object's
+  // hierarchical name passes through -- a task, a function, or a named
+  // sequential or parallel block -- keyed by its full path, `b1` or `u.tk.b2`.
+  // A path with no kind recorded is a module instance's.
+  void SetVcdScopeKind(const std::string& path, VcdScopeKind kind);
+  VcdScopeKind GetVcdScopeKind(std::string_view path) const;
+  // §21.7.4.3.1: the signal the parent connected to each input port, keyed by
+  // the port's hierarchical name, whose drivers are the port's test-fixture
+  // side. Empty for a port connected to no plain signal name.
+  void SetVcdPortSource(const std::string& port, std::string source);
+  std::string_view GetVcdPortSource(std::string_view port) const;
 
  private:
   // §21.7.3.1: the one simulation time at which every $dumpports call must
@@ -161,6 +172,10 @@ struct VcdDumpState {
   std::unordered_set<std::string_view> enum_constants_;
   // §21.7.2.3: the packages. See IsVcdPackage.
   std::unordered_set<std::string_view> packages_;
+  // §21.7.2.3: the scope kinds. See GetVcdScopeKind.
+  std::unordered_map<std::string, VcdScopeKind> scope_kinds_;
+  // §21.7.4.3.1: the input ports' sources. See GetVcdPortSource.
+  std::unordered_map<std::string, std::string> port_sources_;
 };
 
 }  // namespace delta

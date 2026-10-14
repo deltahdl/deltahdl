@@ -58,8 +58,11 @@ bool DispatchMemFileToken(const std::string& tok, AddrFn& on_addr,
   return on_word(tok);
 }
 
+// False when the scan stopped short: a token of no form §21.4 allows, or a
+// callback asking to abort.
 template <class AddrFn, class WordFn>
-void ScanMemFile(const std::string& content, AddrFn on_addr, WordFn on_word) {
+bool ScanMemFile(const ReadmemEnv& env, const std::string& content,
+                 AddrFn on_addr, WordFn on_word) {
   size_t pos = 0;
   size_t n = content.size();
   while (pos < n) {
@@ -74,9 +77,10 @@ void ScanMemFile(const std::string& content, AddrFn on_addr, WordFn on_word) {
     // comment.
     std::string tok = ScanMemFileToken(content, n, pos);
     if (tok.empty()) continue;
-
-    if (!DispatchMemFileToken(tok, on_addr, on_word)) return;
+    if (!CheckMemFileToken(env, tok)) return false;
+    if (!DispatchMemFileToken(tok, on_addr, on_word)) return false;
   }
+  return true;
 }
 
 // §21.4: drives the address-windowed load shared by an ordinary unpacked array
@@ -148,12 +152,11 @@ struct TaskAddrRange {
 };
 
 // §21.4: the mutable cursor state carried through an indexed (windowed) load:
-// the running address, whether any @-address was seen, the parsed-word count,
-// and an abort flag set when a callback ends the scan early.
+// the running address, whether any @-address was seen, and the parsed-word
+// count.
 struct IndexedLoadState {
   int64_t cursor = 0;
   bool addr_in_file = false;
-  bool aborted = false;
   uint64_t data_words = 0;
 };
 
@@ -187,7 +190,6 @@ static bool HandleIndexedAddr(const ReadmemEnv& env, const TaskAddrRange& range,
         "$readmem" + std::string(env.is_hex ? "h" : "b") +
             ": file address outside the range given by the task",
         Subclause("21.4"));
-    st.aborted = true;
     return false;
   }
   st.cursor = addr;
@@ -210,10 +212,7 @@ static bool HandleIndexedWord(const ReadmemEnv& env, const IndexedWordCtx& iwc,
                               const std::string& tok, WriteFn& write_word,
                               IndexedLoadState& st) {
   Logic4Vec word;
-  if (!ParseReadmemWord(env, tok, iwc.et, word)) {
-    st.aborted = true;
-    return false;
-  }
+  if (!ParseReadmemWord(env, tok, iwc.et, word)) return false;
   write_word(st.cursor, word);
   ++st.data_words;
   st.cursor += iwc.descending ? -1 : 1;
@@ -275,8 +274,8 @@ static void EvalReadmemIndexed(const ReadmemEnv& env,
   IndexedWordCtx iwc{req.et, descending};
   IndexedLoadState st;
   st.cursor = w.has_start ? start_addr : mw.low_addr;
-  ScanMemFile(
-      content,
+  bool whole = ScanMemFile(
+      env, content,
       [&](int64_t addr) -> bool {
         return HandleIndexedAddr(env, range, addr, st);
       },
@@ -286,10 +285,9 @@ static void EvalReadmemIndexed(const ReadmemEnv& env,
 
   // §21.4: with an explicit start-through-finish window and no addresses in the
   // file, the data-word count must match the window size. Addresses not covered
-  // by the file are left unmodified, which the write loop above guarantees.
-  if (!st.aborted) {
-    WarnReadmemWordCount(env, range, st);
-  }
+  // by the file are left unmodified, which the write loop above guarantees. A
+  // load that stopped short has no count to compare.
+  if (whole) WarnReadmemWordCount(env, range, st);
 }
 
 // §21.4.1: loads an associative array. Each address — the start_addr default,
@@ -338,7 +336,7 @@ static void EvalReadmemAssoc(const ReadmemEnv& env, const std::string& content,
 
   IndexedWordCtx iwc{et, descending};
   ScanMemFile(
-      content,
+      env, content,
       [&](int64_t addr) -> bool {
         cursor = addr;
         return true;
@@ -468,7 +466,7 @@ static void EvalReadmemMultiDim(const ReadmemEnv& env,
   uint64_t cursor = 0;
 
   ScanMemFile(
-      content,
+      env, content,
       [&](int64_t addr) -> bool {
         return HandleMultiDimAddr(env, geom, addr, cursor);
       },

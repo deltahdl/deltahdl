@@ -697,15 +697,16 @@ ScanFieldResult DispatchScanField(char lc, const ScanInputField& field,
 // `args` binding state, and returns false when the scan must stop (malformed
 // specifier, %% mismatch, or a field that failed to convert).
 
-// §21.3.4.3: the integer format specifiers shall not read into an unpacked
-// aggregate; only %s may fill an unpacked array of byte. True rejects the
-// misuse, after reporting it, so the scan ends without assigning.
+// §21.3.4.3 (printed page 671): the integer format specifiers, %u and %z among
+// them, shall not read into any unpacked aggregate -- an unpacked array of any
+// kind or an unpacked struct or union; only %s may fill an unpacked array of
+// byte. True rejects the misuse, after reporting it, so the scan ends without
+// assigning.
 bool RejectAggregateScanDest(char lc, const ScanSpec& spec, ScanArgs& args) {
   if (!IsIntegerClassCode(lc) || spec.suppress || args.ai >= args.ndest)
     return false;
   const Expr* a = args.dest[args.ai];
-  if (a == nullptr || a->kind != ExprKind::kIdentifier ||
-      args.ctx.FindArrayInfo(a->text) == nullptr)
+  if (ClassifyUnpackedAggregate(a, args.ctx) == UnpackedAggregateKind::kNone)
     return false;
   args.ctx.GetDiag().Warning(a->range.start,
                              std::string("$fscanf/$sscanf: %") + spec.code +

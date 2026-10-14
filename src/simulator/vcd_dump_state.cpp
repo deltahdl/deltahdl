@@ -160,4 +160,24 @@ bool VcdDumpState::IsVcdPackage(std::string_view name) const {
   return packages_.count(name) != 0;
 }
 
+void VcdDumpState::SetVcdScopeKind(const std::string& path, VcdScopeKind kind) {
+  scope_kinds_[path] = kind;
+}
+
+VcdScopeKind VcdDumpState::GetVcdScopeKind(std::string_view path) const {
+  auto it = scope_kinds_.find(std::string(path));
+  return it != scope_kinds_.end() ? it->second : VcdScopeKind::kModule;
+}
+
+void VcdDumpState::SetVcdPortSource(const std::string& port,
+                                    std::string source) {
+  port_sources_[port] = std::move(source);
+}
+
+std::string_view VcdDumpState::GetVcdPortSource(std::string_view port) const {
+  auto it = port_sources_.find(std::string(port));
+  return it != port_sources_.end() ? std::string_view(it->second)
+                                   : std::string_view();
+}
+
 }  // namespace delta

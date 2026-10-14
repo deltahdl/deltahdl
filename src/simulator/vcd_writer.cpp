@@ -329,6 +329,7 @@ static VcdSignal MakeVcdSignalFields(const VcdSignalSpec& spec) {
   // §21.7.4.3: the net whose resolved strength answers the two strength
   // components of a port value change, null when the object is not a net.
   sig.net = spec.net;
+  sig.source_net = spec.source_net;
   return sig;
 }
 
@@ -354,21 +355,6 @@ static VcdSignal MakeVcdSignal(const VcdSignalSpec& spec, char& next_ident,
   VcdSignal sig = MakeVcdSignalFields(spec);
   AssignVcdSignalCodes(sig, next_ident, next_port_id);
   return sig;
-}
-
-// §21.7.4.2 (Syntax 21-28): $var port <size> <<id> <reference> $end. The
-// var_type keyword is always port; the size is the declared index range of a
-// bus or 1 for a single-bit port; the identifier code is the integer preceded
-// by <. At least one space separates each syntactical element.
-static void WritePortVarDecl(std::ostream& ofs, const VcdSignal& sig,
-                             std::string_view name) {
-  ofs << "$var port ";
-  if (sig.msb >= 0 && sig.lsb >= 0) {
-    ofs << "[" << sig.msb << ":" << sig.lsb << "]";
-  } else {
-    ofs << "1";
-  }
-  ofs << " <" << sig.port_id << " " << name << " $end\n";
 }
 
 // §21.7.5 (Table 21-11): a SystemVerilog data type masquerades as a 1364-2005

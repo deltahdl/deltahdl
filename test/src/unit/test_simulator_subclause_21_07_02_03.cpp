@@ -622,6 +622,48 @@ TEST_F(VcdKeywordCommandsE2E, SubInstanceVariablesAreDeclaredInTheirOwnScope) {
   EXPECT_LT(content.rfind("$upscope $end"), content.find("$enddefinitions"));
 }
 
+// §21.7.2.3 (printed page 691): the scope type of a $scope names the kind of
+// scope it opens -- begin for a named sequential block, fork for a named
+// parallel block, task for a task -- and a variable those declare is dumped
+// within its own, the fork's inside the begin block holding it. None of them
+// is a module.
+class VcdScopeKindSim : public VcdDumpFromSourceTestBase {};
+
+TEST_F(VcdScopeKindSim, BlocksAndTasksOpenScopesOfTheirOwnKind) {
+  RunSource(
+      "module m;\n"
+      "  task tk; int tv; tv = 7; endtask\n"
+      "  initial begin : b1\n"
+      "    int bv;\n"
+      "    bv = 1;\n"
+      "    fork : f1\n"
+      "      int fv;\n"
+      "      fv = 2;\n"
+      "    join\n"
+      "    tk();\n"
+      "    #2;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1;\n"
+      "    $dumpfile(\"kinds.vcd\");\n"
+      "    $dumpvars;\n"
+      "  end\n"
+      "endmodule\n");
+  const std::string kDump = DumpFile("kinds.vcd");
+  size_t begin_at = kDump.find("$scope begin b1 $end");
+  size_t fork_at = kDump.find("$scope fork f1 $end");
+  size_t task_at = kDump.find("$scope task tk $end");
+  ASSERT_NE(begin_at, std::string::npos) << kDump;
+  ASSERT_NE(fork_at, std::string::npos) << kDump;
+  ASSERT_NE(task_at, std::string::npos) << kDump;
+  EXPECT_NE(kDump.find(" bv $end", begin_at), std::string::npos) << kDump;
+  EXPECT_NE(kDump.find(" fv $end", fork_at), std::string::npos) << kDump;
+  EXPECT_NE(kDump.find(" tv $end", task_at), std::string::npos) << kDump;
+  EXPECT_LT(begin_at, fork_at) << kDump;
+  EXPECT_EQ(kDump.find("$scope module b1"), std::string::npos) << kDump;
+  EXPECT_EQ(kDump.find("$scope module tk"), std::string::npos) << kDump;
+}
+
 // §21.7.2.3: a `module` scope is a top-level module or a module instance, and
 // a package is instantiated nowhere, so its variables are declared under a
 // scope of its own at the top level of the definitions, beside the module's:

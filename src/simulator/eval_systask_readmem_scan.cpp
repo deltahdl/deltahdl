@@ -1,17 +1,22 @@
+#include <algorithm>
+#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "common/types.h"
 #include "simulator/eval_systask_internal.h"
 #include "simulator/eval_systask_readmem_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 
 namespace delta {
@@ -146,6 +151,46 @@ std::string ScanMemFileToken(const std::string& content, size_t n,
     ++pos;
   }
   return content.substr(begin, pos - begin);
+}
+
+// §21.4: a character a number of the load file's radix may hold -- 0 and 1 for
+// $readmemb, any hexadecimal digit for $readmemh -- or the x, z and ? forms and
+// the underscore either radix takes, as in a number of the source text.
+static bool IsMemNumberChar(char c, bool is_hex) {
+  if (c == 'x' || c == 'X' || c == 'z' || c == 'Z' || c == '?' || c == '_')
+    return true;
+  if (is_hex) return std::isxdigit(static_cast<unsigned char>(c)) != 0;
+  return c == '0' || c == '1';
+}
+
+// §21.4: the load file holds white space, comments, @-addresses -- an `@`
+// followed directly by a hexadecimal number -- and numbers of the task's radix
+// written with neither a length nor a base. A token of another form is
+// reported, and false stops the load.
+bool CheckMemFileToken(const ReadmemEnv& env, const std::string& tok) {
+  std::string task = std::string("$readmem") + (env.is_hex ? "h" : "b");
+  if (tok[0] == '@') {
+    std::string_view digits = std::string_view(tok).substr(1);
+    if (!digits.empty() && std::ranges::all_of(digits, [](char c) {
+          return std::isxdigit(static_cast<unsigned char>(c)) != 0;
+        }))
+      return true;
+    env.ctx.GetDiag().Error(
+        env.loc,
+        task + ": '" + tok +
+            "': '@' is not followed directly by a hexadecimal address",
+        Subclause("21.4"));
+    return false;
+  }
+  if (std::ranges::all_of(
+          tok, [&](char c) { return IsMemNumberChar(c, env.is_hex); }))
+    return true;
+  env.ctx.GetDiag().Error(env.loc,
+                          task + ": '" + tok + "' is not an unsized " +
+                              (env.is_hex ? "hexadecimal" : "binary") +
+                              " number",
+                          Subclause("21.4"));
+  return false;
 }
 
 }  // namespace delta

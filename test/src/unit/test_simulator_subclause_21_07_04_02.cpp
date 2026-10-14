@@ -261,15 +261,5 @@ TEST_F(ExtendedVcdNodeInfoSim, NetPortUsesPortKeywordWithItsIndexRange) {
   EXPECT_EQ(content.find("$var wire"), std::string::npos) << content;
 }
 
-// §21.7.4.2 also states that concatenated ports shall appear in the extended
-// VCD file as separate entries. Splitting a concatenated port (for example
-// {A, b}) into its member objects happens during elaboration, and this
-// implementation currently collapses such a port into a single merged object
-// before it reaches the simulator, so its members are not registered under
-// their own names. Producing the separate members is an elaboration-stage
-// concern outside this subclause's output-stage machinery, so that rule is not
-// exercised here; the writer already emits one $var port line per registered
-// object, as the tests above show for independently declared ports.
-
 }  // namespace
 }  // namespace delta

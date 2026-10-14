@@ -76,9 +76,11 @@ bool SimContext::IsUndumpableVcdName(std::string_view name) const {
 // holding it. The model keys an instance's variables on their hierarchical
 // name, `u.deep`, so the scopes between the one open and the one `name` stands
 // in are closed and opened here, and the name within that scope is returned.
+// A level that is a task, a function or a named block opens under the kind
+// `state` recorded for the path reaching it (VcdDumpState::GetVcdScopeKind).
 static std::string_view EnterVcdInstanceScope(
-    VcdWriter& vcd, std::vector<std::string_view>& open,
-    std::string_view name) {
+    VcdWriter& vcd, const VcdDumpState& state,
+    std::vector<std::string_view>& open, std::string_view name) {
   std::vector<std::string_view> path;
   size_t start = 0;
   for (size_t dot = name.find('.'); dot != std::string_view::npos;
@@ -93,7 +95,9 @@ static std::string_view EnterVcdInstanceScope(
   }
   for (; open.size() > common; open.pop_back()) vcd.EndScope();
   for (; open.size() < path.size(); open.push_back(path[open.size()])) {
-    vcd.BeginScope(path[open.size()]);
+    std::string_view level = path[open.size()];
+    size_t end = static_cast<size_t>(level.data() - name.data()) + level.size();
+    vcd.BeginScope(level, state.GetVcdScopeKind(name.substr(0, end)));
   }
   return name.substr(start);
 }
@@ -167,7 +171,8 @@ void SimContext::RegisterVcdSignalsOf(VcdWriter& vcd, bool packages) {
     // writes only what was registered. The declared kind decides it because a
     // string port reaches SetVcdVarKind but not RegisterStringVariable.
     if (vcd_.GetVcdVarKind(name) == DataTypeKind::kString) continue;
-    std::string_view ref_name = EnterVcdInstanceScope(vcd, open_scopes, name);
+    std::string_view ref_name =
+        EnterVcdInstanceScope(vcd, vcd_, open_scopes, name);
     // §21.7.5: an unpacked structure is not dumped as one object -- it appears
     // as a named fork-join block whose members are the dumped objects. A packed
     // structure is excluded here because the table collapses it to a single reg
@@ -198,6 +203,9 @@ void SimContext::RegisterVcdSignalsOf(VcdWriter& vcd, bool packages) {
       spec.net_type = net->type;
       spec.net = net;
     }
+    // §21.7.4.3.1: an input's test-fixture side, the signal connected to it.
+    if (std::string_view source = vcd_.GetVcdPortSource(name); !source.empty())
+      spec.source_net = FindNet(source);
     SetVcdPortRange(spec);
     vcd.RegisterSignal(spec);
   }

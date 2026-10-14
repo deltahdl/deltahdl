@@ -389,6 +389,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/lowerer_procedural_checker.cpp
     simulator/lowerer_clocking.cpp
     simulator/lowerer_contassign.cpp
+    simulator/lowerer_contassign_driver.cpp
     simulator/lowerer_bidir_switch.cpp
     simulator/contassign_delay.cpp
     simulator/contassign_strength.cpp
