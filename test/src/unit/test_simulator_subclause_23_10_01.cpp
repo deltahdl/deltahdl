@@ -432,4 +432,32 @@ TEST(DefparamSimulation, ADefparamResizesAnInterfacesDeclaration) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §23.10.1 with §27.4: a declaration a loop generate block makes from the
+// parameter and the block's own index is resized from both, 5 and 10 for W of
+// 5, while a net the defparam'd parameter does not size, and one a conditional
+// block declares, read the widths they have: 1 and 5.
+TEST(DefparamSimulation, ADefparamResizesGenerateBlockDeclarations) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module mm #(W = 4)();\n"
+                 "  for (genvar i = 1; i < 3; i++) begin : g\n"
+                 "    logic [W*i-1:0] v;\n"
+                 "  end\n"
+                 "  if (1) begin : b\n"
+                 "    wire [W-1:0] n;\n"
+                 "  end\n"
+                 "  wire s;\n"
+                 "endmodule\n"
+                 "module top;\n"
+                 "  mm d();\n"
+                 "  defparam d.W = 5;\n"
+                 "  initial #1 $display(\"%0d %0d %0d %0d\", $bits(d.g[1].v),\n"
+                 "                      $bits(d.g[2].v), $bits(d.s),\n"
+                 "                      $bits(d.b.n));\n"
+                 "endmodule\n",
+                 f),
+      "5 10 1 5\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

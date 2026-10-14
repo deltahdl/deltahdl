@@ -310,4 +310,28 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
             "3 1\n");
 }
 
+// The array may be declared by its size, `ifc ia[2]`, which counts from 0,
+// and an array of the same interface beside it is no part of the connection:
+// p[0] and p[1] read ia[0] and ia[1], 1 and 2, never other's 3.
+TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
+     AnInterfaceArrayPortTakesTheArrayItNames) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "interface ifc; logic [1:0] a; endinterface\n"
+          "module user(ifc p[2]);\n"
+          "  initial #1 $display(\"%0d %0d\", p[0].a, p[1].a);\n"
+          "endmodule\n"
+          "module top;\n"
+          "  ifc other[2]();\n"
+          "  ifc ia[2]();\n"
+          "  initial begin\n"
+          "    ia[0].a = 1; ia[1].a = 2; other[0].a = 3; other[1].a = 3;\n"
+          "  end\n"
+          "  user u(ia);\n"
+          "endmodule\n",
+          f),
+      "1 2\n");
+}
+
 }  // namespace
