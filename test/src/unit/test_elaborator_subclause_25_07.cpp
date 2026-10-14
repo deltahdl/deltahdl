@@ -22,6 +22,7 @@ TEST(InterfaceSubroutines, InterfaceWithSubroutinesElaborates) {
 TEST(ModportDeclarationElaboration, ImportExportModportElaborates) {
   EXPECT_TRUE(
       ElabOk("interface ifc;\n"
+             "  task Read; endtask\n"
              "  modport mp(import Read, export Write);\n"
              "endinterface\n"
              "module m;\n"
@@ -516,6 +517,158 @@ TEST(ModportDeclarationElaboration,
              "  simple_bus sb_intf(clk);\n"
              "  memMod mem(sb_intf.target);\n"
              "endmodule\n"));
+}
+
+// §25.7: the number and types of a prototype's arguments shall match the
+// subroutine's declaration, and a formal name it gives shall be the
+// declaration's. mp's prototype of f has two arguments where the interface
+// declares one, and mq's names its second formal z where g's is b.
+TEST(ModportImportPrototype, MismatchWithTheDeclarationIsRefused) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface sb;\n"
+      "  function automatic int f(int a); return a; endfunction\n"
+      "  function automatic int g(int a, int b = 9); return b; endfunction\n"
+      "  modport mp(import function int f(int a, int b));\n"
+      "  modport mq(import function int g(int a, int z = 9));\n"
+      "endinterface\n",
+      f, "sb");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the prototype of 'f' modport 'mp' imports does "
+                            "not match its declaration in interface 'sb'",
+                            4, "25.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the prototype of 'g' modport 'mq' imports does "
+                            "not match its declaration in interface 'sb'",
+                            5, "25.7"));
+}
+
+// A prototype matching the declaration is accepted, and one that leaves a
+// formal unnamed agrees with whatever name the declaration gives it. A full
+// prototype of a subroutine the interface does not define, one a module
+// defines, has no declaration here to match.
+TEST(ModportImportPrototype, MatchingPrototypesAreAccepted) {
+  EXPECT_TRUE(
+      ElabOk("interface sb;\n"
+             "  extern task Read(input logic [7:0] raddr);\n"
+             "  function automatic int f(int a, int b); return b; endfunction\n"
+             "  modport mp(import function int f(int a, int b));\n"
+             "  modport mq(import function int f(int, int));\n"
+             "  modport mr(import task Read(input logic [7:0] raddr));\n"
+             "endinterface\n"
+             "module m; endmodule\n"));
+}
+
+// §25.7: importing a subroutine from another module needs a full prototype.
+// The interface defines no Read, its extern prototype being no definition, so
+// `import Read` imports the one memMod defines and is refused.
+TEST(ModportImportPrototype, IdentifierImportFromAnotherModuleIsRefused) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface simple_bus (input logic clk);\n"
+      "  extern task Read(input logic [7:0] raddr);\n"
+      "  modport target(input clk, export Read);\n"
+      "  modport initiator(input clk, import Read);\n"
+      "endinterface\n"
+      "module memMod(interface a);\n"
+      "  task a.Read(input logic [7:0] raddr); endtask\n"
+      "endmodule\n"
+      "module cpuMod(simple_bus.initiator b); initial #1 b.Read(7); endmodule\n"
+      "module top; logic clk = 0; simple_bus sb_intf(clk);\n"
+      "  memMod mem(sb_intf.target); cpuMod cpu(sb_intf.initiator);\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "modport 'initiator' imports 'Read', which "
+                            "interface 'simple_bus' does not define, by its "
+                            "name alone; importing a subroutine another "
+                            "module defines needs a full prototype",
+                            4, "25.7"));
+}
+
+// §25.7: a call binding an argument by name, or leaving one to its default,
+// needs a full prototype in the modport; `import f` alone is none, so each
+// such call through it is refused, while one writing every argument in order
+// is not. An argument left empty, `p.f(, 2)`, is left to its default too.
+TEST(ModportImportPrototype, IdentifierImportCallsNeedingAPrototypeAreRefused) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface sb;\n"
+      "  function automatic int f(int a = 5, int b = 6); return a; "
+      "endfunction\n"
+      "  modport mp(import f);\n"
+      "endinterface\n"
+      "module m(sb.mp p);\n"
+      "  initial $display(\"%0d\", p.f(.a(3)));\n"
+      "  initial $display(\"%0d\", p.f());\n"
+      "  initial $display(\"%0d\", p.f(, 2));\n"
+      "  initial $display(\"%0d\", p.f(1, 2));\n"
+      "endmodule\n"
+      "module top; sb s(); m u(s.mp); endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the call of 'f' through modport 'mp' binds an "
+                            "argument by name, which needs a full prototype "
+                            "of 'f' in the modport",
+                            6, "25.7"));
+  for (int line : {7, 8}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "the call of 'f' through modport 'mp' relies on "
+                              "a default argument value, which needs a full "
+                              "prototype of 'f' in the modport",
+                              line, "25.7"));
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "the call of 'f' through modport 'mp' relies on "
+                             "a default argument value, which needs a full "
+                             "prototype of 'f' in the modport",
+                             9, "25.7"));
+}
+
+// §25.7: a default a call needs shall be given in the prototype. mp's
+// prototype gives b none, so `p.f(1)` leaving b out is refused, though the
+// interface's declaration of f gives b one.
+TEST(ModportImportPrototype, ArgumentThePrototypeGivesNoDefaultIsRefused) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface sb;\n"
+      "  function automatic int f(int a, int b = 9); return b; endfunction\n"
+      "  modport mp(import function int f(int a, int b));\n"
+      "endinterface\n"
+      "module m(sb.mp p); initial $display(\"v=%0d\", p.f(1)); endmodule\n"
+      "module top; sb s(); m u(s.mp); endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the call of 'f' through modport 'mp' omits "
+                            "argument 'b', which the modport's prototype "
+                            "gives no default",
+                            5, "25.7"));
+}
+
+// A call through a modport port of a subroutine the modport does not import
+// is no import call, and is refused only for reaching what the modport does
+// not list (§25.5); a call through no port, `new` or a class method's, is no
+// call through a modport at all.
+TEST(ModportImportPrototype, OtherCallsAreNoImportCalls) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface sb;\n"
+      "  function automatic int f(int a); return a; endfunction\n"
+      "  function automatic int g(); return 3; endfunction\n"
+      "  modport mp(import f);\n"
+      "endinterface\n"
+      "class C; function int h(); return 4; endfunction endclass\n"
+      "module m(sb.mp p);\n"
+      "  C c;\n"
+      "  initial begin c = new; $display(\"%0d %0d\", c.h(), p.g()); end\n"
+      "endmodule\n"
+      "module top; sb s(); m u(s.mp); endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'g' is not accessible through modport 'mp' of "
+                            "interface 'sb'",
+                            9, "25.5"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
 }  // namespace

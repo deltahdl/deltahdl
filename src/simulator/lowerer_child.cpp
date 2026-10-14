@@ -472,8 +472,10 @@ void Lowerer::RegisterChildInstanceKeys(const RtlirModule* mod) {
   }
 }
 
-// The sibling interface instance an actual of `child` names by its stored
-// name, `i` or the `i` of `i.mp`, where that sibling is not yet placed.
+// The sibling an actual of `child` names by its stored name where that sibling
+// is not yet placed: the interface instance `i`, or the `i` of `i.mp`, or the
+// module instance `h` of `h.i`, an interface instance h declares, which the
+// elaborator stores under that path as one name (§25.3).
 static const RtlirModuleInst* UnplacedInterfaceActual(
     const RtlirModuleInst& child, const std::vector<RtlirModuleInst>& siblings,
     const std::vector<bool>& placed, size_t& index) {
@@ -483,10 +485,13 @@ static const RtlirModuleInst* UnplacedInterfaceActual(
       head = head->lhs;
     }
     if (head == nullptr || head->kind != ExprKind::kIdentifier) continue;
+    std::string_view name = head->text.substr(0, head->text.find('.'));
+    bool through_module = name.size() != head->text.size();
     for (index = 0; index < siblings.size(); ++index) {
       const RtlirModuleInst& sibling = siblings[index];
       if (!placed[index] && sibling.resolved != nullptr &&
-          sibling.resolved->is_interface && sibling.inst_name == head->text) {
+          (through_module || sibling.resolved->is_interface) &&
+          sibling.inst_name == name) {
         return &sibling;
       }
     }
@@ -498,9 +503,9 @@ static const RtlirModuleInst* UnplacedInterfaceActual(
 // its actual names (Lowerer::TryAliasInterfacePort), which exists once that
 // instance is lowered, and the port is bound as soon as its own instance is.
 // An interface instance is therefore lowered ahead of a sibling written before
-// it that connects to it, as a module-level instance connecting `g.i` is
-// written before the instance a generate block declares (§27.5); every other
-// instance keeps its place.
+// it that connects to it, and so is a module instance declaring one a sibling
+// written before it connects to by `h.i`; every other instance keeps its
+// place.
 void Lowerer::LowerChildModules(const RtlirModule* mod) {
   const std::vector<RtlirModuleInst>& children = mod->children;
   std::vector<bool> placed(children.size(), false);

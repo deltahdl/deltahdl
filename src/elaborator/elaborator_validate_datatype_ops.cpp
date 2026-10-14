@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <functional>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -14,6 +15,7 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/virtual_interface_modports.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -596,19 +598,10 @@ static void CheckViToViModports(std::string_view lhs_name,
                                 std::string_view rhs_name,
                                 const ViStringMap& vi_var_modports,
                                 SourceLoc loc, DiagEngine& diag) {
-  auto lmp = vi_var_modports.find(lhs_name);
   auto rmp = vi_var_modports.find(rhs_name);
-  bool lhs_has_mp = lmp != vi_var_modports.end() && !lmp->second.empty();
-  bool rhs_has_mp = rmp != vi_var_modports.end() && !rmp->second.empty();
-  if (!lhs_has_mp && rhs_has_mp) {
-    diag.Error(loc,
-               "virtual interface with modport cannot be assigned to "
-               "virtual interface without modport",
-               Subclause("25.9"));
-  } else if (lhs_has_mp && rhs_has_mp && lmp->second != rmp->second) {
-    diag.Error(loc, "virtual interface modports do not match",
-               Subclause("25.9"));
-  }
+  CheckViModportsMatch(
+      lhs_name, rmp != vi_var_modports.end() ? rmp->second : std::string_view{},
+      vi_var_modports, loc, diag);
 }
 
 // §25.9: the actual parameter values shall match for two virtual interfaces to
@@ -639,6 +632,7 @@ struct ViAssignContext {
   const ViParamMap& vi_var_param_values;
   const ViParamMap& interface_inst_param_values;
   const std::unordered_set<std::string_view>& vi_external_defparam_insts;
+  const std::function<const ModuleDecl*(std::string_view)>& find_module;
 };
 
 // §25.9: two virtual interfaces are of the same type, and hence assignment
@@ -750,6 +744,12 @@ static void CheckVirtualInterfaceAssignStmt(const Stmt* s,
     CheckViFromInstanceAssign(ExprIdent(s->lhs), rhs_name, ctx, s->range.start,
                               diag);
   }
+  if (lhs_vi && s->rhs->kind == ExprKind::kMemberAccess) {
+    CheckViFromInstanceModport(
+        s->lhs, s->rhs,
+        {ctx.interface_inst_types, ctx.vi_var_modports, ctx.find_module},
+        s->range.start, diag);
+  }
   if (!lhs_vi && rhs_vi) {
     diag.Error(s->range.start,
                "virtual interface cannot be assigned to a non-virtual-"
@@ -763,13 +763,16 @@ void Elaborator::WalkStmtsForVirtualInterfaceOps(const Stmt* s) {
   if ((s->kind == StmtKind::kBlockingAssign ||
        s->kind == StmtKind::kNonblockingAssign) &&
       s->lhs && s->rhs) {
+    const std::function<const ModuleDecl*(std::string_view)> kFindModule =
+        [this](std::string_view name) { return FindModule(name); };
     const ViAssignContext kCtx{var_types_,
                                interface_inst_types_,
                                vi_var_interface_types_,
                                vi_var_modports_,
                                vi_var_param_values_,
                                interface_inst_param_values_,
-                               vi_external_defparam_insts_};
+                               vi_external_defparam_insts_,
+                               kFindModule};
     CheckVirtualInterfaceAssignStmt(s, kCtx, diag_);
   }
   const ViExprTables kTables{vi_expr_types_, vi_var_interface_types_,

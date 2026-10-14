@@ -11,6 +11,7 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_modport_imports.h"
 #include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
@@ -691,6 +692,7 @@ void ValidateOneModportPort(const ModuleDecl* iface, const ModportDecl* mp,
   CheckSimpleModportItemDeclared(iface, mp, port, scope.declared_names, diag);
   CheckModportConstExprDirection(mp, port, scope.constant_names, diag);
   CheckModportClockingDeclared(iface, mp, port, scope.clocking_names, diag);
+  CheckModportImport(iface, mp, port, diag);
 }
 
 void ValidateOneModport(const ModuleDecl* iface, const ModportDecl* mp,
@@ -702,7 +704,7 @@ void ValidateOneModport(const ModuleDecl* iface, const ModportDecl* mp,
       diag.Error(mp->loc,
                  std::format("duplicate port-id '{}' in modport '{}'",
                              port.name, mp->name),
-                 Subclause("25.5"));
+                 Subclause("25.5.4"));
     }
     ValidateOneModportPort(iface, mp, port, scope, diag);
   }

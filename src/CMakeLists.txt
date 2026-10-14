@@ -148,7 +148,6 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/time_literal_scale.cpp
     elaborator/semantic_leading_clocks.cpp
     elaborator/procedural_concurrent_assertion.cpp
-    elaborator/interface_syntax.cpp
     elaborator/property_rewrite.cpp
     elaborator/rewrite_algorithm.cpp
     elaborator/checker_rewrite.cpp
@@ -516,6 +515,10 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_port_binding.cpp
     elaborator/elaborator_port_binding_nets.cpp
     elaborator/elaborator_gen_block_interfaces.cpp
+    elaborator/elaborator_modport_imports.cpp
+    elaborator/interface_body_references.cpp
+    elaborator/virtual_interface_modports.cpp
+    elaborator/interface_port_typedef.cpp
     elaborator/elaborator_port_binding_checks.cpp
     elaborator/elaborator_process.cpp
     elaborator/elaborator_process_validate.cpp

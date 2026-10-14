@@ -21,6 +21,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/interface_port_typedef.h"
 #include "elaborator/net_data_type.h"
 #include "elaborator/resolution_function_body.h"
 #include "elaborator/rtlir.h"
@@ -431,6 +432,14 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
                             "declaration as {}",
                             item->name, TypedefKindName(it->second)),
                 Subclause("6.18"));
+  }
+  // §25.10: a type taken through an interface port stands for the
+  // interface's own declaration of it, its enumeration members among it.
+  if (!item->typedef_ifc_port.empty()) {
+    const DataType* taken = InterfacePortTypedefType(
+        item, module_decl_path_.back(),
+        [this](std::string_view name) { return FindModuleInScope(name); });
+    if (taken != nullptr) item->typedef_type = *taken;
   }
   AdoptMemberTypedefDims(item->typedef_type, td_array_dims_);
   RecordTypedef(typedefs_, item->name, item->typedef_type);

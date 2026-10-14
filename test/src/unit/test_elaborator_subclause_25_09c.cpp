@@ -438,4 +438,86 @@ TEST(VirtualInterfaceArrayElaboration, ASelectIntoTheMethodsOwnProperty) {
   EXPECT_TRUE(NoErrorOnLine(f, 7));
 }
 
+// §25.9: an interface containing a hierarchical reference to an object outside
+// its body shall not be the type of a virtual interface, wherever in the body
+// the reference stands. Here it is written in a process, `a = top.x`, between
+// statements reaching nothing outside, and in a function's body.
+TEST(VirtualInterfaceOutsideReference, ReferenceInAProceduralBodyIsRefused) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc; logic a;\n"
+      "  initial begin a = 0; a = top.x; a = 1; end\n"
+      "endinterface\n"
+      "interface jfc; logic a;\n"
+      "  function automatic logic get(); return top.x; endfunction\n"
+      "endinterface\n"
+      "module top; logic x; ifc i(); jfc j(); virtual ifc v; virtual jfc w;\n"
+      "endmodule\n",
+      f, "top");
+  for (const char* name : {"ifc", "jfc"}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              std::string("interface '") + name +
+                                  "' contains references to objects outside "
+                                  "its body and cannot be used as a virtual "
+                                  "interface",
+                              7, "25.9"));
+  }
+}
+
+// A dotted name whose first name a body declares itself reaches nothing outside
+// the interface: a function's argument, a block's variable, a foreach index
+// variable used under a select, and a block's label. Nor does a name written
+// with `::`, which reaches a package rather than the hierarchy.
+TEST(VirtualInterfaceOutsideReference, NamesTheBodyDeclaresAreInside) {
+  EXPECT_TRUE(ElabOk(
+      "package pk; typedef struct { int f; } s_t; s_t v; endpackage\n"
+      "interface ifc; logic a;\n"
+      "  typedef struct { int f; } t_t;\n"
+      "  function automatic int get(t_t arg); return arg.f; endfunction\n"
+      "  initial begin : blk\n"
+      "    t_t loc; t_t arr[2];\n"
+      "    int n;\n"
+      "    n = loc.f + pk::v.f + blk.n;\n"
+      "    foreach (arr[k]) n = arr[k].f;\n"
+      "  end\n"
+      "endinterface\n"
+      "module top; ifc i(); virtual ifc v; endmodule\n"));
+}
+
+// §25.9: a modport an interface instance's connection names, `p32.phy`, is
+// selected as a virtual interface's modport is, so it goes only to a virtual
+// interface selecting the same modport: `v32 = p32.phy` is refused as
+// `v16 = v16_phy` is, and `v8 = p8.mon` for naming another modport, while
+// `v8 = p8.phy` and a member that is no modport, `w = p8.addr`, are not
+// judged by the modport rule.
+TEST(VirtualInterfaceModportAssignment, InstanceModportSelectsTheType) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface PBus #(parameter WIDTH=8); logic [WIDTH-1:0] addr, data;\n"
+      "  modport phy(input addr, ref data); modport mon(input addr);\n"
+      "endinterface\n"
+      "module top; PBus #(32) p32(); PBus p8();\n"
+      "  virtual PBus #(32) v32; virtual PBus.phy v8; virtual PBus w;\n"
+      "  initial begin\n"
+      "    v32 = p32.phy;\n"
+      "    v8 = p8.mon;\n"
+      "    v8 = p8.phy;\n"
+      "    w = p8.addr;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "virtual interface with modport cannot be "
+                            "assigned to virtual interface without modport",
+                            7, "25.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "virtual interface modports do not match", 8,
+                            "25.9"));
+  EXPECT_TRUE(NoErrorOnLine(f, 9));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "virtual interface with modport cannot be "
+                             "assigned to virtual interface without modport",
+                             10, "25.9"));
+}
+
 }  // namespace

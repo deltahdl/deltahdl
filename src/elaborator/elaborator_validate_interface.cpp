@@ -9,6 +9,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_modport_imports.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
@@ -16,6 +17,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -455,49 +457,96 @@ const ModportDecl* FindModport(const ModuleDecl* iface,
   return nullptr;
 }
 
+// The modport, with the interface declaring it, that `base_name` of a
+// `base.member` access reaches: the modport an interface port or a virtual
+// interface of that name selects. False where the name is neither, or is one
+// that selects no modport its interface declares.
+struct ModportReach {
+  std::string_view iface_type;
+  std::string_view modport_name;
+  const ModuleDecl* iface = nullptr;
+  const ModportDecl* mp = nullptr;
+};
+
+bool ReachModport(std::string_view base_name, const IfaceAccessContext& ctx,
+                  ModportReach& reach) {
+  bool bound = false;
+  auto pit = ctx.iface_ports.find(base_name);
+  if (pit != ctx.iface_ports.end()) {
+    reach.iface_type = pit->second;
+    auto mp_it = ctx.port_mps.find(base_name);
+    if (mp_it != ctx.port_mps.end()) reach.modport_name = mp_it->second;
+    bound = true;
+  } else {
+    auto vit = ctx.vifs.find(base_name);
+    if (vit != ctx.vifs.end()) {
+      reach.iface_type = vit->second;
+      auto mp_it = ctx.vif_mps.find(base_name);
+      if (mp_it != ctx.vif_mps.end()) reach.modport_name = mp_it->second;
+      bound = true;
+    }
+  }
+  if (!bound || reach.modport_name.empty()) return false;
+  reach.iface = LookupInterfaceDecl(ctx.unit, reach.iface_type);
+  reach.mp = FindModport(reach.iface, reach.modport_name);
+  return reach.mp != nullptr;
+}
+
 // Diagnoses a `base.member` access expression `e` against the interface-port
 // and virtual-interface modport maps: if `base` resolves to a modport-scoped
 // interface and `member` is a modport-listable item not exposed by that
 // modport, reports the inaccessibility error.
 void CheckInterfaceObjectMemberAccess(const Expr* e,
                                       const IfaceAccessContext& ctx) {
-  auto base_name = e->lhs->text;
   auto member_name = e->rhs->text;
-
-  std::string_view iface_type;
-  std::string_view modport_name;
-  bool bound = false;
-
-  auto pit = ctx.iface_ports.find(base_name);
-  if (pit != ctx.iface_ports.end()) {
-    iface_type = pit->second;
-    auto mp_it = ctx.port_mps.find(base_name);
-    if (mp_it != ctx.port_mps.end()) modport_name = mp_it->second;
-    bound = true;
-  } else {
-    auto vit = ctx.vifs.find(base_name);
-    if (vit != ctx.vifs.end()) {
-      iface_type = vit->second;
-      auto mp_it = ctx.vif_mps.find(base_name);
-      if (mp_it != ctx.vif_mps.end()) modport_name = mp_it->second;
-      bound = true;
-    }
-  }
-
-  if (!bound || modport_name.empty() || member_name.empty()) return;
-  const auto* iface = LookupInterfaceDecl(ctx.unit, iface_type);
-  const auto* mp = FindModport(iface, modport_name);
-  if (!iface || !mp) return;
-  const auto* member = FindInterfaceItemByName(iface, member_name);
+  ModportReach reach;
+  if (member_name.empty() || !ReachModport(e->lhs->text, ctx, reach)) return;
+  const auto* member = FindInterfaceItemByName(reach.iface, member_name);
   if (member && IsListableInModport(member->kind) &&
       member->kind != ModuleItemKind::kClockingBlock &&
-      !ModportListsMember(mp, member_name)) {
+      !ModportListsMember(reach.mp, member_name)) {
     ctx.diag.Error(
         e->range.start,
         std::format(
             "'{}' is not accessible through modport '{}' of interface '{}'",
-            member_name, modport_name, iface_type),
+            member_name, reach.modport_name, reach.iface_type),
         Subclause("25.5"));
+  }
+}
+
+// Whether the interface `iface` declares `name` a variable.
+bool DeclaresVariable(const ModuleDecl* iface, std::string_view name) {
+  for (const auto* it : iface->items) {
+    if (it->kind == ModuleItemKind::kVarDecl && it->name == name) return true;
+  }
+  return false;
+}
+
+// §25.5 declares the items a modport lists with the directions it gives them
+// as if inside the module the interface is a port of, and §23.3.3.2 makes a
+// variable declared an input port no target of an assignment. So the target
+// `target` of an assignment, `i.a` or a select of it, `i.a[0]`, may not be a
+// variable the modport `i` reaches lists as an input. A net it lists as an
+// input falls under §23.3.3.1's coercion instead.
+void CheckModportInputTarget(const Expr* target,
+                             const IfaceAccessContext& ctx) {
+  while (target->kind == ExprKind::kSelect) target = target->base;
+  if (target->kind != ExprKind::kMemberAccess) return;
+  std::string_view member = target->rhs->text;
+  ModportReach reach;
+  if (!ReachModport(target->lhs->text, ctx, reach) ||
+      !DeclaresVariable(reach.iface, member)) {
+    return;
+  }
+  for (const auto& port : reach.mp->ports) {
+    if (port.name == member && port.direction == Direction::kInput) {
+      ctx.diag.Error(target->range.start,
+                     std::format("'{}' is an input of modport '{}' of "
+                                 "interface '{}' and cannot be the target of "
+                                 "an assignment",
+                                 member, reach.modport_name, reach.iface_type),
+                     Subclause("25.5"));
+    }
   }
 }
 
@@ -528,6 +577,10 @@ void CheckInterfaceObjectAccessExpr(const Expr* e,
 // directly by statement `s`.
 void CheckInterfaceObjectAccessStmtExprs(const Stmt* s,
                                          const IfaceAccessContext& ctx) {
+  if (s->kind == StmtKind::kBlockingAssign ||
+      s->kind == StmtKind::kNonblockingAssign) {
+    CheckModportInputTarget(s->lhs, ctx);
+  }
   CheckInterfaceObjectAccessExpr(s->lhs, ctx);
   CheckInterfaceObjectAccessExpr(s->rhs, ctx);
   CheckInterfaceObjectAccessExpr(s->expr, ctx);
@@ -569,6 +622,7 @@ void CheckInterfaceObjectAccessItem(const ModuleItem* item,
           item->body, module_ctx.WithVifScopes(scoped, scoped_mps));
     }
   } else if (item->kind == ModuleItemKind::kContAssign) {
+    CheckModportInputTarget(item->assign_lhs, module_ctx);
     CheckInterfaceObjectAccessExpr(item->assign_lhs, module_ctx);
     CheckInterfaceObjectAccessExpr(item->assign_rhs, module_ctx);
   } else if (IsProceduralItemKind(item->kind) && item->body) {
@@ -583,6 +637,7 @@ void Elaborator::ValidateInterfaceObjectAccess(const ModuleDecl* decl) {
 
   IfacePortTypeMap iface_ports;
   IfacePortModportMap port_mps;
+  SelectedModports selected;
   for (const auto& port : decl->ports) {
     if (port.name.empty()) continue;
     if (port.data_type.kind != DataTypeKind::kNamed) continue;
@@ -590,7 +645,10 @@ void Elaborator::ValidateInterfaceObjectAccess(const ModuleDecl* decl) {
     if (!ifc || ifc->decl_kind != ModuleDeclKind::kInterface) continue;
     iface_ports[port.name] = port.data_type.type_name;
     port_mps[port.name] = port.data_type.modport_name;
+    if (const auto* mp = FindModport(ifc, port.data_type.modport_name))
+      selected[port.name] = {ifc, mp};
   }
+  CheckModportImportCalls(decl, selected, diag_);
 
   if (iface_ports.empty() && vi_var_interface_types_.empty()) return;
 

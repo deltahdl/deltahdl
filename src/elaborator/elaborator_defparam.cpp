@@ -714,6 +714,23 @@ void Elaborator::CheckEarlyResolutionAmbiguity(
   }
 }
 
+// §25.3: whether a port actual of `child`, an instance of `parent`, refers
+// to an arrayed interface: names an array of instances `parent` holds, `ia`,
+// or selects an element of one, `ia[0]`. Only an array of interface instances
+// is a legal actual of that form, so the array's kind need not be asked.
+static bool RefersToArrayedInterface(const RtlirModule* parent,
+                                     const RtlirModuleInst& child) {
+  for (const RtlirPortBinding& binding : child.port_bindings) {
+    const Expr* head = binding.connection;
+    if (head != nullptr && head->kind == ExprKind::kSelect) head = head->base;
+    if (head == nullptr || head->kind != ExprKind::kIdentifier) continue;
+    for (const RtlirModuleInst& sibling : parent->children) {
+      if (sibling.array.name == head->text) return true;
+    }
+  }
+  return false;
+}
+
 // §23.10.1 (printed page 764): records on `blocks` the generate block
 // instance or the element of an array of instances `child`, an instance of
 // `parent`, stands in or under -- the element `child` itself is, the blocks of
@@ -722,6 +739,10 @@ void Elaborator::CheckEarlyResolutionAmbiguity(
 static void NoteInstanceBlock(DefparamWriterBlocks& blocks, RtlirModule* parent,
                               const RtlirModuleInst& child) {
   if (child.resolved == nullptr) return;
+  if (RefersToArrayedInterface(parent, child)) {
+    blocks[child.resolved] = {parent, {}, child.resolved, true};
+    return;
+  }
   if (!child.array.name.empty()) {
     blocks[child.resolved] = {parent, {}, child.resolved};
     return;
@@ -780,6 +801,16 @@ void Elaborator::ReportUnresolvedDefparamSite(RtlirModule* mod,
     bool reaches = read && (ResolveDefparamSteps(mod, path, {}) != nullptr ||
                             ResolveDefparamFromTop(path, any) != nullptr);
     if (reaches) {
+      auto block = defparam_writer_blocks_.find(mod);
+      if (block != defparam_writer_blocks_.end() &&
+          block->second.arrayed_interface) {
+        diag_.Error(site.item->loc,
+                    "defparam inside an instance whose port actuals refer to "
+                    "an arrayed interface reaches a parameter outside that "
+                    "instance",
+                    Subclause("25.3"));
+        continue;
+      }
       diag_.Error(site.item->loc,
                   "defparam inside a generate block or an array of instances "
                   "reaches a parameter outside that hierarchy",

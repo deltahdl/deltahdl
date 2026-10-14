@@ -55,4 +55,22 @@ TEST(InterfaceObjectAccess, AlwaysCombRerunsOnAnInterfaceMember) {
   EXPECT_EQ(out, "1\n");
 }
 
+// §25.10 lets a module take a type from an interface through its port, and
+// §6.18 makes the name it declares stand for that type. yes_no is the
+// interface's enumeration choice, so P holds its member N and its methods
+// answer for the enumeration's two members.
+TEST(InterfacePortTypedefSim, TypeTakenThroughAPortIsTheInterfacesType) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface ifc; typedef enum logic [2:0] {Y=1,N=5} "
+                       "choice; endinterface\n"
+                       "module sub(ifc i); typedef i.choice yes_no;\n"
+                       "  yes_no P = yes_no'(5);\n"
+                       "  initial #1 $display(\"n=%s num=%0d\", P.name(), "
+                       "P.num());\n"
+                       "endmodule\n"
+                       "module Top; ifc x(); sub s(x); endmodule\n",
+                       f),
+            "n=N num=2\n");
+}
+
 }  // namespace

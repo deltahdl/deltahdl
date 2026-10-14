@@ -141,4 +141,38 @@ TEST(GenericInterfaceReference, ImplicitGenericPortIsReportedOnce) {
                              7, "23.3.3.4"));
 }
 
+// §25.3.3 bars every implicit connection from a generic interface port, and
+// the `.name` form of §23.3.2.3 is implicit as `.*` is: `.b` reaching the
+// generic port b of cpuMod is refused, while `.clk` beside it is not.
+TEST(GenericInterfaceReference, ImplicitNameCannotReferenceGenericInterface) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface simple_bus; logic req; endinterface\n"
+      "module cpuMod(interface b, input logic clk); endmodule\n"
+      "module top; logic clk = 0; simple_bus b(); cpuMod cpu(.b, .clk);\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "implicit .b port connection cannot reference generic interface "
+      "port 'b' of module 'cpuMod'",
+      3, "25.3.3"));
+  EXPECT_FALSE(ReportedError(
+      f.diag.Diagnostics(),
+      "implicit .clk port connection cannot reference generic interface "
+      "port 'clk' of module 'cpuMod'",
+      3, "25.3.3"));
+}
+
+// A named port connection may reference a generic interface port, and `.b(b)`
+// says by name what `.b` leaves implicit, so it is accepted.
+TEST(GenericInterfaceReference, ExplicitNameReachesGenericInterface) {
+  EXPECT_TRUE(
+      ElabOk("interface simple_bus; logic req; endinterface\n"
+             "module cpuMod(interface b, input logic clk); endmodule\n"
+             "module top; logic clk = 0; simple_bus b();\n"
+             "  cpuMod cpu(.b(b), .clk);\n"
+             "endmodule\n"));
+}
+
 }  // namespace

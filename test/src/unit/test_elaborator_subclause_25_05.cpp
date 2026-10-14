@@ -526,4 +526,50 @@ TEST(InterfaceModportNames, AnElaboratedModuleCarriesNoModports) {
   EXPECT_TRUE(design->top_modules[0]->modports.empty());
 }
 
+// §25.5 declares a modport's items with its directions as if inside the module
+// the interface is a port of, and §23.3.3.2 lets no assignment target a
+// variable declared an input port, so assigning `i.a` through a modport listing
+// a as an input is refused, procedurally or continuously, of the whole
+// variable or a select of it, while the output c beside it may be assigned.
+TEST(ModportElaboration, AssigningAModportInputVariableIsRefused) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface i2; logic [3:0] a; logic c; modport initiator(input a, "
+      "output c); endinterface\n"
+      "module m(i2.initiator i);\n"
+      "  initial begin i.a = 1; i.c = 1; end\n"
+      "  assign i.a[0] = 1;\n"
+      "endmodule\n"
+      "module top; i2 i(); m u1(.i(i)); endmodule\n",
+      f, "top");
+  for (int line : {3, 4}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "'a' is an input of modport 'initiator' of "
+                              "interface 'i2' and cannot be the target of an "
+                              "assignment",
+                              line, "25.5"));
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "'c' is an input of modport 'initiator' of "
+                             "interface 'i2' and cannot be the target of an "
+                             "assignment",
+                             3, "25.5"));
+}
+
+// A net a modport lists as an input is no variable, and §23.3.3.1 coerces an
+// input net assigned from inside the module rather than forbidding it, so
+// `assign i.w = 1` through such a modport is not refused under §25.5.
+TEST(ModportElaboration, AssigningAModportInputNetIsNotRefused) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface i4; wire w; modport mp(input w); endinterface\n"
+      "module m(i4.mp i); assign i.w = 1; endmodule\n"
+      "module top; i4 i(); m u1(.i(i)); endmodule\n",
+      f, "top");
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "'w' is an input of modport 'mp' of interface "
+                             "'i4' and cannot be the target of an assignment",
+                             2, "25.5"));
+}
+
 }  // namespace

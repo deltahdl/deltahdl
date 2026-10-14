@@ -35,4 +35,23 @@ TEST(InterfaceInstanceArraySim, ElementsHoldMembersAndParameters) {
             "P=100 P=7 P=7 x=12 x=3 x=5\n");
 }
 
+// §25.3: an interface port's actual may be a hierarchical reference to an
+// interface instance another module instance declares, `h.i`, which joins the
+// port to that instance's members. The writer, written before h, and the
+// reader, written after it, share h.i's storage, so the value one writes
+// through its port is the one the other reads through its own.
+TEST(InterfacePortHierRefSim, PortJoinsAnInstanceAnotherModuleDeclares) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface ifc; logic [7:0] a = 1; endinterface\n"
+                       "module holder; ifc i(); endmodule\n"
+                       "module writer(ifc p); initial p.a = 9; endmodule\n"
+                       "module reader(ifc p);\n"
+                       "  initial #1 $display(\"x=%0d\", p.a);\n"
+                       "endmodule\n"
+                       "module top; writer w(h.i); holder h(); reader r(h.i);\n"
+                       "endmodule\n",
+                       f),
+            "x=9\n");
+}
+
 }  // namespace

@@ -6,6 +6,8 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
@@ -47,26 +49,51 @@ void EnterGenBlockInstance(RtlirModuleInst& inst, const ModuleDecl* child_decl,
 
 // §25.3 with §23.6, §27.4 and §27.5: registers in `table` each interface
 // instance a named generate block among `items` declares, so a module-level
-// connection `g.i` or `g[k].i` may name it before the block is elaborated: a
-// conditional block's under the name it will be stored under, every
-// alternative walked since which one is selected is not yet folded, and a loop
-// block's under the block's name followed by `[]_`, its iterations' indices
-// not yet folded either. `find_module` resolves an instance's module,
-// interface or program name.
+// connection `g.i` or `g[k].i` is known to reach it, and is refused, before
+// the block is elaborated: a conditional block's under the name it will be
+// stored under, every alternative walked since which one is selected is not
+// yet folded, and a loop block's under the block's name followed by `[]_`,
+// its iterations' indices not yet folded either. `find_module` resolves an
+// instance's module, interface or program name.
 void RegisterGenerateBlockInterfaces(
     const std::vector<ModuleItem*>& items,
     const std::function<const ModuleDecl*(std::string_view)>& find_module,
     InterfaceInstTypes& table, Arena& arena);
 
-// §25.3 with §23.6, §23.9 and §27.4: rewrites each actual of `inst` that names
-// an interface instance a generate block declares -- `i` or `i.mp` written in
-// the block, `g.i` or `g[k].i` written through it -- to that instance's stored
-// name, which the elaborator's interface checks and the simulator's connection
-// both look an instance up by. `scope` folds the index of a loop block's path,
-// and the stored name such a path resolves to is entered into `table`, the
-// loop not yet having been elaborated where the path is written outside it.
+// §23.9 with §27.4: rewrites each actual of `inst` that names an interface
+// instance a generate block declares by its name written in the block, `i` or
+// `i.mp`, to that instance's stored name, which the elaborator's interface
+// checks and the simulator's connection both look an instance up by. §25.3:
+// an actual reaching such an instance through the block, `g.i` or `g[k].i`,
+// is reported at `loc` and its binding marked refused. `scope` folds the index
+// of a loop block's path, and the stored name such a path resolves to is
+// entered into `table`, the loop not yet having been elaborated where the path
+// is written outside it.
 void ResolveGenBlockInterfaceActuals(RtlirModuleInst& inst,
                                      InterfaceInstTypes& table,
-                                     const ScopeMap& scope, Arena& arena);
+                                     const ScopeMap& scope, Arena& arena,
+                                     DiagEngine& diag, SourceLoc loc);
+
+// What resolving an interface port's actual through module instances needs:
+// the declaration of the module the actual is written in, a lookup of an
+// instance's module or interface by its name, the module's interface instance
+// table, and where to report.
+struct InstancePathScope {
+  const ModuleDecl* parent;
+  const std::function<const ModuleDecl*(std::string_view)>& find_module;
+  InterfaceInstTypes& table;
+  Arena& arena;
+  DiagEngine& diag;
+  SourceLoc loc;
+};
+
+// §25.3 with §23.6: rewrites each interface port actual of `inst` that names,
+// through module instances, an interface instance one of them declares, `h.i`
+// or a modport of it, `h.i.mp`, to the instance's path as one name, `h.i`,
+// entered into the table, under which the simulator keys that instance too.
+// An actual whose path resolves through an arrayed instance, `h[0].i`, is
+// reported and its binding marked refused.
+void ResolveInstancePathActuals(RtlirModuleInst& inst,
+                                const InstancePathScope& scope);
 
 }  // namespace delta

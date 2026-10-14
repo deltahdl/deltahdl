@@ -15,12 +15,12 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
+#include "elaborator/elaborator_modport_imports.h"
 #include "elaborator/elaborator_module_inst_internal.h"
 #include "elaborator/elaborator_port_binding_internal.h"
 #include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
-#include "elaborator/type_eval.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -636,32 +636,6 @@ const ModuleItem* FindOutOfBlockBodyInChild(const ModuleDecl* child,
   return nullptr;
 }
 
-// §25.7: when a modport exports a subroutine using a full prototype, the
-// definition supplied by the connected module shall match that prototype
-// exactly — same kind (task vs function), the same argument types and
-// directions, and, for a function, the same return type.
-bool ExportPrototypeMatchesBody(const ModuleItem* proto,
-                                const ModuleItem* body) {
-  if (proto->kind != body->kind) return false;
-  if (proto->func_args.size() != body->func_args.size()) return false;
-  for (size_t i = 0; i < proto->func_args.size(); ++i) {
-    const DataType& pa = proto->func_args[i].data_type;
-    const DataType& ba = body->func_args[i].data_type;
-    if (!TypesMatch(pa, ba)) return false;
-    // §25.7 requires an exact match: TypesMatch does not tell apart packed
-    // bounds that fold only in a scope, so widths are compared too, which
-    // rejects arguments such as logic [7:0] against logic [3:0] however their
-    // bounds are written.
-    if (EvalTypeWidth(pa) != EvalTypeWidth(ba)) return false;
-    if (proto->func_args[i].direction != body->func_args[i].direction)
-      return false;
-  }
-  // A modport function prototype keeps its return type in `data_type`, while an
-  // out-of-block body keeps it in `return_type`; compare the matching fields.
-  return proto->kind != ModuleItemKind::kFunctionDecl ||
-         TypesMatch(proto->data_type, body->return_type);
-}
-
 std::unordered_map<std::string_view, std::string_view>
 CollectInterfaceInstances(const RtlirModule* mod,
                           const FindModuleFn& find_module) {
@@ -703,7 +677,7 @@ void RecordExportSite(const ModportPort& pp, const ModuleItem* body,
   // §25.7: an export written as a full prototype pins the signature
   // the defining module must provide; a definition that does not
   // match it exactly is an elaboration error.
-  if (pp.prototype && !ExportPrototypeMatchesBody(pp.prototype, body)) {
+  if (pp.prototype && !PrototypeMatchesSubroutine(pp.prototype, body)) {
     scan.diag.Error(
         body->loc,
         std::format("definition of exported subroutine '{}' in module '{}' "

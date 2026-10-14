@@ -187,6 +187,7 @@ void CheckOneInterfacePortConnected(const PortBindCtx& ctx,
   Expr* conn = nullptr;
   for (const auto& binding : inst.port_bindings) {
     if (binding.port_name == port.name) {
+      if (binding.refused_actual) return;
       conn = binding.connection;
       break;
     }
@@ -601,6 +602,16 @@ bool Elaborator::ResolveExplicitTarget(const PortBindScope& scope, size_t index,
                             bind.port_name, inst.module_name),
                 Subclause("23.3.2.2"));
     return false;
+  }
+  // §25.3.3: the implicit `.name` form is no more a named port connection than
+  // `.*` is, so it shall not reference a generic interface port either.
+  if (bind.is_implicit && port->is_interface_port &&
+      port->interface_type_name.empty()) {
+    diag_.Error(item->loc,
+                std::format("implicit .{} port connection cannot reference "
+                            "generic interface port '{}' of module '{}'",
+                            bind.port_name, port->name, inst.module_name),
+                Subclause("25.3.3"));
   }
 
   binding.direction = port->direction;

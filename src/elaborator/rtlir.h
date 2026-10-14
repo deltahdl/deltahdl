@@ -614,6 +614,10 @@ struct RtlirPortBinding {
   Expr* port_expr = nullptr;
   // §23.3.3: no connection was written; `connection` is a default in its place.
   bool unconnected = false;
+  // §25.3: the connection is an interface port's actual already reported for
+  // resolving through an arrayed instance or a generate block, which the
+  // checks of what the port is connected to then pass over.
+  bool refused_actual = false;
 };
 
 struct RtlirModuleInst {

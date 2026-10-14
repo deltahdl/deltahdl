@@ -41,4 +41,26 @@ TEST(InterfaceSubroutineSim, CalledThroughNamedInterfacePort) {
             "hit 10 in t.i.hit\ncalls via port 10\n10\ntick o=9 t=3\n");
 }
 
+// §25.7: where a prototype and the declaration both give an argument a
+// default, the value a call through the prototype takes is the prototype's.
+// b defaults to 9 in f's declaration and to 4 in mp's prototype, and each call
+// leaving b without an actual, left out, left empty in order, or by name,
+// takes 4.
+TEST(InterfaceSubroutineSim, ModportPrototypeDefaultIsTheOneUsed) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface sb;\n"
+                       "  function automatic int f(int a, int b = 9); "
+                       "return b; endfunction\n"
+                       "  modport mp(import function int f(int a, int b = "
+                       "4));\n"
+                       "endinterface\n"
+                       "module m(sb.mp p);\n"
+                       "  initial $display(\"v=%0d %0d %0d %0d\", p.f(1), "
+                       "p.f(1, ), p.f(.a(1)), p.f(.a(1), .b()));\n"
+                       "endmodule\n"
+                       "module top; sb s(); m u(s.mp); endmodule\n",
+                       f),
+            "v=4 4 4 4\n");
+}
+
 }  // namespace

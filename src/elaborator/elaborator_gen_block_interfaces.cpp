@@ -1,6 +1,6 @@
 // §25.3 with §27.4 and §27.5: an interface port connected to an interface
-// instance a generate block declares, written in the block or reached through
-// it by a hierarchical name.
+// instance a generate block declares, by its name written in the block; a
+// hierarchical name reaching it through the block is refused.
 
 #include "elaborator/elaborator_gen_block_interfaces.h"
 
@@ -13,6 +13,8 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/rtlir.h"
@@ -91,9 +93,9 @@ void BlockInterfaceWalk::AddBlock(std::string_view name, bool name_is_generated,
 // the enclosing prefix, the block's name and the iteration's index, which is
 // folded only when the loop is elaborated. An interface instance the block
 // declares is therefore registered under the block's name followed by `[]_`,
-// which no stored name can spell, for `g[k].i` to be resolved through once its
-// index is folded (LoopBlockInstance). A construct nested in the loop block is
-// stored under the index as well, and is not walked.
+// which no stored name can spell, for `g[k].i` to be found through once its
+// index is folded (LoopBlockInstance) and refused (§25.3). A construct nested
+// in the loop block is stored under the index as well, and is not walked.
 void BlockInterfaceWalk::AddLoop(const ModuleItem* item,
                                  std::string_view prefix) {
   if (item->name.empty() || item->name_is_generated) return;
@@ -182,8 +184,8 @@ std::string_view LoopBlockInstance(const Expr* conn, const std::string& flat,
   return stored;
 }
 
-// The actual `g.i` or `g[k].i` is rewritten to, an interface instance a
-// generate block declares, or null where it names none.
+// The interface instance a generate block declares that the actual `g.i` or
+// `g[k].i` reaches through the block, or null where it reaches none.
 Expr* ResolvedPath(Expr* conn, const GenBlockPrefixes& prefixes,
                    InterfaceInstTypes& table, const ScopeMap& scope,
                    Arena& arena) {
@@ -199,10 +201,13 @@ Expr* ResolvedPath(Expr* conn, const GenBlockPrefixes& prefixes,
 }
 
 // The actual `conn` is rewritten to, or null where it names no interface
-// instance of a block or already names one by its stored name.
+// instance of a block or already names one by its stored name. §25.3: an
+// actual reaching such an instance from outside its block, `g.i` or `g[k].i`,
+// resolves through the block, which the clause forbids, so it is rewritten to
+// nothing and `through_block` is set instead.
 Expr* ResolvedActual(Expr* conn, const GenBlockPrefixes& prefixes,
                      InterfaceInstTypes& table, const ScopeMap& scope,
-                     Arena& arena) {
+                     Arena& arena, bool& through_block) {
   if (conn->kind == ExprKind::kIdentifier) {
     std::string_view key = FindBlockInterface(conn->text, prefixes, table);
     if (key.empty() || key == conn->text) return nullptr;
@@ -223,7 +228,8 @@ Expr* ResolvedActual(Expr* conn, const GenBlockPrefixes& prefixes,
       return copy;
     }
   }
-  return ResolvedPath(conn, prefixes, table, scope, arena);
+  through_block = ResolvedPath(conn, prefixes, table, scope, arena) != nullptr;
+  return nullptr;
 }
 
 }  // namespace
@@ -250,17 +256,135 @@ void RegisterGenerateBlockInterfaces(
 
 void ResolveGenBlockInterfaceActuals(RtlirModuleInst& inst,
                                      InterfaceInstTypes& table,
-                                     const ScopeMap& scope, Arena& arena) {
+                                     const ScopeMap& scope, Arena& arena,
+                                     DiagEngine& diag, SourceLoc loc) {
   // Every binding is asked rather than only those of a port marked an
   // interface port: an actual is rewritten only where it names an entry of
   // `table`, which holds interface instances alone, and the mark is not set on
   // every interface port by the time the bindings are made.
   for (RtlirPortBinding& binding : inst.port_bindings) {
     if (binding.connection == nullptr) continue;
-    if (Expr* actual = ResolvedActual(
-            binding.connection, inst.gen_block_prefixes, table, scope, arena)) {
+    bool through_block = false;
+    if (Expr* actual =
+            ResolvedActual(binding.connection, inst.gen_block_prefixes, table,
+                           scope, arena, through_block)) {
       binding.connection = actual;
     }
+    if (!through_block) continue;
+    diag.Error(loc,
+               std::format("the actual of interface port '{}' resolves "
+                           "through a generate block",
+                           binding.port_name),
+               Subclause("25.3"));
+    binding.refused_actual = true;
+  }
+}
+
+namespace {
+
+// One step of a hierarchical actual: `h`, or `h[0]` with its select.
+struct ActualPathStep {
+  std::string_view name;
+  bool indexed = false;
+};
+
+// Appends the steps of `e`, `h.i` or `h[0].k.i`, outermost first. A part of
+// any other shape is a step with no name, which no instance answers to.
+void AppendActualPathSteps(const Expr* e, std::vector<ActualPathStep>& steps) {
+  if (e->kind == ExprKind::kMemberAccess) {
+    AppendActualPathSteps(e->lhs, steps);
+    AppendActualPathSteps(e->rhs, steps);
+    return;
+  }
+  bool indexed = e->kind == ExprKind::kSelect;
+  steps.push_back({indexed ? e->base->text : e->text, indexed});
+}
+
+// The instantiation among `decl`'s items of the instance `name`.
+const ModuleItem* FindInstanceItem(const ModuleDecl* decl,
+                                   std::string_view name) {
+  for (const ModuleItem* item : decl->items) {
+    if (item->kind == ModuleItemKind::kModuleInst && item->inst_name == name)
+      return item;
+  }
+  return nullptr;
+}
+
+// Whether `inst`'s port `name` is an interface port.
+bool BindsInterfacePort(const RtlirModuleInst& inst, std::string_view name) {
+  for (const RtlirPort& port : inst.resolved->ports) {
+    if (port.name == name && port.is_interface_port) return true;
+  }
+  return false;
+}
+
+// Rewrites `binding`'s actual, which names the instance of the interface
+// `type` at `path` and, where `rest` is 2, a modport of it (§25.5), to that
+// path as one name, entered into `scope.table`.
+void RewriteInstancePath(RtlirPortBinding& binding, const std::string& path,
+                         std::string_view type, size_t rest,
+                         const InstancePathScope& scope) {
+  std::string_view key(scope.arena.AllocString(path.c_str(), path.size()),
+                       path.size());
+  scope.table.emplace(key, type);
+  Expr* conn = binding.connection;
+  if (rest == 1) {
+    binding.connection = MakeInstanceIdent(key, conn, scope.arena);
+    return;
+  }
+  auto* copy = scope.arena.Create<Expr>(*conn);
+  copy->lhs = MakeInstanceIdent(key, conn->lhs, scope.arena);
+  binding.connection = copy;
+}
+
+// §25.3 with §23.6: resolves the interface port actual `steps` names, step
+// by step from the module `scope.parent`, through module instances to an
+// interface instance.
+void ResolveInstancePath(RtlirPortBinding& binding,
+                         const std::vector<ActualPathStep>& steps,
+                         const InstancePathScope& scope) {
+  const ModuleDecl* decl = scope.parent;
+  std::string path;
+  for (size_t k = 0; k < steps.size(); ++k) {
+    const ModuleItem* item = FindInstanceItem(decl, steps[k].name);
+    decl = item == nullptr ? nullptr : scope.find_module(item->inst_module);
+    if (decl == nullptr) return;
+    bool arrayed = steps[k].indexed || !item->inst_dims.empty();
+    path += steps[k].name;
+    size_t rest = steps.size() - k;
+    if (decl->decl_kind == ModuleDeclKind::kInterface) {
+      // The module's own interface instance, or a modport of it, is connected
+      // as written (§25.3.2, §25.5).
+      if (k == 0 || arrayed || rest > 2) return;
+      RewriteInstancePath(binding, path, decl->name, rest, scope);
+      return;
+    }
+    if (arrayed) {
+      scope.diag.Error(scope.loc,
+                       std::format("the actual of interface port '{}' "
+                                   "resolves through the arrayed instance "
+                                   "'{}'",
+                                   binding.port_name, path),
+                       Subclause("25.3"));
+      binding.refused_actual = true;
+      return;
+    }
+    path += '.';
+  }
+}
+
+}  // namespace
+
+void ResolveInstancePathActuals(RtlirModuleInst& inst,
+                                const InstancePathScope& scope) {
+  for (RtlirPortBinding& binding : inst.port_bindings) {
+    if (binding.connection == nullptr ||
+        !BindsInterfacePort(inst, binding.port_name)) {
+      continue;
+    }
+    std::vector<ActualPathStep> steps;
+    AppendActualPathSteps(binding.connection, steps);
+    if (steps.size() > 1) ResolveInstancePath(binding, steps, scope);
   }
 }
 

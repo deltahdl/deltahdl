@@ -1,12 +1,22 @@
 #include <gtest/gtest.h>
 
-#include "elaborator/interface_syntax.h"
+#include <string_view>
+
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
+
+// The module of `parent`'s instance `name`, or null where it has none.
+const RtlirModule* InstanceNamed(const RtlirModule* parent,
+                                 std::string_view name) {
+  for (const auto& child : parent->children) {
+    if (child.inst_name == name) return child.resolved;
+  }
+  return nullptr;
+}
 
 TEST(InterfaceDefinitions, EmptyInterfaceElaborates) {
   ElabFixture f;
@@ -278,63 +288,160 @@ TEST(InterfacePortActual, NonInterfaceActualIsError) {
                             8, "23.3.3.4"));
 }
 
-// §25.3: an interface-port-connection actual that is a hierarchical reference
-// to an interface instance, taking only plain instance steps, is legal.
-TEST(InterfacePortHierRef, PlainInterfacePathIsLegal) {
+// §25.3 lets an interface port's actual be a hierarchical reference to an
+// interface instance, and `h.i` names the instance i the module instance h
+// declares, so it connects the port as i itself would.
+TEST(InterfacePortHierRef, InstanceInAnotherModuleIsConnected) {
   EXPECT_TRUE(
-      InterfacePortHierRefIsLegal({InterfaceHierRefStep::kInterfaceInstance,
-                                   InterfaceHierRefStep::kInterfaceInstance}));
+      ElabOk("interface ifc; logic a; endinterface\n"
+             "module holder; ifc i(); endmodule\n"
+             "module user(ifc p); endmodule\n"
+             "module top; holder h(); user u(h.i); endmodule\n"));
 }
 
-// §25.3: the reference must terminate at an interface instance; a path ending
-// at something other than an interface instance is rejected.
-TEST(InterfacePortHierRef, NonInterfaceTargetIsIllegal) {
-  EXPECT_FALSE(
-      InterfacePortHierRefIsLegal({InterfaceHierRefStep::kInterfaceInstance,
-                                   InterfaceHierRefStep::kNonInterface}));
+// The reference may reach a modport of the instance, `h.i.mp`, and may step
+// through more than one module instance on its way, `o.h.i`.
+TEST(InterfacePortHierRef, ModportAndDeeperPathsAreConnected) {
+  EXPECT_TRUE(
+      ElabOk("interface ifc; logic a; modport mp(input a); endinterface\n"
+             "module holder; ifc i(); endmodule\n"
+             "module outer; holder h(); endmodule\n"
+             "module user(ifc p); endmodule\n"
+             "module top; holder h(); outer o();\n"
+             "  user u1(h.i.mp); user u2(o.h.i);\n"
+             "endmodule\n"));
 }
 
-// §25.3: the reference shall not resolve through an arrayed instance.
-TEST(InterfacePortHierRef, PathThroughArrayedInstanceIsIllegal) {
-  EXPECT_FALSE(InterfacePortHierRefIsLegal(
-      {InterfaceHierRefStep::kArrayedInstanceElement,
-       InterfaceHierRefStep::kInterfaceInstance}));
+// §25.3 requires the reference to land on an interface instance: a path
+// ending at a module instance, `h.k`, or at an array of interface instances,
+// `h.ia`, connects no instance, and nor does a name past a modport,
+// `h.i.mp.a`. Each is refused as §23.3.3.4 refuses any other actual.
+TEST(InterfacePortHierRef, PathNotEndingAtAnInstanceIsRefused) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc; logic a; modport mp(input a); endinterface\n"
+      "module leaf; endmodule\n"
+      "module holder; ifc i(); ifc ia[2](); leaf k(); endmodule\n"
+      "module user(ifc p); endmodule\n"
+      "module top; holder h();\n"
+      "  user u1(h.k);\n"
+      "  user u2(h.ia);\n"
+      "  user u3(h.i.mp.a);\n"
+      "endmodule\n",
+      f, "top");
+  for (int line : {6, 7, 8}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "interface port 'p' must be connected to an "
+                              "interface instance or interface port",
+                              line, "23.3.3.4"));
+  }
 }
 
-// §25.3: the reference shall not resolve through a generate block.
-TEST(InterfacePortHierRef, PathThroughGenerateBlockIsIllegal) {
-  EXPECT_FALSE(
-      InterfacePortHierRefIsLegal({InterfaceHierRefStep::kGenerateBlock,
-                                   InterfaceHierRefStep::kInterfaceInstance}));
+// §25.3: the reference shall not resolve through an arrayed instance, whether
+// it selects an element of the array, `h[0].i`, or names the array whole,
+// `h.i`. Each is reported once, under §25.3.
+TEST(InterfacePortHierRef, PathThroughArrayedInstanceIsRefused) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc; logic a; endinterface\n"
+      "module holder; ifc i(); endmodule\n"
+      "module user(ifc p); endmodule\n"
+      "module top; holder h[2]();\n"
+      "  user u1(h[0].i);\n"
+      "  user u2(h.i);\n"
+      "endmodule\n",
+      f, "top");
+  for (int line : {5, 6}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "the actual of interface port 'p' resolves "
+                              "through the arrayed instance 'h'",
+                              line, "25.3"));
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                               "interface port 'p' must be connected to an "
+                               "interface instance or interface port",
+                               line, "23.3.3.4"));
+  }
 }
 
-// §25.3: an empty reference designates no interface instance and is illegal.
-TEST(InterfacePortHierRef, EmptyPathIsIllegal) {
-  EXPECT_FALSE(InterfacePortHierRefIsLegal({}));
+// §25.3: the reference shall not resolve through a generate block either, a
+// conditional block's `g.i` or a loop block's `g[1].i`, though the instance
+// each names is one the block declares.
+TEST(InterfacePortHierRef, PathThroughGenerateBlockIsRefused) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc; logic a; endinterface\n"
+      "module user(ifc p); endmodule\n"
+      "module top;\n"
+      "  if (1) begin : g ifc i(); end\n"
+      "  for (genvar k = 0; k < 2; k++) begin : l ifc i(); end\n"
+      "  user u1(g.i);\n"
+      "  user u2(l[1].i);\n"
+      "endmodule\n",
+      f, "top");
+  for (int line : {6, 7}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "the actual of interface port 'p' resolves "
+                              "through a generate block",
+                              line, "25.3"));
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                               "interface port 'p' must be connected to an "
+                               "interface instance or interface port",
+                               line, "23.3.3.4"));
+  }
 }
 
 // §25.3: a defparam inside an instance whose port actuals refer to an arrayed
-// interface may override a parameter within that instance's own hierarchy.
-TEST(ArrayedInterfaceDefparam, WithinHierarchyIsLegal) {
-  EXPECT_TRUE(ArrayedInterfaceDefparamIsLegal(
-      /*instance_has_arrayed_interface_actual=*/true,
-      DefparamReach::kWithinInstance));
+// interface shall not modify a parameter outside that instance's hierarchy.
+// u is connected to the array ia whole, and v to its element ia[0]; each
+// reaches top.o.P, outside itself, so each is refused and P keeps its value.
+TEST(ArrayedInterfaceDefparam, OutsideTheInstanceIsRefused) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface ifc; logic a; endinterface\n"
+      "module other; parameter P = 1; endmodule\n"
+      "module user(ifc p[2]);\n"
+      "  defparam top.o.P = 5;\n"
+      "endmodule\n"
+      "module single(ifc p);\n"
+      "  defparam top.o.P = 6;\n"
+      "endmodule\n"
+      "module top; ifc ia[2](); other o(); user u(ia); single v(ia[0]);\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  for (int line : {4, 7}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "defparam inside an instance whose port actuals "
+                              "refer to an arrayed interface reaches a "
+                              "parameter outside that instance",
+                              line, "25.3"));
+  }
+  const RtlirModule* o = InstanceNamed(design->top_modules[0], "o");
+  ASSERT_NE(o, nullptr);
+  EXPECT_EQ(o->params[0].resolved_value, 1);
 }
 
-// §25.3: such a defparam shall not modify a parameter outside the instance's
-// hierarchy.
-TEST(ArrayedInterfaceDefparam, OutsideHierarchyIsIllegal) {
-  EXPECT_FALSE(ArrayedInterfaceDefparamIsLegal(
-      /*instance_has_arrayed_interface_actual=*/true,
-      DefparamReach::kOutsideInstance));
-}
-
-// §25.3: when the enclosing instance's port actuals do not refer to an arrayed
-// interface, this rule adds no restriction on the defparam's reach.
-TEST(ArrayedInterfaceDefparam, NonArrayedInstanceIsUnconstrained) {
-  EXPECT_TRUE(ArrayedInterfaceDefparamIsLegal(
-      /*instance_has_arrayed_interface_actual=*/false,
-      DefparamReach::kOutsideInstance));
+// The rule leaves a defparam free within the instance's own hierarchy: u's
+// statement reaching its own instance s, by a name starting from top, takes
+// effect.
+TEST(ArrayedInterfaceDefparam, WithinTheInstanceIsApplied) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface ifc; logic a; endinterface\n"
+      "module leaf; parameter Q = 1; endmodule\n"
+      "module user(ifc p[2]);\n"
+      "  leaf s();\n"
+      "  defparam top.u.s.Q = 7;\n"
+      "endmodule\n"
+      "module top; ifc ia[2](); user u(ia); endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const RtlirModule* u = InstanceNamed(design->top_modules[0], "u");
+  ASSERT_NE(u, nullptr);
+  const RtlirModule* s = InstanceNamed(u, "s");
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(s->params[0].resolved_value, 7);
 }
 
 // Syntax 25-1's extern interface header is a prototype as §23.5 describes: the

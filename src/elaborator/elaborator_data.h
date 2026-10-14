@@ -85,11 +85,14 @@ inline constexpr int64_t kDefaultMaxGenerateIterations = 262144;
 //
 // An element of an array of instances confines it as a generate block does:
 // `element` is then the element's module, which ApplyDefparamsRecursively
-// has made the element's own, and `steps` is empty.
+// has made the element's own, and `steps` is empty. §25.3 confines an
+// instance whose port actuals refer to an arrayed interface to its own
+// hierarchy in the same way, which `arrayed_interface` marks.
 struct DefparamWriterBlock {
   RtlirModule* holder;
   HierPath steps;
   const RtlirModule* element = nullptr;
+  bool arrayed_interface = false;
 };
 using DefparamWriterBlocks =
     std::unordered_map<const RtlirModule*, DefparamWriterBlock>;

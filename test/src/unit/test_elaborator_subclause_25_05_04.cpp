@@ -30,12 +30,12 @@ TEST(ModportExpressionElaboration, DuplicatePortIdInSameModportErrors) {
       "  I inst();\n"
       "endmodule\n",
       f);
-  // The duplicate is caught by the §25.5 no-duplicate-port-id check in
+  // The duplicate is caught by the §25.5.4 no-duplicate-port-id check in
   // elaborator_validate_config_rules.cpp, which reports at the modport
   // declaration.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "duplicate port-id 'P' in modport 'mp'", 3,
-                            "25.5"));
+                            "25.5.4"));
 }
 
 TEST(ModportExpressionElaboration,
@@ -286,11 +286,12 @@ TEST(ModportExpressionElaboration, SimplePortIdCollidingWithNamedPortIdErrors) {
       "  I inst();\n"
       "endmodule\n",
       f);
-  // The collision is reported by the §25.5 no-duplicate-port-id check in
-  // elaborator_validate_config_rules.cpp, not under §25.5.4.
+  // The collision is reported by the §25.5.4 no-duplicate-port-id check in
+  // elaborator_validate_config_rules.cpp, a modport's port identifiers sharing
+  // one name space.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "duplicate port-id 'R' in modport 'mp'", 3,
-                            "25.5"));
+                            "25.5.4"));
 }
 
 TEST(ModportExpressionElaboration,

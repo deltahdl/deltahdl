@@ -593,27 +593,4 @@ TEST(GenerateSimulation, ModuleInterfaceInstanceIsConnectedInsideABlock) {
             "oi 72\n");
 }
 
-// §23.6 reaches a block's interface instance through the block's name, and an
-// interface port's actual may be such a name (§25.3), so `cons c(g.i)` at
-// module level connects the instance in block g. The test fails on an
-// elaborator that takes only the first name `g` of the actual.
-TEST(GenerateSimulation, BlockInterfaceInstanceIsConnectedByItsPath) {
-  SimFixture f;
-  EXPECT_EQ(RunCapture("interface ifc;\n"
-                       "  int d;\n"
-                       "endinterface\n"
-                       "module cons(ifc p);\n"
-                       "  initial #1 $display(\"io %0d\", p.d);\n"
-                       "endmodule\n"
-                       "module top;\n"
-                       "  if (1) begin : g\n"
-                       "    ifc i();\n"
-                       "    initial i.d = 71;\n"
-                       "  end\n"
-                       "  cons c(g.i);\n"
-                       "endmodule\n",
-                       f),
-            "io 71\n");
-}
-
 }  // namespace

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -308,6 +309,24 @@ TEST(InterfaceObjectAccessElaboration, GenericModportPortListedAccess_Ok) {
                     "'Q' is not accessible through modport 'mp' of interface "
                     "'ebus_i'",
                     8, "25.5"));
+}
+
+// §25.10: only a port declared of an interface names the interface a type is
+// taken from. A generic port, `interface i`, names none until it is
+// connected; a type the interface does not declare, and a name that is no
+// port at all, give nothing to take, and each typedef is left as written for
+// the elaboration to go on with.
+TEST(InterfacePortTypedef, TypedefsNoInterfaceAnswersElaborate) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface ifc; typedef enum {Y, N} choice; endinterface\n"
+      "module gen(interface i); typedef i.choice t1; endmodule\n"
+      "module miss(ifc i); typedef i.other t2; endmodule\n"
+      "module none(ifc i); typedef j.choice t3; endmodule\n"
+      "module top; ifc x(); gen g(x); miss m(x); none n(x); endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(design->top_modules[0]->children.size(), 4u);
 }
 
 }  // namespace

@@ -30,6 +30,7 @@ TEST(ModportDeclarationElaboration, MixedPortKindsElaborate) {
       ElabOk("interface ifc(input logic clk);\n"
              "  logic req, gnt;\n"
              "  clocking cb @(posedge clk); endclocking\n"
+             "  task Read; endtask\n"
              "  modport mp(\n"
              "    input req,\n"
              "    output gnt,\n"

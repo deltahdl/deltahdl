@@ -26,6 +26,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_validate_classes_internal.h"
+#include "elaborator/interface_body_references.h"
 #include "elaborator/net_data_type.h"
 #include "elaborator/nettype_uses.h"
 #include "elaborator/rtlir.h"
@@ -420,7 +421,7 @@ bool InterfaceContainsExternalReference(const ModuleDecl* iface) {
     if (ExprRefsOutsideInterface(it->assign_lhs, local)) return true;
     if (ExprRefsOutsideInterface(it->assign_rhs, local)) return true;
   }
-  return false;
+  return BodyRefersOutsideInterface(iface, local);
 }
 
 // §25.9: record explicit parameter overrides of a virtual interface variable
