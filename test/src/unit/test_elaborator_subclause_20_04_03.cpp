@@ -30,6 +30,40 @@ TEST(TimeformatElab, ACallWithFewerThanFourArgumentsIsRejected) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, 7, "20.4.3"));
 }
 
+// §20.4.3: Syntax 20-5 makes the parenthesized list optional as a whole, so a
+// call writing the parentheses with nothing between them is not the bare form.
+TEST(TimeformatElab, ACallWithAnEmptyArgumentListIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  initial begin\n"
+      "    $timeformat();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'$timeformat' takes all four of its arguments or none", 3, "20.4.3"));
+}
+
+// §20.4.3: each of the four arguments inside Syntax 20-5's list is required,
+// so a call leaving a position empty, inside the list or at its end, is
+// rejected even though it spells four positions.
+TEST(TimeformatElab, ACallLeavingAnArgumentPositionEmptyIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  initial begin\n"
+      "    $timeformat(-9, , , 10);\n"
+      "    $timeformat(-9, 2, \" ns\", );\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const char* message = "'$timeformat' takes all four of its arguments or none";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, 3, "20.4.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, 4, "20.4.3"));
+}
+
 // §20.4.3: the bare call and the call with all four arguments are the two forms
 // Syntax 20-5 gives, and neither is reported.
 TEST(TimeformatElab, ABareCallAndAFullCallAreAccepted) {

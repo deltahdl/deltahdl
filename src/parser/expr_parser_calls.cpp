@@ -133,6 +133,7 @@ Expr* Parser::ParseSystemCall() {
     if (AtSelectBracket()) return ParseSelectExpr(call);
     return call;
   }
+  call->has_arg_list = true;
 
   if (!Check(TokenKind::kRParen)) {
     ParseSysCallArgs(call);

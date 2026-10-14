@@ -1,6 +1,7 @@
 // §20.4.3: Syntax 20-5 gives $timeformat no argument list or all four of its
 // arguments.
 
+#include <algorithm>
 #include <cstddef>
 #include <vector>
 
@@ -18,10 +19,20 @@ namespace {
 // and minimum_field_width.
 constexpr size_t kTimeformatArgs = 4;
 
+// The list is optional as a whole, but each of its four arguments is required:
+// an empty `()` and an empty position, which the parser keeps as a null
+// argument, match neither form.
+bool IsTimeformatArgListValid(const Expr* call) {
+  if (!call->has_arg_list) return true;
+  if (call->args.size() != kTimeformatArgs) return false;
+  return std::ranges::none_of(call->args,
+                              [](const Expr* a) { return a == nullptr; });
+}
+
 void CheckTimeformatExpr(const Expr* e, DiagEngine& diag) {
   if (e == nullptr) return;
   if (e->kind == ExprKind::kSystemCall && e->callee == "$timeformat" &&
-      !e->args.empty() && e->args.size() != kTimeformatArgs) {
+      !IsTimeformatArgListValid(e)) {
     diag.Error(e->range.start,
                "'$timeformat' takes all four of its arguments or none",
                Subclause("20.4.3"));

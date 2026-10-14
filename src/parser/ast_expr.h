@@ -66,6 +66,10 @@ struct Expr {
   std::string_view callee;
   std::vector<Expr*> args;
   std::vector<std::string_view> arg_names;
+  // kSystemCall only: true when the call wrote a parenthesized argument list,
+  // empty or not, telling `$timeformat();` from the bare `$timeformat;` whose
+  // args are just as empty (§20.4.3).
+  bool has_arg_list = false;
 
   Expr* base = nullptr;
   Expr* index = nullptr;
