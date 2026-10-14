@@ -365,6 +365,7 @@ void CopyDesignMetadata(RtlirDesign* design, const CompilationUnit* unit,
   // default.
   design->global_time_precision = ComputeGlobalTimePrecision(
       unit, unit->has_preproc_timescale, unit->preproc_global_precision);
+  design->global_precision_order = GlobalTimePrecisionOrder(unit);
 }
 
 // Performs the order-independent data tail of elaboration: computing each

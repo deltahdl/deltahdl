@@ -23,4 +23,10 @@ TimeUnit ComputeGlobalTimePrecision(const CompilationUnit* cu,
                                     bool has_preproc_timescale,
                                     TimeUnit preproc_global_precision);
 
+// §3.14.3: the order of the global time precision, the finest precision of
+// every `timescale directive, compilation-unit, module, interface, program and
+// package declaration of `cu`, each with its magnitude: 10ps is -11. 1ns when
+// none is declared.
+int GlobalTimePrecisionOrder(const CompilationUnit* cu);
+
 }  // namespace delta

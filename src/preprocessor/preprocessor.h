@@ -586,6 +586,8 @@ class Preprocessor {
  public:
   const TimeScale& CurrentTimescale() const { return current_timescale_; }
   TimeUnit GlobalPrecision() const { return global_precision_; }
+  // The magnitude, 1, 10 or 100, of the precision GlobalPrecision names.
+  int GlobalPrecisionMagnitude() const { return global_precision_magnitude_; }
   bool HasTimescale() const { return has_timescale_; }
   // Whether any `timescale was read, so GlobalPrecision holds the finest of
   // their precisions. A `resetall clears HasTimescale but not this, because
@@ -730,6 +732,7 @@ class Preprocessor {
  private:
   TimeScale current_timescale_;
   TimeUnit global_precision_ = TimeUnit::kNs;
+  int global_precision_magnitude_ = 1;
   bool has_timescale_ = false;
   bool has_global_precision_ = false;
   NetType default_net_type_ = NetType::kWire;

@@ -777,7 +777,9 @@ static void RegisterDesignScopes(const RtlirDesign* design, SimContext& ctx) {
     ctx.SetCurrentTimeScale(top->timescale);
     ctx.SetCurrentScopeName(top->name);
   }
-  int finest = 2;
+  // §3.14.3: the global precision counts the compilation unit's, the
+  // packages' and every `timescale directive's, which no instance holds.
+  int finest = design->global_precision_order;
   for (auto* top : design->top_modules) {
     // A later top is keyed under its name, as an instance (LowerParallelTop).
     std::string below_top =

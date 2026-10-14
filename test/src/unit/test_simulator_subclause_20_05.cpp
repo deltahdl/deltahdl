@@ -4,6 +4,7 @@
 #include <cstring>
 
 #include "builders_systask.h"
+#include "common/arena.h"
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "parser/ast_expr.h"
@@ -12,6 +13,13 @@
 using namespace delta;
 
 namespace {
+
+Expr* MkReal(Arena& arena, double val) {
+  auto* e = arena.Create<Expr>();
+  e->kind = ExprKind::kRealLiteral;
+  e->real_val = val;
+  return e;
+}
 
 TEST(SysTask, ItoRConvertsIntToReal) {
   SysTaskFixture f;
@@ -65,9 +73,7 @@ TEST(SysTask, RealtobitsReinterpretsRealAsBits) {
 TEST(SysTask, ShortrealtobitsReinterpretsShortrealAs32Bits) {
   SysTaskFixture f;
   double dval = 1.5;  // exactly representable in single precision
-  uint64_t dbits = 0;
-  std::memcpy(&dbits, &dval, sizeof(double));
-  auto* expr = MkSysCall(f.arena, "$shortrealtobits", {MkInt(f.arena, dbits)});
+  auto* expr = MkSysCall(f.arena, "$shortrealtobits", {MkReal(f.arena, dval)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.width, 32u);
   auto fval = static_cast<float>(dval);
@@ -97,9 +103,7 @@ TEST(SysTask, BitstoshortrealReinterprets32BitsAsShortreal) {
 TEST(SysTask, ShortrealtobitsRoundsToNearestRepresentation) {
   SysTaskFixture f;
   double dval = 0.1;
-  uint64_t dbits = 0;
-  std::memcpy(&dbits, &dval, sizeof(double));
-  auto* expr = MkSysCall(f.arena, "$shortrealtobits", {MkInt(f.arena, dbits)});
+  auto* expr = MkSysCall(f.arena, "$shortrealtobits", {MkReal(f.arena, dval)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   auto rounded = static_cast<float>(dval);
   uint32_t expected_bits = 0;
@@ -113,10 +117,10 @@ TEST(SysTask, ShortrealtobitsRoundsToNearestRepresentation) {
 // 32-bit representation and the task is a round trip on it.
 //
 // ShortrealtobitsReinterpretsShortrealAs32Bits and
-// ShortrealtobitsRoundsToNearestRepresentation above build the operand with
-// MkInt from the 64 bits of a double, so the task never receives an operand at
-// the width §6.12 gives a shortreal. Declaring the variable and running the
-// assignment is the only way to reach it. 1.5 is exactly representable in
+// ShortrealtobitsRoundsToNearestRepresentation above pass a real literal, so
+// the task never receives an operand at the width §6.12 gives a shortreal.
+// Declaring the variable and running the assignment is the only way to reach
+// it. 1.5 is exactly representable in
 // single precision: sign 0, biased exponent 127 (0x7F), and a mantissa whose
 // leading fraction bit alone is set (0x400000) pack as 0x3FC00000.
 TEST(SysTask, ShortrealtobitsReadsAShortrealVariable) {
@@ -257,6 +261,56 @@ TEST(ConversionSim, ItorAndBitstorealResultsAreReals) {
                  "endmodule\n",
                  f),
       "16.000000 4 1\n");
+}
+
+// §20.5: $realtobits takes a real and $shortrealtobits a shortreal, so an
+// operand of another type reaches each as its value converted (§6.12.1),
+// never as its bits: the int 3 gives the patterns of 3.0, the int -2 that of
+// -2.0, the shortreal 3.0 the double 3.0, and the real 0.1 the float nearest
+// it.
+TEST(ConversionSim, RealtobitsAndShortrealtobitsConvertTheirOperandByValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int i = 3, n = -2;\n"
+                       "  shortreal s = 3.0;\n"
+                       "  real r = 0.1;\n"
+                       "  initial $display(\"%h %h %h %h %h\", $realtobits(i), "
+                       "$realtobits(n), $realtobits(s), $shortrealtobits(i), "
+                       "$shortrealtobits(r));\n"
+                       "endmodule\n",
+                       f),
+            "4008000000000000 c000000000000000 4008000000000000 40400000 "
+            "3dcccccd\n");
+}
+
+// §20.5: $rtoi takes a real, so an integral operand reaches it as its value
+// converted to real (§6.12.1): the int 7 truncates to 7 and the signed byte
+// -3 to -3, where reading their bits as a float's gives 0.
+TEST(ConversionSim, RtoiConvertsAnIntegralOperandByValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int i = 7;\n"
+                       "  byte signed b = -3;\n"
+                       "  initial $display(\"%0d %0d\", $rtoi(i), $rtoi(b));\n"
+                       "endmodule\n",
+                       f),
+            "7 -3\n");
+}
+
+// §20.5: $itor converts an integer value to real, so the signed byte -3 gives
+// -3.0 rather than the 253.0 its pattern spells, and a real operand reaches it
+// rounded to the nearest integer, ties away from zero (§6.12.1): 2.5 gives 3.0
+// and -2.5 gives -3.0.
+TEST(ConversionSim, ItorConvertsItsOperandToAnIntegerByValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  byte signed b = -3;\n"
+                       "  real r = 2.5, q = -2.5;\n"
+                       "  initial $display(\"%f %f %f\", $itor(b), $itor(r), "
+                       "$itor(q));\n"
+                       "endmodule\n",
+                       f),
+            "-3.000000 3.000000 -3.000000\n");
 }
 
 }  // namespace

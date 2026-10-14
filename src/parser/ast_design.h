@@ -209,6 +209,7 @@ struct CompilationUnit {
   // the last directive, and an earlier finer one need not stand before any
   // design element's header. Meaningful only under has_preproc_timescale.
   TimeUnit preproc_global_precision = TimeUnit::kNs;
+  int preproc_global_precision_magnitude = 1;
 
   // Whether the unit holds nothing an elaboration could take up: no module or
   // program to root a design at, no package or class whose items want

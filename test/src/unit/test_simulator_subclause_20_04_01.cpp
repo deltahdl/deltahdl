@@ -12,6 +12,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "helpers_preprocess_and_get.h"
 
 using namespace delta;
 
@@ -195,6 +196,59 @@ TEST(TimescaleSystemFunctions, AnInstanceArgumentReportsItAndTheProcessGoesOn) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "-9 -12\nTime scale of (s1) is 1ns / 1ps\ndone\n");
+}
+
+// §20.4.1 with §3.14.3: the global time precision counts the compilation
+// unit's precision as well as the instances', so the 1fs the unit declares,
+// finer than top's 1ps, is what $root answers.
+TEST(TimescaleSystemFunctions, RootArgumentCountsTheCompilationUnitsPrecision) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "timeunit 1ns;\n"
+      "timeprecision 1fs;\n"
+      "module top;\n"
+      "  timeunit 1ns; timeprecision 1ps;\n"
+      "  initial $display(\"%0d\", $timeprecision($root));\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "-15\n");
+}
+
+// §20.4.1 with §3.14.3: a package's precision counts toward the global one,
+// magnitude and all, though no instance holds it: the 10fs of p makes $root
+// answer -14, where top alone gives -12 and the unit without its magnitude
+// -15.
+TEST(TimescaleSystemFunctions, RootArgumentCountsAPackagesPrecision) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "package p;\n"
+      "  timeunit 1ns; timeprecision 10fs;\n"
+      "endpackage\n"
+      "module top;\n"
+      "  timeunit 1ns; timeprecision 1ps;\n"
+      "  initial $display(\"%0d\", $timeprecision($root));\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "-14\n");
+}
+
+// §20.4.1 and §20.4.2 with §3.14.3: every `timescale precision counts toward
+// the global one, magnitude and all, a directive that stands before no design
+// element's header included: the trailing 1ns / 10ps makes $root's precision
+// 10ps, where top alone gives 1ns and the unit without its magnitude 1ps.
+TEST(TimescaleSystemFunctions, RootArgumentCountsATrailingTimescalePrecision) {
+  SimFixture f;
+  std::string out = PreprocessAndCapture(
+      "module top;\n"
+      "  timeunit 1ns / 1ns;\n"
+      "  initial begin\n"
+      "    $display(\"%0d\", $timeprecision($root));\n"
+      "    $printtimescale($root);\n"
+      "  end\n"
+      "endmodule\n"
+      "`timescale 1ns / 10ps\n",
+      f);
+  EXPECT_EQ(out, "-11\nTime scale of ($root) is 10ps / 10ps\n");
 }
 
 }  // namespace

@@ -144,6 +144,7 @@ inline void PropagateDirectivesToCu(CompilationUnit* cu,
   cu->preproc_timescale = preproc.CurrentTimescale();
   cu->has_preproc_timescale = preproc.HasGlobalPrecision();
   cu->preproc_global_precision = preproc.GlobalPrecision();
+  cu->preproc_global_precision_magnitude = preproc.GlobalPrecisionMagnitude();
 }
 
 // Preprocesses, parses and elaborates `src`, reporting through `parse_failed`

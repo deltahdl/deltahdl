@@ -86,6 +86,7 @@ inline std::string PreprocessAndCapture(const std::string& src, SimFixture& f) {
   cu->preproc_timescale = pp.CurrentTimescale();
   cu->has_preproc_timescale = pp.HasGlobalPrecision();
   cu->preproc_global_precision = pp.GlobalPrecision();
+  cu->preproc_global_precision_magnitude = pp.GlobalPrecisionMagnitude();
   std::ostringstream captured;
   std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
   Elaborator elab(f.arena, f.diag, cu);

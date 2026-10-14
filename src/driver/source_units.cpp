@@ -57,6 +57,7 @@ void ReadPreprocessorState(const Preprocessor& preproc, PreprocResult& result) {
   result.timescale = preproc.CurrentTimescale();
   result.has_global_precision = preproc.HasGlobalPrecision();
   result.global_precision = preproc.GlobalPrecision();
+  result.global_precision_magnitude = preproc.GlobalPrecisionMagnitude();
   result.runtime_licenses = preproc.RuntimeLicenses();
 }
 
@@ -137,6 +138,7 @@ void ApplyPreprocMetadata(CompilationUnit* cu, const PreprocResult& pp) {
   cu->preproc_timescale = pp.timescale;
   cu->has_preproc_timescale = pp.has_global_precision;
   cu->preproc_global_precision = pp.global_precision;
+  cu->preproc_global_precision_magnitude = pp.global_precision_magnitude;
 }
 
 SeparateUnits ParseSeparateUnits(const CliOptions& opts, SourceManager& src_mgr,

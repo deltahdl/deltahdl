@@ -73,57 +73,85 @@ ResolvedTimescale ResolveModuleTimescale(const ModuleDecl* mod,
   return result;
 }
 
-static void UpdateMin(TimeUnit candidate, TimeUnit& current, bool& found) {
-  if (!found || static_cast<int>(candidate) < static_cast<int>(current)) {
-    current = candidate;
-    found = true;
-  }
-}
+namespace {
 
-static void CollectModulePrecisions(const ModuleDecl* mod, TimeUnit& current,
-                                    bool& found) {
+// The finest precision found so far, as its order: 10ps is -11.
+struct FinestOrder {
+  int order = 0;
+  bool found = false;
+
+  void Update(TimeUnit unit, int magnitude) {
+    int candidate = EffectiveTimeOrder(unit, magnitude);
+    if (!found || candidate < order) {
+      order = candidate;
+      found = true;
+    }
+  }
+};
+
+}  // namespace
+
+static void CollectModulePrecisions(const ModuleDecl* mod,
+                                    FinestOrder& finest) {
   if (mod->has_timeprecision) {
-    UpdateMin(mod->time_prec, current, found);
+    finest.Update(mod->time_prec, mod->time_prec_magnitude);
   }
 
   for (const auto* item : mod->items) {
     if (item->kind == ModuleItemKind::kNestedModuleDecl &&
         item->nested_module_decl) {
-      CollectModulePrecisions(item->nested_module_decl, current, found);
+      CollectModulePrecisions(item->nested_module_decl, finest);
     }
   }
+}
+
+// §3.14.3: the finest of every precision the unit declares, `preproc` holding
+// that of the `timescale directives where any was read.
+static FinestOrder CollectGlobalPrecision(const CompilationUnit* cu,
+                                          const FinestOrder& preproc) {
+  FinestOrder finest = preproc;
+
+  if (cu->has_cu_timeprecision) {
+    finest.Update(cu->cu_time_prec, cu->cu_time_prec_magnitude);
+  }
+
+  for (const auto* mod : cu->modules) {
+    CollectModulePrecisions(mod, finest);
+  }
+  for (const auto* iface : cu->interfaces) {
+    CollectModulePrecisions(iface, finest);
+  }
+  for (const auto* prog : cu->programs) {
+    CollectModulePrecisions(prog, finest);
+  }
+  for (const auto* pkg : cu->packages) {
+    if (pkg->has_timeprecision) {
+      finest.Update(pkg->time_prec, pkg->time_prec_magnitude);
+    }
+  }
+
+  return finest;
 }
 
 TimeUnit ComputeGlobalTimePrecision(const CompilationUnit* cu,
                                     bool has_preproc_timescale,
                                     TimeUnit preproc_global_precision) {
-  TimeUnit result = TimeUnit::kNs;
-  bool found = false;
+  FinestOrder preproc;
+  if (has_preproc_timescale) preproc.Update(preproc_global_precision, 1);
+  FinestOrder finest = CollectGlobalPrecision(cu, preproc);
+  if (!finest.found) return TimeUnit::kNs;
+  // The unit of an order is the power of 1000 at or below it: -11 is ps.
+  return static_cast<TimeUnit>(finest.order - (finest.order % 3 + 3) % 3);
+}
 
-  if (has_preproc_timescale) {
-    UpdateMin(preproc_global_precision, result, found);
+int GlobalTimePrecisionOrder(const CompilationUnit* cu) {
+  FinestOrder preproc;
+  if (cu->has_preproc_timescale) {
+    preproc.Update(cu->preproc_global_precision,
+                   cu->preproc_global_precision_magnitude);
   }
-
-  if (cu->has_cu_timeprecision) {
-    UpdateMin(cu->cu_time_prec, result, found);
-  }
-
-  for (const auto* mod : cu->modules) {
-    CollectModulePrecisions(mod, result, found);
-  }
-  for (const auto* iface : cu->interfaces) {
-    CollectModulePrecisions(iface, result, found);
-  }
-  for (const auto* prog : cu->programs) {
-    CollectModulePrecisions(prog, result, found);
-  }
-  for (const auto* pkg : cu->packages) {
-    if (pkg->has_timeprecision) {
-      UpdateMin(pkg->time_prec, result, found);
-    }
-  }
-
-  return result;
+  FinestOrder finest = CollectGlobalPrecision(cu, preproc);
+  return finest.found ? finest.order : EffectiveTimeOrder(TimeUnit::kNs, 1);
 }
 
 }  // namespace delta

@@ -198,6 +198,11 @@ void TakeElementSignedness(const AssocArrayObject& aa, Logic4Vec& val);
 // hold.
 double RealVecToDouble(const Logic4Vec& v);
 
+// §6.12.1 with §11.3.1: the value of `v` as a real, read from its pattern when
+// `v` is a real and converted from its integer value, by its sign, when it is
+// integral.
+double RealValueOf(const Logic4Vec& v);
+
 // The inverse of RealVecToDouble: lays `val` into a real vector of the given
 // width, rounding to single precision at 32 bits. A value written back at a
 // width other than the one it was read at changes the declared type it stands

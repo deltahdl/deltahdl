@@ -49,6 +49,7 @@ struct PreprocResult {
   TimeScale timescale;
   bool has_global_precision = false;
   TimeUnit global_precision = TimeUnit::kNs;
+  int global_precision_magnitude = 1;
   // The line of `source` each command-line source file's text begins on, in
   // command-line order. §33.3.1 maps a source file to a library, and a design
   // element belongs to the file named on the command line whose text holds

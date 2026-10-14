@@ -94,9 +94,13 @@ void Preprocessor::HandleTimescale(std::string_view rest, SourceLoc loc) {
   }
 
   current_timescale_ = ts;
+  // §3.14.3: the finest precision is the one of the smallest order, its
+  // magnitude counted, so a 10ps directive is finer than a 100ps one.
   if (!has_global_precision_ ||
-      static_cast<int>(ts.precision) < static_cast<int>(global_precision_)) {
+      EffectiveTimeOrder(ts.precision, ts.prec_magnitude) <
+          EffectiveTimeOrder(global_precision_, global_precision_magnitude_)) {
     global_precision_ = ts.precision;
+    global_precision_magnitude_ = ts.prec_magnitude;
   }
   has_timescale_ = true;
   has_global_precision_ = true;

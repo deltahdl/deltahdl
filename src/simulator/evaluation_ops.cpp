@@ -232,7 +232,7 @@ double RealVecToDouble(const Logic4Vec& v) {
 // value, which for a signed operand is the value its sign gives: `-3'sb1` is
 // -1, and read as the unsigned 7 it made `2.0 ** -3'sb1` 128.0 where Table 11-5
 // gives 0.5.
-static double ToDouble(const Logic4Vec& v) {
+double RealValueOf(const Logic4Vec& v) {
   if (v.is_real) return RealVecToDouble(v);
   if (v.is_signed && v.width <= 64)
     return static_cast<double>(SignExtend(v.ToUint64(), v.width));
@@ -264,8 +264,8 @@ static uint32_t RealResultWidth(const Logic4Vec& lhs, const Logic4Vec& rhs) {
 
 static Logic4Vec EvalRealArith(TokenKind op, const Logic4Vec& lhs,
                                const Logic4Vec& rhs, Arena& arena) {
-  double lv = ToDouble(lhs);
-  double rv = ToDouble(rhs);
+  double lv = RealValueOf(lhs);
+  double rv = RealValueOf(rhs);
   uint32_t w = RealResultWidth(lhs, rhs);
   switch (op) {
     case TokenKind::kPlus:
@@ -664,8 +664,8 @@ static bool IsEqualityOp(TokenKind op) {
 
 static Logic4Vec EvalRealRelational(TokenKind op, const Logic4Vec& lhs,
                                     const Logic4Vec& rhs, Arena& arena) {
-  double ld = ToDouble(lhs);
-  double rd = ToDouble(rhs);
+  double ld = RealValueOf(lhs);
+  double rd = RealValueOf(rhs);
   bool r = false;
   switch (op) {
     case TokenKind::kLt:
@@ -758,8 +758,8 @@ static Logic4Vec EvalEqualityCompare(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
                                      Arena& arena) {
   if ((lhs.is_real || rhs.is_real) &&
       (op == TokenKind::kEqEq || op == TokenKind::kBangEq)) {
-    double ld = ToDouble(lhs);
-    double rd = ToDouble(rhs);
+    double ld = RealValueOf(lhs);
+    double rd = RealValueOf(rhs);
     bool eq = (ld == rd);
     return MakeLogic4VecVal(arena, 1, (op == TokenKind::kEqEq) == eq ? 1 : 0);
   }

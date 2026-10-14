@@ -1,4 +1,5 @@
 #include <bit>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -627,23 +628,24 @@ static Logic4Vec EvalSformatf(const Expr* expr, SimContext& ctx, Arena& arena) {
   return out;
 }
 
+// §20.5: $itor converts an integer value to real, so a signed operand gives
+// the value its sign gives, and a real operand reaches it rounded to the
+// nearest integer, ties away from zero (§6.12.1). The result is a real, which
+// a reader tells from an integer by the mark rather than by the bits.
 static Logic4Vec EvalItor(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 64, 0);
   auto val = EvalExpr(expr->args[0], ctx, arena);
-  auto d = static_cast<double>(static_cast<int64_t>(val.ToUint64()));
-  uint64_t bits = 0;
-  std::memcpy(&bits, &d, sizeof(double));
-  // §20.5: $itor returns a real, which a reader tells from an integer by
-  // the mark rather than by the bits.
-  Logic4Vec out = MakeLogic4VecVal(arena, 64, bits);
-  out.is_real = true;
-  return out;
+  double d = RealValueOf(val);
+  if (val.is_real) d = std::round(d);
+  return MakeRealVec(arena, d, 64);
 }
 
 static Logic4Vec EvalRtoi(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
   auto val = EvalExpr(expr->args[0], ctx, arena);
-  auto truncated = static_cast<int64_t>(RealVecToDouble(val));
+  // §20.5: the operand is a real, so an integral one reaches it as its value
+  // converted to real (§6.12.1), never as its bits.
+  auto truncated = static_cast<int64_t>(RealValueOf(val));
   // §20.5: the result is an integer, which is signed.
   Logic4Vec out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(truncated));
   out.is_signed = true;
@@ -660,17 +662,16 @@ static Logic4Vec EvalBitstoreal(const Expr* expr, SimContext& ctx,
   return out;
 }
 
+// §20.5: $realtobits takes a real operand, so an operand of another type
+// reaches it as its value converted to real (§6.12.1), never as its bits: an
+// int 3 gives the pattern of 3.0, and a shortreal the double its float holds.
 static Logic4Vec EvalRealtobits(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 64, 0);
-  auto val = EvalExpr(expr->args[0], ctx, arena);
-  uint64_t raw_bits = val.ToUint64();
-
-  if (expr->args[0]->kind == ExprKind::kRealLiteral) {
-    double d = expr->args[0]->real_val;
-    std::memcpy(&raw_bits, &d, sizeof(double));
-  }
-  return MakeLogic4VecVal(arena, 64, raw_bits);
+  double d = RealValueOf(EvalExpr(expr->args[0], ctx, arena));
+  uint64_t bits = 0;
+  std::memcpy(&bits, &d, sizeof(double));
+  return MakeLogic4VecVal(arena, 64, bits);
 }
 
 static uint32_t CountMatchingBits(const Logic4Vec& val, const bool match[4]) {
@@ -712,11 +713,11 @@ static Logic4Vec EvalConversionSysCall(const Expr* expr, SimContext& ctx,
   if (name == "$shortrealtobits") {
     if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
     auto val = EvalExpr(expr->args[0], ctx, arena);
-    // §20.5 gives this task a shortreal operand, so a shortreal variable
-    // arrives already holding the 32-bit pattern the task returns. Reading it
-    // through RealVecToDouble makes that case a round trip rather than a
-    // reinterpretation, and still narrows a real operand to single precision.
-    auto f = static_cast<float>(RealVecToDouble(val));
+    // §20.5 gives this task a shortreal operand, so an operand of another type
+    // reaches it as its value converted to shortreal (§6.12.1): a real is
+    // narrowed to single precision, an int 3 gives the pattern of 3.0, and a
+    // shortreal variable's own pattern makes the round trip unchanged.
+    auto f = static_cast<float>(RealValueOf(val));
     uint32_t fbits = 0;
     std::memcpy(&fbits, &f, sizeof(float));
     return MakeLogic4VecVal(arena, 32, fbits);
