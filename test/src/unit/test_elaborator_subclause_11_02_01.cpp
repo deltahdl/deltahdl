@@ -506,4 +506,43 @@ TEST(ConstantExpressionElaboration, ParenthesisFreeEnumMethodsFold) {
   EXPECT_EQ(num->resolved_value, 3);
 }
 
+// §11.2.1 with A.8.4: a constant expression reaches a parameter by its own
+// name or a package's, never by a hierarchical one, so a declaration's packed
+// or unpacked range written with one is reported -- it was folded to nothing
+// and the vector made one bit wide -- while a range reading a package's
+// parameter, a built-in method of a variable, or $bits of one is constant.
+TEST(ConstantExpressionElaboration, HierarchicalReferenceInARangeIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pk;\n"
+      "  parameter int PW = 3;\n"
+      "endpackage\n"
+      "typedef enum {A, B, C} e_t;\n"
+      "module mon #(parameter int W = 4) ();\n"
+      "endmodule\n"
+      "module cpu;\n"
+      "  mon #(.W(8)) r();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  cpu c();\n"
+      "  e_t e;\n"
+      "  logic [c.r.W:0] v;\n"
+      "  logic [1:0][c.r.W:0] w;\n"
+      "  logic u [c.r.W];\n"
+      "  logic [pk::PW:0] ok1;\n"
+      "  logic [e.num():0] ok2;\n"
+      "  logic [$bits(e):0] ok3;\n"
+      "endmodule\n",
+      f);
+  const char* message = "contains a hierarchical reference, which is no";
+  for (uint32_t line : {13u, 14u, 15u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, line, "11.2.1"))
+        << line;
+  }
+  for (uint32_t line : {16u, 17u, 18u}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), message, line, "11.2.1"))
+        << line;
+  }
+}
+
 }  // namespace

@@ -543,18 +543,24 @@ void CheckDeclRangesForSpecparam(
 
 }  // namespace
 
-void Elaborator::ValidateSpecparamInDeclRange(const ModuleDecl* decl) {
-  if (specparam_names_.empty()) return;
+static void ReportHierRefInDeclRange(const ModuleItem* item,
+                                     const CompilationUnit* unit,
+                                     DiagEngine& diag);
 
+void Elaborator::ValidateSpecparamInDeclRange(const ModuleDecl* decl) {
   // §6.20.5: a specify parameter is reserved for timing/delay values and may
   // not participate in the range specification of a declaration. Flag any
   // packed or unpacked dimension expression of a net or variable declaration
-  // that references a specparam.
+  // that references a specparam. The same ranges are constant expressions,
+  // which no hierarchical name is (ReportHierRefInDeclRange).
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kNetDecl &&
         item->kind != ModuleItemKind::kVarDecl)
       continue;
-    CheckDeclRangesForSpecparam(item, specparam_names_, diag_);
+    if (!specparam_names_.empty()) {
+      CheckDeclRangesForSpecparam(item, specparam_names_, diag_);
+    }
+    ReportHierRefInDeclRange(item, unit_, diag_);
   }
 }
 
@@ -615,6 +621,30 @@ static bool ExprContainsHierRef(const Expr* e, const CompilationUnit* unit) {
   }
   return AnyExprContainsHierRef(e->elements, unit) ||
          AnyExprContainsHierRef(e->args, unit);
+}
+
+// §11.2.1 with A.8.4: a declaration's range is a constant expression, whose
+// constant_primary reaches a parameter by its own name or a package's and
+// never by a hierarchical one, as the §6.20.2 check below reads a parameter's
+// value; a range written with one, `logic [c.r.W:0] v`, is reported where it
+// would otherwise have been folded to nothing and the vector made one bit.
+static void ReportHierRefInDeclRange(const ModuleItem* item,
+                                     const CompilationUnit* unit,
+                                     DiagEngine& diag) {
+  std::vector<Expr*> ranges{item->data_type.packed_dim_left,
+                            item->data_type.packed_dim_right};
+  for (const auto& [left, right] : item->data_type.extra_packed_dims) {
+    ranges.push_back(left);
+    ranges.push_back(right);
+  }
+  ranges.insert(ranges.end(), item->unpacked_dims.begin(),
+                item->unpacked_dims.end());
+  if (!AnyExprContainsHierRef(ranges, unit)) return;
+  diag.Error(item->loc,
+             std::format("the range of '{}' contains a hierarchical "
+                         "reference, which is no constant expression",
+                         item->name),
+             Subclause("11.2.1"));
 }
 
 namespace {
