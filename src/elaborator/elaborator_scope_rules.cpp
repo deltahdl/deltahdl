@@ -405,8 +405,13 @@ void ReportProcUnresolved(const ModuleDecl* decl, Pred declared,
   }
   std::vector<const Expr*> refs;
   for (const auto* item : decl->items) {
-    if (IsProceduralItemKind(item->kind)) {
-      CollectProcRhsIdents(item->body, locals, refs);
+    if (!IsProceduralItemKind(item->kind)) continue;
+    CollectProcRhsIdents(item->body, locals, refs);
+    // §9.4.2: an always construct's own event control, kept on the item
+    // rather than as a statement of its body, reads what it names as well.
+    for (const EventExpr& ev : item->sensitivity) {
+      CollectBareIdents(ev.signal, refs);
+      CollectBareIdents(ev.iff_condition, refs);
     }
   }
   ReportUnresolvedRefs(refs, declared, diag, DeclaredGenvars(decl->items));

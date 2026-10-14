@@ -87,7 +87,7 @@ TEST(ClockingScopeElab, SameBlockNameAcrossInstantiatedScopesElaborates) {
              "    input data;\n"
              "  endclocking\n"
              "endmodule\n"
-             "module top;\n"
+             "module top; logic clk;\n"
              "  sub u_sub();\n"
              "  logic data; clocking cb @(posedge clk);\n"
              "    input data;\n"

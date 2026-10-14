@@ -65,7 +65,7 @@ TEST(ProceduralAssertionGlitchRun,
   SimFixture f;
   std::string out = RunCapture(
       GlitchSource(std::string(kBlock2) +
-                   "  program reactive_driver; logic clk;\n"
+                   "  program reactive_driver;\n"
                    "    initial forever @(posedge clk) if (!en) foo = bar;\n"
                    "  endprogram\n"),
       f);

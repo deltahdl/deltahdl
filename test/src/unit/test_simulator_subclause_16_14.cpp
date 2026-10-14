@@ -117,7 +117,7 @@ TEST(ConcurrentAssertionStatements,
 // of the hierarchical name its action block reports.
 TEST(ConcurrentAssertionStatements, AStatementStandsInAProgram) {
   std::string out = RunAssertions(
-      "  program prog; logic clk;\n"
+      "  program prog;\n"
       "    pr_named: assert property (@(posedge clk) a)\n"
       "      else $display(\"%m failed at %0d\", $time);\n"
       "  endprogram\n");

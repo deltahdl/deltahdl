@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <string>
 
+#include "common/diagnostic.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
@@ -62,14 +64,22 @@ TEST(EndedSequenceMethodDeprecated, TriggeredMethodOnSequenceStillEvaluates) {
 
 // The removal targets the sequence method specifically. A member named ended
 // whose base is an ordinary variable rather than a named sequence is not the
-// deprecated construct and is left alone by this rule.
+// deprecated construct and is left alone by this rule; §23.7 a) is what
+// refuses it, a select through an integral variable naming nothing.
 TEST(EndedSequenceMethodDeprecated, EndedOnNonSequenceIsNotRejectedByThisRule) {
-  EXPECT_FALSE(
-      RunReportsError("module t;\n"
-                      "  logic [7:0] s;\n"
-                      "  logic r;\n"
-                      "  initial r = s.ended;\n"
-                      "endmodule\n"));
+  SimFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] s;\n"
+      "  logic r;\n"
+      "  initial r = s.ended;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(std::ranges::none_of(
+      f.diag.Diagnostics(),
+      [](const Diagnostic& d) { return d.subclause == "C.2.3"; }));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "is not a built-in method", 4,
+                            "23.7"));
 }
 
 // Annex C.2.3: the usage of the ended sequence method is deprecated and does
