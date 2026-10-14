@@ -36,6 +36,19 @@ namespace delta {
 // its direction and width. That vector is what is created for it, once however
 // many ports select from it; a port with a name is created under the name.
 // Nothing for a port that is neither.
+// §21.7.4.3.1: the drivers of the signal connected to the input port
+// `port_name` are its test-fixture side, which an extended VCD record of the
+// port counts; recorded where the connection is a plain signal name, under the
+// parent instance's prefix `parent_prefix`.
+static void RecordInputPortSource(const RtlirPortBinding& binding,
+                                  const std::string& port_name,
+                                  const std::string& parent_prefix,
+                                  SimContext& ctx) {
+  if (binding.connection->kind != ExprKind::kIdentifier) return;
+  ctx.Vcd().SetVcdPortSource(
+      port_name, parent_prefix + std::string(binding.connection->text));
+}
+
 // §21.7.4.2 (printed page 699): a concatenated port appears in an extended
 // VCD file as separate entries, one per object it names, each facing the
 // port's way; the objects are the module's own, declared from its body, so
@@ -807,12 +820,7 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
       // between.
       NameInterconnectPath(
           {inst_prefix_, inst_seg, binding.port_name, binding.connection}, ca);
-      // §21.7.4.3.1: the drivers of the signal connected to an input are its
-      // test-fixture side, which an extended VCD record of the port counts.
-      if (binding.connection->kind == ExprKind::kIdentifier) {
-        ctx_.Vcd().SetVcdPortSource(
-            port_name, inst_prefix_ + std::string(binding.connection->text));
-      }
+      RecordInputPortSource(binding, port_name, inst_prefix_, ctx_);
       LowerContAssign(ca, from_program);
       continue;
     }

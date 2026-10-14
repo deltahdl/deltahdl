@@ -198,13 +198,16 @@ static PortEnd EndOfPort(const Net& net, uint32_t bit, std::string_view inst,
 // the pair from the unknown-direction list, input first: A for 0 and 1, a for
 // 0 and x, B for 1 and 0, b for 1 and x, C for x and 0, c for x and 1, and ?
 // where both are unknown.
+static char SameValueEndsChar(const PortEnd& in, const PortEnd& out) {
+  bool high = in.value == '1';
+  if (in.strong == out.strong) return high ? '1' : '0';
+  if (in.strong) return high ? 'u' : 'd';
+  return high ? 'h' : 'l';
+}
+
 static char BothEndsChar(const PortEnd& in, const PortEnd& out) {
-  if (in.value == out.value && in.value != 'x') {
-    bool high = in.value == '1';
-    if (in.strong == out.strong) return high ? '1' : '0';
-    if (in.strong) return high ? 'u' : 'd';
-    return high ? 'h' : 'l';
-  }
+  if (in.value == out.value && in.value != 'x')
+    return SameValueEndsChar(in, out);
   switch (in.value) {
     case '0':
       return out.value == '1' ? 'A' : 'a';

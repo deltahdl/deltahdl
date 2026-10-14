@@ -214,7 +214,6 @@ TEST_F(ExtendedVcdStateCharacterSim, UnknownValueSelectsTheUnknownCharacter) {
   EXPECT_EQ(PortStateChars(content), "?") << content;
 }
 
-}  // namespace
 // §21.7.4.2 (printed page 699): a concatenated port appears as separate
 // entries, so the objects `{A, b}` names are two ports of their own, and
 // §21.7.4.3.1 writes each with its direction's characters -- U and D for the
@@ -324,10 +323,10 @@ TEST_F(ExtendedVcdStateCharacterSim, InoutEndsPickTheConflictCharacter) {
       "  m1 kk(.p(wk));\n"
       "  initial $dumpports;\n"
       "endmodule\n");
-  const char* kExpected[] = {"A", "u", "h", "1", "B", "C",
-                             "c", "a", "b", "?", "1"};
+  const char* expected[] = {"A", "u", "h", "1", "B", "C",
+                            "c", "a", "b", "?", "1"};
   for (int code = 0; code < 11; ++code) {
-    EXPECT_EQ(PortStateCharsFor(content, std::to_string(code)), kExpected[code])
+    EXPECT_EQ(PortStateCharsFor(content, std::to_string(code)), expected[code])
         << code << "\n"
         << content;
   }

@@ -8,6 +8,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
 #include "simulator/statement_assign.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
