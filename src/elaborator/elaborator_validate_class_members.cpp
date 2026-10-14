@@ -16,6 +16,7 @@
 
 #include "common/diagnostic.h"
 #include "elaborator/class_method_reads.h"
+#include "elaborator/covergroup_context.h"
 #include "elaborator/covergroup_rules.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"

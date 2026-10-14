@@ -83,8 +83,8 @@ void CheckNameSelected(const SelectExpression& s, const CrossSite& site) {
   }
   std::optional<DataTypeKind> element = site.ctx.type_of(name);
   if (!site.ctx.arrays.kind_of(name).has_value() || !element.has_value() ||
-      !(IsIntegralType(*element) || IsRealType(*element) ||
-        *element == DataTypeKind::kString)) {
+      (!IsIntegralType(*element) && !IsRealType(*element) &&
+       *element != DataTypeKind::kString)) {
     return;
   }
   site.diag.Error(s.loc,
