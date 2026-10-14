@@ -48,16 +48,15 @@ void EnterDeclaredLocals(const std::vector<Stmt*>& items,
                          DeclaredLocals& locals);
 
 // Calls `visit` on each statement directly under `s`, with the context the
-// names there are read through. A begin-end block (§23.9), a for loop
-// (§12.7.1) and a foreach loop (§12.7.3) are scopes whose declarations hide the
-// names of the same spelling around them, so the statements under one get a
-// copy of `ctx` with those declarations entered. A for loop's declared
-// variable stands for its declared type. A foreach loop variable is an int over
-// a fixed-size, dynamic or queue dimension and has the index type over an
-// associative one, so where the dimension it walks is not plainly one of the
-// first three in `ctx.locals`, it hides the outer name without standing for a
-// type. A fork-join block is a scope too, but neither §12.8's nor §18.17.7's
-// check reaches a return inside one, which §9.3.2 forbids.
+// names there are read through. A begin-end block and a fork-join block
+// (§23.9), a for loop (§12.7.1) and a foreach loop (§12.7.3) are scopes whose
+// declarations hide the names of the same spelling around them, so the
+// statements under one get a copy of `ctx` with those declarations entered. A
+// for loop's declared variable stands for its declared type. A foreach loop
+// variable is an int over a fixed-size, dynamic or queue dimension and has the
+// index type over an associative one, so where the dimension it walks is not
+// plainly one of the first three in `ctx.locals`, it hides the outer name
+// without standing for a type.
 void ForEachChildInScope(
     const Stmt* s, const ReturnCtx& ctx,
     const std::function<void(const Stmt*, const ReturnCtx&)>& visit);
@@ -123,5 +122,38 @@ DeclaredLocals ScopeVariables(const std::vector<ModuleItem*>& items);
 using ClassScopes = std::unordered_map<const ClassDecl*, DeclaredLocals>;
 ClassScopes ClassScopesOf(const std::vector<ModuleItem*>& items,
                           const CompilationUnit& unit);
+
+// The names in scope at the top level of subroutine `item`'s body: `outer`,
+// the names around the subroutine, under its formals and the variables its
+// body declares at its top level.
+DeclaredLocals SubroutineLocals(const ModuleItem* item,
+                                const DeclaredLocals& outer);
+
+// The names around each subroutine of `items`, the items of a module, a
+// package or a compilation unit, or the methods of a class. A subroutine
+// outside every class reads the variables of `items` through the typedefs the
+// scope holds. A class method reads its type names in its class first, whose
+// typedefs may hide the outer names that table holds, so it reads no name
+// through a typedef table. It finds the names ClassScopesOf gives the class
+// declaring it, or the class an out-of-block definition names, which stands in
+// the scope of that class (§8.24). A class ClassScopesOf does not give, one an
+// out-of-block definition names that is not declared beside it, gives no name.
+class SubroutineScopes {
+ public:
+  SubroutineScopes(const std::vector<ModuleItem*>& items,
+                   const TypedefMap& typedefs, const CompilationUnit& unit);
+
+  // Whether subroutine `item` is a method of a class.
+  bool IsMethod(const ModuleItem* item) const;
+
+  // The context the names around subroutine `item` are read through.
+  ReturnCtx Around(const ModuleItem* item);
+
+ private:
+  ClassMethods methods_;
+  ClassScopes classes_;
+  const CompilationUnit* unit_;
+  ReturnCtx outside_;
+};
 
 }  // namespace delta

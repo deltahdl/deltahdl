@@ -115,13 +115,15 @@ void EnterForeachLocals(const Stmt* s, DeclaredLocals& locals) {
 }
 
 bool OpensScope(const Stmt* s) {
-  return s->kind == StmtKind::kBlock || s->kind == StmtKind::kFor ||
-         s->kind == StmtKind::kForeach;
+  return s->kind == StmtKind::kBlock || s->kind == StmtKind::kFork ||
+         s->kind == StmtKind::kFor || s->kind == StmtKind::kForeach;
 }
 
 void EnterScopeLocals(const Stmt* s, DeclaredLocals& locals) {
   if (s->kind == StmtKind::kBlock) {
     EnterDeclaredLocals(s->stmts, locals);
+  } else if (s->kind == StmtKind::kFork) {
+    EnterDeclaredLocals(s->fork_stmts, locals);
   } else if (s->kind == StmtKind::kFor) {
     EnterForLocals(s, locals);
   } else {
@@ -286,6 +288,37 @@ ClassScopes ClassScopesOf(const std::vector<ModuleItem*>& items,
     EnterClassScope(cls, kUnitAround, kClasses, unit, scopes);
   }
   return scopes;
+}
+
+DeclaredLocals SubroutineLocals(const ModuleItem* item,
+                                const DeclaredLocals& outer) {
+  DeclaredLocals locals = outer;
+  for (const auto& arg : item->func_args)
+    locals[arg.name] = {&arg.data_type, &arg.unpacked_dims};
+  EnterDeclaredLocals(item->func_body_stmts, locals);
+  return locals;
+}
+
+SubroutineScopes::SubroutineScopes(const std::vector<ModuleItem*>& items,
+                                   const TypedefMap& typedefs,
+                                   const CompilationUnit& unit)
+    : methods_(ClassMethodsOf(items, &unit)),
+      classes_(ClassScopesOf(items, unit)),
+      unit_(&unit),
+      outside_{typedefs, &unit, ScopeVariables(items)} {}
+
+bool SubroutineScopes::IsMethod(const ModuleItem* item) const {
+  return methods_.contains(item) || !item->method_class.empty();
+}
+
+ReturnCtx SubroutineScopes::Around(const ModuleItem* item) {
+  static const TypedefMap kNoTypedefs;
+  if (!IsMethod(item)) return outside_;
+  const auto kMethod = methods_.find(item);
+  const ClassDecl* cls = kMethod != methods_.end()
+                             ? kMethod->second
+                             : FindClassDecl(item->method_class, unit_);
+  return {kNoTypedefs, unit_, classes_[cls]};
 }
 
 }  // namespace delta

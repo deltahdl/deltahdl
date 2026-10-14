@@ -10,11 +10,8 @@
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
-#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/return_value_fit.h"
-#include "elaborator/type_eval.h"
-#include "parser/ast_class.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
@@ -247,18 +244,6 @@ void CheckValueReturningFuncReturn(const Stmt* s, std::string_view func_name,
   });
 }
 
-// The names in scope at the top level of subroutine `item`'s body: `outer`,
-// the names around the subroutine, under its formals and the variables its
-// body declares at its top level.
-DeclaredLocals SubroutineLocals(const ModuleItem* item,
-                                const DeclaredLocals& outer) {
-  DeclaredLocals locals = outer;
-  for (const auto& arg : item->func_args)
-    locals[arg.name] = {&arg.data_type, &arg.unpacked_dims};
-  EnterDeclaredLocals(item->func_body_stmts, locals);
-  return locals;
-}
-
 // §12.8 — applies the jump rules to a function/task body and, for a
 // value-returning function, also checks each return statement's expression.
 //
@@ -307,21 +292,10 @@ void Elaborator::ValidateJumpStatements(const ModuleDecl* decl) {
 // a declaration owns is walked -- ForEachBodyOwningItem in
 // elaborator_validate_internal.h is the one list of those.
 //
-// A class method's type names are read in its class first, whose typedefs may
-// hide the names of the module or the package around it, and `typedefs_`
-// holds those outer names alone. So a method's return check reads no name
-// through them: the methods of the classes `items` declare and of the
-// compilation unit's classes, and every method defined out of its class, are
-// checked with no typedef table. Such a method reads the names ClassScopesOf
-// gives the class declaring it, or the class an out-of-block definition names,
-// which stands in the scope of that class (§8.24). A class ClassScopesOf does
-// not give, one an out-of-block definition names that is not declared beside
-// it, is read for no name.
+// The names around a subroutine are the ones SubroutineScopes gives it, and a
+// class method's are not left to §6.19.3's check, which reads no method.
 void Elaborator::CheckJumpStatementsIn(const std::vector<ModuleItem*>& items) {
-  const ClassMethods kMethods = ClassMethodsOf(items, unit_);
-  ClassScopes class_scopes = ClassScopesOf(items, *unit_);
-  static const TypedefMap kNoTypedefs;
-  const ReturnCtx kScope{typedefs_, unit_, ScopeVariables(items)};
+  SubroutineScopes scopes(items, typedefs_, *unit_);
   ForEachBodyOwningItem(items, [&](const ModuleItem* item) {
     if (IsProceduralItemKind(item->kind) && item->body) {
       CheckJumpRules(item->body, JumpScope{}, diag_);
@@ -329,16 +303,8 @@ void Elaborator::CheckJumpStatementsIn(const std::vector<ModuleItem*>& items) {
     }
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl) {
-      const auto kMethod = kMethods.find(item);
-      if (kMethod == kMethods.end() && item->method_class.empty()) {
-        CheckSubroutineJumpRules(item, kScope, true, diag_);
-        return;
-      }
-      const ClassDecl* cls = kMethod != kMethods.end()
-                                 ? kMethod->second
-                                 : FindClassDecl(item->method_class, unit_);
-      const ReturnCtx kClass{kNoTypedefs, unit_, class_scopes[cls]};
-      CheckSubroutineJumpRules(item, kClass, false, diag_);
+      CheckSubroutineJumpRules(item, scopes.Around(item),
+                               !scopes.IsMethod(item), diag_);
     }
   });
 }

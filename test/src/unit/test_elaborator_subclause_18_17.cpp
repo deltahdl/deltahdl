@@ -570,4 +570,138 @@ TEST(RandsequenceProductionReturns,
              "endmodule\n"));
 }
 
+// §23.9: a name a code block does not declare is searched for outward, here
+// reaching the int the initial block declares around the randsequence, which
+// the class production mk does not take.
+TEST(RandsequenceProductionReturns,
+     AVariableOfTheBlockAroundTheRandsequenceIsChecked) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C; endclass\n"
+             "module t;\n"
+             "  initial begin\n"
+             "    int k = 1;\n"
+             "    randsequence (main)\n"
+             "      main : mk ;\n"
+             "      C mk : { return k; } ;\n"
+             "    endsequence\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return expression in production 'mk' is not "
+                            "assignment-compatible with the production's "
+                            "return type",
+                            7, "18.17.7"));
+}
+
+// The outward search goes on past the procedural block to the module's own
+// variables.
+TEST(RandsequenceProductionReturns, AVariableOfTheModuleIsChecked) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C; endclass\n"
+             "module t;\n"
+             "  int k;\n"
+             "  initial begin\n"
+             "    randsequence (main)\n"
+             "      main : mk ;\n"
+             "      C mk : { return k; } ;\n"
+             "    endsequence\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return expression in production 'mk' is not "
+                            "assignment-compatible with the production's "
+                            "return type",
+                            7, "18.17.7"));
+}
+
+// A formal argument of the task the randsequence stands in is one of the names
+// around its code blocks.
+TEST(RandsequenceProductionReturns, AFormalOfTheEnclosingTaskIsChecked) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C; endclass\n"
+             "module t;\n"
+             "  task run(int k);\n"
+             "    randsequence (main)\n"
+             "      main : mk ;\n"
+             "      C mk : { return k; } ;\n"
+             "    endsequence\n"
+             "  endtask\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return expression in production 'mk' is not "
+                            "assignment-compatible with the production's "
+                            "return type",
+                            6, "18.17.7"));
+}
+
+// §8.4: in a method, a property of its class is one of the names around the
+// randsequence.
+TEST(RandsequenceProductionReturns, APropertyOfTheMethodsClassIsChecked) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; endclass\n"
+      "class H;\n"
+      "  int k;\n"
+      "  task run();\n"
+      "    randsequence (main)\n"
+      "      main : mk ;\n"
+      "      C mk : { return k; } ;\n"
+      "    endsequence\n"
+      "  endtask\n"
+      "endclass\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return expression in production 'mk' is not "
+                            "assignment-compatible with the production's "
+                            "return type",
+                            7, "18.17.7"));
+}
+
+// §23.9 makes a fork-join block a scope, so the int it declares hides the
+// class handle of the initial block, and the int production takes it.
+TEST(RandsequenceProductionReturns, AForkDeclarationHidesTheNameAroundIt) {
+  EXPECT_TRUE(
+      ElabOk("class C; endclass\n"
+             "module t;\n"
+             "  initial begin\n"
+             "    C k = null;\n"
+             "    fork\n"
+             "      int k = 1;\n"
+             "      randsequence (main)\n"
+             "        main : num ;\n"
+             "        int num : { return k; } ;\n"
+             "      endsequence\n"
+             "    join\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// A randsequence written in a code block reads the names of that code block
+// first: its int hides the class handle of the initial block, and the int
+// production of the inner randsequence takes it.
+TEST(RandsequenceProductionReturns,
+     AnInnerRandsequenceReadsTheCodeBlockAroundIt) {
+  EXPECT_TRUE(
+      ElabOk("class C; endclass\n"
+             "module t;\n"
+             "  initial begin\n"
+             "    C k = null;\n"
+             "    randsequence (main)\n"
+             "      main : outer ;\n"
+             "      outer : { int k = 1;\n"
+             "        randsequence (inner)\n"
+             "          inner : num ;\n"
+             "          int num : { return k; } ;\n"
+             "        endsequence } ;\n"
+             "    endsequence\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
 }  // namespace
