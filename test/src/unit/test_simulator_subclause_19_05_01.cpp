@@ -395,6 +395,32 @@ TEST(CovergroupInstanceSim, TransitionBinIffGuardSuppressesItsCount) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.5.1: a default bin's trailing iff keeps it from counting while the
+// guard is false. 5 and 6 fall in no defined bin; only 6, sampled while en is
+// 1, counts toward other.
+TEST(CovergroupInstanceSim, DefaultBinIffGuardSuppressesItsCount) {
+  SimFixture f;
+  RunCapture(
+      "module top;\n"
+      "  bit [3:0] v; bit en;\n"
+      "  covergroup cg;\n"
+      "    coverpoint v { bins a = {1}; bins other = default iff (en); }\n"
+      "  endgroup\n"
+      "  cg c = new;\n"
+      "  initial begin\n"
+      "    v = 5; en = 0; c.sample();\n"
+      "    v = 6; en = 1; c.sample();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+  const CoverGroup* group = f.ctx.CoverageData().FindGroup("c");
+  ASSERT_NE(group, nullptr);
+  const CoverBin& other = group->coverpoints[0].bins.back();
+  EXPECT_EQ(other.name, "other");
+  EXPECT_EQ(other.hit_count, 1u);
+}
+
 // §19.5.1: the number of bins of `[k]` is positive. A covergroup formal
 // giving it 0 or -2 is a run-time error at the building of the instance, of
 // an integral coverpoint as of a real one; 4 builds four bins.

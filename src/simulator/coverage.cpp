@@ -239,8 +239,8 @@ static bool ValueBinTakesHit(const CoverBin& bin, bool value_is_illegal,
 
 // Counts a sampled value into every value bin `matches` finds it in, honoring
 // illegal/ignore dominance and per-bin iff guards, raises the run-time error of
-// an illegal value, and gives the default bin a value no defined bin holds (LRM
-// 19.5, 19.5.1, 19.5.5, 19.5.6).
+// an illegal value, and gives the default bin, while its iff guard allows, a
+// value no defined bin holds (LRM 19.5, 19.5.1, 19.5.5, 19.5.6).
 template <typename Matches>
 static void ScoreSampledValue(CoverPoint* cp, const Matches& matches) {
   bool value_is_illegal =
@@ -263,7 +263,10 @@ static void ScoreSampledValue(CoverPoint* cp, const Matches& matches) {
   if (value_is_illegal) ++cp->illegal_violations;
   if (matched_defined) return;
   for (auto& bin : cp->bins) {
-    if (bin.kind == CoverBinKind::kDefault) ++bin.hit_count;
+    if (bin.kind == CoverBinKind::kDefault &&
+        (!bin.has_iff_guard || bin.iff_guard_value)) {
+      ++bin.hit_count;
+    }
   }
 }
 
