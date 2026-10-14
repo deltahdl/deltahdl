@@ -259,4 +259,38 @@ TEST(UpwardNameReferenceSimulation, UpwardSearchUsesEnclosingModuleNotSibling) {
   EXPECT_EQ(r->value.ToUint64(), 88u);
 }
 
+// §23.8: a function of a module above the caller is called through that
+// module's definition name, and the call runs in the nearest enclosing
+// instance of it, reading that instance's own variables: each leaf adds its
+// own mid's g, two levels up through an inner instance.
+TEST(UpwardNameReferenceSimulation,
+     CallThroughAnEnclosingModulesNameRunsInTheNearestInstance) {
+  SimFixture f;
+  auto* first = RunAndFindVar(
+      "module leaf;\n"
+      "  int y;\n"
+      "  initial #1 y = mid.f(2);\n"
+      "endmodule\n"
+      "module inner;\n"
+      "  leaf t();\n"
+      "endmodule\n"
+      "module mid #(parameter int G = 5);\n"
+      "  int g = G;\n"
+      "  function int f(int x);\n"
+      "    return x + g;\n"
+      "  endfunction\n"
+      "  inner u();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  mid #(5) m1();\n"
+      "  mid #(10) m2();\n"
+      "endmodule\n",
+      f, "m1.u.t.y");
+  ASSERT_NE(first, nullptr);
+  EXPECT_EQ(first->value.ToUint64(), 7u);
+  auto* second = f.ctx.FindVariable("m2.u.t.y");
+  ASSERT_NE(second, nullptr);
+  EXPECT_EQ(second->value.ToUint64(), 12u);
+}
+
 }  // namespace

@@ -125,6 +125,36 @@ void ResolveTopHeadedPath(const std::string& path, SimContext& ctx,
   ApplyGenBlockScope(rest, ctx, target);
 }
 
+// §23.8: a path whose first name is the definition name of a module above
+// the caller, `mid.f(2)` called from an instance mid instantiates, names the
+// subroutine of the nearest enclosing instance of that module. The enclosing
+// instances are the caller's prefix cut back one name at a time, "m.u.t." to
+// "m.u." to "m.", each answering its module through FindInstanceType, and the
+// rest of the path is looked up under the first whose module the head names,
+// where RegisterInstanceSubroutines keyed that instance's subroutines.
+// Answers false where no enclosing instance below the top is of that module
+// or it declares no such subroutine; a top's own name is
+// ResolveTopHeadedPath's.
+bool ResolveUpwardModulePath(const std::string& path, std::string prefix,
+                             SimContext& ctx, SubroutineTarget& target) {
+  std::string_view head = std::string_view(path).substr(0, path.find('.'));
+  for (;;) {
+    auto last = prefix.size() < 2 ? std::string::npos
+                                  : prefix.find_last_of('.', prefix.size() - 2);
+    prefix.resize(last == std::string::npos ? 0 : last + 1);
+    if (prefix.empty()) return false;
+    if (ctx.FindInstanceType(
+            std::string_view(prefix).substr(0, prefix.size() - 1)) == head) {
+      break;
+    }
+  }
+  std::string key = prefix + path.substr(head.size() + 1);
+  target.func = ctx.FindFunction(key);
+  target.inst_prefix = InstanceOfKey(key);
+  ApplyGenBlockScope(key, ctx, target);
+  return target.func != nullptr;
+}
+
 // The path `call` names, "tk" for a bare enable or `tk;`, "u1.tk" for a
 // hierarchical one, with or without its parentheses (`top.T;`),
 // "blk[1].triple" for one into a generate block instance; empty where the call
@@ -319,6 +349,9 @@ SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
     target.func = func;
     target.inst_prefix = InstanceOfKey(relative);
     ApplyGenBlockScope(relative, ctx, target);
+    return target;
+  }
+  if (is_hierarchical && ResolveUpwardModulePath(path, active, ctx, target)) {
     return target;
   }
   // A path from the top of the design, "u1.tk" as written; a bare name found
