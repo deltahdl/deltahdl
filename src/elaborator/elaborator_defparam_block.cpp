@@ -26,18 +26,21 @@ namespace delta {
 namespace {
 
 bool IsNamedBlock(const Stmt* s) {
-  return s != nullptr && !s->label.empty() &&
+  return !s->label.empty() &&
          (s->kind == StmtKind::kBlock || s->kind == StmtKind::kFork);
+}
+
+// Whether the statement `s` declares the parameter `name`.
+bool DeclaresParamNamed(const Stmt* s, std::string_view name) {
+  return s->kind == StmtKind::kVarDecl && s->var_is_param &&
+         s->var_name == name;
 }
 
 // The parameter `name` the named block `block` declares among its items.
 const Stmt* DeclaredParam(const Stmt* block, std::string_view name) {
   const Stmt* found = nullptr;
   ForEachChildStmt(block, [&](const Stmt* sub) {
-    if (sub != nullptr && sub->kind == StmtKind::kVarDecl &&
-        sub->var_is_param && sub->var_name == name) {
-      found = sub;
-    }
+    if (sub != nullptr && DeclaresParamNamed(sub, name)) found = sub;
   });
   return found;
 }
@@ -70,15 +73,11 @@ const Stmt* FindInSubroutine(const ModuleItem& sub, const HierPath& blocks,
     return nullptr;
   }
   for (const Stmt* s : sub.func_body_stmts) {
-    const Stmt* found = nullptr;
-    if (blocks.size() == 1) {
-      bool own = s != nullptr && s->kind == StmtKind::kVarDecl &&
-                 s->var_is_param && s->var_name == name;
-      if (own) found = s;
-    } else {
-      found = FindUnder(s, blocks, 1, name);
+    if (blocks.size() > 1) {
+      if (const Stmt* found = FindUnder(s, blocks, 1, name)) return found;
+    } else if (DeclaresParamNamed(s, name)) {
+      return s;
     }
-    if (found != nullptr) return found;
   }
   return nullptr;
 }
@@ -153,7 +152,7 @@ bool ElaboratorData::ApplyBlockParamDefparam(RtlirModule* mod,
     decl = FindBlockParamDecl(*reach.mod, reach.blocks, steps.back().name);
   }
   if (decl == nullptr) return false;
-  if (decl->decl_item != nullptr && decl->decl_item->is_localparam) {
+  if (decl->decl_item->is_localparam) {
     d.diag.Error(d.loc, "defparam cannot override a local parameter",
                  Subclause("23.10.1"));
     return true;

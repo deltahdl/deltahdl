@@ -162,25 +162,27 @@ TEST(DefparamSimulation, RealRightHandSideTakesTheParametersTypeOrItsOwn) {
 }
 
 // §23.10.1 with §23.6: a defparam may select one instance of an array of
-// instances, u[1], and changes the parameter in that instance alone. The
-// elements shared one elaborated module, so the step was never matched (a
+// instances, u[1] or w[0], and changes the parameter in that instance alone.
+// The elements shared one elaborated module, so the step was never matched (a
 // "target not found" warning), and matched it would have changed u[0] too.
 TEST(DefparamSimulation, AnInstanceSelectReachesThatElementAlone) {
   SimFixture f;
-  EXPECT_EQ(
-      RunCapture("module child;\n"
-                 "  parameter P = 1;\n"
-                 "endmodule\n"
-                 "module cel;\n"
-                 "  child c();\n"
-                 "endmodule\n"
-                 "module top;\n"
-                 "  cel u[0:1]();\n"
-                 "  defparam u[1].c.P = 5;\n"
-                 "  initial #1 $display(\"%0d %0d\", u[0].c.P, u[1].c.P);\n"
-                 "endmodule\n",
-                 f),
-      "1 5\n");
+  EXPECT_EQ(RunCapture("module child;\n"
+                       "  parameter P = 1;\n"
+                       "endmodule\n"
+                       "module cel;\n"
+                       "  child c();\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  cel u[0:1]();\n"
+                       "  cel w[0:1]();\n"
+                       "  defparam u[1].c.P = 5;\n"
+                       "  defparam w[0].c.P = 7;\n"
+                       "  initial #1 $display(\"%0d %0d %0d %0d\", u[0].c.P, "
+                       "u[1].c.P, w[0].c.P, w[1].c.P);\n"
+                       "endmodule\n",
+                       f),
+            "1 5 7 1\n");
   EXPECT_FALSE(f.has_errors);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
@@ -305,6 +307,84 @@ TEST(DefparamSimulation, AnElementsGenerateLoopFollowsItsOwnDefparam) {
                        "endmodule\n",
                        f),
             "1 2 1 1\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §23.10.1 with §23.10.2: a real or a string parameter a named block
+// declares takes the value its defparam writes, and a fork named inside the
+// block is a further step of the path, u.blk.fk.F; the block's variable, its
+// other parameter and a labelled null statement are passed over.
+TEST(DefparamSimulation, RealStringAndForkBlockParametersTakeDefparams) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module child;\n"
+                       "  initial begin : blk\n"
+                       "    int v;\n"
+                       "    parameter A = 1;\n"
+                       "    parameter real R = 1.5;\n"
+                       "    parameter string S = \"ab\";\n"
+                       "    L: ;\n"
+                       "    fork : fk\n"
+                       "      parameter F = 2;\n"
+                       "      $display(\"%0d %0d %0.2f %s\", A, F, R, S);\n"
+                       "    join\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  defparam u.blk.R = 2.25;\n"
+                       "  defparam u.blk.S = \"hello\";\n"
+                       "  defparam u.blk.fk.F = 9;\n"
+                       "  child u();\n"
+                       "endmodule\n",
+                       f),
+            "1 9 2.25 hello\n");
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// §23.10.1 with §27.4: two generate blocks each holding an instance named u
+// are told apart by the block a defparam names, g2.u.P, so g1.u keeps its
+// declared value.
+TEST(DefparamSimulation, ADefparamPicksTheGenerateBlockItNames) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module child;\n"
+                       "  parameter P = 1;\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  if (1) begin : g1\n"
+                       "    child u();\n"
+                       "  end\n"
+                       "  if (1) begin : g2\n"
+                       "    child u();\n"
+                       "  end\n"
+                       "  defparam g2.u.P = 5;\n"
+                       "  initial #1 $display(\"%0d %0d\", g1.u.P, g2.u.P);\n"
+                       "endmodule\n",
+                       f),
+            "1 5\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §23.10.1 with §27.4: where the design's only defparam stands in a generate
+// block of the module an array's elements share, each element given a module
+// of its own keeps that defparam, so both elements' leaves read 4.
+TEST(DefparamSimulation, AnIsolatedElementKeepsItsGenerateBlocksDefparam) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module leaf;\n"
+                       "  parameter P = 1;\n"
+                       "endmodule\n"
+                       "module cel;\n"
+                       "  if (1) begin : g\n"
+                       "    leaf k();\n"
+                       "    defparam k.P = 4;\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  cel u[0:1]();\n"
+                       "  initial #1 $display(\"%0d %0d\", u[0].g.k.P, "
+                       "u[1].g.k.P);\n"
+                       "endmodule\n",
+                       f),
+            "4 4\n");
   EXPECT_FALSE(f.has_errors);
 }
 

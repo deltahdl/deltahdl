@@ -483,4 +483,61 @@ TEST(DefparamElaboration, NamedBlockParameterDefparamNeedsAConstant) {
                               "defparam value is not constant", 7, "23.10.1"));
 }
 
+// A path that names no parameter a block, task or function declares is
+// reported as finding no target: a single name the module does not declare, a
+// select written on a named block or on a task, which no instance array
+// answers, a task that declares no such parameter, and a select written on an
+// instance that is no element of an array.
+TEST(DefparamElaboration, PathsReachingNoBlockParameterAreNotFound) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module c;\n"
+      "  parameter P = 1;\n"
+      "  task t;\n"
+      "    int v;\n"
+      "    parameter A = 1;\n"
+      "    v = A;\n"
+      "  endtask\n"
+      "  initial begin : blk\n"
+      "    parameter Q = 3;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  c u();\n"
+      "  defparam Nope = 1;\n"
+      "  defparam u.blk[0].Q = 2;\n"
+      "  defparam u.t[0].A = 2;\n"
+      "  defparam u.t.Nope = 2;\n"
+      "  defparam u[0].P = 2;\n"
+      "endmodule\n",
+      f, "top");
+  for (int line = 14; line <= 18; ++line) {
+    EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                                "defparam target not found", line, "23.10.1"))
+        << "line " << line;
+  }
+}
+
+// An instance of an unknown module beside an array of instances, and inside
+// the module the array's elements share, holds no module; a defparam through
+// one element still reaches that element's parameter.
+TEST(DefparamElaboration, AnUnresolvedInstanceLeavesAnElementsDefparam) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module c;\n"
+      "  parameter P = 1;\n"
+      "  nope m();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  nope n();\n"
+      "  c u[0:1]();\n"
+      "  defparam u[1].P = 2;\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "unknown module 'nope'", 6,
+                            "23.3.2"));
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+  ASSERT_NE(design, nullptr);
+}
+
 }  // namespace
