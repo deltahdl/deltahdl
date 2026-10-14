@@ -10,13 +10,21 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "elaborator/coverage_option_rules.h"
+#include "elaborator/covergroup_context.h"
+#include "elaborator/covergroup_expression_rules.h"
+#include "elaborator/covergroup_instance_rules.h"
 #include "elaborator/coverpoint_bin_set_expression.h"
+#include "elaborator/coverpoint_rules.h"
+#include "elaborator/cross_bin_rules.h"
 #include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/embedded_covergroup_rules.h"
 #include "elaborator/queue_dim.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/value_kind.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_covergroup.h"
@@ -28,8 +36,6 @@
 namespace delta {
 
 namespace {
-
-using VarTypes = std::unordered_map<std::string_view, DataTypeKind>;
 
 // The binary operators whose result is real when either operand is (§11.3.1):
 // the arithmetic ones a real operand admits.
@@ -85,12 +91,8 @@ std::unordered_set<std::string_view> CoverpointNames(const CovergroupDecl& cg) {
   std::unordered_set<std::string_view> names;
   for (const CoverageSpecOrOption& item : cg.items) {
     if (item.kind != CoverageSpecKind::kCoverPoint) continue;
-    const CoverPointDecl& cp = *item.cover_point;
-    if (!cp.label.empty()) {
-      names.insert(cp.label);
-    } else if (cp.expr != nullptr && cp.expr->kind == ExprKind::kIdentifier) {
-      names.insert(cp.expr->text);
-    }
+    std::string_view name = CoverpointName(*item.cover_point);
+    if (!name.empty()) names.insert(name);
   }
   return names;
 }
@@ -127,14 +129,6 @@ OwnNames CovergroupOwnNames(const CovergroupDecl& cg) {
   return names;
 }
 
-// The formal of `cg` named `name`, or null where it has none.
-const FunctionArg* FindFormal(const CovergroupDecl& cg, std::string_view name) {
-  for (const FunctionArg& formal : cg.formals) {
-    if (formal.name == name) return &formal;
-  }
-  return nullptr;
-}
-
 // The names a covergroup body reads: its own coverpoints; its formals, which
 // shadow the names of the scope it is declared in; and then those names.
 class CovergroupScope {
@@ -150,7 +144,7 @@ class CovergroupScope {
 
   // The formal of the covergroup named `name`, or null where it has none.
   const FunctionArg* Formal(std::string_view name) const {
-    return FindFormal(cg_, name);
+    return FindCovergroupFormal(cg_, name);
   }
 
   std::optional<DataTypeKind> TypeOf(std::string_view name) const {
@@ -183,30 +177,40 @@ bool IsRealCoverpoint(const CoverPointDecl& cp, const CovergroupScope& scope) {
   return cp.expr != nullptr && scope.IsReal(cp.expr);
 }
 
-// §19.5, §19.5.1, §19.5.1.1, §19.5.2: the rules the bins of a real coverpoint
-// obey.
+// §19.5.1, §19.5.1.1, §19.5.2 and §19.5.4: the rules a bin `bins` of a real
+// coverpoint obeys.
+void CheckRealBin(const BinsOrOptions& bins, DiagEngine& diag) {
+  if (bins.kind == BinsOrOptionsKind::kDefault && bins.is_array) {
+    diag.Error(bins.loc,
+               "a real coverpoint's default bin is a single bin and cannot "
+               "be declared as an array",
+               Subclause("19.5.1"));
+  }
+  if (bins.with_expr != nullptr ||
+      bins.kind == BinsOrOptionsKind::kCoverPointWith) {
+    diag.Error(bins.loc,
+               "a bin of a real coverpoint takes no 'with' expression",
+               Subclause("19.5.1.1"));
+  }
+  if (bins.kind == BinsOrOptionsKind::kTransitions) {
+    diag.Error(bins.loc,
+               "a coverpoint of a real expression takes no transition bin",
+               Subclause("19.5.2"));
+  }
+  if (bins.wildcard) {
+    diag.Error(bins.loc, "a bin of a real coverpoint cannot be 'wildcard'",
+               Subclause("19.5.4"));
+  }
+}
+
+// §19.5: a coverpoint of a real expression declares at least one `bins`, and
+// each of its bins obeys CheckRealBin.
 void CheckRealCoverpoint(const CoverPointDecl& cp, DiagEngine& diag) {
   bool has_bins = false;
   for (const BinsOrOptions& bins : cp.bins) {
     if (bins.kind == BinsOrOptionsKind::kOption) continue;
     has_bins = has_bins || bins.keyword == BinsKeyword::kBins;
-    if (bins.kind == BinsOrOptionsKind::kDefault && bins.is_array) {
-      diag.Error(bins.loc,
-                 "a real coverpoint's default bin is a single bin and cannot "
-                 "be declared as an array",
-                 Subclause("19.5.1"));
-    }
-    if (bins.with_expr != nullptr ||
-        bins.kind == BinsOrOptionsKind::kCoverPointWith) {
-      diag.Error(bins.loc,
-                 "a bin of a real coverpoint takes no 'with' expression",
-                 Subclause("19.5.1.1"));
-    }
-    if (bins.kind == BinsOrOptionsKind::kTransitions) {
-      diag.Error(bins.loc,
-                 "a coverpoint of a real expression takes no transition bin",
-                 Subclause("19.5.2"));
-    }
+    CheckRealBin(bins, diag);
   }
   if (!has_bins) {
     diag.Error(cp.loc,
@@ -397,7 +401,8 @@ void ReportUnresolvedSetExpressionReads(const CovergroupDecl& cg,
   OwnNames own_names = CovergroupOwnNames(cg);
   for (const Expr* read : reads) {
     if (own_names.contains(read->text) ||
-        FindFormal(cg, read->text) != nullptr || declared(read->text)) {
+        FindCovergroupFormal(cg, read->text) != nullptr ||
+        declared(read->text)) {
       continue;
     }
     diag.Error(
@@ -447,6 +452,10 @@ void CheckOptionWrites(
                              "or coverpoint definition",
                              member),
                  Subclause("19.7"));
+    } else if (!member.empty() && !IsCovergroupOptionMember(member, false)) {
+      diag.Error(s->range.start,
+                 std::format("option has no member '{}'", member),
+                 Subclause("19.10"));
     }
   }
   ForEachChildStmt(s, [&](const Stmt* sub) {
@@ -506,6 +515,13 @@ void CheckTypeOptionWrite(const Stmt* s, const CovergroupTypeVisible& visible,
     return;
   }
   std::string_view member = CovergroupTypeOptionWritten(s->lhs, visible);
+  if (member.empty()) return;
+  if (!IsCovergroupOptionMember(member, true)) {
+    diag.Error(s->range.start,
+               std::format("type_option has no member '{}'", member),
+               Subclause("19.10"));
+    return;
+  }
   if (!Contains(kTypeDefinitionOnly, member)) return;
   diag.Error(s->range.start,
              std::format("type option '{}' can be set only in the covergroup "
@@ -584,6 +600,15 @@ std::unordered_set<std::string_view> CovergroupVariables(
   return vars;
 }
 
+// The item of `items` of kind `kind` declaring `name`, or null.
+const ModuleItem* ItemNamed(const std::vector<ModuleItem*>& items,
+                            std::string_view name, ModuleItemKind kind) {
+  for (const ModuleItem* item : items) {
+    if (item->kind == kind && item->name == name) return item;
+  }
+  return nullptr;
+}
+
 // The names a covergroup embedded in `cls` reads (§19.4): the class's members
 // and those of the classes it extends, then `scope_items`, the declarations of
 // the scope the class is declared in.
@@ -621,6 +646,49 @@ struct ClassCovergroupScope {
     }
     return ItemsArrayKind(scope_items, name, is_type);
   }
+
+  // The variable `name` is declared as, a property of the class or of a class
+  // it extends or else a variable of `scope_items`; null where neither
+  // declares one.
+  const DataType* VariableType(std::string_view name) const {
+    if (const ClassMember* m = FindMemberInClass(cls, name, unit)) {
+      return m->kind == ClassMemberKind::kProperty ? &m->data_type : nullptr;
+    }
+    const ModuleItem* item =
+        ItemNamed(scope_items, name, ModuleItemKind::kVarDecl);
+    return item != nullptr ? &item->data_type : nullptr;
+  }
+
+  // §19.5: the kind of value a name read where the class is declared gives.
+  ValueKind ValueKindOf(const Expr* e) const {
+    if (e->kind != ExprKind::kIdentifier) return ValueKind::kUnknown;
+    const DataType* type = VariableType(e->text);
+    if (type == nullptr) return ValueKind::kUnknown;
+    return KindOfDeclaredType(*type, [this](std::string_view n) {
+      return FindClassDecl(n, unit) != nullptr;
+    });
+  }
+
+  // §19.5 with §8.19: whether `name` is a property or a variable that is no
+  // constant, a parameter or a const property or variable being one.
+  bool NonConstant(std::string_view name) const {
+    if (const ClassMember* m = FindMemberInClass(cls, name, unit)) {
+      return m->kind == ClassMemberKind::kProperty && !m->is_const &&
+             !m->is_param && !m->data_type.is_const;
+    }
+    const ModuleItem* item =
+        ItemNamed(scope_items, name, ModuleItemKind::kVarDecl);
+    return item != nullptr && !item->data_type.is_const;
+  }
+
+  // The function `name` calls: a method of the class or of a class it extends,
+  // or else a function of `scope_items`.
+  const ModuleItem* Function(std::string_view name) const {
+    if (const ClassMember* m = FindMemberInClass(cls, name, unit)) {
+      return m->kind == ClassMemberKind::kMethod ? m->method : nullptr;
+    }
+    return ItemNamed(scope_items, name, ModuleItemKind::kFunctionDecl);
+  }
 };
 
 // §19.4.1: the coverpoints a derived covergroup `cg` of `cls` inherits, those
@@ -644,46 +712,105 @@ std::unordered_set<std::string_view> InheritedCoverpoints(
 
 }  // namespace
 
-void ValidateCovergroup(const CovergroupDecl& cg,
-                        const CovergroupTypeOf& type_of,
-                        const CovergroupDeclared& declared,
-                        const CovergroupArrays& arrays, DiagEngine& diag) {
-  CovergroupScope scope(cg, type_of);
-  SetExpressionScope set_scope{scope, CovergroupOwnNames(cg), declared, arrays};
+const FunctionArg* FindCovergroupFormal(const CovergroupDecl& cg,
+                                        std::string_view name) {
+  for (const FunctionArg& formal : cg.formals) {
+    if (formal.name == name) return &formal;
+  }
+  return nullptr;
+}
+
+ValueKind KindOfDeclaredType(const DataType& type,
+                             const CovergroupDeclared& is_class) {
+  if (IsRealType(type.kind)) return ValueKind::kReal;
+  if (IsIntegralType(type.kind)) return ValueKind::kIntegral;
+  if (type.kind == DataTypeKind::kString) return ValueKind::kString;
+  if (type.kind == DataTypeKind::kChandle ||
+      type.kind == DataTypeKind::kEvent ||
+      (type.kind == DataTypeKind::kNamed && is_class(type.type_name))) {
+    return ValueKind::kOther;
+  }
+  return ValueKind::kUnknown;
+}
+
+bool IsRefCovergroupFormal(const CovergroupDecl& cg, std::string_view name) {
+  Direction dir = Direction::kInput;
+  for (const FunctionArg& formal : cg.formals) {
+    if (formal.direction != Direction::kNone) dir = formal.direction;
+    if (formal.name == name) return dir == Direction::kRef;
+  }
+  return false;
+}
+
+std::string_view CoverpointName(const CoverPointDecl& cp) {
+  if (!cp.label.empty()) return cp.label;
+  if (cp.expr != nullptr && cp.expr->kind == ExprKind::kIdentifier) {
+    return cp.expr->text;
+  }
+  return {};
+}
+
+void ValidateCovergroup(const CovergroupDecl& cg, const CovergroupContext& ctx,
+                        DiagEngine& diag) {
+  CovergroupScope scope(cg, ctx.type_of);
+  SetExpressionScope set_scope{scope, CovergroupOwnNames(cg), ctx.declared,
+                               ctx.arrays};
+  CheckCovergroupExpressions(cg, ctx, diag);
+  CheckCoverageOptions(cg, ctx, diag);
   for (const CoverageSpecOrOption& item : cg.items) {
     if (item.kind == CoverageSpecKind::kCoverPoint) {
       if (IsRealCoverpoint(*item.cover_point, scope)) {
         CheckRealCoverpoint(*item.cover_point, diag);
       }
+      CheckCoverpointRules(*item.cover_point, cg, ctx, diag);
       CheckSetExpressions(*item.cover_point, set_scope, diag);
     } else if (item.kind == CoverageSpecKind::kCoverCross) {
-      CheckCrossItems(*item.cover_cross, scope, declared, diag);
+      CheckCrossItems(*item.cover_cross, scope, ctx.declared, diag);
+      CheckCrossBinRules(*item.cover_cross, cg, ctx, diag);
     }
   }
 }
 
 void ValidateModuleCovergroups(const ModuleDecl* decl,
-                               const VarTypes& var_types,
+                               const ModuleCovergroupTables& tables,
                                const CovergroupDeclared& declared,
                                DiagEngine& diag) {
+  const ValueScope& values = tables.values;
   CovergroupTypeOf type_of =
       [&](std::string_view name) -> std::optional<DataTypeKind> {
-    auto it = var_types.find(name);
-    if (it == var_types.end()) return std::nullopt;
+    auto it = values.var_types.find(name);
+    if (it == values.var_types.end()) return std::nullopt;
     return it->second;
   };
   CovergroupDeclared is_type = [&](std::string_view name) {
     return ItemsDeclareType(decl->items, name);
   };
-  CovergroupArrays arrays{[&](std::string_view name) {
-                            return ItemsArrayKind(decl->items, name, is_type);
-                          },
-                          is_type};
+  const CovergroupContext kCtx{
+      type_of,
+      declared,
+      {[&](std::string_view name) {
+         return ItemsArrayKind(decl->items, name, is_type);
+       },
+       is_type},
+      [&](const Expr* e) { return KindOfValue(e, values); },
+      // §19.5 with §11.2.1: a variable or net, neither a parameter nor a const
+      // variable, is no constant.
+      [&](std::string_view name) {
+        return values.var_types.contains(name) &&
+               !tables.const_names.contains(name) &&
+               !tables.const_var_names.contains(name);
+      },
+      [&](std::string_view name) -> const ModuleItem* {
+        auto it = values.functions.find(name);
+        return it != values.functions.end() ? it->second : nullptr;
+      },
+      [&](std::string_view name) { return values.class_names.contains(name); }};
   for (const ModuleItem* item : decl->items) {
     if (item->kind != ModuleItemKind::kCovergroupDecl) continue;
-    ValidateCovergroup(*item->covergroup, type_of, declared, arrays, diag);
+    ValidateCovergroup(*item->covergroup, kCtx, diag);
     ReportUnresolvedSetExpressionReads(*item->covergroup, declared, diag);
   }
+  CheckModuleCovergroupInstances(decl, diag);
   std::unordered_set<std::string_view> covergroup_vars =
       CovergroupVariables(decl);
   ForEachBodyOwningItem(decl->items, [&](const auto* body_item) {
@@ -714,21 +841,29 @@ void ValidateEmbeddedCovergroups(const ClassDecl* cls,
   CovergroupTypeOf type_of = [&](std::string_view name) {
     return scope.TypeOf(name);
   };
-  CovergroupArrays arrays{
-      [&](std::string_view name) { return scope.ArrayKind(name); },
-      [&](std::string_view name) { return scope.DeclaresType(name); }};
   for (const ClassMember* m : cls->members) {
     if (m->kind != ClassMemberKind::kCovergroup) continue;
     // §19.4.1: a derived covergroup refers to the components of its base, so
     // a cross of it names the base's coverpoints as its own.
     std::unordered_set<std::string_view> inherited =
         InheritedCoverpoints(cls, *m->covergroup, unit);
-    CovergroupDeclared declared = [&](std::string_view name) {
-      return inherited.contains(name) || type_of(name).has_value();
-    };
-    ValidateCovergroup(*m->covergroup, type_of, declared, arrays, diag);
+    const CovergroupContext kCtx{
+        type_of,
+        [&](std::string_view name) {
+          return inherited.contains(name) || type_of(name).has_value();
+        },
+        {[&](std::string_view name) { return scope.ArrayKind(name); },
+         [&](std::string_view name) { return scope.DeclaresType(name); }},
+        [&](const Expr* e) { return scope.ValueKindOf(e); },
+        [&](std::string_view name) { return scope.NonConstant(name); },
+        [&](std::string_view name) { return scope.Function(name); },
+        [&](std::string_view name) {
+          return FindClassDecl(name, unit) != nullptr;
+        }};
+    ValidateCovergroup(*m->covergroup, kCtx, diag);
     ReportUnresolvedSetExpressionReads(*m->covergroup, unit_declared, diag);
   }
+  CheckEmbeddedCovergroupUses(cls, unit, diag);
 }
 
 }  // namespace delta

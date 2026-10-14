@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include "elaborator/cross_set_expression.h"
+#include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_type.h"
 
 using namespace delta;
@@ -69,6 +71,36 @@ TEST(CrossSetExpression, DifferentNamedTypeRequiresCast) {
   expr.kind = DataTypeKind::kNamed;
   expr.type_name = "SomeOtherQueueType";
   EXPECT_TRUE(CrossSetExpressionCastRequired(CrossQueueType(), expr));
+}
+
+// §19.6.1.4: a cross_set_expression has the cross's CrossQueueType, a queue
+// of structures, so a queue of int or of string elements is an error.
+TEST(CrossSetExpression, QueueOfIntegralOrStringElementsIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit [1:0] a, b;\n"
+      "  int q[$] = '{1, 2, 3};\n"
+      "  string s[$] = '{\"x\"};\n"
+      "  covergroup cg;\n"
+      "    coverpoint a;\n"
+      "    coverpoint b;\n"
+      "    X: cross a, b {\n"
+      "      bins one = q;\n"
+      "      bins two = s;\n"
+      "    }\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the cross_set_expression 'q' of bin 'one' is no "
+                            "queue of the cross's CrossValType",
+                            9, "19.6.1.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the cross_set_expression 's' of bin 'two' is no "
+                            "queue of the cross's CrossValType",
+                            10, "19.6.1.4"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
 }  // namespace

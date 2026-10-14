@@ -109,4 +109,36 @@ TEST(CovergroupTypeCalls, AnImportedTypeIsCalledThroughAsTheModulesOwn) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
+// §19.8, Table 19-5: sample() and set_inst_name() are called on a covergroup
+// instance alone, so calling either on a coverpoint or a cross is an error;
+// stop() on a coverpoint is not.
+TEST(CovergroupItemMethods, SampleOrSetInstNameOnAnItemIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  bit [1:0] a, b;\n"
+      "  covergroup cg;\n"
+      "    cp: coverpoint a;\n"
+      "    X: cross a, b;\n"
+      "  endgroup\n"
+      "  cg c = new;\n"
+      "  initial begin\n"
+      "    c.cp.sample();\n"
+      "    c.X.set_inst_name(\"n\");\n"
+      "    c.sample();\n"
+      "    c.cp.stop();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "sample() is a method of a covergroup instance, "
+                            "not of its coverpoint or cross 'cp'",
+                            9, "19.8"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "set_inst_name() is a method of a covergroup "
+                            "instance, not of its coverpoint or cross 'X'",
+                            10, "19.8"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
 }  // namespace

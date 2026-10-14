@@ -64,4 +64,31 @@ TEST(CoverageOptionWrites, DefinitionOnlyOptionWrittenProcedurallyIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 5u);
 }
 
+// §19.7, Table 19-1, and §19.7.1, Table 19-3: a weight is a non-negative
+// integral value, so a constant negative weight is an error at the covergroup
+// and coverpoint levels, as an instance or a type option; a weight of 0 is
+// legal.
+TEST(CoverageOptionWeight, ConstantNegativeWeightIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit [1:0] a, b;\n"
+      "  covergroup cg;\n"
+      "    option.weight = -1;\n"
+      "    ca: coverpoint a { type_option.weight = -2; }\n"
+      "    cb: coverpoint b { option.weight = 0; }\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the weight -1 is negative; a weight is a "
+                            "non-negative integral value",
+                            4, "19.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the weight -2 is negative; a weight is a "
+                            "non-negative integral value",
+                            5, "19.7"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
 }  // namespace

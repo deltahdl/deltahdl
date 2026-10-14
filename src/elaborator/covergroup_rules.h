@@ -2,13 +2,12 @@
 #define DELTA_ELABORATOR_COVERGROUP_RULES_H
 
 #include <functional>
-#include <optional>
 #include <string_view>
-#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
-#include "elaborator/coverpoint_bin_set_expression.h"
-#include "parser/ast_type.h"
+#include "elaborator/covergroup_context.h"
+#include "elaborator/value_kind.h"
 
 namespace delta {
 
@@ -19,51 +18,45 @@ struct CovergroupDecl;
 struct ModuleDecl;
 struct ModuleItem;
 
-// The type of the variable a name a covergroup reads denotes, or nothing where
-// it denotes none; and whether the name is visible where the covergroup is
-// declared at all.
-using CovergroupTypeOf =
-    std::function<std::optional<DataTypeKind>(std::string_view)>;
-using CovergroupDeclared = std::function<bool(std::string_view)>;
-
-// The arrays a covergroup reads where it is declared: the kind of array a name
-// denotes, or nothing where it denotes no unpacked array, and whether a name is
-// a type, as the index of an associative array may be (§7.8).
-struct CovergroupArrays {
-  std::function<std::optional<SetExpressionArrayKind>(std::string_view)>
-      kind_of;
-  CovergroupDeclared is_type;
-};
-
 // The Clause 19 rules a covergroup is checked against once the declarations it
 // reads are known, read from the tree the parser keeps for it
-// (src/parser/ast_covergroup.h):
+// (src/parser/ast_covergroup.h), `ctx` answering for those declarations:
 // - a coverpoint of a real expression declares at least one `bins` (§19.5),
 //   its default bin is no array (§19.5.1), and its bins take no `with`
-//   expression (§19.5.1.1);
-// - a coverpoint of a real expression has no transition bin (§19.5.2);
+//   expression (§19.5.1.1), no transition (§19.5.2) and no `wildcard`
+//   (§19.5.4);
+// - every coverpoint obeys CheckCoverpointRules (§19.5 to §19.5.1.1);
+// - its covergroup_expressions obey CheckCovergroupExpressions (§19.5, §19.6);
 // - a bin's set_covergroup_expression yields no associative array, nor one
 //   whose elements are not assignment compatible with the coverpoint's type,
-//   and reads no name declared only within the covergroup (§19.5.1.2),
-//   `arrays` giving the kind of array a name denotes;
+//   and reads no name declared only within the covergroup (§19.5.1.2);
 // - a cross item is a coverpoint of its own covergroup or a variable, and no
-//   real variable (§19.6).
-void ValidateCovergroup(const CovergroupDecl& cg,
-                        const CovergroupTypeOf& type_of,
-                        const CovergroupDeclared& declared,
-                        const CovergroupArrays& arrays, DiagEngine& diag);
+//   real variable (§19.6), and the cross's bins obey CheckCrossBinRules
+//   (§19.6.1.2, §19.6.1.4);
+// - its coverage options obey CheckCoverageOptions (§19.7, §19.7.1, §19.10).
+void ValidateCovergroup(const CovergroupDecl& cg, const CovergroupContext& ctx,
+                        DiagEngine& diag);
+
+// The tables of a module its covergroups read (§19.3): the declarations
+// `values` holds, and the names `const_names` and `const_var_names` hold of
+// its parameters and const variables, the constants among them.
+struct ModuleCovergroupTables {
+  const ValueScope& values;
+  const std::unordered_set<std::string_view>& const_names;
+  const std::unordered_set<std::string_view>& const_var_names;
+};
 
 // The covergroups a module declares, checked by ValidateCovergroup and for a
 // set_covergroup_expression reading a name the module does not declare
-// (§23.9), and the procedural writes through an instance of one to an option
-// §19.7 restricts to the definition. `var_types` gives the type of each
-// variable and net the module declares, and `declared` answers whether a name
-// is visible in the module at all: its own declarations, its imports and its
-// generate blocks.
-void ValidateModuleCovergroups(
-    const ModuleDecl* decl,
-    const std::unordered_map<std::string_view, DataTypeKind>& var_types,
-    const CovergroupDeclared& declared, DiagEngine& diag);
+// (§23.9); their instances, by CheckModuleCovergroupInstances (§19.3, §19.8);
+// and the procedural writes through an instance of one to an option §19.7
+// restricts to the definition or §19.10 does not declare. `declared` answers
+// whether a name is visible in the module at all: its own declarations, its
+// imports and its generate blocks.
+void ValidateModuleCovergroups(const ModuleDecl* decl,
+                               const ModuleCovergroupTables& tables,
+                               const CovergroupDeclared& declared,
+                               DiagEngine& diag);
 
 // Whether a bare name denotes a covergroup type where a module reads it.
 using CovergroupTypeVisible = std::function<bool(std::string_view)>;
@@ -82,7 +75,8 @@ void ValidateCovergroupTypeCalls(const ModuleDecl* decl,
 // a property of the class or of a class it extends, or else an item of
 // `scope_items`, the declarations of the scope the class is declared in; a
 // name a set_covergroup_expression reads that `unit_declared` denies any
-// declaration of the unit gives is unresolved (§23.9).
+// declaration of the unit gives is unresolved (§23.9); and the class around
+// them is held to CheckEmbeddedCovergroupUses.
 void ValidateEmbeddedCovergroups(const ClassDecl* cls,
                                  const std::vector<ModuleItem*>& scope_items,
                                  const CompilationUnit* unit,

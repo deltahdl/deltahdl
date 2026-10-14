@@ -27,6 +27,7 @@
 #include "elaborator/string_numeric_assign.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/unit_scope_order.h"
+#include "elaborator/value_kind.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -756,7 +757,10 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
   // §19.6 makes a cross item a coverpoint of its covergroup or a variable, and
   // the variables it may name are the ones a bare read may: the module's
   // covergroups are checked against the same predicate.
-  ValidateModuleCovergroups(decl, var_types_, declared, diag_);
+  const ValueScope kValues{var_types_,  var_named_types_, var_array_info_,
+                           func_decls_, typedefs_,        class_names_};
+  ValidateModuleCovergroups(decl, {kValues, const_names_, const_var_names_},
+                            declared, diag_);
   ValidateCovergroupTypeCalls(
       decl,
       [this, mod](std::string_view n) {

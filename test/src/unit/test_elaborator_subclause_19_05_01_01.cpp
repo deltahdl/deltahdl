@@ -34,4 +34,59 @@ TEST(RealCoverpointBinWith, WithOnRealCoverpointBinIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
+// §19.5.1.1: only the coverpoint holding a bin may be named in place of its
+// range list, so naming another coverpoint of the covergroup is an error.
+TEST(CoverpointBinWith, NamingAnotherCoverpointIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit [3:0] x, y;\n"
+      "  covergroup cg;\n"
+      "    a: coverpoint x;\n"
+      "    b: coverpoint y {\n"
+      "      bins odd[] = a with (item % 2 == 1);\n"
+      "      bins even[] = b with (item % 2 == 0);\n"
+      "    }\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bin 'odd' names coverpoint 'a' before 'with'; "
+                            "only the coverpoint holding the bin may stand "
+                            "there",
+                            6, "19.5.1.1"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+// Footnote 31 of Syntax 19-2 with §19.5.1.1: a bin's `with` expression is
+// assignment compatible with an integral type, which a string and a class
+// handle are not; a comparison over `item` is.
+TEST(CoverpointBinWith, WithExpressionNotIntegralIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; endclass\n"
+      "module m;\n"
+      "  bit [3:0] v;\n"
+      "  function automatic string fs(); return \"a\"; endfunction\n"
+      "  function automatic C fh(); return null; endfunction\n"
+      "  covergroup cg;\n"
+      "    coverpoint v {\n"
+      "      bins c[] = {[0:15]} with (fs());\n"
+      "      bins d[] = {[0:15]} with (fh());\n"
+      "      bins e[] = {[0:15]} with (item > 3);\n"
+      "    }\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the 'with' expression of bin 'c' is not "
+                            "assignment compatible with an integral type",
+                            8, "19.5.1.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the 'with' expression of bin 'd' is not "
+                            "assignment compatible with an integral type",
+                            9, "19.5.1.1"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
 }  // namespace

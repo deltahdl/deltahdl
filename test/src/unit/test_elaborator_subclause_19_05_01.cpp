@@ -35,4 +35,31 @@ TEST(RealCoverpointDefaultBin, DefaultBinArrayOfRealCoverpointIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
+// §19.5.1: a fixed number of bins is given by a positive integral expression,
+// so a constant count of zero or less is an error and a count of one is not.
+TEST(FixedBinCount, ConstantCountOfZeroOrLessIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit [3:0] v;\n"
+      "  covergroup cg;\n"
+      "    coverpoint v {\n"
+      "      bins z[0] = {[0:7]};\n"
+      "      bins n[-2] = {[8:15]};\n"
+      "      bins one[1] = {[0:15]};\n"
+      "    }\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bins 'z' asks for 0 bins; the number of bins is a "
+                            "positive integral value",
+                            5, "19.5.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bins 'n' asks for -2 bins; the number of bins is "
+                            "a positive integral value",
+                            6, "19.5.1"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
 }  // namespace

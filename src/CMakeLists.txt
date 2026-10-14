@@ -155,6 +155,12 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/checker_context_inference.cpp
     elaborator/covergroup_in_checker.cpp
     elaborator/covergroup_rules.cpp
+    elaborator/covergroup_expression_rules.cpp
+    elaborator/covergroup_instance_rules.cpp
+    elaborator/coverage_option_rules.cpp
+    elaborator/coverpoint_rules.cpp
+    elaborator/cross_bin_rules.cpp
+    elaborator/embedded_covergroup_rules.cpp
     elaborator/covergroup_variables.cpp
     elaborator/checker_procedure_rules.cpp
     elaborator/checker_instance_binding.cpp

@@ -62,4 +62,34 @@ TEST(TypeOptionWrites, ClassMemberNamedTypeOptionIsAssignable) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.7.1: a type option is set with a constant expression, so a module
+// variable or a call of a function reading one is an error there, while a
+// parameter and a function reading only a parameter are not.
+TEST(TypeOptionValues, NonConstantValueIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit [1:0] a;\n"
+      "  int w = 3;\n"
+      "  parameter int P = 2;\n"
+      "  function int f(); return w; endfunction\n"
+      "  function int g(); return P; endfunction\n"
+      "  covergroup cg;\n"
+      "    type_option.weight = w;\n"
+      "    ca: coverpoint a { type_option.goal = f(); }\n"
+      "    cb: coverpoint a { type_option.weight = P + g(); }\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type option 'weight' is set with 'w', which is no "
+                            "constant",
+                            8, "19.7.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type option 'goal' is set with a call of 'f', "
+                            "which is no constant function call",
+                            9, "19.7.1"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
 }  // namespace

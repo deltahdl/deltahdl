@@ -39,7 +39,7 @@ TEST(EmbeddedCovergroup, ParameterizedInstantiatedInNewOk) {
              "    coverpoint x;\n"
              "  endgroup\n"
              "  function new();\n"
-             "    cv = new;\n"
+             "    cv = new(4);\n"
              "  endfunction\n"
              "endclass\n"
              "module m; endmodule\n"));
@@ -440,6 +440,67 @@ TEST(EmbeddedCovergroup, AssignOutsideNewInScopedClassError) {
                             "inside the new() method of its class",
                             14, "19.4"));
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+// §19.4 with §8.18: a derived covergroup may inherit the coverage of a
+// property local to the base class, but no covergroup of a subclass defines
+// new coverage of one, derived or not; a protected property is covered there
+// freely.
+TEST(EmbeddedCovergroup, CoveringABaseLocalPropertyInASubclassIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class base;\n"
+      "  local bit [1:0] m_z;\n"
+      "  protected bit [1:0] m_p;\n"
+      "  covergroup g;\n"
+      "    coverpoint m_z;\n"
+      "  endgroup\n"
+      "  function new(); g = new; endfunction\n"
+      "endclass\n"
+      "class derived extends base;\n"
+      "  covergroup extends g;\n"
+      "    coverpoint m_z;\n"
+      "  endgroup\n"
+      "  covergroup h;\n"
+      "    coverpoint m_z;\n"
+      "    coverpoint m_p;\n"
+      "  endgroup\n"
+      "  function new(); super.new(); h = new; endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "covergroup 'g' of class 'derived' cannot cover "
+                            "'m_z', a property local to its base class 'base'",
+                            11, "19.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "covergroup 'h' of class 'derived' cannot cover "
+                            "'m_z', a property local to its base class 'base'",
+                            14, "19.4"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+// §19.3: the `new` building an embedded covergroup in the class's constructor
+// gives each formal without a default an actual.
+TEST(EmbeddedCovergroup, NewWithoutActualForAFormalIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C;\n"
+      "  bit [3:0] x;\n"
+      "  covergroup cv (int arg);\n"
+      "    coverpoint x;\n"
+      "  endgroup\n"
+      "  function new();\n"
+      "    cv = new;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "new of covergroup 'cv' gives no actual to formal "
+                            "'arg', which has no default",
+                            7, "19.3"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
 }  // namespace
