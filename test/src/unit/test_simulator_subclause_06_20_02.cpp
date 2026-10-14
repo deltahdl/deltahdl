@@ -452,4 +452,58 @@ TEST(ValueParameterSim, BlockVariableSizedByEachInstancesParameter) {
             "255\n7\n");
 }
 
+// §6.20.2 with A.2.8: a parameter a procedural block, a task or a function
+// declares with no type and no range takes the type and range of its value,
+// as a module's does. Odd and even values tell the one bit an implicit type
+// would give apart from the 32 the value has: 3 would read 1 and 20 read 0.
+TEST(ValueParameterSimulation,
+     BlockAndSubroutineParametersTakeTheirValuesType) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module child;\n"
+                       "  parameter W = 2;\n"
+                       "  function int fq();\n"
+                       "    parameter FQ = 11;\n"
+                       "    return FQ;\n"
+                       "  endfunction\n"
+                       "  task tk;\n"
+                       "    localparam TL = 9;\n"
+                       "    $display(\"%0d\", TL);\n"
+                       "  endtask\n"
+                       "  initial begin : blk\n"
+                       "    parameter Q = 3;\n"
+                       "    parameter D = W * 10;\n"
+                       "    $display(\"%0d %0d %0d\", Q, D, fq());\n"
+                       "    tk;\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  child #(.W(4)) u();\n"
+                       "endmodule\n",
+                       f),
+            "3 40 11\n9\n");
+}
+
+// §6.20.2 with §23.10: a block parameter written with neither type nor range
+// is real where its value is, and a signing keyword written alone sets the
+// signedness while the range is still the value's. One written with a type or
+// a range keeps it, the value converted to it.
+TEST(ValueParameterSimulation, BlockParameterTakesRealAndWrittenSigning) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  initial begin\n"
+          "    parameter R = 1.5;\n"
+          "    parameter signed S = 8'hF0;\n"
+          "    parameter unsigned U = -1;\n"
+          "    parameter byte B = 300;\n"
+          "    parameter [3:0] N = 25;\n"
+          "    $display(\"%f %0d %0d %0d %0d %0d\", R, $bits(S), S, U, B, "
+          "N);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "1.500000 8 -16 4294967295 44 9\n");
+}
+
 }  // namespace

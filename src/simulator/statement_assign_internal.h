@@ -170,6 +170,14 @@ void CreateDeclAggregate(const Stmt* stmt, uint32_t elem_width, SimContext& ctx,
 // declaration has unpacked dimensions, assigned to the array
 // CreateDeclAggregate made as the statement `name = init` would assign it.
 void AssignDeclAggregateInit(const Stmt* stmt, SimContext& ctx, Arena& arena);
+// Defined in eval_function_body_decl.cpp. §6.20.2: a value parameter a
+// procedural block, a task or a function declares with no type and no range
+// takes the type and range of its value, `parameter Q = 3` holding 32 signed
+// bits rather than the one bit an implicit type gives a variable; a `signed`
+// or `unsigned` written alone sets the signing (§23.10). Answers `stmt` itself
+// for every other declaration and for a parameter with no value.
+const Stmt* DeclParameterTypedByValue(const Stmt* stmt, SimContext& ctx,
+                                      Arena& arena);
 // Defined in statement_assign_decl_array.cpp. §7.4.2 and §7.4.4: registers
 // the fixed-size unpacked array a procedural declaration's own dimensions
 // describe, every one of them, and creates a variable for each of its elements,

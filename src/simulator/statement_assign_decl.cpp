@@ -829,6 +829,7 @@ static StmtResult ExecVarDeclBody(const Stmt* stmt, SimContext& ctx,
                                   Arena& arena) {
   stmt = DeclareInlineEnumOf(stmt, ctx, arena);
   stmt = DeclShapedByTypedef(stmt, ctx, arena);
+  stmt = DeclParameterTypedByValue(stmt, ctx, arena);
   if (TryReuseKeptStaticLocal(stmt, ctx, arena)) return StmtResult::kDone;
   if (TryExecWeakRefVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
   if (TryExecClassVarDecl(stmt, ctx, arena)) return StmtResult::kDone;

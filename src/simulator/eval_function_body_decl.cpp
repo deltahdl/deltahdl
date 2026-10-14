@@ -426,11 +426,41 @@ static const Stmt* DeclOfTypeParam(const Stmt* stmt, SimContext& ctx,
   return copy;
 }
 
+// A packed bound of the type DeclParameterTypedByValue writes.
+static Expr* BoundLiteral(Arena& arena, uint32_t bound) {
+  auto* lit = arena.Create<Expr>();
+  lit->kind = ExprKind::kIntegerLiteral;
+  lit->int_val = bound;
+  return lit;
+}
+
+const Stmt* DeclParameterTypedByValue(const Stmt* stmt, SimContext& ctx,
+                                      Arena& arena) {
+  const DataType& type = stmt->var_decl_type;
+  if (!stmt->var_is_param || stmt->var_init == nullptr ||
+      type.kind != DataTypeKind::kImplicit || type.packed_dim_left != nullptr) {
+    return stmt;
+  }
+  Logic4Vec value = EvalExpr(stmt->var_init, ctx, arena);
+  auto* typed = arena.Create<Stmt>(*stmt);
+  DataType& as_value = typed->var_decl_type;
+  as_value.is_signed = type.signing_written ? type.is_signed : value.is_signed;
+  if (value.is_real) {
+    as_value.kind = DataTypeKind::kReal;
+    return typed;
+  }
+  as_value.kind = DataTypeKind::kLogic;
+  as_value.packed_dim_left = BoundLiteral(arena, value.width - 1);
+  as_value.packed_dim_right = BoundLiteral(arena, 0);
+  return typed;
+}
+
 void ExecFuncVarDecl(const Stmt* stmt, StaticFrame frame, SimContext& ctx,
                      Arena& arena) {
   stmt = DeclOfThisTypeRef(stmt, ctx, arena);
   stmt = DeclOfTypeParam(stmt, ctx, arena);
   stmt = DeclShapedByTypedef(stmt, ctx, arena);
+  stmt = DeclParameterTypedByValue(stmt, ctx, arena);
   if (stmt->var_is_automatic) {
     ExecFuncVarDeclAutomatic(stmt, ctx, arena);
     return;
