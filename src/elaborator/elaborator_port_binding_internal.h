@@ -10,6 +10,7 @@
 #include "common/source_loc.h"
 #include "common/types.h"
 #include "elaborator/rtlir.h"
+#include "parser/ast_design.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 
@@ -129,15 +130,14 @@ bool PortAndSignalDiffer(const RtlirPort& port, std::string_view name,
                          const RtlirModule* parent);
 
 // §23.3.2.3 and §23.3.2.4: the declarations either side of an implicit
-// connection, `form` naming it in the report ("named" for `.name`, ".*" for
-// a wildcard), have equivalent data types, which §6.22.2 makes, for the
-// integral types such a connection joins, the same width, the same signing
-// and the same number of states; a mismatch is reported at `loc` under `rule`.
+// `.name` connection, or a `.*` one where `is_wildcard`, have equivalent data
+// types, which §6.22.2 makes, for the integral types such a connection joins,
+// the same width, the same signing and the same number of states; a mismatch
+// is reported at `loc` under the subclause of the form.
 // Defined in elaborator_port_binding_checks.cpp.
 void ReportNonEquivalentImplicitConnection(DiagEngine& diag, SourceLoc loc,
-                                           std::string_view form,
+                                           bool is_wildcard,
                                            const RtlirPort& port,
-                                           const RtlirModule* parent,
-                                           std::string_view rule);
+                                           const RtlirModule* parent);
 
 }  // namespace delta

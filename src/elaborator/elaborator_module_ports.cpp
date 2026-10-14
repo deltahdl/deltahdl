@@ -468,8 +468,11 @@ static RtlirPort ElaborateOnePort(const ModuleDecl* decl, const PortDecl& port,
                            ctx.typedefs, ctx.diag);
     // §23.2.2.4: a default value is a constant expression of the module
     // that declares the port; a variable of its own is none, and left
-    // standing it would be read in the instantiating module instead.
-    if (!IsConstantExpr(port.default_value, ctx.param_scope)) {
+    // standing it would be read in the instantiating module instead. A
+    // checker's formal may default to $inferred_clock or $inferred_disable
+    // (§17.2), which are no constants.
+    if (decl->decl_kind != ModuleDeclKind::kChecker &&
+        !IsConstantExpr(port.default_value, ctx.param_scope)) {
       ctx.diag.Error(port.loc,
                      std::format("default value of port '{}' is not a "
                                  "constant expression",

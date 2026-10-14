@@ -1,5 +1,6 @@
 #include <cstddef>
 #include <format>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -20,6 +21,7 @@
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -144,24 +146,38 @@ static const RtlirPort* FindPortByName(
   return nullptr;
 }
 
+// The §23.3.3 report of an inout port with a user-defined nettype on one
+// side only, worded by the side that carries it.
+static std::string OneSidedInoutMessage(const RtlirPortBinding& binding,
+                                        std::string_view nettype,
+                                        bool nettype_is_internal) {
+  if (nettype_is_internal) {
+    return std::format(
+        "inout port '{}' of user-defined nettype '{}' is "
+        "connected to no net of that nettype; a port with a "
+        "nettype on one side only shall be an input or an "
+        "output",
+        binding.port_name, nettype);
+  }
+  return std::format(
+      "user-defined nettype signal '{}' cannot connect to "
+      "inout port '{}'",
+      binding.connection->text, binding.port_name);
+}
+
 // §23.3.3: where only one side of a port connection is of a user-defined
 // nettype, the port is an input or an output and the two sides have matching
-// data types. An inout facing an external nettype net is reported where the
-// connection is checked (CheckDirectionalConnectionLegality); the internal side
-// is reported here. The data types are compared by width, signing and number
-// of states, the facts PortAndSignalDiffer reads.
+// data types; with the nettype on both sides the nets merge, an inout among
+// them. The data types are compared by width, signing and number of states,
+// the facts PortAndSignalDiffer reads.
 static void CheckOneSidedNettypePort(const PortBindCtx& ctx,
                                      const RtlirModuleInst& inst,
                                      const RtlirPortBinding& binding,
                                      std::string_view nettype,
                                      bool nettype_is_internal) {
-  if (nettype_is_internal && binding.direction == Direction::kInout) {
+  if (binding.direction == Direction::kInout) {
     ctx.diag.Error(ctx.item->loc,
-                   std::format("inout port '{}' of user-defined nettype '{}' "
-                               "is connected to no net of that nettype; a "
-                               "port with a nettype on one side only shall be "
-                               "an input or an output",
-                               binding.port_name, nettype),
+                   OneSidedInoutMessage(binding, nettype, nettype_is_internal),
                    Subclause("23.3.3"));
     return;
   }

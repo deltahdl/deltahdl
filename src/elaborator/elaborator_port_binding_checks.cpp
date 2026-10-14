@@ -17,6 +17,7 @@
 #include "elaborator/elaborator_port_binding_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
@@ -366,10 +367,12 @@ bool PortAndSignalDiffer(const RtlirPort& port, std::string_view name,
 }
 
 void ReportNonEquivalentImplicitConnection(DiagEngine& diag, SourceLoc loc,
-                                           std::string_view form,
+                                           bool is_wildcard,
                                            const RtlirPort& port,
-                                           const RtlirModule* parent,
-                                           std::string_view rule) {
+                                           const RtlirModule* parent) {
+  // §23.3.2.4 makes `.*` the implicit `.name` connection of every port.
+  std::string_view form = is_wildcard ? ".*" : "named";
+  std::string_view rule = is_wildcard ? "23.3.2.4" : "23.3.2.3";
   uint32_t sig_width = FindSignalWidth(port.name, parent);
   if (sig_width != 0 && sig_width != port.width) {
     diag.Error(loc,

@@ -203,6 +203,23 @@ static std::vector<const Expr*> ItemConstantExprs(const ModuleItem* item) {
   return exprs;
 }
 
+// §23.11: the packed ranges of the declaration `decl` gives module `mod` that
+// reach a bind instance's parameter, each reported at its declaration.
+static void ReportBindParamsInModule(const ModuleDecl* decl,
+                                     const RtlirModule* mod, DiagEngine& diag) {
+  for (const ModuleItem* item : decl->items) {
+    auto exprs = ItemConstantExprs(item);
+    if (std::ranges::none_of(
+            exprs, [mod](const Expr* e) { return ExprCrossesBind(e, mod); })) {
+      continue;
+    }
+    diag.Error(item->loc,
+               "a parameter of an instance a bind made is reached by a "
+               "hierarchical name where a constant expression is required",
+               Subclause("23.11"));
+  }
+}
+
 // §23.11: a bind instance's parameters reached by a hierarchical name are no
 // constant outside the instance; reported where a module's packed range
 // reaches one. `find_module` answers a module's declaration.
@@ -218,18 +235,7 @@ static void ReportBindParamsInConstants(
     if (mod == nullptr || !seen.insert(mod).second) continue;
     for (const auto& child : mod->children) pending.push_back(child.resolved);
     const ModuleDecl* decl = find_module(mod->name);
-    if (decl == nullptr) continue;
-    for (const ModuleItem* item : decl->items) {
-      for (const Expr* e : ItemConstantExprs(item)) {
-        if (!ExprCrossesBind(e, mod)) continue;
-        diag.Error(item->loc,
-                   "a parameter of an instance a bind made is reached by "
-                   "a hierarchical name where a constant expression is "
-                   "required",
-                   Subclause("23.11"));
-        break;
-      }
-    }
+    if (decl != nullptr) ReportBindParamsInModule(decl, mod, diag);
   }
 }
 
@@ -375,15 +381,27 @@ static bool TargetSeesSignal(const RtlirModule* target,
 // declared in the target scope. Returns false (after reporting) on the first
 // connection that refers to an undeclared signal. An ordered connection is
 // reported by the name of the port of `bound` it stands at.
-static bool ValidateBindPortConnections(
-    const BindDirective* bd, const ModuleItem* item, const RtlirModule* target,
-    const ModuleDecl* bound, const CompilationUnit* unit, DiagEngine& diag) {
+// The scopes a bind instantiation's connections are read against: the target
+// it is bound into, the module it instantiates, and the compilation unit
+// holding the packages the target imports from.
+struct BindConnScopes {
+  const RtlirModule* target;
+  const ModuleDecl* bound;
+  const CompilationUnit* unit;
+};
+
+static bool ValidateBindPortConnections(const BindDirective* bd,
+                                        const ModuleItem* item,
+                                        const BindConnScopes& scopes,
+                                        DiagEngine& diag) {
+  const RtlirModule* target = scopes.target;
+  const ModuleDecl* bound = scopes.bound;
   for (size_t i = 0; i < item->inst_ports.size(); ++i) {
     auto [pname, conn_expr] = item->inst_ports[i];
     if (!conn_expr || conn_expr->kind != ExprKind::kIdentifier) continue;
     if (pname.empty() && i < bound->ports.size()) pname = bound->ports[i].name;
     auto name = conn_expr->text;
-    if (!TargetSeesSignal(target, unit, name)) {
+    if (!TargetSeesSignal(target, scopes.unit, name)) {
       diag.Error(bd->loc,
                  std::format("bind port connection '{}' references "
                              "undeclared signal '{}' in target scope '{}'",
@@ -495,7 +513,7 @@ void Elaborator::ApplyBindInstance(BindDirective* bd, RtlirModule* target) {
     return;
   }
 
-  if (!ValidateBindPortConnections(bd, item, target, child_decl, unit_,
+  if (!ValidateBindPortConnections(bd, item, {target, child_decl, unit_},
                                    diag_)) {
     return;
   }

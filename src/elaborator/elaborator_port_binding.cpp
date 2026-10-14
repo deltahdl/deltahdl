@@ -132,8 +132,8 @@ void CheckImplicitNamedPortNetTypes(const PortBindCtx& ctx,
                                     std::string_view port_name,
                                     const Expr* conn_expr,
                                     const RtlirPort* port_it) {
-  ReportNonEquivalentImplicitConnection(ctx.diag, ctx.item->loc, "named",
-                                        *port_it, ctx.parent_mod, "23.3.2.3");
+  ReportNonEquivalentImplicitConnection(ctx.diag, ctx.item->loc, false,
+                                        *port_it, ctx.parent_mod);
 
   NetType pnet = PortNetType(port_it->type_kind);
   if (pnet == NetType::kNone) return;
@@ -256,13 +256,6 @@ void CheckDirectionalConnectionLegality(const PortBindCtx& ctx,
   SourceLoc loc = ctx.item->loc;
   auto cn = conn.conn_name;
   auto pn = conn.port_name;
-  if (conn.direction == Direction::kInout && ctx.nettype_net_names.count(cn)) {
-    diag.Error(loc,
-               std::format("user-defined nettype signal '{}' cannot "
-                           "connect to inout port '{}'",
-                           cn, pn),
-               Subclause("23.3.3"));
-  }
   if (conn.direction == Direction::kInout && ctx.var_types.count(cn) &&
       ctx.net_names.count(cn) == 0) {
     // §23.3.3.2 governs a port declared with a variable data type and §23.3.3.3
@@ -800,8 +793,8 @@ void Elaborator::BindWildcardDeclaredPort(const PortBindScope& scope,
       diag_,      item,       parent_mod,          nettype_net_names_,
       var_types_, net_names_, interconnect_names_, interface_inst_types_};
 
-  ReportNonEquivalentImplicitConnection(diag_, item->loc, ".*", port,
-                                        parent_mod, "23.3.2.4");
+  ReportNonEquivalentImplicitConnection(diag_, item->loc, true, port,
+                                        parent_mod);
   NetType pnet = PortNetType(port.type_kind);
   if (pnet != NetType::kNone) {
     NetType snet = FindSignalNetType(port.name, parent_mod);
