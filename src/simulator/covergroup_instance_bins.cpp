@@ -2,11 +2,8 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <deque>
 #include <format>
-#include <iterator>
 #include <limits>
-#include <map>
 #include <optional>
 #include <set>
 #include <string>
@@ -349,6 +346,22 @@ void AddGuardedBin(SampledCoverpoint& point, const BinsOrOptions& bins,
   if (bins.iff != nullptr) point.bin_guards.emplace_back(index, bins.iff);
 }
 
+// §19.5.1: the number of bins `[N]` asks for. N is positive; a covergroup
+// formal giving it 0 or less is a run-time error, and the definition builds
+// no bin.
+std::optional<uint64_t> BinArraySize(const BinsOrOptions& bins, SimContext& ctx,
+                                     Arena& arena) {
+  int64_t size = CovergroupInt(bins.array_size, ctx, arena);
+  if (size > 0) return static_cast<uint64_t>(size);
+  ctx.GetDiag().Error(
+      bins.array_size->range.start,
+      std::format("bins '{}' asks for {} bins; the number of bins is a "
+                  "positive integral value",
+                  bins.name, size),
+      Subclause("19.5.1"));
+  return std::nullopt;
+}
+
 // The values a bins definition holds, and the `with` that the
 // distribute_first type option holds back until they are distributed, null
 // where none is (§19.5.1.1).
@@ -384,8 +397,9 @@ void AddValueBins(SampledCoverpoint& point, const BinsOrOptions& bins,
     }
     return;
   }
-  auto count = static_cast<uint64_t>(
-      std::max<int64_t>(1, CovergroupInt(bins.array_size, ctx, arena)));
+  std::optional<uint64_t> size = BinArraySize(bins, ctx, arena);
+  if (!size.has_value()) return;
+  uint64_t count = *size;
   uint64_t total = CountValues(held.values);
   uint64_t per_bin = std::max<uint64_t>(1, total / count);
   for (uint64_t i = 0; i < count; ++i) {
@@ -692,8 +706,9 @@ std::string RealItemName(std::string_view base, const RealItem& item) {
 void AddRealBinArray(SampledCoverpoint& point, const BinsOrOptions& bins,
                      const std::vector<RealItem>& parts, SimContext& ctx,
                      Arena& arena) {
-  auto count = static_cast<size_t>(
-      std::max<int64_t>(1, CovergroupInt(bins.array_size, ctx, arena)));
+  std::optional<uint64_t> size = BinArraySize(bins, ctx, arena);
+  if (!size.has_value()) return;
+  auto count = static_cast<size_t>(*size);
   size_t per_bin = std::max<size_t>(1, parts.size() / count);
   CoverBin bin;
   bin.kind = BinKindOf(bins.keyword);
@@ -744,10 +759,12 @@ void AddRealBins(SampledCoverpoint& point, const BinsOrOptions& bins,
   }
 }
 
-void AddDefaultBin(SampledCoverpoint& point, const BinsOrOptions& bins) {
+// §19.5: the default bin, or §19.5.2: the default sequence bin, `kind`.
+void AddDefaultBin(SampledCoverpoint& point, const BinsOrOptions& bins,
+                   CoverBinKind kind) {
   CoverBin bin;
   bin.name = std::string(bins.name);
-  bin.kind = CoverBinKind::kDefault;
+  bin.kind = kind;
   AddGuardedBin(point, bins, std::move(bin));
 }
 
@@ -767,8 +784,8 @@ void AddIntegralBins(const CovergroupInstance& inst, SampledCoverpoint& point,
     case BinsOrOptionsKind::kTransitions:
       AddTransitionBins(point, bins, ctx, arena);
       return;
-    case BinsOrOptionsKind::kDefault:
-      AddDefaultBin(point, bins);
+    case BinsOrOptionsKind::kDefaultSequence:
+      AddDefaultBin(point, bins, CoverBinKind::kDefaultSequence);
       return;
     default:
       return;
@@ -788,99 +805,6 @@ std::vector<std::pair<std::string_view, int64_t>> EnumMembers(
     }
   }
   return members;
-}
-
-using BinPair = std::pair<size_t, size_t>;
-
-// The pairs of bins two of `spans` share a value of, each pair once and the
-// lower index first, where each span comes with the index of its bin, `low`
-// gives a span's low end and `reaches(held, next)` whether a span reaches the
-// low end of one starting no lower. The spans are swept in order of their low
-// ends, each meeting the spans still open, so an array of single-value bins
-// costs no comparison of its own.
-template <typename Span, typename Low, typename Reaches>
-std::set<BinPair> SweepOverlaps(std::vector<std::pair<Span, size_t>> spans,
-                                Low low, Reaches reaches) {
-  std::ranges::sort(spans, {},
-                    [&low](const auto& span) { return low(span.first); });
-  std::set<BinPair> pairs;
-  std::vector<std::pair<Span, size_t>> open;
-  for (const auto& [span, bin] : spans) {
-    std::erase_if(open, [&reaches, &span](const auto& held) {
-      return !reaches(held.first, span);
-    });
-    for (const auto& held : open) {
-      if (held.second != bin) pairs.insert(std::minmax(held.second, bin));
-    }
-    open.emplace_back(span, bin);
-  }
-  return pairs;
-}
-
-// §19.7, Table 19-1: the pairs of `bins`' bins of the `bins` keyword whose
-// range lists share a value: an integral coverpoint's values and ranges, or a
-// real coverpoint's intervals (§19.5.1), whose high end is in the interval
-// only where it is inclusive.
-std::set<BinPair> RangeListOverlaps(const std::deque<CoverBin>& bins) {
-  std::vector<std::pair<CoverValueRange, size_t>> spans;
-  std::vector<std::pair<RealInterval, size_t>> intervals;
-  for (size_t i = 0; i < bins.size(); ++i) {
-    if (bins[i].kind != CoverBinKind::kExplicit) continue;
-    for (const CoverValueRange& r : bins[i].ranges) spans.emplace_back(r, i);
-    for (int64_t v : bins[i].values) {
-      spans.emplace_back(CoverValueRange{v, v}, i);
-    }
-    for (const RealInterval& iv : bins[i].real_intervals) {
-      intervals.emplace_back(iv, i);
-    }
-  }
-  std::set<BinPair> pairs = SweepOverlaps(
-      std::move(spans), [](const CoverValueRange& r) { return r.lo; },
-      [](const CoverValueRange& held, const CoverValueRange& next) {
-        return held.hi >= next.lo;
-      });
-  pairs.merge(SweepOverlaps(
-      std::move(intervals), [](const RealInterval& iv) { return iv.low; },
-      [](const RealInterval& held, const RealInterval& next) {
-        return held.high > next.low ||
-               (held.high_inclusive && held.high == next.low);
-      }));
-  return pairs;
-}
-
-// §19.7, Table 19-1: the pairs of `bins`' transition bins of the `bins`
-// keyword whose transition lists share a transition, each pair once and the
-// lower index first.
-std::set<BinPair> TransitionListOverlaps(const std::deque<CoverBin>& bins) {
-  std::map<std::vector<int64_t>, std::set<size_t>> holders;
-  for (size_t i = 0; i < bins.size(); ++i) {
-    if (bins[i].kind != CoverBinKind::kTransition) continue;
-    for (const auto& sequence : bins[i].transitions)
-      holders[sequence].insert(i);
-  }
-  std::set<BinPair> pairs;
-  for (const auto& [sequence, held] : holders) {
-    for (auto a = held.begin(); a != held.end(); ++a) {
-      for (auto b = std::next(a); b != held.end(); ++b) pairs.insert({*a, *b});
-    }
-  }
-  return pairs;
-}
-
-// §19.7, Table 19-1: the warning detect_overlap asks for, one per pair of
-// `cp`'s bins in `pairs`, at the definition of the later bin of the pair,
-// `origins` giving each bin's definition. `lists` names what overlaps.
-void WarnOfOverlaps(const CoverPoint& cp, const std::set<BinPair>& pairs,
-                    std::string_view lists,
-                    const std::vector<SourceLoc>& origins, DiagEngine& diag) {
-  for (const auto& [first, second] : pairs) {
-    diag.Warning(
-        origins[second],
-        std::format("bins '{}' and '{}' of coverpoint '{}' overlap "
-                    "in their {} lists",
-                    cp.bins[first].name, cp.bins[second].name, cp.name, lists),
-        Subclause("19.7"));
-  }
 }
 
 }  // namespace
@@ -916,17 +840,14 @@ void BuildCoverpointBins(CovergroupInstance& inst, SampledCoverpoint& point,
     if (point.is_real && bins.kind == BinsOrOptionsKind::kValues) {
       AddRealBins(point, bins, ctx, arena);
     } else if (bins.kind == BinsOrOptionsKind::kDefault) {
-      AddDefaultBin(point, bins);
+      AddDefaultBin(point, bins, CoverBinKind::kDefault);
     } else if (!point.is_real) {
       AddIntegralBins(inst, point, bins, ctx, arena);
     }
     origins.resize(cp->bins.size(), bins.loc);
   }
   if (point.option.detect_overlap) {
-    WarnOfOverlaps(*cp, RangeListOverlaps(cp->bins), "range", origins,
-                   ctx.GetDiag());
-    WarnOfOverlaps(*cp, TransitionListOverlaps(cp->bins), "transition", origins,
-                   ctx.GetDiag());
+    WarnOfBinOverlaps(*cp, origins, ctx.GetDiag());
   }
   if (point.enum_type != nullptr) {
     CoverageDB::AutoCreateEnumBins(cp, EnumMembers(point));

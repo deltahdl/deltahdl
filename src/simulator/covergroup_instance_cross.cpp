@@ -175,12 +175,21 @@ struct MatchPolicy {
   }
 };
 
-MatchPolicy ReadPolicy(const SelectExpression& select, SimContext& ctx,
-                       Arena& arena) {
-  if (select.matches_dollar) return {true, 0};
-  if (select.matches == nullptr) return {};
-  return {false, static_cast<uint64_t>(std::max<int64_t>(
-                     1, CovergroupInt(select.matches, ctx, arena)))};
+// A `matches` count is positive; a covergroup formal giving it 0 or less is a
+// run-time error, and the selection selects no bin tuple.
+std::optional<MatchPolicy> ReadPolicy(const SelectExpression& select,
+                                      const CrossSelector& selector,
+                                      SimContext& ctx, Arena& arena) {
+  if (select.matches_dollar) return MatchPolicy{true, 0};
+  if (select.matches == nullptr) return MatchPolicy{};
+  int64_t count = CovergroupInt(select.matches, ctx, arena);
+  if (count > 0) return MatchPolicy{false, static_cast<uint64_t>(count)};
+  ctx.GetDiag().Error(select.matches->range.start,
+                      std::format("cross '{}': the matches count {} is not a "
+                                  "positive integer",
+                                  selector.cross_name, count),
+                      Subclause("19.6.1.2"));
+  return std::nullopt;
 }
 
 // The values of each coverpoint bin of the bin tuple `tuple`, as sorted
@@ -305,9 +314,10 @@ std::set<Tuple> WithSelections(const SelectExpression& select,
         Subclause("19.6.1.2"));
     return chosen;
   }
-  MatchPolicy policy = ReadPolicy(select, ctx, arena);
+  std::optional<MatchPolicy> policy = ReadPolicy(select, selector, ctx, arena);
+  if (!policy.has_value()) return chosen;
   ctx.PushScope();
-  WithEvaluation evaluation(select.expr, policy, selector, ctx, arena);
+  WithEvaluation evaluation(select.expr, *policy, selector, ctx, arena);
   for (const auto& [tuple, spans] : candidates) {
     if (evaluation.Selects(spans)) chosen.insert(*tuple);
   }
@@ -381,10 +391,11 @@ std::set<std::vector<int64_t>> CrossSetValueTuples(
 std::set<Tuple> CrossSetSelections(const SelectExpression& select,
                                    const CrossSelector& selector,
                                    SimContext& ctx, Arena& arena) {
-  MatchPolicy policy = ReadPolicy(select, ctx, arena);
+  std::set<Tuple> chosen;
+  std::optional<MatchPolicy> policy = ReadPolicy(select, selector, ctx, arena);
+  if (!policy.has_value()) return chosen;
   std::set<std::vector<int64_t>> listed =
       CrossSetValueTuples(select.expr, selector, ctx, arena);
-  std::set<Tuple> chosen;
   for (const Tuple& tuple : selector.products) {
     std::vector<std::vector<CoverValueRange>> spans =
         TupleSpans(tuple, selector);
@@ -395,7 +406,7 @@ std::set<Tuple> CrossSetSelections(const SelectExpression& select,
           }
           return true;
         }));
-    if (policy.Met(held, ValueTupleCount(spans))) chosen.insert(tuple);
+    if (policy->Met(held, ValueTupleCount(spans))) chosen.insert(tuple);
   }
   return chosen;
 }

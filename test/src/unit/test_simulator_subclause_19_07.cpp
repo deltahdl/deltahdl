@@ -434,4 +434,39 @@ TEST(CoverageOptionSim, CrossNumPrintMissingListsThatManyMissingBins) {
             "  <auto[0],auto[1]>\n");
 }
 
+// §19.7, Table 19-1, and §19.7.1, Table 19-3: a weight is a non-negative
+// integral value. One given by a covergroup formal or assigned procedurally,
+// through an instance or the type, is a run-time error when negative, and the
+// weight keeps the value it had; 0 is legal.
+TEST(CovergroupInstanceSim, NegativeWeightSetAtRunTimeIsReported) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [1:0] a;\n"
+                       "  covergroup cg (int w);\n"
+                       "    option.weight = w;\n"
+                       "    cp: coverpoint a;\n"
+                       "  endgroup\n"
+                       "  cg c = new(-3);\n"
+                       "  cg d = new(0);\n"
+                       "  initial begin\n"
+                       "    c.cp.option.weight = -4;\n"
+                       "    c.cp.option.weight = 2;\n"
+                       "    cg::type_option.weight = -5;\n"
+                       "    cg::type_option.weight = 0;\n"
+                       "    $display(\"%0d %0d %0d %0d\", c.option.weight, "
+                       "c.cp.option.weight, d.option.weight, "
+                       "cg::type_option.weight);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 2 0 0\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "the weight -3 is negative",
+                            4, "19.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "the weight -4 is negative",
+                            10, "19.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "the weight -5 is negative",
+                            12, "19.7"));
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
+}
+
 }  // namespace

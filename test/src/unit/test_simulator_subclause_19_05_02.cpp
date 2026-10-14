@@ -512,4 +512,89 @@ TEST(CovergroupInstanceSim, TransitionBinCountsItsSequence) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+// §19.5.2: the standard's example. Sampling 4 5 7 11 8 12 2 2 3 counts
+// allother at the 7, which breaks the pending 4=>5=>6, and at the 8; at the 5
+// that sequence goes on, the 11 and the 12 complete sa, the 2s continue the
+// pending sc and the 3 completes it. The default sequence bin is left out of
+// the coverage, so sa and sc are the two bins counted.
+TEST(CovergroupInstanceSim, DefaultSequenceBinCountsTransitionsNoBinTakes) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [4:1] v_a; int n, t;\n"
+                       "  covergroup cg;\n"
+                       "    coverpoint v_a {\n"
+                       "      bins sa = (4 => 5 => 6), ([7:9],10 => 11,12);\n"
+                       "      bins sc = (12 => 3 [-> 1]);\n"
+                       "      bins allother = default sequence;\n"
+                       "    }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin\n"
+                       "    v_a = 4; c.sample(); v_a = 5; c.sample();\n"
+                       "    v_a = 7; c.sample(); v_a = 11; c.sample();\n"
+                       "    v_a = 8; c.sample(); v_a = 12; c.sample();\n"
+                       "    v_a = 2; c.sample(); v_a = 2; c.sample();\n"
+                       "    v_a = 3; c.sample();\n"
+                       "    void'(c.get_inst_coverage(n, t));\n"
+                       "    $display(\"n=%0d t=%0d\", n, t);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "n=2 t=2\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+  const CoverGroup* group = f.ctx.CoverageData().FindGroup("c");
+  ASSERT_NE(group, nullptr);
+  const CoverBin& allother = group->coverpoints[0].bins.back();
+  EXPECT_EQ(allother.name, "allother");
+  EXPECT_EQ(allother.hit_count, 2u);
+}
+
+// §19.5.1 with §19.5.2: a default sequence bin's trailing iff keeps it from
+// counting while the guard is false. The 0 => 3 counts d while en is 1; the
+// 3 => 0 that follows would count it too, but en is then 0.
+TEST(CovergroupInstanceSim, DefaultSequenceBinIffGuardSuppressesItsCount) {
+  SimFixture f;
+  RunCapture(
+      "module top;\n"
+      "  bit [1:0] v; bit en;\n"
+      "  covergroup cg;\n"
+      "    coverpoint v { bins t = (1 => 2); "
+      "bins d = default sequence iff (en); }\n"
+      "  endgroup\n"
+      "  cg c = new;\n"
+      "  initial begin\n"
+      "    en = 1; v = 0; c.sample(); v = 3; c.sample();\n"
+      "    en = 0; v = 0; c.sample();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+  const CoverGroup* group = f.ctx.CoverageData().FindGroup("c");
+  ASSERT_NE(group, nullptr);
+  EXPECT_EQ(group->coverpoints[0].bins[1].name, "d");
+  EXPECT_EQ(group->coverpoints[0].bins[1].hit_count, 1u);
+}
+
+// §19.5: a default sequence bin, as a default bin, is left out of cross
+// coverage, so the cross of a and b holds the one product <one,one>.
+TEST(CovergroupInstanceSim, DefaultSequenceBinIsLeftOutOfACross) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [1:0] v, w; int n, t;\n"
+                       "  covergroup cg;\n"
+                       "    a: coverpoint v { bins one = {1}; "
+                       "bins d = default sequence; }\n"
+                       "    b: coverpoint w { bins one = {1}; }\n"
+                       "    X: cross a, b;\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin v = 1; w = 1; c.sample(); "
+                       "void'(c.X.get_inst_coverage(n, t)); "
+                       "$display(\"n=%0d t=%0d\", n, t); end\n"
+                       "endmodule\n",
+                       f),
+            "n=1 t=1\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

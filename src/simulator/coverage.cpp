@@ -306,15 +306,48 @@ static void AppendSampleHistory(CoverPoint* cp, int64_t value, size_t max_seq) {
   }
 }
 
-// Reports whether the most recent samples match this transition sequence.
-static bool SampleHistoryMatchesSeq(const CoverPoint* cp,
-                                    const std::vector<int64_t>& seq) {
-  if (seq.empty() || cp->sample_history.size() < seq.size()) return false;
-  size_t off = cp->sample_history.size() - seq.size();
-  for (size_t i = 0; i < seq.size(); ++i) {
+// Reports whether the last `length` samples are the first `length` values of
+// this transition sequence.
+static bool SampleHistoryEndsWith(const CoverPoint* cp,
+                                  const std::vector<int64_t>& seq,
+                                  size_t length) {
+  if (cp->sample_history.size() < length) return false;
+  size_t off = cp->sample_history.size() - length;
+  for (size_t i = 0; i < length; ++i) {
     if (cp->sample_history[off + i] != seq[i]) return false;
   }
   return true;
+}
+
+// Reports whether the most recent samples match this transition sequence.
+static bool SampleHistoryMatchesSeq(const CoverPoint* cp,
+                                    const std::vector<int64_t>& seq) {
+  return !seq.empty() && SampleHistoryEndsWith(cp, seq, seq.size());
+}
+
+// What the latest sample did to a coverpoint's transition bins: whether it
+// completed a sequence of one, and whether it continued a sequence that was
+// pending before it, one that had matched at least one sample, without
+// completing it. A default sequence bin counts a sample that did neither (LRM
+// 19.5.2).
+struct TransitionOutcome {
+  bool completed = false;
+  bool pending = false;
+};
+
+// Whether the latest sample continued a concrete transition sequence pending
+// before it: the last k samples, for 2 <= k < the sequence's length, are its
+// first k values.
+static bool SequenceRemainsPending(const CoverPoint* cp) {
+  for (const auto& bin : cp->bins) {
+    if (!IsTransitionBin(bin)) continue;
+    for (const auto& seq : bin.transitions) {
+      for (size_t k = 2; k < seq.size(); ++k) {
+        if (SampleHistoryEndsWith(cp, seq, k)) return true;
+      }
+    }
+  }
+  return false;
 }
 
 // Counts a transition the latest sample completed into bin `index`: an
@@ -332,13 +365,14 @@ static void CountCompletedTransition(CoverPoint* cp, size_t index) {
 }
 
 // Scores any transition bin whose sequence was completed by the latest sample.
-static void ScoreTransitionBins(CoverPoint* cp) {
+static void ScoreTransitionBins(CoverPoint* cp, TransitionOutcome& outcome) {
   for (size_t i = 0; i < cp->bins.size(); ++i) {
     CoverBin& bin = cp->bins[i];
     if (!IsTransitionBin(bin)) continue;
     for (const auto& seq : bin.transitions) {
       if (!SampleHistoryMatchesSeq(cp, seq)) continue;
       CountCompletedTransition(cp, i);
+      outcome.completed = true;
       break;
     }
   }
@@ -429,24 +463,34 @@ static void StepRepeatElement(const TransitionPatternElement& e,
   out.Emit(TransitionMatchThread{th.elem + 1, 0, gap});
 }
 
+// Advances one thread by the sampled value `v`.
+static void StepThread(const std::vector<TransitionPatternElement>& pat,
+                       const TransitionMatchThread& th, int64_t v,
+                       TransitionStepOut& out) {
+  const TransitionPatternElement& e = pat[th.elem];
+  bool in_set = IsInValueSet(e.values, v);
+  if (th.gap_ok && StepGapThread(pat, th, v, in_set, out)) return;
+  if (!e.has_repeat) {
+    StepPlainElement(pat.size(), th, in_set, out);
+    return;
+  }
+  StepRepeatElement(e, pat.size(), th, in_set, out);
+}
+
+// Advances a pattern's threads, and a fresh one at its first element, by the
+// sampled value `v`, reporting whether the pattern completes. A thread at the
+// first element with no occurrence counted has matched nothing, so is pending
+// no sequence; the others are stepped first, and `pending` is set where what
+// they leave goes on.
 static bool AdvanceTransitionPattern(
     const std::vector<TransitionPatternElement>& pat,
-    std::vector<TransitionMatchThread>& threads, int64_t v) {
+    std::vector<TransitionMatchThread>& threads, int64_t v, bool& pending) {
   TransitionStepOut out;
-  std::vector<TransitionMatchThread> current = threads;
-  current.push_back(TransitionMatchThread{0, 0, false});
-
-  for (const auto& th : current) {
-    const TransitionPatternElement& e = pat[th.elem];
-    bool in_set = IsInValueSet(e.values, v);
-    if (th.gap_ok && StepGapThread(pat, th, v, in_set, out)) continue;
-    if (!e.has_repeat) {
-      StepPlainElement(pat.size(), th, in_set, out);
-      continue;
-    }
-    StepRepeatElement(e, pat.size(), th, in_set, out);
+  for (const auto& th : threads) {
+    if (th.elem != 0 || th.reps != 0) StepThread(pat, th, v, out);
   }
-
+  if (!out.next.empty()) pending = true;
+  StepThread(pat, TransitionMatchThread{0, 0, false}, v, out);
   threads = std::move(out.next);
   return out.completed;
 }
@@ -455,7 +499,8 @@ static bool AdvanceTransitionPattern(
 // latest sampled value, incrementing a bin at most once per sample when any of
 // its patterns completes; a completed illegal pattern raises a run-time error
 // and counts toward no bin (LRM 19.5.2, 19.5.6).
-static void ScorePatternBins(CoverPoint* cp, int64_t value) {
+static void ScorePatternBins(CoverPoint* cp, int64_t value,
+                             TransitionOutcome& outcome) {
   for (size_t b = 0; b < cp->bins.size(); ++b) {
     CoverBin& bin = cp->bins[b];
     if (bin.transition_patterns.empty()) continue;
@@ -467,11 +512,33 @@ static void ScorePatternBins(CoverPoint* cp, int64_t value) {
     // state stays consistent for later samples.
     for (size_t i = 0; i < bin.transition_patterns.size(); ++i) {
       if (AdvanceTransitionPattern(bin.transition_patterns[i],
-                                   bin.pattern_threads[i], value)) {
+                                   bin.pattern_threads[i], value,
+                                   outcome.pending)) {
         completed = true;
       }
     }
-    if (completed) CountCompletedTransition(cp, b);
+    if (completed) {
+      CountCompletedTransition(cp, b);
+      outcome.completed = true;
+    }
+  }
+}
+
+// Counts each default sequence bin for a sample making a transition that
+// completes no other transition bin's sequence and continues none pending,
+// unless the bin's iff guard is false at this sampling point (LRM 19.5.1,
+// 19.5.2). The first sample makes no transition.
+static void ScoreDefaultSequenceBins(CoverPoint* cp,
+                                     const TransitionOutcome& outcome) {
+  if (!cp->sampled || !CoverageDB::DefaultSequenceTransitionIncrements(
+                          outcome.completed, outcome.pending)) {
+    return;
+  }
+  for (CoverBin& bin : cp->bins) {
+    if (bin.kind == CoverBinKind::kDefaultSequence &&
+        (!bin.has_iff_guard || bin.iff_guard_value)) {
+      ++bin.hit_count;
+    }
   }
 }
 
@@ -492,11 +559,15 @@ void CoverageDB::SampleCoverPoint(CoverPoint* cp, int64_t value) {
   // window; goto/nonconsecutive pattern bins are matched incrementally. Either,
   // both, or neither may be present.
   size_t max_seq = 0;
+  TransitionOutcome outcome;
   if (CollectTransitionBins(cp, max_seq)) {
     AppendSampleHistory(cp, value, max_seq);
-    ScoreTransitionBins(cp);
+    ScoreTransitionBins(cp, outcome);
+    outcome.pending = SequenceRemainsPending(cp);
   }
-  if (CollectPatternBins(cp)) ScorePatternBins(cp, value);
+  if (CollectPatternBins(cp)) ScorePatternBins(cp, value, outcome);
+  ScoreDefaultSequenceBins(cp, outcome);
+  cp->sampled = true;
 }
 
 // Whether `value` falls within one of the intervals of a real bin (LRM 19.5.1).

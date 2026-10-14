@@ -193,4 +193,34 @@ TEST(CovergroupInstanceSim, CrossWithOverTooManyValueTuplesIsReported) {
                             5, "19.6.1.2"));
 }
 
+// §19.6.1.2 and §19.6.1.4: a matches count is a positive integer. A
+// covergroup formal giving it 0 is a run-time error at the building of the
+// instance, for a `with` as for a cross_set_expression; 1 is legal.
+TEST(CovergroupInstanceSim, NonPositiveMatchesCountFromAFormalIsReported) {
+  SimFixture f;
+  RunCapture(
+      "module top;\n"
+      "  bit [1:0] a, b;\n"
+      "  covergroup cg (int m);\n"
+      "    coverpoint a; coverpoint b;\n"
+      "    X: cross a, b {\n"
+      "      bins eq = X with (a == b) matches m;\n"
+      "      bins s = '{ '{1,1}, '{2,2} } matches m;\n"
+      "    }\n"
+      "  endgroup\n"
+      "  cg c0 = new(0);\n"
+      "  cg c1 = new(1);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cross 'X': the matches count 0 is not a positive "
+                            "integer",
+                            6, "19.6.1.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cross 'X': the matches count 0 is not a positive "
+                            "integer",
+                            7, "19.6.1.2"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
 }  // namespace

@@ -23,6 +23,10 @@ enum class CoverBinKind : uint8_t {
   // A default bin catches every sampled value that does not fall within any
   // other defined bin of its coverpoint (see LRM 19.5).
   kDefault,
+  // §19.5.2: a default sequence bin catches each transition that completes
+  // none of its coverpoint's other transition bins and continues none of
+  // their sequences then pending.
+  kDefaultSequence,
 };
 
 // The repetition a transition item may carry inside a transition bin (LRM
@@ -181,6 +185,9 @@ struct CoverPoint {
   // Whether the latest sampled value held an x or z bit, which keeps it out
   // of every automatically created bin (LRM 19.5.3).
   bool sample_has_xz = false;
+  // Whether the coverpoint has been sampled, so that the next sample makes a
+  // transition from the last one (§19.5.2).
+  bool sampled = false;
 };
 
 struct CrossBin {

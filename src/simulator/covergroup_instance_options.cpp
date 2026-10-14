@@ -2,16 +2,20 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <span>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "common/types.h"
 #include "parser/ast_covergroup.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
+#include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 #include "simulator/covergroup_instance.h"
 #include "simulator/covergroup_instance_internal.h"
@@ -169,8 +173,12 @@ void SetOptionValue(Options& options, const OptionFields<Options>& fields,
 template <typename Options>
 void SetOption(Options& options, const OptionFields<Options>& fields,
                const CoverageOption& option, SimContext& ctx, Arena& arena) {
-  SetOptionValue(options, fields, option.member,
-                 EvalExpr(option.value, ctx, arena));
+  Logic4Vec value = EvalExpr(option.value, ctx, arena);
+  if (!OptionValueAccepted(option.member, value, option.value->range.start,
+                           ctx)) {
+    return;
+  }
+  SetOptionValue(options, fields, option.member, value);
 }
 
 // §19.7: the instance options an assignment after instantiation may set;
@@ -338,6 +346,18 @@ bool ReadDefinedTypeOption(const TypeOptionName& name, SimContext& ctx,
 
 }  // namespace
 
+bool OptionValueAccepted(std::string_view member, const Logic4Vec& value,
+                         SourceLoc at, SimContext& ctx) {
+  auto weight = static_cast<int32_t>(CovergroupIntOf(value));
+  if (member != "weight" || CoverageDB::OptionWeightValid(weight)) return true;
+  ctx.GetDiag().Error(at,
+                      std::format("the weight {} is negative; a weight is a "
+                                  "non-negative integral value",
+                                  weight),
+                      Subclause("19.7"));
+  return false;
+}
+
 void ApplyGroupOption(CovergroupInstance& inst, const CoverageOption& option,
                       SimContext& ctx, Arena& arena) {
   if (option.is_type_option) {
@@ -500,6 +520,10 @@ bool TryCovergroupTypeOptionAssign(const Stmt* stmt, SimContext& ctx,
   // §19.7.1: strobe and real_interval are set in the definition only.
   if (write.member == "strobe" || write.member == "real_interval") return true;
   write.value = EvalExpr(stmt->rhs, ctx, arena);
+  if (!OptionValueAccepted(write.member, write.value, stmt->rhs->range.start,
+                           ctx)) {
+    return true;
+  }
   ctx.Covergroups().WriteTypeOption(std::move(write));
   return true;
 }

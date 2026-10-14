@@ -7,12 +7,14 @@
 #include <string_view>
 #include <vector>
 
+#include "common/source_loc.h"
 #include "common/types.h"
 #include "simulator/coverage_types.h"
 
 namespace delta {
 
 class Arena;
+class DiagEngine;
 class SimContext;
 struct ModuleItem;
 struct ClassObject;
@@ -99,6 +101,13 @@ void BuildCoverpointBins(CovergroupInstance& inst, SampledCoverpoint& point,
                          const CoverPointDecl& decl, SimContext& ctx,
                          Arena& arena);
 
+// §19.7, Table 19-1: the warnings detect_overlap asks for, one for each pair
+// of `cp`'s bins of the `bins` keyword whose range lists share a value or
+// whose transition lists share a transition, at the definition of the later
+// bin of the pair, `origins` giving each bin's definition.
+void WarnOfBinOverlaps(const CoverPoint& cp,
+                       const std::vector<SourceLoc>& origins, DiagEngine& diag);
+
 // §19.6 to §19.6.3: the cross `decl` of an instance whose coverpoints are
 // built, given an implicit coverpoint for each variable it crosses directly.
 // `index` is the cross's position among the covergroup's items, which names
@@ -114,6 +123,13 @@ void ApplyPointOption(SampledCoverpoint& point, const CoverageOption& option,
                       SimContext& ctx, Arena& arena);
 void ApplyCrossOption(CrossCover& cross, const CoverageOption& option,
                       SimContext& ctx, Arena& arena);
+
+// §19.7, Table 19-1, and §19.7.1, Table 19-3: whether `value` may be set as
+// the option `member`. A weight is a non-negative integral value; a negative
+// one, given by a covergroup formal or assigned procedurally, is a run-time
+// error at `at`, and the weight is left as it was.
+bool OptionValueAccepted(std::string_view member, const Logic4Vec& value,
+                         SourceLoc at, SimContext& ctx);
 
 // §19.7: writes `value` to the instance option `member` of the covergroup,
 // the coverpoint `point` or the cross `cross`, where `member` is one that an

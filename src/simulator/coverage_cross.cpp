@@ -49,8 +49,8 @@ bool CoverageDB::CrossItemsInSameGroup(const CoverGroup* group,
 namespace {
 
 // The indices of the bins of the coverpoint `name` that may contribute a cross
-// product: default, ignore, and illegal bins are skipped (LRM 19.6). Empty when
-// the coverpoint is absent.
+// product: default, default sequence, ignore, and illegal bins are skipped
+// (LRM 19.5, 19.6). Empty when the coverpoint is absent.
 std::vector<size_t> ContributingBins(const CoverGroup& group,
                                      const std::string& name) {
   std::vector<size_t> contributing;
@@ -58,8 +58,9 @@ std::vector<size_t> ContributingBins(const CoverGroup& group,
     if (cp.name != name) continue;
     for (size_t i = 0; i < cp.bins.size(); ++i) {
       CoverBinKind kind = cp.bins[i].kind;
-      if (kind == CoverBinKind::kDefault || kind == CoverBinKind::kIgnore ||
-          kind == CoverBinKind::kIllegal) {
+      if (kind == CoverBinKind::kDefault ||
+          kind == CoverBinKind::kDefaultSequence ||
+          kind == CoverBinKind::kIgnore || kind == CoverBinKind::kIllegal) {
         continue;
       }
       contributing.push_back(i);

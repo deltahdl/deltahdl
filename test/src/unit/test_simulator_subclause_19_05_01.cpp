@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 
@@ -392,6 +393,37 @@ TEST(CovergroupInstanceSim, TransitionBinIffGuardSuppressesItsCount) {
                        f),
             "n=0 t=2\n");
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+// §19.5.1: the number of bins of `[k]` is positive. A covergroup formal
+// giving it 0 or -2 is a run-time error at the building of the instance, of
+// an integral coverpoint as of a real one; 4 builds four bins.
+TEST(CovergroupInstanceSim, NonPositiveBinCountFromAFormalIsReported) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [3:0] v; real r; int n, t;\n"
+                       "  covergroup cg (int k);\n"
+                       "    coverpoint v { bins b[k] = {[0:15]}; }\n"
+                       "  endgroup\n"
+                       "  covergroup rg (int k);\n"
+                       "    coverpoint r { bins b[k] = {[0.0:4.0]}; }\n"
+                       "  endgroup\n"
+                       "  cg c0 = new(0);\n"
+                       "  cg c1 = new(-2);\n"
+                       "  cg c2 = new(4);\n"
+                       "  rg r0 = new(0);\n"
+                       "  initial begin void'(c2.get_inst_coverage(n, t)); "
+                       "$display(\"t=%0d\", t); end\n"
+                       "endmodule\n",
+                       f),
+            "t=4\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "bins 'b' asks for 0 bins", 4,
+                            "19.5.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "bins 'b' asks for -2 bins",
+                            4, "19.5.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "bins 'b' asks for 0 bins", 7,
+                            "19.5.1"));
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
 }  // namespace

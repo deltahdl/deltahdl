@@ -832,6 +832,9 @@ bool TryCovergroupOptionAssign(const Stmt* stmt, SimContext& ctx,
   if (target.inst == nullptr) return false;
   Logic4Vec value = EvalExpr(stmt->rhs, ctx, arena);
   std::string_view member = lhs->rhs->text;
+  if (!OptionValueAccepted(member, value, stmt->rhs->range.start, ctx)) {
+    return true;
+  }
   if (target.point != nullptr) {
     WritePointOption(*target.point, member, value);
   } else if (target.cross != nullptr) {
