@@ -291,4 +291,30 @@ TEST(ProgramPortConnectionSim, ArrayPortsCarryValuesBothWays) {
       "os=7\n");
 }
 
+// §24.3.2 with §24.3.1: an element of a program's unpacked-array input port
+// follows the design array as a scalar input port does, so the sequence the
+// program clocks by c[0] ends where the Reactive process reads it, at 15, 25
+// and 35.
+TEST(ProgramPortConnectionSim, ArrayInputPortFollowsTheDesignBeforeObserved) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("program p(input logic c[2]);\n"
+                 "  bit a = 1, b = 1;\n"
+                 "  int n = 0;\n"
+                 "  sequence e4;\n"
+                 "    a ##1 b;\n"
+                 "  endsequence\n"
+                 "  initial forever @(posedge c[0]) if (e4.triggered) n++;\n"
+                 "  initial #41 $display(\"n=%0d\", n);\n"
+                 "endprogram\n"
+                 "module t;\n"
+                 "  logic cs[2] = '{0, 0};\n"
+                 "  always #5 cs[0] = ~cs[0];\n"
+                 "  p u(cs);\n"
+                 "  initial #45 $finish;\n"
+                 "endmodule\n",
+                 f),
+      "n=3\n$finish at time 45\n");
+}
+
 }  // namespace

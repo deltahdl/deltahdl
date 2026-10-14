@@ -30,6 +30,7 @@
 #include "simulator/class_object.h"
 #include "simulator/clocking.h"
 #include "simulator/evaluation.h"
+#include "simulator/lowerer_always_comb.h"
 #include "simulator/process.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
@@ -531,6 +532,13 @@ struct EventAwaiter {
     if (!e) return;
     if (e->kind == ExprKind::kIdentifier) {
       out.push_back(e->text);
+      // §9.4.2: `c[0]` on a fixed-size unpacked array reads an element, which
+      // is a Variable of its own that a write notifies under its own name and
+      // never under the array's, so every element is watched; the watcher
+      // re-evaluates the whole expression before it wakes anything.
+      std::vector<std::string_view> elements =
+          UnpackedElementNames(e->text, ctx);
+      out.insert(out.end(), elements.begin(), elements.end());
       return;
     }
     if (e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution) {
@@ -609,12 +617,24 @@ struct EventAwaiter {
   // watcher against the shared previous value, updating *prev in place. The
   // shared `consumed` guard ensures the resume happens at most once across all
   // sibling watchers. Does not perform the resume itself.
+  // §9.4.2 with §23.9: an operand names what the waiting process's scope
+  // holds, so it is evaluated with that process current, whichever process's
+  // write notified the watcher: a port binding writing `u.c[0]` runs in the
+  // parent, where `c[0]` names nothing.
+  static Logic4Vec EvalInWaitingProcess(const Expr* e, ResumeTarget target) {
+    Process* saved = target.ctx.CurrentProcess();
+    target.ctx.SetCurrentProcess(target.proc);
+    Logic4Vec value = EvalExpr(e, target.ctx, target.ctx.GetArena());
+    target.ctx.SetCurrentProcess(saved);
+    return value;
+  }
+
   static CompoundTrigger EvalCompoundTrigger(const CompoundOperand& op,
                                              const EdgeSpec& spec,
                                              ResumeTarget target) {
     if (*op.consumed) return {true, false};
     if (target.proc && !target.proc->active) return {true, false};
-    auto cur = EvalExpr(op.signal, target.ctx, target.ctx.GetArena());
+    auto cur = EvalInWaitingProcess(op.signal, target);
     if (Logic4VecBitsEqual(cur, op.prev->Get())) return {false, false};
     if (spec.edge != Edge::kNone &&
         !CheckEdgeOnValues(op.prev->Get(), cur, spec.edge)) {
@@ -624,7 +644,7 @@ struct EventAwaiter {
     op.prev->Capture(cur);
     // §9.4.2.3 with §12.4: the guard is true when any bit of it is 1.
     if (spec.iff_cond &&
-        !EvalExpr(spec.iff_cond, target.ctx, target.ctx.GetArena()).IsTruthy())
+        !EvalInWaitingProcess(spec.iff_cond, target).IsTruthy())
       return {false, false};
     *op.consumed = true;
     return {true, true};
