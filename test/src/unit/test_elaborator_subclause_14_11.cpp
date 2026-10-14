@@ -28,7 +28,7 @@ TEST(CycleDelayElab, WithoutDefaultClockingErrors) {
 TEST(CycleDelayElab, WithDefaultClockingNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  logic data; default clocking cb @(posedge clk);\n"
       "    input data;\n"
       "  endclocking\n"
@@ -50,7 +50,7 @@ TEST(CycleDelayElab, WithDefaultClockingNoError) {
 TEST(CycleDelayElab, WithReferenceFormDefaultClockingNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  logic data; clocking cb @(posedge clk);\n"
       "    input data;\n"
       "  endclocking\n"
@@ -94,7 +94,7 @@ TEST(CycleDelayElab, ProgramScopeWithoutDefaultClockingErrors) {
 TEST(CycleDelayElab, ProgramScopeWithDefaultClockingNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "program p;\n"
+      "program p; logic clk;\n"
       "  logic data; default clocking cb @(posedge clk);\n"
       "    input data;\n"
       "  endclocking\n"
@@ -136,7 +136,7 @@ TEST(CycleDelayElab, InterfaceScopeWithoutDefaultClockingErrors) {
 TEST(CycleDelayElab, InterfaceScopeWithDefaultClockingNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "interface intf;\n"
+      "interface intf; logic clk;\n"
       "  logic data; default clocking cb @(posedge clk);\n"
       "    input data;\n"
       "  endclocking\n"
@@ -198,7 +198,7 @@ TEST(CycleDelayElab, CheckerInitialCycleDelayRejectedWithDefaultClocking) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
-      "  checker chk;\n"
+      "  checker chk; logic clk;\n"
       "    logic data; default clocking cb @(posedge clk);\n"
       "      input data;\n"
       "    endclocking\n"
@@ -247,7 +247,7 @@ TEST(CycleDelayElab, NestedCycleDelayWithoutDefaultClockingErrors) {
 TEST(CycleDelayElab, IntraAssignBlockingCycleDelayErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  logic data; default clocking cb @(posedge clk);\n"
       "    output data;\n"
       "  endclocking\n"
@@ -267,7 +267,7 @@ TEST(CycleDelayElab, IntraAssignBlockingCycleDelayErrors) {
 TEST(CycleDelayElab, IntraAssignNonblockingCycleDelayErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  logic data; default clocking cb @(posedge clk);\n"
       "    output data;\n"
       "  endclocking\n"
@@ -289,7 +289,7 @@ TEST(CycleDelayElab, IntraAssignNonblockingCycleDelayErrors) {
 TEST(CycleDelayElab, NestedIntraAssignCycleDelayErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  logic data; default clocking cb @(posedge clk);\n"
       "    output data;\n"
       "  endclocking\n"
@@ -314,7 +314,7 @@ TEST(CycleDelayElab, NestedIntraAssignCycleDelayErrors) {
 TEST(CycleDelayElab, IntraAssignBitSelectLhsCycleDelayErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  logic data; default clocking cb @(posedge clk);\n"
       "    output data;\n"
       "  endclocking\n"
@@ -336,7 +336,7 @@ TEST(CycleDelayElab, IntraAssignBitSelectLhsCycleDelayErrors) {
 TEST(CycleDelayElab, IntraAssignPartSelectLhsCycleDelayErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  logic data; default clocking cb @(posedge clk);\n"
       "    output data;\n"
       "  endclocking\n"
@@ -359,7 +359,7 @@ TEST(CycleDelayElab, IntraAssignPartSelectLhsCycleDelayErrors) {
 TEST(CycleDelayElab, IntraAssignConcatLhsCycleDelayErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  logic data; default clocking cb @(posedge clk);\n"
       "    output data;\n"
       "  endclocking\n"
@@ -383,7 +383,7 @@ TEST(CycleDelayElab, IntraAssignConcatLhsCycleDelayErrors) {
 TEST(CycleDelayElab, SynchronousDriveBitSelectWithCycleDelayNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  logic [7:0] data;\n"
       "  default clocking cb @(posedge clk);\n"
       "    output data;\n"
@@ -403,7 +403,7 @@ TEST(CycleDelayElab, SynchronousDriveBitSelectWithCycleDelayNoError) {
 TEST(CycleDelayElab, SynchronousDriveWithCycleDelayNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  logic data; default clocking cb @(posedge clk);\n"
       "    output data;\n"
       "  endclocking\n"
@@ -473,7 +473,7 @@ TEST(CycleDelayElab, GenerateLoopWithoutDefaultClockingErrors) {
 TEST(CycleDelayElab, IntraAssignCycleDelayInTaskErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  logic data; default clocking cb @(posedge clk);\n"
       "    output data;\n"
       "  endclocking\n"
@@ -499,7 +499,7 @@ TEST(CycleDelayElab, IntraAssignCycleDelayInTaskErrors) {
 TEST(CycleDelayElab, IntraAssignCycleDelayInFunctionErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  logic data; default clocking cb @(posedge clk);\n"
       "    output data;\n"
       "  endclocking\n"
@@ -524,7 +524,7 @@ TEST(CycleDelayElab, IntraAssignCycleDelayInFunctionErrors) {
 TEST(CycleDelayElab, SynchronousDriveInTaskNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  logic data; default clocking cb @(posedge clk);\n"
       "    output data;\n"
       "  endclocking\n"

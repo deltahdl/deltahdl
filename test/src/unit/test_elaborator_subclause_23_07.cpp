@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 namespace {
 
@@ -236,6 +237,46 @@ TEST(DottedNameElaboration, HierarchicalNameAsAssignmentTarget) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §23.7 a) with §6.11 and §6.12: a dotted name whose first component is a
+// variable of an integral or a real type selects from that variable, and
+// neither type has a member or a built-in method, so a call through it, a
+// member read through it and a call through an element of an integral array
+// each name nothing.
+TEST(DottedNameElaboration, SelectThroughAnIntegralOrRealVariableIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int x;\n"
+      "  real r;\n"
+      "  logic [7:0] v [2];\n"
+      "  initial begin\n"
+      "    x.run();\n"
+      "    $display(r.h);\n"
+      "    v[0].go();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const char* noun = "built-in method of the integral or real value";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), noun, 6, "23.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), noun, 7, "23.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), noun, 8, "23.7"));
+}
+
+// §18.8: a random property of a class has rand_mode, an integral one among
+// them, so calling it is no select through an integral value.
+TEST(DottedNameElaboration, RandModeOfARandomIntegralPropertyIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class c;\n"
+      "  rand int x;\n"
+      "  function void off(); x.rand_mode(0); endfunction\n"
+      "endclass\n"
+      "module top;\n"
+      "endmodule\n",
+      f);
   EXPECT_FALSE(f.has_errors);
 }
 

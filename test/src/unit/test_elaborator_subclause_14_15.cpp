@@ -8,7 +8,7 @@ namespace {
 
 TEST(SyncEventElab, WaitForClockingSignalChangeElaborates) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  logic ack; clocking cb @(posedge clk);\n"
              "    input ack;\n"
              "  endclocking\n"
@@ -18,7 +18,7 @@ TEST(SyncEventElab, WaitForClockingSignalChangeElaborates) {
 
 TEST(SyncEventElab, CompoundEventElaborates) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  logic sig1, sig2; clocking dom @(posedge clk);\n"
              "    input sig1, sig2;\n"
              "  endclocking\n"
@@ -28,7 +28,7 @@ TEST(SyncEventElab, CompoundEventElaborates) {
 
 TEST(SyncEventElab, InoutSyncEventElaborates) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  logic data; clocking cb @(posedge clk);\n"
              "    inout data;\n"
              "  endclocking\n"

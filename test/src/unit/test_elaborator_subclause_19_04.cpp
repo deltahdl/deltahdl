@@ -12,7 +12,7 @@ namespace {
 // there is the sanctioned instantiation site and shall elaborate cleanly.
 TEST(EmbeddedCovergroup, AssignInNewMethodOk) {
   EXPECT_TRUE(
-      ElabOk("class C;\n"
+      ElabOk("class C; logic clk;\n"
              "  int x;\n"
              "  covergroup cg @(posedge clk);\n"
              "    coverpoint x;\n"
@@ -50,7 +50,7 @@ TEST(EmbeddedCovergroup, ParameterizedInstantiatedInNewOk) {
 TEST(EmbeddedCovergroup, AssignOutsideNewMethodError) {
   ElabFixture f;
   ElabOk(
-      "class C;\n"
+      "class C; logic clk;\n"
       "  int x;\n"
       "  covergroup cg @(posedge clk);\n"
       "    coverpoint x;\n"
@@ -73,7 +73,7 @@ TEST(EmbeddedCovergroup, AssignOutsideNewMethodError) {
 TEST(EmbeddedCovergroup, NestedAssignOutsideNewMethodError) {
   ElabFixture f;
   ElabOk(
-      "class C;\n"
+      "class C; logic clk;\n"
       "  int x;\n"
       "  bit en;\n"
       "  covergroup cg @(posedge clk);\n"
@@ -95,7 +95,7 @@ TEST(EmbeddedCovergroup, NestedAssignOutsideNewMethodError) {
 // legal; the standard simply says no data will be sampled in that case.
 TEST(EmbeddedCovergroup, NoInstantiationOk) {
   EXPECT_TRUE(
-      ElabOk("class C;\n"
+      ElabOk("class C; logic clk;\n"
              "  int x;\n"
              "  covergroup cg @(posedge clk);\n"
              "    coverpoint x;\n"
@@ -113,7 +113,7 @@ TEST(EmbeddedCovergroup, NoInstantiationOk) {
 TEST(EmbeddedCovergroup, AssignInSecondMethodAlongsideNewError) {
   ElabFixture f;
   ElabOk(
-      "class C;\n"
+      "class C; logic clk;\n"
       "  int x;\n"
       "  covergroup cg @(posedge clk);\n"
       "    coverpoint x;\n"
@@ -140,7 +140,7 @@ TEST(EmbeddedCovergroup, AssignInSecondMethodAlongsideNewError) {
 TEST(EmbeddedCovergroup, AssignInLoopOutsideNewMethodError) {
   ElabFixture f;
   ElabOk(
-      "class C;\n"
+      "class C; logic clk;\n"
       "  int x;\n"
       "  covergroup cg @(posedge clk);\n"
       "    coverpoint x;\n"
@@ -163,7 +163,7 @@ TEST(EmbeddedCovergroup, AssignInLoopOutsideNewMethodError) {
 TEST(EmbeddedCovergroup, AssignInElseBranchOutsideNewMethodError) {
   ElabFixture f;
   ElabOk(
-      "class C;\n"
+      "class C; logic clk;\n"
       "  int x;\n"
       "  bit en;\n"
       "  covergroup cg @(posedge clk);\n"
@@ -186,7 +186,7 @@ TEST(EmbeddedCovergroup, AssignInElseBranchOutsideNewMethodError) {
 TEST(EmbeddedCovergroup, AssignInWhileLoopOutsideNewMethodError) {
   ElabFixture f;
   ElabOk(
-      "class C;\n"
+      "class C; logic clk;\n"
       "  int x;\n"
       "  bit en;\n"
       "  covergroup cg @(posedge clk);\n"
@@ -209,7 +209,7 @@ TEST(EmbeddedCovergroup, AssignInWhileLoopOutsideNewMethodError) {
 TEST(EmbeddedCovergroup, AssignInCaseItemOutsideNewMethodError) {
   ElabFixture f;
   ElabOk(
-      "class C;\n"
+      "class C; logic clk;\n"
       "  int x;\n"
       "  int mode;\n"
       "  covergroup cg @(posedge clk);\n"
@@ -236,7 +236,7 @@ TEST(EmbeddedCovergroup, AssignInCaseItemOutsideNewMethodError) {
 TEST(EmbeddedCovergroup, AssignViaThisHandleOutsideNewMethodError) {
   ElabFixture f;
   ElabOk(
-      "class C;\n"
+      "class C; logic clk;\n"
       "  int x;\n"
       "  covergroup cg @(posedge clk);\n"
       "    coverpoint x;\n"
@@ -260,7 +260,7 @@ TEST(EmbeddedCovergroup, AssignViaThisHandleOutsideNewMethodError) {
 // guard must elaborate cleanly rather than be rejected as an access violation.
 TEST(EmbeddedCovergroup, CoversLocalAndProtectedPropertiesOk) {
   EXPECT_TRUE(
-      ElabOk("class C;\n"
+      ElabOk("class C; logic clk;\n"
              "  local int x;\n"
              "  protected bit en;\n"
              "  covergroup cg @(posedge clk);\n"
@@ -296,7 +296,7 @@ TEST(EmbeddedCovergroup, CoversLocalAndProtectedPropertiesOk) {
 TEST(EmbeddedCovergroup, AssignInAForkArmOutsideNewMethodError) {
   ElabFixture f;
   ElabOk(
-      "class C;\n"
+      "class C; logic clk;\n"
       "  int x;\n"
       "  covergroup cg @(posedge clk);\n"
       "    coverpoint x;\n"
@@ -322,7 +322,7 @@ TEST(EmbeddedCovergroup, AssignInAForkArmOutsideNewMethodError) {
 TEST(EmbeddedCovergroup, AssignInAnAssertionPassStmtOutsideNewMethodError) {
   ElabFixture f;
   ElabOk(
-      "class C;\n"
+      "class C; logic clk;\n"
       "  int x;\n"
       "  covergroup cg @(posedge clk);\n"
       "    coverpoint x;\n"
@@ -341,7 +341,7 @@ TEST(EmbeddedCovergroup, AssignInAnAssertionPassStmtOutsideNewMethodError) {
 TEST(EmbeddedCovergroup, AssignInAnAssertionFailStmtOutsideNewMethodError) {
   ElabFixture f;
   ElabOk(
-      "class C;\n"
+      "class C; logic clk;\n"
       "  int x;\n"
       "  covergroup cg @(posedge clk);\n"
       "    coverpoint x;\n"
@@ -365,7 +365,7 @@ TEST(EmbeddedCovergroup, AssignInAnAssertionFailStmtOutsideNewMethodError) {
 TEST(EmbeddedCovergroup, AssignInARandcaseItemOutsideNewMethodError) {
   ElabFixture f;
   ElabOk(
-      "class C;\n"
+      "class C; logic clk;\n"
       "  int x;\n"
       "  covergroup cg @(posedge clk);\n"
       "    coverpoint x;\n"
@@ -390,7 +390,7 @@ TEST(EmbeddedCovergroup, AssignInARandcaseItemOutsideNewMethodError) {
 TEST(EmbeddedCovergroup, AssignInARandsequenceCodeBlockOutsideNewMethodError) {
   ElabFixture f;
   ElabOk(
-      "class C;\n"
+      "class C; logic clk;\n"
       "  int x;\n"
       "  covergroup cg @(posedge clk);\n"
       "    coverpoint x;\n"

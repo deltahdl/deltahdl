@@ -22,6 +22,7 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/operator_result_members.h"
 #include "elaborator/std_package.h"
+#include "elaborator/type_eval.h"
 #include "elaborator/type_site_lookup.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
@@ -523,28 +524,33 @@ AppliedValue ValueOf(const Expr& root, std::size_t selects,
 }
 
 // §6.16 and §6.19.5: a member access `access`, s.m or e.m, applied to a string
-// or an enumeration (ValueOf), naming none of the built-in methods of its
-// type, which has no members besides. A random property of a class, an
-// enumeration, also has rand_mode (§18.8).
+// or an enumeration (ValueOf), naming none of its type's built-in methods, and
+// §23.7 a): one applied to an integral or real value, which has none. A random
+// property of a class, but a string, also has rand_mode (§18.8).
 void ReportNoBuiltInMethod(const Expr& access, const DataScope& scope,
                            DiagEngine& diag) {
   std::size_t selects = 0;
   const Expr& root = SelectRoot(*access.lhs, selects);
   const AppliedValue kValue = ValueOf(root, selects, scope);
   const bool kString = kValue.kind == DataTypeKind::kString;
-  if (!kString && kValue.kind != DataTypeKind::kEnum) return;
+  const bool kBare = IsMemberlessKind(kValue.kind);
+  if (!kString && !kBare && kValue.kind != DataTypeKind::kEnum) return;
   const std::string_view kName = access.rhs->text;
   using Methods = std::span<const std::string_view>;
-  const Methods kMethods =
-      kString ? Methods(kStringMethods) : Methods(kEnumMethods);
+  const Methods kMethods = kString ? Methods(kStringMethods)
+                           : kBare ? Methods()
+                                   : Methods(kEnumMethods);
   if (std::ranges::find(kMethods, kName) != kMethods.end() ||
-      (!kString && kName == "rand_mode" && kValue.property)) {
+      (!kString && kName == "rand_mode" && kValue.property))
     return;
-  }
+  constexpr const char* kNouns[] = {"string", "integral or real value",
+                                    "enumeration"};
+  constexpr const char* kRules[] = {"6.16", "23.7", "6.19.5"};
+  const int kWhich = kString ? 0 : (kBare ? 1 : 2);
   diag.Error(access.rhs->range.start,
              std::format("'{}' is not a built-in method of the {} {}", kName,
-                         kString ? "string" : "enumeration", kValue.named),
-             Subclause(kString ? "6.16" : "6.19.5"));
+                         kNouns[kWhich], kValue.named),
+             Subclause(kRules[kWhich]));
 }
 
 // §25.9 with §7.4: a select `select` into a class property that is a virtual

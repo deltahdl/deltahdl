@@ -129,7 +129,7 @@ TEST(TimingControlElaboration, EventControlInAlwaysLatchError) {
 TEST(TimingControlElaboration, EventControlInFunctionError) {
   ElabFixture f;
   ElaborateSrc(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  function int f();\n"
       "    @(posedge clk) ;\n"
       "    return 0;\n"
@@ -325,7 +325,7 @@ TEST(TimingControlElaboration, DelayNestedInForLoopAlwaysCombError) {
 TEST(TimingControlElaboration, EventControlNestedInForeverFuncError) {
   ElabFixture f;
   ElaborateSrc(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  function void f();\n"
       "    forever @(posedge clk) ;\n"
       "  endfunction\n"

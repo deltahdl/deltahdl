@@ -594,6 +594,14 @@ bool IsIntegralType(DataTypeKind kind) {
   }
 }
 
+bool IsMemberlessKind(DataTypeKind kind) {
+  if (kind == DataTypeKind::kReal || kind == DataTypeKind::kShortreal ||
+      kind == DataTypeKind::kRealtime)
+    return true;
+  return kind != DataTypeKind::kEnum && kind != DataTypeKind::kImplicit &&
+         IsIntegralType(kind);
+}
+
 bool IsNetTypeKind(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kWire:

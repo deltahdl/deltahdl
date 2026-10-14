@@ -674,11 +674,17 @@ static void CollectProcRhsIdentsIn(
   // (ForEachRandsequenceExpr in elaborator_validate_internal.h), and a return
   // statement's expression, the value §13.4.1 has the function return, read
   // above in place of a right side. Left to the
-  // right side alone, `if (undeclared) x = 1;` elaborated clean. A statement's
-  // delay, event control, disable target, initializer and assertion are not
-  // read here.
+  // right side alone, `if (undeclared) x = 1;` elaborated clean. §9.4.2 has an
+  // event control's expressions name the nets and variables it waits on, and
+  // its iff guard is read as a condition, so both are reads too:
+  // `@(posedge nosuch)` elaborated clean. A statement's delay, disable target,
+  // initializer and assertion are not read here.
   CollectBareIdents(s->condition, refs);
   CollectBareIdents(s->for_cond, refs);
+  for (const EventExpr& ev : s->events) {
+    CollectBareIdents(ev.signal, refs);
+    CollectBareIdents(ev.iff_condition, refs);
+  }
   if (!s->case_matches) {
     for (const auto& ci : s->case_items) {
       for (const auto* p : ci.patterns) CollectBareIdents(p, refs);

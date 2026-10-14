@@ -10,7 +10,7 @@ namespace {
 TEST(DefaultClockingElab, DuplicateDefaultClockingErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "module m;\n"
+      "module m; logic clk1, clk2;\n"
       "  logic a; default clocking cb1 @(posedge clk1);\n"
       "    input a;\n"
       "  endclocking\n"

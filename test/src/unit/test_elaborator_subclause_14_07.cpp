@@ -8,7 +8,7 @@ namespace {
 
 TEST(ClockingScopeElab, ClockingInModuleElaborates) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  logic data; clocking cb @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"
@@ -55,7 +55,7 @@ TEST(ClockingScopeElab, ClockingInInterfaceElaborates) {
 
 TEST(ClockingScopeElab, DotAccessToClockvarElaborates) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  logic sig; clocking dom @(posedge clk);\n"
              "    input sig;\n"
              "  endclocking\n"
@@ -67,7 +67,7 @@ TEST(ClockingScopeElab, DotAccessToClockvarElaborates) {
 
 TEST(ClockingScopeElab, MultipleBlocksSameModuleElaborates) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  logic a; clocking cb1 @(posedge clk);\n"
              "    input a;\n"
              "  endclocking\n"
@@ -82,7 +82,7 @@ TEST(ClockingScopeElab, SameBlockNameAcrossInstantiatedScopesElaborates) {
   // same clocking block name can appear in a module and in a submodule it
   // instantiates without the two colliding during elaboration.
   EXPECT_TRUE(
-      ElabOk("module sub;\n"
+      ElabOk("module sub; logic clk;\n"
              "  logic data; clocking cb @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"
@@ -104,7 +104,7 @@ TEST(ClockingScopeElab, PerInstanceCopyWhenModuleInstantiatedTwice) {
   // exercises per-instance replication, distinct from name reuse across two
   // different module scopes.
   EXPECT_TRUE(
-      ElabOk("module leaf;\n"
+      ElabOk("module leaf; logic clk;\n"
              "  logic data; clocking cb @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"
@@ -117,7 +117,7 @@ TEST(ClockingScopeElab, PerInstanceCopyWhenModuleInstantiatedTwice) {
 
 TEST(ClockingScopeElab, StaticLifetimeInModule) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  logic data; clocking cb @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"

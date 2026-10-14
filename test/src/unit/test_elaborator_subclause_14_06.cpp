@@ -8,7 +8,7 @@ namespace {
 
 TEST(SignalMultiBlockElab, SameSignalInTwoBlocksElaborates) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  logic data; clocking cb1 @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"
@@ -20,7 +20,7 @@ TEST(SignalMultiBlockElab, SameSignalInTwoBlocksElaborates) {
 
 TEST(SignalMultiBlockElab, SameSignalDifferentDirectionsElaborates) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  logic data; clocking cb1 @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"
@@ -32,7 +32,7 @@ TEST(SignalMultiBlockElab, SameSignalDifferentDirectionsElaborates) {
 
 TEST(SignalMultiBlockElab, SharedClockBlocksElaborate) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  logic a; clocking cb1 @(posedge clk);\n"
              "    input a;\n"
              "  endclocking\n"
@@ -46,7 +46,7 @@ TEST(SignalMultiBlockElab, SharedClockBlocksElaborate) {
 // clocking blocks; the same inout signal in two blocks elaborates cleanly.
 TEST(SignalMultiBlockElab, InoutSignalInTwoBlocksElaborates) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  logic data; clocking cb1 @(posedge clk);\n"
              "    inout data;\n"
              "  endclocking\n"
@@ -60,7 +60,7 @@ TEST(SignalMultiBlockElab, InoutSignalInTwoBlocksElaborates) {
 // clocking blocks; the same output signal in two blocks elaborates cleanly.
 TEST(SignalMultiBlockElab, SameOutputSignalInTwoBlocksElaborates) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  logic data; clocking cb1 @(posedge clk);\n"
              "    output data;\n"
              "  endclocking\n"

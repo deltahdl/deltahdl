@@ -288,4 +288,67 @@ TEST(InstanceArrayElaboration, AnElementRecordsItsArrayAndIndex) {
   }
 }
 
+// §23.3.3.5 with §10.8 and §10.9: a connection to an input port is an
+// assignment-like context, so an assignment pattern written without a type
+// takes the type of an unpacked array port and matches its dimensions by
+// construction.
+TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
+     UntypedPatternConnectedToUnpackedArrayInputIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module sub(input var int p [0:1]);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  sub s(.p('{5, 6}));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §23.3.3.5 with §7.4: an element of a multidimensional unpacked array and a
+// slice of an unpacked array are unpacked arrays in their own right, so either
+// connects to a port of the dimensions it leaves.
+TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
+     ElementAndSliceConnectedToMatchingPortAreAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module sa(input logic [3:0] p [2]);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  localparam int L = 1;\n"
+      "  logic [3:0] m [3][2];\n"
+      "  logic [3:0] r [4];\n"
+      "  sa u1(.p(m[1]));\n"
+      "  sa u2(.p(r[1:2]));\n"
+      "  sa u3(.p(r[L+:2]));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §23.3.3.5: the dimensions a select leaves are still matched against the
+// port's, so a slice of three elements on a port of two is reported, and so is
+// an element that leaves no unpacked dimension at all.
+TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
+     ElementAndSliceOfTheWrongShapeAreReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module sa(input logic [3:0] p [2]);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [3:0] r [4];\n"
+      "  sa u1(.p(r[0:2]));\n"
+      "  sa u2(.p(r[1]));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array port 'p' dimension 0 has size 2 "
+                            "but connection has size 3",
+                            5, "23.3.3.5"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array port 'p' has 1 unpacked "
+                            "dimension(s) but connection has 0",
+                            6, "23.3.3.5"));
+}
+
 }  // namespace

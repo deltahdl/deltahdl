@@ -10,6 +10,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -153,6 +154,26 @@ ScopeNameSet ClockingSignalScope(const CompilationUnit* unit,
   return names;
 }
 
+// §14.3 with §23.9: a clocking block's event is an event expression read in
+// the scope holding the block, so each bare identifier it names resolves to a
+// declaration visible there, `names`, or is reported.
+void ReportUndeclaredClockingEvent(const ModuleItem* block,
+                                   const ScopeNameSet& names,
+                                   DiagEngine& diag) {
+  std::vector<const Expr*> refs;
+  for (const EventExpr& ev : block->clocking_event) {
+    CollectBareIdents(ev.signal, refs);
+    CollectBareIdents(ev.iff_condition, refs);
+  }
+  for (const Expr* ref : refs) {
+    if (names.Contains(ref->text)) continue;
+    diag.Error(
+        ref->range.start,
+        std::format("reference to unresolved identifier '{}'", ref->text),
+        Subclause("23.9"));
+  }
+}
+
 }  // namespace
 
 // §14.3 (printed page 355): a clocking item written without an expression
@@ -170,6 +191,7 @@ void Elaborator::ValidateClockingSignalTargets(const ModuleDecl* decl) {
     }
   }
   for (const ModuleItem* block : blocks) {
+    ReportUndeclaredClockingEvent(block, kNames, diag_);
     for (const auto& sig : block->clocking_signals) {
       if (sig.hier_expr == nullptr && !kNames.Contains(sig.name)) {
         diag_.Error(block->loc,

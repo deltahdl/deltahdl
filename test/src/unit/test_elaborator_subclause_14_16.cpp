@@ -10,7 +10,7 @@ namespace {
 TEST(SyncDriveElab, ContinuousAssignToClockvarErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  logic [7:0] data;\n"
       "  clocking cb @(posedge clk);\n"
       "    output data;\n"
@@ -31,7 +31,7 @@ TEST(SyncDriveElab, ContinuousAssignToClockvarErrors) {
 TEST(SyncDriveElab, WriteToInputClockvarErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  logic data; clocking cb @(posedge clk);\n"
       "    input data;\n"
       "  endclocking\n"

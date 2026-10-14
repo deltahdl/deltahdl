@@ -16,7 +16,7 @@ namespace {
 // elaboration succeeds.
 TEST(EmbeddedCovergroupInheritance, ExtendsBaseDefinedInBaseClassOk) {
   EXPECT_TRUE(
-      ElabOk("class base;\n"
+      ElabOk("class base; logic clk;\n"
              "  bit a;\n"
              "  covergroup g1 @(posedge clk);\n"
              "    coverpoint a;\n"
@@ -83,7 +83,7 @@ TEST(EmbeddedCovergroupInheritance, ExtendsWithoutBaseClassError) {
 TEST(EmbeddedCovergroupInheritance, ExtendsBaseInUnrelatedClassError) {
   ElabFixture f;
   ElabOk(
-      "class other;\n"
+      "class other; logic clk;\n"
       "  bit a;\n"
       "  covergroup g1 @(posedge clk);\n"
       "    coverpoint a;\n"
@@ -114,7 +114,7 @@ TEST(EmbeddedCovergroupInheritance, ExtendsBaseInUnrelatedClassError) {
 // defined in its grandparent.
 TEST(EmbeddedCovergroupInheritance, ExtendsBaseInGrandparentOk) {
   EXPECT_TRUE(
-      ElabOk("class gp;\n"
+      ElabOk("class gp; logic clk;\n"
              "  bit a;\n"
              "  covergroup g1 @(posedge clk);\n"
              "    coverpoint a;\n"
@@ -138,7 +138,7 @@ TEST(EmbeddedCovergroupInheritance, ExtendsBaseInGrandparentOk) {
 // because g1 originates in a base class at every level.
 TEST(EmbeddedCovergroupInheritance, ExtendsChainAcrossMultipleClassesOk) {
   EXPECT_TRUE(
-      ElabOk("class a;\n"
+      ElabOk("class a; logic clk;\n"
              "  bit x;\n"
              "  covergroup g1 @(posedge clk);\n"
              "    coverpoint x;\n"

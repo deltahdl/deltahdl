@@ -12,7 +12,7 @@ namespace {
 // and elaborates without error.
 TEST(ClockingHierExprElab, OutputHierExprElaborates) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  clocking cb @(posedge clk);\n"
              "    output ack = top.dut.ack;\n"
              "  endclocking\n"
@@ -24,7 +24,7 @@ TEST(ClockingHierExprElab, OutputHierExprElaborates) {
 // An operator expression is a valid input-port connection, so it elaborates.
 TEST(ClockingHierExprElab, InputAcceptsOperatorExpression) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  clocking cb @(posedge clk);\n"
              "    input s = top.a + top.b;\n"
              "  endclocking\n"
@@ -37,7 +37,7 @@ TEST(ClockingHierExprElab, InputAcceptsOperatorExpression) {
 TEST(ClockingHierExprElab, OutputRejectsOperatorExpression) {
   ElabFixture f;
   ElaborateSrc(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  clocking cb @(posedge clk);\n"
       "    output ack = top.a + top.b;\n"
       "  endclocking\n"
@@ -55,7 +55,7 @@ TEST(ClockingHierExprElab, OutputRejectsOperatorExpression) {
 TEST(ClockingHierExprElab, InoutRejectsOperatorExpression) {
   ElabFixture f;
   ElaborateSrc(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  clocking cb @(posedge clk);\n"
       "    inout d = top.a & top.b;\n"
       "  endclocking\n"
@@ -72,7 +72,7 @@ TEST(ClockingHierExprElab, InoutRejectsOperatorExpression) {
 // output-port connection and elaborates without error.
 TEST(ClockingHierExprElab, OutputAcceptsConcatenationOfLvalues) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  clocking cb @(posedge clk);\n"
              "    output bus = { top.hi, top.lo };\n"
              "  endclocking\n"
@@ -85,7 +85,7 @@ TEST(ClockingHierExprElab, OutputAcceptsConcatenationOfLvalues) {
 // name with a part-select is a legal output-port connection and elaborates.
 TEST(ClockingHierExprElab, OutputAcceptsConcatenationCombiningPartSelect) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  clocking cb @(posedge clk);\n"
              "    output bus = { top.hi, top.lo[3:1] };\n"
              "  endclocking\n"
@@ -96,7 +96,7 @@ TEST(ClockingHierExprElab, OutputAcceptsConcatenationCombiningPartSelect) {
 // a plain (assignable) name therefore elaborates for the inout direction.
 TEST(ClockingHierExprElab, InoutAcceptsVariableName) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  clocking cb @(posedge clk);\n"
              "    inout v = top.dut.var_sig;\n"
              "  endclocking\n"
@@ -107,7 +107,7 @@ TEST(ClockingHierExprElab, InoutAcceptsVariableName) {
 // output-port connection for an output clocking signal and elaborates.
 TEST(ClockingHierExprElab, OutputAcceptsSimpleName) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  clocking cb @(posedge clk);\n"
              "    output ack = ack_sig;\n"
              "  endclocking\n"
@@ -118,7 +118,7 @@ TEST(ClockingHierExprElab, OutputAcceptsSimpleName) {
 // legal output-port connection for an output clocking signal and elaborates.
 TEST(ClockingHierExprElab, OutputAcceptsPartSelect) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  clocking cb @(posedge clk);\n"
              "    output nibble = bus[7:4];\n"
              "  endclocking\n"
@@ -131,7 +131,7 @@ TEST(ClockingHierExprElab, OutputAcceptsPartSelect) {
 TEST(ClockingHierExprElab, OutputRejectsConcatWithNonLvalueElement) {
   ElabFixture f;
   ElaborateSrc(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  clocking cb @(posedge clk);\n"
       "    output bus = { top.sig, top.a + top.b };\n"
       "  endclocking\n"

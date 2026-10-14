@@ -22,7 +22,7 @@ TEST(CovergroupDeclElaboration, BasicCovergroupElaborates) {
 TEST(CovergroupDeclElaboration, CovergroupWithClockingEventElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  covergroup cg @(posedge clk);\n"
       "    coverpoint x;\n"
       "  endgroup\n"
@@ -60,7 +60,7 @@ TEST(CovergroupDeclElaboration, CovergroupWithEndLabelElaborates) {
 TEST(CovergroupDeclElaboration, CovergroupWithCoverpointsElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  covergroup cg @(posedge clk);\n"
       "    cp1: coverpoint addr;\n"
       "    cp2: coverpoint data;\n"
@@ -74,7 +74,7 @@ TEST(CovergroupDeclElaboration, CovergroupWithCoverpointsElaborates) {
 TEST(CovergroupDeclElaboration, CovergroupWithBinsElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  covergroup cg @(posedge clk);\n"
       "    coverpoint addr {\n"
       "      bins low = {[0:15]};\n"
@@ -90,7 +90,7 @@ TEST(CovergroupDeclElaboration, CovergroupWithBinsElaborates) {
 TEST(CovergroupDeclElaboration, CovergroupWithCrossElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  covergroup cg @(posedge clk);\n"
       "    coverpoint a;\n"
       "    coverpoint b;\n"
@@ -121,7 +121,7 @@ TEST(CovergroupDeclElaboration, CovergroupWithOptionsElaborates) {
 TEST(CovergroupDeclElaboration, CovergroupInClassElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
-      "class C;\n"
+      "class C; logic clk;\n"
       "  covergroup cg @(posedge clk);\n"
       "    coverpoint x;\n"
       "  endgroup\n"
@@ -150,7 +150,7 @@ TEST(CovergroupDeclElaboration, MultipleCovergroupsElaborate) {
 TEST(CovergroupDeclElaboration, CovergroupWithBlockEventElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m; logic test_phase;\n"
       "  covergroup cg @@(begin test_phase or end test_phase);\n"
       "    coverpoint x;\n"
       "  endgroup\n"
@@ -176,7 +176,7 @@ TEST(CovergroupDeclElaboration, CovergroupWithSampleFunctionElaborates) {
 TEST(CovergroupDeclElaboration, FullCovergroupElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m;\n"
+      "module m; logic clk;\n"
       "  covergroup cg @(posedge clk);\n"
       "    option.auto_bin_max = 64;\n"
       "    cp_addr: coverpoint addr {\n"

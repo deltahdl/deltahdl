@@ -1,7 +1,9 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <format>
+#include <optional>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -10,6 +12,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_port_binding_internal.h"
 #include "elaborator/rtlir.h"
@@ -209,13 +212,20 @@ void Elaborator::ResolveInterconnectPrimitiveTerminals(
   }
 }
 
-// Validates one unpacked-array port binding: the connection must be an
-// identifier naming an unpacked array with matching dimension count and sizes.
-// `conn_info` is the array the identifier names, null where it names none.
+// The unpacked shape a port connection names: how many unpacked dimensions it
+// has and the size of each, outermost first, 0 where a size does not fold.
+struct ConnectedShape {
+  uint32_t num_dims = 0;
+  std::vector<uint32_t> sizes;
+};
+
+// Validates one unpacked-array port binding: the connection must name an
+// unpacked array with matching dimension count and sizes. `conn` is the shape
+// the connection names, no value where it names no unpacked array.
 static void CheckUnpackedArrayPortBinding(
     DiagEngine& diag, const ModuleItem* item, const RtlirPortBinding& binding,
-    const RtlirPort* port_it, const Elaborator::VarArrayInfo* conn) {
-  if (conn == nullptr) {
+    const RtlirPort* port_it, const std::optional<ConnectedShape>& conn) {
+  if (!conn) {
     diag.Error(item->loc,
                std::format("unpacked array port '{}' requires a matching "
                            "unpacked array connection",
@@ -224,28 +234,27 @@ static void CheckUnpackedArrayPortBinding(
     return;
   }
 
-  const auto& conn_info = *conn;
-  if (conn_info.num_unpacked_dims != port_it->num_unpacked_dims) {
+  if (conn->num_dims != port_it->num_unpacked_dims) {
     diag.Error(
         item->loc,
         std::format("unpacked array port '{}' has {} unpacked dimension(s) "
                     "but connection has {}",
                     binding.port_name, port_it->num_unpacked_dims,
-                    conn_info.num_unpacked_dims),
+                    conn->num_dims),
         Subclause("23.3.3.5"));
     return;
   }
 
   for (uint32_t d = 0; d < port_it->num_unpacked_dims; ++d) {
-    if (d < port_it->unpacked_dim_sizes.size() &&
-        d < conn_info.dim_sizes.size() &&
-        port_it->unpacked_dim_sizes[d] != conn_info.dim_sizes[d]) {
+    if (d < port_it->unpacked_dim_sizes.size() && d < conn->sizes.size() &&
+        conn->sizes[d] != 0 &&
+        port_it->unpacked_dim_sizes[d] != conn->sizes[d]) {
       diag.Error(
           item->loc,
           std::format("unpacked array port '{}' dimension {} has size {} "
                       "but connection has size {}",
                       binding.port_name, d, port_it->unpacked_dim_sizes[d],
-                      conn_info.dim_sizes[d]),
+                      conn->sizes[d]),
           Subclause("23.3.3.5"));
       break;
     }
@@ -271,21 +280,72 @@ static const Elaborator::VarArrayInfo* ConnectedArrayInfo(
   return it != nets.end() ? &it->second : nullptr;
 }
 
+// The number of elements the slice `sel` takes -- `[a:b]`, `[i+:w]` or
+// `[i-:w]` -- when its bounds fold in `scope`, 0 otherwise.
+static uint32_t SliceWidth(const Expr* sel, const ScopeMap& scope) {
+  if (sel->is_part_select_plus || sel->is_part_select_minus) {
+    auto width = ConstEvalInt(sel->index_end, scope);
+    return width && *width > 0 ? static_cast<uint32_t>(*width) : 0;
+  }
+  auto left = ConstEvalInt(sel->index, scope);
+  auto right = ConstEvalInt(sel->index_end, scope);
+  if (!left || !right) return 0;
+  return static_cast<uint32_t>(std::abs(*left - *right) + 1);
+}
+
+// §7.4 (printed page 153): an element of a multidimensional unpacked array and
+// a slice of an unpacked array are unpacked arrays in their own right. An index
+// removes the dimension it selects, and a slice keeps it at the slice's width.
+// No value where the connection names no unpacked array, a select reaching
+// past the unpacked dimensions into the element's bits among them.
+static std::optional<ConnectedShape> ConnectedArrayShape(
+    const Expr* connection, const ArrayInfoMap& vars, const ArrayInfoMap& nets,
+    const ScopeMap& scope) {
+  std::vector<const Expr*> selects;
+  const Expr* base = connection;
+  while (base != nullptr && base->kind == ExprKind::kSelect) {
+    selects.push_back(base);
+    base = base->base;
+  }
+  const Elaborator::VarArrayInfo* info = ConnectedArrayInfo(base, vars, nets);
+  if (info == nullptr) return std::nullopt;
+  ConnectedShape shape{info->num_unpacked_dims, info->dim_sizes};
+  shape.sizes.resize(shape.num_dims, 0);
+  uint32_t dim = 0;
+  for (auto it = selects.rbegin(); it != selects.rend(); ++it) {
+    if (dim >= shape.num_dims) return std::nullopt;
+    if ((*it)->index_end == nullptr) {
+      shape.sizes.erase(shape.sizes.begin() + dim);
+      --shape.num_dims;
+      continue;
+    }
+    shape.sizes[dim++] = SliceWidth(*it, scope);
+  }
+  return shape;
+}
+
 void Elaborator::ValidateUnpackedArrayPorts(const RtlirModuleInst& inst,
                                             const ModuleItem* item,
-                                            RtlirModule*) {
+                                            RtlirModule* parent_mod) {
   if (!inst.resolved) return;
   const auto& child_ports = inst.resolved->ports;
+  ScopeMap scope = BuildParamScope(parent_mod);
 
   for (const auto& binding : inst.port_bindings) {
     const RtlirPort* port_it =
         FindChildPortByName(child_ports, binding.port_name);
     if (!port_it) continue;
     if (port_it->num_unpacked_dims == 0) continue;
+    // §10.8 and §10.9: an assignment pattern written without a type takes the
+    // port's own type where IllegalPatternPortConnection lets it stand, so
+    // its dimensions match the port's by construction.
+    if (binding.connection != nullptr &&
+        binding.connection->kind == ExprKind::kAssignmentPattern)
+      continue;
     CheckUnpackedArrayPortBinding(
         diag_, item, binding, port_it,
-        ConnectedArrayInfo(binding.connection, var_array_info_,
-                           net_array_info_));
+        ConnectedArrayShape(binding.connection, var_array_info_,
+                            net_array_info_, scope));
   }
 }
 

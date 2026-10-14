@@ -14,7 +14,7 @@ namespace {
 TEST(ClockingBlockElab, UnnamedNonDefaultBlockError) {
   ElabFixture f;
   EXPECT_FALSE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  logic data; clocking @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"
@@ -27,7 +27,7 @@ TEST(ClockingBlockElab, UnnamedNonDefaultBlockError) {
 
 TEST(ClockingBlockElab, UnnamedDefaultBlockOk) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  logic data; default clocking @(posedge clk);\n"
              "    input data;\n"
              "  endclocking\n"

@@ -43,7 +43,7 @@ TEST(CovergroupExtendsScope, NonExtendsCovergroupInModuleOk) {
 // elaborates without the "outside class" error.
 TEST(CovergroupExtendsScope, ExtendsInsideClassOk) {
   EXPECT_TRUE(
-      ElabOk("class Base;\n"
+      ElabOk("class Base; logic clk;\n"
              "  int x;\n"
              "  covergroup cg @(posedge clk);\n"
              "    coverpoint x;\n"

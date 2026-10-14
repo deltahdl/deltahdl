@@ -209,6 +209,10 @@ bool WeakRefTypeParamNamesClass(
 
 bool IsIntegralType(DataTypeKind kind);
 
+// §23.7 a) with §6.11 and §6.12: a kind of value with no members and no
+// built-in methods -- an integral type that is no enumeration, or a real one.
+bool IsMemberlessKind(DataTypeKind kind);
+
 // §6.7.1: the net types, whose net declared with no data type takes the
 // implicit logic type.
 bool IsNetTypeKind(DataTypeKind kind);

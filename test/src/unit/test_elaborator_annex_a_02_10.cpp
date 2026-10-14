@@ -146,7 +146,7 @@ TEST(AssertionDeclElaboration, SequenceDeclWithCoverElaborates) {
 TEST(AssertionDeclElaboration, PropertyAndSequenceDeclsTogether) {
   ElabFixture f;
   auto* design = Elaborate(
-      "module m(input logic a, b);\n"
+      "module m(input logic a, b); logic clk;\n"
       "  default clocking @(posedge clk); endclocking\n"
       "  property p; a; endproperty\n"
       "  sequence s; b; endsequence\n"

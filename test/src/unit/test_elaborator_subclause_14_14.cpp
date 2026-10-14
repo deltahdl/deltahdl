@@ -12,7 +12,7 @@ namespace {
 TEST(GlobalClockingElab, DuplicateGlobalClockingErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "module m;\n"
+      "module m; logic clk1, clk2;\n"
       "  global clocking gc1 @(posedge clk1); endclocking\n"
       "  global clocking gc2 @(posedge clk2); endclocking\n"
       "endmodule\n",
@@ -183,7 +183,7 @@ TEST(GlobalClockingElab, DuplicateGlobalClockingInCheckerErrors) {
 TEST(GlobalClockingElab, DuplicateGlobalClockingNames14_14) {
   ElabFixture f;
   ElaborateSrc(
-      "module m;\n"
+      "module m; logic clk1, clk2;\n"
       "  global clocking gc1 @(posedge clk1); endclocking\n"
       "  global clocking gc2 @(posedge clk2); endclocking\n"
       "endmodule\n",

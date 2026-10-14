@@ -211,4 +211,62 @@ TEST(ReadPositions, ReturnOfADeclaredNameIsNotReported) {
              "endmodule\n"));
 }
 
+// §9.4.2 with §23.9: a procedural event control names the nets and variables
+// it waits on, and its iff guard is read as a condition, so an identifier that
+// resolves to no declaration in either is reported -- under an edge, bare, in
+// an or-list and in an iff guard.
+TEST(ReadPositions, UndeclaredIdentifierInAnEventControlIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic q, a;\n"
+      "  always @(posedge nosuch1) q <= 1;\n"
+      "  always @(nosuch2) q <= 1;\n"
+      "  always @(a or nosuch3) q <= 1;\n"
+      "  always @(posedge a iff nosuch4) q <= 1;\n"
+      "endmodule\n",
+      f);
+  const char* message = "reference to unresolved identifier";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, 3, "23.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, 4, "23.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, 5, "23.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, 6, "23.9"));
+}
+
+// §14.3 with §23.9: a clocking block's event is read in the scope holding the
+// block, so an identifier it names that resolves to nothing there is
+// reported.
+TEST(ReadPositions, UndeclaredIdentifierInAClockingEventIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic d;\n"
+      "  clocking cb @(posedge nosuch);\n"
+      "    input d;\n"
+      "  endclocking\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'nosuch'", 3,
+                            "23.9"));
+}
+
+// §23.9: a declared clock, a clocking block named as an event and a named
+// event are each resolved, so none of them is reported.
+TEST(ReadPositions, DeclaredNamesInEventControlsAreAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input logic clk);\n"
+      "  logic d, q;\n"
+      "  event e;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    input d;\n"
+      "  endclocking\n"
+      "  always @(cb) q <= 1;\n"
+      "  always @(e) q <= 0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

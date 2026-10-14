@@ -8,7 +8,7 @@ namespace {
 
 TEST(InputSamplingElab, InputClockvarReadElaborates) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  logic [7:0] data;\n"
              "  clocking cb @(posedge clk);\n"
              "    input data;\n"
@@ -22,7 +22,7 @@ TEST(InputSamplingElab, InputClockvarReadElaborates) {
 
 TEST(InputSamplingElab, InoutClockvarReadElaborates) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  logic [7:0] data;\n"
              "  clocking cb @(posedge clk);\n"
              "    inout data;\n"
@@ -36,7 +36,7 @@ TEST(InputSamplingElab, InoutClockvarReadElaborates) {
 
 TEST(InputSamplingElab, ExplicitZeroSkewInputElaborates) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  logic [7:0] data;\n"
              "  clocking cb @(posedge clk);\n"
              "    input #0 data;\n"
@@ -46,7 +46,7 @@ TEST(InputSamplingElab, ExplicitZeroSkewInputElaborates) {
 
 TEST(InputSamplingElab, MultipleInputSignalsElaborate) {
   EXPECT_TRUE(
-      ElabOk("module m;\n"
+      ElabOk("module m; logic clk;\n"
              "  logic a, b, c;\n"
              "  clocking cb @(posedge clk);\n"
              "    input a, b, c;\n"
