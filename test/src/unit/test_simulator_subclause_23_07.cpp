@@ -271,7 +271,8 @@ TEST(DottedNameResolution, DottedNameWritesAStaticLocalNoCallHasMade) {
 // package's name, `p::f.x`. A function declared in a package or a module is
 // static (§13.4.2), so its local is static though `static` is not written, and
 // the name reaches that one variable: written before any call, read after
-// calls that count in it, and the same through a module's own function.
+// calls that count in it, and the same through a module's own function,
+// whose automatic local and parameter the name passes over.
 TEST(DottedNameSimulation, NameThroughAStaticFunctionReachesItsLocal) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package p;\n"
@@ -284,8 +285,11 @@ TEST(DottedNameSimulation, NameThroughAStaticFunctionReachesItsLocal) {
                        "module m;\n"
                        "  import p::*;\n"
                        "  function int mc();\n"
+                       "    automatic int t;\n"
+                       "    parameter int K = 1;\n"
                        "    int c;\n"
-                       "    c = c + 1;\n"
+                       "    t = K;\n"
+                       "    c = c + t;\n"
                        "    return c;\n"
                        "  endfunction\n"
                        "  initial begin\n"
