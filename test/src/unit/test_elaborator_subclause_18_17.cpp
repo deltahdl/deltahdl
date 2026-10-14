@@ -447,4 +447,127 @@ TEST(RandsequenceProductionReturns, ReturnsOfTheProductionsTypeElaborate) {
              "endmodule\n"));
 }
 
+// §23.9 makes a begin-end block nested in a code block a scope of its own, so
+// the class handle it declares hides mk's int port, and the return gives the
+// handle, which the class production takes.
+TEST(RandsequenceProductionReturns,
+     AReturnReadsTheVariableANestedBlockDeclaresOverAPort) {
+  EXPECT_TRUE(
+      ElabOk("class C; endclass\n"
+             "module t;\n"
+             "  initial begin\n"
+             "    randsequence (main)\n"
+             "      main : mk(1) ;\n"
+             "      C mk (int v) : { begin C v = new; return v; end } ;\n"
+             "    endsequence\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// The nested block's int hides mk's class port, so the return gives an int,
+// which the class production does not take.
+TEST(RandsequenceProductionReturns,
+     AnIntANestedBlockDeclaresOverAClassPortIsReported) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C; endclass\n"
+             "module t;\n"
+             "  initial begin\n"
+             "    randsequence (main)\n"
+             "      main : mk(null) ;\n"
+             "      C mk (C v) : { begin int v = 1; return v; end } ;\n"
+             "    endsequence\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return expression in production 'mk' is not "
+                            "assignment-compatible with the production's "
+                            "return type",
+                            6, "18.17.7"));
+}
+
+// §12.7.1 makes a variable a for loop's initialization declares local to the
+// loop, so the class handle it declares hides mk's int port.
+TEST(RandsequenceProductionReturns,
+     AReturnReadsTheVariableAForLoopDeclaresOverAPort) {
+  EXPECT_TRUE(
+      ElabOk("class C; endclass\n"
+             "module t;\n"
+             "  initial begin\n"
+             "    randsequence (main)\n"
+             "      main : mk(1) ;\n"
+             "      C mk (int v) : { for (C v = null; v != null; ) return v; "
+             "return null; } ;\n"
+             "    endsequence\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+// The for loop's int hides mk's class port, so the return gives an int.
+TEST(RandsequenceProductionReturns,
+     AnIntAForLoopDeclaresOverAClassPortIsReported) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C; endclass\n"
+             "module t;\n"
+             "  initial begin\n"
+             "    randsequence (main)\n"
+             "      main : mk(null) ;\n"
+             "      C mk (C v) : { for (int v = 0; v < 2; v++) return v; "
+             "return null; } ;\n"
+             "    endsequence\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return expression in production 'mk' is not "
+                            "assignment-compatible with the production's "
+                            "return type",
+                            6, "18.17.7"));
+}
+
+// §12.7.3 makes a foreach loop variable local to the loop and, over a
+// fixed-size dimension, an int, so it hides mk's class port and the return
+// gives an int.
+TEST(RandsequenceProductionReturns,
+     AnIntForeachVariableOverAClassPortIsReported) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C; endclass\n"
+             "module t;\n"
+             "  initial begin\n"
+             "    randsequence (main)\n"
+             "      main : mk(null) ;\n"
+             "      C mk (C v) : { int arr[4]; foreach (arr[v]) return v; "
+             "return null; } ;\n"
+             "    endsequence\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return expression in production 'mk' is not "
+                            "assignment-compatible with the production's "
+                            "return type",
+                            6, "18.17.7"));
+}
+
+// Over an associative dimension a foreach loop variable has the index type,
+// here a byte, which the int production takes; it hides mk's class port all
+// the same.
+TEST(RandsequenceProductionReturns,
+     AForeachVariableOverAnAssociativeDimensionHidesAPort) {
+  EXPECT_TRUE(
+      ElabOk("class C; endclass\n"
+             "module t;\n"
+             "  initial begin\n"
+             "    randsequence (main)\n"
+             "      main : mk(null) ;\n"
+             "      int mk (C v) : { int by_key[byte]; foreach (by_key[v]) "
+             "return v; return 0; } ;\n"
+             "    endsequence\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
 }  // namespace

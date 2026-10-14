@@ -101,7 +101,8 @@ void CheckReturnValue(const Stmt* s, const RsProduction& production,
 
 // Checks each return in `s`, a statement of a code block of `production`. A
 // randsequence written inside it has productions of its own, which its own
-// check reads.
+// check reads. A scope nested in the code block hides the names of the same
+// spelling around it, as ForEachChildInScope enters them.
 void CheckProductionReturns(const Stmt* s, const RsProduction& production,
                             const CheckedType& ret, const ReturnCtx& ctx,
                             DiagEngine& diag) {
@@ -110,8 +111,8 @@ void CheckProductionReturns(const Stmt* s, const RsProduction& production,
     CheckReturnValue(s, production, ret, ctx, diag);
     return;
   }
-  ForEachChildStmt(s, [&](Stmt* const& sub) {
-    CheckProductionReturns(sub, production, ret, ctx, diag);
+  ForEachChildInScope(s, ctx, [&](const Stmt* sub, const ReturnCtx& inner) {
+    CheckProductionReturns(sub, production, ret, inner, diag);
   });
 }
 

@@ -6,6 +6,7 @@
 #include "elaborator/return_value_fit.h"
 
 #include <cstddef>
+#include <functional>
 #include <string_view>
 #include <unordered_set>
 #include <vector>
@@ -110,6 +111,21 @@ void EnterForeachLocals(const Stmt* s, DeclaredLocals& locals) {
   }
 }
 
+bool OpensScope(const Stmt* s) {
+  return s->kind == StmtKind::kBlock || s->kind == StmtKind::kFor ||
+         s->kind == StmtKind::kForeach;
+}
+
+void EnterScopeLocals(const Stmt* s, DeclaredLocals& locals) {
+  if (s->kind == StmtKind::kBlock) {
+    EnterDeclaredLocals(s->stmts, locals);
+  } else if (s->kind == StmtKind::kFor) {
+    EnterForLocals(s, locals);
+  } else {
+    EnterForeachLocals(s, locals);
+  }
+}
+
 }  // namespace
 
 CheckedType CheckedTypeOf(const DataType& declared, const ReturnCtx& ctx) {
@@ -131,19 +147,17 @@ void EnterDeclaredLocals(const std::vector<Stmt*>& items,
   }
 }
 
-bool OpensScope(const Stmt* s) {
-  return s->kind == StmtKind::kBlock || s->kind == StmtKind::kFor ||
-         s->kind == StmtKind::kForeach;
-}
-
-void EnterScopeLocals(const Stmt* s, DeclaredLocals& locals) {
-  if (s->kind == StmtKind::kBlock) {
-    EnterDeclaredLocals(s->stmts, locals);
-  } else if (s->kind == StmtKind::kFor) {
-    EnterForLocals(s, locals);
-  } else {
-    EnterForeachLocals(s, locals);
+void ForEachChildInScope(
+    const Stmt* s, const ReturnCtx& ctx,
+    const std::function<void(const Stmt*, const ReturnCtx&)>& visit) {
+  const bool kOpens = OpensScope(s);
+  ReturnCtx scope_ctx{ctx.typedefs, ctx.unit, {}};
+  if (kOpens) {
+    scope_ctx.locals = ctx.locals;
+    EnterScopeLocals(s, scope_ctx.locals);
   }
+  const ReturnCtx& inner = kOpens ? scope_ctx : ctx;
+  ForEachChildStmt(s, [&](const Stmt* sub) { visit(sub, inner); });
 }
 
 CheckedType CheckedTypeOfValue(const Expr* e, const ReturnCtx& ctx) {

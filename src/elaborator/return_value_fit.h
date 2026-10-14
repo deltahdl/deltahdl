@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -47,20 +48,20 @@ struct ReturnCtx {
 void EnterDeclaredLocals(const std::vector<Stmt*>& items,
                          DeclaredLocals& locals);
 
-// Whether the statements directly under `s` stand in a scope of its own: a
-// begin-end block (§23.9), and a for loop or a foreach loop, whose loop
-// variables are local to the loop (§12.7.1, §12.7.3). A fork-join block is a
-// scope too, but neither §12.8's nor §18.17.7's check reaches a return inside
-// one, which §9.3.2 forbids.
-bool OpensScope(const Stmt* s);
-
-// Enters into `locals` the names scope-opening statement `s` declares over the
-// names around it. A for loop's declared variable stands for its declared
-// type. A foreach loop variable is an int over a fixed-size, dynamic or queue
-// dimension and has the index type over an associative one (§12.7.3), so where
-// the dimension it walks is not plainly one of the first three in `locals`,
-// the loop variable hides the outer name without standing for a type.
-void EnterScopeLocals(const Stmt* s, DeclaredLocals& locals);
+// Calls `visit` on each statement directly under `s`, with the context the
+// names there are read through. A begin-end block (§23.9), a for loop
+// (§12.7.1) and a foreach loop (§12.7.3) are scopes whose declarations hide the
+// names of the same spelling around them, so the statements under one get a
+// copy of `ctx` with those declarations entered. A for loop's declared
+// variable stands for its declared type. A foreach loop variable is an int over
+// a fixed-size, dynamic or queue dimension and has the index type over an
+// associative one, so where the dimension it walks is not plainly one of the
+// first three in `ctx.locals`, it hides the outer name without standing for a
+// type. A fork-join block is a scope too, but neither §12.8's nor §18.17.7's
+// check reaches a return inside one, which §9.3.2 forbids.
+void ForEachChildInScope(
+    const Stmt* s, const ReturnCtx& ctx,
+    const std::function<void(const Stmt*, const ReturnCtx&)>& visit);
 
 // The type a return compares, as far as the check can see it: a class, or a
 // type IsAssignmentCompatible answers for, or neither where the type is not

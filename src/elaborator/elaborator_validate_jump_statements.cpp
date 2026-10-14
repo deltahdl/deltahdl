@@ -237,22 +237,11 @@ void CheckValueReturningFuncReturn(const Stmt* s, std::string_view func_name,
   // else is left unreached by stopping here.
   if (s->kind == StmtKind::kRandsequence) return;
 
-  // §23.9 makes a begin-end block a scope, and §12.7.1 and §12.7.3 make a
-  // loop's variables local to the loop. The names declared there hide the
-  // names of the same spelling around them, so the statements under one read
-  // their names through a table those declarations are entered into.
-  const bool kOpens = OpensScope(s);
-  ReturnCtx scope_ctx{ctx.typedefs, ctx.unit, {}};
-  if (kOpens) {
-    scope_ctx.locals = ctx.locals;
-    EnterScopeLocals(s, scope_ctx.locals);
-  }
-  const ReturnCtx& inner = kOpens ? scope_ctx : ctx;
-
   // Every other link comes from ForEachChildStmt in
   // elaborator_validate_internal.h, which is the one list of the fields of Stmt
-  // that hold a statement.
-  ForEachChildStmt(s, [&](Stmt* const& sub) {
+  // that hold a statement, read through ForEachChildInScope, which enters the
+  // declarations of a scope the statement opens.
+  ForEachChildInScope(s, ctx, [&](const Stmt* sub, const ReturnCtx& inner) {
     CheckValueReturningFuncReturn(sub, func_name, ret, inner, diag);
   });
 }
