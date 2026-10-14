@@ -577,6 +577,9 @@ static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
   // task's `O d; d = new;` wrote the property d.
   KeepStaticLocal(stmt, CreateVarInScope(stmt->var_name, 64, false, ctx), ctx);
   ctx.SetVariableClassType(stmt->var_name, class_type);
+  // §9.3.4 with §23.6: reached as `b.h` from another process, as any other
+  // variable of a named block is.
+  BindNamedBlockVariable(stmt->var_name, ctx);
 
   RecordClassParamActuals(stmt->var_name, class_type,
                           stmt->var_decl_type.type_params, ctx);
@@ -831,11 +834,12 @@ static StmtResult ExecVarDeclBody(const Stmt* stmt, SimContext& ctx,
   stmt = DeclShapedByTypedef(stmt, ctx, arena);
   stmt = DeclParameterTypedByValue(stmt, ctx, arena);
   if (TryReuseKeptStaticLocal(stmt, ctx, arena)) return StmtResult::kDone;
-  if (TryExecWeakRefVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
-  if (TryExecClassVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
-
+  // §6.21: a class handle a block declares is as static as any other of its
+  // variables, so it too is reused rather than made null again on each entry.
   auto func_name = ctx.CurrentFuncName();
   if (TryReuseExistingDeclVar(stmt, func_name, ctx)) return StmtResult::kDone;
+  if (TryExecWeakRefVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
+  if (TryExecClassVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
 
   // §6.18: a variable declared with a user-defined type name is an object of
   // the type that name stands for, so `nib v` is as wide as `nib` is.

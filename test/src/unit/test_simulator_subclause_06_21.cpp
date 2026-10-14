@@ -354,4 +354,63 @@ TEST(ScopeAndLifetimeSimulation, BlocksSharingALabelKeepVariablesOfTheirOwn) {
   EXPECT_EQ(RunAndGet(src, "rd"), 10u);
 }
 
+// §6.21: a class handle a block declares is static as an integral variable
+// is, so the object the first pass through blk made is the second pass's.
+// Made afresh on each entry, the handle read null again and r stayed 0.
+TEST(ScopeAndLifetimeSimulation, ABlocksClassHandleKeepsItsObjectAcrossPasses) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  class C; int v; endclass\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    repeat (2) begin : blk\n"
+      "      C h;\n"
+      "      if (h == null) begin h = new; h.v = 5; r = 0; end\n"
+      "      else r = h.v;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 5u);
+}
+
+// §6.21 with §23.6: the handle a named block declares is there before the
+// block runs, so the object handed to inner.h from outside is the one the
+// block reads; replaced on entry, the block read null and r was 99.
+TEST(ScopeAndLifetimeSimulation, ANamedBlocksClassHandleExistsBeforeItRuns) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  class C; int v; endclass\n"
+      "  C k;\n"
+      "  int r;\n"
+      "  initial begin k = new; k.v = 7; inner.h = k; end\n"
+      "  initial begin\n"
+      "    #1;\n"
+      "    begin : inner\n"
+      "      C h;\n"
+      "      r = (h == null) ? 99 : h.v;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 7u);
+}
+
+// §9.3.4 with §23.6: the handle is reached by its hierarchical name once its
+// block has run as well, so inner.h.v reads the object the block made; never
+// bound under inner.h, the read found nothing and r was 0.
+TEST(ScopeAndLifetimeSimulation, ANamedBlocksClassHandleIsReachedByItsPath) {
+  auto val = RunAndGet(
+      "module t;\n"
+      "  class C; int v; endclass\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    begin : inner C h; h = new; h.v = 4; end\n"
+      "    #1 r = inner.h.v;\n"
+      "  end\n"
+      "endmodule\n",
+      "r");
+  EXPECT_EQ(val, 4u);
+}
+
 }  // namespace
