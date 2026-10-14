@@ -305,4 +305,61 @@ TEST(DottedNameSimulation, NameThroughAStaticFunctionReachesItsLocal) {
             "3 3\n5 5\n2 2\n");
 }
 
+// §23.7's dotted name 2 (printed pages 757-758): `s2.x` written in a generate
+// block before the block's instance s2 resolves its first name where it
+// stands, where only the structure p::s2 the module imports is visible, so
+// the write reaches p::s2.x and the instance's x keeps its value.
+TEST(DottedNameResolution, DottedNameBeforeAnInstanceWritesTheImportedStruct) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  struct { int x; } s2;\n"
+                       "endpackage\n"
+                       "module some_module;\n"
+                       "  int x;\n"
+                       "endmodule\n"
+                       "module m;\n"
+                       "  import p::*;\n"
+                       "  if (1) begin : s1\n"
+                       "    initial begin\n"
+                       "      s2.x = 2;\n"
+                       "      #1 $display(\"%0d %0d\", p::s2.x, s1.s2.x);\n"
+                       "    end\n"
+                       "    some_module s2();\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "2 0\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §23.7 with §26.3: the binding holds for a read standing in a block nested
+// inside the one declaring the instance after it, which reads p::s2.x's 7,
+// while a read after a block's instance reaches the instance's x, 3.
+TEST(DottedNameResolution, NestedReadBeforeAnInstanceReadsTheImportedStruct) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  struct { int x; } s2;\n"
+                       "endpackage\n"
+                       "module some_module;\n"
+                       "  int x = 3;\n"
+                       "endmodule\n"
+                       "module m;\n"
+                       "  import p::*;\n"
+                       "  initial p::s2.x = 7;\n"
+                       "  if (1) begin : o\n"
+                       "    if (1) begin : i\n"
+                       "      initial #1 $display(\"%0d\", s2.x);\n"
+                       "    end\n"
+                       "    some_module s2();\n"
+                       "  end\n"
+                       "  if (1) begin : a\n"
+                       "    some_module s2();\n"
+                       "    initial #2 $display(\"%0d\", s2.x);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "7\n3\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

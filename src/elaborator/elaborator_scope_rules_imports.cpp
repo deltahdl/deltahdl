@@ -22,14 +22,21 @@ namespace delta {
 
 namespace {
 
-void WalkExprIdents(const Expr* e, std::vector<const Expr*>& out) {
+// An identifier a reference reads, and whether it heads a dotted name (§23.7)
+// rather than standing alone.
+struct IdentRef {
+  Expr* id;
+  bool dotted;
+};
+
+void WalkExprIdents(Expr* e, std::vector<IdentRef>& out, bool dotted = false) {
   if (!e) return;
   if (e->kind == ExprKind::kIdentifier) {
-    out.push_back(e);
+    out.push_back({e, dotted});
     return;
   }
   if (e->kind == ExprKind::kMemberAccess) {
-    WalkExprIdents(e->lhs, out);
+    WalkExprIdents(e->lhs, out, true);
     return;
   }
   WalkExprIdents(e->lhs, out);
@@ -42,11 +49,11 @@ void WalkExprIdents(const Expr* e, std::vector<const Expr*>& out) {
   WalkExprIdents(e->false_expr, out);
   WalkExprIdents(e->repeat_count, out);
   WalkExprIdents(e->with_expr, out);
-  for (const auto* a : e->args) WalkExprIdents(a, out);
-  for (const auto* el : e->elements) WalkExprIdents(el, out);
+  for (auto* a : e->args) WalkExprIdents(a, out);
+  for (auto* el : e->elements) WalkExprIdents(el, out);
 }
 
-void WalkStmtScalarIdents(const Stmt* s, std::vector<const Expr*>& out) {
+void WalkStmtScalarIdents(const Stmt* s, std::vector<IdentRef>& out) {
   WalkExprIdents(s->condition, out);
   WalkExprIdents(s->lhs, out);
   WalkExprIdents(s->rhs, out);
@@ -57,7 +64,7 @@ void WalkStmtScalarIdents(const Stmt* s, std::vector<const Expr*>& out) {
   WalkExprIdents(s->assert_expr, out);
   WalkExprIdents(s->repeat_event_count, out);
   WalkExprIdents(s->var_init, out);
-  for (const auto* e : s->wait_order_events) WalkExprIdents(e, out);
+  for (auto* e : s->wait_order_events) WalkExprIdents(e, out);
 }
 
 // The expressions a case item and a randcase item hold beside their bodies:
@@ -67,9 +74,9 @@ void WalkStmtScalarIdents(const Stmt* s, std::vector<const Expr*>& out) {
 // descent in WalkStmtIdents below, which ForEachChildStmt reaches through
 // CaseItem::body and through the second member of a randcase item, so that no
 // statement is walked twice.
-void WalkStmtCaseIdents(const Stmt* s, std::vector<const Expr*>& out) {
+void WalkStmtCaseIdents(const Stmt* s, std::vector<IdentRef>& out) {
   for (const auto& ci : s->case_items) {
-    for (const auto* p : ci.patterns) WalkExprIdents(p, out);
+    for (auto* p : ci.patterns) WalkExprIdents(p, out);
   }
   for (const auto& rc : s->randcase_items) WalkExprIdents(rc.first, out);
 }
@@ -80,12 +87,16 @@ void WalkStmtCaseIdents(const Stmt* s, std::vector<const Expr*>& out) {
 // ForEachChildStmt in elaborator_validate_internal.h states those positions
 // once for the whole elaborator, which is why the list is not written out again
 // here.
-void WalkStmtIdents(const Stmt* s, std::vector<const Expr*>& out) {
+void WalkStmtIdents(const Stmt* s, std::vector<IdentRef>& out) {
   if (!s) return;
   WalkStmtScalarIdents(s, out);
   WalkStmtCaseIdents(s, out);
   ForEachChildStmt(s, [&](Stmt* const& sub) { WalkStmtIdents(sub, out); });
 }
+
+using OuterBoundRefs =
+    std::unordered_map<std::string_view,
+                       std::vector<std::pair<Expr*, std::string_view>>>;
 
 // Mutable state shared across the import-rule checking helpers below: one
 // scope's locally visible identifiers, its explicit imports and the packages
@@ -102,6 +113,10 @@ struct ImportRuleCtx {
   std::vector<std::string_view>& wildcard_packages;
   std::unordered_map<std::string_view, SourceLoc>& wildcard_claimed;
   std::unordered_set<std::string_view>& seen_decls;
+  // §23.7 with §26.3: the references standing in this scope, or in one inside
+  // it, that an outer scope's wildcard import bound, by the name each reads,
+  // with the package declaring what it bound.
+  OuterBoundRefs& outer_bound;
   // §26.3: the next outer lexical scope a reference this scope does not
   // resolve is searched in, or null for the module's own scope, where the
   // search ends.
@@ -120,6 +135,13 @@ void TrackImportRuleDecl(ImportRuleCtx& ctx, std::string_view name,
                    Subclause("26.3"));
   }
   ctx.seen_decls.insert(name);
+  // §23.7 with §26.3: a reference an outer scope's wildcard import bound
+  // stays bound to the package's declaration when this scope declares the
+  // name after it, so it is read through that package.
+  auto bound = ctx.outer_bound.find(name);
+  if (bound == ctx.outer_bound.end()) return;
+  for (auto& [ref, origin] : bound->second) ref->scope_prefix = origin;
+  ctx.outer_bound.erase(bound);
 }
 
 // §26.3 makes it illegal for the wildcard imports of more than one package to
@@ -157,23 +179,6 @@ bool ClaimWildcardCandidate(ImportRuleCtx& ctx, const Expr* e) {
   return true;
 }
 
-// §26.3's search for a reference (printed page 810): the current scope's
-// locally visible identifiers, then the candidates the wildcard imports
-// written before the reference in that scope supply, and, where neither
-// matches, the next outer lexical scope the same way, a candidate found there
-// imported into that outer scope. The clause's Example 2 (printed 811) has
-// `initial x = 1;` in a generate block of a module importing p bind p::x
-// through the module's scope, the block's own `import p2::*` standing after
-// the reference.
-void ProcessImportRuleRef(ImportRuleCtx& ctx, const Expr* e) {
-  auto name = e->text;
-  if (name.empty()) return;
-  for (ImportRuleCtx* scope = &ctx; scope != nullptr; scope = scope->outer) {
-    if (scope->seen_decls.count(name)) return;
-    if (ClaimWildcardCandidate(*scope, e)) return;
-  }
-}
-
 // The declaration an explicit import of `pkg_name::name` imports, named by
 // the package declaring it: §26.6 makes an import of a declaration reached
 // through an export an import of the original declaration (printed page 815),
@@ -199,6 +204,46 @@ std::string_view WildcardClaimOrigin(ImportRuleCtx& ctx,
     if (!origin.empty()) return origin;
   }
   return {};
+}
+
+// §23.7 (printed pages 757-758) with §26.3: a reference `binder`'s wildcard
+// import bound from the scope `from` inside it is noted on every scope from
+// `from` out to `binder`, any of which may declare the name after the
+// reference. The clause's dotted name 2 has `s2.x` in a generate block bind
+// the structure p::s2 the module imports, the instance s2 the block declares
+// after it not yet being visible.
+void NoteOuterBinding(ImportRuleCtx& from, ImportRuleCtx& binder, Expr* e) {
+  std::string_view origin = WildcardClaimOrigin(binder, e->text);
+  for (ImportRuleCtx* scope = &from; scope != &binder; scope = scope->outer) {
+    scope->outer_bound[e->text].push_back({e, origin});
+  }
+}
+
+// §26.3's search for a reference (printed page 810): the current scope's
+// locally visible identifiers, then the candidates the wildcard imports
+// written before the reference in that scope supply, and, where neither
+// matches, the next outer lexical scope the same way, a candidate found there
+// imported into that outer scope. The clause's Example 2 (printed 811) has
+// `initial x = 1;` in a generate block of a module importing p bind p::x
+// through the module's scope, the block's own `import p2::*` standing after
+// the reference.
+void ProcessImportRuleRef(ImportRuleCtx& ctx, const IdentRef& ref) {
+  Expr* e = ref.id;
+  bool dotted = ref.dotted;
+  auto name = e->text;
+  if (name.empty()) return;
+  for (ImportRuleCtx* scope = &ctx; scope != nullptr; scope = scope->outer) {
+    if (scope->seen_decls.count(name)) {
+      if (dotted && scope->wildcard_claimed.count(name)) {
+        NoteOuterBinding(ctx, *scope, e);
+      }
+      return;
+    }
+    if (ClaimWildcardCandidate(*scope, e)) {
+      if (dotted) NoteOuterBinding(ctx, *scope, e);
+      return;
+    }
+  }
 }
 
 // §26.3 makes an explicit import illegal where the identifier is explicitly
@@ -296,8 +341,8 @@ void HandleImportDecl(ImportRuleCtx& ctx, const ModuleItem* item) {
 }
 
 void ProcessImportRuleRefs(ImportRuleCtx& ctx,
-                           const std::vector<const Expr*>& refs) {
-  for (const auto* e : refs) ProcessImportRuleRef(ctx, e);
+                           const std::vector<IdentRef>& refs) {
+  for (const IdentRef& ref : refs) ProcessImportRuleRef(ctx, ref);
 }
 
 void HandleImportRuleItem(ImportRuleCtx& ctx, const ModuleItem* item);
@@ -320,15 +365,12 @@ void HandleGenerateBlockImportRules(ImportRuleCtx& outer,
   std::vector<std::string_view> wildcard_packages;
   std::unordered_map<std::string_view, SourceLoc> wildcard_claimed;
   std::unordered_set<std::string_view> seen_decls;
+  OuterBoundRefs outer_bound;
   if (!genvar.empty()) seen_decls.insert(genvar);
-  ImportRuleCtx ctx{outer.diag,
-                    outer.unit,
-                    outer.pkg_provided_names,
-                    explicit_imports,
-                    wildcard_packages,
-                    wildcard_claimed,
-                    seen_decls,
-                    &outer};
+  ImportRuleCtx ctx{
+      outer.diag,       outer.unit,        outer.pkg_provided_names,
+      explicit_imports, wildcard_packages, wildcard_claimed,
+      seen_decls,       outer_bound,       &outer};
   for (const auto* item : items) HandleImportRuleItem(ctx, item);
 }
 
@@ -377,13 +419,13 @@ void HandleImportRuleItem(ImportRuleCtx& ctx, const ModuleItem* item) {
     case ModuleItemKind::kAlwaysCombBlock:
     case ModuleItemKind::kAlwaysFFBlock:
     case ModuleItemKind::kAlwaysLatchBlock: {
-      std::vector<const Expr*> refs;
+      std::vector<IdentRef> refs;
       WalkStmtIdents(item->body, refs);
       ProcessImportRuleRefs(ctx, refs);
       break;
     }
     case ModuleItemKind::kContAssign: {
-      std::vector<const Expr*> refs;
+      std::vector<IdentRef> refs;
       WalkExprIdents(item->assign_lhs, refs);
       WalkExprIdents(item->assign_rhs, refs);
       ProcessImportRuleRefs(ctx, refs);
@@ -424,7 +466,7 @@ void HandleImportRuleItem(ImportRuleCtx& ctx, const ModuleItem* item) {
       ForEachEnumTypeIn(item->typedef_type, track_literals);
       ForEachEnumTypeIn(item->data_type, track_literals);
       if (item->init_expr) {
-        std::vector<const Expr*> refs;
+        std::vector<IdentRef> refs;
         WalkExprIdents(item->init_expr, refs);
         ProcessImportRuleRefs(ctx, refs);
       }
@@ -453,6 +495,7 @@ void Elaborator::ValidatePackageImportRules(const ModuleDecl* decl) {
 
   std::unordered_set<std::string_view> seen_decls;
   SeedImportRuleSeenDecls(decl, seen_decls);
+  OuterBoundRefs outer_bound;
 
   ImportRuleCtx ctx{diag_,
                     unit_,
@@ -461,6 +504,7 @@ void Elaborator::ValidatePackageImportRules(const ModuleDecl* decl) {
                     wildcard_packages_,
                     wildcard_claimed_,
                     seen_decls,
+                    outer_bound,
                     nullptr};
 
   // §26.3: a wildcard import makes its names candidates throughout the entire
