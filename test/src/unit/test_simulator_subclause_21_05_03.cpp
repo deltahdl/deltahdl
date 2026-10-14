@@ -311,6 +311,50 @@ TEST(WritememAddressSim, AssocWildcardIndexDumpsAddresses) {
   std::remove(path.c_str());
 }
 
+// Runs a module declaring `decl` and storing `stores` in its array aa, dumps aa
+// with $writememh to `path` and returns the file's text.
+std::string DumpAssoc(const std::string& path, const std::string& decl,
+                      const std::string& stores) {
+  SimFixture f;
+  RunCapture("module t;\n" + decl + "  initial begin\n" + stores +
+                 "    $writememh(\"" + path + "\", aa);\n  end\nendmodule\n",
+             f);
+  std::string text = SlurpFile(path);
+  std::remove(path.c_str());
+  return text;
+}
+
+// §21.5.3 with §7.8.4: an entry's address is its whole index, so two keys of an
+// 80-bit index type differing only above bit 63 are written under two
+// addresses rather than the low 64 bits of each.
+TEST(WritememAddressSim, AssocIndexWiderThan64BitsKeepsHighBits) {
+  EXPECT_EQ(DumpAssoc("/tmp/deltahdl_t210503_w80.mem",
+                      "  typedef bit [79:0] wide_t;\n"
+                      "  logic [7:0] aa [wide_t];\n",
+                      "    aa[80'h1_0000_0000_0000_0001] = 8'hab;\n"
+                      "    aa[1] = 8'hcd;\n"),
+            "@1\ncd\n@10000000000000001\nab\n");
+}
+
+// §21.5.3 with §7.8.4: a negative key of a signed index type is written as its
+// bits at the index type's own width, which $readmemh reads back into the same
+// type, not as a 64-bit two's complement wider than any int holds.
+TEST(WritememAddressSim, AssocNegativeIntIndexWrittenAtIndexWidth) {
+  EXPECT_EQ(
+      DumpAssoc("/tmp/deltahdl_t210503_neg.mem", "  logic [7:0] aa [int];\n",
+                "    aa[-1] = 8'h11;\n    aa[2] = 8'h22;\n"),
+      "@ffffffff\n11\n@2\n22\n");
+}
+
+// §21.5.3 with §7.8.1: a wildcard index keeps its key's self-determined value,
+// so a key wider than 64 bits is written whole.
+TEST(WritememAddressSim, AssocWildcardIndexWiderThan64BitsKeepsHighBits) {
+  EXPECT_EQ(
+      DumpAssoc("/tmp/deltahdl_t210503_w72.mem", "  logic [7:0] aa [*];\n",
+                "    aa[72'h1_0000_0000_0000_0002] = 8'h5a;\n"),
+      "@10000000000000002\n5a\n");
+}
+
 // §21.5.3: an enumerated index type is integral; each entry's @-address is
 // the member's numeric value, so the file reloads through the §21.4.1
 // enum-indexed read path.

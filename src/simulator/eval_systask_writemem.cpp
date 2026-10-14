@@ -1,5 +1,4 @@
 #include <cstdint>
-#include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -24,14 +23,17 @@ namespace delta {
 // §21.5.3: an associative array's keys are sparse, so a plain sequential read
 // could not place its words. Each entry is written with an @-address ahead of
 // its value. The keys are integral (§21.4.1) and emitted in ascending order as
-// hexadecimal, matching the @-address form $readmem parses.
+// hexadecimal, matching the @-address form $readmem parses. The address is the
+// whole index (§7.8.4) at the index type's width and signedness, as an index
+// variable of that type holds it, and a wildcard index, whose key keeps its
+// self-determined value and is never negative (§7.8.1), at its own width.
 static void WriteAssocMem(std::ofstream& ofs, bool is_hex,
-                          const AssocArrayObject* aa) {
+                          const AssocArrayObject* aa, Arena& arena) {
   for (const auto& entry : aa->int_data) {
-    char addr_buf[20];
-    std::snprintf(addr_buf, sizeof(addr_buf), "%llx",
-                  static_cast<unsigned long long>(entry.first.Low()));
-    ofs << "@" << addr_buf << "\n";
+    Logic4Vec key = aa->is_wildcard ? entry.first.ToSignedVec(arena)
+                                    : entry.first.ToVec(arena, aa->index_width,
+                                                        aa->is_index_signed);
+    ofs << "@" << FormatDisplay("%0h", {key}) << "\n";
     ofs << FormatArg(entry.second, is_hex ? 'h' : 'b') << "\n";
   }
 }
@@ -321,7 +323,7 @@ Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
   // §21.5.3: an associative array's keys are sparse, so its words carry an
   // @-address prefix; the keys are emitted in ascending order.
   if (target.aa != nullptr) {
-    WriteAssocMem(ofs, is_hex, target.aa);
+    WriteAssocMem(ofs, is_hex, target.aa, arena);
     return MakeLogic4VecVal(arena, 1, 0);
   }
 

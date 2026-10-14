@@ -416,6 +416,24 @@ std::string FormatStrength(const NetStrength& ns) {
          static_cast<char>('0' + lo) + known;
 }
 
+// The digits of `full` from its first nonzero one, or a single 0 when every
+// digit is zero, so that a zero value still shows one.
+static std::string TrimLeadingZeros(const std::string& full) {
+  size_t start = full.find_first_not_of('0');
+  if (start == std::string::npos) return "0";
+  return full.substr(start);
+}
+
+// §21.2.1.3: the hex or octal digits of `val`, `bits_per_digit` bits each, with
+// the full width's leading zeros trimmed so that no digit above bit 63 is lost.
+// Status characters carry meaning that cannot be stripped down to significant
+// digits, so a value bearing x/z keeps its full digit string.
+static std::string FormatRadixMinimal(const Logic4Vec& val,
+                                      uint32_t bits_per_digit) {
+  std::string full = FormatRadixXZ(val, bits_per_digit);
+  return val.IsKnown() ? TrimLeadingZeros(full) : full;
+}
+
 // §21.2.1.2: the minimal-width rendering of a value for a given radix, the one
 // with no leading digit to spare, before any explicit field width is applied.
 // The decimal, string, and character forms already carry no leading fill, so
@@ -423,31 +441,15 @@ std::string FormatStrength(const NetStrength& ns) {
 // auto rendering pads out to the full bit width with leading zeros, drop those
 // zeros here.
 static std::string FormatArgMinimal(const Logic4Vec& val, char spec) {
-  uint64_t v = val.ToUint64();
-  char buf[64];
   switch (spec) {
     case 'h':
     case 'x':
-      // §21.2.1.3 status characters carry meaning that cannot be stripped down
-      // to significant digits, so a value bearing x/z keeps its full digit
-      // string; only purely known values get the minimal rendering.
-      if (!val.IsKnown()) return FormatRadixXZ(val, 4);
-      std::snprintf(buf, sizeof(buf), "%llx",
-                    static_cast<unsigned long long>(v));
-      return buf;
+      return FormatRadixMinimal(val, 4);
     case 'o':
-      if (!val.IsKnown()) return FormatRadixXZ(val, 3);
-      std::snprintf(buf, sizeof(buf), "%llo",
-                    static_cast<unsigned long long>(v));
-      return buf;
-    case 'b': {
-      // Each bit prints separately; trim only the leading zeros, keeping at
-      // least one character so a zero value still shows a digit.
-      std::string full = val.ToString();
-      size_t start = full.find_first_not_of('0');
-      if (start == std::string::npos) return "0";
-      return full.substr(start);
-    }
+      return FormatRadixMinimal(val, 3);
+    case 'b':
+      // Each bit prints separately; trim only the leading zeros.
+      return TrimLeadingZeros(val.ToString());
     default:
       return FormatArg(val, spec);
   }

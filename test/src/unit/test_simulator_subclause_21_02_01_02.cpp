@@ -435,4 +435,18 @@ TEST(SizeOfDisplayedData, AutoSizedDecimalForInitLoopVariableIsSigned) {
   EXPECT_EQ(out, ":         -3:\n");
 }
 
+// §21.2.1.2 with §21.2.1.3: a field width of 0 keeps every significant digit
+// of a value however wide it is; a value wider than 64 bits loses no digit
+// above bit 63 under %0h or %0o.
+TEST(SizeOfDisplayedData, ZeroWidthHexAndOctalKeepDigitsAboveBit63) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial $display(\"%0h %0o\", 80'h1_0000_0000_0000_00ff,\n"
+      "                   80'h1_0000_0000_0000_0000);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "100000000000000ff 2000000000000000000000\n");
+}
+
 }  // namespace
