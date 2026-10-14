@@ -289,16 +289,20 @@ TEST_F(ExtendedVcdStateCharacterSim, InputWithTwoActiveDriversIsLowercase) {
 // the pair, input first: A for 0 and 1, B for 1 and 0, C for x and 0, c for x
 // and 1, a for 0 and x, b for 1 and x, ? for x and x. An end of two drivers at
 // 0 and 1 is at x, and with one end alone active the resolved value's own
-// unknown-direction character stands. Registration is in name order, ka.p to
-// kk.p taking codes 0 to 10.
+// unknown-direction character stands. At 0 the strength ranges give 0, d and
+// l; with neither end connected the port is F, and with both three-stated f.
+// Registration is in name order, ka.p to kp.p taking codes 0 to 15.
 TEST_F(ExtendedVcdStateCharacterSim, InoutEndsPickTheConflictCharacter) {
   auto content = RunPortVcd(
       "module m1(inout p); assign p = 1'b1; endmodule\n"
       "module m0(inout p); assign p = 1'b0; endmodule\n"
       "module mx(inout p); assign p = 1'bx; endmodule\n"
       "module mw(inout p); assign (weak0, weak1) p = 1'b1; endmodule\n"
+      "module mv(inout p); assign (weak0, weak1) p = 1'b0; endmodule\n"
+      "module mn(inout p); endmodule\n"
+      "module mz(inout p); assign p = 1'bz; endmodule\n"
       "module t;\n"
-      "  wire wa, wb, wc, wd, we, wf, wg, wh, wi, wj, wk;\n"
+      "  wire wa, wb, wc, wd, we, wf, wg, wh, wi, wj, wk, wl, wm, wn, wo, wp;\n"
       "  assign wa = 1'b0;\n"
       "  assign wb = 1'b1;\n"
       "  assign (weak0, weak1) wc = 1'b1;\n"
@@ -310,6 +314,10 @@ TEST_F(ExtendedVcdStateCharacterSim, InoutEndsPickTheConflictCharacter) {
       "  assign wh = 1'b0;\n"
       "  assign wi = 1'b1;\n"
       "  assign wj = 1'bx;\n"
+      "  assign wl = 1'b0;\n"
+      "  assign wm = 1'b0;\n"
+      "  assign (weak0, weak1) wn = 1'b0;\n"
+      "  assign wp = 1'bz;\n"
       "  m1 ka(.p(wa));\n"
       "  mw kb(.p(wb));\n"
       "  m1 kc(.p(wc));\n"
@@ -321,11 +329,16 @@ TEST_F(ExtendedVcdStateCharacterSim, InoutEndsPickTheConflictCharacter) {
       "  mx ki(.p(wi));\n"
       "  mx kj(.p(wj));\n"
       "  m1 kk(.p(wk));\n"
+      "  m0 kl(.p(wl));\n"
+      "  mv km(.p(wm));\n"
+      "  m0 kn(.p(wn));\n"
+      "  mn ko(.p(wo));\n"
+      "  mz kp(.p(wp));\n"
       "  initial $dumpports;\n"
       "endmodule\n");
-  const char* expected[] = {"A", "u", "h", "1", "B", "C",
-                            "c", "a", "b", "?", "1"};
-  for (int code = 0; code < 11; ++code) {
+  const char* expected[] = {"A", "u", "h", "1", "B", "C", "c", "a",
+                            "b", "?", "1", "0", "d", "l", "F", "f"};
+  for (int code = 0; code < 16; ++code) {
     EXPECT_EQ(PortStateCharsFor(content, std::to_string(code)), expected[code])
         << code << "\n"
         << content;
