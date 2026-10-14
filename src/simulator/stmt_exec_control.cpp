@@ -121,12 +121,14 @@ std::string ActiveNamedScopePath(SimContext& ctx) {
   return path;
 }
 
-void BindNamedBlockVariable(std::string_view name, SimContext& ctx) {
-  if (ctx.ActiveNamedScopes().empty()) return;
+std::string_view BindNamedBlockVariable(std::string_view name,
+                                        SimContext& ctx) {
+  if (ctx.ActiveNamedScopes().empty()) return {};
   std::string path = ActiveNamedScopePath(ctx) + "." + std::string(name);
   const std::string& key = *ctx.GetArena().Create<std::string>(std::move(path));
   ctx.RegisterBlockVariable(key);
   ctx.AliasVariable(key, name);
+  return key;
 }
 
 ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena) {

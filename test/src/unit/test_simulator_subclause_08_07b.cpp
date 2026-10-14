@@ -414,4 +414,43 @@ TEST(ClassConstructorSim,
             22u);
 }
 
+// §8.7 with §23.6: `new` assigned to a handle named hierarchically, u.h in
+// instance u, constructs an object of the handle's class there. Taken by the
+// name's identifier alone, the target was missed and u.h stayed null.
+TEST(ClassConstructorSim, NewIntoAnInstancesHandleByItsPath) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  class C; int v = 3; endclass\n"
+                      "endpackage\n"
+                      "module c; import p::*; C h; endmodule\n"
+                      "module t;\n"
+                      "  c u();\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    u.h = new;\n"
+                      "    r = (u.h == null) ? 99 : u.h.v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            3u);
+}
+
+// The same for the handle a named block declares, given its object from
+// outside the block before the block runs, which then reads that object.
+TEST(ClassConstructorSim, NewIntoANamedBlocksHandleByItsPath) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  class C; int v = 6; endclass\n"
+                      "  int r;\n"
+                      "  initial inner.h = new;\n"
+                      "  initial begin\n"
+                      "    #1;\n"
+                      "    begin : inner\n"
+                      "      C h;\n"
+                      "      r = (h == null) ? 99 : h.v;\n"
+                      "    end\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            6u);
+}
+
 }  // namespace

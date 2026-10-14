@@ -103,8 +103,9 @@ ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena);
 // §9.3.4: binds the hierarchical name of the variable `name` the running
 // statement declares -- the named blocks and task around it, `b1.cnt` or
 // `tk.inner.w`, under the instance's prefix -- so another process reaches it.
+// Answers the name bound, empty where no named block encloses the variable.
 // Defined in stmt_exec_control.cpp.
-void BindNamedBlockVariable(std::string_view name, SimContext& ctx);
+std::string_view BindNamedBlockVariable(std::string_view name, SimContext& ctx);
 // The hierarchical path of the named scopes the running statement stands in,
 // from its innermost subroutine, under the instance's prefix -- `b1.f1` or
 // `tk.inner` -- recording each level's §21.7.2.3 scope kind on the way.

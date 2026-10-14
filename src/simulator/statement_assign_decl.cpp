@@ -524,6 +524,17 @@ static Variable* KeptStaticLocal(const Stmt* stmt, SimContext& ctx) {
                                stmt->var_name);
 }
 
+// §9.3.4 with §23.6: a class handle a block declares is of its class under
+// its own name and, reached as `b.h` from another process, under the
+// hierarchical name its named block binds it by, so `b.h = new` constructs an
+// object of that class (TryClassNewAssign).
+static void BindClassHandle(std::string_view name, std::string_view class_type,
+                            SimContext& ctx) {
+  ctx.SetVariableClassType(name, class_type);
+  std::string_view path = BindNamedBlockVariable(name, ctx);
+  if (!path.empty()) ctx.SetVariableClassType(path, class_type);
+}
+
 // §6.21 with §10.5 (printed page 256): a static local is one variable for the
 // whole simulation, its initializer run once, before any procedure starts
 // (Lowerer::InitializeStaticLocals); its declaration, executed when its block
@@ -542,12 +553,13 @@ static bool TryReuseKeptStaticLocal(const Stmt* stmt, SimContext& ctx,
                          stmt->var_name, ctx);
   std::string_view class_key =
       DeclaredClassKey(stmt->var_decl_type, ctx, arena);
-  if (!class_key.empty()) {
-    ctx.SetVariableClassType(stmt->var_name, class_key);
-    RecordClassParamActuals(stmt->var_name, class_key,
-                            stmt->var_decl_type.type_params, ctx);
+  if (class_key.empty()) {
+    BindNamedBlockVariable(stmt->var_name, ctx);
+    return true;
   }
-  BindNamedBlockVariable(stmt->var_name, ctx);
+  BindClassHandle(stmt->var_name, class_key, ctx);
+  RecordClassParamActuals(stmt->var_name, class_key,
+                          stmt->var_decl_type.type_params, ctx);
   return true;
 }
 
@@ -576,10 +588,7 @@ static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
   // scope's and hides a property of its name; made design-wide instead, a
   // task's `O d; d = new;` wrote the property d.
   KeepStaticLocal(stmt, CreateVarInScope(stmt->var_name, 64, false, ctx), ctx);
-  ctx.SetVariableClassType(stmt->var_name, class_type);
-  // §9.3.4 with §23.6: reached as `b.h` from another process, as any other
-  // variable of a named block is.
-  BindNamedBlockVariable(stmt->var_name, ctx);
+  BindClassHandle(stmt->var_name, class_type, ctx);
 
   RecordClassParamActuals(stmt->var_name, class_type,
                           stmt->var_decl_type.type_params, ctx);

@@ -179,8 +179,15 @@ static void AssignWeakReferenceNew(const Stmt* stmt, std::string_view target,
 // any other target.
 static std::string_view ClassNewTargetKey(const Expr* lhs, Arena& arena) {
   if (lhs->kind == ExprKind::kIdentifier) return lhs->text;
-  if (lhs->kind != ExprKind::kMemberAccess || !lhs->is_scope_resolution ||
-      !lhs->lhs || lhs->lhs->kind != ExprKind::kIdentifier || !lhs->rhs ||
+  if (lhs->kind != ExprKind::kMemberAccess) return {};
+  // §23.6: a handle named hierarchically, `u.h` in instance u or `b.h` in
+  // named block b, is keyed by its dotted name, as FindVariable resolves it.
+  // A property of a handle, `obj.p`, records no class under such a name and
+  // is left to TryMemberClassNewAssign.
+  if (!lhs->is_scope_resolution) {
+    return *arena.Create<std::string>(HierarchicalReferenceName(lhs));
+  }
+  if (!lhs->lhs || lhs->lhs->kind != ExprKind::kIdentifier || !lhs->rhs ||
       lhs->rhs->kind != ExprKind::kIdentifier)
     return {};
   return *arena.Create<std::string>(std::string(lhs->lhs->text) + "." +
