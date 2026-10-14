@@ -288,9 +288,16 @@ void CheckSubroutineJumpRules(const ModuleItem* item, const ReturnCtx& outer,
   scope.in_subroutine = true;
   for (auto* s : item->func_body_stmts) CheckJumpRules(s, scope, diag);
   if (!is_value_returning) return;
-  const ReturnCtx kCtx{outer.typedefs, outer.unit,
-                       SubroutineLocals(item, outer.locals)};
-  const CheckedType kRet = CheckedTypeOf(item->return_type, kCtx);
+  const CheckedType kRet = CheckedTypeOf(item->return_type, outer);
+  // §6.19.3's check, ValidateEnumReturns in
+  // elaborator_validate_enum_assign.cpp, reports a name the function does not
+  // declare returned from a function returning an enumeration, naming the cast
+  // it needs. So such a function's returns read none of the names around it
+  // here, and each is reported once.
+  const bool kEnumReturn = kRet.type.kind == DataTypeKind::kEnum;
+  const ReturnCtx kCtx{
+      outer.typedefs, outer.unit,
+      SubroutineLocals(item, kEnumReturn ? DeclaredLocals{} : outer.locals)};
   for (auto* s : item->func_body_stmts) {
     CheckValueReturningFuncReturn(s, item->name, kRet, kCtx, diag);
   }
