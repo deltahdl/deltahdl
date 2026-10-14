@@ -478,7 +478,9 @@ Logic4Vec EvalTypename(const Expr* expr, SimContext& ctx, Arena& arena) {
   std::string text = arg->kind == ExprKind::kIdentifier
                          ? TypenameOfIdentifier(arg->text, ctx, arena)
                          : TypenameOfElement(arg, ctx, arena);
-  if (text.empty()) text = TypenameOfOperation(arg, ctx, arena);
+  if (text.empty() && arg->kind != ExprKind::kIdentifier) {
+    text = TypenameOfOperation(arg, ctx, arena);
+  }
   if (!text.empty()) return StringToLogic4Vec(arena, text);
   return EvalTypenameOfExpression(expr, ctx, arena);
 }

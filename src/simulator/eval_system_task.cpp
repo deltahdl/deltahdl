@@ -484,13 +484,15 @@ void EmitSeverityHeader(SimContext& ctx, std::string_view prefix,
   // call, and its file name and line (the `__FILE__ and `__LINE__ equivalents,
   // see §22.13). A line of 0 marks a call site with no recorded source
   // location.
+  // A position in the preprocessed text is restated in the file it came from.
   std::string scope = ScopeHierName(ctx);
-  uint32_t line = loc.line;
+  const SourceManager& sources = ctx.GetDiag().Sources();
+  SourceLoc origin = sources.ResolveToOrigin(loc);
+  uint32_t line = origin.line;
   os << "[" << ctx.CurrentTime().ticks << "] " << prefix;
   if (!scope.empty()) os << " " << scope;
   if (line != 0) {
-    os << " (" << ctx.GetDiag().Sources().FilePath(loc.file_id) << ":" << line
-       << ")";
+    os << " (" << sources.FilePath(origin.file_id) << ":" << line << ")";
   }
   if (!msg.empty()) os << ": " << msg;
   os << "\n";

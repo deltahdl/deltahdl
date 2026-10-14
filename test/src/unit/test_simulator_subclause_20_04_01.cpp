@@ -251,29 +251,30 @@ TEST(TimescaleSystemFunctions, RootArgumentCountsATrailingTimescalePrecision) {
   EXPECT_EQ(out, "-11\nTime scale of ($root) is 10ps / 10ps\n");
 }
 
-// §20.4.1 and §20.4.2: an argument may name an instance through the modules
-// above it, as the standard's own b_dat.c1 does. a_dat's 1ms / 1us is what a
-// dotted name that resolved to nothing would report in place of c1's 1ns / 1ns.
+// §20.4.1 and §20.4.2: an argument may name an instance through the
+// instances above it, as the standard's own b_dat.c1 does. a_dat's 1ms / 1us
+// is what a dotted name that resolved to nothing would report in place of
+// c1's 1ns / 1ns.
 TEST(TimescaleSystemFunctions, AHierarchicalArgumentReportsTheInstanceItNames) {
   SimFixture f;
   std::string out = PreprocessAndCapture(
-      "module a_dat;\n"
-      "  timeunit 1ms / 1us;\n"
-      "  initial begin\n"
-      "    $display(\"%0d %0d\", $timeunit(b_dat.c1), "
-      "$timeprecision(b_dat.c1));\n"
-      "    $printtimescale(b_dat.c1);\n"
-      "  end\n"
+      "`timescale 1 ns / 1 ns\n"
+      "module c_dat;\n"
       "endmodule\n"
       "`timescale 10 fs / 1 fs\n"
       "module b_dat;\n"
       "  c_dat c1 ();\n"
       "endmodule\n"
-      "`timescale 1 ns / 1 ns\n"
-      "module c_dat;\n"
+      "module a_dat;\n"
+      "  timeunit 1ms / 1us;\n"
+      "  b_dat b ();\n"
+      "  initial begin\n"
+      "    $display(\"%0d %0d\", $timeunit(b.c1), $timeprecision(b.c1));\n"
+      "    $printtimescale(b.c1);\n"
+      "  end\n"
       "endmodule\n",
       f);
-  EXPECT_EQ(out, "-9 -9\nTime scale of (b_dat.c1) is 1ns / 1ns\n");
+  EXPECT_EQ(out, "-9 -9\nTime scale of (b.c1) is 1ns / 1ns\n");
 }
 
 // §20.4.1 and §20.4.2 with §3.2: a package is a design element, so naming one
