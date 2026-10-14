@@ -156,6 +156,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
     }
   }
   CheckIsunboundedArgs(decl, diag_);
+  CheckTimeformatArgs(decl, diag_);
   std::unordered_set<std::string_view> unbounded;
   for (const auto& param : mod->params) {
     if (param.is_unbounded) unbounded.insert(param.name);

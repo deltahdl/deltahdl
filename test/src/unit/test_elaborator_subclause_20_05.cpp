@@ -131,4 +131,22 @@ TEST(ConversionFunctions, ConversionFoldsWithLocalparamArgument) {
   EXPECT_EQ(design->top_modules[0]->params[1].resolved_value, 5);
 }
 
+// §20.5: $rtoi returns an integer, so a folded real past the 32-bit range keeps
+// only its low 32 bits, read as signed: 3.0e9 is 0xB2D05E00, which is
+// -1294967296, and -3.0e9 is 1294967296. A 64-bit fold would keep both whole.
+TEST(ConversionFunctions, RtoiFoldsToA32BitInteger) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam longint A = $rtoi(3.0e9);\n"
+      "  localparam longint B = $rtoi(-3.0e9);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_GE(design->top_modules[0]->params.size(), 2u);
+  EXPECT_EQ(design->top_modules[0]->params[0].resolved_value, -1294967296);
+  EXPECT_EQ(design->top_modules[0]->params[1].resolved_value, 1294967296);
+}
+
 }  // namespace

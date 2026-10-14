@@ -645,6 +645,10 @@ void ReportPackageSubroutineStaticInits(const PackageDecl* pkg,
 // the name of a parameter. Defined in elaborator_validate_isunbounded.cpp.
 void CheckIsunboundedArgs(const ModuleDecl* decl, DiagEngine& diag);
 
+// §20.4.3: reports each call of $timeformat in `decl` that carries some but not
+// all four of its arguments. Defined in elaborator_validate_timeformat.cpp.
+void CheckTimeformatArgs(const ModuleDecl* decl, DiagEngine& diag);
+
 // §23.9: the declarations a statement of a procedural body sees, innermost
 // last, so a name is judged by the declaration it reaches rather than by any
 // declaration of that name. They are a subroutine's formals, the variables of

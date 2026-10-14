@@ -289,8 +289,9 @@ static std::optional<int64_t> EvalConstRealToIntCall(const Expr* expr,
   if (expr->args.empty()) return std::nullopt;
   auto rv = ConstEvalReal(expr->args[0], scope);
   if (!rv) return std::nullopt;
+  // $rtoi truncates toward zero and returns an integer, a signed 32-bit type.
   if (expr->callee == "$rtoi")
-    return static_cast<int64_t>(*rv);  // truncates toward zero
+    return static_cast<int32_t>(static_cast<int64_t>(*rv));
   if (expr->callee == "$realtobits") {
     double d = *rv;
     uint64_t bits = 0;
