@@ -718,8 +718,9 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
   // though a wire is the clause's own example of an object VPI reaches.
   for (auto& [name, var] : sim_ctx.GetVariables()) {
     // §37.10 detail 6: an imported item is not reached through the scope that
-    // imported it; the key the import enters is the run's, not the scope's.
-    if (sim_ctx.IsImportedName(name)) continue;
+    // imported it, the key the import enters being the run's; and by §37.12 a
+    // named block's variable hangs from the block, which the block walk makes.
+    if (sim_ctx.IsImportedName(name) || sim_ctx.IsBlockVariable(name)) continue;
     VpiHandle obj = DesignObjectForFlatName(name);
     if (obj == nullptr || var == nullptr) continue;
     obj->type = kVpiReg;

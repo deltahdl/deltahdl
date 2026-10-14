@@ -162,6 +162,12 @@ class DeclaredNameTables {
   // (AliasArray in lowerer_import.cpp), the imported declaration's own, so
   // the key up to its first bracket is the one asked for.
   bool IsImportedName(std::string_view name) const;
+  // §37.12 with §6.21: the hierarchical name `b.x` under which a named block
+  // binds a variable it declares (BindNamedBlockVariable), whose VPI object
+  // hangs from the block's rather than from a module named after the block.
+  // `name` must outlive the context.
+  void RegisterBlockVariable(std::string_view name);
+  bool IsBlockVariable(std::string_view name) const;
 
   // §26.3 with §13.4: the package a subroutine was declared in, whose
   // variables its body reads by their bare names, and the package's own
@@ -486,6 +492,8 @@ class DeclaredNameTables {
 
   // §26.3: see RegisterImportedName.
   std::unordered_set<std::string_view> imported_names_;
+  // §37.12: see RegisterBlockVariable.
+  std::unordered_set<std::string_view> block_variables_;
   // §26.3 with §13.4: see RegisterSubroutinePackage.
   std::unordered_map<const ModuleItem*, std::string_view> subroutine_packages_;
   // §13.4.2: see RegisterStaticFrameOwner.

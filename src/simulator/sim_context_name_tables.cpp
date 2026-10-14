@@ -173,6 +173,14 @@ bool DeclaredNameTables::IsImportedName(std::string_view name) const {
          imported_names_.count(name.substr(0, bracket)) != 0;
 }
 
+void DeclaredNameTables::RegisterBlockVariable(std::string_view name) {
+  block_variables_.insert(name);
+}
+
+bool DeclaredNameTables::IsBlockVariable(std::string_view name) const {
+  return block_variables_.count(name) != 0;
+}
+
 void DeclaredNameTables::RegisterSubroutinePackage(const ModuleItem* subroutine,
                                                    std::string_view pkg) {
   subroutine_packages_[subroutine] = pkg;
