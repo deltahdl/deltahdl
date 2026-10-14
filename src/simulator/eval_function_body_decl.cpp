@@ -465,25 +465,20 @@ void ExecFuncVarDecl(const Stmt* stmt, StaticFrame frame, SimContext& ctx,
     ExecFuncVarDeclAutomatic(stmt, ctx, arena);
     return;
   }
-  if (stmt->var_is_static) {
+  // §13.4.2 with §6.21: a local of a static subroutine not declared automatic
+  // is static whether or not `static` is written, kept once for the whole
+  // simulation and reached by hierarchical name (§23.6), `mc.c` or `p::f.x`,
+  // as one written `static` is. §6.21 with §6.8: an automatic subroutine's
+  // local is created, and its initializer run, on every entry to the block
+  // declaring it, so a loop body's `int j = 0;` starts at 0 on each
+  // iteration.
+  if (stmt->var_is_static || frame.is_static_sub) {
     ExecFuncVarDeclStatic(stmt, frame.name, ctx, arena);
-    return;
-  }
-  // §13.4.2: a static subroutine's frame is pushed holding the variables the
-  // last call left (SimContext::PushStaticScope), so its local is found here
-  // and its aggregate is referred to again. §6.21 with §6.8: an automatic
-  // subroutine's local is created, and its initializer run, on every entry
-  // to the block declaring it, so a loop body's `int j = 0;` starts at 0 on
-  // each iteration; found and kept, it held the last iteration's j.
-  if (frame.is_static_sub && ctx.FindLocalVariable(stmt->var_name)) {
-    RestoreStaticAggregate(frame.name, stmt->var_name, ctx);
     return;
   }
   auto* v = CreateFuncLocalVar(stmt->var_name, stmt->var_decl_type,
                                CarrierInit(stmt), ctx, arena);
   CreateFuncLocalAggregate(stmt, v, ctx, arena);
-  if (frame.is_static_sub)
-    RetainStaticAggregate(frame.name, stmt->var_name, ctx, arena);
 }
 
 }  // namespace delta

@@ -187,7 +187,38 @@ Variable* FindVariableByPrefixWalk(const NameLookup& lookup,
   return (top_it != tables.variables.end()) ? top_it->second : nullptr;
 }
 
+// §23.8 with §23.9: a dotted name read inside named blocks, `inner.x` in
+// `outer` or `b.r` in `b`, has its first name looked for in the current scope
+// and then outward through the enclosing ones, a named block among them. A
+// named block's variable is keyed by the path of the named scopes in force
+// where it was declared, starting at the innermost subroutine
+// (BindNamedBlockVariable), so each run of the scopes in force ending at a
+// given depth, innermost depth first, is tried as the name's prefix: the run
+// that starts at a called task's own scope among them. Null for a name with no
+// dot or one no scope answers.
+Variable* FindUnderNamedScopes(
+    const std::unordered_map<std::string_view, Variable*>& variables,
+    const std::string& prefix, const std::vector<std::string_view>& scopes,
+    std::string_view name) {
+  if (name.find('.') == std::string_view::npos) return nullptr;
+  for (size_t depth = scopes.size(); depth > 0; --depth) {
+    for (size_t start = 0; start < depth; ++start) {
+      std::string key = prefix;
+      for (size_t i = start; i < depth; ++i) {
+        key += scopes[i];
+        key += '.';
+      }
+      key += name;
+      auto it = variables.find(key);
+      if (it != variables.end()) return it->second;
+    }
+  }
+  return nullptr;
+}
+
 }  // namespace
+
+// §27.4: resolves `name` against the generate block instances}  // namespace
 
 // §27.4: resolves `name` against the generate block instances the running
 // process is in, if it is in any. `inst_prefix` is the process's
@@ -342,6 +373,10 @@ Variable* SimContext::FindVariable(std::string_view name) {
     std::string prefixed = prefix + std::string(name);
     auto it = variables_.find(prefixed);
     if (it != variables_.end()) return it->second;
+  }
+  if (auto* in_named =
+          FindUnderNamedScopes(variables_, prefix, ActiveNamedScopes(), name)) {
+    return in_named;
   }
   // §23.4: a module declared inside the one instantiating it sees the outer
   // module's name space and may use any name declared there, so the boundary

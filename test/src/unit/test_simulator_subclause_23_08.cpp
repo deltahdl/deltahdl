@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -291,6 +293,38 @@ TEST(UpwardNameReferenceSimulation,
   auto* second = f.ctx.FindVariable("m2.u.t.y");
   ASSERT_NE(second, nullptr);
   EXPECT_EQ(second->value.ToUint64(), 12u);
+}
+
+// §23.8 with §23.9: a dotted name read inside named blocks has its first name
+// looked for in the current scope and then outward through the enclosing
+// ones, so `inner.x` written in `outer` after `inner` ran reaches inner's x,
+// and `b.r` written inside `b` itself, in a task called from a named block of
+// its caller, reaches b's own r, as `tk.b.r` does.
+TEST(UpwardNameReferenceSimulation, DottedNameHeadedByAnEnclosingNamedBlock) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial begin : outer\n"
+                       "    begin : inner\n"
+                       "      reg [3:0] x;\n"
+                       "      x = 4;\n"
+                       "    end\n"
+                       "    $display(\"%0d\", inner.x);\n"
+                       "  end\n"
+                       "  task tk;\n"
+                       "    begin : b\n"
+                       "      logic [3:0] r;\n"
+                       "      b.r = 5;\n"
+                       "      $display(\"%0d\", r);\n"
+                       "      r = 7;\n"
+                       "      $display(\"%0d %0d %0d\", r, b.r, tk.b.r);\n"
+                       "    end\n"
+                       "  endtask\n"
+                       "  initial begin : caller\n"
+                       "    #2 tk;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "4\n5\n7 7 7\n");
 }
 
 }  // namespace

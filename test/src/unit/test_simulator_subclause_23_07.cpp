@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -262,6 +264,41 @@ TEST(DottedNameResolution, DottedNameWritesAStaticLocalNoCallHasMade) {
                        "endmodule\n",
                        f),
             "4\n");
+}
+
+// §23.7 rule c): a dotted name whose first name is a scope a package import
+// brings in, `f.x` with `import p::*`, is the hierarchical name behind the
+// package's name, `p::f.x`. A function declared in a package or a module is
+// static (§13.4.2), so its local is static though `static` is not written, and
+// the name reaches that one variable: written before any call, read after
+// calls that count in it, and the same through a module's own function.
+TEST(DottedNameSimulation, NameThroughAStaticFunctionReachesItsLocal) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  function int f();\n"
+                       "    int x;\n"
+                       "    x = x + 1;\n"
+                       "    return x;\n"
+                       "  endfunction\n"
+                       "endpackage\n"
+                       "module m;\n"
+                       "  import p::*;\n"
+                       "  function int mc();\n"
+                       "    int c;\n"
+                       "    c = c + 1;\n"
+                       "    return c;\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+                       "    f.x = 3;\n"
+                       "    $display(\"%0d %0d\", f.x, p::f.x);\n"
+                       "    void'(f());\n"
+                       "    $display(\"%0d %0d\", p::f(), p::f.x);\n"
+                       "    void'(mc());\n"
+                       "    $display(\"%0d %0d\", mc(), mc.c);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "3 3\n5 5\n2 2\n");
 }
 
 }  // namespace

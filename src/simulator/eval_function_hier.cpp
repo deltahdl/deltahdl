@@ -553,27 +553,39 @@ namespace delta {
 namespace {
 
 // The declaration of the static local `name` among `stmts`, searched through
-// the blocks and branches of the body.
+// the blocks and branches of the body: one written `static`, or, where
+// `every_static`, the subroutine being static, any local not written
+// `automatic` (§13.4.2 with §6.21), a block parameter being no variable.
 const Stmt* FindStaticLocalDecl(const std::vector<Stmt*>& stmts,
-                                std::string_view name);
+                                std::string_view name, bool every_static);
 
-const Stmt* FindStaticLocalDeclIn(const Stmt* s, std::string_view name) {
+const Stmt* FindStaticLocalDeclIn(const Stmt* s, std::string_view name,
+                                  bool every_static) {
   if (s == nullptr) return nullptr;
   if (s->kind == StmtKind::kVarDecl) {
-    return s->var_is_static && s->var_name == name ? s : nullptr;
+    bool is_static = s->var_is_static ||
+                     (every_static && !s->var_is_automatic && !s->var_is_param);
+    return is_static && s->var_name == name ? s : nullptr;
   }
-  if (const Stmt* found = FindStaticLocalDecl(s->stmts, name)) return found;
-  if (const Stmt* found = FindStaticLocalDeclIn(s->body, name)) return found;
-  if (const Stmt* found = FindStaticLocalDeclIn(s->then_branch, name)) {
+  if (const Stmt* found = FindStaticLocalDecl(s->stmts, name, every_static)) {
     return found;
   }
-  return FindStaticLocalDeclIn(s->else_branch, name);
+  if (const Stmt* found = FindStaticLocalDeclIn(s->body, name, every_static)) {
+    return found;
+  }
+  if (const Stmt* found =
+          FindStaticLocalDeclIn(s->then_branch, name, every_static)) {
+    return found;
+  }
+  return FindStaticLocalDeclIn(s->else_branch, name, every_static);
 }
 
 const Stmt* FindStaticLocalDecl(const std::vector<Stmt*>& stmts,
-                                std::string_view name) {
+                                std::string_view name, bool every_static) {
   for (const Stmt* s : stmts) {
-    if (const Stmt* found = FindStaticLocalDeclIn(s, name)) return found;
+    if (const Stmt* found = FindStaticLocalDeclIn(s, name, every_static)) {
+      return found;
+    }
   }
   return nullptr;
 }
@@ -598,7 +610,11 @@ Variable* FunctionStaticLocal(const Expr* member, SimContext& ctx,
     return nullptr;
   }
   std::string_view var = member->rhs->text;
-  const Stmt* decl = FindStaticLocalDecl(target.func->func_body_stmts, var);
+  // §13.4.2: a function declared in a module, an interface, a program or a
+  // package is static unless written automatic.
+  bool is_static_sub = !target.func->is_automatic;
+  const Stmt* decl =
+      FindStaticLocalDecl(target.func->func_body_stmts, var, is_static_sub);
   if (decl == nullptr) return nullptr;
   // §13.4.2: the static frame is keyed by the instance the function runs in,
   // which the call's target names.
@@ -606,10 +622,7 @@ Variable* FunctionStaticLocal(const Expr* member, SimContext& ctx,
   Variable* found = ctx.FindStaticFuncVar(target.func->name, var);
   if (found == nullptr) {
     ctx.PushStaticScope(target.func->name);
-    ExecFuncVarDecl(decl,
-                    {target.func->name,
-                     target.func->is_static && !target.func->is_automatic},
-                    ctx, arena);
+    ExecFuncVarDecl(decl, {target.func->name, is_static_sub}, ctx, arena);
     ctx.PopStaticScope(target.func->name);
     found = ctx.FindStaticFuncVar(target.func->name, var);
   }
