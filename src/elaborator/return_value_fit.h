@@ -106,4 +106,22 @@ ClassMethods ClassMethodsOf(const std::vector<ModuleItem*>& items,
 DeclaredLocals ClassProperties(const ClassDecl* cls,
                                const CompilationUnit* unit);
 
+// The variables `items` declare, those of a module, a package or a compilation
+// unit, which §23.9's outward search finds for a name one of its subroutines
+// uses without declaring it.
+DeclaredLocals ScopeVariables(const std::vector<ModuleItem*>& items);
+
+// Each class `items` declares and each class of `unit`, and each class nested
+// in one (§8.23), with the names a method of it finds without declaring them:
+// its ClassProperties, over the names of the scope around the class (§23.9).
+// That scope is the variables of `items` or of the compilation unit, or, for a
+// nested class, the names a method of the class enclosing it finds. A name the
+// class or a class it extends declares hides the one of the scope around, so
+// none of those is entered. Where a class of the chain extends one
+// SoleClassIndex does not give, the names the chain declares are not known in
+// full, and none of the scope around is entered.
+using ClassScopes = std::unordered_map<const ClassDecl*, DeclaredLocals>;
+ClassScopes ClassScopesOf(const std::vector<ModuleItem*>& items,
+                          const CompilationUnit& unit);
+
 }  // namespace delta

@@ -259,18 +259,6 @@ DeclaredLocals SubroutineLocals(const ModuleItem* item,
   return locals;
 }
 
-// The variables `items` declare, those of a module, a package or a compilation
-// unit, which §23.9's outward search finds for a name one of its subroutines
-// uses without declaring it.
-DeclaredLocals ScopeVariables(const std::vector<ModuleItem*>& items) {
-  DeclaredLocals variables;
-  for (const auto* item : items) {
-    if (item != nullptr && item->kind == ModuleItemKind::kVarDecl)
-      variables[item->name] = {&item->data_type, &item->unpacked_dims};
-  }
-  return variables;
-}
-
 // §12.8 — applies the jump rules to a function/task body and, for a
 // value-returning function, also checks each return statement's expression.
 //
@@ -324,12 +312,14 @@ void Elaborator::ValidateJumpStatements(const ModuleDecl* decl) {
 // holds those outer names alone. So a method's return check reads no name
 // through them: the methods of the classes `items` declare and of the
 // compilation unit's classes, and every method defined out of its class, are
-// checked with no typedef table. Such a method reads its class's properties,
-// those of the class declaring it or of the class an out-of-block definition
-// names (§8.24), and none of the variables of the scope around the class,
-// which a property of a base class the check does not find may hide.
+// checked with no typedef table. Such a method reads the names ClassScopesOf
+// gives the class declaring it, or the class an out-of-block definition names,
+// which stands in the scope of that class (§8.24). A class ClassScopesOf does
+// not give, one an out-of-block definition names that is not declared beside
+// it, is read for no name.
 void Elaborator::CheckJumpStatementsIn(const std::vector<ModuleItem*>& items) {
   const ClassMethods kMethods = ClassMethodsOf(items, unit_);
+  ClassScopes class_scopes = ClassScopesOf(items, *unit_);
   static const TypedefMap kNoTypedefs;
   const ReturnCtx kScope{typedefs_, unit_, ScopeVariables(items)};
   ForEachBodyOwningItem(items, [&](const ModuleItem* item) {
@@ -347,7 +337,7 @@ void Elaborator::CheckJumpStatementsIn(const std::vector<ModuleItem*>& items) {
       const ClassDecl* cls = kMethod != kMethods.end()
                                  ? kMethod->second
                                  : FindClassDecl(item->method_class, unit_);
-      const ReturnCtx kClass{kNoTypedefs, unit_, ClassProperties(cls, unit_)};
+      const ReturnCtx kClass{kNoTypedefs, unit_, class_scopes[cls]};
       CheckSubroutineJumpRules(item, kClass, false, diag_);
     }
   });

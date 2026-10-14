@@ -469,4 +469,133 @@ TEST(JumpStatementElaboration, ANearerDeclarationHidesAClassProperty) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// A name neither a class method nor its class declares is found in the scope
+// around the class (§23.9), so the return gives the module's int, which the
+// method's class return type does not take.
+TEST(JumpStatementElaboration, ReturnOfAVariableAroundAClassIsChecked) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  class A; endclass\n"
+      "  int g;\n"
+      "  class B;\n"
+      "    function A get();\n"
+      "      return g;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return expression in function 'get' is not "
+                            "assignment-compatible with the function's return "
+                            "type",
+                            6, "12.8"));
+}
+
+// A class declared outside every design element finds the compilation unit's
+// variables around it (§3.12.1).
+TEST(JumpStatementElaboration, ReturnOfAUnitVariableFromAUnitClassIsChecked) {
+  ElabFixture f;
+  ElaborateSrc(
+      "int g;\n"
+      "class A; endclass\n"
+      "class B;\n"
+      "  function A get(); return g; endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return expression in function 'get' is not "
+                            "assignment-compatible with the function's return "
+                            "type",
+                            4, "12.8"));
+}
+
+// The scope around a nested class is the class enclosing it (§8.23), whose
+// properties its methods find.
+TEST(JumpStatementElaboration,
+     ReturnOfAnEnclosingClassPropertyFromANestedClassIsChecked) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  class A; endclass\n"
+      "  class O;\n"
+      "    static int depth;\n"
+      "    class I;\n"
+      "      function A get(); return depth; endfunction\n"
+      "    endclass\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return expression in function 'get' is not "
+                            "assignment-compatible with the function's return "
+                            "type",
+                            6, "12.8"));
+}
+
+// A method defined outside its class's body stands in the scope of the class
+// (§8.24), whose variables it finds as one written inside the class does.
+TEST(JumpStatementElaboration,
+     ReturnOfAVariableAroundAClassFromAnOutOfBlockMethodIsChecked) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  class A; endclass\n"
+      "  int g;\n"
+      "  class C;\n"
+      "    extern function A pick();\n"
+      "  endclass\n"
+      "  function A C::pick();\n"
+      "    return g;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "return expression in function 'pick' is not "
+                            "assignment-compatible with the function's return "
+                            "type",
+                            8, "12.8"));
+}
+
+// A property, a parameter and an enumeration constant of the class each hide
+// the module's variable of their name, so no return gives a class handle.
+TEST(JumpStatementElaboration, AClassDeclarationHidesAVariableAroundIt) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  class A; endclass\n"
+      "  A p; A q; A e;\n"
+      "  class B #(parameter int q = 1);\n"
+      "    int p;\n"
+      "    typedef enum {e, f} t;\n"
+      "    function int one(); return p; endfunction\n"
+      "    function int two(); return q; endfunction\n"
+      "    function int three(); return e; endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A class extending its type parameter inherits members the check does not
+// know, any of which may hide a variable around the class, so its methods read
+// none of those variables: here P's int hides the module's class handle.
+TEST(JumpStatementElaboration, AnUnknownBaseLeavesTheVariablesAroundUnread) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  class A; endclass\n"
+      "  A g;\n"
+      "  class P; int g; endclass\n"
+      "  class B #(type T = P) extends T;\n"
+      "    function int get(); return g; endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

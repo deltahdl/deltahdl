@@ -8,8 +8,11 @@
 #include <cstddef>
 #include <functional>
 #include <string_view>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
+#include "elaborator/class_member_names.h"
 #include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_classes_internal.h"
@@ -231,6 +234,58 @@ DeclaredLocals ClassProperties(const ClassDecl* cls,
     }
   }
   return properties;
+}
+
+DeclaredLocals ScopeVariables(const std::vector<ModuleItem*>& items) {
+  DeclaredLocals variables;
+  for (const auto* item : items) {
+    if (item != nullptr && item->kind == ModuleItemKind::kVarDecl)
+      variables[item->name] = {&item->data_type, &item->unpacked_dims};
+  }
+  return variables;
+}
+
+namespace {
+
+// Enters into `scopes` `cls`, with the names a method of it finds over those
+// of `around`, the scope around it, and each class nested in it, with its own
+// over those `cls` gives its methods.
+void EnterClassScope(const ClassDecl* cls, const DeclaredLocals& around,
+                     const SoleClassIndex& classes, const CompilationUnit& unit,
+                     ClassScopes& scopes) {
+  DeclaredLocals names;
+  std::unordered_set<std::string_view> declared;
+  if (classes.SelectableNames(*cls, declared)) {
+    for (const auto& [name, variable] : around) {
+      if (!declared.contains(name)) names.emplace(name, variable);
+    }
+  }
+  for (const auto& [name, property] : ClassProperties(cls, &unit)) {
+    names[name] = property;
+  }
+  for (const ClassMember* m : cls->members) {
+    if (m->kind == ClassMemberKind::kClassDecl)
+      EnterClassScope(m->nested_class, names, classes, unit, scopes);
+  }
+  scopes[cls] = std::move(names);
+}
+
+}  // namespace
+
+ClassScopes ClassScopesOf(const std::vector<ModuleItem*>& items,
+                          const CompilationUnit& unit) {
+  ClassScopes scopes;
+  const SoleClassIndex kClasses(unit);
+  const DeclaredLocals kAround = ScopeVariables(items);
+  for (const auto* item : items) {
+    if (item != nullptr && item->kind == ModuleItemKind::kClassDecl)
+      EnterClassScope(item->class_decl, kAround, kClasses, unit, scopes);
+  }
+  const DeclaredLocals kUnitAround = ScopeVariables(unit.cu_items);
+  for (const auto* cls : unit.classes) {
+    EnterClassScope(cls, kUnitAround, kClasses, unit, scopes);
+  }
+  return scopes;
 }
 
 }  // namespace delta
