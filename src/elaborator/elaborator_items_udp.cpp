@@ -347,8 +347,10 @@ void ClassifyInstantiatedChild(const ModuleItem* item, const ModuleDecl* child,
 }
 
 // Emits the parent-scope legality diagnostics for a module-instance item whose
-// resolved child is `child`: an interface may not instantiate a module, and a
-// program or checker may only instantiate checkers.
+// resolved child is `child`: an interface may not instantiate a module, a
+// program may instantiate no module, interface or program (§24.3), reported as
+// the parser reports one whose cell it has seen declared, and a checker may
+// instantiate only checkers (§17.2).
 void CheckModuleInstParentRules(const ModuleItem* item, const ModuleDecl* decl,
                                 const ModuleDecl* child,
                                 const ParentScopeKind& parent,
@@ -361,8 +363,13 @@ void CheckModuleInstParentRules(const ModuleItem* item, const ModuleDecl* decl,
                            item->inst_module, decl->name),
                Subclause("25.3"));
   }
-  if ((parent.is_program || parent.is_checker) &&
-      child->decl_kind != ModuleDeclKind::kChecker) {
+  if (child->decl_kind == ModuleDeclKind::kChecker) return;
+  if (parent.is_program) {
+    diag.Error(item->loc, "instantiations not allowed in programs",
+               Subclause("24.3"));
+    return;
+  }
+  if (parent.is_checker) {
     diag.Error(item->loc,
                std::format("only checkers can be instantiated inside "
                            "{} '{}'",

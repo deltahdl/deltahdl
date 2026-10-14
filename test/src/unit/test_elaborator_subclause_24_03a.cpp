@@ -813,9 +813,8 @@ TEST(ProgramConstruct, ModuleDeclaredAfterProgramInstantiatingItIsError) {
       "module sub; endmodule\n",
       f, "p");
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "only checkers can be instantiated inside "
-                            "program 'p'",
-                            2, "17.2"));
+                            "instantiations not allowed in programs", 2,
+                            "24.3"));
 }
 
 // §24.3 has a top-level program that is not explicitly instantiated

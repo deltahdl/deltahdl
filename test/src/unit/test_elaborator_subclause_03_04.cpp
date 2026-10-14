@@ -21,9 +21,8 @@ TEST(DesignElementPlacement, ModuleInstanceInAProgramGenerateBlock) {
       "module top; p pi(); endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "only checkers can be instantiated inside program "
-                            "'p'",
-                            3, "17.2"));
+                            "instantiations not allowed in programs", 3,
+                            "24.3"));
 }
 
 TEST(DesignElementPlacement, UdpInstanceInAProgramGenerateBlock) {
