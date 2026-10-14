@@ -294,6 +294,7 @@ void Elaborator::TrackVarArrayInfo(
   // dimension needs the record as much as two: an address is resolved the same
   // way whatever the dimension count.
   var.num_unpacked_dims = static_cast<uint32_t>(item->unpacked_dims.size());
+  var.declared_unpacked_dims = &item->unpacked_dims;
   var.unpacked_dims.reserve(info.declared_dims.size());
   for (const auto& dim : info.declared_dims) {
     var.unpacked_dims.push_back({dim.left, dim.right});

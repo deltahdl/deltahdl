@@ -358,13 +358,36 @@ void Elaborator::RefoldChildOverrides(RtlirModule* mod,
 // declares reads that block's index as well (§27.4). A net carries no such
 // index, so one a generate block declares, named under the block's scope,
 // keeps the width it was elaborated with.
+// §23.10.1 with §7.4.2: the same holds for the unpacked dimensions of a fixed
+// array, `logic x[N]`, whose bounds are folded again in `scope`; a dynamic,
+// queue or associative dimension has no bounds a parameter could give.
+static void RefoldFixedUnpackedDims(RtlirVariable& var, const ScopeMap& scope) {
+  if (var.declared_unpacked_dims == nullptr ||
+      var.unpacked_dim_sizes.size() != var.declared_unpacked_dims->size()) {
+    return;
+  }
+  std::vector<RtlirUnpackedDim> dims;
+  for (const Expr* dim : *var.declared_unpacked_dims) {
+    auto folded = FoldUnpackedDimBounds(dim, scope);
+    if (!folded) return;
+    dims.push_back(*folded);
+  }
+  var.unpacked_dims = dims;
+  var.unpacked_dim_sizes.clear();
+  for (const auto& dim : dims) var.unpacked_dim_sizes.push_back(dim.Size());
+  var.unpacked_size = dims[0].Size();
+  var.unpacked_lo = dims[0].Low();
+  var.is_descending = dims[0].left > dims[0].right;
+}
+
 static void ResizeParamSizedDecls(RtlirModule* mod, const TypedefMap& typedefs,
                                   const ScopeMap& scope) {
   for (auto& var : mod->variables) {
-    if (var.dtype == nullptr) continue;
     ScopeMap var_scope = scope;
     for (const auto& [name, value] : var.gen_block_consts)
       var_scope[name] = value;
+    RefoldFixedUnpackedDims(var, var_scope);
+    if (var.dtype == nullptr) continue;
     var.width = EvalTypeWidth(*var.dtype, typedefs, var_scope);
   }
   for (auto& net : mod->nets) {

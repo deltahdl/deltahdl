@@ -460,4 +460,31 @@ TEST(DefparamSimulation, ADefparamResizesGenerateBlockDeclarations) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §23.10.1 with §7.4.2: an unpacked dimension the parameter sizes takes its
+// size from the value the defparam gives: x[N] holds four elements, x[3] among
+// them, y[N:1] runs from 4 down to 1, and z[2][N] is four wide in its second
+// dimension. Each kept the size the default of 2 gave it: 2, 2 and 2, x[3]
+// reading no element, and y running from 2.
+TEST(DefparamSimulation, ADefparamResizesAnUnpackedDimension) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(
+                "module mm #(N = 2)();\n"
+                "  logic [3:0] x[N];\n"
+                "  logic [3:0] y[N:1];\n"
+                "  logic z[2][N];\n"
+                "  initial begin\n"
+                "    foreach (x[i]) x[i] = i;\n"
+                "    #1 $display(\"%0d %0d %0d %0d %0d %0d\", $size(x), x[3],\n"
+                "                $size(y), $left(y), $right(y), $size(z, 2));\n"
+                "  end\n"
+                "endmodule\n"
+                "module top;\n"
+                "  mm d();\n"
+                "  defparam d.N = 4;\n"
+                "endmodule\n",
+                f),
+            "4 3 4 4 1 4\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

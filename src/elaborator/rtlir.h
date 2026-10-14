@@ -309,6 +309,10 @@ struct RtlirVariable {
   // and `logic [7:0] m [1:4][]` record the same thing, and a consumer reads the
   // second as an array of words it can address.
   uint32_t num_unpacked_dims = 0;
+  // §23.10.1: the unpacked dimensions as the declaration wrote them, null for
+  // a declaration with none, so that a defparam overriding a parameter that
+  // sizes one can fold its bounds again (Elaborator::RecomputeDependentParams).
+  const std::vector<Expr*>* declared_unpacked_dims = nullptr;
   bool is_dynamic = false;
   bool is_queue = false;
   int32_t queue_max_size = -1;
