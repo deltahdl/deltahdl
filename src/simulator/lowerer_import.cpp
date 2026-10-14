@@ -12,6 +12,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"

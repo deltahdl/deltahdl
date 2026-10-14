@@ -7,6 +7,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/unit_scope_order.h"

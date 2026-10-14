@@ -18,6 +18,7 @@
 #include "elaborator/elaborator_items_params.h"
 #include "elaborator/global_clock_assertion_event.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/time_literal_scale.h"
 #include "elaborator/unit_scope_switch.h"

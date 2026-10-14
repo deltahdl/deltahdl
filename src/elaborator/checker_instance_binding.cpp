@@ -15,6 +15,7 @@
 #include "elaborator/checker_actual_rules.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"

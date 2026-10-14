@@ -6,6 +6,7 @@
 #include "common/arena.h"
 #include "common/source_loc.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "parser/ast_covergroup.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
