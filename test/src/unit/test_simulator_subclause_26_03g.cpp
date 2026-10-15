@@ -365,4 +365,79 @@ TEST(PackageImportSim, ImportedPackageVariableIsAnAssignmentTarget) {
             "a=17 b=17\nc=23 d=23\ne=5\nf=2\n");
 }
 
+// §26.3 with §23.7: a bare name the module's wildcard import supplies to a
+// reference in a generate block is imported into the module, so the block's
+// later declaration of the same name is not what the reference reads or
+// writes. The block reads p::q's 5 and writes 7 to it, and its own q keeps 9.
+// Before, both the read and the write reached the block's q.
+TEST(PackageImportSim, BlockReferenceBeforeItsDeclarationReadsTheImport) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package p; int q = 5; endpackage\n"
+                 "module m;\n"
+                 "  import p::*;\n"
+                 "  if (1) begin : s1\n"
+                 "    initial begin #1 $display(\"r=%0d\", q); q = 7; end\n"
+                 "    int q = 9;\n"
+                 "  end\n"
+                 "  initial #2 $display(\"p=%0d b=%0d\", p::q, s1.q);\n"
+                 "endmodule\n",
+                 f),
+      "r=5\np=7 b=9\n");
+}
+
+// §26.3 with §26.7: a class a package declares is visible to a module only
+// through an import or a scoped name, so in a module that does neither,
+// `semaphore` is std's built-in class: the element constructed with one key
+// gives it up once and then has none. Before, the package's class answered
+// the bare name for the whole run once the modules were lowered, and the
+// element was built as an object of p's class.
+TEST(PackageImportSim, UnimportedPackageClassLeavesTheBuiltinName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  class semaphore;\n"
+                       "    int keys;\n"
+                       "  endclass\n"
+                       "endpackage\n"
+                       "module m;\n"
+                       "  semaphore arr[2];\n"
+                       "  int a, b;\n"
+                       "  initial begin\n"
+                       "    arr[1] = new(1);\n"
+                       "    a = arr[1].try_get(1);\n"
+                       "    b = arr[1].try_get(1);\n"
+                       "    $display(\"a=%0d b=%0d\", a, b);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "a=1 b=0\n");
+}
+
+// §26.2: within the package its class is visible by its bare name, so p's
+// method constructs a Node by that name for a module that reaches the class
+// only as p::Node, never importing p.
+TEST(PackageImportSim, PackageClassMethodNamesItsClassBare) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  class Node;\n"
+                       "    int v;\n"
+                       "    Node next;\n"
+                       "    function void grow(int x);\n"
+                       "      Node n = new;\n"
+                       "      n.v = x;\n"
+                       "      next = n;\n"
+                       "    endfunction\n"
+                       "  endclass\n"
+                       "endpackage\n"
+                       "module m;\n"
+                       "  p::Node h = new;\n"
+                       "  initial begin\n"
+                       "    h.grow(4);\n"
+                       "    $display(\"v=%0d\", h.next.v);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "v=4\n");
+}
+
 }  // namespace

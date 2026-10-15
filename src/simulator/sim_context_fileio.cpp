@@ -623,7 +623,7 @@ ClassTypeInfo* SimContext::FindClassType(std::string_view name) const {
   }
   if (own != nullptr) return own;
   auto it = class_types_.find(name);
-  if (it != class_types_.end()) return it->second;
+  if (it != class_types_.end() && it->second != nullptr) return it->second;
   for (const ClassTypeInfo* scope = CurrentMethodClass(); scope != nullptr;
        scope = scope->enclosing) {
     for (const ClassTypeInfo* base = scope; base != nullptr;
@@ -633,14 +633,24 @@ ClassTypeInfo* SimContext::FindClassType(std::string_view name) const {
       }
     }
   }
-  return nullptr;
+  // §26.2 with §26.3: a package's classes are visible by their bare names
+  // throughout the package, its subroutines and its classes' method bodies
+  // included, whose frames carry the package's name (Scope::package), while
+  // a bare name no import brought in stands for no class
+  // (Lowerer::LowerUnimportedPackageClasses); so the package's own code
+  // reaches its class under the package's key.
+  const Scope* frame = PackageFrame();
+  if (frame == nullptr) return nullptr;
+  auto own_package =
+      class_types_.find(std::string(frame->package) + "::" + std::string(name));
+  return own_package != class_types_.end() ? own_package->second : nullptr;
 }
 
 std::vector<ClassTypeInfo*> SimContext::RegisteredClassTypes(bool all) const {
   std::vector<ClassTypeInfo*> classes;
-  // A package class's bare name held back while the modules bind their own
-  // stands with no class behind it (Lowerer::LowerUnimportedPackageClasses)
-  // and is passed over; read through it, this dereferenced null.
+  // A package class's bare name no import brought in stands with no class
+  // behind it (Lowerer::LowerUnimportedPackageClasses) and is passed over;
+  // read through it, this dereferenced null.
   for (const auto& [key, info] : class_types_) {
     if (info != nullptr && (all || key == info->name)) classes.push_back(info);
   }

@@ -914,30 +914,25 @@ static std::vector<std::string_view> UnboundPackageClassNames(
 // after the module's initializer, which ran on a null handle. §26.3
 // (printed 810): a package's class is visible in a module by import or
 // through `p1::C` alone, so a bare name nothing had bound before this pass
-// is given back to no class when the pass is done -- bound to the package's
-// class, it took the bare name from a module's later import of another
-// package's like-named class (LowerPackageItem keeps a bound bare name) --
-// and is bound to the class again once the modules are lowered
-// (RebindStrayPackageClassNames), the state the pass left behind when it
-// ran after them, which a module's `p1::C h; initial h = new` relies on, the
-// elaborator naming the class by its bare name (SetVariableTypeInfo in
-// src/elaborator/elaborator_decls.cpp). A name a unit class or a unit
-// import held keeps its holder, as LowerUnimportedClassesOf gives it back.
+// is given back to no class when the pass is done, for the rest of the run:
+// bound to the package's class, it took the bare name from a module's later
+// import of another package's like-named class (LowerPackageItem keeps a bound
+// bare name), and made the class what a module that never imported p1 means
+// by the name, `semaphore` among them, which is std's built-in class there
+// (§26.7). A module's `p1::C h` is a handle of the class under its qualified
+// key (SetVariableTypeInfo in src/elaborator/elaborator_decls.cpp), and the
+// package's own code reaches the class by its bare name under the package's
+// key (SimContext::FindClassType). The typedef names that denote a class are
+// bound while the bare names still name one, so a package's alias of its own
+// class stands for it. A name a unit class or a unit import held keeps its
+// holder, as LowerUnimportedClassesOf gives it back.
 void Lowerer::LowerUnimportedPackageClasses() {
   if (!design_) return;
   std::vector<std::string_view> unbound =
       UnboundPackageClassNames(design_, ctx_);
   for (const auto* pkg : design_->packages) LowerUnimportedClassesOf(pkg);
-  for (std::string_view name : unbound) {
-    stray_package_class_names_.emplace_back(name, ctx_.FindClassType(name));
-    ctx_.RegisterClassType(name, nullptr);
-  }
-}
-
-void Lowerer::RebindStrayPackageClassNames() {
-  for (const auto& [name, info] : stray_package_class_names_) {
-    if (ctx_.FindClassType(name) == nullptr) ctx_.RegisterClassType(name, info);
-  }
+  RegisterClassTypeAliases(design_, ctx_, arena_);
+  for (std::string_view name : unbound) ctx_.RegisterClassType(name, nullptr);
 }
 
 }  // namespace delta

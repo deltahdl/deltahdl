@@ -253,12 +253,11 @@ class Lowerer {
   // bound under its qualified key, ahead of the modules (§26.2 has the
   // package's declaration assignments, which construct objects of them, made
   // before a module's) and displacing no unqualified binding an import or a
-  // declaration made: a bare name nothing held is left unbound until the
-  // modules are lowered and RebindStrayPackageClassNames binds it to the
-  // class. Defined in lowerer_import.cpp.
+  // declaration made: a bare name nothing held is left bound to no class, so
+  // only an import or the package's own code reaches the class by it (§26.3).
+  // Defined in lowerer_import.cpp.
   void LowerUnimportedPackageClasses();
   void LowerUnimportedClassesOf(const PackageDecl* pkg);
-  void RebindStrayPackageClassNames();
   // Lowers the class `cls` that package `pkg` declares and binds it under
   // "pkg::name" as well as under the bare name LowerClassDecl gives it, once:
   // a second call for the same class finds the qualified key and does nothing,
@@ -470,11 +469,6 @@ class Lowerer {
   // the instance driving one of them does not carry them a second time.
   // LowerPortBindings fills it before the instance's own body is lowered.
   std::unordered_set<std::string> path_delayed_ports_;
-  // The bare class names LowerUnimportedPackageClasses found no scope had
-  // bound, each with the package class the pass bound it to, which
-  // RebindStrayPackageClassNames binds again once the modules are lowered.
-  std::vector<std::pair<std::string_view, ClassTypeInfo*>>
-      stray_package_class_names_;
 };
 
 }  // namespace delta

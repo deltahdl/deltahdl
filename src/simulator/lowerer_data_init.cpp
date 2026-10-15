@@ -98,15 +98,12 @@ void Lowerer::InitCompilationUnitData() {
 // a module's `int y = p1::b.get_n();` reads the package's object. The
 // packages' classes are lowered for it here (LowerUnimportedPackageClasses,
 // lowerer_import.cpp), the unit's having been lowered by
-// LowerCompilationUnitClasses, and the typedef names that denote a class
-// (§6.18) are bound to it so a variable declared by one constructs; the names a
-// package class leaves unbound until the modules are lowered are bound
-// again by RebindStrayPackageClassNames. Constructed after the modules, as
-// they were, the package's object was made after the module's initializer
-// had called a method on a null handle.
+// LowerCompilationUnitClasses, with the typedef names that denote a class
+// (§6.18) bound to it so a variable declared by one constructs. Constructed
+// after the modules, as they were, the package's object was made after the
+// module's initializer had called a method on a null handle.
 void Lowerer::ConstructDesignData() {
   LowerUnimportedPackageClasses();
-  RegisterClassTypeAliases(design_, ctx_, arena_);
   ConstructDataClassInitializers(design_, ctx_, arena_);
 }
 

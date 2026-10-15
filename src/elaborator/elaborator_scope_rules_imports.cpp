@@ -22,21 +22,15 @@ namespace delta {
 
 namespace {
 
-// An identifier a reference reads, and whether it heads a dotted name (§23.7)
-// rather than standing alone.
-struct IdentRef {
-  Expr* id;
-  bool dotted;
-};
-
-void WalkExprIdents(Expr* e, std::vector<IdentRef>& out, bool dotted = false) {
+// The identifiers a reference reads, a dotted name (§23.7) by its first name.
+void WalkExprIdents(Expr* e, std::vector<Expr*>& out) {
   if (!e) return;
   if (e->kind == ExprKind::kIdentifier) {
-    out.push_back({e, dotted});
+    out.push_back(e);
     return;
   }
   if (e->kind == ExprKind::kMemberAccess) {
-    WalkExprIdents(e->lhs, out, true);
+    WalkExprIdents(e->lhs, out);
     return;
   }
   WalkExprIdents(e->lhs, out);
@@ -53,7 +47,7 @@ void WalkExprIdents(Expr* e, std::vector<IdentRef>& out, bool dotted = false) {
   for (auto* el : e->elements) WalkExprIdents(el, out);
 }
 
-void WalkStmtScalarIdents(const Stmt* s, std::vector<IdentRef>& out) {
+void WalkStmtScalarIdents(const Stmt* s, std::vector<Expr*>& out) {
   WalkExprIdents(s->condition, out);
   WalkExprIdents(s->lhs, out);
   WalkExprIdents(s->rhs, out);
@@ -74,7 +68,7 @@ void WalkStmtScalarIdents(const Stmt* s, std::vector<IdentRef>& out) {
 // descent in WalkStmtIdents below, which ForEachChildStmt reaches through
 // CaseItem::body and through the second member of a randcase item, so that no
 // statement is walked twice.
-void WalkStmtCaseIdents(const Stmt* s, std::vector<IdentRef>& out) {
+void WalkStmtCaseIdents(const Stmt* s, std::vector<Expr*>& out) {
   for (const auto& ci : s->case_items) {
     for (auto* p : ci.patterns) WalkExprIdents(p, out);
   }
@@ -87,7 +81,7 @@ void WalkStmtCaseIdents(const Stmt* s, std::vector<IdentRef>& out) {
 // ForEachChildStmt in elaborator_validate_internal.h states those positions
 // once for the whole elaborator, which is why the list is not written out again
 // here.
-void WalkStmtIdents(const Stmt* s, std::vector<IdentRef>& out) {
+void WalkStmtIdents(const Stmt* s, std::vector<Expr*>& out) {
   if (!s) return;
   WalkStmtScalarIdents(s, out);
   WalkStmtCaseIdents(s, out);
@@ -227,20 +221,16 @@ void NoteOuterBinding(ImportRuleCtx& from, ImportRuleCtx& binder, Expr* e) {
 // `initial x = 1;` in a generate block of a module importing p bind p::x
 // through the module's scope, the block's own `import p2::*` standing after
 // the reference.
-void ProcessImportRuleRef(ImportRuleCtx& ctx, const IdentRef& ref) {
-  Expr* e = ref.id;
-  bool dotted = ref.dotted;
+void ProcessImportRuleRef(ImportRuleCtx& ctx, Expr* e) {
   auto name = e->text;
   if (name.empty()) return;
   for (ImportRuleCtx* scope = &ctx; scope != nullptr; scope = scope->outer) {
     if (scope->seen_decls.count(name)) {
-      if (dotted && scope->wildcard_claimed.count(name)) {
-        NoteOuterBinding(ctx, *scope, e);
-      }
+      if (scope->wildcard_claimed.count(name)) NoteOuterBinding(ctx, *scope, e);
       return;
     }
     if (ClaimWildcardCandidate(*scope, e)) {
-      if (dotted) NoteOuterBinding(ctx, *scope, e);
+      NoteOuterBinding(ctx, *scope, e);
       return;
     }
   }
@@ -340,9 +330,8 @@ void HandleImportDecl(ImportRuleCtx& ctx, const ModuleItem* item) {
   HandleExplicitImport(ctx, item, pkg_name);
 }
 
-void ProcessImportRuleRefs(ImportRuleCtx& ctx,
-                           const std::vector<IdentRef>& refs) {
-  for (const IdentRef& ref : refs) ProcessImportRuleRef(ctx, ref);
+void ProcessImportRuleRefs(ImportRuleCtx& ctx, const std::vector<Expr*>& refs) {
+  for (Expr* ref : refs) ProcessImportRuleRef(ctx, ref);
 }
 
 void HandleImportRuleItem(ImportRuleCtx& ctx, const ModuleItem* item);
@@ -419,13 +408,13 @@ void HandleImportRuleItem(ImportRuleCtx& ctx, const ModuleItem* item) {
     case ModuleItemKind::kAlwaysCombBlock:
     case ModuleItemKind::kAlwaysFFBlock:
     case ModuleItemKind::kAlwaysLatchBlock: {
-      std::vector<IdentRef> refs;
+      std::vector<Expr*> refs;
       WalkStmtIdents(item->body, refs);
       ProcessImportRuleRefs(ctx, refs);
       break;
     }
     case ModuleItemKind::kContAssign: {
-      std::vector<IdentRef> refs;
+      std::vector<Expr*> refs;
       WalkExprIdents(item->assign_lhs, refs);
       WalkExprIdents(item->assign_rhs, refs);
       ProcessImportRuleRefs(ctx, refs);
@@ -466,7 +455,7 @@ void HandleImportRuleItem(ImportRuleCtx& ctx, const ModuleItem* item) {
       ForEachEnumTypeIn(item->typedef_type, track_literals);
       ForEachEnumTypeIn(item->data_type, track_literals);
       if (item->init_expr) {
-        std::vector<IdentRef> refs;
+        std::vector<Expr*> refs;
         WalkExprIdents(item->init_expr, refs);
         ProcessImportRuleRefs(ctx, refs);
       }

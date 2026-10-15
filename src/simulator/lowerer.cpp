@@ -848,10 +848,8 @@ void Lowerer::Lower(const RtlirDesign* design) {
       LowerParallelTop(mod);
     }
   }
-  // §26.3: the bare names of the package classes no scope had bound, held
-  // back while the modules bound their own, and the typedef names that
-  // denote one of them (§6.18), bound once the modules are lowered.
-  RebindStrayPackageClassNames();
+  // §6.18: the typedef names the modules declare that denote a class, bound
+  // once the modules have bound their classes.
   RegisterClassTypeAliases(design, ctx_, arena_);
   // §10.5: a static variable's declaration initializer is set before any
   // initial or always procedure starts, the module variables it may read

@@ -7,8 +7,7 @@
 namespace delta {
 
 std::string IdentifierLookupKey(const Expr* expr) {
-  if (expr->scope_prefix != "$root" && expr->scope_prefix != "$unit")
-    return std::string(expr->text);
+  if (expr->scope_prefix.empty()) return std::string(expr->text);
   std::string key(expr->scope_prefix);
   key += '.';
   key += expr->text;
@@ -16,8 +15,8 @@ std::string IdentifierLookupKey(const Expr* expr) {
 }
 
 std::string DeclaredKindsKey(const Expr* expr) {
-  if (expr->scope_prefix == "$unit") return IdentifierLookupKey(expr);
-  return std::string(expr->text);
+  if (expr->scope_prefix == "$root") return std::string(expr->text);
+  return IdentifierLookupKey(expr);
 }
 
 }  // namespace delta
