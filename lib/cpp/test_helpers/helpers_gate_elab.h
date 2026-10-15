@@ -6,6 +6,7 @@
 
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "lexer/token.h"
 #include "parser/ast_expr.h"
 
 using namespace delta;
@@ -38,13 +39,22 @@ inline const RtlirContAssign* ElaborateSingleGateAssign(
 // expression of the module's first continuous assignment (the lowered drive
 // expression). Returns nullptr (after firing a gtest failure) on any
 // structural mismatch.
+//
+// A MOS switch's drive tests its data for z ahead of the conditional its
+// control selects with (§28.7 Table 28-6 gives z data a z output whatever the
+// control), so for one the conditional answered is the one behind that test.
 inline const Expr* ElaborateSingleGateRhs(const std::string& instantiation,
                                           ElabFixture& f) {
   const auto* assign = ElaborateSingleGateAssign(instantiation, f);
   EXPECT_NE(assign, nullptr);
   if (assign == nullptr) return nullptr;
   EXPECT_NE(assign->rhs, nullptr);
-  return assign->rhs;
+  const Expr* rhs = assign->rhs;
+  if (rhs != nullptr && rhs->kind == ExprKind::kTernary &&
+      rhs->condition != nullptr && rhs->condition->op == TokenKind::kEqEqEq) {
+    return rhs->false_expr;
+  }
+  return rhs;
 }
 
 // Asserts that the lowered drive expression is a conditional whose enabling

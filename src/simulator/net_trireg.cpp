@@ -90,6 +90,10 @@ void ScheduleChargeDecay(Net& net, uint64_t since, Arena& arena,
       value.words[b / 64].bval |= mask;
     }
     net.Resolve(arena, sched);
+    // The decay changed the value the net shows in place, which a net that
+    // resolves after a net delay (Net::delay) finds already standing and so
+    // announces to no one.
+    net.resolved->NotifyWatchers();
   };
   auto time = sched->CurrentTime();
   time.ticks += net.decay_ticks;

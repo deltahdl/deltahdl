@@ -248,6 +248,19 @@ Net* SimContext::FindNet(std::string_view name) {
     return (it != nets_.end()) ? it->second : nullptr;
   }
   std::string prefix = ActiveInstancePrefix();
+  // §27.4 and §23.9: a net a generate block the running process stands in
+  // declares is held under the block's prefix and is found ahead of one the
+  // enclosing scope declares, innermost block first, as FindVariable finds a
+  // variable (SimContext::FindInGenerateBlock). Looked up under the instance
+  // prefix alone, a continuous assignment in a block drove the module's net of
+  // its name, or none.
+  if (current_process_ != nullptr) {
+    for (const std::string& key :
+         GenerateBlockKeys(prefix, current_process_->gen_prefixes, name)) {
+      auto found = nets_.find(key);
+      if (found != nets_.end()) return found->second;
+    }
+  }
   if (!prefix.empty()) {
     auto prefixed = nets_.find(prefix + std::string(name));
     if (prefixed != nets_.end()) return prefixed->second;
