@@ -73,6 +73,9 @@
 #include "fixture_config_run.h"
 #include "fixture_scratch_dir.h"
 #include "fixture_simulator.h"
+#include "fixture_vpi_run.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context.h"
@@ -341,6 +344,40 @@ TEST(LibraryBindingDisplay, StrobedCommandExpandsTheSpecifier) {
   EXPECT_EQ(out, "[work.leaf]\n");
 }
 
+// §33.7: a function called across the hierarchy runs in the instance holding
+// it, so a %l it formats names that instance even when the command calling it
+// is deferred: work.leaf, as $display would give, not the caller's work.t.
+TEST(LibraryBindingDisplay, FunctionCalledFromAStrobedArgumentNamesItsOwn) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module leaf;\n"
+      "  function string who(); return $sformatf(\"%l\"); endfunction\n"
+      "endmodule\n"
+      "module t;\n"
+      "  leaf u();\n"
+      "  initial $strobe(\"[%s]\", u.who());\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "[work.leaf]\n");
+}
+
+// §33.7: a static variable initializer of a child instance is evaluated while
+// that instance is being built, and is part of it, so a %l it formats names
+// the child's binding, work.leaf, not the top's.
+TEST(LibraryBindingDisplay, ChildStaticInitializerNamesTheChild) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module leaf;\n"
+      "  string s = $sformatf(\"[%l]\");\n"
+      "  initial $display(s);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  leaf u();\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "[work.leaf]\n");
+}
+
 // The monitoring command is deferred the same way, and produces its text from a
 // display list the run holds on to rather than from the call site, so the same
 // instance question is asked of a retained list. It is written into the same
@@ -598,13 +635,14 @@ TEST(LibraryBindingDisplay, VpiGetStrReturnsCellNameForModule) {
 }
 
 // Every module instance is bound to some cell, and where no cell name was
-// recorded separately the cell is the design element's own -- so the property
-// names it rather than answering with an empty string. The instance path is
-// kept different from the cell name here, since a module whose two names
-// coincide could not tell the two apart.
-TEST(LibraryBindingDisplay, VpiCellFallsBackToTheModulesOwnName) {
+// recorded separately the cell is the definition it is an instance of -- so
+// the property names that rather than the instance's own name. The two are
+// kept different here, since a module whose two names coincide could not tell
+// them apart.
+TEST(LibraryBindingDisplay, VpiCellFallsBackToTheDefinitionName) {
   VpiContext ctx;
-  VpiHandle mod = ctx.CreateModule("adder", "top.a2");
+  VpiHandle mod = ctx.CreateModule("a2", "top.a2");
+  mod->def_name = "adder";
   const char* cell = ctx.GetStr(kVpiCell, mod);
   ASSERT_NE(cell, nullptr);
   EXPECT_STREQ(cell, "adder");
@@ -666,6 +704,51 @@ TEST(LibraryBindingDisplay, VpiGetStrCApiReadsBindingProperties) {
   EXPECT_STREQ(vpi_get_str(vpiCell, VpiHandleOf(mod)), "adder");
   EXPECT_STREQ(vpi_get_str(vpiConfig, VpiHandleOf(mod)), "work.cfg1");
   SetGlobalVpiContext(nullptr);
+}
+
+// A design run with a PLI application registered, elaborated under the first
+// configuration its source declares rather than from a top module.
+class LibraryBindingVpiRun : public VpiDesignRun {
+ protected:
+  void RunUnderConfig(const std::string& src) {
+    auto fid = f_.mgr.AddFile("<test>", src);
+    Lexer lexer(f_.mgr.FileContent(fid), fid, f_.diag);
+    Parser parser(lexer, f_.arena, f_.diag);
+    auto* cu = parser.Parse();
+    ASSERT_NE(cu, nullptr);
+    ASSERT_FALSE(cu->configs.empty());
+    Elaborator elab(f_.arena, f_.diag, cu);
+    RtlirDesign* design = elab.Elaborate(cu->configs[0]);
+    ASSERT_NE(design, nullptr);
+    ASSERT_FALSE(f_.diag.HasErrors());
+    LowerAndRun(design, f_);
+  }
+};
+
+// §33.7: in a real run, an instance's vpiLibrary is the library its module was
+// compiled into -- work, with no library map -- and its vpiCell the cell bound
+// to it, adder, not the instance's own name a2. No configuration controlled
+// the binding, so vpiConfig names none.
+TEST_F(LibraryBindingVpiRun, InstanceReportsItsLibraryAndCell) {
+  Run("module adder; endmodule\n"
+      "module top; adder a2(); endmodule\n");
+  vpiHandle a2 = By("top.a2");
+  ASSERT_NE(a2, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiLibrary, a2), "work");
+  EXPECT_STREQ(vpi_get_str(vpiCell, a2), "adder");
+  EXPECT_STREQ(vpi_get_str(vpiConfig, a2), "");
+}
+
+// §33.7: elaborated under config cfg1, compiled into work, the instance names
+// that configuration as the one that controlled its binding.
+TEST_F(LibraryBindingVpiRun, InstanceBoundUnderAConfigReportsTheConfig) {
+  RunUnderConfig(
+      "module adder; endmodule\n"
+      "module top; adder a1(); endmodule\n"
+      "config cfg1; design work.top; endconfig\n");
+  vpiHandle a1 = By("top.a1");
+  ASSERT_NE(a1, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiConfig, a1), "work.cfg1");
 }
 
 }  // namespace

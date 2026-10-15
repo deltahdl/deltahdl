@@ -467,8 +467,7 @@ void Lowerer::RegisterChildInstanceKeys(const RtlirModule* mod) {
   for (const auto& child : mod->children) {
     if (child.resolved == nullptr) continue;
     RegisterInstanceKeyBinding(inst_prefix_ + std::string(child.inst_name),
-                               child.resolved->library, child.resolved->name,
-                               ctx_);
+                               child.resolved, ctx_);
   }
 }
 
@@ -607,8 +606,7 @@ void Lowerer::LowerChildInstance(const RtlirModuleInst& child) {
   // stopping at the §23.9 module boundary.
   if (child.is_nested_decl) ctx_.RegisterNestedDeclScope(inst_prefix_);
 
-  RegisterInstanceKeyBinding(inst_prefix_, child.resolved->library,
-                             child.resolved->name, ctx_);
+  RegisterInstanceKeyBinding(inst_prefix_, child.resolved, ctx_);
   LowerParams(child.resolved);
   // §30.3: the child's specify blocks belong to this instance, so they are
   // recorded under this instance's prefix. Lower registers them once every

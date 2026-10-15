@@ -586,6 +586,18 @@ void DeclaredNameTables::RegisterInstanceType(std::string_view prefix,
   instance_types_[std::string(prefix)] = std::string(type);
 }
 
+void DeclaredNameTables::RegisterInstanceConfig(std::string_view prefix,
+                                                std::string_view config) {
+  instance_configs_[std::string(prefix)] = std::string(config);
+}
+
+std::string_view DeclaredNameTables::FindInstanceConfig(
+    std::string_view prefix) const {
+  auto it = instance_configs_.find(std::string(prefix));
+  return it != instance_configs_.end() ? std::string_view(it->second)
+                                       : std::string_view{};
+}
+
 std::string_view DeclaredNameTables::FindInstanceType(
     std::string_view prefix) const {
   auto it = instance_types_.find(std::string(prefix));

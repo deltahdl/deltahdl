@@ -830,8 +830,12 @@ class ElaboratorData {
     decltype(cell_liblist_bindings_) cell_liblist_bindings;
     decltype(config_delegations_) delegations;
     decltype(cell_config_delegations_) cell_delegations;
+    std::string_view config;
   };
   std::vector<ConfigRuleTables> enclosing_config_rules_;
+  // §33.7: the library.cell of the configuration whose rules are in force,
+  // which every module elaborated under them records as its controller.
+  std::string_view active_config_;
 
   std::string current_inst_path_;
   // §33.4.1.3 (printed page 939): the instance clause's instance name is a

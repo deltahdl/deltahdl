@@ -352,6 +352,10 @@ class DeclaredNameTables {
 
   void RegisterInstanceType(std::string_view prefix, std::string_view type);
   std::string_view FindInstanceType(std::string_view prefix) const;
+  // §33.7: the library.cell of the configuration that controlled the binding
+  // of the instance keyed `prefix`, empty where none did.
+  void RegisterInstanceConfig(std::string_view prefix, std::string_view config);
+  std::string_view FindInstanceConfig(std::string_view prefix) const;
   // §23.9 with §23.10.2: the instance an override of `prefix`'s parameters
   // was written in is the instance holding `prefix`. Its prefix is found by
   // dropping one dotted component at a time until what is left names an
@@ -559,6 +563,7 @@ class DeclaredNameTables {
   std::unordered_map<uint64_t, MailboxObject*> contained_mailboxes_;
 
   std::unordered_map<std::string, std::string> instance_types_;
+  std::unordered_map<std::string, std::string> instance_configs_;
   std::unordered_map<std::string, std::string> instance_paths_;
   std::unordered_map<std::string, std::string> instance_keys_by_path_;
   std::unordered_map<std::string, std::string> interface_port_instances_;

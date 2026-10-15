@@ -303,6 +303,16 @@ void VpiContext::AttachModuleDefNames(SimContext& sim_ctx) {
     if (!VpiIsInstanceType(obj->type)) continue;
     std::string_view type = sim_ctx.FindInstanceType(obj->full_name);
     if (!type.empty()) obj->def_name = std::string(type);
+    // §33.7: the library the bound module was compiled into and the cell it
+    // is, as the binding %l reports names them, and the configuration that
+    // controlled the binding.
+    std::string_view binding = sim_ctx.FindInstanceBinding(obj->full_name);
+    if (const std::size_t kDot = binding.find('.');
+        kDot != std::string_view::npos) {
+      obj->library_name = std::string(binding.substr(0, kDot));
+      obj->cell_name = std::string(binding.substr(kDot + 1));
+    }
+    obj->config_name = std::string(sim_ctx.FindInstanceConfig(obj->full_name));
   }
 }
 

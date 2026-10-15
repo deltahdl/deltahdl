@@ -2,11 +2,11 @@
 #define DELTA_SIMULATOR_LOWERER_CHILD_H_
 
 #include <string>
-#include <string_view>
 
 namespace delta {
 
 class SimContext;
+struct RtlirModule;
 
 // Defined in lowerer.cpp and shared with the child-module lowering split out
 // into lowerer_child.cpp. RegisterInstanceKeyBinding records an instance's
@@ -15,8 +15,7 @@ class SimContext;
 // and its let decls by RegisterModuleLets, both declared in
 // lowerer_register.h.)
 void RegisterInstanceKeyBinding(const std::string& inst_prefix,
-                                std::string_view library, std::string_view name,
-                                SimContext& ctx);
+                                const RtlirModule* mod, SimContext& ctx);
 
 // §40.3.2.1 Table 40-2 with §23.6: the hierarchical path of the instance the
 // run keys under `key`. The first top's declarations and instances are keyed

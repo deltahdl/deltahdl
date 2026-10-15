@@ -516,11 +516,13 @@ static const char* VpiLibraryStr(VpiHandle obj) {
   return obj->library_name.c_str();
 }
 
-// §37.5: vpiCell names a module's cell, falling back to its own name; any other
-// object kind yields null.
+// §37.5: vpiCell names a module's cell, which is the definition it is an
+// instance of where no binding was recorded, never the instance's own name;
+// any other object kind yields null.
 static const char* VpiCellStr(VpiHandle obj) {
   if (obj->type != kVpiModule) return nullptr;
-  return obj->cell_name.empty() ? obj->name.data() : obj->cell_name.c_str();
+  return obj->cell_name.empty() ? obj->def_name.c_str()
+                                : obj->cell_name.c_str();
 }
 
 // §37.5: vpiConfig names the configuration bound to a module; any other object

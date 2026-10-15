@@ -176,6 +176,14 @@ bool UseClauseNamesConfig(const ConfigRule* rule, const ConfigDecl* cfg,
 
 namespace {
 
+// §33.7: the library.cell naming `cfg`, held in `arena` for the modules that
+// record it.
+std::string_view ConfigLibCell(const ConfigDecl* cfg, Arena& arena) {
+  const std::string kName =
+      std::string(cfg->library) + "." + std::string(cfg->name);
+  return {arena.AllocString(kName.c_str(), kName.size()), kName.size()};
+}
+
 // §33.4.2: an instance clause of a configuration reached by delegation names
 // its instance from that configuration's own design cell, `inner_top`, down,
 // and the instance it stands for is the one at `outer_path` and below it.
@@ -826,7 +834,9 @@ void Elaborator::EnterDelegatedConfig(const ConfigDecl* inner) {
        std::move(instance_use_overrides_), std::move(instance_bind_overrides_),
        std::move(instance_param_overrides_), std::move(cell_param_overrides_),
        std::move(config_localparam_scope_), std::move(cell_liblist_bindings_),
-       std::move(config_delegations_), std::move(cell_config_delegations_)});
+       std::move(config_delegations_), std::move(cell_config_delegations_),
+       active_config_});
+  active_config_ = ConfigLibCell(inner, arena_);
   library_order_ = enclosing_config_rules_.back().library_order;
   library_order_strict_ = false;
   cell_clause_use_overrides_.clear();
@@ -874,6 +884,7 @@ void Elaborator::LeaveDelegatedConfig() {
   cell_liblist_bindings_ = std::move(outer.cell_liblist_bindings);
   config_delegations_ = std::move(outer.delegations);
   cell_config_delegations_ = std::move(outer.cell_delegations);
+  active_config_ = outer.config;
   enclosing_config_rules_.pop_back();
 }
 
@@ -891,6 +902,7 @@ void Elaborator::CollectConfigRuleTables(const ConfigDecl* cfg) {
 
 RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
   in_config_elaboration_ = true;
+  active_config_ = ConfigLibCell(cfg, arena_);
 
   UnitScopeTables::RunPreElaborationValidations(*this);
 

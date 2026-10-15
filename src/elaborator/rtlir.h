@@ -667,6 +667,9 @@ struct RtlirModule {
   SourceLoc loc;
 
   std::string_view library;
+  // §33.7: the library.cell of the configuration that controlled this
+  // instance's binding, empty where none did.
+  std::string_view config;
   int unit_index = -1;  // §3.12.1: into RtlirDesign::compilation_units
   bool has_param_port_list = false;
   bool is_program = false;

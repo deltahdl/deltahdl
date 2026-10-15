@@ -492,6 +492,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   auto* mod = arena_.Create<RtlirModule>();
   if (!units_.views.empty()) mod->unit_index = static_cast<int>(units_.current);
   InitRtlirModuleHeader(mod, decl, unit_, diag_);
+  mod->config = active_config_;
 
   // The per-module item-elaboration state (the members reset by
   // ResetItemElaborationState) is accumulated as this module's items are

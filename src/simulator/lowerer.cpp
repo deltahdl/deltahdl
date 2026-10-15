@@ -207,8 +207,9 @@ std::string CoverageScopeOfInstanceKey(const std::string& key,
 }
 
 void RegisterInstanceKeyBinding(const std::string& inst_prefix,
-                                std::string_view library, std::string_view name,
-                                SimContext& ctx) {
+                                const RtlirModule* mod, SimContext& ctx) {
+  const std::string_view library = mod->library;
+  const std::string_view name = mod->name;
   std::string key = inst_prefix;
   if (!key.empty() && key.back() == '.') key.pop_back();
   ctx.RegisterInstanceType(key, name);
@@ -223,6 +224,7 @@ void RegisterInstanceKeyBinding(const std::string& inst_prefix,
   // specifier can report its binding. The cell is the module's design-element
   // name; the library is the one it was compiled into.
   ctx.RegisterInstanceBinding(key, library, name);
+  if (!mod->config.empty()) ctx.RegisterInstanceConfig(key, mod->config);
 }
 
 // A scope is recorded for the §30.3 specify blocks the module declares, for the
@@ -250,7 +252,7 @@ void Lowerer::RecordSpecifyScope(const RtlirModule* mod) {
 
 void Lowerer::LowerModule(const RtlirModule* mod) {
   EnterInstanceUnit(design_, mod, inst_prefix_, ctx_, arena_);
-  RegisterInstanceKeyBinding(inst_prefix_, mod->library, mod->name, ctx_);
+  RegisterInstanceKeyBinding(inst_prefix_, mod, ctx_);
   LowerParams(mod);
   RecordSpecifyScope(mod);
   RegisterModuleNets(mod, ctx_, arena_);

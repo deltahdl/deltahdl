@@ -67,11 +67,20 @@ struct FormatArgs {
 // §21.2.1).
 static std::string BuildInstanceBinding(SimContext* ctx) {
   if (ctx != nullptr) {
+    // §33.7: the instance containing the call. A subroutine called across the
+    // hierarchy runs in the instance holding it (EnterCalleeInstance), even
+    // while a deferred output reinstates its caller around it; a deferred
+    // output otherwise stands in its caller; and with no process at all, as a
+    // static initializer is evaluated during lowering, the instance being
+    // lowered is the one. Prefixes take the "u1.u2." form, empty at the top.
+    const Process* proc = ctx->CurrentProcess();
     std::string prefix;
-    if (ctx->DeferredBindingScope().has_value()) {
+    if (proc != nullptr && !proc->caller_inst_prefixes.empty()) {
+      prefix = proc->inst_prefix;
+    } else if (ctx->DeferredBindingScope().has_value()) {
       prefix = *ctx->DeferredBindingScope();
-    } else if (Process* proc = ctx->CurrentProcess()) {
-      prefix = proc->inst_prefix;  // "u1.u2." form, empty at the top level
+    } else {
+      prefix = ctx->ActiveInstancePrefix();
     }
     if (!prefix.empty() && prefix.back() == '.') prefix.pop_back();
     std::string_view binding = ctx->FindInstanceBinding(prefix);
