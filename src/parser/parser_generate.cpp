@@ -218,7 +218,7 @@ void Parser::ParseGenerateRegion(std::vector<ModuleItem*>& items) {
 // stands. A genvar with no name is looked up by nothing, and a value that is
 // no expression folds to nothing, so the loop builds no instance.
 Stmt* Parser::ParseGenvarInitialization() {
-  Match(TokenKind::kKwGenvar);
+  bool declares_genvar = Match(TokenKind::kKwGenvar);
   auto saved = lexer_.SavePos();
   bool is_assignment = CheckIdentifier();
   if (is_assignment) {
@@ -240,6 +240,9 @@ Stmt* Parser::ParseGenvarInitialization() {
   }
   Token id = Consume();
   init->lhs = MakeIdentifierNode(arena_, id.text, id.loc);
+  // §27.4: the keyword declares the index as a genvar, which the elaborator
+  // reads as var_name, the name a statement declares.
+  if (declares_genvar) init->var_name = id.text;
   Consume();
   init->rhs = ParseExpr();
   Expect(TokenKind::kSemicolon, Subclause("27.4"));

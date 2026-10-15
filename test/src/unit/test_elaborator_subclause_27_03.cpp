@@ -3,6 +3,7 @@
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_generate_elab.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -55,7 +56,7 @@ TEST(GenerateConstructSyntax, ConstantConditionFromLocalparamElaborates) {
 
 // §27.3: all expressions in generate schemes shall be constant expressions,
 // deterministic at elaboration time. A condition that depends on a runtime
-// variable is not constant, and the elaborator flags it.
+// variable is not constant, and the elaborator reports it as an error.
 TEST(GenerateConstructSyntax, NonConstantGenerateSchemeIsDiagnosed) {
   auto r = RunGenerateElaboration(
       "module top;\n"
@@ -64,13 +65,14 @@ TEST(GenerateConstructSyntax, NonConstantGenerateSchemeIsDiagnosed) {
       "    logic a;\n"
       "  end\n"
       "endmodule\n");
-  ASSERT_NE(r.design, nullptr);
-  EXPECT_GE(r.f.diag.WarningCount(), 1u);
+  EXPECT_TRUE(ReportedError(r.f.diag.Diagnostics(),
+                            "generate-if condition is not constant", 3,
+                            "27.5"));
 }
 
 // §27.3: the constant-expression requirement covers every generate-scheme
 // expression, including a case-generate selector. A selector that depends on
-// a runtime variable is not constant and is flagged.
+// a runtime variable is not constant and is reported as an error.
 TEST(GenerateConstructSyntax, NonConstantCaseSelectorIsDiagnosed) {
   auto r = RunGenerateElaboration(
       "module top;\n"
@@ -84,8 +86,9 @@ TEST(GenerateConstructSyntax, NonConstantCaseSelectorIsDiagnosed) {
       "    end\n"
       "  endcase\n"
       "endmodule\n");
-  ASSERT_NE(r.design, nullptr);
-  EXPECT_GE(r.f.diag.WarningCount(), 1u);
+  EXPECT_TRUE(ReportedError(r.f.diag.Diagnostics(),
+                            "generate-case selector is not constant", 3,
+                            "27.5"));
 }
 
 // §27.3: elaboration of a generate construct results in zero or more
@@ -117,6 +120,63 @@ TEST(GenerateConstructSyntax, LoopProducesMultipleInstances) {
   ASSERT_NE(r.design, nullptr);
   ASSERT_EQ(r.design->top_modules.size(), 1u);
   EXPECT_EQ(CountVariablesNamed(r.design->top_modules[0], 'a'), 3);
+}
+
+// §27.3: every expression of a generate scheme is a constant expression, and
+// Syntax 27-1 writes each item expression of a case-generate as one. An item
+// that reads a variable is reported where it stands, rather than read as an
+// alternative that does not match, which would build the default block in its
+// place with nothing said.
+TEST(GenerateConstructSyntax, NonConstantCaseItemExpressionIsReported) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  logic v;\n"
+      "  case (1)\n"
+      "    v: begin : a logic x; end\n"
+      "    default: begin : b logic y; end\n"
+      "  endcase\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.f.diag.Diagnostics(),
+                            "generate-case item expression is not constant", 4,
+                            "27.3"));
+}
+
+// The requirement holds of every item expression, not only of those read
+// before the one that matches: here the first item selects its block, and the
+// item after it still reads a variable. A check made while searching for the
+// match stops at line 4 and never reaches line 5.
+TEST(GenerateConstructSyntax, NonConstantCaseItemAfterTheMatchIsReported) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  logic v;\n"
+      "  case (1)\n"
+      "    1: begin : a logic x; end\n"
+      "    2, v: begin : b logic y; end\n"
+      "  endcase\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.f.diag.Diagnostics(),
+                            "generate-case item expression is not constant", 5,
+                            "27.3"));
+}
+
+// Item expressions that fold are constant, so a case-generate built from them
+// elaborates with no report, and the alternative listing the selector's value
+// second builds its block.
+TEST(GenerateConstructSyntax, ConstantCaseItemExpressionsElaborate) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  parameter P = 3;\n"
+      "  case (P)\n"
+      "    1, P - 1: begin logic b; end\n"
+      "    2 + 1, 4: begin logic a; end\n"
+      "    default: begin logic c; end\n"
+      "  endcase\n"
+      "endmodule\n");
+  ASSERT_NE(r.design, nullptr);
+  EXPECT_FALSE(r.f.has_errors);
+  ASSERT_EQ(r.design->top_modules.size(), 1u);
+  EXPECT_EQ(CountVariablesNamed(r.design->top_modules[0], 'a'), 1);
+  EXPECT_EQ(CountVariablesNamed(r.design->top_modules[0], 'b'), 0);
 }
 
 }  // namespace

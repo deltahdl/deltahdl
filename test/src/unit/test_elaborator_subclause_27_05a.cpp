@@ -603,7 +603,8 @@ TEST(GenerateElaboration, CaseAlternativeLabelPrefixesItsDeclaration) {
 // only after an earlier import in the current scope. The scope holding the
 // import here is module a, so W names nothing in module b and the condition is
 // not a constant expression there: Elaborator::ElaborateGenerateIf in
-// src/elaborator/elaborator_generate.cpp warns and instantiates neither branch.
+// src/elaborator/elaborator_generate.cpp reports an error and instantiates
+// neither branch.
 //
 // What this fails on is the condition folding anyway, which it does when the
 // scope the condition is evaluated against is assembled after every module has
@@ -630,9 +631,9 @@ TEST(GenerateElaboration,
       "  end\n"
       "endmodule\n",
       f, "", true);
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "generate-if condition is not constant", 8,
-                              "27.5"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "generate-if condition is not constant", 8,
+                            "27.5"));
 }
 
 // §27.5 requires every alternative of a conditional generate construct to be
@@ -648,7 +649,7 @@ TEST(GenerateElaboration,
 //
 // What this fails on is the else branch being instantiated without its
 // condition read, which produced no report at all and built g1 regardless of W.
-TEST(GenerateElaboration, GenerateIfNonConstantElseIfConditionIsWarned) {
+TEST(GenerateElaboration, GenerateIfNonConstantElseIfConditionIsReported) {
   ElabFixture f;
   ElaborateWithPreprocessor(
       "package p;\n"
@@ -665,9 +666,9 @@ TEST(GenerateElaboration, GenerateIfNonConstantElseIfConditionIsWarned) {
       "  end\n"
       "endmodule\n",
       f, "", true);
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "generate-if condition is not constant", 10,
-                              "27.5"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "generate-if condition is not constant", 10,
+                            "27.5"));
 }
 
 // The other side of §26.3: the import that module b writes is in force for

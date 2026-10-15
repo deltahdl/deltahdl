@@ -303,7 +303,7 @@ TEST(UserDefinedTypeElaboration, ForwardTypedefResolvedInGenerateBlock) {
   auto* design = ElaborateSrc(
       "module t;\n"
       "  generate\n"
-      "    for (i = 0; i < 1; i = i + 1) begin : g\n"
+      "    for (genvar i = 0; i < 1; i = i + 1) begin : g\n"
       "      typedef enum color_e;\n"
       "      typedef enum {RED, GREEN, BLUE} color_e;\n"
       "      color_e c;\n"

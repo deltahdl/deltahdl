@@ -174,18 +174,34 @@ void AssignUnitGenerateBlockNames(const CompilationUnit* unit, Arena& arena) {
 // across the alternatives of a single conditional construct is permitted.
 // §27.5 states the rule of the named generate blocks, so a genblk<n> name
 // §27.6 assigned an unnamed block is not collected: that name is chosen so as
-// not to conflict.
+// not to conflict. A block holding only a directly nested conditional construct
+// is no scope of its own, and §27.5 counts the inner construct's blocks as the
+// outer construct's, so their names are collected with the outer's.
+static void CollectGenerateBlockNames(
+    const ModuleItem* item, std::unordered_set<std::string_view>& out);
+
+static void CollectDirectlyNestedBlockNames(
+    const std::vector<ModuleItem*>& body, bool has_begin_end,
+    std::unordered_set<std::string_view>& out) {
+  if (IsDirectlyNestedBlock(body, has_begin_end)) {
+    CollectGenerateBlockNames(body[0], out);
+  }
+}
+
 static void CollectGenerateBlockNames(
     const ModuleItem* item, std::unordered_set<std::string_view>& out) {
   switch (item->kind) {
     case ModuleItemKind::kGenerateIf:
       if (!item->name.empty() && !item->name_is_generated)
         out.insert(item->name);
+      CollectDirectlyNestedBlockNames(item->gen_body,
+                                      item->gen_body_has_begin_end, out);
       if (item->gen_else) CollectGenerateBlockNames(item->gen_else, out);
       break;
     case ModuleItemKind::kGenerateCase:
       for (const auto& ci : item->gen_case_items) {
         if (!ci.label.empty() && !ci.name_is_generated) out.insert(ci.label);
+        CollectDirectlyNestedBlockNames(ci.body, ci.has_begin_end, out);
       }
       break;
     case ModuleItemKind::kGenerateFor:
@@ -197,31 +213,27 @@ static void CollectGenerateBlockNames(
   }
 }
 
-// Names of ordinary declarations in this scope: ports, parameters, and the
-// named module items that are not themselves generate constructs.
-static std::unordered_set<std::string_view> CollectNonGenerateDeclNames(
-    const ModuleDecl* decl) {
-  std::unordered_set<std::string_view> decl_names;
-  for (const auto& port : decl->ports)
-    if (!port.name.empty()) decl_names.insert(port.name);
-  for (const auto& p : decl->params)
-    if (!p.first.empty()) decl_names.insert(p.first);
-  for (const auto* item : decl->items) {
+// Names of the ordinary declarations among `items`, the named items that are
+// not themselves generate constructs, added to the names `decl_names` already
+// holds: a module's ports and parameters, or nothing for a generate block.
+static void CollectNonGenerateDeclNames(
+    const std::vector<ModuleItem*>& items,
+    std::unordered_set<std::string_view>& decl_names) {
+  for (const auto* item : items) {
     if (IsGenerateConstruct(item->kind)) continue;
     if (!item->name.empty()) decl_names.insert(item->name);
     if (!item->inst_name.empty()) decl_names.insert(item->inst_name);
     if (!item->gate_inst_name.empty()) decl_names.insert(item->gate_inst_name);
   }
-  return decl_names;
 }
 
-// How many distinct generate constructs in this scope declare a block of each
+// How many distinct generate constructs among `items` declare a block of each
 // name. A name claimed by more than one construct violates the rule against
 // sharing a block name across conditional or loop generate constructs.
 static std::unordered_map<std::string_view, int> CountGenerateConstructUses(
-    const ModuleDecl* decl) {
+    const std::vector<ModuleItem*>& items) {
   std::unordered_map<std::string_view, int> construct_uses;
-  for (const auto* item : decl->items) {
+  for (const auto* item : items) {
     if (!IsGenerateConstruct(item->kind)) continue;
     std::unordered_set<std::string_view> names;
     CollectGenerateBlockNames(item, names);
@@ -259,6 +271,61 @@ static void ReportConditionalGenerateNameConflicts(
   }
 }
 
+// Declared here because CheckGenerateNamingInScope and
+// CheckConstructBlockScopes call each other: a scope holds constructs, and a
+// construct's blocks are each a scope in their own right.
+static void CheckConstructBlockScopes(DiagEngine& diag, const ModuleItem* item);
+
+// §27.5's naming rules for the conditional generate constructs among `items`,
+// the items of one scope whose other declarations `decl_names` starts from,
+// then for every generate block those items' constructs hold, each a scope of
+// its own (§27.3, §27.4, §27.5).
+static void CheckGenerateNamingInScope(
+    DiagEngine& diag, const std::vector<ModuleItem*>& items,
+    std::unordered_set<std::string_view> decl_names) {
+  CollectNonGenerateDeclNames(items, decl_names);
+  std::unordered_map<std::string_view, int> construct_uses =
+      CountGenerateConstructUses(items);
+  for (const auto* item : items) {
+    if (!IsGenerateConstruct(item->kind)) continue;
+    if (IsConditionalGenerateConstruct(item->kind)) {
+      ReportConditionalGenerateNameConflicts(diag, item, decl_names,
+                                             construct_uses);
+    }
+    CheckConstructBlockScopes(diag, item);
+  }
+}
+
+// A block holding only a directly nested conditional construct is no scope of
+// its own, so the scopes it leads to are the blocks of the inner construct.
+static void CheckBlockScope(DiagEngine& diag,
+                            const std::vector<ModuleItem*>& body,
+                            bool has_begin_end) {
+  if (IsDirectlyNestedBlock(body, has_begin_end)) {
+    CheckConstructBlockScopes(diag, body[0]);
+    return;
+  }
+  CheckGenerateNamingInScope(diag, body, {});
+}
+
+// Every block of one construct, selected for instantiation or not: §27.5 holds
+// a block to the rules whether or not it is selected. A plain else is held in
+// gen_else as a kGenerateIf of its own, so following gen_else reaches it as it
+// reaches an else-if.
+static void CheckConstructBlockScopes(DiagEngine& diag,
+                                      const ModuleItem* item) {
+  if (!IsConditionalGenerateConstruct(item->kind)) {
+    CheckGenerateNamingInScope(diag, item->gen_body, {});
+    return;
+  }
+  CheckBlockScope(diag, item->gen_body, item->gen_body_has_begin_end);
+  for (const auto& alt : item->gen_case_items) {
+    CheckBlockScope(diag, alt.body, alt.has_begin_end);
+  }
+  if (item->gen_else != nullptr)
+    CheckConstructBlockScopes(diag, item->gen_else);
+}
+
 // §27.5: enforce the naming rules for conditional generate constructs. A named
 // generate block shares the enclosing scope's namespace, so the name of a block
 // in an if-generate or case-generate must not also name another declaration in
@@ -268,21 +335,15 @@ static void ReportConditionalGenerateNameConflicts(
 // collision is reported even when the offending block is not instantiated.
 // Reusing a name across the alternatives of one conditional construct is left
 // untouched: those names are deduplicated per construct, so only one will be
-// counted.
+// counted. The design element's ports and parameters are declarations of its
+// scope, and the rules then hold in every generate block it holds.
 void Elaborator::CheckConditionalGenerateNaming(const ModuleDecl* decl) {
-  std::unordered_set<std::string_view> decl_names =
-      CollectNonGenerateDeclNames(decl);
-  std::unordered_map<std::string_view, int> construct_uses =
-      CountGenerateConstructUses(decl);
-
-  for (const auto* item : decl->items) {
-    if (item->kind != ModuleItemKind::kGenerateIf &&
-        item->kind != ModuleItemKind::kGenerateCase) {
-      continue;
-    }
-    ReportConditionalGenerateNameConflicts(diag_, item, decl_names,
-                                           construct_uses);
-  }
+  std::unordered_set<std::string_view> decl_names;
+  for (const auto& port : decl->ports)
+    if (!port.name.empty()) decl_names.insert(port.name);
+  for (const auto& p : decl->params)
+    if (!p.first.empty()) decl_names.insert(p.first);
+  CheckGenerateNamingInScope(diag_, decl->items, std::move(decl_names));
 }
 
 }  // namespace delta

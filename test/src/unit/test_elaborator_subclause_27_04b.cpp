@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <utility>
 
 #include "common/diagnostic.h"
 #include "fixture_elaborator.h"
@@ -20,7 +21,7 @@ TEST(GenerateElaboration, GenerateForSingleItemBodyWithoutBeginEnd) {
   auto* design = Elaborate(
       "module top #(parameter N = 3) ();\n"
       "  generate\n"
-      "    for (i = 0; i < N; i = i + 1)\n"
+      "    for (genvar i = 0; i < N; i = i + 1)\n"
       "      logic [7:0] v;\n"
       "  endgenerate\n"
       "endmodule\n",
@@ -326,7 +327,7 @@ TEST(GenerateElaboration, GenerateForInitReferencesOwnGenvarNames27_4) {
   ElabOk(
       "module top();\n"
       "  generate\n"
-      "    for (i = i + 1; i < 3; i = i + 1) begin\n"
+      "    for (genvar i = i + 1; i < 3; i = i + 1) begin\n"
       "      logic [7:0] x;\n"
       "    end\n"
       "  endgenerate\n"
@@ -341,7 +342,8 @@ TEST(GenerateElaboration, GenerateForInitReferencesOwnGenvarNames27_4) {
 // expression, and §26.3 makes a wildcard-imported name locally visible only
 // after an earlier import in the current scope. The scope holding the import is
 // module a, so W names nothing in module b and Elaborator::OpenGenerateForLoop
-// in src/elaborator/elaborator_generate.cpp warns instead of opening the loop.
+// in src/elaborator/elaborator_generate.cpp reports an error instead of opening
+// the loop.
 //
 // What this fails on is W folding in module b anyway, which it does when the
 // scope the loop header is evaluated against is assembled after every module
@@ -358,7 +360,7 @@ TEST(GenerateElaboration, GenerateForInitReferencesOwnGenvarNames27_4) {
 //
 // The case that the import still reaches the module that wrote it is
 // GenerateElaboration.ImportedParameterReachesItsOwnModulesGenerateIf in
-// test/src/unit/test_elaborator_subclause_27_05.cpp.
+// test/src/unit/test_elaborator_subclause_27_05a.cpp.
 TEST(GenerateElaboration,
      ImportedParameterDoesNotReachAnotherModulesGenerateFor) {
   ElabFixture f;
@@ -375,8 +377,8 @@ TEST(GenerateElaboration,
       "  end\n"
       "endmodule\n",
       f, "", true);
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "generate-for init is not constant", 8, "27.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "generate-for init is not constant", 8, "27.4"));
 }
 
 // Annex A.8.3 gives `genvar_expression ::= constant_expression`, so the
@@ -401,7 +403,7 @@ TEST(GenerateElaboration, GenerateForBoundOnAVariableIsNotConstant) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedWarning(
+  EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "generate-for termination expression is not constant", 3, "27.4"));
 }
@@ -425,9 +427,9 @@ TEST(GenerateElaboration, GenerateForStepOnAVariableIsNotConstant) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedWarning(
-      f.diag.Diagnostics(), "generate-for iteration expression is not constant",
-      3, "27.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "generate-for iteration expression is not constant",
+                            3, "27.4"));
 }
 
 // The form the same defect takes when the bound was meant to name a parameter a
@@ -446,7 +448,7 @@ TEST(GenerateElaboration,
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedWarning(
+  EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "generate-for termination expression is not constant", 2, "27.4"));
 }
@@ -460,7 +462,7 @@ TEST(GenerateElaboration,
 // which is the shape a fix takes when it reports at the site of the break
 // rather than at the fold.
 //
-// The absence of a report is read here rather than through ReportedWarning in
+// The absence of a report is read here rather than through ReportedError in
 // lib/cpp/test_helpers/helpers_reported_error.h, which answers that a named
 // report was made and has no form for the claim that none was.
 TEST(GenerateElaboration, GenerateForBoundThatFoldsToFalseIsNotReported) {
@@ -600,6 +602,78 @@ TEST(GenerateElaboration, GenvarInConstantPositionsInsideALoopAccepted) {
              "    assign #i w[i] = a[i];\n"
              "  end\n"
              "endmodule\n"));
+}
+
+// §27.4 requires the index of a loop generate construct to be declared by a
+// genvar declaration before the loop uses it, and A.4.2 gives two places for
+// one: a genvar_declaration earlier in an enclosing scope, or the keyword in
+// the loop's own initialization. k is declared nowhere, n is a variable and no
+// genvar, and j is declared only after the loop that uses it, so each of the
+// three loops is reported; m and p are declared in the two ways the standard
+// gives, and their loops draw nothing.
+TEST(GenerateElaboration, LoopIndexNoEarlierGenvarDeclaresIsReported) {
+  ElabFixture f;
+  Elaborate(
+      "module top;\n"
+      "  integer n;\n"
+      "  for (k = 0; k < 2; k = k + 1) begin : a end\n"
+      "  for (n = 0; n < 2; n = n + 1) begin : b end\n"
+      "  for (j = 0; j < 2; j = j + 1) begin : c end\n"
+      "  genvar j;\n"
+      "  for (genvar m = 0; m < 2; m++) begin : d end\n"
+      "  genvar p;\n"
+      "  for (p = 0; p < 2; p++) begin : e end\n"
+      "endmodule\n",
+      f);
+  for (auto [name, line] :
+       {std::pair<const char*, uint32_t>{"k", 3}, {"n", 4}, {"j", 5}}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              std::string("loop generate index '") + name +
+                                  "' is declared by no genvar declaration",
+                              line, "27.4"))
+        << name;
+  }
+  for (const auto& diag : f.diag.Diagnostics()) {
+    EXPECT_LT(diag.loc.line, 6u) << diag.message;
+  }
+}
+
+// A genvar declared in a generate block encloses the loops written after it in
+// that block, and one declared in the module encloses those in every block,
+// so neither loop below is reported. The loop over q in block g2 is: q is
+// declared in g1, which is no scope enclosing g2. Nor is an index the outer
+// loop's initialization declares one the loop after it may use.
+TEST(GenerateElaboration, GenvarOfAnEnclosingScopeDeclaresALoopIndex) {
+  ElabFixture f;
+  Elaborate(
+      "module top;\n"
+      "  genvar i;\n"
+      "  if (1) begin : g1\n"
+      "    genvar q;\n"
+      "    for (q = 0; q < 2; q++) begin : x end\n"
+      "    for (i = 0; i < 2; i++) begin : y end\n"
+      "  end\n"
+      "  if (1) begin : g2\n"
+      "    for (q = 0; q < 2; q++) begin : z end\n"
+      "  end\n"
+      "  for (genvar r = 0; r < 2; r++) begin : w end\n"
+      "  for (r = 0; r < 2; r++) begin : u end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "loop generate index 'q' is declared by no genvar "
+                            "declaration",
+                            9, "27.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "loop generate index 'r' is declared by no genvar "
+                            "declaration",
+                            12, "27.4"));
+  for (const auto& diag : f.diag.Diagnostics()) {
+    if (diag.message.find("is declared by no genvar") == std::string::npos) {
+      continue;
+    }
+    EXPECT_TRUE(diag.loc.line == 9 || diag.loc.line == 12) << diag.message;
+  }
 }
 
 }  // namespace

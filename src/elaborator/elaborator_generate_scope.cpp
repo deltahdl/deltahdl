@@ -81,8 +81,8 @@ void Elaborator::ElaborateGenerateIf(ModuleItem* item, RtlirModule* mod,
   auto cond = EvalConstTypeRefCompare(item->gen_cond);
   if (!cond) cond = ConstEvalInt(item->gen_cond, scope);
   if (!cond) {
-    diag_.Warning(item->loc, "generate-if condition is not constant",
-                  Subclause("27.5"));
+    diag_.Error(item->loc, "generate-if condition is not constant",
+                Subclause("27.5"));
     return;
   }
   if (*cond) {
@@ -128,13 +128,31 @@ void Elaborator::ElaborateGenerateIf(ModuleItem* item, RtlirModule* mod,
       mod, scope);
 }
 
+// §27.3: every expression of a generate scheme is a constant expression, and
+// Syntax 27-1 writes each item expression of a case-generate as one, so every
+// item is checked before any is matched, those after the matching one included.
+static bool CaseItemsAreConstant(DiagEngine& diag, const ModuleItem& item,
+                                 const ScopeMap& scope) {
+  bool all_constant = true;
+  for (const auto& ci : item.gen_case_items) {
+    for (const auto* pat : ci.patterns) {
+      if (ConstEvalInt(pat, scope)) continue;
+      diag.Error(pat->range.start,
+                 "generate-case item expression is not constant",
+                 Subclause("27.3"));
+      all_constant = false;
+    }
+  }
+  return all_constant;
+}
+
+// Every pattern folds by the time this runs, CaseItemsAreConstant having
+// returned before matching when one does not.
 static bool MatchesCasePattern(const std::vector<Expr*>& patterns,
                                int64_t selector, const ScopeMap& scope) {
-  for (const auto* pat : patterns) {
-    auto val = ConstEvalInt(pat, scope);
-    if (val && *val == selector) return true;
-  }
-  return false;
+  return std::any_of(patterns.begin(), patterns.end(), [&](const Expr* pat) {
+    return ConstEvalInt(pat, scope) == selector;
+  });
 }
 
 void Elaborator::ElaborateGenerateCase(ModuleItem* item, RtlirModule* mod,
@@ -147,10 +165,11 @@ void Elaborator::ElaborateGenerateCase(ModuleItem* item, RtlirModule* mod,
   std::optional<int64_t> selector;
   if (!selector_type) selector = ConstEvalInt(item->gen_cond, scope);
   if (!selector_type && !selector) {
-    diag_.Warning(item->loc, "generate-case selector is not constant",
-                  Subclause("27.5"));
+    diag_.Error(item->loc, "generate-case selector is not constant",
+                Subclause("27.5"));
     return;
   }
+  if (!selector_type && !CaseItemsAreConstant(diag_, *item, scope)) return;
   auto matches = [&](const std::vector<Expr*>& patterns) {
     if (!selector_type) return MatchesCasePattern(patterns, *selector, scope);
     return std::any_of(patterns.begin(), patterns.end(), [&](const Expr* p) {

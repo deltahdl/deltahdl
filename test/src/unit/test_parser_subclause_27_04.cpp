@@ -2,7 +2,9 @@
 
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 
 using namespace delta;
 
@@ -108,6 +110,28 @@ TEST(LoopGenerateParsing, StepThatIsANonIncrementUnaryIsRejected) {
       "endmodule\n");
   EXPECT_TRUE(ReportedError(r.diags, "a loop generate's iteration is written",
                             4, "A.4.2"));
+}
+
+// A.4.2 gives genvar_initialization ::= [ genvar ] genvar_identifier =
+// constant_expression, and §27.4 requires the loop index to be declared by a
+// genvar declaration, which the keyword written here is. The parser records
+// the name the keyword declares on the initialization, and nothing for a loop
+// whose index is declared elsewhere, so the elaborator can tell the two apart.
+TEST(LoopGenerateParsing, InlineGenvarIsRecordedOnTheInitialization) {
+  auto r = Parse(
+      "module m;\n"
+      "  genvar p;\n"
+      "  for (genvar i = 0; i < 2; i++) begin : a end\n"
+      "  for (p = 0; p < 2; p++) begin : b end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->items.size(), 3u);
+  ASSERT_NE(mod->items[1]->gen_init, nullptr);
+  EXPECT_EQ(mod->items[1]->gen_init->var_name, "i");
+  ASSERT_NE(mod->items[2]->gen_init, nullptr);
+  EXPECT_EQ(mod->items[2]->gen_init->var_name, "");
+  EXPECT_EQ(mod->items[2]->gen_init->lhs->text, "p");
 }
 
 }  // namespace

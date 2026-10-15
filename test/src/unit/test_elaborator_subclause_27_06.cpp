@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_generate_elab.h"
 #include "helpers_reported_error.h"
@@ -316,10 +318,11 @@ TEST(GenerateBlockNaming, GenblkNameNoConstructIsGivenIsReported) {
                             5, "23.8"));
 }
 
-// The name §27.6 does give, genblk1, is a declaration a first name resolves
-// to, so §23.8 reports nothing of it. The test fails on a fix that drops the
-// genblk<n> admission without collecting the names §27.6 assigns.
-TEST(GenerateBlockNaming, GenblkNameAConstructIsGivenIsAFirstName) {
+// The name §27.6 does give, genblk1, is one the elaborator knows, so §23.8
+// does not call it a name that resolves to nothing. §27.6 gives it only for
+// interfaces such as VPI, and it is no name a hierarchical name may use, so
+// the reference is reported for reaching into an unnamed block instead.
+TEST(GenerateBlockNaming, GenblkNameAConstructIsGivenIsReportedAsUnnamed) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -333,12 +336,77 @@ TEST(GenerateBlockNaming, GenblkNameAConstructIsGivenIsAFirstName) {
                              "hierarchical name 'genblk1' resolves to no "
                              "declaration",
                              5, "23.8"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical name reaches into unnamed generate "
+                            "block 'genblk1'",
+                            5, "27.6"));
 }
 
-// The genblk<n> name of a block in a module the elaborator has not reached
-// when the first module is checked is collected as well. `top` is elaborated
-// before `other`, which it does not instantiate.
-TEST(GenerateBlockNaming, GenblkNameOfAnotherModuleIsAFirstName) {
+// §27.4 and §27.5 let no hierarchical name reach the declarations of a block
+// the source leaves unnamed, and §27.6 adds that the genblk<n> name it gives
+// one is no name a hierarchical name may use: neither the conditional block nor
+// the loop block below is reachable through it, whether the path starts at the
+// block's name or at the module's.
+TEST(GenerateBlockNaming, ReachingIntoAnUnnamedBlockIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  if (1) begin\n"
+      "    int a;\n"
+      "  end\n"
+      "  for (genvar i = 0; i < 2; i++) begin\n"
+      "    int b;\n"
+      "  end\n"
+      "  initial $display(\"%0d %0d\", genblk1.a, genblk2[0].b);\n"
+      "  initial $display(\"%0d\", top.genblk1.a);\n"
+      "endmodule\n",
+      f);
+  const char* kConditional =
+      "hierarchical name reaches into unnamed generate block 'genblk1'";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kConditional, 8, "27.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical name reaches into unnamed generate "
+                            "block 'genblk2'",
+                            8, "27.6"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kConditional, 9, "27.6"));
+}
+
+// Each block §27.6 names is held to the rule however its construct holds it:
+// the else block beside a named then-block, a case item's block, and the
+// block of an if-generate directly nested in another's, which §27.5 makes the
+// outer construct's own. The blocks the source names, named and d, stay
+// reachable through their names.
+TEST(GenerateBlockNaming, EveryUnnamedBlockOfAConstructIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top #(parameter P = 0) ();\n"
+      "  if (P) begin : named int a; end else begin int b; end\n"
+      "  case (P) 0: begin int c; end default: begin : d int e; end endcase\n"
+      "  if (1) if (P) begin int g; end\n"
+      "  for (genvar i = 0; i < 2; i++) begin : loop int h; end\n"
+      "  initial $display(\"%0d %0d %0d\", genblk1.b, genblk2.c, genblk3.g);\n"
+      "  initial $display(\"%0d %0d %0d\", named.a, d.e, loop[1].h);\n"
+      "endmodule\n",
+      f);
+  for (const char* block : {"genblk1", "genblk2", "genblk3"}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::string("hierarchical name reaches into unnamed generate block '") +
+            block + "'",
+        6, "27.6"))
+        << block;
+  }
+  for (const auto& diag : f.diag.Diagnostics()) {
+    EXPECT_NE(diag.loc.line, 7u) << diag.message;
+  }
+}
+
+// The genblk<n> name of a block in another module is no name a hierarchical
+// name may use either (§27.6), so §23.8 finds no declaration for the first
+// name genblk3, though `other` does have a third unnamed construct. `top` is
+// elaborated before `other`, which it does not instantiate, so the case fails
+// as well when the names of a module not yet reached are collected as written.
+TEST(GenerateBlockNaming, GenblkNameOfAnotherModuleIsReported) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -353,10 +421,10 @@ TEST(GenerateBlockNaming, GenblkNameOfAnotherModuleIsAFirstName) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
-                             "hierarchical name 'genblk3' resolves to no "
-                             "declaration",
-                             2, "23.8"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical name 'genblk3' resolves to no "
+                            "declaration",
+                            2, "23.8"));
 }
 
 // §27.4 makes a loop's unnamed block reachable by no user-chosen name, and

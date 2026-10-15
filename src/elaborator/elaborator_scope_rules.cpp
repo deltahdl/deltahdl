@@ -762,20 +762,29 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
   if (!unit_hier_head_names_) {
     // §27.6 gives each unnamed generate block a genblk<n> name, which
     // Elaborator::ElaborateModule assigns as it reaches each module, so the
-    // modules not yet reached are named here for the names to be collected.
+    // modules not yet reached are named here, each such name marked as
+    // §27.6's, for the set to leave out as no name a hierarchical name may use.
     AssignUnitGenerateBlockNames(unit_, arena_);
     unit_hier_head_names_ = std::make_shared<const UnitHierHeadNames>(unit_);
   }
+  // A genblk<n> name of the module's own blocks is reported below under §27.6
+  // for the block it reaches into, and so is not reported again here.
+  const std::unordered_set<std::string_view> own_unnamed_blocks =
+      UnnamedGenerateBlockNames(decl);
   ReportUnresolvedHierHeads(
       decl,
-      [this, &declared](std::string_view n) {
-        return declared(n) || unit_hier_head_names_->Admits(n);
+      [this, &declared, &own_unnamed_blocks](std::string_view n) {
+        return declared(n) || own_unnamed_blocks.contains(n) ||
+               unit_hier_head_names_->Admits(n);
       },
       diag_);
   // §23.6 with §27.4 and §27.5: a first name that is one of the module's
   // generate blocks resolves, and the name after it is then one the block has
   // to declare.
   ReportUndeclaredGenerateBlockMembers(decl, diag_);
+  // §27.6: the genblk<n> name of an unnamed block is no name a hierarchical
+  // name may use, though §23.8 admits it above as a name the unit declares.
+  ReportUnnamedGenerateBlockReaches(decl, diag_);
 
   // §26.3: a `pkg::x` scope prefix must name a known package (or a class/type
   // for static-member / type-scope access). cu_scope_names_ holds packages,

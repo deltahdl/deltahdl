@@ -564,6 +564,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   ElaboratePorts(decl, mod);
 
   CheckConditionalGenerateNaming(decl);
+  ReportUndeclaredLoopGenvars(decl, diag_);
   AssignGenerateBlockNames(decl);
 
   // §14.14 (rule b): a $global_clock reference resolves against the effective

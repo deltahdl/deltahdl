@@ -629,7 +629,7 @@ static std::optional<std::string_view> ValidateGenerateForHeader(
 
   // §27.4: a genvar that takes an x or z bit at any point of the loop's
   // evaluation is an error. An x/z initialization value triggers a dedicated
-  // error rather than the generic non-constant warning.
+  // error rather than the generic non-constant report.
   if (ExprHasXZLiteral(item->gen_init->rhs)) {
     diag.Error(item->loc,
                "generate-for genvar must hold no x or z bit while the loop is "
@@ -676,9 +676,8 @@ static std::optional<int64_t> ComputeGenerateForNextValue(
   if (item->gen_step->rhs) {
     auto next = ConstEvalInt(item->gen_step->rhs, loop_scope);
     if (!next) {
-      diag.Warning(item->loc,
-                   "generate-for iteration expression is not constant",
-                   Subclause("27.4"));
+      diag.Error(item->loc, "generate-for iteration expression is not constant",
+                 Subclause("27.4"));
     }
     return next;
   }
@@ -815,8 +814,8 @@ std::optional<Elaborator::GenerateForOpening> Elaborator::OpenGenerateForLoop(
 
   auto init_val = ConstEvalInt(item->gen_init->rhs, scope);
   if (!init_val) {
-    diag_.Warning(item->loc, "generate-for init is not constant",
-                  Subclause("27.4"));
+    diag_.Error(item->loc, "generate-for init is not constant",
+                Subclause("27.4"));
     return std::nullopt;
   }
   return GenerateForOpening{genvar_name, *init_val};
@@ -873,9 +872,9 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
     std::optional<bool> keep_iterating =
         GenerateForConditionHolds(item, loop_scope);
     if (!keep_iterating) {
-      diag_.Warning(item->loc,
-                    "generate-for termination expression is not constant",
-                    Subclause("27.4"));
+      diag_.Error(item->loc,
+                  "generate-for termination expression is not constant",
+                  Subclause("27.4"));
       close_loop();
       return;
     }

@@ -103,6 +103,20 @@ void ReportUnresolvedHierHeads(
 void ReportUndeclaredGenerateBlockMembers(const ModuleDecl* decl,
                                           DiagEngine& diag);
 
+// The genblk<n> names §27.6 gave the generate blocks that stand in the scope
+// of `decl` itself, those of a construct directly nested in one included
+// (§27.5). Defined in elaborator_scope_rules_hier.cpp.
+std::unordered_set<std::string_view> UnnamedGenerateBlockNames(
+    const ModuleDecl* decl);
+
+// §27.4, §27.5 and §27.6: reports each hierarchical name the continuous
+// assignments and procedural blocks of `decl` write that reaches into a
+// generate block of `decl` the source left unnamed, through the genblk<n> name
+// §27.6 gave it, written first or after the name of `decl` itself. Defined in
+// elaborator_scope_rules_hier.cpp.
+void ReportUnnamedGenerateBlockReaches(const ModuleDecl* decl,
+                                       DiagEngine& diag);
+
 // §23.9: reports each name a method of a class of `unit` reads that neither
 // the method declares, as a formal or in its body, nor any declaration of the
 // unit gives (UnitDeclaredNames).

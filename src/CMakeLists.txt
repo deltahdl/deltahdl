@@ -503,6 +503,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_dpi_names.cpp
     elaborator/elaborator_dpi_signature.cpp
     elaborator/elaborator_generate.cpp
+    elaborator/elaborator_generate_genvars.cpp
     elaborator/elaborator_generate_naming.cpp
     elaborator/elaborator_generate_scope.cpp
     elaborator/gen_block_members.cpp

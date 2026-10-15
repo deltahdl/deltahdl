@@ -15,7 +15,7 @@ TEST(GenerateSimulation, GenerateForAssignValues) {
       "module t #(parameter N = 3) ();\n"
       "  logic [31:0] x;\n"
       "  generate\n"
-      "    for (i = 0; i < N; i = i + 1) begin\n"
+      "    for (genvar i = 0; i < N; i = i + 1) begin\n"
       "      logic [31:0] w;\n"
       "      assign w = 10;\n"
       "    end\n"

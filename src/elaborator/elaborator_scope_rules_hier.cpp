@@ -365,9 +365,10 @@ UnitHierHeadNames::UnitHierHeadNames(const CompilationUnit* unit)
   }
 }
 
-// A genblk<n> name §27.6 gives an unnamed generate block is among
-// scope_names_, because Elaborator::ValidateUnresolvedReferences has every
-// scope of the unit named before this is built.
+// A genblk<n> name §27.6 gives an unnamed generate block is not among
+// scope_names_, being no name a hierarchical name may use, and
+// Elaborator::ValidateUnresolvedReferences has every scope of the unit named
+// before this is built so that each such name is marked as §27.6's.
 bool UnitHierHeadNames::Admits(std::string_view name) const {
   return declared_.Declares(name) || scope_names_.Contains(name);
 }
@@ -402,7 +403,7 @@ void ScopeNameSet::AddItem(const ModuleItem* item) {
   for (const ModuleItem* sub : item->gen_body) AddItem(sub);
   AddItem(item->gen_else);
   for (const auto& ci : item->gen_case_items) {
-    Insert(ci.label);
+    if (!ci.name_is_generated) Insert(ci.label);
     for (const ModuleItem* sub : ci.body) AddItem(sub);
   }
   if (item->gen_init != nullptr) AddStmt(item->gen_init);
@@ -418,8 +419,8 @@ void ScopeNameSet::AddItem(const ModuleItem* item) {
 // is taken as one: it is a name the scope declares whether or not something
 // else declares it first.
 void ScopeNameSet::AddItemOwnNames(const ModuleItem* item) {
-  for (std::string_view name :
-       {item->name, item->inst_name, item->gate_inst_name}) {
+  if (!item->name_is_generated) Insert(item->name);
+  for (std::string_view name : {item->inst_name, item->gate_inst_name}) {
     Insert(name);
   }
   AddEnumerations(item->data_type);
@@ -580,6 +581,76 @@ void ReportUndeclaredGenerateBlockMembers(const ModuleDecl* decl,
                            "is not declared in generate block '{}'",
                            block, ma->rhs->text, ma->rhs->text, block),
                Subclause("23.6"));
+  }
+}
+
+namespace {
+
+void AddGeneratedBlockNames(const ModuleItem* item,
+                            std::unordered_set<std::string_view>& out);
+
+// One block of a conditional construct, or the blocks of the construct
+// directly nested in it, which §27.5 makes the outer construct's own.
+void AddGeneratedBlockName(std::string_view name, bool name_is_generated,
+                           const std::vector<ModuleItem*>& body,
+                           bool has_begin_end,
+                           std::unordered_set<std::string_view>& out) {
+  if (IsDirectlyNestedBlock(body, has_begin_end)) {
+    AddGeneratedBlockNames(body[0], out);
+    return;
+  }
+  if (name_is_generated) out.insert(name);
+}
+
+// The genblk<n> names §27.6 gave the blocks of `item` that stand in the scope
+// `item` is written in. A plain else is held in gen_else as a kGenerateIf of
+// its own, so following gen_else reaches it as it reaches an else-if.
+void AddGeneratedBlockNames(const ModuleItem* item,
+                            std::unordered_set<std::string_view>& out) {
+  if (!IsConditionalGenerateConstruct(item->kind)) {
+    if (item->name_is_generated) out.insert(item->name);
+    return;
+  }
+  AddGeneratedBlockName(item->name, item->name_is_generated, item->gen_body,
+                        item->gen_body_has_begin_end, out);
+  for (const auto& ci : item->gen_case_items) {
+    AddGeneratedBlockName(ci.label, ci.name_is_generated, ci.body,
+                          ci.has_begin_end, out);
+  }
+  if (item->gen_else != nullptr) AddGeneratedBlockNames(item->gen_else, out);
+}
+
+}  // namespace
+
+std::unordered_set<std::string_view> UnnamedGenerateBlockNames(
+    const ModuleDecl* decl) {
+  std::unordered_set<std::string_view> generated;
+  for (const ModuleItem* item : decl->items) {
+    AddGeneratedBlockNames(item, generated);
+  }
+  return generated;
+}
+
+void ReportUnnamedGenerateBlockReaches(const ModuleDecl* decl,
+                                       DiagEngine& diag) {
+  const std::unordered_set<std::string_view> generated =
+      UnnamedGenerateBlockNames(decl);
+  std::vector<const Expr*> accesses;
+  CollectModuleMemberAccesses(decl, accesses);
+  for (const Expr* ma : accesses) {
+    std::string_view block;
+    const Expr* select_index = nullptr;
+    if (!DecodeInstanceArrayBase(ma, block, select_index)) continue;
+    // A path may start at the design element's own name, as top.genblk1.a
+    // does, and the block it reaches is then the name after it.
+    if (block == decl->name) block = ma->rhs->text;
+    if (!generated.contains(block)) continue;
+    diag.Error(ma->range.start,
+               std::format("hierarchical name reaches into unnamed generate "
+                           "block '{}', whose generated name no hierarchical "
+                           "name may use",
+                           block),
+               Subclause("27.6"));
   }
 }
 

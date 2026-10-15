@@ -166,6 +166,12 @@ bool PortSelectsFrom(const RtlirPort& port, std::string_view name);
 // which constructs the direct-nesting rules reach is written once.
 bool IsConditionalGenerateConstruct(ModuleItemKind k);
 
+// §27.4: reports each loop generate construct of `decl`, and of the generate
+// blocks it holds, whose index no genvar declaration declares before the loop,
+// in an enclosing scope or in the loop's own initialization. Defined in
+// elaborator_generate_genvars.cpp.
+void ReportUndeclaredLoopGenvars(const ModuleDecl* decl, DiagEngine& diag);
+
 // §27.5: whether a generate block's only item is itself a conditional generate
 // construct written without begin-end, which makes the construct within it
 // directly nested and the block no separate scope. Defined in

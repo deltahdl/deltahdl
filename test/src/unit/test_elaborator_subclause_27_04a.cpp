@@ -16,7 +16,7 @@ TEST(GenerateElaboration, GenerateForCreatesVars) {
   auto* design = ElaborateSrc(
       "module t #(parameter N = 3) ();\n"
       "  generate\n"
-      "    for (i = 0; i < N; i = i + 1) begin\n"
+      "    for (genvar i = 0; i < N; i = i + 1) begin\n"
       "      logic [31:0] x;\n"
       "    end\n"
       "  endgenerate\n"
@@ -36,7 +36,7 @@ TEST(GenerateElaboration, GenerateForZeroIterations) {
   auto* design = ElaborateSrc(
       "module t #(parameter N = 0) ();\n"
       "  generate\n"
-      "    for (i = 0; i < N; i = i + 1) begin\n"
+      "    for (genvar i = 0; i < N; i = i + 1) begin\n"
       "      logic [31:0] x;\n"
       "    end\n"
       "  endgenerate\n"
@@ -53,7 +53,7 @@ TEST(GenerateElaboration, GenerateForWithAssign) {
   auto* design = ElaborateSrc(
       "module t #(parameter N = 2) ();\n"
       "  generate\n"
-      "    for (i = 0; i < N; i = i + 1) begin\n"
+      "    for (genvar i = 0; i < N; i = i + 1) begin\n"
       "      logic [31:0] w;\n"
       "      assign w = 100;\n"
       "    end\n"
@@ -75,7 +75,7 @@ TEST(GenerateElaboration, GenerateForCreatesInstances) {
       "module sub(input logic a); endmodule\n"
       "module top #(parameter N = 2) ();\n"
       "  generate\n"
-      "    for (i = 0; i < N; i = i + 1) begin : blk\n"
+      "    for (genvar i = 0; i < N; i = i + 1) begin : blk\n"
       "      sub u(.a(1'b0));\n"
       "    end\n"
       "  endgenerate\n"
@@ -91,7 +91,7 @@ TEST(GenerateElaboration, GenerateForStepByTwo) {
   auto* design = Elaborate(
       "module top #(parameter N = 6) ();\n"
       "  generate\n"
-      "    for (i = 0; i < N; i = i + 2) begin\n"
+      "    for (genvar i = 0; i < N; i = i + 2) begin\n"
       "      logic [7:0] v;\n"
       "    end\n"
       "  endgenerate\n"
@@ -107,7 +107,7 @@ TEST(GenerateElaboration, NestedGenerateForIf) {
   auto* design = Elaborate(
       "module top #(parameter N = 2) ();\n"
       "  generate\n"
-      "    for (i = 0; i < N; i = i + 1) begin\n"
+      "    for (genvar i = 0; i < N; i = i + 1) begin\n"
       "      if (1) begin\n"
       "        logic [7:0] inner;\n"
       "      end\n"
@@ -130,7 +130,7 @@ TEST(GenerateElaboration, GenerateForNonTerminatingLoopErrors) {
   ElabOk(
       "module top();\n"
       "  generate\n"
-      "    for (i = 0; i >= 0; i = i + 1) begin\n"
+      "    for (genvar i = 0; i >= 0; i = i + 1) begin\n"
       "      logic [7:0] x;\n"
       "    end\n"
       "  endgenerate\n"
@@ -165,7 +165,7 @@ TEST(GenerateElaboration, LoopGenerateAboveTheOldBoundElaborates) {
   auto* design = ElaborateSrc(
       "module t #(parameter N = 65600) ();\n"
       "  generate\n"
-      "    for (i = 0; i < N; i = i + 1) begin\n"
+      "    for (genvar i = 0; i < N; i = i + 1) begin\n"
       "      logic [7:0] x;\n"
       "    end\n"
       "  endgenerate\n"
@@ -187,7 +187,7 @@ TEST(GenerateElaboration, LoopGenerateBoundDecidesWhetherASchemeIsReported) {
   const std::string kSrc =
       "module t #(parameter N = 300) ();\n"
       "  generate\n"
-      "    for (i = 0; i < N; i = i + 1) begin\n"
+      "    for (genvar i = 0; i < N; i = i + 1) begin\n"
       "      logic [7:0] x;\n"
       "    end\n"
       "  endgenerate\n"
@@ -218,7 +218,7 @@ TEST(GenerateElaboration, GenerateForRepeatedGenvarValueErrors) {
   ElabOk(
       "module top();\n"
       "  generate\n"
-      "    for (i = 5; i < 10; i = 5) begin\n"
+      "    for (genvar i = 5; i < 10; i = 5) begin\n"
       "      logic [7:0] x;\n"
       "    end\n"
       "  endgenerate\n"
@@ -252,7 +252,7 @@ TEST(GenerateElaboration, GenerateForInitReferencesOwnGenvarErrors) {
   ElabOk(
       "module top();\n"
       "  generate\n"
-      "    for (i = i + 1; i < 3; i = i + 1) begin\n"
+      "    for (genvar i = i + 1; i < 3; i = i + 1) begin\n"
       "      logic [7:0] x;\n"
       "    end\n"
       "  endgenerate\n"
@@ -376,7 +376,7 @@ TEST(GenerateElaboration, GenerateForGenvarXZInitErrors) {
   ElaborateSrc(
       "module top();\n"
       "  generate\n"
-      "    for (i = 2'b1x; i < 3; i = i + 1) begin\n"
+      "    for (genvar i = 2'b1x; i < 3; i = i + 1) begin\n"
       "      logic [7:0] v;\n"
       "    end\n"
       "  endgenerate\n"
@@ -401,7 +401,7 @@ TEST(GenerateElaboration, GenerateForGenvarXZStepErrors) {
   ElaborateSrc(
       "module top();\n"
       "  generate\n"
-      "    for (i = 0; i < 3; i = 2'b0z) begin\n"
+      "    for (genvar i = 0; i < 3; i = 2'b0z) begin\n"
       "      logic [7:0] v;\n"
       "    end\n"
       "  endgenerate\n"
@@ -436,7 +436,7 @@ TEST(GenerateElaboration, GenerateForGenvarXZReportsNameWhichHalfOfTheHeader) {
   ElaborateSrc(
       "module top();\n"
       "  generate\n"
-      "    for (i = 2'b1x; i < 3; i = i + 1) begin\n"
+      "    for (genvar i = 2'b1x; i < 3; i = i + 1) begin\n"
       "      logic [7:0] v;\n"
       "    end\n"
       "  endgenerate\n"
@@ -450,7 +450,7 @@ TEST(GenerateElaboration, GenerateForGenvarXZReportsNameWhichHalfOfTheHeader) {
   ElaborateSrc(
       "module top();\n"
       "  generate\n"
-      "    for (i = 0; i < 3; i = 2'b0z) begin\n"
+      "    for (genvar i = 0; i < 3; i = 2'b0z) begin\n"
       "      logic [7:0] v;\n"
       "    end\n"
       "  endgenerate\n"
