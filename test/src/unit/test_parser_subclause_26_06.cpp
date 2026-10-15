@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_module.h"
 
 using namespace delta;
@@ -75,6 +76,43 @@ TEST(PackageExportParsing, PackageContainingOnlyExports) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->packages.size(), 1u);
   EXPECT_EQ(r.cu->packages[0]->items.size(), 2u);
+}
+
+// §26.6 with A.1.11: a package export declaration is a package item, so one
+// written in a module body is reported at the export. It was parsed into the
+// module and ignored.
+TEST(PackageExportParsing, ExportInAModuleBodyIsReported) {
+  auto r = Parse(
+      "package p1; int x = 5; endpackage\n"
+      "module top;\n"
+      "  import p1::*;\n"
+      "  export p1::x;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a package export declaration is allowed only in a package", 4,
+      "26.6"));
+}
+
+// A DPI export (§35.5.4) shares the keyword and stays an item of the module.
+TEST(PackageExportParsing, DpiExportInAModuleBodyStaysLegal) {
+  auto r = Parse(
+      "module top;\n"
+      "  export \"DPI-C\" function f;\n"
+      "  function void f(); endfunction\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+// Syntax 26-4: `export *::*` stands alone, so a list after it is a syntax error
+// at the comma. It was read as two exports.
+TEST(PackageExportParsing, ExportStarStarTakesNoList) {
+  auto r = Parse(
+      "package p1; int x = 5; endpackage\n"
+      "package p2;\n"
+      "  import p1::x;\n"
+      "  export *::*, p1::x;\n"
+      "endpackage\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got ','", 4, "26.6"));
 }
 
 }  // namespace

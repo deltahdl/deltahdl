@@ -366,4 +366,29 @@ TEST(PackageDeclaration, MalformedPackageHeaderNames26_2) {
   EXPECT_TRUE(ReportedError(r.diags, "expected identifier", 1, "26.2"));
 }
 
+// §26.2 lets a package declare a checker, and §17.2 lets a checker declare a
+// clocking block: the checker is a scope of its own, so its default clocking
+// is no clocking block of the package (§14.7). It was reported as one.
+TEST(PackageDeclaration, CheckerInAPackageMayDeclareAClockingBlock) {
+  auto r = Parse(
+      "package p;\n"
+      "  checker chk(logic a, logic clk);\n"
+      "    default clocking cb @(posedge clk); endclocking\n"
+      "    a1: assert property (a);\n"
+      "  endchecker\n"
+      "endpackage\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+// The package's own clocking block is still reported, at the block.
+TEST(PackageDeclaration, ClockingBlockOfThePackageItselfStaysReported) {
+  auto r = Parse(
+      "package p;\n"
+      "  checker chk(logic a); endchecker\n"
+      "  clocking cb @(posedge clk); endclocking\n"
+      "endpackage\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a package body cannot hold a clocking block", 3, "14.7"));
+}
+
 }  // namespace

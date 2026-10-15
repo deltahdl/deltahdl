@@ -104,6 +104,16 @@ void Parser::ParseExportDecl(std::vector<ModuleItem*>& items) {
     items.push_back(ParseDpiExport(loc));
     return;
   }
+  // §26.6 with A.1.11 and A.1.2: a package export declaration is an item of a
+  // package, and of the compilation unit, which takes package items; a
+  // module, interface, program or checker body holds none, a checker a
+  // package declares included, and the design element being read is what
+  // current_module_ holds.
+  if (current_module_ != nullptr) {
+    diag_.Error(loc,
+                "a package export declaration is allowed only in a package",
+                Subclause("26.6"));
+  }
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kExportDecl;
   item->loc = loc;
@@ -112,16 +122,19 @@ void Parser::ParseExportDecl(std::vector<ModuleItem*>& items) {
     Expect(TokenKind::kColonColon, Subclause("26.6"));
     Expect(TokenKind::kStar, Subclause("26.6"));
     item->import_item.is_wildcard = true;
+    // Syntax 26-4: `export *::*` stands alone, taking no list after it.
+    items.push_back(item);
+    Expect(TokenKind::kSemicolon, Subclause("26.6"));
+    return;
+  }
+  item->import_item.package_name =
+      Expect(TokenKind::kIdentifier, Subclause("26.6")).text;
+  Expect(TokenKind::kColonColon, Subclause("26.6"));
+  if (Match(TokenKind::kStar)) {
+    item->import_item.is_wildcard = true;
   } else {
-    item->import_item.package_name =
+    item->import_item.item_name =
         Expect(TokenKind::kIdentifier, Subclause("26.6")).text;
-    Expect(TokenKind::kColonColon, Subclause("26.6"));
-    if (Match(TokenKind::kStar)) {
-      item->import_item.is_wildcard = true;
-    } else {
-      item->import_item.item_name =
-          Expect(TokenKind::kIdentifier, Subclause("26.6")).text;
-    }
   }
   items.push_back(item);
 
