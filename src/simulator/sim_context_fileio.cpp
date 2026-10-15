@@ -240,6 +240,24 @@ void SimContext::AliasMailbox(std::string_view alias_name,
 // on an `output logic [3:0] dout` port, whose storage is a variable rather than
 // a net under the child's prefix, found the parent's like-named net and drove
 // it, leaving the connected net undriven (§23.3.2.2).
+// §27.4 and §23.9: a net a generate block the running process `proc` stands
+// in declares is held under the block's prefix and is found ahead of one the
+// enclosing scope declares, innermost block first, as FindVariable finds a
+// variable (SimContext::FindInGenerateBlock). Looked up under the instance
+// prefix alone, a continuous assignment in a block drove the module's net of
+// its name, or none.
+static Net* FindNetInGenerateBlock(
+    const std::unordered_map<std::string_view, Net*>& nets, const Process* proc,
+    const std::string& prefix, std::string_view name) {
+  if (proc == nullptr) return nullptr;
+  for (const std::string& key :
+       GenerateBlockKeys(prefix, proc->gen_prefixes, name)) {
+    auto found = nets.find(key);
+    if (found != nets.end()) return found->second;
+  }
+  return nullptr;
+}
+
 Net* SimContext::FindNet(std::string_view name) {
   // §23.6: a name written from $root is absolute, as FindVariable reads one.
   constexpr std::string_view kRootPrefix = "$root.";
@@ -248,18 +266,9 @@ Net* SimContext::FindNet(std::string_view name) {
     return (it != nets_.end()) ? it->second : nullptr;
   }
   std::string prefix = ActiveInstancePrefix();
-  // §27.4 and §23.9: a net a generate block the running process stands in
-  // declares is held under the block's prefix and is found ahead of one the
-  // enclosing scope declares, innermost block first, as FindVariable finds a
-  // variable (SimContext::FindInGenerateBlock). Looked up under the instance
-  // prefix alone, a continuous assignment in a block drove the module's net of
-  // its name, or none.
-  if (current_process_ != nullptr) {
-    for (const std::string& key :
-         GenerateBlockKeys(prefix, current_process_->gen_prefixes, name)) {
-      auto found = nets_.find(key);
-      if (found != nets_.end()) return found->second;
-    }
+  if (Net* in_block =
+          FindNetInGenerateBlock(nets_, current_process_, prefix, name)) {
+    return in_block;
   }
   if (!prefix.empty()) {
     auto prefixed = nets_.find(prefix + std::string(name));
