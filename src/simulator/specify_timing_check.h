@@ -375,6 +375,13 @@ uint32_t VectorTransitionViolationCount(uint64_t before, uint64_t after,
 
 bool TimingCheckUsesDelayedSignals(TimingCheckKind kind);
 
+// §31.9.1: whether `check` is evaluated on the delayed copies of its signals,
+// with its limits adjusted, which every check of a kind that uses them is but
+// a negative $setuphold or $recrem, whose shifted window is evaluated on the
+// signals themselves. A signal with no delayed copy lags by 0. Defined in
+// simulator/timing_check_negative_delays.cpp.
+bool EvaluatedOnDelayedSignals(const TimingCheckEntry& check);
+
 struct AdjustedNegativeTimingLimit {
   uint64_t limit;
   bool warn;

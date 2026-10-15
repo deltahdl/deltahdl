@@ -291,4 +291,128 @@ TEST(NegativeTimingCheckSwitches, NotifierTogglesWhenTheDelayedSignalsViolate) {
             "510.01\n");
 }
 
+// §31.9.1 (printed page 921): every check naming a signal that has a delayed
+// copy is evaluated on that copy, a $setup with no negative limit of its own
+// among them. The $setuphold delays clk by 11 and e not at all, so the $setup
+// limit of 5 is adjusted to 16 and the check sees e change at 100 and the
+// delayed clk rise at 113, 13 apart and inside it. The notifier toggles then,
+// not at 102 when the undelayed clk rose.
+TEST(NegativeTimingCheckSwitches, SetupOnADelayedClockTogglesAtTheDelayedEdge) {
+  SimFixture f;
+  EXPECT_EQ(RunUnder("`timescale 1ns/1ns\n"
+                     "module top(output reg clk = 0, output reg d = 0,\n"
+                     "           output reg e = 0);\n"
+                     "  reg n = 0;\n"
+                     "  specify\n"
+                     "    $setuphold(posedge clk, d, -10, 20);\n"
+                     "    $setup(e, posedge clk, 5, n);\n"
+                     "  endspecify\n"
+                     "  always @(n) $display(\"%0d\", $time);\n"
+                     "  initial begin\n"
+                     "    #100 e = 1;\n"
+                     "    #2 clk = 1;\n"
+                     "  end\n"
+                     "endmodule\n",
+                     {true, false}, f),
+            "113\n");
+}
+
+// The same delays adjust a $hold limit of 5 to 5 - 11, which is not positive,
+// so §31.9.1 sets it to 0 with a warning, and a $hold of limit 0 reports
+// nothing: e changing 2 after clk, a violation of the declared limit, toggles
+// no notifier.
+TEST(NegativeTimingCheckSwitches, HoldAdjustedBelowZeroIsZeroedWithAWarning) {
+  SimFixture f;
+  EXPECT_EQ(RunUnder("`timescale 1ns/1ns\n"
+                     "module top(output reg clk = 0, output reg d = 0,\n"
+                     "           output reg e = 0);\n"
+                     "  reg n = 0;\n"
+                     "  specify\n"
+                     "    $setuphold(posedge clk, d, -10, 20);\n"
+                     "    $hold(posedge clk, e, 5, n);\n"
+                     "  endspecify\n"
+                     "  always @(n) $display(\"%0d\", $time);\n"
+                     "  initial begin\n"
+                     "    #100 clk = 1;\n"
+                     "    #2 e = 1;\n"
+                     "  end\n"
+                     "endmodule\n",
+                     {true, false}, f),
+            "");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "is no longer positive and is set to 0", 7,
+                              "31.9.1"));
+}
+
+// $width watches one signal, whose edges are delayed alike, so its limit is
+// not adjusted, but it is evaluated on the delayed clk: the pulse from 100 to
+// 105 is too narrow, and the violation is seen at the delayed falling edge,
+// 116.
+TEST(NegativeTimingCheckSwitches, WidthOnADelayedClockReportsAtTheDelayedEdge) {
+  SimFixture f;
+  EXPECT_EQ(RunUnder("`timescale 1ns/1ns\n"
+                     "module top(output reg clk = 0, output reg d = 0);\n"
+                     "  reg n = 0;\n"
+                     "  specify\n"
+                     "    $setuphold(posedge clk, d, -10, 20);\n"
+                     "    $width(posedge clk, 10, 0, n);\n"
+                     "  endspecify\n"
+                     "  always @(n) $display(\"%0d\", $time);\n"
+                     "  initial begin\n"
+                     "    #100 clk = 1;\n"
+                     "    #5 clk = 0;\n"
+                     "  end\n"
+                     "endmodule\n",
+                     {true, false}, f),
+            "116\n");
+}
+
+// A $nochange's offsets move with the delays as a limit does, so on the
+// delayed clk, high from 111 to 131, its window still covers 100 to 120 and e
+// changing at 110 violates it; the violation is seen when the delayed clk
+// falls and closes the window, at 131.
+TEST(NegativeTimingCheckSwitches, NochangeOnADelayedClockReportsAtItsClose) {
+  SimFixture f;
+  EXPECT_EQ(RunUnder("`timescale 1ns/1ns\n"
+                     "module top(output reg clk = 0, output reg d = 0,\n"
+                     "           output reg e = 0);\n"
+                     "  reg n = 0;\n"
+                     "  specify\n"
+                     "    $setuphold(posedge clk, d, -10, 20);\n"
+                     "    $nochange(posedge clk, e, 0, 0, n);\n"
+                     "  endspecify\n"
+                     "  always @(n) $display(\"%0d\", $time);\n"
+                     "  initial begin\n"
+                     "    #100 clk = 1;\n"
+                     "    #10 e = 1;\n"
+                     "    #10 clk = 0;\n"
+                     "  end\n"
+                     "endmodule\n",
+                     {true, false}, f),
+            "131\n");
+}
+
+// §31.9.1 keeps $skew on the undelayed signals: e rising 5 after clk exceeds
+// the limit of 3 at 105, though the delayed clk, rising at 111, would put e
+// before it.
+TEST(NegativeTimingCheckSwitches, SkewKeepsTheUndelayedSignals) {
+  SimFixture f;
+  EXPECT_EQ(RunUnder("`timescale 1ns/1ns\n"
+                     "module top(output reg clk = 0, output reg d = 0,\n"
+                     "           output reg e = 0);\n"
+                     "  reg n = 0;\n"
+                     "  specify\n"
+                     "    $setuphold(posedge clk, d, -10, 20);\n"
+                     "    $skew(posedge clk, posedge e, 3, n);\n"
+                     "  endspecify\n"
+                     "  always @(n) $display(\"%0d\", $time);\n"
+                     "  initial begin\n"
+                     "    #100 clk = 1;\n"
+                     "    #5 e = 1;\n"
+                     "  end\n"
+                     "endmodule\n",
+                     {true, false}, f),
+            "105\n");
+}
+
 }  // namespace

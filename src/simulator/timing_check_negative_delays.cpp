@@ -18,6 +18,15 @@
 // Limits no delays satisfy are what the clause calls mutually inconsistent. The
 // run warns, sets the least negative limit to 0 and solves again, until a
 // solution is reached; at worst every negative limit is 0 and nothing lags.
+//
+// Every other check naming a delayed signal is evaluated on the delayed copy
+// too, but $skew, $fullskew and $timeskew, and its limits are adjusted by the
+// same two delays so that its window stays where it was declared and only the
+// moment it reports moves. An adjusted limit that is no longer positive is set
+// to 0 with a warning. $width and $period watch one signal, whose edges are
+// delayed alike, and keep their limits. WatchConditionedEdge
+// (simulator/timing_check_driver_internal.h) is what delivers such a check's
+// transitions late.
 
 #include <cstddef>
 #include <cstdint>
@@ -29,6 +38,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "parser/ast_specify.h"
 #include "simulator/specify.h"
 #include "simulator/specify_timing_check.h"
@@ -151,7 +161,51 @@ void ZeroLeastNegativeLimit(std::vector<TimingCheckEntry>& checks,
   *places[i] = 0;
 }
 
+// A positive limit moved by `shift`, set to 0 with §31.9.1's warning where it
+// is no longer positive. A zero limit bounds no window and stays 0.
+void ShiftLimit(uint64_t& limit, int64_t& signed_limit, int64_t shift,
+                const SourceLoc& loc, DiagEngine& diag) {
+  if (limit == 0) return;
+  const AdjustedNegativeTimingLimit kAdjusted =
+      AdjustNegativeTimingCheckLimit(static_cast<int64_t>(limit) + shift);
+  if (kAdjusted.warn) {
+    diag.Warning(loc,
+                 "adjusted for the delays of the delayed signals it is "
+                 "evaluated on, a limit of this check is no longer positive "
+                 "and is set to 0",
+                 Subclause("31.9.1"));
+  }
+  limit = kAdjusted.limit;
+  signed_limit = static_cast<int64_t>(kAdjusted.limit);
+}
+
+// A limit bounding the side before the reference edge grows by d(ref) - d(data)
+// and one bounding the side after it shrinks by as much. $setup's, $removal's
+// and $setuphold's first limits are before it, and $hold's, $recovery's and
+// $recrem's after it, the second limit of the two-sided checks bounding the
+// other side. $nochange's offsets move its window's two ends the same way;
+// §31.4.6 gives an offset that is not positive a meaning of its own, so they
+// are moved and never set to 0.
+void AdjustLimitsForDelays(TimingCheckEntry& e, int64_t shift,
+                           DiagEngine& diag) {
+  if (e.kind == TimingCheckKind::kNochange) {
+    e.start_edge_offset += shift;
+    e.end_edge_offset -= shift;
+    return;
+  }
+  const bool kFirstBefore = e.kind == TimingCheckKind::kSetup ||
+                            e.kind == TimingCheckKind::kSetuphold ||
+                            e.kind == TimingCheckKind::kRemoval;
+  const int64_t kFirstShift = kFirstBefore ? shift : -shift;
+  ShiftLimit(e.limit, e.signed_limit, kFirstShift, e.loc, diag);
+  ShiftLimit(e.limit2, e.signed_limit2, -kFirstShift, e.loc, diag);
+}
+
 }  // namespace
+
+bool EvaluatedOnDelayedSignals(const TimingCheckEntry& e) {
+  return TimingCheckUsesDelayedSignals(e.kind) && !TakesNegativeDelays(e);
+}
 
 void SpecifyManager::ResolveNegativeTimingCheckDelays(int64_t unit_ticks,
                                                       DiagEngine& diag) {
@@ -171,6 +225,18 @@ void SpecifyManager::ResolveNegativeTimingCheckDelays(int64_t unit_ticks,
     if (delays[node] > 0) {
       timing_check_signal_delays_[name] = static_cast<uint64_t>(delays[node]);
     }
+  }
+  for (TimingCheckEntry& e : timing_checks_) {
+    if (!EvaluatedOnDelayedSignals(e) || e.kind == TimingCheckKind::kWidth ||
+        e.kind == TimingCheckKind::kPeriod) {
+      continue;
+    }
+    const auto kShift =
+        static_cast<int64_t>(
+            TimingCheckSignalDelay(e.inst_prefix + e.ref_signal)) -
+        static_cast<int64_t>(
+            TimingCheckSignalDelay(e.inst_prefix + e.data_signal));
+    if (kShift != 0) AdjustLimitsForDelays(e, kShift, diag);
   }
 }
 

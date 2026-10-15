@@ -331,22 +331,54 @@ struct ConditionedEdgeActions {
   std::function<void()> on_suppressed;
 };
 
+// Runs the action §31.7 picks for one transition of a conditioned event.
+inline void RunConditionedActions(const ConditionedEvent& event,
+                                  SimContext& ctx,
+                                  const ConditionedEdgeActions& actions) {
+  if (TimingCheckEventEnabled(event.Condition(),
+                              event.armed.Entry().inst_prefix, ctx)) {
+    actions.on_edge();
+    return;
+  }
+  if (actions.on_suppressed) actions.on_suppressed();
+}
+
+// §31.9.1: how long after a transition of the event's signal the check sees
+// it. A check evaluated on delayed signals sees the delayed copy, which lags
+// the signal by the delay SpecifyManager::ResolveNegativeTimingCheckDelays
+// settled for it; every other check sees the signal itself.
+inline uint64_t DelayedEventLag(const ConditionedEvent& event) {
+  const TimingCheckEntry& check = event.armed.Entry();
+  if (!EvaluatedOnDelayedSignals(check)) return 0;
+  return event.armed.mgr->TimingCheckSignalDelay(
+      check.inst_prefix +
+      (event.is_data_event ? check.data_signal : check.ref_signal));
+}
+
 // Arms the watcher WatchEdge arms and calls `on_edge` only for a transition
 // that §31.7 makes an occurrence of the check. Every §31 watcher goes through
 // this rather than through WatchEdge: an event written without a `&&&`
 // condition carries a null one and is enabled unconditionally, so there is no
 // second case to keep.
+//
+// A transition the check sees on a delayed copy reaches it that much later,
+// its condition read then, when the copy makes it.
 inline void WatchConditionedEdge(Variable* var, TimingCheckEdge edge,
                                  ConditionedEvent event, SimContext& ctx,
                                  ConditionedEdgeActions actions) {
   WatchEdge(
       var, std::move(edge), [event, &ctx, actions = std::move(actions)]() {
-        if (TimingCheckEventEnabled(event.Condition(),
-                                    event.armed.Entry().inst_prefix, ctx)) {
-          actions.on_edge();
+        const uint64_t kLag = DelayedEventLag(event);
+        if (kLag == 0) {
+          RunConditionedActions(event, ctx, actions);
           return;
         }
-        if (actions.on_suppressed) actions.on_suppressed();
+        auto* late = ctx.GetScheduler().GetEventPool().Acquire();
+        late->callback = [event, &ctx, actions]() {
+          RunConditionedActions(event, ctx, actions);
+        };
+        ctx.GetScheduler().ScheduleEvent(
+            SimTime{ctx.CurrentTime().ticks + kLag}, Region::kActive, late);
       });
 }
 
