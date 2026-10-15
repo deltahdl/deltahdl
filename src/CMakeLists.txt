@@ -717,6 +717,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/stmt_exec_control.cpp
     simulator/timing_check_delayed_signals.cpp
     simulator/timing_check_driver.cpp
+    simulator/timing_check_negative_delays.cpp
     simulator/timing_check_pulse.cpp
     simulator/timing_check_skew.cpp
     simulator/timing_check_stability.cpp

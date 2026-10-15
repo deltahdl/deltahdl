@@ -377,6 +377,48 @@ bool TimingCheckConditionEnables(TimingCheckConditionKind kind,
   return false;
 }
 
+// §31.7's Syntax 31-16: scalar_constant is one of ten spellings, `1'b0`,
+// `1'b1`, `1'B0`, `1'B1`, `'b0`, `'b1`, `'B0`, `'B1`, `1` and `0`. A comparison
+// whose right-hand side is anything else, another signal or a wider literal, is
+// not one of the four comparison forms but the plain `expression` form, whose
+// own value gates the event.
+static bool IsScalarConstant(const Expr* e) {
+  if (e->kind != ExprKind::kIntegerLiteral) return false;
+  static constexpr std::string_view kSpellings[] = {
+      "1'b0", "1'b1", "1'B0", "1'B1", "'b0", "'b1", "'B0", "'B1", "1", "0"};
+  for (std::string_view spelling : kSpellings) {
+    if (e->text == spelling) return true;
+  }
+  return false;
+}
+
+// The comparison form `condition` is, or kPlain where it is none: one of the
+// four operators of Syntax 31-16 with a scalar_constant on its right.
+static TimingCheckConditionKind ComparisonFormOf(const Expr* condition) {
+  if (condition->kind != ExprKind::kBinary) {
+    return TimingCheckConditionKind::kPlain;
+  }
+  TimingCheckConditionKind kind = TimingCheckConditionKind::kPlain;
+  switch (condition->op) {
+    case TokenKind::kEqEq:
+      kind = TimingCheckConditionKind::kEq;
+      break;
+    case TokenKind::kEqEqEq:
+      kind = TimingCheckConditionKind::kCaseEq;
+      break;
+    case TokenKind::kBangEq:
+      kind = TimingCheckConditionKind::kNeq;
+      break;
+    case TokenKind::kBangEqEq:
+      kind = TimingCheckConditionKind::kCaseNeq;
+      break;
+    default:
+      break;
+  }
+  return IsScalarConstant(condition->rhs) ? kind
+                                          : TimingCheckConditionKind::kPlain;
+}
+
 TimingCheckConditionClass ClassifyTimingCheckCondition(const Expr* condition) {
   TimingCheckConditionClass result;
   if (condition == nullptr) return result;  // unconditioned event -> plain
@@ -390,35 +432,11 @@ TimingCheckConditionClass ClassifyTimingCheckCondition(const Expr* condition) {
 
   // `expression <op> scalar_constant`: the four comparison forms. The LSB of
   // the right-hand scalar_constant is the value compared against.
-  if (condition->kind == ExprKind::kBinary) {
-    bool matched = true;
-    switch (condition->op) {
-      case TokenKind::kEqEq:
-        result.kind = TimingCheckConditionKind::kEq;
-        break;
-      case TokenKind::kEqEqEq:
-        result.kind = TimingCheckConditionKind::kCaseEq;
-        break;
-      case TokenKind::kBangEq:
-        result.kind = TimingCheckConditionKind::kNeq;
-        break;
-      case TokenKind::kBangEqEq:
-        result.kind = TimingCheckConditionKind::kCaseNeq;
-        break;
-      default:
-        matched = false;
-        break;
-    }
-    if (matched) {
-      if (condition->rhs != nullptr) {
-        result.scalar_constant_bit =
-            static_cast<uint8_t>(condition->rhs->int_val & 1u);
-      }
-      return result;
-    }
+  result.kind = ComparisonFormOf(condition);
+  if (result.kind != TimingCheckConditionKind::kPlain) {
+    result.scalar_constant_bit =
+        static_cast<uint8_t>(condition->rhs->int_val & 1u);
   }
-
-  // Any other expression is the plain form: its own value gates the check.
   return result;
 }
 
@@ -434,16 +452,8 @@ const Expr* TimingCheckConditioningSignal(const Expr* condition) {
   // `expression <op> scalar_constant`: the comparison is applied by
   // TimingCheckConditionEnables against the scalar_constant it already carries,
   // so the left-hand operand is the conditioning signal.
-  if (condition->kind == ExprKind::kBinary) {
-    switch (condition->op) {
-      case TokenKind::kEqEq:
-      case TokenKind::kEqEqEq:
-      case TokenKind::kBangEq:
-      case TokenKind::kBangEqEq:
-        return condition->lhs;
-      default:
-        break;
-    }
+  if (ComparisonFormOf(condition) != TimingCheckConditionKind::kPlain) {
+    return condition->lhs;
   }
   // Any other expression is the plain form, whose own value gates the check --
   // the same expression ClassifyTimingCheckCondition reports as kPlain.

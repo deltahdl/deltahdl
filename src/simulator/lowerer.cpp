@@ -728,6 +728,10 @@ void Lowerer::RegisterDesignTiming() {
                              ctx_, arena_, mgr);
   }
   ctx_.SetLoweringInstancePrefix("");
+  // §31.9.1: the delays of the negative checks' delayed signals are settled
+  // across every check just registered, before any is armed, since settling
+  // them may zero a limit those checks are then evaluated against.
+  mgr.ResolveNegativeTimingCheckDelays(ctx_.GetDiag());
   // §30.5.3 selects among the module paths whose input changed latest, and
   // nothing records when a signal last changed. This
   // arms the watcher that does, on the source terminal of every path just

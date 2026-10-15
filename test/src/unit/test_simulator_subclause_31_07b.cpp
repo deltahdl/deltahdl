@@ -305,4 +305,62 @@ TEST(ConditionedTimingCheckEvaluation,
   EXPECT_EQ(FindDiag(f, "$hold violation: data signal"), nullptr);
 }
 
+// §31.7's comparison forms take a scalar_constant on the right, and `sel` is
+// none, so `en == sel` is the plain expression form and its own value gates the
+// reference event. Both at 1 make it true, and `d` rising 7 before `clk`
+// against a limit of 31 is reported. Read as a comparison with the constant 0,
+// `en` at 1 would disable the event.
+TEST(ConditionedTimingCheckEvaluation,
+     ComparisonWithASignalIsEvaluatedAsAWhole) {
+  SimFixture f;
+  const std::string kDesign =
+      "module top(\n"
+      "    output logic d,\n"
+      "    output logic clk);\n"
+      "  logic en, sel;\n"
+      "  specify\n"
+      "    $setup(d, posedge clk &&& (en == sel), 31);\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    d = 1'b0;\n"
+      "    clk = 1'b0;\n"
+      "    en = 1'b1;\n"
+      "    sel = 1'b1;\n"
+      "    #17 d = 1'b1;\n"
+      "    #7 clk = 1'b1;\n"
+      "  end\n"
+      "endmodule\n";
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(), "$setup violation: data signal",
+      LineHolding(kDesign, "$setup(d, posedge clk &&& (en == sel)"), "31.3.1"));
+}
+
+// A two-bit literal is no scalar_constant either, so `en == 2'b10` is false
+// with `en` at 2'b00 and the data event of the $hold never occurs. Read as a
+// comparison of `en`'s least significant bit with 0, it would occur, and the
+// 5 units of hold against a limit of 43 would be reported.
+TEST(ConditionedTimingCheckEvaluation,
+     ComparisonWithAWideLiteralIsEvaluatedAsAWhole) {
+  SimFixture f;
+  const std::string kDesign =
+      "module top(\n"
+      "    output logic d,\n"
+      "    output logic clk);\n"
+      "  logic [1:0] en;\n"
+      "  specify\n"
+      "    $hold(posedge clk, d &&& (en == 2'b10), 43);\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    d = 1'b0;\n"
+      "    clk = 1'b0;\n"
+      "    en = 2'b00;\n"
+      "    #26 clk = 1'b1;\n"
+      "    #5 d = 1'b1;\n"
+      "  end\n"
+      "endmodule\n";
+  ASSERT_TRUE(DrivenToCompletion(kDesign, f));
+  EXPECT_EQ(FindDiag(f, "$hold violation: data signal"), nullptr);
+}
+
 }  // namespace

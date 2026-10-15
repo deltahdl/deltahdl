@@ -5,6 +5,7 @@
 #include "driver/cli_options.h"
 #include "fixture_simulator.h"
 #include "helpers_command_line.h"
+#include "helpers_reported_error.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
 #include "simulator/specify_timing_check.h"
@@ -94,12 +95,15 @@ TEST(NegativeTimingCheckSwitches, NegativeHoldShiftsTheWindowBeforeTheEdge) {
 }
 
 // §31.9.1 (printed page 922): the setup time of -7, the larger in magnitude,
-// gives dCLK a delay of 7, so under the option dclk rises 7 after clk and
-// samples through dd the d that changed 2 after clk. Without the option the two
-// are copies and dclk rises with clk.
+// gives dCLK a delay of 7 -- 7.1 on a 100 ps precision, the least delay that
+// leaves the adjusted setup limit one unit of precision -- so under the option
+// dclk rises 7.1 after clk, which $time reads as 27, and samples through dd the
+// d that changed 2 after clk. Without the option the two are copies and dclk
+// rises with clk.
 TEST(NegativeTimingCheckSwitches,
      DelayedReferenceLagsByTheLargestNegativeSetup) {
   const std::string kDesign =
+      "`timescale 1ns/100ps\n"
       "module top(output reg q, output reg clk = 0, output reg d = 0);\n"
       "  reg n = 0; integer t = 0;\n"
       "  specify\n"
@@ -138,6 +142,134 @@ TEST(NegativeTimingCheckSwitches, AllChecksOffReportsNothing) {
                      "endmodule\n",
                      {false, true}, f),
             "0\n");
+}
+
+// §31.3.3 (printed page 901): with a limit negative, a $setuphold's two limits
+// sum to more than one unit of simulation precision. -4 and 5 sum to 1 under a
+// 1 ns precision, which is not more.
+TEST(NegativeTimingCheckSwitches, SetupholdLimitsSummingToOneUnitAreReported) {
+  SimFixture f;
+  RunUnder(
+      "`timescale 1ns/1ns\n"
+      "module top(output reg clk = 0, output reg d = 0);\n"
+      "  specify\n"
+      "    $setuphold(posedge clk, d, -4, 5);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      {true, false}, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "sum to 1 in units of simulation precision", 4,
+                            "31.3.3"));
+}
+
+// Two units are more than one, so -4 and 6 meet the restriction.
+TEST(NegativeTimingCheckSwitches, SetupholdLimitsSummingToTwoUnitsAreAccepted) {
+  SimFixture f;
+  RunUnder(
+      "`timescale 1ns/1ns\n"
+      "module top(output reg clk = 0, output reg d = 0);\n"
+      "  specify\n"
+      "    $setuphold(posedge clk, d, -4, 6);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      {true, false}, f);
+  EXPECT_EQ(FindDiag(f, "in units of simulation precision"), nullptr);
+}
+
+// §31.3.6 (printed page 904) puts the same restriction on $recrem's recovery
+// and removal limits, which -10 and 5 break.
+TEST(NegativeTimingCheckSwitches, RecremLimitsSummingBelowOneUnitAreReported) {
+  SimFixture f;
+  RunUnder(
+      "`timescale 1ns/1ns\n"
+      "module top(output reg clr = 0, output reg clk = 0);\n"
+      "  specify\n"
+      "    $recrem(posedge clr, posedge clk, -10, 5);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      {true, false}, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "sum to -5 in units of simulation precision", 4,
+                            "31.3.6"));
+}
+
+// §31.9.1's Figure 31-6 (printed page 923) gives the delays of its three
+// checks' delayed signals on a 10 ps precision: 10.01 for cp, 0 for d, 20.02
+// for ti and 2.02 for te, the least delays that leave every adjusted limit at
+// least one unit of precision. Each delayed copy rises that long after the
+// original, which all rise at 100.
+TEST(NegativeTimingCheckSwitches, DelayedSignalsTakeFigure31_6Delays) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunUnder("`timescale 1ns/10ps\n"
+               "module top(output reg cp = 0, output reg d = 0,\n"
+               "           output reg ti = 0, output reg te = 0);\n"
+               "  specify\n"
+               "    $setuphold(posedge cp, d, -10, 20, , , , dcp, dd);\n"
+               "    $setuphold(posedge cp, ti, 20, -10, , , , dcp, dti);\n"
+               "    $setuphold(posedge cp, te, -4, 8, , , , dcp, dte);\n"
+               "  endspecify\n"
+               "  always @(posedge dcp) $display(\"dcp %0.2f\", $realtime);\n"
+               "  always @(posedge dd) $display(\"dd %0.2f\", $realtime);\n"
+               "  always @(posedge dti) $display(\"dti %0.2f\", $realtime);\n"
+               "  always @(posedge dte) $display(\"dte %0.2f\", $realtime);\n"
+               "  initial begin\n"
+               "    #100 cp = 1; d = 1; ti = 1; te = 1;\n"
+               "  end\n"
+               "endmodule\n",
+               {true, false}, f),
+      "dd 100.00\ndte 102.02\ndcp 110.01\ndti 120.02\n");
+}
+
+// §31.9.1 (printed page 921): a lags b by more than 10 in the first check and b
+// lags a by more than 10 in the second, which no delays satisfy. The run warns
+// and sets the least negative limit to 0, the first check's -10 where the two
+// tie, after which b lags a by 11 and a does not lag at all.
+TEST(NegativeTimingCheckSwitches,
+     InconsistentLimitsWarnAndZeroTheLeastNegative) {
+  SimFixture f;
+  EXPECT_EQ(RunUnder("`timescale 1ns/1ns\n"
+                     "module top(output reg a = 0, output reg b = 0);\n"
+                     "  specify\n"
+                     "    $setuphold(posedge a, b, -10, 12, , , , da, db);\n"
+                     "    $setuphold(posedge b, a, -10, 12);\n"
+                     "  endspecify\n"
+                     "  always @(posedge da) $display(\"da %0d\", $time);\n"
+                     "  always @(posedge db) $display(\"db %0d\", $time);\n"
+                     "  initial begin\n"
+                     "    #10 a = 1; b = 1;\n"
+                     "  end\n"
+                     "endmodule\n",
+                     {true, false}, f),
+            "da 10\ndb 21\n");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), "no consistent delays", 4,
+                              "31.9.1"));
+}
+
+// §31.9.3 (printed page 923): the check is evaluated on the delayed signals, so
+// the notifier toggles when they violate. Under Figure 31-6's delays te
+// changing at 505, inside the (504, 508) window cp rising at 500 sets, reaches
+// the delayed te at 507.02, and the violation is detected when the delayed cp
+// rises at 510.01.
+TEST(NegativeTimingCheckSwitches, NotifierTogglesWhenTheDelayedSignalsViolate) {
+  SimFixture f;
+  EXPECT_EQ(RunUnder("`timescale 1ns/10ps\n"
+                     "module top(output reg cp = 0, output reg d = 0,\n"
+                     "           output reg ti = 0, output reg te = 0);\n"
+                     "  reg n = 0;\n"
+                     "  specify\n"
+                     "    $setuphold(posedge cp, d, -10, 20);\n"
+                     "    $setuphold(posedge cp, ti, 20, -10);\n"
+                     "    $setuphold(posedge cp, te, -4, 8, n);\n"
+                     "  endspecify\n"
+                     "  always @(n) $display(\"%0.2f\", $realtime);\n"
+                     "  initial begin\n"
+                     "    #500 cp = 1;\n"
+                     "    #5 te = 1;\n"
+                     "  end\n"
+                     "endmodule\n",
+                     {true, false}, f),
+            "510.01\n");
 }
 
 }  // namespace

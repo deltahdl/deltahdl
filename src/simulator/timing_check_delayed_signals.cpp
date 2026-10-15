@@ -6,13 +6,11 @@
 //
 // Without the option enabling negative timing checks the delayed signals are
 // plain copies of the originals, so a copy follows at once. With it they lag
-// only where some limit is negative: in §31.9.1's example the setup limit of
-// -7, the larger magnitude of the two, gives dCLK a delay of 7, so a reference
-// is delayed by the largest negative setup (or removal) limit of the checks it
-// is the reference of, and a data signal by the largest negative hold (or
-// recovery) limit. A signal given a delayed copy in some checks and not in
-// others uses that delayed copy in all of them, so the delay belongs to the
-// original signal, whichever check names the copy.
+// by the delays SpecifyManager::ResolveNegativeTimingCheckDelays
+// (simulator/timing_check_negative_delays.cpp) settles across every check. A
+// signal given a delayed copy in some checks and not in others uses that
+// delayed copy in all of them, so the delay belongs to the original signal,
+// whichever check names the copy.
 //
 // Each transition of the original reaches the copy the same delay later,
 // however close the next one follows: a delayed copy carries the signal, not a
@@ -20,7 +18,6 @@
 
 #include "simulator/timing_check_delayed_signals.h"
 
-#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <map>
@@ -54,36 +51,27 @@ struct DelayedCopy {
   int64_t index = 0;
 };
 
-uint64_t NegativePart(int64_t limit) {
-  return limit < 0 ? static_cast<uint64_t>(-limit) : 0;
-}
-
-// The copies the registered checks name, and the delay each original signal
-// takes, by full name.
+// The copies the registered checks name, keyed by the copy so that a copy two
+// checks name is driven once.
 struct DelayedCopyPlan {
   std::vector<DelayedCopy> copies;
-  std::map<std::string, uint64_t> delays;
   std::map<std::string, bool> planned;
 
   void Add(const std::string& prefix, const std::string& signal,
-           const TerminalSelect& select, const DelayedSignalTarget& target,
-           uint64_t delay) {
-    std::string source = prefix + signal;
-    uint64_t& d = delays[source];
-    d = std::max(d, delay);
+           const TerminalSelect& select, const DelayedSignalTarget& target) {
     if (target.name.empty()) return;
     std::string key = prefix + target.name;
     if (target.indexed) key += "[" + std::to_string(target.index) + "]";
     if (planned[key]) return;
     planned[key] = true;
-    copies.push_back({std::move(source), select, prefix + target.name,
+    copies.push_back({prefix + signal, select, prefix + target.name,
                       target.indexed, target.index});
   }
 };
 
-// $setuphold's setup limit and $recrem's removal limit bound the side before
-// the reference edge, so a negative one delays the reference; the hold and
-// recovery limits bound the side after it and a negative one delays the data.
+// The copies $setuphold and $recrem declare. How far each lags its original is
+// SpecifyManager::TimingCheckSignalDelay's answer, which §31.9.1 makes a
+// property of the original signal whichever check names the copy.
 DelayedCopyPlan PlanCopies(const SpecifyManager& mgr) {
   DelayedCopyPlan plan;
   for (const TimingCheckEntry& e : mgr.GetTimingChecks()) {
@@ -91,14 +79,8 @@ DelayedCopyPlan PlanCopies(const SpecifyManager& mgr) {
         e.kind != TimingCheckKind::kRecrem) {
       continue;
     }
-    const bool kRecrem = e.kind == TimingCheckKind::kRecrem;
-    const int64_t kBefore = kRecrem ? e.signed_limit2 : e.signed_limit;
-    const int64_t kAfter = kRecrem ? e.signed_limit : e.signed_limit2;
-    const bool kShift = e.negative_timing_check_enabled;
-    plan.Add(e.inst_prefix, e.ref_signal, e.ref_select, e.delayed_ref,
-             kShift ? NegativePart(kBefore) : 0);
-    plan.Add(e.inst_prefix, e.data_signal, e.data_select, e.delayed_data,
-             kShift ? NegativePart(kAfter) : 0);
+    plan.Add(e.inst_prefix, e.ref_signal, e.ref_select, e.delayed_ref);
+    plan.Add(e.inst_prefix, e.data_signal, e.data_select, e.delayed_data);
   }
   return plan;
 }
@@ -221,7 +203,7 @@ void DriveTimingCheckDelayedSignals(const SpecifyManager& mgr, SimContext& ctx,
                                     Arena& arena) {
   DelayedCopyPlan plan = PlanCopies(mgr);
   for (const DelayedCopy& copy : plan.copies) {
-    InstallCopy(copy, plan.delays[copy.source], ctx, arena);
+    InstallCopy(copy, mgr.TimingCheckSignalDelay(copy.source), ctx, arena);
   }
 }
 

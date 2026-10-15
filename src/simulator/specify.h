@@ -18,6 +18,7 @@
 
 namespace delta {
 
+class DiagEngine;
 class SimContext;
 
 // §32.4.3: a module path declaration together with the module instance it was
@@ -473,6 +474,18 @@ class SpecifyManager {
     return timing_checks_;
   }
 
+  // §31.9.1: settles how far each delayed copy of a negative $setuphold's or
+  // $recrem's signals lags its original, once every check is registered. A
+  // limit sum §31.3.3 or §31.3.6 forbids is reported, and limits that leave no
+  // consistent delays are warned about and zeroed until they do. Defined in
+  // simulator/timing_check_negative_delays.cpp.
+  void ResolveNegativeTimingCheckDelays(DiagEngine& diag);
+
+  // §31.9.1: how far the delayed copy of `signal`, named under its instance
+  // prefix, lags it. Zero for a signal no negative timing check delays, which
+  // is every signal while the option enabling negative checks is off.
+  uint64_t TimingCheckSignalDelay(std::string_view signal) const;
+
   bool HasPathDelay(std::string_view src, std::string_view dst) const;
   bool CheckSetupViolation(std::string_view ref, uint64_t ref_time,
                            std::string_view data, uint64_t data_time) const;
@@ -579,6 +592,9 @@ class SpecifyManager {
   std::vector<PathDelay> path_delays_;
   std::vector<PrimitiveDriver> primitive_drivers_;
   std::vector<TimingCheckEntry> timing_checks_;
+  // §31.9.1: ResolveNegativeTimingCheckDelays's answer, by signal name under
+  // its instance prefix, holding only the signals that lag.
+  std::unordered_map<std::string, uint64_t> timing_check_signal_delays_;
 
   // §32.4.3: what each LABEL entry asked for, kept whether or not the design
   // declared the name as a specparam. The index is keyed by the entry's name

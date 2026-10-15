@@ -49,6 +49,7 @@
 
 #include "simulator/timing_check_stability.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -56,7 +57,9 @@
 #include <string>
 #include <utility>
 
+#include "common/types.h"
 #include "parser/ast_specify.h"
+#include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
 #include "simulator/specify_timing_check.h"
@@ -391,6 +394,19 @@ bool ConditionsAdmit(StabilitySide side, const StabilityPair& pair) {
   return first.timestamp && second.timecheck;
 }
 
+// §31.9.1 and §31.9.3 (printed page 923): a negative check is evaluated on the
+// delayed copies of its two signals, so it detects a violation when the later
+// of the two delayed transitions arrives, and the notifier toggles then rather
+// than at the undelayed transition. The window the undelayed times are judged
+// against is the delayed one moved back by the two delays, which is why the
+// verdict itself is reached here.
+uint64_t DelayedDetectionTicks(const StabilityPair& pair) {
+  const SpecifyManager& mgr = *pair.armed.mgr;
+  return std::max(
+      pair.ref_ticks + mgr.TimingCheckSignalDelay(pair.ref_signal),
+      pair.data_ticks + mgr.TimingCheckSignalDelay(pair.data_signal));
+}
+
 // A §31.3 check whose timecheck event happened in the slot running now.
 // Reports a violation when the two signals' last transitions leave one inside
 // the window the other bounds.
@@ -410,6 +426,18 @@ void EvaluateStabilityPair(const StabilityPair& pair, SimContext& ctx) {
       ViolatedSide(*pair.armed.mgr, check, pair.ref_ticks, pair.data_ticks);
   if (side == StabilitySide::kNone) return;
   if (!ConditionsAdmit(side, pair)) return;
+  const uint64_t kDetected = DelayedDetectionTicks(pair);
+  if (check.negative_timing_check_enabled &&
+      kDetected > ctx.CurrentTime().ticks) {
+    auto* event = ctx.GetScheduler().GetEventPool().Acquire();
+    event->callback = [pair, side, &ctx]() {
+      ReportViolation(pair.armed.Entry().kind, side, pair, ctx);
+      ToggleNotifier(pair.armed.Entry(), ctx);
+    };
+    ctx.GetScheduler().ScheduleEvent(SimTime{kDetected}, Region::kActive,
+                                     event);
+    return;
+  }
   ReportViolation(check.kind, side, pair, ctx);
   ToggleNotifier(check, ctx);
 }
