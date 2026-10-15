@@ -473,6 +473,22 @@ static void ValidateGateStrength(GateKind gate_kind, SourceLoc loc,
                Subclause("28.3.2"));
 }
 
+// §28.3.2 and A.3.2: a pull gate's strength written as a pair is one strength0
+// keyword and one strength1 keyword. ParseStrength0 and ParseStrength1 answer
+// none for a keyword of the other side, so a pair of one side leaves the second
+// unrecorded; every other gate type answers it through the check that both
+// strengths are given.
+static void ValidatePullStrengthPair(GateKind gate_kind, SourceLoc loc,
+                                     uint8_t str0, uint8_t str1,
+                                     DiagEngine& diag) {
+  if (GateTypeOf(gate_kind) != GateType::kPullGate) return;
+  if (str0 != 0 && str1 != 0) return;
+  diag.Error(loc,
+             "a pull gate's strength pair is one strength0 keyword and one "
+             "strength1 keyword",
+             Subclause("28.3.2"));
+}
+
 static void ValidateGateDelay(GateKind gate_kind, SourceLoc loc, Expr* delay,
                               Expr* delay_decay, DiagEngine& diag) {
   if (delay && !GateAllowsDelay(gate_kind))
@@ -499,15 +515,19 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
       return;
     }
 
+    bool paired = false;
     if (IsStrength0Token(tk)) {
       str0 = ParseStrength0();
-      if (Match(TokenKind::kComma)) str1 = ParseStrength1();
+      paired = Match(TokenKind::kComma);
+      if (paired) str1 = ParseStrength1();
     } else {
       str1 = ParseStrength1();
-      if (Match(TokenKind::kComma)) str0 = ParseStrength0();
+      paired = Match(TokenKind::kComma);
+      if (paired) str0 = ParseStrength0();
     }
     Expect(TokenKind::kRParen, Subclause("28.3.2"));
     ValidateGateStrength(gate_kind, loc, str0, str1, diag_);
+    if (paired) ValidatePullStrengthPair(gate_kind, loc, str0, str1, diag_);
   }
 
   Expr* delay = nullptr;
