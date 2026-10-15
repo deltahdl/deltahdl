@@ -585,6 +585,35 @@ std::string SimContext::SetClassInstanceScope(std::string scope) {
   return scope;
 }
 
+// §26.7 with Syntax 26-5: drops a leading `std::` from `name`, false where
+// what is left is std's semaphore or mailbox, which are no class the table
+// holds (BuiltinSyncKindOf), so that a user class of the bare name, which the
+// table may hold, is not taken for what `std::` names.
+static bool DropStdScope(std::string_view& name) {
+  constexpr std::string_view kStdScope = "std::";
+  if (!name.starts_with(kStdScope)) return true;
+  name.remove_prefix(kStdScope.size());
+  return name != "semaphore" && name != "mailbox";
+}
+
+// §8.23: the class nested in the running method's class `method_class`, or
+// in a class lexically containing it, innermost first, each tried through its
+// base chain, that `name` names there; null where none does.
+static ClassTypeInfo* NestedClassInScopes(
+    const std::unordered_map<std::string_view, ClassTypeInfo*>& table,
+    const ClassTypeInfo* method_class, std::string_view name) {
+  for (const ClassTypeInfo* scope = method_class; scope != nullptr;
+       scope = scope->enclosing) {
+    for (const ClassTypeInfo* base = scope; base != nullptr;
+         base = base->parent) {
+      if (ClassTypeInfo* nested = NestedClassOf(table, *base, name)) {
+        return nested;
+      }
+    }
+  }
+  return nullptr;
+}
+
 ClassTypeInfo* SimContext::ExactClassType(std::string_view name) {
   return ClassUnder(class_types_, class_scope_, name);
 }
@@ -608,14 +637,7 @@ ClassTypeInfo* SimContext::ExactClassType(std::string_view name) {
 // same declaration the bare name does, and §26.7 lets no user package be
 // called std, so a `std::` head is dropped before the table is asked.
 ClassTypeInfo* SimContext::FindClassType(std::string_view name) const {
-  constexpr std::string_view kStdScope = "std::";
-  if (name.substr(0, kStdScope.size()) == kStdScope) {
-    name = name.substr(kStdScope.size());
-    // std's semaphore and mailbox are no class the table holds
-    // (BuiltinSyncKindOf), so a user class of the bare name, which the table
-    // may hold, is not what `std::` names.
-    if (name == "semaphore" || name == "mailbox") return nullptr;
-  }
+  if (!DropStdScope(name)) return nullptr;
   // §3.12.1: where each unit has a scope of its own, the running code's unit's
   // class of the name stands ahead of another unit's
   // (Lowerer::RegisterClassDecl).
@@ -629,14 +651,9 @@ ClassTypeInfo* SimContext::FindClassType(std::string_view name) const {
   if (own != nullptr) return own;
   auto it = class_types_.find(name);
   if (it != class_types_.end() && it->second != nullptr) return it->second;
-  for (const ClassTypeInfo* scope = CurrentMethodClass(); scope != nullptr;
-       scope = scope->enclosing) {
-    for (const ClassTypeInfo* base = scope; base != nullptr;
-         base = base->parent) {
-      if (ClassTypeInfo* nested = NestedClassOf(class_types_, *base, name)) {
-        return nested;
-      }
-    }
+  if (ClassTypeInfo* nested =
+          NestedClassInScopes(class_types_, CurrentMethodClass(), name)) {
+    return nested;
   }
   // §26.2 with §26.3: a package's classes are visible by their bare names
   // throughout the package, its subroutines and its classes' method bodies
@@ -645,10 +662,8 @@ ClassTypeInfo* SimContext::FindClassType(std::string_view name) const {
   // (Lowerer::LowerUnimportedPackageClasses); so the package's own code
   // reaches its class under the package's key.
   const Scope* frame = PackageFrame();
-  if (frame == nullptr) return nullptr;
-  auto own_package =
-      class_types_.find(std::string(frame->package) + "::" + std::string(name));
-  return own_package != class_types_.end() ? own_package->second : nullptr;
+  return frame != nullptr ? ClassUnder(class_types_, frame->package, name)
+                          : nullptr;
 }
 
 std::vector<ClassTypeInfo*> SimContext::RegisteredClassTypes(bool all) const {
