@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 51a015a3-4652-42ac-8c15-ce1bc6f6ae12
-  modified: 2026-10-08T11:41:11.502Z
+  modified: 2026-10-15T23:00:30.673Z
 ---
 
 # A question the rules answer is not a decision
@@ -64,5 +64,13 @@ greedy rule (the first dynamically sized item takes the remainder, and the later
 ones stay empty) applies again inside a dynamic array of strings, because each
 string is a dynamically sized item. That fixes the shape at one element holding
 every remaining byte.
+A clash between two rules is not open just because no sentence ranks them.
+Read what each clause says it selects, and you can usually settle the order.
+In §33.4.1, an instance clause selects only the instance it names
+(§33.4.1.3), and that instance's descendants get its liblist by inheritance.
+A cell clause selects any instance bound to its cell (§33.4.1.4), and
+§33.4.1.5 has the selection clauses choose the current list. So a cell
+clause that selects a descendant replaces the list the descendant would
+inherit.
 Once the answer stands,
 state it per [[issues-state-conclusions-not-the-trail]] and remove the label.
