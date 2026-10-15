@@ -11,6 +11,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "elaborator/assertion_body_slots.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_modport_imports.h"
@@ -242,27 +243,38 @@ void WalkPackageItemInit(PackageRefContext& ctx, const ModuleItem* item) {
                 [&] { WalkPackageRefExpr(ctx, item->init_expr); });
 }
 
-void WalkPropertyNode(const PackageRefContext& ctx,
-                      const PropertyExprNode* node) {
+// Each expression of the property tree under `node`, the sequences of its
+// operands and antecedents, its ranges, case items and operand clocks
+// included.
+void WalkPropertyNode(const PackageRefContext& ctx, PropertyExprNode* node) {
   if (node == nullptr) return;
-  WalkPackageRefExpr(ctx, node->boolean);
-  for (const auto* op : node->operands) WalkPropertyNode(ctx, op);
+  ForEachTreeSlot(node, [&](const Expr* e) { WalkPackageRefExpr(ctx, e); });
 }
 
 // §26.2 holds for a property the package declares (§16.12): its clocking
-// event, its disable condition and its body, which read its formals as its own
-// names.
+// event, its disable condition and its body, which read its formals and its
+// locals as its own names.
 void WalkPackageProperty(PackageRefContext& ctx, const ModuleItem* item) {
   if (item->kind != ModuleItemKind::kPropertyDecl) return;
-  std::unordered_set<std::string_view> formals(item->prop_formals.begin(),
-                                               item->prop_formals.end());
-  WalkWithNames(ctx, formals, [&] {
+  WalkWithNames(ctx, AssertionBoundNames(item), [&] {
     for (const EventExpr& ev : item->prop_clock) {
       WalkPackageRefExpr(ctx, ev.signal);
     }
     WalkPackageRefExpr(ctx, item->prop_disable_iff);
     WalkPackageRefExpr(ctx, item->prop_body_expr);
     WalkPropertyNode(ctx, item->prop_body_tree);
+  });
+}
+
+// §26.2 holds for a sequence the package declares (§16.8): its clocking event
+// and its body, which read its formals and its locals as its own names. The
+// body is the one the parser holds in seq_linear.
+void WalkPackageSequence(PackageRefContext& ctx, ModuleItem* item) {
+  if (item->kind != ModuleItemKind::kSequenceDecl) return;
+  auto walk = [&](const Expr* e) { WalkPackageRefExpr(ctx, e); };
+  WalkWithNames(ctx, AssertionBoundNames(item), [&] {
+    ForEachEventSlot(item->seq_clock, walk);
+    ForEachBodySlot(item->seq_linear, walk);
   });
 }
 
@@ -334,10 +346,11 @@ void Elaborator::ValidatePackageReferences() {
     ctx.diag = &diag_;
     CollectPackageLocalNames(pkg, ctx);
 
-    for (const auto* item : pkg->items) {
+    for (ModuleItem* item : pkg->items) {
       WalkPackageItemInit(ctx, item);
       WalkPackageSubroutine(ctx, item);
       WalkPackageProperty(ctx, item);
+      WalkPackageSequence(ctx, item);
       WalkPackageClass(ctx, pkg, item, kDesignElements);
     }
   }

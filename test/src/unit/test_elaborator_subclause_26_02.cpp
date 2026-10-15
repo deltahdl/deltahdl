@@ -630,4 +630,60 @@ TEST(PackageDeclarationElaboration, HierarchicalRefInAPackageProperty) {
                             3, "26.2"));
 }
 
+// §26.2 with §16.8: a sequence the package declares is a package item, so a
+// hierarchical reference in its body or its clocking event is reported, and a
+// formal or a local variable read in the body is the sequence's own name, not
+// the compilation unit's of the same spelling. The sequence was never walked.
+TEST(PackageDeclarationElaboration, HierarchicalRefInAPackageSequence) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("int v;\n"
+             "package p;\n"
+             "  sequence s; top.a ##1 top.b; endsequence\n"
+             "  sequence sc; @(posedge top.clk) 1; endsequence\n"
+             "  sequence sf(v); v ##1 v; endsequence\n"
+             "  sequence sl; int v; (1, v = 1) ##1 (v == 1); endsequence\n"
+             "endpackage\n"
+             "module top; logic clk = 0, a = 1, b = 1; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "package item contains a hierarchical reference "
+                            "'top'",
+                            3, "26.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "package item contains a hierarchical reference "
+                            "'top'",
+                            4, "26.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "package item references 'v' from the "
+                             "compilation-unit scope",
+                             5, "26.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "package item references 'v' from the "
+                             "compilation-unit scope",
+                             6, "26.2"));
+}
+
+// §26.2 with §16.12: the whole body of a package's property is held to the
+// rule, an implication's antecedent and a sequence operand as much as a
+// boolean. Only the boolean operands of the body were walked.
+TEST(PackageDeclarationElaboration, HierarchicalRefInAPackagePropertySequence) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p;\n"
+             "  property pa(b); @(posedge b) top.a |-> b; endproperty\n"
+             "  property ps(b); @(posedge b) b ##1 top.a; endproperty\n"
+             "endpackage\n"
+             "module top; logic a = 1; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "package item contains a hierarchical reference "
+                            "'top'",
+                            2, "26.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "package item contains a hierarchical reference "
+                            "'top'",
+                            3, "26.2"));
+}
+
 }  // namespace

@@ -80,4 +80,10 @@ void CollectBodyLocals(const SeqLinearBody& body,
 void CollectTreeLocals(const PropertyExprNode* node,
                        std::unordered_set<std::string_view>& out);
 
+// The names the sequence or property declaration `item` binds for its body,
+// its formals and its locals, which hide the scope's names of the same
+// spelling.
+std::unordered_set<std::string_view> AssertionBoundNames(
+    const ModuleItem* item);
+
 }  // namespace delta

@@ -53,4 +53,18 @@ void CollectTreeLocals(const PropertyExprNode* node,
   }
 }
 
+std::unordered_set<std::string_view> AssertionBoundNames(
+    const ModuleItem* item) {
+  std::unordered_set<std::string_view> bound(item->prop_formals.begin(),
+                                             item->prop_formals.end());
+  bound.insert(item->prop_seq_assert_vars.begin(),
+               item->prop_seq_assert_vars.end());
+  for (const SeqLocalDecl& local : item->prop_locals) bound.insert(local.name);
+  CollectBodyLocals(item->seq_linear, bound);
+  if (item->prop_body_tree != nullptr) {
+    CollectTreeLocals(item->prop_body_tree, bound);
+  }
+  return bound;
+}
+
 }  // namespace delta

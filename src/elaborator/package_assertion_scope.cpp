@@ -47,21 +47,6 @@ std::unordered_set<std::string_view> PackageNames(const PackageDecl* pkg) {
   return own;
 }
 
-// The names the declaration `item` binds for its body, its formals and its
-// locals, which hide the package's names of the same spelling.
-std::unordered_set<std::string_view> BoundNames(const ModuleItem* item) {
-  std::unordered_set<std::string_view> bound(item->prop_formals.begin(),
-                                             item->prop_formals.end());
-  bound.insert(item->prop_seq_assert_vars.begin(),
-               item->prop_seq_assert_vars.end());
-  for (const SeqLocalDecl& local : item->prop_locals) bound.insert(local.name);
-  CollectBodyLocals(item->seq_linear, bound);
-  if (item->prop_body_tree != nullptr) {
-    CollectTreeLocals(item->prop_body_tree, bound);
-  }
-  return bound;
-}
-
 // Each call under `e` whose callee is one of `scoped`'s names made a call
 // through the path that stands for it, `pk::s2(x, y)` as the parser reads it.
 void ScopeCallees(Expr* e, const ActualsByFormal& scoped) {
@@ -86,7 +71,7 @@ void ScopeCallees(Expr* e, const ActualsByFormal& scoped) {
 void ResolveInPackage(ModuleItem* item, std::string_view pkg,
                       const std::unordered_set<std::string_view>& own,
                       Arena& arena) {
-  std::unordered_set<std::string_view> bound = BoundNames(item);
+  std::unordered_set<std::string_view> bound = AssertionBoundNames(item);
   ActualsByFormal scoped;
   for (std::string_view name : own) {
     if (bound.count(name) != 0) continue;
