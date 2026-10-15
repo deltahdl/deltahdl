@@ -309,4 +309,24 @@ TEST(SemaphoreSim, LoopGenerateSemaphoreNewReadsItsInstanceIndex) {
             1011u);
 }
 
+// §15.3.1 with §7.4: an element of a fixed-size array of semaphores is given
+// the semaphore new builds, holding the keys new names: arr[1] gives its one
+// key up once and then has none. The element was taken for a value and new
+// constructed nothing, so both calls answered 0.
+TEST(SemaphoreSim, FixedArrayElementIsGivenItsSemaphore) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  semaphore arr[2];\n"
+                       "  int a, b;\n"
+                       "  initial begin\n"
+                       "    arr[1] = new(1);\n"
+                       "    a = arr[1].try_get(1);\n"
+                       "    b = arr[1].try_get(1);\n"
+                       "    $display(\"a=%0d b=%0d\", a, b);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "a=1 b=0\n");
+}
+
 }  // namespace

@@ -69,14 +69,20 @@ const Expr* SelectOfMemberAccess(const Expr* expr) {
 // subroutine body's), so the name is what tells an array of handles from one
 // of values, as HandleArrayOfSelect (eval_assoc_class_handles.cpp) reads it
 // for an associative array. A queue's elements are told by the queue's own
-// flag (TryEvalQueueElementMember) and are not asked for here.
+// flag (TryEvalQueueElementMember) and are not asked for here. §15.3 and
+// §15.4: the built-in semaphore and mailbox are classes an array may hold
+// handles of too, though no registered class answers their names
+// (BuiltinSyncKindOf); asked by the registry alone, `semaphore arr[2]` was an
+// array of values and `arr[1] = new(1)` constructed nothing.
 std::string_view DeclaredArrayElementClass(const Expr* base, SimContext& ctx) {
   if (base == nullptr || base->kind != ExprKind::kIdentifier ||
       ctx.FindArrayInfo(base->text) == nullptr) {
     return {};
   }
   std::string_view cls = ctx.GetVariableClassType(base->text);
-  return ctx.FindClassType(cls) != nullptr ? cls : std::string_view{};
+  bool holds_handles = ctx.FindClassType(cls) != nullptr ||
+                       BuiltinSyncKindOf(cls, ctx) != SyncKind::kNone;
+  return holds_handles ? cls : std::string_view{};
 }
 
 // §8.4: `a[i] = new` where `a` is a declared array of handles: the element's

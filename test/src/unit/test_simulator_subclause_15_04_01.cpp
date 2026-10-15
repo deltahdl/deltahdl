@@ -892,4 +892,25 @@ TEST(MailboxSim, AutomaticTaskLocalMailboxHoldsItsOwnQueue) {
   EXPECT_EQ(var->value.ToUint64(), 23u);
 }
 
+// §15.4.1 with §7.4: an element of a fixed-size array of mailboxes is given
+// the mailbox new builds: a message put in mb[0] is counted there and taken
+// back out of it. The element was taken for a value and new constructed
+// nothing, so the put went nowhere and the mailbox counted none.
+TEST(MailboxSim, FixedArrayElementIsGivenItsMailbox) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  mailbox mb[2];\n"
+                       "  int n, ok, v;\n"
+                       "  initial begin\n"
+                       "    mb[0] = new;\n"
+                       "    mb[0].put(37);\n"
+                       "    n = mb[0].num();\n"
+                       "    ok = mb[0].try_get(v);\n"
+                       "    $display(\"n=%0d ok=%0d v=%0d\", n, ok, v);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "n=1 ok=1 v=37\n");
+}
+
 }  // namespace
