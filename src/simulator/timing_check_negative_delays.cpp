@@ -36,7 +36,7 @@
 namespace delta {
 namespace {
 
-// d[later] - d[earlier] >= gap, in ticks of the global precision.
+// d[later] - d[earlier] >= gap, in ticks.
 struct DelayConstraint {
   std::size_t later = 0;
   std::size_t earlier = 0;
@@ -60,17 +60,20 @@ int64_t& AfterLimit(TimingCheckEntry& e) {
 }
 
 // §31.3.3 and §31.3.6: with a limit negative, the two sum to more than one
-// unit of simulation precision, which is one tick.
-void ReportLimitSum(const TimingCheckEntry& e, DiagEngine& diag) {
+// unit of simulation precision.
+void ReportLimitSum(const TimingCheckEntry& e, int64_t unit_ticks,
+                    DiagEngine& diag) {
   const int64_t kSum = e.signed_limit + e.signed_limit2;
-  if (kSum > 1) return;
+  if (kSum > unit_ticks) return;
   const bool kRecrem = e.kind == TimingCheckKind::kRecrem;
-  diag.Error(e.loc,
-             std::format("the limits of a {} with a negative limit sum to {} "
-                         "in units of simulation precision, where more than 1 "
-                         "is required",
-                         kRecrem ? "$recrem" : "$setuphold", kSum),
-             Subclause(kRecrem ? "31.3.6" : "31.3.3"));
+  diag.Error(
+      e.loc,
+      std::format("the limits of a {} with a negative limit sum to {} "
+                  "in units of simulation precision, where more than 1 "
+                  "is required",
+                  kRecrem ? "$recrem" : "$setuphold",
+                  static_cast<double>(kSum) / static_cast<double>(unit_ticks)),
+      Subclause(kRecrem ? "31.3.6" : "31.3.3"));
 }
 
 std::size_t NodeOf(std::unordered_map<std::string, std::size_t>& nodes,
@@ -79,11 +82,11 @@ std::size_t NodeOf(std::unordered_map<std::string, std::size_t>& nodes,
   return it->second;
 }
 
-// A limit L adjusted by the two delays stays at least one tick: before the
-// edge L + d(ref) - d(data) >= 1, after it L - d(ref) + d(data) >= 1. A zero
+// A limit L adjusted by the two delays stays at least one unit U: before the
+// edge L + d(ref) - d(data) >= U, after it L - d(ref) + d(data) >= U. A zero
 // limit bounds no window on its side and constrains nothing.
 std::vector<DelayConstraint> ConstraintsOf(
-    std::vector<TimingCheckEntry>& checks,
+    std::vector<TimingCheckEntry>& checks, int64_t unit_ticks,
     std::unordered_map<std::string, std::size_t>& nodes) {
   std::vector<DelayConstraint> constraints;
   for (TimingCheckEntry& e : checks) {
@@ -91,10 +94,10 @@ std::vector<DelayConstraint> ConstraintsOf(
     const std::size_t kRef = NodeOf(nodes, e.inst_prefix + e.ref_signal);
     const std::size_t kData = NodeOf(nodes, e.inst_prefix + e.data_signal);
     if (BeforeLimit(e) != 0) {
-      constraints.push_back({kRef, kData, 1 - BeforeLimit(e)});
+      constraints.push_back({kRef, kData, unit_ticks - BeforeLimit(e)});
     }
     if (AfterLimit(e) != 0) {
-      constraints.push_back({kData, kRef, 1 - AfterLimit(e)});
+      constraints.push_back({kData, kRef, unit_ticks - AfterLimit(e)});
     }
   }
   return constraints;
@@ -121,7 +124,7 @@ bool SolveLeastDelays(const std::vector<DelayConstraint>& constraints,
 
 // Sets the least negative limit of the negative checks to 0, with §31.9.1's
 // warning at its check. Limits with none negative always solve, every delay
-// at 0 leaving each non-zero limit as it was and so at least one tick, so the
+// at 0 leaving each non-zero limit as it was and so at least one unit, so the
 // caller asks this only where some limit is negative.
 void ZeroLeastNegativeLimit(std::vector<TimingCheckEntry>& checks,
                             DiagEngine& diag) {
@@ -150,16 +153,17 @@ void ZeroLeastNegativeLimit(std::vector<TimingCheckEntry>& checks,
 
 }  // namespace
 
-void SpecifyManager::ResolveNegativeTimingCheckDelays(DiagEngine& diag) {
+void SpecifyManager::ResolveNegativeTimingCheckDelays(int64_t unit_ticks,
+                                                      DiagEngine& diag) {
   timing_check_signal_delays_.clear();
   for (const TimingCheckEntry& e : timing_checks_) {
-    if (TakesNegativeDelays(e)) ReportLimitSum(e, diag);
+    if (TakesNegativeDelays(e)) ReportLimitSum(e, unit_ticks, diag);
   }
   std::unordered_map<std::string, std::size_t> nodes;
   std::vector<int64_t> delays;
   for (;;) {
     std::vector<DelayConstraint> constraints =
-        ConstraintsOf(timing_checks_, nodes);
+        ConstraintsOf(timing_checks_, unit_ticks, nodes);
     if (SolveLeastDelays(constraints, nodes.size(), delays)) break;
     ZeroLeastNegativeLimit(timing_checks_, diag);
   }

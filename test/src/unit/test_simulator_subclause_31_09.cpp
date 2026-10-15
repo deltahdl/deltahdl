@@ -164,6 +164,23 @@ TEST(NegativeTimingCheckSwitches, SetupholdLimitsSummingToOneUnitAreReported) {
                             "31.3.3"));
 }
 
+// The unit is the precision's, magnitude and all: -1 and 1.01 sum to one unit
+// of a 10 ps precision, which is ten of its 1 ps ticks, and is not more.
+TEST(NegativeTimingCheckSwitches, LimitSumIsCountedInUnitsOfTheFullPrecision) {
+  SimFixture f;
+  RunUnder(
+      "`timescale 1ns/10ps\n"
+      "module top(output reg clk = 0, output reg d = 0);\n"
+      "  specify\n"
+      "    $setuphold(posedge clk, d, -1, 1.01);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      {true, false}, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "sum to 1 in units of simulation precision", 4,
+                            "31.3.3"));
+}
+
 // Two units are more than one, so -4 and 6 meet the restriction.
 TEST(NegativeTimingCheckSwitches, SetupholdLimitsSummingToTwoUnitsAreAccepted) {
   SimFixture f;

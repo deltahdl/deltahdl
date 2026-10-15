@@ -477,9 +477,10 @@ class SpecifyManager {
   // §31.9.1: settles how far each delayed copy of a negative $setuphold's or
   // $recrem's signals lags its original, once every check is registered. A
   // limit sum §31.3.3 or §31.3.6 forbids is reported, and limits that leave no
-  // consistent delays are warned about and zeroed until they do. Defined in
+  // consistent delays are warned about and zeroed until they do, both counted
+  // in units of simulation precision, `unit_ticks` ticks each. Defined in
   // simulator/timing_check_negative_delays.cpp.
-  void ResolveNegativeTimingCheckDelays(DiagEngine& diag);
+  void ResolveNegativeTimingCheckDelays(int64_t unit_ticks, DiagEngine& diag);
 
   // §31.9.1: how far the delayed copy of `signal`, named under its instance
   // prefix, lags it. Zero for a signal no negative timing check delays, which

@@ -730,8 +730,12 @@ void Lowerer::RegisterDesignTiming() {
   ctx_.SetLoweringInstancePrefix("");
   // §31.9.1: the delays of the negative checks' delayed signals are settled
   // across every check just registered, before any is armed, since settling
-  // them may zero a limit those checks are then evaluated against.
-  mgr.ResolveNegativeTimingCheckDelays(ctx_.GetDiag());
+  // them may zero a limit those checks are then evaluated against. They are
+  // counted in units of the simulation precision, $root's, which a tick is
+  // finer than where its magnitude is 10 or 100.
+  const auto kUnitTicks = static_cast<int64_t>(DelayToTicks(
+      1, *ctx_.FindScopeTimeScale("$root"), ctx_.GlobalPrecision()));
+  mgr.ResolveNegativeTimingCheckDelays(kUnitTicks, ctx_.GetDiag());
   // §30.5.3 selects among the module paths whose input changed latest, and
   // nothing records when a signal last changed. This
   // arms the watcher that does, on the source terminal of every path just
