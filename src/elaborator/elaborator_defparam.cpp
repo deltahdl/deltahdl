@@ -5,6 +5,7 @@
 #include <string_view>
 #include <tuple>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -343,8 +344,14 @@ void Elaborator::RefoldChildOverrides(RtlirModule* mod,
     for (auto& p : cm->params) {
       if (!RefoldsFromInstantiation(p, mod)) continue;
       int64_t before = p.resolved_value;
-      RefoldOverride(p, p.override_expr,
-                     ScopeOverlaidWith(p.override_scope, mod_scope));
+      // §33.4.3: a configuration's override names the configuration's own
+      // localparams as well as the instantiating scope's parameters, and its
+      // localparams are what a name both declare means.
+      ScopeMap scope = ScopeOverlaidWith(p.override_scope, mod_scope);
+      if (p.config_locked) {
+        scope = ScopeOverlaidWith(std::move(scope), config_localparam_scope_);
+      }
+      RefoldOverride(p, p.override_expr, scope);
       changed = changed || p.resolved_value != before;
     }
     if (changed) RecomputeDependentParams(cm);

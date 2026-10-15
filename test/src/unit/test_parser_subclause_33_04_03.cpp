@@ -91,7 +91,7 @@ TEST(ConfigLocalparam, DataTypedLocalparamParses) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->configs.size(), 1u);
   ASSERT_EQ(r.cu->configs[0]->local_params.size(), 1u);
-  EXPECT_EQ(r.cu->configs[0]->local_params[0].first, "S");
+  EXPECT_EQ(r.cu->configs[0]->local_params[0].name, "S");
 }
 
 // The same declaration's list_of_param_assignments declares each name it lists.
@@ -106,8 +106,8 @@ TEST(ConfigLocalparam, LocalparamListDeclaresEachName) {
   ASSERT_EQ(r.cu->configs.size(), 1u);
   const auto& params = r.cu->configs[0]->local_params;
   ASSERT_EQ(params.size(), 2u);
-  EXPECT_EQ(params[0].first, "S");
-  EXPECT_EQ(params[1].first, "T");
+  EXPECT_EQ(params[0].name, "S");
+  EXPECT_EQ(params[1].name, "T");
 }
 
 }  // namespace

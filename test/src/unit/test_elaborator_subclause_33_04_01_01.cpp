@@ -253,6 +253,25 @@ TEST(ConfigDesignStatement, DesignCellNoLibraryHoldsIsReportedAtThatCell) {
                             "33.4.1.1"));
 }
 
+// §33.4.1.1: a design cell written without a library is searched for in the
+// library holding the config, and only there, so a `top` held by another
+// library is not found.
+TEST(ConfigDesignStatement, OmittedLibrarySearchesOnlyTheConfigsLibrary) {
+  ConfigUnit u;
+  ASSERT_TRUE(
+      u.Parse("module top; endmodule\n"
+              "config c;\n"
+              "  design top;\n"
+              "endconfig\n"));
+  u.cu->modules[0]->library = "libT";
+  u.cu->configs[0]->library = "libC";
+  EXPECT_EQ(u.ElaborateConfig(0), nullptr);
+  EXPECT_TRUE(ReportedError(u.diag.Diagnostics(),
+                            "config 'c' design cell 'top' not found in "
+                            "library 'libC'",
+                            3, "33.4.1.1"));
+}
+
 // The infrastructure one bind runs against. A configuration reaches a bind
 // already compiled, so the case writes it into a compiled form and reads it
 // back rather than parsing a source description.

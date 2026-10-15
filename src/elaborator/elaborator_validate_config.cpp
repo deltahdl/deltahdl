@@ -15,6 +15,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir_attribute.h"
 #include "elaborator/type_eval.h"
@@ -335,9 +336,12 @@ void Elaborator::ValidateConfigCellClauses() {
       if (rule->kind != ConfigRuleKind::kCell) continue;
       if (rule->cell_lib.empty()) continue;
 
+      // §33.4.3's `use #()` is a use expansion too, one that names no cell
+      // and carries no assignment, only the reset of every parameter.
       bool is_use_expansion = !rule->use_cell.empty() ||
                               !rule->use_lib.empty() || rule->use_config ||
-                              !rule->use_params.empty();
+                              !rule->use_params.empty() ||
+                              rule->use_param_reset_all;
       if (!is_use_expansion) {
         diag_.Error(rule->loc,
                     std::format("config '{}' cell clause '{}.{}' uses a "
@@ -356,8 +360,17 @@ void Elaborator::ValidateConfigPackageBinding() {
   // is fixed and a config may not change it. A package is not instantiated, so
   // any clause that names a package — whether the cell selected for
   // reconfiguration or the cell an instance is bound to — is rejected.
+  //
+  // §3.13(b) gives packages a name space of their own, so a name a package and
+  // a module, interface, program or primitive share names that design element
+  // in a cell or use clause, and only a name no such element holds names the
+  // package.
   std::unordered_set<std::string_view> package_names;
   for (auto* pkg : unit_->packages) package_names.insert(pkg->name);
+  for (auto* m : unit_->modules) package_names.erase(m->name);
+  for (auto* i : unit_->interfaces) package_names.erase(i->name);
+  for (auto* p : unit_->programs) package_names.erase(p->name);
+  for (auto* u : unit_->udps) package_names.erase(u->name);
   if (package_names.empty()) return;
 
   for (auto* cfg : unit_->configs) {
@@ -482,13 +495,23 @@ bool WalkExprAnyChildren(const Expr* expr, Visitor&& v) {
 
 void Elaborator::ValidateConfigLocalparams() {
   for (auto* cfg : unit_->configs) {
-    for (const auto& [name, expr] : cfg->local_params) {
-      if (!expr) continue;
-      if (!IsLiteralKind(expr->kind)) {
-        diag_.Error(expr->range.start,
+    for (const ConfigLocalparam& lp : cfg->local_params) {
+      // A type is no literal value, so a `localparam type` breaks the rule
+      // whatever type it names.
+      if (lp.is_type) {
+        diag_.Error(lp.loc,
+                    std::format("config '{}' localparam '{}' is a type, not "
+                                "a literal value",
+                                cfg->name, lp.name),
+                    Subclause("33.4.3"));
+        continue;
+      }
+      if (!lp.init_expr) continue;
+      if (!IsLiteralKind(lp.init_expr->kind)) {
+        diag_.Error(lp.init_expr->range.start,
                     std::format("config '{}' localparam '{}' is not assigned a "
                                 "literal value",
-                                cfg->name, name),
+                                cfg->name, lp.name),
                     Subclause("33.4.3"));
       }
     }
@@ -515,6 +538,35 @@ bool IsPureTermTree(const Expr* e) {
   return false;
 }
 
+// A step of a hierarchical name. `p::X` reaches into a package (§26.3), which
+// is a scope resolution and no hierarchical reference.
+bool IsHierarchicalStep(const Expr* e) {
+  return e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution;
+}
+
+// §33.4.3 restricts the indexes of a hierarchical name, which are the selects
+// standing inside one of its steps and those applied to a name that holds a
+// step. A select on a plain name resolves in the instance's parent scope like
+// any other name, and is not restricted.
+std::unordered_set<const Expr*> HierarchicalNameSelects(const Expr* expr) {
+  std::unordered_set<const Expr*> selects;
+  const auto kCollect = [&selects](const Expr* within) {
+    WalkExprAny(within, [&selects](const Expr* e) {
+      if (e->kind == ExprKind::kSelect) selects.insert(e);
+      return false;
+    });
+  };
+  WalkExprAny(expr, [&](const Expr* e) {
+    if (IsHierarchicalStep(e)) kCollect(e);
+    if (e->kind == ExprKind::kSelect &&
+        WalkExprAny(e->base, IsHierarchicalStep)) {
+      selects.insert(e);
+    }
+    return false;
+  });
+  return selects;
+}
+
 void CheckParamOverrideSelectIndices(
     const ConfigDecl* cfg, std::string_view pname, const Expr* expr,
     const std::unordered_set<std::string_view>& lp_names, DiagEngine& diag) {
@@ -532,20 +584,16 @@ void CheckParamOverrideSelectIndices(
       return false;
     });
   };
-  WalkExprAny(expr, [&](const Expr* e) {
-    if (e->kind == ExprKind::kSelect) {
-      if (e->index) check_index(e->index);
-      if (e->index_end) check_index(e->index_end);
-    }
-    return false;
-  });
+  for (const Expr* e : HierarchicalNameSelects(expr)) {
+    if (e->index) check_index(e->index);
+    if (e->index_end) check_index(e->index_end);
+  }
 }
 
 void ValidateOneParamOverride(
     const ConfigDecl* cfg, std::string_view pname, const Expr* expr,
     const std::unordered_set<std::string_view>& lp_names, DiagEngine& diag) {
-  bool has_hier = WalkExprAny(
-      expr, [](const Expr* e) { return e->kind == ExprKind::kMemberAccess; });
+  bool has_hier = WalkExprAny(expr, IsHierarchicalStep);
 
   if (has_hier && !IsPureTermTree(expr)) {
     diag.Error(expr->range.start,
@@ -557,8 +605,7 @@ void ValidateOneParamOverride(
   }
 
   bool has_mid_chain_select = WalkExprAny(expr, [](const Expr* e) {
-    return e->kind == ExprKind::kMemberAccess && e->lhs &&
-           e->lhs->kind == ExprKind::kSelect;
+    return IsHierarchicalStep(e) && e->lhs && e->lhs->kind == ExprKind::kSelect;
   });
   if (has_mid_chain_select) {
     diag.Error(expr->range.start,
@@ -716,7 +763,7 @@ bool OverrideReferenceCrossesGenerate(const ConfigDecl* cfg,
 void ValidateConfigOverrides(const ConfigDecl* cfg, const CompilationUnit* unit,
                              DiagEngine& diag) {
   std::unordered_set<std::string_view> lp_names;
-  for (const auto& [name, _] : cfg->local_params) lp_names.insert(name);
+  for (const ConfigLocalparam& lp : cfg->local_params) lp_names.insert(lp.name);
 
   for (const auto* rule : cfg->rules) {
     for (const auto& [pname, expr] : rule->use_params) {
@@ -737,6 +784,10 @@ void ValidateConfigOverrides(const ConfigDecl* cfg, const CompilationUnit* unit,
 }  // namespace
 
 void Elaborator::ValidateConfigParamOverrides() {
+  // §27.6 names each unnamed generate block genblk<n>, and that block is a
+  // generate scope an override may not refer through, so the names are given
+  // before the references are judged.
+  if (!unit_->configs.empty()) AssignUnitGenerateBlockNames(unit_, arena_);
   for (const auto* cfg : unit_->configs) {
     ValidateConfigOverrides(cfg, unit_, diag_);
   }

@@ -173,6 +173,51 @@ TEST(SeparateCompilationBinding, TopIsBoundFromNothingButItsName) {
   EXPECT_EQ(design->top_modules[0]->name, "top");
 }
 
+// §33.5.3 and §33.5.4: the binding tool is given the lib.cell of a top-level
+// cell, which takes that library's cell even where the search order would
+// have reached another library's first.
+TEST(SeparateCompilationBinding, TopNamedAsLibCellIsBoundFromThatLibrary) {
+  ScratchDir tmp;
+  auto rtl = tmp.dir / "rtlLib.dpl";
+  auto gate = tmp.dir / "gateLib.dpl";
+  Precompile("module adder;\nendmodule\n", "rtlLib", rtl);
+  Precompile("module adder;\nendmodule\n", "gateLib", gate);
+
+  BindHarness h;
+  ASSERT_TRUE(h.binder.LoadLibrary(rtl));
+  ASSERT_TRUE(h.binder.LoadLibrary(gate));
+  auto* design = h.binder.Bind({"gateLib.adder"});
+  ASSERT_FALSE(h.diag.HasErrors());
+  ASSERT_NE(design, nullptr);
+  ASSERT_EQ(design->top_modules.size(), 1u);
+  EXPECT_EQ(design->top_modules[0]->library, "gateLib");
+}
+
+// §33.5.4: the config is named lib.cell as well, which tells apart two
+// configs of one name compiled into different libraries.
+TEST(SeparateCompilationBinding, ConfigNamedAsLibCellIsTakenFromThatLibrary) {
+  ScratchDir tmp;
+  auto rtl = tmp.dir / "rtlLib.dpl";
+  auto gate = tmp.dir / "gateLib.dpl";
+  Precompile(
+      "module top;\nendmodule\n"
+      "config cfg;\n  design rtlLib.top;\nendconfig\n",
+      "rtlLib", rtl);
+  Precompile(
+      "module other;\nendmodule\n"
+      "config cfg;\n  design gateLib.other;\nendconfig\n",
+      "gateLib", gate);
+
+  BindHarness h;
+  ASSERT_TRUE(h.binder.LoadLibrary(rtl));
+  ASSERT_TRUE(h.binder.LoadLibrary(gate));
+  auto* design = h.binder.BindConfig("gateLib.cfg");
+  ASSERT_FALSE(h.diag.HasErrors());
+  ASSERT_NE(design, nullptr);
+  ASSERT_EQ(design->top_modules.size(), 1u);
+  EXPECT_EQ(design->top_modules[0]->name, "other");
+}
+
 TEST(SeparateCompilationBinding, EveryNamedTopRootsTheBoundDesign) {
   // A design may have more than one top-level cell, and the binder is told all
   // of them. Both hierarchies are rooted, in the order named.

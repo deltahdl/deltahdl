@@ -175,57 +175,30 @@ bool UseClauseNamesConfig(const ConfigRule* rule, const ConfigDecl* cfg,
 
 namespace {
 
-// True when an inner instance path lies at or beneath the inner config's top
-// cell, so it can be rewritten onto the outer hierarchy (§33.4.1).
-bool InnerPathUnderTop(std::string_view ipath, std::string_view inner_top) {
-  return ipath == inner_top ||
-         (ipath.size() > inner_top.size() && ipath.starts_with(inner_top) &&
-          ipath[inner_top.size()] == '.');
-}
-
-// Records a delegated inner default rule (§33.4.1) as a liblist override rooted
-// at outer_path. No-op when the rule carries no library list.
-void CollectInnerConfigDefaultOverride(
-    const ConfigRule* irule, const std::string& outer_path,
-    std::vector<std::pair<std::string, std::vector<std::string>>>& overrides) {
-  if (irule->liblist.empty()) return;
-  overrides.emplace_back(outer_path, LiblistToStrings(irule->liblist));
-}
-
-// Translates a delegated inner instance rule (§33.4.1) whose path lies under
-// inner_top into a liblist override rooted at outer_path. No-op when the rule
-// carries no library list or its path is outside the inner top cell.
-void CollectInnerConfigInstanceOverride(
-    const ConfigRule* irule, const std::string& outer_path,
-    std::string_view inner_top,
-    std::vector<std::pair<std::string, std::vector<std::string>>>& overrides) {
-  if (irule->liblist.empty()) return;
-  std::string_view ipath = irule->inst_path;
-  if (!InnerPathUnderTop(ipath, inner_top)) return;
-  std::string translated = outer_path;
-  if (ipath.size() > inner_top.size()) {
-    translated.append(ipath.substr(inner_top.size()));
+// §33.4.2: an instance clause of a configuration reached by delegation names
+// its instance from that configuration's own design cell, `inner_top`, down,
+// and the instance it stands for is the one at `outer_path` and below it.
+// Rewrites `path` that way, answering false for a path the design cell does not
+// start, which names no instance of the delegated subtree.
+bool RebaseConfigPath(std::string& path, std::string_view inner_top,
+                      std::string_view outer_path) {
+  if (path != inner_top &&
+      !(path.size() > inner_top.size() && path.starts_with(inner_top) &&
+        path[inner_top.size()] == '.')) {
+    return false;
   }
-  overrides.emplace_back(std::move(translated),
-                         LiblistToStrings(irule->liblist));
+  path = std::string(outer_path) + path.substr(inner_top.size());
+  return true;
 }
 
-// Translates the default/instance liblist rules of a delegated inner config
-// (§33.4.1) into instance liblist overrides rooted at outer_path, appending
-// them to overrides. inner_top names the inner config's top cell, used to
-// match and rewrite inner instance paths onto the outer hierarchy.
-void CollectInnerConfigLiblistOverrides(
-    const ConfigDecl* inner, const std::string& outer_path,
-    std::string_view inner_top,
-    std::vector<std::pair<std::string, std::vector<std::string>>>& overrides) {
-  for (auto* irule : inner->rules) {
-    if (irule->kind == ConfigRuleKind::kDefault) {
-      CollectInnerConfigDefaultOverride(irule, outer_path, overrides);
-    } else if (irule->kind == ConfigRuleKind::kInstance) {
-      CollectInnerConfigInstanceOverride(irule, outer_path, inner_top,
-                                         overrides);
-    }
-  }
+// Rebases the path every entry of `table` carries, as `path_of` reads it, and
+// drops the entries no instance of the delegated subtree answers to.
+template <typename Table, typename PathOf>
+void RebaseConfigTable(Table& table, std::string_view inner_top,
+                       std::string_view outer_path, PathOf path_of) {
+  std::erase_if(table, [&](auto& entry) {
+    return !RebaseConfigPath(path_of(entry), inner_top, outer_path);
+  });
 }
 
 // Sorts the compilation-unit items into the design's function/task and let
@@ -251,13 +224,25 @@ bool RuleCarriesParamOverride(const ConfigRule* rule) {
 
 // Evaluates each config localparam (restricted to a literal value, §33.4.3)
 // and records it in scope so later overrides may reference earlier ones.
+//
+// §6.20.2: a localparam declared with a type or a range holds its value
+// converted to that type, as any parameter does.
 void EvalConfigLocalparams(const ConfigDecl* cfg, ScopeMap& scope) {
-  for (const auto& [name, expr] : cfg->local_params) {
-    if (!expr) continue;
-    if (auto val = ConstEvalInt(expr, scope)) {
-      scope[name] = *val;
+  for (const ConfigLocalparam& lp : cfg->local_params) {
+    if (lp.is_type || lp.init_expr == nullptr) continue;
+    if (auto val = FoldDeclaredParamValue(lp.init_expr, lp.data_type, scope)) {
+      scope[lp.name] = *val;
     }
   }
+}
+
+// Whether a config localparam was declared with neither a type nor a range, so
+// that its literal is its value exactly as written.
+bool HoldsItsLiteralAsWritten(const ConfigLocalparam& lp) {
+  return !lp.is_type && lp.init_expr != nullptr &&
+         IsLiteralKind(lp.init_expr->kind) &&
+         lp.data_type.kind == DataTypeKind::kImplicit &&
+         lp.data_type.packed_dim_left == nullptr;
 }
 
 // Applies the configuration's default clause library list (§33.4.1), taking the
@@ -279,23 +264,29 @@ void CollectInstanceLiblistOverrides(
     std::vector<std::pair<std::string, std::vector<std::string>>>& overrides) {
   for (auto* rule : cfg->rules) {
     if (rule->kind != ConfigRuleKind::kInstance) continue;
-    if (rule->liblist.empty()) continue;
+    // §33.4.1.5: a liblist clause listing no library still selects a list,
+    // the empty one, which FindModule reads as the parent cell's library; a
+    // use clause selects none.
+    const bool kUseExpansion = !rule->use_cell.empty() ||
+                               !rule->use_lib.empty() || rule->use_config ||
+                               RuleCarriesParamOverride(rule);
+    if (kUseExpansion) continue;
     overrides.emplace_back(std::string(rule->inst_path),
                            LiblistToStrings(rule->liblist));
   }
 }
 
-// Expands instance clauses that delegate to another configuration (§33.4.1)
-// into instance use overrides plus translated liblist overrides. A clause
-// delegates when its use clause names a config, which §33.2.1 decides: the
-// ':config' extension names one outright, and a name that reaches no other
+// Expands instance clauses that delegate to another configuration (§33.4.2)
+// into the binding of the instance to that configuration's design cell, and
+// records the delegation, below which the configuration's own rules govern. A
+// clause delegates when its use clause names a config, which §33.2.1 decides:
+// the ':config' extension names one outright, and a name that reaches no other
 // design element names the config of that name on its own.
 void CollectConfigDelegationOverrides(
     const ConfigDecl* cfg, const CompilationUnit* unit, DiagEngine& diag,
     std::vector<std::tuple<std::string, std::string, std::string>>&
         use_overrides,
-    std::vector<std::pair<std::string, std::vector<std::string>>>&
-        liblist_overrides) {
+    std::vector<std::pair<std::string, const ConfigDecl*>>& delegations) {
   for (auto* rule : cfg->rules) {
     if (rule->kind != ConfigRuleKind::kInstance) continue;
     if (!UseClauseNamesConfig(rule, cfg, unit)) continue;
@@ -314,10 +305,7 @@ void CollectConfigDelegationOverrides(
     const ConfigDesignCell& inner_first = inner->design_cells.front();
     use_overrides.emplace_back(outer_path, std::string(inner_first.library),
                                std::string(inner_first.cell));
-
-    std::string_view inner_top = inner_first.cell;
-    CollectInnerConfigLiblistOverrides(inner, outer_path, inner_top,
-                                       liblist_overrides);
+    delegations.emplace_back(std::move(outer_path), inner);
   }
 }
 
@@ -489,7 +477,9 @@ bool Elaborator::ElaborateTopModules(const std::vector<ModuleDecl*>& top_decls,
     std::vector<std::string_view> config_locked;
     ModuleItem top_item;
     top_item.inst_module = mod_decl->name;
-    ApplyConfigParamOverrides(&top_item, mod_decl, top_params, ScopeMap{},
+    // §3.12.1: a top-level module stands in its compilation unit, whose
+    // parameters are the names an override of it reads.
+    ApplyConfigParamOverrides(&top_item, mod_decl, top_params, cu_param_scope_,
                               config_locked);
     // §6.20.3: no instantiation assigns a top-level module's type parameters,
     // so each takes its default, or a configuration's assignment, and is
@@ -671,7 +661,10 @@ RtlirDesign* Elaborator::Elaborate(
   std::unordered_set<std::string_view> already_named;
   for (auto name : top_names) {
     if (!already_named.insert(name).second) continue;
-    auto* mod_decl = FindModule(name);
+    // §33.5.4: a top-level cell may be named lib.cell, which takes it from
+    // that library alone.
+    const auto& [lib, cell] = SplitLibCell(name);
+    auto* mod_decl = FindDesignCell(lib, cell);
     if (mod_decl == nullptr) {
       diag_.Error(SourceLoc::None(),
                   std::format("top module '{}' not found", name),
@@ -703,10 +696,9 @@ OverridesWithLocalparamLiterals(
     std::vector<std::pair<std::string_view, Expr*>> params) {
   for (auto& [pname, pexpr] : params) {
     if (pexpr == nullptr || pexpr->kind != ExprKind::kIdentifier) continue;
-    for (const auto& [lname, lexpr] : cfg->local_params) {
-      if (lname == pexpr->text && lexpr != nullptr &&
-          IsLiteralKind(lexpr->kind)) {
-        pexpr = lexpr;
+    for (const ConfigLocalparam& lp : cfg->local_params) {
+      if (lp.name == pexpr->text && HoldsItsLiteralAsWritten(lp)) {
+        pexpr = lp.init_expr;
         break;
       }
     }
@@ -774,6 +766,12 @@ void Elaborator::CollectConfigCellClauseOverrides(const ConfigDecl* cfg) {
       std::string use_lib;
       std::string use_cell;
       if (!CellUseTarget(rule, cfg, unit_, use_lib, use_cell)) continue;
+      // §33.4.2: a cell clause binding the cell to a configuration hands each
+      // of its instances to that configuration's rules.
+      if (UseClauseNamesConfig(rule, cfg, unit_)) {
+        cell_config_delegations_[std::string(rule->cell_name)] =
+            FindDelegatedConfig(unit_->configs, cfg, rule->use_cell);
+      }
       cell_clause_use_overrides_[std::string(rule->cell_name)] = {
           std::string(rule->cell_lib), std::move(use_lib), std::move(use_cell)};
       continue;
@@ -783,87 +781,104 @@ void Elaborator::CollectConfigCellClauseOverrides(const ConfigDecl* cfg) {
   }
 }
 
-// What a binding clause of a config an instance clause delegates to carries
-// onto the delegated instance: a cell clause's use of a cell, an instance
-// clause's use of a cell for an instance under the config's design cell, or
-// nothing.
-enum class DelegatedBinding : uint8_t { kNone, kCellUse, kInstanceBind };
-
-static DelegatedBinding DelegatedBindingOf(const ConfigRule* irule,
-                                           const ConfigDecl* inner,
-                                           const CompilationUnit* unit,
-                                           std::string_view inner_top) {
-  if (irule->use_cell.empty() || UseClauseNamesConfig(irule, inner, unit)) {
-    return DelegatedBinding::kNone;
-  }
-  if (irule->kind == ConfigRuleKind::kCell) return DelegatedBinding::kCellUse;
-  if (irule->kind == ConfigRuleKind::kInstance &&
-      InnerPathUnderTop(irule->inst_path, inner_top)) {
-    return DelegatedBinding::kInstanceBind;
-  }
-  return DelegatedBinding::kNone;
-}
-
 // §33.4.1.6: an instance clause whose use expansion names a cell binds that
 // specific instance to the exact library.cell named. A use clause that names a
 // config instead is expanded by CollectConfigDelegationOverrides and so is
 // skipped here; §33.2.1 settles which of the two a given name is.
-//
-// §33.4.2 (printed page 939): an instance bound to a configuration gives way to
-// the design hierarchy the configuration specifies, and the configuration's
-// rules settle every other subinstance. A binding clause of that configuration
-// names its instances from its own design cell down, so each is rewritten onto
-// the instance the outer clause delegated and recorded here as well.
 void Elaborator::CollectConfigInstanceBindOverrides(const ConfigDecl* cfg) {
   for (auto* rule : cfg->rules) {
-    if (rule->kind != ConfigRuleKind::kInstance || rule->use_cell.empty()) {
+    if (rule->kind != ConfigRuleKind::kInstance || rule->use_cell.empty() ||
+        UseClauseNamesConfig(rule, cfg, unit_)) {
       continue;
     }
-    if (!UseClauseNamesConfig(rule, cfg, unit_)) {
-      instance_bind_overrides_.emplace_back(std::string(rule->inst_path),
-                                            std::string(rule->use_lib),
-                                            std::string(rule->use_cell));
-      continue;
-    }
-    const ConfigDecl* inner =
-        FindDelegatedConfig(unit_->configs, cfg, rule->use_cell);
-    if (inner == nullptr || inner->design_cells.empty()) continue;
-    std::string_view inner_top = inner->design_cells.front().cell;
-    for (auto* irule : inner->rules) {
-      switch (DelegatedBindingOf(irule, inner, unit_, inner_top)) {
-        case DelegatedBinding::kCellUse:
-          delegated_cell_use_overrides_.push_back(
-              {std::string(rule->inst_path),
-               std::string(irule->cell_name),
-               {std::string(irule->cell_lib), std::string(irule->use_lib),
-                std::string(irule->use_cell)}});
-          break;
-        case DelegatedBinding::kInstanceBind:
-          instance_bind_overrides_.emplace_back(
-              std::string(rule->inst_path) +
-                  std::string(irule->inst_path.substr(inner_top.size())),
-              std::string(irule->use_lib), std::string(irule->use_cell));
-          break;
-        case DelegatedBinding::kNone:
-          break;
-      }
-    }
+    instance_bind_overrides_.emplace_back(std::string(rule->inst_path),
+                                          std::string(rule->use_lib),
+                                          std::string(rule->use_cell));
   }
+}
+
+const ConfigDecl* Elaborator::DelegatedConfigFor(std::string_view cell) const {
+  for (const auto& [path, inner] : config_delegations_) {
+    if (path == config_inst_path_) return inner;
+  }
+  auto it = cell_config_delegations_.find(std::string(cell));
+  return it == cell_config_delegations_.end() ? nullptr : it->second;
+}
+
+void Elaborator::EnterDelegatedConfig(const ConfigDecl* inner) {
+  enclosing_config_rules_.push_back(
+      {std::move(library_order_), library_order_strict_,
+       std::move(cell_clause_use_overrides_),
+       std::move(cell_clause_liblist_overrides_),
+       std::move(instance_liblist_overrides_),
+       std::move(instance_use_overrides_), std::move(instance_bind_overrides_),
+       std::move(instance_param_overrides_), std::move(cell_param_overrides_),
+       std::move(config_localparam_scope_), std::move(cell_liblist_bindings_),
+       std::move(config_delegations_), std::move(cell_config_delegations_)});
+  library_order_ = enclosing_config_rules_.back().library_order;
+  library_order_strict_ = false;
+  cell_clause_use_overrides_.clear();
+  cell_clause_liblist_overrides_.clear();
+  instance_liblist_overrides_.clear();
+  instance_use_overrides_.clear();
+  instance_bind_overrides_.clear();
+  instance_param_overrides_.clear();
+  cell_param_overrides_.clear();
+  config_localparam_scope_.clear();
+  cell_liblist_bindings_.clear();
+  config_delegations_.clear();
+  cell_config_delegations_.clear();
+  EvalConfigLocalparams(inner, config_localparam_scope_);
+  CollectConfigRuleTables(inner);
+  CollectConfigInstanceParamOverrides(inner);
+  // §33.4.2: the configuration's rules name their instances from its own
+  // design cell down, which here is the delegated instance.
+  const std::string_view kTop = inner->design_cells.front().cell;
+  const std::string_view kAt = config_inst_path_;
+  RebaseConfigTable(instance_liblist_overrides_, kTop, kAt,
+                    [](auto& e) -> std::string& { return e.first; });
+  RebaseConfigTable(instance_use_overrides_, kTop, kAt,
+                    [](auto& e) -> std::string& { return std::get<0>(e); });
+  RebaseConfigTable(instance_bind_overrides_, kTop, kAt,
+                    [](auto& e) -> std::string& { return std::get<0>(e); });
+  RebaseConfigTable(instance_param_overrides_, kTop, kAt,
+                    [](auto& e) -> std::string& { return e.inst_path; });
+  RebaseConfigTable(config_delegations_, kTop, kAt,
+                    [](auto& e) -> std::string& { return e.first; });
+}
+
+void Elaborator::LeaveDelegatedConfig() {
+  ConfigRuleTables& outer = enclosing_config_rules_.back();
+  library_order_ = std::move(outer.library_order);
+  library_order_strict_ = outer.library_order_strict;
+  cell_clause_use_overrides_ = std::move(outer.cell_uses);
+  cell_clause_liblist_overrides_ = std::move(outer.cell_liblists);
+  instance_liblist_overrides_ = std::move(outer.instance_liblists);
+  instance_use_overrides_ = std::move(outer.instance_uses);
+  instance_bind_overrides_ = std::move(outer.instance_binds);
+  instance_param_overrides_ = std::move(outer.instance_params);
+  cell_param_overrides_ = std::move(outer.cell_params);
+  config_localparam_scope_ = std::move(outer.localparams);
+  cell_liblist_bindings_ = std::move(outer.cell_liblist_bindings);
+  config_delegations_ = std::move(outer.delegations);
+  cell_config_delegations_ = std::move(outer.cell_delegations);
+  enclosing_config_rules_.pop_back();
+}
+
+// The rule tables one configuration fills that say which cell an instance
+// binds to: the default list, the cell clauses, the instance clauses' lists
+// and uses, and the delegations to other configurations.
+void Elaborator::CollectConfigRuleTables(const ConfigDecl* cfg) {
+  ApplyConfigDefaultLiblist(cfg, library_order_, library_order_strict_);
+  CollectConfigCellClauseOverrides(cfg);
+  CollectInstanceLiblistOverrides(cfg, instance_liblist_overrides_);
+  CollectConfigDelegationOverrides(cfg, unit_, diag_, instance_use_overrides_,
+                                   config_delegations_);
+  CollectConfigInstanceBindOverrides(cfg);
 }
 
 RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
   in_config_elaboration_ = true;
-
-  // §33.2.2: which design cells the configuration's own text qualified with a
-  // library, recorded before the validations below substitute the library of
-  // the configuration itself into the cells left unqualified (§33.4.1.1). A
-  // library the statement named is where its cell has to be; a library the
-  // statement inherited is only where the search for it starts.
-  std::vector<bool> qualified_in_source;
-  qualified_in_source.reserve(cfg->design_cells.size());
-  for (const auto& design_cell : cfg->design_cells) {
-    qualified_in_source.push_back(!design_cell.library.empty());
-  }
 
   UnitScopeTables::RunPreElaborationValidations(*this);
 
@@ -887,30 +902,19 @@ RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
   // any other library is not a substitute for it.
   std::vector<ModuleDecl*> top_decls;
   top_decls.reserve(cfg->design_cells.size());
-  for (size_t i = 0; i < cfg->design_cells.size(); ++i) {
-    const ConfigDesignCell& design_cell = cfg->design_cells[i];
-    auto* md = FindDesignCell(design_cell.library, design_cell.cell,
-                              qualified_in_source[i]);
+  for (const ConfigDesignCell& design_cell : cfg->design_cells) {
+    auto* md = FindDesignCell(design_cell.library, design_cell.cell);
     if (!md) {
-      auto msg =
-          DesignCellNotFoundMessage(cfg->name, design_cell.library,
-                                    design_cell.cell, qualified_in_source[i]);
+      auto msg = DesignCellNotFoundMessage(cfg->name, design_cell.library,
+                                           design_cell.cell,
+                                           !design_cell.library.empty());
       diag_.Error(design_cell.loc, msg, Subclause("33.4.1.1"));
       return nullptr;
     }
     top_decls.push_back(md);
   }
 
-  ApplyConfigDefaultLiblist(cfg, library_order_, library_order_strict_);
-
-  CollectConfigCellClauseOverrides(cfg);
-
-  CollectInstanceLiblistOverrides(cfg, instance_liblist_overrides_);
-
-  CollectConfigDelegationOverrides(cfg, unit_, diag_, instance_use_overrides_,
-                                   instance_liblist_overrides_);
-
-  CollectConfigInstanceBindOverrides(cfg);
+  CollectConfigRuleTables(cfg);
 
   return ElaborateTops(top_decls);
 }

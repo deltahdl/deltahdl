@@ -734,14 +734,13 @@ class ElaboratorData {
     std::string use_cell;
   };
   std::unordered_map<std::string, CellUseOverride> cell_clause_use_overrides_;
-  // §33.4.2: a cell clause of a config an instance clause hands `subtree` to,
-  // which governs the instances of `cell` beneath that instance and no others.
-  struct DelegatedCellUseOverride {
-    std::string subtree;
-    std::string cell;
-    CellUseOverride use;
-  };
-  std::vector<DelegatedCellUseOverride> delegated_cell_use_overrides_;
+
+  // §33.4.2: the instance clauses binding an instance to a configuration, by
+  // the instance's path, and the cell clauses binding every instance of a cell
+  // to one, by the cell's name. Below such an instance that configuration's
+  // rules govern in place of these.
+  std::vector<std::pair<std::string, const ConfigDecl*>> config_delegations_;
+  std::unordered_map<std::string, const ConfigDecl*> cell_config_delegations_;
 
   // A cell selection clause paired with a liblist expansion clause: the named
   // cell is searched for in this ordered library list (§33.4.1.4, §33.4.1.5).
@@ -798,6 +797,37 @@ class ElaboratorData {
   // Literal values of the localparams declared in the configuration being
   // elaborated, used to evaluate parameter-override expressions (§33.4.3).
   ScopeMap config_localparam_scope_;
+
+  // §33.4.3: the parameter values of each instance a configuration's override
+  // has been applied below so far, by hierarchical path, so an override can
+  // read a parameter of any instance above the one it configures.
+  std::unordered_map<std::string, ScopeMap> config_ancestor_scopes_;
+
+  // §33.4.1.5: the lists cell clauses selected, by the path of the instance
+  // each was selected for, which the instances below inherit as liblists are
+  // inherited downward. Grown as FindModule binds, which is otherwise const.
+  mutable std::vector<std::pair<std::string, std::vector<std::string>>>
+      cell_liblist_bindings_;
+
+  // §33.4.2: every table above that one configuration's rules fill, set aside
+  // for the configurations whose subtrees enclose a delegated instance while
+  // the delegated configuration's rules govern beneath it.
+  struct ConfigRuleTables {
+    std::vector<std::string> library_order;
+    bool library_order_strict = false;
+    decltype(cell_clause_use_overrides_) cell_uses;
+    decltype(cell_clause_liblist_overrides_) cell_liblists;
+    decltype(instance_liblist_overrides_) instance_liblists;
+    decltype(instance_use_overrides_) instance_uses;
+    decltype(instance_bind_overrides_) instance_binds;
+    decltype(instance_param_overrides_) instance_params;
+    decltype(cell_param_overrides_) cell_params;
+    ScopeMap localparams;
+    decltype(cell_liblist_bindings_) cell_liblist_bindings;
+    decltype(config_delegations_) delegations;
+    decltype(cell_config_delegations_) cell_delegations;
+  };
+  std::vector<ConfigRuleTables> enclosing_config_rules_;
 
   std::string current_inst_path_;
   // §33.4.1.3 (printed page 939): the instance clause's instance name is a

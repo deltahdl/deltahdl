@@ -1,56 +1,15 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
 #include <string>
 #include <string_view>
 
-#include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_config_params.h"
 #include "helpers_reported_error.h"
-#include "lexer/lexer.h"
 #include "parser/ast_expr.h"
-#include "parser/parser.h"
 
 namespace {
-
-// Config-elaborates `src` through its first configuration.
-RtlirDesign* ConfigElab(ElabFixture& f, const std::string& src) {
-  auto fid = f.mgr.AddFile("<test>", src);
-  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
-  Parser parser(lexer, f.arena, f.diag);
-  auto* cu = parser.Parse();
-  Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->configs[0]);
-  f.has_errors = f.diag.HasErrors();
-  return design;
-}
-
-// Config-elaborates `src` through its first configuration and returns the cell
-// bound to the first child instance of the design's top module, so that
-// configuration-applied parameter values can be inspected (§33.4.3).
-RtlirModule* ConfigElabFirstChild(ElabFixture& f, const std::string& src) {
-  auto* design = ConfigElab(f, src);
-  if (!design || design->top_modules.empty()) return nullptr;
-  auto* top = design->top_modules[0];
-  if (top->children.empty()) return nullptr;
-  return top->children[0].resolved;
-}
-
-int64_t ResolvedParam(const RtlirModule* m, std::string_view name) {
-  for (const auto& p : m->params) {
-    if (p.name == name) return p.resolved_value;
-  }
-  return -1;
-}
-
-// The override expression the named parameter of `m` was given, or nullptr.
-const Expr* OverrideExpr(const RtlirModule* m, std::string_view name) {
-  for (const auto& p : m->params) {
-    if (p.name == name) return p.override_expr;
-  }
-  return nullptr;
-}
 
 // §33.4.3: a localparam a configuration declares must be given a value, and
 // that value must be a literal, so an override naming one hands the instance
@@ -75,14 +34,6 @@ TEST(ConfigLocalparamLiteral, StringLocalparamReachesTheInstanceWhole) {
   EXPECT_EQ(id->kind, ExprKind::kStringLiteral);
   EXPECT_NE(id->text.find("abcdef"), std::string_view::npos) << id->text;
   EXPECT_EQ(ResolvedParam(child, "W"), 100);
-}
-
-// The width of the variable named `name` in `m`, or 0.
-uint32_t VariableWidth(const RtlirModule* m, std::string_view name) {
-  for (const auto& v : m->variables) {
-    if (v.name == name) return v.width;
-  }
-  return 0;
 }
 
 // §33.4.3 with Syntax 33-4: a use clause's named_parameter_assignment may set a
@@ -117,6 +68,23 @@ TEST(ConfigParamOverride, TypeParameterOverrideBeatsTheInstantiation) {
   EXPECT_FALSE(f.has_errors);
   ASSERT_NE(child, nullptr);
   EXPECT_EQ(VariableWidth(child, "v"), 16u);
+}
+
+// §33.4.3: `.T()` returns the type parameter to its declared default, setting
+// the instantiation's `int` aside: v is a byte, 8 bits wide.
+TEST(ConfigParamOverride, EmptyTypeParameterAssignmentResetsToTheDefault) {
+  ElabFixture f;
+  auto* child = ConfigElabFirstChild(
+      f,
+      "module holder #(parameter type T = byte); T v; endmodule\n"
+      "module top; holder #(.T(int)) h(); endmodule\n"
+      "config cfg;\n"
+      "  design top;\n"
+      "  instance top.h use #(.T());\n"
+      "endconfig\n");
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_NE(child, nullptr);
+  EXPECT_EQ(VariableWidth(child, "v"), 8u);
 }
 
 // §33.4.3 (printed page 940): a parameter identifier is looked up beginning in
@@ -393,6 +361,40 @@ TEST(ConfigParamOverride, NonHierIdentInExpressionAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §33.4.3 with §6.20.2: a config localparam declared `bit [3:0]` holds its
+// literal converted to four bits, so 24 reaches the override as 8.
+TEST(ConfigLocalparamLiteral, DeclaredTypeConvertsTheLiteral) {
+  ElabFixture f;
+  auto* a1 = ConfigElabFirstChild(f,
+                                  "module adder #(parameter W = 3); endmodule\n"
+                                  "module top; adder a1(); endmodule\n"
+                                  "config c;\n"
+                                  "  localparam bit [3:0] S = 24;\n"
+                                  "  design top;\n"
+                                  "  instance top.a1 use #(.W(S));\n"
+                                  "endconfig\n");
+  ASSERT_NE(a1, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ResolvedParam(a1, "W"), 8);
+}
+
+// §33.4.3: a config localparam is given only a literal value, and a type is
+// none, so a `localparam type` in a config is reported.
+TEST(ConfigLocalparamLiteral, TypeLocalparamRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top; endmodule\n"
+      "config c;\n"
+      "  localparam type T = int;\n"
+      "  design top;\n"
+      "endconfig\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "config 'c' localparam 'T' is a type, not a "
+                            "literal value",
+                            3, "33.4.3"));
+}
+
 TEST(ConfigParamOverride, IndexUsingUnknownIdentifierRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -429,6 +431,42 @@ TEST(ConfigParamOverride, IndexUsingConfigLocalparamAccepted) {
       "  localparam IDX = 0;\n"
       "  design top;\n"
       "  instance top.a1 use #(.W(top.PARAM[IDX]));\n"
+      "endconfig\n",
+      f, "top");
+  EXPECT_FALSE(f.has_errors);
+}
+
+// §33.4.3 restricts only the indexes of a hierarchical name. A select on a
+// plain parameter of the parent resolves there like any other name, so its
+// index may name another parameter of the parent.
+TEST(ConfigParamOverride, IndexOfAPlainNameIsNotRestricted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module adder #(parameter W = 8); endmodule\n"
+      "module top;\n"
+      "  parameter int PARR[4] = '{1, 2, 3, 4};\n"
+      "  parameter K = 1;\n"
+      "  adder a1();\n"
+      "endmodule\n"
+      "config c;\n"
+      "  design top;\n"
+      "  instance top.a1 use #(.W(PARR[K]));\n"
+      "endconfig\n",
+      f, "top");
+  EXPECT_FALSE(f.has_errors);
+}
+
+// A package-scoped name (§26.3) is no hierarchical identifier, so it may stand
+// beside other terms in a config override.
+TEST(ConfigParamOverride, PackageScopedNameInALargerExpressionAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p; parameter X = 4; endpackage\n"
+      "module adder #(parameter W = 8); endmodule\n"
+      "module top; adder a1(); endmodule\n"
+      "config c;\n"
+      "  design top;\n"
+      "  instance top.a1 use #(.W(p::X + 1));\n"
       "endconfig\n",
       f, "top");
   EXPECT_FALSE(f.has_errors);

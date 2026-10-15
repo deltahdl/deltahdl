@@ -86,12 +86,23 @@ struct ConfigDesignCell {
   SourceLoc loc;
 };
 
+// §33.4.3: a localparam a config declares, for the values its overrides pass.
+// `data_type` is the type it was declared with, implicit where none was
+// written, and `is_type` marks a `localparam type`, which carries no value.
+struct ConfigLocalparam {
+  std::string_view name;
+  Expr* init_expr = nullptr;
+  DataType data_type;
+  bool is_type = false;
+  SourceLoc loc;
+};
+
 struct ConfigDecl {
   std::string_view name;
   SourceRange range;
   std::vector<ConfigDesignCell> design_cells;
   std::vector<ConfigRule*> rules;
-  std::vector<std::pair<std::string_view, Expr*>> local_params;
+  std::vector<ConfigLocalparam> local_params;
   std::string_view library;
 };
 

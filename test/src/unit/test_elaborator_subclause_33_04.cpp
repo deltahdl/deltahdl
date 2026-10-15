@@ -94,6 +94,23 @@ TEST(ConfigPackageBinding, CellClauseSelectingModuleIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §3.13(b): a package's name space is its own, so a cell clause naming a
+// module that shares a package's name selects the module, which a config may
+// rebind.
+TEST(ConfigPackageBinding, CellClauseNamingModuleSharingAPackagesNameAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p; endpackage\n"
+      "module p; endmodule\n"
+      "module top; p u(); endmodule\n"
+      "config c;\n"
+      "  design top;\n"
+      "  cell p liblist work;\n"
+      "endconfig\n",
+      f, "top");
+  EXPECT_FALSE(f.has_errors);
+}
+
 // The cell-clause companion to the unreferenced-package guard above: with a
 // package actually present in the design, a cell clause selecting an ordinary
 // module must still be accepted. This exercises the prohibition's cell-clause

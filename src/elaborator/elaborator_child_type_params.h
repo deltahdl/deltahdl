@@ -29,11 +29,14 @@ struct SavedTypedef {
 // and the parameter overrides a configuration made for the instance (§33.4.3),
 // which take precedence over it; `config_reset_all` is the configuration's
 // empty `#()`, which returns every parameter to its default and so sets the
-// instantiation's assignments aside.
+// instantiation's assignments aside. `config_reset` names the parameters the
+// configuration wrote with empty parentheses, `.T()`, each returned to its
+// default the same way.
 struct TypeParamAssignments {
   const ModuleItem* item;
   std::vector<std::pair<std::string_view, Expr*>> config;
   bool config_reset_all = false;
+  std::vector<std::string_view> config_reset;
 };
 
 // Gathers where the type parameters of the instance at `inst_path`, written as
@@ -44,12 +47,16 @@ template <typename Overrides>
 TypeParamAssignments TypeParamSourcesFor(const ModuleItem* item,
                                          const Overrides& overrides,
                                          const std::string& inst_path) {
-  TypeParamAssignments from{item, {}, false};
+  TypeParamAssignments from{item, {}, false, {}};
   for (const auto& ov : overrides) {
     if (ov.inst_path != inst_path) continue;
     if (ov.reset_all) from.config_reset_all = true;
     for (const auto& assignment : ov.params) {
-      if (assignment.second != nullptr) from.config.push_back(assignment);
+      if (assignment.second != nullptr) {
+        from.config.push_back(assignment);
+      } else {
+        from.config_reset.push_back(assignment.first);
+      }
     }
   }
   return from;

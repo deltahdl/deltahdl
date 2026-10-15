@@ -87,6 +87,20 @@ TEST(ConfigCellClause, UnqualifiedCellWithLiblistAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §33.4.3's `use #()` is a use expansion that resets every parameter, so a
+// library-qualified cell clause may expand through it.
+TEST(ConfigCellClause, LibQualifiedCellWithParameterResetAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top; endmodule\n"
+      "config c;\n"
+      "  design top;\n"
+      "  cell rtlLib.adder use #();\n"
+      "endconfig\n",
+      f, "top");
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(ConfigCellClause, LibQualifiedCellWithUseClauseAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -270,6 +284,41 @@ TEST(ConfigCellClause, InstanceOverrideBeatsTheCellOverride) {
       run);
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_EQ(WidthsOfEachChild(run), "x=12 y=20 ");
+}
+
+// §33.4.1.4: a cell clause naming aLib selects only the instances bound to, or
+// being considered for, aLib's adder. The default list searches gateLib
+// before rtlLib and never aLib, so top.u binds gateLib.adder and the clause
+// does not apply.
+TEST(ConfigCellClause, LibQualifiedCellSkipsAnInstanceBoundElsewhere) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  std::string src =
+      "module adder; endmodule\n"
+      "module adder; endmodule\n"
+      "module alt; endmodule\n"
+      "module top; adder u(); endmodule\n"
+      "config c;\n"
+      "  design rtlLib.top;\n"
+      "  default liblist gateLib rtlLib;\n"
+      "  cell aLib.adder use rtlLib.alt;\n"
+      "endconfig\n";
+  auto fid = mgr.AddFile("<test>", std::move(src));
+  Lexer lex(mgr.FileContent(fid), fid, diag);
+  Parser parser(lex, arena, diag);
+  auto* cu = parser.Parse();
+  cu->modules[0]->library = "gateLib";
+  cu->modules[1]->library = "aLib";
+  cu->modules[2]->library = "rtlLib";
+  cu->modules[3]->library = "rtlLib";
+  Elaborator elab(arena, diag, cu);
+  auto* design = elab.Elaborate(cu->configs[0]);
+  ASSERT_NE(design, nullptr);
+  const RtlirModule* u = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(u->name, "adder");
+  EXPECT_EQ(u->library, "gateLib");
 }
 
 }  // namespace

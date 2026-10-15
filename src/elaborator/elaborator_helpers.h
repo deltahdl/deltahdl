@@ -531,6 +531,15 @@ bool LibraryExcludedBySelectedList(std::string_view library,
 // ancestor of `top.a1`. Where two clauses cover one path, the longer -- the one
 // naming the nearer ancestor -- is the one that governs. The returned list is
 // owned by `overrides`.
+// §33.3 and §33.5.4: the library and the cell a lib.cell name gives, the
+// library empty where the name is a cell's alone.
+inline std::pair<std::string_view, std::string_view> SplitLibCell(
+    std::string_view name) {
+  const std::size_t kDot = name.find('.');
+  if (kDot == std::string_view::npos) return {{}, name};
+  return {name.substr(0, kDot), name.substr(kDot + 1)};
+}
+
 const std::vector<std::string>* InstanceLiblistForPath(
     const std::string& inst_path,
     const std::vector<std::pair<std::string, std::vector<std::string>>>&

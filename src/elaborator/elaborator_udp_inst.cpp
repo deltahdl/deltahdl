@@ -114,6 +114,17 @@ std::optional<UdpDecl*> Elaborator::ResolveUdpUseOverride(
 }
 
 UdpDecl* Elaborator::FindUdpByName(std::string_view name) const {
+  // §33.4.1.6: an instance clause's use expansion binds the instance it names
+  // to the cell it names, so where that cell is a primitive the instance is
+  // that primitive's, and where it is no primitive the instance is no
+  // primitive's, whatever primitive its own cell name would have found.
+  for (const auto& [path, ulib, ucell] : instance_bind_overrides_) {
+    if (config_inst_path_.empty() || path != config_inst_path_) continue;
+    std::string_view target_lib = ulib.empty()
+                                      ? std::string_view(current_library_)
+                                      : std::string_view(ulib);
+    return FindUdpInLibrary(target_lib, ucell, unit_);
+  }
   if (auto bound = ResolveUdpUseOverride(name); bound.has_value()) {
     return *bound;
   }
@@ -252,12 +263,28 @@ static void CheckUdpInstTerminalCount(const ModuleItem* item,
 // ElaborateGateInst (src/elaborator/elaborator_gates.cpp) appends; a primitive
 // instance reaches it as the RtlirUdpInst Elaborator::ElaborateOneUdpInst
 // appends. Append nothing and no instance's output terminal has a driver.
+// §33.4.1.3: an instance clause names an instance by its own hierarchical
+// path, and this runs while the cell holding the instantiation is elaborated,
+// one level above it, so the primitive is looked for under the instance's
+// path, as ReclassifyForwardUdpInstances looks for it, and the path is put
+// back afterwards.
+UdpDecl* Elaborator::FindUdpForInstance(const ModuleItem* item) {
+  std::string saved_inst_path = config_inst_path_;
+  if (!item->gate_inst_name.empty()) {
+    config_inst_path_ = HierInstancePath(config_inst_path_, gen_block_path_,
+                                         item->gate_inst_name);
+  }
+  UdpDecl* udp = FindUdpByName(item->inst_module);
+  config_inst_path_ = std::move(saved_inst_path);
+  return udp;
+}
+
 void Elaborator::ElaborateUdpInst(ModuleItem* item, RtlirModule* mod) {
   // §29.8 reads the terminal count off the primitive's own port list, so it is
   // answered once for the instantiation rather than once per element of an
   // array: every element of an expanded array carries the terminal list written
   // here, and one list written wrong is one mistake.
-  if (const UdpDecl* decl = FindUdpByName(item->inst_module); decl != nullptr) {
+  if (const UdpDecl* decl = FindUdpForInstance(item); decl != nullptr) {
     CheckUdpInstTerminalCount(item, decl, diag_);
   } else if (item->udp_undeclared_at_parse) {
     // Read as a UDP instance in a form no module instance writes, before the
@@ -317,7 +344,7 @@ void Elaborator::ElaborateUdpInst(ModuleItem* item, RtlirModule* mod) {
 // onto RtlirModule::processes and RtlirModule::assigns after the item is
 // elaborated, and it does not stamp RtlirModule::udp_insts.
 void Elaborator::ElaborateOneUdpInst(const ModuleItem* item, RtlirModule* mod) {
-  const UdpDecl* decl = FindUdpByName(item->inst_module);
+  const UdpDecl* decl = FindUdpForInstance(item);
   if (decl == nullptr) return;
   if (item->gate_terminals.empty()) return;
 

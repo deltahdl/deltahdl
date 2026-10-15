@@ -190,7 +190,10 @@ struct ParserConfigHelpers {
       p.ParseParamDecl(items);
       for (auto* item : items) {
         if (item->kind != ModuleItemKind::kParamDecl) continue;
-        decl->local_params.emplace_back(item->name, item->init_expr);
+        // ParseTypeParamDecl gives a type parameter the void data type.
+        decl->local_params.push_back(
+            {item->name, item->init_expr, item->data_type,
+             item->data_type.kind == DataTypeKind::kVoid, item->loc});
       }
     }
   }

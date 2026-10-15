@@ -1,5 +1,6 @@
 #include "elaborator/elaborator_child_type_params.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <format>
 #include <optional>
@@ -82,7 +83,12 @@ static std::optional<DataType> ResolveChildTypeParam(
   const ModuleItem* item = from.item;
   std::string_view pname = child_decl->params[i].first;
   const Expr* ov = ConfigTypeParamOverride(from, pname);
-  if (ov == nullptr && !from.config_reset_all) {
+  // §33.4.3: `.T()` returns the parameter to its default, setting aside the
+  // instantiation's assignment as `#()` does for every parameter.
+  const bool kConfigReset =
+      from.config_reset_all ||
+      std::ranges::find(from.config_reset, pname) != from.config_reset.end();
+  if (ov == nullptr && !kConfigReset) {
     ov = FindTypeParamOverrideExpr(item, child_decl, pname);
   }
   if (ov != nullptr) {

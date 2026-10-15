@@ -55,8 +55,8 @@ TEST(ConfigSourceText, ConfigDeclarationLocalParams) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->configs[0]->local_params.size(), 2u);
-  EXPECT_EQ(r.cu->configs[0]->local_params[0].first, "WIDTH");
-  EXPECT_EQ(r.cu->configs[0]->local_params[1].first, "DEPTH");
+  EXPECT_EQ(r.cu->configs[0]->local_params[0].name, "WIDTH");
+  EXPECT_EQ(r.cu->configs[0]->local_params[1].name, "DEPTH");
 }
 
 // The endconfig terminal is required to close the declaration.
@@ -378,8 +378,8 @@ TEST(ConfigSourceText, UseClauseCellWithNamedParams) {
   EXPECT_EQ(rule->use_lib, "work");
   EXPECT_EQ(rule->use_cell, "alt");
   ASSERT_EQ(rule->use_params.size(), 2u);
-  EXPECT_EQ(rule->use_params[0].first, "W");
-  EXPECT_EQ(rule->use_params[1].first, "D");
+  EXPECT_EQ(rule->use_params[0].name, "W");
+  EXPECT_EQ(rule->use_params[1].name, "D");
 }
 
 // Second alternative: a bare named_parameter_assignment list with no cell.
@@ -394,8 +394,8 @@ TEST(ConfigSourceText, UseClauseBareNamedParams) {
   auto* rule = r.cu->configs[0]->rules[0];
   EXPECT_TRUE(rule->use_cell.empty());
   ASSERT_EQ(rule->use_params.size(), 2u);
-  EXPECT_EQ(rule->use_params[0].first, "WIDTH");
-  EXPECT_EQ(rule->use_params[1].first, "DEPTH");
+  EXPECT_EQ(rule->use_params[0].name, "WIDTH");
+  EXPECT_EQ(rule->use_params[1].name, "DEPTH");
 }
 
 // The [ : config ] suffix may close a parameterized use_clause as well.
@@ -411,7 +411,7 @@ TEST(ConfigSourceText, UseClauseParamsWithConfigSuffix) {
   EXPECT_EQ(rule->use_lib, "work");
   EXPECT_EQ(rule->use_cell, "fast_add");
   ASSERT_EQ(rule->use_params.size(), 1u);
-  EXPECT_EQ(rule->use_params[0].first, "W");
+  EXPECT_EQ(rule->use_params[0].name, "W");
   EXPECT_TRUE(rule->use_config);
 }
 

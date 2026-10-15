@@ -529,28 +529,22 @@ void Elaborator::RegisterCuScopeItems() {
   all_cu_param_scope_ = cu_param_scope_;
 }
 
+// §33.4.1.4: a cell clause naming a library applies to an instance bound to,
+// or being considered for binding to, that library's cell, which is the cell
+// the search the configuration's lists direct arrives at, `found`. One naming
+// no library applies to every instance of the cell.
+static bool CellClauseSelects(std::string_view src_lib,
+                              const ModuleDecl* found) {
+  return src_lib.empty() || (found != nullptr && found->library == src_lib);
+}
+
 std::optional<ModuleDecl*> Elaborator::ResolveCellUseOverride(
-    std::string_view name) const {
-  // A cell clause of a config an instance was handed to is the nearer rule for
-  // the instances beneath that one (§33.4.2).
-  for (const auto& dov : delegated_cell_use_overrides_) {
-    if (dov.cell != name || !config_inst_path_.starts_with(dov.subtree + ".") ||
-        !CellUseOverrideApplies(dov.use.src_lib, name, unit_)) {
-      continue;
-    }
-    std::string_view lib = dov.use.use_lib.empty()
-                               ? std::string_view(current_library_)
-                               : std::string_view(dov.use.use_lib);
-    return FindCellInLibrary(lib, dov.use.use_cell, unit_);
-  }
+    std::string_view name, const ModuleDecl* found) const {
   auto it = cell_clause_use_overrides_.find(std::string(name));
   if (it == cell_clause_use_overrides_.end()) return std::nullopt;
   const auto& ov = it->second;
 
-  // A library-qualified cell clause applies only to the cell as defined in
-  // that library (§33.4.1.4); if no such cell exists the clause matches
-  // nothing and resolution proceeds normally.
-  if (!CellUseOverrideApplies(ov.src_lib, name, unit_)) return std::nullopt;
+  if (!CellClauseSelects(ov.src_lib, found)) return std::nullopt;
 
   // An omitted target library is inherited from the parent cell (§33.4.1.6).
   std::string_view target_lib = ov.use_lib.empty()
@@ -677,56 +671,38 @@ const std::vector<std::string>* InstanceLiblistForPath(
   return inherited;
 }
 
-// §33.4.1.4, §33.4.1.5: selects the library list that governs resolution of
-// `name`, preferring the most specific instance-scoped liblist rule and falling
-// back to a cell-clause liblist. Returns nullptr when no liblist clause
-// applies.
-static const std::vector<std::string>* SelectOverrideLiblist(
-    std::string_view name, const std::string& current_inst_path,
-    const std::vector<std::pair<std::string, std::vector<std::string>>>&
-        instance_liblist_overrides,
-    const std::unordered_map<std::string, std::vector<std::string>>&
-        cell_clause_liblist_overrides) {
-  const std::vector<std::string>* override_liblist =
-      InstanceLiblistForPath(current_inst_path, instance_liblist_overrides);
-
-  // Absent an instance-scoped library list, a cell selection clause may name
-  // the library list for this cell (§33.4.1.4, §33.4.1.5).
-  if (override_liblist == nullptr) {
-    if (auto it = cell_clause_liblist_overrides.find(std::string(name));
-        it != cell_clause_liblist_overrides.end()) {
-      override_liblist = &it->second;
-    }
-  }
-  return override_liblist;
-}
-
 // Chooses among `candidates` using the global library order, applying strict
-// library-order filtering and the config-elaboration parent-library preference
-// (§33.4.1.5). Returns nullptr when no candidate survives filtering.
+// library-order filtering. Returns nullptr when no candidate survives
+// filtering.
 static ModuleDecl* PickCandidateByGlobalOrder(
     std::vector<ModuleDecl*> candidates,
-    const std::vector<std::string>& library_order, bool library_order_strict,
-    bool in_config_elaboration, std::string_view current_library) {
-  // An empty selected library list selects no libraries to filter against;
-  // it is treated here as no list being selected (§33.4.1.5).
-  bool list_in_force =
-      SelectedLibraryListInForce(library_order, library_order_strict);
-  if (list_in_force && !candidates.empty()) {
+    const std::vector<std::string>& library_order, bool library_order_strict) {
+  if (SelectedLibraryListInForce(library_order, library_order_strict) &&
+      !candidates.empty()) {
     candidates = FilterCandidatesByLibrary(candidates, library_order);
   }
   if (candidates.empty()) return nullptr;
-
-  // §33.4.1.5: when no library list clause is selected (or the selected
-  // list is empty), the list holds only the parent cell's library, so an
-  // instance binds to the cell defined in its parent's library.
-  bool no_list_selected = !list_in_force;
-  if (in_config_elaboration && no_list_selected && !current_library.empty()) {
-    for (auto* c : candidates) {
-      if (c->library == current_library) return c;
-    }
-  }
   return PickByLibraryOrder(candidates, library_order);
+}
+
+const std::vector<std::string>* Elaborator::SelectedLiblist(
+    std::string_view name) const {
+  // §33.4.1.4, §33.4.1.5: the most specific instance-scoped list, inherited
+  // from the nearest instance clause above, comes first; then a cell clause
+  // selecting this cell; then a list a cell clause selected for an instance
+  // above, which its subinstances inherit as they are bound.
+  if (const auto* inst = InstanceLiblistForPath(config_inst_path_,
+                                                instance_liblist_overrides_)) {
+    return inst;
+  }
+  if (auto it = cell_clause_liblist_overrides_.find(std::string(name));
+      it != cell_clause_liblist_overrides_.end()) {
+    if (in_config_elaboration_ && !config_inst_path_.empty()) {
+      cell_liblist_bindings_.emplace_back(config_inst_path_, it->second);
+    }
+    return &it->second;
+  }
+  return InstanceLiblistForPath(config_inst_path_, cell_liblist_bindings_);
 }
 
 ModuleDecl* Elaborator::FindModule(std::string_view name) const {
@@ -743,23 +719,37 @@ ModuleDecl* Elaborator::FindModule(std::string_view name) const {
   }
 
   // §33.6.3: a cell selection clause's use expansion binds every cell of the
-  // selected name to the one library.cell it names, so the binding is settled
-  // here rather than by the search below. The position is the rule and not an
-  // ordering of convenience: a configuration may name a cell in a library its
-  // own default clause leaves off the list, and that cell is still what the
-  // name binds, because naming a description is not asking for a search that a
-  // library list could exclude it from.
-  if (auto hit = ResolveCellUseOverride(name); hit.has_value()) {
+  // selected name to the one library.cell it names, whatever library the
+  // search would have taken it from: a configuration may name a cell in a
+  // library its own default clause leaves off the list, and that cell is
+  // still what the name binds, because naming a description is not asking for
+  // a search that a library list could exclude it from. The search still runs
+  // first, since a clause naming a library selects only the instances it
+  // arrives at that library's cell for (§33.4.1.4).
+  ModuleDecl* found = SearchModule(name);
+  if (auto hit = ResolveCellUseOverride(name, found); hit.has_value()) {
     return *hit;
   }
+  return found;
+}
 
+ModuleDecl* Elaborator::SearchModule(std::string_view name) const {
   ModuleDecl* extern_decl = nullptr;
   std::vector<ModuleDecl*> candidates;
   CollectModuleCandidates(name, unit_, candidates, extern_decl);
 
-  const std::vector<std::string>* override_liblist = SelectOverrideLiblist(
-      name, config_inst_path_, instance_liblist_overrides_,
-      cell_clause_liblist_overrides_);
+  const std::vector<std::string>* override_liblist = SelectedLiblist(name);
+  // §33.4.1.5: under a configuration, a selected list that is empty, and the
+  // absence of any list, both leave the single library holding the parent
+  // cell.
+  const std::vector<std::string> kParentLibrary{current_library_};
+  if (in_config_elaboration_ && !current_library_.empty() &&
+      (override_liblist != nullptr
+           ? override_liblist->empty()
+           : !SelectedLibraryListInForce(library_order_,
+                                         library_order_strict_))) {
+    override_liblist = &kParentLibrary;
+  }
 
   // §33.6.2: a library the default clause's list leaves out is not searched at
   // all, so a description held only there is not used. Filtering against that
@@ -775,17 +765,18 @@ ModuleDecl* Elaborator::FindModule(std::string_view name) const {
   // not put back the libraries the default clause left out.
   bool selected_list_governed =
       SelectedLibraryListInForce(library_order_, library_order_strict_);
-  if (override_liblist != nullptr && !candidates.empty()) {
+  // A selected list is the whole of the search: a cell held only by a library
+  // outside it is not found, whatever kind of design element it is.
+  if (override_liblist != nullptr) {
     candidates = FilterCandidatesByLibrary(candidates, *override_liblist);
     if (!candidates.empty()) {
       return PickByLibraryOrder(candidates, *override_liblist);
     }
-  } else {
-    if (ModuleDecl* picked = PickCandidateByGlobalOrder(
-            std::move(candidates), library_order_, library_order_strict_,
-            in_config_elaboration_, current_library_)) {
-      return picked;
-    }
+    return extern_decl;
+  }
+  if (ModuleDecl* picked = PickCandidateByGlobalOrder(
+          std::move(candidates), library_order_, library_order_strict_)) {
+    return picked;
   }
   if (extern_decl) return extern_decl;
   if (selected_list_governed) return nullptr;
@@ -794,12 +785,9 @@ ModuleDecl* Elaborator::FindModule(std::string_view name) const {
 }
 
 ModuleDecl* Elaborator::FindDesignCell(std::string_view library,
-                                       std::string_view cell,
-                                       bool qualified_in_source) const {
+                                       std::string_view cell) const {
   if (library.empty()) return FindModule(cell);
-  ModuleDecl* in_library = FindCellInLibrary(library, cell, unit_);
-  if (in_library != nullptr || qualified_in_source) return in_library;
-  return FindModule(cell);
+  return FindCellInLibrary(library, cell, unit_);
 }
 
 ModuleDecl* Elaborator::FindModuleInScope(std::string_view name) const {

@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <initializer_list>
 #include <string>
 #include <string_view>
 
@@ -305,6 +307,65 @@ TEST(ConfigUseClause, UseNamingAnAbsentLibraryReportsThatLibrary) {
       "endconfig\n");
   EXPECT_TRUE(ReportedError(diags, "library 'gateLib' holds no cell 'adder'", 2,
                             "33.4.1.6"));
+}
+
+// Elaborates `src` under its first config, giving its primitives the
+// libraries `udp_libs` names in order and its modules and configs `lib`.
+RtlirDesign* ElaborateWithPrimitives(
+    ConfigElaboration& run, const std::string& src,
+    std::initializer_list<std::string_view> udp_libs, std::string_view lib) {
+  auto fid = run.mgr.AddFile("<test>", src);
+  Lexer lex(run.mgr.FileContent(fid), fid, run.diag);
+  Parser parser(lex, run.arena, run.diag);
+  auto* cu = parser.Parse();
+  size_t i = 0;
+  for (std::string_view udp_lib : udp_libs) cu->udps[i++]->library = udp_lib;
+  for (auto* mod : cu->modules) mod->library = lib;
+  for (auto* cfg : cu->configs) cfg->library = lib;
+  Elaborator elab(run.arena, run.diag, cu);
+  return elab.Elaborate(cu->configs[0]);
+}
+
+// §33.4 lets a config rebind a primitive instance, and §33.4.1.6 has an
+// instance clause's use name the cell the instance binds to, a primitive
+// among cells (§33.2.1): top.a, written as an instance of module foo, becomes
+// an instance of the primitive prim.
+TEST(ConfigUseClause, InstanceClauseBindsAnInstanceToAPrimitive) {
+  ConfigElaboration run;
+  auto* design = ElaborateWithPrimitives(
+      run,
+      "primitive prim(output o, input i); table 0:0; 1:1; endtable "
+      "endprimitive\n"
+      "module foo(output o, input i); assign o = i; endmodule\n"
+      "module top; wire o, i; foo a(o, i); endmodule\n"
+      "config c; design work.top; instance top.a use prim; endconfig\n",
+      {"work"}, "work");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(run.diag.HasErrors());
+  const RtlirModule* top = design->top_modules[0];
+  ASSERT_EQ(top->udp_insts.size(), 1u);
+  EXPECT_EQ(top->udp_insts[0].decl->name, "prim");
+}
+
+// §33.4.1.3: an instance clause selects the instance its path names, and an
+// instance of a primitive declared before it is one: top.u, written in
+// rtlLib against rtlLib's u_and, takes gateLib's u_and from the clause's list.
+TEST(ConfigUseClause, InstanceClauseReachesAnEarlierDeclaredPrimitive) {
+  ConfigElaboration run;
+  auto* design = ElaborateWithPrimitives(
+      run,
+      "primitive u_and(output o, input a); table 0:0; 1:1; endtable "
+      "endprimitive\n"
+      "primitive u_and(output o, input a); table 0:1; 1:0; endtable "
+      "endprimitive\n"
+      "module top; wire o, a; u_and u(o, a); endmodule\n"
+      "config c; design rtlLib.top; default liblist rtlLib;\n"
+      "  instance top.u liblist gateLib; endconfig\n",
+      {"rtlLib", "gateLib"}, "rtlLib");
+  ASSERT_NE(design, nullptr);
+  const RtlirModule* top = design->top_modules[0];
+  ASSERT_EQ(top->udp_insts.size(), 1u);
+  EXPECT_EQ(top->udp_insts[0].decl->library, "gateLib");
 }
 
 }  // namespace

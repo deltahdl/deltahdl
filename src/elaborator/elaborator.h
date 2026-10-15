@@ -136,6 +136,11 @@ class Elaborator : public ElaboratorClassRules {
   void CollectConfigInstanceParamOverrides(const ConfigDecl* cfg);
   void CollectConfigCellClauseOverrides(const ConfigDecl* cfg);
   void CollectConfigInstanceBindOverrides(const ConfigDecl* cfg);
+  void CollectConfigRuleTables(const ConfigDecl* cfg);
+  // §33.4.2: delegation to a configuration (elaborator.cpp says how).
+  const ConfigDecl* DelegatedConfigFor(std::string_view cell) const;
+  void EnterDelegatedConfig(const ConfigDecl* inner);
+  void LeaveDelegatedConfig();
 
   void ValidateAnonymousProgramNameSharing();
 
@@ -166,24 +171,21 @@ class Elaborator : public ElaboratorClassRules {
   void ResolveExternModules();
 
   ModuleDecl* FindModule(std::string_view name) const;
-
-  // §33.2.2: a design statement names the top-level cell of the design and, in
-  // the library qualifying that name, the source description the cell is taken
-  // from. `qualified_in_source` says the configuration's own text named that
-  // library, and such a name is looked up in that library alone: a like-named
-  // cell held elsewhere is not the description the statement asked for. A
-  // library the statement instead inherited from the configuration holding it
-  // (§33.4.1.1) is where the search starts rather than where it ends, and an
-  // empty `library` confines the search not at all. Null when no cell exists.
-  ModuleDecl* FindDesignCell(std::string_view library, std::string_view cell,
-                             bool qualified_in_source) const;
+  // FindModule's library-list search, before any cell clause's use expansion.
+  ModuleDecl* SearchModule(std::string_view name) const;
+  // §33.4.1.5: the list a configuration selected for `name`, or null.
+  const std::vector<std::string>* SelectedLiblist(std::string_view name) const;
+  // §33.2.2, §33.4.1.1: `cell` from `library` alone (the configuration's where
+  // the design statement wrote none), or any where empty; else null.
+  ModuleDecl* FindDesignCell(std::string_view library,
+                             std::string_view cell) const;
 
   // Applies a cell selection clause's use expansion to a cell being resolved
   // (§33.4.1.4, §33.4.1.6). Returns nullopt when no clause applies (resolution
   // should continue normally); a present value (possibly nullptr) is the bound
   // cell, where nullptr means the named target does not exist.
   std::optional<ModuleDecl*> ResolveCellUseOverride(
-      std::string_view name) const;
+      std::string_view name, const ModuleDecl* found) const;
 
   // Applies an instance selection clause's plain use expansion to the instance
   // currently being resolved (§33.4.1.6). The exact instance at the named path
@@ -329,6 +331,7 @@ class Elaborator : public ElaboratorClassRules {
   void ElaborateOneUdpInst(const ModuleItem* item, RtlirModule* mod);
 
   UdpDecl* FindUdpByName(std::string_view name) const;
+  UdpDecl* FindUdpForInstance(const ModuleItem* item);
 
   // §33.4.1.4/§33.4.1.6: applies a cell selection clause's use expansion to a
   // primitive being resolved. Returns nullopt when no clause applies (the

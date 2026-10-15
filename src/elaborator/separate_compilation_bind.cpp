@@ -89,11 +89,15 @@ void CollectNestedCellNames(const std::vector<ModuleItem*>& items,
 
 // The loaded configuration of that name, or nullptr. A configuration is one of
 // the design elements a library holds, so one reaches a bind the same way every
-// other cell does: read back out of a compiled form.
+// other cell does: read back out of a compiled form. §33.5.4 names it lib.cell,
+// which takes it from that library alone.
 const ConfigDecl* FindConfig(const CompilationUnit& unit,
                              std::string_view name) {
+  const auto& [lib, cell] = SplitLibCell(name);
   for (const auto* cfg : unit.configs) {
-    if (cfg->name == name) return cfg;
+    if (cfg->name == cell && (lib.empty() || cfg->library == lib)) {
+      return cfg;
+    }
   }
   return nullptr;
 }
@@ -164,8 +168,9 @@ bool SeparateCompilationBinder::AllCellsPrecompiled(
     const std::vector<std::string_view>& top_names) {
   Descent descent;
   for (auto name : top_names) {
-    if (!descent.reached.insert(name).second) continue;
-    auto* decl = FindDescendableCell(unit_, {}, name);
+    const auto& [lib, cell] = SplitLibCell(name);
+    if (!descent.reached.insert(cell).second) continue;
+    auto* decl = FindDescendableCell(unit_, lib, cell);
     if (decl == nullptr) {
       // A top-level cell is named to this tool rather than instantiated by
       // anything, so nothing written in a source description says where the

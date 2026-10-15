@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -105,9 +106,10 @@ TEST(ConfigLiblistClause, EmptyDefaultLiblistFallsBackToParentLibrary) {
   EXPECT_EQ(bound->library, "libY");
 }
 
-// §33.4.1.5: when the parent's library does not contain the cell, the parent
-// fallback yields nothing and resolution continues with the remaining cells.
-TEST(ConfigLiblistClause, ParentFallbackSkippedWhenParentLacksCell) {
+// §33.4.1.5: with no list selected, the list is the parent's library alone, so
+// a cell no other library than libA and libB holds is not found under a top
+// in libZ.
+TEST(ConfigLiblistClause, ParentLibraryLackingTheCellLeavesItUnbound) {
   SourceManager mgr;
   Arena arena;
   DiagEngine diag(mgr);
@@ -115,9 +117,112 @@ TEST(ConfigLiblistClause, ParentFallbackSkippedWhenParentLacksCell) {
       BindLeafUnderTop(mgr, arena, diag,
                        BindLeafParams{"config c; design top; endconfig\n",
                                       "libA", "libB", "libZ"});
+  EXPECT_EQ(bound, nullptr);
+  EXPECT_TRUE(diag.HasErrors());
+}
+
+// §33.4.1.5: an instance clause's liblist that names no library selects the
+// empty list, which leaves the parent's library, L1, rather than the default
+// clause's L2 first.
+TEST(ConfigLiblistClause, EmptyInstanceLiblistMeansTheParentsLibrary) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  auto* bound = BindLeafUnderTop(
+      mgr, arena, diag,
+      BindLeafParams{"config c; design top; default liblist L2 L1;\n"
+                     "  instance top.u liblist; endconfig\n",
+                     "L1", "L2", "L1"});
   ASSERT_NE(bound, nullptr);
-  EXPECT_EQ(bound->name, "leaf");
-  EXPECT_EQ(bound->library, "libA");
+  EXPECT_EQ(bound->library, "L1");
+}
+
+// §33.4.1.5: a cell clause's empty liblist is the same empty list, and so the
+// parent's library, L1.
+TEST(ConfigLiblistClause, EmptyCellLiblistMeansTheParentsLibrary) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  auto* bound = BindLeafUnderTop(
+      mgr, arena, diag,
+      BindLeafParams{"config c; design top; default liblist L2 L1;\n"
+                     "  cell leaf liblist; endconfig\n",
+                     "L1", "L2", "L1"});
+  ASSERT_NE(bound, nullptr);
+  EXPECT_EQ(bound->library, "L1");
+}
+
+// The design of §33.6 reduced to what one cell clause decides: `m` is held by
+// gateLib and aLib, `adder`, which instantiates `m`, by gateLib and aLib, and
+// `top` by rtlLib. Elaborated under `config c` with `body` as its rules.
+RtlirDesign* ElaborateCellListDesign(SourceManager& mgr, Arena& arena,
+                                     DiagEngine& diag,
+                                     const std::string& body) {
+  std::string src =
+      "module m; endmodule\n"
+      "module m; endmodule\n"
+      "module adder; m f1(); endmodule\n"
+      "module adder; m f1(); endmodule\n"
+      "module top; adder a1(); endmodule\n"
+      "config c; design rtlLib.top;\n" +
+      body + "endconfig\n";
+  auto fid = mgr.AddFile("<test>", std::move(src));
+  Lexer lex(mgr.FileContent(fid), fid, diag);
+  Parser parser(lex, arena, diag);
+  auto* cu = parser.Parse();
+  const std::string_view kLibs[] = {"gateLib", "aLib", "gateLib", "aLib",
+                                    "rtlLib"};
+  for (size_t i = 0; i < cu->modules.size(); ++i) {
+    cu->modules[i]->library = kLibs[i];
+  }
+  for (auto* cfg : cu->configs) cfg->library = "rtlLib";
+  Elaborator elab(arena, diag, cu);
+  return elab.Elaborate(cu->configs[0]);
+}
+
+// §33.4.1.5: a list is inherited downward as instances are bound, whichever
+// clause selected it, so the aLib a cell clause gives `adder` is the list its
+// `m` is bound from as well: aLib.m, not the default list's gateLib.m.
+TEST(ConfigLiblistClause, CellClauseListIsInheritedByTheCellsSubinstances) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  auto* design = ElaborateCellListDesign(
+      mgr, arena, diag,
+      "  default liblist gateLib rtlLib;\n  cell adder liblist aLib;\n");
+  ASSERT_NE(design, nullptr);
+  const RtlirModule* a1 = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(a1, nullptr);
+  EXPECT_EQ(a1->library, "aLib");
+  ASSERT_FALSE(a1->children.empty());
+  ASSERT_NE(a1->children[0].resolved, nullptr);
+  EXPECT_EQ(a1->children[0].resolved->library, "aLib");
+}
+
+// §33.4.1.5: a selected list is the whole of the search, so an interface held
+// only by libB is not found through an instance clause listing libA.
+TEST(ConfigLiblistClause, LiblistExcludingAnInterfaceLeavesItUnbound) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  std::string src =
+      "interface ifc; endinterface\n"
+      "module top; ifc i(); endmodule\n"
+      "config c; design libA.top; instance top.i liblist libA; endconfig\n";
+  auto fid = mgr.AddFile("<test>", std::move(src));
+  Lexer lex(mgr.FileContent(fid), fid, diag);
+  Parser parser(lex, arena, diag);
+  auto* cu = parser.Parse();
+  cu->interfaces[0]->library = "libB";
+  cu->modules[0]->library = "libA";
+  cu->configs[0]->library = "libA";
+  Elaborator elab(arena, diag, cu);
+  auto* design = elab.Elaborate(cu->configs[0]);
+  const bool kBound = design != nullptr && !design->top_modules.empty() &&
+                      !design->top_modules[0]->children.empty() &&
+                      design->top_modules[0]->children[0].resolved != nullptr;
+  EXPECT_FALSE(kBound);
+  EXPECT_TRUE(diag.HasErrors());
 }
 
 // §33.4.1.5: with no parent library context (an unlibraried top cell), the

@@ -22,16 +22,16 @@
 // recognised through UseClauseNamesConfig and expanded by
 // CollectConfigDelegationOverrides (src/elaborator/elaborator.cpp), which
 // records the inner configuration's design cell as an instance use override
-// and translates the inner rules through CollectInnerConfigLiblistOverrides;
-// the InnerPathUnderTop test inside CollectInnerConfigInstanceOverride is the
-// relative-path reading, and it is what rewrites an inner path onto the outer
-// hierarchy. Elaborator::FindModule consults the use override ahead of every
-// library list (src/elaborator/elaborator_resolve.cpp), which is how the inner
-// design statement outranks both default clauses at the selected instance, and
-// InstanceLiblistForPath there takes the longest matching path, which is how
-// an inner instance clause outranks the inner default clause below it. A path
-// that is not written against the inner configuration's own design cell is
-// reported by ValidateConfigInstanceClauses
+// and the delegation itself. Elaborator::EnterDelegatedConfig puts the inner
+// configuration's rules in force beneath the selected instance, and its
+// RebaseConfigPath is the relative-path reading, rewriting an inner path onto
+// the outer hierarchy. Elaborator::FindModule consults the use override ahead
+// of every library list (src/elaborator/elaborator_resolve.cpp), which is how
+// the inner design statement outranks both default clauses at the selected
+// instance, and InstanceLiblistForPath there takes the longest matching path,
+// which is how an inner instance clause outranks the inner default clause below
+// it. A path that is not written against the inner configuration's own design
+// cell is reported by ValidateConfigInstanceClauses
 // (src/elaborator/elaborator_validate_config.cpp).
 //
 // What the rule consumes comes from this pass's dependencies: §33.6.2's
@@ -696,6 +696,99 @@ TEST(ConfigHierarchicalConfigExample, WithoutDelegationTheDeepCellIsUnbound) {
   auto* middle = CellAt(elaborated, "m1.s");
   ASSERT_NE(middle, nullptr);
   EXPECT_EQ(CellAt(elaborated, "m1.s.u"), nullptr);
+}
+
+// The library of the cell bound at `path` when the §33.6 design is
+// elaborated under `config_name`, one of the configurations `configs` holds,
+// or the empty string where nothing is bound there.
+std::string LibraryUnderConfigs(const std::string& configs,
+                                std::string_view config_name,
+                                std::string_view path) {
+  ScratchDir tmp;
+  LibraryDesign design;
+  if (!BuildExampleDesign(tmp, design)) return {};
+  auto* elaborated = ElaborateNamedConfig(tmp, design, configs, config_name);
+  auto* bound = CellAt(elaborated, path);
+  return bound == nullptr ? std::string() : std::string(bound->library);
+}
+
+// §33.4.2: every rule of the delegated configuration governs the subtree, its
+// cell clauses as much as its default and instance clauses, so its cell
+// clause's rtlLib list is what both of the second adder's m instances are
+// searched in.
+TEST(ConfigHierarchicalConfigExample, DelegatedCellClauseListBindsDescendants) {
+  const std::string kConfigs =
+      "config cfg13;\n"
+      "  design aLib.adder;\n"
+      "  default liblist gateLib aLib;\n"
+      "  cell m liblist rtlLib;\n"
+      "endconfig\n"
+      "config cfg14;\n"
+      "  design rtlLib.top;\n"
+      "  default liblist aLib rtlLib;\n"
+      "  instance top.a2 use work.cfg13:config;\n"
+      "endconfig\n";
+  EXPECT_EQ(LibraryUnderConfigs(kConfigs, "cfg14", "a2.f2"), "rtlLib");
+}
+
+// §33.4.2: a delegated configuration's own instance clause may hand one of its
+// instances to a further configuration, whose design statement then binds it:
+// gateLib.m for the second adder's f1.
+TEST(ConfigHierarchicalConfigExample, NestedDelegationIsFollowed) {
+  const std::string kConfigs =
+      "config cfg15;\n"
+      "  design gateLib.m;\n"
+      "endconfig\n"
+      "config cfg16;\n"
+      "  design aLib.adder;\n"
+      "  default liblist aLib;\n"
+      "  instance adder.f1 use work.cfg15:config;\n"
+      "endconfig\n"
+      "config cfg17;\n"
+      "  design rtlLib.top;\n"
+      "  default liblist aLib rtlLib;\n"
+      "  instance top.a2 use work.cfg16:config;\n"
+      "endconfig\n";
+  EXPECT_EQ(LibraryUnderConfigs(kConfigs, "cfg17", "a2.f1"), "gateLib");
+}
+
+// §33.4.1.6 with §33.4.2: a cell clause of the delegated configuration may
+// bind its cell to a further configuration, whose design statement binds the
+// instances: gateLib.m for the second adder's f2.
+TEST(ConfigHierarchicalConfigExample, DelegatedCellClauseUsingAConfigBinds) {
+  const std::string kConfigs =
+      "config cfg18;\n"
+      "  design gateLib.m;\n"
+      "endconfig\n"
+      "config cfg19;\n"
+      "  design aLib.adder;\n"
+      "  default liblist aLib;\n"
+      "  cell m use work.cfg18:config;\n"
+      "endconfig\n"
+      "config cfg20;\n"
+      "  design rtlLib.top;\n"
+      "  default liblist aLib rtlLib;\n"
+      "  instance top.a2 use work.cfg19:config;\n"
+      "endconfig\n";
+  EXPECT_EQ(LibraryUnderConfigs(kConfigs, "cfg20", "a2.f2"), "gateLib");
+}
+
+// §33.4.2: beneath the delegated instance only the delegated configuration
+// governs. It selects no list, so §33.4.1.5 leaves the parent's library, aLib,
+// and the enclosing configuration's cell clause binding m to gateLib does not
+// reach in.
+TEST(ConfigHierarchicalConfigExample, EnclosingRulesStayOutOfTheSubtree) {
+  const std::string kConfigs =
+      "config cfg21;\n"
+      "  design aLib.adder;\n"
+      "endconfig\n"
+      "config cfg22;\n"
+      "  design rtlLib.top;\n"
+      "  default liblist aLib rtlLib;\n"
+      "  cell m use gateLib.m;\n"
+      "  instance top.a2 use work.cfg21:config;\n"
+      "endconfig\n";
+  EXPECT_EQ(LibraryUnderConfigs(kConfigs, "cfg22", "a2.f1"), "aLib");
 }
 
 }  // namespace

@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <format>
@@ -261,49 +262,6 @@ static uint32_t EvalInstDimSize(const Expr* left, const Expr* right,
 
 namespace {
 
-// Removes any existing override for `pname` from `child_params`, preserving the
-// relative order of the remaining entries.
-void DropParamOverride(Elaborator::ParamList& child_params,
-                       std::string_view pname) {
-  Elaborator::ParamList kept;
-  kept.reserve(child_params.size());
-  for (const auto& e : child_params) {
-    if (e.name != pname) kept.push_back(e);
-  }
-  child_params.swap(kept);
-}
-
-// "#()" returns every parameter to its module default: discard the
-// instantiation's overrides and let the configuration own each one (§33.4.3).
-//
-// §33.4.3 (printed page 940) has the configuration's parameter override take
-// precedence over a defparam on the same parameter, and the parameters the
-// use clause returns to their defaults are every one the instance's
-// assignment could name (OverridableParamNames) -- a `parameter` among the
-// items of a module declared with no parameter port list among them
-// (§6.20.1, printed 125-126), which the cleared assignment list leaves to
-// its own value. The parameter port list's alone were locked before, so
-// `defparam top.u.P = 9` in top after `instance top.u use #()` on `module c;
-// parameter P = 2;` made P 9. A defparam on a type parameter is refused
-// before the lock is read (§6.20.3), so locking one changes nothing.
-void ResetAllConfigParams(const ModuleDecl* child_decl,
-                          Elaborator::ParamList& child_params,
-                          std::vector<std::string_view>& locked) {
-  child_params.clear();
-  for (const auto& [dname, dexpr] : child_decl->params) {
-    if (child_decl->localparam_port_names.count(dname) > 0) continue;
-    if (child_decl->type_param_names.count(dname) > 0) continue;
-    if (dexpr) {
-      if (auto val = ConstEvalInt(dexpr)) {
-        child_params.push_back({dname, *val, dexpr});
-      }
-    }
-  }
-  const std::vector<std::string_view> kOwned =
-      OverridableParamNames(child_decl);
-  locked.insert(locked.end(), kOwned.begin(), kOwned.end());
-}
-
 // Resolves positional parameter overrides (#(v0, v1, ...)) against the child
 // module's overridable parameters, appending evaluated values to child_params.
 // §23.10 (printed page 763) with §6.20.1 (printed 125): those are the
@@ -415,101 +373,6 @@ void ReportUnknownModule(const ModuleItem* item, DiagEngine& diag) {
                std::format("unknown module '{}::{}'", item->inst_scope,
                            item->inst_module),
                Subclause("23.3.2"));
-}
-
-// Builds the scope used to evaluate configuration parameter-override
-// expressions: the instance's parent scope augmented with the configuration's
-// own localparams (§33.4.3).
-ScopeMap BuildConfigOverrideScope(const ScopeMap& parent_scope,
-                                  const ScopeMap& config_localparam_scope) {
-  ScopeMap scope = parent_scope;
-  for (const auto& [name, val] : config_localparam_scope) {
-    scope[name] = val;
-  }
-  return scope;
-}
-
-// The dotted names a member-access chain is written with, outermost first, or
-// nothing where the chain is not a pure one.
-static std::vector<std::string_view> MemberAccessNames(const Expr* e) {
-  std::vector<std::string_view> names;
-  while (e != nullptr && e->kind == ExprKind::kMemberAccess) {
-    if (e->rhs == nullptr) return {};
-    names.insert(names.begin(), e->rhs->text);
-    e = e->lhs;
-  }
-  if (e == nullptr || e->kind != ExprKind::kIdentifier) return {};
-  names.insert(names.begin(), e->text);
-  return names;
-}
-
-// §33.4.3 (printed page 940): parameter identifiers resolve starting in the
-// instance's parent scope, so a hierarchical reference in a configuration's
-// override that names the configured instance's parent, `top.WIDTH` for
-// `instance top.a1`, is that parent's parameter. It is folded here, where the
-// parent's values are known: a scalar parameter becomes its value and a
-// parameter array its name in the parent's scope, which an index -- a literal
-// or a config localparam -- then selects in. A reference naming any other scope
-// is left as it was written.
-static Expr* ResolveParentReference(Expr* e, std::string_view parent_path,
-                                    const ScopeMap& parent_scope,
-                                    Arena& arena) {
-  if (e == nullptr) return e;
-  if (e->kind == ExprKind::kSelect && e->base != nullptr &&
-      e->base->kind == ExprKind::kMemberAccess) {
-    Expr* base =
-        ResolveParentReference(e->base, parent_path, parent_scope, arena);
-    if (base == e->base) return e;
-    auto* copy = arena.Create<Expr>(*e);
-    copy->base = base;
-    return copy;
-  }
-  auto names = MemberAccessNames(e);
-  if (names.size() < 2) return e;
-  std::string scope_path;
-  for (size_t i = 0; i + 1 < names.size(); ++i) {
-    if (i > 0) scope_path += '.';
-    scope_path.append(names[i]);
-  }
-  bool names_parent =
-      parent_path == scope_path ||
-      (parent_path.size() > scope_path.size() &&
-       parent_path.ends_with(scope_path) &&
-       parent_path[parent_path.size() - scope_path.size() - 1] == '.');
-  if (!names_parent) return e;
-  std::string_view param = names.back();
-  if (auto it = parent_scope.find(param); it != parent_scope.end()) {
-    auto* value = arena.Create<Expr>();
-    value->kind = ExprKind::kIntegerLiteral;
-    value->int_val = static_cast<uint64_t>(it->second);
-    value->range = e->range;
-    return value;
-  }
-  auto* ident = arena.Create<Expr>();
-  ident->kind = ExprKind::kIdentifier;
-  ident->text = param;
-  ident->range = e->range;
-  return ident;
-}
-
-// Applies one configuration override's explicit per-parameter values onto
-// child_params, recording each touched parameter in `locked`. A present
-// expression sets a new value, a null one ("(.p())") leaves the parameter at
-// its module default; either way the configuration now owns the parameter
-// (§33.4.3).
-void ApplyConfigOverrideParams(
-    const std::vector<std::pair<std::string_view, Expr*>>& override_params,
-    Elaborator::ParamList& child_params, const ScopeMap& scope,
-    std::vector<std::string_view>& locked) {
-  for (const auto& [pname, pexpr] : override_params) {
-    DropParamOverride(child_params, pname);
-    if (pexpr) {
-      if (auto val = ConstEvalInt(pexpr, scope)) {
-        child_params.push_back({pname, *val, pexpr});
-      }
-    }
-    locked.push_back(pname);
-  }
 }
 
 using VarArrayInfoMap =
@@ -734,43 +597,6 @@ void ResolveInstParams(const ModuleItem* item, const ModuleDecl* child_decl,
   }
 }
 
-void Elaborator::ApplyConfigParamOverrides(
-    const ModuleItem* item, const ModuleDecl* child_decl,
-    Elaborator::ParamList& child_params, const ScopeMap& parent_scope,
-    std::vector<std::string_view>& locked) {
-  if (config_inst_path_.empty()) return;
-  if (instance_param_overrides_.empty() && cell_param_overrides_.empty()) {
-    return;
-  }
-
-  // Parameter identifiers resolve in the instance's parent scope, augmented
-  // with the configuration's own localparams (§33.4.3).
-  ScopeMap scope =
-      BuildConfigOverrideScope(parent_scope, config_localparam_scope_);
-  std::string_view parent_path = config_inst_path_;
-  parent_path = parent_path.substr(0, parent_path.rfind('.'));
-  auto apply = [&](const ConfigParamOverride& ov) {
-    if (ov.reset_all) ResetAllConfigParams(child_decl, child_params, locked);
-    auto params = ov.params;
-    for (auto& assignment : params) {
-      assignment.second = ResolveParentReference(assignment.second, parent_path,
-                                                 parent_scope, arena_);
-    }
-    ApplyConfigOverrideParams(
-        AssignableConfigParams(child_decl, params, ov.loc, diag_), child_params,
-        scope, locked);
-  };
-  // §33.4.1.4: a cell clause's overrides reach every instance of the cell; an
-  // instance clause, the more specific selection (§33.4.1.6), is applied after
-  // it and so decides a parameter both name.
-  for (const auto& ov : cell_param_overrides_) {
-    if (ov.inst_path == item->inst_module) apply(ov);
-  }
-  for (const auto& ov : instance_param_overrides_) {
-    if (ov.inst_path == config_inst_path_) apply(ov);
-  }
-}
-
 void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   // §27.4: a loop generate block stays a generate block even without begin-end,
   // and like every generate block forms a scope of its own and a further level
@@ -867,6 +693,10 @@ void Elaborator::ElaborateChildInstance(RtlirModuleInst& inst,
                                         ModuleDecl* child_decl,
                                         RtlirModule* mod,
                                         const ScopeMap& parent_scope) {
+  // §33.4.2: an instance bound to a configuration is configured, it and all
+  // beneath it, by that configuration's rules alone.
+  const ConfigDecl* delegated = DelegatedConfigFor(item->inst_module);
+  if (delegated != nullptr) EnterDelegatedConfig(delegated);
   auto saved_nested = nested_module_decls_;
   Elaborator::ParamList child_params;
   ResolveInstParams(item, child_decl, parent_scope, child_params, diag_);
@@ -908,6 +738,7 @@ void Elaborator::ElaborateChildInstance(RtlirModuleInst& inst,
   RestoreChildTypeParams(typedefs_, applied_type_params.saved);
   nested_module_decls_ = std::move(saved_nested);
   MarkConfigLockedParams(inst, config_locked);
+  if (delegated != nullptr) LeaveDelegatedConfig();
 }
 
 void Elaborator::CheckInstancePorts(const RtlirModuleInst& inst,
