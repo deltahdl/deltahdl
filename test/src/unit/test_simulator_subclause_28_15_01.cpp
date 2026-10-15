@@ -261,4 +261,36 @@ TEST(Tri0Tri1NetStrengths, DeclaredTri1MultiSourceAllHighZKeepsPull) {
   EXPECT_EQ(w->resolved_strength.s1_hi, Strength::kPull);
 }
 
+// The pull a tri0 or tri1 net carries applies only where no other source
+// overrides it, and a signal reaching the net through a bidirectional pass
+// switch (§28.8) is a source: a strong 1 arriving through a tran overrides a
+// tri0's pull 0, and a strong 0 a tri1's pull 1. Deciding the default from the
+// net's own drivers alone, both nets kept their pull value.
+TEST(Tri0Tri1NetStrengths, SignalThroughASwitchOverridesThePull) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wire a, b;\n"
+      "  tri0 t0;\n"
+      "  tri1 t1;\n"
+      "  assign a = 1'b1;\n"
+      "  assign b = 1'b0;\n"
+      "  tran (a, t0);\n"
+      "  tran (b, t1);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* t0 = f.ctx.FindNet("t0");
+  auto* t1 = f.ctx.FindNet("t1");
+  ASSERT_NE(t0, nullptr);
+  ASSERT_NE(t1, nullptr);
+  EXPECT_EQ(t0->resolved->value.ToUint64() & 0x1, 1u);
+  EXPECT_EQ(t0->resolved_strength.s1_hi, Strength::kStrong);
+  EXPECT_EQ(t0->resolved_strength.s0_hi, Strength::kHighz);
+  EXPECT_EQ(t1->resolved->value.ToUint64() & 0x1, 0u);
+  EXPECT_EQ(t1->resolved_strength.s0_hi, Strength::kStrong);
+  EXPECT_EQ(t1->resolved_strength.s1_hi, Strength::kHighz);
+}
+
 }  // namespace

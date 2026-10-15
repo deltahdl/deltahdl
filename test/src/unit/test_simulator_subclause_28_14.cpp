@@ -10,6 +10,7 @@
 #include "helpers_switch_network.h"
 #include "model_strength.h"
 #include "simulator/net.h"
+#include "simulator/sim_context.h"
 #include "simulator/switch_network.h"
 
 using namespace delta;
@@ -320,6 +321,101 @@ TEST(StrengthReductionResistive, NonconductingRtranif1LeavesFarNetStrength) {
                                       Strength::kSupply);
   EXPECT_EQ(ValOf(*r.nets.vb), kValZ);
   EXPECT_EQ(r.b_strength.s1_hi, Strength::kHighz);
+}
+
+// Table 28-8's rows for the charge storage strengths apply to a trireg's stored
+// charge crossing a resistive switch: once the nmos turns off, the trireg holds
+// a large 1, which an rtran carries on as a medium 1 and a tran (§28.13) as a
+// large 1. The charge was offered to no net joined to the trireg, so both read
+// high impedance.
+TEST(StrengthReductionResistive,
+     ATriregsChargeCrossesASwitchReducedByTable288) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  reg d = 1, g = 1;\n"
+      "  trireg (large) t;\n"
+      "  wire w1, w2;\n"
+      "  nmos (t, d, g);\n"
+      "  rtran (t, w1);\n"
+      "  tran (t, w2);\n"
+      "  initial #1 g = 0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* w1 = f.ctx.FindNet("w1");
+  auto* w2 = f.ctx.FindNet("w2");
+  ASSERT_NE(w1, nullptr);
+  ASSERT_NE(w2, nullptr);
+  EXPECT_EQ(w1->resolved->value.ToUint64() & 0x1, 1u);
+  EXPECT_EQ(w1->resolved->value.words[0].bval & 0x1, 0u);
+  EXPECT_EQ(w1->resolved_strength.s1_hi, Strength::kMedium);
+  EXPECT_EQ(w2->resolved->value.ToUint64() & 0x1, 1u);
+  EXPECT_EQ(w2->resolved->value.words[0].bval & 0x1, 0u);
+  EXPECT_EQ(w2->resolved_strength.s1_hi, Strength::kLarge);
+}
+
+// A resistive switch reduces the strength of whatever its data input is: a
+// variable or a constant drives at strong, which Table 28-8 reduces to pull,
+// and a bit-select of a supply net carries that bit's supply strength, also
+// reduced to pull, as does one named by its hierarchical name. Read only from a
+// data input naming a whole net by its simple name, these passed strong
+// unreduced.
+TEST(StrengthReductionResistive, ADataInputThatIsNoWholeNetIsReduced) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic d = 1, c = 1, nc = 1, pc = 0;\n"
+      "  supply1 [1:0] s;\n"
+      "  wire y1, y2, y3, y4, y5;\n"
+      "  rnmos (y1, d, c);\n"
+      "  rcmos (y2, d, nc, pc);\n"
+      "  rnmos (y3, s[0], c);\n"
+      "  rnmos (y4, 1'b1, c);\n"
+      "  rnmos (y5, m.s[1], c);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  for (const char* name : {"y1", "y2", "y3", "y4", "y5"}) {
+    auto* y = f.ctx.FindNet(name);
+    ASSERT_NE(y, nullptr) << name;
+    EXPECT_EQ(y->resolved->value.ToUint64() & 0x1, 1u) << name;
+    EXPECT_EQ(y->resolved_strength.s1_hi, Strength::kPull) << name;
+  }
+}
+
+// A switch passes an ambiguous strength as the range it is (§28.12.2): u holds
+// a 1 from pull to strong (651), which an nmos passes unchanged and an rnmos
+// reduces at each end, strong to pull and pull to weak (531). Reduced at its
+// top alone, the range came out as one level.
+TEST(StrengthReductionResistive, ASwitchPassesAnAmbiguousStrengthAsARange) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic a = 1, b = 1'bx, on = 1;\n"
+      "  wire u, y1, y2;\n"
+      "  pmos p (u, a, b);\n"
+      "  pullup (u);\n"
+      "  nmos n (y1, u, on);\n"
+      "  rnmos r (y2, u, on);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* y1 = f.ctx.FindNet("y1");
+  auto* y2 = f.ctx.FindNet("y2");
+  ASSERT_NE(y1, nullptr);
+  ASSERT_NE(y2, nullptr);
+  EXPECT_EQ(y1->resolved->value.ToUint64() & 0x1, 1u);
+  EXPECT_EQ(y1->resolved->value.words[0].bval & 0x1, 0u);
+  EXPECT_EQ(y1->resolved_strength.s1_hi, Strength::kStrong);
+  EXPECT_EQ(y1->resolved_strength.s1_lo, Strength::kPull);
+  EXPECT_EQ(y2->resolved->value.ToUint64() & 0x1, 1u);
+  EXPECT_EQ(y2->resolved->value.words[0].bval & 0x1, 0u);
+  EXPECT_EQ(y2->resolved_strength.s1_hi, Strength::kPull);
+  EXPECT_EQ(y2->resolved_strength.s1_lo, Strength::kWeak);
 }
 
 }  // namespace

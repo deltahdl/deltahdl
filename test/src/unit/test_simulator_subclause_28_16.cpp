@@ -867,4 +867,27 @@ TEST(GateNetDelays, PulseShorterThanTheGateDelayNeverReachesTheOutput) {
   EXPECT_EQ(out, "t=65 q=0\n");
 }
 
+// Table 28-9 chooses a gate's delay by the transition of its own output: g
+// falls from 1 to 0 at 20 and takes the fall delay of 10, so at 27 it still
+// drives 1 and the wand reads 1 & 1. Read from the net's value, which the
+// other driver held at 0, the transition was 0 to 0 and took the rise delay of
+// 1, and the net read 0.
+TEST(GateNetDelays, AGatesDelayIsChosenFromItsOwnPreviousOutput) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  reg a = 1, b = 0;\n"
+      "  wand w;\n"
+      "  buf #(1, 10) g (w, a);\n"
+      "  assign w = b;\n"
+      "  initial begin\n"
+      "    #20 a = 0;\n"
+      "    #5 b = 1;\n"
+      "    #2 $display(\"%b\", w);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1\n");
+}
+
 }  // namespace

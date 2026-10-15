@@ -173,6 +173,12 @@ struct AnyChangeAwaiter {
   // continuous assigns) keep their frame alive at final_suspend, so they leave
   // this null and rely on the h.done() check below.
   std::shared_ptr<bool> finished = nullptr;
+  // §28.13 and §28.14: whether a change of a watched net's strength alone
+  // (Variable::strength_generation) resumes the coroutine, as it does the
+  // continuous assignment of a MOS or CMOS switch, which passes its data
+  // input's strength on. §9.4.2 has an event control wait for a change of
+  // value, so every other waiter leaves this false.
+  bool strength_changes = false;
 
   bool await_ready() const noexcept { return false; }
 
@@ -187,6 +193,7 @@ struct AnyChangeAwaiter {
   struct WatchedObject {
     Variable* var;
     bool value_backed;
+    bool strength_changes;
   };
 
   // The observable state of a watched variable as of one moment: the bits, and
@@ -211,10 +218,12 @@ struct AnyChangeAwaiter {
   struct ObservedState {
     Logic4Snapshot bits;
     uint64_t triggered_ticks = UINT64_MAX;
+    uint64_t strength_generation = 0;
 
     void Capture(const Variable& var) {
       bits.Capture(var.value);
       triggered_ticks = var.triggered_ticks;
+      strength_generation = var.strength_generation;
     }
   };
 
@@ -321,8 +330,11 @@ struct AnyChangeAwaiter {
                                ObservedState& prev, uint64_t now_ticks) {
     if (!watched.value_backed) return true;
     const Variable& var = *watched.var;
-    bool moved = var.triggered_ticks != prev.triggered_ticks ||
-                 !EventAwaiter::Logic4VecBitsEqual(prev.bits.Get(), var.value);
+    bool moved =
+        var.triggered_ticks != prev.triggered_ticks ||
+        !EventAwaiter::Logic4VecBitsEqual(prev.bits.Get(), var.value) ||
+        (watched.strength_changes &&
+         var.strength_generation != prev.strength_generation);
     bool triggered_now = var.triggered_ticks == now_ticks;
     prev.Capture(var);
     return moved || triggered_now;
@@ -549,8 +561,9 @@ struct AnyChangeAwaiter {
       // The name is in hand only here, and the decision it feeds is the same
       // for every notification the watcher will see, so it is made once per
       // name per suspension rather than in the watcher body.
-      AttachChangeWatcher({var, StateLivesInValue(ctx, *var, name)}, h, proc,
-                          fin, consumed);
+      AttachChangeWatcher(
+          {var, StateLivesInValue(ctx, *var, name), strength_changes}, h, proc,
+          fin, consumed);
     }
   }
 

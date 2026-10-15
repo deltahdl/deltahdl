@@ -8,12 +8,15 @@
 // turn-off delays §28.8 gives it.
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
+#include "common/packed_range.h"
 #include "common/types.h"
 #include "elaborator/rtlir_primitives.h"
 #include "elaborator/sensitivity.h"
@@ -57,6 +60,38 @@ static Net* BidirTerminalNet(const Expr* e, SimContext& ctx) {
     return FindHierarchicalNet(e, ctx);
   }
   return nullptr;
+}
+
+// One bidirectional terminal: the net it names and the offset from that net's
+// least significant end of the bit a bit-select terminal names, which §28.8
+// admits besides a scalar net. Null where the terminal names no net, or a bit
+// outside the vector's declared range.
+struct BidirTerminal {
+  Net* net = nullptr;
+  std::optional<uint32_t> bit;
+};
+
+static BidirTerminal ResolveBidirTerminal(const Expr* e, SimContext& ctx,
+                                          Arena& arena) {
+  if (e->kind != ExprKind::kSelect) return {BidirTerminalNet(e, ctx), {}};
+  Net* net = BidirTerminalNet(e->base, ctx);
+  if (net == nullptr) return {};
+  int64_t index = SelectBoundValue(EvalExpr(e->index, ctx, arena));
+  PackedRange range = net->resolved->DeclaredRange();
+  if (!range.Contains(index)) return {};
+  return {net, static_cast<uint32_t>(range.OffsetOf(index))};
+}
+
+// The bits a link from terminal `from` to terminal `to` joins
+// (SwitchLink::bit_map): none where both name a net whole, which the link then
+// joins whole, and otherwise the one bit of each, a whole scalar net's being
+// its bit 0.
+static const std::vector<std::pair<uint32_t, uint32_t>>* TerminalBitMap(
+    const BidirTerminal& from, const BidirTerminal& to, Arena& arena) {
+  if (!from.bit && !to.bit) return nullptr;
+  return arena.Create<std::vector<std::pair<uint32_t, uint32_t>>>(
+      std::vector<std::pair<uint32_t, uint32_t>>{
+          {from.bit.value_or(0), to.bit.value_or(0)}});
 }
 
 // What the control process of one switch reads and writes.
@@ -132,16 +167,18 @@ static SimCoroutine MakeBidirSwitchCoroutine(BidirSwitchRun run,
 }
 
 void Lowerer::LowerBidirSwitch(const RtlirBidirSwitch& sw, bool from_program) {
-  Net* a = BidirTerminalNet(sw.terminal_a, ctx_);
-  Net* b = BidirTerminalNet(sw.terminal_b, ctx_);
-  if (a == nullptr || b == nullptr || a == b) return;
+  BidirTerminal ta = ResolveBidirTerminal(sw.terminal_a, ctx_, arena_);
+  BidirTerminal tb = ResolveBidirTerminal(sw.terminal_b, ctx_, arena_);
+  Net* a = ta.net;
+  Net* b = tb.net;
+  if (a == nullptr || b == nullptr || (a == b && ta.bit == tb.bit)) return;
   auto* state = arena_.Create<BidirSwitchState>();
   state->kind = BidirKindOf(sw.kind);
   state->state =
       sw.control == nullptr ? BidirSwitchState::kOn : BidirSwitchState::kOff;
   state->user_defined_nets = a->is_user_nettype || b->is_user_nettype;
-  a->switch_links.push_back({b, state});
-  b->switch_links.push_back({a, state});
+  a->switch_links.push_back({b, state, TerminalBitMap(ta, tb, arena_)});
+  b->switch_links.push_back({a, state, TerminalBitMap(tb, ta, arena_)});
 
   auto* p = arena_.Create<Process>();
   p->kind = ProcessKind::kContAssign;

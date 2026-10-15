@@ -531,8 +531,11 @@ Net* SimContext::CreateNet(std::string_view name, NetType type, uint32_t width,
   // §28.15.3: a supply0/supply1 net models a constant ground/power connection.
   // Like tri0/tri1 above it holds its value (0/1) at supply strength with no
   // driver connected, so resolve it at creation instead of leaving it z.
+  // §28.15.2: a trireg nothing drives is in the charge storage state, holding
+  // its initial x at its charge strength.
   if (type == NetType::kTri0 || type == NetType::kTri1 ||
-      type == NetType::kSupply0 || type == NetType::kSupply1) {
+      type == NetType::kSupply0 || type == NetType::kSupply1 ||
+      type == NetType::kTrireg) {
     net->Resolve(arena_);
   }
   return net;

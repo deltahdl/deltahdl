@@ -47,11 +47,18 @@ uint8_t DriverBit(const Logic4Vec& v, uint32_t bit) {
 // high-impedance level (§21.2.1.4), and for an x the 0 and the 1 at the levels
 // its two strengths give them -- with z besides where one of them is at the
 // high-impedance level, which is the L or the H of §28.6 and §28.7.
+// A known value driven over a range of strengths (DriverStrength::s0_lo,
+// DriverStrength::s1_lo) stands in that value at both ends of the range.
 std::vector<BitState> DriverStates(uint8_t val, DriverStrength ds) {
   auto s0 = static_cast<uint8_t>(ds.s0);
   auto s1 = static_cast<uint8_t>(ds.s1);
-  if (val == 0) return {s0 != 0 ? BitState{0, s0} : kHighZ};
-  if (val == 1) return {s1 != 0 ? BitState{1, s1} : kHighZ};
+  if (val < 2) {
+    uint8_t hi = val == 0 ? s0 : s1;
+    auto lo = static_cast<uint8_t>(val == 0 ? ds.s0_lo : ds.s1_lo);
+    if (hi == 0) return {kHighZ};
+    if (lo == 0) return {BitState{val, hi}};
+    return {BitState{val, hi}, BitState{val, lo}};
+  }
   if (val == 3) return {kHighZ};
   if (s0 != 0 && s0 == s1) return {BitState{2, s0, true}};
   std::vector<BitState> states;
@@ -147,6 +154,17 @@ bool AnyDriverUnknownAt(const std::vector<Logic4Vec>& drivers, uint32_t bit) {
   return std::any_of(drivers.begin(), drivers.end(), [bit](const Logic4Vec& v) {
     return DriverBit(v, bit) == 2;
   });
+}
+
+bool AnyDriverRangedAt(const std::vector<Logic4Vec>& drivers,
+                       const std::vector<DriverStrength>& strengths,
+                       uint32_t bit) {
+  for (size_t i = 0; i < drivers.size(); ++i) {
+    uint8_t val = DriverBit(drivers[i], bit);
+    Strength lo = val == 0 ? strengths[i].s0_lo : strengths[i].s1_lo;
+    if (val < 2 && lo != Strength::kHighz) return true;
+  }
+  return false;
 }
 
 namespace {

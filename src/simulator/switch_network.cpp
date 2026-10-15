@@ -3,12 +3,15 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
+#include "simulator/net_trireg.h"
 #include "simulator/statement_assign.h"
 #include "simulator/variable.h"
 
@@ -273,32 +276,71 @@ std::vector<Net*> SwitchGroupOf(Net& start) {
   return members;
 }
 
+using BitPairs = std::vector<std::pair<uint32_t, uint32_t>>;
+
 // One net reached from a member across conducting switches: the index of the
-// net it was reached from, and the switch it was reached across.
+// net it was reached from, the switch it was reached across, and, where a
+// switch on the way joins single bits (SwitchLink::bit_map), the bits of the
+// member each is one with: a bit of the member, then the bit of `net`. None
+// where the way joins the nets whole.
 struct Reached {
   Net* net;
   size_t from;
   const SwitchLink* link;
+  std::optional<BitPairs> bits;
 };
 
-// §10.11: a link joining bits (SwitchLink::bit_map) maps the bits of the
-// member it belongs to alone, so it is followed from the member and no
-// further; LowerBitAlias links every net sharing a bit with the member to it
-// directly.
+// The bits a way joins once it goes on across `link`: the bits it joined, each
+// carried on to the bit of the next net `link` joins it to.
+std::optional<BitPairs> ComposeBits(const std::optional<BitPairs>& bits,
+                                    const SwitchLink& link) {
+  if (link.bit_map == nullptr) return bits;
+  if (!bits) return *link.bit_map;
+  BitPairs composed;
+  for (const auto& [mine, at] : *bits) {
+    for (const auto& [from, to] : *link.bit_map) {
+      if (from == at) composed.emplace_back(mine, to);
+    }
+  }
+  return composed;
+}
+
+bool IsAliasBitLink(const SwitchLink* link) {
+  return link != nullptr && link->bit_map != nullptr && link->sw->is_alias;
+}
+
+// §10.11: a link joining the bits of an alias maps the bits of the member it
+// belongs to alone, so it is followed from the member and no further;
+// LowerBitAlias links every net sharing a bit with the member to it directly.
+// §28.8: a switch joining single bits is followed on across every switch after
+// it, as a switch joining nets whole is, the bits it joins carried along.
 bool FollowsFrom(const SwitchLink& link, const Reached& from, size_t i) {
-  if (from.link != nullptr && from.link->bit_map != nullptr) return false;
-  return link.bit_map == nullptr || i == 0;
+  if (IsAliasBitLink(from.link)) return false;
+  return !IsAliasBitLink(&link) || i == 0;
+}
+
+// Whether a way back to the member joins each bit to itself alone, which is
+// the member's own sources and nothing a switch carries to it.
+bool JoinsBitsToThemselves(const BitPairs& bits) {
+  return std::all_of(bits.begin(), bits.end(),
+                     [](const auto& p) { return p.first == p.second; });
 }
 
 std::vector<Reached> ReachAcrossConducting(Net& member) {
-  std::vector<Reached> reached{{&member, 0, nullptr}};
+  std::vector<Reached> reached{{&member, 0, nullptr, std::nullopt}};
   for (size_t i = 0; i < reached.size(); ++i) {
     for (const SwitchLink& link : reached[i].net->switch_links) {
       if (!LinkConducts(link) || !FollowsFrom(link, reached[i], i)) continue;
-      bool seen = std::any_of(
-          reached.begin(), reached.end(),
-          [&link](const Reached& r) { return r.net == link.other; });
-      if (!seen) reached.push_back({link.other, i, &link});
+      std::optional<BitPairs> bits = ComposeBits(reached[i].bits, link);
+      if (bits && (bits->empty() ||
+                   (link.other == &member && JoinsBitsToThemselves(*bits)))) {
+        continue;
+      }
+      bool seen = std::any_of(reached.begin(), reached.end(),
+                              [&link, &bits](const Reached& r) {
+                                return r.net == link.other && r.bits == bits;
+                              });
+      if (!seen) reached.push_back({link.other, i, &link, std::move(bits)});
     }
   }
   return reached;
@@ -314,8 +356,8 @@ Logic4Vec ConstantOf(uint32_t width, bool one, Arena& arena) {
 }
 
 // What a net contributes to the nets joined to it: its drivers at their
-// strengths, and the constant a supply0 or supply1 net (§28.15.3) or a tri0
-// or tri1 net (§6.6.5) carries without one.
+// strengths, the constant a supply0 or supply1 net (§28.15.3) or a tri0 or
+// tri1 net (§6.6.5) carries without one, and a trireg's stored charge.
 void OwnSources(const Net& net, Arena& arena, std::vector<Logic4Vec>& values,
                 std::vector<DriverStrength>& strengths) {
   values = net.drivers;
@@ -330,6 +372,13 @@ void OwnSources(const Net& net, Arena& arena, std::vector<Logic4Vec>& values,
   if (net.type == NetType::kSupply1) add(true, Strength::kSupply);
   if (net.type == NetType::kTri0) add(false, Strength::kPull);
   if (net.type == NetType::kTri1) add(true, Strength::kPull);
+  // §28.14 and §28.15.2: a trireg drives the charge its bits store at its
+  // charge strength, and a switch carries that on, reduced by Table 28-8 across
+  // a resistive one.
+  if (net.type == NetType::kTrireg) {
+    values.push_back(TriregStoredCharge(net, arena));
+    strengths.push_back({net.charge_strength, net.charge_strength});
+  }
 }
 
 // §28.13 and §28.14: a signal crossing tran, tranif0 or tranif1 keeps its
@@ -374,14 +423,16 @@ void AppendThroughUnknown(Net& member, const Logic4Vec& v, DriverStrength ds,
 }
 
 // A source value as it lands on a member `width` bits wide: resized to it, or,
-// across a link joining bits (§10.11), each bit the link maps placed at the
-// member's bit it is one with and every other bit z, which drives nothing.
-Logic4Vec ArrivingValue(const Logic4Vec& value, const SwitchLink* link,
-                        uint32_t width, Arena& arena) {
-  if (link == nullptr || link->bit_map == nullptr)
-    return ResizeToWidth(value, width, arena);
+// across a way joining single bits (Reached::bits) -- a bit alias (§10.11) or a
+// switch with a bit-select terminal (§28.8) -- each bit the way joins placed
+// at the member's bit it is one with and every other bit z, which drives
+// nothing.
+Logic4Vec ArrivingValue(const Logic4Vec& value,
+                        const std::optional<BitPairs>& bits, uint32_t width,
+                        Arena& arena) {
+  if (!bits) return ResizeToWidth(value, width, arena);
   Logic4Vec v = MakeAllHighZ(arena, width);
-  for (const auto& [mine, theirs] : *link->bit_map)
+  for (const auto& [mine, theirs] : *bits)
     DepositBitField(v, mine, ExtractBitField(arena, value, theirs, 1), 1);
   return v;
 }
@@ -403,7 +454,7 @@ void AppendReachedSources(Net& member, const std::vector<Reached>& reached,
       unknown =
           unknown || reached[k].link->sw->state == BidirSwitchState::kUnknown;
     }
-    Logic4Vec v = ArrivingValue(values[d], reached[j].link, width, arena);
+    Logic4Vec v = ArrivingValue(values[d], reached[j].bits, width, arena);
     if (unknown) {
       AppendThroughUnknown(member, v, ds, arena);
     } else {
@@ -424,9 +475,13 @@ void GatherSwitchDrivers(Net& member, Arena& arena) {
   }
 }
 
+// Whether the net holds a value with nothing reaching it: a supply0, supply1,
+// tri0 or tri1 net its constant (§28.15.1, §28.15.3), and a trireg its charge
+// (§28.15.2) rather than the z of an undriven net.
 bool CarriesItsOwnSource(const Net& net) {
   return net.type == NetType::kSupply0 || net.type == NetType::kSupply1 ||
-         net.type == NetType::kTri0 || net.type == NetType::kTri1;
+         net.type == NetType::kTri0 || net.type == NetType::kTri1 ||
+         net.type == NetType::kTrireg;
 }
 
 // §6.6: a net no driver is connected to has the high-impedance value z, which

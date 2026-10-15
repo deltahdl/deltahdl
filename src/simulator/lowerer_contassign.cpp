@@ -176,19 +176,53 @@ static DriverStrength ThreeStateGateStrength(const ContAssignParams& params,
   return drive;
 }
 
+// The net a MOS or CMOS switch's data input reads: the one it names, by its
+// simple or its hierarchical name, or the one a bit-select of it selects from.
+// Null for anything else, a variable or a constant.
+static Net* DataInputNet(const Expr* data, SimContext& ctx) {
+  const Expr* base = data->kind == ExprKind::kSelect ? data->base : data;
+  if (base->kind == ExprKind::kMemberAccess) {
+    return FindHierarchicalNet(base, ctx);
+  }
+  return base->kind == ExprKind::kIdentifier ? ctx.FindNet(base->text)
+                                             : nullptr;
+}
+
+// §28.13 and §28.14: the strength a MOS or CMOS switch's data input carries
+// into it: a net's, the one bit's of a net a bit-select names, and strong for
+// anything else, a variable or a constant driving at strong. A select past
+// the declared range is answered with the net's whole strength by
+// Net::BitStrength, the value it reads being x.
+static NetStrength DataInputStrength(const Expr* data, SimContext& ctx) {
+  Net* net = DataInputNet(data, ctx);
+  if (net == nullptr) {
+    return {Strength::kStrong, Strength::kStrong, Strength::kStrong,
+            Strength::kStrong};
+  }
+  if (data->kind != ExprKind::kSelect) return net->resolved_strength;
+  int64_t index = SelectBoundValue(EvalExpr(data->index, ctx, ctx.GetArena()));
+  PackedRange range = net->resolved->DeclaredRange();
+  return net->BitStrength(static_cast<uint32_t>(range.OffsetOf(index)));
+}
+
+// The lower end of a range a switch passes, reduced as its upper end is, or
+// high impedance where the reduced range is one level (DriverStrength::s0_lo).
+static Strength ReducedRangeLow(Strength (*reduce)(Strength), Strength hi,
+                                Strength lo) {
+  Strength low = reduce(lo);
+  return low == reduce(hi) ? Strength::kHighz : low;
+}
+
 static DriverStrength ComputeEffectiveDriverStrength(
     const ContAssignParams& params, SimContext& ctx) {
   DriverStrength effective_ds = params.ds;
-  if ((params.nonresistive_switch || params.resistive_switch) &&
-      params.data_input && params.data_input->kind == ExprKind::kIdentifier) {
-    auto* data_net = ctx.FindNet(params.data_input->text);
-    if (data_net) {
-      const NetStrength& ns = data_net->resolved_strength;
-      auto reduce =
-          params.resistive_switch ? &ReduceResistive : &ReduceNonresistive;
-      effective_ds.s0 = reduce(ns.s0_hi);
-      effective_ds.s1 = reduce(ns.s1_hi);
-    }
+  if (params.nonresistive_switch || params.resistive_switch) {
+    NetStrength ns = DataInputStrength(params.data_input, ctx);
+    auto reduce =
+        params.resistive_switch ? &ReduceResistive : &ReduceNonresistive;
+    effective_ds = {reduce(ns.s0_hi), reduce(ns.s1_hi),
+                    ReducedRangeLow(reduce, ns.s0_hi, ns.s0_lo),
+                    ReducedRangeLow(reduce, ns.s1_hi, ns.s1_lo)};
   }
   if (params.three_state_ctrl != nullptr &&
       params.three_state_pass != nullptr) {
@@ -268,13 +302,25 @@ static void ApplyContAssignResult(const ContAssignParams& params,
   }
 }
 
-// The value the target holds now, which §10.3.3's rules read to choose among an
-// assignment's rise, fall and turn-off delays. For a select the target is the
-// selected bits, so the comparison is against those bits and not against the
-// whole net around them.
+// The value a transition is read from, which §10.3.3's rules read to choose
+// among an assignment's rise, fall and turn-off delays. For a select the target
+// is the selected bits, so the comparison is against those bits and not
+// against the whole net around them.
+//
+// §28.16's Table 28-9 reads a gate's transition from the value its output had,
+// and §10.3.3 handles an assignment's delay as a gate's: once the assignment
+// has driven a net, the transition is from what it drove last, which is its
+// own slot among the net's drivers. The net's value is what every source of it
+// resolves to, so on a net others drive too it is no value of this one's: a
+// buf falling from 1 to 0 on a wand another driver holds at 0 compared 0 with
+// 0 and took the rise delay.
 static Logic4Vec CurrentContAssignOldValue(const ContAssignParams& params,
                                            const ContAssignDriver& drv,
                                            SimContext& ctx, Arena& arena) {
+  if (drv.net != nullptr && !drv.first) {
+    const Logic4Vec& own = drv.net->drivers[drv.driver_idx];
+    return drv.partial ? ExtractBitField(arena, own, drv.lo, drv.width) : own;
+  }
   Logic4Vec old_val = MakeLogic4VecVal(arena, 1, 0);
   auto* var = params.lhs->kind == ExprKind::kIdentifier
                   ? ctx.FindVariable(params.lhs->text)
@@ -718,6 +764,19 @@ static std::string ModulePathOutputName(const ContAssignParams& params) {
   return params.inst_prefix + std::string(target_name);
 }
 
+// §28.13 and §28.14: a MOS or CMOS switch passes its data input's strength
+// on, so a change of that strength alone resumes the switch as a change of a
+// value it reads does (AnyChangeAwaiter::strength_changes). Marks the net the
+// data input reads to record such changes, and answers whether `params` is a
+// switch's.
+static bool WatchDataInputStrength(const ContAssignParams& params,
+                                   SimContext& ctx) {
+  if (!params.nonresistive_switch && !params.resistive_switch) return false;
+  Net* net = DataInputNet(params.data_input, ctx);
+  if (net != nullptr) net->strength_watched = true;
+  return true;
+}
+
 static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
                                             SimContext& ctx, Arena& arena) {
   if (!params.lhs) co_return;
@@ -737,6 +796,7 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
   CollectExprAndStaticReads(params.rhs, ctx, read_strs);
   std::vector<std::string_view> read_vars(read_strs.begin(), read_strs.end());
   DropUnwatchableNames(ctx, read_vars);
+  bool passes_strength = WatchDataInputStrength(params, ctx);
 
   ContAssignDriver drv = MakeContAssignDriver(params.lhs, ctx);
   if (params.preset_driver >= 0 && drv.net != nullptr) {
@@ -788,7 +848,7 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
     }
 
     if (read_vars.empty()) break;
-    co_await AnyChangeAwaiter{ctx, read_vars};
+    co_await AnyChangeAwaiter{ctx, read_vars, nullptr, passes_strength};
   }
 }
 // §6.6 (printed page 91): a net's drivers determine its value, and it is high

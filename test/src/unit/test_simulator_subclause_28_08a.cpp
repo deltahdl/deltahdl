@@ -185,4 +185,91 @@ TEST(BidirSwitchRun, TranifJoinsNetsOfAUserDefinedNetType) {
   EXPECT_EQ(out, "b=1\n");
 }
 
+// §28.8 admits a bit-select of a vector net as a bidirectional terminal, the
+// only form a resistive switch's terminal takes besides a scalar net, and the
+// switch conducts between that one bit and its other terminal in both
+// directions. Lowered only for a terminal naming a whole net, every switch
+// below was dropped and both scalars read z.
+TEST(BidirSwitchRun, ABitSelectTerminalConducts) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module top;\n"
+      "  wire [1:0] v;\n"
+      "  wire [3:0] w;\n"
+      "  wire s1, s2, s3, s4;\n"
+      "  logic c = 1, d = 1'bz;\n"
+      "  assign v[0] = 1'b1;\n"
+      "  assign w[2] = 1'b0;\n"
+      "  assign s4 = d;\n"
+      "  tran    t1 (v[0], s1);\n"
+      "  tranif1 t2 (v[0], s2, c);\n"
+      "  rtran   t3 (w[2], s3);\n"
+      "  tran    t4 (w[1], s4);\n"
+      "  initial begin\n"
+      "    #1 $display(\"%b %b %b %b\", s1, s2, s3, w);\n"
+      "    d = 1'b1;\n"
+      "    #1 $display(\"%b\", w);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "1 1 0 z0zz\n"
+            "z01z\n");
+}
+
+// The two terminals of one switch may be two bits of the same vector net, and
+// the switch carries the value driven on either bit to the other.
+TEST(BidirSwitchRun, ASwitchJoiningTwoBitsOfOneNetConducts) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module top;\n"
+      "  wire [2:0] v;\n"
+      "  assign v[0] = 1'b1;\n"
+      "  tran t (v[0], v[2]);\n"
+      "  initial #1 $display(\"%b\", v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1z1\n");
+}
+
+// Switches that conduct join their terminals into one network, and a chain of
+// them carries a signal from end to end whether or not a terminal along it is
+// a bit-select: u's strong 1 and v[1]'s strong 0 meet across the four switches
+// below in one network, every net of which carries both. Followed one step
+// from the member alone, a link joining bits stopped the chain at s.
+TEST(BidirSwitchRun, AChainThroughBitSelectTerminalsIsOneNetwork) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module top;\n"
+      "  wire [1:0] v;\n"
+      "  wire s, u, x;\n"
+      "  assign u = 1'b1;\n"
+      "  assign v[1] = 1'b0;\n"
+      "  tran (v[0], s);\n"
+      "  tran (s, u);\n"
+      "  tran (v[1], x);\n"
+      "  tran (x, s);\n"
+      "  initial #1 $display(\"%b %b %b\", v, s, x);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "xx x x\n");
+}
+
+// The one-bit chain alone: u's 1 crosses two switches to reach v[0], and v[1],
+// which no switch joins, stays undriven.
+TEST(BidirSwitchRun, ASignalCrossesASwitchChainToABitSelectTerminal) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module top;\n"
+      "  wire [1:0] v;\n"
+      "  wire s, u;\n"
+      "  assign u = 1'b1;\n"
+      "  tran (v[0], s);\n"
+      "  tran (s, u);\n"
+      "  initial #1 $display(\"%b %b\", v, s);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "z1 1\n");
+}
+
 }  // namespace

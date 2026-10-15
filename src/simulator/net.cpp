@@ -3,13 +3,15 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
+#include <tuple>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/types.h"
 #include "simulator/net_bit_outcomes.h"
+#include "simulator/net_trireg.h"
 #include "simulator/nettype_resolution.h"
-#include "simulator/scheduler.h"
 #include "simulator/switch_network.h"
 #include "simulator/variable.h"
 
@@ -368,45 +370,22 @@ static bool AllDriversZ(const std::vector<Logic4Vec>& drivers) {
   return true;
 }
 
+// Whether nothing reaches the net but high impedance: neither its own drivers
+// nor the signals a bidirectional pass switch carries to it (§28.8), which
+// drive the net as its own drivers do.
+static bool AllSourcesZ(const Net& net) {
+  return AllDriversZ(net.drivers) && AllDriversZ(net.switch_drivers);
+}
+
 static void SetAllX(Logic4Vec& val) {
   for (uint32_t w = 0; w < val.nwords; ++w) {
     val.words[w] = {~uint64_t{0}, ~uint64_t{0}};  // x = (aval=1, bval=1)
   }
 }
 
-static void DecayKnownBitsToX(Logic4Vec& val) {
-  for (uint32_t w = 0; w < val.nwords; ++w) {
-    uint64_t known = ~val.words[w].bval;
-    val.words[w].aval |= known;  // decayed bit becomes x = (aval=1, bval=1)
-    val.words[w].bval |= known;
-  }
-}
-
-static void RecordTriregChargeStrengths(Net& net);
-
-// §28.16.2.1 (printed page 858): when the charge decay time elapses the net
-// moves from 1 or 0 to x, and the strength §21.2.1.4 reports for
-// it is that of the charge it now stores, an x at the charge's size. The value
-// alone was turned to x, and `%v` went on reporting the decayed 1 as `La1`.
-static void ScheduleDecay(Net& net, Scheduler* sched) {
-  uint64_t gen = ++net.decay_generation;
-  auto* event = sched->GetEventPool().Acquire();
-
-  event->kind = EventKind::kUpdate;
-  event->callback = [&net, gen]() {
-    if (net.decay_generation != gen) return;
-    DecayKnownBitsToX(net.resolved->value);
-    RecordTriregChargeStrengths(net);
-    net.resolved->NotifyWatchers();
-  };
-  auto time = sched->CurrentTime();
-  time.ticks += net.decay_ticks;
-  sched->ScheduleEvent(time, Region::kActive, event);
-}
-
 static bool ResolveTriPullDefault(Net& net, Arena& arena) {
   if (net.type != NetType::kTri0 && net.type != NetType::kTri1) return false;
-  if (!net.drivers.empty() && !AllDriversZ(net.drivers)) return false;
+  if (!AllSourcesZ(net)) return false;
 
   auto result = MakeLogic4Vec(arena, net.resolved->value.width);
   FillConstBit(result, net.type == NetType::kTri1);
@@ -423,10 +402,12 @@ static bool ResolveTriPullDefault(Net& net, Arena& arena) {
   return true;
 }
 
-// §6.6.6: supply0 and supply1 nets model the power supplies in a circuit and
-// shall carry supply strength. The value is pinned to 0 (supply0) or 1
-// (supply1) and the resolved strength is forced to supply on the driven side,
-// overriding whatever the drivers contribute.
+// §6.6.6 and §28.15.3: supply0 and supply1 nets model the power supplies in a
+// circuit and carry supply strength. With nothing driving it the net holds 0
+// (supply0) or 1 (supply1) at supply strength on that side; a net something
+// does drive resolves its constant together with its drivers instead
+// (AppendImplicitNetSource), so that §28.12.1 combines an opposing driver of
+// supply strength with it into x.
 static void ResolveSupplyNet(Net& net, Arena& arena) {
   bool is_supply1 = net.type == NetType::kSupply1;
   if (is_supply1) {
@@ -477,75 +458,10 @@ static void WidenNetStrengthOverBit(NetStrength& net, const NetStrength& bit) {
   WidenSide(net.s1_hi, net.s1_lo, bit.s1_hi, bit.s1_lo);
 }
 
-// §28.15.2: the charge one bit of a trireg holds, as the strength of a drive.
-// The trireg's charge strength is declared once for the net -- large, medium
-// or small -- while the value it retains in
-// the capacitive state is a value per bit (§6.6.4), so which side of the scale
-// the charge appears on is what the bit decides. A bit holding 0 is charged
-// low, one holding 1 is charged high, and one holding neither is charged on
-// both sides, the same way §28.12.2 puts a signal of value x on levels from
-// both the strength1 and the strength0 halves of the scale.
-static NetStrength TriregBitCharge(const Logic4Vec& value, uint32_t bit,
-                                   Strength charge) {
-  NetStrength out;
-  BitVal v = GetBitVal(value, bit);
-  if (v.val != 1) {
-    out.s0_hi = charge;
-    out.s0_lo = charge;
-  }
-  if (v.val != 0) {
-    out.s1_hi = charge;
-    out.s1_lo = charge;
-  }
-  return out;
-}
-
-// §28.15.2: once every driver goes to high impedance the trireg enters the
-// charge storage state, retaining its last value. The drive resulting from that
-// retained value carries the trireg's charge strength -- one of large, medium,
-// or small, medium by default. Reflect that charge strength on the resolved
-// drive so the stored charge competes with other sources at the correct level.
-//
-// The value retained is per bit, and §28.12 resolves each bit of a net on its
-// own, so each bit's charge is computed and then folded into the one pair the
-// net reports. Reading bit 0 and letting it stand for the rest said of a
-// `trireg [63:0]` holding 64'd1 that it was charged high and not low, when
-// sixty-three of its bits were charged low (#3465).
-// The strength of each bit of a trireg holding charge, and of the net, as the
-// value it stores and its charge strength give them (TriregBitCharge).
-static void RecordTriregChargeStrengths(Net& net) {
-  net.resolved_strength = NetStrength{};
-  net.bit_strengths.clear();
-  for (uint32_t b = 0; b < net.resolved->value.width; ++b) {
-    NetStrength bit_charge =
-        TriregBitCharge(net.resolved->value, b, net.charge_strength);
-    net.bit_strengths.push_back(bit_charge);
-    WidenNetStrengthOverBit(net.resolved_strength, bit_charge);
-  }
-}
-
-static void ResolveTriregCharge(Net& net, Scheduler* sched) {
-  if (net.was_driven) net.holds_charge = true;
-  RecordTriregChargeStrengths(net);
-  // §28.16.2.1: the decay process ends once the charge decay time has run out
-  // and the trireg net has moved from 1 or 0 to x, so a charge decay time of
-  // zero schedules that transition at the current time rather than never.
-  // Reading the count alone left a `trireg #(0, 0, 0)` holding its charge for
-  // the whole run, which is what §28.16.2.2 gives a declaration writing no
-  // third delay instead.
-  if (net.decays && sched != nullptr) {
-    ScheduleDecay(net, sched);
-  }
-  net.resolved->NotifyWatchers();
-}
-
-static bool ResolveSpecialNet(Net& net, Arena& arena, Scheduler* sched) {
-  if (net.type == NetType::kSupply0 || net.type == NetType::kSupply1) {
+static bool ResolveSpecialNet(Net& net, Arena& arena) {
+  if ((net.type == NetType::kSupply0 || net.type == NetType::kSupply1) &&
+      AllSourcesZ(net)) {
     ResolveSupplyNet(net, arena);
-    return true;
-  }
-  if (net.type == NetType::kTrireg && AllDriversZ(net.drivers)) {
-    ResolveTriregCharge(net, sched);
     return true;
   }
   if (ResolveTriPullDefault(net, arena)) return true;
@@ -553,7 +469,7 @@ static bool ResolveSpecialNet(Net& net, Arena& arena, Scheduler* sched) {
 }
 
 bool Net::InCapacitiveState() const {
-  return type == NetType::kTrireg && AllDriversZ(drivers);
+  return type == NetType::kTrireg && AllSourcesZ(*this);
 }
 
 // §6.6.5: a tri0 (tri1) net is equivalent to a wire carrying a continuous 0 (1)
@@ -561,30 +477,21 @@ bool Net::InCapacitiveState() const {
 // combines with them in the normal strength resolution rather than merely
 // filling the bits they leave floating: being pull strength, it overrides any
 // real driver weaker than pull, ties an equal-strength pull driver into a
-// conflict, and yields to strong/supply drivers. Materialize it as an extra
-// driver appended to local copies of the driver/strength lists so the shared
-// strength-resolution machinery applies it uniformly.
-static void AppendTriPullDriver(std::vector<Logic4Vec>& drivers,
-                                std::vector<DriverStrength>& strengths,
-                                NetType type, uint32_t width, Arena& arena) {
-  if (type != NetType::kTri0 && type != NetType::kTri1) return;
-  auto pull = MakeLogic4Vec(arena, width);
-  FillConstBit(pull, type == NetType::kTri1);
-  drivers.push_back(pull);
-  strengths.push_back(DriverStrength{Strength::kPull, Strength::kPull});
-}
-
-// §28.15.2: whether a trireg's charge strength outranks the strength of every
-// driver of it that drives anything but high impedance, which is what keeps it
-// in the charge storage state while those drivers are on.
-static bool ChargeOutranksDrivers(const Net& net) {
-  for (size_t i = 0; i < net.drivers.size(); ++i) {
-    if (AllDriversZ({net.drivers[i]})) continue;
-    if (i >= net.driver_strengths.size()) return false;
-    const DriverStrength& ds = net.driver_strengths[i];
-    if (std::max(ds.s0, ds.s1) >= net.charge_strength) return false;
-  }
-  return true;
+// conflict, and yields to strong/supply drivers. §28.15.3 gives a supply0
+// (supply1) net the same kind of source at supply strength. Materialize it as
+// an extra driver appended to local copies of the driver/strength lists so the
+// shared strength-resolution machinery applies it uniformly.
+static void AppendImplicitNetSource(std::vector<Logic4Vec>& drivers,
+                                    std::vector<DriverStrength>& strengths,
+                                    NetType type, uint32_t width,
+                                    Arena& arena) {
+  bool supply = type == NetType::kSupply0 || type == NetType::kSupply1;
+  if (type != NetType::kTri0 && type != NetType::kTri1 && !supply) return;
+  auto source = MakeLogic4Vec(arena, width);
+  FillConstBit(source, type == NetType::kTri1 || type == NetType::kSupply1);
+  drivers.push_back(source);
+  Strength level = supply ? Strength::kSupply : Strength::kPull;
+  strengths.push_back(DriverStrength{level, level});
 }
 
 // `charge`, where given, is the value a trireg in the charge storage state
@@ -603,8 +510,8 @@ static void ResolveStrengthDriven(Net& net, Arena& arena,
     drivers.push_back(*charge);
     strengths.push_back({net.charge_strength, net.charge_strength});
   }
-  AppendTriPullDriver(drivers, strengths, net.type, net.resolved->value.width,
-                      arena);
+  AppendImplicitNetSource(drivers, strengths, net.type,
+                          net.resolved->value.width, arena);
 
   auto result = MakeLogic4Vec(arena, net.resolved->value.width);
   net.resolved_strength = NetStrength{};
@@ -616,7 +523,8 @@ static void ResolveStrengthDriven(Net& net, Arena& arena,
     // or an x at two strengths -- is resolved over the states those drivers
     // stand for (simulator/net_bit_outcomes.h says why).
     NetStrength bit_strength;
-    if (AnyDriverUnknownAt(drivers, b)) {
+    if (AnyDriverUnknownAt(drivers, b) ||
+        AnyDriverRangedAt(drivers, strengths, b)) {
       SetBit(result, b,
              ResolveBitOverDriverStates(drivers, strengths, net.type, b,
                                         bit_strength));
@@ -716,14 +624,35 @@ NetStrength Net::BitStrength(uint32_t bit) const {
 // Resolves the net from its drivers, which is every rule but §10.6.2's force.
 static void ResolveFromDrivers(Net& net, Arena& arena, Scheduler* sched);
 
+static void ResolveNet(Net& net, Arena& arena, Scheduler* sched);
+
+static bool SameNetStrength(const NetStrength& a, const NetStrength& b) {
+  return std::tie(a.s0_hi, a.s0_lo, a.s1_hi, a.s1_lo) ==
+         std::tie(b.s0_hi, b.s0_lo, b.s1_hi, b.s1_lo);
+}
+
+// §28.13 and §28.14: a switch reading the net as its data input passes the
+// net's strength on, so a change of that strength alone is told to the
+// variable's watchers as one of the value is, for the switch's own watcher to
+// pass (Variable::strength_generation).
 void Net::Resolve(Arena& arena, Scheduler* sched) {
   if (!resolved) return;
-  if (!switch_links.empty() && ResolveSwitchGroup(*this, arena, sched)) return;
+  NetStrength before = resolved_strength;
+  ResolveNet(*this, arena, sched);
+  if (!strength_watched || SameNetStrength(before, resolved_strength)) return;
+  ++resolved->strength_generation;
+  resolved->NotifyWatchers();
+}
+
+static void ResolveNet(Net& net, Arena& arena, Scheduler* sched) {
+  if (!net.switch_links.empty() && ResolveSwitchGroup(net, arena, sched)) {
+    return;
+  }
 
   // Every resolution below either records one strength per bit or gives the
   // whole net one, so what a previous resolution recorded says nothing about
   // this one and is dropped before it runs.
-  bit_strengths.clear();
+  net.bit_strengths.clear();
 
   // §10.6.2: a force on a net overrides every driver of it, and a force naming
   // the whole net leaves no bit for a driver to reach, so the drivers are not
@@ -732,51 +661,48 @@ void Net::Resolve(Arena& arena, Scheduler* sched) {
   // resolution followed by the forced bits being laid back over it. Reading the
   // flag alone here dropped every driver of every bit, so `assign bus = 8'h55;`
   // stopped reaching bits 7:4 and 2:0 the moment `force bus[3] = 1'b1;` ran.
-  if (resolved->WholeIsForced()) {
-    ResolveForcedStrength(*this);
+  if (net.resolved->WholeIsForced()) {
+    ResolveForcedStrength(net);
     return;
   }
 
-  ResolveFromDrivers(*this, arena, sched);
-  if (resolved->is_forced) {
-    ApplyPartialForcedValue(*this, arena);
-    ApplyPartialForcedStrength(*this);
-    resolved->NotifyWatchers();
+  ResolveFromDrivers(net, arena, sched);
+  if (net.resolved->is_forced) {
+    ApplyPartialForcedValue(net, arena);
+    ApplyPartialForcedStrength(net);
+    net.resolved->NotifyWatchers();
   }
 }
 
 static void ResolveFromDrivers(Net& net, Arena& arena, Scheduler* sched) {
   // §28.15.3: a supply0/supply1 net models a constant ground/power connection,
   // so it carries value 0/1 at supply strength inherently -- like tri0/tri1, it
-  // must resolve even with no driver connected rather than staying z.
+  // must resolve even with no driver connected rather than staying z. A trireg
+  // with no driver holds its charge at its charge strength (§28.15.2).
   bool needs_resolution_when_undriven =
       net.is_user_nettype || net.type == NetType::kTri0 ||
       net.type == NetType::kTri1 || net.type == NetType::kSupply0 ||
-      net.type == NetType::kSupply1;
+      net.type == NetType::kSupply1 || net.type == NetType::kTrireg;
   if (net.drivers.empty() && net.switch_drivers.empty() &&
       !needs_resolution_when_undriven) {
     return;
   }
 
-  const Logic4Vec* charge = nullptr;
-  if (net.type == NetType::kTrireg && !AllDriversZ(net.drivers)) {
-    ++net.decay_generation;
-    // §28.15.2 (printed page 855) with §28.12.1's Table 28-7: a trireg holding
-    // charge drives at its charge strength, so its stored value stands against
-    // a weaker driver -- a `large` charge outranks a `weak` one -- and it stays
-    // in the charge storage state for as long as it does. Resolved from its
-    // drivers alone, a `bufif1 (weak1, weak0)` driving 0 overwrote a large 1.
-    if (net.holds_charge) charge = &net.resolved->value;
-    net.holds_charge = net.holds_charge && ChargeOutranksDrivers(net);
-    net.was_driven = !net.holds_charge;
-  }
+  // §28.15.2 (printed page 855) with §28.12.1's Table 28-7: a trireg holding
+  // charge drives at its charge strength, so its stored value stands against
+  // a weaker driver -- a `large` charge outranks a `weak` one -- and it stays
+  // in the charge storage state for as long as it does. Resolved from its
+  // drivers alone, a `bufif1 (weak1, weak0)` driving 0 overwrote a large 1.
+  std::optional<Logic4Vec> charge;
+  if (net.type == NetType::kTrireg)
+    charge = SettleTriregCharge(net, arena, sched);
 
-  if (ResolveSpecialNet(net, arena, sched)) return;
+  if (ResolveSpecialNet(net, arena)) return;
   if (ResolveThroughNettypeFunction(net, arena)) return;
 
-  if (!net.is_user_nettype &&
-      (!net.driver_strengths.empty() || !net.switch_drivers.empty())) {
-    ResolveStrengthDriven(net, arena, charge);
+  if (!net.is_user_nettype && (!net.driver_strengths.empty() ||
+                               !net.switch_drivers.empty() || charge)) {
+    ResolveStrengthDriven(net, arena, charge ? &*charge : nullptr);
     return;
   }
 
@@ -827,121 +753,6 @@ void PropagateCharge(Net& a, Net& b) {
 
 void DisconnectCharge(Net& net) {
   net.charge_strength = net.base_charge_strength;
-}
-
-bool ValidateNettypeDataKind(NettypeDataKind kind) {
-  switch (kind) {
-    case NettypeDataKind::k4StateIntegral:
-    case NettypeDataKind::k2StateIntegral:
-    case NettypeDataKind::kReal:
-    case NettypeDataKind::kShortreal:
-    case NettypeDataKind::kFixedUnpackedArray:
-      return true;
-    case NettypeDataKind::kDynamicArray:
-    case NettypeDataKind::kString:
-    case NettypeDataKind::kClass:
-      return false;
-  }
-  return false;
-}
-
-bool ResolveUserDefinedNet(Net& net, const UserNettype& nettype, Arena& arena) {
-  // With a resolution function the whole driver set is handed to the function,
-  // which computes the single atomic value of the net. Without one the net is
-  // left at its existing value (an undriven nettype net is unknown).
-  if (nettype.resolution) {
-    Logic4Vec result = nettype.resolution(arena, net.drivers);
-    net.resolved->value = result;
-  } else if (net.drivers.empty() && net.resolved) {
-    // §6.6.7/§6.7.3: a logic net of an unresolved user-defined nettype with no
-    // drivers takes the data type's default value, which for a 4-state type is
-    // x (not z and not 0).
-    SetAllX(net.resolved->value);
-  }
-  return true;
-}
-
-bool CheckUnresolvedMultipleDrivers(const Net& net, const UserNettype& nt) {
-  return !nt.resolution && net.drivers.size() > 1;
-}
-
-// The 4-state data types default to x; the 2-state, real, and shortreal types
-// default to a zero bit pattern. §6.7.3 leans on these defaults via Table 6-7.
-static bool DataTypeDefaultsToX(NettypeDataKind kind) {
-  switch (kind) {
-    case NettypeDataKind::k4StateIntegral:
-    case NettypeDataKind::kFixedUnpackedArray:
-      return true;
-    case NettypeDataKind::k2StateIntegral:
-    case NettypeDataKind::kReal:
-    case NettypeDataKind::kShortreal:
-    case NettypeDataKind::kDynamicArray:
-    case NettypeDataKind::kString:
-    case NettypeDataKind::kClass:
-      return false;
-  }
-  return true;
-}
-
-static void SetAllZero(Logic4Vec& val) {
-  for (uint32_t w = 0; w < val.nwords; ++w) {
-    val.words[w] = {0, 0};
-  }
-}
-
-static void SetBit(Logic4Vec& val, uint32_t bit, uint64_t aval, uint64_t bval) {
-  uint32_t w = bit / 64;
-  uint64_t mask = uint64_t{1} << (bit % 64);
-  if (aval & 1) {
-    val.words[w].aval |= mask;
-  } else {
-    val.words[w].aval &= ~mask;
-  }
-  if (bval & 1) {
-    val.words[w].bval |= mask;
-  } else {
-    val.words[w].bval &= ~mask;
-  }
-}
-
-bool InitializeUserDefinedNet(Net& net, const UserNettype& nettype,
-                              Arena& arena) {
-  if (!net.resolved) return false;
-
-  // §6.7.3: the initial value is the data-type default and must be in place
-  // before the guaranteed resolution call (and before any procedure starts).
-  if (DataTypeDefaultsToX(nettype.data_kind)) {
-    SetAllX(net.resolved->value);
-  } else {
-    SetAllZero(net.resolved->value);
-  }
-
-  // §6.7.3: a resolved nettype's resolution function is activated at least once
-  // at time zero -- even for an undriven net, where it sees an empty driver
-  // set.
-  if (nettype.resolution) {
-    net.resolved->value = nettype.resolution(arena, net.drivers);
-  }
-  return true;
-}
-
-Logic4Vec InitialStructNetValue(Arena& arena, uint32_t total_width,
-                                const std::vector<StructMemberInit>& members) {
-  Logic4Vec value = MakeLogic4Vec(arena, total_width);
-  // §6.7.3: members with no initializer keep the 4-state data-type default (x).
-  SetAllX(value);
-  // §6.7.3: any initialization expression for a struct member is applied.
-  for (const auto& m : members) {
-    if (!m.has_initializer) continue;
-    for (uint32_t b = 0; b < m.width; ++b) {
-      uint32_t src = b / 64;
-      uint64_t bitmask = uint64_t{1} << (b % 64);
-      uint64_t a = (m.init_value.words[src].aval & bitmask) ? 1 : 0;
-      uint64_t bv = (m.init_value.words[src].bval & bitmask) ? 1 : 0;
-      SetBit(value, m.offset + b, a, bv);
-    }
-  }
-  return value;
 }
 
 }  // namespace delta

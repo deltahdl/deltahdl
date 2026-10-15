@@ -31,6 +31,13 @@ namespace delta {
 // Whether some driver drives bit `bit` at x.
 bool AnyDriverUnknownAt(const std::vector<Logic4Vec>& drivers, uint32_t bit);
 
+// Whether some driver drives bit `bit` at a known value over a range of
+// strengths (DriverStrength::s0_lo, DriverStrength::s1_lo). `strengths` holds
+// one entry for each of `drivers`.
+bool AnyDriverRangedAt(const std::vector<Logic4Vec>& drivers,
+                       const std::vector<DriverStrength>& strengths,
+                       uint32_t bit);
+
 // Resolves bit `bit` of a net of type `type` from its drivers as above,
 // setting `out` to the range of strengths it can hold and answering its value:
 // 0 or 1 where every state it can resolve to is that value, z where it can

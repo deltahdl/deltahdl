@@ -10,6 +10,7 @@
 #include "helpers_switch_network.h"
 #include "model_strength.h"
 #include "simulator/net.h"
+#include "simulator/sim_context.h"
 #include "simulator/switch_network.h"
 
 using namespace delta;
@@ -325,6 +326,30 @@ TEST(StrengthReductionNonresistive, NonconductingTranif1LeavesFarNetStrength) {
       ResolveAcrossBidir(BidirSwitchKind::kTranif1, {0, 0}, Strength::kSupply);
   EXPECT_EQ(ValOf(*r.nets.vb), kValZ);
   EXPECT_EQ(r.b_strength.s1_hi, Strength::kHighz);
+}
+
+// The strength an nmos passes is its data input's, so when that strength
+// changes the switch passes the new one, though the value it passes is the
+// same 1 before and after: d is a weak 1 until en rises, and a strong 1 after.
+// Re-evaluated only on a change of value, the switch kept driving weak.
+TEST(StrengthReductionNonresistive, AStrengthChangeOfTheDataInputIsPassedOn) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  reg en = 0;\n"
+      "  wire d, y;\n"
+      "  assign (weak0, weak1) d = 1'b1;\n"
+      "  assign d = en ? 1'b1 : 1'bz;\n"
+      "  nmos (y, d, 1'b1);\n"
+      "  initial #1 en = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* y = f.ctx.FindNet("y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->resolved->value.ToUint64() & 0x1, 1u);
+  EXPECT_EQ(y->resolved_strength.s1_hi, Strength::kStrong);
 }
 
 }  // namespace

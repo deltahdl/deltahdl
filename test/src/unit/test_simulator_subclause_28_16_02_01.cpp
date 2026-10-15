@@ -350,4 +350,51 @@ TEST(ChargeDecayProcess, DecayedChargeReportsItsXStrength) {
             "t=61 cap1=x LaX\n");
 }
 
+// The charge decay of a trireg begins when its drivers turn off and runs out
+// after the decay time, and a driver that stays off -- still driving z, its
+// data input having changed -- neither ends it nor starts it again: the
+// drivers turned off at 10, so the 1 decays at 60, and at 70 the trireg holds
+// x. Rescheduled from every re-committed z, the decay moved to 90.
+TEST(ChargeDecayProcess, ADriverReCommittingZDoesNotRestartTheDecay) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  reg en = 1, d = 1;\n"
+      "  trireg #(0, 0, 50) t;\n"
+      "  bufif1 g (t, d, en);\n"
+      "  initial begin\n"
+      "    #10 en = 0;\n"
+      "    #30 d = 0;\n"
+      "    #30 $display(\"%b\", t);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "x\n");
+}
+
+// A driver that turns on too weak to overcome the stored charge gets no value
+// into the net, so the decay goes on: the large 1 stored at 10 decays at 60
+// with the weak 0 on since 20. Ending the decay as soon as any driver came on
+// left the 1 standing for as long as the weak driver stayed on.
+TEST(ChargeDecayProcess, ADriverTheChargeOutranksDoesNotEndTheDecay) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  reg en1 = 1, en2 = 0;\n"
+      "  trireg (large) #(0, 0, 50) t;\n"
+      "  bufif1 (strong0, strong1) g1 (t, 1'b1, en1);\n"
+      "  bufif1 (weak0, weak1) g2 (t, 1'b0, en2);\n"
+      "  initial begin\n"
+      "    #10 en1 = 0;\n"
+      "    #10 en2 = 1;\n"
+      "    #30 $display(\"%b\", t);\n"
+      "    #20 $display(\"%b\", t);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "1\n"
+            "x\n");
+}
+
 }  // namespace

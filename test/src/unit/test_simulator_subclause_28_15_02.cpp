@@ -248,4 +248,30 @@ TEST(TriregStrengthSim, LargeChargeOutranksAWeakDriver) {
             "c=0 We0 l=1 La1\n");
 }
 
+// A trireg nothing drives is in the charge storage state from the start,
+// holding the x it is initialized to at the charge strength its declaration
+// names: medium by default, large where written. Never resolved, the net
+// reported that x at high impedance on both sides.
+TEST(TriregChargeStrength, UndrivenTriregHoldsXAtItsChargeStrength) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  trireg t;\n"
+      "  trireg (large) u;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* t = f.ctx.FindNet("t");
+  auto* u = f.ctx.FindNet("u");
+  ASSERT_NE(t, nullptr);
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(t->resolved->value.words[0].aval & 0x1, 1u);
+  EXPECT_EQ(t->resolved->value.words[0].bval & 0x1, 1u);
+  EXPECT_EQ(t->resolved_strength.s0_hi, Strength::kMedium);
+  EXPECT_EQ(t->resolved_strength.s1_hi, Strength::kMedium);
+  EXPECT_EQ(u->resolved_strength.s0_hi, Strength::kLarge);
+  EXPECT_EQ(u->resolved_strength.s1_hi, Strength::kLarge);
+}
+
 }  // namespace

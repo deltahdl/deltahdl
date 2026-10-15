@@ -178,6 +178,12 @@ struct Variable {
   bool is_signed = false;
   bool is_4state = true;
   uint64_t triggered_ticks = UINT64_MAX;
+  // §28.13 and §28.14: a count Net::Resolve advances each time the net this
+  // variable holds the value of resolves to another strength with its value
+  // unchanged, for a MOS or CMOS switch reading the net as its data input to
+  // pass the new strength on (AnyChangeAwaiter::strength_changes). Only a net
+  // whose Net::strength_watched is set keeps it.
+  uint64_t strength_generation = 0;
 
   // §20.6.1: the data type the declaration gave the variable, null where none
   // was recorded, and what $typename writes before a user-defined type the

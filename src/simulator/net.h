@@ -17,6 +17,14 @@ struct Variable;
 struct DriverStrength {
   Strength s0 = Strength::kStrong;
   Strength s1 = Strength::kStrong;
+  // §28.12.2: the lower end of the range a driven 0 (s0_lo) or 1 (s1_lo) spans
+  // where the driver passes on an ambiguous strength, as a MOS switch passes
+  // its data input's (§28.13, §28.14): a 1 from pull to strong has s1 strong
+  // and s1_lo pull. High impedance where the value is driven at its one level,
+  // which a known value's range never reaches down to; an x's range is given
+  // by its two levels alone.
+  Strength s0_lo = Strength::kHighz;
+  Strength s1_lo = Strength::kHighz;
 };
 
 struct Net;
@@ -77,13 +85,13 @@ struct Net {
   // §28.16.2.1: whether this net decays, which decay_ticks alone cannot say.
   // See RtlirNet::decays in src/elaborator/rtlir.h.
   bool decays = false;
-  uint64_t decay_generation = 0;
-  // §28.15.2 (printed page 855): whether this trireg is in the charge storage
-  // state -- a driver charged the net and then let go to high impedance -- and
-  // so drives with its charge strength, and whether a driver has charged it
-  // since the run began. The x a trireg starts with is no charge a driver left.
-  bool holds_charge = false;
-  bool was_driven = false;
+  // §28.15.2 and §28.16.2: for each bit of a trireg, the tick it entered the
+  // charge storage state at -- a source drove it and then went to high
+  // impedance -- or that a source drives it, or that it holds the x the net
+  // starts with, which no driver left and which stands against no source.
+  // SettleTriregCharge (simulator/net_trireg.h) keeps it; empty until the net
+  // first resolves.
+  std::vector<uint64_t> charge_since;
 
   bool is_user_nettype = false;
   std::string_view resolve_func;
@@ -110,6 +118,11 @@ struct Net {
   NetStrength BitStrength(uint32_t bit) const;
 
   bool InCapacitiveState() const;
+
+  // Whether a MOS or CMOS switch reads the net as its data input, which makes
+  // Resolve record a change of the net's strength
+  // (Variable::strength_generation) for the switch to pass on (§28.13, §28.14).
+  bool strength_watched = false;
 };
 
 void PropagateCharge(Net& a, Net& b);

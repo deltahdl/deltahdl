@@ -6,6 +6,7 @@
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "simulator/net.h"
+#include "simulator/sim_context.h"
 #include "simulator/variable.h"
 
 using namespace delta;
@@ -327,6 +328,92 @@ TEST(TriregChargeDecayRuntime, AbsentThirdDelayHoldsTheChargeAfterTurnOff) {
   ASSERT_NE(net->resolved, nullptr);
   EXPECT_EQ(net->resolved->value.words[0].aval & 1u, 1u);
   EXPECT_EQ(net->resolved->value.words[0].bval & 1u, 0u);
+}
+
+// A trireg's drivers turning off is what puts it in the charge storage state,
+// and a signal reaching it through a bidirectional pass switch (§28.8) drives
+// it as one of its own drivers would: a strong 1 through a tran lands in the
+// trireg as a strong 1. Deciding the state from the trireg's own drivers
+// alone, it was held storing its initial charge and the 1 never arrived.
+TEST(TriregChargeStorage, SignalThroughASwitchDrivesTheTrireg) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wire a;\n"
+      "  trireg t;\n"
+      "  assign a = 1'b1;\n"
+      "  tran (a, t);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* t = f.ctx.FindNet("t");
+  ASSERT_NE(t, nullptr);
+  EXPECT_EQ(t->resolved->value.words[0].aval & 0x1, 1u);
+  EXPECT_EQ(t->resolved->value.words[0].bval & 0x1, 0u);
+  EXPECT_EQ(t->resolved_strength.s1_hi, Strength::kStrong);
+}
+
+// A trireg joined by a switch to a net nothing drives has nothing reaching it
+// and stays in the charge storage state, holding its initial x at its charge
+// strength, rather than being left at the high impedance of an undriven wire.
+TEST(TriregChargeStorage, TriregNothingReachesThroughASwitchHoldsItsCharge) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wire a;\n"
+      "  trireg t;\n"
+      "  tran (a, t);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* t = f.ctx.FindNet("t");
+  ASSERT_NE(t, nullptr);
+  EXPECT_EQ(t->resolved->value.words[0].aval & 0x1, 1u);
+  EXPECT_EQ(t->resolved->value.words[0].bval & 0x1, 1u);
+  EXPECT_EQ(t->resolved_strength.s0_hi, Strength::kMedium);
+  EXPECT_EQ(t->resolved_strength.s1_hi, Strength::kMedium);
+}
+
+// §28.12 resolves each bit of a net on its own, so a bit whose drivers turn off
+// keeps its charge while another bit of the trireg is still driven: bit 0
+// keeps the 1 it was driven to. Deciding the charge storage state for the
+// whole net, bit 0 read z while bit 1 was driven.
+TEST(TriregChargeStorage, ABitWhoseDriversTurnOffAloneKeepsItsCharge) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  reg e = 1;\n"
+      "  trireg [1:0] t;\n"
+      "  assign t[0] = e ? 1'b1 : 1'bz;\n"
+      "  assign t[1] = 1'b1;\n"
+      "  initial begin\n"
+      "    #10 e = 0;\n"
+      "    #1 $display(\"%b\", t);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "11\n");
+}
+
+// The bit that keeps its charge alone also decays alone: with a decay time of
+// 5, bit 0 moves to x at 15 while the driven bit 1 keeps its 1.
+TEST(TriregChargeStorage, ABitHoldingChargeAloneDecaysAlone) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  reg e = 1;\n"
+      "  trireg [1:0] #(0, 0, 5) t;\n"
+      "  assign t[0] = e ? 1'b1 : 1'bz;\n"
+      "  assign t[1] = 1'b1;\n"
+      "  initial begin\n"
+      "    #10 e = 0;\n"
+      "    #6 $display(\"%b\", t);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1x\n");
 }
 
 }  // namespace
