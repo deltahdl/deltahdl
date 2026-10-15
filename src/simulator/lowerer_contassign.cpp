@@ -15,9 +15,12 @@
 // ScheduleProcess, which src/simulator/lowerer.h declares because §9.2's
 // procedures and §10.3's assignments are started the same way.
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <memory>
+#include <optional>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -32,6 +35,7 @@
 #include "simulator/contassign_strength.h"
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
+#include "simulator/interconnect_drive.h"
 #include "simulator/lowerer.h"
 #include "simulator/lowerer_contassign_driver.h"
 #include "simulator/module_path_delay.h"
@@ -705,49 +709,59 @@ struct InterconnectDelayQuery {
   Arena& arena;
 };
 
-// §32.4.4: how long the value this assignment just evaluated takes to reach the
-// port it drives, or zero where nothing was annotated between the two.
+// §32.4.4: the load sees the value only once the interconnect delay annotated
+// between the connection's two names has passed, each change of the source
+// carried across on its own (DriveAcrossInterconnect). An assignment with
+// nothing annotated between its two names commits at once, which is what
+// every continuous assignment did before.
 //
 // The delay is read on every evaluation rather than once when the coroutine
 // starts, which is what a module path delay does: §32.9's $sdf_annotate is a
 // system task executed during simulation, so the annotation may not exist yet
 // the first time this assignment runs and may be replaced by a later call.
-//
-// §32.4.4 gives an interconnect delay the twelve transition delays a specify
-// path delay carries, and the two this reads are the rise and the fall, chosen
-// by §10.3.3's own rule for a continuous assignment's delay so that a port
-// connection picks its delay the way every other continuous assignment does.
-static uint64_t InterconnectDelayTicks(const InterconnectDelayQuery& q) {
-  if (q.params.interconnect_load.empty()) return 0;
+static void CommitAcrossInterconnect(
+    const InterconnectDelayQuery& q,
+    const std::shared_ptr<InterconnectSchedule>& schedule,
+    const std::function<void(const Logic4Vec&)>& commit) {
   const SpecifyManager* mgr = q.ctx.GetSpecifyManager();
-  if (mgr == nullptr) return 0;
-  const InterconnectDelay* annotated = mgr->FindInterconnectDelay(
-      q.params.interconnect_source, q.params.interconnect_load);
-  if (annotated == nullptr) return 0;
-  ContAssignDelays d;
-  d.rise = annotated->rise;
-  d.fall = annotated->fall;
-  d.has_fall = true;
-  Logic4Vec old_val =
+  // §32.4.4: a load with a delay of its own from some source of the net it
+  // reads takes each source's changes across that source's delay, which the
+  // net's drivers carry to it (FollowNetDrivers), not the net's one value.
+  if (schedule->shadow != nullptr && mgr != nullptr &&
+      mgr->HasSourceSpecificInterconnectDelay(q.params.interconnect_load)) {
+    return;
+  }
+  const std::optional<InterconnectDelay> kAnnotated =
+      q.params.interconnect_load.empty() || mgr == nullptr
+          ? std::nullopt
+          : mgr->ConnectionInterconnectDelay(q.params.interconnect_source,
+                                             q.params.interconnect_load);
+  if (!kAnnotated.has_value() && schedule->pending.empty()) {
+    commit(q.val);
+    return;
+  }
+  const Logic4Vec kHeld =
       CurrentContAssignOldValue(q.params, q.drv, q.ctx, q.arena);
-  Logic4Vec driven = ContAssignDrivenBits(q.drv, q.val, q.arena);
-  return SelectContAssignDelay(
-      old_val, driven, d, ContAssignTransitionWidth(q.drv, q.params.width));
+  const Logic4Vec kBits = ContAssignDrivenBits(q.drv, q.val, q.arena);
+  DriveAcrossInterconnect(schedule, kAnnotated.value_or(InterconnectDelay{}),
+                          InterconnectChange{kHeld, q.val, kBits}, q.ctx,
+                          commit);
 }
 
-// §32.4.4: the load sees the value only once the delay has passed -- an
-// annotated interconnect
-// delay is the time the source's value takes to arrive at the port, so the
-// value is evaluated when the source changed and driven onto the port that much
-// later. An assignment with nothing annotated between its two names commits at
-// once, which is what every continuous assignment did before.
-static ExecTask CommitAfterInterconnectDelay(
-    const InterconnectDelayQuery& q,
-    const std::function<void(const Logic4Vec&)>& commit) {
-  uint64_t ticks = InterconnectDelayTicks(q);
-  if (ticks > 0) co_await DelayAwaiter{q.ctx, ticks};
-  commit(q.val);
-  co_return StmtResult::kDone;
+// §32.4.4: where an input port connection reads a net, the load follows each
+// of the net's drivers, so that a delay annotated from one of the net's
+// sources to it reaches it from that source alone.
+static void FollowConnectedNet(
+    const ContAssignParams& params, InterconnectSchedule& schedule,
+    SimContext& ctx, const std::function<void(const Logic4Vec&)>& commit) {
+  if (params.interconnect_source.empty()) return;
+  std::string dotted = params.interconnect_source;
+  std::ranges::replace(dotted, '/', '.');
+  Net* net = ctx.FindNet(dotted);
+  if (net == nullptr) return;
+  schedule.shadow = std::make_shared<InterconnectShadow>();
+  FollowNetDrivers(*net, schedule.shadow, params.interconnect_load, ctx,
+                   commit);
 }
 
 // The name a module path declared in this instance gives this assignment's
@@ -811,6 +825,12 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
     CommitContAssignValue(params, drv, v, ctx, arena);
     drv.first = false;
   };
+  // §32.4.4: the transitions on their way across an interconnect delay.
+  InterconnectScheduleOwner interconnect;
+  FollowConnectedNet(params, *interconnect.schedule, ctx, commit);
+  // §32.4.4: the output port this assignment carries out of its instance,
+  // which the net it drives records beside the driver.
+  drv.source_port = params.module_path_port;
 
   // §30.4: a module path declared in a specify block delays whatever drives the
   // path output, and §30.7's pulse limits then decide what reaches it. The
@@ -844,7 +864,7 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
 
     if (!committed) {
       InterconnectDelayQuery query{params, drv, val, ctx, arena};
-      co_await CommitAfterInterconnectDelay(query, commit);
+      CommitAcrossInterconnect(query, interconnect.schedule, commit);
     }
 
     if (read_vars.empty()) break;

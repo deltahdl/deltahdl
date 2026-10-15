@@ -10,6 +10,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "common/types.h"
@@ -141,30 +142,54 @@ SdfDelayValue ApplySdfScaling(SdfDelayValue value, SdfScaleType type,
       out.min_negative = value.min_negative;
       out.typ_negative = value.typ_negative;
       out.max_negative = value.max_negative;
+      out.min_empty = value.min_empty;
+      out.typ_empty = value.typ_empty;
+      out.max_empty = value.max_empty;
       break;
     case SdfScaleType::kFromMinimum:
       src_min = src_typ = src_max =
           ExactMagnitude(value.min_val, value.min_real);
       out.min_negative = out.typ_negative = out.max_negative =
           value.min_negative;
+      out.min_empty = out.typ_empty = out.max_empty = value.min_empty;
       break;
     case SdfScaleType::kFromTypical:
       src_min = src_typ = src_max =
           ExactMagnitude(value.typ_val, value.typ_real);
       out.min_negative = out.typ_negative = out.max_negative =
           value.typ_negative;
+      out.min_empty = out.typ_empty = out.max_empty = value.typ_empty;
       break;
     case SdfScaleType::kFromMaximum:
       src_min = src_typ = src_max =
           ExactMagnitude(value.max_val, value.max_real);
       out.min_negative = out.typ_negative = out.max_negative =
           value.max_negative;
+      out.min_empty = out.typ_empty = out.max_empty = value.max_empty;
       break;
   }
-  out.min_val = RoundToTicks(src_min * factors.min_factor);
-  out.typ_val = RoundToTicks(src_typ * factors.typ_factor);
-  out.max_val = RoundToTicks(src_max * factors.max_factor);
+  // §32.5: a value written empty still holds what it stands for once scaled,
+  // and the real magnitudes, which a real specparam reads, scale with it.
+  out.empty = value.empty;
+  out.min_real = src_min * factors.min_factor;
+  out.typ_real = src_typ * factors.typ_factor;
+  out.max_real = src_max * factors.max_factor;
+  out.min_val = RoundToTicks(out.min_real);
+  out.typ_val = RoundToTicks(out.typ_real);
+  out.max_val = RoundToTicks(out.max_real);
   return out;
+}
+
+// The delay and the two limits of every direction an IOPATH or interconnect
+// entry wrote.
+static void ScaleSdfDirections(std::vector<SdfIopathDirection>& directions,
+                               SdfScaleType type,
+                               const SdfScaleFactors& factors) {
+  for (auto& dir : directions) {
+    dir.delay = ApplySdfScaling(dir.delay, type, factors);
+    dir.reject = ApplySdfScaling(dir.reject, type, factors);
+    dir.error = ApplySdfScaling(dir.error, type, factors);
+  }
 }
 
 // §32.5: scale every delay value one cell entry carries -- its IOPATH rise,
@@ -176,11 +201,8 @@ static void ScaleSdfCell(SdfCell& cell, SdfScaleType type,
     io.rise = ApplySdfScaling(io.rise, type, factors);
     io.fall = ApplySdfScaling(io.fall, type, factors);
     io.turnoff = ApplySdfScaling(io.turnoff, type, factors);
-    io.rise_reject = ApplySdfScaling(io.rise_reject, type, factors);
-    io.rise_error = ApplySdfScaling(io.rise_error, type, factors);
-    io.fall_reject = ApplySdfScaling(io.fall_reject, type, factors);
-    io.fall_error = ApplySdfScaling(io.fall_error, type, factors);
     for (auto& v : io.values) v = ApplySdfScaling(v, type, factors);
+    ScaleSdfDirections(io.directions, type, factors);
   }
   for (auto& tc : cell.timing_checks) {
     tc.limit = ApplySdfScaling(tc.limit, type, factors);
@@ -193,8 +215,13 @@ static void ScaleSdfCell(SdfCell& cell, SdfScaleType type,
     ic.rise = ApplySdfScaling(ic.rise, type, factors);
     ic.fall = ApplySdfScaling(ic.fall, type, factors);
     for (auto& v : ic.values) v = ApplySdfScaling(v, type, factors);
+    ScaleSdfDirections(ic.directions, type, factors);
   }
+  // §32.7: a PATHPULSEPERCENT entry states percentages of the delay, which are
+  // not timing values, so neither the scale factors nor the file's time unit
+  // folded into them reach it.
   for (auto& pl : cell.pulse_limits) {
+    if (pl.is_percent) continue;
     pl.reject = ApplySdfScaling(pl.reject, type, factors);
     pl.error = ApplySdfScaling(pl.error, type, factors);
   }

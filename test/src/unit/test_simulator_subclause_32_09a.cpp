@@ -213,4 +213,24 @@ TEST(SdfRealValues, ScalingReadsTheExactMagnitude) {
   EXPECT_EQ(out.typ_val, 2500u);
 }
 
+// A PATHPULSEPERCENT entry (§32.7) carries percentages of the delay rather than
+// times, so the scale factors that multiply the file's timing values leave it
+// as written while they double the PATHPULSE limits beside it.
+TEST(SdfScaling, PulsePercentagesAreNotScaled) {
+  SdfFile file;
+  ASSERT_TRUE(ParseSdf(
+      "(DELAYFILE (CELL (CELLTYPE \"m\") (INSTANCE u) (DELAY (ABSOLUTE "
+      "(PATHPULSEPERCENT a y (25) (50)) (PATHPULSE a y (2) (3))))))",
+      file));
+  SdfScaleFactors factors;
+  ASSERT_TRUE(ParseSdfScaleFactors("2:2:2", factors));
+  const SdfFile kScaled = ScaleSdfFile(file, SdfScaleType::kFromMtm, factors);
+  ASSERT_EQ(kScaled.cells.size(), 1u);
+  ASSERT_EQ(kScaled.cells[0].pulse_limits.size(), 2u);
+  EXPECT_EQ(kScaled.cells[0].pulse_limits[0].reject.typ_val, 25u);
+  EXPECT_EQ(kScaled.cells[0].pulse_limits[0].error.typ_val, 50u);
+  EXPECT_EQ(kScaled.cells[0].pulse_limits[1].reject.typ_val, 4u);
+  EXPECT_EQ(kScaled.cells[0].pulse_limits[1].error.typ_val, 6u);
+}
+
 }  // namespace

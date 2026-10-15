@@ -21,6 +21,7 @@
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 #include "simulator/assertion_read_names.h"
 #include "simulator/awaiters.h"
 #include "simulator/awaiters_event_control.h"
@@ -712,8 +713,15 @@ void Lowerer::RegisterDesignTiming() {
     // propagation delay may be written as a specparam, and it is evaluated
     // under the same lowering instance prefix so that
     // SimContext::FindVariable reaches the specparam of this instance.
-    RegisterModuleGates(scope.module->gate_insts, scope.inst_prefix, ctx_,
-                        arena_, mgr);
+    std::vector<std::string_view> module_outputs;
+    for (const RtlirPort& port : scope.module->ports) {
+      if (port.direction == Direction::kOutput ||
+          port.direction == Direction::kInout) {
+        module_outputs.push_back(port.name);
+      }
+    }
+    RegisterModuleGates({scope.module->gate_insts, module_outputs},
+                        scope.inst_prefix, ctx_, arena_, mgr);
     // §6.20.5 admits two declaration sites for a specparam -- a specify block
     // and the module body -- and §32.4.3 states no exception for
     // either, so the module-body ones are bound beside the in-block ones
@@ -726,6 +734,12 @@ void Lowerer::RegisterDesignTiming() {
     // an instantiated module.
     RegisterModuleSpecparams(scope.module->specparam_names, scope.inst_prefix,
                              ctx_, arena_, mgr);
+    // §32.4.3: the initializers a LABEL reevaluates where they read a
+    // specparam it annotates, at both of §6.20.5's declaration sites.
+    for (const RtlirVariable& var : scope.module->variables) {
+      mgr.RecordSpecparamInitializer(scope.inst_prefix, var.name,
+                                     var.init_expr);
+    }
   }
   ctx_.SetLoweringInstancePrefix("");
   // §31.9.1: the delays of the negative checks' delayed signals are settled

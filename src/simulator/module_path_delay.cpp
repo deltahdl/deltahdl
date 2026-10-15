@@ -336,9 +336,10 @@ ModulePathDelay SelectModulePathDelay(const ModulePathDrive& drive,
   }
   // §30.7 measures a pulse against the limits of the delay that formed its
   // edge, so all three are read off the one path the selection settled on.
-  return ModulePathDelay{true, selected->delays[slot],
-                         selected->reject_limit[slot],
-                         selected->error_limit[slot], source_ticks};
+  const uint64_t kDelay = selected->delays[slot];
+  return ModulePathDelay{
+      true, kDelay, EffectivePulseLimit(selected->reject_limit[slot], kDelay),
+      EffectivePulseLimit(selected->error_limit[slot], kDelay), source_ticks};
 }
 
 // Records on `var` the time its value last changed, for as long as the run

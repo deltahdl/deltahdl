@@ -744,4 +744,23 @@ TEST(SdfSpecparamReevaluation, RegisteredReevaluatorFiresOnlyForItsSpecparam) {
   EXPECT_EQ(low_calls, 0);
 }
 
+// §32.4.3 with §6.20.5: a specparam may hold a real, and the value a LABEL
+// gives it is that real, fraction included, so the path delay 1.4 * cap + 0.7
+// is reevaluated as 1.4 * 1.5 + 0.7 = 2.8, which rounds to 3 units.
+TEST(SdfSpecparamReevaluation, RealSpecparamTakesTheRealValue) {
+  Design d;
+  ASSERT_TRUE(
+      d.Build("module m(input a, output z);\n"
+              "  specify\n"
+              "    specparam cap = 2.5;\n"
+              "    (a => z) = 1.4 * cap + 0.7;\n"
+              "  endspecify\n"
+              "endmodule\n"));
+  ASSERT_EQ(d.mgr.GetPathDelay("a", "z"), 4u);
+
+  d.Annotate(SdfLabel("(ABSOLUTE (cap 1.5))"));
+
+  EXPECT_EQ(d.mgr.GetPathDelay("a", "z"), 3u);
+}
+
 }  // namespace

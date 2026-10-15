@@ -190,4 +190,188 @@ TEST(InterconnectDelaySim, AnInstanceOutputPortIsASourceTheLoadWaitsOn) {
   EXPECT_EQ(late->value.ToUint64(), kNewValue);
 }
 
+// §32.9: a cell's INSTANCE names where its entries apply, an interconnect
+// entry's ports among them, so the pair inside instance b is annotated: b's
+// load still holds the old value 2 after its source changed.
+TEST(InterconnectDelaySim, ACellsInterconnectReachesThePortsOfItsInstance) {
+  const std::string kSdf = WriteSdfFile(
+      "region.sdf",
+      "(DELAYFILE (CELL (CELLTYPE \"blk\") (INSTANCE top/b) (DELAY "
+      "(ABSOLUTE (INTERCONNECT src u/din (10))))))");
+  SimFixture f;
+  auto* early = RunAndFindVar(
+      "module leaf(input logic [7:0] din, output logic [7:0] dout);\n"
+      "  assign dout = din;\n"
+      "endmodule\n"
+      "module blk;\n"
+      "  logic [7:0] src = 8'h00;\n"
+      "  logic [7:0] out;\n"
+      "  logic [7:0] early = 8'hEE;\n"
+      "  leaf u(.din(src), .dout(out));\n"
+      "  initial begin #5 src = 8'hA5; #2 early = out; end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  blk b();\n"
+      "  initial #1 $sdf_annotate(\"" +
+          kSdf + "\");\nendmodule\n",
+      f, "b.early");
+  ASSERT_NE(early, nullptr);
+  EXPECT_EQ(early->value.ToUint64(), kOldValue);
+}
+
+// The leaf/top design of the cases above, with the source driven by
+// `stimulus`, written inside the initial block after the annotation at 1, and
+// the load sampled into `seen` by `sampling`.
+std::string StimulusDesign(const std::string& sdf_path,
+                           const std::string& stimulus,
+                           const std::string& sampling) {
+  return "module leaf(input logic [7:0] din, output logic [7:0] dout);\n"
+         "  assign dout = din;\n"
+         "endmodule\n"
+         "module top;\n"
+         "  logic [7:0] src = 8'h01;\n"
+         "  logic [7:0] out;\n"
+         "  logic [7:0] seen = 8'hEE;\n"
+         "  logic ok = 1'b0;\n"
+         "  leaf u(.din(src), .dout(out));\n"
+         "  initial begin\n"
+         "    #1 $sdf_annotate(\"" +
+         sdf_path + "\");\n" + stimulus +
+         "  end\n"
+         "  initial begin\n" +
+         sampling +
+         "  end\n"
+         "endmodule\n";
+}
+
+// §32.4.4 gives an interconnect delay all twelve transition delays, so a
+// change to z takes the turn-off delay, 7 of (1) (2) (7), and the load still
+// holds 01 at 8, three after the change at 5.
+TEST(InterconnectDelaySim, AChangeToZTakesTheTurnOffDelay) {
+  const std::string kSdf = WriteSdfFile(
+      "turnoff.sdf", DelayFile("(INTERCONNECT src u/din (1) (2) (7))"));
+  SimFixture f;
+  auto* ok = RunAndFindVar(StimulusDesign(kSdf, "    #4 src = 8'hzz;\n",
+                                          "    #8 ok = (out === 8'h01);\n"),
+                           f, "ok");
+  ASSERT_NE(ok, nullptr);
+  EXPECT_EQ(ok->value.ToUint64(), 1u);
+}
+
+// §32.4.4 permits any number of future schedules, so the source moving again
+// while the delay is pending is not lost: the load ends at 3C, the value the
+// source settled at, rather than the A5 it passed through.
+TEST(InterconnectDelaySim, ASecondChangeDuringTheDelayReachesTheLoad) {
+  const std::string kSdf =
+      WriteSdfFile("pending.sdf", DelayFile("(INTERCONNECT src u/din (10))"));
+  SimFixture f;
+  auto* seen = RunAndFindVar(
+      StimulusDesign(kSdf, "    #4 src = 8'hA5;\n    #3 src = 8'h3C;\n",
+                     "    #40 seen = out;\n"),
+      f, "seen");
+  ASSERT_NE(seen, nullptr);
+  EXPECT_EQ(seen->value.ToUint64(), 0x3Cu);
+}
+
+// §32.4.4 gives interconnect delays the path delays' pulse limits, which are
+// the delay itself by default (§32.7), so a pulse of 3 on the source, narrower
+// than the delay of 10, never reaches the load: it holds 01 throughout.
+TEST(InterconnectDelaySim, APulseNarrowerThanTheRejectLimitIsFiltered) {
+  const std::string kSdf =
+      WriteSdfFile("pulse.sdf", DelayFile("(INTERCONNECT src u/din (10))"));
+  SimFixture f;
+  auto* ok = RunAndFindVar(
+      StimulusDesign(kSdf, "    #4 src = 8'hFF;\n    #3 src = 8'h01;\n",
+                     "    #16 ok = (out === 8'h01);\n"),
+      f, "ok");
+  ASSERT_NE(ok, nullptr);
+  EXPECT_EQ(ok->value.ToUint64(), 1u);
+}
+
+// A driver u1 and a load c one level down inside u2, joined by the net w and
+// u2's port i. u1 moves from 01 to A5 at 5, and c samples what reaches its din
+// at `when` into `seen`.
+std::string HierarchyDesign(const std::string& sdf_path,
+                            const std::string& when) {
+  return "module drv(output logic [7:0] o);\n"
+         "  logic [7:0] r = 8'h01;\n"
+         "  assign o = r;\n"
+         "  initial #5 r = 8'hA5;\n"
+         "endmodule\n"
+         "module sink(input logic [7:0] din);\n"
+         "  logic [7:0] seen = 8'hEE;\n"
+         "  initial #" +
+         when +
+         " seen = din;\n"
+         "endmodule\n"
+         "module mid(input logic [7:0] i);\n"
+         "  sink c(.din(i));\n"
+         "endmodule\n"
+         "module top;\n"
+         "  wire [7:0] w;\n"
+         "  drv u1(.o(w));\n"
+         "  mid u2(.i(w));\n"
+         "  initial #1 $sdf_annotate(\"" +
+         sdf_path + "\");\nendmodule\n";
+}
+
+// §32.4.4's down-hierarchy annotation: the source u1/o sits above the load
+// u2/c/din, and the change it makes at 5 reaches the load 5 later, so at 8
+// the load still holds 01.
+TEST(InterconnectDelaySim, ADownHierarchyDelayReachesTheLoadBelow) {
+  const std::string kSdf =
+      WriteSdfFile("down.sdf", DelayFile("(INTERCONNECT u1/o u2/c/din (5))"));
+  SimFixture f;
+  auto* seen = RunAndFindVar(HierarchyDesign(kSdf, "8"), f, "u2.c.seen");
+  ASSERT_NE(seen, nullptr);
+  EXPECT_EQ(seen->value.ToUint64(), 0x01u);
+}
+
+// A NETDELAY on w is the delay from w's source to every load port on it, u2/i
+// and u2/c/din alike, so the change at 5 reaches u2/c/din at 10, not once per
+// level at 15: at 12 the load holds A5.
+TEST(InterconnectDelaySim, ANetDelayReachesALoadBelowOnce) {
+  const std::string kSdf =
+      WriteSdfFile("netdelay.sdf", DelayFile("(NETDELAY w (5))"));
+  SimFixture f;
+  auto* seen = RunAndFindVar(HierarchyDesign(kSdf, "12"), f, "u2.c.seen");
+  ASSERT_NE(seen, nullptr);
+  EXPECT_EQ(seen->value.ToUint64(), 0xA5u);
+}
+
+// §32.4.4: on a multisource net each source/load pair may carry a delay of
+// its own. u1 and u3 both drive w, u1 holding z throughout; u3 moves to A5 at
+// 5, and its own delay of 9 is what reaches the load, not u1's 5, so at 12 the
+// load still holds z.
+TEST(InterconnectDelaySim, EachSourceReachesTheLoadWithItsOwnDelay) {
+  const std::string kSdf = WriteSdfFile(
+      "multisource.sdf", DelayFile("(INTERCONNECT u1/o u2/din (5))"
+                                   " (INTERCONNECT u3/o u2/din (9))"));
+  SimFixture f;
+  auto* ok = RunAndFindVar(
+      "module drv(output logic [7:0] o);\n"
+      "  logic [7:0] r = 8'hzz;\n"
+      "  assign o = r;\n"
+      "endmodule\n"
+      "module sink(input logic [7:0] din);\n"
+      "  logic ok = 1'b0;\n"
+      "  initial #12 ok = (din === 8'hzz);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire [7:0] w;\n"
+      "  drv u1(.o(w));\n"
+      "  drv u3(.o(w));\n"
+      "  sink u2(.din(w));\n"
+      "  initial begin\n"
+      "    #1 $sdf_annotate(\"" +
+          kSdf +
+          "\");\n"
+          "    #4 u3.r = 8'hA5;\n"
+          "  end\n"
+          "endmodule\n",
+      f, "u2.ok");
+  ASSERT_NE(ok, nullptr);
+  EXPECT_EQ(ok->value.ToUint64(), 1u);
+}
+
 }  // namespace

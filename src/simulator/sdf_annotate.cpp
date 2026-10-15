@@ -19,6 +19,7 @@
 #include <string_view>
 #include <vector>
 
+#include "simulator/sdf_annotate_internal.h"
 #include "simulator/sdf_parser.h"
 
 namespace delta {
@@ -26,19 +27,22 @@ namespace delta {
 // §32.4, §32.7: one SDF construct apiece, defined in
 // simulator/sdf_annotate_entry.cpp.
 void AnnotateSdfIopathEntry(const SdfIopath& io, std::string_view inst_prefix,
-                            SpecifyManager& mgr, SdfMtm mtm);
+                            SpecifyManager& mgr, SdfMtm mtm,
+                            SdfAnnotationResult& result);
 void AnnotateSdfPulseLimitEntry(const SdfPulseLimit& pl,
                                 std::string_view inst_prefix,
-                                SpecifyManager& mgr, SdfMtm mtm);
+                                SpecifyManager& mgr, SdfMtm mtm,
+                                SdfAnnotationResult& result);
 void AnnotateSdfInterconnectEntry(const SdfInterconnect& ic,
-                                  const SdfFile& file, SpecifyManager& mgr,
+                                  const SdfCellSource& src, SpecifyManager& mgr,
                                   SdfMtm mtm, SdfAnnotationResult& result);
 void AnnotateSdfDeviceEntry(const SdfDevice& dev, std::string_view inst_prefix,
                             SpecifyManager& mgr, SdfMtm mtm,
                             SdfAnnotationResult& result);
 void AnnotateSdfSpecparamEntry(const SdfSpecparam& sp,
                                std::string_view inst_prefix,
-                               SpecifyManager& mgr, SdfMtm mtm);
+                               SpecifyManager& mgr, SdfMtm mtm,
+                               SdfAnnotationResult& result);
 void AnnotateSdfTimingCheckEntry(const SdfTimingCheck& tc,
                                  std::string_view inst_prefix,
                                  SpecifyManager& mgr, SdfMtm mtm,
@@ -100,20 +104,6 @@ std::vector<SdfCellEntryRef> BuildDerivedSdfCellOrder(const SdfCell& cell) {
   return derived;
 }
 
-// §32.5: the SDF source one annotation is taken from -- the cell whose entry is
-// being applied, the file it sits in, which an INTERCONNECT entry resolves its
-// port names against, and the instance prefix the cell's CELLINSTANCE names.
-//
-// `inst_prefix` is what SdfCellPrefixInRegion (simulator/sdf_parser.h) made of
-// the cell's instance path, read from the §32.9 region down: the
-// hierarchical prefix of the module instance whose specify block declared the
-// paths this cell annotates, in the spelling PathDelay::inst_prefix carries.
-struct SdfCellSource {
-  const SdfCell& cell;
-  const SdfFile& file;
-  std::string_view inst_prefix;
-};
-
 void AnnotateSdfCellEntry(const SdfCellSource& src,
                           const SdfCellEntryRef& entry, SpecifyManager& mgr,
                           SdfMtm mtm, SdfAnnotationResult& result) {
@@ -121,15 +111,15 @@ void AnnotateSdfCellEntry(const SdfCellSource& src,
   switch (entry.kind) {
     case SdfCellEntryKind::kIopath:
       AnnotateSdfIopathEntry(cell.iopaths[entry.index], src.inst_prefix, mgr,
-                             mtm);
+                             mtm, result);
       break;
     case SdfCellEntryKind::kPulseLimit:
       AnnotateSdfPulseLimitEntry(cell.pulse_limits[entry.index],
-                                 src.inst_prefix, mgr, mtm);
+                                 src.inst_prefix, mgr, mtm, result);
       break;
     case SdfCellEntryKind::kInterconnect:
-      AnnotateSdfInterconnectEntry(cell.interconnects[entry.index], src.file,
-                                   mgr, mtm, result);
+      AnnotateSdfInterconnectEntry(cell.interconnects[entry.index], src, mgr,
+                                   mtm, result);
       break;
     case SdfCellEntryKind::kDevice:
       AnnotateSdfDeviceEntry(cell.devices[entry.index], src.inst_prefix, mgr,
@@ -137,7 +127,7 @@ void AnnotateSdfCellEntry(const SdfCellSource& src,
       break;
     case SdfCellEntryKind::kSpecparam:
       AnnotateSdfSpecparamEntry(cell.specparams[entry.index], src.inst_prefix,
-                                mgr, mtm);
+                                mgr, mtm, result);
       break;
     case SdfCellEntryKind::kTimingCheck:
       AnnotateSdfTimingCheckEntry(cell.timing_checks[entry.index],

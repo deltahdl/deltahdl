@@ -345,4 +345,28 @@ TEST(SdfLabelInsideAnInstance, LabelReachesASpecparamAtEachDeclarationSite) {
   EXPECT_EQ(from_block->delays[0], 41u);
 }
 
+// §32.4.3 reevaluates every expression containing an annotated specparam, and
+// a specparam's initializer is one: b = a * 3 follows a's annotated 5 to 15,
+// and the path reading b follows b, where it kept the 6 a's declared 2 gave.
+TEST(SdfLabelInsideAnInstance, SpecparamReadingTheAnnotatedOneFollowsIt) {
+  const std::string kSdf = SdfWrittenFor(
+      "chain",
+      LabelFileText("spec_chain", "board/i_chain", LabelEntry("a", 5)));
+
+  LabelledRun run;
+  ASSERT_TRUE(run.Start(DesignOf(
+      "module spec_chain(input in_p, output out_p);\n"
+      "  specify\n"
+      "    specparam a = 2;\n"
+      "    specparam b = a * 3;\n"
+      "    (in_p => out_p) = b;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      "  logic chain_o;\n  spec_chain i_chain(1'b0, chain_o);\n", kSdf)));
+
+  const PathDelay* path = run.PathOfInstance("i_chain.");
+  ASSERT_NE(path, nullptr);
+  EXPECT_EQ(path->delays[0], 15u);
+}
+
 }  // namespace

@@ -129,6 +129,14 @@ const char* const kFiftyDelayPathSrc =
     "  endspecify\n"
     "endmodule\n";
 
+// A path whose delay of 1 lies below any limit a test states.
+const char* const kUnitDelayPathSrc =
+    "module c(input A, output Z);\n"
+    "  specify\n"
+    "    (A => Z) = 1;\n"
+    "  endspecify\n"
+    "endmodule\n";
+
 // A module path whose rise and fall delays differ (§30.5.1), so a single pulse
 // limit annotated across the path meets two different delays and each
 // transition slot can be told apart from the others.
@@ -212,6 +220,23 @@ TEST(SdfPulseLimitAnnotation, InvocationPercentagesScaleTheAnnotatedDelay) {
   d.mgr.SetGlobalPulseLimitPercents(40, 80);
 
   d.Annotate(SdfAbsolute("(IOPATH A Z (5))"));
+
+  const auto* pd = d.Path();
+  ASSERT_NE(pd, nullptr);
+  EXPECT_EQ(pd->delays[0], 5u);
+  EXPECT_EQ(pd->reject_limit[0], 2u);
+  EXPECT_EQ(pd->error_limit[0], 4u);
+}
+
+// A DEVICE entry annotates the delays of the paths to the module's outputs
+// (Table 32-1), so its delay of 5 derives the same limits as an IOPATH's: 2
+// and 4 under 40% and 80%, in place of the limits the old delay left.
+TEST(SdfPulseLimitAnnotation, DeviceDelayDerivesTheLimitsToo) {
+  Design d;
+  ASSERT_TRUE(d.Build(kPathWithLimitsSrc));
+  d.mgr.SetGlobalPulseLimitPercents(40, 80);
+
+  d.Annotate(SdfAbsolute("(DEVICE (5))"));
 
   const auto* pd = d.Path();
   ASSERT_NE(pd, nullptr);
@@ -668,8 +693,8 @@ TEST(SdfPulseLimitAnnotation, PathpulseLimitsAboveTheDelayBehaveAsTheDelay) {
 
   const auto* pd = d.Path();
   ASSERT_NE(pd, nullptr);
-  EXPECT_EQ(pd->reject_limit[0], 40u);
-  EXPECT_EQ(pd->error_limit[0], 40u);
+  EXPECT_EQ(EffectivePulseLimit(pd->reject_limit[0], pd->delays[0]), 40u);
+  EXPECT_EQ(EffectivePulseLimit(pd->error_limit[0], pd->delays[0]), 40u);
 }
 
 // Only a limit above the delay is affected: the reject limit written below it
@@ -683,8 +708,8 @@ TEST(SdfPulseLimitAnnotation, PathpulseLeavesALimitBelowTheDelayAlone) {
 
   const auto* pd = d.Path();
   ASSERT_NE(pd, nullptr);
-  EXPECT_EQ(pd->reject_limit[0], 20u);
-  EXPECT_EQ(pd->error_limit[0], 40u);
+  EXPECT_EQ(EffectivePulseLimit(pd->reject_limit[0], pd->delays[0]), 20u);
+  EXPECT_EQ(EffectivePulseLimit(pd->error_limit[0], pd->delays[0]), 40u);
 }
 
 // The delay a limit is measured against is the delay of its own transition. On
@@ -702,10 +727,10 @@ TEST(SdfPulseLimitAnnotation, PathpulseMeasuresEachSlotAgainstItsOwnDelay) {
 
   const auto* pd = d.Path();
   ASSERT_NE(pd, nullptr);
-  EXPECT_EQ(pd->reject_limit[0], 20u);
-  EXPECT_EQ(pd->error_limit[0], 20u);
-  EXPECT_EQ(pd->reject_limit[1], 50u);
-  EXPECT_EQ(pd->error_limit[1], 60u);
+  EXPECT_EQ(EffectivePulseLimit(pd->reject_limit[0], pd->delays[0]), 20u);
+  EXPECT_EQ(EffectivePulseLimit(pd->error_limit[0], pd->delays[0]), 20u);
+  EXPECT_EQ(EffectivePulseLimit(pd->reject_limit[1], pd->delays[1]), 50u);
+  EXPECT_EQ(EffectivePulseLimit(pd->error_limit[1], pd->delays[1]), 60u);
 }
 
 // The percentage spelling reaches above the delay when a percentage above 100
@@ -718,8 +743,30 @@ TEST(SdfPulseLimitAnnotation, PathpulsepercentOverAHundredBehavesAsTheDelay) {
 
   const auto* pd = d.Path();
   ASSERT_NE(pd, nullptr);
-  EXPECT_EQ(pd->reject_limit[0], 50u);
-  EXPECT_EQ(pd->error_limit[0], 50u);
+  EXPECT_EQ(EffectivePulseLimit(pd->reject_limit[0], pd->delays[0]), 50u);
+  EXPECT_EQ(EffectivePulseLimit(pd->error_limit[0], pd->delays[0]), 50u);
+}
+
+// §32.5: limits a PATHPULSE puts above the delay are kept as written, so an
+// IOPATH that raises the delay and holds the limits with empty parentheses
+// leaves the path as one IOPATH stating 2 and 3 beside its delays would. The
+// declared delay of 1 is below both.
+TEST(SdfPulseLimitAnnotation, PathpulseLimitsAboveTheDelayOutliveIt) {
+  Design d;
+  ASSERT_TRUE(d.Build(kUnitDelayPathSrc));
+
+  d.Annotate(
+      SdfAbsolute("(PATHPULSE A Z (2) (3))"
+                  " (IOPATH A Z ((4) () ()) ((6) () ()))"));
+
+  const auto* pd = d.Path();
+  ASSERT_NE(pd, nullptr);
+  EXPECT_EQ(pd->delays[0], 4u);
+  EXPECT_EQ(pd->delays[1], 6u);
+  EXPECT_EQ(pd->reject_limit[0], 2u);
+  EXPECT_EQ(pd->error_limit[0], 3u);
+  EXPECT_EQ(pd->reject_limit[1], 2u);
+  EXPECT_EQ(pd->error_limit[1], 3u);
 }
 
 // ---------------------------------------------------------------------------
@@ -783,8 +830,8 @@ TEST(SdfPulseLimitAnnotation,
 
   const auto* pd = d.Path();
   ASSERT_NE(pd, nullptr);
-  EXPECT_EQ(pd->reject_limit[0], 40u);
-  EXPECT_EQ(pd->error_limit[0], 40u);
+  EXPECT_EQ(EffectivePulseLimit(pd->reject_limit[0], pd->delays[0]), 40u);
+  EXPECT_EQ(EffectivePulseLimit(pd->error_limit[0], pd->delays[0]), 40u);
 }
 
 // A percentage stays a share of the path's delay when it states a change, so

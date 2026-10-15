@@ -325,6 +325,36 @@ TEST(SdfInterconnectAnnotation, PrimitivePinLoadIsRefused) {
   EXPECT_TRUE(d.mgr.GetInterconnectDelays().empty());
 }
 
+// A user-defined primitive (§29) is a primitive as a gate is, so its pin is no
+// module port and an INTERCONNECT from it is refused the same way.
+const char* const kUdpSrc =
+    "primitive udp_buf(out, in);\n"
+    "  output out;\n"
+    "  input in;\n"
+    "  table\n"
+    "    0 : 0;\n"
+    "    1 : 1;\n"
+    "  endtable\n"
+    "endprimitive\n"
+    "module ld(d);\n"
+    "  input d;\n"
+    "  wire d;\n"
+    "endmodule\n"
+    "module top;\n"
+    "  wire a;\n"
+    "  wire n;\n"
+    "  udp_buf ud1(n, a);\n"
+    "  ld u2(.d(n));\n"
+    "endmodule\n";
+
+TEST(SdfInterconnectAnnotation, UdpPinSourceIsRefused) {
+  Design d;
+  ASSERT_TRUE(d.Build(kUdpSrc));
+  auto result = d.Annotate(SdfDelay("(INTERCONNECT ud1/out u2/d (4))"));
+  EXPECT_TRUE(d.AnyWarningMentions(result, "primitive pin"));
+  EXPECT_EQ(d.Load("u2/d"), nullptr);
+}
+
 // ---------------------------------------------------------------------------
 // PORT: search for the port and annotate the delay from all sources to it.
 // ---------------------------------------------------------------------------
@@ -512,6 +542,11 @@ TEST(SdfInterconnectAnnotation, MissingSourceWarnsAndStillAnnotatesTheLoad) {
   const auto* got = d.Load("u2/d");
   ASSERT_NE(got, nullptr);
   EXPECT_EQ(got->delays[0], 4u);
+  // The run asks by the signal the load's connection names, n, and the delay
+  // annotated anyway is the one it finds.
+  const InterconnectDelay* found = d.mgr.FindInterconnectDelay("n", "u2/d");
+  ASSERT_NE(found, nullptr);
+  EXPECT_EQ(found->delays[0], 4u);
 }
 
 // The same on a multisource net: the delay is then taken as the delay from all
@@ -526,15 +561,14 @@ TEST(SdfInterconnectAnnotation,
   EXPECT_NE(d.mgr.FindInterconnectDelay("s2/q", "l1/d"), nullptr);
 }
 
-// On a single-source net the delay stays the delay from the source the entry
-// named, so it does not answer for the net's real source.
+// On a single-source net the delay annotated anyway is the delay to the load
+// from its one source, so it answers for the net's real source u1/q.
 TEST(SdfInterconnectAnnotation,
-     MissingSourceOnASingleSourceNetStaysFromThatSource) {
+     MissingSourceOnASingleSourceNetIsFromItsOneSource) {
   Design d;
   ASSERT_TRUE(d.Build(kPairSrc));
   d.Annotate(SdfDelay("(INTERCONNECT u9/q u2/d (4))"));
-  EXPECT_NE(d.mgr.FindInterconnectDelay("u9/q", "u2/d"), nullptr);
-  EXPECT_EQ(d.mgr.FindInterconnectDelay("u1/q", "u2/d"), nullptr);
+  EXPECT_NE(d.mgr.FindInterconnectDelay("u1/q", "u2/d"), nullptr);
 }
 
 // A source and a load that are not actually on the same net is warned about
@@ -675,6 +709,67 @@ TEST(SdfInterconnectAnnotation, DownHierarchyAnnotationIsFromSourcesAbove) {
   EXPECT_EQ(above->delays[0], 4u);
 }
 
+// A delay from a source port is from every source hierarchically above or
+// below it: u1/s/q drives u1/q from inside u1 and is covered, while u3/q, a
+// sibling at u1's own depth on the same net, is not.
+TEST(SdfInterconnectAnnotation, SourceCoverageFollowsTheHierarchyNotTheDepth) {
+  Design d;
+  ASSERT_TRUE(
+      d.Build("module drv(q);\n"
+              "  output q;\n"
+              "  reg q;\n"
+              "endmodule\n"
+              "module wrap(q);\n"
+              "  output q;\n"
+              "  wire q;\n"
+              "  drv s(.q(q));\n"
+              "endmodule\n"
+              "module ld(d);\n"
+              "  input d;\n"
+              "  wire d;\n"
+              "endmodule\n"
+              "module top;\n"
+              "  wire w;\n"
+              "  wrap u1(.q(w));\n"
+              "  drv u3(.q(w));\n"
+              "  ld u2(.d(w));\n"
+              "endmodule\n"));
+  d.Annotate(SdfDelay("(INTERCONNECT u1/q u2/d (5))"));
+  const auto* below = d.mgr.FindInterconnectDelay("u1/s/q", "u2/d");
+  ASSERT_NE(below, nullptr);
+  EXPECT_EQ(below->delays[0], 5u);
+  EXPECT_EQ(d.mgr.FindInterconnectDelay("u3/q", "u2/d"), nullptr);
+}
+
+// §32.4.4 has interconnect delays follow the path delays' rules for pulse
+// limits, so a value may state its limits beside its delay: the load takes the
+// delay 5 with reject 2 and error 3, and nothing is left over to warn about.
+TEST(SdfInterconnectAnnotation, ValueStatingItsPulseLimitsIsRead) {
+  Design d;
+  ASSERT_TRUE(d.Build(kPairSrc));
+  auto result = d.Annotate(SdfDelay("(INTERCONNECT u1/q u2/d ((5) (2) (3)))"));
+  EXPECT_TRUE(result.warnings.empty());
+  const auto* got = d.Load("u2/d");
+  ASSERT_NE(got, nullptr);
+  EXPECT_EQ(got->delays[0], 5u);
+  EXPECT_EQ(got->reject_limit[0], 2u);
+  EXPECT_EQ(got->error_limit[0], 3u);
+}
+
+// §32.5: a value written empty holds what it stands for, so the second entry
+// keeps the rising delay 6 the first gave and sets the falling one to 7.
+TEST(SdfInterconnectAnnotation, EmptyValueHoldsTheDelayInForce) {
+  Design d;
+  ASSERT_TRUE(d.Build(kPairSrc));
+  d.Annotate(
+      SdfDelay("(INTERCONNECT u1/q u2/d (6) (6))"
+               " (INTERCONNECT u1/q u2/d () (7))"));
+  const auto* got = d.Load("u2/d");
+  ASSERT_NE(got, nullptr);
+  EXPECT_EQ(got->delays[0], 6u);
+  EXPECT_EQ(got->delays[1], 7u);
+}
+
 // Hierarchically overlapping annotations: the first covers every port of the
 // net at or within the load it names, and the second, naming a smaller subset,
 // changes only the ports of that subset.
@@ -714,7 +809,7 @@ TEST(SdfInterconnectAnnotation, ThreeValueEntryFillsTwelveTransitions) {
   d.Annotate(SdfDelay("(INTERCONNECT u1/q u2/d (4) (6) (9))"));
   const auto* got = d.Load("u2/d");
   ASSERT_NE(got, nullptr);
-  const uint64_t kExpected[12] = {4, 6, 9, 4, 9, 6, 4, 9, 6, 6, 9, 4};
+  const uint64_t kExpected[12] = {4, 6, 9, 4, 9, 6, 4, 4, 6, 6, 9, 4};
   for (int i = 0; i < 12; ++i) {
     EXPECT_EQ(got->delays[i], kExpected[i]) << "slot " << i;
   }

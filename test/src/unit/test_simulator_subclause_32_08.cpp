@@ -206,14 +206,12 @@ TEST(SdfTwelveTransitionMapping, ThreeIopathValuesAddTheTurnOffFamily) {
   EXPECT_EQ(pd->delays[4], 9u);   // 1->z turn-off
   EXPECT_EQ(pd->delays[5], 6u);   // z->0 fall
   EXPECT_EQ(pd->delays[6], 4u);   // 0->x smaller of rise and turn-off
+  EXPECT_EQ(pd->delays[7], 4u);   // x->1 rise, not the larger of rise and
+                                  // turn-off
   EXPECT_EQ(pd->delays[8], 6u);   // 1->x smaller of fall and turn-off
   EXPECT_EQ(pd->delays[9], 6u);   // x->0 fall
   EXPECT_EQ(pd->delays[10], 9u);  // x->z turn-off
   EXPECT_EQ(pd->delays[11], 4u);  // z->x smaller of rise and fall
-  // The x->1 slot of this column is left unpinned here: the value the tree
-  // computes for it disagrees with the row Table 32-4 gives, and another
-  // subclause's test already fixes the tree's value, so which of the two
-  // readings is right is not settled inside this file.
 }
 
 TEST(SdfTwelveTransitionMapping, SixIopathValuesDeriveTheXTransitions) {
@@ -424,6 +422,38 @@ TEST(SdfThreeTransitionMapping, DeviceDelayToTheXStateIsTheSmallestOfThree) {
   EXPECT_EQ(drv->delays[6], 10u);   // 0->x
   EXPECT_EQ(drv->delays[8], 10u);   // 1->x
   EXPECT_EQ(drv->delays[11], 10u);  // z->x
+}
+
+// Fewer than three values are expanded by §28.16's Table 28-9, which takes the
+// turn-off delay of two as the smaller of them: the 3 written second, where the
+// 5 written first would be the rise delay copied.
+TEST(SdfThreeTransitionMapping, TwoDeviceValuesTurnOffAtTheSmaller) {
+  SimFixture f;
+  SpecifyManager mgr;
+  ASSERT_TRUE(BuildDesign(kGateDesign, f, mgr));
+
+  AnnotateFileOnto(DelaySdf("(DEVICE (5) (3))"), mgr);
+
+  const PrimitiveDriver* drv = DriverOfY(mgr);
+  ASSERT_NE(drv, nullptr);
+  EXPECT_EQ(drv->delays[2], 3u);   // 0->z
+  EXPECT_EQ(drv->delays[4], 3u);   // 1->z
+  EXPECT_EQ(drv->delays[10], 3u);  // x->z
+}
+
+// §32.5: a DEVICE value written empty holds the delay it stands for, so the
+// rise delay the gate declared, 1, stays while the fall delay becomes 7.
+TEST(SdfThreeTransitionMapping, EmptyDeviceValueHoldsTheDeclaredDelay) {
+  SimFixture f;
+  SpecifyManager mgr;
+  ASSERT_TRUE(BuildDesign(kGateDesign, f, mgr));
+
+  AnnotateFileOnto(DelaySdf("(DEVICE () (7))"), mgr);
+
+  const PrimitiveDriver* drv = DriverOfY(mgr);
+  ASSERT_NE(drv, nullptr);
+  EXPECT_EQ(drv->delays[0], 1u);
+  EXPECT_EQ(drv->delays[1], 7u);
 }
 
 // ---------------------------------------------------------------------------

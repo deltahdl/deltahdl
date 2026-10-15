@@ -6,6 +6,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/types.h"
@@ -40,6 +41,28 @@ struct SdfDelayValue {
   double min_real = 0.0;
   double typ_real = 0.0;
   double max_real = 0.0;
+
+  // §32.5: written as empty parentheses, `()`, which holds the value it stands
+  // for rather than stating one.
+  bool empty = false;
+
+  // §32.3: a member of the triple left out, as `1::3` leaves out its typical
+  // value; selecting it annotates nothing (SdfValueHeld).
+  bool min_empty = false;
+  bool typ_empty = false;
+  bool max_empty = false;
+};
+
+// §32.5: one direction of an IOPATH written in the form that states pulse
+// limits, `(delay reject error)`, each of which may be left as empty
+// parentheses to hold what the path already carries.
+struct SdfIopathDirection {
+  SdfDelayValue delay;
+  bool delay_present = false;
+  SdfDelayValue reject;
+  bool reject_present = false;
+  SdfDelayValue error;
+  bool error_present = false;
 };
 
 struct SdfIopath {
@@ -71,17 +94,11 @@ struct SdfIopath {
 
   bool is_ifnone = false;
 
+  // The form that writes each direction as `(delay reject error)`, with its
+  // directions in the order written; `values` then holds their delays, an
+  // empty one as a zero the annotator holds rather than writes.
   bool extended_form = false;
-  bool rise_delay_present = true;
-  bool fall_delay_present = true;
-  SdfDelayValue rise_reject;
-  bool rise_reject_present = false;
-  SdfDelayValue rise_error;
-  bool rise_error_present = false;
-  SdfDelayValue fall_reject;
-  bool fall_reject_present = false;
-  SdfDelayValue fall_error;
-  bool fall_error_present = false;
+  std::vector<SdfIopathDirection> directions;
 };
 
 enum class SdfCheckType : uint8_t {
@@ -105,11 +122,26 @@ struct SdfTimingCheck {
   SpecifyEdge ref_edge = SpecifyEdge::kNone;
   std::string data_port;
   SpecifyEdge data_edge = SpecifyEdge::kNone;
+  // §32.4.2: the §31.5 edge descriptor a signal's SDF transition edge, 01 or
+  // 1z, stands for, where its edge is SpecifyEdge::kEdge.
+  std::vector<std::pair<char, char>> ref_edge_descriptors;
+  std::vector<std::pair<char, char>> data_edge_descriptors;
 
   SdfDelayValue limit;
   SdfDelayValue limit2;
 
+  // §32.4.2: the condition each signal was written with, matched against the
+  // declared check's condition on that same signal; empty where it carries
+  // none. `condition` is the reference's, or the data signal's where the
+  // reference has none.
   std::string condition;
+  std::string ref_condition;
+  std::string data_condition;
+
+  // The keyword of a parenthesized construct the check carried after its
+  // values, SCOND or CCOND, which conditions the check in a way no declared
+  // check's condition is matched against; empty where it carried none.
+  std::string trailing_construct;
 };
 
 struct SdfSpecparam {
@@ -138,6 +170,10 @@ struct SdfInterconnect {
   // are the first two, kept for callers that only ever want those; `values`
   // holds the whole list in the order it was written.
   std::vector<SdfDelayValue> values;
+
+  // §32.4.4 with §32.5: each listed value as a direction, its delay with the
+  // reject and error limits a value written `((d) (r) (e))` states beside it.
+  std::vector<SdfIopathDirection> directions;
 };
 
 // §32.4.1 Table 32-1: a DEVICE entry of a DELAY section. `port_instance` is the

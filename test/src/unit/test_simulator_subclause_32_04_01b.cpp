@@ -66,6 +66,7 @@
 
 #include "fixture_sdf_design.h"
 #include "fixture_simulator.h"
+#include "helpers_sdf_delay_mapping.h"
 #include "simulator/specify.h"
 #include "simulator/specify_path_delay.h"
 
@@ -366,6 +367,94 @@ TEST(SdfGateDeviceRun, DeviceEntryTimesTheGateDrivingTheOutput) {
       RunCapture(AndCellRun(WriteAndCellSdf("port", "(DEVICE y (7) (13))")),
                  port),
       "yo=1 at 57\nyo=0 at 113\n");
+}
+
+// §32.4.1 annotates a conditional entry to the paths between its two ports
+// with its condition, every one of them: two edge-sensitive paths that share
+// the condition and differ in their edge both take an entry naming no edge.
+TEST(SdfDelayMapping, ConditionalIopathReachesEveryPathWithItsCondition) {
+  SimFixture f;
+  SpecifyManager mgr;
+  ASSERT_TRUE(BuildSpecifyFromSource(
+      "module k(input clk, input en, input d, output q);\n"
+      "  specify\n"
+      "    if (en) (posedge clk => (q +: d)) = 3;\n"
+      "    if (en) (negedge clk => (q -: d)) = 4;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f, mgr));
+
+  AnnotateFileOnto(DelaySdf("(COND en (IOPATH clk q (9)))"), mgr);
+
+  int reached = 0;
+  for (const auto& pd : mgr.GetPathDelays()) {
+    if (pd.src_port == "clk" && pd.dst_port == "q") {
+      EXPECT_EQ(pd.delays[0], 9u);
+      ++reached;
+    }
+  }
+  EXPECT_EQ(reached, 2);
+}
+
+// §32.4.1 Table 32-1 falls back to the primitives driving the module's
+// outputs, so a DEVICE entry with no operand reaches g2, which drives output
+// y, and leaves g1, which drives the internal n, at its declared 2.
+TEST(SdfDeviceFallback, NoOperandDeviceReachesOnlyOutputDrivingGates) {
+  const std::string kSdf =
+      SavedSdf("internal_gate",
+               "(DELAYFILE (CELL (CELLTYPE \"gate_pair\") (INSTANCE gate_top/u)"
+               " (DELAY (ABSOLUTE (DEVICE (7))))))");
+  SdfDesign design;
+  SpecifyManager* mgr = ManagerOfRun(design,
+                                     "module gate_pair(input a, output y);\n"
+                                     "  wire n;\n"
+                                     "  and #2 g1(n, a, a);\n"
+                                     "  buf #3 g2(y, n);\n"
+                                     "endmodule\n"
+                                     "module gate_top;\n"
+                                     "  logic a_in;\n"
+                                     "  logic y_out;\n"
+                                     "  gate_pair u(a_in, y_out);\n"
+                                     "  initial $sdf_annotate(\"" +
+                                         kSdf + "\");\nendmodule\n");
+  ASSERT_NE(mgr, nullptr);
+  const PrimitiveDriver* internal = DriverFound(*mgr, "u.", "n");
+  const PrimitiveDriver* output = DriverFound(*mgr, "u.", "y");
+  ASSERT_NE(internal, nullptr);
+  ASSERT_NE(output, nullptr);
+  EXPECT_EQ(internal->delays[kRiseSlot], 2u);
+  EXPECT_EQ(output->delays[kRiseSlot], 7u);
+}
+
+// §32.4.1 Table 32-1: a DEVICE operand naming a module instance in the cell
+// reaches that instance's specify paths to its outputs, so the cell dev_top
+// annotating `u1` gives u1's a => y path the 7 in place of its declared 5.
+TEST(SdfDeviceFallback, OperandNamingAnInstanceReachesItsPaths) {
+  const std::string kSdf =
+      SavedSdf("device_instance",
+               "(DELAYFILE (CELL (CELLTYPE \"dev_top\") (INSTANCE dev_top)"
+               " (DELAY (ABSOLUTE (DEVICE u1 (7))))))");
+  SdfDesign design;
+  SpecifyManager* mgr = ManagerOfRun(design,
+                                     "module dev_leaf(input a, output y);\n"
+                                     "  specify\n"
+                                     "    (a => y) = 5;\n"
+                                     "  endspecify\n"
+                                     "endmodule\n"
+                                     "module dev_top;\n"
+                                     "  logic a_in;\n"
+                                     "  logic y_out;\n"
+                                     "  dev_leaf u1(a_in, y_out);\n"
+                                     "  initial $sdf_annotate(\"" +
+                                         kSdf + "\");\nendmodule\n");
+  ASSERT_NE(mgr, nullptr);
+  int reached = 0;
+  for (const auto& pd : mgr->GetPathDelays()) {
+    if (pd.inst_prefix != "u1.") continue;
+    EXPECT_EQ(pd.delays[kRiseSlot], 7u);
+    ++reached;
+  }
+  EXPECT_EQ(reached, 1);
 }
 
 }  // namespace

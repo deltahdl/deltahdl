@@ -462,7 +462,10 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/constraint_solver.cpp
     simulator/module_path_delay.cpp
     simulator/module_path_drive.cpp
+    simulator/interconnect_drive.cpp
     simulator/specify.cpp
+    simulator/specify_sdf_device.cpp
+    simulator/specify_sdf_timing_check.cpp
     simulator/specify_condition_text.cpp
     simulator/specify_pulse.cpp
     simulator/specify_register.cpp
@@ -696,6 +699,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/sync_variable.cpp
     simulator/sdf_annotate.cpp
     simulator/sdf_annotate_entry.cpp
+    simulator/sdf_annotate_timing_check.cpp
     simulator/sdf_annotate_task.cpp
     simulator/sim_context_classgc.cpp
     simulator/sim_context_name_tables.cpp

@@ -129,50 +129,56 @@ bool Expect(std::string_view& s, SdfTokKind kind) {
   return tok.kind == kind;
 }
 
-// Fills a triple (min:typ:max) into `dv` given an already-parsed leading
-// numeric token `first`. All three fields default to `first`; if a ':' follows
-// the leading value, the optional typ and max values override the defaults.
-static void ParseSdfDelayTypMax(std::string_view& s, const SdfToken& first,
-                                SdfDelayValue& dv) {
-  dv.min_val = first.num_val;
-  dv.typ_val = first.num_val;
-  dv.max_val = first.num_val;
-  dv.min_real = first.real_val;
-  dv.typ_real = first.real_val;
-  dv.max_real = first.real_val;
-  dv.min_negative = first.is_negative;
-  dv.typ_negative = first.is_negative;
-  dv.max_negative = first.is_negative;
-
-  SkipWhitespace(s);
-  if (!s.empty() && s[0] == ':') {
-    Expect(s, SdfTokKind::kColon);
-    auto typ = NextSdfToken(s);
-    if (typ.kind == SdfTokKind::kNumber) {
-      dv.typ_val = typ.num_val;
-      dv.typ_real = typ.real_val;
-      dv.typ_negative = typ.is_negative;
-    }
-    Expect(s, SdfTokKind::kColon);
-    auto max_tok = NextSdfToken(s);
-    if (max_tok.kind == SdfTokKind::kNumber) {
-      dv.max_val = max_tok.num_val;
-      dv.max_real = max_tok.real_val;
-      dv.max_negative = max_tok.is_negative;
-    }
+// One member of a min:typ:max triple, taken from the number `tok`.
+static void SetSdfTripleMember(SdfDelayValue& dv, int member,
+                               const SdfToken& tok) {
+  if (member == 0) {
+    dv.min_val = tok.num_val;
+    dv.min_real = tok.real_val;
+    dv.min_negative = tok.is_negative;
+  } else if (member == 1) {
+    dv.typ_val = tok.num_val;
+    dv.typ_real = tok.real_val;
+    dv.typ_negative = tok.is_negative;
+  } else {
+    dv.max_val = tok.num_val;
+    dv.max_real = tok.real_val;
+    dv.max_negative = tok.is_negative;
   }
 }
 
-SdfDelayValue ParseDelayVal(std::string_view& s) {
-  SdfDelayValue dv;
-
-  if (!Expect(s, SdfTokKind::kLParen)) return dv;
-  auto first = NextSdfToken(s);
-  if (first.kind == SdfTokKind::kNumber) {
-    ParseSdfDelayTypMax(s, first, dv);
+// Reads a value's body up to the ')' that closes it, which is left for the
+// caller: one number, which every member of the triple takes, or a
+// min:typ:max triple, any member of which may be left out (§32.3). Answers
+// whether any member was written.
+static bool ParseSdfValueBody(std::string_view& s, SdfDelayValue& dv) {
+  bool written[3] = {false, false, false};
+  bool triple = false;
+  for (int member = 0; member < 3; ++member) {
+    SkipWhitespace(s);
+    if (!s.empty() && s[0] != ':' && s[0] != ')') {
+      const SdfToken kTok = NextSdfToken(s);
+      if (kTok.kind == SdfTokKind::kNumber) {
+        SetSdfTripleMember(dv, member, kTok);
+        written[member] = true;
+      }
+    }
+    SkipWhitespace(s);
+    if (member == 2 || s.empty() || s[0] != ':') break;
+    Expect(s, SdfTokKind::kColon);
+    triple = true;
   }
-  Expect(s, SdfTokKind::kRParen);
-  return dv;
+  if (!triple) {
+    dv.typ_val = dv.max_val = dv.min_val;
+    dv.typ_real = dv.max_real = dv.min_real;
+    dv.typ_negative = dv.max_negative = dv.min_negative;
+    written[1] = written[0];
+    written[2] = written[0];
+  }
+  dv.min_empty = !written[0];
+  dv.typ_empty = !written[1];
+  dv.max_empty = !written[2];
+  return written[0] || written[1] || written[2];
 }
 
 static std::string ParseSdfPort(std::string_view& s) {
@@ -197,7 +203,7 @@ static std::string ParseSdfPort(std::string_view& s) {
   return port;
 }
 
-static void SkipSdfParen(std::string_view& s) {
+void SkipSdfParen(std::string_view& s) {
   int depth = 1;
   while (depth > 0 && !s.empty()) {
     auto tok = NextSdfToken(s);
@@ -256,26 +262,21 @@ static SdfDelayValue ParseDelayValOrEmpty(std::string_view& s, bool* present) {
     Expect(s, SdfTokKind::kRParen);
     return dv;
   }
-  auto first = NextSdfToken(s);
-  if (first.kind == SdfTokKind::kNumber) {
-    *present = true;
-    ParseSdfDelayTypMax(s, first, dv);
-  }
+  *present = ParseSdfValueBody(s, dv);
   Expect(s, SdfTokKind::kRParen);
   return dv;
 }
 
-struct ExtendedIopathDir {
-  SdfDelayValue delay;
-  bool delay_present = false;
-  SdfDelayValue reject;
-  bool reject_present = false;
-  SdfDelayValue error;
-  bool error_present = false;
-};
+// A value, `(...)`, read with whether it was written as empty parentheses.
+SdfDelayValue ParseDelayVal(std::string_view& s) {
+  bool written = false;
+  SdfDelayValue dv = ParseDelayValOrEmpty(s, &written);
+  dv.empty = !written;
+  return dv;
+}
 
-static ExtendedIopathDir ParseExtendedDirection(std::string_view& s) {
-  ExtendedIopathDir d;
+static SdfIopathDirection ParseExtendedDirection(std::string_view& s) {
+  SdfIopathDirection d;
   if (!Expect(s, SdfTokKind::kLParen)) return d;
   SkipWhitespace(s);
   if (!s.empty() && s[0] == '(') {
@@ -327,44 +328,21 @@ static void SkipOptionalIopathRetain(std::string_view& s) {
   }
 }
 
-static void ApplyRiseDirection(const ExtendedIopathDir& dir, SdfIopath& io) {
-  if (dir.delay_present) io.rise = dir.delay;
-  io.rise_delay_present = dir.delay_present;
-  io.rise_reject = dir.reject;
-  io.rise_reject_present = dir.reject_present;
-  io.rise_error = dir.error;
-  io.rise_error_present = dir.error_present;
-}
-
-static void ApplyFallDirection(const ExtendedIopathDir& dir, SdfIopath& io) {
-  if (dir.delay_present) io.fall = dir.delay;
-  io.fall_delay_present = dir.delay_present;
-  io.fall_reject = dir.reject;
-  io.fall_reject_present = dir.reject_present;
-  io.fall_error = dir.error;
-  io.fall_error_present = dir.error_present;
-}
-
-// Parses the extended (parenthesized-direction) form of an IOPATH delay list:
-// up to three directions for rise, fall, and turnoff. §32.8: each direction
-// read contributes one delay value to the list, whether or not it wrote a
-// delay, so a direction that held its delay still counts towards how many
-// values the entry supplied.
+// Parses the form of an IOPATH delay list that writes each direction as
+// `(delay reject error)`. §32.8: a module path carries twelve transition
+// delays filled from a listed one, two, three, six or twelve values, so every
+// direction written is read, and each counts towards how many values the entry
+// supplied whether or not it wrote a delay.
 static void ParseExtendedIopathDelays(std::string_view& s, SdfIopath& io) {
-  ApplyRiseDirection(ParseExtendedDirection(s), io);
-  io.values.push_back(io.rise);
-  SkipWhitespace(s);
-  if (!s.empty() && s[0] == '(') {
-    ApplyFallDirection(ParseExtendedDirection(s), io);
-    io.values.push_back(io.fall);
+  while (io.directions.size() < 12) {
+    SkipWhitespace(s);
+    if (s.empty() || s[0] != '(') break;
+    io.directions.push_back(ParseExtendedDirection(s));
+    io.values.push_back(io.directions.back().delay);
   }
-  SkipWhitespace(s);
-  if (!s.empty() && s[0] == '(') {
-    auto turnoff_dir = ParseExtendedDirection(s);
-
-    if (turnoff_dir.delay_present) io.turnoff = turnoff_dir.delay;
-    io.values.push_back(io.turnoff);
-  }
+  if (!io.values.empty()) io.rise = io.values[0];
+  if (io.values.size() > 1) io.fall = io.values[1];
+  if (io.values.size() > 2) io.turnoff = io.values[2];
 }
 
 // §32.8: parses the simple form of an IOPATH delay list. A module path carries
@@ -432,7 +410,20 @@ static void ParseInterconnectDelayList(std::string_view& s,
   while (ic.values.size() < 12) {
     SkipWhitespace(s);
     if (s.empty() || s[0] != '(') break;
-    ic.values.push_back(ParseDelayVal(s));
+    // §32.4.4: interconnect delays follow the specify path delays' rules for
+    // pulse limits, so a value may state its limits as an IOPATH direction
+    // does, `((d) (r) (e))`.
+    if (LooksLikeExtendedIopathDirection(s)) {
+      ic.directions.push_back(ParseExtendedDirection(s));
+      ic.values.push_back(ic.directions.back().delay);
+      ic.values.back().empty = !ic.directions.back().delay_present;
+      continue;
+    }
+    SdfIopathDirection dir;
+    dir.delay = ParseDelayVal(s);
+    dir.delay_present = !dir.delay.empty;
+    ic.directions.push_back(dir);
+    ic.values.push_back(dir.delay);
   }
   if (!ic.values.empty()) ic.rise = ic.values[0];
   if (ic.values.size() > 1) ic.fall = ic.values[1];

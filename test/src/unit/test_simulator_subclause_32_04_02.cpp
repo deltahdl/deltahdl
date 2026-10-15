@@ -136,6 +136,117 @@ TEST_F(SdfTimingCheckMapping, HoldReachesHoldAndTheHoldValueOfSetuphold) {
   EXPECT_EQ(Limit(TimingCheckKind::kSetup), 11u);
 }
 
+// §32.5: a value written as empty parentheses holds what it stands for, so
+// the setup value of 11 and 13 stays while the hold value of 80 lands, and the
+// entry after it is read in step and lands too.
+TEST_F(SdfTimingCheckMapping, EmptyValueHoldsWhatItStandsFor) {
+  Run("(SETUPHOLD d (posedge clk) () (80)) (RECOVERY rst (posedge clk) (55))");
+
+  EXPECT_EQ(Limit(TimingCheckKind::kSetup), 11u);
+  EXPECT_EQ(Limit(TimingCheckKind::kHold), 80u);
+  EXPECT_EQ(Limit(TimingCheckKind::kSetuphold), 13u);
+  EXPECT_EQ(Limit2(TimingCheckKind::kSetuphold), 80u);
+  EXPECT_EQ(Limit(TimingCheckKind::kRecovery), 55u);
+}
+
+// §32.4.2 matches a check by its signals' names, and a signal written with a
+// select names the bit the declaration selected: d[0] reaches the check on
+// d[0] and d[1] reaches nothing.
+TEST(SdfTimingCheckSelect, BitSelectNamesTheCheckOnThatBit) {
+  SimFixture f;
+  SpecifyManager mgr;
+  ASSERT_TRUE(
+      BuildTimingChecksFromSource("module t(input [1:0] d, input clk);\n"
+                                  "  reg ntf;\n"
+                                  "  specify\n"
+                                  "    $setup(d[0], posedge clk, 1, ntf);\n"
+                                  "  endspecify\n"
+                                  "endmodule\n",
+                                  f, mgr));
+
+  Annotate(SdfWith("(SETUP d[1] (posedge clk) (7))"), mgr);
+  ASSERT_EQ(mgr.TimingCheckCount(), 1u);
+  EXPECT_EQ(mgr.GetTimingChecks().front().limit, 1u);
+
+  Annotate(SdfWith("(SETUP d[0] (posedge clk) (5))"), mgr);
+  EXPECT_EQ(mgr.GetTimingChecks().front().limit, 5u);
+}
+
+// §32.4.2 matches a condition on the signal it was written on: the SDF check
+// conditions its data signal on mode and leaves its reference bare, so the
+// declaration conditioning data on mode takes the values whatever its
+// reference carries, and the one conditioning only its reference on mode does
+// not, its data signal being unconditioned.
+TEST(SdfTimingCheckConditionSignal, EachConditionMatchesOnItsOwnSignal) {
+  SimFixture f;
+  SpecifyManager mgr;
+  ASSERT_TRUE(BuildTimingChecksFromSource(
+      "module t(input data, input clk, input mode, input en);\n"
+      "  reg ntf;\n"
+      "  specify\n"
+      "    $setuphold(posedge clk &&& en, data &&& mode, 1, 1, ntf);\n"
+      "    $setuphold(posedge clk &&& mode, data, 2, 2, ntf);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f, mgr));
+
+  Annotate(SdfWith("(SETUPHOLD (COND mode data) (posedge clk) (5) (6))"), mgr);
+  ASSERT_EQ(mgr.TimingCheckCount(), 2u);
+  EXPECT_EQ(mgr.GetTimingChecks()[0].limit, 5u);
+  EXPECT_EQ(mgr.GetTimingChecks()[1].limit, 2u);
+}
+
+// An SDF edge written as a transition, 01, is §31.5's edge [01]: it reaches
+// the check declared on that edge and not the negedge one, which it would
+// reach if the edge were dropped.
+TEST(SdfTimingCheckTransitionEdge, TransitionEdgeNamesTheDescriptorItIs) {
+  SimFixture f;
+  SpecifyManager mgr;
+  ASSERT_TRUE(BuildTimingChecksFromSource(
+      "module t(input data, input clk);\n"
+      "  reg ntf;\n"
+      "  specify\n"
+      "    $setuphold(negedge clk, data, 1, 1, ntf);\n"
+      "    $setuphold(edge [01] clk, data, 2, 2, ntf);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f, mgr));
+
+  Annotate(SdfWith("(SETUPHOLD data (01 clk) (5) (6))"), mgr);
+  ASSERT_EQ(mgr.TimingCheckCount(), 2u);
+  EXPECT_EQ(mgr.GetTimingChecks()[0].limit, 1u);
+  EXPECT_EQ(mgr.GetTimingChecks()[1].limit, 5u);
+}
+
+// §31.9 gives a $setuphold's limits a meaning below zero and §31.4.6 a
+// $nochange's offsets one, so an SDF value written negative reaches them as
+// written: -2 becomes the setup limit, honored under the enabling option, and
+// -1 the start offset.
+TEST(SdfTimingCheckNegativeValues, NegativeValuesKeepTheirSign) {
+  SimFixture f;
+  SpecifyManager mgr;
+  mgr.SetTimingCheckInvocationOptions(
+      TimingCheckInvocationOptions{true, false});
+  ASSERT_TRUE(
+      BuildTimingChecksFromSource("module t(input d, input clk);\n"
+                                  "  reg ntf;\n"
+                                  "  specify\n"
+                                  "    $setuphold(posedge clk, d, 3, 4, ntf);\n"
+                                  "    $nochange(posedge clk, d, 1, 2, ntf);\n"
+                                  "  endspecify\n"
+                                  "endmodule\n",
+                                  f, mgr));
+
+  Annotate(SdfWith("(SETUPHOLD d (posedge clk) (-2) (5))"
+                   " (NOCHANGE d (posedge clk) (-1) (2))"),
+           mgr);
+  ASSERT_EQ(mgr.TimingCheckCount(), 2u);
+  const TimingCheckEntry& setuphold = mgr.GetTimingChecks()[0];
+  EXPECT_EQ(setuphold.signed_limit, -2);
+  EXPECT_TRUE(setuphold.negative_timing_check_enabled);
+  EXPECT_EQ(mgr.GetTimingChecks()[1].start_edge_offset, -1);
+}
+
 // Table 32-2 row 3: SETUPHOLD's two values split across three targets -- the
 // first to $setup, the second to $hold, and both to $setuphold.
 TEST_F(SdfTimingCheckMapping, SetupholdReachesSetupHoldAndSetuphold) {

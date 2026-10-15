@@ -283,6 +283,101 @@ TEST(SdfAnnotator, TimingCheckMatchingNoDeclarationWarns) {
   EXPECT_EQ(LimitOf(mgr, TimingCheckKind::kHold), 51u);
 }
 
+// C1 for a delay construct: the module declares paths a => y and b => z and
+// none from a to z, so an IOPATH naming a and z has no path to annotate. §32.4
+// has backannotation replace what declarations hold, so the entry warns and
+// leaves the paths as they were, adding no path of its own.
+TEST(SdfAnnotator, IopathMatchingNoDeclaredPathWarnsAndAddsNoPath) {
+  SimFixture f;
+  SpecifyManager mgr;
+  auto result = AnnotateOntoDesign(
+      "(DELAYFILE (CELL (CELLTYPE \"t\") (INSTANCE u1)"
+      " (DELAY (ABSOLUTE (IOPATH a z (5))))))",
+      f, mgr);
+
+  ASSERT_EQ(result.warnings.size(), 1u);
+  EXPECT_NE(result.warnings[0].find("IOPATH"), std::string::npos);
+  EXPECT_EQ(mgr.GetPathDelays().size(), 2u);
+  EXPECT_EQ(mgr.GetPathDelay("a", "y"), 21u);
+}
+
+// The conditional form: no declared path from a to y carries the condition en,
+// so the entry is as unannotatable as one naming undeclared ports.
+TEST(SdfAnnotator, ConditionalIopathMatchingNoDeclaredPathWarns) {
+  SimFixture f;
+  SpecifyManager mgr;
+  auto result = AnnotateOntoDesign(
+      "(DELAYFILE (CELL (CELLTYPE \"t\") (INSTANCE u1)"
+      " (DELAY (ABSOLUTE (COND en (IOPATH a y (5)))))))",
+      f, mgr);
+
+  ASSERT_EQ(result.warnings.size(), 1u);
+  EXPECT_NE(result.warnings[0].find("IOPATH"), std::string::npos);
+  EXPECT_EQ(mgr.GetPathDelay("a", "y"), 21u);
+}
+
+// C1 for the pulse-limit construct: no path runs from a to z, so the limits a
+// PATHPULSE names for that pair have nowhere to go.
+TEST(SdfAnnotator, PathpulseMatchingNoDeclaredPathWarns) {
+  SimFixture f;
+  SpecifyManager mgr;
+  auto result = AnnotateOntoDesign(
+      "(DELAYFILE (CELL (CELLTYPE \"t\") (INSTANCE u1)"
+      " (DELAY (ABSOLUTE (PATHPULSE a z (1) (2))))))",
+      f, mgr);
+
+  ASSERT_EQ(result.warnings.size(), 1u);
+  EXPECT_NE(result.warnings[0].find("PATHPULSE"), std::string::npos);
+}
+
+// C1 for a LABEL: the module has the specparam tRise and none called tFall, so
+// a LABEL naming tFall reaches nothing and warns, while tRise keeps its 11.
+TEST(SdfAnnotator, LabelNamingNoSpecparamWarns) {
+  SimFixture f;
+  SpecifyManager mgr;
+  auto result = AnnotateOntoDesign(
+      "(DELAYFILE (CELL (CELLTYPE \"t\") (INSTANCE u1)"
+      " (LABEL (ABSOLUTE (tFall 9)))))",
+      f, mgr);
+
+  ASSERT_EQ(result.warnings.size(), 1u);
+  EXPECT_NE(result.warnings[0].find("tFall"), std::string::npos);
+  EXPECT_EQ(SpecparamOf(mgr, "tRise"), 11u);
+}
+
+// C1 for a check carrying an SCOND: its condition is matched against no
+// declared check, so it warns and annotates nothing, and the SETUP written
+// after it is still read and lands.
+TEST(SdfAnnotator, CheckCarryingScondWarnsAndTheNextCheckLands) {
+  SimFixture f;
+  SpecifyManager mgr;
+  auto result = AnnotateOntoDesign(
+      "(DELAYFILE (CELL (CELLTYPE \"t\") (INSTANCE u1) (TIMINGCHECK"
+      " (SETUPHOLD d (posedge clk) (1) (2) (SCOND en))"
+      " (SETUP d (posedge clk) (5)))))",
+      f, mgr);
+
+  ASSERT_EQ(result.warnings.size(), 1u);
+  EXPECT_NE(result.warnings[0].find("SCOND"), std::string::npos);
+  EXPECT_EQ(LimitOf(mgr, TimingCheckKind::kSetup), 5u);
+}
+
+// C3 for a triple: (1::3) gives no typical value, so under the typical
+// selection the a => y path keeps its 21, and the entry after it is read in
+// step and gives b => z its 9.
+TEST(SdfAnnotator, TripleLeavingOutTheSelectedMemberLeavesTheValue) {
+  SimFixture f;
+  SpecifyManager mgr;
+  auto result = AnnotateOntoDesign(
+      "(DELAYFILE (CELL (CELLTYPE \"t\") (INSTANCE u1)"
+      " (DELAY (ABSOLUTE (IOPATH a y (1::3)) (IOPATH b z (9))))))",
+      f, mgr);
+
+  EXPECT_TRUE(result.warnings.empty());
+  EXPECT_EQ(mgr.GetPathDelay("a", "y"), 21u);
+  EXPECT_EQ(mgr.GetPathDelay("b", "z"), 9u);
+}
+
 // C1, seventh input form: the keyword that opens a DELAY section body. It
 // selects how the delays inside are applied; one it does not recognize makes
 // the whole section unannotatable, so it warns -- and the IOPATH nested inside

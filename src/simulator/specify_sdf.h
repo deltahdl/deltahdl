@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "parser/ast_design.h"
@@ -16,6 +17,9 @@ namespace delta {
 struct SpecparamValue {
   std::string name;
   uint64_t value = 0;
+  // The value exactly as written, a fraction included, which a specparam of
+  // type real (§6.20.5) takes in place of `value`, the number rounded.
+  double real_value = 0.0;
 };
 
 struct InterconnectDelay {
@@ -83,6 +87,26 @@ struct InterconnectTopology {
 InterconnectTopology CollectInterconnectTopology(const CompilationUnit& cu,
                                                  const ModuleDecl& top);
 
+// §32.5: which of a module path's twelve delays and twelve pairs of pulse
+// limits an annotation holds at the value the path already carries instead of
+// overwriting it. An IOPATH may write any delay or limit as an empty pair of
+// parentheses, which holds what it stands for, and §32.8's Table 32-4 spreads
+// what it wrote over the transitions slot by slot, so each slot is held or
+// written on its own.
+struct PathDelayRetention {
+  std::array<bool, 12> delay{};
+  std::array<bool, 12> reject{};
+  std::array<bool, 12> error{};
+
+  // Every slot of the reject limit, of the error limit, or of both, held.
+  static PathDelayRetention PulseLimits(bool reject_held, bool error_held) {
+    PathDelayRetention retain;
+    retain.reject.fill(reject_held);
+    retain.error.fill(error_held);
+    return retain;
+  }
+};
+
 // §32.4.4: one SDF interconnect entry ready to be applied. `source` is empty
 // for the PORT and NETDELAY rows, which carry only a load and delay values;
 // `load` is a load port for the INTERCONNECT and PORT rows and may also be a
@@ -93,6 +117,14 @@ struct SdfInterconnectAnnotation {
   SdfInterconnectConstruct construct = SdfInterconnectConstruct::kInterconnect;
   uint64_t delays[12] = {};
   bool is_increment = false;
+  // §32.5: the transitions whose delay or limits the entry left as they stood,
+  // written as empty parentheses or left out of a min:typ:max triple.
+  PathDelayRetention held;
+  // Where the entry wrote its values with their pulse limits, `((d) (r) (e))`,
+  // the limits it stated; otherwise the limits come from the percentages.
+  bool limits_written = false;
+  uint64_t reject_limit[12] = {};
+  uint64_t error_limit[12] = {};
 };
 
 // §32.4.4: what became of one interconnect entry -- whether it reached anything
@@ -120,9 +152,23 @@ struct SdfTcAnnotation {
   SpecifyEdge ref_edge = SpecifyEdge::kNone;
   std::string data_signal;
   SpecifyEdge data_edge = SpecifyEdge::kNone;
+  // §32.4.2: the select each signal was written with, `[0]` or `[3:2]`, as the
+  // file spelled it; empty where it carries none.
+  std::string ref_select;
+  std::string data_select;
+  // §32.4.2: the descriptor an SDF transition edge stands for, where the edge
+  // is SpecifyEdge::kEdge.
+  std::vector<std::pair<char, char>> ref_edge_descriptors;
+  std::vector<std::pair<char, char>> data_edge_descriptors;
+  // §32.4.2: the condition each signal was written with, matched against the
+  // declared check's condition on that same signal.
+  std::string ref_condition;
+  std::string data_condition;
   std::string condition;
-  uint64_t limit = 0;
-  uint64_t limit2 = 0;
+  // Signed, since §31.9 gives a $setuphold's or a $recrem's limits a meaning
+  // below zero; every other limit takes a negative value as 0.
+  int64_t limit = 0;
+  int64_t limit2 = 0;
   int64_t start_edge_offset = 0;
   int64_t end_edge_offset = 0;
   bool set_limit = false;
@@ -192,21 +238,22 @@ struct SdfDeviceAnnotation {
   uint64_t delays[12] = {};
   uint64_t three_state_delays[4] = {};
   bool is_increment = false;
-};
-
-// §32.5: which of a module path's two pulse limits an annotation holds at the
-// value the path already carries instead of overwriting it. The extended IOPATH
-// form writes each limit either as a value or as an empty pair of parentheses,
-// and an empty one asks for that limit to be held -- independently of the
-// other, so an entry may supply one limit and hold the other.
-struct PathDelayPulseRetention {
-  bool reject = false;
-  bool error = false;
+  // §32.5: the transitions of a path, and the three delays and the delay to x
+  // of a primitive, the entry left as they stood.
+  std::array<bool, 12> held{};
+  std::array<bool, 4> three_state_held{};
 };
 
 // §32.7 (printed pages 930-931): what an INCREMENT entry adds to a module path,
 // one amount per transition of §32.8 Table 32-4. Signed, since a negative value
 // in INCREMENT mode lowers the delay it is added to.
 using SdfPathDelayIncrement = std::array<int64_t, 12>;
+
+// §32.7: what an INCREMENT entry adds to a module path's reject and error
+// limits, one amount per transition of each.
+struct SdfPulseLimitIncrement {
+  SdfPathDelayIncrement reject{};
+  SdfPathDelayIncrement error{};
+};
 
 }  // namespace delta

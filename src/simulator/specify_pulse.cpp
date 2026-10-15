@@ -25,13 +25,17 @@
 // src/simulator/specify_timing_violation.cpp.
 
 #include <algorithm>
+#include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include "common/arena.h"
 #include "common/types.h"
 #include "simulator/evaluation.h"
 #include "simulator/instance_prefix_override.h"
@@ -200,8 +204,9 @@ void SpecifyManager::RebuildPathDelaysForSpecparam(
     // instance the declaration was registered under (§30.4), keeping the pulse
     // limits that entry holds.
     pd.inst_prefix = registered.inst_prefix;
-    ReplacePathDelayPreservingPulse(path_delays_[registered.path_index],
-                                    std::move(pd), {true, true});
+    ReplacePathDelayRetaining(path_delays_[registered.path_index],
+                              std::move(pd),
+                              PathDelayRetention::PulseLimits(true, true));
   }
 }
 
@@ -249,6 +254,9 @@ void SpecifyManager::ReplacePrimitiveDriver(PrimitiveDriver rebuilt) {
   for (auto& existing : primitive_drivers_) {
     if (existing.output_port == rebuilt.output_port &&
         existing.inst_prefix == rebuilt.inst_prefix) {
+      // What the module made of the driver's output is not in its
+      // declaration, so the rebuilt driver keeps it.
+      rebuilt.drives_module_output = existing.drives_module_output;
       existing = std::move(rebuilt);
       return;
     }
@@ -291,7 +299,8 @@ void SpecifyManager::RebuildGateDriversForSpecparam(
 
 void SpecifyManager::ApplyAnnotatedSpecparam(std::string_view inst_prefix,
                                              const std::string& name,
-                                             uint64_t value) {
+                                             uint64_t value,
+                                             double real_value) {
   if (specparam_ctx_ == nullptr) return;
   // §32.4.3: a LABEL section annotates to specparams. A name the instance did
   // not declare as a specparam therefore has nothing here for the annotation to
@@ -306,21 +315,93 @@ void SpecifyManager::ApplyAnnotatedSpecparam(std::string_view inst_prefix,
       storage != nullptr) {
     const uint32_t kWidth =
         storage->value.width == 0 ? 32u : storage->value.width;
-    storage->value = MakeLogic4VecVal(*specparam_arena_, kWidth, value);
+    // §6.20.5: a specparam of type real holds the value as a real number, its
+    // fraction included, where any other holds the integer.
+    storage->value = storage->is_real
+                         ? MakeRealVec(*specparam_arena_, real_value, kWidth)
+                         : MakeLogic4VecVal(*specparam_arena_, kWidth, value);
   }
 
   // §32.4.3: an expression containing one or more specparams is reevaluated
-  // when a value is annotated to it from an SDF file.
-  const std::vector<std::string> kChanged{name};
+  // when a value is annotated to it from an SDF file, another specparam's
+  // initializer among them, and what reads that specparam in turn.
+  const std::vector<std::string> kChanged =
+      ReevaluateDependentSpecparams(inst_prefix, name);
   RebuildPathDelaysForSpecparam(inst_prefix, kChanged);
   RebuildTimingChecksForSpecparam(inst_prefix, kChanged);
   RebuildGateDriversForSpecparam(inst_prefix, kChanged);
+}
+
+namespace {
+
+// Whether `declared`, a specparam of the instance `inst_prefix` names, is one
+// to reevaluate because its initializer reads the specparam `reading`: one
+// not already reevaluated (`changed`), and not one a LABEL gave a value of its
+// own (`annotated`, keyed by prefix and name), which that value outranks.
+bool ReadsTheChangedSpecparam(
+    const DeclaredSpecparam& declared, std::string_view inst_prefix,
+    const std::vector<std::string>& changed,
+    const std::vector<std::string>& reading,
+    const std::unordered_map<std::string, std::size_t>& annotated) {
+  if (declared.inst_prefix != inst_prefix || declared.init == nullptr) {
+    return false;
+  }
+  if (std::ranges::find(changed, declared.name) != changed.end()) return false;
+  if (annotated.contains(std::string(inst_prefix) + declared.name)) {
+    return false;
+  }
+  return ExprReadsSpecparam(declared.init, reading);
+}
+
+// Stores `value` into a specparam's storage, as a real where the specparam is
+// one (§6.20.5) and as the integer, rounded, where it is not.
+void StoreSpecparamValue(Variable& storage, const Logic4Vec& value,
+                         Arena& arena) {
+  const double kReal = value.is_real ? RealVecToDouble(value)
+                                     : static_cast<double>(value.ToUint64());
+  if (storage.is_real) {
+    storage.value = MakeRealVec(arena, kReal, storage.value.width);
+    return;
+  }
+  storage.value = MakeLogic4VecVal(
+      arena, storage.value.width,
+      value.is_real ? static_cast<uint64_t>(std::llround(kReal))
+                    : value.ToUint64());
+}
+
+}  // namespace
+
+std::vector<std::string> SpecifyManager::ReevaluateDependentSpecparams(
+    std::string_view inst_prefix, const std::string& annotated) {
+  std::vector<std::string> changed{annotated};
+  for (std::size_t next = 0; next < changed.size(); ++next) {
+    const std::vector<std::string> kReading{changed[next]};
+    for (const DeclaredSpecparam& declared : declared_specparams_) {
+      if (!ReadsTheChangedSpecparam(declared, inst_prefix, changed, kReading,
+                                    specparam_index_)) {
+        continue;
+      }
+      Variable* storage = specparam_ctx_->FindVariable(
+          std::string(inst_prefix) + declared.name);
+      if (storage == nullptr) continue;
+      // The initializer reads its specparams by bare name, in the instance
+      // that declared it.
+      InstancePrefixOverride scope(specparam_ctx_->InstancePrefixOverride(),
+                                   inst_prefix);
+      StoreSpecparamValue(
+          *storage, EvalExpr(declared.init, *specparam_ctx_, *specparam_arena_),
+          *specparam_arena_);
+      changed.push_back(declared.name);
+    }
+  }
+  return changed;
 }
 
 void SpecifyManager::SetSpecparamValue(SpecparamValue spec,
                                        std::string_view inst_prefix) {
   std::string name = spec.name;
   uint64_t value = spec.value;
+  const double kRealValue = spec.real_value;
   // Keyed per instance because §30.3 has a specify block declare its specparams
   // by bare names: what one instance's CELL record asked for is not another's.
   std::string key = std::string(inst_prefix) + spec.name;
@@ -332,11 +413,29 @@ void SpecifyManager::SetSpecparamValue(SpecparamValue spec,
     specparam_values_.push_back(std::move(spec));
   }
 
-  ApplyAnnotatedSpecparam(inst_prefix, name, value);
+  ApplyAnnotatedSpecparam(inst_prefix, name, value, kRealValue);
 
   for (const auto& reev : specparam_reevaluators_) {
     if (reev.first == name) reev.second(value);
   }
+}
+
+bool SpecifyManager::KnowsSpecparam(std::string_view inst_prefix,
+                                    std::string_view name) const {
+  if (IsDeclaredSpecparam(inst_prefix, name)) return true;
+  return specparam_index_.contains(std::string(inst_prefix) +
+                                   std::string(name));
+}
+
+double SpecifyManager::StoredSpecparamReal(std::string_view inst_prefix,
+                                           const std::string& name) const {
+  if (specparam_ctx_ == nullptr || !IsDeclaredSpecparam(inst_prefix, name))
+    return 0.0;
+  Variable* storage =
+      specparam_ctx_->FindVariable(std::string(inst_prefix) + name);
+  if (storage == nullptr) return 0.0;
+  return storage->is_real ? RealVecToDouble(storage->value)
+                          : static_cast<double>(storage->value.ToUint64());
 }
 
 uint64_t SpecifyManager::StoredSpecparamValue(std::string_view inst_prefix,
@@ -353,26 +452,31 @@ void SpecifyManager::IncrementSpecparamValue(SpecparamValue delta,
   std::string name = std::move(delta.name);
   uint64_t added = delta.value;
   uint64_t new_value = added;
+  double new_real = delta.real_value;
   // Keyed per instance as in SetSpecparamValue, and the reason bites here: an
   // INCREMENT entry would otherwise add onto another instance's running total.
   std::string key = std::string(inst_prefix) + name;
   auto it = specparam_index_.find(key);
   if (it != specparam_index_.end()) {
     new_value = specparam_values_[it->second].value + added;
+    new_real += specparam_values_[it->second].real_value;
     specparam_values_[it->second].value = new_value;
+    specparam_values_[it->second].real_value = new_real;
   } else {
     // §32.4.3 (printed page 927) with §32.5 (printed page 929): an INCREMENT
     // modifies what the specparam holds, which before any LABEL reaches it is
     // the value its declaration gave it. Taken as 0, `(INCREMENT (cap (3)))`
     // on `specparam cap = 1` made cap 3 rather than 4.
     new_value = StoredSpecparamValue(inst_prefix, name) + added;
+    new_real += StoredSpecparamReal(inst_prefix, name);
     specparam_index_[key] = specparam_values_.size();
     SpecparamValue stored;
     stored.name = name;
     stored.value = new_value;
+    stored.real_value = new_real;
     specparam_values_.push_back(std::move(stored));
   }
-  ApplyAnnotatedSpecparam(inst_prefix, name, new_value);
+  ApplyAnnotatedSpecparam(inst_prefix, name, new_value, new_real);
   for (const auto& reev : specparam_reevaluators_) {
     if (reev.first == name) reev.second(new_value);
   }
@@ -393,13 +497,6 @@ void ApplySdfPercentPulseLimits(PathDelay& pd, uint64_t reject, bool has_error,
   for (int i = 0; i < 12; ++i) {
     pd.reject_limit[i] = pd.delays[i] * reject_pct / 100;
     pd.error_limit[i] = pd.delays[i] * error_pct / 100;
-  }
-}
-
-void ClampPulseLimitsToDelays(PathDelay& pd) {
-  for (int i = 0; i < 12; ++i) {
-    if (pd.reject_limit[i] > pd.delays[i]) pd.reject_limit[i] = pd.delays[i];
-    if (pd.error_limit[i] > pd.delays[i]) pd.error_limit[i] = pd.delays[i];
   }
 }
 
@@ -445,9 +542,11 @@ void IncrementPulseLimitsOnPath(PathDelay& pd, const SdfPulseLimitSpec& spec) {
 }
 
 // §32.7: put one entry's limits on a path it reaches. The entry either states
-// the limits or states amounts to change them by, and either way the limits it
-// leaves behind are measured against the path's delay afterwards -- a limit
-// this construct puts above the delay behaves as one put at the delay.
+// the limits or states amounts to change them by. A limit it puts above the
+// delay behaves as one put at the delay, which EffectivePulseLimit
+// (simulator/specify_path_delay.h) gives where a pulse is judged; the limit
+// itself is kept as written, so a delay annotated later is measured against it
+// (§32.5).
 void PlaceSdfPulseLimits(PathDelay& pd, const SdfPulseLimitSpec& spec) {
   if (spec.is_increment) {
     IncrementPulseLimitsOnPath(pd, spec);
@@ -458,7 +557,6 @@ void PlaceSdfPulseLimits(PathDelay& pd, const SdfPulseLimitSpec& spec) {
     ApplySdfPulseLimits(pd, StatedPulseLimit(spec.reject), spec.has_error,
                         StatedPulseLimit(spec.error));
   }
-  ClampPulseLimitsToDelays(pd);
 }
 
 }  // namespace
@@ -469,13 +567,16 @@ void PlaceSdfPulseLimits(PathDelay& pd, const SdfPulseLimitSpec& spec) {
 // (simulator/sdf_annotate.cpp) made of the entry's CELLINSTANCE, read from the
 // §32.9 region down, so the limits reach the paths of that one instance and of
 // no other in-scope instance of the cell.
-void SpecifyManager::AddSdfPulseLimit(const SdfPulseLimitSpec& spec,
+bool SpecifyManager::AddSdfPulseLimit(const SdfPulseLimitSpec& spec,
                                       std::string_view inst_prefix) {
+  bool placed = false;
   for (auto& pd : path_delays_) {
     if (pd.src_port != spec.src || pd.dst_port != spec.dst) continue;
     if (pd.inst_prefix != inst_prefix) continue;
     PlaceSdfPulseLimits(pd, spec);
+    placed = true;
   }
+  return placed;
 }
 
 void SpecifyManager::ResolvePulseControlSpecparams(
@@ -532,19 +633,17 @@ void SpecifyManager::ApplyPathSpecificPulseControl(
 // As with AddSdfPulseLimit above, `inst_prefix` is the prefix of the instance
 // the SDF cell named, so the amounts reach the paths of that one instance
 // rather than of every in-scope instance of the cell.
-void SpecifyManager::IncrementSdfPulseLimit(std::string_view src,
-                                            std::string_view dst,
-                                            int64_t reject_delta,
-                                            int64_t error_delta,
-                                            std::string_view inst_prefix) {
+void SpecifyManager::IncrementSdfPulseLimit(
+    std::string_view src, std::string_view dst,
+    const SdfPulseLimitIncrement& deltas, std::string_view inst_prefix) {
   for (auto& pd : path_delays_) {
     if (pd.src_port != src || pd.dst_port != dst) continue;
     if (pd.inst_prefix != inst_prefix) continue;
-    for (int i = 0; i < 12; ++i) {
+    for (std::size_t i = 0; i < 12; ++i) {
       const int64_t kNewReject =
-          static_cast<int64_t>(pd.reject_limit[i]) + reject_delta;
+          static_cast<int64_t>(pd.reject_limit[i]) + deltas.reject[i];
       const int64_t kNewError =
-          static_cast<int64_t>(pd.error_limit[i]) + error_delta;
+          static_cast<int64_t>(pd.error_limit[i]) + deltas.error[i];
       pd.reject_limit[i] =
           kNewReject < 0 ? 0u : static_cast<uint64_t>(kNewReject);
       pd.error_limit[i] = kNewError < 0 ? 0u : static_cast<uint64_t>(kNewError);

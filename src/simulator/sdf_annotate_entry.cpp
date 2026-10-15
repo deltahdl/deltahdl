@@ -4,7 +4,8 @@
 // Table 32-3, PATHPULSE and PATHPULSEPERCENT from §32.7, and the checks a
 // TIMINGCHECK section lists. AnnotateSdfDeviceEntry, AnnotateSdfIopathEntry,
 // AnnotateSdfSpecparamEntry, AnnotateSdfInterconnectEntry,
-// AnnotateSdfPulseLimitEntry and AnnotateSdfTimingCheckEntry are those six.
+// AnnotateSdfPulseLimitEntry and AnnotateSdfTimingCheckEntry are those six,
+// the last of them in simulator/sdf_annotate_timing_check.cpp.
 // Each takes one entry's values to the SpecifyManager call that places them.
 // Where the design has nothing an INTERCONNECT, a DEVICE or a timing check can
 // reach, §32.3 has the entry warned about rather than dropped in silence; a
@@ -29,7 +30,7 @@
 #include <utility>
 #include <vector>
 
-#include "parser/ast_specify.h"
+#include "simulator/sdf_annotate_internal.h"
 #include "simulator/sdf_parser.h"
 #include "simulator/specify.h"
 #include "simulator/specify_path_delay.h"
@@ -68,9 +69,29 @@ static bool SelectMtmNegative(const SdfDelayValue& dv, SdfMtm mtm) {
 // the one annotation that gives a negative value a meaning -- a pulse limit
 // changed in INCREMENT mode, where a negative value lowers the limit already in
 // place instead of raising it.
-static int64_t SelectSignedMtm(const SdfDelayValue& dv, SdfMtm mtm) {
+int64_t SelectSignedMtm(const SdfDelayValue& dv, SdfMtm mtm) {
   const auto kMagnitude = static_cast<int64_t>(SelectMtmMagnitude(dv, mtm));
   return SelectMtmNegative(dv, mtm) ? -kMagnitude : kMagnitude;
+}
+
+// The selected member exactly as written, its fraction and its sign included.
+static double SelectRealMtm(const SdfDelayValue& dv, SdfMtm mtm) {
+  double real = dv.typ_real;
+  if (mtm == SdfMtm::kMinimum) real = dv.min_real;
+  if (mtm == SdfMtm::kMaximum) real = dv.max_real;
+  return SelectMtmNegative(dv, mtm) ? -real : real;
+}
+
+bool SdfValueHeld(const SdfDelayValue& dv, SdfMtm mtm) {
+  if (dv.empty) return true;
+  switch (mtm) {
+    case SdfMtm::kMinimum:
+      return dv.min_empty;
+    case SdfMtm::kMaximum:
+      return dv.max_empty;
+    default:
+      return dv.typ_empty;
+  }
 }
 
 // The selected value as the unsigned quantity the annotator's other targets
@@ -78,7 +99,7 @@ static int64_t SelectSignedMtm(const SdfDelayValue& dv, SdfMtm mtm) {
 // None of those can carry a negative number, and §30.5.1 puts a delay whose
 // expression is negative at zero, so that is where a value written negative
 // reads here.
-static uint64_t SelectMtm(const SdfDelayValue& dv, SdfMtm mtm) {
+uint64_t SelectMtm(const SdfDelayValue& dv, SdfMtm mtm) {
   if (SelectMtmNegative(dv, mtm)) return 0;
   return SelectMtmMagnitude(dv, mtm);
 }
@@ -111,7 +132,7 @@ static void ExpandSdfDelaysThree(std::vector<T>& out, T v1, T v2, T v3) {
   out[4] = v3;
   out[5] = v2;
   out[6] = std::min(v1, v3);
-  out[7] = std::max(v1, v3);
+  out[7] = v1;
   out[8] = std::min(v2, v3);
   out[9] = v2;
   out[10] = v3;
@@ -164,6 +185,27 @@ static void ExpandSdfDelaysSix(std::vector<T>& out, const SdfSixDelays<T>& d) {
   ExpandSdfDelaysSixDerived(out, d);
 }
 
+// The twelve transition values the listed values `v` spread to.
+template <typename T>
+static std::vector<T> ExpandListedDelays(const std::vector<T>& v) {
+  std::vector<T> out(12, 0);
+  if (v.empty()) return out;
+  const std::size_t kN = v.size();
+  if (kN == 2) {
+    ExpandSdfDelaysTwo(out, v[0], v[1]);
+  } else if (kN == 3) {
+    ExpandSdfDelaysThree(out, v[0], v[1], v[2]);
+  } else if (kN == 6) {
+    ExpandSdfDelaysSix(out,
+                       SdfSixDelays<T>{v[0], v[1], v[2], v[3], v[4], v[5]});
+  } else if (kN == 12) {
+    std::copy(v.begin(), v.end(), out.begin());
+  } else {
+    std::fill(out.begin(), out.end(), v[0]);
+  }
+  return out;
+}
+
 // The twelve transition values `vals` spreads to, each listed value read by
 // `select`, which decides what a value written negative becomes.
 template <typename T>
@@ -171,38 +213,46 @@ static std::vector<T> ExpandSdfDelaysBy(const std::vector<SdfDelayValue>& vals,
                                         SdfMtm mtm,
                                         T (*select)(const SdfDelayValue&,
                                                     SdfMtm)) {
-  std::vector<T> out(12, 0);
-  if (vals.empty()) return out;
+  std::vector<T> listed;
+  listed.reserve(vals.size());
+  for (const SdfDelayValue& dv : vals) listed.push_back(select(dv, mtm));
+  return ExpandListedDelays(listed);
+}
 
-  const std::size_t kN = vals.size();
-  const T kV1 = select(vals[0], mtm);
-
-  if (kN != 2 && kN != 3 && kN != 6 && kN != 12) {
-    std::fill(out.begin(), out.end(), kV1);
-    return out;
+// §32.5 with §32.8: the transitions an entry leaves as they stood, where
+// `written` says which of its listed values it wrote and which it left as
+// empty parentheses. A transition Table 32-4 takes from one listed value is
+// held where that value is empty, and one it takes as the smaller or the
+// larger of two where either is: spread, the written flags say a smaller-of
+// slot is written only where both are, and the empty flags say a larger-of
+// slot is empty where either is.
+static std::array<bool, 12> HeldTransitions(const std::vector<bool>& written) {
+  std::vector<uint8_t> written_flags;
+  std::vector<uint8_t> empty_flags;
+  written_flags.reserve(written.size());
+  empty_flags.reserve(written.size());
+  for (const bool kWritten : written) {
+    written_flags.push_back(kWritten ? 1 : 0);
+    empty_flags.push_back(kWritten ? 0 : 1);
   }
-
-  const T kV2 = select(vals[1], mtm);
-  if (kN == 2) {
-    ExpandSdfDelaysTwo(out, kV1, kV2);
-    return out;
+  const std::vector<uint8_t> kWrittenSpread = ExpandListedDelays(written_flags);
+  const std::vector<uint8_t> kEmptySpread = ExpandListedDelays(empty_flags);
+  std::array<bool, 12> held{};
+  for (std::size_t i = 0; i < 12 && !written.empty(); ++i) {
+    held[i] = kWrittenSpread[i] == 0 || kEmptySpread[i] == 1;
   }
+  return held;
+}
 
-  const T kV3 = select(vals[2], mtm);
-  if (kN == 3) {
-    ExpandSdfDelaysThree(out, kV1, kV2, kV3);
-    return out;
+// Which of the listed values provide one for `mtm` to select (SdfValueHeld).
+static std::vector<bool> ValuesWritten(const std::vector<SdfDelayValue>& values,
+                                       SdfMtm mtm) {
+  std::vector<bool> written;
+  written.reserve(values.size());
+  for (const SdfDelayValue& dv : values) {
+    written.push_back(!SdfValueHeld(dv, mtm));
   }
-
-  if (kN == 6) {
-    ExpandSdfDelaysSix(
-        out, SdfSixDelays<T>{kV1, kV2, kV3, select(vals[3], mtm),
-                             select(vals[4], mtm), select(vals[5], mtm)});
-    return out;
-  }
-
-  for (std::size_t i = 0; i < 12; ++i) out[i] = select(vals[i], mtm);
-  return out;
+  return written;
 }
 
 std::vector<uint64_t> ExpandSdfDelays(const std::vector<SdfDelayValue>& vals,
@@ -225,186 +275,12 @@ std::array<uint64_t, 4> ReduceSdfDelaysToThree(
 
   out[0] = SelectMtm(vals[0], mtm);
   out[1] = vals.size() >= 2 ? SelectMtm(vals[1], mtm) : out[0];
-  out[2] = vals.size() >= 3 ? SelectMtm(vals[2], mtm) : out[0];
+  // §28.16's Table 28-9: of two delays, the smaller is the turn-off delay.
+  out[2] =
+      vals.size() >= 3 ? SelectMtm(vals[2], mtm) : std::min(out[0], out[1]);
 
   out[3] = std::min({out[0], out[1], out[2]});
   return out;
-}
-
-namespace {
-
-// Mirrors the `push` lambda in ExpandSdfTimingCheckTargets: appends a new
-// annotation seeded from the timing check and returns a reference to it.
-SdfTcAnnotation& PushSdfTcAnnotation(std::vector<SdfTcAnnotation>& targets,
-                                     const SdfTimingCheck& tc,
-                                     TimingCheckKind kind) {
-  SdfTcAnnotation a;
-  a.kind = kind;
-  a.ref_signal = tc.ref_port;
-  a.ref_edge = tc.ref_edge;
-  a.data_signal = tc.data_port;
-  a.data_edge = tc.data_edge;
-  a.condition = tc.condition;
-  targets.push_back(std::move(a));
-  return targets.back();
-}
-
-void PopulateSdfTcSetupHold(std::vector<SdfTcAnnotation>& targets,
-                            const SdfTimingCheck& tc, SdfCheckType check_type,
-                            uint64_t v1, uint64_t v2) {
-  switch (check_type) {
-    case SdfCheckType::kSetup: {
-      auto& s = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kSetup);
-      s.set_limit = true;
-      s.limit = v1;
-      auto& sh = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kSetuphold);
-      sh.set_limit = true;
-      sh.limit = v1;
-      break;
-    }
-    case SdfCheckType::kHold: {
-      auto& h = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kHold);
-      h.set_limit = true;
-      h.limit = v1;
-      auto& sh = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kSetuphold);
-      sh.set_limit2 = true;
-      sh.limit2 = v1;
-      break;
-    }
-    case SdfCheckType::kSetuphold: {
-      auto& s = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kSetup);
-      s.set_limit = true;
-      s.limit = v1;
-      auto& h = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kHold);
-      h.set_limit = true;
-      h.limit = v2;
-      auto& sh = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kSetuphold);
-      sh.set_limit = true;
-      sh.limit = v1;
-      sh.set_limit2 = true;
-      sh.limit2 = v2;
-      break;
-    }
-    default:
-      break;
-  }
-}
-
-void PopulateSdfTcRecRem(std::vector<SdfTcAnnotation>& targets,
-                         const SdfTimingCheck& tc, SdfCheckType check_type,
-                         uint64_t v1, uint64_t v2) {
-  switch (check_type) {
-    case SdfCheckType::kRecovery: {
-      auto& r = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kRecovery);
-      r.set_limit = true;
-      r.limit = v1;
-      auto& rr = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kRecrem);
-      rr.set_limit = true;
-      rr.limit = v1;
-      break;
-    }
-    case SdfCheckType::kRemoval: {
-      auto& r = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kRemoval);
-      r.set_limit = true;
-      r.limit = v1;
-      auto& rr = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kRecrem);
-      rr.set_limit2 = true;
-      rr.limit2 = v1;
-      break;
-    }
-    case SdfCheckType::kRecrem: {
-      auto& r = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kRecovery);
-      r.set_limit = true;
-      r.limit = v1;
-      auto& rm = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kRemoval);
-      rm.set_limit = true;
-      rm.limit = v2;
-      auto& rr = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kRecrem);
-      rr.set_limit = true;
-      rr.limit = v1;
-      rr.set_limit2 = true;
-      rr.limit2 = v2;
-      break;
-    }
-    default:
-      break;
-  }
-}
-
-void PopulateSdfTcSkewWidthPeriod(std::vector<SdfTcAnnotation>& targets,
-                                  const SdfTimingCheck& tc,
-                                  SdfCheckType check_type, uint64_t v1,
-                                  uint64_t v2) {
-  switch (check_type) {
-    case SdfCheckType::kSkew: {
-      auto& s = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kSkew);
-      s.set_limit = true;
-      s.limit = v1;
-      auto& ts = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kTimeskew);
-      ts.set_limit = true;
-      ts.limit = v1;
-      break;
-    }
-    case SdfCheckType::kBidirectskew: {
-      auto& fs = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kFullskew);
-      fs.set_limit = true;
-      fs.limit = v1;
-      fs.set_limit2 = true;
-      fs.limit2 = v2;
-      break;
-    }
-    case SdfCheckType::kWidth: {
-      auto& w = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kWidth);
-      w.set_limit = true;
-      w.limit = v1;
-      break;
-    }
-    case SdfCheckType::kPeriod: {
-      auto& p = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kPeriod);
-      p.set_limit = true;
-      p.limit = v1;
-      break;
-    }
-    case SdfCheckType::kNochange: {
-      auto& nc = PushSdfTcAnnotation(targets, tc, TimingCheckKind::kNochange);
-      nc.set_start_edge_offset = true;
-      nc.start_edge_offset = static_cast<int64_t>(v1);
-      nc.set_end_edge_offset = true;
-      nc.end_edge_offset = static_cast<int64_t>(v2);
-      break;
-    }
-    default:
-      break;
-  }
-}
-
-}  // namespace
-
-static std::vector<SdfTcAnnotation> ExpandSdfTimingCheckTargets(
-    const SdfTimingCheck& tc, SdfMtm mtm) {
-  const uint64_t kV1 = SelectMtm(tc.limit, mtm);
-  const uint64_t kV2 = SelectMtm(tc.limit2, mtm);
-  std::vector<SdfTcAnnotation> targets;
-  switch (tc.check_type) {
-    case SdfCheckType::kSetup:
-    case SdfCheckType::kHold:
-    case SdfCheckType::kSetuphold:
-      PopulateSdfTcSetupHold(targets, tc, tc.check_type, kV1, kV2);
-      break;
-    case SdfCheckType::kRecovery:
-    case SdfCheckType::kRemoval:
-    case SdfCheckType::kRecrem:
-      PopulateSdfTcRecRem(targets, tc, tc.check_type, kV1, kV2);
-      break;
-    case SdfCheckType::kSkew:
-    case SdfCheckType::kBidirectskew:
-    case SdfCheckType::kWidth:
-    case SdfCheckType::kPeriod:
-    case SdfCheckType::kNochange:
-      PopulateSdfTcSkewWidthPeriod(targets, tc, tc.check_type, kV1, kV2);
-      break;
-  }
-  return targets;
 }
 
 namespace {
@@ -436,113 +312,143 @@ SdfPathDelayIncrement SdfIopathIncrementOf(const SdfIopath& io, SdfMtm mtm) {
   return deltas;
 }
 
-// Handles the non-extended (legacy) iopath form: increment in place, or apply
-// the global pulse limits and add. Returns once the entry is committed.
-void AnnotateSdfIopathSimple(PathDelay& pd, const SdfIopath& io,
-                             SpecifyManager& mgr, SdfMtm mtm) {
-  if (io.is_increment) {
-    mgr.IncrementSdfPathDelay(pd, SdfIopathIncrementOf(io, mtm));
-    return;
-  }
-  ApplyGlobalPulseLimits(pd, mgr.RejectPulseLimitPercent(),
-                         mgr.ErrorPulseLimitPercent());
-  mgr.AnnotateSdfPathDelay(pd);
-}
-
-// Applies the explicit reject/error pulse limits supplied with an extended-form
-// iopath onto the already-built path delay.
-void ApplySdfIopathPulseLimits(PathDelay& pd, const SdfIopath& io,
-                               SpecifyManager& mgr, SdfMtm mtm) {
-  ApplyGlobalPulseLimits(pd, mgr.RejectPulseLimitPercent(),
-                         mgr.ErrorPulseLimitPercent());
-  if (io.rise_reject_present || io.fall_reject_present) {
-    const SdfDelayValue& src_dv =
-        io.rise_reject_present ? io.rise_reject : io.fall_reject;
-    const uint64_t kReject = SelectMtm(src_dv, mtm);
-    for (int i = 0; i < 12; ++i) pd.reject_limit[i] = kReject;
-  }
-  if (io.rise_error_present || io.fall_error_present) {
-    const SdfDelayValue& src_dv =
-        io.rise_error_present ? io.rise_error : io.fall_error;
-    const uint64_t kErr = SelectMtm(src_dv, mtm);
-    for (int i = 0; i < 12; ++i) pd.error_limit[i] = kErr;
-  }
-}
-
-// §32.5: an extended iopath writes each of its two pulse limits either as a
-// value or as an empty pair of parentheses, and an empty one holds whatever the
-// path already carries rather than overwriting it. The two limits are decided
-// separately, so an entry may supply a reject limit and hold the error limit,
-// or the other way round, as well as hold both or supply both.
-PathDelayPulseRetention SdfIopathPulseRetention(const SdfIopath& io) {
-  PathDelayPulseRetention retain;
-  retain.reject = !io.rise_reject_present && !io.fall_reject_present;
-  retain.error = !io.rise_error_present && !io.fall_error_present;
+// §32.5 with §32.8: the transitions a simple iopath leaves as they stood,
+// those Table 32-4 takes from a value written as empty parentheses. Nothing is
+// written for such a transition, its pulse limits included.
+PathDelayRetention SdfIopathSimpleRetention(const SdfIopath& io, SdfMtm mtm) {
+  PathDelayRetention retain;
+  retain.delay = HeldTransitions(ValuesWritten(SdfIopathDelayValues(io), mtm));
+  retain.reject = retain.delay;
+  retain.error = retain.delay;
   return retain;
 }
 
-// Handles the extended iopath form: the limits it supplies are applied, and the
-// ones it left empty are held at their current values.
-void AnnotateSdfIopathExtended(PathDelay& pd, const SdfIopath& io,
-                               SpecifyManager& mgr, SdfMtm mtm) {
-  ApplySdfIopathPulseLimits(pd, io, mgr, mtm);
-  mgr.AnnotateSdfPathDelay(pd, SdfIopathPulseRetention(io));
+// Handles the non-extended (legacy) iopath form: increment in place, or apply
+// the global pulse limits and add. Answers whether a declared path took it.
+bool AnnotateSdfIopathSimple(PathDelay& pd, const SdfIopath& io,
+                             SpecifyManager& mgr, SdfMtm mtm) {
+  const PathDelayRetention kHeld = SdfIopathSimpleRetention(io, mtm);
+  if (io.is_increment) {
+    SdfPathDelayIncrement deltas = SdfIopathIncrementOf(io, mtm);
+    for (std::size_t i = 0; i < 12; ++i) {
+      if (kHeld.delay[i]) deltas[i] = 0;
+    }
+    return mgr.IncrementSdfPathDelay(pd, deltas);
+  }
+  ApplyGlobalPulseLimits(pd, mgr.RejectPulseLimitPercent(),
+                         mgr.ErrorPulseLimitPercent());
+  return mgr.AnnotateSdfPathDelay(pd, kHeld);
 }
 
-// §32.7: how much an extended iopath in INCREMENT mode changes each of the two
-// pulse limits by. A limit the entry wrote as an empty pair of parentheses is
-// one it is not changing, so its amount is zero; one written with a leading
-// minus sign lowers the limit rather than raising it. The two are decided
-// separately, exactly as the absolute form decides them.
-struct SdfIopathPulseIncrement {
-  int64_t reject = 0;
-  int64_t error = 0;
-};
+// One member of every direction an extended iopath wrote: its delay, its
+// reject limit or its error limit, an empty one read as zero.
+std::vector<SdfDelayValue> DirectionMember(
+    const std::vector<SdfIopathDirection>& directions,
+    SdfDelayValue SdfIopathDirection::* member) {
+  std::vector<SdfDelayValue> out;
+  out.reserve(directions.size());
+  for (const SdfIopathDirection& dir : directions) out.push_back(dir.*member);
+  return out;
+}
 
-SdfIopathPulseIncrement SdfIopathPulseIncrementOf(const SdfIopath& io,
-                                                  SdfMtm mtm) {
-  SdfIopathPulseIncrement inc;
-  if (io.rise_reject_present || io.fall_reject_present) {
-    const SdfDelayValue& reject_dv =
-        io.rise_reject_present ? io.rise_reject : io.fall_reject;
-    inc.reject = SelectSignedMtm(reject_dv, mtm);
+// Which directions wrote that member, `written` saying whether it was left as
+// empty parentheses and SdfValueHeld whether it left out the member `mtm`
+// selects.
+std::vector<bool> DirectionWrote(
+    const std::vector<SdfIopathDirection>& directions,
+    SdfDelayValue SdfIopathDirection::* member,
+    bool SdfIopathDirection::* written, SdfMtm mtm) {
+  std::vector<bool> out;
+  out.reserve(directions.size());
+  for (const SdfIopathDirection& dir : directions) {
+    out.push_back(dir.*written && !SdfValueHeld(dir.*member, mtm));
   }
-  if (io.rise_error_present || io.fall_error_present) {
-    const SdfDelayValue& error_dv =
-        io.rise_error_present ? io.rise_error : io.fall_error;
-    inc.error = SelectSignedMtm(error_dv, mtm);
+  return out;
+}
+
+// §32.5 with §32.8: an extended iopath leaves as they stood the delays and the
+// limits it wrote as empty parentheses, each transition held or written by the
+// directions Table 32-4 takes it from. The delays and the two limits are
+// decided apart, so an entry may supply one and hold the others.
+PathDelayRetention DirectionsRetention(
+    const std::vector<SdfIopathDirection>& directions, SdfMtm mtm) {
+  PathDelayRetention retain;
+  retain.delay =
+      HeldTransitions(DirectionWrote(directions, &SdfIopathDirection::delay,
+                                     &SdfIopathDirection::delay_present, mtm));
+  retain.reject =
+      HeldTransitions(DirectionWrote(directions, &SdfIopathDirection::reject,
+                                     &SdfIopathDirection::reject_present, mtm));
+  retain.error =
+      HeldTransitions(DirectionWrote(directions, &SdfIopathDirection::error,
+                                     &SdfIopathDirection::error_present, mtm));
+  return retain;
+}
+
+// Handles the extended iopath form: each direction's reject and error limits
+// spread over the transitions as its delays do (§32.8), and those of a
+// transition whose directions left them empty, or wrote none, held at their
+// current values (§32.5).
+bool AnnotateSdfIopathExtended(PathDelay& pd, const SdfIopath& io,
+                               SpecifyManager& mgr, SdfMtm mtm) {
+  ApplyGlobalPulseLimits(pd, mgr.RejectPulseLimitPercent(),
+                         mgr.ErrorPulseLimitPercent());
+  const std::vector<uint64_t> kRejects = ExpandSdfDelays(
+      DirectionMember(io.directions, &SdfIopathDirection::reject), mtm);
+  const std::vector<uint64_t> kErrors = ExpandSdfDelays(
+      DirectionMember(io.directions, &SdfIopathDirection::error), mtm);
+  for (std::size_t i = 0; i < 12; ++i) {
+    pd.reject_limit[i] = kRejects[i];
+    pd.error_limit[i] = kErrors[i];
   }
-  return inc;
+  return mgr.AnnotateSdfPathDelay(pd, DirectionsRetention(io.directions, mtm));
+}
+
+// §32.7: the twelve amounts an extended iopath in INCREMENT mode adds to one
+// of the path's members, spread by §32.8 like its delays. A transition the
+// entry held with empty parentheses is one it is not changing, so its amount
+// is zero; one written with a leading minus sign lowers what it reaches.
+SdfPathDelayIncrement SdfIopathMemberIncrement(
+    const std::vector<SdfDelayValue>& listed, const std::array<bool, 12>& held,
+    SdfMtm mtm) {
+  const std::vector<int64_t> kExpanded = ExpandSignedSdfDelays(listed, mtm);
+  SdfPathDelayIncrement deltas{};
+  for (std::size_t i = 0; i < 12; ++i) deltas[i] = held[i] ? 0 : kExpanded[i];
+  return deltas;
 }
 
 // §32.7: an extended iopath in INCREMENT mode modifies what the path already
 // carries rather than replacing it, on both halves of the entry. Its delay
-// values add to the path's delays -- a direction written as an empty pair of
-// parentheses adds nothing there -- and its two pulse-limit values add to the
-// limits the path already holds. Nothing here derives a limit from the
-// percentage settings: those supply a limit a construct did not state, and an
-// INCREMENT entry states a change to the limit already in place.
+// values add to the path's delays and its pulse-limit values to the limits the
+// path already holds, transition by transition. Nothing here derives a limit
+// from the percentage settings: those supply a limit a construct did not
+// state, and an INCREMENT entry states a change to the limit already in place.
 //
 // The delays go through IncrementSdfPathDelay and the two limits through
 // IncrementSdfPulseLimit, and both match PathDelay::inst_prefix, so the whole
 // entry reaches the one instance its cell named.
-void AnnotateSdfIopathIncrementExtended(const PathDelay& pd,
+bool AnnotateSdfIopathIncrementExtended(const PathDelay& pd,
                                         const SdfIopath& io,
                                         SpecifyManager& mgr, SdfMtm mtm) {
-  mgr.IncrementSdfPathDelay(pd, SdfIopathIncrementOf(io, mtm));
-  const SdfIopathPulseIncrement kIncrement = SdfIopathPulseIncrementOf(io, mtm);
-  mgr.IncrementSdfPulseLimit(pd.src_port, pd.dst_port, kIncrement.reject,
-                             kIncrement.error, pd.inst_prefix);
+  const PathDelayRetention kHeld = DirectionsRetention(io.directions, mtm);
+  const bool kPlaced = mgr.IncrementSdfPathDelay(
+      pd, SdfIopathMemberIncrement(SdfIopathDelayValues(io), kHeld.delay, mtm));
+  mgr.IncrementSdfPulseLimit(
+      pd.src_port, pd.dst_port,
+      {SdfIopathMemberIncrement(
+           DirectionMember(io.directions, &SdfIopathDirection::reject),
+           kHeld.reject, mtm),
+       SdfIopathMemberIncrement(
+           DirectionMember(io.directions, &SdfIopathDirection::error),
+           kHeld.error, mtm)},
+      pd.inst_prefix);
+  return kPlaced;
 }
 
 }  // namespace
 
-// §32.4.1 (printed page 925): an SDF port written with a select, `a[1]` or
-// `b[3:2]`, as the bare name a path's terminal is recorded under and the
-// select PathDelay::src_select spells; the whole spelling as the name, and no
-// select, where it carries none.
-static void SplitSdfPortSelect(const std::string& port, std::string& name,
-                               std::string& select) {
+void SplitSdfPortSelect(const std::string& port, std::string& name,
+                        std::string& select) {
   const size_t kOpen = port.find('[');
   if (kOpen == std::string::npos || kOpen == 0 || port.back() != ']') {
     name = port;
@@ -558,8 +464,11 @@ static void SplitSdfPortSelect(const std::string& port, std::string& name,
 // of the same cell by PathDelay::inst_prefix alone. The prefix the cell's
 // CELLINSTANCE gave (SdfCellPrefixInRegion) is stamped on here, which is what
 // SpecifyManager::AnnotateSdfPathDelay and IncrementSdfPathDelay match on.
+// §32.3: an entry no declared path takes is data the annotator could not
+// place, so it is warned about.
 void AnnotateSdfIopathEntry(const SdfIopath& io, std::string_view inst_prefix,
-                            SpecifyManager& mgr, SdfMtm mtm) {
+                            SpecifyManager& mgr, SdfMtm mtm,
+                            SdfAnnotationResult& result) {
   PathDelay pd;
   SplitSdfPortSelect(io.src_port, pd.src_port, pd.src_select);
   SplitSdfPortSelect(io.dst_port, pd.dst_port, pd.dst_select);
@@ -570,15 +479,18 @@ void AnnotateSdfIopathEntry(const SdfIopath& io, std::string_view inst_prefix,
   pd.is_ifnone = io.is_ifnone;
 
   FillSdfIopathDelays(pd, io, mtm);
+  bool placed = false;
   if (!io.extended_form) {
-    AnnotateSdfIopathSimple(pd, io, mgr, mtm);
-    return;
+    placed = AnnotateSdfIopathSimple(pd, io, mgr, mtm);
+  } else if (io.is_increment) {
+    placed = AnnotateSdfIopathIncrementExtended(pd, io, mgr, mtm);
+  } else {
+    placed = AnnotateSdfIopathExtended(pd, io, mgr, mtm);
   }
-  if (io.is_increment) {
-    AnnotateSdfIopathIncrementExtended(pd, io, mgr, mtm);
-    return;
-  }
-  AnnotateSdfIopathExtended(pd, io, mgr, mtm);
+  if (placed) return;
+  result.warnings.push_back(
+      "SDF annotator: unable to annotate IOPATH delay from " + io.src_port +
+      " to " + io.dst_port);
 }
 
 namespace {
@@ -637,28 +549,54 @@ std::vector<SdfDelayValue> SdfInterconnectDelayValues(
 
 }  // namespace
 
+// §32.9: an interconnect entry's ports are named within the instance its cell
+// names, which `inst_prefix` (SdfCellPrefixInRegion) spells, so they are read
+// below it rather than from the top of the design.
+static std::string PortUnderCell(std::string_view inst_prefix,
+                                 const std::string& port) {
+  if (port.empty()) return port;
+  return std::string(inst_prefix) + port;
+}
+
 void AnnotateSdfInterconnectEntry(const SdfInterconnect& ic,
-                                  const SdfFile& file, SpecifyManager& mgr,
+                                  const SdfCellSource& src, SpecifyManager& mgr,
                                   SdfMtm mtm, SdfAnnotationResult& result) {
   if (ic.kind == SdfInterconnectKind::kNetdelay &&
-      !SdfVersionHasNetdelay(file.version)) {
+      !SdfVersionHasNetdelay(src.file.version)) {
     result.warnings.push_back(
         "SDF annotator: unable to annotate NETDELAY construct, which SDF "
         "version " +
-        file.version + " does not define");
+        src.file.version + " does not define");
     return;
   }
 
   SdfInterconnectAnnotation ann;
-  ann.source = ic.src_port;
-  ann.load = ic.dst_port;
+  ann.source = PortUnderCell(src.inst_prefix, ic.src_port);
+  ann.load = PortUnderCell(src.inst_prefix, ic.dst_port);
   ann.construct = SdfInterconnectConstructOf(ic.kind);
   ann.is_increment = ic.is_increment;
 
   // §32.4.4: interconnect delays fill in their twelve transition delays from
-  // the values the entry lists exactly the way a specify path delay does.
+  // the values the entry lists exactly the way a specify path delay does,
+  // their pulse limits too where the values state them, and §32.5 holds what
+  // a value written empty stands for.
   const auto kExpanded = ExpandSdfDelays(SdfInterconnectDelayValues(ic), mtm);
   for (int i = 0; i < 12; ++i) ann.delays[i] = kExpanded[i];
+  if (!ic.directions.empty()) {
+    ann.held = DirectionsRetention(ic.directions, mtm);
+    ann.limits_written =
+        std::ranges::any_of(ic.directions, [](const SdfIopathDirection& dir) {
+          return dir.reject_present || dir.error_present;
+        });
+    const auto kRejects = ExpandSdfDelays(
+        DirectionMember(ic.directions, &SdfIopathDirection::reject), mtm);
+    const auto kErrors = ExpandSdfDelays(
+        DirectionMember(ic.directions, &SdfIopathDirection::error), mtm);
+    for (std::size_t i = 0; i < 12; ++i) {
+      ann.reject_limit[i] = kRejects[i];
+      ann.error_limit[i] = kErrors[i];
+    }
+  }
 
   SdfInterconnectOutcome outcome = mgr.AnnotateSdfInterconnect(ann);
   for (auto& warning : outcome.warnings) {
@@ -700,6 +638,22 @@ std::vector<SdfDelayValue> SdfDeviceDelayValues(const SdfDevice& dev) {
 // the entry rather than on it because SdfDeviceAnnotation
 // (simulator/specify_sdf.h) has no field for it. It is what holds the delay to
 // the outputs of the one instance the entry names.
+// §32.5 with §32.8: which of the three delays and the delay to x a DEVICE entry
+// leaves as they stood on a primitive -- each one the reduction takes from a
+// value written empty, the turn-off delay of two values held where either
+// is, and the delay to x, the least of the three, where any of them is.
+static std::array<bool, 4> DeviceThreeStateHeld(
+    const std::vector<SdfDelayValue>& values, SdfMtm mtm) {
+  std::array<bool, 4> held{};
+  if (values.empty()) return held;
+  const bool kRise = !SdfValueHeld(values[0], mtm);
+  const bool kFall = values.size() >= 2 ? !SdfValueHeld(values[1], mtm) : kRise;
+  const bool kOff =
+      values.size() >= 3 ? !SdfValueHeld(values[2], mtm) : kRise && kFall;
+  held = {!kRise, !kFall, !kOff, !(kRise && kFall && kOff)};
+  return held;
+}
+
 void AnnotateSdfDeviceEntry(const SdfDevice& dev, std::string_view inst_prefix,
                             SpecifyManager& mgr, SdfMtm mtm,
                             SdfAnnotationResult& result) {
@@ -711,6 +665,8 @@ void AnnotateSdfDeviceEntry(const SdfDevice& dev, std::string_view inst_prefix,
   for (int i = 0; i < 12; ++i) ann.delays[i] = kExpanded[i];
   const auto kReduced = ReduceSdfDelaysToThree(kValues, mtm);
   for (int i = 0; i < 4; ++i) ann.three_state_delays[i] = kReduced[i];
+  ann.three_state_held = DeviceThreeStateHeld(kValues, mtm);
+  ann.held = HeldTransitions(ValuesWritten(kValues, mtm));
 
   if (mgr.AnnotateSdfDeviceDelay(ann, inst_prefix)) return;
   const std::string kTarget = dev.port_instance.empty()
@@ -744,8 +700,9 @@ int64_t SdfPulseLimitValue(const SdfDelayValue& dv, SdfMtm mtm,
 // PathDelay::inst_prefix, so the limits reach the one instance the entry names.
 void AnnotateSdfPulseLimitEntry(const SdfPulseLimit& pl,
                                 std::string_view inst_prefix,
-                                SpecifyManager& mgr, SdfMtm mtm) {
-  mgr.AddSdfPulseLimit(
+                                SpecifyManager& mgr, SdfMtm mtm,
+                                SdfAnnotationResult& result) {
+  const bool kPlaced = mgr.AddSdfPulseLimit(
       SdfPulseLimitSpec{
           /*src=*/pl.src_port,
           /*dst=*/pl.dst_port,
@@ -756,6 +713,13 @@ void AnnotateSdfPulseLimitEntry(const SdfPulseLimit& pl,
           /*is_increment=*/pl.is_increment,
       },
       inst_prefix);
+  // §32.3: limits no declared path between the two ports takes are data the
+  // annotator could not place.
+  if (kPlaced) return;
+  result.warnings.push_back(std::string("SDF annotator: unable to annotate ") +
+                            (pl.is_percent ? "PATHPULSEPERCENT" : "PATHPULSE") +
+                            " limits from " + pl.src_port + " to " +
+                            pl.dst_port);
 }
 
 // §32.4.3: hand over one LABEL entry. §30.3 has a specify block declare its
@@ -763,85 +727,25 @@ void AnnotateSdfPulseLimitEntry(const SdfPulseLimit& pl,
 // for the cell, as for the three siblings above -- holds it to that instance.
 void AnnotateSdfSpecparamEntry(const SdfSpecparam& sp,
                                std::string_view inst_prefix,
-                               SpecifyManager& mgr, SdfMtm mtm) {
+                               SpecifyManager& mgr, SdfMtm mtm,
+                               SdfAnnotationResult& result) {
+  // §32.3: a name the instance has no specparam under is data the annotator
+  // could not place.
+  if (!mgr.KnowsSpecparam(inst_prefix, sp.name)) {
+    result.warnings.push_back("SDF annotator: unable to annotate LABEL " +
+                              sp.name + ", which names no specparam");
+    return;
+  }
   SpecparamValue value;
   value.name = sp.name;
   value.value = SelectMtm(sp.value, mtm);
+  value.real_value = SelectRealMtm(sp.value, mtm);
 
   if (sp.is_increment) {
     mgr.IncrementSpecparamValue(std::move(value), inst_prefix);
   } else {
     mgr.SetSpecparamValue(std::move(value), inst_prefix);
   }
-}
-
-namespace {
-
-// The SDF keyword a check came in under, so a warning about it names the same
-// construct the file's author wrote.
-std::string_view SdfCheckTypeName(SdfCheckType type) {
-  switch (type) {
-    case SdfCheckType::kSetup:
-      return "SETUP";
-    case SdfCheckType::kHold:
-      return "HOLD";
-    case SdfCheckType::kSetuphold:
-      return "SETUPHOLD";
-    case SdfCheckType::kRecovery:
-      return "RECOVERY";
-    case SdfCheckType::kRemoval:
-      return "REMOVAL";
-    case SdfCheckType::kRecrem:
-      return "RECREM";
-    case SdfCheckType::kWidth:
-      return "WIDTH";
-    case SdfCheckType::kPeriod:
-      return "PERIOD";
-    case SdfCheckType::kSkew:
-      return "SKEW";
-    case SdfCheckType::kBidirectskew:
-      return "BIDIRECTSKEW";
-    case SdfCheckType::kNochange:
-      return "NOCHANGE";
-  }
-  return "timing";
-}
-
-}  // namespace
-
-// §32.4.2 Table 32-2: hand one TIMINGCHECK entry to the manager, which updates
-// whichever declared checks it matches.
-//
-// §31.2 puts a system timing check inside a specify block and §30.3 puts that
-// block inside a module declaration, so two instances of one cell declare
-// checks naming identically spelled signals. `inst_prefix` is what
-// SdfCellPrefixInRegion made of the cell's CELLINSTANCE, and it travels beside
-// the annotation rather than on it because SdfTcAnnotation
-// (simulator/specify_sdf.h) has no field for it, as with AnnotateSdfDeviceEntry
-// above. It is what holds the constraint to the checks of the one instance the
-// entry names.
-void AnnotateSdfTimingCheckEntry(const SdfTimingCheck& tc,
-                                 std::string_view inst_prefix,
-                                 SpecifyManager& mgr, SdfMtm mtm,
-                                 SdfAnnotationResult& result) {
-  // An SDF check offers several candidate annotations so it can update
-  // whichever form the specify block happens to declare; landing any one of
-  // them means the constraint was placed.
-  bool placed = false;
-  for (const auto& target : ExpandSdfTimingCheckTargets(tc, mtm)) {
-    if (mgr.AnnotateSdfTimingCheck(target, inst_prefix, result.warnings)) {
-      placed = true;
-    }
-  }
-  // §32.3: a constraint the design declares no check for is data the annotator
-  // understood but could not put anywhere, so it warns rather than dropping the
-  // value in silence. Timing checks are the only category that can fail this
-  // way -- delays and specparams that match nothing are simply recorded.
-  if (placed) return;
-  result.warnings.push_back("SDF annotator: unable to annotate " +
-                            std::string(SdfCheckTypeName(tc.check_type)) +
-                            " timing check on " + tc.ref_port + "/" +
-                            tc.data_port);
 }
 
 }  // namespace delta

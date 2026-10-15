@@ -141,6 +141,10 @@ struct PrimitiveDriver {
   // time (the continuous assignment the gate is lowered to reads them through
   // SpecifyManager::FindAnnotatedPrimitiveDriver).
   bool sdf_annotated = false;
+  // §32.4.1 Table 32-1: whether `output_port` is an output or inout port of
+  // the module, the only primitives a DEVICE entry falls back to. A driver
+  // registered without the module's ports to hand is taken as one.
+  bool drives_module_output = true;
 };
 
 // §32.4.1: collect the module-output drivers one gate instantiation
@@ -251,5 +255,12 @@ void ApplyGlobalPulseLimits(PathDelay& pd, uint8_t reject_pct,
 
 void ApplySdfPulseLimits(PathDelay& pd, uint64_t reject, bool has_error,
                          uint64_t error);
+
+// §32.7: a pulse limit set above its transition's delay behaves as one set at
+// the delay. The limit is kept as stated, so a later change of the delay is
+// measured against what was written, and capped where a pulse is judged.
+inline uint64_t EffectivePulseLimit(uint64_t limit, uint64_t delay) {
+  return limit < delay ? limit : delay;
+}
 
 }  // namespace delta

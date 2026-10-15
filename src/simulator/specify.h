@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -10,6 +11,7 @@
 #include <vector>
 
 #include "common/types.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_specify.h"
 #include "simulator/specify_path_delay.h"
@@ -88,6 +90,10 @@ struct RegisteredGateDecl {
 struct DeclaredSpecparam {
   std::string inst_prefix;
   std::string name;
+  // The expression the declaration initializes it from, which §32.4.3 has
+  // reevaluated when it reads a specparam a LABEL annotates; null where none
+  // was recorded.
+  const Expr* init = nullptr;
 };
 
 class SpecifyManager {
@@ -133,8 +139,8 @@ class SpecifyManager {
   // that prefix from the cell's own instance path, read from the §32.9 region
   // down, so an SDF record reaches the instance it names and no other; a cell
   // outside the region it leaves out before any path is reached.
-  bool AnnotateSdfPathDelay(PathDelay delay,
-                            PathDelayPulseRetention retain = {});
+  bool AnnotateSdfPathDelay(const PathDelay& delay,
+                            PathDelayRetention retain = {});
 
   // §32.4.1: the incremental form of the same rule -- the entry's values add to
   // what the path already carries instead of replacing it, and a conditional
@@ -191,9 +197,14 @@ class SpecifyManager {
   // because RebuildGateDriversForSpecparam files a rebuilt driver back at the
   // instance the declaration came from. It defaults to the empty prefix so a
   // caller registering the gates of one module can name the gate alone.
-  void AddPrimitiveDriversFromGate(const ModuleItem& gate, SimContext& ctx,
-                                   Arena& arena,
-                                   std::string_view inst_prefix = {});
+  //
+  // `module_outputs`, where given, names the module's output and inout ports,
+  // and a driver of anything else is recorded as no module output's
+  // (PrimitiveDriver::drives_module_output).
+  void AddPrimitiveDriversFromGate(
+      const ModuleItem& gate, SimContext& ctx, Arena& arena,
+      std::string_view inst_prefix = {},
+      const std::vector<std::string_view>* module_outputs = nullptr);
 
   // §32.4.1 Table 32-1: the primitive driver of output `output` of the instance
   // `inst_prefix` names whose delays an SDF DEVICE entry annotated, or null
@@ -247,6 +258,12 @@ class SpecifyManager {
   // SetSpecparamValue, so two instances of one cell accumulate separately.
   void IncrementSpecparamValue(SpecparamValue delta,
                                std::string_view inst_prefix = {});
+
+  // §32.4.3 with §32.3: whether a LABEL entry naming `name` in the instance
+  // `inst_prefix` names has a specparam to reach -- one the design declared
+  // there, or one a value was already given for.
+  bool KnowsSpecparam(std::string_view inst_prefix,
+                      std::string_view name) const;
   void AddInterconnectDelay(InterconnectDelay delay);
 
   void IncrementInterconnectDelay(const InterconnectDelay& delta);
@@ -288,12 +305,10 @@ class SpecifyManager {
   const InterconnectTerminal* ResolveInterconnectSourcePort(
       const std::string& source_name, SdfInterconnectOutcome& out) const;
   std::vector<std::string> CoveredSourcesOnSameNet(
-      const InterconnectTerminal* source,
-      const InterconnectTerminal* first_load) const;
+      const InterconnectTerminal* source) const;
   std::vector<std::string> CoveredSourcesOffNet(
       const InterconnectTerminal* source, const std::string& source_name,
-      const std::string& load_name, const InterconnectTerminal* first_load,
-      SdfInterconnectOutcome& out) const;
+      const std::string& load_name, SdfInterconnectOutcome& out) const;
   void ExtendLoadsUpHierarchy(
       const InterconnectTerminal* source,
       std::vector<const InterconnectTerminal*>& loads) const;
@@ -304,12 +319,27 @@ class SpecifyManager {
   // §32.4.4: how an annotated delay's covered sources answer for a source a run
   // asks about -- by its very name, by sitting on its net, or not at all
   // (FindInterconnectDelay).
+  // The net whose sources answer for an asked source no entry names
+  // (FindInterconnectDelay).
+  std::string AskedSourceNet(std::string_view source) const;
   enum class SourceMatch : uint8_t { kNone, kSameNet, kNamed };
   SourceMatch CoveredSourceMatch(const InterconnectDelay& delay,
                                  std::string_view source,
                                  const std::string& source_net) const;
 
  public:
+  // §32.4.4: whether `load` carries a delay from a source of its own, apart
+  // from the delay from every source, which is what makes its connection
+  // follow each source of a multisource net separately.
+  bool HasSourceSpecificInterconnectDelay(std::string_view load) const;
+
+  // §32.4.4: what of the delay from `source` to `load` a port connection
+  // between them waits out -- the annotated delay, less what the connection's
+  // source port, itself annotated from the same sources, already waited --
+  // or nothing where no delay is annotated.
+  std::optional<InterconnectDelay> ConnectionInterconnectDelay(
+      std::string_view source, std::string_view load) const;
+
   // §32.4.4: the annotated delay from `source` to `load`, or null when nothing
   // is annotated between them. A delay recorded as being from all sources
   // answers for any source, and a down-hierarchy annotation answers for every
@@ -344,6 +374,12 @@ class SpecifyManager {
   void BindDesignSpecparams(std::vector<std::string> names, SimContext& ctx,
                             Arena& arena, std::string_view inst_prefix = {});
 
+  // §32.4.3: record the initializer of the specparam `name` the instance
+  // `inst_prefix` names declared. A name not bound as a specparam there is
+  // ignored, so the module's variables may be handed over wholesale.
+  void RecordSpecparamInitializer(std::string_view inst_prefix,
+                                  std::string_view name, const Expr* init);
+
   const std::vector<DeclaredSpecparam>& GetDeclaredSpecparamsWithInstance()
       const {
     return declared_specparams_;
@@ -370,8 +406,9 @@ class SpecifyManager {
   // construct puts above the path's delay behaves as one put at the delay.
   //
   // `inst_prefix` is in the form PathDelay::inst_prefix carries, since §30.4
-  // has two instances of one cell declare paths spelled identically.
-  void AddSdfPulseLimit(const SdfPulseLimitSpec& spec,
+  // has two instances of one cell declare paths spelled identically. Returns
+  // whether any path took the limits (§32.3 warns about one no path took).
+  bool AddSdfPulseLimit(const SdfPulseLimitSpec& spec,
                         std::string_view inst_prefix);
 
   // §30.7.1: apply the specify block's PATHPULSE$ pulse-control specparams to
@@ -383,14 +420,15 @@ class SpecifyManager {
   void ResolvePulseControlSpecparams(
       const std::vector<PulseControlSpecparam>& specs);
 
-  // §32.7: add the two amounts to the pulse limits of the module paths between
+  // §32.7: add the amounts to the pulse limits of the module paths between
   // `src` and `dst` in the instance `inst_prefix` names, that prefix being in
-  // the form PathDelay::inst_prefix carries. An annotation that lowers a limit
-  // writes its amount as a negative number, so both are signed, and a limit the
-  // addition would carry below zero is left at zero instead. An amount of zero
-  // names a limit the annotation is not changing at all.
+  // the form PathDelay::inst_prefix carries, one amount per transition of each
+  // limit. An annotation that lowers a limit writes its amount as a negative
+  // number, so they are signed, and a limit the addition would carry below
+  // zero is left at zero instead. An amount of zero names a limit the
+  // annotation is not changing at all.
   void IncrementSdfPulseLimit(std::string_view src, std::string_view dst,
-                              int64_t reject_delta, int64_t error_delta,
+                              const SdfPulseLimitIncrement& deltas,
                               std::string_view inst_prefix);
 
   void SetGlobalPulseLimitPercents(uint8_t reject_pct, uint8_t error_pct);
@@ -545,7 +583,13 @@ class SpecifyManager {
   // under that prefix, so `inst_prefix + name` is the key the storage is filed
   // under and the bare name reaches it only for a module elaborated as a top.
   void ApplyAnnotatedSpecparam(std::string_view inst_prefix,
-                               const std::string& name, uint64_t value);
+                               const std::string& name, uint64_t value,
+                               double real_value);
+  // §32.4.3: reevaluate, from its initializer, every specparam of the instance
+  // `inst_prefix` names whose initializer reads `annotated` or a specparam so
+  // reevaluated, and answer all of their names, `annotated` first.
+  std::vector<std::string> ReevaluateDependentSpecparams(
+      std::string_view inst_prefix, const std::string& annotated);
   // §32.4.3: recompute from their declarations the module path delays that read
   // a changed specparam. Only the paths declared in the instance `inst_prefix`
   // names are considered, a specparam of one instance not being the one an
@@ -587,7 +631,15 @@ class SpecifyManager {
   // specparam or no storage answers for it.
   uint64_t StoredSpecparamValue(std::string_view inst_prefix,
                                 const std::string& name) const;
+  // The same as a real number, read as one where the specparam is a real.
+  double StoredSpecparamReal(std::string_view inst_prefix,
+                             const std::string& name) const;
 
+  // §32.5: the record in force for `source` and `load` before an entry
+  // replaces it -- the one for that very source, else the load's record from
+  // all sources -- or null where neither stands.
+  const InterconnectDelay* PriorInterconnectDelay(
+      const std::string& source, const std::string& load) const;
   // §32.4.4: place one already-resolved (source, load) pair's delay, either
   // replacing what is there or adding to it for an INCREMENT section.
   void PlaceInterconnectDelay(const SdfInterconnectAnnotation& annotation,
@@ -710,7 +762,13 @@ void RegisterSpecifyBlocks(const std::vector<ModuleItem*>& blocks,
 // `ctx` the way a module path delay is and the module's specparams must already
 // be lowered as variables there. `inst_prefix` is the instance the gates were
 // instantiated in, recorded on each driver as PrimitiveDriver::inst_prefix.
-void RegisterModuleGates(const std::vector<ModuleItem*>& gates,
+// The gate instantiations of one module, and the module's output and inout
+// ports, which are what a DEVICE entry falls back to the primitives driving.
+struct ModuleGates {
+  const std::vector<ModuleItem*>& gates;
+  const std::vector<std::string_view>& outputs;
+};
+void RegisterModuleGates(const ModuleGates& module,
                          std::string_view inst_prefix, SimContext& ctx,
                          Arena& arena, SpecifyManager& mgr);
 

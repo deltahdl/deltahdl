@@ -64,12 +64,20 @@ void ApplyContAssignToNet(const ContAssignDriver& drv,
   if (drv.net->driver_origins.size() <= slot)
     drv.net->driver_origins.resize(slot + 1);
   drv.net->driver_origins[slot] = drv.origin;
+  if (drv.net->driver_ports.size() <= slot)
+    drv.net->driver_ports.resize(slot + 1);
+  drv.net->driver_ports[slot] = drv.source_port;
   // §28.16.2.1: when this update leaves a trireg net with only high-impedance
   // drivers it enters the charge storage state, and Resolve arms the charge
   // decay process by scheduling the transition to x on the scheduler. Pass the
   // scheduler through so a driver turning off actually starts that process at
   // run time (a null scheduler would silently drop it).
   drv.net->Resolve(arena, sched);
+  // §32.4.4: a load following each source of the net on its own is told which
+  // driver moved. Indexed, since a listener may register another.
+  for (std::size_t i = 0; i < drv.net->driver_listeners.size(); ++i) {
+    drv.net->driver_listeners[i](slot);
+  }
 }
 
 }  // namespace delta

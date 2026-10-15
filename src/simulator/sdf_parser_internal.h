@@ -41,6 +41,8 @@ struct SdfToken {
 void SkipWhitespace(std::string_view& s);
 SdfToken NextSdfToken(std::string_view& s);
 bool Expect(std::string_view& s, SdfTokKind kind);
+// Consumes up to and including the ')' closing a '(' already consumed.
+void SkipSdfParen(std::string_view& s);
 SdfDelayValue ParseDelayVal(std::string_view& s);
 
 // §32.4.1: the tokens of a COND condition expression, up to the `(` or `)`

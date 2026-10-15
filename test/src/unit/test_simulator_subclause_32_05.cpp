@@ -648,6 +648,55 @@ TEST(SdfMultipleAnnotations, EmptyParenthesesHoldDeclaredPathPulseLimits) {
 // The pair of constructs above can be written as the single equivalent
 // statement that spells the held limits out, and the two forms shall leave the
 // path in the same state -- across every transition slot, not only the first.
+// Each direction of §32.5's form carries its own limits beside its delay, and
+// §32.8 spreads them over the transitions as it spreads the delays: the 1->0
+// transition takes the fall direction's 4 and 6, not the rise direction's 2
+// and 3.
+TEST(SdfMultipleAnnotations, EachDirectionsPulseLimitsReachItsTransitions) {
+  Design d;
+  ASSERT_TRUE(d.Build(kLiteralPathSrc));
+
+  d.Annotate(SdfDelay("(IOPATH A Z ((10) (2) (3)) ((20) (4) (6)))"));
+
+  const auto* pd = d.Path("A", "Z");
+  ASSERT_NE(pd, nullptr);
+  EXPECT_EQ(pd->reject_limit[0], 2u);
+  EXPECT_EQ(pd->error_limit[0], 3u);
+  EXPECT_EQ(pd->reject_limit[1], 4u);
+  EXPECT_EQ(pd->error_limit[1], 6u);
+}
+
+// The simple form too: the rise value written as empty parentheses holds the
+// declared 40, and the fall value 7 lands.
+TEST(SdfMultipleAnnotations, EmptySimpleValueHoldsTheCurrentDelay) {
+  Design d;
+  ASSERT_TRUE(d.Build(kLiteralPathSrc));
+
+  d.Annotate(SdfDelay("(IOPATH A Z () (7))"));
+
+  const auto* pd = d.Path("A", "Z");
+  ASSERT_NE(pd, nullptr);
+  EXPECT_EQ(pd->delays[0], 40u);
+  EXPECT_EQ(pd->delays[1], 7u);
+}
+
+// An empty delay holds what the path carries as an empty limit does: the rise
+// direction writes its limits and leaves its delay empty, so the rising
+// transitions keep the declared 40 while the falling ones take 7.
+TEST(SdfMultipleAnnotations, EmptyDelayParenthesesHoldTheCurrentDelay) {
+  Design d;
+  ASSERT_TRUE(d.Build(kLiteralPathSrc));
+
+  d.Annotate(SdfDelay("(IOPATH A Z (() (1) (2)) ((7)))"));
+
+  const auto* pd = d.Path("A", "Z");
+  ASSERT_NE(pd, nullptr);
+  EXPECT_EQ(pd->delays[0], 40u);
+  EXPECT_EQ(pd->delays[1], 7u);
+  EXPECT_EQ(pd->reject_limit[0], 1u);
+  EXPECT_EQ(pd->error_limit[0], 2u);
+}
+
 TEST(SdfMultipleAnnotations, CombinedIopathMatchesPathpulseThenHeldIopath) {
   Design separate;
   ASSERT_TRUE(separate.Build(kLiteralPathSrc));

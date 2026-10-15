@@ -51,11 +51,11 @@ void DerivePulseLimitsFromDelays(const uint64_t (&delays)[12],
                                  uint8_t reject_pct, uint8_t error_pct,
                                  uint64_t (&reject_limit)[12],
                                  uint64_t (&error_limit)[12]);
-// Overwrites `existing` with `replacement`, holding back whichever pulse
-// (reject/error) limits `retain` names at the values `existing` already had.
-// Defined in specify.cpp.
-void ReplacePathDelayPreservingPulse(PathDelay& existing, PathDelay replacement,
-                                     PathDelayPulseRetention retain);
+// Overwrites `existing` with `replacement`, holding back whichever delays and
+// pulse limits `retain` names at the values `existing` already had. Defined in
+// specify.cpp.
+void ReplacePathDelayRetaining(PathDelay& existing, PathDelay replacement,
+                               const PathDelayRetention& retain);
 std::string SpecifyConditionText(const Expr* cond);
 // The name a specify terminal reads in its module: the port identifier, or
 // `interface_identifier . port_identifier` spelled with its dot (§30.4.2,

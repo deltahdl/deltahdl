@@ -56,6 +56,9 @@ struct ContAssignDriver {
   // (Net::driver_origins) so a dumped inout port can tell the drivers inside
   // its instance from those outside it.
   std::string_view origin;
+  // §32.4.4: the module output port this assignment carries out of its
+  // instance, where it is that port's connection (Net::driver_ports).
+  std::string_view source_port;
 };
 
 // The value a continuous-assignment driver contributes to net resolution: the

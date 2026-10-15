@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -64,6 +65,15 @@ struct Net {
   // the drivers outside its instance, from its output end, those inside. A
   // slot past the end, or one no assignment filled, records no instance.
   std::vector<std::string_view> driver_origins;
+  // §32.4.4: the module output port each driver stands for, where an
+  // instance's output port connection drives the net, slot for slot with
+  // `drivers`; empty for a driver of any other kind. An interconnect delay is
+  // annotated from such a port.
+  std::vector<std::string_view> driver_ports;
+  // §32.4.4: told the slot of every driver whose value a continuous
+  // assignment writes, which is how a load annotated with a delay of its own
+  // from each source sees which source moved.
+  std::vector<std::function<void(std::size_t)>> driver_listeners;
   NetStrength resolved_strength;
 
   // §21.2.1.4: the strength of each bit of this net, indexed from the least

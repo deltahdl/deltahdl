@@ -4,9 +4,12 @@
 // src/simulator/sdf_parser.cpp, which reads the section itself and hands each
 // entry here.
 
+#include <cctype>
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "parser/ast_specify.h"
 #include "simulator/sdf_parser.h"
@@ -49,9 +52,49 @@ bool MapCheckType(std::string_view name, SdfCheckType& out) {
 struct SdfSignalRef {
   std::string port;
   SpecifyEdge edge = SpecifyEdge::kNone;
+  std::vector<std::pair<char, char>> edge_descriptors;
 
   std::string condition;
 };
+
+// §32.4.2: the edge an SDF signal was written with -- posedge, negedge, or one
+// of the transitions 01, 10, 0z, z1, 1z and z0, each of which is §31.5's edge
+// descriptor of that one transition, z read as the x §31.5 handles it as.
+// Anything else leaves the edge unknown.
+// The next word of `s`, up to white space or a parenthesis, taken whole: an
+// edge such as 0z, which the token reader splits into a number and a name, or
+// a port written with a range select, d[3:2], which it splits at the colon.
+static std::string_view TakeSdfWord(std::string_view& s) {
+  SkipWhitespace(s);
+  std::size_t len = 0;
+  while (len < s.size() && s[len] != '(' && s[len] != ')' &&
+         std::isspace(static_cast<unsigned char>(s[len])) == 0) {
+    ++len;
+  }
+  const std::string_view kWord = s.substr(0, len);
+  s.remove_prefix(len);
+  return kWord;
+}
+
+static void ReadSdfEdge(std::string_view text, SdfSignalRef& ref) {
+  if (text == "posedge") {
+    ref.edge = SpecifyEdge::kPosedge;
+    return;
+  }
+  if (text == "negedge") {
+    ref.edge = SpecifyEdge::kNegedge;
+    return;
+  }
+  static constexpr std::string_view kTransitions[] = {"01", "10", "0z",
+                                                      "z1", "1z", "z0"};
+  for (const std::string_view kTransition : kTransitions) {
+    if (text != kTransition) continue;
+    const auto kLevel = [](char c) { return c == 'z' ? 'x' : c; };
+    ref.edge = SpecifyEdge::kEdge;
+    ref.edge_descriptors = {{kLevel(text[0]), kLevel(text[1])}};
+    return;
+  }
+}
 
 // Parses the condition text and the (optionally edge-qualified) port that
 // follow a leading COND keyword inside a signal reference. The opening '(' of
@@ -65,13 +108,8 @@ static SdfSignalRef ParseSdfCondSignal(std::string_view& s) {
     // far belongs to the condition.
     ref.condition = JoinSdfCondTokens(tokens, tokens.size());
     Expect(s, SdfTokKind::kLParen);
-    auto edge_tok = NextSdfToken(s);
-    if (edge_tok.text == "posedge")
-      ref.edge = SpecifyEdge::kPosedge;
-    else if (edge_tok.text == "negedge")
-      ref.edge = SpecifyEdge::kNegedge;
-    auto port_tok = NextSdfToken(s);
-    ref.port = std::string(port_tok.text);
+    ReadSdfEdge(TakeSdfWord(s), ref);
+    ref.port = std::string(TakeSdfWord(s));
     Expect(s, SdfTokKind::kRParen);
   } else if (!tokens.empty()) {
     // §32.4.2: a signal may carry a condition without carrying an edge, and
@@ -90,19 +128,13 @@ static SdfSignalRef ParseSdfSignal(std::string_view& s) {
   SkipWhitespace(s);
   if (!s.empty() && s[0] == '(') {
     Expect(s, SdfTokKind::kLParen);
-    auto first_tok = NextSdfToken(s);
-
-    if (first_tok.text == "COND") {
-      return ParseSdfCondSignal(s);
-    }
-    if (first_tok.text == "posedge") ref.edge = SpecifyEdge::kPosedge;
-    if (first_tok.text == "negedge") ref.edge = SpecifyEdge::kNegedge;
-    auto port_tok = NextSdfToken(s);
-    ref.port = std::string(port_tok.text);
+    const std::string_view kFirst = TakeSdfWord(s);
+    if (kFirst == "COND") return ParseSdfCondSignal(s);
+    ReadSdfEdge(kFirst, ref);
+    ref.port = std::string(TakeSdfWord(s));
     Expect(s, SdfTokKind::kRParen);
   } else {
-    auto tok = NextSdfToken(s);
-    ref.port = std::string(tok.text);
+    ref.port = std::string(TakeSdfWord(s));
   }
   return ref;
 }
@@ -117,22 +149,26 @@ SdfTimingCheck ParseOneTc(std::string_view& s, SdfCheckType type) {
   if (kSingleSignal) {
     tc.ref_port = first.port;
     tc.ref_edge = first.edge;
+    tc.ref_edge_descriptors = first.edge_descriptors;
 
+    tc.ref_condition = first.condition;
     tc.condition = std::move(first.condition);
   } else {
     tc.data_port = first.port;
     tc.data_edge = first.edge;
+    tc.data_edge_descriptors = first.edge_descriptors;
     auto ref = ParseSdfSignal(s);
     tc.ref_port = ref.port;
     tc.ref_edge = ref.edge;
+    tc.ref_edge_descriptors = ref.edge_descriptors;
 
     // §32.4.2: either signal of a timing check may carry a condition, and a
-    // condition the file supplies has to take part in matching -- dropping one
-    // would turn a conditioned check into an unconditioned one, which matches
-    // every corresponding declaration instead of only the one it names. The
-    // reference signal's condition identifies the check where it has one; a
-    // condition carried only by the data signal identifies it instead, which is
-    // the same precedence the SystemVerilog side of the match uses.
+    // condition the file supplies has to match the declared check's condition
+    // on that same signal -- dropping one would turn a conditioned check into
+    // an unconditioned one, which matches every corresponding declaration
+    // instead of only the one it names -- so the two are kept apart.
+    tc.ref_condition = ref.condition;
+    tc.data_condition = first.condition;
     tc.condition = ref.condition.empty() ? std::move(first.condition)
                                          : std::move(ref.condition);
   }
@@ -146,6 +182,18 @@ SdfTimingCheck ParseOneTc(std::string_view& s, SdfCheckType type) {
     if (!s.empty() && s[0] == '(') {
       tc.limit2 = ParseDelayVal(s);
     }
+  }
+  // §32.3: a construct written after the values, an SCOND or a CCOND, is read
+  // through to its own closing parenthesis, so the check's own one still
+  // closes the check and the entries after it are read in step.
+  SkipWhitespace(s);
+  while (!s.empty() && s[0] == '(') {
+    Expect(s, SdfTokKind::kLParen);
+    if (tc.trailing_construct.empty()) {
+      tc.trailing_construct = std::string(NextSdfToken(s).text);
+    }
+    SkipSdfParen(s);
+    SkipWhitespace(s);
   }
   Expect(s, SdfTokKind::kRParen);
   return tc;
