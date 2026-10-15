@@ -13,6 +13,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_items_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_primitives.h"
 #include "lexer/token.h"
@@ -684,15 +685,24 @@ static void ElaborateOneGate(ModuleItem* item, RtlirModule* mod, Arena& arena) {
 // terminal as wide as the array gives element `p` its bit `p` above the least
 // significant end, the element of the range's right-hand index taking that
 // end (GateTerminalBit), and a single-bit terminal is broadcast unchanged.
+// Where the terminals of one array are read: the module and the scope that
+// size them, and the arena the bit-selects are made in.
+struct GateArraySite {
+  const RtlirModule* mod;
+  const ScopeMap& scope;
+  Arena& arena;
+};
+
 static std::vector<Expr*> InstanceArrayElementTerminals(
-    const std::vector<Expr*>& terms, const RtlirModule* mod, Arena& arena,
-    const ScopeMap& scope, uint32_t array_len, uint32_t p) {
+    const std::vector<Expr*>& terms, const GateArraySite& site,
+    uint32_t array_len, uint32_t p) {
   std::vector<Expr*> bit_terms;
   bit_terms.reserve(terms.size());
   for (auto* t : terms) {
-    bit_terms.push_back(GateTerminalWidth(t, mod, scope) == array_len
-                            ? GateTerminalBit(t, p, mod, scope, arena)
-                            : t);
+    bit_terms.push_back(
+        GateTerminalWidth(t, site.mod, site.scope) == array_len
+            ? GateTerminalBit(t, p, site.mod, site.scope, site.arena)
+            : t);
   }
   return bit_terms;
 }
@@ -730,7 +740,7 @@ bool ExpandInstanceArray(
   std::vector<Expr*> saved = item->gate_terminals;
   for (uint32_t p = 0; p < array_len; ++p) {
     item->gate_terminals =
-        InstanceArrayElementTerminals(saved, mod, arena, scope, array_len, p);
+        InstanceArrayElementTerminals(saved, {mod, scope, arena}, array_len, p);
     elaborate_element(item);
   }
   item->gate_terminals = saved;

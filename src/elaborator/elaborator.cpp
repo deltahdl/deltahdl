@@ -17,7 +17,6 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_child_type_params.h"
-#include "elaborator/elaborator_decls_internal.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_type_facts.h"
 #include "elaborator/elaborator_validate_classes.h"

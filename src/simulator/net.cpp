@@ -648,7 +648,8 @@ static bool ValuesEqual(const Logic4Vec& a, const Logic4Vec& b) {
 // it the strengths that value carries. The sources resolve into storage of
 // their own. A change arriving before the pending one has landed replaces it,
 // and one back to the value the net holds leaves none pending.
-static void ResolveAfterNetDelay(Net& net, Arena& arena, Scheduler* sched) {
+static void ResolveAfterNetDelay(Net& net, const ContAssignDelays& delays,
+                                 Arena& arena, Scheduler* sched) {
   Variable* shown = net.resolved;
   Variable scratch;
   scratch.value = ExtractBitField(arena, shown->value, 0, shown->value.width);
@@ -684,7 +685,7 @@ static void ResolveAfterNetDelay(Net& net, Arena& arena, Scheduler* sched) {
   };
   auto time = sched->CurrentTime();
   time.ticks +=
-      SelectContAssignDelay(shown->value, target, *net.delay, target.width);
+      SelectContAssignDelay(shown->value, target, delays, target.width);
   sched->ScheduleEvent(time, Region::kActive, event);
 }
 
@@ -701,7 +702,7 @@ void Net::Resolve(Arena& arena, Scheduler* sched) {
   NetStrength before = resolved_strength;
   if (delay && sched != nullptr && switch_links.empty() &&
       !resolved->is_forced) {
-    ResolveAfterNetDelay(*this, arena, sched);
+    ResolveAfterNetDelay(*this, *delay, arena, sched);
   } else {
     ++delay_generation;
     pending_value.reset();
