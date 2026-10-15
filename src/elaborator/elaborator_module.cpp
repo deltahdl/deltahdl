@@ -526,8 +526,8 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   // contains; record its library so child binding can fall back to it
   // (§33.4.1.5) or inherit it for a library-less use clause (§33.4.1.6). The
   // previous value is restored before returning.
-  std::string saved_library = std::move(current_library_);
-  current_library_.assign(decl->library.data(), decl->library.size());
+  std::string saved_library =
+      std::exchange(current_library_, std::string(decl->library));
 
   ApplyCompilationUnitImports(decl, mod);
   ApplyHeaderImports(decl);

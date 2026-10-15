@@ -208,8 +208,8 @@ std::string CoverageScopeOfInstanceKey(const std::string& key,
 
 void RegisterInstanceKeyBinding(const std::string& inst_prefix,
                                 const RtlirModule* mod, SimContext& ctx) {
-  const std::string_view library = mod->library;
-  const std::string_view name = mod->name;
+  std::string_view library = mod->library;
+  std::string_view name = mod->name;
   std::string key = inst_prefix;
   if (!key.empty() && key.back() == '.') key.pop_back();
   ctx.RegisterInstanceType(key, name);
