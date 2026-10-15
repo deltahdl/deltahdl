@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -155,20 +156,12 @@ TEST(AssignmentDelayElaboration, NetDeclTwoDelayOnImplicitAssign) {
 // declaration differently from a net delay followed by a separate continuous
 // assignment to the net, and the three cases above write the first of those two
 // forms. This is the second: the declaration assigns nothing, so its delay is
-// what the clause calls a net delay, and every value change another statement
-// applies to the net waits on it. The continuous assignment written separately
-// is such a statement, so the elaborated design has to carry the five ticks on
-// it; a design that drops them cannot delay the net at run time, which is the
-// failure this case names one stage before the simulator sees it.
-//
-// The delay is read off the continuous assignment because that is where the
-// three slots live today (RtlirContAssign::delay), and because the assignment
-// is the only driver this source gives the net. A net with two drivers is
-// delayed on both, since §28.16 measures the delay from a change on any of the
-// net's drivers, and a design that carried the delay somewhere else would have
-// to be read somewhere else here.
-TEST(AssignmentDelayElaboration,
-     NetDeclDelayWithoutAssignReachesSeparateContAssign) {
+// what the clause calls a net delay, which delays the changes the net's drivers
+// resolve to (§28.16) rather than any one driver's. The net carries it, and the
+// continuous assignment written separately carries none of its own: folded into
+// each driver, the delay was chosen from that driver's change rather than the
+// net's.
+TEST(AssignmentDelayElaboration, NetDeclDelayWithoutAssignStaysOnTheNet) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -181,10 +174,14 @@ TEST(AssignmentDelayElaboration,
   EXPECT_FALSE(f.diag.HasErrors());
   auto* mod = design->top_modules[0];
   ASSERT_EQ(mod->assigns.size(), 1u);
-  ASSERT_NE(mod->assigns[0].delay, nullptr);
-  EXPECT_EQ(mod->assigns[0].delay->int_val, 5u);
-  EXPECT_EQ(mod->assigns[0].delay_fall, nullptr);
-  EXPECT_EQ(mod->assigns[0].delay_decay, nullptr);
+  EXPECT_EQ(mod->assigns[0].delay, nullptr);
+  const RtlirNet* w = nullptr;
+  for (const auto& net : mod->nets) {
+    if (net.name == "w") w = &net;
+  }
+  ASSERT_NE(w, nullptr);
+  ASSERT_NE(w->delay_rise, nullptr);
+  EXPECT_EQ(w->delay_rise->int_val, 5u);
 }
 
 // §10.3.3 admits a single delay not only on a scalar nettype net but also on an

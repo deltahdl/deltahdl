@@ -304,7 +304,7 @@ void CheckGateInstanceArrayTerminalWidths(
   }
   uint32_t array_len = *len;
   for (auto* term : item->gate_terminals) {
-    uint32_t w = LookupLhsWidth(term, mod);
+    uint32_t w = GateTerminalWidth(term, mod, scope);
     if (w == 0) continue;
     bool is_interconnect = term && term->kind == ExprKind::kIdentifier &&
                            interconnect_names.count(term->text) != 0;

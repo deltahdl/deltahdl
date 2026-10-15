@@ -8,6 +8,7 @@
 // reads the two values and the delays and nothing of the process.
 
 #include <cstdint>
+#include <optional>
 
 #include "common/types.h"
 
@@ -17,6 +18,7 @@ class Arena;
 class SimContext;
 struct Expr;
 struct RtlirContAssign;
+struct RtlirNet;
 
 // The delays an assignment's delay expressions evaluated to: `rise` always,
 // `fall` and `decay` where the assignment wrote a second and a third.
@@ -27,6 +29,14 @@ struct ContAssignDelays {
   bool has_fall = false;
   bool has_decay = false;
 };
+
+// §28.16: the delays a net declared with a net delay waits, its rise, fall and
+// turn-off delays evaluated in the time unit `scale` of the module declaring
+// it (§22.7); none for a net declared without one. Defined in
+// simulator/contassign_delay.cpp.
+std::optional<ContAssignDelays> NetDelayTicks(const RtlirNet& net,
+                                              const TimeScale& scale,
+                                              SimContext& ctx, Arena& arena);
 
 // The delay §10.3.3 gives the transition of a `width`-bit target from
 // `old_val` to `new_val`: Table 28-9 for a scalar, the clause's three rules

@@ -9,7 +9,6 @@
 
 #include "common/arena.h"
 #include "common/types.h"
-#include "elaborator/elaborator_decls_internal.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -905,9 +904,6 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
     ca.module_path_port =
         inst_prefix_ + inst_seg + std::string(binding.port_name);
     path_delayed_ports_.insert(ca.module_path_port);
-    // §10.3.3: a net delay delays every driver of the net, and an output
-    // port is a driver of the net it is connected to.
-    ApplyNetDeclDelayToPortDriver(arena_, ca, *port_parent_);
     // §17.3: a checker's output formal is assigned to its actual as if by a
     // continuous assignment of the Reactive region, as a program's is.
     LowerContAssign(ca, from_program || inst.resolved->is_checker);

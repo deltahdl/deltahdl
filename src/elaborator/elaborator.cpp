@@ -531,18 +531,6 @@ bool Elaborator::ElaborateTopModules(const std::vector<ModuleDecl*>& top_decls,
   return true;
 }
 
-// Every module of the tree rooted at `mod`, each given its net delays once.
-// The walk keys on the module rather than on its name: two instances of one
-// module may hold two RtlirModule objects sharing a name, and a set keyed by
-// name would give one of them the pass and skip the other.
-void Elaborator::ApplyNetDelaysInModuleTree(RtlirModule* mod) {
-  if (mod == nullptr || !net_delay_modules_.insert(mod).second) return;
-  ApplyNetDeclDelaysToDrivers(arena_, mod);
-  for (auto& child : mod->children) {
-    ApplyNetDelaysInModuleTree(child.resolved);
-  }
-}
-
 void Elaborator::ResolveDefparamsAndGenerates(RtlirDesign* design) {
   while (true) {
     for (auto* top : design->top_modules) {
@@ -591,18 +579,6 @@ RtlirDesign* Elaborator::ElaborateTops(
     std::vector<PendingGenerate> batch;
     batch.swap(pending_generates_);
     for (const auto& pg : batch) ProcessPendingGenerate(pg);
-  }
-
-  // §27.5 puts the items of a selected generate block into the enclosing
-  // module, and ProcessPendingGenerate appends them to RtlirModule::assigns,
-  // ::udp_insts and ::nets after ElaborateItems has run over that module. So
-  // the net delays are given to their drivers here, where a module's items are
-  // complete, a bound module's among them: run during ElaborateItems, the pass
-  // saw neither a driver written in a generate block nor a net declared in
-  // one, and `wire #5 w;` was honoured at module level and ignored one `if`
-  // away.
-  for (auto* top : design->top_modules) {
-    ApplyNetDelaysInModuleTree(top);
   }
 
   for (auto* top : design->top_modules) {

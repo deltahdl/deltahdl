@@ -283,9 +283,9 @@ TEST(AssignmentDelaySim, VectorNetDeclMultiDelayUsesFallForNonzeroToZero) {
 //
 // The delay here is a net delay, §10.3.3's `wire #10 wireA;` form: the
 // declaration assigns nothing and a separate continuous assignment drives it,
-// so ApplyNetDeclDelaysToDrivers (src/elaborator/elaborator_net_delay.cpp) is
-// what puts the net's delays on the driver. The case below it is the other
-// form, and the two agree -- which is what #3372 asked to be settled.
+// so the net's own transition waits the net's delays (Net::delay in
+// src/simulator/net.h). The case below it is the other form, and the two
+// agree -- which is what #3372 asked to be settled.
 //
 // The rise delay is 2 and the fall delay 4, and the source changes at 50, so
 // the whole vector settles at 52. A reading that gave each bit its own delay

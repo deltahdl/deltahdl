@@ -378,8 +378,12 @@ uint64_t DelayTicksFromValue(const Logic4Vec& val) {
 }
 
 uint64_t DelayValueToTicks(const Logic4Vec& val, const SimContext& ctx) {
-  const TimeScale& scale = ActiveInstanceTimeScale(ctx);
-  TimeUnit precision = ctx.GlobalPrecision();
+  return DelayValueToTicksIn(val, ActiveInstanceTimeScale(ctx),
+                             ctx.GlobalPrecision());
+}
+
+uint64_t DelayValueToTicksIn(const Logic4Vec& val, const TimeScale& scale,
+                             TimeUnit precision) {
   if (val.is_real) {
     // §3.14.1: a real delay is rounded to the nearest multiple of the design
     // element's time precision before it is used. The value carries IEEE-754

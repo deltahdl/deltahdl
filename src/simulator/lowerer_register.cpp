@@ -24,6 +24,7 @@
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/class_specialization.h"
+#include "simulator/contassign_delay.h"
 #include "simulator/covergroup_instance.h"
 #include "simulator/dpi_formal_type.h"
 #include "simulator/dpi_runtime.h"
@@ -206,6 +207,7 @@ static Net* CreateNetStorage(std::string_view name, const RtlirNet& net,
               NetDecayTicks(net, scale, ctx.GlobalPrecision()), net.decays,
               net.is_user_nettype, net.resolve_func, net.is_signed});
   AttachNettypeResolution(*created, net.resolve_func, ctx);
+  created->delay = NetDelayTicks(net, scale, ctx, arena);
   RecordPackedRange(net.dtype, created->resolved, ctx, arena);
   // §6.7.1 with §7.2.1: a net of a packed structure, `wire instruction_t
   // w`, is laid out from the aggregate its declaration carries so a member

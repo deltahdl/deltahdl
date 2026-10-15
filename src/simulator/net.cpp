@@ -9,9 +9,11 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "simulator/contassign_delay.h"
 #include "simulator/net_bit_outcomes.h"
 #include "simulator/net_trireg.h"
 #include "simulator/nettype_resolution.h"
+#include "simulator/scheduler.h"
 #include "simulator/switch_network.h"
 #include "simulator/variable.h"
 
@@ -631,14 +633,80 @@ static bool SameNetStrength(const NetStrength& a, const NetStrength& b) {
          std::tie(b.s0_hi, b.s0_lo, b.s1_hi, b.s1_lo);
 }
 
+static bool ValuesEqual(const Logic4Vec& a, const Logic4Vec& b) {
+  uint32_t n = (a.nwords < b.nwords) ? a.nwords : b.nwords;
+  for (uint32_t w = 0; w < n; ++w) {
+    if (a.words[w].aval != b.words[w].aval) return false;
+    if (a.words[w].bval != b.words[w].bval) return false;
+  }
+  return true;
+}
+
+// §28.16 and §10.3.3: a net declared with a net delay takes the value its
+// sources resolve to only once the delay Table 28-9 gives the net's own
+// transition -- from the value it holds to that one -- has passed, and with
+// it the strengths that value carries. The sources resolve into storage of
+// their own. A change arriving before the pending one has landed replaces it,
+// and one back to the value the net holds leaves none pending.
+static void ResolveAfterNetDelay(Net& net, Arena& arena, Scheduler* sched) {
+  Variable* shown = net.resolved;
+  Variable scratch;
+  scratch.value = ExtractBitField(arena, shown->value, 0, shown->value.width);
+  NetStrength shown_strength = net.resolved_strength;
+  std::vector<NetStrength> shown_bits = net.bit_strengths;
+  net.resolved = &scratch;
+  ResolveNet(net, arena, sched);
+  net.resolved = shown;
+  Logic4Vec target = scratch.value;
+  NetStrength target_strength = net.resolved_strength;
+  std::vector<NetStrength> target_bits = net.bit_strengths;
+  net.resolved_strength = shown_strength;
+  net.bit_strengths = shown_bits;
+  if (net.pending_value && ValuesEqual(*net.pending_value, target)) return;
+  ++net.delay_generation;
+  net.pending_value.reset();
+  if (ValuesEqual(shown->value, target)) {
+    net.resolved_strength = target_strength;
+    net.bit_strengths = target_bits;
+    return;
+  }
+  net.pending_value = target;
+  uint64_t gen = net.delay_generation;
+  auto* event = sched->GetEventPool().Acquire();
+  event->kind = EventKind::kUpdate;
+  event->callback = [&net, gen, target, target_strength, target_bits]() {
+    if (net.delay_generation != gen) return;
+    net.pending_value.reset();
+    net.resolved->value = target;
+    net.resolved_strength = target_strength;
+    net.bit_strengths = target_bits;
+    net.resolved->NotifyWatchers();
+  };
+  auto time = sched->CurrentTime();
+  time.ticks +=
+      SelectContAssignDelay(shown->value, target, *net.delay, target.width);
+  sched->ScheduleEvent(time, Region::kActive, event);
+}
+
 // §28.13 and §28.14: a switch reading the net as its data input passes the
 // net's strength on, so a change of that strength alone is told to the
 // variable's watchers as one of the value is, for the switch's own watcher to
 // pass (Variable::strength_generation).
+//
+// A net under a force, a net a switch joins to others -- which resolve as one
+// group -- and one resolved where no scheduler runs take a change at once,
+// which leaves none of a net delay pending.
 void Net::Resolve(Arena& arena, Scheduler* sched) {
   if (!resolved) return;
   NetStrength before = resolved_strength;
-  ResolveNet(*this, arena, sched);
+  if (delay && sched != nullptr && switch_links.empty() &&
+      !resolved->is_forced) {
+    ResolveAfterNetDelay(*this, arena, sched);
+  } else {
+    ++delay_generation;
+    pending_value.reset();
+    ResolveNet(*this, arena, sched);
+  }
   if (!strength_watched || SameNetStrength(before, resolved_strength)) return;
   ++resolved->strength_generation;
   resolved->NotifyWatchers();
@@ -724,15 +792,6 @@ static void ResolveFromDrivers(Net& net, Arena& arena, Scheduler* sched) {
   FixupTriPull(result, net.type);
   net.resolved->value = result;
   net.resolved->NotifyWatchers();
-}
-
-static bool ValuesEqual(const Logic4Vec& a, const Logic4Vec& b) {
-  uint32_t n = (a.nwords < b.nwords) ? a.nwords : b.nwords;
-  for (uint32_t w = 0; w < n; ++w) {
-    if (a.words[w].aval != b.words[w].aval) return false;
-    if (a.words[w].bval != b.words[w].bval) return false;
-  }
-  return true;
 }
 
 void PropagateCharge(Net& a, Net& b) {

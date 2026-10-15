@@ -7,6 +7,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "common/types.h"
 #include "simulator/exec_task.h"
 #include "simulator/pattern_match.h"
 #include "simulator/stmt_result.h"
@@ -36,6 +37,12 @@ uint64_t DelayTicksFromValue(const Logic4Vec& val);
 // precision. Shared so a standalone delay-control statement (§9.4.1) and the
 // intra-assignment delay of a blocking assignment (§10.4.1) round identically.
 uint64_t DelayValueToTicks(const Logic4Vec& val, const SimContext& ctx);
+
+// The same in the time unit `scale` gives, for a delay counted where no
+// instance is running: a net delay (§28.16) is evaluated as the net is created,
+// in the unit of the module declaring it (§22.7).
+uint64_t DelayValueToTicksIn(const Logic4Vec& val, const TimeScale& scale,
+                             TimeUnit precision);
 
 // Statement executors split out of stmt_exec.cpp into sibling translation
 // units. The dispatcher in stmt_exec.cpp calls these by name, so they have

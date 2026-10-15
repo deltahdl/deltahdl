@@ -415,6 +415,12 @@ static Expr* BuildNInputGateExpr(Arena& arena, GateKind kind,
       break;
   }
   auto* chain = BuildBinaryChain(arena, op, inputs);
+  // §28.4: Table 28-3 reads a z input as x, so a logic gate drives 0, 1 or x.
+  // With one input the chain is the input alone, with no operator to read it
+  // so, and inverting it twice does, as a buf's `~~in` does (§28.5).
+  if (inputs.size() == 1 && !invert) {
+    chain = WrapInvert(arena, WrapInvert(arena, chain));
+  }
   return invert ? WrapInvert(arena, chain) : chain;
 }
 
@@ -501,36 +507,56 @@ static void ElaborateBufifNotifGate(ModuleItem* item, RtlirModule* mod,
   mod->assigns.push_back(ca);
 }
 
-static void ElaborateMosGate(ModuleItem* item, RtlirModule* mod, Arena& arena) {
-  auto kind = item->gate_kind;
-  auto& terms = item->gate_terminals;
-  if (terms.size() != 3) return;
-  auto* data = terms[1];
-  auto* ctrl = terms[2];
-  bool conduct_on_one = (kind == GateKind::kNmos || kind == GateKind::kRnmos);
-  Expr* hi_z = MakeHighZ(arena);
-  Expr* rhs = conduct_on_one ? MakeTernary(arena, ctrl, data, hi_z)
-                             : MakeTernary(arena, ctrl, hi_z, data);
-  RtlirContAssign ca;
-  ca.lhs = terms[0];
-  ca.rhs = rhs;
-  ca.width = LookupLhsWidth(ca.lhs, mod);
+// One MOS switch (§28.7) from `data` to `out` under `ctrl`: conducting on a 1
+// of its control (nmos, rnmos) or a 0 (pmos, rpmos), and reducing the strength
+// it passes by §28.14 where resistive.
+struct MosSwitch {
+  Expr* out;
+  Expr* data;
+  Expr* ctrl;
+  bool conducts_on_one;
+  bool resistive;
+};
 
-  ca.from_nonresistive_switch =
-      (kind == GateKind::kNmos || kind == GateKind::kPmos);
-  ca.from_resistive_switch =
-      (kind == GateKind::kRnmos || kind == GateKind::kRpmos);
-  if (ca.from_nonresistive_switch || ca.from_resistive_switch) {
-    ca.data_input = data;
-  }
+static void EmitMosSwitch(const MosSwitch& sw, const ModuleItem* item,
+                          RtlirModule* mod, Arena& arena) {
+  Expr* conducting =
+      sw.conducts_on_one
+          ? MakeTernary(arena, sw.ctrl, sw.data, MakeHighZ(arena))
+          : MakeTernary(arena, sw.ctrl, MakeHighZ(arena), sw.data);
+  // §28.7 Table 28-6 (printed page 839): z data drives z whatever the control,
+  // where the conditional above, its control x or z, merges the z it passes
+  // with the z of the off state into x as §11.4.11 merges two arms.
+  auto* data_is_z = arena.Create<Expr>();
+  data_is_z->kind = ExprKind::kBinary;
+  data_is_z->op = TokenKind::kEqEqEq;
+  data_is_z->lhs = sw.data;
+  data_is_z->rhs = MakeHighZ(arena);
+  RtlirContAssign ca;
+  ca.lhs = sw.out;
+  ca.rhs = MakeTernary(arena, data_is_z, MakeHighZ(arena), conducting);
+  ca.width = LookupLhsWidth(ca.lhs, mod);
+  ca.from_nonresistive_switch = !sw.resistive;
+  ca.from_resistive_switch = sw.resistive;
+  ca.data_input = sw.data;
   // §28.7 Table 28-6 (printed page 839): a MOS switch whose control is x or z
   // passes a 0 as L and a 1 as H, as §28.6's three-state gates do, so its two
   // terminals travel with the assignment the same way; what it passes is the
   // data terminal itself.
-  ca.three_state_ctrl = ctrl;
-  ca.three_state_pass = data;
+  ca.three_state_ctrl = sw.ctrl;
+  ca.three_state_pass = sw.data;
   ApplyGateDelays(ca, item);
   mod->assigns.push_back(ca);
+}
+
+static void ElaborateMosGate(ModuleItem* item, RtlirModule* mod, Arena& arena) {
+  auto kind = item->gate_kind;
+  auto& terms = item->gate_terminals;
+  if (terms.size() != 3) return;
+  EmitMosSwitch({terms[0], terms[1], terms[2],
+                 kind == GateKind::kNmos || kind == GateKind::kRnmos,
+                 kind == GateKind::kRnmos || kind == GateKind::kRpmos},
+                item, mod, arena);
 }
 
 static void ElaboratePullGate(ModuleItem* item, RtlirModule* mod,
@@ -550,29 +576,20 @@ static void ElaboratePullGate(ModuleItem* item, RtlirModule* mod,
   mod->assigns.push_back(ca);
 }
 
+// §28.9 (printed page 841): a cmos switch is an nmos and a pmos sharing the
+// data input and the output, with a control each, and an rcmos an rnmos and an
+// rpmos. Built as one conditional over both controls, the switch merged its
+// data with the z of the half that was off into a strong x where Table 28-6
+// gives the other half's L or H.
 static void ElaborateCmosGate(ModuleItem* item, RtlirModule* mod,
                               Arena& arena) {
-  auto kind = item->gate_kind;
   auto& terms = item->gate_terminals;
   if (terms.size() != 4) return;
-  auto* data = terms[1];
-  auto* nctrl = terms[2];
-  auto* pctrl = terms[3];
-  Expr* hi_z = MakeHighZ(arena);
-  Expr* pmos_branch = MakeTernary(arena, pctrl, hi_z, data);
-  Expr* rhs = MakeTernary(arena, nctrl, data, pmos_branch);
-  RtlirContAssign ca;
-  ca.lhs = terms[0];
-  ca.rhs = rhs;
-  ca.width = LookupLhsWidth(ca.lhs, mod);
-
-  ca.from_nonresistive_switch = (kind == GateKind::kCmos);
-  ca.from_resistive_switch = (kind == GateKind::kRcmos);
-  if (ca.from_nonresistive_switch || ca.from_resistive_switch) {
-    ca.data_input = data;
-  }
-  ApplyGateDelays(ca, item);
-  mod->assigns.push_back(ca);
+  bool resistive = item->gate_kind == GateKind::kRcmos;
+  EmitMosSwitch({terms[0], terms[1], terms[2], true, resistive}, item, mod,
+                arena);
+  EmitMosSwitch({terms[0], terms[1], terms[3], false, resistive}, item, mod,
+                arena);
 }
 
 static void ElaborateLogicOrOutputGate(ModuleItem* item, RtlirModule* mod,
@@ -602,16 +619,6 @@ static void ElaborateLogicOrOutputGate(ModuleItem* item, RtlirModule* mod,
   ca.width = LookupLhsWidth(ca.lhs, mod);
   ApplyGateDelays(ca, item);
   mod->assigns.push_back(ca);
-}
-
-// `base[idx]`: the 1-bit part-select through which one element of an instance
-// array connects to bit `idx` of a distributed terminal.
-static Expr* MakeBitSelect(Arena& arena, Expr* base, uint32_t idx) {
-  auto* e = arena.Create<Expr>();
-  e->kind = ExprKind::kSelect;
-  e->base = base;
-  e->index = MakeIntLiteral(arena, idx);
-  return e;
 }
 
 // Elaborates one scalar gate or switch from the terminal list currently held on
@@ -673,17 +680,20 @@ static void ElaborateOneGate(ModuleItem* item, RtlirModule* mod, Arena& arena) {
   ElaborateLogicOrOutputGate(item, mod, arena);
 }
 
-// The terminal list one element of an instance array connects to: a terminal
-// as wide as the array takes its [p] bit-select, and a single-bit terminal is
-// broadcast unchanged.
+// §28.3.6: the terminal list one element of an instance array connects to. A
+// terminal as wide as the array gives element `p` its bit `p` above the least
+// significant end, the element of the range's right-hand index taking that
+// end (GateTerminalBit), and a single-bit terminal is broadcast unchanged.
 static std::vector<Expr*> InstanceArrayElementTerminals(
     const std::vector<Expr*>& terms, const RtlirModule* mod, Arena& arena,
-    uint32_t array_len, uint32_t p) {
+    const ScopeMap& scope, uint32_t array_len, uint32_t p) {
   std::vector<Expr*> bit_terms;
   bit_terms.reserve(terms.size());
-  for (auto* t : terms)
-    bit_terms.push_back(
-        LookupLhsWidth(t, mod) == array_len ? MakeBitSelect(arena, t, p) : t);
+  for (auto* t : terms) {
+    bit_terms.push_back(GateTerminalWidth(t, mod, scope) == array_len
+                            ? GateTerminalBit(t, p, mod, scope, arena)
+                            : t);
+  }
   return bit_terms;
 }
 
@@ -720,7 +730,7 @@ bool ExpandInstanceArray(
   std::vector<Expr*> saved = item->gate_terminals;
   for (uint32_t p = 0; p < array_len; ++p) {
     item->gate_terminals =
-        InstanceArrayElementTerminals(saved, mod, arena, array_len, p);
+        InstanceArrayElementTerminals(saved, mod, arena, scope, array_len, p);
     elaborate_element(item);
   }
   item->gate_terminals = saved;

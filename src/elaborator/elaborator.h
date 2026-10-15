@@ -759,9 +759,6 @@ class Elaborator : public ElaboratorClassRules {
   // the methods of each class declared outside every design element.
   void ValidatePerDeclarationRulesInUnitScopes();
 
-  // §28.16: give every module of the tree rooted here its declared net
-  // delays, once the generate blocks are in and the item lists complete.
-  void ApplyNetDelaysInModuleTree(RtlirModule* mod);
   void ValidateConstantFunctionCalls(const ModuleDecl* decl);
   void ValidateTaskCallsInExpressions(const ModuleDecl* decl);
   // §13.3: the names a call written in the module names a task by -- the

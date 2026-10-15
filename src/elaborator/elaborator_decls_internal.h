@@ -108,18 +108,4 @@ void CheckDeclRedeclaration(const ModuleItem* item,
                             const DeclTypeRef& decl_type, DeclNameTables tables,
                             std::string_view kind_word, DiagEngine& diag);
 
-// §28.16: give every driver of a net the net delay the net was declared with,
-// since a net delay is the time from any driver of the net changing value to
-// the net's value being updated and passed on, and so belongs to the net rather
-// than to any one driver of it. Runs over a module whose items have all been
-// elaborated, because §10.3.2 lets a continuous assignment stand before the
-// declaration of the net it drives.
-void ApplyNetDeclDelaysToDrivers(Arena& arena, RtlirModule* mod);
-
-// §10.3.3: the same for the driver `ca` that a child instance's output port
-// makes on a net of its parent `mod`, which lowering creates after `mod` was
-// elaborated (Lowerer::LowerPortBindings).
-void ApplyNetDeclDelayToPortDriver(Arena& arena, RtlirContAssign& ca,
-                                   const RtlirModule& mod);
-
 }  // namespace delta

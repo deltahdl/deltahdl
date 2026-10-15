@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <optional>
 
 #include "common/arena.h"
 #include "common/types.h"
@@ -10,6 +11,7 @@
 #include "parser/ast_module.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/stmt_exec_internal.h"
 
 namespace delta {
 
@@ -63,10 +65,9 @@ static uint64_t SelectScalarContAssignDelay(const Logic4Vec& old_val,
 // The clause's later sentence restricts the same thing again for one of the two
 // forms -- an assignment made in a vector net's declaration does not apply its
 // rise and fall delays bit by bit -- and grants nothing to the other. A net
-// delay reaches here as the driver's own delay, ApplyNetDeclDelaysToDrivers
-// (src/elaborator/elaborator_net_delay.cpp) having added it to whatever the
-// driver wrote, and it is selected by these same rules. So both forms settle a
-// vector whole, which is what #3372 asked to be decided and recorded.
+// delay is selected by these same rules for the net's own transition
+// (Net::delay), so both forms settle a vector whole, which is what #3372 asked
+// to be decided and recorded.
 //
 // A scalar left-hand side is the other half of the clause: its delay is handled
 // as a gate delay is, which is Table 28-9 and is what
@@ -120,6 +121,23 @@ uint64_t SelectTransitionDelay(const ContAssignWhole& whole,
   Logic4Vec old_val = EvalExpr(whole.lhs, ctx, arena);
   Logic4Vec new_val = EvalExpr(whole.rhs, ctx, arena, old_val.width);
   return SelectContAssignDelay(old_val, new_val, d, old_val.width);
+}
+
+std::optional<ContAssignDelays> NetDelayTicks(const RtlirNet& net,
+                                              const TimeScale& scale,
+                                              SimContext& ctx, Arena& arena) {
+  if (net.delay_rise == nullptr) return std::nullopt;
+  auto ticks = [&](const Expr* e) {
+    return DelayValueToTicksIn(EvalExpr(e, ctx, arena), scale,
+                               ctx.GlobalPrecision());
+  };
+  ContAssignDelays d;
+  d.rise = ticks(net.delay_rise);
+  d.has_fall = net.delay_fall != nullptr;
+  d.fall = d.has_fall ? ticks(net.delay_fall) : 0;
+  d.has_decay = net.delay_turnoff != nullptr;
+  d.decay = d.has_decay ? ticks(net.delay_turnoff) : 0;
+  return d;
 }
 
 }  // namespace delta

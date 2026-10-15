@@ -419,4 +419,23 @@ TEST(NInputGateDelay, ProductionTwoDelayAndGateSchedulerEndsAtInputPlusRise) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 7u);
 }
 
+// §28.4 gives an and, or or xor gate one or more inputs, and Table 28-3 reads a
+// z input as x, a logic gate driving 0, 1 or x alone. With one input there was
+// no operator to read the z, so each gate below passed it through as z.
+TEST(NInputGateSim, ASingleInputGateDrivesXForAZInput) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  wire i;\n"
+      "  wire oa, oo, ox, on;\n"
+      "  and g1 (oa, i);\n"
+      "  or  g2 (oo, i);\n"
+      "  xor g3 (ox, i);\n"
+      "  nand g4 (on, i);\n"
+      "  initial #1 $display(\"%b %b %b %b\", oa, oo, ox, on);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "x x x x\n");
+}
+
 }  // namespace

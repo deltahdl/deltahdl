@@ -166,6 +166,20 @@ bool PortSelectsFrom(const RtlirPort& port, std::string_view name);
 // which constructs the direct-nesting rules reach is written once.
 bool IsConditionalGenerateConstruct(ModuleItemKind k);
 
+// §28.3.6: the bit length of a terminal of an array of gate or switch
+// instances: a named signal's, a select's, a concatenation's of those, and a
+// ~, &, | or ^ expression's over them; zero for anything else, which is
+// connected whole. Defined in
+// elaborator_gate_array_terminals.cpp.
+uint32_t GateTerminalWidth(const Expr* t, const RtlirModule* mod,
+                           const ScopeMap& scope);
+
+// §28.3.6: the bit `bit` above the least significant end of the terminal `t`,
+// as GateTerminalWidth measures it, through which one instance of the array
+// connects. Defined in elaborator_gate_array_terminals.cpp.
+Expr* GateTerminalBit(Expr* t, uint32_t bit, const RtlirModule* mod,
+                      const ScopeMap& scope, Arena& arena);
+
 // §27.4: reports each loop generate construct of `decl`, and of the generate
 // blocks it holds, whose index no genvar declaration declares before the loop,
 // in an enclosing scope or in the loop's own initialization. Defined in

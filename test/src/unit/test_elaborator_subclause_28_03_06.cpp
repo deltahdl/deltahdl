@@ -160,4 +160,44 @@ TEST(GateArrayConnection, InterconnectWidthEqualToArrayLengthElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §28.3.6 makes a terminal with too many or too few bits for every instance an
+// error, a part-select's and a concatenation's as a named vector's: three bits
+// and two bits for four instances. Measured as named signals only, both were
+// passed over.
+TEST(GateArrayConnection, ASelectOrConcatenationOfTheWrongWidthIsReported) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  wire [7:0] y;\n"
+      "  wire a, b, c, o;\n"
+      "  and g[3:0] (y[2:0], a, b);\n"
+      "  and h[3:0] (o, {a, b}, c);\n"
+      "endmodule\n",
+      f);
+  for (int line : {4, 5}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "gate or primitive array terminal width does not "
+                              "match",
+                              line, "28.3.6"))
+        << line;
+  }
+}
+
+// An operator expression of the wrong width is reported as a named vector is:
+// ~s is three bits for four instances.
+TEST(GateArrayConnection, AnOperatorExpressionOfTheWrongWidthIsReported) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  wire [2:0] s;\n"
+      "  wire o;\n"
+      "  and h[3:0] (o, ~s, 1'b1);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "gate or primitive array terminal width does not "
+                            "match",
+                            4, "28.3.6"));
+}
+
 }  // namespace

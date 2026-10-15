@@ -2,11 +2,13 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string_view>
 #include <utility>
 #include <vector>
 
 #include "common/types.h"
+#include "simulator/contassign_delay.h"
 
 namespace delta {
 
@@ -118,6 +120,14 @@ struct Net {
   NetStrength BitStrength(uint32_t bit) const;
 
   bool InCapacitiveState() const;
+
+  // §28.16: the net delay the net was declared with, and the change it holds
+  // back: the value its sources last resolved to that has not yet landed, with
+  // that value's strengths, and a count that tells a pending change from one
+  // a later resolution replaced (§10.3.3's descheduling).
+  std::optional<ContAssignDelays> delay;
+  std::optional<Logic4Vec> pending_value;
+  uint64_t delay_generation = 0;
 
   // Whether a MOS or CMOS switch reads the net as its data input, which makes
   // Resolve record a change of the net's strength

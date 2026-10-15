@@ -278,4 +278,71 @@ TEST(GateArrayRuntime, GateOutputOnABitSelectOfAnOutputPort) {
             "y=01\n");
 }
 
+// §28.3.6 gives the least significant bit of a terminal wider than one
+// instance's to the instance of the array range's right-hand index, and the
+// next bits to the instances after it, whatever range the terminal was
+// declared with: a's least significant bit is a[3] and b's most significant
+// b[4]. Selected at its element's number as an index of the declared range,
+// a[0] went to instance [0] and b[0], out of range, besides.
+TEST(GateArrayRuntime, ATerminalsBitsFollowItsDeclaredRange) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  wire [3:0] y;\n"
+      "  wire [0:3] a = 4'b0001;\n"
+      "  wire [4:1] z;\n"
+      "  wire [4:1] b = 4'b1000;\n"
+      "  buf g[3:0] (y, a);\n"
+      "  buf h[3:0] (z, b);\n"
+      "  initial #1 $display(\"%b %b\", y, z);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0001 1000\n");
+}
+
+// A part-select, an indexed part-select or a concatenation as wide as the array
+// is shared out a bit per instance as a named vector is: each bufif1 takes one
+// bit of a[3:0] under one bit of c[3:0], and the outputs reach the bits of y
+// through the concatenation, y[3:2] taking its low two. Connected whole, every
+// instance drove all four bits under one control.
+TEST(GateArrayRuntime, SelectsAndConcatenationsAreSharedOutPerInstance) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  wire [7:0] a = 8'hA5;\n"
+      "  wire [7:0] c = 8'b0000_0110;\n"
+      "  wire [7:0] d = 8'b0110_0000;\n"
+      "  wire [7:0] e = 8'b1100_0000;\n"
+      "  wire [3:0] y, w, v;\n"
+      "  bufif1 g[3:0] (y, a[3:0], c[3:0]);\n"
+      "  buf h[3:0] ({w[1:0], w[3:2]}, d[4 +: 4]);\n"
+      "  buf k[3:0] (v, e[7 -: 4]);\n"
+      "  initial #1 $display(\"%b %b %b\", y, w, v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "z10z 1001 1100\n");
+}
+
+// An input terminal is any expression, and one as wide as the array is shared
+// out a bit per instance like a named vector: the bitwise &, | and ^ of two
+// four-bit vectors, and the ~ of one, are four bits each. An operator the
+// width is not read through, a +, connects whole. Measured as nothing, each
+// operator terminal was connected whole to every instance.
+TEST(GateArrayRuntime, AnOperatorExpressionTerminalIsSharedOutPerInstance) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  wire [3:0] a = 4'b0101, b = 4'b0011, c = 4'b0110;\n"
+      "  wire [3:0] y1, y2, y3, y4, y5;\n"
+      "  bufif1 g1[3:0] (y1, a & b, c);\n"
+      "  buf g2[3:0] (y2, a | b);\n"
+      "  buf g3[3:0] (y3, a ^ b);\n"
+      "  buf g4[3:0] (y4, ~a);\n"
+      "  buf g5[3:0] (y5, !c);\n"
+      "  initial #1 $display(\"%b %b %b %b %b\", y1, y2, y3, y4, y5);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "z00z 0111 0110 1010 0000\n");
+}
+
 }  // namespace

@@ -337,4 +337,24 @@ TEST(CmosSwitches, RcmosSingleDelayAppliesToEveryTransition) {
             27u);
 }
 
+// §28.9 makes a cmos switch an nmos and a pmos sharing the data input and the
+// output, so with one part off and the other's control unknown it drives the
+// L or H that part does (Table 28-6), and with both controls unknown the same,
+// and z data drives z under any control. Built as one conditional, the switch
+// merged its data with the z of the off part into a strong x.
+TEST(CmosSwitchSim, AnUnknownControlDrivesTheLOrHOfThePairedSwitches) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  logic d0 = 0, d1 = 1, dz = 1'bz, nx = 1'bx, poff = 1, px = 1'bx;\n"
+      "  wire y1, y2, y3;\n"
+      "  cmos (y1, d0, nx, poff);\n"
+      "  cmos (y2, d1, nx, px);\n"
+      "  cmos (y3, dz, nx, px);\n"
+      "  initial #1 $display(\"%v %v %b\", y1, y2, y3);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "StL StH z\n");
+}
+
 }  // namespace

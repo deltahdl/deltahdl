@@ -419,4 +419,25 @@ TEST(MosSwitchSimulation, UnknownControlPassesLAndH) {
             "StH StH\n");
 }
 
+// Table 28-6 gives a MOS switch whose data input is z a z output whatever its
+// control, an x or z control included, unlike a three-state gate (Table 28-5),
+// which turns z data into x. Merged as a conditional operator's two arms are
+// under an unknown condition, the z of the data and the z of the off state
+// came out x.
+TEST(MosSwitchSimulation, ZDataUnderAnUnknownControlDrivesZ) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  logic d = 1'bz, cx = 1'bx, cz = 1'bz;\n"
+      "  wire y1, y2, y3, y4;\n"
+      "  nmos (y1, d, cx);\n"
+      "  pmos (y2, d, cx);\n"
+      "  rnmos (y3, d, cz);\n"
+      "  rpmos (y4, d, cz);\n"
+      "  initial #1 $display(\"%b %b %b %b\", y1, y2, y3, y4);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "z z z z\n");
+}
+
 }  // namespace
