@@ -191,6 +191,14 @@ class DeclaredNameTables {
   void RegisterStaticFrameOwner(const ModuleItem* subroutine,
                                 std::string_view owner);
   std::string_view StaticFrameOwner(const ModuleItem* subroutine) const;
+  // §27.4: a subroutine a generate block declares is declared once per
+  // instance of the block, and `depth` counts the blocks the declaring one
+  // is nested in, itself included, so that a call keeps the subroutine's
+  // static frames under the instance declaring it (FrameOwnerEntry). Zero for
+  // every other subroutine.
+  void RegisterGenBlockSubroutineDepth(const ModuleItem* subroutine,
+                                       size_t depth);
+  size_t GenBlockSubroutineDepth(const ModuleItem* subroutine) const;
   // The subroutines given an owner, in the order they were registered.
   const std::vector<const ModuleItem*>& OwnedSubroutines() const {
     return owned_subroutines_;
@@ -511,6 +519,8 @@ class DeclaredNameTables {
   std::unordered_map<const ModuleItem*, std::string_view> subroutine_packages_;
   // §13.4.2: see RegisterStaticFrameOwner.
   std::unordered_map<const ModuleItem*, std::string_view> static_frame_owners_;
+  // §27.4: see RegisterGenBlockSubroutineDepth.
+  std::unordered_map<const ModuleItem*, size_t> gen_block_subroutine_depths_;
   std::vector<const ModuleItem*> owned_subroutines_;
   struct PackageImport {
     std::string_view imported;

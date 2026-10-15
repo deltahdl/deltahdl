@@ -307,8 +307,10 @@ struct Process {
   // §13.4.2: the owner each enable still running keeps its static frames
   // under, one entry per enable as above -- the package or compilation unit
   // declaring a subroutine of one (DeclaredNameTables::StaticFrameOwner),
-  // empty for an instance's subroutine, whose frames are its instance's.
-  std::vector<std::string_view> frame_owners;
+  // empty for an instance's subroutine, whose frames are its instance's --
+  // with the depth of the generate block instance declaring it (§27.4,
+  // FrameOwnerEntry).
+  std::vector<FrameOwnerEntry> frame_owners;
   // A copy of a calling process that carries its context to a display written
   // later (SnapshotCallingProcess in deferred_caller.h); no thread of the run.
   bool stand_in = false;

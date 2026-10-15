@@ -216,6 +216,17 @@ std::string_view DeclaredNameTables::StaticFrameOwner(
   return it != static_frame_owners_.end() ? it->second : std::string_view{};
 }
 
+void DeclaredNameTables::RegisterGenBlockSubroutineDepth(
+    const ModuleItem* subroutine, size_t depth) {
+  gen_block_subroutine_depths_[subroutine] = depth;
+}
+
+size_t DeclaredNameTables::GenBlockSubroutineDepth(
+    const ModuleItem* subroutine) const {
+  auto it = gen_block_subroutine_depths_.find(subroutine);
+  return it != gen_block_subroutine_depths_.end() ? it->second : 0;
+}
+
 void DeclaredNameTables::RegisterPackageImport(std::string_view pkg,
                                                std::string_view imported,
                                                std::string_view item) {

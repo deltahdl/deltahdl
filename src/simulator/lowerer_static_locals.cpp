@@ -102,19 +102,21 @@ void InitSubroutineStatics(const StaticLocalOwner& owner, SimContext& ctx,
   ctx.PopStaticScope(func->name);
 }
 
-// §27.4: whether `func` is one of the subroutines a generate block of `mod`
-// declares. The elaborator lists such a subroutine among the module's own
-// function_decls as well, under its bare name and possibly as a copy, so it is
-// told by where it is written; made from there, its static locals were made
-// without the block's loop constants their initializers read.
-bool IsGenBlockSubroutine(const ModuleItem* func, const RtlirModule* mod) {
-  return std::ranges::any_of(
+// §27.4: the record of a generate block of `mod` declaring `func`, null
+// where none does. The elaborator lists such a subroutine among the module's
+// own function_decls as well, under its bare name and possibly as a copy, so
+// it is told by where it is written; made from there, its static locals were
+// made without the block's loop constants their initializers read.
+const RtlirGenBlockSubroutine* DeclaringGenBlock(const ModuleItem* func,
+                                                 const RtlirModule* mod) {
+  auto it = std::ranges::find_if(
       mod->gen_block_subroutines, [&](const RtlirGenBlockSubroutine& sub) {
         const SourceLoc& at = sub.decl->loc;
         return std::tie(sub.decl->name, at.file_id, at.line, at.column) ==
                std::tie(func->name, func->loc.file_id, func->loc.line,
                         func->loc.column);
       });
+  return it != mod->gen_block_subroutines.end() ? &*it : nullptr;
 }
 
 // §10.5 with §13.4.2: the static locals of the package and compilation-unit
@@ -127,7 +129,7 @@ void InitOwnedSubroutineStatics(SimContext& ctx, Arena& arena) {
     Process stand_in;
     stand_in.stand_in = true;
     stand_in.is_static_init = true;
-    stand_in.frame_owners.push_back(ctx.StaticFrameOwner(func));
+    stand_in.frame_owners.push_back({ctx.StaticFrameOwner(func), 0});
     CallerStandIn in_owner(&stand_in, ctx);
     StaticLocalOwner owner;
     owner.subroutine = func;
@@ -399,14 +401,24 @@ void Lowerer::RecordStaticLocalSubroutines(const RtlirModule* mod) {
     static_local_owners_.push_back(
         {.inst_prefix = inst_prefix_, .classes = &mod->class_decls});
   }
+  // §27.4: a subroutine a generate block declares keeps its static frames
+  // under the block instance declaring it, the one its depth names among a
+  // call's generate block prefixes, whichever of the module's lists the call
+  // finds it in.
   for (const ModuleItem* func : mod->function_decls) {
-    if (!func->method_class.empty() || IsGenBlockSubroutine(func, mod))
+    if (!func->method_class.empty()) continue;
+    if (const RtlirGenBlockSubroutine* sub = DeclaringGenBlock(func, mod)) {
+      ctx_.RegisterGenBlockSubroutineDepth(func,
+                                           sub->gen_block_prefixes.size());
       continue;
+    }
     StaticLocalOwner owner{.inst_prefix = inst_prefix_, .subroutine = func};
     specializing_code_.push_back(owner);
     if (!StaticInitsOf(func).empty()) static_local_owners_.push_back(owner);
   }
   for (const RtlirGenBlockSubroutine& sub : mod->gen_block_subroutines) {
+    ctx_.RegisterGenBlockSubroutineDepth(sub.decl,
+                                         sub.gen_block_prefixes.size());
     StaticLocalOwner owner{
         .inst_prefix = inst_prefix_, .subroutine = sub.decl, .gen_block = &sub};
     specializing_code_.push_back(owner);

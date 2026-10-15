@@ -1,5 +1,6 @@
 #include "simulator/eval_function_hier.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <string>
@@ -19,6 +20,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/instance_prefix_override.h"
 #include "simulator/process.h"
+#include "simulator/scope.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
@@ -420,13 +422,13 @@ const Stmt* ExternForkjoinCall(const Expr* call, SimContext& ctx,
 
 // §13.4.2: the owners of the subroutines the running process, or a call made
 // where none runs, has entered (Process::frame_owners).
-static std::vector<std::string_view>& FrameOwners(SimContext& ctx) {
+static std::vector<FrameOwnerEntry>& FrameOwners(SimContext& ctx) {
   Process* proc = ctx.CurrentProcess();
   return proc != nullptr ? proc->frame_owners : ctx.ProcesslessFrameOwners();
 }
 
 void EnterStaticFrameOwner(SimContext& ctx, std::string_view owner) {
-  FrameOwners(ctx).push_back(owner);
+  FrameOwners(ctx).push_back({owner, 0});
 }
 
 void LeaveStaticFrameOwner(SimContext& ctx) { FrameOwners(ctx).pop_back(); }
@@ -463,9 +465,17 @@ StaticLocalFrameScope::~StaticLocalFrameScope() {
 }
 
 void EnterCalleeInstance(SimContext& ctx, const SubroutineTarget& target) {
-  EnterStaticFrameOwner(ctx, target.func != nullptr
-                                 ? ctx.StaticFrameOwner(target.func)
-                                 : std::string_view{});
+  // §27.4: a subroutine reached through its block instance's name stands in
+  // that instance, whose prefixes the process takes on below; one reached
+  // by its bare name is called from within the block declaring it, so the
+  // caller's prefixes lead to that block at its depth.
+  size_t gen_depth = target.gen_block != nullptr
+                         ? target.gen_block->gen_prefixes.size()
+                         : ctx.GenBlockSubroutineDepth(target.func);
+  FrameOwners(ctx).push_back({target.func != nullptr
+                                  ? ctx.StaticFrameOwner(target.func)
+                                  : std::string_view{},
+                              gen_depth});
   Process* proc = ctx.CurrentProcess();
   if (proc == nullptr) return;
   proc->caller_inst_prefixes.push_back(std::move(proc->inst_prefix));

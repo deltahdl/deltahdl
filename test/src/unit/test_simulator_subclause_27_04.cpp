@@ -521,4 +521,110 @@ TEST(LoopGenerateInstanceSim, PortConnectionsReadTheInstanceIndex) {
       "p 5 7 9\n");
 }
 
+// §27.4 with §6.21: each instance of a loop generate block is a scope of its
+// own, so a static variable its procedure declares is one per instance. Each
+// instance starts its s at its own value and counts it once; kept in one frame
+// for both, s was made by whichever instance came first, and the second count
+// carried on from the first.
+TEST(LoopGenerateStaticFrameSim, AProceduresStaticLocalIsItsInstances) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  for (genvar i = 0; i < 2; i++) begin : b\n"
+                       "    initial begin\n"
+                       "      static int s = i + 10;\n"
+                       "      #(2 - i) s++;\n"
+                       "      $display(\"s%0d %0d\", i, s);\n"
+                       "    end\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "s1 12\ns0 11\n");
+}
+
+// §27.4 with §6.21: the static variable of a named block in a block
+// instance's procedure, kept from one pass to the next, is the instance's.
+// Kept in one frame for both instances, the second instance's passes added to
+// the first's sum.
+TEST(LoopGenerateStaticFrameSim, ANamedBlocksVariableIsItsInstances) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int r [2];\n"
+                       "  for (genvar i = 0; i < 2; i++) begin : b\n"
+                       "    initial repeat (2) begin : nb\n"
+                       "      int c;\n"
+                       "      c = c + i + 1;\n"
+                       "      r[i] = c;\n"
+                       "    end\n"
+                       "  end\n"
+                       "  initial #1 $display(\"%0d %0d\", r[0], r[1]);\n"
+                       "endmodule\n",
+                       f),
+            "2 4\n");
+}
+
+// §27.4 with §13.4.2: a function a loop generate block declares is declared
+// once per instance, so its static variable is one per instance, while a
+// function the module declares is one function whose static variable every
+// instance's call shares. Kept in one frame, f's s counted on from the other
+// instance's; kept by the calling block, bump's count started again at 1.
+TEST(LoopGenerateStaticFrameSim, ABlocksFunctionKeepsAStaticPerInstance) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int n;\n"
+                       "  function void bump(); static int c = 0; c++; "
+                       "n = c; endfunction\n"
+                       "  for (genvar i = 0; i < 2; i++) begin : b\n"
+                       "    function int f(); static int s = 10 + i; s++; "
+                       "return s; endfunction\n"
+                       "    initial begin\n"
+                       "      #(2 - i) $display(\"f%0d %0d\", i, f());\n"
+                       "      bump();\n"
+                       "    end\n"
+                       "  end\n"
+                       "  initial #3 $display(\"n %0d\", n);\n"
+                       "endmodule\n",
+                       f),
+            "f1 12\nf0 11\nn 2\n");
+}
+
+// §27.4 with §23.6: a call through the block instance's name, `b[1].f()`,
+// reaches the frame the instance's own bare calls keep, and the other
+// instance's stays apart.
+TEST(LoopGenerateStaticFrameSim, AHierarchicalCallSharesTheInstancesFrame) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  for (genvar i = 0; i < 2; i++) begin : b\n"
+                       "    function int f(); static int s = 10 * (i + 1); "
+                       "s++; return s; endfunction\n"
+                       "    initial #(1 + i) $display(\"in%0d %0d\", i, f());\n"
+                       "  end\n"
+                       "  initial begin\n"
+                       "    $display(\"h1 %0d\", b[1].f());\n"
+                       "    $display(\"h0 %0d\", b[0].f());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "h1 21\nh0 11\nin0 12\nin1 22\n");
+}
+
+// §27.4 with §23.9: a bare call from a block nested in the declaring block
+// reaches the declaring instance's frame, one for every nested instance of
+// it. Kept by the innermost calling block, each of c[0] and c[1] counted
+// apart and the second call of each b[i] read the first again.
+TEST(LoopGenerateStaticFrameSim, ANestedBlocksCallSharesTheDeclaringFrame) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  for (genvar i = 0; i < 2; i++) begin : b\n"
+                       "    function int f(); static int s = i * 10; s++; "
+                       "return s; endfunction\n"
+                       "    for (genvar j = 0; j < 2; j++) begin : c\n"
+                       "      initial #(1 + 2 * i + j)\n"
+                       "        $display(\"c%0d%0d %0d\", i, j, f());\n"
+                       "    end\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "c00 1\nc01 2\nc10 11\nc11 12\n");
+}
+
 }  // namespace

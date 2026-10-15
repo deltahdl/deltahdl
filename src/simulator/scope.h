@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <string_view>
 #include <unordered_map>
 
@@ -81,6 +82,20 @@ struct Scope {
   // §11.12: the lets the block or the subroutine body this frame stands for
   // declares, each the let its name refers to within that scope.
   std::unordered_map<std::string_view, ModuleItem*> lets;
+};
+
+// §13.4.2 with §27.4: what one subroutine enable still running keeps its
+// static frames under (Process::frame_owners). `owner` is the package or
+// compilation unit declaring the subroutine, empty for an instance's.
+// `gen_depth` counts the running process's generate block prefixes
+// (Process::gen_prefixes) that lead to the block instance declaring the
+// subroutine, the last of them naming that instance, since §27.4 makes each
+// instance of a generate block a scope of its own and declares its
+// subroutines once per instance; it is zero for a subroutine no generate
+// block declares, whose frames are its module instance's alone.
+struct FrameOwnerEntry {
+  std::string_view owner;
+  size_t gen_depth = 0;
 };
 
 }  // namespace delta

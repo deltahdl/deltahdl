@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <iterator>
@@ -134,17 +136,27 @@ std::vector<Scope> ScopeStack::SwapScopeStack(std::vector<Scope> new_stack) {
 std::string_view SimContext::StaticFrameKey(std::string_view name) {
   // §13.4.2: a package's or the compilation unit's subroutine keeps its
   // frames, and those of the blocks in its body, under its owner's name.
-  const std::vector<std::string_view>& owners =
+  const std::vector<FrameOwnerEntry>& owners =
       current_process_ != nullptr ? current_process_->frame_owners
                                   : processless_frame_owners_;
-  if (!owners.empty() && !owners.back().empty()) {
-    return *arena_.Create<std::string>(std::string(owners.back()) +
+  if (!owners.empty() && !owners.back().owner.empty()) {
+    return *arena_.Create<std::string>(std::string(owners.back().owner) +
                                        "::" + std::string(name));
   }
-  if (!current_process_ || current_process_->inst_prefix.empty()) return name;
-  auto* key = arena_.Create<std::string>(current_process_->inst_prefix +
-                                         std::string(name));
-  return *key;
+  if (!current_process_) return name;
+  // §27.4: each generate block instance is a scope of its own, so a frame
+  // is kept under the module instance and the block instance declaring what
+  // the frame is of: the process's own block for its procedural code, and for
+  // a subroutine's body the block declaring the subroutine, none for one the
+  // module declares (FrameOwnerEntry::gen_depth).
+  const std::vector<std::string>& blocks = current_process_->gen_prefixes;
+  size_t depth = owners.empty()
+                     ? blocks.size()
+                     : std::min(owners.back().gen_depth, blocks.size());
+  std::string key = current_process_->inst_prefix;
+  if (depth > 0) key += blocks[depth - 1];
+  if (key.empty()) return name;
+  return *arena_.Create<std::string>(key + std::string(name));
 }
 
 void SimContext::PushStaticScope(std::string_view func_name) {

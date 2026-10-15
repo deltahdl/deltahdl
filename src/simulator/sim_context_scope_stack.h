@@ -97,7 +97,7 @@ class ScopeStack {
   }
   // §13.4.2: Process::frame_owners for a call made where no process runs,
   // such as a module variable's initializer.
-  std::vector<std::string_view>& ProcesslessFrameOwners() {
+  std::vector<FrameOwnerEntry>& ProcesslessFrameOwners() {
     return processless_frame_owners_;
   }
 
@@ -109,7 +109,7 @@ class ScopeStack {
                      std::unordered_map<std::string_view, Variable*>>
       static_frames_;
   std::vector<std::string_view> func_name_stack_;
-  std::vector<std::string_view> processless_frame_owners_;
+  std::vector<FrameOwnerEntry> processless_frame_owners_;
   std::unordered_map<const Stmt*, std::string> stmt_frames_;
 };
 
