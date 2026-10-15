@@ -392,6 +392,11 @@ class Lowerer {
                             const RtlirPortBinding& binding,
                             const RtlirModule* ifc, const std::string& port_key,
                             const std::string& instance);
+  void DrivePathDelayedMembers(const RtlirModuleInst& inst,
+                               std::string_view port_name,
+                               const RtlirModule* ifc,
+                               const std::string& port_prefix,
+                               const std::string& instance);
   std::string ConnectedInstanceKey(std::string_view name) const;
   const RtlirModule* ConnectedInterface(const RtlirPort& port, const Expr* conn,
                                         std::string& instance) const;

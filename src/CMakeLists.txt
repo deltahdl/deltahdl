@@ -415,6 +415,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/lowerer_process.cpp
     simulator/lowerer_static_locals.cpp
     simulator/lowerer_inst.cpp
+    simulator/lowerer_interface_paths.cpp
     simulator/lowerer_import.cpp
     simulator/lowerer_alias_kinds.cpp
     simulator/lowerer_enum_types.cpp

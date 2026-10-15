@@ -98,4 +98,46 @@ TEST(InterfaceForkjoinSim, CallWithNoDefinitionIsReported) {
                             "25.7.4"));
 }
 
+// §25.7.4: a disable of an extern forkjoin task through one module instance,
+// m1.a.Hit, ends only the call to that instance; m2's call runs on and the
+// fork-join returns when it does. Before, the disable ended every call by the
+// task's name and the wait ended at 5.
+std::string RunDisabledForkjoin(const char* disable, SimFixture& f) {
+  return RunCapture(
+      std::string(
+          "interface sb;\n"
+          "  extern forkjoin task Hit();\n"
+          "  modport target(export Hit);\n"
+          "endinterface\n"
+          "module memMod #(parameter int D = 1)(sb.target a);\n"
+          "  task a.Hit(); #(D); $display(\"finished %0d\", D); endtask\n"
+          "endmodule\n"
+          "module top;\n"
+          "  sb s();\n"
+          "  memMod #(10) m1(s.target);\n"
+          "  memMod #(20) m2(s.target);\n"
+          "  initial begin\n"
+          "    fork s.Hit(); join_none\n"
+          "    #5 ") +
+          disable +
+          ";\n"
+          "    wait fork;\n"
+          "    $display(\"done at %0t\", $time);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+}
+
+TEST(InterfaceForkjoinSim, DisableThroughModuleInstanceEndsItsCallAlone) {
+  SimFixture f;
+  EXPECT_EQ(RunDisabledForkjoin("disable m1.a.Hit", f),
+            "finished 20\ndone at 20\n");
+}
+
+// The same disable through the interface instance, s.Hit, ends every call.
+TEST(InterfaceForkjoinSim, DisableThroughInterfaceInstanceEndsEveryCall) {
+  SimFixture f;
+  EXPECT_EQ(RunDisabledForkjoin("disable s.Hit", f), "done at 5\n");
+}
+
 }  // namespace

@@ -473,6 +473,7 @@ void Lowerer::AliasInterfacePortTo(const RtlirModuleInst& inst,
   std::string port_prefix = port_key + ".";
   std::string conn_prefix = inst_prefix_ + instance + ".";
   AliasVariableMembers(ifc, port_prefix, conn_prefix, ctx_, arena_);
+  DrivePathDelayedMembers(inst, binding.port_name, ifc, port_prefix, instance);
   // A net shares one storage between its net-map entry (driver resolution)
   // and its variable-map entry (value reads). Alias both, like LowerAliases,
   // so a continuous assign driven through the port reaches the shared net and

@@ -41,6 +41,27 @@ TEST(VirtualInterfaceSim, NullReferenceEndsTheRun) {
                             "25.9"));
 }
 
+// §25.9: one assignment through a null virtual interface is one use, and
+// draws one fatal error. The blocking assignment measures its target to size
+// the right-hand side before it writes, and the measurement reported the null
+// base too, so the one error was printed twice at the same place.
+TEST(VirtualInterfaceSim, NullAssignmentTargetReportsOnce) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "interface ifc; logic a; endinterface\n"
+      "module top;\n"
+      "  virtual ifc v;\n"
+      "  initial begin $display(\"before\"); #2 v.a = 1; "
+      "$display(\"after\"); end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "before\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference through a null virtual interface", 4,
+                            "25.9"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
 // §25.9: two virtual interfaces are equal when they represent the same
 // instance, wherever they are compared. In a method, the property `vif` set
 // to s1 equals the formal bound to s1, not the one bound to s2, and `!=`

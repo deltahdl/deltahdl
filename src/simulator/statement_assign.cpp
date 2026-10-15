@@ -577,9 +577,10 @@ static FieldTarget ResolvePackageClassStaticField(const Expr* lhs,
 // null reference §25.9 makes a runtime error -- the same one a read through
 // it raises -- reported here and resolved to storage that takes no value, so
 // the caller sees a handled path rather than an unwritten one it would report
-// again or drop in silence.
+// again or drop in silence. `report` is false where the target is only
+// measured ahead of the write that reports the one use (FieldLhsWidth).
 static FieldTarget ResolveVirtualInterfaceField(const Expr* lhs,
-                                                SimContext& ctx,
+                                                SimContext& ctx, bool report,
                                                 bool* handled) {
   *handled = false;
   if (lhs->kind != ExprKind::kMemberAccess || lhs->is_scope_resolution ||
@@ -596,7 +597,7 @@ static FieldTarget ResolveVirtualInterfaceField(const Expr* lhs,
   if (!base.is_virtual_interface) return {};
   *handled = true;
   if (base.handle == kNullVirtualInterface) {
-    ReportNullVirtualInterface(lhs->range.start, ctx);
+    if (report) ReportNullVirtualInterface(lhs->range.start, ctx);
     FieldTarget target;
     target.kind = FieldTarget::Kind::kNoOp;
     return target;
@@ -661,7 +662,9 @@ static size_t FieldTargetSplit(const Expr* lhs, const std::string& name) {
   return name.find('.');
 }
 
-FieldTarget ResolveFieldTarget(const Expr* lhs, SimContext& ctx) {
+// ResolveFieldTarget, reporting a null virtual interface base where `report`.
+static FieldTarget ResolveFieldTargetOf(const Expr* lhs, SimContext& ctx,
+                                        bool report) {
   // A virtual interface base is asked first, on the expression rather than
   // the flattened name: `this.vif.a` splits to `this` and `vif.a`, which
   // ResolveThisField would take for a property named by the flat key, and
@@ -670,7 +673,7 @@ FieldTarget ResolveFieldTarget(const Expr* lhs, SimContext& ctx) {
   // bare `this`, `super` or class type name resolves to no virtual interface,
   // so those bases still reach their own resolvers below.
   bool handled = false;
-  FieldTarget target = ResolveVirtualInterfaceField(lhs, ctx, &handled);
+  FieldTarget target = ResolveVirtualInterfaceField(lhs, ctx, report, &handled);
   if (handled) return target;
   target = ResolvePackageClassStaticField(lhs, ctx, &handled);
   if (handled) return target;
@@ -895,8 +898,14 @@ static uint32_t FieldTargetWidth(const FieldTarget& target) {
   return 0;
 }
 
+FieldTarget ResolveFieldTarget(const Expr* lhs, SimContext& ctx) {
+  return ResolveFieldTargetOf(lhs, ctx, true);
+}
+
+// §25.9: measuring the target is not a use of a null virtual interface base;
+// the write that follows is, and reports it once.
 uint32_t FieldLhsWidth(const Expr* lhs, SimContext& ctx) {
-  return FieldTargetWidth(ResolveFieldTarget(lhs, ctx));
+  return FieldTargetWidth(ResolveFieldTargetOf(lhs, ctx, false));
 }
 
 bool WriteStructField(const Expr* lhs, const Logic4Vec& rhs_val,

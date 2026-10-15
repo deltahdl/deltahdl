@@ -13,12 +13,14 @@
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
+#include "simulator/eval_function_hier.h"
 #include "simulator/exec_task.h"
 #include "simulator/procedural_assertion.h"
 #include "simulator/process.h"
 #include "simulator/process_termination.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/stmt_exec_internal.h"
 #include "simulator/stmt_result.h"
 #include "simulator/vpi_context.h"
@@ -95,6 +97,23 @@ static bool TryUnwindForDisable(Process* proc, std::string_view target,
   return true;
 }
 
+// §25.7.4 with §9.6.2: the instance the definition a hierarchical disable
+// names runs in, where the path names one module instance's definition of a
+// task, `m1.a.Hit` for the task m1 defines through its port `a`, read from
+// the calling instance first and then from the top of the design; null for
+// any other path. A disable of such a path ends only the calls running in
+// that instance, while `s.Hit`, the interface instance's own extern forkjoin
+// task, names none and ends the calls of every definition.
+static const std::string* DisabledDefinitionInstance(const Expr* e,
+                                                     SimContext& ctx) {
+  if (e->kind != ExprKind::kMemberAccess) return nullptr;
+  std::string path = EvaluatedHierarchicalPath(e, ctx, ctx.GetArena());
+  const GenBlockSubroutineScope* scope =
+      ctx.FindGenBlockSubroutineScope(ctx.ActiveInstancePrefix() + path);
+  if (scope == nullptr) scope = ctx.FindGenBlockSubroutineScope(path);
+  return scope != nullptr ? &scope->inst_prefix : nullptr;
+}
+
 StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {
   auto target = DisableTargetLabel(stmt->expr);
   if (target.empty()) return StmtResult::kDone;
@@ -104,6 +123,12 @@ StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {
   auto procs = ctx.FindNamedScopeProcesses(target);
   std::sort(procs.begin(), procs.end());
   procs.erase(std::unique(procs.begin(), procs.end()), procs.end());
+  if (const std::string* instance =
+          DisabledDefinitionInstance(stmt->expr, ctx)) {
+    std::erase_if(procs, [instance](const Process* proc) {
+      return proc->inst_prefix != *instance;
+    });
+  }
   bool self_disable = false;
 
   for (auto* proc : procs) {
