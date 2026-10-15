@@ -1,8 +1,10 @@
 #include "driver/cli_options.h"
 
 #include <charconv>
+#include <cstdint>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -14,6 +16,8 @@
 #include "common/types.h"
 #include "preprocessor/protect_cli.h"
 #include "simulator/foreign_code.h"
+#include "simulator/specify.h"
+#include "simulator/specify_path_delay.h"
 #include "simulator/sv_vpi_user.h"
 
 namespace delta {
@@ -315,6 +319,74 @@ bool TryParseTimingCheckFlag(std::string_view arg, CliOptions& opts) {
   return false;
 }
 
+// §30.7.4.1 (printed page 889) and §30.7.4.2 (printed page 890): the invocation
+// options selecting on-event or on-detect pulse filtering, and showcancelled or
+// noshowcancelled, for every module path output. The one written last stands.
+bool TryParsePulseStyleFlag(std::string_view arg, CliOptions& opts) {
+  if (arg == "--pulse-style-onevent") {
+    opts.pulse_style_ondetect = false;
+    return true;
+  }
+  if (arg == "--pulse-style-ondetect") {
+    opts.pulse_style_ondetect = true;
+    return true;
+  }
+  if (arg == "--showcancelled") {
+    opts.showcancelled = true;
+    return true;
+  }
+  if (arg == "--noshowcancelled") {
+    opts.showcancelled = false;
+    return true;
+  }
+  return false;
+}
+
+// §30.7.2 (printed page 888): a pulse limit percentage is an integer from 0 to
+// 100. A value TakeNumber refused, or one left off, has been reported there.
+bool TakePulseLimitPercent(std::string_view arg, std::string_view name,
+                           ArgCursor cur, uint8_t& out) {
+  const int kBefore = cur.i;
+  uint32_t value = 0;
+  if (!TakeNumber(arg, name, cur, value)) return false;
+  if (cur.i == kBefore) return true;
+  if (value > 100) {
+    std::cerr << name
+              << " expects a percentage from 0 to 100: " << cur.argv[cur.i]
+              << "\n";
+    cur.opts.rejected_argument = true;
+    return true;
+  }
+  out = static_cast<uint8_t>(value);
+  return true;
+}
+
+bool TryParsePulseLimitArg(std::string_view arg, int& i, int argc,
+                           const char* const argv[], CliOptions& opts) {
+  ArgCursor cur{i, argc, argv, opts};
+  if (TakePulseLimitPercent(arg, "--pulse-reject-limit", cur,
+                            opts.pulse_reject_percent)) {
+    return true;
+  }
+  return TakePulseLimitPercent(arg, "--pulse-error-limit", cur,
+                               opts.pulse_error_percent);
+}
+
+// §30.7.2: an error limit percentage smaller than the reject limit percentage
+// is an error, and the error limit percentage is then set equal to the reject
+// limit percentage. The run goes on with that value, which is what the clause
+// says happens next, so the parse is not failed for it.
+void SettlePulseLimitPercents(CliOptions& opts) {
+  if (opts.pulse_error_percent >= opts.pulse_reject_percent) return;
+  std::cerr << "error: --pulse-error-limit "
+            << static_cast<unsigned>(opts.pulse_error_percent)
+            << " is smaller than --pulse-reject-limit "
+            << static_cast<unsigned>(opts.pulse_reject_percent)
+            << "; the error limit percentage is taken as "
+            << static_cast<unsigned>(opts.pulse_reject_percent) << "\n";
+  opts.pulse_error_percent = opts.pulse_reject_percent;
+}
+
 bool TryParseSynthFlag(std::string_view arg, CliOptions& opts) {
   if (arg == "--dump-aig") {
     opts.dump_aig = true;
@@ -369,6 +441,8 @@ bool TryParseSingleArg(std::string_view arg, int& i, int argc,
                        const char* const argv[], CliOptions& opts) {
   if (TryParseGeneralFlag(arg, opts)) return true;
   if (TryParseTimingCheckFlag(arg, opts)) return true;
+  if (TryParsePulseStyleFlag(arg, opts)) return true;
+  if (TryParsePulseLimitArg(arg, i, argc, argv, opts)) return true;
   if (TryParseSynthFlag(arg, opts)) return true;
   if (TryParseDefineArg(arg, i, argc, argv, opts)) return true;
   if (TryParseSimArg(arg, i, argc, argv, opts)) return true;
@@ -513,7 +587,23 @@ bool ParseArgsAtDepth(int argc, char* argv[], CliOptions& opts, int depth) {
 }  // namespace
 
 bool ParseArgs(int argc, char* argv[], CliOptions& opts) {
-  return ParseArgsAtDepth(argc, argv, opts, 0);
+  bool ok = ParseArgsAtDepth(argc, argv, opts, 0);
+  SettlePulseLimitPercents(opts);
+  return ok;
+}
+
+void ApplyPulseControlOptions(const CliOptions& opts, SpecifyManager& mgr) {
+  mgr.SetGlobalPulseLimitPercents(opts.pulse_reject_percent,
+                                  opts.pulse_error_percent);
+  if (opts.pulse_style_ondetect.has_value()) {
+    mgr.SetGlobalPulseStyle(*opts.pulse_style_ondetect ? PulseStyle::kOnDetect
+                                                       : PulseStyle::kOnEvent);
+  }
+  if (opts.showcancelled.has_value()) {
+    mgr.SetGlobalShowCancelled(*opts.showcancelled
+                                   ? ShowCancelled::kShowcancelled
+                                   : ShowCancelled::kNoshowcancelled);
+  }
 }
 
 }  // namespace delta

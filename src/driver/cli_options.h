@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -12,6 +13,8 @@
 #include "simulator/foreign_code.h"
 
 namespace delta {
+
+class SpecifyManager;
 
 // What the command line said, and the reading of it.
 //
@@ -98,6 +101,20 @@ struct CliOptions {
   // every timing check off (--no-timing-checks).
   bool negative_timing_checks = false;
   bool no_timing_checks = false;
+  // §30.7.2's two invocation options: the percentage of each module path
+  // transition delay used as its reject limit (--pulse-reject-limit) and as its
+  // error limit (--pulse-error-limit), each an integer from 0 to 100 and 100
+  // where not given.
+  uint8_t pulse_reject_percent = 100;
+  uint8_t pulse_error_percent = 100;
+  // §30.7.4.1's invocation option selecting on-detect (--pulse-style-ondetect)
+  // or on-event (--pulse-style-onevent) pulse filtering for every module path
+  // output, over any pulse style declaration; empty where neither was given.
+  std::optional<bool> pulse_style_ondetect;
+  // §30.7.4.2's showcancelled (--showcancelled) and noshowcancelled
+  // (--noshowcancelled) invocation options, true for the first, over any
+  // showcancelled declaration; empty where neither was given.
+  std::optional<bool> showcancelled;
   // Whether an option was recognized and its argument refused. It is separate
   // from the unrecognized option ParseArgs reports, because an option that
   // names its own complaint has already printed the one a reader needs.
@@ -122,5 +139,11 @@ struct CliOptions {
 // may name another, so the options a command line carries are not only the ones
 // written on it.
 bool ParseArgs(int argc, char* argv[], CliOptions& opts);
+
+// Puts the pulse control invocation options of §30.7.2, §30.7.4.1 and
+// §30.7.4.2 that `opts` carries in force on `mgr`, which has to happen before
+// the design's module paths are registered: each path derives its limits from
+// the percentages as it is.
+void ApplyPulseControlOptions(const CliOptions& opts, SpecifyManager& mgr);
 
 }  // namespace delta

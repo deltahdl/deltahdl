@@ -4,8 +4,10 @@
 #include <string>
 #include <string_view>
 
+#include "driver/cli_options.h"
 #include "fixture_simulator.h"
 #include "fixture_specify_manager.h"
+#include "helpers_command_line.h"
 #include "parser/ast_specify.h"
 #include "simulator/specify.h"
 #include "simulator/specify_path_delay.h"
@@ -194,6 +196,40 @@ TEST(PulseStyleRun, OnDetectDrivesAFilteredPulseXFromItsDetection) {
                        "endmodule\n",
                        f),
             "t=7 y=1\nt=14 y=x\nt=21 y=1\n");
+}
+
+// The on-detect invocation option selects on-detect for every module path
+// output, over the on-event an output's declaration chose.
+TEST(PulseFilterStyleSim, OnDetectInvocationOptionOverridesTheDeclaration) {
+  SimFixture f;
+  SpecifyManager mgr;
+  LoadPulseStylesFromSource("    pulsestyle_onevent out;", f, mgr);
+  CliOptions opts;
+  ASSERT_TRUE(ParseCommandLine({"--pulse-style-ondetect"}, opts));
+  ApplyPulseControlOptions(opts, mgr);
+  EXPECT_EQ(mgr.ResolvePulseStyle("out"), PulseStyle::kOnDetect);
+}
+
+// The on-event invocation option likewise overrides an on-detect declaration.
+TEST(PulseFilterStyleSim, OnEventInvocationOptionOverridesTheDeclaration) {
+  SimFixture f;
+  SpecifyManager mgr;
+  LoadPulseStylesFromSource("    pulsestyle_ondetect out;", f, mgr);
+  CliOptions opts;
+  ASSERT_TRUE(ParseCommandLine({"--pulse-style-onevent"}, opts));
+  ApplyPulseControlOptions(opts, mgr);
+  EXPECT_EQ(mgr.ResolvePulseStyle("out"), PulseStyle::kOnEvent);
+}
+
+// With neither option given, the declaration stands.
+TEST(PulseFilterStyleSim, WithoutAStyleOptionTheDeclarationStands) {
+  SimFixture f;
+  SpecifyManager mgr;
+  LoadPulseStylesFromSource("    pulsestyle_ondetect out;", f, mgr);
+  CliOptions opts;
+  ASSERT_TRUE(ParseCommandLine({}, opts));
+  ApplyPulseControlOptions(opts, mgr);
+  EXPECT_EQ(mgr.ResolvePulseStyle("out"), PulseStyle::kOnDetect);
 }
 
 }  // namespace

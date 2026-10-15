@@ -116,6 +116,18 @@ void PrintHelp() {
             << "                       Accept negative $setuphold/$recrem "
                "limits (31.9.4)\n"
             << "  --no-timing-checks   Turn every timing check off (31.9.4)\n"
+            << "  --pulse-reject-limit <percent>\n"
+            << "                       Reject limit as a percentage of each "
+               "path delay (30.7.2)\n"
+            << "  --pulse-error-limit <percent>\n"
+            << "                       Error limit as a percentage of each "
+               "path delay (30.7.2)\n"
+            << "  --pulse-style-onevent, --pulse-style-ondetect\n"
+            << "                       Pulse filtering style for every path "
+               "output (30.7.4.1)\n"
+            << "  --showcancelled, --noshowcancelled\n"
+            << "                       Show cancelled pulses as x on every "
+               "path output, or not (30.7.4.2)\n"
             << "  -D <name>[=<value>]  Define preprocessor macro\n"
             << "  --compilation-unit-per-file\n"
             << "                       Make each source file a compilation "
@@ -425,6 +437,10 @@ int SimulateDesign(const delta::CliOptions& opts,
   // design's checks are registered at lowering, which builds each under them.
   sim_ctx.AcquireSpecifyManager().SetTimingCheckInvocationOptions(
       {opts.negative_timing_checks, opts.no_timing_checks});
+  // §30.7.2, §30.7.4.1 and §30.7.4.2: the pulse control invocation options are
+  // in force before lowering registers the design's module paths, each of which
+  // derives its pulse limits from the percentages as it is registered.
+  delta::ApplyPulseControlOptions(opts, sim_ctx.AcquireSpecifyManager());
   delta::Lowerer lowerer(sim_ctx, arena, diag);
   lowerer.Lower(design);
   // §35.4: the imports lowering registered are bound to the global symbols

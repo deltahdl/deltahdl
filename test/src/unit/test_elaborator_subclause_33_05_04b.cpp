@@ -45,9 +45,6 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
-#include <iostream>
-#include <sstream>
-#include <streambuf>
 #include <string>
 #include <vector>
 
@@ -274,11 +271,9 @@ TEST(SeparateCompilationCommandLine,
 // Runs one command line with std::cerr captured and returns what was printed.
 std::string ParseCapturingStderr(const std::vector<std::string>& args,
                                  CliOptions& opts) {
-  std::ostringstream captured;
-  std::streambuf* old_buf = std::cerr.rdbuf(captured.rdbuf());
-  ParseCommandLine(args, opts);
-  std::cerr.rdbuf(old_buf);
-  return captured.str();
+  std::string err;
+  ParseCommandLineCapturingStderr(args, opts, err);
+  return err;
 }
 
 TEST(SeparateCompilationCommandLine, OptionsFileNamesItselfInAMissingValue) {

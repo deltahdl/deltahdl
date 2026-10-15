@@ -869,7 +869,14 @@ void SpecifyManager::AddPathDelayFromDecl(const SpecifyPathDecl& decl,
       // §30.4 names a path's terminals by the declaring module's own port
       // names, so the instance is what tells two instances of one cell apart.
       pd.inst_prefix = inst_prefix;
-      if (default_pulse_limits) InitDefaultPulseLimits(pd);
+      // §30.7.2 (printed page 888): the invocation options' percentages of
+      // each transition delay, 100% where none was given, which leaves the
+      // limits equal to the delay. A PATHPULSE$ specparam and SDF annotation
+      // reach the path later and outrank them.
+      if (default_pulse_limits) {
+        InitDefaultPulseLimits(pd);
+        ApplyGlobalPulseLimits(pd, reject_pulse_pct_, error_pulse_pct_);
+      }
       // §30.5.3 (printed page 885): every declared path is a path of its own,
       // a second declaration between the same terminals among them, and where
       // more than one is active for a transition the least of their delays is

@@ -3,10 +3,12 @@
 #include <string>
 #include <vector>
 
+#include "driver/cli_options.h"
 #include "elaborator/elaborator.h"
 #include "fixture_simulator.h"
 #include "fixture_specify_manager.h"
 #include "fixture_specify_path_decl.h"
+#include "helpers_command_line.h"
 #include "lexer/lexer.h"
 #include "parser/ast_module.h"
 #include "parser/ast_specify.h"
@@ -227,6 +229,64 @@ TEST(GlobalPulseLimitScaling, DefaultGlobalPercentagesAreHundred) {
   SpecifyManager mgr;
   EXPECT_EQ(mgr.RejectPulseLimitPercent(), 100u);
   EXPECT_EQ(mgr.ErrorPulseLimitPercent(), 100u);
+}
+
+// The two invocation options carry their percentages to the manager the run's
+// module paths take their limits from.
+TEST(GlobalPulseLimitScaling, InvocationOptionsSetThePercentages) {
+  CliOptions opts;
+  ASSERT_TRUE(ParseCommandLine(
+      {"--pulse-reject-limit", "40", "--pulse-error-limit", "80"}, opts));
+  SpecifyManager mgr;
+  ApplyPulseControlOptions(opts, mgr);
+  EXPECT_EQ(mgr.RejectPulseLimitPercent(), 40u);
+  EXPECT_EQ(mgr.ErrorPulseLimitPercent(), 80u);
+}
+
+// A percentage is an integer from 0 to 100, so 101 is refused.
+TEST(GlobalPulseLimitScaling, PercentageAboveHundredIsRefused) {
+  CliOptions opts;
+  std::string err;
+  EXPECT_FALSE(ParseCommandLineCapturingStderr({"--pulse-error-limit", "101"},
+                                               opts, err));
+  EXPECT_TRUE(opts.rejected_argument);
+  EXPECT_NE(err.find("--pulse-error-limit expects a percentage from 0 to 100: "
+                     "101"),
+            std::string::npos)
+      << err;
+}
+
+// An error limit percentage below the reject limit percentage is an error, and
+// the error limit percentage is then taken as the reject limit percentage.
+TEST(GlobalPulseLimitScaling, ErrorPercentageBelowRejectIsReportedAndRaised) {
+  CliOptions opts;
+  std::string err;
+  EXPECT_TRUE(ParseCommandLineCapturingStderr(
+      {"--pulse-reject-limit", "60", "--pulse-error-limit", "20"}, opts, err));
+  EXPECT_EQ(opts.pulse_reject_percent, 60u);
+  EXPECT_EQ(opts.pulse_error_percent, 60u);
+  EXPECT_NE(err.find("--pulse-error-limit 20 is smaller than "
+                     "--pulse-reject-limit 60"),
+            std::string::npos)
+      << err;
+}
+
+// The percentages are in force when the design's module paths are registered,
+// so a declared path derives its limits from them: 50% and 80% of its rise
+// delay 10 and its fall delay 20.
+TEST(GlobalPulseLimitScaling, DeclaredPathTakesTheGlobalPercentages) {
+  SimFixture f;
+  f.ctx.AcquireSpecifyManager().SetGlobalPulseLimitPercents(50, 80);
+  auto c =
+      ElaboratePathDecl("input a, output y", "    (a => y) = (10, 20);", f);
+  ASSERT_NE(c.design, nullptr);
+  LowerAndRun(c.design, f);
+  const auto& paths = f.ctx.AcquireSpecifyManager().GetPathDelays();
+  ASSERT_EQ(paths.size(), 1u);
+  EXPECT_EQ(paths[0].reject_limit[0], 5u);
+  EXPECT_EQ(paths[0].error_limit[0], 8u);
+  EXPECT_EQ(paths[0].reject_limit[1], 10u);
+  EXPECT_EQ(paths[0].error_limit[1], 16u);
 }
 
 }  // namespace

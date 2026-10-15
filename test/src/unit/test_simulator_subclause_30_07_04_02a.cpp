@@ -4,8 +4,10 @@
 #include <string>
 #include <string_view>
 
+#include "driver/cli_options.h"
 #include "fixture_simulator.h"
 #include "fixture_specify_manager.h"
+#include "helpers_command_line.h"
 #include "parser/ast_specify.h"
 #include "simulator/specify.h"
 #include "simulator/specify_path_delay.h"
@@ -213,6 +215,30 @@ TEST(NegativePulseDetectionSim, NegativePulseFromUnequalDelaysForcesX) {
       mgr.ResolveShowCancelled("undeclared"), PulseStyle::kOnEvent,
       /*detect_time=*/kTrailing, /*scheduled_leading_time=*/kLeading);
   EXPECT_FALSE(hidden.force_x);
+}
+
+// The showcancelled invocation option enables showcancelled for every module
+// path output, over an output's noshowcancelled declaration.
+TEST(NegativePulseDetectionSim, ShowcancelledOptionOverridesTheDeclaration) {
+  SimFixture f;
+  SpecifyManager mgr;
+  LoadShowCancelledFromSource("    noshowcancelled out;", f, mgr);
+  CliOptions opts;
+  ASSERT_TRUE(ParseCommandLine({"--showcancelled"}, opts));
+  ApplyPulseControlOptions(opts, mgr);
+  EXPECT_EQ(mgr.ResolveShowCancelled("out"), ShowCancelled::kShowcancelled);
+}
+
+// The noshowcancelled invocation option likewise overrides a showcancelled
+// declaration.
+TEST(NegativePulseDetectionSim, NoshowcancelledOptionOverridesTheDeclaration) {
+  SimFixture f;
+  SpecifyManager mgr;
+  LoadShowCancelledFromSource("    showcancelled out;", f, mgr);
+  CliOptions opts;
+  ASSERT_TRUE(ParseCommandLine({"--noshowcancelled"}, opts));
+  ApplyPulseControlOptions(opts, mgr);
+  EXPECT_EQ(mgr.ResolveShowCancelled("out"), ShowCancelled::kNoshowcancelled);
 }
 
 }  // namespace

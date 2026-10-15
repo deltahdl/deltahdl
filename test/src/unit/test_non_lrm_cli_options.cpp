@@ -16,9 +16,6 @@
 
 #include <gtest/gtest.h>
 
-#include <iostream>
-#include <sstream>
-#include <streambuf>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -33,18 +30,6 @@
 using namespace delta;
 
 namespace {
-
-// Runs one command line with std::cerr captured, answering whether the parse
-// was accepted and filling `err` with what was printed.
-bool ParseCapturingStderr(const std::vector<std::string>& args,
-                          CliOptions& opts, std::string& err) {
-  std::ostringstream captured;
-  std::streambuf* old_buf = std::cerr.rdbuf(captured.rdbuf());
-  bool ok = ParseCommandLine(args, opts);
-  std::cerr.rdbuf(old_buf);
-  err = captured.str();
-  return ok;
-}
 
 // --parse-only reaches CliOptions::parse_only.
 TEST(RunStageOptions, ParseOnlySetsParseOnly) {
@@ -96,10 +81,12 @@ TEST(RunStageOptions, NoStageOptionLeavesBothUnset) {
 // A numeric option written last has no value, which is reported as missing
 // rather than as an option that does not exist.
 TEST(NumericOptions, NumberWrittenLastIsReportedAsMissingItsValue) {
-  for (const char* name : {"--seed", "--max-generate-iterations"}) {
+  for (const char* name : {"--seed", "--max-generate-iterations",
+                           "--pulse-reject-limit", "--pulse-error-limit"}) {
     CliOptions opts;
     std::string err;
-    EXPECT_FALSE(ParseCapturingStderr({"m.sv", name}, opts, err)) << name;
+    EXPECT_FALSE(ParseCommandLineCapturingStderr({"m.sv", name}, opts, err))
+        << name;
     EXPECT_TRUE(opts.rejected_argument) << name;
     EXPECT_NE(err.find(std::string(name) + " expects a value"),
               std::string::npos)
@@ -115,7 +102,8 @@ TEST(NumericOptions, NegativeNumberIsRefused) {
   for (const char* name : {"--seed", "--max-generate-iterations"}) {
     CliOptions opts;
     std::string err;
-    EXPECT_FALSE(ParseCapturingStderr({name, "-1"}, opts, err)) << name;
+    EXPECT_FALSE(ParseCommandLineCapturingStderr({name, "-1"}, opts, err))
+        << name;
     EXPECT_TRUE(opts.rejected_argument) << name;
     EXPECT_NE(err.find(std::string(name) +
                        " expects a number that is not negative: -1"),
@@ -184,7 +172,7 @@ TEST(RemovedOptions, EachIsReportedAsAnUnknownOption) {
                            "--format", "--area", "--delay", "--retime"}) {
     CliOptions opts;
     std::string err;
-    EXPECT_FALSE(ParseCapturingStderr({name}, opts, err)) << name;
+    EXPECT_FALSE(ParseCommandLineCapturingStderr({name}, opts, err)) << name;
     EXPECT_FALSE(opts.rejected_argument) << name;
     EXPECT_NE(err.find(std::string("unknown option: ") + name),
               std::string::npos)
@@ -231,7 +219,7 @@ TEST(DefineOption, JoinedAndSeparateDefinitionsBothReachTheDefines) {
 TEST(DefineOption, DefineWrittenLastIsReportedAsMissingItsValue) {
   CliOptions opts;
   std::string err;
-  EXPECT_FALSE(ParseCapturingStderr({"m.sv", "-D"}, opts, err));
+  EXPECT_FALSE(ParseCommandLineCapturingStderr({"m.sv", "-D"}, opts, err));
   EXPECT_TRUE(opts.rejected_argument);
   EXPECT_NE(err.find("-D expects a value"), std::string::npos) << err;
   EXPECT_TRUE(opts.defines.empty());
@@ -243,8 +231,8 @@ TEST(DefineOption, DefineWrittenLastIsReportedAsMissingItsValue) {
 TEST(ProtectOptions, RefusedNamedKeyFailsTheParse) {
   CliOptions opts;
   std::string err;
-  EXPECT_FALSE(
-      ParseCapturingStderr({"--protect-named-key", "acme"}, opts, err));
+  EXPECT_FALSE(ParseCommandLineCapturingStderr({"--protect-named-key", "acme"},
+                                               opts, err));
   EXPECT_TRUE(opts.protect.rejected_argument);
   EXPECT_TRUE(opts.rejected_argument);
   EXPECT_NE(err.find("--protect-named-key expects <owner>:<name>=<key>: acme"),
@@ -264,7 +252,8 @@ TEST(OptionsFile, FileThatCannotBeOpenedStopsTheParse) {
 
   CliOptions opts;
   std::string err;
-  EXPECT_FALSE(ParseCapturingStderr({"-f", kAbsent, "m.sv"}, opts, err));
+  EXPECT_FALSE(
+      ParseCommandLineCapturingStderr({"-f", kAbsent, "m.sv"}, opts, err));
   EXPECT_NE(err.find("cannot open options file '" + kAbsent + "'"),
             std::string::npos)
       << err;
