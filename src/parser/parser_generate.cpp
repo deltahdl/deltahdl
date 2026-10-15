@@ -1,3 +1,4 @@
+#include <format>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -58,6 +59,31 @@ static bool EndsGenerateBlockItems(TokenKind tk, bool else_may_follow) {
          (else_may_follow && tk == TokenKind::kKwElse);
 }
 
+// Syntax 27-1 (§27.3) writes what a generate block holds, and A.4.2 what a
+// generate region holds, as generate_items: a module_or_generate_item, an
+// interface_or_generate_item or a checker_or_generate_item. None of the three
+// reaches a module_declaration, an interface_declaration or a
+// program_declaration, which only A.1.4's non_port_module_item and A.1.6's
+// non_port_interface_item reach, while a checker_declaration and an
+// interface_class_declaration are reached through
+// package_or_generate_item_declaration. So a declaration of one of those three
+// design elements is reported at its keyword, and every item is then read by
+// Parser::ParseModuleItem, so that the block or region resumes after it.
+void Parser::ParseGenerateItem(std::vector<ModuleItem*>& items) {
+  bool design_element = Check(TokenKind::kKwModule) ||
+                        Check(TokenKind::kKwMacromodule) ||
+                        Check(TokenKind::kKwProgram) ||
+                        (Check(TokenKind::kKwInterface) && !IsAtClassDecl());
+  if (design_element) {
+    diag_.Error(CurrentLoc(),
+                std::format("'{}' declares a design element, which is not an "
+                            "item of a generate block or region",
+                            CurrentToken().text),
+                Subclause("27.3"));
+  }
+  ParseModuleItem(items);
+}
+
 void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
                                std::string_view& out_label,
                                bool& out_has_begin_end, bool else_may_follow) {
@@ -102,7 +128,7 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
 
   // A bare (non-`begin`) generate body is a single module item.
   if (!Match(TokenKind::kKwBegin)) {
-    ParseModuleItem(body);
+    ParseGenerateItem(body);
     return;
   }
   // The `begin` has been consumed, so this is the begin-end form of A.4.2's
@@ -129,7 +155,7 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
   // it, and the report below could only ever fire at end of input.
   while (!Check(TokenKind::kKwEnd) && !AtEnd() &&
          !EndsGenerateBlockItems(CurrentToken().kind, else_may_follow)) {
-    ParseModuleItem(body);
+    ParseGenerateItem(body);
   }
   // Leave the token for the enclosing production when the loop stopped on one,
   // which is what lets the generate region find its endgenerate, the case
@@ -168,7 +194,7 @@ void Parser::ParseGenerateRegion(std::vector<ModuleItem*>& items) {
   // should have been.
   while (!Check(TokenKind::kKwEndgenerate) && !AtEnd() &&
          !ClosesGenerateRegionEnclosure(CurrentToken().kind)) {
-    ParseModuleItem(items);
+    ParseGenerateItem(items);
   }
   in_generate_region_ = saved;
   // Leave the token for the enclosing production when it is one of the closers,

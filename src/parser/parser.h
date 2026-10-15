@@ -903,6 +903,8 @@ class Parser {
 
   int generate_block_depth_ = 0;
   bool InGenerateBlock() const { return generate_block_depth_ > 0; }
+  bool in_generate_region_ = false;
+  void ParseGenerateItem(std::vector<ModuleItem*>& items);
 
   // How many of §18.17's rs_code_block are open around the statement being
   // read. A.6.12 gives `rs_code_block ::= { { data_declaration }
@@ -917,8 +919,6 @@ class Parser {
   bool ClosesOpenRsCodeBlock(TokenKind tk) const {
     return tk == TokenKind::kRBrace && rs_code_block_depth_ > 0;
   }
-
-  bool in_generate_region_ = false;
 
   // §16.14: how many always or initial procedures the statement being parsed
   // stands in, which are the only procedural code a concurrent assertion

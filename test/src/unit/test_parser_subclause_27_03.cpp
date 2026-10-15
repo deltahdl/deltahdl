@@ -275,4 +275,78 @@ TEST(GenerateRegion, MalformedGenerateRegionNames27_3) {
   EXPECT_TRUE(ReportedError(r.diags, "expected 'endgenerate'", 3, "27.3"));
 }
 
+// Syntax 27-1 writes what a generate block holds as generate_items, and none
+// of module_or_generate_item, interface_or_generate_item and
+// checker_or_generate_item reaches a module, interface or program declaration.
+// A checker declaration is reached, through
+// package_or_generate_item_declaration, so the checker on line 6 is left alone.
+TEST(GenerateItemContent, DesignElementDeclaredInAGenerateBlockIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (1) begin : g\n"
+      "    module inner; endmodule\n"
+      "    program p; endprogram\n"
+      "    interface i; endinterface\n"
+      "    checker c; endchecker\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "'module' declares a design element, which is not "
+                            "an item of a generate block or region",
+                            3, "27.3"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "'program' declares a design element, which is not "
+                            "an item of a generate block or region",
+                            4, "27.3"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "'interface' declares a design element, which is "
+                            "not an item of a generate block or region",
+                            5, "27.3"));
+  EXPECT_FALSE(ReportedError(r.diags, "declares a design element", 6, "27.3"));
+}
+
+// A.4.2 gives a generate region the same generate_items, so a declaration
+// written straight into one is reported as one in a block is.
+TEST(GenerateItemContent, DesignElementDeclaredInAGenerateRegionIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  generate\n"
+      "    macromodule inner; endmodule\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "'macromodule' declares a design element, which is "
+                            "not an item of a generate block or region",
+                            3, "27.3"));
+}
+
+// The single generate_item form of generate_block, with no begin-end, is read
+// apart from the begin-end form, and is held to the same rule.
+TEST(GenerateItemContent, DesignElementAsASingleItemGenerateBodyIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  for (genvar k = 0; k < 2; k++)\n"
+      "    module inner; endmodule\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "'module' declares a design element, which is not "
+                            "an item of a generate block or region",
+                            3, "27.3"));
+}
+
+// A module body reaches a module declaration through non_port_module_item, and
+// a generate block reaches an interface class declaration through
+// package_or_generate_item_declaration, so neither is reported: the rule turns
+// on the item being a design element in a generate block, not on the keyword.
+TEST(GenerateItemContent, NestedModuleAndGenerateInterfaceClassAreAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  module inner; endmodule\n"
+      "  if (1) begin : g\n"
+      "    interface class ic; endclass\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
