@@ -71,14 +71,20 @@ TEST(ConfigDesignStatement, DesignBeforeRulesAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-TEST(ConfigDesignStatement, RuleBeforeDesignRejected) {
+// §33.4.1.1: the one design statement, written after a rule, is out of place,
+// and that is the one error: the config neither lacks a design statement nor
+// holds two.
+TEST(ConfigDesignStatement, RuleBeforeDesignRejectedOnce) {
   auto r = Parse(
       "config c;\n"
       "  default liblist work;\n"
       "  design work.top;\n"
       "endconfig\n");
-  EXPECT_TRUE(ReportedError(r.diags, "expected 'design' statement in config", 2,
-                            "33.4.1.1"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "config 'c' places its 'design' statement after a "
+                            "config rule statement",
+                            3, "33.4.1.1"));
+  EXPECT_EQ(r.diags.size(), 1u);
 }
 
 TEST(ConfigDesignStatement, MultipleBareTopModulesInOneDesignStatement) {

@@ -402,4 +402,22 @@ TEST(LibraryMapFileReading, SourceNamedThroughASymbolicLinkMatches) {
   EXPECT_EQ(direct.LibraryForFile((link / "top.v").string()), "rtlLib");
 }
 
+// §33.3.3 compares the source file's name against the specification, and the
+// source's symbolic links are resolved before the comparison, so a
+// specification naming its directory through a link is resolved the same way:
+// a source named through that link is the file it names.
+TEST(LibraryMapFileReading, SpecNamingItsDirectoryThroughASymbolicLinkMatches) {
+  ScratchMapDir tmp;
+  fs::create_directories(tmp.dir / "real");
+  fs::path link = tmp.dir / "link";
+  std::error_code ec;
+  fs::create_directory_symlink(tmp.dir / "real", link, ec);
+  ASSERT_FALSE(ec) << ec.message();
+  tmp.Write("lib.map", "library L " + (link / "*.v").string() + ";\n");
+
+  LibraryMap m;
+  ASSERT_TRUE(m.LoadMapFile(tmp.dir / "lib.map"));
+  EXPECT_EQ(m.LibraryForFile((link / "a.v").string()), "L");
+}
+
 }  // namespace

@@ -78,8 +78,8 @@ TEST(ConfigSourceText, ConfigDeclarationRequiresDesign) {
       "endconfig\n");
   // §33.4.1.1 owns design_statement, so the report over its absence is filed
   // there rather than under §33.4.1 with config_declaration.
-  EXPECT_TRUE(ReportedError(r.diags, "expected 'design' statement in config", 2,
-                            "33.4.1.1"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "config 'cfg' is missing a 'design' statement", 1, "33.4.1.1"));
 }
 
 // config_declaration carries design_statement exactly once (it is not part of

@@ -1,16 +1,20 @@
 #pragma once
 
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "common/source_loc.h"
 
 namespace delta {
 
+class Arena;
 struct CompilationUnit;
+struct ConfigDecl;
 struct LibraryDecl;
 class DiagEngine;
 class SourceManager;
@@ -79,6 +83,12 @@ class LibraryMap {
 
   std::vector<std::string_view> LibraryDeclarationOrder() const;
 
+  // §33.3.1, Syntax 33-2: the configs the loaded map files declare, each
+  // placed in the library its map file maps to, as a source file's design
+  // elements are. Called once every map file is loaded, since a later map can
+  // still claim an earlier one.
+  std::vector<ConfigDecl*> DeclaredConfigs() const;
+
   // Whether `name` is a library name. A library declaration introduces its
   // library with an identifier, so a name is a letter or an underscore
   // followed by letters, digits, underscores and dollar signs; anything else
@@ -135,6 +145,13 @@ class LibraryMap {
   std::vector<Entry> entries_;
   std::unordered_map<std::string, LibraryCell> cells_;
   SourceManager* mgr_ = nullptr;
+  // Where map files are parsed when no caller's manager was supplied, kept
+  // so that the configs DeclaredConfigs hands out can still read their text.
+  std::shared_ptr<SourceManager> own_mgr_;
+  // The parses the configs a map file declared point into, and those configs
+  // with the map file each was written in.
+  std::vector<std::shared_ptr<Arena>> arenas_;
+  std::vector<std::pair<ConfigDecl*, std::string>> map_configs_;
 
   // Every specification claiming a file as specifically as any other does, in
   // declaration order, one element per specification rather than per library.
@@ -146,6 +163,11 @@ class LibraryMap {
   bool LoadMapFileImpl(const std::filesystem::path& map_file,
                        std::vector<std::filesystem::path>& stack,
                        std::vector<std::string>* errors);
+
+  bool LoadDescriptionsInOrder(const CompilationUnit& cu,
+                               const std::filesystem::path& canon,
+                               std::vector<std::filesystem::path>& stack,
+                               std::vector<std::string>* errors);
 };
 
 }  // namespace delta

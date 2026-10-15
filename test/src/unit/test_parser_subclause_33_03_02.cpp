@@ -2,9 +2,11 @@
 
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "fixture_scratch_dir.h"
+#include "parser/ast_design.h"
 #include "parser/library_map.h"
 
 using namespace delta;
@@ -156,6 +158,53 @@ TEST(LibraryMapInclude, AbsoluteIncludePathIsHonoredAsGiven) {
   LibraryMap m;
   ASSERT_TRUE(m.LoadMapFile(top));
   EXPECT_EQ(m.LibraryForFile((away_dir / "x.av").string()), "absLib");
+}
+
+// §33.3.2: an include stands for the included file's text at its own place,
+// so the library it declares falls between the two the including file
+// declares around it in the declaration order §33.6.1 searches.
+TEST(LibraryMapInclude, IncludedDeclarationsTakeTheIncludesPlaceInTheOrder) {
+  ScratchDir tmp;
+  tmp.Write("gates.map", "library gateLib gates/*.v;\n");
+  auto top = tmp.Write("main.map",
+                       "library rtlLib rtl/*.v;\n"
+                       "include gates.map;\n"
+                       "library aLib a/*.v;\n");
+  LibraryMap m;
+  ASSERT_TRUE(m.LoadMapFile(top));
+  const std::vector<std::string_view> kExpected = {"rtlLib", "gateLib", "aLib"};
+  EXPECT_EQ(m.LibraryDeclarationOrder(), kExpected);
+}
+
+// §33.3.2 and §33.8.3: an include's path is a file_path_spec, which may be
+// written between double quotes and then names the file its bare spelling
+// names.
+TEST(LibraryMapInclude, QuotedIncludePathNamesTheFileItsBareSpellingNames) {
+  ScratchDir tmp;
+  fs::create_directories(tmp.dir / "sub");
+  tmp.Write("sub/lib.map", "library subLib *.sv;\n");
+  auto top = tmp.Write("top.map", "include \"sub/lib.map\";\n");
+  LibraryMap m;
+  ASSERT_TRUE(m.LoadMapFile(top));
+  EXPECT_EQ(m.LibraryForFile((tmp.dir / "sub" / "x.sv").string()), "subLib");
+}
+
+// Syntax 33-2: a map file's library_text admits a config declaration, and the
+// config is kept for elaboration in the library the map file itself maps to:
+// work, where no declaration claims the map file.
+TEST(LibraryMapInclude, ConfigDeclaredInAMapFileIsKept) {
+  ScratchDir tmp;
+  auto top = tmp.Write("lib.map",
+                       "library rtlLib *.v;\n"
+                       "config cfg; design rtlLib.top; endconfig\n");
+  LibraryMap m;
+  ASSERT_TRUE(m.LoadMapFile(top));
+  const std::vector<ConfigDecl*> kConfigs = m.DeclaredConfigs();
+  ASSERT_EQ(kConfigs.size(), 1u);
+  EXPECT_EQ(kConfigs[0]->name, "cfg");
+  EXPECT_EQ(kConfigs[0]->library, "work");
+  ASSERT_EQ(kConfigs[0]->design_cells.size(), 1u);
+  EXPECT_EQ(kConfigs[0]->design_cells[0].cell, "top");
 }
 
 }  // namespace

@@ -279,6 +279,13 @@ bool TagDesignElementLibraries(delta::CompilationUnit& cu,
   return ok;
 }
 
+// §33.3.1, Syntax 33-2: a config a library map file declares is a config of
+// the design as much as one a source file declares.
+void AddMapConfigs(delta::CompilationUnit& cu,
+                   const delta::LibraryMap& lib_map) {
+  for (auto* cfg : lib_map.DeclaredConfigs()) cu.configs.push_back(cfg);
+}
+
 // The top-level instance a dump named on the command line is rooted at: the
 // one --top names, else the first the design roots.
 std::string DumpTopModule(const delta::CliOptions& opts,
@@ -775,6 +782,7 @@ int RunSeparateUnits(const delta::CliOptions& opts,
   }
   if (!tagged) return 1;
   units.cu = delta::PoolCompilationUnits(units.separate, ast_arena).merged;
+  AddMapConfigs(*units.cu, lib_map);
   return RunParsedUnit(opts, lib_map, units, diag, [&] {
     return delta::RuntimeLicensesGranted(
         parsed.units.back().pp.runtime_licenses, licenses, diag);
@@ -860,6 +868,7 @@ int main(int argc, char* argv[]) {
   }
   delta::ApplyPreprocMetadata(cu, pp);
   if (!TagDesignElementLibraries(*cu, pp, lib_map, diag)) return 1;
+  AddMapConfigs(*cu, lib_map);
   return RunParsedUnit(opts, lib_map, ParsedUnits{cu, {}}, diag, [&] {
     return delta::RuntimeLicensesGranted(pp.runtime_licenses, licenses, diag);
   });

@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -18,6 +19,8 @@
 #include "common/source_loc.h"
 #include "common/source_mgr.h"
 #include "lexer/lexer.h"
+#include "parser/ast_design.h"
+#include "parser/ast_specify.h"
 #include "parser/parser.h"
 
 namespace delta {
@@ -212,13 +215,48 @@ CompilationUnit* ParseLibraryMapContent(const std::filesystem::path& canon,
   return cu;
 }
 
+// §33.3.2: an include statement names its map file with a file_path_spec, the
+// production a library declaration names its files with, so a quoted path
+// names the file its bare spelling does.
 std::filesystem::path ResolveIncludePath(std::string_view file_path,
                                          const std::filesystem::path& canon) {
-  std::filesystem::path inc_path{std::string{file_path}};
+  std::filesystem::path inc_path{std::string{UnquoteSpec(file_path)}};
   if (inc_path.is_relative()) {
     inc_path = canon.parent_path() / inc_path;
   }
   return inc_path;
+}
+
+// Whether a resolved specification's segment holds a wildcard, after which the
+// segments name no one directory a path could be resolved through.
+bool IsWildSegment(std::string_view seg) {
+  return seg.find_first_of("*?") != std::string_view::npos ||
+         seg.find("...") != std::string_view::npos;
+}
+
+// §33.3.3 compares a source file's name against an absolute specification,
+// and ComparedSourcePath resolves the source's symbolic links before it does.
+// The directories an absolute specification names before its first wildcard
+// are resolved the same way, so a specification naming a directory through a
+// link and a source named through it spell that directory alike.
+std::string ResolveFixedDirectories(const std::string& resolved) {
+  bool absolute = false;
+  auto segs = SplitSegments(resolved, absolute);
+  if (!absolute) return resolved;
+  std::size_t fixed = 0;
+  while (fixed + 1 < segs.size() && !IsWildSegment(segs[fixed])) ++fixed;
+  if (fixed == 0) return resolved;
+  std::vector<std::string_view> head(segs.begin(), segs.begin() + fixed);
+  std::error_code ec;
+  const std::filesystem::path kCanon =
+      std::filesystem::weakly_canonical(Join(head, true), ec);
+  if (ec) return resolved;
+  std::string out = kCanon.string();
+  for (std::size_t i = fixed; i < segs.size(); ++i) {
+    out += '/';
+    out.append(segs[i]);
+  }
+  return out;
 }
 
 }  // namespace
@@ -246,7 +284,8 @@ std::string LibraryMap::ResolveSpec(std::string_view raw_spec,
 bool LibraryMap::PathMatches(std::string_view spec, std::string_view base_dir,
                              std::string_view path) {
   if (UnquoteSpec(spec).empty() || path.empty()) return false;
-  std::string resolved_pat = ResolveSpec(spec, base_dir);
+  std::string resolved_pat =
+      ResolveFixedDirectories(ResolveSpec(spec, base_dir));
 
   bool pat_abs = false, path_abs = false;
   auto pat_segs = SplitSegments(resolved_pat, pat_abs);
@@ -453,29 +492,63 @@ bool LibraryMap::LoadMapFileImpl(const std::filesystem::path& map_file,
   std::string content;
   if (!ReadFileContent(canon, content, errors)) return false;
 
-  Arena arena;
-  auto* cu =
-      ParseLibraryMapContent(canon, std::move(content), arena, mgr_, errors);
-  if (cu == nullptr) return false;
-
-  std::string base_dir = canon.parent_path().string();
-  for (auto* lib_decl : cu->libraries) {
-    AddDeclaration(*lib_decl, base_dir);
+  // The configs a map file declares are kept for elaboration, so the parse
+  // they point into, and the text it points into, outlive this call.
+  auto arena = std::make_shared<Arena>();
+  if (mgr_ == nullptr && own_mgr_ == nullptr) {
+    own_mgr_ = std::make_shared<SourceManager>();
   }
+  SourceManager* parse_mgr = mgr_ != nullptr ? mgr_ : own_mgr_.get();
+  auto* cu = ParseLibraryMapContent(canon, std::move(content), *arena,
+                                    parse_mgr, errors);
+  if (cu == nullptr) return false;
+  arenas_.push_back(arena);
+  for (auto* cfg : cu->configs) map_configs_.emplace_back(cfg, canon.string());
 
   stack.push_back(canon);
-  bool ok = true;
-  for (auto* inc : cu->lib_includes) {
-    if (inc->file_path.empty()) {
-      ok = false;
-      continue;
-    }
-    fs::path inc_path = ResolveIncludePath(inc->file_path, canon);
-    if (!LoadMapFileImpl(inc_path, stack, errors)) ok = false;
-  }
+  const bool kOk = LoadDescriptionsInOrder(*cu, canon, stack, errors);
   stack.pop_back();
+  return kOk;
+}
 
+// §33.3.2: an include statement stands for the whole of the map file it
+// names, at the place it is written, so its declarations take that place in
+// the declaration order (§33.6.1) among the including file's own.
+bool LibraryMap::LoadDescriptionsInOrder(
+    const CompilationUnit& cu, const std::filesystem::path& canon,
+    std::vector<std::filesystem::path>& stack,
+    std::vector<std::string>* errors) {
+  const auto kBefore = [](SourceLoc a, SourceLoc b) {
+    return a.line != b.line ? a.line < b.line : a.column < b.column;
+  };
+  const std::string kBaseDir = canon.parent_path().string();
+  std::size_t lib = 0;
+  bool ok = true;
+  for (const IncludeStmt* inc : cu.lib_includes) {
+    while (lib < cu.libraries.size() &&
+           kBefore(cu.libraries[lib]->range.start, inc->loc)) {
+      AddDeclaration(*cu.libraries[lib++], kBaseDir);
+    }
+    if (inc->file_path.empty() ||
+        !LoadMapFileImpl(ResolveIncludePath(inc->file_path, canon), stack,
+                         errors)) {
+      ok = false;
+    }
+  }
+  while (lib < cu.libraries.size()) {
+    AddDeclaration(*cu.libraries[lib++], kBaseDir);
+  }
   return ok;
+}
+
+std::vector<ConfigDecl*> LibraryMap::DeclaredConfigs() const {
+  std::vector<ConfigDecl*> configs;
+  configs.reserve(map_configs_.size());
+  for (const auto& [cfg, map_file] : map_configs_) {
+    cfg->library = LibraryForFile(map_file);
+    configs.push_back(cfg);
+  }
+  return configs;
 }
 
 }  // namespace delta

@@ -212,12 +212,30 @@ struct ParserConfigHelpers {
     p.Match(TokenKind::kSemicolon);
   }
 
-  // The config_rule_statements up to 'endconfig', a duplicate 'design'
-  // statement among them reported and skipped.
-  static void Rules(Parser& p, ConfigDecl* decl) {
+  // §33.4.1.1: the one design statement written after a config rule
+  // statement, reported once for being out of place and still read, so that
+  // the config does not also count as lacking one or as holding two.
+  static void LateDesign(Parser& p, ConfigDecl* decl) {
+    p.diag_.Error(p.CurrentLoc(),
+                  std::format("config '{}' places its 'design' statement "
+                              "after a config rule statement",
+                              decl->name),
+                  Subclause("33.4.1.1"));
+    p.ParseDesignStatement(decl);
+  }
+
+  // The config_rule_statements up to 'endconfig'. A design statement among
+  // them is reported as out of place when it is the config's first, and as a
+  // duplicate otherwise.
+  static void Rules(Parser& p, ConfigDecl* decl, bool& has_design) {
     while (!p.Check(TokenKind::kKwEndconfig) && !p.AtEnd()) {
       if (p.Check(TokenKind::kKwDesign)) {
-        SkipDuplicateDesign(p, decl);
+        if (has_design) {
+          SkipDuplicateDesign(p, decl);
+        } else {
+          LateDesign(p, decl);
+          has_design = true;
+        }
         continue;
       }
       auto before = p.lexer_.SavePos().pos;
@@ -287,12 +305,9 @@ ConfigDecl* Parser::ParseConfigDecl() {
   if (Check(TokenKind::kKwDesign)) {
     ParseDesignStatement(decl);
     has_design = true;
-  } else if (!Check(TokenKind::kKwEndconfig) && !AtEnd()) {
-    diag_.Error(CurrentLoc(), "expected 'design' statement in config",
-                Subclause("33.4.1.1"));
   }
 
-  ParserConfigHelpers::Rules(*this, decl);
+  ParserConfigHelpers::Rules(*this, decl, has_design);
 
   if (!has_design) {
     diag_.Error(
