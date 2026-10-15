@@ -391,7 +391,7 @@ TEST(PackageImportSim, BlockReferenceBeforeItsDeclarationReadsTheImport) {
 // `semaphore` is std's built-in class: the element constructed with one key
 // gives it up once and then has none. Before, the package's class answered
 // the bare name for the whole run once the modules were lowered, and the
-// element was built as an object of p's class.
+// element was built as an object of p's class, which has no try_get.
 TEST(PackageImportSim, UnimportedPackageClassLeavesTheBuiltinName) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package p;\n"
@@ -400,12 +400,12 @@ TEST(PackageImportSim, UnimportedPackageClassLeavesTheBuiltinName) {
                        "  endclass\n"
                        "endpackage\n"
                        "module m;\n"
-                       "  semaphore arr[2];\n"
+                       "  semaphore s[string];\n"
                        "  int a, b;\n"
                        "  initial begin\n"
-                       "    arr[1] = new(1);\n"
-                       "    a = arr[1].try_get(1);\n"
-                       "    b = arr[1].try_get(1);\n"
+                       "    s[\"k\"] = new(1);\n"
+                       "    a = s[\"k\"].try_get(1);\n"
+                       "    b = s[\"k\"].try_get(1);\n"
                        "    $display(\"a=%0d b=%0d\", a, b);\n"
                        "  end\n"
                        "endmodule\n",
