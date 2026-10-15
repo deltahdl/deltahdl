@@ -405,12 +405,13 @@ TEST(GenerateBlockNaming, EveryUnnamedBlockOfAConstructIsReported) {
 
 // The genblk<n> name of a block in another module is no name a hierarchical
 // name may use either (§27.6), so §23.8 finds no declaration for the first
-// name genblk3, though `other` does have a third unnamed construct. `top` is
-// elaborated before `other`, which it does not instantiate, so the case fails
-// as well when the names of a module not yet reached are collected as written.
+// name genblk3, though `other` does have a third unnamed construct. Neither
+// module instantiates the other, so both are elaborated as tops, which the
+// auto_top argument asks for: with the last module as the one named top,
+// `top` is never elaborated and its reference never checked.
 TEST(GenerateBlockNaming, GenblkNameOfAnotherModuleIsReported) {
   ElabFixture f;
-  ElaborateSrc(
+  ElaborateWithPreprocessor(
       "module top;\n"
       "  initial $display(\"%0d\", genblk3.a);\n"
       "endmodule\n"
@@ -422,7 +423,7 @@ TEST(GenerateBlockNaming, GenblkNameOfAnotherModuleIsReported) {
       "    int a;\n"
       "  end\n"
       "endmodule\n",
-      f);
+      f, "", true);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "hierarchical name 'genblk3' resolves to no "
                             "declaration",
