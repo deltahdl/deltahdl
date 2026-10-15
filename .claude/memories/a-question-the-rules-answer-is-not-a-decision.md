@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 51a015a3-4652-42ac-8c15-ce1bc6f6ae12
-  modified: 2026-10-15T23:00:30.673Z
+  modified: 2026-10-15T23:09:10.817Z
 ---
 
 # A question the rules answer is not a decision
@@ -72,5 +72,13 @@ A cell clause selects any instance bound to its cell (§33.4.1.4), and
 §33.4.1.5 has the selection clauses choose the current list. So a cell
 clause that selects a descendant replaces the list the descendant would
 inherit.
+A choice of how to implement a rule is not a decision for a person either.
+The standard fixes the behaviour, and a person adds nothing by picking among
+lowerings that all conform. Strike every option that breaks a shall, then
+pick from what is left. Before treating a constraint as a requirement, read
+the clause it is credited to. The inout-port merge credited to §23.3.3.3
+is in fact §23.3.3.7's permission. §23.3.3.6 confirms that not merging is
+allowed, so §32.4.4's interconnect delay on an inout load requires
+splitting the port.
 Once the answer stands,
 state it per [[issues-state-conclusions-not-the-trail]] and remove the label.
