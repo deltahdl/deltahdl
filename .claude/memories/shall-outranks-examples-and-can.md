@@ -4,6 +4,8 @@ description: "In IEEE 1800-2023 a shall is mandatory (§1.5) while examples are 
 metadata:
   node_type: memory
   type: feedback
+  originSessionId: 68e93dca-df8f-4fa9-a625-c13a34fbd398
+  modified: 2026-10-15T23:04:03.874Z
 ---
 
 # A shall outranks an example and a can
@@ -21,5 +23,11 @@ precision number's range outranks the clause's example passing 5, and the
 §21.3.4.1 shall on the next `$fgetc` outranks §21.3.4's can sentence.
 
 **How to apply:** Only two requirements of equal force that cannot both hold
-go to a person. See [[a-question-the-rules-answer-is-not-a-decision]] and
+go to a person. Two shalls are not equal when one is written for the exact
+case and the other is general. Ask what each would leave the other to
+govern. If letting the general rule govern would leave the specific shall
+nothing to apply to, the specific one governs. §33.3.1.1 requires a warning
+for same-named modules mapped into one library in one invocation. Every
+file lands in some library, so a §3.13(a) error there would leave that
+warning nothing to apply to. See [[a-question-the-rules-answer-is-not-a-decision]] and
 [[lrm-source-of-truth]].
