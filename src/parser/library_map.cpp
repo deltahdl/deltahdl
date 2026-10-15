@@ -246,7 +246,8 @@ std::string ResolveFixedDirectories(const std::string& resolved) {
   std::size_t fixed = 0;
   while (fixed + 1 < segs.size() && !IsWildSegment(segs[fixed])) ++fixed;
   if (fixed == 0) return resolved;
-  std::vector<std::string_view> head(segs.begin(), segs.begin() + fixed);
+  std::vector<std::string_view> head(
+      segs.begin(), segs.begin() + static_cast<std::ptrdiff_t>(fixed));
   std::error_code ec;
   const std::filesystem::path kCanon =
       std::filesystem::weakly_canonical(Join(head, true), ec);
