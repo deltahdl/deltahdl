@@ -2,11 +2,13 @@
 // parser_udp.cpp, which reached the size the assert-no-oversized-source-files
 // job fails at.
 
+#include <cstdint>
 #include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "lexer/token.h"
+#include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/parser.h"
 #include "parser/parser_instance_internal.h"

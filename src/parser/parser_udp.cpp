@@ -1,6 +1,5 @@
 #include <algorithm>
 #include <cstddef>
-#include <cstdint>
 #include <format>
 #include <string>
 #include <string_view>
@@ -11,7 +10,6 @@
 #include "common/source_loc.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
-#include "parser/ast_module.h"
 #include "parser/ast_specify.h"
 #include "parser/parser.h"
 #include "parser/udp_ansi_port_entry.h"

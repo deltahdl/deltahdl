@@ -12,7 +12,6 @@
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "fixture_scratch_dir.h"
-#include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
@@ -798,12 +797,12 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
   // compilation unit and not all of them, so the primitive declared on the
   // first command line is no primitive name to the second.
   // SinglePassCompiler::CompileCommandLine empties the scope it carries at the
-  // start of each command line, and the unnamed form is what says whether that
-  // still holds once a primitive name travels in it: `myudp (q, d, clk);`
-  // parses only where the name is known to name a primitive, and where it is
-  // not, Parser::ParsePlainVarDecl reads myudp as the variable and reports the
-  // `;` it wanted at the `(` under §6.8. The named form would parse as a module
-  // instantiation and report nothing, so it cannot tell the two apart.
+  // start of each command line, and ModuleItem::udp_undeclared_at_parse is
+  // what says whether that still holds once a primitive name travels in it.
+  // The unnamed form `myudp (q, d, clk);` is a UDP instance whatever the parser
+  // knows, and the flag is set on it only where the parser held no declaration
+  // of myudp. The named form would parse as a module instantiation where the
+  // name is unknown, which carries no such flag to read.
   ScratchDir tmp;
   tmp.Write("lib.map", kLibMap);
   auto prim = tmp.Write("src/prim.sv", kAndPrimitive);
@@ -823,9 +822,10 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
   ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
   ASSERT_TRUE(h.compiler.CompileCommandLine({prim}, h.unit));
   CompilationUnit second;
-  EXPECT_FALSE(h.compiler.CompileCommandLine({top}, second));
-  EXPECT_TRUE(
-      ReportedError(h.diag.Diagnostics(), "expected ';', got '('", 3, "6.8"));
+  EXPECT_TRUE(h.compiler.CompileCommandLine({top}, second));
+  const auto* inst = SoleUdpInstance(second, "top");
+  ASSERT_NE(inst, nullptr);
+  EXPECT_TRUE(inst->udp_undeclared_at_parse);
 }
 
 TEST(CompilationUnitScopeAcrossCommandLineFiles,

@@ -285,12 +285,19 @@ TEST(ModuleInstantiationGrammar, ErrorOrderedAndNamedParamsCannotMix) {
       1, "23.3.2"));
 }
 
-TEST(ModuleInstantiationGrammar, ErrorMissingInstanceName) {
+// A.4.1.1's hierarchical_instance names its instance before the `(`, so
+// `sub(a, b)` is no module instance. §29.8 makes a UDP instance's name
+// optional and §29.3 lets the UDP be declared later, so the parser, which does
+// not know what `sub` names, reads the item as a UDP instance and marks it.
+// Elaborator::ElaborateUdpInst reports one whose name reaches no primitive.
+TEST(ModuleInstantiationGrammar, NoInstanceNameReadsAsAnUnresolvedUdpInstance) {
   auto r = Parse("module m; sub(a, b); endmodule\n");
-  // With no instance name after `sub`, Parser::ParseImplicitTypeOrInst takes
-  // the data_declaration branch, so the report is the §6.8 one for a
-  // declaration that does not end in `;`.
-  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got '('", 1, "6.8"));
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules[0]->items.size(), 1u);
+  const auto* item = r.cu->modules[0]->items[0];
+  EXPECT_EQ(item->kind, ModuleItemKind::kUdpInst);
+  EXPECT_TRUE(item->udp_undeclared_at_parse);
 }
 
 // A.4.1.1's hierarchical_instance makes the parenthesized
