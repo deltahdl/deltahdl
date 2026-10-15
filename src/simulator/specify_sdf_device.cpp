@@ -113,11 +113,11 @@ struct SdfDeviceTarget {
 // of such an instance, `u1/y`. An instance is known by the paths or the
 // primitive drivers registered under its prefix.
 SdfDeviceTarget ResolveSdfDeviceTarget(
-    std::string_view cell_prefix, const std::string& operand,
+    std::string_view cell_prefix, std::string_view operand,
     const std::vector<PathDelay>& paths,
     const std::vector<PrimitiveDriver>& drivers) {
   if (operand.empty()) return {std::string(cell_prefix), {}};
-  std::string dotted = operand;
+  std::string dotted(operand);
   std::ranges::replace(dotted, '/', '.');
   const std::string kInstance = std::string(cell_prefix) + dotted + ".";
   const bool kIsInstance =
@@ -129,7 +129,9 @@ SdfDeviceTarget ResolveSdfDeviceTarget(
       });
   if (kIsInstance) return {kInstance, {}};
   const std::size_t kDot = dotted.rfind('.');
-  if (kDot == std::string::npos) return {std::string(cell_prefix), operand};
+  if (kDot == std::string::npos) {
+    return {std::string(cell_prefix), std::string(operand)};
+  }
   return {std::string(cell_prefix) + dotted.substr(0, kDot + 1),
           dotted.substr(kDot + 1)};
 }
