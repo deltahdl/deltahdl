@@ -419,7 +419,7 @@ TEST(InterconnectDelaySim, ACrossingTransitionDropsTheOneItCrosses) {
 // a delay annotated before the run starts holds that drive back without
 // losing it. The connection sends a5 across a delay of 10 at time 0 and has
 // nothing further to wait for, yet the port takes a5 at 10, and the output the
-// instance copies it to with it: at 7 both are still x, at 17 both a5.
+// instance copies it to with it: at 7 neither holds a5 yet, at 17 both do.
 TEST(InterconnectDelaySim, AConstantConnectionsPendingDriveStillArrives) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -430,8 +430,8 @@ TEST(InterconnectDelaySim, AConstantConnectionsPendingDriveStillArrives) {
       "  logic [7:0] out;\n"
       "  leaf u(.din(8'hA5), .dout(out));\n"
       "  initial begin\n"
-      "    #7 $display(\"%h %h\", u.din, out);\n"
-      "    #10 $display(\"%h %h\", u.din, out);\n"
+      "    #7 $display(\"%b%b\", u.din === 8'hA5, out === 8'hA5);\n"
+      "    #10 $display(\"%b%b\", u.din === 8'hA5, out === 8'hA5);\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -447,7 +447,7 @@ TEST(InterconnectDelaySim, AConstantConnectionsPendingDriveStillArrives) {
   f.scheduler.Run();
   std::cout.rdbuf(old_buf);
 
-  EXPECT_EQ(captured.str(), "xx xx\na5 a5\n");
+  EXPECT_EQ(captured.str(), "00\n11\n");
 }
 
 }  // namespace
