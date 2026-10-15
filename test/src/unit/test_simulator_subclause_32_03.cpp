@@ -378,6 +378,29 @@ TEST(SdfAnnotator, TripleLeavingOutTheSelectedMemberLeavesTheValue) {
   EXPECT_EQ(mgr.GetPathDelay("b", "z"), 9u);
 }
 
+// C3 under the other two selections: (:2:3) gives no minimum and (1:2:) no
+// maximum, so selecting the member left out leaves each path as declared.
+TEST(SdfAnnotator, TripleLeavingOutMinimumOrMaximumLeavesTheValue) {
+  SimFixture f;
+  SpecifyManager mgr;
+  ASSERT_TRUE(BuildSpecifyFromSource(kDesign, f, mgr));
+  SdfFile min_file;
+  ASSERT_TRUE(
+      ParseSdf("(DELAYFILE (CELL (CELLTYPE \"t\") (INSTANCE u1)"
+               " (DELAY (ABSOLUTE (IOPATH a y (:2:3))))))",
+               min_file));
+  AnnotateSdfToManager(min_file, mgr, SdfMtm::kMinimum);
+  SdfFile max_file;
+  ASSERT_TRUE(
+      ParseSdf("(DELAYFILE (CELL (CELLTYPE \"t\") (INSTANCE u1)"
+               " (DELAY (ABSOLUTE (IOPATH b z (1:2:))))))",
+               max_file));
+  AnnotateSdfToManager(max_file, mgr, SdfMtm::kMaximum);
+
+  EXPECT_EQ(mgr.GetPathDelay("a", "y"), 21u);
+  EXPECT_EQ(mgr.GetPathDelay("b", "z"), 31u);
+}
+
 // C1, seventh input form: the keyword that opens a DELAY section body. It
 // selects how the delays inside are applied; one it does not recognize makes
 // the whole section unannotatable, so it warns -- and the IOPATH nested inside

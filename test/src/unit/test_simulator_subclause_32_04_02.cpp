@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -245,6 +246,37 @@ TEST(SdfTimingCheckNegativeValues, NegativeValuesKeepTheirSign) {
   EXPECT_EQ(setuphold.signed_limit, -2);
   EXPECT_TRUE(setuphold.negative_timing_check_enabled);
   EXPECT_EQ(mgr.GetTimingChecks()[1].start_edge_offset, -1);
+}
+
+// Each SDF transition edge is the §31.5 descriptor of that transition, z read
+// as x: 10, 0z, 1z, z0 and z1 each reach the check declared with edge [10],
+// [0x], [1x], [x0] and [x1], and only that one.
+TEST(SdfTimingCheckTransitionEdge, EveryTransitionEdgeNamesItsDescriptor) {
+  SimFixture f;
+  SpecifyManager mgr;
+  ASSERT_TRUE(BuildTimingChecksFromSource(
+      "module t(input data, input clk);\n"
+      "  reg ntf;\n"
+      "  specify\n"
+      "    $setuphold(edge [10] clk, data, 1, 1, ntf);\n"
+      "    $setuphold(edge [0x] clk, data, 1, 1, ntf);\n"
+      "    $setuphold(edge [1x] clk, data, 1, 1, ntf);\n"
+      "    $setuphold(edge [x0] clk, data, 1, 1, ntf);\n"
+      "    $setuphold(edge [x1] clk, data, 1, 1, ntf);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f, mgr));
+
+  Annotate(SdfWith("(SETUPHOLD data (10 clk) (10) (6))"
+                   " (SETUPHOLD data (0z clk) (20) (6))"
+                   " (SETUPHOLD data (1z clk) (30) (6))"
+                   " (SETUPHOLD data (z0 clk) (40) (6))"
+                   " (SETUPHOLD data (z1 clk) (50) (6))"),
+           mgr);
+  ASSERT_EQ(mgr.TimingCheckCount(), 5u);
+  for (std::size_t i = 0; i < 5; ++i) {
+    EXPECT_EQ(mgr.GetTimingChecks()[i].limit, 10 * (i + 1)) << "check " << i;
+  }
 }
 
 // Table 32-2 row 3: SETUPHOLD's two values split across three targets -- the

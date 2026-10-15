@@ -457,4 +457,35 @@ TEST(SdfDeviceFallback, OperandNamingAnInstanceReachesItsPaths) {
   EXPECT_EQ(reached, 1);
 }
 
+// §32.4.1 Table 32-1: a DEVICE operand naming an output of a module instance,
+// `u1/y`, reaches the specify paths to that output alone.
+TEST(SdfDeviceFallback, OperandNamingAnInstanceOutputReachesItsPaths) {
+  const std::string kSdf =
+      SavedSdf("device_instance_output",
+               "(DELAYFILE (CELL (CELLTYPE \"dev2_top\") (INSTANCE dev2_top)"
+               " (DELAY (ABSOLUTE (DEVICE u1/y (7))))))");
+  SdfDesign design;
+  SpecifyManager* mgr =
+      ManagerOfRun(design,
+                   "module dev2_leaf(input a, output y, output z);\n"
+                   "  specify\n"
+                   "    (a => y) = 5;\n"
+                   "    (a => z) = 6;\n"
+                   "  endspecify\n"
+                   "endmodule\n"
+                   "module dev2_top;\n"
+                   "  logic a_in;\n"
+                   "  logic y_out;\n"
+                   "  logic z_out;\n"
+                   "  dev2_leaf u1(a_in, y_out, z_out);\n"
+                   "  initial $sdf_annotate(\"" +
+                       kSdf + "\");\nendmodule\n");
+  ASSERT_NE(mgr, nullptr);
+  for (const auto& pd : mgr->GetPathDelays()) {
+    if (pd.inst_prefix != "u1.") continue;
+    EXPECT_EQ(pd.delays[kRiseSlot], pd.dst_port == "y" ? 7u : 6u)
+        << pd.dst_port;
+  }
+}
+
 }  // namespace

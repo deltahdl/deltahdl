@@ -377,4 +377,38 @@ TEST(InterconnectDelaySim, EachSourceReachesTheLoadWithItsOwnDelay) {
   EXPECT_EQ(ok->value.ToUint64(), 1u);
 }
 
+// §30.7 with §32.4.4: a pulse between the reject limit and the error limit an
+// interconnect value states, ((10) (2) (8)), reaches the load as x. The source
+// pulses to FF from 5 to 9, which would reach the load from 15 to 19, a width
+// of 4: at 17 the load holds x.
+TEST(InterconnectDelaySim, APulseBetweenTheLimitsReachesTheLoadAsX) {
+  const std::string kSdf = WriteSdfFile(
+      "pulse_x.sdf", DelayFile("(INTERCONNECT src u/din ((10) (2) (8)))"));
+  SimFixture f;
+  auto* ok = RunAndFindVar(
+      StimulusDesign(kSdf, "    #4 src = 8'hFF;\n    #4 src = 8'h01;\n",
+                     "    #17 ok = (out === 8'hxx);\n"),
+      f, "ok");
+  ASSERT_NE(ok, nullptr);
+  EXPECT_EQ(ok->value.ToUint64(), 1u);
+}
+
+// §30.7.4.2 with §32.4.4: a falling change taking 2 that follows a rising one
+// taking 10 arrives first and crosses it, so the rising one is dropped. The
+// source falls at 5, rises at 9 and falls again at 10: the rise would land at
+// 19, the fall after it at 12, and the load stays 00 from 7 on.
+TEST(InterconnectDelaySim, ACrossingTransitionDropsTheOneItCrosses) {
+  const std::string kSdf = WriteSdfFile(
+      "crossing.sdf", DelayFile("(INTERCONNECT src u/din (10) (2))"));
+  SimFixture f;
+  auto* ok =
+      RunAndFindVar(StimulusDesign(kSdf,
+                                   "    #4 src = 8'h00;\n    #4 src = 8'h01;\n"
+                                   "    #1 src = 8'h00;\n",
+                                   "    #20 ok = (out === 8'h00);\n"),
+                    f, "ok");
+  ASSERT_NE(ok, nullptr);
+  EXPECT_EQ(ok->value.ToUint64(), 1u);
+}
+
 }  // namespace
