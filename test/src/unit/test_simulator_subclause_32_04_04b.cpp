@@ -28,6 +28,8 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "simulator/lowerer.h"
+#include "simulator/sdf_parser.h"
 #include "simulator/specify.h"
 #include "simulator/specify_sdf.h"
 #include "simulator/variable.h"
@@ -409,6 +411,45 @@ TEST(InterconnectDelaySim, ACrossingTransitionDropsTheOneItCrosses) {
                     f, "ok");
   ASSERT_NE(ok, nullptr);
   EXPECT_EQ(ok->value.ToUint64(), 1u);
+}
+
+// §32.4.4: a port connection reading only a constant drives its load once, and
+// a delay annotated before the run starts holds that drive back without
+// losing it. The connection sends A5 across a delay of 10 at time 0 and has
+// nothing further to wait for, yet the load takes A5 at 10: at 7 it is still
+// x, at 17 A5.
+TEST(InterconnectDelaySim, AConstantConnectionsPendingDriveStillArrives) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module leaf(input logic [7:0] din, output logic [7:0] dout);\n"
+      "  assign dout = din;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [7:0] out;\n"
+      "  logic early = 1'b0;\n"
+      "  logic late = 1'b0;\n"
+      "  leaf u(.din(8'hA5), .dout(out));\n"
+      "  initial begin\n"
+      "    #7 early = (out === 8'hxx);\n"
+      "    #10 late = (out === 8'hA5);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  SdfFile file;
+  ASSERT_TRUE(ParseSdf(DelayFile("(PORT u/din (10))"), file));
+  AnnotateSdfToManager(file, f.ctx.AcquireSpecifyManager(), SdfMtm::kTypical,
+                       {}, "top");
+  f.scheduler.Run();
+
+  auto* early = f.ctx.FindVariable("early");
+  auto* late = f.ctx.FindVariable("late");
+  ASSERT_NE(early, nullptr);
+  ASSERT_NE(late, nullptr);
+  EXPECT_EQ(early->value.ToUint64(), 1u);
+  EXPECT_EQ(late->value.ToUint64(), 1u);
 }
 
 }  // namespace

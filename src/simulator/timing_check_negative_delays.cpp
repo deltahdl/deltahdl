@@ -238,15 +238,8 @@ void SpecifyManager::ResolveNegativeTimingCheckDelays(int64_t unit_ticks,
     }
   }
   for (TimingCheckEntry& e : timing_checks_) {
-    if (!EvaluatedOnDelayedSignals(e) || e.kind == TimingCheckKind::kWidth ||
-        e.kind == TimingCheckKind::kPeriod) {
-      continue;
-    }
-    const auto kShift =
-        static_cast<int64_t>(
-            TimingCheckSignalDelay(e.inst_prefix + e.ref_signal)) -
-        static_cast<int64_t>(
-            TimingCheckSignalDelay(e.inst_prefix + e.data_signal));
+    if (!EvaluatedOnDelayedSignals(e)) continue;
+    const int64_t kShift = DelayedSignalShift(e);
     if (kShift != 0) AdjustLimitsForDelays(e, kShift, diag);
   }
 }
@@ -254,6 +247,18 @@ void SpecifyManager::ResolveNegativeTimingCheckDelays(int64_t unit_ticks,
 uint64_t SpecifyManager::TimingCheckSignalDelay(std::string_view signal) const {
   auto it = timing_check_signal_delays_.find(std::string(signal));
   return it == timing_check_signal_delays_.end() ? 0 : it->second;
+}
+
+int64_t SpecifyManager::DelayedSignalShift(
+    const TimingCheckEntry& check) const {
+  if (check.kind == TimingCheckKind::kWidth ||
+      check.kind == TimingCheckKind::kPeriod) {
+    return 0;
+  }
+  return static_cast<int64_t>(
+             TimingCheckSignalDelay(check.inst_prefix + check.ref_signal)) -
+         static_cast<int64_t>(
+             TimingCheckSignalDelay(check.inst_prefix + check.data_signal));
 }
 
 }  // namespace delta

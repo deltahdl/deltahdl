@@ -5,6 +5,7 @@
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -109,11 +110,11 @@ uint64_t AnnotatedLimit(uint64_t limit, int64_t shift,
   return kAdjusted.limit;
 }
 
-// §32.4.2: the annotation replaces the signed limits a negative check reads.
-// One annotated limit and its signed form. A value annotated below zero keeps
-// its sign in the signed form, which §31.9 reads on a $setuphold or a $recrem
-// under the enabling option, and reads as 0 in the unsigned one every other
-// reader takes.
+// §32.4.2: one annotated limit and its signed form, the form a negative check
+// reads, which the annotation replaces as well. A value annotated below zero
+// keeps its sign in the signed form, which §31.9 reads on a $setuphold or a
+// $recrem under the enabling option, and reads as 0 in the unsigned one every
+// other reader takes.
 void ApplySdfLimit(uint64_t& limit, int64_t& signed_limit, int64_t value,
                    int64_t shift, std::vector<std::string>& warnings) {
   limit = AnnotatedLimit(value < 0 ? 0 : static_cast<uint64_t>(value), shift,
@@ -121,26 +122,64 @@ void ApplySdfLimit(uint64_t& limit, int64_t& signed_limit, int64_t value,
   signed_limit = value < 0 ? value : static_cast<int64_t>(limit);
 }
 
-void ApplySdfAnnotationFields(TimingCheckEntry& check, const SdfTcAnnotation& a,
-                              const TimingCheckInvocationOptions& options,
-                              std::vector<std::string>& warnings) {
-  const int64_t kFirstShift = FirstLimitDelayShift(check);
-  if (a.set_limit) {
-    ApplySdfLimit(check.limit, check.signed_limit, a.limit, kFirstShift,
-                  warnings);
-  }
-  if (a.set_limit2) {
-    ApplySdfLimit(check.limit2, check.signed_limit2, a.limit2, -kFirstShift,
-                  warnings);
-  }
-  // §31.9.4: a negative value annotated onto a $setuphold or a $recrem is
-  // honored as one declared there would be, under the enabling option.
+// §31.9.4: a $setuphold or a $recrem is a negative check, under the enabling
+// option, while either of its limits is negative, an annotated one as much as
+// a declared one, and an ordinary check again once the annotation leaves
+// neither negative. §31.9.1 then has it evaluated on the delayed signals with
+// its limits adjusted by `delayed_shift`; a negative check is evaluated on the
+// signals themselves and its limits are taken as written.
+void SettleNegativeHandling(TimingCheckEntry& check, const SdfTcAnnotation& a,
+                            const TimingCheckInvocationOptions& options,
+                            int64_t delayed_shift) {
   const bool kTakesNegative = check.kind == TimingCheckKind::kSetuphold ||
                               check.kind == TimingCheckKind::kRecrem;
-  if (kTakesNegative && (check.signed_limit < 0 || check.signed_limit2 < 0)) {
+  if (kTakesNegative && (a.set_limit || a.set_limit2)) {
+    const int64_t kFirst = a.set_limit ? a.limit : check.signed_limit;
+    const int64_t kSecond = a.set_limit2 ? a.limit2 : check.signed_limit2;
     check.negative_timing_check_enabled =
-        NegativeTimingCheckValuesAccepted(true, options);
+        NegativeTimingCheckValuesAccepted(kFirst < 0 || kSecond < 0, options);
   }
+  check.delayed_signal_shift =
+      EvaluatedOnDelayedSignals(check) ? delayed_shift : 0;
+}
+
+// One limit of a check, as its unsigned and its signed form.
+struct SdfLimitPlace {
+  uint64_t& limit;
+  int64_t& signed_limit;
+};
+
+// §31.9.1: an annotated limit is adjusted by the whole of `shift`. A limit the
+// annotation leaves as it was already carries the adjustment the check had, so
+// where the annotation changed how the check is evaluated it moves by the
+// difference, `moved`, alone.
+void PlaceSdfLimit(SdfLimitPlace place, std::optional<int64_t> annotated,
+                   int64_t shift, int64_t moved,
+                   std::vector<std::string>& warnings) {
+  if (annotated.has_value()) {
+    ApplySdfLimit(place.limit, place.signed_limit, *annotated, shift, warnings);
+    return;
+  }
+  if (moved != 0) {
+    ApplySdfLimit(place.limit, place.signed_limit, place.signed_limit, moved,
+                  warnings);
+  }
+}
+
+void ApplySdfAnnotationFields(TimingCheckEntry& check, const SdfTcAnnotation& a,
+                              const TimingCheckInvocationOptions& options,
+                              int64_t delayed_shift,
+                              std::vector<std::string>& warnings) {
+  const int64_t kPriorShift = FirstLimitDelayShift(check);
+  SettleNegativeHandling(check, a, options, delayed_shift);
+  const int64_t kFirstShift = FirstLimitDelayShift(check);
+  const int64_t kMoved = kFirstShift - kPriorShift;
+  PlaceSdfLimit({check.limit, check.signed_limit},
+                a.set_limit ? std::optional<int64_t>(a.limit) : std::nullopt,
+                kFirstShift, kMoved, warnings);
+  PlaceSdfLimit({check.limit2, check.signed_limit2},
+                a.set_limit2 ? std::optional<int64_t>(a.limit2) : std::nullopt,
+                -kFirstShift, -kMoved, warnings);
   if (a.set_start_edge_offset) {
     check.start_edge_offset = a.start_edge_offset + check.delayed_signal_shift;
   }
@@ -164,7 +203,8 @@ bool SpecifyManager::AnnotateSdfTimingCheck(
   bool applied = false;
   for (auto& existing : timing_checks_) {
     if (!SdfAnnotationMatchesCheck(existing, a, inst_prefix)) continue;
-    ApplySdfAnnotationFields(existing, a, timing_check_options_, warnings);
+    ApplySdfAnnotationFields(existing, a, timing_check_options_,
+                             DelayedSignalShift(existing), warnings);
     applied = true;
   }
   return applied;

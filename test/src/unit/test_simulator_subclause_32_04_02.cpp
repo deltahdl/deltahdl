@@ -898,30 +898,52 @@ TEST(SdfTimingCheckInstanceScope,
   EXPECT_EQ(SetupLimitIn(*mgr, "u_inner."), 37u);
 }
 
-// §32.4.2: the values a SETUPHOLD entry carries replace the declared check's
-// limits, a check §31.9 evaluates with negative limits included. Such a check
-// reads its window off its signed limits, so the annotated 5 and 6 are what
-// those hold afterwards, in place of the declared -10 and 20.
-TEST(SdfTimingCheckNegativeLimits, AnnotationReachesTheSignedLimits) {
-  SimFixture f;
+// Runs a $setuphold declared with -10 and 20 under the option enabling negative
+// checks, annotates `values` onto it and returns it.
+const TimingCheckEntry* NegativeCheckAnnotated(const std::string& values,
+                                               SimFixture& f) {
   f.ctx.AcquireSpecifyManager().SetTimingCheckInvocationOptions(
       TimingCheckInvocationOptions{true, false});
   SpecifyManager* mgr = ManagerAfterRun(
-      "module top(input clk, input d);\n"
-      "  specify\n"
-      "    $setuphold(posedge clk, d, -10, 20);\n"
-      "  endspecify\n"
-      "endmodule\n",
+      "module top(input clk, input d);\n  specify\n"
+      "    $setuphold(posedge clk, d, -10, 20);\n  endspecify\nendmodule\n",
       f);
-  ASSERT_NE(mgr, nullptr);
+  if (mgr == nullptr || mgr->TimingCheckCount() != 1) return nullptr;
   AnnotateUnderDesignRoot(
       DelayFileOf("  (CELL (CELLTYPE \"top\") (INSTANCE top) (TIMINGCHECK "
-                  "(SETUPHOLD d (posedge clk) (5) (6))))\n"),
+                  "(SETUPHOLD d (posedge clk) " +
+                  values + ")))\n"),
       *mgr, "top");
-  ASSERT_EQ(mgr->TimingCheckCount(), 1u);
-  const TimingCheckEntry& check = mgr->GetTimingChecks().front();
-  EXPECT_EQ(check.signed_limit, 5);
-  EXPECT_EQ(check.signed_limit2, 6);
+  return &mgr->GetTimingChecks().front();
+}
+
+// §32.4.2: a SETUPHOLD entry's values replace the limits of a check §31.9
+// evaluates with negative limits included, which reads its window off its
+// signed limits: those hold the annotated -5 and 6 in place of -10 and 20.
+TEST(SdfTimingCheckNegativeLimits, AnnotationReachesTheSignedLimits) {
+  SimFixture f;
+  const TimingCheckEntry* check = NegativeCheckAnnotated("(-5) (6)", f);
+  ASSERT_NE(check, nullptr);
+  EXPECT_TRUE(check->negative_timing_check_enabled);
+  EXPECT_EQ(check->signed_limit, -5);
+  EXPECT_EQ(check->signed_limit2, 6);
+}
+
+// §31.9.4: annotating 3 over the -10 leaves no negative limit, so §31.9.1
+// evaluates the now ordinary check on the delayed signals the -10 gave clk: the
+// annotated 3 and the 20 it left alone are both adjusted by d(clk) - d(d).
+TEST(SdfTimingCheckNegativeLimits, NonNegativeValuesEndNegativeHandling) {
+  SimFixture f;
+  const TimingCheckEntry* check = NegativeCheckAnnotated("(3) ()", f);
+  ASSERT_NE(check, nullptr);
+  SpecifyManager& mgr = f.ctx.AcquireSpecifyManager();
+  const int64_t kShift =
+      static_cast<int64_t>(mgr.TimingCheckSignalDelay("clk")) -
+      static_cast<int64_t>(mgr.TimingCheckSignalDelay("d"));
+  ASSERT_GT(kShift, 0);
+  EXPECT_FALSE(check->negative_timing_check_enabled);
+  EXPECT_EQ(check->signed_limit, 3 + kShift);
+  EXPECT_EQ(check->signed_limit2, 20 - kShift);
 }
 
 }  // namespace

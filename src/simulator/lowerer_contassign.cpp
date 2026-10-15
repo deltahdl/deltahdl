@@ -869,7 +869,12 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
       CommitAcrossInterconnect(query, interconnect.schedule, commit);
     }
 
-    if (read_vars.empty()) break;
+    // §32.4.4: an assignment reading nothing changes no more, but the
+    // transitions it sent across an interconnect delay still arrive.
+    if (read_vars.empty()) {
+      co_await AwaitInterconnectArrivals(*interconnect.schedule, ctx);
+      break;
+    }
     co_await AnyChangeAwaiter{ctx, read_vars, nullptr, passes_strength};
   }
 }

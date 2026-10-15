@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "common/types.h"
+#include "simulator/exec_task.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify_sdf.h"
@@ -68,6 +69,13 @@ struct InterconnectScheduleOwner {
     if (schedule->shadow != nullptr) schedule->shadow->alive = false;
   }
 };
+
+// §32.4.4: suspends until every transition pending on `schedule` has reached
+// the load, waking at the time of the last of them and never after it, so a
+// connection that has no further change to wait for lets them all arrive
+// before it ends.
+ExecTask AwaitInterconnectArrivals(const InterconnectSchedule& schedule,
+                                   SimContext& ctx);
 
 // One change of a port connection's source: the part of the load the
 // connection drives as it stands, the connection's new value, and the part of

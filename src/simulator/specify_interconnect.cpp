@@ -427,14 +427,22 @@ void SpecifyManager::PlaceInterconnectDelay(
   // path delay's limits follow -- each limit derived from that transition's own
   // delay under whatever pulse-limit percentages are in effect, or stated
   // beside the delay as a path's may be.
-  DerivePulseLimitsFromDelays(delay.delays, reject_pulse_pct_, error_pulse_pct_,
-                              delay.reject_limit, delay.error_limit);
-  PlaceStatedInterconnectLimits(delay, annotation, prior);
   delay.covered_sources = std::move(covered_sources);
   if (annotation.is_increment) {
+    // §32.7: an INCREMENT entry's limits are amounts added to the limits in
+    // place, as its delays are; a limit it left unstated or empty adds 0.
+    for (std::size_t i = 0; i < 12; ++i) {
+      delay.reject_limit[i] =
+          annotation.held.reject[i] ? 0 : annotation.reject_limit[i];
+      delay.error_limit[i] =
+          annotation.held.error[i] ? 0 : annotation.error_limit[i];
+    }
     IncrementInterconnectDelay(delay);
     return;
   }
+  DerivePulseLimitsFromDelays(delay.delays, reject_pulse_pct_, error_pulse_pct_,
+                              delay.reject_limit, delay.error_limit);
+  PlaceStatedInterconnectLimits(delay, annotation, prior);
   AddInterconnectDelay(std::move(delay));
 }
 

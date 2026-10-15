@@ -527,7 +527,11 @@ void AddInterconnectDelayValues(InterconnectDelay& existing,
                                 const InterconnectDelay& delta) {
   existing.rise += delta.rise;
   existing.fall += delta.fall;
-  for (int i = 0; i < 12; ++i) existing.delays[i] += delta.delays[i];
+  for (int i = 0; i < 12; ++i) {
+    existing.delays[i] += delta.delays[i];
+    existing.reject_limit[i] += delta.reject_limit[i];
+    existing.error_limit[i] += delta.error_limit[i];
+  }
 }
 
 // §32.5: the entry standing for every source on a load -- what a PORT entry

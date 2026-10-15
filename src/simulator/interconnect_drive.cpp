@@ -15,7 +15,9 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "simulator/awaiters.h"
 #include "simulator/evaluation.h"
+#include "simulator/exec_task.h"
 #include "simulator/module_path_delay.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
@@ -23,6 +25,7 @@
 #include "simulator/specify.h"
 #include "simulator/specify_path_delay.h"
 #include "simulator/specify_sdf.h"
+#include "simulator/stmt_result.h"
 #include "simulator/variable.h"
 
 namespace delta {
@@ -103,6 +106,18 @@ void DriveAcrossInterconnect(
     ScheduleArrival(schedule, transition, ctx, commit);
     return;
   }
+}
+
+ExecTask AwaitInterconnectArrivals(const InterconnectSchedule& schedule,
+                                   SimContext& ctx) {
+  // A wait landing in the same time step as the last arrival may run first;
+  // the next one is then a zero delay, which waits out the region the arrival
+  // stands in.
+  while (!schedule.pending.empty()) {
+    const uint64_t kLast = schedule.pending.back()->ticks;
+    co_await DelayAwaiter{ctx, kLast - ctx.CurrentTime().ticks};
+  }
+  co_return StmtResult::kDone;
 }
 
 namespace {

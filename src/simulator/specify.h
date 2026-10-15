@@ -530,6 +530,11 @@ class SpecifyManager {
   // is every signal while the option enabling negative checks is off.
   uint64_t TimingCheckSignalDelay(std::string_view signal) const;
 
+  // §31.9.1: d(ref) - d(data) for `check`, the shift its limits are adjusted
+  // by where it is evaluated on delayed signals; 0 for $width and $period,
+  // whose one signal's edges are delayed alike.
+  int64_t DelayedSignalShift(const TimingCheckEntry& check) const;
+
   bool HasPathDelay(std::string_view src, std::string_view dst) const;
   bool CheckSetupViolation(std::string_view ref, uint64_t ref_time,
                            std::string_view data, uint64_t data_time) const;

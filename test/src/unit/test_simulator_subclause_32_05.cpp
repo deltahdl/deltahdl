@@ -467,6 +467,24 @@ TEST(SdfMultipleAnnotations, IncrementInterconnectModifiesTheEarlierOne) {
   EXPECT_EQ(got->delays[0], 9u);
 }
 
+// §32.7: the limits an INCREMENT value states beside its delay are amounts too,
+// added to the limits in place as the delay is added to the delay: 10, 4 and 6
+// raised by 1, 2 and 3 are 11, 6 and 9.
+TEST(SdfMultipleAnnotations, IncrementInterconnectAddsItsStatedLimits) {
+  Design d;
+  ASSERT_TRUE(d.Build(kThreeSourceSrc));
+
+  d.Annotate(SdfCellText(
+      "(DELAY (ABSOLUTE (INTERCONNECT i13/out i15/in ((10) (4) (6)))))"
+      " (DELAY (INCREMENT (INTERCONNECT i13/out i15/in ((1) (2) (3)))))"));
+
+  const auto* got = d.mgr.FindInterconnectDelay("i13/out", "i15/in");
+  ASSERT_NE(got, nullptr);
+  EXPECT_EQ(got->delays[0], 11u);
+  EXPECT_EQ(got->reject_limit[0], 6u);
+  EXPECT_EQ(got->error_limit[0], 9u);
+}
+
 // An increment modifies whatever delay is in force, which for a source with no
 // entry of its own is the one the PORT construct before it annotated. So the
 // named source ends up at the PORT delay plus the increment, and the sources
