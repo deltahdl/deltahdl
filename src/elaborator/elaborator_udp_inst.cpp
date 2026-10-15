@@ -3,6 +3,7 @@
 // instances. Moved out of elaborator_items_udp.cpp, which reached the size
 // the assert-no-oversized-source-files job fails at.
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdlib>
 #include <format>
@@ -139,6 +140,46 @@ UdpDecl* Elaborator::FindUdpByName(std::string_view name) const {
   return nearest;
 }
 
+// §29.8 gives a UDP instance a gate's delay2, at most two delays and those
+// written in order. Read before the primitive's declaration, `#( ... )` is the
+// parameter override of what the parser took for a module, so its ordered
+// values are the instance's rise and fall delays, a third is more than a UDP
+// takes, and a named assignment is no delay at all.
+static void TakeForwardUdpDelays(ModuleItem* item, DiagEngine& diag) {
+  const auto& params = item->inst_params;
+  if (params.empty()) return;
+  bool named = std::any_of(params.begin(), params.end(),
+                           [](const auto& p) { return !p.first.empty(); });
+  if (named) {
+    diag.Error(item->loc,
+               "a UDP instance takes its delays in order, not a named "
+               "assignment",
+               Subclause("29.8"));
+  } else if (params.size() > 2) {
+    diag.Error(item->loc, "UDP instantiation shall have at most two delays",
+               Subclause("29.8"));
+  }
+  if (!named) {
+    item->gate_delay = params[0].second;
+    if (params.size() > 1) item->gate_delay_fall = params[1].second;
+  }
+  item->inst_params.clear();
+}
+
+// §29.8 connects a UDP instance's terminals in the order its definition gives,
+// and Syntax 29-2 writes them as terminals alone, so neither a named
+// connection nor `.*`, which a module instance may write, is among them.
+static void ReportNamedUdpConnections(const ModuleItem* item,
+                                      DiagEngine& diag) {
+  bool named = item->inst_wildcard ||
+               std::any_of(item->inst_ports.begin(), item->inst_ports.end(),
+                           [](const auto& p) { return !p.first.empty(); });
+  if (!named) return;
+  diag.Error(item->loc,
+             "a UDP instance connects its terminals in order, not by name",
+             Subclause("29.8"));
+}
+
 void Elaborator::ReclassifyForwardUdpInstances(const ModuleDecl* decl) {
   for (auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kModuleInst) continue;
@@ -159,6 +200,8 @@ void Elaborator::ReclassifyForwardUdpInstances(const ModuleDecl* decl) {
     config_inst_path_ = std::move(saved_inst_path);
     if (udp == nullptr) continue;
 
+    ReportNamedUdpConnections(item, diag_);
+    TakeForwardUdpDelays(item, diag_);
     item->kind = ModuleItemKind::kUdpInst;
     item->gate_inst_name = item->inst_name;
     item->inst_name = {};

@@ -534,4 +534,107 @@ TEST(UdpInstanceElaboration, InstanceArrayTerminalCountIsReportedOnce) {
   EXPECT_EQ(count_reports, 1);
 }
 
+// A design whose one module instantiates p_fwd, a primitive declared only after
+// it, by the instantiation `inst` written on line 3. §29.3 lets a UDP be
+// declared anywhere, so the parser, which has not read p_fwd's declaration when
+// it reaches the instantiation, reads it as a module instance, and
+// Elaborator::ReclassifyForwardUdpInstances turns it into a UDP instance.
+std::string ForwardUdpSrc(const std::string& inst) {
+  return "module fwd_top;\n"
+         "  wire f_out, f_a, f_b;\n"
+         "  " +
+         inst +
+         "\n"
+         "endmodule\n"
+         "primitive p_fwd(output f_out, input f_a, input f_b);\n"
+         "  table\n"
+         "    0 0 : 0;\n"
+         "    1 1 : 1;\n"
+         "  endtable\n"
+         "endprimitive\n";
+}
+
+// The one UDP instance of fwd_top, or nullptr when it elaborated none.
+const RtlirUdpInst* ForwardUdpInst(RtlirDesign* design) {
+  auto* mod = TopModule(design);
+  if (mod == nullptr || mod->udp_insts.size() != 1) return nullptr;
+  return &mod->udp_insts[0];
+}
+
+// §29.8 gives a UDP instance a gate's delay2, whose parenthesised form is
+// `#( d )`. Read before p_fwd's declaration, `#(5)` is an ordered parameter
+// override of what the parser takes for a module, and the conversion to a UDP
+// instance left it there, so the instance had no delay at all.
+TEST(UdpInstanceElaboration, ForwardDeclaredUdpTakesAParenthesisedDelay) {
+  ElabFixture f;
+  const auto* inst = ForwardUdpInst(ElaborateSrc(
+      ForwardUdpSrc("p_fwd #(5) u(f_out, f_a, f_b);"), f, "fwd_top"));
+  ASSERT_NE(inst, nullptr);
+  ASSERT_NE(inst->delay, nullptr);
+  EXPECT_EQ(inst->delay->int_val, 5U);
+  EXPECT_EQ(inst->delay_fall, nullptr);
+}
+
+// The second of a delay2's two values is the fall delay, so `#(5, 3)` gives
+// the instance a rise delay of 5 and a fall delay of 3, in that order.
+TEST(UdpInstanceElaboration, ForwardDeclaredUdpTakesRiseAndFallDelays) {
+  ElabFixture f;
+  const auto* inst = ForwardUdpInst(ElaborateSrc(
+      ForwardUdpSrc("p_fwd #(5, 3) u(f_out, f_a, f_b);"), f, "fwd_top"));
+  ASSERT_NE(inst, nullptr);
+  ASSERT_NE(inst->delay, nullptr);
+  ASSERT_NE(inst->delay_fall, nullptr);
+  EXPECT_EQ(inst->delay->int_val, 5U);
+  EXPECT_EQ(inst->delay_fall->int_val, 3U);
+}
+
+// §29.8 allows a UDP instance two delays at most, a UDP having no z, and the
+// parser already reports a third for a primitive it has read. One declared
+// after its use draws the same report.
+TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithThreeDelaysIsReported) {
+  ElabFixture f;
+  ElaborateSrc(ForwardUdpSrc("p_fwd #(5, 3, 1) u(f_out, f_a, f_b);"), f,
+               "fwd_top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "UDP instantiation shall have at most two delays",
+                            3, "29.8"));
+}
+
+// A delay2 lists its delays in order and names none, so a named parameter
+// assignment on a UDP instance is no delay §29.8 admits.
+TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithANamedAssignmentIsReported) {
+  ElabFixture f;
+  ElaborateSrc(ForwardUdpSrc("p_fwd #(.d(5)) u(f_out, f_a, f_b);"), f,
+               "fwd_top");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a UDP instance takes its delays in order, not a named assignment", 3,
+      "29.8"));
+}
+
+// §29.8 connects a UDP instance's terminals in the order its definition gives,
+// and Syntax 29-2 writes them as a list of terminals alone. The conversion
+// copied named connections into the terminal list in the order written, so
+// `.f_b(f_b)` became the output terminal and nothing was reported.
+TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithNamedConnectionsIsReported) {
+  ElabFixture f;
+  ElaborateSrc(ForwardUdpSrc("p_fwd u(.f_b(f_b), .f_out(f_out), .f_a(f_a));"),
+               f, "fwd_top");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a UDP instance connects its terminals in order, not by name", 3,
+      "29.8"));
+}
+
+// `.*` names no terminal at all, and the conversion found an empty terminal
+// list behind it. It is a connection by name, reported as the named ones are.
+TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithAWildcardIsReported) {
+  ElabFixture f;
+  ElaborateSrc(ForwardUdpSrc("p_fwd u(.*);"), f, "fwd_top");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a UDP instance connects its terminals in order, not by name", 3,
+      "29.8"));
+}
+
 }  // namespace
