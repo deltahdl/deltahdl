@@ -10,14 +10,15 @@ namespace {
 
 // §6.19.2 (printed page 121, Table 6-10) with §26.6 (printed 815): `VAL[3]`
 // generates the constants VAL0, VAL1 and VAL2, valued 0, 1 and 2, and a
-// wildcard export hands the constants p1 declares on under p2's qualifier,
-// so `p2::VAL2` and `p2::VAL1` are p1's: 2 * 10 + 1. The export walk held the
-// member under its written name VAL, which no storage answers, so nothing
-// was bound under "p2.VAL2" and both read 0. The reads stand in a declaration
-// initializer: the elaborator's provided-name walk (AddEnumMemberNames in
-// elaborator_scope_rules_names.cpp) holds the member under its written name
-// too, so the same reads in a procedural statement are reported there as
-// names p2 neither declares nor exports, a check that reaches no initializer.
+// wildcard export hands the constants p2's reads import from p1 on under p2's
+// qualifier, so `p2::VAL2` and `p2::VAL1` are p1's: 2 * 10 + 1. The export walk
+// held the member under its written name VAL, which no storage answers, so
+// nothing was bound under "p2.VAL2" and both read 0. The reads stand in a
+// declaration initializer: the elaborator's provided-name walk
+// (AddEnumMemberNames in elaborator_scope_rules_names.cpp) holds the member
+// under its written name too, so the same reads in a procedural statement are
+// reported there as names p2 neither declares nor exports, a check that reaches
+// no initializer.
 TEST(PackageImportSim, WildcardReExportedRangedLiteralThroughTheExporter) {
   EXPECT_EQ(RunAndGet("package p1;\n"
                       "  typedef enum {VAL[3]} t;\n"
@@ -25,6 +26,7 @@ TEST(PackageImportSim, WildcardReExportedRangedLiteralThroughTheExporter) {
                       "package p2;\n"
                       "  import p1::*;\n"
                       "  export p1::*;\n"
+                      "  int seen = VAL1 + VAL2;\n"
                       "endpackage\n"
                       "module top;\n"
                       "  int y = p2::VAL2 * 10 + p2::VAL1;\n"

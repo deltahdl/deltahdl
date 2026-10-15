@@ -629,12 +629,13 @@ class ExportedNameWalk {
   const std::vector<std::string_view>& EnumConstantNames(
       const PackageDecl* pkg);
   bool DeclaresEnumConstant(const PackageDecl* pkg, std::string_view name);
-  const std::unordered_set<std::string_view>& Referenced(
-      const PackageDecl* pkg);
   void CollectProvided(const PackageDecl* pkg, PackageSet visited,
                        std::vector<ExportedName>& out);
   void CollectFromExports(const PackageDecl* pkg, const PackageSet& visited,
                           std::vector<ExportedName>& out);
+  void CollectReferencedProvided(const PackageDecl* pkg, const PackageDecl* src,
+                                 const PackageSet& visited,
+                                 std::vector<ExportedName>& out);
   void CollectImportsFrom(const PackageDecl* pkg, std::string_view src_name,
                           const PackageSet& visited,
                           std::vector<ExportedName>& out);
@@ -647,8 +648,6 @@ class ExportedNameWalk {
   // for them by every wildcard import of it the walk follows.
   std::unordered_map<const PackageDecl*, std::vector<std::string_view>>
       enum_names_;
-  std::unordered_map<const PackageDecl*, std::unordered_set<std::string_view>>
-      referenced_;
 };
 
 const PackageDecl* ExportedNameWalk::Find(std::string_view name) const {
@@ -673,15 +672,6 @@ bool ExportedNameWalk::DeclaresEnumConstant(const PackageDecl* pkg,
     if (m == name) return true;
   }
   return false;
-}
-
-const std::unordered_set<std::string_view>& ExportedNameWalk::Referenced(
-    const PackageDecl* pkg) {
-  auto it = referenced_.find(pkg);
-  if (it == referenced_.end()) {
-    it = referenced_.emplace(pkg, PackageReferencedNames(pkg)).first;
-  }
-  return it->second;
 }
 
 // The names `pkg`'s exports hand on.
@@ -722,6 +712,20 @@ void ExportedNameWalk::CollectFromExports(const PackageDecl* pkg,
   }
 }
 
+// What `pkg`'s wildcard import of `src` brings in: the names src provides
+// that pkg references.
+void ExportedNameWalk::CollectReferencedProvided(
+    const PackageDecl* pkg, const PackageDecl* src, const PackageSet& visited,
+    std::vector<ExportedName>& out) {
+  std::vector<ExportedName> provided;
+  CollectProvided(src, visited, provided);
+  const std::unordered_set<std::string_view> kReferenced =
+      PackageReferencedNames(pkg);
+  for (const ExportedName& e : provided) {
+    if (kReferenced.contains(e.name)) out.push_back(e);
+  }
+}
+
 // What the imports `pkg` writes from the package `src_name` bring in, or
 // every import's for the "*" of `export *::*`.
 void ExportedNameWalk::CollectImportsFrom(const PackageDecl* pkg,
@@ -735,11 +739,7 @@ void ExportedNameWalk::CollectImportsFrom(const PackageDecl* pkg,
     const PackageDecl* src = Find(imp.package_name);
     if (src == nullptr) continue;
     if (imp.is_wildcard) {
-      std::vector<ExportedName> provided;
-      CollectProvided(src, visited, provided);
-      for (const ExportedName& e : provided) {
-        if (Referenced(pkg).contains(e.name)) out.push_back(e);
-      }
+      CollectReferencedProvided(pkg, src, visited, out);
     } else {
       CollectNamed(src, imp.item_name, visited, out);
     }
