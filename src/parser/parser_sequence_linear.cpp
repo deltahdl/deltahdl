@@ -872,8 +872,9 @@ void Parser::CaptureLinearSequenceBody(ModuleItem* item) {
   // §16.16 (f): the clocking event the body opens with is the sequence's own
   // leading clocking event, the one an assertion instantiating the sequence
   // resolves to, whatever sequence_expr follows it; §16.7's grammar admits
-  // shapes the linear form does not hold, a parenthesised `and` before a
-  // `##0`, say, so the clock read whole is kept where the operands are not.
+  // shapes the linear form does not hold, a ranged repetition of a
+  // parenthesised group, say, so the clock read whole is kept where the
+  // operands are not.
   bool clock_read = ok;
   if (ok) ok = ParserSeqLinearHelpers::ParseLinearSeqOperands(*this, item);
   // The sequence_expr is terminated by ';' before `endsequence`.

@@ -691,10 +691,11 @@ TEST(PackageDeclarationElaboration, HierarchicalRefInAPackagePropertySequence) {
 
 // §26.2 with §16.7: a package sequence's body is held to the rule whatever
 // shape it takes, one the parser's linear form of a body does not hold, a
-// parenthesized `and` before a `##0`, as much as one it does. Such a body kept
-// no expression, so the head of a member access in it went unjudged; a head
-// the package declares or the sequence takes as a formal is no hierarchical
-// reference, and a clock the linear form does hold is judged once.
+// ranged repetition of a parenthesized group, as much as one it does. Such a
+// body kept no expression, so the head of a member access in it went
+// unjudged; a head the package declares or the sequence takes as a formal is
+// no hierarchical reference, and a clock the linear form does hold is judged
+// once.
 TEST(PackageDeclarationElaboration,
      HierarchicalRefInAPackageSequenceOfAnyShape) {
   ElabFixture f;
@@ -702,10 +703,10 @@ TEST(PackageDeclarationElaboration,
       ElabOk("package p;\n"
              "  typedef struct packed { logic f; } st_t;\n"
              "  st_t w;\n"
-             "  sequence s; (top.a and 1) ##0 1; endsequence\n"
-             "  sequence sc; @(posedge top.clk) (1 and 1) ##0 1; endsequence\n"
-             "  sequence sw; (w.f and 1) ##0 1; endsequence\n"
-             "  sequence sf(v); (v.f and 1) ##0 1; endsequence\n"
+             "  sequence s; (top.a ##1 1)[*1:2]; endsequence\n"
+             "  sequence sc; @(posedge top.clk) (w ##1 1)[*1:2]; endsequence\n"
+             "  sequence sw; (w.f ##1 1)[*1:2]; endsequence\n"
+             "  sequence sf(v); (v.f ##1 1)[*1:2]; endsequence\n"
              "endpackage\n"
              "module top; logic clk = 0, a = 1; endmodule\n",
              f));
@@ -741,9 +742,9 @@ TEST(PackageDeclarationElaboration, CuNameInAPackageSequenceOfAnyShape) {
   EXPECT_FALSE(
       ElabOk("int v;\n"
              "package p;\n"
-             "  sequence su; (v and 1) ##0 1; endsequence\n"
-             "  sequence sf(v); (v and 1) ##0 1; endsequence\n"
-             "  sequence sl; int v; (v and 1) ##0 1; endsequence\n"
+             "  sequence su; (v ##1 1)[*1:2]; endsequence\n"
+             "  sequence sf(v); (v ##1 1)[*1:2]; endsequence\n"
+             "  sequence sl; int v; (v ##1 1)[*1:2]; endsequence\n"
              "endpackage\n",
              f));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),

@@ -4,7 +4,6 @@
 
 #include "lexer/lexer.h"
 #include "lexer/token.h"
-#include "parser/ast_assertion_text.h"
 #include "parser/ast_module.h"
 #include "parser/parser.h"
 #include "parser/parser_property_spec_internal.h"
