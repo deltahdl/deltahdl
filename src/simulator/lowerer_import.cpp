@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <functional>
 #include <string>
@@ -10,6 +11,7 @@
 #include "common/arena.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_enum_constants.h"
+#include "elaborator/package_references.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "parser/ast_class.h"
@@ -186,29 +188,50 @@ void Lowerer::LowerImportedName(
 }
 
 // State shared by the free helpers that walk one package's export declarations
-// for a wildcard import (§26.5). `lower_all`/`lower_named` forward back into
-// the owning Lowerer so the recursion lives outside LowerAllImported's own
-// body, keeping its cognitive complexity low. Each callback already snapshots
-// the visited set, so it is passed by const reference here.
+// for a wildcard import (§26.5). `lower_named` forwards back into the owning
+// Lowerer so the recursion lives outside LowerAllImported's own body, keeping
+// its cognitive complexity low. The callback already snapshots the visited
+// set, so it is passed by const reference here.
 namespace {
 struct ReExportWalk {
   PackageDecl* pkg;
+  // The names pkg's own declarations write (PackageReferencedNames).
+  const std::unordered_set<std::string_view>& referenced;
   const std::unordered_set<const PackageDecl*>& visited;
   std::function<PackageDecl*(std::string_view)> find_pkg;
-  std::function<void(PackageDecl*)> lower_all;
   std::function<void(PackageDecl*, std::string_view)> lower_named;
 };
+
+// §26.6 (printed page 815) with §26.3 (printed 810): a wildcard import
+// imports only the candidates of `src` that `w.pkg` references, so those
+// alone are handed on, each by its name: src's own declarations in the order
+// src declares them, a class before one extending it, and then the names src
+// supplies otherwise, its enumeration literals and its exports' names, in
+// name order.
+void ReExportReferencedCandidates(const ReExportWalk& w, PackageDecl* src) {
+  for (const auto* item : src->items) {
+    if (IsImportOrExportDecl(item)) continue;
+    for (std::string_view name : w.referenced) {
+      if (PackageItemHasName(item, name)) w.lower_named(src, name);
+    }
+  }
+  std::vector<std::string_view> rest;
+  for (std::string_view name : w.referenced) {
+    if (FindNamedPackageItem(src, name) == nullptr) rest.push_back(name);
+  }
+  std::ranges::sort(rest);
+  for (std::string_view name : rest) w.lower_named(src, name);
+}
 
 // §26.6 (printed page 815): an export hands on what the exporting package
 // actually imported, so each import item of `w.pkg` the export covers is
 // handed on from `src`, the package it names, as it was imported: an explicit
-// `import src::name` its one name, and a wildcard `import src::*` every
-// candidate of src, no reference tracking here telling which of them the
-// package referenced.
+// `import src::name` its one name, and a wildcard `import src::*` the
+// candidates the package referenced.
 void ReExportImport(const ReExportWalk& w, PackageDecl* src,
                     const ImportItem& imp) {
   if (imp.is_wildcard) {
-    w.lower_all(src);
+    ReExportReferencedCandidates(w, src);
   } else {
     w.lower_named(src, imp.item_name);
   }
@@ -262,12 +285,10 @@ void Lowerer::LowerAllImported(
     AliasPackageDataItem(pkg, item);
   }
 
-  ReExportWalk walk{pkg, visited,
+  const std::unordered_set<std::string_view> kReferenced =
+      PackageReferencedNames(pkg);
+  ReExportWalk walk{pkg, kReferenced, visited,
                     [this](std::string_view name) { return FindPackage(name); },
-                    [this, &visited](PackageDecl* src) {
-                      auto sub = visited;
-                      LowerAllImported(src, sub);
-                    },
                     [this, &visited](PackageDecl* src, std::string_view name) {
                       auto sub = visited;
                       LowerImportedName(src, name, sub);
@@ -589,12 +610,12 @@ std::vector<std::string_view> PackageEnumConstantNames(const PackageDecl* pkg,
 // the package declaring it, a chain of exports followed to the original
 // declaration: `export src::name` hands on the one name, `export src::*`
 // every name the package imports from src, and `export *::*` every name the
-// package imports. A wildcard import contributes every name its source
-// provides, the over-approximation the elaborator's walk makes too
-// (AddImportedNamesFrom in elaborator_scope_rules_names.cpp), §26.6 handing
-// on only what the package's references actually imported. A package already
-// on the chain being walked contributes nothing more, which ends a cycle of
-// exports.
+// package imports. A wildcard import contributes the names its source
+// provides that the package references (PackageReferencedNames), §26.6
+// handing on only what the package actually imported, as the elaborator's
+// walk does (AddImportedNamesFrom in elaborator_scope_rules_names.cpp). A
+// package already on the chain being walked contributes nothing more, which
+// ends a cycle of exports.
 class ExportedNameWalk {
  public:
   ExportedNameWalk(const RtlirDesign* design, Arena& arena)
@@ -608,6 +629,8 @@ class ExportedNameWalk {
   const std::vector<std::string_view>& EnumConstantNames(
       const PackageDecl* pkg);
   bool DeclaresEnumConstant(const PackageDecl* pkg, std::string_view name);
+  const std::unordered_set<std::string_view>& Referenced(
+      const PackageDecl* pkg);
   void CollectProvided(const PackageDecl* pkg, PackageSet visited,
                        std::vector<ExportedName>& out);
   void CollectFromExports(const PackageDecl* pkg, const PackageSet& visited,
@@ -624,6 +647,8 @@ class ExportedNameWalk {
   // for them by every wildcard import of it the walk follows.
   std::unordered_map<const PackageDecl*, std::vector<std::string_view>>
       enum_names_;
+  std::unordered_map<const PackageDecl*, std::unordered_set<std::string_view>>
+      referenced_;
 };
 
 const PackageDecl* ExportedNameWalk::Find(std::string_view name) const {
@@ -648,6 +673,15 @@ bool ExportedNameWalk::DeclaresEnumConstant(const PackageDecl* pkg,
     if (m == name) return true;
   }
   return false;
+}
+
+const std::unordered_set<std::string_view>& ExportedNameWalk::Referenced(
+    const PackageDecl* pkg) {
+  auto it = referenced_.find(pkg);
+  if (it == referenced_.end()) {
+    it = referenced_.emplace(pkg, PackageReferencedNames(pkg)).first;
+  }
+  return it->second;
 }
 
 // The names `pkg`'s exports hand on.
@@ -701,7 +735,11 @@ void ExportedNameWalk::CollectImportsFrom(const PackageDecl* pkg,
     const PackageDecl* src = Find(imp.package_name);
     if (src == nullptr) continue;
     if (imp.is_wildcard) {
-      CollectProvided(src, visited, out);
+      std::vector<ExportedName> provided;
+      CollectProvided(src, visited, provided);
+      for (const ExportedName& e : provided) {
+        if (Referenced(pkg).contains(e.name)) out.push_back(e);
+      }
     } else {
       CollectNamed(src, imp.item_name, visited, out);
     }

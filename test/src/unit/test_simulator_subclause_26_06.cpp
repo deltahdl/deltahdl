@@ -400,4 +400,49 @@ TEST(PackageExportSim, StarExportHandsOnOnlyTheExplicitImport) {
             "y=1 z=90\n");
 }
 
+// §26.6 (printed page 815) with §26.3 (printed 810): p4's wildcard import of
+// p1 imports the x p4 reads and not the y it never references, so `export
+// p1::*` hands on x alone and p7's y is the one top reads. The export handed
+// on every candidate of p1, and top read p1's 10.
+TEST(PackageExportSim, WildcardExportHandsOnOnlyReferencedCandidates) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p1; int x = 1; int y = 10; endpackage\n"
+                       "package p4;\n"
+                       "  import p1::*;\n"
+                       "  export p1::*;\n"
+                       "  int q = x;\n"
+                       "endpackage\n"
+                       "package p7; int y = 70; endpackage\n"
+                       "module top;\n"
+                       "  import p4::*;\n"
+                       "  import p7::*;\n"
+                       "  initial $display(\"x=%0d y=%0d\", x, y);\n"
+                       "endmodule\n",
+                       f),
+            "x=1 y=70\n");
+}
+
+// The same for `export *::*`: p4 calls p1's f and never names p1's y, so f is
+// handed on and p7's y is the one top reads.
+TEST(PackageExportSim, StarExportHandsOnOnlyReferencedCandidates) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p1;\n"
+                       "  int y = 10;\n"
+                       "  function int f(); return 5; endfunction\n"
+                       "endpackage\n"
+                       "package p4;\n"
+                       "  import p1::*;\n"
+                       "  export *::*;\n"
+                       "  int q = f();\n"
+                       "endpackage\n"
+                       "package p7; int y = 70; endpackage\n"
+                       "module top;\n"
+                       "  import p4::*;\n"
+                       "  import p7::*;\n"
+                       "  initial $display(\"f=%0d y=%0d\", f(), y);\n"
+                       "endmodule\n",
+                       f),
+            "f=5 y=70\n");
+}
+
 }  // namespace
