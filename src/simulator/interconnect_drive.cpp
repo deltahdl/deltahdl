@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -112,7 +113,7 @@ namespace {
 struct InterconnectFollow {
   Net& net;
   std::shared_ptr<InterconnectShadow> shadow;
-  std::string load;
+  InterconnectEnds ends;
   std::function<void(const Logic4Vec&)> commit;
 };
 
@@ -138,16 +139,21 @@ void FollowDriver(const std::shared_ptr<InterconnectFollow>& follow,
   const DriverStrength kStrength = follow->net.driver_strengths[slot];
   const SpecifyManager* mgr = ctx.GetSpecifyManager();
   if (mgr == nullptr ||
-      !mgr->HasSourceSpecificInterconnectDelay(follow->load)) {
+      !mgr->HasSourceSpecificInterconnectDelay(follow->ends.load)) {
     shadow.net.drivers[slot] = value;
     shadow.net.driver_strengths[slot] = kStrength;
     return;
   }
+  // A driver standing for no output port -- the connection of the port above,
+  // say -- is asked about by the name the connection reads, as the
+  // connection's own lookup asks.
   const std::string_view kPort = slot < follow->net.driver_ports.size()
                                      ? follow->net.driver_ports[slot]
                                      : std::string_view();
-  const InterconnectDelay* delay =
-      mgr->FindInterconnectDelay(kPort, follow->load);
+  const std::optional<InterconnectDelay> kDelay =
+      mgr->ConnectionInterconnectDelay(
+          kPort.empty() ? std::string_view(follow->ends.source) : kPort,
+          follow->ends.load);
   const auto kArrive = [follow, slot, kStrength, &ctx](const Logic4Vec& v) {
     InterconnectShadow& arrived = *follow->shadow;
     if (!arrived.alive) return;
@@ -157,7 +163,7 @@ void FollowDriver(const std::shared_ptr<InterconnectFollow>& follow,
     follow->commit(arrived.resolved.value);
   };
   DriveAcrossInterconnect(
-      shadow.per_driver[slot], delay == nullptr ? InterconnectDelay{} : *delay,
+      shadow.per_driver[slot], kDelay.value_or(InterconnectDelay{}),
       InterconnectChange{shadow.net.drivers[slot], value, value}, ctx, kArrive);
 }
 
@@ -165,7 +171,7 @@ void FollowDriver(const std::shared_ptr<InterconnectFollow>& follow,
 
 void FollowNetDrivers(Net& net,
                       const std::shared_ptr<InterconnectShadow>& shadow,
-                      std::string load, SimContext& ctx,
+                      InterconnectEnds ends, SimContext& ctx,
                       std::function<void(const Logic4Vec&)> commit) {
   shadow->net.type = net.type;
   shadow->net.resolved = &shadow->resolved;
@@ -173,7 +179,7 @@ void FollowNetDrivers(Net& net,
       net.resolved == nullptr ? 1U : net.resolved->value.width;
   shadow->resolved.value = MakeLogic4Vec(ctx.GetArena(), kWidth);
   auto follow = std::make_shared<InterconnectFollow>(
-      InterconnectFollow{net, shadow, std::move(load), std::move(commit)});
+      InterconnectFollow{net, shadow, std::move(ends), std::move(commit)});
   // A driver the net already carries starts the shadow where it stands, so
   // its next write is measured from there; a source that moved before the
   // load began following it would otherwise look unmoved.

@@ -93,15 +93,24 @@ void DriveAcrossInterconnect(
     const InterconnectDelay& delay, const InterconnectChange& change,
     SimContext& ctx, const std::function<void(const Logic4Vec&)>& commit);
 
-// §32.4.4: keeps `shadow` following every driver of `net` for the load named
-// `load`, whose connection commits through `commit`. While the load carries no
-// delay of its own from any one source a written driver is mirrored at once,
-// the connection carrying the net's resolved value as before; once it does,
-// each driver reaches the shadow across the delay from the port it stands for
-// (Net::driver_ports), and the shadow's resolution is what reaches the load.
+// §32.4.4: the two names a port connection's interconnect delay is annotated
+// between -- the signal it reads and the port it drives.
+struct InterconnectEnds {
+  std::string source;
+  std::string load;
+};
+
+// §32.4.4: keeps `shadow` following every driver of `net` for the connection
+// named by `ends`, which commits to its load through `commit`. While the load
+// carries no delay of its own from any one source a written driver is mirrored
+// at once, the connection carrying the net's resolved value as before; once it
+// does, each driver reaches the shadow across the delay from the port it stands
+// for (Net::driver_ports), or, for one standing for no port, the delay the
+// connection's own source name is asked about, and the shadow's resolution is
+// what reaches the load.
 void FollowNetDrivers(Net& net,
                       const std::shared_ptr<InterconnectShadow>& shadow,
-                      std::string load, SimContext& ctx,
+                      InterconnectEnds ends, SimContext& ctx,
                       std::function<void(const Logic4Vec&)> commit);
 
 }  // namespace delta

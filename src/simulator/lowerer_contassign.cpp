@@ -760,8 +760,10 @@ static void FollowConnectedNet(
   Net* net = ctx.FindNet(dotted);
   if (net == nullptr) return;
   schedule.shadow = std::make_shared<InterconnectShadow>();
-  FollowNetDrivers(*net, schedule.shadow, params.interconnect_load, ctx,
-                   commit);
+  FollowNetDrivers(
+      *net, schedule.shadow,
+      InterconnectEnds{params.interconnect_source, params.interconnect_load},
+      ctx, commit);
 }
 
 // The name a module path declared in this instance gives this assignment's
