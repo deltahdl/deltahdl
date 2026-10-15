@@ -25,6 +25,8 @@
 #include <cstdint>
 #include <fstream>
 #include <ios>
+#include <iostream>
+#include <sstream>
 #include <string>
 
 #include "fixture_simulator.h"
@@ -415,9 +417,9 @@ TEST(InterconnectDelaySim, ACrossingTransitionDropsTheOneItCrosses) {
 
 // §32.4.4: a port connection reading only a constant drives its load once, and
 // a delay annotated before the run starts holds that drive back without
-// losing it. The connection sends A5 across a delay of 10 at time 0 and has
-// nothing further to wait for, yet the load takes A5 at 10: at 7 it is still
-// x, at 17 A5.
+// losing it. The connection sends a5 across a delay of 10 at time 0 and has
+// nothing further to wait for, yet the port takes a5 at 10, and the output the
+// instance copies it to with it: at 7 both are still x, at 17 both a5.
 TEST(InterconnectDelaySim, AConstantConnectionsPendingDriveStillArrives) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -426,12 +428,10 @@ TEST(InterconnectDelaySim, AConstantConnectionsPendingDriveStillArrives) {
       "endmodule\n"
       "module top;\n"
       "  logic [7:0] out;\n"
-      "  logic early = 1'b0;\n"
-      "  logic late = 1'b0;\n"
       "  leaf u(.din(8'hA5), .dout(out));\n"
       "  initial begin\n"
-      "    #7 early = (out === 8'hxx);\n"
-      "    #10 late = (out === 8'hA5);\n"
+      "    #7 $display(\"%h %h\", u.din, out);\n"
+      "    #10 $display(\"%h %h\", u.din, out);\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -442,14 +442,12 @@ TEST(InterconnectDelaySim, AConstantConnectionsPendingDriveStillArrives) {
   ASSERT_TRUE(ParseSdf(DelayFile("(PORT u/din (10))"), file));
   AnnotateSdfToManager(file, f.ctx.AcquireSpecifyManager(), SdfMtm::kTypical,
                        {}, "top");
+  std::ostringstream captured;
+  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
   f.scheduler.Run();
+  std::cout.rdbuf(old_buf);
 
-  auto* early = f.ctx.FindVariable("early");
-  auto* late = f.ctx.FindVariable("late");
-  ASSERT_NE(early, nullptr);
-  ASSERT_NE(late, nullptr);
-  EXPECT_EQ(early->value.ToUint64(), 1u);
-  EXPECT_EQ(late->value.ToUint64(), 1u);
+  EXPECT_EQ(captured.str(), "xx xx\na5 a5\n");
 }
 
 }  // namespace
