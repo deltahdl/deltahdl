@@ -349,4 +349,47 @@ TEST(PackageExportSim, WriteThroughExporterReachesTheDeclaringPackagesElement) {
             9u);
 }
 
+// §26.6 (printed page 815): `export p1::*` hands on only what p2 imported from
+// p1, the x of `import p1::x`, so p7's y is the one top's wildcard import of p7
+// reaches, and p0's w, which p2 imports but exports nothing of, is handed on by
+// neither. The export handed on the whole of p1, so p1's y took the name first
+// and top read 10.
+TEST(PackageExportSim, WildcardExportHandsOnOnlyTheExplicitImport) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p1; int x = 1; int y = 10; endpackage\n"
+                       "package p0; int w = 4; endpackage\n"
+                       "package p2;\n"
+                       "  import p0::w;\n"
+                       "  import p1::x;\n"
+                       "  export p1::*;\n"
+                       "endpackage\n"
+                       "package p7; int y = 70; endpackage\n"
+                       "module top;\n"
+                       "  import p2::*;\n"
+                       "  import p7::*;\n"
+                       "  initial $display(\"x=%0d y=%0d\", x, y);\n"
+                       "endmodule\n",
+                       f),
+            "x=1 y=70\n");
+}
+
+// The same for `export *::*`: p8 imports p7's y alone, so p9's z is the one top
+// reads. The export handed on the whole of p7, and top read p7's 70.
+TEST(PackageExportSim, StarExportHandsOnOnlyTheExplicitImport) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p7; int y = 1; int z = 70; endpackage\n"
+                       "package p8;\n"
+                       "  export *::*;\n"
+                       "  import p7::y;\n"
+                       "endpackage\n"
+                       "package p9; int z = 90; endpackage\n"
+                       "module top;\n"
+                       "  import p8::*;\n"
+                       "  import p9::*;\n"
+                       "  initial $display(\"y=%0d z=%0d\", y, z);\n"
+                       "endmodule\n",
+                       f),
+            "y=1 z=90\n");
+}
+
 }  // namespace

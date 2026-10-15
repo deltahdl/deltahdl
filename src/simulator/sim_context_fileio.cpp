@@ -609,8 +609,13 @@ ClassTypeInfo* SimContext::ExactClassType(std::string_view name) {
 // called std, so a `std::` head is dropped before the table is asked.
 ClassTypeInfo* SimContext::FindClassType(std::string_view name) const {
   constexpr std::string_view kStdScope = "std::";
-  if (name.substr(0, kStdScope.size()) == kStdScope)
+  if (name.substr(0, kStdScope.size()) == kStdScope) {
     name = name.substr(kStdScope.size());
+    // std's semaphore and mailbox are no class the table holds
+    // (BuiltinSyncKindOf), so a user class of the bare name, which the table
+    // may hold, is not what `std::` names.
+    if (name == "semaphore" || name == "mailbox") return nullptr;
+  }
   // §3.12.1: where each unit has a scope of its own, the running code's unit's
   // class of the name stands ahead of another unit's
   // (Lowerer::RegisterClassDecl).

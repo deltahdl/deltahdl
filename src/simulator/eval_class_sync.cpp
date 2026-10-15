@@ -47,11 +47,19 @@ static std::string_view TypeTargetFor(std::string_view name,
   return ctx.FindTypeTarget(name);
 }
 
+// §26.7 (printed page 817): `std::` before a name reaches the built-in
+// package's declaration whatever user code calls by the bare name, so
+// `std::semaphore` is the built-in class even beside a user class semaphore,
+// which the bare name means where one is declared (§15.2).
 SyncKind BuiltinSyncKindOf(std::string_view name, const SimContext& ctx) {
+  constexpr std::string_view kStdScope = "std::";
+  const bool kStdScoped = name.starts_with(kStdScope);
+  if (kStdScoped) name.remove_prefix(kStdScope.size());
   SyncKind kind = SyncKind::kNone;
   if (name == "semaphore") kind = SyncKind::kSemaphore;
   if (name == "mailbox") kind = SyncKind::kMailbox;
-  if (kind == SyncKind::kNone || ctx.FindClassType(name) != nullptr)
+  if (kind == SyncKind::kNone ||
+      (!kStdScoped && ctx.FindClassType(name) != nullptr))
     return SyncKind::kNone;
   return kind;
 }
@@ -640,7 +648,8 @@ Logic4Vec NewContainedSyncObject(const Expr* new_expr,
                                  std::string_view class_type, SimContext& ctx,
                                  Arena& arena) {
   const void* obj = nullptr;
-  if (class_type == "semaphore") {
+  // The element class is written bare or as `std::semaphore` (§26.7).
+  if (BuiltinSyncKindOf(class_type, ctx) == SyncKind::kSemaphore) {
     auto* sem = ctx.GetArena().Create<SemaphoreObject>(
         SemaphoreKeyArg(new_expr, ctx, arena, 0));
     ctx.RecordContainedSemaphore(sem);

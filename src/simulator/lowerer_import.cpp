@@ -200,23 +200,43 @@ struct ReExportWalk {
   std::function<void(PackageDecl*, std::string_view)> lower_named;
 };
 
-void ReExportAll(const ReExportWalk& w, PackageDecl* src) { w.lower_all(src); }
-
-// Handles `export *::*;`: re-exports everything from each package `pkg`
-// imports.
-void ReExportWildcardStar(const ReExportWalk& w) {
-  for (std::string_view src_name : WildcardExportImportNames(w.pkg)) {
-    if (auto* src = w.find_pkg(src_name)) ReExportAll(w, src);
+// §26.6 (printed page 815): an export hands on what the exporting package
+// actually imported, so each import item of `w.pkg` the export covers is
+// handed on from `src`, the package it names, as it was imported: an explicit
+// `import src::name` its one name, and a wildcard `import src::*` every
+// candidate of src, no reference tracking here telling which of them the
+// package referenced.
+void ReExportImport(const ReExportWalk& w, PackageDecl* src,
+                    const ImportItem& imp) {
+  if (imp.is_wildcard) {
+    w.lower_all(src);
+  } else {
+    w.lower_named(src, imp.item_name);
   }
 }
 
-// Handles one resolved `export pkg::item;` / `export pkg::*;`.
+// Handles `export *::*;`: re-exports what `pkg` imports from every package.
+void ReExportWildcardStar(const ReExportWalk& w) {
+  for (const auto* item : w.pkg->items) {
+    if (item->kind != ModuleItemKind::kImportDecl) continue;
+    if (auto* src = w.find_pkg(item->import_item.package_name))
+      ReExportImport(w, src, item->import_item);
+  }
+}
+
+// Handles one resolved `export pkg::item;` / `export pkg::*;`, the second
+// handing on what `w.pkg` imports from pkg alone.
 void ReExportFromPackage(const ReExportWalk& w, PackageDecl* src,
                          const ImportItem& ex) {
-  if (ex.is_wildcard) {
-    ReExportAll(w, src);
-  } else {
+  if (!ex.is_wildcard) {
     w.lower_named(src, ex.item_name);
+    return;
+  }
+  for (const auto* item : w.pkg->items) {
+    if (item->kind == ModuleItemKind::kImportDecl &&
+        item->import_item.package_name == src->name) {
+      ReExportImport(w, src, item->import_item);
+    }
   }
 }
 

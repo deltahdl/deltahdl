@@ -54,7 +54,9 @@ enum class SyncKind : uint8_t { kNone, kSemaphore, kMailbox };
 // §15.2: the built-in class the type name `name` denotes, `semaphore` or
 // `mailbox`, which stand in the std package (§26.7) and so are hidden by a
 // class of the same name the design declares where the name is read; kNone
-// for any other name and for a name such a class takes.
+// for any other name and for a name such a class takes. Written
+// `std::semaphore` or `std::mailbox`, the name is the built-in class whatever
+// the design declares (§26.7).
 SyncKind BuiltinSyncKindOf(std::string_view name, const SimContext& ctx);
 
 SyncKind SyncKindOfType(const DataType& type, std::string_view package,

@@ -96,4 +96,85 @@ TEST(StdBuiltInPackageSim, ModuleLevelStdProcessStateVariable) {
             "FINISHED RUNNING\n");
 }
 
+// §26.7 (printed page 817): `std::semaphore` names the built-in class, so a
+// procedural variable declared so holds the semaphore new builds: its one key
+// is given up once and then gone. The scoped name was recognised as no
+// built-in class and no semaphore was bound, so both calls answered 0.
+TEST(StdPackageSim, ProceduralStdSemaphoreHoldsTheBuiltinObject) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  int a, b;\n"
+                       "  initial begin\n"
+                       "    automatic std::semaphore s = new(1);\n"
+                       "    a = s.try_get(1);\n"
+                       "    b = s.try_get(1);\n"
+                       "    $display(\"a=%0d b=%0d\", a, b);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "a=1 b=0\n");
+}
+
+// The same for `std::mailbox`: the message put is counted and taken back.
+TEST(StdPackageSim, ProceduralStdMailboxHoldsTheBuiltinObject) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  int n, ok, v;\n"
+                       "  initial begin\n"
+                       "    automatic std::mailbox m = new;\n"
+                       "    m.put(23);\n"
+                       "    n = m.num();\n"
+                       "    ok = m.try_get(v);\n"
+                       "    $display(\"n=%0d ok=%0d v=%0d\", n, ok, v);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "n=1 ok=1 v=23\n");
+}
+
+// §26.7 with §15.2: a class the module declares named semaphore is what the
+// bare name means there, but `std::semaphore` still reaches the built-in
+// class, whose one key is given up once. The handle was recorded as the
+// module's class, which has no try_get, and both calls answered 0.
+TEST(StdPackageSim, StdSemaphoreBesideAUserClassIsTheBuiltin) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  class semaphore;\n"
+                 "    int keys;\n"
+                 "    function new(int k = 0); keys = k + 40; endfunction\n"
+                 "  endclass\n"
+                 "  std::semaphore s = new(1);\n"
+                 "  semaphore u = new(2);\n"
+                 "  int a, b;\n"
+                 "  initial begin\n"
+                 "    a = s.try_get(1);\n"
+                 "    b = s.try_get(1);\n"
+                 "    $display(\"a=%0d b=%0d u=%0d\", a, b, u.keys);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "a=1 b=0 u=42\n");
+}
+
+// The same for `std::mailbox` beside a class the module names mailbox.
+TEST(StdPackageSim, StdMailboxBesideAUserClassIsTheBuiltin) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  class mailbox;\n"
+                       "    int n = 5;\n"
+                       "  endclass\n"
+                       "  std::mailbox m = new;\n"
+                       "  int n, v;\n"
+                       "  initial begin\n"
+                       "    m.put(31);\n"
+                       "    n = m.num();\n"
+                       "    void'(m.try_get(v));\n"
+                       "    $display(\"n=%0d v=%0d\", n, v);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "n=1 v=31\n");
+}
+
 }  // namespace

@@ -828,7 +828,16 @@ void Elaborator::SetVariableTypeInfo(const ModuleItem* item,
     var.class_data_type = &item->data_type;
   } else if (item->data_type.kind == DataTypeKind::kNamed &&
              class_names_.count(item->data_type.type_name)) {
-    var.class_type_name = item->data_type.type_name;
+    // §26.7: `std::semaphore` and `std::mailbox` keep their scope, which
+    // names the built-in class past a class of the bare name the scope
+    // declares; std's other classes, process among them, are registered under
+    // their bare names and read by them.
+    std::string_view type_name = item->data_type.type_name;
+    bool std_sync = item->data_type.scope_name == "std" &&
+                    (type_name == "semaphore" || type_name == "mailbox");
+    var.class_type_name =
+        std_sync ? *arena_.Create<std::string>("std::" + std::string(type_name))
+                 : type_name;
     var.class_data_type = &item->data_type;
   }
   var.written_type = &item->data_type;
