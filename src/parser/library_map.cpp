@@ -10,6 +10,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <tuple>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -520,7 +521,7 @@ bool LibraryMap::LoadDescriptionsInOrder(
     std::vector<std::filesystem::path>& stack,
     std::vector<std::string>* errors) {
   const auto kBefore = [](SourceLoc a, SourceLoc b) {
-    return a.line != b.line ? a.line < b.line : a.column < b.column;
+    return std::tie(a.line, a.column) < std::tie(b.line, b.column);
   };
   const std::string kBaseDir = canon.parent_path().string();
   std::size_t lib = 0;
@@ -530,8 +531,9 @@ bool LibraryMap::LoadDescriptionsInOrder(
            kBefore(cu.libraries[lib]->range.start, inc->loc)) {
       AddDeclaration(*cu.libraries[lib++], kBaseDir);
     }
-    if (inc->file_path.empty() ||
-        !LoadMapFileImpl(ResolveIncludePath(inc->file_path, canon), stack,
+    // An include with no path is a parse error, which ended the load
+    // before this.
+    if (!LoadMapFileImpl(ResolveIncludePath(inc->file_path, canon), stack,
                          errors)) {
       ok = false;
     }

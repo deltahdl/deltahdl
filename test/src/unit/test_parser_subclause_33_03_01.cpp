@@ -199,6 +199,20 @@ TEST(LibraryMapPathMatches, AbsoluteSpecMatchesAbsolutePath) {
   EXPECT_FALSE(LibraryMap::PathMatches("/x/y.v", "/proj", "/x/z.v"));
 }
 
+// A specification whose first segment is already a wildcard names no
+// directory before it to resolve, and still matches every file it covers.
+TEST(LibraryMapPathMatches, SpecWildcardedFromTheRootMatches) {
+  EXPECT_TRUE(LibraryMap::PathMatches("/*.v", "/proj", "/a.v"));
+  EXPECT_FALSE(LibraryMap::PathMatches("/*.v", "/proj", "/a.sv"));
+}
+
+// With no directory to resolve it against, a relative specification stays
+// relative and matches a path written relative to the same place.
+TEST(LibraryMapPathMatches, RelativeSpecWithNoBaseMatchesARelativePath) {
+  EXPECT_TRUE(LibraryMap::PathMatches("rtl/*.v", "", "rtl/a.v"));
+  EXPECT_FALSE(LibraryMap::PathMatches("rtl/*.v", "", "gates/a.v"));
+}
+
 // §33.3.1: the library mapping information is read from a predefined map file
 // prior to parsing source files. Exercise the file-reading path itself rather
 // than constructing entries directly, so the mapping that drives source-to-
