@@ -292,7 +292,7 @@ class Parser {
   void CheckSolveBeforeConstraint(ClassMember* member);
   void ParseSolveBeforeList(std::vector<ConstraintSolveBeforeEntry>& out);
   void CheckDistSet();
-
+  std::pair<uint8_t, uint8_t> ParseGateStrength(GateKind kind, SourceLoc loc);
   bool IsAtGateKeyword();
   void ParseGateInst(std::vector<ModuleItem*>& items);
   void ParseInlineGateTerminals(GateKind kind, SourceLoc loc,

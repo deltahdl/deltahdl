@@ -1,5 +1,6 @@
 #include <cstddef>
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -498,36 +499,44 @@ static void ValidateGateDelay(GateKind gate_kind, SourceLoc loc, Expr* delay,
                Subclause("28.3.3"));
 }
 
+// §28.3.2: the drive strength written after a gate keyword's `(`, which holds
+// a strength keyword: one keyword, or a pair of a keyword of each side in
+// either order, checked against what the gate type admits. Answers the
+// strength0 and strength1 codes, 0 for a side not written.
+std::pair<uint8_t, uint8_t> Parser::ParseGateStrength(GateKind kind,
+                                                      SourceLoc loc) {
+  uint8_t str0 = 0;
+  uint8_t str1 = 0;
+  bool paired = false;
+  if (IsStrength0Token(CurrentToken().kind)) {
+    str0 = ParseStrength0();
+    paired = Match(TokenKind::kComma);
+    if (paired) str1 = ParseStrength1();
+  } else {
+    str1 = ParseStrength1();
+    paired = Match(TokenKind::kComma);
+    if (paired) str0 = ParseStrength0();
+  }
+  Expect(TokenKind::kRParen, Subclause("28.3.2"));
+  ValidateGateStrength(kind, loc, str0, str1, diag_);
+  if (paired) ValidatePullStrengthPair(kind, loc, str0, str1, diag_);
+  return {str0, str1};
+}
+
 void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
   auto loc = CurrentLoc();
   auto gate_kind = TokenToGateKind(CurrentToken().kind);
   Consume();
 
-  uint8_t str0 = 0;
-  uint8_t str1 = 0;
-  bool has_strength = false;
+  std::pair<uint8_t, uint8_t> strength{0, 0};
   if (Check(TokenKind::kLParen)) {
     Consume();
     auto tk = CurrentToken().kind;
-    has_strength = IsStrength0Token(tk) || IsStrength1Token(tk);
-    if (!has_strength) {
+    if (!IsStrength0Token(tk) && !IsStrength1Token(tk)) {
       ParseInlineGateTerminals(gate_kind, loc, items);
       return;
     }
-
-    bool paired = false;
-    if (IsStrength0Token(tk)) {
-      str0 = ParseStrength0();
-      paired = Match(TokenKind::kComma);
-      if (paired) str1 = ParseStrength1();
-    } else {
-      str1 = ParseStrength1();
-      paired = Match(TokenKind::kComma);
-      if (paired) str0 = ParseStrength0();
-    }
-    Expect(TokenKind::kRParen, Subclause("28.3.2"));
-    ValidateGateStrength(gate_kind, loc, str0, str1, diag_);
-    if (paired) ValidatePullStrengthPair(gate_kind, loc, str0, str1, diag_);
+    strength = ParseGateStrength(gate_kind, loc);
   }
 
   Expr* delay = nullptr;
@@ -540,8 +549,8 @@ void Parser::ParseGateInst(std::vector<ModuleItem*>& items) {
   std::vector<std::string_view> array_names;
   auto parse_instance = [&]() -> ModuleItem* {
     auto* mi = ParseOneGateInstance(gate_kind, loc);
-    mi->drive_strength0 = str0;
-    mi->drive_strength1 = str1;
+    mi->drive_strength0 = strength.first;
+    mi->drive_strength1 = strength.second;
     mi->gate_delay = delay;
     mi->gate_delay_fall = delay_fall;
     mi->gate_delay_decay = delay_decay;
