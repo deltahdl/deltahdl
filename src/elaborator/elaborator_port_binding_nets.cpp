@@ -10,6 +10,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_bind_scope.h"
 #include "elaborator/elaborator_gen_block_interfaces.h"
@@ -391,14 +392,18 @@ void Elaborator::BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
   // a generate block declares, or one a module instance declares, is
   // rewritten to that instance's stored name before the checks below look the
   // instance up by it.
-  ResolveGenBlockInterfaceActuals(inst, interface_inst_types_,
-                                  BuildParamScope(parent_mod), arena_, diag_,
-                                  item->loc);
   const std::function<const ModuleDecl*(std::string_view)> kFindModule =
       [&](std::string_view name) { return FindModuleInScope(name); };
-  ResolveInstancePathActuals(
-      inst, {module_decl_path_.back(), kFindModule, interface_inst_types_,
-             arena_, diag_, item->loc});
+  const ScopeMap kParams = BuildParamScope(parent_mod);
+  const InterfaceActualScope kActualScope{module_decl_path_.back(),
+                                          kFindModule,
+                                          interface_inst_types_,
+                                          kParams,
+                                          arena_,
+                                          diag_,
+                                          item->loc};
+  ResolveGenBlockInterfaceActuals(inst, kActualScope);
+  ResolveInstancePathActuals(inst, kActualScope);
   // §23.3.3 shared port-binding context for the post-bind connectivity checks.
   const PortBindCtx kPortCtx{
       diag_,      item,       parent_mod,          nettype_net_names_,

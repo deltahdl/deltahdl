@@ -4,6 +4,7 @@
 
 #include "elaborator/elaborator_gen_block_interfaces.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <functional>
@@ -14,7 +15,6 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
-#include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/rtlir.h"
@@ -206,12 +206,12 @@ Expr* ResolvedPath(Expr* conn, const GenBlockPrefixes& prefixes,
 // resolves through the block, which the clause forbids, so it is rewritten to
 // nothing and `through_block` is set instead.
 Expr* ResolvedActual(Expr* conn, const GenBlockPrefixes& prefixes,
-                     InterfaceInstTypes& table, const ScopeMap& scope,
-                     Arena& arena, bool& through_block) {
+                     const InterfaceActualScope& scope, bool& through_block) {
   if (conn->kind == ExprKind::kIdentifier) {
-    std::string_view key = FindBlockInterface(conn->text, prefixes, table);
+    std::string_view key =
+        FindBlockInterface(conn->text, prefixes, scope.table);
     if (key.empty() || key == conn->text) return nullptr;
-    return MakeInstanceIdent(key, conn, arena);
+    return MakeInstanceIdent(key, conn, scope.arena);
   }
   if (conn->kind != ExprKind::kMemberAccess || conn->is_scope_resolution ||
       conn->lhs == nullptr || conn->rhs == nullptr ||
@@ -220,15 +220,17 @@ Expr* ResolvedActual(Expr* conn, const GenBlockPrefixes& prefixes,
   }
   // `i.mp`, a modport of an interface instance (§25.5).
   if (conn->lhs->kind == ExprKind::kIdentifier) {
-    std::string_view key = FindBlockInterface(conn->lhs->text, prefixes, table);
+    std::string_view key =
+        FindBlockInterface(conn->lhs->text, prefixes, scope.table);
     if (key == conn->lhs->text) return nullptr;
     if (!key.empty()) {
-      auto* copy = arena.Create<Expr>(*conn);
-      copy->lhs = MakeInstanceIdent(key, conn->lhs, arena);
+      auto* copy = scope.arena.Create<Expr>(*conn);
+      copy->lhs = MakeInstanceIdent(key, conn->lhs, scope.arena);
       return copy;
     }
   }
-  through_block = ResolvedPath(conn, prefixes, table, scope, arena) != nullptr;
+  through_block = ResolvedPath(conn, prefixes, scope.table, scope.params,
+                               scope.arena) != nullptr;
   return nullptr;
 }
 
@@ -255,9 +257,7 @@ void RegisterGenerateBlockInterfaces(
 }
 
 void ResolveGenBlockInterfaceActuals(RtlirModuleInst& inst,
-                                     InterfaceInstTypes& table,
-                                     const ScopeMap& scope, Arena& arena,
-                                     DiagEngine& diag, SourceLoc loc) {
+                                     const InterfaceActualScope& scope) {
   // Every binding is asked rather than only those of a port marked an
   // interface port: an actual is rewritten only where it names an entry of
   // `table`, which holds interface instances alone, and the mark is not set on
@@ -266,16 +266,16 @@ void ResolveGenBlockInterfaceActuals(RtlirModuleInst& inst,
     if (binding.connection == nullptr) continue;
     bool through_block = false;
     if (Expr* actual =
-            ResolvedActual(binding.connection, inst.gen_block_prefixes, table,
-                           scope, arena, through_block)) {
+            ResolvedActual(binding.connection, inst.gen_block_prefixes, scope,
+                           through_block)) {
       binding.connection = actual;
     }
     if (!through_block) continue;
-    diag.Error(loc,
-               std::format("the actual of interface port '{}' resolves "
-                           "through a generate block",
-                           binding.port_name),
-               Subclause("25.3"));
+    scope.diag.Error(scope.loc,
+                     std::format("the actual of interface port '{}' resolves "
+                                 "through a generate block",
+                                 binding.port_name),
+                     Subclause("25.3"));
     binding.refused_actual = true;
   }
 }
@@ -323,7 +323,7 @@ bool BindsInterfacePort(const RtlirModuleInst& inst, std::string_view name) {
 // path as one name, entered into `scope.table`.
 void RewriteInstancePath(RtlirPortBinding& binding, const std::string& path,
                          std::string_view type, size_t rest,
-                         const InstancePathScope& scope) {
+                         const InterfaceActualScope& scope) {
   std::string_view key(scope.arena.AllocString(path.c_str(), path.size()),
                        path.size());
   scope.table.emplace(key, type);
@@ -342,7 +342,7 @@ void RewriteInstancePath(RtlirPortBinding& binding, const std::string& path,
 // interface instance.
 void ResolveInstancePath(RtlirPortBinding& binding,
                          const std::vector<ActualPathStep>& steps,
-                         const InstancePathScope& scope) {
+                         const InterfaceActualScope& scope) {
   const ModuleDecl* decl = scope.parent;
   std::string path;
   for (size_t k = 0; k < steps.size(); ++k) {
@@ -376,7 +376,7 @@ void ResolveInstancePath(RtlirPortBinding& binding,
 }  // namespace
 
 void ResolveInstancePathActuals(RtlirModuleInst& inst,
-                                const InstancePathScope& scope) {
+                                const InterfaceActualScope& scope) {
   for (RtlirPortBinding& binding : inst.port_bindings) {
     if (binding.connection == nullptr ||
         !BindsInterfacePort(inst, binding.port_name)) {

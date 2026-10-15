@@ -575,6 +575,10 @@ class ElaboratorData {
     // interface port connection written in the selected body may name;
     // interface_inst_types_ is per-module state as func_decls_ is.
     std::unordered_map<std::string_view, std::string_view> interface_inst_types;
+    // §25.3: the declarations of the module and of those enclosing it, through
+    // whose instances an interface port connection written in the body may
+    // reach an interface instance; module_decl_path_ is per-module state too.
+    std::vector<const ModuleDecl*> module_decl_path;
   };
   std::vector<PendingGenerate> pending_generates_;
 

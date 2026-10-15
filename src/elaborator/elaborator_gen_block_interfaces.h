@@ -60,32 +60,30 @@ void RegisterGenerateBlockInterfaces(
     const std::function<const ModuleDecl*(std::string_view)>& find_module,
     InterfaceInstTypes& table, Arena& arena);
 
+// What resolving an interface port's actual needs: the declaration of the
+// module the actual is written in, a lookup of an instance's module or
+// interface by its name, the module's interface instance table, its
+// parameters, which fold the index of a loop block's path, and where to report.
+struct InterfaceActualScope {
+  const ModuleDecl* parent;
+  const std::function<const ModuleDecl*(std::string_view)>& find_module;
+  InterfaceInstTypes& table;
+  const ScopeMap& params;
+  Arena& arena;
+  DiagEngine& diag;
+  SourceLoc loc;
+};
+
 // §23.9 with §27.4: rewrites each actual of `inst` that names an interface
 // instance a generate block declares by its name written in the block, `i` or
 // `i.mp`, to that instance's stored name, which the elaborator's interface
 // checks and the simulator's connection both look an instance up by. §25.3:
 // an actual reaching such an instance through the block, `g.i` or `g[k].i`,
-// is reported at `loc` and its binding marked refused. `scope` folds the index
-// of a loop block's path, and the stored name such a path resolves to is
-// entered into `table`, the loop not yet having been elaborated where the path
-// is written outside it.
+// is reported and its binding marked refused. The stored name a loop block's
+// path resolves to is entered into the table, the loop not yet having been
+// elaborated where the path is written outside it.
 void ResolveGenBlockInterfaceActuals(RtlirModuleInst& inst,
-                                     InterfaceInstTypes& table,
-                                     const ScopeMap& scope, Arena& arena,
-                                     DiagEngine& diag, SourceLoc loc);
-
-// What resolving an interface port's actual through module instances needs:
-// the declaration of the module the actual is written in, a lookup of an
-// instance's module or interface by its name, the module's interface instance
-// table, and where to report.
-struct InstancePathScope {
-  const ModuleDecl* parent;
-  const std::function<const ModuleDecl*(std::string_view)>& find_module;
-  InterfaceInstTypes& table;
-  Arena& arena;
-  DiagEngine& diag;
-  SourceLoc loc;
-};
+                                     const InterfaceActualScope& scope);
 
 // §25.3 with §23.6: rewrites each interface port actual of `inst` that names,
 // through module instances, an interface instance one of them declares, `h.i`
@@ -94,6 +92,6 @@ struct InstancePathScope {
 // An actual whose path resolves through an arrayed instance, `h[0].i`, is
 // reported and its binding marked refused.
 void ResolveInstancePathActuals(RtlirModuleInst& inst,
-                                const InstancePathScope& scope);
+                                const InterfaceActualScope& scope);
 
 }  // namespace delta

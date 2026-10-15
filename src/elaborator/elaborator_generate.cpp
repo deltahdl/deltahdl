@@ -124,9 +124,11 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   property_registry_ = pg.property_registry;
   // §25.3 with §23.9: an interface port connection in the body may name the
   // module's interface instances, and those the body itself declares are
-  // added as it is elaborated.
+  // added as it is elaborated, or reach one through the module's instances,
+  // which the module's declaration names.
   auto saved_interface_inst_types =
       std::exchange(interface_inst_types_, pg.interface_inst_types);
+  auto saved_decl_path = std::exchange(module_decl_path_, pg.module_decl_path);
   auto scope = BuildParamScope(pg.mod);
   switch (pg.item->kind) {
     case ModuleItemKind::kGenerateIf:
@@ -156,6 +158,7 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   cu_param_scope_ = std::move(saved_cu_param_scope);
   property_registry_ = std::move(saved_property_registry);
   interface_inst_types_ = std::move(saved_interface_inst_types);
+  module_decl_path_ = std::move(saved_decl_path);
   config_inst_path_ = std::move(saved_config_path);
   current_library_ = std::move(saved_library);
   // Write what this generate declared back into the module's entry rather than

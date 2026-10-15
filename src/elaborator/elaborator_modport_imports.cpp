@@ -6,7 +6,6 @@
 #include <cstddef>
 #include <format>
 #include <string_view>
-#include <unordered_map>
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator_validate_internal.h"
