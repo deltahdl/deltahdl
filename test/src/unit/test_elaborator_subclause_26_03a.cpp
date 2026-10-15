@@ -85,6 +85,34 @@ TEST(PackageImport, ImportedIdentifierNotVisibleViaHierarchicalRef) {
                             10, "26.3"));
 }
 
+// §26.3: the child's reference to x imports it through the wildcard import,
+// and an imported name is as far out of reach of a hierarchical reference as
+// an explicitly imported one. The package's other items, a variable and a
+// class, supply no x.
+TEST(PackageImport, WildcardImportedIdentifierNotVisibleViaHierarchicalRef) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package pkg;\n"
+             "  int w;\n"
+             "  class K; endclass\n"
+             "  int x;\n"
+             "endpackage\n"
+             "module child;\n"
+             "  import pkg::*;\n"
+             "  int seen = x;\n"
+             "endmodule\n"
+             "module top;\n"
+             "  child c();\n"
+             "  int y;\n"
+             "  initial y = c.x;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference 'c.x' targets a name "
+                            "imported into 'child' from a package",
+                            13, "26.3"));
+}
+
 // §26.3 (printed pages 810, 812): a name the child declares is its own, and
 // a wildcard import of a package declaring the same name supplies nothing for
 // it, so `u.x` reaches the child's x and is accepted. It was reported as a

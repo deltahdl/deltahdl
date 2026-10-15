@@ -216,6 +216,27 @@ TEST(PackageExport, ExportOfWildcardImportedNameBlocksLaterEnumLiteral) {
                             5, "26.6"));
 }
 
+// The same for a variable whose own enumeration type writes the literal x
+// (§6.19), the export's claim passing over an unrelated declaration before it.
+TEST(PackageExport, ExportOfWildcardImportedNameBlocksLaterEnumVariable) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p1; int x = 3; endpackage\n"
+             "package p6;\n"
+             "  import p1::*;\n"
+             "  export p1::x;\n"
+             "  int other;\n"
+             "  enum {w, x} v;\n"
+             "endpackage\n"
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "declaration of 'x' in package 'p6' follows an "
+                            "export that referenced it through a wildcard "
+                            "package import",
+                            6, "26.6"));
+}
+
 TEST(PackageExport, ExportOfExplicitlyImportedNameAllowsUnrelatedLocalDecl) {
   // Positive control: the conflict is specific to a name pulled in *only*
   // through a wildcard import. An explicit import of one name leaves an
@@ -861,6 +882,8 @@ TEST(PackageExport, PackageReferencedNamesReadEveryDeclaration) {
       "    typedef int ctd_t;\n"
       "    function void meth(); m = meth_ref; endfunction\n"
       "  endclass\n"
+      "  typedef int pt_t;\n"
+      "  C #(pt_t) cv;\n"
       "endpackage\n");
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->packages.size(), 1u);
@@ -871,7 +894,7 @@ TEST(PackageExport, PackageReferencedNamesReadEveryDeclaration) {
         "KL",       "KX",         "KU",       "defv",      "body_ref",
         "call_ref", "clk_ref",    "tree_ref", "clk2",      "dis_ref",
         "bool_ref", "cparam_ref", "base_ref", "minit_ref", "mdim_ref",
-        "meth_ref"}) {
+        "meth_ref", "pt_t"}) {
     EXPECT_TRUE(kNames.contains(name)) << name;
   }
 }
