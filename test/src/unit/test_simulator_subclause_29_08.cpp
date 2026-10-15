@@ -449,4 +449,71 @@ TEST(UdpInstanceRun, UnnamedSequentialUdpInsideAChildModuleCaptures) {
             "x 1\nx 0\n");
 }
 
+// A UDP instance's delays are a gate's, so a change computed later supersedes
+// one still pending: the rise computed at 10 is pending for 15 when the fall
+// computed at 12 takes the output back to the 0 it holds, and nothing lands.
+// Scheduled and never descheduled, the rise landed at 15 after the fall and q
+// read 1.
+TEST(UdpInstanceDelayRun, ALaterChangeSupersedesAPendingOne) {
+  EXPECT_EQ(RunCapture("primitive ubuf (o, a);\n"
+                       "  output o; input a;\n"
+                       "  table 0 : 0 ; 1 : 1 ; endtable\n"
+                       "endprimitive\n"
+                       "module top;\n"
+                       "  reg a = 0;\n"
+                       "  wire q;\n"
+                       "  ubuf #(5, 1) u (q, a);\n"
+                       "  initial begin\n"
+                       "    #10 a = 1;\n"
+                       "    #2 a = 0;\n"
+                       "    #10 $display(\"%b\", q);\n"
+                       "  end\n"
+                       "endmodule\n"),
+            "0\n");
+}
+
+// An evaluation giving the value already on its way leaves that change where
+// it is: c moving at 12 leaves the output at 1, and the 1 pending since 10
+// lands at 15 rather than 17.
+TEST(UdpInstanceDelayRun, AnEvaluationGivingThePendingValueLeavesItPending) {
+  EXPECT_EQ(RunCapture("primitive ugate (o, a, c);\n"
+                       "  output o; input a, c;\n"
+                       "  table 0 ? : 0 ; 1 ? : 1 ; endtable\n"
+                       "endprimitive\n"
+                       "module top;\n"
+                       "  reg a = 0, c = 0;\n"
+                       "  wire q;\n"
+                       "  ugate #5 u (q, a, c);\n"
+                       "  initial begin\n"
+                       "    #10 a = 1;\n"
+                       "    #2 c = 1;\n"
+                       "    #4 $display(\"%b\", q);\n"
+                       "  end\n"
+                       "endmodule\n"),
+            "1\n");
+}
+
+// A UDP output that is a bit-select drives that bit of its net as a gate does,
+// at its drive strength and resolved with the net's other drivers (§28.12): a
+// strong 1 from the instance and a strong 0 from the assignment make bit 1 of
+// y2 x, and the pull 0 of each element of the array gives way to the strong
+// 1 on y. Written as a procedural assignment, each bit read whichever write
+// came last.
+TEST(UdpInstanceSim, ASelectOutputIsADriverOfItsNet) {
+  EXPECT_EQ(RunCapture("primitive ubuf (o, a);\n"
+                       "  output o; input a;\n"
+                       "  table 0 : 0 ; 1 : 1 ; endtable\n"
+                       "endprimitive\n"
+                       "module top;\n"
+                       "  reg a = 0, b = 1;\n"
+                       "  wire [1:0] y, y2;\n"
+                       "  ubuf (pull0, pull1) g[1:0] (y, {a, a});\n"
+                       "  assign y = 2'b11;\n"
+                       "  ubuf u (y2[1], b);\n"
+                       "  assign y2 = 2'b00;\n"
+                       "  initial #1 $display(\"%b %b\", y, y2);\n"
+                       "endmodule\n"),
+            "11 x0\n");
+}
+
 }  // namespace

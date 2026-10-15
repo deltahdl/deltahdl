@@ -136,11 +136,22 @@ static std::vector<char> ReadUdpInputs(const RtlirUdpInst& inst,
 // at. The slot is appended by the first commit and overwritten by every later
 // one, which is what `first` distinguishes; `strength` is the instance's
 // drive_strength, which is fixed for the run.
+//
+// §28.3.6 lets a terminal be a bit-select, so a select of a net is a driver of
+// that net at the one bit `bit` counts from its least significant end, and
+// `partial` says so. §29.8 gives the instance a gate's delays, so the driver
+// also holds the value last committed, the change still pending, and a count
+// that tells a pending change from one a later evaluation superseded.
 struct UdpOutputDriver {
   Net* net = nullptr;
   DriverStrength strength;
   std::size_t idx = 0;
   bool first = true;
+  bool partial = false;
+  uint32_t bit = 0;
+  char committed = 0;
+  char pending = 0;
+  uint64_t generation = 0;
 };
 
 static UdpOutputDriver MakeUdpOutputDriver(const RtlirUdpInst& inst,
@@ -151,12 +162,32 @@ static UdpOutputDriver MakeUdpOutputDriver(const RtlirUdpInst& inst,
   if (inst.output->kind == ExprKind::kIdentifier) {
     drv.net = ctx.FindNet(inst.output->text);
   }
+  // A bit-select of a net, which every element of an instance array drives
+  // (§28.3.6), is a driver of that net at the selected bit.
+  const Expr* sel = inst.output;
+  if (sel->kind == ExprKind::kSelect) {
+    drv.net = ctx.FindNet(sel->base->text);
+    drv.partial = drv.net != nullptr;
+  }
+  if (drv.partial) {
+    int64_t index = SelectBoundValue(EvalExpr(sel->index, ctx, ctx.GetArena()));
+    drv.bit = static_cast<uint32_t>(
+        drv.net->resolved->DeclaredRange().OffsetOf(index));
+  }
   return drv;
 }
 
 static void CommitUdpOutput(const Expr* terminal, UdpOutputDriver* drv,
                             char out, SimContext& ctx, Arena& arena) {
+  drv->committed = out;
   Logic4Vec val = UdpDrivenBit(out, drv->strength, arena);
+  if (drv->partial) {
+    // The selected bit, and high impedance on every other bit of the net,
+    // which drives nothing there.
+    Logic4Vec whole = MakeAllHighZ(arena, drv->net->resolved->value.width);
+    DepositBitField(whole, drv->bit, val, 1);
+    val = whole;
+  }
   if (drv->net == nullptr) {
     // A terminal that is not a whole net -- a select, which §29.8 admits by
     // connecting UDP terminals under the gate rules of §28.3.6 -- has no driver
@@ -208,18 +239,33 @@ static uint64_t SelectUdpDelay(const RtlirUdpInst& inst, char out,
 // two such transitions has to see both; a process parked on the delay would see
 // only the first, because the watch is re-armed after the delay elapses and a
 // transition in between reaches nothing.
+//
+// §29.8 gives the instance a gate's delays, so a change computed later
+// supersedes one still pending, as §10.3.3 has a delayed assignment's do: an
+// evaluation giving the value already on its way leaves it there, one giving
+// another replaces it, and one giving back the value standing leaves none.
+// Scheduled and never withdrawn, an earlier change could land after a later
+// one when the two waited different delays.
 static void DriveUdpOutput(const RtlirUdpInst& inst, UdpOutputDriver* drv,
                            char out, SimContext& ctx, Arena& arena) {
+  if (drv->pending == out) return;
+  ++drv->generation;
+  drv->pending = 0;
+  if (out == drv->committed) return;
   uint64_t ticks = SelectUdpDelay(inst, out, ctx, arena);
   if (ticks == 0) {
     CommitUdpOutput(inst.output, drv, out, ctx, arena);
     return;
   }
+  drv->pending = out;
+  uint64_t gen = drv->generation;
   const Expr* terminal = inst.output;
   auto* event = ctx.GetScheduler().GetEventPool().Acquire();
   // §4.4: putting a new value on a net is an update event.
   event->kind = EventKind::kUpdate;
-  event->callback = [terminal, drv, out, &ctx, &arena]() {
+  event->callback = [terminal, drv, out, gen, &ctx, &arena]() {
+    if (drv->generation != gen) return;
+    drv->pending = 0;
     CommitUdpOutput(terminal, drv, out, ctx, arena);
   };
   // §24.3.1: an instance written in a program drives in the Reactive region,

@@ -13,9 +13,11 @@
 // canonical file for this subclause.
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
 #include "fixture_parser.h"
+#include "fixture_simulator.h"
 #include "simulator/udp_eval.h"
 
 using namespace delta;
@@ -294,6 +296,39 @@ TEST(UdpSymbolSemantics, ParenEdgeBEndpointMatchesBitValuesNotX) {
   EXPECT_EQ(EvaluateEdgeOnFirstInput(decl, '0', '1'), '0');  // 0->1, b admits 0
   EXPECT_EQ(EvaluateEdgeOnFirstInput(decl, 'x', '1'),
             'x');  // x->1, b excludes x
+}
+
+// Syntax 29-1 gives every table symbol in both cases and Table 29-1 gives the
+// upper-case forms the meanings of the lower-case ones: the X row matches the
+// x on b, the R row captures d on the rising clock, and the F row, its current
+// state B matching the 1 captured, holds it on the falling clock. Compared
+// only in their lower-case forms, those rows were passed over and both outputs
+// read x.
+TEST(UdpSymbolSemantics, UpperCaseSymbolsMatchAsTheLowerCaseOnesDo) {
+  SimFixture f;
+  auto out = RunCapture(
+      "primitive pass1 (o, a, b);\n"
+      "  output o; input a, b;\n"
+      "  table 1 X : 1 ; 0 ? : 0 ; endtable\n"
+      "endprimitive\n"
+      "primitive dff (q, clk, d);\n"
+      "  output q; reg q; input clk, d;\n"
+      "  table R 1 : ? : 1 ; R 0 : ? : 0 ; F ? : B : - ; ? * : ? : - ;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module top;\n"
+      "  reg a = 1, b = 1'bx, clk = 0, d = 1;\n"
+      "  wire o, q;\n"
+      "  pass1 u1 (o, a, b);\n"
+      "  dff u2 (q, clk, d);\n"
+      "  initial begin\n"
+      "    #1 clk = 1;\n"
+      "    #1 clk = 0;\n"
+      "    #1 $display(\"%b %b\", o, q);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1\n");
 }
 
 }  // namespace

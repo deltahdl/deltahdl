@@ -1,5 +1,6 @@
 #include "simulator/udp_eval.h"
 
+#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -16,7 +17,15 @@ UdpEvalState::UdpEvalState(const UdpDecl& decl, char initial_output)
   output_ = (decl_.is_sequential && decl_.has_initial) ? initial_output : 'x';
 }
 
+// §29.3 Syntax 29-1 writes every table symbol in both cases, and Table 29-1
+// gives the upper-case forms the meanings of the lower-case ones, so a symbol
+// is read in its lower-case form wherever it is matched.
+static char Lowered(char symbol) {
+  return static_cast<char>(std::tolower(static_cast<unsigned char>(symbol)));
+}
+
 static bool IsEdgeSymbol(char symbol) {
+  symbol = Lowered(symbol);
   return symbol == 'r' || symbol == 'f' || symbol == 'p' || symbol == 'n' ||
          symbol == '*' || symbol == '\x01';
 }
@@ -31,6 +40,7 @@ static std::vector<char> CoerceUdpInputs(const std::vector<char>& inputs) {
 }
 
 static bool MatchLevel(char symbol, char value) {
+  symbol = Lowered(symbol);
   if (symbol == value) return true;
   if (symbol == '?') return value == '0' || value == '1' || value == 'x';
   if (symbol == 'b') return value == '0' || value == '1';
@@ -38,6 +48,7 @@ static bool MatchLevel(char symbol, char value) {
 }
 
 static bool MatchEdge(char symbol, char prev, char curr) {
+  symbol = Lowered(symbol);
   if (symbol == 'r') return prev == '0' && curr == '1';
   if (symbol == 'f') return prev == '1' && curr == '0';
   if (symbol == '*') return prev != curr;
@@ -73,7 +84,7 @@ static bool MatchState(const UdpDecl& decl, const UdpTableRow& row,
 }
 
 static char ResolveOutput(char row_output, char current_output) {
-  return (row_output == '-') ? current_output : row_output;
+  return (row_output == '-') ? current_output : Lowered(row_output);
 }
 
 char UdpEvalState::Evaluate(const std::vector<char>& inputs) {
