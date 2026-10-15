@@ -5,6 +5,7 @@
 #include "driver/cli_options.h"
 #include "fixture_simulator.h"
 #include "helpers_command_line.h"
+#include "helpers_preprocess_and_get.h"
 #include "helpers_reported_error.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
@@ -31,12 +32,13 @@ TEST(NegativeTimingCheckSwitches, BothSwitchesAreRecognized) {
   EXPECT_FALSE(none.no_timing_checks);
 }
 
-// Runs `src` with the two §31.9.4 options set as a run the switches selected
-// is, before the design's checks are registered.
+// Runs `src`, preprocessed so that its `timescale sets the precision the
+// delayed signals' delays are counted in, with the two §31.9.4 options set as a
+// run the switches selected is, before the design's checks are registered.
 std::string RunUnder(const std::string& src, TimingCheckInvocationOptions o,
                      SimFixture& f) {
   f.ctx.AcquireSpecifyManager().SetTimingCheckInvocationOptions(o);
-  return RunCapture(src, f);
+  return PreprocessAndCapture(src, f);
 }
 
 // With the option, `$setuphold(posedge clk, d, -10, 20, n)` has its window
