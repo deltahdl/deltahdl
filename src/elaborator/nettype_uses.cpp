@@ -179,6 +179,25 @@ static void CheckScopeItems(const std::vector<ModuleItem*>& items,
   }
 }
 
+// §26.2 (printed page 807): a package holds no process, so a net it declares
+// carries no implicit continuous assignment, a net of a user-defined nettype
+// (§6.6.7) as much as one of a built-in net type. The parser makes the first a
+// variable declaration, which ValidatePackageItems does not ask of a net's
+// initializer, so it is asked here, where the package's nettypes are known.
+static void ReportPackageNettypeNetInits(const std::vector<ModuleItem*>& items,
+                                         const NettypeScan& scan) {
+  for (const ModuleItem* item : items) {
+    if (item->kind == ModuleItemKind::kVarDecl &&
+        !WrittenAsDataDeclaration(item) && item->init_expr != nullptr &&
+        IsNettype(item->data_type, scan)) {
+      scan.diag.Error(item->loc,
+                      "net declaration with implicit continuous assignment is "
+                      "not allowed in a package",
+                      Subclause("26.2"));
+    }
+  }
+}
+
 void CheckUnitNettypeUses(const CompilationUnit* unit, DiagEngine& diag) {
   const std::unordered_set<std::string_view> kUnitNettypes =
       DeclaredNettypes(unit->cu_items);
@@ -188,7 +207,9 @@ void CheckUnitNettypeUses(const CompilationUnit* unit, DiagEngine& diag) {
   for (const PackageDecl* pkg : unit->packages) {
     const std::unordered_set<std::string_view> kPackageNettypes =
         DeclaredNettypes(pkg->items);
-    CheckScopeItems(pkg->items, {kPackageNettypes, diag});
+    const NettypeScan kPackageScan{kPackageNettypes, diag};
+    CheckScopeItems(pkg->items, kPackageScan);
+    ReportPackageNettypeNetInits(pkg->items, kPackageScan);
   }
 }
 

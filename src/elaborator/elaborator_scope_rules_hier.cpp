@@ -146,6 +146,8 @@ bool ImportedIntoModule(const CompilationUnit* unit, const RtlirModule* m,
   return false;
 }
 
+bool ModuleDeclaresMember(const RtlirModule* m, std::string_view name);
+
 void CheckHierRefImportedMemberAccess(
     DiagEngine& diag, const CompilationUnit* unit,
     const std::unordered_map<std::string_view, const RtlirModule*>& inst_type,
@@ -155,6 +157,10 @@ void CheckHierRefImportedMemberAccess(
   if (!ma->rhs || ma->rhs->kind != ExprKind::kIdentifier) return;
   auto it = inst_type.find(ma->lhs->text);
   if (it == inst_type.end()) return;
+  // §26.3 (printed pages 810, 812): a name the child declares is its own, a
+  // wildcard import supplying nothing for it, so the reference reaches that
+  // declaration and no imported one.
+  if (ModuleDeclaresMember(it->second, ma->rhs->text)) return;
   if (ImportedIntoModule(unit, it->second, ma->rhs->text)) {
     diag.Error(
         ma->range.start,

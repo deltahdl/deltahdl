@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <format>
+#include <functional>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -12,6 +13,8 @@
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/std_package.h"
+#include "elaborator/unit_scope_order.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -92,6 +95,18 @@ using OuterBoundRefs =
     std::unordered_map<std::string_view,
                        std::vector<std::pair<Expr*, std::string_view>>>;
 
+// §26.3 (printed page 810): what settling a module-level reference that no
+// import written before it resolved takes: the packages the module's body
+// imports by wildcard anywhere, and whether the module declares the name,
+// whether the compilation unit declares it as data before the module, and
+// whether anything else the module reaches declares it.
+struct LateImportCheck {
+  const std::vector<std::string_view>& wildcards;
+  std::function<bool(std::string_view)> module_declares;
+  std::function<bool(std::string_view)> unit_data;
+  std::function<bool(std::string_view)> declared;
+};
+
 // Mutable state shared across the import-rule checking helpers below: one
 // scope's locally visible identifiers, its explicit imports and the packages
 // its wildcard imports name, with the names those have been made to supply.
@@ -115,6 +130,8 @@ struct ImportRuleCtx {
   // resolve is searched in, or null for the module's own scope, where the
   // search ends.
   ImportRuleCtx* outer;
+  // The module's own scope's LateImportCheck; null for a generate block's.
+  const LateImportCheck* late = nullptr;
 };
 
 void TrackImportRuleDecl(ImportRuleCtx& ctx, std::string_view name,
@@ -200,6 +217,19 @@ std::string_view WildcardClaimOrigin(ImportRuleCtx& ctx,
   return {};
 }
 
+// The first of the wildcard-imported packages `packages` that provides
+// `name`; empty where none does.
+std::string_view WildcardOriginAmong(
+    ImportRuleCtx& ctx, const std::vector<std::string_view>& packages,
+    std::string_view name) {
+  for (auto pkg : packages) {
+    if (PackageProvidesName(ctx.unit, ctx.pkg_provided_names, pkg, name)) {
+      return pkg;
+    }
+  }
+  return {};
+}
+
 // §23.7 (printed pages 757-758) with §26.3: a reference `binder`'s wildcard
 // import bound from the scope `from` inside it is noted on every scope from
 // `from` out to `binder`, any of which may declare the name after the
@@ -221,10 +251,36 @@ void NoteOuterBinding(ImportRuleCtx& from, ImportRuleCtx& binder, Expr* e) {
 // `initial x = 1;` in a generate block of a module importing p bind p::x
 // through the module's scope, the block's own `import p2::*` standing after
 // the reference.
+// §26.3 (printed page 810): a module-level reference no scope resolved, where
+// a wildcard import written after it in the module would supply the name. The
+// import does not reach back to it, so the search ends in the compilation
+// unit: the reference reads the unit's data of the name, recorded on it as
+// `$unit::` records it (§3.12.1), and with no declaration of the name to reach
+// it is reported. A name the module, or anything else it reaches, declares is
+// left to the checks of its own.
+void SettleReferenceBeforeImport(ImportRuleCtx& module, Expr* e) {
+  const LateImportCheck& late = *module.late;
+  std::string_view name = e->text;
+  std::string_view later = WildcardOriginAmong(module, late.wildcards, name);
+  if (later.empty() || late.module_declares(name)) return;
+  if (late.unit_data(name)) {
+    e->scope_prefix = "$unit";
+    return;
+  }
+  if (late.declared(name)) return;
+  module.diag.Error(e->range.start,
+                    std::format("reference to '{}' precedes the wildcard "
+                                "import of package '{}' that declares it",
+                                name, later),
+                    Subclause("26.3"));
+}
+
 void ProcessImportRuleRef(ImportRuleCtx& ctx, Expr* e) {
   auto name = e->text;
   if (name.empty()) return;
+  ImportRuleCtx* module = &ctx;
   for (ImportRuleCtx* scope = &ctx; scope != nullptr; scope = scope->outer) {
+    module = scope;
     if (scope->seen_decls.count(name)) {
       if (scope->wildcard_claimed.count(name)) NoteOuterBinding(ctx, *scope, e);
       return;
@@ -234,6 +290,7 @@ void ProcessImportRuleRef(ImportRuleCtx& ctx, Expr* e) {
       return;
     }
   }
+  SettleReferenceBeforeImport(*module, e);
 }
 
 // §26.3 makes an explicit import illegal where the identifier is explicitly
@@ -289,9 +346,31 @@ bool ReportExplicitImportAfterWildcardClaim(ImportRuleCtx& ctx,
   return true;
 }
 
+// §26.3 (printed page 809) with §26.6 (printed 815): an explicit import
+// imports the declaration the package makes visible under the name, its own
+// or one an export hands on, and std's are Annex G's (§26.7); a name the
+// package neither declares nor exports is no candidate for import, what it
+// imports without exporting included. Answers whether the import was reported.
+bool ReportImportOfNoCandidate(ImportRuleCtx& ctx, const ModuleItem* item,
+                               std::string_view pkg_name) {
+  auto name = item->import_item.item_name;
+  bool candidate = pkg_name == "std"
+                       ? StdPackageMemberNamed(name).has_value()
+                       : PackageProvidesName(ctx.unit, ctx.pkg_provided_names,
+                                             pkg_name, name);
+  if (candidate) return false;
+  ctx.diag.Error(item->loc,
+                 std::format("explicit import of '{}::{}', which package '{}' "
+                             "neither declares nor exports",
+                             pkg_name, name, pkg_name),
+                 Subclause("26.3"));
+  return true;
+}
+
 void HandleExplicitImport(ImportRuleCtx& ctx, const ModuleItem* item,
                           std::string_view pkg_name) {
   auto name = item->import_item.item_name;
+  if (ReportImportOfNoCandidate(ctx, item, pkg_name)) return;
   if (CheckAgainstEarlierExplicitImport(ctx, item, pkg_name)) return;
   if (ctx.seen_decls.count(name)) {
     if (ctx.wildcard_claimed.find(name) != ctx.wildcard_claimed.end()) {
@@ -309,6 +388,27 @@ void HandleExplicitImport(ImportRuleCtx& ctx, const ModuleItem* item,
   ctx.seen_decls.insert(name);
 }
 
+// §26.3 (printed page 808): the compilation of a package precedes that of the
+// scopes importing it, so an import written ahead of the package it names has
+// no package yet to import from. Answers whether the import was reported.
+bool ReportImportBeforePackage(ImportRuleCtx& ctx, const ModuleItem* item,
+                               std::string_view pkg_name) {
+  for (const auto* pkg : ctx.unit->packages) {
+    if (pkg->name != pkg_name || PrecedesInText(pkg->range.start, item->loc)) {
+      continue;
+    }
+    ctx.diag.Error(item->loc,
+                   std::format("import from package '{}', which is declared "
+                               "after the scope importing it; a package must "
+                               "be declared before any scope that imports "
+                               "from it",
+                               pkg_name),
+                   Subclause("26.3"));
+    return true;
+  }
+  return false;
+}
+
 void HandleImportDecl(ImportRuleCtx& ctx, const ModuleItem* item) {
   auto pkg_name = item->import_item.package_name;
   if (!PackageDeclared(ctx.unit, pkg_name)) {
@@ -320,6 +420,7 @@ void HandleImportDecl(ImportRuleCtx& ctx, const ModuleItem* item) {
                    Subclause("26.3"));
     return;
   }
+  if (ReportImportBeforePackage(ctx, item, pkg_name)) return;
   if (item->import_item.is_wildcard) {
     if (std::find(ctx.wildcard_packages.begin(), ctx.wildcard_packages.end(),
                   pkg_name) == ctx.wildcard_packages.end()) {
@@ -361,6 +462,40 @@ void HandleGenerateBlockImportRules(ImportRuleCtx& outer,
       explicit_imports, wildcard_packages, wildcard_claimed,
       seen_decls,       outer_bound,       &outer};
   for (const auto* item : items) HandleImportRuleItem(ctx, item);
+}
+
+// §26.3 (printed pages 809-810) with A.2.8: a task or function body is a scope
+// of its own, its formals, its result and its declarations its locally visible
+// names, and an import among its block item declarations makes names
+// candidates for the body's references after it alone. The body is walked as
+// a scope nested in the one the subroutine stands in, in source order: a local
+// variable is a declaration once its initializer has been read, and a let, a
+// typedef or an import is the item it carries.
+void HandleSubroutineImportRules(ImportRuleCtx& outer, const ModuleItem* item) {
+  TrackImportRuleDecl(outer, item->name, item->loc);
+  std::unordered_map<std::string_view, std::pair<std::string_view, SourceLoc>>
+      explicit_imports;
+  std::vector<std::string_view> wildcard_packages;
+  std::unordered_map<std::string_view, SourceLoc> wildcard_claimed;
+  std::unordered_set<std::string_view> seen_decls{item->name};
+  OuterBoundRefs outer_bound;
+  for (const FunctionArg& arg : item->func_args) seen_decls.insert(arg.name);
+  ImportRuleCtx ctx{
+      outer.diag,       outer.unit,        outer.pkg_provided_names,
+      explicit_imports, wildcard_packages, wildcard_claimed,
+      seen_decls,       outer_bound,       &outer};
+  for (const Stmt* s : item->func_body_stmts) {
+    if (s->kind == StmtKind::kBlockItemDecl) {
+      HandleImportRuleItem(ctx, s->decl_item);
+      continue;
+    }
+    std::vector<Expr*> refs;
+    WalkStmtIdents(s, refs);
+    ProcessImportRuleRefs(ctx, refs);
+    if (s->kind == StmtKind::kVarDecl) {
+      TrackImportRuleDecl(ctx, s->var_name, s->range.start);
+    }
+  }
 }
 
 // The genvar a loop generate construct is written over (§27.4), whether
@@ -432,6 +567,16 @@ void HandleImportRuleItem(ImportRuleCtx& ctx, const ModuleItem* item) {
         TrackImportRuleDecl(ctx, item->class_decl->name, item->loc);
       }
       break;
+    case ModuleItemKind::kFunctionDecl:
+    case ModuleItemKind::kTaskDecl:
+      // §8.24: an out-of-block method body reads its class's members, which
+      // no scope here holds, and is the class's to check.
+      if (item->method_class.empty()) {
+        HandleSubroutineImportRules(ctx, item);
+      } else {
+        TrackImportRuleDecl(ctx, item->name, item->loc);
+      }
+      break;
     default:
       // §26.5 module m example: a net/variable/parameter declaration with an
       // initializer (e.g. `wire a = c;`) references names in that initializer.
@@ -486,6 +631,25 @@ void Elaborator::ValidatePackageImportRules(const ModuleDecl* decl) {
   SeedImportRuleSeenDecls(decl, seen_decls);
   OuterBoundRefs outer_bound;
 
+  // §26.3 (printed page 810): a wildcard import makes its names candidates for
+  // the references after it alone, so the scope's packages are gathered as the
+  // walk below reaches each import; every one the body writes is kept apart
+  // for a reference written ahead of the import that supplies it.
+  std::vector<std::string_view> body_wildcards;
+  for (const auto* item : decl->items) {
+    if (item->kind == ModuleItemKind::kImportDecl &&
+        item->import_item.is_wildcard) {
+      body_wildcards.push_back(item->import_item.package_name);
+    }
+  }
+  const LateImportCheck kLate{
+      body_wildcards,
+      [this](std::string_view n) { return IsNameInModuleScope(n); },
+      [this, decl](std::string_view n) {
+        return UnitDeclaresData(unit_, n, decl->range.start);
+      },
+      [this](std::string_view n) { return IsDeclaredNameForRhs(n); }};
+
   ImportRuleCtx ctx{diag_,
                     unit_,
                     pkg_provided_names_,
@@ -494,24 +658,8 @@ void Elaborator::ValidatePackageImportRules(const ModuleDecl* decl) {
                     wildcard_claimed_,
                     seen_decls,
                     outer_bound,
-                    nullptr};
-
-  // §26.3: a wildcard import makes its names candidates throughout the entire
-  // scope, including for references that textually precede the import. Gather
-  // every (declared) wildcard package up front so such references resolve --
-  // and, when two wildcard imports supply the same name, are reported as
-  // ambiguous. Only the package list is pre-seeded here; claim/decl ordering
-  // is still driven by the textual pass below.
-  for (const auto* item : decl->items) {
-    if (item->kind != ModuleItemKind::kImportDecl) continue;
-    if (!item->import_item.is_wildcard) continue;
-    auto pkg = item->import_item.package_name;
-    if (!PackageDeclared(unit_, pkg)) continue;
-    if (std::find(wildcard_packages_.begin(), wildcard_packages_.end(), pkg) ==
-        wildcard_packages_.end()) {
-      wildcard_packages_.push_back(pkg);
-    }
-  }
+                    nullptr,
+                    &kLate};
 
   for (const auto* item : decl->items) HandleImportRuleItem(ctx, item);
 }

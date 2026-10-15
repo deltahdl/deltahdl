@@ -1,5 +1,7 @@
 #include <cstdint>
 #include <format>
+#include <functional>
+#include <initializer_list>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -17,6 +19,7 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/std_package.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -36,6 +39,12 @@ struct PackageRefContext {
   std::unordered_set<std::string_view> wildcard_pkgs;
   ProvidedNameCache* provided_names;
   DiagEngine* diag;
+  // §26.2 within a class the package declares: the names of the unit's
+  // design elements, the one head of a member access taken there for a
+  // hierarchical reference, since a method also reads the members a base class
+  // an import declares hands down (§8.13), which no name here lists. Null
+  // outside a class.
+  const std::unordered_set<std::string_view>* design_elements = nullptr;
 };
 
 std::unordered_set<std::string_view> CollectCuTopNames(
@@ -125,13 +134,20 @@ bool IsStdPackageOrMember(std::string_view name) {
 // member access is a hierarchical reference the subclause forbids. Held to
 // the package's own names, `r.push_back(v)` in a function of a package with
 // `import p0::*` was reported for p0's queue r.
+bool RootIsOutsidePackage(const PackageRefContext& ctx, std::string_view root) {
+  if (ctx.design_elements != nullptr) {
+    return ctx.design_elements->count(root) != 0;
+  }
+  bool is_pkg =
+      ctx.known_package_names->count(root) > 0 || IsStdPackageOrMember(root);
+  bool is_self = ctx.pkg_names.count(root) > 0;
+  return !is_pkg && !is_self && !IsImportedName(ctx, root);
+}
+
 void CheckPackageRefMemberRoot(const PackageRefContext& ctx, const Expr* e) {
   if (e->lhs && e->lhs->kind == ExprKind::kIdentifier && e->rhs) {
     auto root = e->lhs->text;
-    bool is_pkg =
-        ctx.known_package_names->count(root) > 0 || IsStdPackageOrMember(root);
-    bool is_self = ctx.pkg_names.count(root) > 0;
-    if (!is_pkg && !is_self && !IsImportedName(ctx, root)) {
+    if (RootIsOutsidePackage(ctx, root)) {
       ctx.diag->Error(
           e->range.start,
           std::format("package item contains a hierarchical reference "
@@ -186,19 +202,109 @@ void WalkPackageRefStmt(PackageRefContext& ctx, const Stmt* s) {
   for (auto name : added) ctx.pkg_names.erase(name);
 }
 
+// Runs `walk` with `names` joining the package's names for its length, the
+// names a body sees as its own and not as the package's.
+void WalkWithNames(PackageRefContext& ctx,
+                   const std::unordered_set<std::string_view>& names,
+                   const std::function<void()>& walk) {
+  std::vector<std::string_view> added;
+  for (auto name : names) {
+    if (ctx.pkg_names.insert(name).second) added.push_back(name);
+  }
+  walk();
+  for (auto name : added) ctx.pkg_names.erase(name);
+}
+
+// A subroutine's or a method's body, walked with the names the whole body sees
+// added for the walk.
+void WalkMethodBody(PackageRefContext& ctx, const ModuleItem* method) {
+  WalkWithNames(ctx, CollectMethodLocalNames(method), [&] {
+    for (const auto* s : method->func_body_stmts) WalkPackageRefStmt(ctx, s);
+  });
+}
+
 // A subroutine of the package, an out-of-block class method among the items
-// left to its class (§8.24): its body is walked with the names the whole
-// body sees added for the walk.
+// left to its class (§8.24, WalkPackageClass).
 void WalkPackageSubroutine(PackageRefContext& ctx, const ModuleItem* item) {
   bool is_subroutine = item->kind == ModuleItemKind::kFunctionDecl ||
                        item->kind == ModuleItemKind::kTaskDecl;
   if (!is_subroutine || !item->method_class.empty()) return;
-  std::vector<std::string_view> added;
-  for (auto name : CollectMethodLocalNames(item)) {
-    if (ctx.pkg_names.insert(name).second) added.push_back(name);
+  WalkMethodBody(ctx, item);
+}
+
+// An item's initializer, and a let's body (§11.12), which reads the let's
+// formals as its own names.
+void WalkPackageItemInit(PackageRefContext& ctx, const ModuleItem* item) {
+  if (item->init_expr == nullptr) return;
+  std::unordered_set<std::string_view> formals;
+  for (const FunctionArg& arg : item->func_args) formals.insert(arg.name);
+  WalkWithNames(ctx, formals,
+                [&] { WalkPackageRefExpr(ctx, item->init_expr); });
+}
+
+void WalkPropertyNode(const PackageRefContext& ctx,
+                      const PropertyExprNode* node) {
+  if (node == nullptr) return;
+  WalkPackageRefExpr(ctx, node->boolean);
+  for (const auto* op : node->operands) WalkPropertyNode(ctx, op);
+}
+
+// §26.2 holds for a property the package declares (§16.12): its clocking
+// event, its disable condition and its body, which read its formals as its own
+// names.
+void WalkPackageProperty(PackageRefContext& ctx, const ModuleItem* item) {
+  if (item->kind != ModuleItemKind::kPropertyDecl) return;
+  std::unordered_set<std::string_view> formals(item->prop_formals.begin(),
+                                               item->prop_formals.end());
+  WalkWithNames(ctx, formals, [&] {
+    for (const EventExpr& ev : item->prop_clock) {
+      WalkPackageRefExpr(ctx, ev.signal);
+    }
+    WalkPackageRefExpr(ctx, item->prop_disable_iff);
+    WalkPackageRefExpr(ctx, item->prop_body_expr);
+    WalkPropertyNode(ctx, item->prop_body_tree);
+  });
+}
+
+// §26.2 holds for a class the package declares: its property initializers and
+// its methods, those written in its body and the out-of-block bodies the
+// package holds for it (§8.24), read its parameters and members as their own
+// names, and a member access there reaches outside the package only through
+// a design element's name (PackageRefContext::design_elements).
+void WalkPackageClass(PackageRefContext& ctx, const PackageDecl* pkg,
+                      const ModuleItem* item,
+                      const std::unordered_set<std::string_view>& elements) {
+  if (item->kind != ModuleItemKind::kClassDecl) return;
+  const ClassDecl* cls = item->class_decl;
+  std::unordered_set<std::string_view> members;
+  for (const auto& [name, value] : cls->params) members.insert(name);
+  for (const ClassMember* m : cls->members) {
+    members.insert(m->kind == ClassMemberKind::kMethod ? m->method->name
+                                                       : m->name);
   }
-  for (const auto* s : item->func_body_stmts) WalkPackageRefStmt(ctx, s);
-  for (auto name : added) ctx.pkg_names.erase(name);
+  ctx.design_elements = &elements;
+  WalkWithNames(ctx, members, [&] {
+    for (const ClassMember* m : cls->members) {
+      if (m->init_expr != nullptr) WalkPackageRefExpr(ctx, m->init_expr);
+      if (m->kind == ClassMemberKind::kMethod) WalkMethodBody(ctx, m->method);
+    }
+    for (const auto* body : pkg->items) {
+      if (body->method_class == cls->name) WalkMethodBody(ctx, body);
+    }
+  });
+  ctx.design_elements = nullptr;
+}
+
+// The names of the design elements the unit declares, which a hierarchical
+// reference from a package's class starts from (§23.6).
+std::unordered_set<std::string_view> DesignElementNames(
+    const CompilationUnit* unit) {
+  std::unordered_set<std::string_view> names;
+  for (const auto* scopes :
+       {&unit->modules, &unit->interfaces, &unit->programs, &unit->checkers}) {
+    for (const ModuleDecl* decl : *scopes) names.insert(decl->name);
+  }
+  return names;
 }
 
 }  // namespace
@@ -208,6 +314,8 @@ void Elaborator::ValidatePackageReferences() {
   for (const auto* pkg : unit_->packages) known_package_names.insert(pkg->name);
 
   std::unordered_set<std::string_view> cu_top_names = CollectCuTopNames(unit_);
+  const std::unordered_set<std::string_view> kDesignElements =
+      DesignElementNames(unit_);
 
   for (const auto* pkg : unit_->packages) {
     PackageRefContext ctx;
@@ -219,8 +327,10 @@ void Elaborator::ValidatePackageReferences() {
     CollectPackageLocalNames(pkg, ctx);
 
     for (const auto* item : pkg->items) {
-      if (item->init_expr) WalkPackageRefExpr(ctx, item->init_expr);
+      WalkPackageItemInit(ctx, item);
       WalkPackageSubroutine(ctx, item);
+      WalkPackageProperty(ctx, item);
+      WalkPackageClass(ctx, pkg, item, kDesignElements);
     }
   }
 }
@@ -496,12 +606,19 @@ void RecordWildcardSourcedExport(
   }
 }
 
-// Whether the package item `pi` declares `name`: an item by its own name, or
-// a class declaration by the class's.
+// Whether the package item `pi` declares `name`: an item by its own name, a
+// class declaration by the class's, or an enumeration it writes by one of its
+// literals.
 bool PackageItemDeclaresName(const ModuleItem* pi, std::string_view name) {
   if (pi->name == name) return true;
-  return pi->kind == ModuleItemKind::kClassDecl && pi->class_decl &&
-         pi->class_decl->name == name;
+  if (pi->kind == ModuleItemKind::kClassDecl && pi->class_decl &&
+      pi->class_decl->name == name) {
+    return true;
+  }
+  // §6.19: an enumeration's literals are declarations of the scope its type
+  // is declared in, so a literal of the name is a later declaration of it.
+  return TypeDeclaresEnumLiteral(pi->typedef_type, name) ||
+         TypeDeclaresEnumLiteral(pi->data_type, name);
 }
 
 // A declaration that follows such an export and supplies one of the claimed

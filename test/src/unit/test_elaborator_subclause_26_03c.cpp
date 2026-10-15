@@ -277,4 +277,80 @@ TEST(PackageScopeReference, AnImportedTypedefChainEndingAtAPackageClass) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §26.3 (printed pages 809-810): a function body is a scope of its own, held
+// to the import rules a module body is. Wildcard imports of two packages
+// declaring c make a read of c ambiguous. Nothing in a body was checked.
+TEST(PackageScopeReference, AmbiguousWildcardReadInAFunctionBody) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p; int c = 1; endpackage\n"
+             "package q; int c = 2; endpackage\n"
+             "module m;\n"
+             "  function int f();\n"
+             "    import p::*;\n"
+             "    import q::*;\n"
+             "    return c;\n"
+             "  endfunction\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to 'c' is ambiguous between wildcard "
+                            "imports of packages 'p' and 'q'",
+                            7, "26.3"));
+}
+
+// A declaration following a read the body's wildcard import resolved, here
+// in the initializer of the declaration before it, is illegal in the body as
+// in a module.
+TEST(PackageScopeReference, DeclarationAfterAWildcardClaimInATaskBody) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p; int c = 1; endpackage\n"
+             "module m;\n"
+             "  int r;\n"
+             "  task t();\n"
+             "    import p::*;\n"
+             "    int a = c;\n"
+             "    int c;\n"
+             "    r = a;\n"
+             "  endtask\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "declaration of 'c' follows a reference resolved "
+                            "through a wildcard package import",
+                            7, "26.3"));
+}
+
+// An explicit import of a name the body declares collides with it.
+TEST(PackageScopeReference, ExplicitImportBesideALocalInAFunctionBody) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p; int c = 1; endpackage\n"
+             "module m;\n"
+             "  function int f(int c);\n"
+             "    import p::c;\n"
+             "    return c;\n"
+             "  endfunction\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "explicit import of 'p::c' collides with existing "
+                            "declaration of 'c'",
+                            4, "26.3"));
+}
+
+// A body whose import and declarations agree elaborates.
+TEST(PackageScopeReference, FunctionBodyImportElaborates) {
+  EXPECT_TRUE(
+      ElabOk("package p; int c = 1; endpackage\n"
+             "module m;\n"
+             "  function int f(int a);\n"
+             "    import p::*;\n"
+             "    int v = a;\n"
+             "    return v + c;\n"
+             "  endfunction\n"
+             "endmodule\n"));
+}
+
 }  // namespace

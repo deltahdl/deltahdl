@@ -108,28 +108,30 @@ TEST(PackageImportSim, ImportedPackageDynamicArraySizedByPackageFunction) {
 // "p2.a" held no ArrayInfo, so the loop ran once per bit of the carrier:
 // 0 * 10 + 32.
 TEST(PackageImportSim, ExportedPackageFixedSizeArrayReadThroughTheExporter) {
-  EXPECT_EQ(RunAndGet("package p1;\n"
-                      "  int a[2];\n"
-                      "  function void set(int i, int v);\n"
-                      "    a[i] = v;\n"
-                      "  endfunction\n"
-                      "endpackage\n"
-                      "package p2;\n"
-                      "  import p1::*;\n"
-                      "  export p1::*;\n"
-                      "endpackage\n"
-                      "module top;\n"
-                      "  import p2::*;\n"
-                      "  int n = 0;\n"
-                      "  int y;\n"
-                      "  initial begin\n"
-                      "    p1::set(1, 5);\n"
-                      "    foreach (p2::a[i]) n++;\n"
-                      "    y = a[1] * 10 + n;\n"
-                      "  end\n"
-                      "endmodule\n",
-                      "y"),
-            52u);
+  EXPECT_EQ(
+      RunAndGet("package p1;\n"
+                "  int a[2];\n"
+                "  function void set(int i, int v);\n"
+                "    a[i] = v;\n"
+                "  endfunction\n"
+                "endpackage\n"
+                "package p2;\n"
+                "  import p1::*;\n"
+                "  export p1::*;\n"
+                "  function automatic int seen(); return a[0]; endfunction\n"
+                "endpackage\n"
+                "module top;\n"
+                "  import p2::*;\n"
+                "  int n = 0;\n"
+                "  int y;\n"
+                "  initial begin\n"
+                "    p1::set(1, 5);\n"
+                "    foreach (p2::a[i]) n++;\n"
+                "    y = a[1] * 10 + n;\n"
+                "  end\n"
+                "endmodule\n",
+                "y"),
+      52u);
 }
 
 // §26.3 (printed page 810) with §27.3 (printed 818): an import written in a
@@ -438,6 +440,25 @@ TEST(PackageImportSim, PackageClassMethodNamesItsClassBare) {
                        "endmodule\n",
                        f),
             "v=4\n");
+}
+
+// §26.3 with §3.12.1: a read written before the module's wildcard import is
+// not resolved through it, and the search ends in the compilation unit, whose
+// c holds 7; the read after the import reaches p's c. Both read p's 2 before.
+TEST(PackageImportSim, ReadBeforeTheWildcardImportReachesTheUnitsData) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "package p; int c = 2; endpackage\n"
+          "int c = 7;\n"
+          "module m;\n"
+          "  int y, z;\n"
+          "  initial begin y = c; end\n"
+          "  import p::*;\n"
+          "  initial begin #1 z = c; $display(\"y=%0d z=%0d\", y, z); end\n"
+          "endmodule\n",
+          f),
+      "y=7 z=2\n");
 }
 
 }  // namespace

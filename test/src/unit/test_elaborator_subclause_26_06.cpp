@@ -1,6 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <string_view>
+#include <unordered_set>
+
+#include "elaborator/package_references.h"
 #include "fixture_elaborator.h"
+#include "fixture_parser.h"
 #include "helpers_reported_error.h"
 
 namespace {
@@ -187,6 +192,28 @@ TEST(PackageExport, ExportOfWildcardImportedNameBlocksLaterLocalDecl) {
                             "export that referenced it through a wildcard "
                             "package import",
                             7, "26.6"));
+}
+
+// The same for an enumeration literal named x: §6.19 makes a literal a
+// declaration of the scope its type stands in, so the typedef declares x after
+// the export referenced it. Only a later item of the name was matched, and the
+// literal passed.
+TEST(PackageExport, ExportOfWildcardImportedNameBlocksLaterEnumLiteral) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p1; int x = 3; endpackage\n"
+             "package p6;\n"
+             "  import p1::*;\n"
+             "  export p1::x;\n"
+             "  typedef enum {x, w} e_t;\n"
+             "endpackage\n"
+             "module m; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "declaration of 'x' in package 'p6' follows an "
+                            "export that referenced it through a wildcard "
+                            "package import",
+                            5, "26.6"));
 }
 
 TEST(PackageExport, ExportOfExplicitlyImportedNameAllowsUnrelatedLocalDecl) {
@@ -431,6 +458,7 @@ TEST(PackageExport, ExplicitImportsOfOneDeclarationThroughTwoExportsAgree) {
              "package p4;\n"
              "  import p1::*;\n"
              "  export p1::*;\n"
+             "  int y = x;\n"
              "endpackage\n"
              "module top;\n"
              "  import p2::x;\n"
@@ -442,7 +470,7 @@ TEST(PackageExport, ExplicitImportsOfOneDeclarationThroughTwoExportsAgree) {
              "endmodule\n",
              f));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
-                             "reference to unresolved identifier 'x'", 17,
+                             "reference to unresolved identifier 'x'", 18,
                              "23.9"));
 }
 
@@ -495,6 +523,7 @@ TEST(PackageExport, ExplicitImportOfTheDeclarationAWildcardReferenceBound) {
              "package p4;\n"
              "  import p1::*;\n"
              "  export p1::*;\n"
+             "  int y = x;\n"
              "endpackage\n"
              "module top;\n"
              "  import p4::*;\n"
@@ -513,6 +542,7 @@ TEST(PackageExport, ExplicitImportOfTheDeclarationAWildcardReferenceBound) {
              "package p4;\n"
              "  import p1::*;\n"
              "  export p1::*;\n"
+             "  int y = x;\n"
              "endpackage\n"
              "module top;\n"
              "  import p4::*;\n"
@@ -525,7 +555,7 @@ TEST(PackageExport, ExplicitImportOfTheDeclarationAWildcardReferenceBound) {
                             "explicit import of 'p3::x' is illegal because 'x' "
                             "was already referenced through a wildcard "
                             "package import",
-                            15, "26.5"));
+                            16, "26.5"));
 }
 
 // §26.3 (printed page 808) references a declaration made in a package through
@@ -548,6 +578,7 @@ TEST(PackageExport, ScopedReferenceThroughTheExportingPackage) {
              "package p4;\n"
              "  import p1::*;\n"
              "  export p1::*;\n"
+             "  int y = x;\n"
              "endpackage\n"
              "module top;\n"
              "  int r;\n"
@@ -725,6 +756,123 @@ TEST(PackageExport, ExportOfANameARangedLiteralNeverGeneratesIsReported) {
   EXPECT_FALSE(ReportedError(
       f.diag.Diagnostics(),
       "'w1' is not a candidate for import from package 'p1'", 9, "26.6"));
+}
+
+// §26.6 (printed page 815): what p2 imports without exporting is no candidate
+// for import from p2, so `import p2::x;` imports nothing and is reported at
+// the import, as `p2::x` written in an expression is. It was accepted, and x
+// then counted as declared.
+TEST(PackageExport, ExplicitImportOfAnUnexportedImportIsReported) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p1; int x = 5; endpackage\n"
+             "package p2; import p1::x; endpackage\n"
+             "module top;\n"
+             "  import p2::x;\n"
+             "  initial $display(\"%0d\", x);\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "explicit import of 'p2::x', which package 'p2' "
+                            "neither declares nor exports",
+                            4, "26.3"));
+}
+
+// §26.3 (printed page 809): a name the package does not declare at all is no
+// candidate either.
+TEST(PackageExport, ExplicitImportOfAnUndeclaredNameIsReported) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p; int x = 5; endpackage\n"
+             "module top;\n"
+             "  import p::nosuch;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "explicit import of 'p::nosuch', which package "
+                            "'p' neither declares nor exports",
+                            3, "26.3"));
+}
+
+// The candidates are every declaration the package makes, a checker it
+// declares among them (§26.2), and std's are Annex G's classes (§26.7).
+TEST(PackageExport, ExplicitImportsOfACheckerAndAStdClassElaborate) {
+  EXPECT_TRUE(
+      ElabOk("package p;\n"
+             "  checker chk(logic a); endchecker\n"
+             "endpackage\n"
+             "module top;\n"
+             "  import p::chk;\n"
+             "  import std::semaphore;\n"
+             "  logic a = 1;\n"
+             "  chk c(a);\n"
+             "  semaphore s = new(1);\n"
+             "endmodule\n"));
+}
+
+// §26.6 (printed page 815): `export p1::*` hands on what p4 actually imported
+// from p1, the x its declaration reads and not the y it never references, so
+// p7's y is the one candidate top's wildcard imports supply and the read is no
+// ambiguity. Every candidate was handed on, and the read was reported as
+// ambiguous between p4 and p7.
+TEST(PackageExport, WildcardExportHandsOnOnlyReferencedCandidates) {
+  EXPECT_TRUE(
+      ElabOk("package p1; int x = 1; int y = 10; endpackage\n"
+             "package p4;\n"
+             "  import p1::*;\n"
+             "  export p1::*;\n"
+             "  int q = x;\n"
+             "endpackage\n"
+             "package p7; int y = 70; endpackage\n"
+             "module top;\n"
+             "  import p4::*;\n"
+             "  import p7::*;\n"
+             "  int z = y;\n"
+             "  initial $display(\"%0d %0d\", y, q);\n"
+             "endmodule\n"));
+}
+
+// The names a package writes, which decide what its wildcard imports
+// actually import: in initializers and dimensions, as the names of types and
+// of a class's base, in a subroutine's formals and body, a property's clock,
+// disable condition and body, and a class's members and methods.
+TEST(PackageExport, PackageReferencedNamesReadEveryDeclaration) {
+  auto r = Parse(
+      "package p;\n"
+      "  typedef int my_t;\n"
+      "  typedef enum {A = KA, R[RN]} e_t;\n"
+      "  typedef struct { my_t m; int arr[KD]; struct { int k; } in; } s_t;\n"
+      "  my_t v = initv;\n"
+      "  logic [KL:0] w;\n"
+      "  logic [1:0][KX:0] z;\n"
+      "  int u[KU];\n"
+      "  function my_t f(my_t a = defv);\n"
+      "    typedef int blk_t;\n"
+      "    my_t loc = body_ref;\n"
+      "    return call_ref(a);\n"
+      "  endfunction\n"
+      "  property pr(b); @(posedge clk_ref) b |-> tree_ref; endproperty\n"
+      "  property pq; @(posedge clk2) disable iff (dis_ref) bool_ref;\n"
+      "  endproperty\n"
+      "  class C #(int W = cparam_ref) extends base_ref;\n"
+      "    my_t m = minit_ref;\n"
+      "    int marr[mdim_ref];\n"
+      "    typedef int ctd_t;\n"
+      "    function void meth(); m = meth_ref; endfunction\n"
+      "  endclass\n"
+      "endpackage\n");
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  const std::unordered_set<std::string_view> kNames =
+      PackageReferencedNames(r.cu->packages[0]);
+  for (std::string_view name :
+       {"KA",       "RN",         "my_t",     "KD",        "initv",
+        "KL",       "KX",         "KU",       "defv",      "body_ref",
+        "call_ref", "clk_ref",    "tree_ref", "clk2",      "dis_ref",
+        "bool_ref", "cparam_ref", "base_ref", "minit_ref", "mdim_ref",
+        "meth_ref"}) {
+    EXPECT_TRUE(kNames.contains(name)) << name;
+  }
 }
 
 }  // namespace

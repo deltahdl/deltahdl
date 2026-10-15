@@ -529,6 +529,8 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/operator_result_members.cpp
     elaborator/type_site_lookup.cpp
     elaborator/elaborator_scope_rules.cpp
+    elaborator/scope_resolution_bases.cpp
+    elaborator/package_references.cpp
     elaborator/elaborator_scope_rules_enclosing.cpp
     elaborator/elaborator_scope_rules_hier.cpp
     elaborator/elaborator_scope_rules_imports.cpp

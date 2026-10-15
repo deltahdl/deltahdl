@@ -97,4 +97,34 @@ TEST(StdBuiltinPackage, StdIsImplicitlyWildcardImported) {
   EXPECT_TRUE(has_std_wildcard);
 }
 
+// §26.7 (printed pages 816-817): std's declarations are those Annex G makes,
+// so `std::nosuch` names nothing and is reported at its base, as a user
+// package's undeclared member is. A std base was skipped unasked.
+TEST(StdPackage, ScopedReferenceToANameStdDoesNotDeclareIsReported) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module top;\n"
+             "  int v;\n"
+             "  initial begin\n"
+             "    v = std::nosuch;\n"
+             "  end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to 'std::nosuch', which package 'std' "
+                            "neither declares nor exports",
+                            4, "26.3"));
+}
+
+// A member std does declare is reached through the scope as before.
+TEST(StdPackage, ScopedReferenceToAStdClassElaborates) {
+  EXPECT_TRUE(
+      ElabOk("module top;\n"
+             "  std::process p;\n"
+             "  initial begin\n"
+             "    p = std::process::self();\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
 }  // namespace

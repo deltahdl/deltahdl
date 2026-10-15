@@ -12,6 +12,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/package_references.h"
 #include "elaborator/rtlir.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
@@ -151,6 +152,11 @@ void AddPackageItemNames(const PackageDecl* pkg, const ModuleItem* pi,
       !pi->class_decl->name.empty()) {
     names.emplace(pi->class_decl->name, pkg->name);
   }
+  // §26.2: a checker the package declares is held as a nested declaration,
+  // by the checker's own name.
+  if (pi->kind == ModuleItemKind::kNestedModuleDecl) {
+    names.emplace(pi->nested_module_decl->name, pkg->name);
+  }
   AddEnumMemberNames(pi->typedef_type, pkg->name, names);
   AddEnumMemberNames(pi->data_type, pkg->name, names);
 }
@@ -188,11 +194,11 @@ std::string_view DeclaringPackageOf(
 }
 
 // The names `pkg` imports from the package `src_name`, which an export of
-// that package hands on (§26.6): the one name of each explicit import, and
-// for a wildcard import every name the source package provides. §26.6 hands
-// on only what a wildcard import actually imported, which is decided by the
-// references the package makes; every candidate is taken instead, which can
-// only suppress a report, never raise one.
+// that package hands on (§26.6): the one name of each explicit import, and for
+// a wildcard import the candidates the package actually imported, those its
+// own declarations write (§26.3, PackageReferencedNames). Taken whole, a
+// candidate p4 never referenced was handed on beside p7's own declaration of
+// the name, and a module importing both was told the name was ambiguous.
 void AddImportedNamesFrom(const CompilationUnit* unit, const PackageDecl* pkg,
                           std::string_view src_name, ProvidedNames& names,
                           std::unordered_set<const PackageDecl*>& visited) {
@@ -204,7 +210,13 @@ void AddImportedNamesFrom(const CompilationUnit* unit, const PackageDecl* pkg,
       names.emplace(imp.item_name,
                     DeclaringPackageOf(unit, src_name, imp.item_name, visited));
     } else if (const PackageDecl* src = FindPackageDecl(unit, src_name)) {
-      AddPackageProvidedNames(unit, src, names, visited);
+      ProvidedNames candidates;
+      AddPackageProvidedNames(unit, src, candidates, visited);
+      const std::unordered_set<std::string_view> kReferenced =
+          PackageReferencedNames(pkg);
+      for (const auto& [name, origin] : candidates) {
+        if (kReferenced.contains(name)) names.emplace(name, origin);
+      }
     }
   }
 }

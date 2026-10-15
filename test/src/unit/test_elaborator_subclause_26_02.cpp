@@ -25,6 +25,32 @@ TEST(PackageDeclarationElaboration,
                             2, "26.2"));
 }
 
+// §26.2 with §6.6.7: a net of a user-defined nettype is a net, so its
+// initializer is the implicit continuous assignment a package cannot hold,
+// reported as the wire's is. The declaration was taken for a variable's and
+// passed; the same net with no initializer is accepted.
+TEST(PackageDeclarationElaboration, NettypeNetWithInitializerRejected) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package pkg;\n"
+             "  nettype logic [7:0] byte_net;\n"
+             "  byte_net w = 8'd5;\n"
+             "  byte_net u;\n"
+             "endpackage\n"
+             "module m;\n"
+             "  import pkg::*;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "net declaration with implicit continuous "
+                            "assignment is not allowed in a package",
+                            3, "26.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "net declaration with implicit continuous "
+                             "assignment is not allowed in a package",
+                             4, "26.2"));
+}
+
 TEST(PackageDeclarationElaboration, InitialBlockInPackageRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -525,6 +551,83 @@ TEST(PackageDeclarationElaboration,
                             "'top' that does not target the package itself "
                             "or an imported package",
                             5, "26.2"));
+}
+
+// §26.2 (printed page 808) with §11.12: a let's formals are the let's own
+// names, so a formal sharing a name with a compilation-unit declaration reads
+// the formal, and a member access through a formal is no hierarchical
+// reference. Both were reported.
+TEST(PackageDeclarationElaboration, LetFormalsAreTheLetsOwnNames) {
+  EXPECT_TRUE(
+      ElabOk("int a = 100;\n"
+             "package p;\n"
+             "  typedef struct { int m; } s_t;\n"
+             "  let twice(a) = a * 2;\n"
+             "  let get_m(s_t v) = v.m;\n"
+             "endpackage\n"
+             "module top;\n"
+             "  int r;\n"
+             "  initial r = p::twice(7);\n"
+             "endmodule\n"));
+}
+
+// §26.2: a class the package declares is a package item, so a hierarchical
+// reference in its method is reported, while its own members, its parameter,
+// a base class's member and a local read through a handle are not. The class
+// was never walked.
+TEST(PackageDeclarationElaboration, HierarchicalRefInAPackageClassMethod) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p;\n"
+             "  class B; int inherited; endclass\n"
+             "  class C #(int W = 2) extends B;\n"
+             "    int own = W;\n"
+             "    C next;\n"
+             "    function int get();\n"
+             "      return own + next.own + inherited + top.x;\n"
+             "    endfunction\n"
+             "    extern function int later();\n"
+             "  endclass\n"
+             "  function int C::later(); return top.x; endfunction\n"
+             "endpackage\n"
+             "module top;\n"
+             "  int x = 4;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "package item contains a hierarchical reference "
+                            "'top'",
+                            7, "26.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "package item contains a hierarchical reference "
+                            "'top'",
+                            11, "26.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "package item contains a hierarchical reference "
+                             "'next'",
+                             7, "26.2"));
+}
+
+// §26.2 with §16.12: a property the package declares is a package item, so a
+// hierarchical reference in its clocking event or its body is reported, a
+// formal read in the body not. The property was never walked.
+TEST(PackageDeclarationElaboration, HierarchicalRefInAPackageProperty) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p;\n"
+             "  property pr; @(posedge top.clk) top.a; endproperty\n"
+             "  property pq(b); @(posedge b) b |-> top.a; endproperty\n"
+             "endpackage\n"
+             "module top; logic clk = 0, a = 1; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "package item contains a hierarchical reference "
+                            "'top'",
+                            2, "26.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "package item contains a hierarchical reference "
+                            "'top'",
+                            3, "26.2"));
 }
 
 }  // namespace

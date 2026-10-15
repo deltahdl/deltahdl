@@ -85,6 +85,67 @@ TEST(PackageImport, ImportedIdentifierNotVisibleViaHierarchicalRef) {
                             10, "26.3"));
 }
 
+// §26.3 (printed pages 810, 812): a name the child declares is its own, and
+// a wildcard import of a package declaring the same name supplies nothing for
+// it, so `u.x` reaches the child's x and is accepted. It was reported as a
+// name imported into the child.
+TEST(PackageImport, HierarchicalRefToAChildsOwnDeclarationElaborates) {
+  EXPECT_TRUE(
+      ElabOk("package p; int x = 1; endpackage\n"
+             "module child;\n"
+             "  import p::*;\n"
+             "  int x = 9;\n"
+             "endmodule\n"
+             "module top;\n"
+             "  child u();\n"
+             "  int y;\n"
+             "  initial #1 y = u.x;\n"
+             "endmodule\n"));
+}
+
+// §26.3 (printed page 808): a package is compiled before the scopes importing
+// it, so an import ahead of the package it names is reported at the import.
+// The package was found wherever it stood.
+TEST(PackageImport, ImportOfAPackageDeclaredLaterIsReported) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module top;\n"
+             "  import p::*;\n"
+             "  int r = K;\n"
+             "endmodule\n"
+             "package p; parameter int K = 3; endpackage\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "import from package 'p', which is declared after "
+                            "the scope importing it",
+                            2, "26.3"));
+}
+
+// §26.3 (printed page 810): a wildcard import makes its names candidates for
+// the references after it alone, so a read of x written before the module's
+// `import p::*` resolves to nothing and is reported. The module's wildcard
+// packages were gathered ahead of its items and the read passed.
+TEST(PackageImport, ReferenceBeforeTheWildcardImportIsReported) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p; int x = 5; endpackage\n"
+             "module m;\n"
+             "  int y;\n"
+             "  initial begin y = x; end\n"
+             "  import p::*;\n"
+             "  initial begin y = x; end\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to 'x' precedes the wildcard import of "
+                            "package 'p' that declares it",
+                            4, "26.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "reference to 'x' precedes the wildcard import of "
+                             "package 'p' that declares it",
+                             6, "26.3"));
+}
+
 TEST(PackageImport, WildcardImportFromUnknownPackageIsError) {
   ElabFixture f;
   EXPECT_FALSE(
