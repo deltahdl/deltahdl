@@ -599,6 +599,17 @@ ElaboratorData::UseTargetInForce(CompilationUnit* unit, const std::string& path,
   return std::nullopt;
 }
 
+void ElaboratorData::RecordCellClauseListBinding(std::string_view cell) {
+  if (!in_config_elaboration_ || config_inst_path_.empty() ||
+      InstanceLiblistForPath(config_inst_path_, instance_liblist_overrides_) !=
+          nullptr) {
+    return;
+  }
+  auto it = cell_clause_liblist_overrides_.find(std::string(cell));
+  if (it == cell_clause_liblist_overrides_.end()) return;
+  cell_liblist_bindings_.emplace_back(config_inst_path_, it->second);
+}
+
 bool ElaboratorData::ReportConfigRuleBindingNothing(CompilationUnit* unit,
                                                     const ModuleItem* item,
                                                     DiagEngine& diag) const {
@@ -704,9 +715,6 @@ const std::vector<std::string>* Elaborator::SelectedLiblist(
   }
   if (auto it = cell_clause_liblist_overrides_.find(std::string(name));
       it != cell_clause_liblist_overrides_.end()) {
-    if (in_config_elaboration_ && !config_inst_path_.empty()) {
-      cell_liblist_bindings_.emplace_back(config_inst_path_, it->second);
-    }
     return &it->second;
   }
   return InstanceLiblistForPath(config_inst_path_, cell_liblist_bindings_);

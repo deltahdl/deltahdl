@@ -41,6 +41,7 @@ CompilationUnit* ParseWithLibraries(const BindOnlyChildArgs& args) {
   cu->modules[0]->library = args.lib0;
   cu->modules[1]->library = args.lib1;
   cu->modules[2]->library = args.lib2;
+  PlaceConfigsWithTheirTops(cu);
   return cu;
 }
 
@@ -118,6 +119,7 @@ TEST(ConfigUseClause, UseDoesNotAlterLibraryList) {
   cu->modules[0]->library = "libB";
   cu->modules[1]->library = "libB";
   cu->modules[2]->library = "libA";
+  PlaceConfigsWithTheirTops(cu);
 
   Elaborator elab(arena, diag, cu);
   auto* design = elab.Elaborate(cu->configs[0]);
@@ -147,6 +149,7 @@ TEST(ConfigUseClause, UseToMissingTargetLeavesInstanceUnbound) {
   Parser parser(lex, arena, diag);
   auto* cu = parser.Parse();
   cu->modules[0]->library = "mainLib";
+  PlaceConfigsWithTheirTops(cu);
 
   Elaborator elab(arena, diag, cu);
   auto* design = elab.Elaborate(cu->configs[0]);
@@ -191,6 +194,7 @@ TEST(ConfigUseClause, ConfigSuffixSelectsConfigurationNotSameNamedModule) {
   cu->modules[1]->library = "libB";    // leaf
   cu->modules[2]->library = "lib1";    // bot
   cu->modules[3]->library = "libTop";  // top
+  PlaceConfigsWithTheirTops(cu);
 
   // Elaborate the outer config `c` (configs[0]); its use clause delegates top.b
   // to config `bot` (configs[1]) because of the :config suffix.
@@ -238,6 +242,7 @@ TEST(ConfigUseClause, InstanceUseClauseBindsExactLibraryAndCell) {
   cu->modules[0]->library = "libA";    // widget
   cu->modules[1]->library = "libB";    // widget
   cu->modules[2]->library = "libTop";  // top
+  PlaceConfigsWithTheirTops(cu);
 
   Elaborator elab(arena, diag, cu);
   auto* design = elab.Elaborate(cu->configs[0]);
@@ -272,6 +277,7 @@ TEST(ConfigUseClause, InstanceUseWithoutLibraryInheritsParentLibrary) {
   cu->modules[0]->library = "libP";  // bar
   cu->modules[1]->library = "libP";  // foo
   cu->modules[2]->library = "libP";  // top
+  PlaceConfigsWithTheirTops(cu);
 
   Elaborator elab(arena, diag, cu);
   auto* design = elab.Elaborate(cu->configs[0]);

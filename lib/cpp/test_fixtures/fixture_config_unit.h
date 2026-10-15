@@ -11,6 +11,7 @@
 #include "common/source_mgr.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "helpers_config_reports.h"
 #include "lexer/lexer.h"
 #include "parser/library_map.h"
 #include "parser/parser.h"
@@ -47,6 +48,7 @@ struct ConfigUnit {
     ASSERT_EQ(cu->modules.size(), libraries.size());
     size_t i = 0;
     for (const char* library : libraries) cu->modules[i++]->library = library;
+    PlaceConfigsWithTheirTops(cu);
   }
 
   // Puts the unit's one config in `library`, for a test whose subject is not

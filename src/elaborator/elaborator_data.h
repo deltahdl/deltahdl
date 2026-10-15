@@ -805,9 +805,13 @@ class ElaboratorData {
 
   // §33.4.1.5: the lists cell clauses selected, by the path of the instance
   // each was selected for, which the instances below inherit as liblists are
-  // inherited downward. Grown as FindModule binds, which is otherwise const.
-  mutable std::vector<std::pair<std::string, std::vector<std::string>>>
+  // inherited downward. RecordCellClauseListBinding grows it as each instance
+  // is bound.
+  std::vector<std::pair<std::string, std::vector<std::string>>>
       cell_liblist_bindings_;
+  // Records the list a cell clause selected for the instance of `cell` at
+  // config_inst_path_, where no instance clause's list governs it.
+  void RecordCellClauseListBinding(std::string_view cell);
 
   // §33.4.2: every table above that one configuration's rules fill, set aside
   // for the configurations whose subtrees enclose a delegated instance while

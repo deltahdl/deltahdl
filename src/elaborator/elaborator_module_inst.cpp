@@ -695,6 +695,7 @@ void Elaborator::ElaborateChildInstance(RtlirModuleInst& inst,
                                         const ScopeMap& parent_scope) {
   // §33.4.2: an instance bound to a configuration is configured, it and all
   // beneath it, by that configuration's rules alone.
+  RecordCellClauseListBinding(item->inst_module);
   const ConfigDecl* delegated = DelegatedConfigFor(item->inst_module);
   if (delegated != nullptr) EnterDelegatedConfig(delegated);
   auto saved_nested = nested_module_decls_;

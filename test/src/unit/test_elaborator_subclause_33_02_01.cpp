@@ -21,6 +21,7 @@
 #include "common/source_mgr.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
+#include "helpers_config_reports.h"
 #include "helpers_reported_error.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
@@ -77,16 +78,7 @@ void ConfigElab::Run(const std::string& src, const CellLibraries& libs) {
   WriteCellsToLibraries(cu->udps, libs.primitives);
   WriteCellsToLibraries(cu->checkers, libs.checkers);
   ASSERT_FALSE(cu->configs.empty());
-  // A config compiles into the library of the source holding it, which here
-  // is the library its top module was written into (§33.4.1.1).
-  for (auto* cfg : cu->configs) {
-    for (const auto* mod : cu->modules) {
-      if (!cfg->design_cells.empty() &&
-          mod->name == cfg->design_cells.front().cell) {
-        cfg->library = mod->library;
-      }
-    }
-  }
+  PlaceConfigsWithTheirTops(cu);
   Elaborator elab(arena, diag, cu);
   design = elab.Elaborate(cu->configs[0]);
 }
@@ -194,18 +186,19 @@ TEST(LibraryCellNotation, PlainNameNamesModuleSharingConfigName) {
 }
 
 // A primitive of the name settles the plain name just as a module does. The
-// configuration goes unreached, so the instance is left with nothing of the
-// configuration's design statement under it -- had the name reached the
-// configuration, cell lib1.mid would be bound here.
+// configuration goes unreached and the instance is the primitive's -- had the
+// name reached the configuration, cell lib1.mid would be bound here -- so the
+// instance, connecting none of the primitive's two terminals, is reported as
+// one of the primitive (§29.8).
 TEST(LibraryCellNotation, PlainNameNamesPrimitiveSharingConfigName) {
   ConfigElab e;
   e.Run(
       std::string(kLeafAndMidCells) + kPrimitiveMidcfg + kPlainUseOfMidcfg,
       {.modules = {"libA", "libB", "lib1", "libTop"}, .primitives = {"lib1"}});
-  auto* top = OnlyTop(e.design);
-  ASSERT_NE(top, nullptr);
-  ASSERT_EQ(top->children.size(), 1u);
-  EXPECT_EQ(top->children[0].resolved, nullptr);
+  EXPECT_TRUE(ReportedError(e.diag.Diagnostics(),
+                            "primitive 'midcfg' takes 2 terminal(s) but this "
+                            "instance connects 0",
+                            7, "29.8"));
 }
 
 // Which is what the extension is for: with a primitive answering to the name,

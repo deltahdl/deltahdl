@@ -14,6 +14,22 @@
 #include "parser/ast_module.h"
 #include "parser/parser.h"
 
+// §33.4.1.1 searches a design cell written without a library in the library
+// of its configuration, and a configuration compiles into the library of the
+// source holding it. A test that writes its modules into libraries by hand
+// puts each configuration with the module its design statement names, as one
+// source file holding both would.
+inline void PlaceConfigsWithTheirTops(delta::CompilationUnit* cu) {
+  for (auto* cfg : cu->configs) {
+    if (cfg->design_cells.empty()) continue;
+    for (const auto* mod : cu->modules) {
+      if (mod->name == cfg->design_cells.front().cell) {
+        cfg->library = mod->library;
+      }
+    }
+  }
+}
+
 // One elaboration of a design under its configuration, held together so the
 // design can be read after the run that built it.
 struct ConfigElaboration {
