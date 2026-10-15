@@ -169,4 +169,54 @@ TEST(UdpInstantiation, RejectsThreeDelays) {
       r.diags, "UDP instantiation shall have at most two delays", 8, "29.8"));
 }
 
+// §29.3 lets a UDP be declared anywhere, so the parser meets my_udp here before
+// its declaration and does not yet know it for a primitive. A delay written
+// with no parentheses is no module's parameter assignment, which always writes
+// them, so the item is a UDP instance whatever the name turns out to be. It was
+// read as a module instance and failed at the `5`.
+TEST(UdpInstantiation, UdpDeclaredLaterTakesADelayWithoutParentheses) {
+  auto r = Parse(
+      "module top;\n"
+      "  my_udp #5 u1 (y, a, b);\n"
+      "endmodule\n" +
+      std::string(udp_def));
+  EXPECT_FALSE(r.has_errors);
+  auto insts = FindUdpInstances(r);
+  ASSERT_EQ(insts.size(), 1u);
+  ASSERT_NE(insts[0]->gate_delay, nullptr);
+  EXPECT_EQ(insts[0]->gate_delay->int_val, 5u);
+  EXPECT_EQ(insts[0]->gate_inst_name, "u1");
+}
+
+// A drive strength stands where a module instance names its instance, so it
+// too is a UDP instance's whatever the name. It failed to parse at the `(`.
+TEST(UdpInstantiation, UdpDeclaredLaterTakesADriveStrength) {
+  auto r = Parse(
+      "module top;\n"
+      "  my_udp (strong0, weak1) u1 (y, a, b);\n"
+      "endmodule\n" +
+      std::string(udp_def));
+  EXPECT_FALSE(r.has_errors);
+  auto insts = FindUdpInstances(r);
+  ASSERT_EQ(insts.size(), 1u);
+  EXPECT_EQ(insts[0]->drive_strength0, 4u);  // strong0
+  EXPECT_EQ(insts[0]->drive_strength1, 2u);  // weak1
+}
+
+// §29.8 makes the instance name optional, and a module instance always names
+// its instance, so `my_udp (` is a UDP instance with no name. It failed to
+// parse, read as a variable declaration.
+TEST(UdpInstantiation, UdpDeclaredLaterTakesAnUnnamedInstance) {
+  auto r = Parse(
+      "module top;\n"
+      "  my_udp (y, a, b);\n"
+      "endmodule\n" +
+      std::string(udp_def));
+  EXPECT_FALSE(r.has_errors);
+  auto insts = FindUdpInstances(r);
+  ASSERT_EQ(insts.size(), 1u);
+  EXPECT_TRUE(insts[0]->gate_inst_name.empty());
+  ASSERT_EQ(insts[0]->gate_terminals.size(), 3u);
+}
+
 }  // namespace

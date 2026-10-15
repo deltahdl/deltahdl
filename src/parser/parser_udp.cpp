@@ -1,7 +1,9 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <format>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -12,75 +14,10 @@
 #include "parser/ast_module.h"
 #include "parser/ast_specify.h"
 #include "parser/parser.h"
-#include "parser/parser_instance_internal.h"
 #include "parser/udp_ansi_port_entry.h"
 #include "parser/udp_row_overlap.h"
 
 namespace delta {
-
-// A.5.4's udp_instance, `[ name_of_instance ] ( output_terminal ,
-// input_terminal { , input_terminal } )`: two terminals at least, the first
-// a net_lvalue under A.3.3. The parser had read the terminal list as any list
-// of expressions and left both to elaboration, which reports the count for a
-// primitive it resolves and the output terminal for none; each is now reported
-// where the instance is read, the count under A.5.4 and the terminal under
-// §28.3 as a gate's is, since §29.8 has a UDP instance written the way a gate
-// instance is.
-ModuleItem* Parser::ParseOneUdpInstance(const Token& udp_tok, SourceLoc loc) {
-  auto* item = arena_.Create<ModuleItem>();
-  item->kind = ModuleItemKind::kUdpInst;
-  item->loc = loc;
-  item->inst_module = udp_tok.text;
-
-  ParseGateInstanceTail(*this, item,
-                        CheckIdentifier() && !Check(TokenKind::kLParen));
-  if (item->gate_terminals.size() < 2) {
-    diag_.Error(loc,
-                "a UDP instance connects an output terminal and at least one "
-                "input terminal",
-                Subclause("A.5.4"));
-  }
-  if (!item->gate_terminals.empty() && !IsNetLvalue(item->gate_terminals[0])) {
-    diag_.Error(loc, "output terminal must be a net lvalue", Subclause("28.3"));
-  }
-  return item;
-}
-
-void Parser::ParseUdpInstList(const Token& udp_tok,
-                              std::vector<ModuleItem*>& items) {
-  auto loc = udp_tok.loc;
-
-  uint8_t str0 = 0;
-  uint8_t str1 = 0;
-  TryParseStrengthSpec(str0, str1);
-
-  Expr* delay = nullptr;
-  Expr* delay_fall = nullptr;
-  Expr* decay = nullptr;
-  ParseGateDelay(delay, delay_fall, decay);
-
-  if (decay != nullptr) {
-    diag_.Error(loc, "UDP instantiation shall have at most two delays",
-                Subclause("29.8"));
-  }
-
-  auto apply_common = [&](ModuleItem* item) {
-    item->drive_strength0 = str0;
-    item->drive_strength1 = str1;
-    item->gate_delay = delay;
-    item->gate_delay_fall = delay_fall;
-  };
-
-  auto* first = ParseOneUdpInstance(udp_tok, loc);
-  apply_common(first);
-  items.push_back(first);
-  while (Match(TokenKind::kComma)) {
-    auto* next = ParseOneUdpInstance(udp_tok, loc);
-    apply_common(next);
-    items.push_back(next);
-  }
-  Expect(TokenKind::kSemicolon, Subclause("29.8"));
-}
 
 void Parser::RejectUdpPortDimension() {
   if (!Check(TokenKind::kLBracket)) return;
@@ -164,18 +101,11 @@ static bool IsValidUdpInitialLiteral(std::string_view text) {
   return false;
 }
 
-char Parser::ParseUdpInitialValue(TokenKind stop1, TokenKind stop2) {
-  char result = '0';
-  while (!Check(stop1) && !Check(stop2) && !AtEnd()) {
-    auto tok = Consume();
-    if (!tok.text.empty()) {
-      char last = tok.text.back();
-      if (last == '0' || last == '1' || last == 'x' || last == 'X') {
-        result = (last == 'X') ? 'x' : last;
-      }
-    }
-  }
-  return result;
+// The bit a literal IsValidUdpInitialLiteral accepts gives the output: its
+// last character, an upper-case X read as x.
+static char UdpInitialLiteralBit(std::string_view text) {
+  char last = text.back();
+  return last == 'X' ? 'x' : last;
 }
 
 // A.5.2: the one bit a 1-bit reg keeps of an integer literal written as its
@@ -379,20 +309,32 @@ static void ValidateUdpRowInputTransitions(DiagEngine& diag,
 // permits `-` only in the output field of a sequential UDP, and a current-state
 // field exists only in that form, so a row read as the other form has neither
 // rule to answer.
+// §29.3 Syntax 29-1 makes a sequential row's current-state field a
+// level_symbol, so - and the edge symbols are refused there, and so is any
+// other character but z, which UdpRowContainsZ reports for every field.
+static void ValidateUdpRowCurrentState(DiagEngine& diag, char cs,
+                                       SourceLoc row_loc) {
+  if (cs == '-') {
+    diag.Error(row_loc, "- shall not appear in the current-state field",
+               Subclause("29.3.6"));
+  } else if (UdpInputIsEdge(cs)) {
+    diag.Error(row_loc,
+               "edge symbols shall not appear in the current-state field",
+               Subclause("29.3.6"));
+  } else if (!UdpIsLevelSymbol(cs) && !UdpSymbolIsZ(cs)) {
+    diag.Error(
+        row_loc,
+        "the current-state field holds a level symbol (0, 1, x, X, ?, b, B)",
+        Subclause("29.3.6"));
+  }
+}
+
 static void ValidateUdpRowStateAndOutput(DiagEngine& diag,
                                          bool row_is_sequential,
                                          const UdpTableRow& row,
                                          SourceLoc row_loc) {
   if (row_is_sequential) {
-    char cs = row.current_state;
-    if (cs == '-') {
-      diag.Error(row_loc, "- shall not appear in the current-state field",
-                 Subclause("29.3.6"));
-    } else if (UdpInputIsEdge(cs)) {
-      diag.Error(row_loc,
-                 "edge symbols shall not appear in the current-state field",
-                 Subclause("29.3.6"));
-    }
+    ValidateUdpRowCurrentState(diag, row.current_state, row_loc);
   }
 
   {
@@ -530,6 +472,35 @@ char Parser::ParseUdpFieldSymbol() {
   return UdpCharFromToken(tok);
 }
 
+// §29.3 Syntax 29-1 writes a parenthesised edge `( level_symbol level_symbol
+// )`. The lexer hands the two over as one token, as `01` or `x1`, or as two, as
+// `?` and `0`, so every symbol up to the `)` is gathered and the edge is
+// refused unless there are two. Taking the first two of a token, `(011)` was
+// read as `(01)`.
+void Parser::ParseUdpParenEdge(UdpTableRow& row) {
+  SourceLoc loc = Consume().loc;
+  std::string symbols;
+  while (!Check(TokenKind::kRParen) && !Check(TokenKind::kColon) && !AtEnd()) {
+    Token tok = Consume();
+    if (tok.text.empty()) {
+      symbols.push_back(UdpCharFromToken(tok));
+    } else {
+      symbols.append(tok.text);
+    }
+  }
+  Expect(TokenKind::kRParen, Subclause("29.3.4"));
+  if (symbols.size() != 2) {
+    diag_.Error(loc, "an edge in parentheses is two level symbols",
+                Subclause("29.3"));
+    symbols.resize(2, '?');
+  }
+  while (row.paren_edges.size() < row.inputs.size()) {
+    row.paren_edges.push_back({0, 0});
+  }
+  row.inputs.push_back('\x01');
+  row.paren_edges.push_back({symbols[0], symbols[1]});
+}
+
 void Parser::ParseUdpTableRow(UdpDecl* udp, bool& reg_mismatch_reported,
                               bool& row_width_reported) {
   UdpTableRow row;
@@ -537,22 +508,7 @@ void Parser::ParseUdpTableRow(UdpDecl* udp, bool& reg_mismatch_reported,
   row.loc = row_loc;
   while (!Check(TokenKind::kColon) && !AtEnd()) {
     if (Check(TokenKind::kLParen)) {
-      Consume();
-      Token tok = Consume();
-      char from = 0, to = 0;
-      if (tok.text.size() >= 2) {
-        from = tok.text[0];
-        to = tok.text[1];
-      } else {
-        from = UdpCharFromToken(tok);
-        to = UdpCharFromToken(Consume());
-      }
-      Expect(TokenKind::kRParen, Subclause("29.3.4"));
-      while (row.paren_edges.size() < row.inputs.size()) {
-        row.paren_edges.push_back({0, 0});
-      }
-      row.inputs.push_back('\x01');
-      row.paren_edges.push_back({from, to});
+      ParseUdpParenEdge(row);
     } else {
       AppendUdpInputSymbols(row, Consume());
     }
@@ -597,14 +553,59 @@ void Parser::ParseUdpTable(UdpDecl* udp) {
   Expect(TokenKind::kKwEndtable, Subclause("29.3.4"));
 }
 
+// §29.3.1 and §29.3.2: the non-ANSI header lists the ports and the
+// declarations after it declare them, so the list and the declarations name
+// one set of ports, each once. Reports a name listed twice or never declared,
+// where the list writes it, and a declared input the list leaves out, at the
+// list's first name.
+static void MatchUdpNonAnsiPortList(DiagEngine& diag, const UdpDecl* udp,
+                                    const Token& first,
+                                    const std::vector<Token>& inputs) {
+  auto listed = [&](std::string_view name, size_t before) {
+    if (first.text == name) return true;
+    return std::any_of(inputs.begin(),
+                       inputs.begin() + static_cast<std::ptrdiff_t>(before),
+                       [&](const Token& t) { return t.text == name; });
+  };
+  const auto& declared = udp->input_names;
+  for (size_t i = 0; i < inputs.size(); ++i) {
+    std::string_view name = inputs[i].text;
+    if (listed(name, i)) {
+      diag.Error(inputs[i].loc,
+                 std::format("port '{}' appears more than once in the UDP's "
+                             "port list",
+                             name),
+                 Subclause("29.3.2"));
+    } else if (std::find(declared.begin(), declared.end(), name) ==
+                   declared.end() &&
+               name != udp->output_name) {
+      diag.Error(inputs[i].loc,
+                 std::format("port '{}' is listed in the UDP's port list but "
+                             "never declared",
+                             name),
+                 Subclause("29.3.2"));
+    }
+  }
+  for (std::string_view name : declared) {
+    if (listed(name, inputs.size())) continue;
+    diag.Error(first.loc,
+               std::format("port '{}' is declared but missing from the UDP's "
+                           "port list",
+                           name),
+               Subclause("29.3.2"));
+  }
+}
+
 // Validates that the non-ANSI port list's first port matches the declared
 // output, then reorders udp->input_names to follow the order in which the
 // inputs appeared in the parenthesized port list (only when every port-list
 // input maps to a declared input).
-static void ReconcileUdpNonAnsiPortList(
-    DiagEngine& diag, UdpDecl* udp, std::string_view first_name,
-    SourceLoc first_loc,
-    const std::vector<std::string_view>& port_list_inputs) {
+static void ReconcileUdpNonAnsiPortList(DiagEngine& diag, UdpDecl* udp,
+                                        const Token& first,
+                                        const std::vector<Token>& inputs) {
+  MatchUdpNonAnsiPortList(diag, udp, first, inputs);
+  std::string_view first_name = first.text;
+  SourceLoc first_loc = first.loc;
   if (!udp->output_name.empty() && !first_name.empty() &&
       first_name != udp->output_name) {
     diag.Error(first_loc,
@@ -613,10 +614,10 @@ static void ReconcileUdpNonAnsiPortList(
   }
 
   std::vector<std::string_view> reordered;
-  reordered.reserve(port_list_inputs.size());
-  for (auto name : port_list_inputs) {
+  reordered.reserve(inputs.size());
+  for (const Token& tok : inputs) {
     for (auto decl_name : udp->input_names) {
-      if (decl_name == name) {
+      if (decl_name == tok.text) {
         reordered.push_back(decl_name);
         break;
       }
@@ -698,7 +699,7 @@ UdpAnsiPortEntry Parser::ParseUdpAnsiPortEntry() {
   } else if (Match(TokenKind::kKwOutput)) {
     entry.is_output = true;
   } else {
-    Match(TokenKind::kKwInput);
+    entry.keyword_omitted = !Match(TokenKind::kKwInput);
   }
   // A.5.2 writes the optional `reg` and the optional initial value into
   // `udp_output_declaration` alone, so neither is read on an input entry.
@@ -746,8 +747,19 @@ void Parser::ParseUdpAnsiHeader(UdpDecl* udp) {
   bool have_first_port = false;
   bool first_port_is_output = false;
   SourceLoc first_port_loc{};
+  bool after_output = false;
   do {
     UdpAnsiPortEntry entry = ParseUdpAnsiPortEntry();
+    // §29.3 Syntax 29-1 opens each udp_input_declaration with input, and only
+    // the names after the first in its list go without it, so a bare name
+    // straight after the output declaration continues no input declaration.
+    if (entry.keyword_omitted && after_output) {
+      diag_.Error(
+          entry.loc,
+          "the first input of a UDP's port list is declared with 'input'",
+          Subclause("29.3"));
+    }
+    after_output = entry.is_output;
     bool is_output = PlaceUdpAnsiPortEntry(diag_, udp, entry);
     // An inout entry is not a port §29.3.1 admits, and RejectUdpInoutPort has
     // already said so, so it is not what the output's position is measured
@@ -778,17 +790,14 @@ void Parser::ParseUdpAnsiHeader(UdpDecl* udp) {
 // port declarations, then reconciles the port-list order against them.
 void Parser::ParseUdpNonAnsiHeader(UdpDecl* udp) {
   auto first_tok = ExpectIdentifier(Subclause("29.3.1"));
-  std::string_view first_name = first_tok.text;
-  SourceLoc first_loc = first_tok.loc;
-  std::vector<std::string_view> port_list_inputs;
+  std::vector<Token> port_list_inputs;
   while (Match(TokenKind::kComma)) {
-    port_list_inputs.push_back(ExpectIdentifier(Subclause("29.3.1")).text);
+    port_list_inputs.push_back(ExpectIdentifier(Subclause("29.3.1")));
   }
   Expect(TokenKind::kRParen, Subclause("29.3.1"));
   Expect(TokenKind::kSemicolon, Subclause("29.3.1"));
   ParseUdpPortDecls(udp);
-  ReconcileUdpNonAnsiPortList(diag_, udp, first_name, first_loc,
-                              port_list_inputs);
+  ReconcileUdpNonAnsiPortList(diag_, udp, first_tok, port_list_inputs);
 }
 
 // Parses the optional UDP initial statement (initial out = literal;),
@@ -805,10 +814,15 @@ void Parser::ParseUdpInitialStatement(UdpDecl* udp) {
   ValidateUdpInitialHeader(diag_, udp, scan, id_tok);
   Expect(TokenKind::kEq, Subclause("29.3.3"));
 
+  // §29.3.3: one single-bit literal and nothing after it, so a right-hand side
+  // opening with one and going on is refused with the rest read past.
   auto rhs_tok = CurrentToken();
-  udp->initial_value =
-      ParseUdpInitialValue(TokenKind::kSemicolon, TokenKind::kSemicolon);
-  if (!IsValidUdpInitialLiteral(rhs_tok.text)) {
+  if (!Check(TokenKind::kSemicolon)) Consume();
+  bool one_literal =
+      Check(TokenKind::kSemicolon) && IsValidUdpInitialLiteral(rhs_tok.text);
+  while (!Check(TokenKind::kSemicolon) && !AtEnd()) Consume();
+  udp->initial_value = one_literal ? UdpInitialLiteralBit(rhs_tok.text) : 'x';
+  if (!one_literal) {
     diag_.Error(rhs_tok.loc,
                 "UDP initial statement RHS shall be 0, 1, or a single-bit "
                 "literal",

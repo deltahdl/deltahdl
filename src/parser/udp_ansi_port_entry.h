@@ -17,6 +17,9 @@ struct UdpAnsiPortEntry {
   bool is_output = false;
   bool is_inout = false;
   bool declares_reg = false;
+  // Set on an entry written with no direction keyword, which only continues
+  // the list of the input declaration before it.
+  bool keyword_omitted = false;
   // A.5.2's `= constant_expression`, as written; null where the entry wrote
   // none, or wrote one after an output declared without reg, which is not a
   // place the grammar puts one.

@@ -307,4 +307,39 @@ TEST(UdpDeclGrammar, UdpHeaderWithoutStateTableRejected) {
                             "29.3.4"));
 }
 
+// §29.3 Syntax 29-1 opens every udp_input_declaration with the keyword input,
+// so a name straight after the output declaration is no input at all. The
+// parser took a missing input keyword for an optional one and read `a` here as
+// an input without a report.
+TEST(UdpDeclGrammar, AnsiFirstInputWithoutTheInputKeywordRejected) {
+  auto r = Parse(
+      "primitive p1(output q, a);\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "the first input of a UDP's port list is declared with 'input'",
+      1, "29.3"));
+}
+
+// The names after the first in one udp_input_declaration's
+// list_of_udp_port_identifiers carry no keyword of their own, so `b` continues
+// `input a` and the header is the one the check above leaves alone.
+TEST(UdpDeclGrammar, AnsiInputListContinuesWithoutTheKeyword) {
+  auto r = Parse(
+      "primitive p2(output q, input a, b);\n"
+      "  table\n"
+      "    0 0 : 1;\n"
+      "    1 ? : 0;\n"
+      "    ? 1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->udps[0]->input_names.size(), 2u);
+  EXPECT_EQ(r.cu->udps[0]->input_names[1], "b");
+}
+
 }  // namespace

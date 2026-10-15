@@ -501,6 +501,13 @@ struct ModuleItem {
   // elaborator is what knows the module names.
   bool type_name_undeclared_at_parse = false;
 
+  // §29.3 lets a UDP be declared anywhere, and §29.8 gives its instance forms
+  // no module instance writes: set on a kUdpInst read in such a form, as
+  // Parser::AtUdpOnlyInstanceForm tells, before the parser had read a
+  // declaration of the name it gives. The elaborator reports one whose name
+  // proves to reach no primitive.
+  bool udp_undeclared_at_parse = false;
+
   DataTypeKind forward_type_kind = DataTypeKind::kImplicit;
 
   bool is_rand = false;

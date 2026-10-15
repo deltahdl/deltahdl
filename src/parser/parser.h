@@ -312,7 +312,7 @@ class Parser {
   void ParseUdpNonAnsiHeader(UdpDecl* udp);
   void ParseUdpInitialStatement(UdpDecl* udp);
   UdpDecl* ParseExternUdpDecl();
-  char ParseUdpInitialValue(TokenKind stop1, TokenKind stop2);
+  void ParseUdpParenEdge(UdpTableRow& row);
   Expr* ParseUdpOutputInitialValue(bool declares_reg);
   void ParseUdpOutputDecl(UdpDecl* udp);
   void ParseUdpPortDecls(UdpDecl* udp);
@@ -333,7 +333,7 @@ class Parser {
   void ParseUdpInputDecl(UdpDecl* udp);
 
   void ValidateUdpHeader(UdpDecl* udp);
-
+  bool AtUdpOnlyInstanceForm();
   void ValidateUdpTable(UdpDecl* udp);
   bool TryParseStrengthSpec(uint8_t& str0, uint8_t& str1);
   ModuleItem* ParseOneUdpInstance(const Token& udp_tok, SourceLoc loc);

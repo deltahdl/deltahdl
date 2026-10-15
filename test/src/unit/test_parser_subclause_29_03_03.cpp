@@ -194,4 +194,21 @@ TEST(UdpSequentialInitial, BlockStatementIsRejected) {
       2, "29.3.3"));
 }
 
+// §29.3.3: the initial statement assigns one single-bit literal. Only the
+// right-hand side's first token was checked, so a literal followed by more of
+// an expression passed, its value taken from its last token.
+TEST(UdpSequentialInitial, ExpressionOpeningWithALiteralIsRejected) {
+  auto r = Parse(
+      "primitive dff(output reg q, input d, input clk);\n"
+      "  initial q = 1'b1 + 1'b0;\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "UDP initial statement RHS shall be 0, 1, or a single-bit literal", 2,
+      "29.3.3"));
+}
+
 }  // namespace

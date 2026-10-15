@@ -485,4 +485,58 @@ TEST(UdpPortDeclaration,
                              6, "29.3.2"));
 }
 
+// §29.3.1 and §29.3.2: the non-ANSI header lists the ports and the
+// declarations after it declare them, so every name the list holds is a
+// declared port. Only the list's first name was ever checked, and `b` here
+// drew no report.
+TEST(UdpPortDeclaration, ListedPortNeverDeclaredRejected) {
+  auto r = Parse(
+      "primitive p1(q, a, b);\n"
+      "  output q;\n"
+      "  input a;\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "port 'b' is listed in the UDP's port list but never declared",
+      1, "29.3.2"));
+}
+
+// The other side of the rule: every declared port is one the list names, and
+// the table's input fields follow the list's order, so a declared input the
+// list leaves out has no field of its own.
+TEST(UdpPortDeclaration, DeclaredPortMissingFromTheListRejected) {
+  auto r = Parse(
+      "primitive p2(q, a);\n"
+      "  output q;\n"
+      "  input a, b;\n"
+      "  table\n"
+      "    0 0 : 1;\n"
+      "    1 ? : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "port 'b' is declared but missing from the UDP's port list", 1,
+      "29.3.2"));
+}
+
+// A port is one entry of the list, so a name written twice stands for two
+// ports that one declaration cannot both be.
+TEST(UdpPortDeclaration, PortListedTwiceRejected) {
+  auto r = Parse(
+      "primitive p3(q, q, a);\n"
+      "  output q;\n"
+      "  input a;\n"
+      "  table\n"
+      "    0 : 1;\n"
+      "    1 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "port 'q' appears more than once in the UDP's port list", 1,
+      "29.3.2"));
+}
+
 }  // namespace

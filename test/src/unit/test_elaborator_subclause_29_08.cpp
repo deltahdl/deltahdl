@@ -637,4 +637,59 @@ TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithAWildcardIsReported) {
       "29.8"));
 }
 
+// A delay with no parentheses, which the parser reads as a UDP instance's
+// before it knows p_fwd, reaches the instance as one written after the
+// primitive's declaration does.
+TEST(UdpInstanceElaboration, ForwardDeclaredUdpTakesADelayWithoutParentheses) {
+  ElabFixture f;
+  const auto* inst = ForwardUdpInst(ElaborateSrc(
+      ForwardUdpSrc("p_fwd #5 u(f_out, f_a, f_b);"), f, "fwd_top"));
+  ASSERT_NE(inst, nullptr);
+  ASSERT_NE(inst->delay, nullptr);
+  EXPECT_EQ(inst->delay->int_val, 5U);
+}
+
+// A drive strength reaches the instance the same way. Strong is 4 and weak is
+// 2, so neither is the 0 an instance that dropped the strength holds.
+TEST(UdpInstanceElaboration, ForwardDeclaredUdpTakesADriveStrength) {
+  ElabFixture f;
+  const auto* inst = ForwardUdpInst(
+      ElaborateSrc(ForwardUdpSrc("p_fwd (strong0, weak1) u(f_out, f_a, f_b);"),
+                   f, "fwd_top"));
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(inst->drive_strength0, 4);
+  EXPECT_EQ(inst->drive_strength1, 2);
+}
+
+// An unnamed instance of p_fwd drives its output terminal, as one of a
+// primitive declared first does.
+TEST(UdpInstanceElaboration, UnnamedInstanceOfAForwardDeclaredUdp) {
+  ElabFixture f;
+  const auto* inst = ForwardUdpInst(
+      ElaborateSrc(ForwardUdpSrc("p_fwd (f_out, f_a, f_b);"), f, "fwd_top"));
+  ASSERT_NE(inst, nullptr);
+  ASSERT_NE(inst->output, nullptr);
+  EXPECT_EQ(inst->output->text, "f_out");
+}
+
+// The parser reads `m_child #5 u (...)` as a UDP instance before it knows what
+// m_child names, since no module instance is written that way. m_child is a
+// module, so the instantiation is neither a primitive's nor a module's, and
+// the instance was dropped without a report.
+TEST(UdpInstanceElaboration, ModuleWrittenAsAPrimitiveInstanceIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m_child(output o, input i);\n"
+      "endmodule\n"
+      "module fwd_top;\n"
+      "  wire f_out, f_a;\n"
+      "  m_child #5 u(f_out, f_a);\n"
+      "endmodule\n",
+      f, "fwd_top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'m_child' is instantiated as a user-defined "
+                            "primitive, but no primitive has that name",
+                            5, "29.8"));
+}
+
 }  // namespace

@@ -259,6 +259,16 @@ void Elaborator::ElaborateUdpInst(ModuleItem* item, RtlirModule* mod) {
   // here, and one list written wrong is one mistake.
   if (const UdpDecl* decl = FindUdpByName(item->inst_module); decl != nullptr) {
     CheckUdpInstTerminalCount(item, decl, diag_);
+  } else if (item->udp_undeclared_at_parse) {
+    // Read as a UDP instance in a form no module instance writes, before the
+    // parser knew the name, and the name reaches no primitive: the
+    // instantiation is neither a primitive's nor a module's.
+    diag_.Error(item->loc,
+                std::format("'{}' is instantiated as a user-defined "
+                            "primitive, but no primitive has that name",
+                            item->inst_module),
+                Subclause("29.8"));
+    return;
   }
 
   // §29.8: an array of UDP instances may carry an optional range, and the
@@ -294,7 +304,7 @@ void Elaborator::ElaborateUdpInst(ModuleItem* item, RtlirModule* mod) {
 // `[ name_of_instance ] ( output_terminal , input_terminal { , input_terminal }
 // )` -- so ModuleItem::gate_terminals splits at index 1. ModuleItem::gate_kind
 // is not consulted, because Parser::ParseOneUdpInstance
-// (src/parser/parser_udp.cpp:6) never writes it for a primitive instance.
+// (src/parser/parser_udp_inst.cpp) never writes it for a primitive instance.
 //
 // §29.8 admits two delays and no more, since a UDP does not support z.
 // ModuleItem::gate_delay and ModuleItem::gate_delay_fall are therefore carried

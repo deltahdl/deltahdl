@@ -910,7 +910,7 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
     ParseVarDeclList(items, dtype);
     return;
   }
-  if (known_udps_.count(name_tok.text) != 0) {
+  if (known_udps_.count(name_tok.text) != 0 || AtUdpOnlyInstanceForm()) {
     if (InProgramBlock()) {
       diag_.Error(name_tok.loc, "primitive instances not allowed in programs",
                   Subclause("24.3"));
