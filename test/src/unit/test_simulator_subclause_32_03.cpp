@@ -490,12 +490,14 @@ TEST(SdfAnnotator, TimingenvIsIgnoredWithoutWarnings) {
   )";
   ASSERT_TRUE(ParseSdf(sdf, file));
 
+  SimFixture f;
   SpecifyManager mgr;
+  ASSERT_TRUE(BuildSpecifyFromSource(kDesign, f, mgr));
   SdfAnnotationResult result =
       AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
 
   EXPECT_TRUE(result.warnings.empty());
-  EXPECT_TRUE(mgr.HasPathDelay("a", "y"));
+  EXPECT_EQ(mgr.GetPathDelay("a", "y"), 10u);
 }
 
 // C2, second syntactic position: the unrelated section sits inside a CELL,
@@ -518,12 +520,14 @@ TEST(SdfAnnotator, TimingenvInsideCellIsIgnoredWithoutWarnings) {
   )";
   ASSERT_TRUE(ParseSdf(sdf, file));
 
+  SimFixture f;
   SpecifyManager mgr;
+  ASSERT_TRUE(BuildSpecifyFromSource(kDesign, f, mgr));
   SdfAnnotationResult result =
       AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
 
   EXPECT_TRUE(result.warnings.empty());
-  EXPECT_TRUE(mgr.HasPathDelay("a", "y"));
+  EXPECT_EQ(mgr.GetPathDelay("a", "y"), 10u);
 }
 
 // C2, third input form: the file header. Date, vendor, program, tool version,
@@ -554,13 +558,15 @@ TEST(SdfAnnotator, HeaderConstructsAreIgnoredWithoutWarnings) {
   )";
   ASSERT_TRUE(ParseSdf(sdf, file));
 
+  SimFixture f;
   SpecifyManager mgr;
+  ASSERT_TRUE(BuildSpecifyFromSource(kDesign, f, mgr));
   SdfAnnotationResult result =
       AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
 
   EXPECT_TRUE(result.warnings.empty());
   EXPECT_EQ(file.version, "3.0");
-  EXPECT_TRUE(mgr.HasPathDelay("a", "y"));
+  EXPECT_EQ(mgr.GetPathDelay("a", "y"), 10u);
 }
 
 // ---------------------------------------------------------------------------
@@ -833,13 +839,15 @@ TEST(SdfAnnotator, UnannotatableConstructInLaterCellStillWarns) {
   )";
   ASSERT_TRUE(ParseSdf(sdf, file));
 
+  SimFixture f;
   SpecifyManager mgr;
+  ASSERT_TRUE(BuildSpecifyFromSource(kDesign, f, mgr));
   SdfAnnotationResult result =
       AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
 
   ASSERT_EQ(result.warnings.size(), 1u);
   EXPECT_NE(result.warnings[0].find("DEVICE"), std::string::npos);
-  EXPECT_TRUE(mgr.HasPathDelay("a", "y"));
+  EXPECT_EQ(mgr.GetPathDelay("a", "y"), 10u);
 }
 
 // All three rules at once on one file: the unrelated TIMINGENV section is

@@ -174,6 +174,10 @@ void FollowNetDrivers(Net& net,
   shadow->resolved.value = MakeLogic4Vec(ctx.GetArena(), kWidth);
   auto follow = std::make_shared<InterconnectFollow>(
       InterconnectFollow{net, shadow, std::move(load), std::move(commit)});
+  // A driver the net already carries starts the shadow where it stands, so
+  // its next write is measured from there; a source that moved before the
+  // load began following it would otherwise look unmoved.
+  if (!net.drivers.empty()) GrowShadow(*follow, net.drivers.size() - 1);
   net.driver_listeners.emplace_back(
       [follow, &ctx](std::size_t slot) { FollowDriver(follow, slot, ctx); });
 }

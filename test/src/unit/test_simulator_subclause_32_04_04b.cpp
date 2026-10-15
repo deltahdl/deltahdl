@@ -342,7 +342,7 @@ TEST(InterconnectDelaySim, ANetDelayReachesALoadBelowOnce) {
 // §32.4.4: on a multisource net each source/load pair may carry a delay of
 // its own. u1 and u3 both drive w, u1 holding z throughout; u3 moves to A5 at
 // 5, and its own delay of 9 is what reaches the load, not u1's 5, so at 12 the
-// load still holds z.
+// load still holds z and at 16 it holds A5.
 TEST(InterconnectDelaySim, EachSourceReachesTheLoadWithItsOwnDelay) {
   const std::string kSdf = WriteSdfFile(
       "multisource.sdf", DelayFile("(INTERCONNECT u1/o u2/din (5))"
@@ -355,7 +355,10 @@ TEST(InterconnectDelaySim, EachSourceReachesTheLoadWithItsOwnDelay) {
       "endmodule\n"
       "module sink(input logic [7:0] din);\n"
       "  logic ok = 1'b0;\n"
-      "  initial #12 ok = (din === 8'hzz);\n"
+      "  initial begin\n"
+      "    #12 ok = (din === 8'hzz);\n"
+      "    #4 ok = ok && (din === 8'hA5);\n"
+      "  end\n"
       "endmodule\n"
       "module top;\n"
       "  wire [7:0] w;\n"
