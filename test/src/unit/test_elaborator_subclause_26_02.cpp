@@ -761,4 +761,59 @@ TEST(PackageDeclarationElaboration, CuNameInAPackageSequenceOfAnyShape) {
                              5, "26.2"));
 }
 
+// §26.2 with §16.7 and §16.8.1: a sub-sequence a package sequence writes in
+// parentheses with `and`, and a sequence a package sequence or property passes
+// as an actual, are the item's own text, so a hierarchical head or a
+// compilation-unit name in either is reported. The parser holds each as a
+// sequence of its own under the operand standing in its place, which the walk
+// did not reach; a head the package declares or the sequence takes as a formal
+// stays no hierarchical reference there.
+TEST(PackageDeclarationElaboration,
+     NamesInANestedGroupOrASequenceActualOfAPackageItem) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("int v;\n"
+             "package p;\n"
+             "  typedef struct packed { logic f; } st_t;\n"
+             "  st_t w;\n"
+             "  sequence s; (top.a and 1) ##0 1; endsequence\n"
+             "  sequence su; (v and 1) ##0 1; endsequence\n"
+             "  sequence sw; (w.f and 1) ##0 1; endsequence\n"
+             "  sequence sf(v); (v.f and v) ##0 1; endsequence\n"
+             "  sequence s2(x); x ##1 1; endsequence\n"
+             "  sequence sa; s2(top.b ##1 1) ##1 1; endsequence\n"
+             "  property q; s2(top.c ##1 1); endproperty\n"
+             "endpackage\n"
+             "module top; logic a = 1, b = 1, c = 1; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "package item contains a hierarchical reference "
+                            "'top'",
+                            5, "26.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "package item references 'v' from the "
+                            "compilation-unit scope",
+                            6, "26.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "package item contains a hierarchical reference "
+                             "'w'",
+                             7, "26.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "package item contains a hierarchical reference "
+                             "'v'",
+                             8, "26.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "package item references 'v' from the "
+                             "compilation-unit scope",
+                             8, "26.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "package item contains a hierarchical reference "
+                            "'top'",
+                            10, "26.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "package item contains a hierarchical reference "
+                            "'top'",
+                            11, "26.2"));
+}
+
 }  // namespace

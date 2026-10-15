@@ -175,8 +175,15 @@ void CheckPackageRefMemberRoot(const PackageRefContext& ctx, const Expr* e) {
   }
 }
 
+void WalkPropertyNode(const PackageRefContext& ctx, PropertyExprNode* node);
+
+// An expression of a package item, the sequence or property an operand
+// stands in place of included: a parenthesized group joining sequences
+// (§16.9) or a sequence or property passed as an actual (§16.8.1), which the
+// parser holds as a tree of its own under `property_actual`.
 void WalkPackageRefExpr(const PackageRefContext& ctx, const Expr* e) {
   if (!e) return;
+  WalkPropertyNode(ctx, e->property_actual);
   if (e->kind == ExprKind::kIdentifier) {
     CheckPackageRefIdentifier(ctx, e);
   } else if (e->kind == ExprKind::kMemberAccess) {
