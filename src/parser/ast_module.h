@@ -11,6 +11,7 @@
 #include "common/source_loc.h"
 #include "common/types.h"
 #include "lexer/token.h"
+#include "parser/ast_assertion_text.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_fsm.h"
 #include "parser/ast_stmt.h"
@@ -311,24 +312,6 @@ struct ClockingSignalDecl {
 // A bound written as the name of a formal argument of the declaring sequence
 // is kept by name until §16.8's instantiation supplies the actual, an
 // elaboration-time constant or `$`, that the flattening reads it as.
-// §23.9 with §16.8 and §16.12: a name the property_spec of a concurrent
-// assertion, or the body of a named sequence or property, reads without a
-// hierarchical path, and where the read stands.
-struct AssertionRead {
-  std::string_view name;
-  SourceLoc loc;
-};
-
-// §16.8: an identifier written as the whole of a positional actual argument
-// of an instance in such a text: the name of what is instantiated, the
-// position of the argument, the identifier and where it stands.
-struct AssertionInstanceArg {
-  std::string_view callee;
-  size_t index = 0;
-  std::string_view name;
-  SourceLoc loc;
-};
-
 // §16.7: a cycle delay's bounds, `$` kept as kUnbounded, and a bound written
 // as a constant expression kept until an instance or the scope settles it.
 struct SeqCycleDelay {

@@ -4,6 +4,7 @@
 
 #include "lexer/lexer.h"
 #include "lexer/token.h"
+#include "parser/ast_assertion_text.h"
 #include "parser/ast_module.h"
 #include "parser/parser.h"
 #include "parser/parser_property_spec_internal.h"
@@ -108,7 +109,7 @@ struct AssertionTextScan {
     if (const_bracket > 0) {
       item->assertion_const_names.push_back(t.text);
     }
-    item->assertion_reads.push_back({t.text, t.loc});
+    item->assertion_reads.push_back({t.text, t.loc, next.Is(TokenKind::kDot)});
   }
 
   // An opening parenthesis after a name, not a member's, opens the argument
@@ -173,13 +174,13 @@ struct AssertionTextScan {
 
 // §23.9, §16.8 and §16.10: a scan of the text from the current token to `end`
 // (for `kRParen`, the one closing the parenthesis the caller consumed), which
-// records on `item` the names the text reads without a hierarchical path, the
-// names it declares as local variables of a user-defined type, the names it
-// writes in a cycle delay or a repetition bound, and the identifiers it passes
-// whole as positional actuals to the instances it writes. A name followed by
-// an argument list is an instance or a call, which other rules resolve, and a
-// name after `.` or `::` is a member, which the path resolves. The lexer is
-// left where it was.
+// records on `item` the names the text reads, marking each a member access
+// starts from (§26.2 judges that name in a package), the names it declares as
+// local variables of a user-defined type, the names it writes in a cycle delay
+// or a repetition bound, and the identifiers it passes whole as positional
+// actuals to the instances it writes. A name followed by an argument list is an
+// instance or a call, which other rules resolve, and a name after `.` or `::`
+// is a member, which the path resolves. The lexer is left where it was.
 void ParserPropertySpecHelpers::RecordAssertionReads(Parser& p,
                                                      ModuleItem* item,
                                                      TokenKind end) {

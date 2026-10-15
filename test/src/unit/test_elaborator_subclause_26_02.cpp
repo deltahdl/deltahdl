@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdint>
+#include <string>
 
+#include "common/diagnostic.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
@@ -684,6 +687,77 @@ TEST(PackageDeclarationElaboration, HierarchicalRefInAPackagePropertySequence) {
                             "package item contains a hierarchical reference "
                             "'top'",
                             3, "26.2"));
+}
+
+// §26.2 with §16.7: a package sequence's body is held to the rule whatever
+// shape it takes, one the parser's linear form of a body does not hold, a
+// parenthesized `and` before a `##0`, as much as one it does. Such a body kept
+// no expression, so the head of a member access in it went unjudged; a head
+// the package declares or the sequence takes as a formal is no hierarchical
+// reference, and a clock the linear form does hold is judged once.
+TEST(PackageDeclarationElaboration,
+     HierarchicalRefInAPackageSequenceOfAnyShape) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p;\n"
+             "  typedef struct packed { logic f; } st_t;\n"
+             "  st_t w;\n"
+             "  sequence s; (top.a and 1) ##0 1; endsequence\n"
+             "  sequence sc; @(posedge top.clk) (1 and 1) ##0 1; endsequence\n"
+             "  sequence sw; (w.f and 1) ##0 1; endsequence\n"
+             "  sequence sf(v); (v.f and 1) ##0 1; endsequence\n"
+             "endpackage\n"
+             "module top; logic clk = 0, a = 1; endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "package item contains a hierarchical reference "
+                            "'top'",
+                            4, "26.2"));
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_EQ(std::count_if(diags.begin(), diags.end(),
+                          [](const Diagnostic& d) {
+                            return d.loc.line == 5 &&
+                                   d.message.find(
+                                       "hierarchical reference "
+                                       "'top'") != std::string::npos;
+                          }),
+            1);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "package item contains a hierarchical reference "
+                             "'w'",
+                             6, "26.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "package item contains a hierarchical reference "
+                             "'v'",
+                             7, "26.2"));
+}
+
+// §26.2 with §16.7: a compilation-unit name read in a package sequence is
+// reported whatever shape the body takes, and a formal or a local of the
+// sequence spelled as that name is the sequence's own. A body the parser's
+// linear form does not hold kept no expression, so the name went unjudged.
+TEST(PackageDeclarationElaboration, CuNameInAPackageSequenceOfAnyShape) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("int v;\n"
+             "package p;\n"
+             "  sequence su; (v and 1) ##0 1; endsequence\n"
+             "  sequence sf(v); (v and 1) ##0 1; endsequence\n"
+             "  sequence sl; int v; (v and 1) ##0 1; endsequence\n"
+             "endpackage\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "package item references 'v' from the "
+                            "compilation-unit scope",
+                            3, "26.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "package item references 'v' from the "
+                             "compilation-unit scope",
+                             4, "26.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "package item references 'v' from the "
+                             "compilation-unit scope",
+                             5, "26.2"));
 }
 
 }  // namespace

@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdint>
 #include <format>
 #include <functional>
@@ -5,6 +6,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -12,6 +14,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/assertion_body_slots.h"
+#include "elaborator/assertion_walk.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_modport_imports.h"
@@ -20,6 +23,7 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/std_package.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_assertion_text.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -96,6 +100,21 @@ bool IsImportedName(const PackageRefContext& ctx, std::string_view name) {
   return ctx.imported_names.count(name) != 0 || IsProvidedByWildcard(ctx, name);
 }
 
+// §26.2 (printed page 808): a package item may not refer to an item of the
+// compilation-unit scope, which a name the package declares or imports hides.
+void CheckPackageRefCuName(const PackageRefContext& ctx, std::string_view name,
+                           SourceLoc loc) {
+  if (ctx.cu_top_names->count(name) && !ctx.pkg_names.count(name) &&
+      !IsImportedName(ctx, name)) {
+    ctx.diag->Error(loc,
+                    std::format("package item references '{}' from the "
+                                "compilation-unit scope; packages cannot refer "
+                                "to compilation-unit-scope items",
+                                name),
+                    Subclause("26.2"));
+  }
+}
+
 void CheckPackageRefIdentifier(const PackageRefContext& ctx, const Expr* e) {
   if (!e->scope_prefix.empty()) {
     ctx.diag->Error(
@@ -104,15 +123,8 @@ void CheckPackageRefIdentifier(const PackageRefContext& ctx, const Expr* e) {
                     "a scope outside the package",
                     e->scope_prefix),
         Subclause("26.2"));
-  } else if (ctx.cu_top_names->count(e->text) &&
-             !ctx.pkg_names.count(e->text) && !IsImportedName(ctx, e->text)) {
-    ctx.diag->Error(
-        e->range.start,
-        std::format("package item references '{}' from the "
-                    "compilation-unit scope; packages cannot refer to "
-                    "compilation-unit-scope items",
-                    e->text),
-        Subclause("26.2"));
+  } else {
+    CheckPackageRefCuName(ctx, e->text, e->range.start);
   }
 }
 
@@ -145,18 +157,21 @@ bool RootIsOutsidePackage(const PackageRefContext& ctx, std::string_view root) {
   return !is_pkg && !is_self && !IsImportedName(ctx, root);
 }
 
+void CheckPackageRefRoot(const PackageRefContext& ctx, std::string_view root,
+                         SourceLoc loc) {
+  if (RootIsOutsidePackage(ctx, root)) {
+    ctx.diag->Error(loc,
+                    std::format("package item contains a hierarchical "
+                                "reference '{}' that does not target the "
+                                "package itself or an imported package",
+                                root),
+                    Subclause("26.2"));
+  }
+}
+
 void CheckPackageRefMemberRoot(const PackageRefContext& ctx, const Expr* e) {
   if (e->lhs && e->lhs->kind == ExprKind::kIdentifier && e->rhs) {
-    auto root = e->lhs->text;
-    if (RootIsOutsidePackage(ctx, root)) {
-      ctx.diag->Error(
-          e->range.start,
-          std::format("package item contains a hierarchical reference "
-                      "'{}' that does not target the package itself or "
-                      "an imported package",
-                      root),
-          Subclause("26.2"));
-    }
+    CheckPackageRefRoot(ctx, e->lhs->text, e->range.start);
   }
 }
 
@@ -266,15 +281,45 @@ void WalkPackageProperty(PackageRefContext& ctx, const ModuleItem* item) {
   });
 }
 
+// §26.2 for a sequence body of a shape the parser's linear form does not
+// hold (§16.7), which keeps no expression: each name the body reads, as the
+// parser's scan of its text records it, is judged as an identifier is, and
+// one a member access starts from as that access's root is. A name of the
+// clock, which is kept as an expression whatever the body's shape, is judged
+// there.
+void WalkPackageSequenceReads(const PackageRefContext& ctx, ModuleItem* item) {
+  std::vector<SourceLoc> clock_names;
+  ForEachEventSlot(item->seq_clock, [&](const Expr* slot) {
+    ForEachSubExpr(slot, [&](const Expr* e) {
+      if (e->kind == ExprKind::kIdentifier)
+        clock_names.push_back(e->range.start);
+    });
+  });
+  for (const AssertionRead& read : item->assertion_reads) {
+    bool in_clock = std::ranges::any_of(clock_names, [&](SourceLoc loc) {
+      return std::tie(loc.file_id, loc.line, loc.column) ==
+             std::tie(read.loc.file_id, read.loc.line, read.loc.column);
+    });
+    if (in_clock) continue;
+    CheckPackageRefCuName(ctx, read.name, read.loc);
+    if (read.heads_member_access) CheckPackageRefRoot(ctx, read.name, read.loc);
+  }
+}
+
 // §26.2 holds for a sequence the package declares (§16.8): its clocking event
 // and its body, which read its formals and its locals as its own names. The
-// body is the one the parser holds in seq_linear.
+// body is the one the parser holds in seq_linear, or, where that holds none,
+// the reads its scan of the text records.
 void WalkPackageSequence(PackageRefContext& ctx, ModuleItem* item) {
   if (item->kind != ModuleItemKind::kSequenceDecl) return;
   auto walk = [&](const Expr* e) { WalkPackageRefExpr(ctx, e); };
   WalkWithNames(ctx, AssertionBoundNames(item), [&] {
     ForEachEventSlot(item->seq_clock, walk);
-    ForEachBodySlot(item->seq_linear, walk);
+    if (item->seq_linear.operands.empty()) {
+      WalkPackageSequenceReads(ctx, item);
+    } else {
+      ForEachBodySlot(item->seq_linear, walk);
+    }
   });
 }
 

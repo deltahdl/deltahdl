@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "parser/ast_assertion_text.h"
 #include "parser/ast_module.h"
 
 namespace delta {
