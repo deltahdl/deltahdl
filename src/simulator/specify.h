@@ -164,8 +164,13 @@ class SpecifyManager {
   // instance exists: SdfCellPrefixInRegion (simulator/sdf_parser.h) answers a
   // definite prefix for every cell, so an empty value stands for the root
   // rather than for an instance the file left out.
+  //
+  // A limit annotated onto a check evaluated on delayed signals is adjusted
+  // for their delays (§31.9.1), and the warning for one that adjustment sets
+  // to 0 is added to `warnings`.
   bool AnnotateSdfTimingCheck(const SdfTcAnnotation& annotation,
-                              std::string_view inst_prefix = {});
+                              std::string_view inst_prefix,
+                              std::vector<std::string>& warnings);
 
   // §32.4.1: register a module output driven by a gate primitive, so a DEVICE
   // delay that finds no specify path for that output can still land on it.

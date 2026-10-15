@@ -829,7 +829,9 @@ void AnnotateSdfTimingCheckEntry(const SdfTimingCheck& tc,
   // them means the constraint was placed.
   bool placed = false;
   for (const auto& target : ExpandSdfTimingCheckTargets(tc, mtm)) {
-    if (mgr.AnnotateSdfTimingCheck(target, inst_prefix)) placed = true;
+    if (mgr.AnnotateSdfTimingCheck(target, inst_prefix, result.warnings)) {
+      placed = true;
+    }
   }
   // §32.3: a constraint the design declares no check for is data the annotator
   // understood but could not put anywhere, so it warns rather than dropping the

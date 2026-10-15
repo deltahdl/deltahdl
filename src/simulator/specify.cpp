@@ -678,18 +678,42 @@ bool SdfAnnotationMatchesCheck(const TimingCheckEntry& existing,
   return true;
 }
 
-void ApplySdfAnnotationFields(TimingCheckEntry& check,
-                              const SdfTcAnnotation& a) {
-  if (a.set_limit) check.limit = a.limit;
-  if (a.set_limit2) check.limit2 = a.limit2;
-  if (a.set_start_edge_offset) check.start_edge_offset = a.start_edge_offset;
-  if (a.set_end_edge_offset) check.end_edge_offset = a.end_edge_offset;
+// §31.9.1: an annotated limit of a check evaluated on delayed signals is
+// adjusted for their delays as a declared one was, and set to 0 with a warning
+// where that leaves it no longer positive.
+uint64_t AnnotatedLimit(uint64_t limit, int64_t shift,
+                        std::vector<std::string>& warnings) {
+  const AdjustedNegativeTimingLimit kAdjusted =
+      ShiftTimingCheckLimit(limit, shift);
+  if (kAdjusted.warn) {
+    warnings.emplace_back(
+        "SDF annotator: adjusted for the delays of the delayed signals its "
+        "check is evaluated on, an annotated limit is no longer positive and "
+        "is set to 0");
+  }
+  return kAdjusted.limit;
+}
+
+void ApplySdfAnnotationFields(TimingCheckEntry& check, const SdfTcAnnotation& a,
+                              std::vector<std::string>& warnings) {
+  const int64_t kFirstShift = FirstLimitDelayShift(check);
+  if (a.set_limit) check.limit = AnnotatedLimit(a.limit, kFirstShift, warnings);
+  if (a.set_limit2) {
+    check.limit2 = AnnotatedLimit(a.limit2, -kFirstShift, warnings);
+  }
+  if (a.set_start_edge_offset) {
+    check.start_edge_offset = a.start_edge_offset + check.delayed_signal_shift;
+  }
+  if (a.set_end_edge_offset) {
+    check.end_edge_offset = a.end_edge_offset - check.delayed_signal_shift;
+  }
 }
 
 }  // namespace
 
-bool SpecifyManager::AnnotateSdfTimingCheck(const SdfTcAnnotation& a,
-                                            std::string_view inst_prefix) {
+bool SpecifyManager::AnnotateSdfTimingCheck(
+    const SdfTcAnnotation& a, std::string_view inst_prefix,
+    std::vector<std::string>& warnings) {
   // §32.1: SDF back-annotates the timing checks a design already declares in
   // its specify blocks; it never introduces a new check. A single SDF check
   // (e.g. SETUPHOLD) expands into several candidate annotations (setup, hold,
@@ -700,7 +724,7 @@ bool SpecifyManager::AnnotateSdfTimingCheck(const SdfTcAnnotation& a,
   bool applied = false;
   for (auto& existing : timing_checks_) {
     if (!SdfAnnotationMatchesCheck(existing, a, inst_prefix)) continue;
-    ApplySdfAnnotationFields(existing, a);
+    ApplySdfAnnotationFields(existing, a, warnings);
     applied = true;
   }
   return applied;

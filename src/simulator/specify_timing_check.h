@@ -116,6 +116,10 @@ struct TimingCheckEntry {
 
   int64_t start_edge_offset = 0;
   int64_t end_edge_offset = 0;
+  // §31.9.1: d(ref) - d(data) for a check evaluated on the delayed copies of
+  // its signals, which its limits and offsets were adjusted by, and 0 for
+  // every other check. A limit §32.4.2 annotates later is adjusted by it too.
+  int64_t delayed_signal_shift = 0;
   std::string notifier;
 
   std::string condition;
@@ -389,6 +393,18 @@ struct AdjustedNegativeTimingLimit {
 
 AdjustedNegativeTimingLimit AdjustNegativeTimingCheckLimit(
     int64_t adjusted_limit);
+
+// §31.9.1: how far the delays of its delayed signals move `check`'s first
+// limit -- TimingCheckEntry::delayed_signal_shift where that limit bounds the
+// side before the reference edge, its negation where it bounds the side after
+// -- the second limit moving the other way. Defined in
+// simulator/timing_check_negative_delays.cpp, as is the next.
+int64_t FirstLimitDelayShift(const TimingCheckEntry& check);
+
+// §31.9.1: `limit` moved by `shift`. A zero limit bounds no window and stays 0,
+// and one moved to 0 or below is set to 0 with `warn` set.
+AdjustedNegativeTimingLimit ShiftTimingCheckLimit(uint64_t limit,
+                                                  int64_t shift);
 
 bool NegativeTimingWindowCanYieldViolation(int64_t lower, int64_t upper,
                                            uint64_t precision_ticks);

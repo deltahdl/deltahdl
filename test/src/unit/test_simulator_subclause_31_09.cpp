@@ -1,12 +1,15 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <vector>
 
 #include "driver/cli_options.h"
 #include "fixture_simulator.h"
 #include "helpers_command_line.h"
 #include "helpers_preprocess_and_get.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_specify.h"
+#include "simulator/sdf_parser.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
 #include "simulator/specify_timing_check.h"
@@ -413,6 +416,79 @@ TEST(NegativeTimingCheckSwitches, SkewKeepsTheUndelayedSignals) {
                      "endmodule\n",
                      {true, false}, f),
             "105\n");
+}
+
+// The checks a run of `check` beside $setuphold(posedge clk, d, -10, 20) left
+// registered, under the option that delays clk by 11 and e not at all.
+SpecifyManager& ManagerWithClkDelayed(const std::string& check, SimFixture& f) {
+  RunUnder(
+      "`timescale 1ns/1ns\n"
+      "module top(output reg clk = 0, output reg d = 0,\n"
+      "           output reg e = 0);\n"
+      "  specify\n"
+      "    $setuphold(posedge clk, d, -10, 20);\n"
+      "    " +
+          check +
+          "\n"
+          "  endspecify\n"
+          "endmodule\n",
+      {true, false}, f);
+  return *f.ctx.GetSpecifyManager();
+}
+
+// §32.4.2's TIMINGCHECK entry `entry`, annotated onto the top's checks.
+std::vector<std::string> AnnotateOntoTop(const std::string& entry,
+                                         SpecifyManager& mgr) {
+  SdfFile file;
+  EXPECT_TRUE(
+      ParseSdf("(DELAYFILE (CELL (CELLTYPE \"top\") (INSTANCE top) "
+               "(TIMINGCHECK " +
+                   entry + ")))",
+               file));
+  return AnnotateSdfToManager(file, mgr, SdfMtm::kTypical, {}, "top").warnings;
+}
+
+const TimingCheckEntry& CheckOfKind(const SpecifyManager& mgr,
+                                    TimingCheckKind kind) {
+  for (const TimingCheckEntry& e : mgr.GetTimingChecks()) {
+    if (e.kind == kind) return e;
+  }
+  return mgr.GetTimingChecks().front();
+}
+
+// §31.9.1 adjusts whatever limit the check carries, an annotated one as much as
+// a declared one: the $setup is evaluated on the delayed clk, so the annotated
+// 7 is applied as 7 + 11.
+TEST(NegativeTimingCheckSwitches, AnnotatedLimitOfADelayedCheckIsAdjusted) {
+  SimFixture f;
+  SpecifyManager& mgr = ManagerWithClkDelayed("$setup(e, posedge clk, 5);", f);
+  AnnotateOntoTop("(SETUP e (posedge clk) (7))", mgr);
+  EXPECT_EQ(CheckOfKind(mgr, TimingCheckKind::kSetup).limit, 18u);
+}
+
+// An annotated $hold limit of 8 adjusts to 8 - 11, which is not positive, so it
+// is set to 0 and the annotation warns.
+TEST(NegativeTimingCheckSwitches, AnnotatedLimitAdjustedBelowZeroIsZeroed) {
+  SimFixture f;
+  SpecifyManager& mgr = ManagerWithClkDelayed("$hold(posedge clk, e, 5);", f);
+  const std::vector<std::string> kWarnings =
+      AnnotateOntoTop("(HOLD e (posedge clk) (8))", mgr);
+  EXPECT_EQ(CheckOfKind(mgr, TimingCheckKind::kHold).limit, 0u);
+  ASSERT_EQ(kWarnings.size(), 1u);
+  EXPECT_NE(kWarnings[0].find("is no longer positive and is set to 0"),
+            std::string::npos);
+}
+
+// $nochange's annotated offsets move as its declared ones do: the start offset
+// by 11 and the end offset by -11.
+TEST(NegativeTimingCheckSwitches, AnnotatedNochangeOffsetsAreMoved) {
+  SimFixture f;
+  SpecifyManager& mgr =
+      ManagerWithClkDelayed("$nochange(posedge clk, e, 0, 0);", f);
+  AnnotateOntoTop("(NOCHANGE e (posedge clk) (3) (4))", mgr);
+  const TimingCheckEntry& kCheck = CheckOfKind(mgr, TimingCheckKind::kNochange);
+  EXPECT_EQ(kCheck.start_edge_offset, 14);
+  EXPECT_EQ(kCheck.end_edge_offset, -7);
 }
 
 }  // namespace

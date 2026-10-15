@@ -161,13 +161,11 @@ void ZeroLeastNegativeLimit(std::vector<TimingCheckEntry>& checks,
   *places[i] = 0;
 }
 
-// A positive limit moved by `shift`, set to 0 with §31.9.1's warning where it
-// is no longer positive. A zero limit bounds no window and stays 0.
+// A limit moved by `shift`, with §31.9.1's warning where it was set to 0.
 void ShiftLimit(uint64_t& limit, int64_t& signed_limit, int64_t shift,
                 const SourceLoc& loc, DiagEngine& diag) {
-  if (limit == 0) return;
   const AdjustedNegativeTimingLimit kAdjusted =
-      AdjustNegativeTimingCheckLimit(static_cast<int64_t>(limit) + shift);
+      ShiftTimingCheckLimit(limit, shift);
   if (kAdjusted.warn) {
     diag.Warning(loc,
                  "adjusted for the delays of the delayed signals it is "
@@ -179,29 +177,42 @@ void ShiftLimit(uint64_t& limit, int64_t& signed_limit, int64_t shift,
   signed_limit = static_cast<int64_t>(kAdjusted.limit);
 }
 
-// A limit bounding the side before the reference edge grows by d(ref) - d(data)
-// and one bounding the side after it shrinks by as much. $setup's, $removal's
-// and $setuphold's first limits are before it, and $hold's, $recovery's and
-// $recrem's after it, the second limit of the two-sided checks bounding the
-// other side. $nochange's offsets move its window's two ends the same way;
-// §31.4.6 gives an offset that is not positive a meaning of its own, so they
-// are moved and never set to 0.
+// Records the shift and moves the check's limits by it. $nochange's offsets
+// move its window's two ends the same way; §31.4.6 gives an offset that is not
+// positive a meaning of its own, so they are moved and never set to 0.
 void AdjustLimitsForDelays(TimingCheckEntry& e, int64_t shift,
                            DiagEngine& diag) {
+  e.delayed_signal_shift = shift;
   if (e.kind == TimingCheckKind::kNochange) {
     e.start_edge_offset += shift;
     e.end_edge_offset -= shift;
     return;
   }
-  const bool kFirstBefore = e.kind == TimingCheckKind::kSetup ||
-                            e.kind == TimingCheckKind::kSetuphold ||
-                            e.kind == TimingCheckKind::kRemoval;
-  const int64_t kFirstShift = kFirstBefore ? shift : -shift;
+  const int64_t kFirstShift = FirstLimitDelayShift(e);
   ShiftLimit(e.limit, e.signed_limit, kFirstShift, e.loc, diag);
   ShiftLimit(e.limit2, e.signed_limit2, -kFirstShift, e.loc, diag);
 }
 
 }  // namespace
+
+// A limit bounding the side before the reference edge grows by d(ref) - d(data)
+// and one bounding the side after it shrinks by as much. $setup's, $removal's
+// and $setuphold's first limits are before it, and $hold's, $recovery's and
+// $recrem's after it, the second limit of the two-sided checks bounding the
+// other side.
+int64_t FirstLimitDelayShift(const TimingCheckEntry& check) {
+  const bool kFirstBefore = check.kind == TimingCheckKind::kSetup ||
+                            check.kind == TimingCheckKind::kSetuphold ||
+                            check.kind == TimingCheckKind::kRemoval;
+  return kFirstBefore ? check.delayed_signal_shift
+                      : -check.delayed_signal_shift;
+}
+
+AdjustedNegativeTimingLimit ShiftTimingCheckLimit(uint64_t limit,
+                                                  int64_t shift) {
+  if (limit == 0) return {0u, false};
+  return AdjustNegativeTimingCheckLimit(static_cast<int64_t>(limit) + shift);
+}
 
 bool EvaluatedOnDelayedSignals(const TimingCheckEntry& e) {
   return TimingCheckUsesDelayedSignals(e.kind) && !TakesNegativeDelays(e);
