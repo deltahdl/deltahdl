@@ -354,6 +354,23 @@ void Elaborator::ValidateConfigCellClauses() {
   }
 }
 
+namespace {
+
+// §3.13(b): the names of packages no module, interface, program or primitive
+// shares, which are the names a cell or use clause can only mean a package by.
+std::unordered_set<std::string_view> NamesOnlyAPackageHolds(
+    const CompilationUnit* unit) {
+  std::unordered_set<std::string_view> names;
+  for (auto* pkg : unit->packages) names.insert(pkg->name);
+  for (auto* m : unit->modules) names.erase(m->name);
+  for (auto* i : unit->interfaces) names.erase(i->name);
+  for (auto* p : unit->programs) names.erase(p->name);
+  for (auto* u : unit->udps) names.erase(u->name);
+  return names;
+}
+
+}  // namespace
+
 void Elaborator::ValidateConfigPackageBinding() {
   // §33.4: a configuration's rules may redirect the binding of module,
   // primitive, interface, and program instances, but the binding of a package
@@ -365,18 +382,14 @@ void Elaborator::ValidateConfigPackageBinding() {
   // a module, interface, program or primitive share names that design element
   // in a cell or use clause, and only a name no such element holds names the
   // package.
-  std::unordered_set<std::string_view> package_names;
-  for (auto* pkg : unit_->packages) package_names.insert(pkg->name);
-  for (auto* m : unit_->modules) package_names.erase(m->name);
-  for (auto* i : unit_->interfaces) package_names.erase(i->name);
-  for (auto* p : unit_->programs) package_names.erase(p->name);
-  for (auto* u : unit_->udps) package_names.erase(u->name);
-  if (package_names.empty()) return;
+  const std::unordered_set<std::string_view> kPackageNames =
+      NamesOnlyAPackageHolds(unit_);
+  if (kPackageNames.empty()) return;
 
   for (auto* cfg : unit_->configs) {
     for (auto* rule : cfg->rules) {
       if (rule->kind == ConfigRuleKind::kCell &&
-          package_names.contains(rule->cell_name)) {
+          kPackageNames.contains(rule->cell_name)) {
         diag_.Error(
             rule->loc,
             std::format("config '{}' cell clause selects package '{}'; a "
@@ -384,7 +397,7 @@ void Elaborator::ValidateConfigPackageBinding() {
                         cfg->name, rule->cell_name),
             Subclause("33.4"));
       }
-      if (!rule->use_cell.empty() && package_names.contains(rule->use_cell)) {
+      if (!rule->use_cell.empty() && kPackageNames.contains(rule->use_cell)) {
         diag_.Error(
             rule->loc,
             std::format("config '{}' use clause binds an instance to package "

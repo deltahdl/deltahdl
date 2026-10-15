@@ -46,6 +46,8 @@ CompilationUnit* ParseTwoLeafTop(SourceManager& mgr, Arena& arena,
   cu->modules[0]->library = params.lib_leaf0;
   cu->modules[1]->library = params.lib_leaf1;
   cu->modules[2]->library = params.lib_top;
+  // §33.4.1.1: the config compiles with its top module.
+  for (auto* cfg : cu->configs) cfg->library = params.lib_top;
   return cu;
 }
 
@@ -118,7 +120,11 @@ TEST(ConfigLiblistClause, ParentLibraryLackingTheCellLeavesItUnbound) {
                        BindLeafParams{"config c; design top; endconfig\n",
                                       "libA", "libB", "libZ"});
   EXPECT_EQ(bound, nullptr);
-  EXPECT_TRUE(diag.HasErrors());
+  EXPECT_TRUE(ReportedError(diag.Diagnostics(),
+                            "unknown module 'leaf': the configuration's "
+                            "parent cell's library (libZ) holds no cell 'leaf' "
+                            "for instance 'top.u'",
+                            3, "33.4.1.5"));
 }
 
 // §33.4.1.5: an instance clause's liblist that names no library selects the
@@ -222,7 +228,11 @@ TEST(ConfigLiblistClause, LiblistExcludingAnInterfaceLeavesItUnbound) {
                       !design->top_modules[0]->children.empty() &&
                       design->top_modules[0]->children[0].resolved != nullptr;
   EXPECT_FALSE(kBound);
-  EXPECT_TRUE(diag.HasErrors());
+  EXPECT_TRUE(ReportedError(diag.Diagnostics(),
+                            "unknown module 'ifc': the configuration's library "
+                            "list (libA) holds no cell 'ifc' for instance "
+                            "'top.i'",
+                            2, "33.4.1.5"));
 }
 
 // §33.4.1.5: with no parent library context (an unlibraried top cell), the
@@ -354,6 +364,7 @@ TEST(ConfigLiblistClause, LiblistInheritedBySubhierarchy) {
   cu->modules[2]->library = "libB";  // mid
   cu->modules[3]->library = "libR";  // mid
   cu->modules[4]->library = "libR";  // top
+  for (auto* cfg : cu->configs) cfg->library = "libR";
 
   Elaborator elab(arena, diag, cu);
   auto* design = elab.Elaborate(cu->configs[0]);

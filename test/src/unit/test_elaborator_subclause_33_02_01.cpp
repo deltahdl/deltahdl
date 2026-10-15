@@ -77,6 +77,16 @@ void ConfigElab::Run(const std::string& src, const CellLibraries& libs) {
   WriteCellsToLibraries(cu->udps, libs.primitives);
   WriteCellsToLibraries(cu->checkers, libs.checkers);
   ASSERT_FALSE(cu->configs.empty());
+  // A config compiles into the library of the source holding it, which here
+  // is the library its top module was written into (§33.4.1.1).
+  for (auto* cfg : cu->configs) {
+    for (const auto* mod : cu->modules) {
+      if (!cfg->design_cells.empty() &&
+          mod->name == cfg->design_cells.front().cell) {
+        cfg->library = mod->library;
+      }
+    }
+  }
   Elaborator elab(arena, diag, cu);
   design = elab.Elaborate(cu->configs[0]);
 }

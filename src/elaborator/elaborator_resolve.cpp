@@ -626,6 +626,13 @@ bool ElaboratorData::ReportConfigRuleBindingNothing(CompilationUnit* unit,
     libs = &library_order_;
     which = "default library list";
   }
+  // §33.4.1.5: an empty list, or none, leaves the parent cell's library.
+  const std::vector<std::string> kParentLibrary{current_library_};
+  if (in_config_elaboration_ && !current_library_.empty() &&
+      (libs == nullptr || libs->empty())) {
+    libs = &kParentLibrary;
+    which = "parent cell's library";
+  }
   if (libs == nullptr) return false;
   diag.Error(
       item->loc,

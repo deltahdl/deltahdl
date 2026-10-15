@@ -12,6 +12,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
@@ -192,6 +193,20 @@ std::vector<std::string_view> ApplyConfigOverrideParams(
   return unresolved;
 }
 
+// §33.4.3: reports each override in `unapplied`, written at `loc`, whose value
+// gave no constant to apply to its parameter of `child_decl`.
+void ReportUnappliedOverrides(const std::vector<std::string_view>& unapplied,
+                              const ModuleDecl* child_decl, SourceLoc loc,
+                              DiagEngine& diag) {
+  for (std::string_view pname : unapplied) {
+    diag.Error(loc,
+               std::format("configuration override of parameter '{}' of '{}' "
+                           "has no constant value",
+                           pname, child_decl->name),
+               Subclause("33.4.3"));
+  }
+}
+
 }  // namespace
 
 void Elaborator::ApplyConfigParamOverrides(
@@ -220,16 +235,12 @@ void Elaborator::ApplyConfigParamOverrides(
           ResolveParentReference(assignment.second, parent_path, parent_scope,
                                  config_ancestor_scopes_, arena_);
     }
-    for (std::string_view pname : ApplyConfigOverrideParams(
-             child_decl,
-             AssignableConfigParams(child_decl, params, ov.loc, diag_),
-             child_params, scope, locked)) {
-      diag_.Error(ov.loc,
-                  std::format("configuration override of parameter '{}' of "
-                              "'{}' has no constant value",
-                              pname, child_decl->name),
-                  Subclause("33.4.3"));
-    }
+    ReportUnappliedOverrides(
+        ApplyConfigOverrideParams(
+            child_decl,
+            AssignableConfigParams(child_decl, params, ov.loc, diag_),
+            child_params, scope, locked),
+        child_decl, ov.loc, diag_);
   };
   // §33.4.1.4: a cell clause's overrides reach every instance of the cell; an
   // instance clause, the more specific selection (§33.4.1.6), is applied after

@@ -1,7 +1,6 @@
 #include "elaborator/elaborator.h"
 
 #include <algorithm>
-#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <string>
@@ -23,11 +22,13 @@
 #include "elaborator/package_assertion_scope.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/time_literal_scale.h"
+#include "elaborator/type_eval.h"
 #include "elaborator/unit_scope_switch.h"
 #include "elaborator/viewport_resolution.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 #include "parser/time_resolve.h"
 
 namespace delta {
@@ -182,11 +183,10 @@ namespace {
 // start, which names no instance of the delegated subtree.
 bool RebaseConfigPath(std::string& path, std::string_view inner_top,
                       std::string_view outer_path) {
-  if (path != inner_top &&
-      !(path.size() > inner_top.size() && path.starts_with(inner_top) &&
-        path[inner_top.size()] == '.')) {
-    return false;
-  }
+  const bool kUnder = path == inner_top || (path.size() > inner_top.size() &&
+                                            path.starts_with(inner_top) &&
+                                            path[inner_top.size()] == '.');
+  if (!kUnder) return false;
   path = std::string(outer_path) + path.substr(inner_top.size());
   return true;
 }
@@ -227,12 +227,18 @@ bool RuleCarriesParamOverride(const ConfigRule* rule) {
 //
 // §6.20.2: a localparam declared with a type or a range holds its value
 // converted to that type, as any parameter does.
-void EvalConfigLocalparams(const ConfigDecl* cfg, ScopeMap& scope) {
+void EvalConfigLocalparams(const ConfigDecl* cfg, ScopeMap& scope,
+                           const TypedefMap& typedefs) {
   for (const ConfigLocalparam& lp : cfg->local_params) {
     if (lp.is_type || lp.init_expr == nullptr) continue;
-    if (auto val = FoldDeclaredParamValue(lp.init_expr, lp.data_type, scope)) {
-      scope[lp.name] = *val;
+    auto val = FoldDeclaredParamValue(lp.init_expr, lp.data_type, scope);
+    if (!val) continue;
+    // An unsigned type holds the bits its width keeps, read unsigned.
+    const uint32_t kWidth = DeclaredParamTypeWidth(lp.data_type, scope);
+    if (kWidth > 0 && kWidth < 64 && !IsSignedType(lp.data_type, typedefs)) {
+      *val &= static_cast<int64_t>((uint64_t{1} << kWidth) - 1);
     }
+    scope[lp.name] = *val;
   }
 }
 
@@ -746,6 +752,22 @@ void Elaborator::CollectConfigInstanceParamOverrides(const ConfigDecl* cfg) {
   }
 }
 
+// One cell clause's use expansion, binding every instance of its cell. §33.4.2:
+// one binding the cell to a configuration hands each of those instances to that
+// configuration's rules as well.
+void Elaborator::CollectCellUseOverride(const ConfigDecl* cfg,
+                                        const ConfigRule* rule) {
+  std::string use_lib;
+  std::string use_cell;
+  if (!CellUseTarget(rule, cfg, unit_, use_lib, use_cell)) return;
+  if (UseClauseNamesConfig(rule, cfg, unit_)) {
+    cell_config_delegations_[std::string(rule->cell_name)] =
+        FindDelegatedConfig(unit_->configs, cfg, rule->use_cell);
+  }
+  cell_clause_use_overrides_[std::string(rule->cell_name)] = {
+      std::string(rule->cell_lib), std::move(use_lib), std::move(use_cell)};
+}
+
 // §33.4.1.4/§33.4.1.6: a cell clause either rebinds a cell through a use
 // expansion -- a target cell is required, while the target library may be
 // omitted and is then inherited from the parent cell, and a qualifying library
@@ -763,17 +785,7 @@ void Elaborator::CollectConfigCellClauseOverrides(const ConfigDecl* cfg) {
       if (rule->use_cell.empty()) continue;
     }
     if (!rule->use_cell.empty()) {
-      std::string use_lib;
-      std::string use_cell;
-      if (!CellUseTarget(rule, cfg, unit_, use_lib, use_cell)) continue;
-      // §33.4.2: a cell clause binding the cell to a configuration hands each
-      // of its instances to that configuration's rules.
-      if (UseClauseNamesConfig(rule, cfg, unit_)) {
-        cell_config_delegations_[std::string(rule->cell_name)] =
-            FindDelegatedConfig(unit_->configs, cfg, rule->use_cell);
-      }
-      cell_clause_use_overrides_[std::string(rule->cell_name)] = {
-          std::string(rule->cell_lib), std::move(use_lib), std::move(use_cell)};
+      CollectCellUseOverride(cfg, rule);
       continue;
     }
     cell_clause_liblist_overrides_[std::string(rule->cell_name)] =
@@ -828,7 +840,7 @@ void Elaborator::EnterDelegatedConfig(const ConfigDecl* inner) {
   cell_liblist_bindings_.clear();
   config_delegations_.clear();
   cell_config_delegations_.clear();
-  EvalConfigLocalparams(inner, config_localparam_scope_);
+  EvalConfigLocalparams(inner, config_localparam_scope_, typedefs_);
   CollectConfigRuleTables(inner);
   CollectConfigInstanceParamOverrides(inner);
   // §33.4.2: the configuration's rules name their instances from its own
@@ -885,7 +897,7 @@ RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
   // A config localparam is restricted to a literal value (§33.4.3), so it can
   // be evaluated once here and made available to parameter-override
   // expressions that reference it.
-  EvalConfigLocalparams(cfg, config_localparam_scope_);
+  EvalConfigLocalparams(cfg, config_localparam_scope_, typedefs_);
 
   CollectConfigInstanceParamOverrides(cfg);
 

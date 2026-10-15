@@ -150,8 +150,8 @@ TEST(PrecompiledConfig, ConfigLocalParametersSurviveTheCompiledForm) {
 
   const auto* cfg = target.configs[0];
   ASSERT_EQ(cfg->local_params.size(), 1u);
-  EXPECT_EQ(cfg->local_params[0].first, "W");
-  EXPECT_NE(cfg->local_params[0].second, nullptr);
+  EXPECT_EQ(cfg->local_params[0].name, "W");
+  EXPECT_NE(cfg->local_params[0].init_expr, nullptr);
 }
 
 }  // namespace

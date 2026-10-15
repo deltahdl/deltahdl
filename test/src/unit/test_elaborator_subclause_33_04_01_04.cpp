@@ -45,6 +45,8 @@ CompilationUnit* ParseAdderUnit(const BindAdderInputs& in) {
   cu->modules[0]->library = in.la;
   cu->modules[1]->library = in.lb;
   cu->modules[2]->library = in.lt;
+  // §33.4.1.1: the config compiles with its top module.
+  for (auto* cfg : cu->configs) cfg->library = in.lt;
   return cu;
 }
 

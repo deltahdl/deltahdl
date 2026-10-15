@@ -137,8 +137,8 @@ class Elaborator : public ElaboratorClassRules {
   void CollectConfigCellClauseOverrides(const ConfigDecl* cfg);
   void CollectConfigInstanceBindOverrides(const ConfigDecl* cfg);
   void CollectConfigRuleTables(const ConfigDecl* cfg);
-  // §33.4.2: delegation to a configuration (elaborator.cpp says how).
-  const ConfigDecl* DelegatedConfigFor(std::string_view cell) const;
+  void CollectCellUseOverride(const ConfigDecl* cfg, const ConfigRule* rule);
+  const ConfigDecl* DelegatedConfigFor(std::string_view cell) const;  // §33.4.2
   void EnterDelegatedConfig(const ConfigDecl* inner);
   void LeaveDelegatedConfig();
 

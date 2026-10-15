@@ -63,6 +63,8 @@ RtlirModule* BindChildUnderTop(ElabFixture& f, const std::string& config_body,
   cu->modules[0]->library = "libA";
   cu->modules[1]->library = "libB";
   cu->modules[2]->library = "libC";
+  // §33.4.1.1: the config compiles with its top module, into libC.
+  for (auto* cfg : cu->configs) cfg->library = "libC";
   Elaborator elab(f.arena, f.diag, cu);
   auto* design = elab.Elaborate(cu->configs[0]);
   if (design == nullptr || design->top_modules.empty()) return nullptr;
@@ -148,6 +150,7 @@ TEST(ConfigDefaultClause, CellClauseOverridesDefaultForNamedCellOnly) {
   cu->modules[2]->library = "libA";  // mid
   cu->modules[3]->library = "libB";  // mid
   cu->modules[4]->library = "libC";  // top
+  for (auto* cfg : cu->configs) cfg->library = "libC";
   Elaborator elab(f.arena, f.diag, cu);
   auto* design = elab.Elaborate(cu->configs[0]);
   ASSERT_NE(design, nullptr);

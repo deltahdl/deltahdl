@@ -288,8 +288,8 @@ TEST(ConfigUseClauseParsing, BareNamedParameterAssignmentList) {
   auto* rule = r.cu->configs[0]->rules[0];
   EXPECT_EQ(rule->use_cell, "");
   ASSERT_EQ(rule->use_params.size(), 2u);
-  EXPECT_EQ(rule->use_params[0].name, "W");
-  EXPECT_EQ(rule->use_params[1].name, "D");
+  EXPECT_EQ(rule->use_params[0].first, "W");
+  EXPECT_EQ(rule->use_params[1].first, "D");
 }
 
 // use_clause ::= use [ library_identifier . ] cell_identifier
@@ -305,7 +305,7 @@ TEST(ConfigUseClauseParsing, CellFollowedByNamedParameterAssignments) {
   EXPECT_EQ(rule->use_lib, "gateLib");
   EXPECT_EQ(rule->use_cell, "adder");
   ASSERT_EQ(rule->use_params.size(), 1u);
-  EXPECT_EQ(rule->use_params[0].name, "W");
+  EXPECT_EQ(rule->use_params[0].first, "W");
   EXPECT_TRUE(rule->use_config);
 }
 
@@ -324,8 +324,8 @@ TEST(ConfigUseClauseParsing, CellDirectlyFollowedByNamedParameterAssignments) {
   EXPECT_EQ(rule->use_lib, "gateLib");
   EXPECT_EQ(rule->use_cell, "adder");
   ASSERT_EQ(rule->use_params.size(), 2u);
-  EXPECT_EQ(rule->use_params[0].name, "W");
-  EXPECT_EQ(rule->use_params[1].name, "D");
+  EXPECT_EQ(rule->use_params[0].first, "W");
+  EXPECT_EQ(rule->use_params[1].first, "D");
   EXPECT_TRUE(rule->use_config);
 }
 
@@ -342,7 +342,7 @@ TEST(ConfigUseClauseParsing,
   EXPECT_EQ(rule->use_lib, "");
   EXPECT_EQ(rule->use_cell, "adder");
   ASSERT_EQ(rule->use_params.size(), 1u);
-  EXPECT_EQ(rule->use_params[0].name, "W");
+  EXPECT_EQ(rule->use_params[0].first, "W");
 }
 
 // The bare named_parameter_assignment form also accepts the ': config' suffix.
@@ -356,7 +356,7 @@ TEST(ConfigUseClauseParsing, BareNamedParametersWithConfigSuffix) {
   auto* rule = r.cu->configs[0]->rules[0];
   EXPECT_EQ(rule->use_cell, "");
   ASSERT_EQ(rule->use_params.size(), 1u);
-  EXPECT_EQ(rule->use_params[0].name, "W");
+  EXPECT_EQ(rule->use_params[0].first, "W");
   EXPECT_TRUE(rule->use_config);
 }
 
@@ -369,8 +369,8 @@ TEST(ConfigUseClauseParsing, EmptyParameterExpressionAccepted) {
   ASSERT_FALSE(r.has_errors);
   auto* rule = r.cu->configs[0]->rules[0];
   ASSERT_EQ(rule->use_params.size(), 1u);
-  EXPECT_EQ(rule->use_params[0].name, "W");
-  EXPECT_EQ(rule->use_params[0].init_expr, nullptr);
+  EXPECT_EQ(rule->use_params[0].first, "W");
+  EXPECT_EQ(rule->use_params[0].second, nullptr);
 }
 
 // A named_parameter_assignment value is a param_expression, so besides a
@@ -392,8 +392,8 @@ TEST(ConfigUseClauseParsing, ParameterOverrideValueReferencesConfigLocalparam) {
   auto* rule = cfg->rules[0];
   EXPECT_EQ(rule->use_cell, "adder");
   ASSERT_EQ(rule->use_params.size(), 1u);
-  EXPECT_EQ(rule->use_params[0].name, "P");
-  EXPECT_NE(rule->use_params[0].init_expr, nullptr);
+  EXPECT_EQ(rule->use_params[0].first, "P");
+  EXPECT_NE(rule->use_params[0].second, nullptr);
 }
 
 }  // namespace
