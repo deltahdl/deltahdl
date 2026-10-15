@@ -455,6 +455,7 @@ TEST(UdpInstanceRun, UnnamedSequentialUdpInsideAChildModuleCaptures) {
 // Scheduled and never descheduled, the rise landed at 15 after the fall and q
 // read 1.
 TEST(UdpInstanceDelayRun, ALaterChangeSupersedesAPendingOne) {
+  SimFixture f;
   EXPECT_EQ(RunCapture("primitive ubuf (o, a);\n"
                        "  output o; input a;\n"
                        "  table 0 : 0 ; 1 : 1 ; endtable\n"
@@ -468,7 +469,8 @@ TEST(UdpInstanceDelayRun, ALaterChangeSupersedesAPendingOne) {
                        "    #2 a = 0;\n"
                        "    #10 $display(\"%b\", q);\n"
                        "  end\n"
-                       "endmodule\n"),
+                       "endmodule\n",
+                       f),
             "0\n");
 }
 
@@ -476,6 +478,7 @@ TEST(UdpInstanceDelayRun, ALaterChangeSupersedesAPendingOne) {
 // it is: c moving at 12 leaves the output at 1, and the 1 pending since 10
 // lands at 15 rather than 17.
 TEST(UdpInstanceDelayRun, AnEvaluationGivingThePendingValueLeavesItPending) {
+  SimFixture f;
   EXPECT_EQ(RunCapture("primitive ugate (o, a, c);\n"
                        "  output o; input a, c;\n"
                        "  table 0 ? : 0 ; 1 ? : 1 ; endtable\n"
@@ -489,7 +492,8 @@ TEST(UdpInstanceDelayRun, AnEvaluationGivingThePendingValueLeavesItPending) {
                        "    #2 c = 1;\n"
                        "    #4 $display(\"%b\", q);\n"
                        "  end\n"
-                       "endmodule\n"),
+                       "endmodule\n",
+                       f),
             "1\n");
 }
 
@@ -500,6 +504,7 @@ TEST(UdpInstanceDelayRun, AnEvaluationGivingThePendingValueLeavesItPending) {
 // 1 on y. Written as a procedural assignment, each bit read whichever write
 // came last.
 TEST(UdpInstanceSim, ASelectOutputIsADriverOfItsNet) {
+  SimFixture f;
   EXPECT_EQ(RunCapture("primitive ubuf (o, a);\n"
                        "  output o; input a;\n"
                        "  table 0 : 0 ; 1 : 1 ; endtable\n"
@@ -512,7 +517,8 @@ TEST(UdpInstanceSim, ASelectOutputIsADriverOfItsNet) {
                        "  ubuf u (y2[1], b);\n"
                        "  assign y2 = 2'b00;\n"
                        "  initial #1 $display(\"%b %b\", y, y2);\n"
-                       "endmodule\n"),
+                       "endmodule\n",
+                       f),
             "11 x0\n");
 }
 

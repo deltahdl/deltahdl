@@ -162,19 +162,23 @@ static UdpOutputDriver MakeUdpOutputDriver(const RtlirUdpInst& inst,
   if (inst.output->kind == ExprKind::kIdentifier) {
     drv.net = ctx.FindNet(inst.output->text);
   }
-  // A bit-select of a net, which every element of an instance array drives
-  // (§28.3.6), is a driver of that net at the selected bit.
-  const Expr* sel = inst.output;
-  if (sel->kind == ExprKind::kSelect) {
-    drv.net = ctx.FindNet(sel->base->text);
-    drv.partial = drv.net != nullptr;
-  }
-  if (drv.partial) {
-    int64_t index = SelectBoundValue(EvalExpr(sel->index, ctx, ctx.GetArena()));
-    drv.bit = static_cast<uint32_t>(
-        drv.net->resolved->DeclaredRange().OffsetOf(index));
-  }
   return drv;
+}
+
+// A bit-select of a net, which every element of an instance array drives
+// (§28.3.6), is a driver of that net at the selected bit. Its index may read a
+// generate block's genvar (§27.4), so the bit is found by the instance's own
+// process, which has the block's values installed.
+static void FindUdpSelectOutput(const Expr* output, UdpOutputDriver* drv,
+                                SimContext& ctx) {
+  if (output->kind != ExprKind::kSelect) return;
+  drv->net = ctx.FindNet(output->base->text);
+  drv->partial = drv->net != nullptr;
+  if (!drv->partial) return;
+  int64_t index =
+      SelectBoundValue(EvalExpr(output->index, ctx, ctx.GetArena()));
+  drv->bit = static_cast<uint32_t>(
+      drv->net->resolved->DeclaredRange().OffsetOf(index));
 }
 
 static void CommitUdpOutput(const Expr* terminal, UdpOutputDriver* drv,
@@ -336,6 +340,7 @@ static SimCoroutine MakeUdpInstCoroutine(const RtlirUdpInst* inst,
   // per evaluation would match every row against the initial value §29.7 gives
   // rather than against the state the previous evaluation left.
   UdpEvalState state(*inst->decl, UdpInitialOutput(*inst->decl, ctx, arena));
+  FindUdpSelectOutput(inst->output, drv, ctx);
 
   // §29.7: that value is the state table's current state as simulation
   // begins, and a delay on the instance does not put off assigning it to the
