@@ -700,8 +700,12 @@ static void ResolveFromDrivers(Net& net, Arena& arena, Scheduler* sched) {
   if (ResolveSpecialNet(net, arena)) return;
   if (ResolveThroughNettypeFunction(net, arena)) return;
 
-  if (!net.is_user_nettype && (!net.driver_strengths.empty() ||
-                               !net.switch_drivers.empty() || charge)) {
+  // A supply net something drives resolves its constant with its drivers at
+  // supply strength (AppendImplicitNetSource) whatever they record.
+  bool supply = net.type == NetType::kSupply0 || net.type == NetType::kSupply1;
+  if (!net.is_user_nettype &&
+      (!net.driver_strengths.empty() || !net.switch_drivers.empty() || charge ||
+       supply)) {
     ResolveStrengthDriven(net, arena, charge ? &*charge : nullptr);
     return;
   }

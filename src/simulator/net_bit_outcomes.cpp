@@ -49,16 +49,18 @@ uint8_t DriverBit(const Logic4Vec& v, uint32_t bit) {
 // high-impedance level, which is the L or the H of §28.6 and §28.7.
 // A known value driven over a range of strengths (DriverStrength::s0_lo,
 // DriverStrength::s1_lo) stands in that value at both ends of the range.
+std::vector<BitState> KnownValueStates(uint8_t val, DriverStrength ds) {
+  auto hi = static_cast<uint8_t>(val == 0 ? ds.s0 : ds.s1);
+  auto lo = static_cast<uint8_t>(val == 0 ? ds.s0_lo : ds.s1_lo);
+  if (hi == 0) return {kHighZ};
+  if (lo == 0) return {BitState{val, hi}};
+  return {BitState{val, hi}, BitState{val, lo}};
+}
+
 std::vector<BitState> DriverStates(uint8_t val, DriverStrength ds) {
+  if (val < 2) return KnownValueStates(val, ds);
   auto s0 = static_cast<uint8_t>(ds.s0);
   auto s1 = static_cast<uint8_t>(ds.s1);
-  if (val < 2) {
-    uint8_t hi = val == 0 ? s0 : s1;
-    auto lo = static_cast<uint8_t>(val == 0 ? ds.s0_lo : ds.s1_lo);
-    if (hi == 0) return {kHighZ};
-    if (lo == 0) return {BitState{val, hi}};
-    return {BitState{val, hi}, BitState{val, lo}};
-  }
   if (val == 3) return {kHighZ};
   if (s0 != 0 && s0 == s1) return {BitState{2, s0, true}};
   std::vector<BitState> states;

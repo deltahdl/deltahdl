@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_wide_undriven_net.h"
@@ -162,17 +164,13 @@ TEST(SupplyNetStrengths, Supply1NotOverriddenByStrongOppositeSource) {
 
 // A supply net drives at supply strength, and §28.12.1 combines two signals of
 // equal strength and opposite value into x at that strength: a supply-strength
-// 1 driven onto a supply0 net, which is no stronger than the net's own 0,
-// leaves an x at supply strength on both sides, where pinning the net to its
-// constant reads 0.
-TEST(SupplyNetStrengths, Supply0ContendedAtSupplyStrengthResolvesToX) {
+// value driven onto a supply net of the opposite constant, which is no
+// stronger than the net's own, leaves an x at supply strength on both sides,
+// where pinning the net to its constant read the constant. `body` declares w
+// and drives it.
+void ExpectSupplyX(const std::string& body) {
   SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
-      "  supply0 w;\n"
-      "  assign (supply0, supply1) w = 1'b1;\n"
-      "endmodule\n",
-      f);
+  auto* design = ElaborateSrc("module m;\n" + body + "endmodule\n", f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
   auto* w = f.ctx.FindNet("w");
@@ -183,23 +181,17 @@ TEST(SupplyNetStrengths, Supply0ContendedAtSupplyStrengthResolvesToX) {
   EXPECT_EQ(w->resolved_strength.s1_hi, Strength::kSupply);
 }
 
+TEST(SupplyNetStrengths, Supply0ContendedAtSupplyStrengthResolvesToX) {
+  ExpectSupplyX(
+      "  supply0 w;\n"
+      "  assign (supply0, supply1) w = 1'b1;\n");
+}
+
 // The dual: a supply-strength 0 driven onto a supply1 net leaves a supply x.
 TEST(SupplyNetStrengths, Supply1ContendedAtSupplyStrengthResolvesToX) {
-  SimFixture f;
-  auto* design = ElaborateSrc(
-      "module m;\n"
+  ExpectSupplyX(
       "  supply1 w;\n"
-      "  assign (supply0, supply1) w = 1'b0;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  auto* w = f.ctx.FindNet("w");
-  ASSERT_NE(w, nullptr);
-  EXPECT_EQ(w->resolved->value.words[0].aval & 0x1, 1u);
-  EXPECT_EQ(w->resolved->value.words[0].bval & 0x1, 1u);
-  EXPECT_EQ(w->resolved_strength.s0_hi, Strength::kSupply);
-  EXPECT_EQ(w->resolved_strength.s1_hi, Strength::kSupply);
+      "  assign (supply0, supply1) w = 1'b0;\n");
 }
 
 }  // namespace

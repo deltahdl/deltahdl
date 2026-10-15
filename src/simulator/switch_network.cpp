@@ -326,21 +326,29 @@ bool JoinsBitsToThemselves(const BitPairs& bits) {
                      [](const auto& p) { return p.first == p.second; });
 }
 
+// Adds the net `link` joins `reached[i]` to, with the bits the way joins,
+// unless the way joins no bit, leads back to the member's own bits, or reaches
+// a net already reached by the same bits.
+void ReachAcross(std::vector<Reached>& reached, size_t i,
+                 const SwitchLink& link, const Net& member) {
+  std::optional<BitPairs> bits = ComposeBits(reached[i].bits, link);
+  if (bits && (bits->empty() ||
+               (link.other == &member && JoinsBitsToThemselves(*bits)))) {
+    return;
+  }
+  bool seen = std::any_of(reached.begin(), reached.end(),
+                          [&link, &bits](const Reached& r) {
+                            return r.net == link.other && r.bits == bits;
+                          });
+  if (!seen) reached.push_back({link.other, i, &link, std::move(bits)});
+}
+
 std::vector<Reached> ReachAcrossConducting(Net& member) {
   std::vector<Reached> reached{{&member, 0, nullptr, std::nullopt}};
   for (size_t i = 0; i < reached.size(); ++i) {
     for (const SwitchLink& link : reached[i].net->switch_links) {
       if (!LinkConducts(link) || !FollowsFrom(link, reached[i], i)) continue;
-      std::optional<BitPairs> bits = ComposeBits(reached[i].bits, link);
-      if (bits && (bits->empty() ||
-                   (link.other == &member && JoinsBitsToThemselves(*bits)))) {
-        continue;
-      }
-      bool seen = std::any_of(reached.begin(), reached.end(),
-                              [&link, &bits](const Reached& r) {
-                                return r.net == link.other && r.bits == bits;
-                              });
-      if (!seen) reached.push_back({link.other, i, &link, std::move(bits)});
+      ReachAcross(reached, i, link, member);
     }
   }
   return reached;
@@ -525,8 +533,13 @@ void ResolveMember(Net& member, Arena& arena, Scheduler* sched) {
     return;
   }
   Guard().resolving = &member;
+  std::vector<uint64_t> charge_before = member.charge_since;
   member.Resolve(arena, sched);
   Guard().resolving = nullptr;
+  // §28.16.2: a trireg bit entering or leaving the charge storage state changes
+  // the charge the trireg offers the nets joined to it (TriregStoredCharge),
+  // which they gathered before it resolved, so the group gathers again.
+  if (member.charge_since != charge_before) Guard().dirty = true;
 }
 
 // Enough passes for a change a member's watchers made to settle; each pass
