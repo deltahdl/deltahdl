@@ -33,6 +33,14 @@ Simulation:
   --negative-timing-checks
                        Accept negative $setuphold/$recrem limits (31.9.4)
   --no-timing-checks   Turn every timing check off (31.9.4)
+  --pulse-reject-limit <percent>
+                       Reject limit as a percentage of each path delay (30.7.2)
+  --pulse-error-limit <percent>
+                       Error limit as a percentage of each path delay (30.7.2)
+  --pulse-style-onevent, --pulse-style-ondetect
+                       Pulse filtering style for every path output (30.7.4.1)
+  --showcancelled, --noshowcancelled
+                       Show cancelled pulses as x on every path output, or not (30.7.4.2)
   -D <name>[=<value>]  Define preprocessor macro
   --compilation-unit-per-file
                        Make each source file a compilation unit (3.12.1)
