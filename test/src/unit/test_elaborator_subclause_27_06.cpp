@@ -361,14 +361,16 @@ TEST(GenerateBlockNaming, ReachingIntoAnUnnamedBlockIsReported) {
       "  initial $display(\"%0d\", top.genblk1.a);\n"
       "endmodule\n",
       f);
-  const char* kConditional =
+  const char* conditional_report =
       "hierarchical name reaches into unnamed generate block 'genblk1'";
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kConditional, 8, "27.6"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), conditional_report, 8, "27.6"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "hierarchical name reaches into unnamed generate "
                             "block 'genblk2'",
                             8, "27.6"));
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kConditional, 9, "27.6"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), conditional_report, 9, "27.6"));
 }
 
 // Each block §27.6 names is held to the rule however its construct holds it:

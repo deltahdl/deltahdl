@@ -769,7 +769,7 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
   }
   // A genblk<n> name of the module's own blocks is reported below under §27.6
   // for the block it reaches into, and so is not reported again here.
-  const std::unordered_set<std::string_view> own_unnamed_blocks =
+  std::unordered_set<std::string_view> own_unnamed_blocks =
       UnnamedGenerateBlockNames(decl);
   ReportUnresolvedHierHeads(
       decl,

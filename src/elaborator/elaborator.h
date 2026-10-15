@@ -474,7 +474,7 @@ class Elaborator : public ElaboratorClassRules {
 
   void AssignGenerateBlockNames(const ModuleDecl* decl);
 
-  void CheckConditionalGenerateNaming(const ModuleDecl* decl);
+  void CheckGenerateConstructs(const ModuleDecl* decl);
 
   // Every defparam statement belonging to `mod`: the ones ModuleDecl::items
   // holds directly, then the ones each generate block instance elaborated into

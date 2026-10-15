@@ -458,7 +458,8 @@ TEST(GenerateElaboration, BlockNameCollidesWithLoopGenerateIsError) {
       "  end\n"
       "endmodule\n",
       f);
-  // Elaborator::CheckConditionalGenerateNaming reports only for the
+  // CheckConditionalGenerateNaming in
+  // src/elaborator/elaborator_generate_naming.cpp reports only for the
   // conditional construct, so the report stands at the `if` on line 2 even
   // though the loop generate is the other half of the collision.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),

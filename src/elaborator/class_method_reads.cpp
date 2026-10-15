@@ -84,7 +84,11 @@ bool UnitDeclaredNames::Declares(std::string_view name) const {
 
 void UnitDeclaredNames::AddItems(const std::vector<ModuleItem*>& items) {
   for (const ModuleItem* item : items) {
-    if (!item->name.empty()) names_.insert(item->name);
+    // §27.6 gives an unnamed generate block a name no hierarchical name may
+    // use, so that name is left out.
+    if (!item->name.empty() && !item->name_is_generated) {
+      names_.insert(item->name);
+    }
     AddEnumerations(item->data_type);
     if (item->kind == ModuleItemKind::kTypedef) {
       AddEnumerations(item->typedef_type);

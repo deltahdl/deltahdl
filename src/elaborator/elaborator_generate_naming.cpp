@@ -337,13 +337,22 @@ static void CheckConstructBlockScopes(DiagEngine& diag,
 // untouched: those names are deduplicated per construct, so only one will be
 // counted. The design element's ports and parameters are declarations of its
 // scope, and the rules then hold in every generate block it holds.
-void Elaborator::CheckConditionalGenerateNaming(const ModuleDecl* decl) {
+static void CheckConditionalGenerateNaming(const ModuleDecl* decl,
+                                           DiagEngine& diag) {
   std::unordered_set<std::string_view> decl_names;
   for (const auto& port : decl->ports)
     if (!port.name.empty()) decl_names.insert(port.name);
   for (const auto& p : decl->params)
     if (!p.first.empty()) decl_names.insert(p.first);
-  CheckGenerateNamingInScope(diag_, decl->items, std::move(decl_names));
+  CheckGenerateNamingInScope(diag, decl->items, std::move(decl_names));
+}
+
+// The rules a design element's generate constructs are held to as written,
+// before any is elaborated: §27.5's naming of conditional generate blocks and
+// §27.4's declaration of each loop's genvar.
+void Elaborator::CheckGenerateConstructs(const ModuleDecl* decl) {
+  CheckConditionalGenerateNaming(decl, diag_);
+  ReportUndeclaredLoopGenvars(decl, diag_);
 }
 
 }  // namespace delta

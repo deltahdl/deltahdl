@@ -633,7 +633,7 @@ std::unordered_set<std::string_view> UnnamedGenerateBlockNames(
 
 void ReportUnnamedGenerateBlockReaches(const ModuleDecl* decl,
                                        DiagEngine& diag) {
-  const std::unordered_set<std::string_view> generated =
+  std::unordered_set<std::string_view> generated =
       UnnamedGenerateBlockNames(decl);
   std::vector<const Expr*> accesses;
   CollectModuleMemberAccesses(decl, accesses);
