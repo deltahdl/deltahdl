@@ -694,12 +694,17 @@ uint64_t AnnotatedLimit(uint64_t limit, int64_t shift,
   return kAdjusted.limit;
 }
 
+// §32.4.2: the annotation replaces the signed limits a negative check reads.
 void ApplySdfAnnotationFields(TimingCheckEntry& check, const SdfTcAnnotation& a,
                               std::vector<std::string>& warnings) {
   const int64_t kFirstShift = FirstLimitDelayShift(check);
-  if (a.set_limit) check.limit = AnnotatedLimit(a.limit, kFirstShift, warnings);
+  if (a.set_limit) {
+    check.limit = AnnotatedLimit(a.limit, kFirstShift, warnings);
+    check.signed_limit = static_cast<int64_t>(check.limit);
+  }
   if (a.set_limit2) {
     check.limit2 = AnnotatedLimit(a.limit2, -kFirstShift, warnings);
+    check.signed_limit2 = static_cast<int64_t>(check.limit2);
   }
   if (a.set_start_edge_offset) {
     check.start_edge_offset = a.start_edge_offset + check.delayed_signal_shift;

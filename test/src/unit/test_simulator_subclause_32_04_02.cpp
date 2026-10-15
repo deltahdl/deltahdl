@@ -755,4 +755,30 @@ TEST(SdfTimingCheckInstanceScope,
   EXPECT_EQ(SetupLimitIn(*mgr, "u_inner."), 37u);
 }
 
+// §32.4.2: the values a SETUPHOLD entry carries replace the declared check's
+// limits, a check §31.9 evaluates with negative limits included. Such a check
+// reads its window off its signed limits, so the annotated 5 and 6 are what
+// those hold afterwards, in place of the declared -10 and 20.
+TEST(SdfTimingCheckNegativeLimits, AnnotationReachesTheSignedLimits) {
+  SimFixture f;
+  f.ctx.AcquireSpecifyManager().SetTimingCheckInvocationOptions(
+      TimingCheckInvocationOptions{true, false});
+  SpecifyManager* mgr = ManagerAfterRun(
+      "module top(input clk, input d);\n"
+      "  specify\n"
+      "    $setuphold(posedge clk, d, -10, 20);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(mgr, nullptr);
+  AnnotateUnderDesignRoot(
+      DelayFileOf("  (CELL (CELLTYPE \"top\") (INSTANCE top) (TIMINGCHECK "
+                  "(SETUPHOLD d (posedge clk) (5) (6))))\n"),
+      *mgr, "top");
+  ASSERT_EQ(mgr->TimingCheckCount(), 1u);
+  const TimingCheckEntry& check = mgr->GetTimingChecks().front();
+  EXPECT_EQ(check.signed_limit, 5);
+  EXPECT_EQ(check.signed_limit2, 6);
+}
+
 }  // namespace
