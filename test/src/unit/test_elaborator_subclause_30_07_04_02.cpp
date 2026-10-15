@@ -65,4 +65,27 @@ TEST(SpecifyBlockDeclElaboration,
                     4, "30.7.4.2"));
 }
 
+// The output has already appeared in a module path declaration when an earlier
+// specify block of the module declared that path, so the later block's
+// showcancelled declaration of it is an error too.
+TEST(SpecifyBlockDeclElaboration,
+     ShowcancelledAfterAPathOfAnEarlierBlockIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input a, output o);\n"
+      "  specify\n"
+      "    (a => o) = 5;\n"
+      "  endspecify\n"
+      "  specify\n"
+      "    showcancelled o;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "showcancelled declaration for 'o' conflicts with a "
+                    "module path that drives the same output",
+                    6, "30.7.4.2"));
+}
+
 }  // namespace

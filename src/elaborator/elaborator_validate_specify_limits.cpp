@@ -331,9 +331,37 @@ static void CheckConditionMemberOperand(const Expr* e, SourceLoc loc,
              Subclause("30.4.4.1"));
 }
 
+// The expression forms a condition may not take, named for the report: A.8.4's
+// module_path_primary has none of them and Table 30-1 lists none as an
+// operator. Every other form answers empty.
+static std::string_view ForbiddenConditionForm(ExprKind kind) {
+  switch (kind) {
+    case ExprKind::kInside:
+      return "an inside expression";
+    case ExprKind::kCast:
+      return "a cast";
+    case ExprKind::kStreamingConcat:
+      return "a streaming concatenation";
+    case ExprKind::kAssignmentPattern:
+      return "an assignment pattern";
+    case ExprKind::kTagged:
+      return "a tagged expression";
+    default:
+      return {};
+  }
+}
+
 void CheckConditionExpr(const Expr* e, SourceLoc loc, const PortMap& port_map,
                         DiagEngine& diag) {
   if (!e) return;
+  if (std::string_view form = ForbiddenConditionForm(e->kind); !form.empty()) {
+    diag.Error(loc,
+               std::format("{} is not permitted in a state-dependent path "
+                           "conditional expression",
+                           form),
+               Subclause("30.4.4.1"));
+    return;
+  }
   switch (e->kind) {
     case ExprKind::kIdentifier: {
       auto it = port_map.find(e->text);
@@ -374,7 +402,6 @@ void CheckConditionExpr(const Expr* e, SourceLoc loc, const PortMap& port_map,
       CheckConditionExpr(e->index_end, loc, port_map, diag);
       return;
     case ExprKind::kConcatenation:
-    case ExprKind::kAssignmentPattern:
       for (auto* el : e->elements) CheckConditionExpr(el, loc, port_map, diag);
       return;
     case ExprKind::kReplicate:

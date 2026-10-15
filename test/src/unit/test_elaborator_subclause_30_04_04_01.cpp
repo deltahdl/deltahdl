@@ -529,4 +529,85 @@ TEST(OperatorElaboration, InterfacePortMemberOperandElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §30.4.4.1 lists the operators a condition may use in Table 30-1, and A.8.4's
+// module_path_primary the operands. Set membership is neither, though its
+// operands here are a legal input port and literals.
+TEST(OperatorElaboration, InsideExpressionIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input [1:0] a, input b, output y);\n"
+      "  specify\n"
+      "    if (a inside {1, 2}) (b => y) = 1;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "an inside expression is not permitted in a "
+                            "state-dependent path conditional expression",
+                            3, "30.4.4.1"));
+}
+
+TEST(OperatorElaboration, CastIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input [1:0] a, input b, output y);\n"
+      "  specify\n"
+      "    if (int'(a)) (b => y) = 2;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a cast is not permitted in a state-dependent "
+                            "path conditional expression",
+                            3, "30.4.4.1"));
+}
+
+TEST(OperatorElaboration, StreamingConcatenationIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input [1:0] a, input b, output y);\n"
+      "  specify\n"
+      "    if ({>>{a}}) (b => y) = 3;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a streaming concatenation is not permitted in a "
+                            "state-dependent path conditional expression",
+                            3, "30.4.4.1"));
+}
+
+TEST(OperatorElaboration, AssignmentPatternIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input [1:0] a, input b, output y);\n"
+      "  specify\n"
+      "    if ('{a[0], b} == 2'b11) (b => y) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "an assignment pattern is not permitted in a "
+                            "state-dependent path conditional expression",
+                            3, "30.4.4.1"));
+}
+
+// A function call is a module_path_primary in A.8.4, so a condition built on
+// one stays legal while the forms above are refused.
+TEST(OperatorElaboration, FunctionCallOperandElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(input [1:0] a, input b, output y);\n"
+      "  function automatic logic odd(logic [1:0] v);\n"
+      "    return v[0];\n"
+      "  endfunction\n"
+      "  specify\n"
+      "    if (odd(a)) (b => y) = 4;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

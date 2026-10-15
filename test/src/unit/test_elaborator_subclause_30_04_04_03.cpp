@@ -39,7 +39,9 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
 // §30.4.4.3 criterion: the same edge-sensitive path may carry different delays
 // only when every port is referenced the same way in each declaration. Here the
 // destination is a part-select in one declaration and a bit-select in the
-// other, which is illegal (LRM Example 4).
+// other, which is illegal (LRM Example 4). The tests of this rule that select
+// or name a whole vector destination write a full connection, which §30.4.3
+// allows such a destination where a parallel one does not.
 TEST(EdgeSensitiveStateDependentPathElaboration,
      InconsistentPortReferenceIsIllegal) {
   ElabFixture f;
@@ -47,8 +49,8 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
       "module m(input clk, input reset, output [3:0] q);\n"
       "  reg [3:0] data;\n"
       "  specify\n"
-      "    if (reset) (posedge clk => (q[3:0] : data)) = (10, 5);\n"
-      "    if (!reset) (posedge clk => (q[0] : data)) = (15, 8);\n"
+      "    if (reset) (posedge clk *> (q[3:0] : data)) = (10, 5);\n"
+      "    if (!reset) (posedge clk *> (q[0] : data)) = (15, 8);\n"
       "  endspecify\n"
       "endmodule\n",
       f);
@@ -68,8 +70,8 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
       "module m(input clk, input reset, output [3:0] q);\n"
       "  reg [3:0] data;\n"
       "  specify\n"
-      "    if (reset) (posedge clk => (q : data)) = (10, 5);\n"
-      "    if (!reset) (posedge clk => (q[0] : data)) = (15, 8);\n"
+      "    if (reset) (posedge clk *> (q : data)) = (10, 5);\n"
+      "    if (!reset) (posedge clk *> (q[0] : data)) = (15, 8);\n"
       "  endspecify\n"
       "endmodule\n",
       f);
@@ -108,8 +110,8 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
       "module m(input clk, input reset, output [3:0] q);\n"
       "  reg [3:0] data;\n"
       "  specify\n"
-      "    if (reset) (posedge clk => (q[3:0] : data)) = (10, 5);\n"
-      "    if (!reset) (posedge clk => (q[3:0] : data)) = (15, 8);\n"
+      "    if (reset) (posedge clk *> (q[3:0] : data)) = (10, 5);\n"
+      "    if (!reset) (posedge clk *> (q[3:0] : data)) = (15, 8);\n"
       "  endspecify\n"
       "endmodule\n",
       f);
@@ -220,13 +222,34 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
       "module m(input clk, input reset, output [3:0] q);\n"
       "  reg [3:0] data;\n"
       "  specify\n"
-      "    if (reset) (posedge clk => (q[1+:2] : data)) = (10, 5);\n"
-      "    if (!reset) (posedge clk => (q[1+:2] : data)) = (15, 8);\n"
+      "    if (reset) (posedge clk *> (q[1+:2] : data)) = (10, 5);\n"
+      "    if (!reset) (posedge clk *> (q[1+:2] : data)) = (15, 8);\n"
       "  endspecify\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+// A module's specify blocks together declare its module paths, so two
+// declarations of one edge-sensitive path in separate blocks are held to the
+// same reference rule as two in one block.
+TEST(EdgeSensitiveStateDependentPathElaboration,
+     InconsistentReferenceAcrossSpecifyBlocksIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input clk, input reset, output [3:0] q);\n"
+      "  reg [3:0] data;\n"
+      "  specify\n"
+      "    if (reset) (posedge clk *> (q[3:0] : data)) = (10, 5);\n"
+      "  endspecify\n"
+      "  specify\n"
+      "    if (!reset) (posedge clk *> (q[0] : data)) = (15, 8);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "bit-select, or part-select)",
+                            7, "30.4.4.3"));
 }
 
 }  // namespace

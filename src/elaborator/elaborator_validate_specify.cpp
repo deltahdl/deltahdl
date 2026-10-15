@@ -390,11 +390,31 @@ bool SameEndpoints(const SpecifyPathDecl& a, const SpecifyPathDecl& b) {
   return true;
 }
 
-// Reports if an ifnone path conflicts with an unconditional path on the same
-// endpoints, or fails to match any companion state-dependent path.
+// The specify items of every specify block `mod` holds, in source order. A
+// module may write more than one specify block (A.1.4), and the paths they
+// declare are all the module's, so the rules of §30.4.4.3, §30.4.4.4 and
+// §30.7.4 that relate one declaration to another read them together.
+std::vector<SpecifyItem*> ModuleSpecifyItems(const ModuleDecl* mod) {
+  std::vector<SpecifyItem*> items;
+  for (auto* item : mod->items) {
+    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
+    items.insert(items.end(), item->specify_items.begin(),
+                 item->specify_items.end());
+  }
+  return items;
+}
+
+// §30.4.2: a simple module path is one with no edge identifier and no data
+// source expression, both of which make it an edge-sensitive path (§30.4.3).
+bool IsSimplePath(const SpecifyPathDecl& path) {
+  return path.edge == SpecifyEdge::kNone && path.data_source == nullptr;
+}
+
+// Reports an ifnone path whose module path also has an unconditional simple
+// path (§30.4.4.4). An ifnone path no state-dependent path corresponds to is
+// legal, the clause treating it as an unconditional simple path of its own.
 void CheckIfnonePath(SpecifyItem* ifn,
                      const std::vector<SpecifyItem*>& unconditionals,
-                     const std::vector<SpecifyItem*>& conditionals,
                      DiagEngine& diag) {
   for (auto* un : unconditionals) {
     if (SameEndpoints(ifn->path, un->path)) {
@@ -402,47 +422,25 @@ void CheckIfnonePath(SpecifyItem* ifn,
                  "ifnone path conflicts with an unconditional "
                  "path on the same endpoints",
                  Subclause("30.4.4.4"));
-      break;
+      return;
     }
-  }
-  if (conditionals.empty()) return;
-  bool matched = false;
-  for (auto* c : conditionals) {
-    if (SameEndpoints(ifn->path, c->path)) {
-      matched = true;
-      break;
-    }
-  }
-  if (!matched) {
-    diag.Error(ifn->loc,
-               "ifnone path endpoints do not match any companion "
-               "state-dependent path",
-               Subclause("30.4.4.4"));
   }
 }
 
-// Pass: ifnone path conflict / companion-match checks within each specify
-// block.
+// Pass: an ifnone path may not share its module path with an unconditional
+// simple path, whichever of the module's specify blocks declares each.
 void ValidateIfnonePaths(const ModuleDecl* mod, DiagEngine& diag) {
-  for (auto* item : mod->items) {
-    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-    std::vector<SpecifyItem*> ifnones;
-    std::vector<SpecifyItem*> conditionals;
-    std::vector<SpecifyItem*> unconditionals;
-    for (auto* si : item->specify_items) {
-      if (si->kind != SpecifyItemKind::kPathDecl) continue;
-      if (si->path.is_ifnone) {
-        ifnones.push_back(si);
-      } else if (si->path.condition != nullptr) {
-        conditionals.push_back(si);
-      } else {
-        unconditionals.push_back(si);
-      }
-    }
-    for (auto* ifn : ifnones) {
-      CheckIfnonePath(ifn, unconditionals, conditionals, diag);
+  std::vector<SpecifyItem*> ifnones;
+  std::vector<SpecifyItem*> unconditionals;
+  for (auto* si : ModuleSpecifyItems(mod)) {
+    if (si->kind != SpecifyItemKind::kPathDecl) continue;
+    if (si->path.is_ifnone) {
+      ifnones.push_back(si);
+    } else if (si->path.condition == nullptr && IsSimplePath(si->path)) {
+      unconditionals.push_back(si);
     }
   }
+  for (auto* ifn : ifnones) CheckIfnonePath(ifn, unconditionals, diag);
 }
 
 // Classifies how a port is referenced: 0 = entire port, 1 = bit-select,
@@ -472,10 +470,11 @@ bool ConsistentRefs(const SpecifyPathDecl& a, const SpecifyPathDecl& b) {
   return true;
 }
 
-// Collects the edge-sensitive path declarations within one specify block.
-std::vector<SpecifyItem*> CollectEdgePaths(const ModuleItem* item) {
+// Collects the edge-sensitive path declarations of every specify block of
+// `mod`.
+std::vector<SpecifyItem*> CollectEdgePaths(const ModuleDecl* mod) {
   std::vector<SpecifyItem*> edge_paths;
-  for (auto* si : item->specify_items) {
+  for (auto* si : ModuleSpecifyItems(mod)) {
     if (si->kind != SpecifyItemKind::kPathDecl) continue;
     if (si->path.edge == SpecifyEdge::kNone) continue;
     edge_paths.push_back(si);
@@ -503,12 +502,9 @@ void CheckEdgePathConsistency(const std::vector<SpecifyItem*>& edge_paths,
 // Pass: enforce consistent port-reference forms across edge-sensitive paths to
 // the same module path (§30.4.4.3).
 void ValidateEdgePathConsistency(const ModuleDecl* mod, DiagEngine& diag) {
-  for (auto* item : mod->items) {
-    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-    std::vector<SpecifyItem*> edge_paths = CollectEdgePaths(item);
-    for (size_t j = 0; j < edge_paths.size(); ++j) {
-      CheckEdgePathConsistency(edge_paths, j, diag);
-    }
+  std::vector<SpecifyItem*> edge_paths = CollectEdgePaths(mod);
+  for (size_t j = 0; j < edge_paths.size(); ++j) {
+    CheckEdgePathConsistency(edge_paths, j, diag);
   }
 }
 
@@ -618,12 +614,9 @@ void CheckEdgePathUniqueness(const std::vector<SpecifyItem*>& edge_paths,
 // Pass: enforce that edge-sensitive state-dependent paths sharing a module path
 // are distinguished by edge and/or condition (§30.4.4.3).
 void ValidateEdgePathUniqueness(const ModuleDecl* mod, DiagEngine& diag) {
-  for (auto* item : mod->items) {
-    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-    std::vector<SpecifyItem*> edge_paths = CollectEdgePaths(item);
-    for (size_t j = 0; j < edge_paths.size(); ++j) {
-      CheckEdgePathUniqueness(edge_paths, j, diag);
-    }
+  std::vector<SpecifyItem*> edge_paths = CollectEdgePaths(mod);
+  for (size_t j = 0; j < edge_paths.size(); ++j) {
+    CheckEdgePathUniqueness(edge_paths, j, diag);
   }
 }
 
@@ -667,13 +660,42 @@ uint32_t SumWidths(const std::vector<SpecifyTerminal>& ts,
   return total;
 }
 
-// Checks that one parallel module path has equal source and destination bit
-// widths; non-parallel or data-source paths and unknown widths are skipped.
+// §30.4.3 (printed page 874): with a parallel connection, an edge-sensitive
+// path's destination is a scalar output or inout port or a bit-select of a
+// vector one. Its source may be any input or inout port, its edge read off the
+// least significant bit, so the source's width is not compared. A destination
+// whose port or width is unknown is left alone.
+void CheckEdgeParallelPathDestination(const SpecifyItem* si,
+                                      const PortMap& port_map,
+                                      DiagEngine& diag) {
+  for (const auto& t : si->path.dst_ports) {
+    std::string_view form;
+    if (t.range_kind == SpecifyRangeKind::kNone) {
+      if (TerminalWidth(t, port_map) > 1) form = "a vector";
+    } else if (t.range_kind != SpecifyRangeKind::kBitSelect) {
+      form = "a part-select";
+    }
+    if (form.empty()) continue;
+    diag.Error(si->loc,
+               std::format("destination '{}' of an edge-sensitive parallel "
+                           "path is {}, where a scalar port or a bit-select "
+                           "is required",
+                           t.name, form),
+               Subclause("30.4.3"));
+  }
+}
+
+// Checks that one simple parallel module path has equal source and destination
+// bit widths (§30.4.5), and an edge-sensitive one its destination (§30.4.3);
+// full paths and unknown widths are skipped.
 void CheckParallelPathWidth(const SpecifyItem* si, const PortMap& port_map,
                             DiagEngine& diag) {
   if (si->kind != SpecifyItemKind::kPathDecl) return;
   if (si->path.path_kind != SpecifyPathKind::kParallel) return;
-  if (si->path.data_source != nullptr) return;
+  if (!IsSimplePath(si->path)) {
+    CheckEdgeParallelPathDestination(si, port_map, diag);
+    return;
+  }
   bool src_known = true;
   bool dst_known = true;
   uint32_t src_bits = SumWidths(si->path.src_ports, port_map, src_known);
@@ -738,15 +760,13 @@ void CheckPulseStyleItem(const SpecifyItem* si, SignalSet& path_dsts,
   }
 }
 
-// Pass: pulsestyle/showcancelled declarations may not name an output already
-// driven by a module path.
+// Pass: pulsestyle/showcancelled declarations may not name an output a module
+// path declaration has already reached, in its own specify block or an earlier
+// one of the module.
 void ValidatePulseStyleConflicts(const ModuleDecl* mod, DiagEngine& diag) {
-  for (auto* item : mod->items) {
-    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
-    SignalSet path_dsts;
-    for (auto* si : item->specify_items) {
-      CheckPulseStyleItem(si, path_dsts, diag);
-    }
+  SignalSet path_dsts;
+  for (auto* si : ModuleSpecifyItems(mod)) {
+    CheckPulseStyleItem(si, path_dsts, diag);
   }
 }
 
