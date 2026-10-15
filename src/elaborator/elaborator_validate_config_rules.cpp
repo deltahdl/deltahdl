@@ -271,27 +271,35 @@ void WalkPackageProperty(PackageRefContext& ctx, const ModuleItem* item) {
 // package holds for it (§8.24), read its parameters and members as their own
 // names, and a member access there reaches outside the package only through
 // a design element's name (PackageRefContext::design_elements).
-void WalkPackageClass(PackageRefContext& ctx, const PackageDecl* pkg,
-                      const ModuleItem* item,
-                      const std::unordered_set<std::string_view>& elements) {
-  if (item->kind != ModuleItemKind::kClassDecl) return;
-  const ClassDecl* cls = item->class_decl;
+std::unordered_set<std::string_view> ClassMemberNames(const ClassDecl* cls) {
   std::unordered_set<std::string_view> members;
   for (const auto& [name, value] : cls->params) members.insert(name);
   for (const ClassMember* m : cls->members) {
     members.insert(m->kind == ClassMemberKind::kMethod ? m->method->name
                                                        : m->name);
   }
+  return members;
+}
+
+void WalkClassBodies(PackageRefContext& ctx, const PackageDecl* pkg,
+                     const ClassDecl* cls) {
+  for (const ClassMember* m : cls->members) {
+    if (m->init_expr != nullptr) WalkPackageRefExpr(ctx, m->init_expr);
+    if (m->kind == ClassMemberKind::kMethod) WalkMethodBody(ctx, m->method);
+  }
+  for (const auto* body : pkg->items) {
+    if (body->method_class == cls->name) WalkMethodBody(ctx, body);
+  }
+}
+
+void WalkPackageClass(PackageRefContext& ctx, const PackageDecl* pkg,
+                      const ModuleItem* item,
+                      const std::unordered_set<std::string_view>& elements) {
+  if (item->kind != ModuleItemKind::kClassDecl) return;
+  const ClassDecl* cls = item->class_decl;
   ctx.design_elements = &elements;
-  WalkWithNames(ctx, members, [&] {
-    for (const ClassMember* m : cls->members) {
-      if (m->init_expr != nullptr) WalkPackageRefExpr(ctx, m->init_expr);
-      if (m->kind == ClassMemberKind::kMethod) WalkMethodBody(ctx, m->method);
-    }
-    for (const auto* body : pkg->items) {
-      if (body->method_class == cls->name) WalkMethodBody(ctx, body);
-    }
-  });
+  WalkWithNames(ctx, ClassMemberNames(cls),
+                [&] { WalkClassBodies(ctx, pkg, cls); });
   ctx.design_elements = nullptr;
 }
 

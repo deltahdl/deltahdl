@@ -71,6 +71,7 @@ TEST(PackageImportSim, ReExportedStructMemberLiteralThroughAWildcardExport) {
                       "package p2;\n"
                       "  import p1::*;\n"
                       "  export p1::*;\n"
+                      "  int seen = BUSY;\n"
                       "endpackage\n"
                       "module top;\n"
                       "  int y;\n"

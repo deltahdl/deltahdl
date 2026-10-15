@@ -306,8 +306,9 @@ TEST(PackageExportSim, MultipleExportedPathsToSameDeclarationDoNotConflict) {
 }
 
 // A design whose package p declares `int a[2] = '{1, 2};` and a function f
-// reading a[0], and whose package q imports p and exports p's names, ahead
-// of the module `top`, whose process reads into y; answers y.
+// reading a[0], and whose package q imports p, reads a, which imports it, and
+// exports p's names, ahead of the module `top`, whose process reads into y;
+// answers y.
 static uint64_t ExportedArrayRead(const std::string& top) {
   return RunAndGet(
       "package p;\n"
@@ -319,6 +320,7 @@ static uint64_t ExportedArrayRead(const std::string& top) {
       "package q;\n"
       "  import p::*;\n"
       "  export p::*;\n"
+      "  int seen = a[0];\n"
       "endpackage\n" +
           top,
       "y");

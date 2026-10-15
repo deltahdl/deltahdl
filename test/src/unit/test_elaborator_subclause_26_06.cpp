@@ -426,6 +426,7 @@ TEST(PackageExport, StarStarExportMakesTheImportedVariableVisible) {
              "package p3;\n"
              "  import p2::*;\n"
              "  export p2::*;\n"
+             "  int seen = x;\n"
              "endpackage\n"
              "module top;\n"
              "  import p3::*;\n"

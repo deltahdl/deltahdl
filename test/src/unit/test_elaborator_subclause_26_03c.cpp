@@ -25,6 +25,7 @@ TEST(PackageImport, RangedEnumConstantsAreProvidedThroughAWildcardExport) {
              "package p2;\n"
              "  import p1::*;\n"
              "  export p1::*;\n"
+             "  int seen = VAL1 + VAL2;\n"
              "endpackage\n"
              "module top;\n"
              "  int r;\n"
@@ -345,7 +346,7 @@ TEST(PackageScopeReference, FunctionBodyImportElaborates) {
   EXPECT_TRUE(
       ElabOk("package p; int c = 1; endpackage\n"
              "module m;\n"
-             "  function int f(int a);\n"
+             "  function automatic int f(int a);\n"
              "    import p::*;\n"
              "    int v = a;\n"
              "    return v + c;\n"

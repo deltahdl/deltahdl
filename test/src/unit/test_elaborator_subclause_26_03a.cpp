@@ -229,16 +229,16 @@ TEST(PackageImport, WildcardAmbiguityBetweenTwoPackagesIsError) {
              "  parameter int X = 2;\n"
              "endpackage\n"
              "module m;\n"
-             "  int y;\n"
-             "  initial y = X;\n"
              "  import p1::*;\n"
              "  import p2::*;\n"
+             "  int y;\n"
+             "  initial y = X;\n"
              "endmodule\n",
              f));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "reference to 'X' is ambiguous between wildcard "
                             "imports of packages 'p1' and 'p2'",
-                            9, "26.3"));
+                            11, "26.3"));
 }
 
 TEST(PackageImport, DeclarationAfterWildcardClaimIsError) {
@@ -837,8 +837,9 @@ void ExpectWildcardAmbiguityIn(const std::string& stmt) {
   std::string src =
       "package p1;\n  parameter int X = 1;\nendpackage\n"
       "package p2;\n  parameter int X = 2;\nendpackage\n"
-      "module m;\n  int y;\n  initial\n    " +
-      stmt + "\n  import p1::*;\n  import p2::*;\nendmodule\n";
+      "module m;\n  import p1::*;\n  import p2::*;\n  int y;\n"
+      "  initial\n    " +
+      stmt + "\nendmodule\n";
   ElaborateSrc(src, f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "reference to 'X' is ambiguous between wildcard "
