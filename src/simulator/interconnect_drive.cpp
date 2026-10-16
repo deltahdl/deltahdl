@@ -160,10 +160,9 @@ void FollowDriver(const std::shared_ptr<InterconnectFollow>& follow,
   }
   // A driver standing for no output port -- the connection of the port above,
   // say -- is asked about by the name the connection reads, as the
-  // connection's own lookup asks.
-  const std::string_view kPort = slot < follow->net.driver_ports.size()
-                                     ? follow->net.driver_ports[slot]
-                                     : std::string_view();
+  // connection's own lookup asks. ApplyContAssignToNet records the slot's port
+  // before it tells a listener.
+  const std::string_view kPort = follow->net.driver_ports[slot];
   const std::optional<InterconnectDelay> kDelay =
       mgr->ConnectionInterconnectDelay(
           kPort.empty() ? std::string_view(follow->ends.source) : kPort,
