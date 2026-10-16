@@ -401,6 +401,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/contassign_strength.cpp
     simulator/lowerer_udp.cpp
     simulator/lowerer_register.cpp
+    simulator/lowerer_package_enum_constants.cpp
     simulator/lowerer_package_data.cpp
     simulator/lowerer_package_type.cpp
     simulator/lowerer_sequence_monitors.cpp
