@@ -136,12 +136,20 @@ static const DataType* NestedAggregateSource(const StructMember& m,
 }
 
 void SizeClassHandleMembers(
-    DataType& dt, const std::unordered_set<std::string_view>& class_names) {
+    DataType& dt, const TypedefMap& typedefs,
+    const std::unordered_set<std::string_view>& class_names) {
   for (StructMember& m : dt.struct_members) {
-    if (m.type_kind == DataTypeKind::kNamed &&
-        class_names.contains(m.type_name)) {
-      m.resolved_width = kClassMemberHandleWidth;
-    }
+    DataType written;
+    written.kind = m.type_kind;
+    written.type_name = m.type_name;
+    written.scope_name = m.scope_name;
+    // §6.18: a typedef of a class names the class, so the member is one of
+    // the class the chain of names ends at, and is recorded under it.
+    const DataType& end = LastTypeInChain(written, typedefs);
+    if (!class_names.contains(end.type_name)) continue;
+    m.type_name = end.type_name;
+    m.scope_name = end.scope_name;
+    m.resolved_width = kClassMemberHandleWidth;
   }
 }
 

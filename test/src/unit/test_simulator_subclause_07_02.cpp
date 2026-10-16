@@ -638,4 +638,33 @@ TEST(UnpackedStructClassMember, AHandleCopiedThroughAClassMemberIsKept) {
   EXPECT_EQ(out, "5 7 5 8\n");
 }
 
+// §7.2 with §6.18: a member declared through a typedef of a class, and
+// through a typedef of that typedef, is a member of the class: it holds the
+// whole handle, and `new` assigned to it constructs the class with its
+// argument (#7231). Under the typedef's name the member took no bits and its
+// `new` found no class to construct.
+TEST(UnpackedStructClassMember, AMemberDeclaredThroughAClassTypedefIsAHandle) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C; int x; function new(int v); x = v; endfunction endclass\n"
+      "module t;\n"
+      "  typedef C c_t;\n"
+      "  typedef c_t cc_t;\n"
+      "  typedef struct { int i; c_t h; cc_t k; } st;\n"
+      "  st s;\n"
+      "  C one, r1, r2;\n"
+      "  initial begin\n"
+      "    one = new(1);\n"
+      "    s.h = new(5);\n"
+      "    s.k = new(7);\n"
+      "    s.i = 9;\n"
+      "    r1 = s.h;\n"
+      "    r2 = s.k;\n"
+      "    $display(\"%0d %0d %0d\", r1.x, r2.x, s.i);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "5 7 9\n");
+}
+
 }  // namespace
