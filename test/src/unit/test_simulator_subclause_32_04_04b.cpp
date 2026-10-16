@@ -616,4 +616,34 @@ TEST(InterconnectDelaySim, ARefPortSharesItsVariableInADesignThatAnnotates) {
   EXPECT_EQ(ok->value.ToUint64(), 1u);
 }
 
+// §27.5 with §23.9: in a design that calls $sdf_annotate an inout port is kept
+// as two nets, the second being the one its connection names, which inside a
+// generate block is the block's n over the module's. c drives 1 on its port,
+// so g.n reads 1 and the module's n stays z.
+TEST(InterconnectDelaySim, AnInoutInAGenerateBlockKeepsToTheBlocksNet) {
+  const std::string kSdf = WriteSdfFile("inout_gen.sdf", "(DELAYFILE)");
+  SimFixture f;
+  auto* ok = RunAndFindVar(
+      "module child(inout wire p);\n"
+      "  assign p = 1'b1;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire n;\n"
+      "  logic ok = 1'b0;\n"
+      "  if (1) begin : g\n"
+      "    wire n;\n"
+      "    child c(.p(n));\n"
+      "  end\n"
+      "  initial begin\n"
+      "    $sdf_annotate(\"" +
+          kSdf +
+          "\");\n"
+          "    #1 ok = (g.n === 1'b1) && (n === 1'bz);\n"
+          "  end\n"
+          "endmodule\n",
+      f, "ok");
+  ASSERT_NE(ok, nullptr);
+  EXPECT_EQ(ok->value.ToUint64(), 1u);
+}
+
 }  // namespace

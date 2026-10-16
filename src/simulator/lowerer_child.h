@@ -2,6 +2,9 @@
 #define DELTA_SIMULATOR_LOWERER_CHILD_H_
 
 #include <string>
+#include <string_view>
+
+#include "elaborator/rtlir_scopes.h"
 
 namespace delta {
 
@@ -23,6 +26,18 @@ void RegisterInstanceKeyBinding(const std::string& inst_prefix,
 // its own name already.
 std::string CoverageScopeOfInstanceKey(const std::string& key,
                                        const SimContext& ctx);
+
+// §27.5 with §23.9: the key the object a name written in a generate block
+// stands for is held under, `name` being written under the instance
+// `inst_prefix` names inside `gen_blocks`, outermost first. A generate block
+// declares its objects under its prefix and a name declared locally stands
+// over the enclosing scope's, so the innermost block declaring the name is the
+// one meant, and the instance's own object where none does. A net is found
+// with the rest, CreateNet registering its value as a variable of its name.
+// §10.11's alias and §23.3.3's shared port connections read their names so.
+std::string GenBlockObjectKey(const std::string& inst_prefix,
+                              const GenBlockPrefixes& gen_blocks,
+                              std::string_view name, SimContext& ctx);
 
 }  // namespace delta
 

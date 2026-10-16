@@ -168,20 +168,14 @@ struct AliasScope {
   const GenBlockPrefixes& gen_blocks;
 };
 
-// §10.11 with §27.5 and §23.9: the key a net an alias names by its simple
-// name is held under. A generate block declares its nets under its prefix and
-// a name declared locally stands over the enclosing scope's, so the innermost
-// block declaring the name is the one meant, and the instance's own net where
-// none does. Looked up under the instance prefix alone, `alias a = b;` in a
-// block found no net, or an outer one of the same name.
-static std::string AliasNetKey(const AliasScope& scope, std::string_view name,
-                               SimContext& ctx) {
-  for (auto it = scope.gen_blocks.rbegin(); it != scope.gen_blocks.rend();
-       ++it) {
-    std::string key = scope.inst_prefix + std::string(*it) + std::string(name);
-    if (ctx.FindNet(key) != nullptr) return key;
+std::string GenBlockObjectKey(const std::string& inst_prefix,
+                              const GenBlockPrefixes& gen_blocks,
+                              std::string_view name, SimContext& ctx) {
+  for (auto it = gen_blocks.rbegin(); it != gen_blocks.rend(); ++it) {
+    std::string key = inst_prefix + std::string(*it) + std::string(name);
+    if (ctx.FindVariable(key) != nullptr) return key;
   }
-  return scope.inst_prefix + std::string(name);
+  return inst_prefix + std::string(name);
 }
 
 // Appends the bits of the net, the bit-select or the part-select `e`, the
@@ -191,7 +185,8 @@ static bool AppendNetOperandBits(const Expr* e, const AliasScope& scope,
                                  std::vector<AliasBit>& out) {
   const Expr* base = e->kind == ExprKind::kSelect ? e->base : e;
   if (base == nullptr || base->kind != ExprKind::kIdentifier) return false;
-  Net* net = ctx.FindNet(AliasNetKey(scope, base->text, ctx));
+  Net* net = ctx.FindNet(
+      GenBlockObjectKey(scope.inst_prefix, scope.gen_blocks, base->text, ctx));
   if (net == nullptr || net->resolved == nullptr) return false;
   std::pair<int64_t, int64_t> span{0, net->resolved->value.width - 1};
   if (e->kind == ExprKind::kSelect) {
@@ -296,12 +291,14 @@ void Lowerer::LowerAliases(const RtlirModule* mod) {
       continue;
     }
     const AliasScope kScope{inst_prefix_, alias.gen_block_prefixes};
-    std::string root =
-        AliasGroupRoot(parent, AliasNetKey(kScope, alias.nets[0]->text, ctx_));
+    std::string root = AliasGroupRoot(
+        parent, GenBlockObjectKey(kScope.inst_prefix, kScope.gen_blocks,
+                                  alias.nets[0]->text, ctx_));
     parent.emplace(root, root);
     for (auto* net : alias.nets) {
-      std::string other =
-          AliasGroupRoot(parent, AliasNetKey(kScope, net->text, ctx_));
+      std::string other = AliasGroupRoot(
+          parent, GenBlockObjectKey(kScope.inst_prefix, kScope.gen_blocks,
+                                    net->text, ctx_));
       parent[other] = root;
     }
   }

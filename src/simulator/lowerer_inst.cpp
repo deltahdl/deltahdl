@@ -21,6 +21,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/inout_port_link.h"
 #include "simulator/lowerer.h"
+#include "simulator/lowerer_child.h"
 #include "simulator/lowerer_register.h"
 #include "simulator/net.h"
 #include "simulator/sequence_flatten.h"
@@ -697,13 +698,14 @@ bool Lowerer::LowerArrayPortBinding(const RtlirModuleInst& inst,
 }
 
 // What an inout or ref port binding of one instance is joined in: the
-// instance's segment and its parent's prefix, and the connection each of the
-// instance's objects was joined to first.
+// instance and its segment, its parent's prefix, and the connection each of
+// the instance's objects was joined to first.
 struct InoutJoinScope {
   SimContext& ctx;
   Arena& arena;
   std::string local_prefix;
   const std::string& parent_prefix;
+  const RtlirModuleInst& inst;
   std::unordered_map<std::string_view, std::string_view>& joins;
 };
 
@@ -725,11 +727,11 @@ struct InoutJoinScope {
 // ports on the one inout i, so the two connections are one net with i. The
 // first is joined to i; a later one joins the first.
 static void JoinInoutPortBinding(const RtlirPortBinding& binding,
+                                 const std::string& connection,
                                  const InoutJoinScope& scope) {
   const std::string& local = *scope.arena.Create<std::string>(
       scope.local_prefix + std::string(PortStorageName(binding)));
-  const std::string& target = *scope.arena.Create<std::string>(
-      scope.parent_prefix + std::string(binding.connection->text));
+  const std::string& target = *scope.arena.Create<std::string>(connection);
   auto [joined, fresh] = scope.joins.try_emplace(local, target);
   if (!fresh) {
     scope.ctx.AliasVariable(target, joined->second);
@@ -747,16 +749,18 @@ static void JoinInoutPortBinding(const RtlirPortBinding& binding,
 // joined to its connection (JoinInoutPortBinding). A connection naming a net
 // is an inout port's, since §23.3.3.2 connects a ref port to a variable alone
 // and §23.2.2.3 gives an inout port no variable type, so the port is the net
-// CreatePortVariable (lowerer_register.cpp) registered for it.
+// CreatePortVariable (lowerer_register.cpp) registered for it. The connection
+// is read where it is written, in the generate blocks around the instance.
 static void LinkOrJoinSharedPortBinding(const RtlirPortBinding& binding,
                                         const InoutJoinScope& scope,
                                         bool link) {
   if (binding.connection->kind != ExprKind::kIdentifier) return;
   std::string target =
-      scope.parent_prefix + std::string(binding.connection->text);
+      GenBlockObjectKey(scope.parent_prefix, scope.inst.gen_block_prefixes,
+                        binding.connection->text, scope.ctx);
   Net* outer = link ? scope.ctx.FindNet(target) : nullptr;
   if (outer == nullptr) {
-    JoinInoutPortBinding(binding, scope);
+    JoinInoutPortBinding(binding, target, scope);
     return;
   }
   std::string local =
@@ -895,10 +899,10 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
     if (binding.direction == Direction::kInout ||
         binding.direction == Direction::kRef ||
         BoundPortType(inst, binding) == DataTypeKind::kEvent) {
-      LinkOrJoinSharedPortBinding(
-          binding,
-          {ctx_, arena_, inst_prefix_ + inst_seg, inst_prefix_, inout_joins},
-          interconnect_annotatable_);
+      LinkOrJoinSharedPortBinding(binding,
+                                  {ctx_, arena_, inst_prefix_ + inst_seg,
+                                   inst_prefix_, inst, inout_joins},
+                                  interconnect_annotatable_);
       continue;
     }
 

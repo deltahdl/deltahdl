@@ -208,4 +208,43 @@ TEST(RefPortSimulation, RefPortBesideTheOtherDirections) {
             "sum 12 r 42 io 1\n");
 }
 
+// §23.3.3.2 with §27.5 and §23.9: a ref port connected inside a generate block
+// to a variable the block declares is that variable, found under the block's
+// name: c writes 5A through its port, and g.v reads it. Joined under the
+// module's name alone, the port was a variable of its own and g.v kept 00.
+TEST(GenerateBlockRefConnectionSim, ARefReachesTheVariableItsBlockDeclares) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module child(ref logic [7:0] r);\n"
+                       "  initial #1 r = 8'h5A;\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  if (1) begin : g\n"
+                       "    logic [7:0] v = 8'h00;\n"
+                       "    child c(.r(v));\n"
+                       "  end\n"
+                       "  initial #2 $display(\"g.v %h\", g.v);\n"
+                       "endmodule\n",
+                       f),
+            "g.v 5a\n");
+}
+
+// The block's v stands over the module's v of the same name (§23.9), so the
+// write through the port lands in the block's and the module's keeps C3.
+TEST(GenerateBlockRefConnectionSim, TheBlocksVariableStandsOverTheModules) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module child(ref logic [7:0] r);\n"
+                       "  initial #1 r = 8'h5A;\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  logic [7:0] v = 8'hC3;\n"
+                       "  if (1) begin : g\n"
+                       "    logic [7:0] v = 8'h00;\n"
+                       "    child c(.r(v));\n"
+                       "  end\n"
+                       "  initial #2 $display(\"g.v %h v %h\", g.v, v);\n"
+                       "endmodule\n",
+                       f),
+            "g.v 5a v c3\n");
+}
+
 }  // namespace

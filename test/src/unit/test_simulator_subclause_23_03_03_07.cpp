@@ -118,4 +118,64 @@ TEST(DissimilarNetTypePortConnectionSimulation,
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
+// §23.3.3.7 with §27.5 and §23.9: an inout port connected inside a generate
+// block to a net the block declares is one net with that net, found under the
+// block's name: c drives 1 on its port, and g.n reads it. Joined under the
+// module's name alone, the port reached no net and g.n stayed z.
+TEST(GenerateBlockInoutConnectionSim, AnInoutReachesTheNetItsBlockDeclares) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module child(inout wire p);\n"
+                       "  assign p = 1'b1;\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  if (1) begin : g\n"
+                       "    wire n;\n"
+                       "    child c(.p(n));\n"
+                       "  end\n"
+                       "  initial #1 $display(\"g.n %b\", g.n);\n"
+                       "endmodule\n",
+                       f),
+            "g.n 1\n");
+}
+
+// The block's n stands over the module's n of the same name (§23.9), so the
+// port is joined to the block's and the module's stays undriven at z. Joined
+// under the module's name alone, the two read the other way round.
+TEST(GenerateBlockInoutConnectionSim, TheBlocksNetStandsOverTheModules) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module child(inout wire p);\n"
+                       "  assign p = 1'b1;\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  wire n;\n"
+                       "  if (1) begin : g\n"
+                       "    wire n;\n"
+                       "    child c(.p(n));\n"
+                       "  end\n"
+                       "  initial #1 $display(\"g.n %b n %b\", g.n, n);\n"
+                       "endmodule\n",
+                       f),
+            "g.n 1 n z\n");
+}
+
+// Where the block declares nothing of the connection's name, the name is the
+// module's (§23.9 climbing out of the block): c drives 1 on its port in g, and
+// the module's n reads it.
+TEST(GenerateBlockInoutConnectionSim, ANameTheBlockLacksIsTheModulesNet) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module child(inout wire p);\n"
+                       "  assign p = 1'b1;\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  wire n;\n"
+                       "  if (1) begin : g\n"
+                       "    wire m;\n"
+                       "    child c(.p(n));\n"
+                       "  end\n"
+                       "  initial #1 $display(\"n %b\", n);\n"
+                       "endmodule\n",
+                       f),
+            "n 1\n");
+}
+
 }  // namespace
