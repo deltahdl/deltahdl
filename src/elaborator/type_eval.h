@@ -26,12 +26,11 @@ void ResolveNestedAggregateTypes(DataType& dt, const TypedefMap& typedefs,
                                  Arena& arena);
 
 // §7.2 with §8.4: give every member of `dt` whose type names a class in
-// `class_names`, and no typedef, the width of the handle it holds,
-// kClassMemberHandleWidth, which otherwise stays unresolved and is sized as a
-// one-bit vector.
+// `class_names` the width of the handle it holds, kClassMemberHandleWidth; a
+// class's name is no typedef's, so the member otherwise stays unresolved and
+// is sized as a one-bit vector.
 void SizeClassHandleMembers(
-    DataType& dt, const TypedefMap& typedefs,
-    const std::unordered_set<std::string_view>& class_names);
+    DataType& dt, const std::unordered_set<std::string_view>& class_names);
 
 // §7.2.1 with §6.18: the packed structure or union a declared type stands for,
 // laid out for a member select -- an arena copy of the type itself when the
