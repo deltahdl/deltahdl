@@ -533,9 +533,15 @@ TEST(ProtectDigestKeynameEncryptionInput,
 
 // The control: the name that entity does hold. Without it the case above would
 // hold of a tool that reported every region it was handed.
+// The region's data reach no key, which §34.3.1's report alone says.
 TEST(ProtectDigestKeynameEncryptionInput, AHeldDigestNameIsSealedInSilence) {
   DigestSealingRun run(Sealing(Designates(kProvider, kProviderName)));
-  EXPECT_FALSE(run.f.diag.HasErrors()) << run.text;
+  EXPECT_EQ(run.f.diag.ErrorCount(), 1U) << run.text;
+  EXPECT_TRUE(
+      ReportedError(run.f.diag.Diagnostics(),
+                    "protect pragma encryption envelope has no key to be "
+                    "encrypted under, so it is written out unencrypted",
+                    1, "34.3.1"));
 }
 
 // §34.5.16 fills the entity where a text named none for its digest: the digest
@@ -547,7 +553,12 @@ TEST(ProtectDigestKeynameEncryptionInput, ANameFallsBackToTheDatasEntity) {
   std::string described = Written("data_keyowner", kDataParty);
   described += Written("digest_keyname", kDataName);
   DigestSealingRun run(Sealing(described));
-  EXPECT_FALSE(run.f.diag.HasErrors()) << run.text;
+  EXPECT_EQ(run.f.diag.ErrorCount(), 1U) << run.text;
+  EXPECT_TRUE(
+      ReportedError(run.f.diag.Diagnostics(),
+                    "protect pragma encryption envelope has no key to be "
+                    "encrypted under, so it is written out unencrypted",
+                    1, "34.3.1"));
 }
 
 }  // namespace

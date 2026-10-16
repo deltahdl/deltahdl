@@ -136,11 +136,16 @@ static std::string ExpressionsBesideDelimiter(std::string_view line,
                                               bool ahead) {
   std::string_view body;
   ProtectPragmaLine(line, &body);
+  // The list ends where a comment written on the line begins.
+  auto after = static_cast<size_t>(delimiter.keyword.data() - body.data()) +
+               delimiter.keyword.size();
+  std::string_view listed_part = body.substr(
+      0, after + ExpressionsAfterDelimiter(body.substr(after)).size());
   std::vector<std::string_view> expressions;
-  for (const ListedKeyword& listed : TopLevelKeywords(body)) {
+  for (const ListedKeyword& listed : TopLevelKeywords(listed_part)) {
     if (listed.name.data() == delimiter.keyword.data()) continue;
     if ((listed.name.data() < delimiter.keyword.data()) == ahead) {
-      expressions.push_back(ListedExpressionText(body, listed));
+      expressions.push_back(ListedExpressionText(listed_part, listed));
     }
   }
   return ProtectDirectiveWriting(expressions);

@@ -285,16 +285,15 @@ TEST(EnvelopeEncryption, TheDescriptionWrittenWithTheBlockGovernsIt) {
 
 // A comment written on a delimiter's directive is not a pragma expression and
 // says nothing about the envelope, so it is not among the things carried
-// across. The expressions beside it are carried and the comment is not, which
-// is also what keeps the produced envelope readable: a block comment the
-// author never closed would otherwise be carried onto the opening directive
-// and take the description and the block after it into the comment, leaving an
-// envelope that closes nothing and a design that never arrives.
+// across. The expressions beside it are carried and the comment is not. (A
+// block comment left open there runs on over the lines after it, which are then
+// comment text rather than the region's, §34.3 having the encrypting half
+// interpret nothing in a comment.)
 TEST(EnvelopeEncryption, ACommentOnADelimiterIsNotACarriedExpression) {
   std::string opening =
       "`pragma protect author=\"Acme Corp\", begin_protected\n";
   std::string src =
-      "`pragma protect author=\"Acme Corp\", begin /* never closed\n"
+      "`pragma protect author=\"Acme Corp\", begin /* a note */\n"
       "  initial result = 42;\n"
       "`pragma protect end\n";
   std::string written = Encrypted(src);

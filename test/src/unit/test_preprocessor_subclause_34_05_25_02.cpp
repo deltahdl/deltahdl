@@ -417,12 +417,18 @@ TEST(ProtectKeyKeynameEncryptionInput, AHeldNameIsSealedInSilence) {
 }
 
 // A name written under an entity the tool holds no list for. A name cannot be
-// found missing from a list that was never supplied, so nothing is reported.
-// That reading is what Preprocessor::CheckKeyKeyname already gave, and a report
-// made where both modes reach it leaves it standing.
+// found missing from a list that was never supplied, so the name is not
+// reported. That reading is what Preprocessor::CheckKeyKeyname already gave,
+// and a report made where both modes reach it leaves it standing. The region
+// reaches no key either, which §34.3.1's report alone says.
 TEST(ProtectKeyKeynameEncryptionInput, ANameUnderAnUnheldEntityIsNotReported) {
   SigningRun run(Region(Designates(kStrangerEntity, kUnheldName)));
-  EXPECT_FALSE(run.f.diag.HasErrors()) << run.text;
+  EXPECT_EQ(run.f.diag.ErrorCount(), 1U) << run.text;
+  EXPECT_TRUE(
+      ReportedError(run.f.diag.Diagnostics(),
+                    "protect pragma encryption envelope has no key to be "
+                    "encrypted under, so it is written out unencrypted",
+                    1, "34.3.1"));
 }
 
 }  // namespace

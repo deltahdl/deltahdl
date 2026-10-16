@@ -447,7 +447,13 @@ TEST(ProtectDataKeynameEncryptionInput, ANameTheEntityHoldsIsSealedInSilence) {
 TEST(ProtectDataKeynameEncryptionInput,
      ANameUnderAnUnknownEntityIsNotReported) {
   SealingRun run(Region(Names("a-party-holding-nothing-here", kOwnerKeyName)));
-  EXPECT_FALSE(run.f.diag.HasErrors()) << run.text;
+  // The region reaches no key, which §34.3.1's report alone says.
+  EXPECT_EQ(run.f.diag.ErrorCount(), 1U) << run.text;
+  EXPECT_TRUE(
+      ReportedError(run.f.diag.Diagnostics(),
+                    "protect pragma encryption envelope has no key to be "
+                    "encrypted under, so it is written out unencrypted",
+                    1, "34.3.1"));
 }
 
 }  // namespace
