@@ -163,7 +163,9 @@ void GrowShadow(InoutPortLink& link, std::size_t slot, Arena& arena) {
 
 // Toward the port: a write of `outer`'s driver `slot`, carried across the
 // delay annotated to the port from the source the driver stands for, or, for
-// one standing for no port, from the connection.
+// one standing for no port, from the connection. ApplyContAssignToNet records
+// the slot's port before it tells a listener, and Lowerer::Lower acquires the
+// manager before anything runs.
 void CarryIn(const std::shared_ptr<InoutPortLink>& link, std::size_t slot,
              SimContext& ctx) {
   if (IsOwnSlot(link->to_outer, slot)) return;
@@ -171,16 +173,11 @@ void CarryIn(const std::shared_ptr<InoutPortLink>& link, std::size_t slot,
   const Net& outer = link->ends.outer;
   const Logic4Vec& value = outer.drivers[slot];
   const DriverStrength kStrength = outer.driver_strengths[slot];
-  const std::string_view kPort = slot < outer.driver_ports.size()
-                                     ? outer.driver_ports[slot]
-                                     : std::string_view();
-  const SpecifyManager* mgr = ctx.GetSpecifyManager();
+  const std::string_view kPort = outer.driver_ports[slot];
   const std::optional<InterconnectDelay> kDelay =
-      mgr == nullptr
-          ? std::nullopt
-          : mgr->ConnectionInterconnectDelay(
-                kPort.empty() ? std::string_view(link->ends.source) : kPort,
-                link->ends.load);
+      ctx.AcquireSpecifyManager().ConnectionInterconnectDelay(
+          kPort.empty() ? std::string_view(link->ends.source) : kPort,
+          link->ends.load);
   const auto kArrive = [link, slot, kStrength, &ctx](const Logic4Vec& v) {
     Net& shadow = link->toward_inner.net;
     shadow.drivers[slot] = v;

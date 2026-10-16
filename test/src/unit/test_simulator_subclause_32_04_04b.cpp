@@ -557,4 +557,63 @@ TEST(InterconnectDelaySim, AnInoutSourceReachesAnInoutLoadAcrossItsDelay) {
   EXPECT_EQ(ok->value.ToUint64(), 1u);
 }
 
+// §32.4.4: a driver the parent itself writes onto the net stands for no port,
+// so its delay to an inout load is the one annotated from the net. top drives
+// n from 0 to 1 at 2 and the delay from n to c/p is 5, so at 4 n holds 1 and
+// c.p still 0, and at 8 c.p holds 1. Looked up from anything but n, the
+// driver finds no delay and c.p reads 1 at 4.
+TEST(InterconnectDelaySim, AParentsOwnDriveReachesAnInoutLoadAcrossItsDelay) {
+  const std::string kSdf =
+      WriteSdfFile("inout_parent.sdf", DelayFile("(INTERCONNECT n c/p (5))"));
+  SimFixture f;
+  auto* ok = RunAndFindVar(
+      "module child(inout wire p);\n"
+      "  assign p = 1'bz;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  reg d = 1'b0;\n"
+      "  wire n;\n"
+      "  logic ok = 1'b0;\n"
+      "  assign n = d;\n"
+      "  child c(.p(n));\n"
+      "  initial begin\n"
+      "    #1 $sdf_annotate(\"" +
+          kSdf +
+          "\");\n"
+          "    #1 d = 1'b1;\n"
+          "    #2 ok = (n === 1'b1) && (c.p === 1'b0);\n"
+          "    #4 ok = ok && (c.p === 1'b1);\n"
+          "  end\n"
+          "endmodule\n",
+      f, "ok");
+  ASSERT_NE(ok, nullptr);
+  EXPECT_EQ(ok->value.ToUint64(), 1u);
+}
+
+// §23.3.3.2: a ref port is its connection's variable whether or not the design
+// calls $sdf_annotate, which keeps only an inout port's two nets apart. c
+// writes r at 2, and at 3 the parent's v reads what c wrote.
+TEST(InterconnectDelaySim, ARefPortSharesItsVariableInADesignThatAnnotates) {
+  const std::string kSdf = WriteSdfFile("ref_port.sdf", "(DELAYFILE)");
+  SimFixture f;
+  auto* ok = RunAndFindVar(
+      "module child(ref logic [7:0] r);\n"
+      "  initial #2 r = 8'h5A;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [7:0] v = 8'h00;\n"
+      "  logic ok = 1'b0;\n"
+      "  child c(.r(v));\n"
+      "  initial begin\n"
+      "    #1 $sdf_annotate(\"" +
+          kSdf +
+          "\");\n"
+          "    #2 ok = (v === 8'h5A);\n"
+          "  end\n"
+          "endmodule\n",
+      f, "ok");
+  ASSERT_NE(ok, nullptr);
+  EXPECT_EQ(ok->value.ToUint64(), 1u);
+}
+
 }  // namespace

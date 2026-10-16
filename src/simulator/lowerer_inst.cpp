@@ -726,7 +726,6 @@ struct InoutJoinScope {
 // first is joined to i; a later one joins the first.
 static void JoinInoutPortBinding(const RtlirPortBinding& binding,
                                  const InoutJoinScope& scope) {
-  if (binding.connection->kind != ExprKind::kIdentifier) return;
   const std::string& local = *scope.arena.Create<std::string>(
       scope.local_prefix + std::string(PortStorageName(binding)));
   const std::string& target = *scope.arena.Create<std::string>(
@@ -744,29 +743,28 @@ static void JoinInoutPortBinding(const RtlirPortBinding& binding,
 // §32.4.4: where an interconnect delay can reach the design while it runs
 // (`link`), an inout port binding of a net to a net is kept as the two nets,
 // joined by LinkInoutPortNets, so that a delay annotated to the port sits
-// between them; every other inout, ref or event port binding is joined to its
-// connection (JoinInoutPortBinding).
+// between them; every other inout, ref or event port binding of a name is
+// joined to its connection (JoinInoutPortBinding). A connection naming a net
+// is an inout port's, since §23.3.3.2 connects a ref port to a variable alone
+// and §23.2.2.3 gives an inout port no variable type, so the port is the net
+// CreatePortVariable (lowerer_register.cpp) registered for it.
 static void LinkOrJoinSharedPortBinding(const RtlirPortBinding& binding,
                                         const InoutJoinScope& scope,
                                         bool link) {
-  if (!link || binding.direction != Direction::kInout ||
-      binding.connection->kind != ExprKind::kIdentifier) {
+  if (binding.connection->kind != ExprKind::kIdentifier) return;
+  std::string target =
+      scope.parent_prefix + std::string(binding.connection->text);
+  Net* outer = link ? scope.ctx.FindNet(target) : nullptr;
+  if (outer == nullptr) {
     JoinInoutPortBinding(binding, scope);
     return;
   }
   std::string local =
       scope.local_prefix + std::string(PortStorageName(binding));
-  std::string target =
-      scope.parent_prefix + std::string(binding.connection->text);
-  Net* inner = scope.ctx.FindNet(local);
-  Net* outer = scope.ctx.FindNet(target);
-  if (inner == nullptr || outer == nullptr || inner == outer) {
-    JoinInoutPortBinding(binding, scope);
-    return;
-  }
+  Net& inner = *scope.ctx.FindNet(local);
   std::string load = SdfHierName(local);
   std::string source = SdfHierName(target);
-  LinkInoutPortNets({*outer, *inner, scope.parent_prefix, scope.local_prefix,
+  LinkInoutPortNets({*outer, inner, scope.parent_prefix, scope.local_prefix,
                      std::move(local), std::move(source), std::move(load)},
                     scope.ctx);
 }
