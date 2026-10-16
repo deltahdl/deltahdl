@@ -749,36 +749,46 @@ TEST(ClassSim, AMailboxMessageKeepsItsObject) {
   EXPECT_EQ(out, "7\n");
 }
 
-// §8.29: a handle held as a member of an unpacked struct is a root (#7226).
+// §8.29: a handle held as a member of an unpacked struct, at bit 32 after the
+// int before it, is a root (#7226): the run's collector, which ran when the
+// time slot that made the object ended, left it resident.
 TEST(ClassSim, AStructMemberHandleKeepsItsObject) {
   SimFixture f;
-  std::string out = RunCapture(
-      "class C; int x = 7; endclass\n"
+  auto* design = ElaborateSrc(
+      "class C; int x; endclass\n"
       "module t;\n"
       "  typedef struct { int i; C h; } st;\n"
       "  st s;\n"
-      "  initial begin s.h = new; #10 $display(\"%0d\", s.h.x); end\n"
+      "  initial begin s.h = new; #10; end\n"
       "endmodule\n",
       f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(out, "7\n");
+  EXPECT_EQ(ResidentOthers(f, kNullClassHandle), 1);
 }
 
 // §8.29: a pending nonblocking assignment's value is a root until it runs; to
 // a class member, whose variable records no pending value, it is held only by
-// the assignment (#7227).
+// the assignment (#7227). Both objects are resident once the run is over, the
+// one the member now holds among them.
 TEST(ClassSim, APendingNonblockingAssignmentToAMemberKeepsItsObject) {
   SimFixture f;
-  std::string out = RunCapture(
-      "class C; int x = 7; C n; endclass\n"
+  auto* design = ElaborateSrc(
+      "class C; int x; C n; endclass\n"
       "module t;\n"
       "  C p, t;\n"
       "  initial begin p = new; t = new; p.n <= #5 t; t = null; end\n"
-      "  initial #6 $display(\"%0d\", p.n.x);\n"
       "endmodule\n",
       f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_EQ(out, "7\n");
+  EXPECT_EQ(ResidentOthers(f, kNullClassHandle), 2);
 }
 
 // §8.29: the value a blocking assignment holds across its intra-assignment
