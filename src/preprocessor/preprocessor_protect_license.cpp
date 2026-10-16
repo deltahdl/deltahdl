@@ -1,4 +1,3 @@
-#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -64,16 +63,10 @@ void Preprocessor::ApplyLicense(const PragmaKeywordExpression& expr,
     runtime_licenses_.push_back({std::move(license), loc});
     return;
   }
-  // RecoveredTextLicensed asked about this one before the text was processed.
-  const std::pair<uint32_t, uint32_t> kAt{loc.file_id, loc.line};
-  if (std::find(asked_licence_lines_.begin(), asked_licence_lines_.end(),
-                kAt) != asked_licence_lines_.end()) {
-    return;
-  }
-  if (AskDecryptLicense(license, loc)) return;
-  if (decryption_refused_depth_ == 0) {
-    decryption_refused_depth_ = protect_envelopes_.DecryptionEnvelopeDepth();
-  }
+  // §34.5.28.2 asks before the decrypted text is processed, so
+  // RecoveredTextLicensed asked about this one off the recovered text's own
+  // lines before any of them was read. A licence that only a macro substituted
+  // while the text was processed is not one that could be asked about first.
 }
 
 // §34.5.28.2: the library is loaded, its entry function called with the
@@ -111,9 +104,9 @@ bool Preprocessor::LicencesOfDirectiveGranted(std::string_view body,
     } else if (*sealed_inside == 0 && listed.name == kDecryptLicenseKeyword) {
       ProtectLicense license = ParseProtectLicense(listed.value);
       if (!license.stated) continue;
-      asked_licence_lines_.emplace_back(block_id, line_num);
-      granted = AskDecryptLicense(license, SourceLoc{block_id, line_num, 1}) &&
-                granted;
+      if (!AskDecryptLicense(license, SourceLoc{block_id, line_num, 1})) {
+        granted = false;
+      }
     }
   }
   return granted;
@@ -128,9 +121,9 @@ bool Preprocessor::RecoveredTextLicensed(std::string_view cleartext,
     ++line_num;
     std::string_view body;
     if (!ProtectPragmaLine(line, &body)) continue;
-    granted =
-        LicencesOfDirectiveGranted(body, block_id, line_num, &sealed_inside) &&
-        granted;
+    if (!LicencesOfDirectiveGranted(body, block_id, line_num, &sealed_inside)) {
+      granted = false;
+    }
   }
   return granted;
 }

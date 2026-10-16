@@ -837,9 +837,6 @@ class Preprocessor {
   // recovers nothing into the output, and the refusal lapses once the envelope
   // it was met in closes.
   size_t decryption_refused_depth_ = 0;
-  // The file and line of each decrypt_license RecoveredTextLicensed asked
-  // about already, which ApplyLicense does not ask about a second time.
-  std::vector<std::pair<uint32_t, uint32_t>> asked_licence_lines_;
   // The designations the source text has written for the keys of the entities
   // it names. They are unique for the entity they are written under, so they
   // accumulate across the whole compilation input alongside the keyword values

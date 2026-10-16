@@ -222,4 +222,22 @@ TEST(ProtectDataDecryptKeyDescription, AKeyTheAuthorMadeSealsTheData) {
   EXPECT_EQ(recovered.find("data_decrypt_key"), std::string::npos) << recovered;
 }
 
+// A line beneath the keyword that the scheme in effect never wrote carries no
+// key, so the region is not sealed under its characters: a key is made for it
+// as for a region that supplied none.
+TEST(ProtectDataDecryptKeyDescription, ALineTheSchemeNeverWroteIsNoKey) {
+  std::string region = "`pragma protect begin\n";
+  region.append(Writes("key_keyowner", kProvider));
+  region.append(Writes("key_keyname", kBlockKeyName));
+  region.append("`pragma protect data_decrypt_key\nnot a key!\n");
+  region.append(kSealedDesign).append("`pragma protect end\n");
+  std::string envelope = EncryptEnvelopes(region, {}, TheBlockKey());
+  ASSERT_NE(envelope.find("`pragma protect key_block"), std::string::npos)
+      << envelope;
+  std::string recovered;
+  EXPECT_FALSE(DecryptProtectedRegion(LineBeneath(envelope, "data_block"),
+                                      "not a key!", &recovered))
+      << envelope;
+}
+
 }  // namespace

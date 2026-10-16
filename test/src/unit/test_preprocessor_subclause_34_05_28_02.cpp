@@ -331,4 +331,22 @@ TEST(ProtectDecryptLicenseDescription, ALicenceInCleartextIsNotAsked) {
   EXPECT_TRUE(run.diag.Diagnostics().empty());
 }
 
+// A licence in the recovered text written some other way than §34.5.28.1's
+// list names no library to ask, so nothing is asked about it ahead of the text,
+// and the reading reports its spelling where it reaches it.
+TEST(ProtectDecryptLicenseDescription, AMalformedLicenceIsReportedNotAsked) {
+  constexpr std::string_view kMalformed =
+      "`pragma protect decrypt_license=(library=\"liblic.so\")\n";
+  std::string envelope = EnvelopeOf(kMalformed);
+  Asked asked;
+  ReadSource run(envelope, Answering(Returning(1), &asked));
+  EXPECT_TRUE(asked.licenses.empty());
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
+                            "protect pragma decrypt_license expression is "
+                            "written as a library, an entry and a feature, "
+                            "each against a string",
+                            LicenceLine(envelope, "decrypt_license"),
+                            "34.5.28.1"));
+}
+
 }  // namespace

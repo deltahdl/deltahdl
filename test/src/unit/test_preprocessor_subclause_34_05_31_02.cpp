@@ -455,4 +455,16 @@ TEST(ProtectResetDescription, AResetUndoesOnlyWhatItsDirectiveWroteAheadOfIt) {
       Holds(Encrypted(ahead + RegionAround(kSealedDesign)), kBlockOpening));
 }
 
+// §34.5.31.1 writes the keyword standing alone, so one written with a value
+// against it is not the reset and puts nothing back: the names ahead of it
+// still reach the region.
+TEST(ProtectResetDescription, AResetWrittenWithAValueResetsNothing) {
+  std::string names = "data_keyowner=\"";
+  names.append(kKeyOwner).append("\", data_keyname=\"");
+  names.append(kKeyName).append("\"");
+  std::string valued = "`pragma protect " + names + ", reset=\"all\"\n";
+  EXPECT_TRUE(
+      Holds(Encrypted(valued + RegionAround(kSealedDesign)), kBlockOpening));
+}
+
 }  // namespace

@@ -145,8 +145,7 @@ bool LiftedIntoTheClear(std::string_view line, bool previously_protected) {
 // hold back from the block: one of their three keywords with a single written
 // thing against it, which is the value each is defined with.
 bool IsLiftedExpression(const ListedKeyword& listed) {
-  if (!listed.has_value || listed.value.empty() ||
-      IsParenthesizedPragmaValue(listed.value)) {
+  if (!listed.has_value || IsParenthesizedPragmaValue(listed.value)) {
     return false;
   }
   return listed.name == kAuthorKeyword || listed.name == kAuthorInfoKeyword ||

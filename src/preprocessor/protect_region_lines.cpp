@@ -248,10 +248,6 @@ void TakeEncodingKeyword(std::string_view line, RegionKeyReader* reader) {
   reader->encoding = stated;
 }
 
-// Whether `line` carried the encoded value a keyword on the line before it left
-// waiting. Three keywords each give the line beneath them to a public key, so
-// the line after one of them is that key's characters rather than a line of
-// expressions to be read for keywords of its own.
 // The key a line the previous one announced holds, read out of the scheme in
 // effect into `key`; a line that scheme never wrote leaves `key` as it was.
 void TakeEncodedKeyLine(std::string_view line, const ProtectEncoding& encoding,
@@ -262,6 +258,11 @@ void TakeEncodedKeyLine(std::string_view line, const ProtectEncoding& encoding,
     *key = std::move(read);
   }
 }
+
+// Whether `line` carried the encoded value a keyword on the line before it left
+// waiting. Three keywords each give the line beneath them to a public key, so
+// the line after one of them is that key's characters rather than a line of
+// expressions to be read for keywords of its own.
 
 bool TookAwaitedPublicKey(std::string_view line, uint32_t line_num,
                           RegionKeyReader* reader) {

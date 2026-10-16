@@ -526,9 +526,7 @@ void Preprocessor::ReadProtectDataBlock(std::string_view text, SourceLoc loc,
   // processed, so nothing of a refused model takes effect, a macro it would
   // have defined included.
   if (!RecoveredTextLicensed(cleartext, block_id)) {
-    if (decryption_refused_depth_ == 0) {
-      decryption_refused_depth_ = protect_envelopes_.DecryptionEnvelopeDepth();
-    }
+    decryption_refused_depth_ = protect_envelopes_.DecryptionEnvelopeDepth();
     return;
   }
   // A block before this one in the envelope has its text read first.
@@ -541,17 +539,10 @@ void Preprocessor::ReadRecoveredText(std::string& output) {
   if (!recovered_text_.has_value()) return;
   RecoveredText held = std::move(*recovered_text_);
   recovered_text_.reset();
-  size_t origins = line_origins_.size();
-  std::string recovered =
-      ProcessSource(held.cleartext, held.block_id, held.depth);
-  // §34.5.28.2: a decrypt_license the recovered text carried was refused, so
-  // nothing of the model is processed on, and the lines it would have written
-  // take their origins with them.
-  if (decryption_refused_depth_ != 0) {
-    line_origins_.resize(origins);
-    return;
-  }
-  output.append(recovered);
+  // The model's own licences were granted before its text was held here
+  // (RecoveredTextLicensed), and a model sealed inside it that is refused
+  // recovers nothing of its own, so the whole of what was read goes out.
+  output.append(ProcessSource(held.cleartext, held.block_id, held.depth));
 }
 
 // Whether `line` carried a value the line before it announced, which is what

@@ -256,7 +256,7 @@ std::string ProtectDirectiveWriting(
 
 bool ResetsProtectPragmaLine(std::string_view line) {
   std::string_view rest = TrimLeading(line);
-  if (rest.empty() || rest.front() != '`') return false;
+  if (rest.substr(0, 1) != "`") return false;
   rest.remove_prefix(1);
   if (!ConsumeWord(rest, "pragma")) return false;
   rest = TrimLeading(rest);
@@ -279,7 +279,7 @@ std::optional<std::string> ProtectLineAfterLastReset(std::string_view line) {
   }
   if (!after.has_value()) return std::nullopt;
   std::string_view rest = TrimLeading(*after);
-  if (!rest.empty() && rest.front() == ',') rest = TrimLeading(rest.substr(1));
+  if (rest.substr(0, 1) == ",") rest = TrimLeading(rest.substr(1));
   std::string directive = "`pragma protect ";
   directive.append(rest);
   return directive;
