@@ -481,8 +481,9 @@ std::optional<bool> BuiltinMethodCallIsConstant(const Expr* expr,
 // §8.23 with §26.3: the key a name written with the scope resolution operator
 // is recorded under in a ScopeMap -- "Class.name" or "pkg.name", and
 // "Outer.Inner.name" for a class nested in another -- read off a chain of
-// member accesses every part of which is an identifier; empty for any other
-// expression. Defined in const_eval_func.cpp.
+// member accesses every base of which is an identifier or another member
+// access, the parser writing an identifier after every `::` and `.`; empty
+// for any other expression. Defined in const_eval_func.cpp.
 std::optional<std::string> ScopedNameKey(const Expr* expr);
 
 }  // namespace delta

@@ -105,9 +105,7 @@ std::optional<PackedRange> RegisteredParamRange(std::string_view name) {
 
 std::optional<std::string> ScopedNameKey(const Expr* expr) {
   if (expr->kind == ExprKind::kIdentifier) return std::string(expr->text);
-  if (expr->kind != ExprKind::kMemberAccess ||
-      expr->rhs->kind != ExprKind::kIdentifier)
-    return std::nullopt;
+  if (expr->kind != ExprKind::kMemberAccess) return std::nullopt;
   auto base = ScopedNameKey(expr->lhs);
   if (!base) return std::nullopt;
   return *base + "." + std::string(expr->rhs->text);

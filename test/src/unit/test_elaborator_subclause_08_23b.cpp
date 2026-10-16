@@ -2,10 +2,13 @@
 
 #include <cstdint>
 #include <initializer_list>
+#include <optional>
 #include <string>
 #include <utility>
 
+#include "elaborator/const_eval.h"
 #include "fixture_elaborator.h"
+#include "fixture_evaluator.h"
 #include "helpers_param_value.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
@@ -178,6 +181,17 @@ TEST(ClassScopeResolutionElaboration, NestedModuleClassParameterSizesAVar) {
   const auto* v = FindVar(design, "m", "v");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->width, 5u);
+}
+
+// §8.23: only a chain of class or package names before `::` names a scoped
+// parameter, so `a[0].b` has no key even where "a.b" holds one: it neither
+// folds to that value nor counts as a constant.
+TEST(ClassScopeResolutionElaboration, SelectInAScopedChainHasNoKey) {
+  EvalFixture f;
+  ScopeMap scope{{"a.b", 3}};
+  auto* e = ParseExprFrom("a[0].b", f);
+  EXPECT_EQ(ConstEvalInt(e, scope), std::nullopt);
+  EXPECT_FALSE(IsConstantExpr(e, scope));
 }
 
 }  // namespace

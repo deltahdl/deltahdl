@@ -189,8 +189,7 @@ static void RegisterOneClassParams(ClassParamRegistration& reg) {
 static void RegisterClassTreeParams(ClassParamRegistration& reg) {
   RegisterOneClassParams(reg);
   for (const auto* m : reg.cls->members) {
-    if (m->kind != ClassMemberKind::kClassDecl || m->nested_class == nullptr)
-      continue;
+    if (m->kind != ClassMemberKind::kClassDecl) continue;
     const ClassDecl* inner = m->nested_class;
     auto* prefix = reg.arena.Create<std::string>(
         std::string(reg.key_prefix) + "." + std::string(inner->name));
