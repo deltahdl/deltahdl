@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -561,6 +562,251 @@ TEST(ClassSim, E2eGcReclaimsObjectDroppedByReassignment) {
   EXPECT_EQ(f.ctx.GetClassObject(current)->GetProperty("x", f.arena).ToUint64(),
             2u);
   EXPECT_EQ(ResidentOthers(f, current), 0);
+}
+
+// §8.29 and §8.30.1: a run's collector reclaims an object no handle refers to,
+// and clears the weak references to it, by the next time slot (#7218).
+TEST(ClassSim, ARunCollectsADroppedObjectAndClearsItsWeakReference) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C; endclass\n"
+      "module t;\n"
+      "  C o;\n"
+      "  std::weak_reference #(C) w;\n"
+      "  initial begin\n"
+      "    o = new;\n"
+      "    w = new(o);\n"
+      "    o = null;\n"
+      "    #1 $display(\"%0d\", w.get() == null);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "1\n");
+}
+
+// §8.29: a local of a process suspended while another runs is a root
+// (#7219).
+TEST(ClassSim, ASuspendedProcesssLocalKeepsItsObject) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C; int x = 7; endclass\n"
+      "module t;\n"
+      "  initial begin automatic C c = new; #10 $display(\"%0d\", c.x); end\n"
+      "  initial #1 ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "7\n");
+}
+
+// §8.29: what a fork branch carries from its parent's locals is a root, after
+// the parent has ended (#7219).
+TEST(ClassSim, AForkBranchsCarriedLocalKeepsItsObject) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C; int x = 7; endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    automatic C c = new;\n"
+      "    fork #10 $display(\"%0d\", c.x); join_none\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "7\n");
+}
+
+// §8.29: the object a suspended class task runs on is a root, though no
+// variable refers to it any more (#7219).
+TEST(ClassSim, ASuspendedClassTasksThisKeepsItsObject) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class D; int x = 7; task t(); #10 $display(\"%0d\", x); endtask "
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    automatic D d = new;\n"
+      "    fork d.t(); join_none\n"
+      "    d = null;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "7\n");
+}
+
+// §8.29: the caller's stack $monitor keeps to re-read its arguments is a root,
+// after the caller has ended (#7220).
+TEST(ClassSim, AMonitorsCallerKeepsItsObject) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C; int x = 7; endclass\n"
+      "module t;\n"
+      "  int k;\n"
+      "  initial begin automatic C c = new; $monitor(\"%0d %0d\", c.x, k); "
+      "end\n"
+      "  initial #10 k = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "7 0\n7 1\n");
+}
+
+// §8.29: an element of a fixed unpacked array of handles is a root (#7221).
+TEST(ClassSim, AFixedArrayElementKeepsItsObject) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C; int x = 7; endclass\n"
+      "module t;\n"
+      "  C a[2];\n"
+      "  initial begin a[0] = new; #10 $display(\"%0d\", a[0].x); end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "7\n");
+}
+
+// §8.29: the elements of a queue and of a dynamic array are roots (#7222).
+TEST(ClassSim, QueueAndDynamicArrayElementsKeepTheirObjects) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C; int x = 7; endclass\n"
+      "module t;\n"
+      "  C q[$];\n"
+      "  C d[];\n"
+      "  initial begin\n"
+      "    q.push_back(new);\n"
+      "    d = new[1];\n"
+      "    d[0] = new;\n"
+      "    #10 $display(\"%0d %0d\", q[0].x, d[0].x);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "7 7\n");
+}
+
+// §8.29: the values and the class-handle keys of an associative array are
+// roots (#7223).
+TEST(ClassSim, AssocArrayValuesAndKeysKeepTheirObjects) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C; int x = 7; endclass\n"
+      "module t;\n"
+      "  C m[int];\n"
+      "  int k[C];\n"
+      "  initial begin\n"
+      "    C o;\n"
+      "    m[0] = new;\n"
+      "    o = new;\n"
+      "    k[o] = 1;\n"
+      "    o = null;\n"
+      "    #10 foreach (k[i]) $display(\"%0d %0d\", i.x, m[0].x);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "7 7\n");
+}
+
+// §8.29: a static class property is a root (#7224).
+TEST(ClassSim, AStaticPropertyKeepsItsObject) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C; int x = 7; endclass\n"
+      "class S; static C s; endclass\n"
+      "module t;\n"
+      "  initial begin S::s = new; #10 $display(\"%0d\", S::s.x); end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "7\n");
+}
+
+// §8.29: a message a mailbox holds is a root (#7225).
+TEST(ClassSim, AMailboxMessageKeepsItsObject) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C; int x = 7; endclass\n"
+      "module t;\n"
+      "  mailbox #(C) mb = new;\n"
+      "  initial begin\n"
+      "    C h = new;\n"
+      "    mb.put(h);\n"
+      "    h = null;\n"
+      "    #10 mb.get(h);\n"
+      "    $display(\"%0d\", h.x);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "7\n");
+}
+
+// §8.29: a handle held as a member of an unpacked struct is a root (#7226).
+TEST(ClassSim, AStructMemberHandleKeepsItsObject) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C; int x = 7; endclass\n"
+      "module t;\n"
+      "  typedef struct { int i; C h; } st;\n"
+      "  st s;\n"
+      "  initial begin s.h = new; #10 $display(\"%0d\", s.h.x); end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "7\n");
+}
+
+// §8.29: each pending nonblocking assignment's value is a root until it runs,
+// not only the one scheduled last (#7227).
+TEST(ClassSim, AnEarlierPendingNonblockingAssignmentKeepsItsObject) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C; int x = 7; endclass\n"
+      "module t;\n"
+      "  C h, t;\n"
+      "  initial begin t = new; h <= #10 t; h <= #5 null; t = null; end\n"
+      "  initial #11 $display(\"%0d\", h.x);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "7\n");
+}
+
+// §8.29: the value a blocking assignment holds across its intra-assignment
+// delay is a root (#7227).
+TEST(ClassSim, ABlockingIntraAssignmentDelaysValueKeepsItsObject) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C; int x = 7; endclass\n"
+      "module t;\n"
+      "  C h, t, z;\n"
+      "  initial begin t = new; h = #5 t; $display(\"%0d\", h.x); end\n"
+      "  initial #1 t = null;\n"
+      "  initial #2 z = new;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "7\n");
+}
+
+// §8.29: the cell a ref formal bound to a class member writes is a root
+// (#7228).
+TEST(ClassSim, ARefCellBoundToAMemberKeepsItsObject) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C; int x = 7; C n; endclass\n"
+      "module t;\n"
+      "  task automatic w(ref C r); r = new; #10 $display(\"%0d\", r.x); "
+      "endtask\n"
+      "  C o = new;\n"
+      "  initial w(o.n);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "7\n");
 }
 
 }  // namespace

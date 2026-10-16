@@ -197,6 +197,9 @@ void Scheduler::Run() {
     ExecuteTimeSlot(it->second);
     ReleaseSlot(it->second);
     event_calendar_.erase(it);
+    // §8.29: between time slots no process is mid-statement, so every handle
+    // a running process holds is in a stack the collector reads.
+    if (ctx_ != nullptr && ClassCollectionDue()) ctx_->CollectGarbage();
   }
   // The scheduler is now idle: no process is executing. An event callback that
   // resumed a process left it installed as the context's current process (that
