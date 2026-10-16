@@ -742,7 +742,7 @@ void Elaborator::ElaborateChildInstance(RtlirModuleInst& inst,
   if (delegated != nullptr) LeaveDelegatedConfig();
 }
 
-void Elaborator::CheckInstancePorts(const RtlirModuleInst& inst,
+void Elaborator::CheckInstancePorts(RtlirModuleInst& inst,
                                     const ModuleItem* item, RtlirModule* mod) {
   CheckPortCoercion(inst, item->loc);
   ReportActualsOnlyACheckerTakes(inst, item, diag_);

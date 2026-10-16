@@ -530,6 +530,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/virtual_interface_modports.cpp
     elaborator/interface_port_typedef.cpp
     elaborator/elaborator_port_binding_checks.cpp
+    elaborator/sdf_annotate_calls.cpp
     elaborator/elaborator_process.cpp
     elaborator/elaborator_process_validate.cpp
     elaborator/elaborator_resolve.cpp

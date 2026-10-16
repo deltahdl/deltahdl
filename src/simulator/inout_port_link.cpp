@@ -9,12 +9,6 @@
 
 #include "common/arena.h"
 #include "common/types.h"
-#include "elaborator/assertion_walk.h"
-#include "elaborator/rtlir.h"
-#include "elaborator/sensitivity.h"
-#include "parser/ast_expr.h"
-#include "parser/ast_module.h"
-#include "parser/ast_stmt.h"
 #include "simulator/evaluation.h"
 #include "simulator/interconnect_drive.h"
 #include "simulator/lowerer_contassign_driver.h"
@@ -25,36 +19,6 @@
 #include "simulator/variable.h"
 
 namespace delta {
-
-static bool StmtCallsSdfAnnotate(const Stmt* stmt) {
-  bool calls = false;
-  ForEachStmtReadExpr(stmt, [&calls](const Expr* e) {
-    calls = calls || AnySubExpr(e, [](const Expr* sub) {
-              return sub->kind == ExprKind::kSystemCall &&
-                     sub->callee == "$sdf_annotate";
-            });
-  });
-  return calls;
-}
-
-static bool ModuleCallsSdfAnnotate(const RtlirModule& mod) {
-  for (const RtlirProcess& proc : mod.processes) {
-    if (StmtCallsSdfAnnotate(proc.body)) return true;
-  }
-  for (const ModuleItem* decl : mod.function_decls) {
-    for (const Stmt* stmt : decl->func_body_stmts) {
-      if (StmtCallsSdfAnnotate(stmt)) return true;
-    }
-  }
-  return false;
-}
-
-bool DesignCallsSdfAnnotate(const RtlirDesign& design) {
-  for (const auto& [name, mod] : design.all_modules) {
-    if (ModuleCallsSdfAnnotate(*mod)) return true;
-  }
-  return false;
-}
 
 namespace {
 

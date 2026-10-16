@@ -312,7 +312,7 @@ class Elaborator : public ElaboratorClassRules {
                               ModuleDecl* child_decl, RtlirModule* mod,
                               const ScopeMap& parent_scope);
   // The three checks on an instance's port connections once they are bound.
-  void CheckInstancePorts(const RtlirModuleInst& inst, const ModuleItem* item,
+  void CheckInstancePorts(RtlirModuleInst& inst, const ModuleItem* item,
                           RtlirModule* mod);
 
   // Reports a gate or user-defined primitive instance whose terminals are the
@@ -384,7 +384,7 @@ class Elaborator : public ElaboratorClassRules {
 
   void CheckPortCoercion(const RtlirModuleInst& inst, SourceLoc loc);
 
-  void CheckUwirePortMerge(const RtlirModuleInst& inst, const ModuleItem* item,
+  void CheckUwirePortMerge(RtlirModuleInst& inst, const ModuleItem* item,
                            RtlirModule* parent_mod);
 
   void CheckInterconnectPortMerge(const RtlirModuleInst& inst,

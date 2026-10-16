@@ -9,13 +9,7 @@
 namespace delta {
 
 struct Net;
-struct RtlirDesign;
 class SimContext;
-
-// §32.9: whether a procedure or a subroutine of a module of `design` calls
-// $sdf_annotate, which is how an interconnect delay reaches a run that the
-// design alone shows.
-bool DesignCallsSdfAnnotate(const RtlirDesign& design);
 
 // The two nets of one inout port binding and the names §32.4.4 annotates
 // between them: `outer` is the net the parent connected to the port and

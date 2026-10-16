@@ -618,6 +618,8 @@ struct RtlirPortBinding {
   // resolving through an arrayed instance or a generate block, which the
   // checks of what the port is connected to then pass over.
   bool refused_actual = false;
+  // §23.3.3.6: the port joins two nets, one a uwire, counted as merged.
+  bool uwire_net_join = false;
 };
 
 struct RtlirModuleInst {

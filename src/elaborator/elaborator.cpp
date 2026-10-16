@@ -21,6 +21,7 @@
 #include "elaborator/elaborator_validate_classes.h"
 #include "elaborator/package_assertion_scope.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/sdf_annotate_calls.h"
 #include "elaborator/time_literal_scale.h"
 #include "elaborator/unit_scope_switch.h"
 #include "elaborator/viewport_resolution.h"
@@ -581,6 +582,8 @@ RtlirDesign* Elaborator::ElaborateTops(
 
     CollectAllModules(top, design->all_modules);
   }
+  // §23.3.3.6: whether the design calls $sdf_annotate is known only now.
+  WarnUwireNetsKeptApart(*design, diag_);
 
   // §23.10.4.2: detect defparam hierarchical names whose early resolution would
   // diverge from the fully elaborated hierarchy. all_modules holds each

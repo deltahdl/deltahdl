@@ -17,6 +17,7 @@
 #include "elaborator/elaborator_port_binding_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
+#include "elaborator/sdf_annotate_calls.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -134,13 +135,13 @@ static bool PortLeftUnconnected(const std::vector<RtlirPort>& child_ports,
   return true;
 }
 
-void Elaborator::CheckUwirePortMerge(const RtlirModuleInst& inst,
+void Elaborator::CheckUwirePortMerge(RtlirModuleInst& inst,
                                      const ModuleItem* item,
                                      RtlirModule* parent_mod) {
   if (!inst.resolved) return;
   const auto& child_ports = inst.resolved->ports;
 
-  for (const auto& binding : inst.port_bindings) {
+  for (auto& binding : inst.port_bindings) {
     const RtlirPort* port_it = FindBoundChildPort(child_ports, binding);
     if (!port_it) continue;
     if (PortLeftUnconnected(child_ports, item, binding.port_name)) continue;
@@ -158,14 +159,13 @@ void Elaborator::CheckUwirePortMerge(const RtlirModuleInst& inst,
 
     if (!internal_is_uwire && !external_is_uwire) continue;
 
-    bool merged = (internal_net != NetType::kNone) && external_is_net;
-    if (!merged) {
-      diag_.Warning(
-          item->loc,
-          std::format("uwire net on port '{}' of instance '{}' is not "
-                      "merged into a single net",
-                      binding.port_name, inst.inst_name),
-          Subclause("23.3.3.6"));
+    // A port joining two nets is counted as merged here, and the binding is
+    // marked, since a design that calls $sdf_annotate keeps an inout's two
+    // nets apart (WarnUwireNetsKeptApart).
+    binding.uwire_net_join =
+        (internal_net != NetType::kNone) && external_is_net;
+    if (!binding.uwire_net_join) {
+      WarnUwireNotMerged(diag_, item->loc, binding.port_name, inst.inst_name);
     }
   }
 }
