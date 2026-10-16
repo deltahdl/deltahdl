@@ -43,7 +43,7 @@ void VpiContext::NoteThreadEnded(Process* proc) {
   // and to the objects belonging to it, and cbEndOfThread reports the end. A
   // thread no application asked for has no object, and is made one only where
   // a cbEndOfThread callback is there to be told of its end.
-  if (sim_ctx_ == nullptr || proc == nullptr) return;
+  if (sim_ctx_ == nullptr) return;
   if (!run_objects_.contains(proc) &&
       !HasCallbackFor(callbacks_, cbEndOfThread)) {
     return;

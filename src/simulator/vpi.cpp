@@ -47,11 +47,12 @@ class VpiRoutineErrorScope {
 
 // §37.2.1 lets a tool hand two requests for one object the same handle, so
 // long as the sharing alters nothing a program sees (§37.2.2). Each hand-out
-// of a live object of the model is counted, and the object is a live handle
-// again however many earlier hand-outs were released; vpi_release_handle()
-// releases it only when the last outstanding hand-out is released.
+// of an object of the model is counted, and the object is a live handle again
+// however many earlier hand-outs were released; vpi_release_handle() releases
+// it only when the last outstanding hand-out is released. An object that has
+// ceased to exist stays invalid whatever this says (§37.2.4, HandleValid).
 vpiHandle HandOut(delta::VpiObject* object) {
-  if (object != nullptr && object->object_exists) {
+  if (object != nullptr) {
     ++object->handles_held;
     object->released = false;
   }
