@@ -865,6 +865,10 @@ struct ModuleDecl {
   std::vector<ModuleItem*> items;
   std::vector<std::pair<std::string_view, Expr*>> params;
   std::vector<DataType> param_types;
+  // §37.3.3: where each parameter port's identifier was written, one per
+  // entry of `params` in its order, which the port's vpiLineNo and vpiFile
+  // report.
+  std::vector<SourceLoc> param_port_locs;
   // A.2.1.1's param_assignment gives a parameter port { variable_dimension }:
   // the unpacked dimensions each port parameter declared with any was written
   // with, by name, as ModuleItem::unpacked_dims holds a body parameter's.

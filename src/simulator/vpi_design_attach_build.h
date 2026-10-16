@@ -192,9 +192,11 @@ VpiObject* VpiImportedTypespec(std::string_view name,
 // type parameter a vpiTypeParameter, each saying whether it is a localparam,
 // and relate a type parameter to the typespec of the type it has, a typedef's
 // among those its scope declares or `unit_typespecs`, the compilation unit's,
-// which AttachTypespecs made and answered.
+// which AttachTypespecs made and answered. §37.3.3: each reports the line
+// and file its declaration was written at, which `ctx`'s source description
+// resolves.
 void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
-                      const VpiObjectMap& unit_typespecs,
+                      const VpiObjectMap& unit_typespecs, SimContext& ctx,
                       const VpiAttachBuild& build);
 
 // §37.3.1 with §37.10 detail 5: the full name of `name` declared in `scope`,

@@ -15,6 +15,16 @@ namespace delta {
 
 namespace {
 
+// What the parameter objects of a run are made with: the compilation unit's
+// typespecs, which a type parameter's type is looked up among, the model's
+// allocation, and the run whose source description says where each parameter
+// was written.
+struct ParamAttach {
+  const VpiObjectMap& unit;
+  const VpiAttachBuild& build;
+  SimContext& ctx;
+};
+
 // The typespec `scope` declares under `name`, or null.
 VpiObject* TypespecNamed(const VpiObject& scope, std::string_view name) {
   for (VpiObject* child : scope.children) {
@@ -53,8 +63,10 @@ VpiObject* TypeParameterTypespec(const DataType& type, VpiObject* scope,
 // §37.28 details 1 and 2: the type parameter object `param` stands as in
 // `scope`, related through vpiTypespec to the type it has. A type parameter
 // has no value and so no storage, and nothing else makes an object for it.
+// §37.3.3: it stands where its declaration was written.
 void MakeTypeParameter(VpiObject* scope, const RtlirParamDecl& param,
-                       const VpiObjectMap& unit, const VpiAttachBuild& build) {
+                       const ParamAttach& with) {
+  const VpiAttachBuild& build = with.build;
   VpiObject* obj = build.alloc();
   obj->type = vpiTypeParameter;
   obj->name = build.keep(std::string(param.name));
@@ -63,24 +75,24 @@ void MakeTypeParameter(VpiObject* scope, const RtlirParamDecl& param,
   obj->local_param = param.is_localparam;
   if (param.resolved_type != nullptr) {
     obj->param_typespec =
-        TypeParameterTypespec(*param.resolved_type, scope, unit, build);
+        TypeParameterTypespec(*param.resolved_type, scope, with.unit, build);
   }
+  VpiRecordWrittenLocation(obj, param.loc, with.ctx);
   scope->children.push_back(obj);
 }
 
 // The parameters of the instance at `prefix`, an instance of `mod`, each made
-// the kind of parameter object it is; `unit` holds the compilation unit's
-// typespecs.
+// the kind of parameter object it is and given the position its declaration
+// was written at.
 void AttachScopeParameters(const RtlirModule* mod, const std::string& prefix,
                            const VpiObjectMap& objects,
-                           const VpiObjectMap& unit,
-                           const VpiAttachBuild& build) {
+                           const ParamAttach& with) {
   VpiObject* scope = FindObjectForFlatName(
       objects, prefix.empty() ? std::string(mod->name) : prefix);
   for (const RtlirParamDecl& param : mod->params) {
     if (param.is_type_param) {
       if (scope != nullptr && param.gen_block_prefix.empty()) {
-        MakeTypeParameter(scope, param, unit, build);
+        MakeTypeParameter(scope, param, with);
       }
       continue;
     }
@@ -90,6 +102,7 @@ void AttachScopeParameters(const RtlirModule* mod, const std::string& prefix,
     if (obj == nullptr) continue;
     obj->type = vpiParameter;
     obj->local_param = param.is_localparam;
+    VpiRecordWrittenLocation(obj, param.loc, with.ctx);
   }
 }
 
@@ -97,25 +110,26 @@ void AttachScopeParameters(const RtlirModule* mod, const std::string& prefix,
 // the package it stands as: a value parameter's object, which its storage
 // made, made a vpiParameter, and a type parameter given one of its own. Each
 // is a local parameter, since §6.20.4 makes a `parameter` written in a
-// package mean `localparam`.
+// package mean `localparam`. Each stands where its declaration was written.
 void AttachPackageParameters(const PackageDecl& pkg, VpiObject& scope,
-                             const VpiObjectMap& unit,
-                             const VpiAttachBuild& build) {
+                             const ParamAttach& with) {
   for (const ModuleItem* item : pkg.items) {
     if (item == nullptr || item->kind != ModuleItemKind::kParamDecl) continue;
     if (item->data_type.kind == DataTypeKind::kVoid) {
       RtlirParamDecl param;
       param.name = item->name;
+      param.loc = item->loc;
       param.is_localparam = true;
       param.is_type_param = true;
       param.resolved_type = &item->typedef_type;
-      MakeTypeParameter(&scope, param, unit, build);
+      MakeTypeParameter(&scope, param, with);
       continue;
     }
     for (VpiObject* child : scope.children) {
       if (child->name == item->name && !VpiIsTypespecType(child->type)) {
         child->type = vpiParameter;
         child->local_param = true;
+        VpiRecordWrittenLocation(child, item->loc, with.ctx);
       }
     }
   }
@@ -124,7 +138,7 @@ void AttachPackageParameters(const PackageDecl& pkg, VpiObject& scope,
 }  // namespace
 
 void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
-                      const VpiObjectMap& unit_typespecs,
+                      const VpiObjectMap& unit_typespecs, SimContext& ctx,
                       const VpiAttachBuild& build) {
   // §37.28 details 1 and 2: a value parameter is a vpiParameter, which says
   // through vpiLocalParam whether it is a localparam, and a type parameter is
@@ -133,15 +147,16 @@ void AttachParameters(const RtlirDesign* design, const VpiObjectMap& objects,
   // and a type parameter had none, so the vpiParameter iteration found nothing
   // and no type parameter reached a typespec.
   if (design == nullptr) return;
-  WalkInstancePaths(
-      design, [&](const RtlirModule* mod, const std::string& prefix) {
-        AttachScopeParameters(mod, prefix, objects, unit_typespecs, build);
-      });
+  const ParamAttach kWith{unit_typespecs, build, ctx};
+  WalkInstancePaths(design,
+                    [&](const RtlirModule* mod, const std::string& prefix) {
+                      AttachScopeParameters(mod, prefix, objects, kWith);
+                    });
   for (const PackageDecl* pkg : design->packages) {
     if (pkg == nullptr) continue;
     VpiObject* scope = FindObjectForFlatName(objects, pkg->name);
     if (scope != nullptr) {
-      AttachPackageParameters(*pkg, *scope, unit_typespecs, build);
+      AttachPackageParameters(*pkg, *scope, kWith);
     }
   }
 }

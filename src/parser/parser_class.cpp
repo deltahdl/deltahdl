@@ -248,9 +248,10 @@ ClassDecl* Parser::ParseClassDecl() {
   if (Check(TokenKind::kHash)) {
     Consume();
     Expect(TokenKind::kLParen, Subclause("8.25"));
-    ParseParamPortDecls(decl->params, decl->type_param_names,
-                        decl->localparam_port_names, &decl->param_types,
-                        &decl->param_port_unpacked_dims);
+    ParamPortList out{decl->params, decl->type_param_names,
+                      decl->localparam_port_names, &decl->param_types,
+                      &decl->param_port_unpacked_dims};
+    ParseParamPortDecls(out);
     Expect(TokenKind::kRParen, Subclause("8.25"));
   }
 

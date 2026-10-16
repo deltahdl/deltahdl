@@ -475,6 +475,7 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
 
   RtlirParamDecl pd;
   pd.name = item->name;
+  pd.loc = item->loc;
   // §27.4: a generate block forms a scope of its own and a further level of
   // hierarchy once instantiated, and this site elaborates a parameter written
   // in one as readily as one written among a module's own items.

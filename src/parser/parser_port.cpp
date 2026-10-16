@@ -555,9 +555,13 @@ void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
     Consume();
     Expect(TokenKind::kLParen, Subclause("23.2.3"));
     decl.has_param_port_list = true;
-    ParseParamPortDecls(decl.params, decl.type_param_names,
-                        decl.localparam_port_names, &decl.param_types,
-                        &decl.param_port_unpacked_dims);
+    ParamPortList out{decl.params,
+                      decl.type_param_names,
+                      decl.localparam_port_names,
+                      &decl.param_types,
+                      &decl.param_port_unpacked_dims,
+                      &decl.param_port_locs};
+    ParseParamPortDecls(out);
     Expect(TokenKind::kRParen, Subclause("23.2.3"));
   }
   if (Check(TokenKind::kLParen)) {

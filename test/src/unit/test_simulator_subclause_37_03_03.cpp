@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -407,6 +408,65 @@ TEST_F(WrittenLinesOfARun, AModulePathReportsTheLineItWasWrittenOn) {
 
 TEST_F(WrittenLinesOfARun, ATimingCheckReportsTheLineItWasWrittenOn) {
   EXPECT_EQ(LineOfFirst(vpiTchk), 10);
+}
+
+// §37.3.3 against a design: a parameter reports the line it was written on,
+// whether it is declared among a module's items (#7236) or in the module's
+// parameter port list (#7243), a value or a type parameter, of a module or of
+// a package. None kept where it was written, so each answered line 0.
+class ParameterLinesOfARun : public VpiDesignRun {
+ protected:
+  void SetUp() override {
+    VpiDesignRun::SetUp();
+    Run("package pk;\n"
+        "  parameter int Q = 4;\n"
+        "  parameter type R = byte;\n"
+        "endpackage\n"
+        "module top #(\n"
+        "  parameter int W = 1,\n"
+        "  parameter type TP = int\n"
+        ");\n"
+        "  parameter int P = 3;\n"
+        "  parameter type T = logic;\n"
+        "endmodule\n");
+  }
+
+  // The line of the object of `type` named `name` that `scope` reaches, -1
+  // for none.
+  static int LineOf(int type, const char* scope, std::string_view name) {
+    vpiHandle obj = Named(type, By(scope), name);
+    return obj == nullptr ? -1 : vpi_get(vpiLineNo, obj);
+  }
+};
+
+TEST_F(ParameterLinesOfARun, AValueParameterOfTheBodyReportsItsLine) {
+  EXPECT_EQ(LineOf(vpiParameter, "top", "P"), 9);
+}
+
+TEST_F(ParameterLinesOfARun, ATypeParameterOfTheBodyReportsItsLine) {
+  EXPECT_EQ(LineOf(vpiTypeParameter, "top", "T"), 10);
+}
+
+TEST_F(ParameterLinesOfARun, AValueParameterPortReportsItsLine) {
+  EXPECT_EQ(LineOf(vpiParameter, "top", "W"), 6);
+}
+
+TEST_F(ParameterLinesOfARun, ATypeParameterPortReportsItsLine) {
+  EXPECT_EQ(LineOf(vpiTypeParameter, "top", "TP"), 7);
+}
+
+TEST_F(ParameterLinesOfARun, AValueParameterOfAPackageReportsItsLine) {
+  EXPECT_EQ(LineOf(vpiParameter, "pk", "Q"), 2);
+}
+
+TEST_F(ParameterLinesOfARun, ATypeParameterOfAPackageReportsItsLine) {
+  EXPECT_EQ(LineOf(vpiTypeParameter, "pk", "R"), 3);
+}
+
+TEST_F(ParameterLinesOfARun, AParameterReportsTheFileItWasWrittenIn) {
+  vpiHandle param = Named(vpiParameter, By("top"), "P");
+  ASSERT_NE(param, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFile, param), "<test>");
 }
 
 }  // namespace

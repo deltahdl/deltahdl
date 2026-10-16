@@ -2,7 +2,6 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
-#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -12,19 +11,6 @@
 #include "parser/parser.h"
 
 namespace delta {
-
-// §23.10 / Syntax A.1.3 parameter_port_list: the collections being built up as
-// each parameter_declaration / type_parameter_declaration in the list is
-// parsed. These four references are the one accumulator object for the whole
-// parameter port list, so the value- and type-parameter parsers share it.
-struct ParamPortList {
-  std::vector<std::pair<std::string_view, Expr*>>& params;
-  std::unordered_set<std::string_view>& type_param_names;
-  std::unordered_set<std::string_view>& localparam_port_names;
-  std::vector<DataType>* param_types;
-  // Where a value parameter's unpacked dimensions go, by name.
-  std::unordered_map<std::string_view, std::vector<Expr*>>* unpacked_dims;
-};
 
 // What one parameter_port_declaration of A.1.3's parameter_port_list hands to
 // the element after the comma. A.2.1.1's `parameter` and `localparam` each
@@ -76,6 +62,7 @@ struct ParserParamPortHelpers {
                     Subclause("6.20.1"));
     }
     out.params.push_back({name.text, nullptr});
+    if (out.locs) out.locs->push_back(name.loc);
     // §6.20.3: retain the default type (empty/kImplicit means no default).
     if (out.param_types) out.param_types->push_back(def_type);
     out.type_param_names.insert(name.text);
@@ -152,6 +139,7 @@ struct ParserParamPortHelpers {
                     Subclause("6.20.1"));
     }
     out.params.push_back({name.text, default_val});
+    if (out.locs) out.locs->push_back(name.loc);
     if (out.param_types) out.param_types->push_back(dtype);
     if (is_localparam_group) out.localparam_port_names.insert(name.text);
   }
@@ -160,15 +148,8 @@ struct ParserParamPortHelpers {
 // The parameter_port_declarations between the parentheses of A.1.3's
 // parameter_port_list, which may be none; the caller reads the parentheses,
 // whose subclause is its own.
-void Parser::ParseParamPortDecls(
-    std::vector<std::pair<std::string_view, Expr*>>& params,
-    std::unordered_set<std::string_view>& type_param_names,
-    std::unordered_set<std::string_view>& localparam_port_names,
-    std::vector<DataType>* param_types,
-    std::unordered_map<std::string_view, std::vector<Expr*>>* unpacked_dims) {
+void Parser::ParseParamPortDecls(ParamPortList& out) {
   if (Check(TokenKind::kRParen)) return;
-  ParamPortList out{params, type_param_names, localparam_port_names,
-                    param_types, unpacked_dims};
   ParamPortGroup group;
   do {
     ParserParamPortHelpers::ParseParamPortDecl(*this, out, group);

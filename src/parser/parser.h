@@ -38,6 +38,24 @@ inline constexpr char kAnonymousProgramItemsMessage[] =
     "an anonymous program may contain only task, function, class, interface "
     "class, covergroup, and class constructor declarations";
 
+// §23.10 / Syntax A.1.3 parameter_port_list: the collections being built up as
+// each parameter_declaration / type_parameter_declaration in the list is
+// parsed. It is the one accumulator for the whole parameter port list, so the
+// value- and type-parameter parsers share it, and a module, interface, program
+// or class header builds it over the declaration the header opens.
+struct ParamPortList {
+  std::vector<std::pair<std::string_view, Expr*>>& params;
+  std::unordered_set<std::string_view>& type_param_names;
+  std::unordered_set<std::string_view>& localparam_port_names;
+  std::vector<DataType>* param_types;
+  // Where a value parameter's unpacked dimensions go, by name.
+  std::unordered_map<std::string_view, std::vector<Expr*>>* unpacked_dims;
+  // Where each parameter's identifier was written, one per entry of `params`
+  // in its order, for a header whose declaration keeps them; null for one
+  // that does not.
+  std::vector<SourceLoc>* locs = nullptr;
+};
+
 class Parser {
  public:
   Parser(Lexer& lexer, Arena& arena, DiagEngine& diag);
@@ -164,12 +182,7 @@ class Parser {
                          CompilationUnit* cu = nullptr,
                          PackageDecl* pkg = nullptr);
   bool TryParseClockingOrVerification(std::vector<ModuleItem*>& items);
-  void ParseParamPortDecls(
-      std::vector<std::pair<std::string_view, Expr*>>& params,
-      std::unordered_set<std::string_view>& type_param_names,
-      std::unordered_set<std::string_view>& localparam_port_names,
-      std::vector<DataType>* param_types,
-      std::unordered_map<std::string_view, std::vector<Expr*>>* unpacked_dims);
+  void ParseParamPortDecls(ParamPortList& out);
   void ParseParamsPortsAndSemicolon(ModuleDecl& decl);
 
   void ParseGenerateRegion(std::vector<ModuleItem*>& items);

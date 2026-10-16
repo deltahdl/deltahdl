@@ -460,6 +460,9 @@ struct RtlirProcess {
 
 struct RtlirParamDecl {
   std::string_view name;
+  // §37.3.3: where the parameter's declaration was written, which its object's
+  // vpiLineNo and vpiFile report.
+  SourceLoc loc;
   // §23.9: the generate block prefix in force where this parameter was
   // declared, empty for a parameter of the module itself. §23.9 lists generate
   // blocks among the elements that open a new scope, so a parameter declared in

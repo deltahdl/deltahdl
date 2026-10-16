@@ -476,6 +476,7 @@ static RtlirParamDecl BuildParamDeclShell(const ModuleDecl* decl, size_t i,
   const auto& [pname, pval] = decl->params[i];
   RtlirParamDecl pd;
   pd.name = pname;
+  pd.loc = decl->param_port_locs[i];
   pd.default_value = pval;
   pd.is_resolved = false;
   pd.is_type_param = decl->type_param_names.count(pname) > 0;
