@@ -207,8 +207,9 @@ std::optional<int64_t> ConstEvalInt(const Expr* expr, const ScopeMap& scope);
 // parameter declared with `type` and the initializer `expr`, folded against
 // `scope` as the right-hand side of an assignment to the parameter -- its
 // context-determined operands sized by the declared width and the value cut
-// to it where the declaration writes a range or a type, and self-determined
-// where it writes neither and the value sizes the parameter. For a package's
+// to it, the cut bits read with the declared type's signedness, where the
+// declaration writes a range or a type, and self-determined where it writes
+// neither and the value sizes the parameter. For a package's
 // or the compilation unit's parameter, whose declaration stands on its
 // ModuleItem alone; a module's has its RtlirParamDecl folded by FoldParamValue
 // (const_eval_internal.h). Defined in const_eval_bits.cpp.

@@ -496,25 +496,28 @@ FoldContext DeclaredFoldContext(const RtlirParamDecl& pd) {
 }
 
 // The value of `expr` folded as the right-hand side of an assignment to a
-// parameter read in `ctx`, cut to the context's width where it has one. The
-// cut keeps the expression's own signedness, as a ConstVal of the width
-// reads its bits, rather than the declaration's: what stands in
-// RtlirParamDecl::resolved_value is read again at the declared width and
-// signedness wherever the name is (RegisteredParamValue, the lowerer), and
-// `localparam int H = P[95:64]` over a select of all ones has always held
-// the 0xFFFFFFFF the unsigned select folds to.
-static std::optional<int64_t> FoldValueInContext(const Expr* expr,
-                                                 const ScopeMap& scope,
-                                                 FoldContext ctx) {
+// parameter read in `ctx`, cut to the context's width where it has one and
+// the cut bits read signed where `read_signed` says so, or with the
+// expression's own signedness where it says nothing.
+static std::optional<int64_t> FoldValueInContext(
+    const Expr* expr, const ScopeMap& scope, FoldContext ctx,
+    std::optional<bool> read_signed) {
   auto value = ConstEvalFull(expr, scope, ctx);
   if (!value) return std::nullopt;
   if (ctx.width == 0) return value->value;
-  return CastConstVal(*value, ctx.width, value->is_signed).value;
+  return CastConstVal(*value, ctx.width, read_signed.value_or(value->is_signed))
+      .value;
 }
 
+// A module's parameter keeps the expression's own signedness in the cut, as a
+// ConstVal of the width reads its bits, rather than the declaration's: what
+// stands in RtlirParamDecl::resolved_value is read again at the declared
+// width and signedness wherever the name is (RegisteredParamValue, the
+// lowerer), and `localparam int H = P[95:64]` over a select of all ones has
+// always held the 0xFFFFFFFF the unsigned select folds to.
 std::optional<int64_t> FoldParamValue(const RtlirParamDecl& pd,
                                       const Expr* expr, const ScopeMap& scope) {
-  return FoldValueInContext(expr, scope, DeclaredFoldContext(pd));
+  return FoldValueInContext(expr, scope, DeclaredFoldContext(pd), std::nullopt);
 }
 
 uint32_t DeclaredParamTypeWidth(const DataType& type, const ScopeMap& scope) {
@@ -523,11 +526,17 @@ uint32_t DeclaredParamTypeWidth(const DataType& type, const ScopeMap& scope) {
   return EvalTypeWidth(type);
 }
 
+// §6.20.2 (printed pages 126-127): the cut bits are read with the declared
+// type's signedness, since nothing reads the value stored for a package's,
+// the compilation unit's or a class's parameter again at its declaration:
+// `parameter bit [3:0] P = 24` is 8, where the sign of the unsized literal
+// (§5.7.1) made it -8, and a range written with no type is unsigned.
 std::optional<int64_t> FoldDeclaredParamValue(const Expr* expr,
                                               const DataType& type,
                                               const ScopeMap& scope) {
   return FoldValueInContext(
-      expr, scope, FoldContext{DeclaredParamTypeWidth(type, scope), false});
+      expr, scope, FoldContext{DeclaredParamTypeWidth(type, scope), false},
+      type.is_signed);
 }
 
 // §6.20.2 (printed pages 126-127) with §23.10.2 (printed 766) and §23.10.1

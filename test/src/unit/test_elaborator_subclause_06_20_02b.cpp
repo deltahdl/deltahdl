@@ -200,4 +200,74 @@ TEST(ValueParameters, RealModuleParamAsAnExtendsOverrideIsAccepted) {
              "endmodule\n"));
 }
 
+// §6.20.2 (printed pages 126-127): a package parameter declared `bit [3:0]`
+// holds 24 converted to four unsigned bits, 8, and a constant expression
+// reading it through `p::P` reads 8. The fold cut the value to four bits but
+// read them with the sign of the unsized literal (§5.7.1), which made it -8.
+TEST(TypedParameterSign, PackageParameterOfAnUnsignedTypeReadsUnsigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  parameter bit [3:0] P = 24;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  localparam int Q = p::P;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "Q"), 8);
+}
+
+// §6.20.2: a parameter with a range and no type is unsigned whatever its
+// value, so a compilation-unit `parameter [3:0] R = 24` is 8, read the same
+// through a module's localparam.
+TEST(TypedParameterSign, CompilationUnitParameterWithARangeReadsUnsigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "parameter [3:0] R = 24;\n"
+      "module m;\n"
+      "  localparam int Q = R;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "Q"), 8);
+}
+
+// §6.20.2: a parameter of a signed type is signed, so `byte B = 8'd200` holds
+// the eight bits of 200 read signed, -56, though the sized literal is
+// unsigned. The fold read them with the literal's sign, 200.
+TEST(TypedParameterSign, PackageParameterOfASignedTypeReadsSigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  parameter byte B = 8'd200;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  localparam int Q = p::B;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "Q"), -56);
+}
+
+// §6.20.2 with §8.25: a class parameter's default is converted to its declared
+// type as any parameter's is, so `bit [3:0] P = 24` read through `C#()::P`
+// is 8 and not the -8 the signed literal's sign made of the cut bits.
+TEST(TypedParameterSign, ClassParameterOfAnUnsignedTypeReadsUnsigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class C #(bit [3:0] P = 24);\n"
+      "endclass\n"
+      "module m;\n"
+      "  localparam int Q = C#()::P;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "Q"), 8);
+}
+
 }  // namespace

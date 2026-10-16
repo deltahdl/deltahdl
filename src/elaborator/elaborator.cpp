@@ -22,7 +22,6 @@
 #include "elaborator/package_assertion_scope.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/time_literal_scale.h"
-#include "elaborator/type_eval.h"
 #include "elaborator/unit_scope_switch.h"
 #include "elaborator/viewport_resolution.h"
 #include "parser/ast_design.h"
@@ -235,18 +234,11 @@ bool RuleCarriesParamOverride(const ConfigRule* rule) {
 //
 // §6.20.2: a localparam declared with a type or a range holds its value
 // converted to that type, as any parameter does.
-void EvalConfigLocalparams(const ConfigDecl* cfg, ScopeMap& scope,
-                           const TypedefMap& typedefs) {
+void EvalConfigLocalparams(const ConfigDecl* cfg, ScopeMap& scope) {
   for (const ConfigLocalparam& lp : cfg->local_params) {
     if (lp.is_type || lp.init_expr == nullptr) continue;
     auto val = FoldDeclaredParamValue(lp.init_expr, lp.data_type, scope);
-    if (!val) continue;
-    // An unsigned type holds the bits its width keeps, read unsigned.
-    const uint32_t kWidth = DeclaredParamTypeWidth(lp.data_type, scope);
-    if (kWidth > 0 && kWidth < 64 && !IsSignedType(lp.data_type, typedefs)) {
-      *val &= static_cast<int64_t>((uint64_t{1} << kWidth) - 1);
-    }
-    scope[lp.name] = *val;
+    if (val) scope[lp.name] = *val;
   }
 }
 
@@ -850,7 +842,7 @@ void Elaborator::EnterDelegatedConfig(const ConfigDecl* inner) {
   cell_liblist_bindings_.clear();
   config_delegations_.clear();
   cell_config_delegations_.clear();
-  EvalConfigLocalparams(inner, config_localparam_scope_, typedefs_);
+  EvalConfigLocalparams(inner, config_localparam_scope_);
   CollectConfigRuleTables(inner);
   CollectConfigInstanceParamOverrides(inner);
   // §33.4.2: the configuration's rules name their instances from its own
@@ -909,7 +901,7 @@ RtlirDesign* Elaborator::Elaborate(const ConfigDecl* cfg) {
   // A config localparam is restricted to a literal value (§33.4.3), so it can
   // be evaluated once here and made available to parameter-override
   // expressions that reference it.
-  EvalConfigLocalparams(cfg, config_localparam_scope_, typedefs_);
+  EvalConfigLocalparams(cfg, config_localparam_scope_);
 
   CollectConfigInstanceParamOverrides(cfg);
 
