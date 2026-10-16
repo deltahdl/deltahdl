@@ -139,6 +139,38 @@ static SdfSignalRef ParseSdfSignal(std::string_view& s) {
   return ref;
 }
 
+// §32.4.2 with IEEE 1497: SETUP, HOLD and SETUPHOLD write the data signal
+// first and the reference signal second; every other two-signal check --
+// RECOVERY, REMOVAL, RECREM, SKEW, BIDIRECTSKEW and NOCHANGE -- writes the
+// reference signal first, as the SystemVerilog check it annotates does.
+// Reads the second signal of `tc`'s check, whose first is `first`, and
+// records the two as the check's reference and data events.
+static void ReadSignalPair(std::string_view& s, SdfSignalRef first,
+                           SdfTimingCheck& tc) {
+  auto second = ParseSdfSignal(s);
+  const bool kDataFirst = (tc.check_type == SdfCheckType::kSetup ||
+                           tc.check_type == SdfCheckType::kHold ||
+                           tc.check_type == SdfCheckType::kSetuphold);
+  SdfSignalRef& data = kDataFirst ? first : second;
+  SdfSignalRef& ref = kDataFirst ? second : first;
+  tc.data_port = data.port;
+  tc.data_edge = data.edge;
+  tc.data_edge_descriptors = data.edge_descriptors;
+  tc.ref_port = ref.port;
+  tc.ref_edge = ref.edge;
+  tc.ref_edge_descriptors = ref.edge_descriptors;
+
+  // §32.4.2: either signal of a timing check may carry a condition, and a
+  // condition the file supplies has to match the declared check's condition
+  // on that same signal -- dropping one would turn a conditioned check into
+  // an unconditioned one, which matches every corresponding declaration
+  // instead of only the one it names -- so the two are kept apart.
+  tc.ref_condition = ref.condition;
+  tc.data_condition = data.condition;
+  tc.condition = ref.condition.empty() ? std::move(data.condition)
+                                       : std::move(ref.condition);
+}
+
 SdfTimingCheck ParseOneTc(std::string_view& s, SdfCheckType type) {
   SdfTimingCheck tc;
   tc.check_type = type;
@@ -154,32 +186,7 @@ SdfTimingCheck ParseOneTc(std::string_view& s, SdfCheckType type) {
     tc.ref_condition = first.condition;
     tc.condition = std::move(first.condition);
   } else {
-    // §32.4.2 with IEEE 1497: SETUP, HOLD and SETUPHOLD write the data signal
-    // first and the reference signal second; every other two-signal check --
-    // RECOVERY, REMOVAL, RECREM, SKEW, BIDIRECTSKEW and NOCHANGE -- writes the
-    // reference signal first, as the SystemVerilog check it annotates does.
-    auto second = ParseSdfSignal(s);
-    const bool kDataFirst =
-        (type == SdfCheckType::kSetup || type == SdfCheckType::kHold ||
-         type == SdfCheckType::kSetuphold);
-    SdfSignalRef& data = kDataFirst ? first : second;
-    SdfSignalRef& ref = kDataFirst ? second : first;
-    tc.data_port = data.port;
-    tc.data_edge = data.edge;
-    tc.data_edge_descriptors = data.edge_descriptors;
-    tc.ref_port = ref.port;
-    tc.ref_edge = ref.edge;
-    tc.ref_edge_descriptors = ref.edge_descriptors;
-
-    // §32.4.2: either signal of a timing check may carry a condition, and a
-    // condition the file supplies has to match the declared check's condition
-    // on that same signal -- dropping one would turn a conditioned check into
-    // an unconditioned one, which matches every corresponding declaration
-    // instead of only the one it names -- so the two are kept apart.
-    tc.ref_condition = ref.condition;
-    tc.data_condition = data.condition;
-    tc.condition = ref.condition.empty() ? std::move(data.condition)
-                                         : std::move(ref.condition);
+    ReadSignalPair(s, std::move(first), tc);
   }
   tc.limit = ParseDelayVal(s);
 

@@ -741,26 +741,34 @@ static void JoinInoutPortBinding(const RtlirPortBinding& binding,
   scope.ctx.AliasNet(local, target);
 }
 
-// §32.4.4: in a design an interconnect delay can reach while it runs, an
-// inout port binding of a net to a net is kept as the two nets, joined by
-// LinkInoutPortNets, so that a delay annotated to the port sits between them.
-// Answers false, linking nothing, where either side is not a net of its own.
-static bool LinkInoutPortBinding(const RtlirPortBinding& binding,
-                                 const InoutJoinScope& scope) {
-  if (binding.connection->kind != ExprKind::kIdentifier) return false;
+// §32.4.4: where an interconnect delay can reach the design while it runs
+// (`link`), an inout port binding of a net to a net is kept as the two nets,
+// joined by LinkInoutPortNets, so that a delay annotated to the port sits
+// between them; every other inout, ref or event port binding is joined to its
+// connection (JoinInoutPortBinding).
+static void LinkOrJoinSharedPortBinding(const RtlirPortBinding& binding,
+                                        const InoutJoinScope& scope,
+                                        bool link) {
+  if (!link || binding.direction != Direction::kInout ||
+      binding.connection->kind != ExprKind::kIdentifier) {
+    JoinInoutPortBinding(binding, scope);
+    return;
+  }
   std::string local =
       scope.local_prefix + std::string(PortStorageName(binding));
   std::string target =
       scope.parent_prefix + std::string(binding.connection->text);
   Net* inner = scope.ctx.FindNet(local);
   Net* outer = scope.ctx.FindNet(target);
-  if (inner == nullptr || outer == nullptr || inner == outer) return false;
+  if (inner == nullptr || outer == nullptr || inner == outer) {
+    JoinInoutPortBinding(binding, scope);
+    return;
+  }
   std::string load = SdfHierName(local);
   std::string source = SdfHierName(target);
   LinkInoutPortNets({*outer, *inner, scope.parent_prefix, scope.local_prefix,
                      std::move(local), std::move(source), std::move(load)},
                     scope.ctx);
-  return true;
 }
 
 // §16.18 with §17.3: an input formal of a checker bound to a clocking block
@@ -889,13 +897,10 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
     if (binding.direction == Direction::kInout ||
         binding.direction == Direction::kRef ||
         BoundPortType(inst, binding) == DataTypeKind::kEvent) {
-      const InoutJoinScope kScope{ctx_, arena_, inst_prefix_ + inst_seg,
-                                  inst_prefix_, inout_joins};
-      if (binding.direction == Direction::kInout && interconnect_annotatable_ &&
-          LinkInoutPortBinding(binding, kScope)) {
-        continue;
-      }
-      JoinInoutPortBinding(binding, kScope);
+      LinkOrJoinSharedPortBinding(
+          binding,
+          {ctx_, arena_, inst_prefix_ + inst_seg, inst_prefix_, inout_joins},
+          interconnect_annotatable_);
       continue;
     }
 
