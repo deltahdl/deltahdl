@@ -280,4 +280,48 @@ TEST(DpiGlobalNameElab, ExportLinkageInAGenerateBlockIsItsOwnScope) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §35.4 holds exports sharing a linkage name to equivalent signatures, and two
+// functions whose formals differ only in signing have different ones.
+TEST(DpiGlobalNameElab, ExportsDifferingOnlyInSigningAreError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      function void sv_a(input int x);
+      endfunction
+      export "DPI-C" link_s = function sv_a;
+    endmodule
+    module n;
+      function void sv_b(input int unsigned x);
+      endfunction
+      export "DPI-C" link_s = function sv_b;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI export linkage name 'link_s' was previously "
+                            "declared with a different type signature",
+                            10, "35.4"));
+}
+
+// The same through a typedef: a formal written as a name standing for `int`
+// is the `int` the other export's formal is written as.
+TEST(DpiGlobalNameElab, ExportsWithATypedefOfTheSameTypeAgree) {
+  ElabFixture f;
+  Elaborate(R"(
+    typedef int my_int_t;
+    module m;
+      function void sv_a(input my_int_t x);
+      endfunction
+      export "DPI-C" link_t = function sv_a;
+    endmodule
+    module n;
+      function void sv_b(input int x);
+      endfunction
+      export "DPI-C" link_t = function sv_b;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

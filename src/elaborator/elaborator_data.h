@@ -292,6 +292,10 @@ class ElaboratorData {
   TypedefMap pending_type_param_types_;
 
   std::unordered_set<std::string_view> declared_names_;
+  // §35.5.4: the scoped names the scope's import declarations took, so a second
+  // import of one is left to CheckDuplicateImportNamesInScope's report rather
+  // than drawing a redeclaration besides.
+  std::unordered_set<std::string_view> dpi_import_names_;
   // §23.9: the declared names of each elaborated module scope, keyed by the
   // module they belong to. A generate construct is elaborated after every
   // module has returned, by which point ItemElaborationStateSaver::Restore

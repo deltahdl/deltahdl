@@ -832,6 +832,12 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       ValidateElabSystemTask(item, mod);
       return true;
     case ModuleItemKind::kDpiImport:
+      // §35.5.4 has an import define a subroutine of its name in the scope it
+      // stands in, which §35.2.1 lets a scope define once, so the name enters
+      // the module name space as a function's does.
+      if (dpi_import_names_.insert(ScopedName(item->name)).second) {
+        DeclareInModuleNameSpace(item->name, item->loc);
+      }
       ValidateDpiImport(item);
       mod->dpi_import_decls.push_back(item);
       return true;

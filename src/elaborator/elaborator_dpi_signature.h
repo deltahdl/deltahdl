@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 
+#include "elaborator/type_eval.h"
 #include "parser/ast_type.h"
 
 namespace delta {
@@ -37,8 +38,16 @@ struct DpiDimension {
 // type is, and every dimension written on it. Packed and unpacked dimensions
 // are held apart because a formal declaring one of each is a different type
 // from one declaring two of either.
+//
+// A type written through a typedef name is shaped as the type the name stands
+// for (§6.18), so the name and that type are one signature. A name that
+// resolves to nothing keeps its spelling, which is all there is to tell it
+// from another such name. Signing is the type's own, a default one included,
+// since §6.22.1 has two types of different signing be different types.
 struct DpiTypeShape {
   DataTypeKind kind = DataTypeKind::kImplicit;
+  bool is_signed = false;
+  std::string_view unresolved_name;
   bool has_unsized_packed_dim = false;
   std::vector<DpiDimension> packed_dims;
   std::vector<DpiDimension> unpacked_dims;
@@ -77,16 +86,20 @@ struct DpiExportSignature {
 // it defaults to the SystemVerilog subroutine name.
 std::string_view DpiLinkageName(const ModuleItem* item);
 
-// The shape a type contributes to a signature. `unpacked_dims` are the
-// dimensions written after the declared name, which only a formal argument
-// has; a function result passes an empty list.
+// The shape a type contributes to a signature, its names resolved through
+// `typedefs`. `unpacked_dims` are the dimensions written after the declared
+// name, which only a formal argument has; a function result passes an empty
+// list.
 DpiTypeShape BuildDpiTypeShape(const DataType& type,
-                               const std::vector<Expr*>& unpacked_dims);
+                               const std::vector<Expr*>& unpacked_dims,
+                               const TypedefMap& typedefs);
 
-DpiSignatureKey BuildDpiSignature(const ModuleItem* item);
+DpiSignatureKey BuildDpiSignature(const ModuleItem* item,
+                                  const TypedefMap& typedefs);
 
 bool DpiSignaturesMatch(const DpiSignatureKey& a, const DpiSignatureKey& b);
 
-DpiExportSignature BuildDpiExportSignature(const ModuleItem* callable);
+DpiExportSignature BuildDpiExportSignature(const ModuleItem* callable,
+                                           const TypedefMap& typedefs);
 
 }  // namespace delta

@@ -263,13 +263,13 @@ void CheckExportResultType(const ModuleItem* callable, const ModuleItem* item,
 
 // §35.4 claim 14: exports sharing one linkage name across scopes must have
 // equivalent type signatures. Records the signature the first time the linkage
-// name is seen and compares against it on later exports.
+// name is seen and compares against it on later exports. `sig` is the
+// signature of the routine `item` exports.
 void CheckExportSignatureEquivalence(
-    const ModuleItem* callable, std::string_view link_name,
+    const DpiExportSignature& sig, std::string_view link_name,
     const ModuleItem* item,
     std::unordered_map<std::string_view, DpiExportSignature>& export_signatures,
     DiagEngine& diag) {
-  auto sig = BuildDpiExportSignature(callable);
   auto [sig_it, sig_was_new] = export_signatures.emplace(link_name, sig);
   if (!sig_was_new && !(sig_it->second == sig)) {
     diag.Error(item->loc,
@@ -403,8 +403,9 @@ void ValidateExportDeclaration(
   CheckExportFormalUnpackedDims(callable, item, scope.typedefs, scope.classes,
                                 diag);
   CheckExportResultType(callable, item, scope.typedefs, diag);
-  CheckExportSignatureEquivalence(callable, link_name, item, export_signatures,
-                                  diag);
+  CheckExportSignatureEquivalence(
+      BuildDpiExportSignature(callable, scope.typedefs), link_name, item,
+      export_signatures, diag);
 }
 
 // §35.5.4: every declaration, in whatever scope, has to carry exactly the same
@@ -412,12 +413,12 @@ void ValidateExportDeclaration(
 // under the same linkage name, recording it the first time. Argument names and
 // defaults may differ.
 void CheckImportSignatureAgreement(
-    const ModuleItem* item,
+    const ModuleItem* item, const TypedefMap& typedefs,
     std::unordered_map<std::string_view, DpiSignatureKey>& signatures,
     std::unordered_map<std::string_view, SourceLoc>& first_decl_loc,
     DiagEngine& diag) {
   auto link_name = DpiLinkageName(item);
-  auto sig = BuildDpiSignature(item);
+  auto sig = BuildDpiSignature(item, typedefs);
 
   auto found = signatures.find(link_name);
   if (found == signatures.end()) {
@@ -516,8 +517,11 @@ void ProcessDpiGlobalNameItem(const ModuleItem* item, ExportScopeContext& scope,
 // agreement it requires holds across scopes, so signatures and first_decl_loc
 // are threaded through every scope while the duplicate check starts afresh in
 // each.
+//
+// `typedefs` are the names the scope resolves, which a signature is built
+// through so that a formal written as a typedef name is the type it names.
 void CheckDpiScopeImportDeclarations(
-    const std::vector<ModuleItem*>& items,
+    const std::vector<ModuleItem*>& items, const TypedefMap& typedefs,
     std::unordered_map<std::string_view, DpiSignatureKey>& signatures,
     std::unordered_map<std::string_view, SourceLoc>& first_decl_loc,
     DiagEngine& diag) {
@@ -529,7 +533,8 @@ void CheckDpiScopeImportDeclarations(
     // carries no signature in its syntax (the signature comes from the
     // SystemVerilog function being exported).
     if (item->kind != ModuleItemKind::kDpiImport) continue;
-    CheckImportSignatureAgreement(item, signatures, first_decl_loc, diag);
+    CheckImportSignatureAgreement(item, typedefs, signatures, first_decl_loc,
+                                  diag);
   }
 }
 
@@ -662,7 +667,9 @@ void Elaborator::ValidateDpiDeclarations() {
   std::unordered_map<std::string_view, SourceLoc> first_decl_loc;
 
   for (const auto* items : DpiDeclarationScopes(unit_, units_.units)) {
-    CheckDpiScopeImportDeclarations(*items, signatures, first_decl_loc, diag_);
+    CheckDpiScopeImportDeclarations(*items,
+                                    DpiScopeTypedefs(*items, unit_, typedefs_),
+                                    signatures, first_decl_loc, diag_);
   }
 }
 

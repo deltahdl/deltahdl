@@ -434,4 +434,163 @@ TEST(DpiDeclElab, ATypedefOfAPermittedTypeStaysPermitted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+// §35.5.4 puts the type of every argument into the signature, and a type's
+// signing is part of it (§6.22.1), so `int` and `int unsigned` under one
+// linkage name are two signatures.
+TEST(DpiDeclElab, FormalsDifferingOnlyInSigningDisagree) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      import "DPI-C" function void sv_f(input int x);
+    endmodule
+    module n;
+      import "DPI-C" function void sv_f(input int unsigned x);
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI declaration of linkage name 'sv_f' "
+                            "disagrees with the earlier declaration's type "
+                            "signature",
+                            6, "35.5.4"));
+}
+
+// The same of the result type.
+TEST(DpiDeclElab, ResultsDifferingOnlyInSigningDisagree) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      import "DPI-C" function int sv_r();
+    endmodule
+    module n;
+      import "DPI-C" function int unsigned sv_r();
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI declaration of linkage name 'sv_r' "
+                            "disagrees with the earlier declaration's type "
+                            "signature",
+                            6, "35.5.4"));
+}
+
+// The signing compared is the type's, not the keyword's: `int` is signed by
+// default, so `int` and `int signed` are one type and one signature.
+TEST(DpiDeclElab, OneSigningSpelledTwoWaysAgrees) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      import "DPI-C" function void sv_s(input int x);
+    endmodule
+    module n;
+      import "DPI-C" function void sv_s(input int signed x);
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// A typedef name stands for the type it names (§6.18), so a formal written
+// through one has the signature of the type written directly.
+TEST(DpiDeclElab, ATypedefAgreesWithTheTypeItNames) {
+  ElabFixture f;
+  Elaborate(R"(
+    typedef int my_int_t;
+    module m;
+      import "DPI-C" function void sv_t(input my_int_t x);
+    endmodule
+    module n;
+      import "DPI-C" function void sv_t(input int x);
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// And two typedef names standing for different types are two signatures,
+// though both are written as names.
+TEST(DpiDeclElab, TypedefsOfDifferentTypesDisagree) {
+  ElabFixture f;
+  Elaborate(R"(
+    typedef int my_int_t;
+    typedef real my_real_t;
+    module m;
+      import "DPI-C" function void sv_u(input my_int_t x);
+    endmodule
+    module n;
+      import "DPI-C" function void sv_u(input my_real_t x);
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI declaration of linkage name 'sv_u' "
+                            "disagrees with the earlier declaration's type "
+                            "signature",
+                            8, "35.5.4"));
+}
+
+// A name that resolves to no type in reach is compared by its spelling, which
+// is the one thing known of it, so the same name on both sides agrees.
+TEST(DpiDeclElab, OneUnresolvedNameOnBothSidesAgrees) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      import "DPI-C" function void sv_v(input mystery_t x);
+    endmodule
+    module n;
+      import "DPI-C" function void sv_v(input mystery_t x);
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+// §35.5.4 makes an import the definition of a subroutine of its name in the
+// scope it stands in, and a name is defined once per scope (§35.2.1), so an
+// import may not take the name of a function the scope already defines.
+TEST(DpiDeclElab, AnImportTakingANativeFunctionsNameIsARedeclaration) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      function int sv_g(); return 1; endfunction
+      import "DPI-C" function int sv_g();
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "redeclaration of 'sv_g'", 4,
+                            "23.9"));
+}
+
+// Nor that of a variable of the scope.
+TEST(DpiDeclElab, AnImportTakingAVariablesNameIsARedeclaration) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      logic sv_h;
+      import "DPI-C" function void sv_h();
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "redeclaration of 'sv_h'", 4,
+                            "23.9"));
+}
+
+// Two imports of one name are the case §35.5.4 states on its own, and that is
+// the one report they draw rather than a redeclaration besides.
+TEST(DpiDeclElab, TwoImportsOfOneNameDrawOneReport) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      import "DPI-C" function void sv_k();
+      import "DPI-C" function void sv_k();
+    endmodule
+  )",
+            f, "m");
+  EXPECT_EQ(f.diag.ErrorCount(), 1U);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI import name 'sv_k' already declared in this "
+                            "scope",
+                            4, "35.5.4"));
+}
+
 }  // namespace

@@ -200,6 +200,7 @@ static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
 void Elaborator::ResetItemElaborationState() {
   forward_typedef_kinds_.clear();
   declared_names_.clear();
+  dpi_import_names_.clear();
   net_names_.clear();
   cont_assign_targets_.clear();
   proc_assign_targets_.clear();
@@ -254,6 +255,7 @@ void Elaborator::ResetItemElaborationState() {
 struct ItemElaborationStateSaver {
   decltype(Elaborator::forward_typedef_kinds_) forward_typedef_kinds;
   decltype(Elaborator::declared_names_) declared_names;
+  decltype(Elaborator::dpi_import_names_) dpi_import_names;
   decltype(Elaborator::net_names_) net_names;
   decltype(Elaborator::cont_assign_targets_) cont_assign_targets;
   decltype(Elaborator::proc_assign_targets_) proc_assign_targets;
@@ -331,6 +333,7 @@ struct ItemElaborationStateSaver {
       : typedefs(e.typedefs_), cu_param_scope(e.cu_param_scope_) {
     forward_typedef_kinds = std::move(e.forward_typedef_kinds_);
     declared_names = std::move(e.declared_names_);
+    dpi_import_names = std::move(e.dpi_import_names_);
     net_names = std::move(e.net_names_);
     cont_assign_targets = std::move(e.cont_assign_targets_);
     proc_assign_targets = std::move(e.proc_assign_targets_);
@@ -396,6 +399,7 @@ struct ItemElaborationStateSaver {
   void Restore(Elaborator& e) {
     e.forward_typedef_kinds_ = std::move(forward_typedef_kinds);
     e.declared_names_ = std::move(declared_names);
+    e.dpi_import_names_ = std::move(dpi_import_names);
     e.net_names_ = std::move(net_names);
     e.cont_assign_targets_ = std::move(cont_assign_targets);
     e.proc_assign_targets_ = std::move(proc_assign_targets);
