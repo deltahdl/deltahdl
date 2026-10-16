@@ -608,9 +608,10 @@ TEST(UnpackedStructDynamicMember, AnUnwrittenMemberIsEmptyAndGrowsByMethod) {
 
 // §7.2 with §8.4: a member of a class type holds the whole handle of the
 // object stored in it, whether the structure is a typedef's or written in the
-// declaration, so a property is read through it; with one bit of the handle
-// kept, handle 2 read as the null handle and handle 3 as handle 1 (#7229).
-TEST(UnpackedStructClassMember, APropertyIsReadThroughAClassTypedMember) {
+// declaration, so a handle copied in and out again names the same object.
+// With one bit of each handle kept, handle 2 came back as the null handle and
+// handle 3 as handle 1, the object holding 1 (#7229).
+TEST(UnpackedStructClassMember, AHandleCopiedThroughAClassMemberIsKept) {
   SimFixture f;
   std::string out = RunCapture(
       "class C; int x; function new(int v); x = v; endfunction endclass\n"
@@ -618,16 +619,23 @@ TEST(UnpackedStructClassMember, APropertyIsReadThroughAClassTypedMember) {
       "  typedef struct { int i; C h; } st;\n"
       "  st s;\n"
       "  struct { C a; byte b; C c; } u;\n"
+      "  C one, two, three, r1, r2, r3;\n"
       "  initial begin\n"
-      "    s.h = new(5);\n"
-      "    u.a = new(6);\n"
-      "    u.c = new(7);\n"
+      "    one = new(1);\n"
+      "    two = new(5);\n"
+      "    three = new(7);\n"
+      "    s.h = two;\n"
+      "    u.a = three;\n"
       "    u.b = 8;\n"
-      "    $display(\"%0d %0d %0d %0d\", s.h.x, u.a.x, u.c.x, u.b);\n"
+      "    u.c = two;\n"
+      "    r1 = s.h;\n"
+      "    r2 = u.a;\n"
+      "    r3 = u.c;\n"
+      "    $display(\"%0d %0d %0d %0d\", r1.x, r2.x, r3.x, u.b);\n"
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_EQ(out, "5 6 7 8\n");
+  EXPECT_EQ(out, "5 7 5 8\n");
 }
 
 }  // namespace
