@@ -415,9 +415,12 @@ TEST(ProtectEncodingEncryptionOutput, TheCountIsOfTheDataAndNotOfTheWriting) {
 // writing without describing any block, and one ahead of each block. That is
 // also the shape a text needs to ask for one field to be written differently
 // from another, an expression standing ahead of each field.
+//
+// The request is the tool's to act on rather than a line of the design, so the
+// data block holds the design alone (§34.5.22.2).
 TEST(ProtectEncodingEncryptionOutput, EachBlockOfAnEnvelopeStatesItsOwnCount) {
   std::string envelope = EnvelopeAround(kDigestBlockLine);
-  size_t held = ProtectedRegionBlockSize(EncodingRegionBody(kDigestBlockLine));
+  size_t held = ProtectedRegionBlockSize(kEncodingSealedDesign);
   ASSERT_TRUE(Holds(envelope, kDigestBlockLine));
   EXPECT_EQ(TimesWritten(envelope, kAnyEncoding), 3U);
   EXPECT_EQ(TimesWritten(envelope, "bytes="), 2U);

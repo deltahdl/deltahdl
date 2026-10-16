@@ -351,7 +351,8 @@ TEST(ProtectDigestBlockEncryptionOutput, NoKeyReachedWritesNoDigest) {
 // back out of the scheme and out of the key leaves the digest of the region's
 // own text, which is also what says nothing was prepended to it: §34.5.22.2
 // puts an initialization vector ahead of the digest for a CBC algorithm that
-// requires one, and the cipher here requires none.
+// requires one, and the cipher here requires none. The request written in the
+// region is not of that text, being the tool's to act on.
 TEST(ProtectDigestBlockEncryptionOutput, TheLineHoldsTheDigestAndNothingElse) {
   std::string envelope = EnvelopeAround(kDigestBlockLine);
   std::string carried;
@@ -361,7 +362,7 @@ TEST(ProtectDigestBlockEncryptionOutput, TheLineHoldsTheDigestAndNothingElse) {
   std::string opened;
   ASSERT_TRUE(DecryptProtectedBlock(carried, kEncodingExchangeKey, &opened))
       << envelope;
-  EXPECT_EQ(opened, DigestOf(EncodingRegionBody(kDigestBlockLine)));
+  EXPECT_EQ(opened, DigestOf(kEncodingSealedDesign));
 }
 
 // §34.5.9 has a count written ahead of each value an envelope carries, and a
@@ -369,8 +370,8 @@ TEST(ProtectDigestBlockEncryptionOutput, TheLineHoldsTheDigestAndNothingElse) {
 // digest's size and not the size of the block the digest stands for.
 TEST(ProtectDigestBlockEncryptionOutput, TheDigestIsCountedAsAValueOfItsOwn) {
   std::string envelope = EnvelopeAround(kDigestBlockLine);
-  EXPECT_TRUE(Holds(envelope, TheCountOf(ProtectedRegionBlockSize(DigestOf(
-                                  EncodingRegionBody(kDigestBlockLine))))))
+  EXPECT_TRUE(Holds(envelope, TheCountOf(ProtectedRegionBlockSize(
+                                  DigestOf(kEncodingSealedDesign)))))
       << envelope;
 }
 
