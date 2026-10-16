@@ -667,6 +667,19 @@ TEST(ProtectEncodingDecryptionInput, ACarriageReturnInABreakIsNotData) {
   EXPECT_EQ(bytes, kDesignatedKey);
 }
 
+// The same of the tool's own scheme, which writes one run of characters and
+// takes every break back out of a block before reading it.
+TEST(ProtectEncodingDecryptionInput, ACarriageReturnInTheToolsSchemeIsNotData) {
+  ProtectEncoding encoding;
+  encoding.enctype = std::string(kBlockEnctype);
+  std::string written = EncodeProtectBlock(kDesignatedKey, encoding);
+  ASSERT_GT(written.size(), 4U);
+  written.insert(4, "\r\n");
+  std::string bytes;
+  ASSERT_TRUE(DecodeProtectBlock(written, kBlockEnctype, &bytes));
+  EXPECT_EQ(bytes, kDesignatedKey);
+}
+
 // The negative of the length: the one row of the table with nothing for it to
 // bound. A length limits the characters a line holds once the writing has been
 // applied, and the identity transformation applies none -- the block is the
