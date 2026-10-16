@@ -11,6 +11,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
+#include "parser/param_port_list.h"
 #include "parser/parser.h"
 #include "parser/parser_token_skips.h"
 #include "parser/parser_type_name_scope.h"

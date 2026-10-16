@@ -176,13 +176,15 @@ static void CheckExternParamMatch(const ModuleDecl* mod,
 // extern's name-only ports. §6.20.3: a type parameter's default type is carried
 // in param_types (parallel to params), so it is imported alongside the names --
 // otherwise a `.*` module whose ports are typed by an imported type parameter
-// would leave that parameter with no default type.
+// would leave that parameter with no default type. §37.3.3: the positions
+// the extern wrote the parameters at come too, parallel to params alike.
 static void ImportExternWildcardHeader(ModuleDecl* mod,
                                        const ModuleDecl* extern_decl) {
   if (mod->ports.empty()) mod->ports = extern_decl->ports;
   if (!mod->params.empty() || extern_decl->params.empty()) return;
   mod->params = extern_decl->params;
   mod->param_types = extern_decl->param_types;
+  mod->param_port_locs = extern_decl->param_port_locs;
   mod->type_param_names = extern_decl->type_param_names;
   mod->has_param_port_list = extern_decl->has_param_port_list;
 }
