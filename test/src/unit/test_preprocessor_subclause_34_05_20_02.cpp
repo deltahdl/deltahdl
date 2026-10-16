@@ -324,6 +324,57 @@ TEST(ProtectDigestDecryptKeyDefault, ThatDefaultIsTheDataKeyAndNoOther) {
   EXPECT_NE(run.DigestCheck(), ProtectDigestCheck::kMatched);
 }
 
+// The same default reaches the digest written after the data block. The key
+// block carries a key for the data and none for the digest, the data block is
+// sealed under that data key, and so is the digest after it, which therefore
+// opens under the data key and agrees with the design.
+TEST(ProtectDigestDecryptKeyDefault, TheDataBlocksDigestOpensUnderTheDataKey) {
+  ProtectEncoding encoding = DefaultProtectEncoding();
+  std::string data = ProtectEncodedValueDirective(
+      encoding, ProtectedRegionBlockSize(kSealedDesign, kDataMethod));
+  data.append("`pragma protect data_block\n");
+  data.append(EncryptProtectedRegion(kSealedDesign, kSessionKey,
+                                     encoding.enctype, kDataMethod));
+  data.append("\n");
+  ProtectDigestBlockPolicy policy;
+  policy.requested = true;
+  policy.method = std::string(kDefaultDigestMethod);
+  policy.key = std::string(kSessionKey);
+  data.append(ProtectDigestBlockDirectives(kSealedDesign, policy, encoding));
+  std::string src = EnvelopeSealingItsDigestUnder({}, kSessionKey);
+  src.insert(src.find("`pragma protect end_protected\n"), data);
+  ReadUnderKeys run(src, TheBlockKey());
+  EXPECT_TRUE(run.Holds("module sealed_m")) << run.text;
+  EXPECT_EQ(run.DigestCheck(), ProtectDigestCheck::kMatched);
+}
+
+// §34.5.20.2 lets the author make the key that opens the digests and write it
+// on the line beneath the keyword in the input, so the region's digest is
+// encrypted under that key rather than under one made here.
+TEST(ProtectDigestDecryptKeyDescription, AKeyTheAuthorMadeSealsTheDigest) {
+  constexpr std::string_view kAuthorsKey = "the-authors-own-digest-key";
+  std::string region = "`pragma protect digest_block\n`pragma protect begin\n";
+  region.append(Writes("key_keyowner", kProvider));
+  region.append(Writes("key_keyname", kBlockKeyName));
+  region.append("`pragma protect digest_decrypt_key\n");
+  region.append(EncodeProtectValue(kAuthorsKey, DefaultProtectEncoding()));
+  region.append("\n").append(kSealedDesign).append("`pragma protect end\n");
+  std::string envelope = EncryptEnvelopes(region, {}, TheBlockKey());
+  size_t data_at = envelope.find("`pragma protect data_block\n");
+  ASSERT_NE(data_at, std::string::npos) << envelope;
+  constexpr std::string_view kDigestLine = "`pragma protect digest_block\n";
+  size_t digest_at = envelope.find(kDigestLine, data_at);
+  ASSERT_NE(digest_at, std::string::npos) << envelope;
+  size_t starts = digest_at + kDigestLine.size();
+  std::string encoded =
+      envelope.substr(starts, envelope.find('\n', starts) - starts);
+  std::string block;
+  ASSERT_TRUE(
+      DecodeProtectBlock(encoded, DefaultProtectEncoding().enctype, &block));
+  std::string carried;
+  EXPECT_TRUE(DecryptProtectedBlock(block, kAuthorsKey, &carried)) << envelope;
+}
+
 // The default is the current value of data_decrypt_key, and what is current is
 // decided where the digest is read. Two envelopes stand here: the first carries
 // a key of its own for its digest, and the second carries none and has its

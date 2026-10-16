@@ -153,7 +153,7 @@ std::string ProtectKeyBlockContent(const ProtectDataDecryption& data,
   // everything the block contains against a key that is one part of it.
   text.append(ProtectEncodedValueDirective(encoding, data.decrypt_key.size()));
   text.append(ProtectDataDecryptKeyDirective(
-      EncodeProtectBlock(data.decrypt_key, encoding)));
+      EncodeProtectValue(data.decrypt_key, encoding)));
   // §34.5.20 stores the key that opens the region's digests in this same block,
   // and §34.5.17 has the cipher that key belongs to travel with it whenever a
   // digital signature is in use. They come after the data's own key because
@@ -199,7 +199,7 @@ std::string ProtectKeyBlockDirectives(const ProtectKeyBlockRequest& request,
     text.append(ProtectEncodedValueDirective(encodings.one_line,
                                              request.public_key.size()));
     text.append(ProtectKeyPublicKeyDirective(
-        EncodeProtectBlock(request.public_key, encodings.one_line)));
+        EncodeProtectValue(request.public_key, encodings.one_line)));
   }
   text.append(ProtectEncodedValueDirective(
       encodings.blocks, ProtectedRegionBlockSize(content, method)));
@@ -244,7 +244,9 @@ ProtectKeyBlocks ProtectKeyBlocksFor(const ProtectKeyBlockRequests& requests,
       blocks.data_key = region.data_key.empty()
                             ? ProtectGeneratedDataKey(region.cleartext, key)
                             : std::string(region.data_key);
-      blocks.digest_key = ProtectGeneratedDigestKey(blocks.data_key);
+      blocks.digest_key = region.digest_key.empty()
+                              ? ProtectGeneratedDigestKey(blocks.data_key)
+                              : std::string(region.digest_key);
     }
     if (first == nullptr) {
       first = &request.data;

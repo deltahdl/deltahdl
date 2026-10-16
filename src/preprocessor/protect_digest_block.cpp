@@ -16,11 +16,9 @@ namespace delta {
 // and the characters it opened are not the same characters twice unless the two
 // tools also agree on a cipher, a key and a coding scheme.
 //
-// The cipher this implementation encrypts a digest under is a stream cipher and
-// asks for no initialization vector, so the cipher-block §34.5.22 has prepended
-// to a digest encrypted under a CBC algorithm has nothing here to be prepended
-// to. A tool offering such a cipher writes it ahead of the digest before the
-// encoding is applied; one that does not, as here, writes the digest alone.
+// §34.5.22 has the digest encrypted under the cipher the policy names, and a
+// CBC cipher's initialization vector prepended to it before the encoding is
+// applied, which EncryptProtectedRegion does for des-cbc.
 std::string ProtectDigestBlockDirectives(std::string_view cleartext,
                                          const ProtectDigestBlockPolicy& policy,
                                          const ProtectEncoding& encoding) {
@@ -31,10 +29,11 @@ std::string ProtectDigestBlockDirectives(std::string_view cleartext,
   // §34.5.9 has the count stated ahead of each block a tool writes, and a
   // digest is a block of its own: an envelope carrying a digest for each of its
   // blocks writes one of these ahead of each rather than one for them all.
-  text.append(
-      ProtectEncodedValueDirective(encoding, ProtectedRegionBlockSize(digest)));
+  text.append(ProtectEncodedValueDirective(
+      encoding, ProtectedRegionBlockSize(digest, policy.cipher)));
   text.append("`pragma protect ").append(kDigestBlockKeyword).append("\n");
-  text.append(EncryptProtectedRegion(digest, policy.key, encoding.enctype));
+  text.append(EncryptProtectedRegion(digest, policy.key, encoding.enctype,
+                                     policy.cipher));
   text.push_back('\n');
   return text;
 }
@@ -44,15 +43,15 @@ std::string ProtectDigestBlockDirectives(std::string_view cleartext,
 // so that a block nothing here can open is told apart from a block whose digest
 // disagrees with the data beside it.
 //
-// The same stream cipher opens the digest, so the initialization vector
-// §34.5.22 has removed from the front of a digest encrypted under a CBC
-// algorithm is not there to be removed and the whole of the decoded block is
-// the digest.
+// §34.5.22 has the first cipher-block of a digest encrypted under a CBC
+// algorithm taken off as the initialization vector, which
+// DecryptProtectedBlock does for des-cbc.
 ProtectDigestCheck CheckProtectDigestBlock(std::string_view block,
                                            const ProtectDigestTarget& target,
-                                           std::string_view method) {
+                                           std::string_view method,
+                                           std::string_view cipher) {
   std::string carried;
-  if (!DecryptProtectedBlock(block, target.key, &carried)) {
+  if (!DecryptProtectedBlock(block, target.key, &carried, cipher)) {
     return ProtectDigestCheck::kUnreadable;
   }
   std::string regenerated;

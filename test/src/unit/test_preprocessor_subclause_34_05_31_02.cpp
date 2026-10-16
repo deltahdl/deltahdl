@@ -418,4 +418,41 @@ TEST(ProtectResetDescription, WithoutItThatDigestKeyOpensTheDigest) {
   EXPECT_EQ(run.DigestCheck(), ProtectDigestCheck::kMatched);
 }
 
+// §34.5.31.2 makes the keyword a synonym for §22.11.1's reset pragma naming
+// protect, and that pragma and resetall put the protect keywords back in an
+// encrypting run as in a reading: the names ahead of either reach no region
+// after it.
+TEST(ProtectResetDescription, TheResetPragmasTakeTheNamesAwayWhenEncrypting) {
+  for (std::string_view reset :
+       {"`pragma reset protect\n", "`pragma resetall\n"}) {
+    std::string source = ReachesTheKey();
+    source.append(reset).append(RegionAround(kSealedDesign));
+    EXPECT_FALSE(Holds(Encrypted(source), kBlockOpening)) << reset;
+  }
+}
+
+// The control: a reset pragma naming only some other pragma leaves the protect
+// keywords standing.
+TEST(ProtectResetDescription, AResetPragmaNamingAnotherPragmaLeavesTheNames) {
+  std::string source = ReachesTheKey();
+  source.append("`pragma reset vendor_option\n")
+      .append(RegionAround(kSealedDesign));
+  EXPECT_TRUE(Holds(Encrypted(source), kBlockOpening));
+}
+
+// §34.2 reads a directive's expressions left to right, so a reset written after
+// the names in their own directive takes them away, and one written ahead of
+// them leaves them standing.
+TEST(ProtectResetDescription, AResetUndoesOnlyWhatItsDirectiveWroteAheadOfIt) {
+  std::string names = "data_keyowner=\"";
+  names.append(kKeyOwner).append("\", data_keyname=\"");
+  names.append(kKeyName).append("\"");
+  std::string after = "`pragma protect " + names + ", reset\n";
+  EXPECT_FALSE(
+      Holds(Encrypted(after + RegionAround(kSealedDesign)), kBlockOpening));
+  std::string ahead = "`pragma protect reset, " + names + "\n";
+  EXPECT_TRUE(
+      Holds(Encrypted(ahead + RegionAround(kSealedDesign)), kBlockOpening));
+}
+
 }  // namespace

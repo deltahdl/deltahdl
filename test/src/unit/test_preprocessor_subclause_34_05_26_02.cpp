@@ -286,6 +286,48 @@ TEST(ProtectKeyPublicKeyDescription, ABlockReachedByNameCarriesNoPublicKey) {
   EXPECT_FALSE(Holds(envelope, "key_public_key")) << envelope;
 }
 
+// The envelope `encoding_list` names the scheme of, written around a region
+// that designates its key by a 64-byte public key under that scheme, and the
+// value that public key is written as when kept to one line.
+struct LongPublicKeyRun {
+  std::string written;
+  std::string envelope;
+
+  explicit LongPublicKeyRun(std::string_view encoding_list) {
+    const std::string kLongKey(64, 'p');
+    ProtectEncoding stated = ParseProtectEncoding(encoding_list);
+    written = EncodeProtectValue(kLongKey, stated);
+    std::string src = "`pragma protect encoding=";
+    src.append(encoding_list).append("\n");
+    std::string designation = "`pragma protect key_public_key\n";
+    designation.append(written).append("\n");
+    src.append(RegionDesignating(designation));
+    ProtectKeyList keys;
+    keys.Add(KeyOf(kEntity, kLongKey, kTheKey));
+    envelope = EncryptEnvelopes(src, {}, keys);
+  }
+};
+
+// §34.5.26.2 puts the value on the line beneath the keyword, the line a reading
+// takes it from, so a key whose base64 writing runs past RFC 2045's 76
+// characters is still written whole on that one line.
+TEST(ProtectKeyPublicKeyDescription, AValueLongerThanABase64LineStaysOnOne) {
+  LongPublicKeyRun run("(enctype=\"base64\")");
+  ASSERT_GT(run.written.size(), 76U);
+  EXPECT_TRUE(Holds(run.envelope, "`pragma protect key_public_key\n" +
+                                      run.written + "\n`pragma protect"))
+      << run.envelope;
+}
+
+// §34.5.9.2 bounds the lines of the data_block, so a stated line_length breaks
+// that block and leaves a one-line value whole.
+TEST(ProtectKeyPublicKeyDescription, AStatedLineLengthLeavesTheValueWhole) {
+  LongPublicKeyRun run("(enctype=\"base64\", line_length=16)");
+  EXPECT_TRUE(Holds(run.envelope, "`pragma protect key_public_key\n" +
+                                      run.written + "\n`pragma protect"))
+      << run.envelope;
+}
+
 // A designation reaching no key of the entity is written into no block, there
 // being no block: the region asked for one, the request reached nothing, and
 // what comes back is the region as it stood.

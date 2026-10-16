@@ -254,6 +254,19 @@ TEST(ProtectBase64Writing, AStatedLengthBoundsEveryLine) {
   EXPECT_TRUE(ReadsBackAs(written, kBase64Enctype, data));
 }
 
+// A value written on the one line beneath its keyword is never broken, under
+// base64 or the tool's own scheme, whatever length is stated; the identity
+// transformation writes the bytes as they are.
+TEST(ProtectBase64Writing, AOneLineValueIsNeverBroken) {
+  std::string data = EveryByteUpTo(256);
+  for (std::string_view enctype : {kBase64Enctype, kBlockEnctype}) {
+    std::string written = EncodeProtectValue(data, Stated(enctype, 10));
+    EXPECT_EQ(written.find('\n'), std::string::npos) << enctype;
+    EXPECT_TRUE(ReadsBackAs(written, enctype, data)) << enctype;
+  }
+  EXPECT_EQ(EncodeProtectValue("a\nb", Stated(kRawEnctype, 0)), "a\nb");
+}
+
 // RFC 2045 §6.8 has a reading ignore every character outside the alphabet, so
 // a block indented, padded with blanks or broken where its writing never broke
 // it reads as the same bytes.

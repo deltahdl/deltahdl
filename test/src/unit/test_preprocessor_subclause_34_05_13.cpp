@@ -49,6 +49,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -803,6 +804,46 @@ TEST(ProtectDataPublicKeyDecryptionInput,
   ReadUnderKeys read(EnvelopeFor(described, keys), keys);
   EXPECT_TRUE(read.Holds("module sealed_m")) << read.text;
   EXPECT_FALSE(read.diag.HasErrors());
+}
+
+// The encrypting run over a region naming the entity, a key by name and a key
+// by public key, holding `keys`, with what it reported.
+std::vector<Diagnostic> EncryptingReports(const ProtectKeyList& keys) {
+  std::string src =
+      Region(NamesKeyOwner(kKeyOwner) + NamesKeyName(kKeyName) +
+                 PublicKeyDesignation(kPublicKey, DefaultProtectEncoding()),
+             kSealedDesign);
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  EncryptEnvelopes(src, "", keys, &diag, mgr.AddFile("<test>", src));
+  return diag.Diagnostics();
+}
+
+constexpr std::string_view kTwoKeysDesignated =
+    "protect pragma data_public_key and data_keyname designate different keys "
+    "of the data_keyowner in effect";
+
+// §34.5.13.2 has the two designations refer to the same key as an ENCRYPTION
+// INPUT constraint, so the encrypting run reports a region whose name and
+// public key reach two different keys of its entity, at the region's opening.
+TEST(ProtectDataPublicKeyEncryptionInput, TwoDesignationsOfTwoKeysAreReported) {
+  EXPECT_TRUE(ReportedError(
+      EncryptingReports(KeysUnderBothDesignations(kRegionKey, kSecondKey)),
+      kTwoKeysDesignated, 1, "34.5.13"));
+}
+
+// The controls: two designations of one key, and a designation reaching no
+// key the run holds, are not two keys.
+TEST(ProtectDataPublicKeyEncryptionInput, OneKeyOrAnUnheldOneIsNotReported) {
+  EXPECT_FALSE(ReportedError(
+      EncryptingReports(KeysUnderBothDesignations(kRegionKey, kRegionKey)),
+      kTwoKeysDesignated, 1, "34.5.13"));
+  EXPECT_FALSE(
+      ReportedError(EncryptingReports(KeyHeldUnder(kKeyOwner, kKeyName)),
+                    kTwoKeysDesignated, 1, "34.5.13"));
+  EXPECT_FALSE(
+      ReportedError(EncryptingReports(KeyHeldUnder(kKeyOwner, kPublicKey)),
+                    kTwoKeysDesignated, 1, "34.5.13"));
 }
 
 }  // namespace

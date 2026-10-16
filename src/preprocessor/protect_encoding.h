@@ -183,6 +183,16 @@ std::string ProtectEncodedValueDirective(const ProtectEncoding& encoding,
 std::string EncodeProtectBlock(std::string_view bytes,
                                const ProtectEncoding& encoding);
 
+// Writes `bytes` as a value §34.5.13, §34.5.14, §34.5.19, §34.5.20 and
+// §34.5.26 put on the single line beneath their keyword, under the scheme
+// `encoding` names. That line is the whole of the value a reading takes, so the
+// writing is never broken: neither a stated line length, which §34.5.9.2 gives
+// the data_block, nor a scheme's own longest line breaks it. The schemes kept
+// for such values (ProtectEncodingFitsOneLine) write no line break of their
+// own.
+std::string EncodeProtectValue(std::string_view bytes,
+                               const ProtectEncoding& encoding);
+
 // The inverse: recovers into `*bytes` the data that `text` is the encoding of
 // under `enctype`. Returns false, leaving `*bytes` untouched, where `enctype`
 // names a scheme this implementation does not provide or where `text` is not

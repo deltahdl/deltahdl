@@ -250,6 +250,19 @@ TEST(ProtectDecryptLicenseDescription, AnotherAnswerDecryptsNothing) {
   EXPECT_FALSE(Holds(run.text, kEncodingSealedDesign)) << run.text;
 }
 
+// §34.5.28.2 asks before the decrypted text is processed, so a model the tool
+// is not licensed to decrypt has no effect at all: a macro its text defines
+// ahead of the licence is not defined after the envelope.
+TEST(ProtectDecryptLicenseDescription, ARefusedModelDefinesNothing) {
+  std::string src =
+      EnvelopeOf("`define SECRET_MODE 1\n" + std::string(kLicense));
+  src.append("`ifdef SECRET_MODE\nleaked\n`endif\n");
+  Asked asked;
+  ReadSource run(src, Answering(Returning(7), &asked));
+  EXPECT_FALSE(Holds(run.text, "leaked")) << run.text;
+  EXPECT_EQ(asked.licenses.size(), 1U);
+}
+
 // A licence writing no match value is held to 0, the value the NOTE closing the
 // subclause has a forged library return to avoid the check. An entry function
 // returning 0 licenses the tool.

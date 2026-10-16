@@ -23,6 +23,9 @@
 #include "preprocessor/protect_region_lines.h"
 
 #include <cstdint>
+#include <deque>
+#include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -249,6 +252,17 @@ void TakeEncodingKeyword(std::string_view line, RegionKeyReader* reader) {
 // waiting. Three keywords each give the line beneath them to a public key, so
 // the line after one of them is that key's characters rather than a line of
 // expressions to be read for keywords of its own.
+// The key a line the previous one announced holds, read out of the scheme in
+// effect into `key`; a line that scheme never wrote leaves `key` as it was.
+void TakeEncodedKeyLine(std::string_view line, const ProtectEncoding& encoding,
+                        std::string* key) {
+  std::string read;
+  if (ReadProtectEncodedValue(TrimTrailing(TrimLeading(line)), encoding,
+                              &read) == ProtectEncodedValueRead::kRead) {
+    *key = std::move(read);
+  }
+}
+
 bool TookAwaitedPublicKey(std::string_view line, uint32_t line_num,
                           RegionKeyReader* reader) {
   if (reader->encoded_key_next) {
@@ -261,6 +275,16 @@ bool TookAwaitedPublicKey(std::string_view line, uint32_t line_num,
   }
   if (reader->encoded_digest_key_next) {
     TakeDigestPublicKeyLine(line, reader);
+    return true;
+  }
+  if (reader->encoded_data_decrypt_key_next) {
+    reader->encoded_data_decrypt_key_next = false;
+    TakeEncodedKeyLine(line, reader->encoding, &reader->data_decrypt_key);
+    return true;
+  }
+  if (reader->encoded_digest_decrypt_key_next) {
+    reader->encoded_digest_decrypt_key_next = false;
+    TakeEncodedKeyLine(line, reader->encoding, &reader->digest_decrypt_key);
     return true;
   }
   return false;
@@ -317,11 +341,12 @@ void TakeComment(std::string_view line, RegionKeyReader* reader) {
 // data, and a comment written before the reset was found there whatever the
 // reset goes on to do to the keyword: what is held here is an output already
 // owed rather than a value something later reads.
-void TakeReset(std::string_view line, RegionKeyReader* reader) {
-  if (!NamesBareKeyword(line, kResetKeyword)) return;
+void TakeReset(RegionKeyReader* reader) {
   std::string documented = std::move(reader->comment_directives);
+  std::shared_ptr<std::deque<std::string>> held = std::move(reader->held_lines);
   *reader = {};
   reader->comment_directives = std::move(documented);
+  reader->held_lines = std::move(held);
 }
 
 // The names a line designates the region's keys by: the data key and the entity
@@ -398,6 +423,10 @@ void TakeAnnouncements(std::string_view line, RegionKeyReader* reader) {
   // they hold -- so a block named here belongs to no earlier encryption and is
   // the request rather than a digest some other tool already produced.
   if (NamesKeyword(line, kDigestBlockKeyword)) reader->digest_requested = true;
+  reader->encoded_data_decrypt_key_next =
+      NamesBareKeyword(line, kDataDecryptKeyKeyword);
+  reader->encoded_digest_decrypt_key_next =
+      NamesBareKeyword(line, kDigestDecryptKeyKeyword);
   reader->encoded_key_next = NamesBareKeyword(line, kKeyPublicKeyKeyword);
   // §34.5.13 defines its keyword standing alone and gives the line after it to
   // the encoded value of the public key the data are to be encrypted under, so
@@ -418,16 +447,25 @@ void TakeAnnouncements(std::string_view line, RegionKeyReader* reader) {
 void TakeKeyNames(std::string_view line, uint32_t line_num,
                   RegionKeyReader* reader) {
   if (TookAwaitedPublicKey(line, line_num, reader)) return;
-  // The reset is answered ahead of the keywords a line may write beside it,
-  // because §34.4 reads a directive's expressions left to right and a text
-  // putting the keywords back before stating new ones is the order an author
-  // writes: what follows the reset on the line is stated after it.
-  TakeReset(line, reader);
-  TakeAuthorship(line, reader);
+  // The comment is owed to the output wherever it stands on the line, a reset
+  // putting back the keywords rather than the documentation (TakeReset).
   TakeComment(line, reader);
-  TakeKeyDesignations(line, line_num, reader);
-  TakeMethodKeywords(line, line_num, reader);
-  TakeAnnouncements(line, reader);
+  // §22.11.1's reset pragma naming protect, and its resetall pragma, put every
+  // protect keyword back as §34.5.31.2's keyword does, and write none.
+  if (ResetsProtectPragmaLine(line)) {
+    TakeReset(reader);
+    return;
+  }
+  // §34.2 reads a directive's expressions left to right, so a reset undoes
+  // what the directive wrote ahead of it, and only what follows it stands.
+  std::optional<std::string> after_reset = ProtectLineAfterLastReset(line);
+  if (after_reset.has_value()) TakeReset(reader);
+  std::string_view read =
+      after_reset.has_value() ? reader->Hold(std::move(*after_reset)) : line;
+  TakeAuthorship(read, reader);
+  TakeKeyDesignations(read, line_num, reader);
+  TakeMethodKeywords(read, line_num, reader);
+  TakeAnnouncements(read, reader);
 }
 
 }  // namespace

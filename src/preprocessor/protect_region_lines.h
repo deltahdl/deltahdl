@@ -1,8 +1,11 @@
 #pragma once
 
 #include <cstdint>
+#include <deque>
+#include <memory>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_envelope_output.h"
@@ -34,6 +37,17 @@ namespace delta {
 // reading that designation spans two lines and the reading has to carry, from
 // the first to the second, the fact that it is part way through one.
 struct RegionKeyReader {
+  // Directives the reading wrote for itself out of the lines it was given --
+  // the expressions on one side of a delimiting word, or those after a reset --
+  // which the views below may point into. They are kept for as long as anything
+  // read from them is, a reset putting back the values rather than the text.
+  std::shared_ptr<std::deque<std::string>> held_lines =
+      std::make_shared<std::deque<std::string>>();
+  std::string_view Hold(std::string text) {
+    held_lines->push_back(std::move(text));
+    return held_lines->back();
+  }
+
   RegionKeyNames names;
   // The name the text gave for whoever wrote the design, empty where the text
   // gave none. It is carried beside the names for the reason they are carried
@@ -142,6 +156,13 @@ struct RegionKeyReader {
   // its data under a key of another, so a line answering one announcement says
   // nothing about the others.
   bool encoded_digest_key_next = false;
+  // §34.5.14 and §34.5.20 announce the line after them the same way, with the
+  // encoded value of a key the author made for the region's data, or for its
+  // digests, which the key blocks carry in place of a key made here.
+  bool encoded_data_decrypt_key_next = false;
+  bool encoded_digest_decrypt_key_next = false;
+  std::string data_decrypt_key;
+  std::string digest_decrypt_key;
 };
 
 // The data decryption pragma expressions standing where a region asks for a key

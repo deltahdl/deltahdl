@@ -296,6 +296,9 @@ std::string ProtectKeyBlockDirectives(const ProtectKeyBlockRequest& request,
 struct ProtectKeyBlockRegion {
   std::string_view cleartext;
   std::string_view data_key;
+  // A key the author made for the region's digests (§34.5.20), carried in the
+  // blocks in place of one made here; empty where the author made none.
+  std::string_view digest_key;
 };
 
 // The key blocks `requests` asks for, over the region whose cleartext is

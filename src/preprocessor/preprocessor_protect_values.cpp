@@ -163,8 +163,9 @@ void Preprocessor::ReadProtectDigestBlock(std::string_view text,
   digest_target_ = ProtectDigestTarget();
   std::string block;
   if (!ReadEncodedProtectValue(text, loc, &block)) return;
-  last_digest_block_check_ =
-      CheckProtectDigestBlock(block, target, DigestMethodInEffect());
+  last_digest_block_check_ = CheckProtectDigestBlock(
+      block, target, DigestMethodInEffect(),
+      ProtectDigestKeyMethodInEffect(protect_keywords_).value);
   if (last_digest_block_check_ == ProtectDigestCheck::kAltered) {
     diag_.Error(loc,
                 "protect pragma digest block disagrees with the block it "
@@ -458,6 +459,9 @@ void Preprocessor::ReadProtectDataBlock(std::string_view text, SourceLoc loc,
   // it did write rather than under a key some earlier envelope made for itself.
   // Taking a copy is what lets the key be put away before it is used.
   std::string region_key(ProtectKeyInEffect());
+  // §34.5.20 makes the data key the default key of the region's digest, so the
+  // digest's key is settled while the data key is still standing.
+  std::string digest_key(DigestBlockKeyInEffect());
   data_decrypt_key_.clear();
   // §34.5.11.2: the data_method states the algorithm the data block is to be
   // decrypted with. This implementation provides two -- the clause's required
@@ -488,17 +492,10 @@ void Preprocessor::ReadProtectDataBlock(std::string_view text, SourceLoc loc,
   }
   // §34.5.22 owes this block a digest of its own, written immediately after it,
   // so what the block recovered to is held for the digest that follows,
-  // together with the key that digest is under. Both are taken before the
-  // recovered text is read through, because that text may carry envelopes of
-  // its own and each of those spends its keys and checks its digests as it
-  // goes; installing this one afterwards is what leaves the outer block's
-  // digest checked against the outer block.
-  ProtectDigestTarget target{cleartext, std::string(DigestBlockKeyInEffect())};
-  // Nothing of the envelope's own is left standing over the recovered text
-  // while it is read: a key block of this envelope was the last thing
-  // recovered, and a digest_block expression the design itself carries follows
-  // no block of the design.
-  digest_target_ = ProtectDigestTarget();
+  // together with the key that digest is under. The recovered text is read
+  // only once the envelope is (ReadRecoveredText), so the digest is checked
+  // under what the envelope wrote rather than under anything that text writes.
+  ProtectDigestTarget target{cleartext, std::move(digest_key)};
   // §34.5.20 has a key a key block carried open the digests of the region that
   // block belongs to, so it is spent here alongside the key that opened the
   // data rather than left standing over whatever the text goes on to hold. The
@@ -525,8 +522,28 @@ void Preprocessor::ReadProtectDataBlock(std::string_view text, SourceLoc loc,
   src_mgr_.MarkProtected(block_id);
   // §34.5.32.2: the envelope a viewport of it describes is this text.
   protect_envelope_source_ = block_id;
+  // §34.5.28.2 asks about the model's decrypt_license before its text is
+  // processed, so nothing of a refused model takes effect, a macro it would
+  // have defined included.
+  if (!RecoveredTextLicensed(cleartext, block_id)) {
+    if (decryption_refused_depth_ == 0) {
+      decryption_refused_depth_ = protect_envelopes_.DecryptionEnvelopeDepth();
+    }
+    return;
+  }
+  // A block before this one in the envelope has its text read first.
+  ReadRecoveredText(output);
+  recovered_text_ = RecoveredText{std::move(cleartext), block_id, depth};
+  digest_target_ = std::move(target);
+}
+
+void Preprocessor::ReadRecoveredText(std::string& output) {
+  if (!recovered_text_.has_value()) return;
+  RecoveredText held = std::move(*recovered_text_);
+  recovered_text_.reset();
   size_t origins = line_origins_.size();
-  std::string recovered = ProcessSource(cleartext, block_id, depth);
+  std::string recovered =
+      ProcessSource(held.cleartext, held.block_id, held.depth);
   // §34.5.28.2: a decrypt_license the recovered text carried was refused, so
   // nothing of the model is processed on, and the lines it would have written
   // take their origins with them.
@@ -535,7 +552,6 @@ void Preprocessor::ReadProtectDataBlock(std::string_view text, SourceLoc loc,
     return;
   }
   output.append(recovered);
-  digest_target_ = std::move(target);
 }
 
 // Whether `line` carried a value the line before it announced, which is what
@@ -579,7 +595,12 @@ bool Preprocessor::TookAnnouncedValue(std::string_view line, SourceLoc loc,
   // The block is read before this line is, so a directive that ended one takes
   // effect after the block it stood beneath rather than before it.
   FinishGatheredProtectBlock(depth, output);
-  if (ends_envelope) EndAccumulatedProtectPragmas();
+  if (ends_envelope) {
+    // §34.3.2: the envelope is read to its end, digests checked included,
+    // before the text recovered from it is.
+    EndAccumulatedProtectPragmas();
+    ReadRecoveredText(output);
+  }
   if (TakeKeyPublicKeyValue(line, loc)) return true;
   if (StartGatheredProtectBlock(line, loc)) return true;
   if (TakeDataDecryptKeyValue(line, loc)) return true;

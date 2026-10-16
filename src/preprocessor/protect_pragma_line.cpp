@@ -2,10 +2,14 @@
 
 #include <cctype>
 #include <cstddef>
+#include <optional>
+#include <string>
 #include <string_view>
 #include <vector>
 
 #include "preprocessor/protect_envelope.h"
+#include "preprocessor/protect_keywords.h"
+#include "preprocessor/standard_pragmas.h"
 
 namespace delta {
 namespace {
@@ -191,10 +195,13 @@ std::string_view KeywordValueOnLine(std::string_view line,
                                     std::string_view keyword) {
   std::string_view body;
   if (!ProtectPragmaLine(line, &body)) return {};
+  // §34.2 reads the list left to right, so a keyword written twice ends at the
+  // value written last.
+  std::string_view value;
   for (const ListedKeyword& listed : TopLevelKeywords(body)) {
-    if (listed.name == keyword && listed.has_value) return listed.value;
+    if (listed.name == keyword && listed.has_value) value = listed.value;
   }
-  return {};
+  return value;
 }
 
 bool IsParenthesizedPragmaValue(std::string_view value) {
@@ -224,6 +231,55 @@ bool NamesKeyword(std::string_view line, std::string_view keyword) {
     if (listed.name == keyword) return true;
   }
   return false;
+}
+
+std::string_view ListedExpressionText(const ListedKeyword& listed) {
+  if (!listed.has_value) return listed.name;
+  const char* kEnd = listed.value.data() + listed.value.size();
+  return {listed.name.data(), static_cast<size_t>(kEnd - listed.name.data())};
+}
+
+std::string ProtectDirectiveWriting(
+    const std::vector<std::string_view>& expressions) {
+  if (expressions.empty()) return {};
+  std::string directive = "`pragma protect ";
+  for (size_t n = 0; n < expressions.size(); ++n) {
+    if (n != 0) directive.append(", ");
+    directive.append(expressions[n]);
+  }
+  directive.push_back('\n');
+  return directive;
+}
+
+bool ResetsProtectPragmaLine(std::string_view line) {
+  std::string_view rest = TrimLeading(line);
+  if (rest.empty() || rest.front() != '`') return false;
+  rest.remove_prefix(1);
+  if (!ConsumeWord(rest, "pragma")) return false;
+  rest = TrimLeading(rest);
+  if (ConsumeWord(rest, kResetallPragmaName)) return true;
+  if (!ConsumeWord(rest, kResetPragmaName)) return false;
+  for (const ListedKeyword& listed : TopLevelKeywords(rest)) {
+    if (listed.name == kProtectPragmaName) return true;
+  }
+  return false;
+}
+
+std::optional<std::string> ProtectLineAfterLastReset(std::string_view line) {
+  std::string_view body;
+  if (!ProtectPragmaLine(line, &body)) return std::nullopt;
+  std::optional<std::string_view> after;
+  for (const ListedKeyword& listed : TopLevelKeywords(body)) {
+    if (listed.name != kResetKeyword || listed.has_value) continue;
+    after = body.substr(static_cast<size_t>(listed.name.data() - body.data()) +
+                        listed.name.size());
+  }
+  if (!after.has_value()) return std::nullopt;
+  std::string_view rest = TrimLeading(*after);
+  if (!rest.empty() && rest.front() == ',') rest = TrimLeading(rest.substr(1));
+  std::string directive = "`pragma protect ";
+  directive.append(rest);
+  return directive;
 }
 
 }  // namespace delta

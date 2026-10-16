@@ -329,16 +329,20 @@ TEST(ProtectEndEncryptionOutput, AnUnterminatedLastLineIsReplacedToo) {
   EXPECT_TRUE(Holds(written, "`pragma protect end_protected\n"));
 }
 
-// It is the expression that is replaced rather than the directive carrying it.
-// The expressions written beside it described the region and go on describing
-// the envelope standing in its place, so the one thing changed on that line is
-// the word naming the delimiter.
-TEST(ProtectEndEncryptionOutput, OnlyTheDelimitingWordChangesOnItsLine) {
+// §34.2 makes an expression written ahead of the closing word a content
+// keyword of the region it closes, so it is the region's rather than the
+// envelope's: the produced directive carries the replacement alone, and an
+// author written there is output where §34.5.5 has a region's author output,
+// in a directive of its own inside the envelope.
+TEST(ProtectEndEncryptionOutput, ExpressionsAheadOfTheWordAreTheRegions) {
   std::string closing = "`pragma protect author=\"Acme Corp\", end\n";
   std::string written = Encrypted(RegionClosedWith(kSealedDesign, closing));
-  constexpr std::string_view kTransformed =
-      "`pragma protect author=\"Acme Corp\", end_protected\n";
-  EXPECT_TRUE(Holds(written, kTransformed));
+  EXPECT_TRUE(Holds(written, "`pragma protect end_protected\n")) << written;
+  EXPECT_TRUE(Holds(written, "`pragma protect author=\"Acme Corp\"\n"))
+      << written;
+  EXPECT_LT(written.find("`pragma protect author="),
+            written.find("`pragma protect data_block"))
+      << written;
 }
 
 // The other side of the same line. An expression written after the delimiter

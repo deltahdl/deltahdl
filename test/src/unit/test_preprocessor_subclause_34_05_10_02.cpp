@@ -358,4 +358,45 @@ TEST(ProtectDataKeyownerEncryptionOutput,
   EXPECT_TRUE(Holds(run.text, kSealedDesign)) << run.text;
 }
 
+// §34.5.10.2 states the uniqueness as an ENCRYPTION INPUT constraint as well,
+// so the encrypting run reports a region writing one value against two of the
+// names designating a key of its data_keyowner, at the line the region opens
+// on.
+TEST(ProtectDataKeyownerEncryptionInput, OneValueAgainstTwoNamesIsReported) {
+  std::string src = "`pragma protect begin\n";
+  src.append("`pragma protect data_keyowner=\"acme\"\n");
+  src.append("`pragma protect data_keyname=\"same-value\"\n");
+  src.append("`pragma protect data_public_key\n");
+  src.append(EncodeProtectValue("same-value", DefaultProtectEncoding()));
+  src.append("\nmodule sealed_m; endmodule\n`pragma protect end\n");
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  EncryptEnvelopes(src, "exchange", ProtectKeyList(), &diag,
+                   mgr.AddFile("<test>", src));
+  EXPECT_TRUE(ReportedError(diag.Diagnostics(),
+                            "protect pragma writes one value against two of "
+                            "the names that designate a key of the "
+                            "data_keyowner in effect",
+                            1, "34.5.10"));
+}
+
+// The control: distinct values draw no such report.
+TEST(ProtectDataKeyownerEncryptionInput, DistinctValuesAreNotReported) {
+  std::string src = "`pragma protect begin\n";
+  src.append("`pragma protect data_keyowner=\"acme\"\n");
+  src.append("`pragma protect data_keyname=\"one-value\"\n");
+  src.append("`pragma protect data_public_key\n");
+  src.append(EncodeProtectValue("another-value", DefaultProtectEncoding()));
+  src.append("\nmodule sealed_m; endmodule\n`pragma protect end\n");
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  EncryptEnvelopes(src, "exchange", ProtectKeyList(), &diag,
+                   mgr.AddFile("<test>", src));
+  EXPECT_FALSE(ReportedError(diag.Diagnostics(),
+                             "protect pragma writes one value against two of "
+                             "the names that designate a key of the "
+                             "data_keyowner in effect",
+                             1, "34.5.10"));
+}
+
 }  // namespace

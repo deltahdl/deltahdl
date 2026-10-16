@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -6,7 +8,9 @@
 #include "common/source_loc.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_envelope.h"
+#include "preprocessor/protect_input_line.h"
 #include "preprocessor/protect_license.h"
+#include "preprocessor/protect_pragma_line.h"
 
 namespace delta {
 namespace {
@@ -60,21 +64,63 @@ void Preprocessor::ApplyLicense(const PragmaKeywordExpression& expr,
     runtime_licenses_.push_back({std::move(license), loc});
     return;
   }
-  // §34.5.28.2 asks its question before the decrypted text is processed: the
-  // library is loaded, its entry function called with the feature string, and
-  // the value it returns compared with the match value.
+  // RecoveredTextLicensed asked about this one before the text was processed.
+  const std::pair<uint32_t, uint32_t> kAt{loc.file_id, loc.line};
+  if (std::find(asked_licence_lines_.begin(), asked_licence_lines_.end(),
+                kAt) != asked_licence_lines_.end()) {
+    return;
+  }
+  if (AskDecryptLicense(license, loc)) return;
+  if (decryption_refused_depth_ == 0) {
+    decryption_refused_depth_ = protect_envelopes_.DecryptionEnvelopeDepth();
+  }
+}
+
+// §34.5.28.2: the library is loaded, its entry function called with the
+// feature string, and the value it returns compared with the match value.
+bool Preprocessor::AskDecryptLicense(const ProtectLicense& license,
+                                     SourceLoc loc) {
   ProtectLicenseAnswer answer;
   if (config_.ask_license) {
     answer = config_.ask_license(license);
   } else {
     answer.why_not_called = "this reading loads no library";
   }
-  if (ProtectLicenseGranted(license, answer)) return;
-  diag_.Error(loc, ProtectLicenseRefusal(expr.keyword, license, answer),
+  if (ProtectLicenseGranted(license, answer)) return true;
+  diag_.Error(loc,
+              ProtectLicenseRefusal(kDecryptLicenseKeyword, license, answer),
               Subclause("34.5.28.2"));
-  if (decryption_refused_depth_ == 0) {
-    decryption_refused_depth_ = protect_envelopes_.DecryptionEnvelopeDepth();
+  return false;
+}
+
+// A model sealed inside this one carries licences of its own, which are asked
+// about when its own text is recovered, so the lines between its delimiters
+// are passed over here.
+bool Preprocessor::RecoveredTextLicensed(std::string_view cleartext,
+                                         uint32_t block_id) {
+  bool granted = true;
+  int sealed_inside = 0;
+  uint32_t line_num = 0;
+  for (std::string_view line : SplitLines(cleartext)) {
+    ++line_num;
+    std::string_view body;
+    if (!ProtectPragmaLine(line, &body)) continue;
+    for (const ListedKeyword& listed : TopLevelKeywords(body)) {
+      if (listed.name == kBeginDecryptionKeyword) {
+        ++sealed_inside;
+      } else if (listed.name == kEndDecryptionKeyword) {
+        --sealed_inside;
+      } else if (sealed_inside == 0 && listed.name == kDecryptLicenseKeyword) {
+        ProtectLicense license = ParseProtectLicense(listed.value);
+        if (!license.stated) continue;
+        asked_licence_lines_.emplace_back(block_id, line_num);
+        if (!AskDecryptLicense(license, SourceLoc{block_id, line_num, 1})) {
+          granted = false;
+        }
+      }
+    }
   }
+  return granted;
 }
 
 }  // namespace delta

@@ -29,6 +29,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -37,6 +38,7 @@
 #include "helpers_protect_keys.h"
 #include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
+#include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
 
@@ -182,6 +184,42 @@ TEST(ProtectDataDecryptKeyDescription,
   std::string read = Preprocess(envelope, f, config);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(read.find(kSealedDesign), std::string::npos) << read;
+}
+
+// The line of `envelope` beneath the expression `keyword` writes standing
+// alone, which is where §34.5.15 and §34.5.22 put a block, the search starting
+// at `from`.
+std::string LineBeneath(std::string_view envelope, std::string_view keyword,
+                        size_t from = 0) {
+  std::string opening = "`pragma protect ";
+  opening.append(keyword).append("\n");
+  size_t at = envelope.find(opening, from);
+  if (at == std::string_view::npos) return {};
+  size_t starts = at + opening.size();
+  return std::string(
+      envelope.substr(starts, envelope.find('\n', starts) - starts));
+}
+
+// §34.5.14.2 lets the author make the key that opens the data and write it on
+// the line beneath the keyword: the data block is encrypted under that key and
+// the key block carries it, and neither line goes into the data block.
+TEST(ProtectDataDecryptKeyDescription, AKeyTheAuthorMadeSealsTheData) {
+  constexpr std::string_view kAuthorsKey = "the-authors-own-data-key";
+  std::string region = "`pragma protect begin\n";
+  region.append(Writes("key_keyowner", kProvider));
+  region.append(Writes("key_keyname", kBlockKeyName));
+  region.append("`pragma protect data_decrypt_key\n");
+  region.append(EncodeProtectValue(kAuthorsKey, DefaultProtectEncoding()));
+  region.append("\n").append(kSealedDesign).append("`pragma protect end\n");
+  std::string envelope = EncryptEnvelopes(region, {}, TheBlockKey());
+  ASSERT_NE(envelope.find("`pragma protect key_block"), std::string::npos)
+      << envelope;
+  std::string recovered;
+  ASSERT_TRUE(DecryptProtectedRegion(LineBeneath(envelope, "data_block"),
+                                     kAuthorsKey, &recovered))
+      << envelope;
+  EXPECT_NE(recovered.find(kSealedDesign), std::string::npos) << recovered;
+  EXPECT_EQ(recovered.find("data_decrypt_key"), std::string::npos) << recovered;
 }
 
 }  // namespace

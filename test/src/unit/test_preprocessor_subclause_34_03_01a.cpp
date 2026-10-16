@@ -42,8 +42,10 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_envelope.h"
+#include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
 
 using namespace delta;
@@ -547,6 +549,83 @@ TEST(EnvelopeEncryption, AnEnvelopeFormedHereOpensAgainUnderTheSameKey) {
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(Holds(run.text, "initial result = 42;"));
   EXPECT_FALSE(Holds(run.text, "data_block"));
+}
+
+// §34.3.1 has each encryption envelope replaced by a decryption envelope. A
+// region the run holds no key for cannot be, so it goes back as it was
+// written, and the run is told at the line the region opened on rather than
+// handed the cleartext as though it were encrypted output.
+TEST(EnvelopeEncryption, ARegionWithNoKeyIsReportedWhereItOpens) {
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  const std::string kSource =
+      "module m;\n"
+      "`pragma protect begin\n"
+      "  initial x = 1;\n"
+      "`pragma protect end\n"
+      "endmodule\n";
+  std::string out = EncryptEnvelopes(kSource, "", ProtectKeyList(), &diag,
+                                     mgr.AddFile("<test>", kSource));
+  EXPECT_EQ(out, kSource);
+  EXPECT_TRUE(ReportedError(diag.Diagnostics(),
+                            "protect pragma encryption envelope has no key to "
+                            "be encrypted under, so it is written out "
+                            "unencrypted",
+                            2, "34.3.1"));
+}
+
+// §34.4 lets the scope of protect directives cross file boundaries, so one run
+// encrypting two texts reads the names the first wrote into a region the second
+// opens, and a region opened in one text closes in the next.
+TEST(EnvelopeEncryption, TheKeywordScopeCarriesFromOneTextToTheNext) {
+  ProtectKeyList keys;
+  keys.Add({"acme", "k1", "acme-key-one"});
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  EnvelopeEncryptor encryptor("", keys, &diag);
+  const std::string kNames =
+      "`pragma protect data_keyowner=\"acme\", data_keyname=\"k1\"\n";
+  const std::string kRegion =
+      "`pragma protect begin\n  initial secret = 1;\n`pragma protect end\n";
+  std::string first = encryptor.Encrypt(kNames, mgr.AddFile("a.sv", kNames));
+  std::string second = encryptor.Encrypt(kRegion, mgr.AddFile("b.sv", kRegion));
+  EXPECT_EQ(first, kNames);
+  EXPECT_NE(second.find("`pragma protect data_block\n"), std::string::npos)
+      << second;
+  EXPECT_EQ(second.find("initial secret = 1;"), std::string::npos) << second;
+  EXPECT_EQ(encryptor.Finish(), "");
+  EXPECT_FALSE(diag.HasErrors());
+}
+
+// The same run with the region opened at the end of one text and closed in the
+// next: the envelope is written out with the text it closes in, and nothing of
+// it is left over when the run finishes.
+TEST(EnvelopeEncryption, ARegionOpenedInOneTextClosesInTheNext) {
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  EnvelopeEncryptor encryptor("exchange", ProtectKeyList(), &diag);
+  const std::string kOpens = "`pragma protect begin\n  initial secret = 1;\n";
+  const std::string kCloses =
+      "`pragma protect end\nmodule after_m; endmodule\n";
+  std::string first = encryptor.Encrypt(kOpens, mgr.AddFile("a.sv", kOpens));
+  std::string second = encryptor.Encrypt(kCloses, mgr.AddFile("b.sv", kCloses));
+  EXPECT_EQ(first, "");
+  EXPECT_NE(second.find("`pragma protect begin_protected"), std::string::npos)
+      << second;
+  EXPECT_EQ(second.find("initial secret = 1;"), std::string::npos) << second;
+  EXPECT_NE(second.find("module after_m; endmodule\n"), std::string::npos);
+  EXPECT_EQ(encryptor.Finish(), "");
+}
+
+// A region the last text leaves open goes back as it was written when the run
+// finishes.
+TEST(EnvelopeEncryption, ARegionLeftOpenGoesBackWhenTheRunFinishes) {
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  EnvelopeEncryptor encryptor("exchange", ProtectKeyList(), &diag);
+  const std::string kOpens = "`pragma protect begin\n  initial secret = 1;\n";
+  EXPECT_EQ(encryptor.Encrypt(kOpens, mgr.AddFile("a.sv", kOpens)), "");
+  EXPECT_EQ(encryptor.Finish(), kOpens);
 }
 
 }  // namespace

@@ -129,7 +129,7 @@ std::string ProtectDigestDecryptionContent(
     text.append(
         ProtectEncodedValueDirective(encoding, digest.decrypt_key.size()));
     text.append(ProtectDigestDecryptKeyDirective(
-        EncodeProtectBlock(digest.decrypt_key, encoding)));
+        EncodeProtectValue(digest.decrypt_key, encoding)));
   }
   return text;
 }

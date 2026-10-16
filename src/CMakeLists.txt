@@ -25,6 +25,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     preprocessor/protect_des.cpp
     preprocessor/protect_digest.cpp
     preprocessor/protect_digest_algorithms.cpp
+    preprocessor/protect_designation_reports.cpp
     preprocessor/protect_digest_block.cpp
     preprocessor/protect_digest_key.cpp
     preprocessor/protect_encoding.cpp

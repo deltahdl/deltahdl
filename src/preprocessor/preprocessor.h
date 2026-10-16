@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -418,6 +419,11 @@ class Preprocessor {
   // envelope's decryption refused (§34.5.28.2). A runtime_license met there is
   // recorded for the run that executes the model (§34.5.29.2).
   void ApplyLicense(const PragmaKeywordExpression& expr, SourceLoc loc);
+  // §34.5.28.2 asks before the decrypted text is processed: every
+  // decrypt_license the recovered `cleartext` writes for its own model is asked
+  // about first, each refusal reported at its line of `block_id`.
+  bool RecoveredTextLicensed(std::string_view cleartext, uint32_t block_id);
+  bool AskDecryptLicense(const ProtectLicense& license, SourceLoc loc);
   // Finishes the run of pragma expressions gathered for the block a decryption
   // envelope carries. §34.5.4.2 has the expression closing such an envelope
   // mark where that run ends and state that what it holds suffices to open the
@@ -493,6 +499,16 @@ class Preprocessor {
   // of the envelope it arrived in.
   void ReadProtectDataBlock(std::string_view block, SourceLoc loc, int depth,
                             std::string& output);
+  // §34.3.2 has decryption envelopes in a recovered text decrypted after their
+  // enclosing envelope is replaced, so a data block's text is held here until
+  // that envelope's end_protected and only then read (ReadRecoveredText).
+  struct RecoveredText {
+    std::string cleartext;
+    uint32_t block_id;
+    int depth;
+  };
+  std::optional<RecoveredText> recovered_text_;
+  void ReadRecoveredText(std::string& output);
   // Takes `line` as the encoded value announced by a key_public_key expression
   // on the line before it, and says whether it did. A line taken this way is
   // the designation of a key rather than text of the design, so the caller
@@ -816,6 +832,9 @@ class Preprocessor {
   // recovers nothing into the output, and the refusal lapses once the envelope
   // it was met in closes.
   size_t decryption_refused_depth_ = 0;
+  // The file and line of each decrypt_license RecoveredTextLicensed asked
+  // about already, which ApplyLicense does not ask about a second time.
+  std::vector<std::pair<uint32_t, uint32_t>> asked_licence_lines_;
   // The designations the source text has written for the keys of the entities
   // it names. They are unique for the entity they are written under, so they
   // accumulate across the whole compilation input alongside the keyword values

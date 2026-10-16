@@ -550,18 +550,45 @@ TEST(ProtectBeginEncryptionOutput, OnlyTheDelimitingWordChangesOnItsLine) {
   EXPECT_TRUE(Holds(run.text, kTransformed));
 }
 
-// The other side of the same line. An expression written after the delimiter
-// belongs to the list the delimiter belongs to, so it is carried onto the
-// produced directive on the side it was written on, and the replacement reaches
-// only the word between the two.
-TEST(ProtectBeginEncryptionOutput, ExpressionsAfterTheDelimiterAreCarried) {
+// The other side of the same line. §34.2 makes an expression written after the
+// opening word a content keyword of the region, so it is the region's rather
+// than the envelope's: the produced directive carries the replacement alone,
+// and a comment written there is output where §34.5.30 has a region's comment
+// output, in the clear ahead of the block.
+TEST(ProtectBeginEncryptionOutput, ExpressionsAfterTheWordAreTheRegions) {
   EncryptionRun run(
       "`pragma protect begin, comment=\"the region below\"\n"
       "  initial result = 42;\n"
       "`pragma protect end\n");
-  constexpr std::string_view kTransformed =
-      "`pragma protect begin_protected, comment=\"the region below\"\n";
-  EXPECT_TRUE(Holds(run.text, kTransformed));
+  EXPECT_TRUE(Holds(run.text, "`pragma protect begin_protected\n")) << run.text;
+  EXPECT_TRUE(Holds(run.text, "`pragma protect comment=\"the region below\"\n"))
+      << run.text;
+}
+
+// §34.5.28.2 and §34.5.29.2 have a licence between the delimiters encrypted
+// like the rest of the region, and §34.2 makes an expression after the opening
+// word, or ahead of the closing one, one of the region's. A licence written on
+// either delimiting directive therefore goes into the block and appears nowhere
+// in the clear.
+TEST(ProtectBeginEncryptionOutput, ALicenceOnADelimitingLineIsEncrypted) {
+  constexpr std::string_view kRuntime =
+      "runtime_license=(library=\"lic.so\",entry=\"chk\",feature=\"run\")";
+  constexpr std::string_view kDecrypt =
+      "decrypt_license=(library=\"lic.so\",entry=\"chk\",feature=\"open\")";
+  std::string src = "`pragma protect begin, ";
+  src.append(kRuntime).append("\n  initial result = 42;\n");
+  src.append("`pragma protect ").append(kDecrypt).append(", end\n");
+  EncryptionRun run(src);
+  EXPECT_FALSE(Holds(run.text, "_license")) << run.text;
+  constexpr std::string_view kBlockLine = "`pragma protect data_block\n";
+  size_t at = run.text.find(kBlockLine);
+  ASSERT_NE(at, std::string::npos) << run.text;
+  size_t from = at + kBlockLine.size();
+  std::string block = run.text.substr(from, run.text.find('\n', from) - from);
+  std::string recovered;
+  ASSERT_TRUE(DecryptProtectedRegion(block, kAuthorKey, &recovered));
+  EXPECT_TRUE(Holds(recovered, kRuntime)) << recovered;
+  EXPECT_TRUE(Holds(recovered, kDecrypt)) << recovered;
 }
 
 // The one thing written after the delimiter that is not carried across, and the

@@ -47,6 +47,8 @@
 #include "common/source_mgr.h"
 #include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
+#include "preprocessor/protect_digest_block.h"
+#include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_processing.h"
 
 using namespace delta;
@@ -359,6 +361,32 @@ TEST(EnvelopeDecryption, AMacroInAnEnclosedEnvelopeIsSubstitutedAfterBoth) {
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_TRUE(run.Holds("logic [8-1:0] sealed_bus;"));
   EXPECT_FALSE(run.Holds("`WIDTH"));
+}
+
+// §34.3.2 has an envelope inside a recovered text decrypted after its enclosing
+// envelope has been replaced, so nothing the inner one writes changes what the
+// enclosing one is read under. The inner envelope here ends with the reset this
+// tool writes after every envelope, and the enclosing one states md5 for its
+// digest: the digest after its block is checked under md5, and agrees.
+TEST(EnvelopeDecryption, AnEnclosedEnvelopesResetLeavesTheOuterDigestAlone) {
+  std::string inner = EnvelopeOf("initial sealed_value = 2;\n");
+  ASSERT_NE(inner.find("`pragma protect reset"), std::string::npos) << inner;
+  ProtectEncoding encoding = DefaultProtectEncoding();
+  std::string outer = "`pragma protect begin_protected\n";
+  outer += "`pragma protect digest_method=\"md5\"\n";
+  outer +=
+      ProtectEncodedValueDirective(encoding, ProtectedRegionBlockSize(inner));
+  outer += kSealedBlockAnnouncement;
+  outer += EncryptProtectedRegion(inner, kAuthorKey) + "\n";
+  ProtectDigestBlockPolicy policy;
+  policy.requested = true;
+  policy.method = "md5";
+  policy.key = std::string(kAuthorKey);
+  outer += ProtectDigestBlockDirectives(inner, policy, encoding);
+  outer += "`pragma protect end_protected\n";
+  ProducedText run(outer, kAuthorKey);
+  EXPECT_FALSE(run.diag.HasErrors()) << run.text;
+  EXPECT_TRUE(run.Holds("initial sealed_value = 2;")) << run.text;
 }
 
 }  // namespace

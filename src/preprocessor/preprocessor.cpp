@@ -896,6 +896,9 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
   // block begun inside a recovered block from being carried out into the text
   // that carried it, this function being what runs such text.
   FinishGatheredProtectBlock(depth, output);
+  // The same of a recovered text whose envelope this text never closed: there
+  // is no end_protected left to wait for.
+  ReadRecoveredText(output);
   return output;
 }
 

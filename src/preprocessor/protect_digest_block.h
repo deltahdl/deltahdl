@@ -70,6 +70,11 @@ struct ProtectDigestBlockPolicy {
   // written beside the key for whatever reads the digest; this implementation
   // offers one cipher, so nothing here selects among ciphers with it.
   std::string key_method;
+  // The cipher the digest is in fact encrypted under: the one key_method names,
+  // or, where it names none, the one the region's data are under (§34.5.17,
+  // §34.5.22). A cipher this implementation does not provide falls back to its
+  // own, as a region's data do.
+  std::string cipher;
   // The name the region gave the key its digest is encrypted with, as the text
   // spelled it and empty where the text spelled none.
   //
@@ -146,9 +151,13 @@ enum class ProtectDigestCheck : uint8_t {
 // two. Two that disagree say either the block carrying the digest or the
 // encrypted data was altered since the input data was encrypted; which of the
 // two it was is not something the comparison can tell, so neither is named.
+//
+// `cipher` names the cipher the digest was encrypted under: §34.5.17 has the
+// digest_key_method in effect name it, and the data's cipher where none does.
 ProtectDigestCheck CheckProtectDigestBlock(std::string_view block,
                                            const ProtectDigestTarget& target,
-                                           std::string_view method);
+                                           std::string_view method,
+                                           std::string_view cipher = {});
 
 // The key that the entity a region named for its digest and the public key one
 // of that entity's keys is select together out of `keys`.

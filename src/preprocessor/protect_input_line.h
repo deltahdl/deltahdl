@@ -61,23 +61,41 @@ struct DelimiterMatch {
 // at a point the standard does not put an end there.
 DelimiterMatch DelimiterOfLine(std::string_view line);
 
-// The directive that delimits a decryption envelope where `line` delimited an
-// encryption one.
+// Whether a block comment stands open at the end of `line`, given whether one
+// stood open at its start. A comment opener inside a string literal or after a
+// one-line comment opens nothing, and the closer ends the comment it is in.
 //
-// Only the word naming the delimiter is transformed, because only that word
-// said which of the two modes the envelope was defined for. Every expression
-// beside it -- who wrote the design, which algorithm and key name were asked
-// for, what a run of it is licensed on -- specified the encryption envelope,
-// and each is written out again exactly as it stands so that it goes on
-// specifying the envelope standing in its place. The line's own leading
-// whitespace and directive text are kept for the same reason.
-//
-// An expression written ahead of the delimiter describes the envelope and an
-// expression written after it describes the enclosed region, so carrying each
-// one across on the side it was written on is what keeps the two apart.
-std::string TransformedDelimiterLine(std::string_view line,
-                                     const DelimiterMatch& delimiter,
-                                     std::string_view replacement);
+// §34.3 has an encrypting tool interpret nothing but the protect directives,
+// and a directive written inside a comment is comment text rather than one, so
+// this is what tells the two apart across the lines of a source text.
+bool BlockCommentOpenAfter(std::string_view line, bool open_at_start);
+
+// The directive that opens a decryption envelope where `line` opened an
+// encryption one. §34.2 makes the expressions ahead of the opening word
+// envelope keywords, which go on describing the envelope, so they are carried
+// across as written with the line's own leading text; the word is replaced; and
+// what follows it, the region's content keywords, is left to the region
+// (ExpressionsBehindDelimiter).
+std::string OpeningDirectiveOf(std::string_view line,
+                               const DelimiterMatch& delimiter,
+                               std::string_view replacement);
+
+// The directive that closes a decryption envelope where `line` closed an
+// encryption one. The expressions ahead of the closing word are content
+// keywords of the region it closes (ExpressionsAheadOfDelimiter), so only the
+// word, replaced, and what follows it are written, up to any comment.
+std::string ClosingDirectiveOf(std::string_view line,
+                               const DelimiterMatch& delimiter,
+                               std::string_view replacement);
+
+// The protect pragma directive writing the expressions `line` writes ahead of
+// its delimiter, and empty where none stand there.
+std::string ExpressionsAheadOfDelimiter(std::string_view line,
+                                        const DelimiterMatch& delimiter);
+
+// The same for the expressions written after the delimiter.
+std::string ExpressionsBehindDelimiter(std::string_view line,
+                                       const DelimiterMatch& delimiter);
 
 // How many previously generated begin_protected-end_protected blocks the
 // reading stands inside.

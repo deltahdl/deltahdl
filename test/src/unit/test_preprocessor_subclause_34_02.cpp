@@ -23,9 +23,12 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_protect_region.h"
 #include "helpers_reported_error.h"
+#include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_envelope.h"
+#include "preprocessor/protect_processing.h"
 
 using namespace delta;
 
@@ -509,6 +512,35 @@ TEST(ProtectedEnvelopeOverview, SplittingASequenceKeepsThePairing) {
   EXPECT_EQ(split.Envelopes().ClosedEnvelopes().size(), 1U);
   EXPECT_EQ(joined.Envelopes().EncryptionEnvelopeDepth(), 0U);
   EXPECT_EQ(split.Envelopes().EncryptionEnvelopeDepth(), 0U);
+}
+
+// The encrypting run reads a directive left to right as a reading does, so the
+// same keyword written twice in one directive ends at the value written last:
+// the name reaching the key is the one written second.
+TEST(ProtectEnvelopeEncryptionOrder, TheLaterOfTwoValuesInOneDirectiveStands) {
+  std::string later = DesignatesTheProvider();
+  later.append("`pragma protect data_keyname=\"no-such-key\", data_keyname=\"");
+  later.append(kKeyName).append("\"\n");
+  EXPECT_TRUE(
+      Holds(Encrypted(later + RegionAround(kSealedDesign)), kBlockOpening));
+  std::string earlier = DesignatesTheProvider();
+  earlier.append("`pragma protect data_keyname=\"");
+  earlier.append(kKeyName).append("\", data_keyname=\"no-such-key\"\n");
+  EXPECT_FALSE(
+      Holds(Encrypted(earlier + RegionAround(kSealedDesign)), kBlockOpening));
+}
+
+// The closing word ends the region where it stands in its directive, so a name
+// written after it describes what follows: the region it closed keeps the key
+// it was under, and the next region is under the name written after the word.
+TEST(ProtectEnvelopeEncryptionOrder, ANameAfterTheClosingWordIsForWhatFollows) {
+  std::string source = ReachesTheKey();
+  source.append("`pragma protect begin\n").append(kSealedDesign);
+  source.append("`pragma protect end, data_keyname=\"no-such-key\"\n");
+  source.append(RegionAround("module next_m; endmodule\n"));
+  std::string written = Encrypted(source);
+  EXPECT_EQ(TimesWritten(written, kBlockOpening), 1U) << written;
+  EXPECT_TRUE(Holds(written, "module next_m; endmodule\n")) << written;
 }
 
 }  // namespace

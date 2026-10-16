@@ -78,10 +78,10 @@ constexpr std::string_view kOtherNotice = "Patent pending, Acme Corp";
 // ask whether an envelope documents anything at all rather than what.
 constexpr std::string_view kAnyDocumenting = "`pragma protect comment";
 
-// The opening of §34.5.9's expression, which is the one directive this
-// subclause allows between the comment and the block: that subclause states the
-// count against the block it counts, so the comment stands ahead of the count
-// rather than between the count and the block.
+// The opening of §34.5.9's expression, which states the count of the block
+// ahead of it. That subclause puts the count prior to the block, and this one
+// puts the comment immediately prior to it, so the count comes first and the
+// comment stands between it and the block.
 constexpr std::string_view kBlockCounting = "`pragma protect encoding=";
 
 // The opening of any protect pragma directive at all, for the reading that asks
@@ -122,10 +122,9 @@ std::string SealedModelDocumenting(std::string_view notice) {
 //
 // This is how standing directly before the data_block is read: not as the
 // comment standing somewhere earlier in the envelope, but as nothing of the
-// envelope's description standing between the two beyond the count §34.5.9 owes
-// the block. A text the directive was not found in comes back whole, so a test
-// asking what separates the two fails on the envelope that never carried the
-// comment at all.
+// envelope's description standing between the two. A text the directive was not
+// found in comes back whole, so a test asking what separates the two fails on
+// the envelope that never carried the comment at all.
 std::string BetweenTheCommentAndTheBlock(const std::string& written,
                                          std::string_view notice) {
   std::string documenting = Documents(notice);
@@ -239,16 +238,20 @@ TEST(ProtectCommentDescription, AParenthesizedListDocumentsNothing) {
 // ---------------------------------------------------------------------------
 
 // The position the subclause names, read as the position it is. The comment
-// stands ahead of §34.5.15's expression, and the only thing the envelope writes
-// between the two is the count §34.5.9 owes that block -- a count that
-// subclause states against the block it counts, so it cannot be lifted over the
-// comment.
+// stands on the line before §34.5.15's expression with nothing between them,
+// and the count §34.5.9 owes the block, which that subclause puts merely prior
+// to it, comes ahead of the comment.
 TEST(ProtectCommentDescription, TheCommentStandsImmediatelyPriorToTheBlock) {
   std::string written = Encrypted(RegionWriting(Documents(kNotice)));
   EXPECT_LT(written.find(Documents(kNotice)), written.find(kBlockOpening));
   std::string between = BetweenTheCommentAndTheBlock(written, kNotice);
-  EXPECT_EQ(TimesWritten(between, kAnyDirective), 1U);
-  EXPECT_TRUE(Holds(between, kBlockCounting));
+  EXPECT_EQ(between, "") << written;
+  size_t comment_at = written.find(Documents(kNotice));
+  ASSERT_GT(comment_at, 1U);
+  size_t line_before = written.rfind('\n', comment_at - 2) + 1;
+  EXPECT_EQ(written.compare(line_before, kBlockCounting.size(), kBlockCounting),
+            0)
+      << written;
 }
 
 // The same position in the envelope that has something to place wrongly.
@@ -263,7 +266,7 @@ TEST(ProtectCommentDescription, TheCommentFollowsTheKeyBlockOfItsEnvelope) {
   EXPECT_LT(written.find("`pragma protect key_block\n"),
             written.find(Documents(kNotice)));
   std::string between = BetweenTheCommentAndTheBlock(written, kNotice);
-  EXPECT_EQ(TimesWritten(between, kAnyDirective), 1U);
+  EXPECT_EQ(TimesWritten(between, kAnyDirective), 0U) << written;
 }
 
 // Several comments in one region, each owed its own line. §34.5.30.2 asks for
@@ -298,6 +301,21 @@ TEST(ProtectCommentDescription, ACommentBesideAnAuthorIsOutputOnItsOwnLine) {
 // ENCRYPTION INPUT: the pragma itself and the value are not included in the
 // encrypted text, because they would be known cleartext inside the data_block.
 // ---------------------------------------------------------------------------
+
+// The comment is all §34.5.30 holds back from the block. An expression written
+// beside it on its directive is content of the region like any other, so
+// §34.5.1.2 has it encrypted: the comment is output in the clear on its own and
+// the expression beside it goes into the block.
+TEST(ProtectCommentDescription, AnExpressionBesideTheCommentGoesIntoTheBlock) {
+  constexpr std::string_view kLicence =
+      "runtime_license=(library=\"lic.so\",entry=\"chk\",feature=\"f\")";
+  std::string directive = "`pragma protect comment=\"";
+  directive.append(kNotice).append("\", ").append(kLicence).append("\n");
+  std::string written = Encrypted(RegionWriting(directive));
+  EXPECT_TRUE(Holds(written, Documents(kNotice))) << written;
+  EXPECT_FALSE(Holds(written, "runtime_license")) << written;
+  EXPECT_TRUE(Holds(OpenedBlockOf(written), kLicence)) << written;
+}
 
 // The rule observed where it is decided: the block is opened with the key the
 // region was sealed under and read. The design the region held is in there, and

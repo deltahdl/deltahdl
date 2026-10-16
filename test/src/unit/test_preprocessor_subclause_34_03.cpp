@@ -372,6 +372,37 @@ TEST(ProtectedEnvelopeProcessing, TextOutsideAnEnvelopeIsCopiedNotInterpreted) {
   EXPECT_TRUE(Holds(transformed, "  logic [`WIDTH-1:0] bus;\n"));
 }
 
+// A directive written inside a block comment is comment text rather than a
+// directive, and §34.3 has the encrypting half interpret nothing else: the
+// opening word in the comment opens no region, so the closing word after it
+// closes nothing either, and the text is copied as it stands.
+TEST(ProtectedEnvelopeProcessing, AWordInsideABlockCommentOpensNoRegion) {
+  const std::string kSource =
+      "/*\n"
+      "`pragma protect begin\n"
+      "*/\n"
+      "module m; endmodule\n"
+      "`pragma protect end\n";
+  EXPECT_EQ(Encrypted(kSource), kSource);
+}
+
+// The same inside a region: a closing word in a comment closes nothing, so
+// the region runs to the closing word that is a directive, and everything up
+// to it, the comment included, is encrypted.
+TEST(ProtectedEnvelopeProcessing, AWordInsideABlockCommentClosesNoRegion) {
+  std::string transformed = Encrypted(
+      "`pragma protect begin\n"
+      "/* `pragma protect end\n"
+      "`pragma protect end */\n"
+      "  initial result = 42;\n"
+      "`pragma protect end\n");
+  EXPECT_EQ(transformed.find("initial result = 42;"), std::string::npos)
+      << transformed;
+  EXPECT_NE(transformed.find("`pragma protect end_protected"),
+            std::string::npos)
+      << transformed;
+}
+
 // The negative form of the one thing the process does interpret. A delimiter
 // spelled against another pragma_name is not part of a protect pragma
 // directive, so it delimits nothing and the text stays whole.

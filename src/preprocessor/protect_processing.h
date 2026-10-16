@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <string_view>
 
@@ -115,6 +116,37 @@ bool DecryptProtectedRegion(std::string_view data_block, std::string_view key,
                             std::string* cleartext,
                             std::string_view enctype = kBlockEnctype,
                             std::string_view method = {});
+
+// §34.3.1's encrypting mode over the source texts of one run, in order.
+//
+// §34.4 makes the scope of protect pragma directives lexical and lets it cross
+// file boundaries, so what one text leaves in effect -- the keyword values, a
+// region it opened and has not closed, a block comment still open -- is in
+// effect at the start of the next. Each text's output is what stands where its
+// lines were; a region opened in one text and closed in a later one is written
+// out with the later text, where it closes.
+class EnvelopeEncryptor {
+ public:
+  EnvelopeEncryptor(std::string_view exchange_key, const ProtectKeyList& keys,
+                    DiagEngine* diag);
+  ~EnvelopeEncryptor();
+  EnvelopeEncryptor(const EnvelopeEncryptor&) = delete;
+  EnvelopeEncryptor& operator=(const EnvelopeEncryptor&) = delete;
+
+  // The text standing where `source_text`'s envelopes were written, as
+  // EncryptEnvelopes describes it. `source_text` is read by view, so it is to
+  // outlive the run: a region left open at its end still refers to it.
+  std::string Encrypt(std::string_view source_text, uint32_t file_id);
+
+  // What a region the last text left open goes back as, there being no
+  // closing word to replace it at: its opening line and the lines after it,
+  // as written. Empty where every region was closed.
+  std::string Finish();
+
+ private:
+  struct State;
+  std::unique_ptr<State> state_;
+};
 
 // Envelope encryption over a whole source text. Every encryption envelope in
 // `source_text` comes back a decryption envelope carrying its body encrypted

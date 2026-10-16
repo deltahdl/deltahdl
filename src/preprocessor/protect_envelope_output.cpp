@@ -23,7 +23,7 @@ namespace {
 void AppendKeyPublicKey(std::string_view key, const ProtectEncoding& encoding,
                         std::string* text) {
   text->append(ProtectEncodedValueDirective(encoding, key.size()));
-  text->append(ProtectKeyPublicKeyDirective(EncodeProtectBlock(key, encoding)));
+  text->append(ProtectKeyPublicKeyDirective(EncodeProtectValue(key, encoding)));
 }
 
 // §34.5.13 says the same of the public key a region's data are under: the
@@ -36,7 +36,7 @@ void AppendDataPublicKey(std::string_view key, const ProtectEncoding& encoding,
                          std::string* text) {
   text->append(ProtectEncodedValueDirective(encoding, key.size()));
   text->append(
-      ProtectDataPublicKeyDirective(EncodeProtectBlock(key, encoding)));
+      ProtectDataPublicKeyDirective(EncodeProtectValue(key, encoding)));
 }
 
 // §34.5.19 says the same of the public key a region's digest is under: the
@@ -49,7 +49,7 @@ void AppendDigestPublicKey(std::string_view key,
                            const ProtectEncoding& encoding, std::string* text) {
   text->append(ProtectEncodedValueDirective(encoding, key.size()));
   text->append(
-      ProtectDigestPublicKeyDirective(EncodeProtectBlock(key, encoding)));
+      ProtectDigestPublicKeyDirective(EncodeProtectValue(key, encoding)));
 }
 
 // The names and identifiers an envelope states in the clear.
@@ -374,18 +374,17 @@ std::string DecryptionEnvelopeText(const EncryptionEnvelope& envelope,
   text.append(how.key_blocks.directives);
   // §34.5.30 has the entire comment including the beginning pragma output in
   // cleartext immediately prior to the data block of the begin-end it was found
-  // in. It is written here, after everything else describing the envelope,
-  // because the one expression it may not be separated from the block by is the
-  // count on the line below: §34.5.9 states that count against the block it
-  // counts, so the comment stands ahead of the count rather than between the
-  // two.
-  text.append(envelope.comment_directives);
+  // in. §34.5.9 puts the count merely prior to the block, so the count comes
+  // first and the comment is written last, on the line the block's expression
+  // follows.
+  //
   // §34.5.9 has an encrypting tool state, against the bytes subkeyword, how
   // much data the block about to be written stands for. The count is of the
   // block before any of the encoding was applied to it, so it is taken from
   // what goes into the writing rather than from the characters that come out.
   text.append(ProtectEncodedValueDirective(
       encodings.blocks, ProtectedRegionBlockSize(envelope.body, block_method)));
+  text.append(envelope.comment_directives);
   // §34.5.15.1 spells the expression as the keyword standing alone, and
   // §34.5.15.2 has it announce a data block starting on the line after it.
   // The block is therefore written beneath the keyword rather than

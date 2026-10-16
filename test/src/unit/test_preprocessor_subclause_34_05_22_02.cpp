@@ -75,6 +75,7 @@
 #include "preprocessor/protect_digest.h"
 #include "preprocessor/protect_digest_block.h"
 #include "preprocessor/protect_encoding.h"
+#include "preprocessor/protect_key_method.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
 
@@ -281,6 +282,32 @@ TEST(ProtectDigestBlockEncryptionOutput, EachBlockGeneratedGetsItsOwnDigest) {
   EXPECT_EQ(BlocksOf(TwoKeyBlockEnvelope(kDigestBlockLine)),
             (std::vector<std::string>{"key", "digest", "key", "digest", "data",
                                       "digest"}));
+}
+
+// §34.5.22.2 has the digest encrypted under the cipher digest_key_method
+// names, or under the region's data_method where none is named, with a CBC
+// cipher's initialization vector in front. A region under des-cbc therefore
+// gets a digest that opens under des-cbc, and a reading holding the key finds
+// that it agrees with the design.
+TEST(ProtectDigestBlockEncryptionOutput, TheDigestIsUnderTheRegionsDataCipher) {
+  constexpr std::string_view kDesign = "module vouched_m; endmodule\n";
+  std::string source = "`pragma protect data_method=\"des-cbc\"\n";
+  source.append("`pragma protect digest_block\n`pragma protect begin\n");
+  source.append(kDesign).append("`pragma protect end\n");
+  std::string envelope = EncryptEnvelopes(source, kEncodingExchangeKey);
+  std::string after_data =
+      envelope.substr(envelope.find(kEncodingBlockOpening));
+  std::string digest_block;
+  ASSERT_TRUE(DecodeProtectBlock(BlockLinesAfter(after_data, kDigestBlockLine),
+                                 TheScheme().enctype, &digest_block))
+      << envelope;
+  std::string carried;
+  ASSERT_TRUE(DecryptProtectedBlock(digest_block, kEncodingExchangeKey,
+                                    &carried, kDesCbcMethod))
+      << envelope;
+  EXPECT_EQ(carried, DigestOf(kDesign));
+  ReadEnvelope run(envelope);
+  EXPECT_EQ(run.DigestCheck(), ProtectDigestCheck::kMatched);
 }
 
 // The same region asking for no digest, which is what makes the case above

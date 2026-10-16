@@ -296,6 +296,15 @@ std::string EncodeProtectBlock(std::string_view bytes,
   return {};
 }
 
+std::string EncodeProtectValue(std::string_view bytes,
+                               const ProtectEncoding& encoding) {
+  if (encoding.enctype == kBase64Enctype) return EncodeBase64(bytes);
+  if (encoding.enctype == kBlockEnctype) {
+    return EncodeProtectBlockAlphabet(bytes);
+  }
+  return EncodeProtectBlock(bytes, encoding);
+}
+
 // The two line-oriented schemes are handed the text as it stands, a line
 // meaning something to each of them, and the identity transformation is handed
 // it as it stands because there every byte is data. base64 is too, its reading

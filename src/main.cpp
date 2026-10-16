@@ -552,7 +552,7 @@ int RunOnDeepStack(const std::function<int()>& run) {
 // output, one source after another, which is what lets an author redirect it
 // into the file they mean to ship.
 //
-// The engine the run already holds is handed to EncryptEnvelopes, so the four
+// The engine the run already holds is handed to the encryptor, so the four
 // conditions §34.5.1, §34.5.15 and §34.5.27 make an error in an input file are
 // printed and decide the status. The transformation reads each text to its end
 // whatever it found, so a breach costs the report rather than the text, and the
@@ -560,13 +560,18 @@ int RunOnDeepStack(const std::function<int()>& run) {
 int RunEnvelopeEncryption(const delta::CliOptions& opts,
                           delta::SourceManager& src_mgr,
                           delta::DiagEngine& diag) {
+  // §34.4 lets the scope of the protect directives cross file boundaries, so
+  // one encryptor reads every source in turn, and the source manager holds each
+  // text for as long as a region left open in it may still refer to it.
+  delta::EnvelopeEncryptor encryptor(opts.protect.exchange_key,
+                                     opts.protect.keys, &diag);
   for (const auto& path : opts.source_files) {
     std::optional<std::string> content = delta::ReadSource(path);
     if (!content) return 1;
     auto file_id = src_mgr.AddFile(path, *content);
-    std::cout << delta::EncryptEnvelopes(*content, opts.protect.exchange_key,
-                                         opts.protect.keys, &diag, file_id);
+    std::cout << encryptor.Encrypt(src_mgr.FileContent(file_id), file_id);
   }
+  std::cout << encryptor.Finish();
   return diag.HasErrors() ? 1 : 0;
 }
 

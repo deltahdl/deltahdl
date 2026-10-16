@@ -75,19 +75,83 @@ DelimiterMatch DelimiterOfLine(std::string_view line) {
   return {EnvelopeDelimiter::kNone, {}};
 }
 
-std::string TransformedDelimiterLine(std::string_view line,
-                                     const DelimiterMatch& delimiter,
-                                     std::string_view replacement) {
+bool BlockCommentOpenAfter(std::string_view line, bool open_at_start) {
+  bool open = open_at_start;
+  size_t i = 0;
+  while (i < line.size()) {
+    if (open) {
+      if (line.compare(i, 2, "*/") == 0) {
+        open = false;
+        i += 2;
+      } else {
+        ++i;
+      }
+    } else if (line[i] == '"') {
+      i = SkipStringValue(line, i);
+    } else if (StartsLineComment(line, i)) {
+      break;
+    } else if (line.compare(i, 2, "/*") == 0) {
+      open = true;
+      i += 2;
+    } else {
+      ++i;
+    }
+  }
+  return open;
+}
+
+std::string OpeningDirectiveOf(std::string_view line,
+                               const DelimiterMatch& delimiter,
+                               std::string_view replacement) {
   auto at = static_cast<size_t>(delimiter.keyword.data() - line.data());
   std::string transformed(line.substr(0, at));
   transformed.append(replacement);
-  transformed.append(
-      ExpressionsAfterDelimiter(line.substr(at + delimiter.keyword.size())));
   // The trimming takes the line's terminator with it, and the last line of a
   // source text need not have had one. What follows this line either way is a
   // directive of its own.
   transformed.push_back('\n');
   return transformed;
+}
+
+std::string ClosingDirectiveOf(std::string_view line,
+                               const DelimiterMatch& delimiter,
+                               std::string_view replacement) {
+  std::string_view body;
+  ProtectPragmaLine(line, &body);
+  auto opens = static_cast<size_t>(body.data() - line.data());
+  auto at = static_cast<size_t>(delimiter.keyword.data() - line.data());
+  std::string transformed(line.substr(0, opens));
+  transformed.append(replacement);
+  transformed.append(
+      ExpressionsAfterDelimiter(line.substr(at + delimiter.keyword.size())));
+  transformed.push_back('\n');
+  return transformed;
+}
+
+// The expressions of `line`'s list standing on one side of its delimiter.
+static std::string ExpressionsBesideDelimiter(std::string_view line,
+                                              const DelimiterMatch& delimiter,
+                                              bool ahead) {
+  std::string_view body;
+  ProtectPragmaLine(line, &body);
+  std::vector<std::string_view> expressions;
+  for (const ListedKeyword& listed : TopLevelKeywords(body)) {
+    if (listed.name.data() == delimiter.keyword.data()) continue;
+    if ((listed.name.data() < delimiter.keyword.data()) == ahead) {
+      expressions.push_back(ListedExpressionText(listed));
+    }
+  }
+  return ProtectDirectiveWriting(expressions);
+}
+
+std::string ExpressionsAheadOfDelimiter(std::string_view line,
+                                        const DelimiterMatch& delimiter) {
+  return ExpressionsBesideDelimiter(line, delimiter, true);
+}
+
+std::string ExpressionsBehindDelimiter(std::string_view line,
+                                       const DelimiterMatch& delimiter) {
+  return ExpressionsBesideDelimiter(line, delimiter, false);
 }
 
 bool PreviouslyProtectedBlock::Contains(std::string_view line) {

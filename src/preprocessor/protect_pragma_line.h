@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -137,5 +139,28 @@ bool NamesBareKeyword(std::string_view line, std::string_view keyword);
 // beneath it is read against NamesBareKeyword above, and §34.5.22's keyword is
 // read against both, one predicate for each of the two things it does.
 bool NamesKeyword(std::string_view line, std::string_view keyword);
+
+// The text of the expression `listed` stands for on its list: its name, and,
+// where one was written, the '=' and the value after it, as the directive
+// spelled them. `listed` is one TopLevelKeywords returned, its views pointing
+// into the one body.
+std::string_view ListedExpressionText(const ListedKeyword& listed);
+
+// A protect pragma directive line writing `expressions` in order, separated by
+// commas; empty where there are none, there being no directive to write.
+std::string ProtectDirectiveWriting(
+    const std::vector<std::string_view>& expressions);
+
+// True when `line` is §22.11.1's reset pragma naming protect among its
+// pragma_keywords, or its resetall pragma. Either restores every protect
+// keyword to its default, as §34.5.31.2's own keyword does.
+bool ResetsProtectPragmaLine(std::string_view line);
+
+// The protect pragma directive holding only the expressions `line` writes after
+// the last reset keyword on its list, written standing alone as §34.5.31.1
+// defines it; nullopt where the line is no protect directive or names no such
+// reset. §34.2 reads a directive's expressions left to right, so what stands
+// ahead of that reset is undone by it and only what follows it remains.
+std::optional<std::string> ProtectLineAfterLastReset(std::string_view line);
 
 }  // namespace delta
