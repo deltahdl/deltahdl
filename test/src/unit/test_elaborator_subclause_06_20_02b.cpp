@@ -383,4 +383,67 @@ TEST(TypedefParameterType, TypedefRangeNamingAPackageParameterSizesTheCut) {
   EXPECT_EQ(ParamValue(design, "Q"), 15);
 }
 
+// §6.20.2 with §8.23: a class body's parameter may take a typedef the class
+// declares, so `t P = 12'hFFF` on the class's `typedef bit [3:0] t` is 15
+// through `C::P`. The class's typedef was recorded only as `C::t` and looked
+// up as the bare `t`, so the value was left uncut, 4095.
+TEST(TypedefParameterType, ClassBodyParameterOfTheClassTypedefIsCut) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  typedef int u;\n"
+      "  typedef bit [3:0] t;\n"
+      "  localparam t P = 12'hFFF;\n"
+      "endclass\n"
+      "module m;\n"
+      "  localparam int Q = C::P;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "Q"), 15);
+}
+
+// The same read through a specialization, `D#()::P`, which folds the body
+// parameters again under the specialization's values; and the class's `t`
+// is taken over a compilation-unit typedef of the same name, a byte, under
+// which the bits of 12'hFFF would read -1.
+TEST(TypedefParameterType, SpecializationReadsTheClassTypedefOverTheUnits) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "typedef byte t;\n"
+      "class D #(int W = 1);\n"
+      "  typedef bit [3:0] t;\n"
+      "  localparam t P = 12'hFFF;\n"
+      "endclass\n"
+      "module m;\n"
+      "  localparam int Q = D#()::P;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "Q"), 15);
+}
+
+// The same for a class declared inside a module (§8.26), whose typedefs were
+// keyed only after its parameters had been folded: `logic [C::P-1:0] v` after
+// the class is fifteen bits wide, where the uncut 4095 made it 4095.
+TEST(TypedefParameterType, ModuleClassParameterOfTheClassTypedefIsCut) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  class C;\n"
+      "    typedef bit [3:0] t;\n"
+      "    localparam t P = 12'hFFF;\n"
+      "  endclass\n"
+      "  logic [C::P-1:0] v;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* v = FindVar(design, "m", "v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->width, 15u);
+}
+
 }  // namespace

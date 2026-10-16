@@ -5,6 +5,7 @@
 
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
@@ -143,7 +144,8 @@ static SpecializationArg FoldUnderSpecialization(const Expr* expr,
   }
   for (const auto* m : decl->members) {
     if (m->kind != ClassMemberKind::kProperty || !m->is_param) continue;
-    auto v = FoldClassParamDefault(m->init_expr, &m->data_type, values);
+    DataType type = InClassScope(m->data_type, *decl);
+    auto v = FoldClassParamDefault(m->init_expr, &type, values);
     if (m->name == target) return Answer({false, v});
     Bind(values, m->name, v);
   }

@@ -496,6 +496,14 @@ void Elaborator::RegisterCuScopeItems() {
                    cu_param_scope_,
                    diag_,
                    arena_};
+  // §26.2 (printed page 808) bars a package from referring to the
+  // compilation unit's items, while §26.3 lets the unit's own parameters
+  // reference a package's, so the packages' typedefs and parameters are
+  // registered ahead of the walk that folds the unit's: `parameter int X =
+  // p::P` reads the "p.P" key RegisterPackageParams records.
+  RegisterPackageTypedefs(unit_, typedefs_, td_array_dims_, arena_);
+  MarkPackageStagedArrays(unit_);
+  RegisterPackageParams(unit_, cu_param_scope_, arena_);
   for (auto* item : unit_->cu_items) {
     ClassifyCuScopeItem(item, cu_scope);
     // §7.4.4 (printed page 155) with §6.18: a typedef's unpacked dimensions
@@ -518,12 +526,9 @@ void Elaborator::RegisterCuScopeItems() {
   RegisterCuClasses(unit_, class_names_, cu_scope_names_,
                     parameterized_class_names_);
   RegisterAnonymousProgramNames(unit_, anonymous_program_names_);
-  // The packages' and classes' typedefs are registered ahead of their
-  // parameters, whose values are converted to the types those name.
-  RegisterPackageTypedefs(unit_, typedefs_, td_array_dims_, arena_);
-  MarkPackageStagedArrays(unit_);
+  // The classes' typedefs are registered ahead of their parameters, whose
+  // values are converted to the types those name.
   RegisterClassTypedefs(unit_, typedefs_, td_array_dims_, arena_);
-  RegisterPackageParams(unit_, cu_param_scope_, arena_);
   RegisterClassParams(unit_, cu_param_scope_, arena_, diag_);
   // §13.3 with §7.2.1: after the two typedef registrations above, which are
   // what give the table the "pkg::T" and "Class::T" names a formal's member

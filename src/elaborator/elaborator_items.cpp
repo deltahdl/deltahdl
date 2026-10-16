@@ -593,16 +593,18 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
 void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
   RecordClassDecl(item, mod, class_names_, parameterized_class_names_);
   if (item->class_decl == nullptr) return;
-  RegisterModuleClassParams(item->class_decl, BuildParamScope(mod),
-                            cu_param_scope_, arena_, diag_);
   // §8.23: the class's typedefs are reached through its name from outside
   // the class, `Node::value_t v;` in the module's own procedure, and the
   // "Class::name" key is what the type tables answer such a name by;
   // RegisterClassTypedefs in elaborator_resolve.cpp keys the compilation
   // unit's classes so, and a class of a module had no key at all, so a local
-  // declared with the name was sized as a name nothing could resolve.
+  // declared with the name was sized as a name nothing could resolve. They are
+  // keyed ahead of the class's parameters, whose values are converted to the
+  // types the class's typedefs name (§6.20.2).
   RegisterClassTypedefKeys(item->class_decl, item->class_decl->name, typedefs_,
                            td_array_dims_, arena_);
+  RegisterModuleClassParams(item->class_decl, BuildParamScope(mod),
+                            cu_param_scope_, arena_, diag_);
   // §13.3 with §7.2.1: the class's methods are reached by no item walk, so
   // their inline aggregate formals are resolved here, against the module's
   // typedefs as they stand at the declaration and the class's own (§8.23),

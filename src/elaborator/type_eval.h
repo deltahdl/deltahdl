@@ -13,6 +13,7 @@ struct DataType;
 enum class DataTypeKind : uint8_t;
 class Arena;
 struct PackageDecl;
+struct ClassDecl;
 
 using TypedefMap = std::unordered_map<std::string_view, DataType>;
 
@@ -134,6 +135,13 @@ void RecordTypedef(TypedefMap& typedefs, std::string_view name,
 // "package::name" key and never among the names of a scope importing the
 // package, which may declare one of its own under that name.
 DataType InPackageScope(const DataType& type, const PackageDecl& package);
+
+// §8.23 with §6.18: `type`, as a member of the class `cls` is declared with
+// it, its name written behind the class's scope where it names a typedef the
+// class declares, so it is looked up under the "Class::name" key
+// RegisterClassTypedefs records and never as a typedef of the scope around
+// the class, which may declare one of its own under that name.
+DataType InClassScope(const DataType& type, const ClassDecl& cls);
 
 // The type `dtype` stands for, following each typedef or user-defined nettype
 // name (§6.18, §6.6.7) to the type it was declared with as far as the table

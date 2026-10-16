@@ -13,6 +13,7 @@
 #include "common/arena.h"
 #include "elaborator/std_package.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
@@ -43,15 +44,29 @@ const DataType* FindNamedType(const DataType& dtype,
   return (it != typedefs.end()) ? &it->second : nullptr;
 }
 
+// Whether `type` is a typedef name written with no scope prefix.
+static bool IsBareTypeName(const DataType& type) {
+  return type.kind == DataTypeKind::kNamed && type.scope_name.empty();
+}
+
 DataType InPackageScope(const DataType& type, const PackageDecl& package) {
   DataType scoped = type;
-  if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty()) {
-    return scoped;
-  }
+  if (!IsBareTypeName(type)) return scoped;
   for (const ModuleItem* item : package.items) {
     if (item->kind == ModuleItemKind::kTypedef &&
         item->name == type.type_name) {
       scoped.scope_name = package.name;
+    }
+  }
+  return scoped;
+}
+
+DataType InClassScope(const DataType& type, const ClassDecl& cls) {
+  DataType scoped = type;
+  if (!IsBareTypeName(type)) return scoped;
+  for (const ClassMember* m : cls.members) {
+    if (m->kind == ClassMemberKind::kTypedef && m->name == type.type_name) {
+      scoped.scope_name = cls.name;
     }
   }
   return scoped;

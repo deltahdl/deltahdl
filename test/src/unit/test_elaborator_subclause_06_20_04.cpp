@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
+#include "helpers_param_value.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
 
@@ -564,6 +565,28 @@ TEST(LocalparamElaboration,
   ASSERT_NE(y, nullptr);
   EXPECT_TRUE(y->is_resolved);
   EXPECT_EQ(y->resolved_value, 7);
+}
+
+// §6.20.4 with §6.20.2 and §26.3: a compilation-unit parameter is a
+// localparam whose value may reference a package declared before it, so
+// `parameter int X = p::P` after a package setting P to 4 is constant and 4.
+// The unit's own parameters were classified before any package parameter was
+// recorded, so `p::P` read as no constant, X was reported under §6.20.4 and
+// held no value.
+TEST(LocalparamElaboration, CompilationUnitParameterFromAPackageParameter) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  parameter int P = 4;\n"
+      "endpackage\n"
+      "parameter int X = p::P;\n"
+      "module m;\n"
+      "  localparam int Q = X;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "Q"), 4);
 }
 
 }  // namespace

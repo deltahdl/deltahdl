@@ -16,6 +16,7 @@
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_items_params.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -168,9 +169,10 @@ static void RegisterOneClassParams(ClassParamRegistration& reg) {
                      reg.cls->param_port_unpacked_dims.count(pname) != 0, reg);
   }
   for (const auto* m : reg.cls->members) {
-    if (m->kind == ClassMemberKind::kProperty && m->is_param)
-      RecordClassParam(m->name, m->init_expr, &m->data_type,
-                       !m->unpacked_dims.empty(), reg);
+    if (m->kind != ClassMemberKind::kProperty || !m->is_param) continue;
+    DataType type = InClassScope(m->data_type, *reg.cls);
+    RecordClassParam(m->name, m->init_expr, &type, !m->unpacked_dims.empty(),
+                     reg);
   }
 }
 
