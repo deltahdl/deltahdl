@@ -25,6 +25,14 @@ using TypedefMap = std::unordered_map<std::string_view, DataType>;
 void ResolveNestedAggregateTypes(DataType& dt, const TypedefMap& typedefs,
                                  Arena& arena);
 
+// §7.2 with §8.4: give every member of `dt` whose type names a class in
+// `class_names`, and no typedef, the width of the handle it holds,
+// kClassMemberHandleWidth, which otherwise stays unresolved and is sized as a
+// one-bit vector.
+void SizeClassHandleMembers(
+    DataType& dt, const TypedefMap& typedefs,
+    const std::unordered_set<std::string_view>& class_names);
+
 // §7.2.1 with §6.18: the packed structure or union a declared type stands for,
 // laid out for a member select -- an arena copy of the type itself when the
 // declaration wrote one, or of the one a typedef name resolves to through the
@@ -87,6 +95,11 @@ inline constexpr uint32_t kStringMemberHandleWidth = 64;
 // to the member's elements (DynMemberQueue in
 // src/simulator/dyn_struct_member.h), their count being of no fixed size.
 inline constexpr uint32_t kDynamicMemberHandleWidth = 64;
+
+// §7.2 with §8.4: the width a member of an unpacked structure declared with a
+// class type takes in the structure's packed value, the handle of the object
+// it refers to, as wide as a variable of the class holds.
+inline constexpr uint32_t kClassMemberHandleWidth = 64;
 
 struct StructMember;
 uint32_t EvalStructMemberWidth(const StructMember& m);

@@ -1,12 +1,15 @@
 // Named-type and member-type resolution: FindNamedType, MemberNamedType,
 // NestedAggregateSource and ResolveNestedAggregateTypes, moved out of
 // type_eval.cpp verbatim, for room, once that file reached the source-size
-// gate; LastTypeInChain and ResolvedTypeKind, which follow a chain of names to
-// its type; and RecordTypedef, which enters a typedef into the table.
+// gate; SizeClassHandleMembers, which sizes a member of a class type as the
+// handle it holds; LastTypeInChain and ResolvedTypeKind, which follow a chain
+// of names to its type; and RecordTypedef, which enters a typedef into the
+// table.
 
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -130,6 +133,19 @@ static const DataType* NestedAggregateSource(const StructMember& m,
   bool aggregate = named != nullptr && (named->kind == DataTypeKind::kStruct ||
                                         named->kind == DataTypeKind::kUnion);
   return aggregate ? named : nullptr;
+}
+
+void SizeClassHandleMembers(
+    DataType& dt, const TypedefMap& typedefs,
+    const std::unordered_set<std::string_view>& class_names) {
+  for (StructMember& m : dt.struct_members) {
+    if (m.type_kind != DataTypeKind::kNamed || m.resolved_width != 0 ||
+        !class_names.contains(m.type_name) ||
+        MemberNamedType(m, typedefs) != nullptr) {
+      continue;
+    }
+    m.resolved_width = kClassMemberHandleWidth;
+  }
 }
 
 void ResolveNestedAggregateTypes(DataType& dt, const TypedefMap& typedefs,

@@ -442,6 +442,7 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
     if (taken != nullptr) item->typedef_type = *taken;
   }
   AdoptMemberTypedefDims(item->typedef_type, td_array_dims_);
+  SizeClassHandleMembers(item->typedef_type, typedefs_, class_names_);
   RecordTypedef(typedefs_, item->name, item->typedef_type);
   // §6.18: the dimensions belong to the type the name stands for, so a name
   // written with any of them stands for an aggregate rather than for one

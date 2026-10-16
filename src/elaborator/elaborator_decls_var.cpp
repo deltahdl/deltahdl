@@ -888,6 +888,9 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   // §37.3.3: where the declaration stands, which the variable object reports
   // through vpiLineNo and vpiFile.
   var.loc = item->loc;
+  // §7.2 with §8.4: a structure written in the declaration itself sizes its
+  // members of a class type as the handles they hold, as a typedef's does.
+  SizeClassHandleMembers(item->data_type, typedefs_, class_names_);
   // A packed dimension may reference a parameter (e.g. `logic [W-1:0]`), so the
   // width must be evaluated in the module's parameter scope (10.3.3 / A.2.2.1).
   var.width = EvalTypeWidth(item->data_type, typedefs_, BuildParamScope(mod));

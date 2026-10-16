@@ -606,4 +606,28 @@ TEST(UnpackedStructDynamicMember, AnUnwrittenMemberIsEmptyAndGrowsByMethod) {
   EXPECT_EQ(out, "0\n2 4 1\n");
 }
 
+// §7.2 with §8.4: a member of a class type holds the whole handle of the
+// object stored in it, whether the structure is a typedef's or written in the
+// declaration, so a property is read through it; with one bit of the handle
+// kept, handle 2 read as the null handle and handle 3 as handle 1 (#7229).
+TEST(UnpackedStructClassMember, APropertyIsReadThroughAClassTypedMember) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C; int x; function new(int v); x = v; endfunction endclass\n"
+      "module t;\n"
+      "  typedef struct { int i; C h; } st;\n"
+      "  st s;\n"
+      "  struct { C a; byte b; C c; } u;\n"
+      "  initial begin\n"
+      "    s.h = new(5);\n"
+      "    u.a = new(6);\n"
+      "    u.c = new(7);\n"
+      "    u.b = 8;\n"
+      "    $display(\"%0d %0d %0d %0d\", s.h.x, u.a.x, u.c.x, u.b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "5 6 7 8\n");
+}
+
 }  // namespace
