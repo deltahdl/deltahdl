@@ -529,16 +529,17 @@ TEST(DpiDeclElab, TypedefsOfDifferentTypesDisagree) {
                             8, "35.5.4"));
 }
 
-// A name that resolves to no type in reach is compared by its spelling, which
-// is the one thing known of it, so the same name on both sides agrees.
+// A name that resolves to no typedef in reach -- a type parameter, whose type
+// is the one each instance is given -- is compared by its spelling, which is
+// the one thing known of it there, so the same name on both sides agrees.
 TEST(DpiDeclElab, OneUnresolvedNameOnBothSidesAgrees) {
   ElabFixture f;
   Elaborate(R"(
-    module m;
-      import "DPI-C" function void sv_v(input mystery_t x);
+    module m #(parameter type T = int);
+      import "DPI-C" function void sv_v(input T x);
     endmodule
-    module n;
-      import "DPI-C" function void sv_v(input mystery_t x);
+    module n #(parameter type T = int);
+      import "DPI-C" function void sv_v(input T x);
     endmodule
   )",
             f, "m");
