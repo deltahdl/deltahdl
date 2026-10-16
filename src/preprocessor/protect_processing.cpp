@@ -162,7 +162,7 @@ std::string LeftInTheBlock(std::string_view line) {
   std::vector<std::string_view> kept;
   for (const ListedKeyword& listed : TopLevelKeywords(body)) {
     if (!IsLiftedExpression(listed)) {
-      kept.push_back(ListedExpressionText(listed));
+      kept.push_back(ListedExpressionText(body, listed));
     }
   }
   return ProtectDirectiveWriting(kept);
@@ -653,7 +653,7 @@ void ReportClosedRegion(const RegionKeyReader& in_effect,
                 "encrypted under, so it is written out unencrypted",
                 Subclause("34.3.1"));
   }
-  const uint32_t file_id = opened.file_id;
+  uint32_t file_id = opened.file_id;
   // §34.5.27 has every key block of one envelope encode the same data
   // decryption key data, so a region whose data decryption pragma expressions
   // changed value between two of them is reported rather than left carrying
@@ -705,7 +705,7 @@ bool SetAsideRejectedPragmaLine(std::string_view line, SourceLoc loc,
 
 // What the encrypting half carries from one line to the next, and from one
 // text of the run to the next.
-struct EnvelopeEncryptor::State {
+struct EnvelopeEncryptionState {
   std::string exchange_key;
   ProtectKeyList keys;
   DiagEngine* diag = nullptr;
@@ -727,10 +727,118 @@ struct EnvelopeEncryptor::State {
   bool in_block_comment = false;
 };
 
+namespace {
+
+// §34.3: a line beginning inside a block comment is comment text, and the
+// directive it may spell is no directive, so it is carried as text: back where
+// it stood outside a region, into the region's text inside one. Answers whether
+// the line was one such.
+bool CarriedAsComment(EnvelopeEncryptionState& state, std::string_view line,
+                      std::string* transformed) {
+  const bool kInComment = state.in_block_comment;
+  state.in_block_comment = BlockCommentOpenAfter(line, state.in_block_comment);
+  if (!kInComment) return false;
+  if (state.in_envelope) {
+    state.region.source_body.append(line);
+    state.region.body.append(line);
+  } else {
+    transformed->append(line);
+  }
+  return true;
+}
+
+// §34.5.2.2 has the closing expression state, in the input cleartext, where
+// the region that is to be encrypted stops. The region therefore ends at the
+// line the word is written on rather than at the end of the text or at some
+// later delimiter, so this is where the lines gathered so far become a block
+// and the lines after it go back to being carried across.
+void CloseRegion(EnvelopeEncryptionState& state, std::string_view line,
+                 uint32_t line_num, const DelimiterMatch& delimiter,
+                 std::string* transformed) {
+  ReadIntoRegion(ExpressionsAheadOfDelimiter(line, delimiter), line_num,
+                 &state.in_effect, &state.region);
+  RegionEncryption how = RegionEncryptionFor(
+      state.in_effect, state.region, state.exchange_key, state.keys, line_num);
+  ReportClosedRegion(state.in_effect, how, state.keys, state.diag,
+                     state.region.opened);
+  transformed->append(
+      ClosedRegionText(state.region, state.in_effect, line, delimiter, how));
+  state.in_envelope = false;
+  ReadOutsideRegion(ExpressionsBehindDelimiter(line, delimiter), line_num,
+                    &state.in_effect);
+}
+
+void OpenRegion(EnvelopeEncryptionState& state, std::string_view line,
+                SourceLoc loc, const DelimiterMatch& delimiter) {
+  ReadOutsideRegion(ExpressionsAheadOfDelimiter(line, delimiter), loc.line,
+                    &state.in_effect);
+  state.in_envelope = true;
+  state.region.opening_line = line;
+  state.region.opened = loc;
+  state.region.opening_directive =
+      OpeningDirectiveOf(line, delimiter, kBeginDecryptionKeyword);
+  state.region.source_body.clear();
+  state.region.body.clear();
+  state.region.written_inside = {};
+  // What the region wrote for itself is collected apart from what stands over
+  // it, but the coding scheme is not one of the things collected: it decides
+  // how the region's own lines are read, and the scheme in effect where the
+  // region opens is in effect inside it until the region says otherwise.
+  state.region.written_inside.encoding = state.in_effect.encoding;
+  ReadIntoRegion(ExpressionsBehindDelimiter(line, delimiter), loc.line,
+                 &state.in_effect, &state.region);
+}
+
+// One line of the input, at `loc`.
+void EncryptLine(EnvelopeEncryptionState& state, std::string_view line,
+                 SourceLoc loc, std::string* transformed) {
+  if (CarriedAsComment(state, line, transformed)) return;
+  if (SetAsideRejectedPragmaLine(line, loc, state.in_envelope, state.diag,
+                                 transformed)) {
+    return;
+  }
+  InputLine input =
+      ReadInputLine(line, &state.previously_protected, state.diag, loc);
+  DelimiterMatch delimiter = input.delimiter;
+  // §34.2 makes the expressions after the opening word, and those ahead of the
+  // closing one, content keywords of the region, and the ones on the outer side
+  // of either describe what stands outside it, so each side of a delimiting
+  // line is read where it stands.
+  if (state.in_envelope && delimiter.kind == EnvelopeDelimiter::kEnd) {
+    CloseRegion(state, line, loc.line, delimiter, transformed);
+    return;
+  }
+  if (!state.in_envelope && delimiter.kind == EnvelopeDelimiter::kBegin) {
+    OpenRegion(state, line, loc, delimiter);
+    return;
+  }
+  TakeKeyNamesOutsideProtectedBlock(line, loc.line, input.previously_protected,
+                                    &state.in_effect);
+  if (state.in_envelope) {
+    // §34.5.1 rules out a second opening expression here, this region not
+    // having been closed yet, so a line carrying one is reported before it is
+    // taken as text of the region.
+    ReportNestedRegion(delimiter, state.diag, loc);
+    // §34.5.3 and §34.5.4 have the two expressions delimiting a previously
+    // generated block, and everything between them, encrypted into the block
+    // of the envelope enclosing them. Adding the line unread is what does that:
+    // an already-protected model travels into the larger one as the bytes it is
+    // written with.
+    AppendEnvelopeLine(line, loc.line, input.previously_protected,
+                       &state.region);
+    return;
+  }
+  // Text no encryption envelope contains is carried across as the bytes it was
+  // written with, whatever it says.
+  transformed->append(line);
+}
+
+}  // namespace
+
 EnvelopeEncryptor::EnvelopeEncryptor(std::string_view exchange_key,
                                      const ProtectKeyList& keys,
                                      DiagEngine* diag)
-    : state_(std::make_unique<State>()) {
+    : state_(std::make_unique<EnvelopeEncryptionState>()) {
   state_->exchange_key = std::string(exchange_key);
   state_->keys = keys;
   state_->diag = diag;
@@ -740,7 +848,6 @@ EnvelopeEncryptor::~EnvelopeEncryptor() = default;
 
 std::string EnvelopeEncryptor::Encrypt(std::string_view source_text,
                                        uint32_t file_id) {
-  State& state = *state_;
   std::string transformed;
   // Which line of the input the reading stands on, counted from one as the
   // reports name it. A report about a line of a source description carries the
@@ -749,94 +856,7 @@ std::string EnvelopeEncryptor::Encrypt(std::string_view source_text,
   uint32_t line_num = 0;
   for (std::string_view line : SplitLines(source_text)) {
     ++line_num;
-    SourceLoc loc = LineOf(file_id, line_num);
-    // §34.3: a line beginning inside a block comment is comment text, and the
-    // directive it may spell is no directive, so it is carried as text: back
-    // where it stood outside a region, into the region's text inside one.
-    const bool kInComment = state.in_block_comment;
-    state.in_block_comment =
-        BlockCommentOpenAfter(line, state.in_block_comment);
-    if (kInComment) {
-      if (state.in_envelope) {
-        state.region.source_body.append(line);
-        state.region.body.append(line);
-      } else {
-        transformed.append(line);
-      }
-      continue;
-    }
-    if (SetAsideRejectedPragmaLine(line, loc, state.in_envelope, state.diag,
-                                   &transformed)) {
-      continue;
-    }
-    InputLine input =
-        ReadInputLine(line, &state.previously_protected, state.diag, loc);
-    DelimiterMatch delimiter = input.delimiter;
-    // §34.2 makes the expressions after the opening word, and those ahead of
-    // the closing one, content keywords of the region, and the ones on the
-    // outer side of either describe what stands outside it. Each side of a
-    // delimiting line is therefore read where it stands.
-    const bool kDelimits =
-        (state.in_envelope && delimiter.kind == EnvelopeDelimiter::kEnd) ||
-        (!state.in_envelope && delimiter.kind == EnvelopeDelimiter::kBegin);
-    if (!kDelimits) {
-      TakeKeyNamesOutsideProtectedBlock(
-          line, line_num, input.previously_protected, &state.in_effect);
-    }
-    // §34.5.2.2 has the closing expression state, in the input cleartext, where
-    // the region that is to be encrypted stops. The region therefore ends at
-    // the line the word is written on rather than at the end of the text or at
-    // some later delimiter, so this is where the lines gathered so far become a
-    // block and the lines after it go back to being carried across.
-    if (state.in_envelope && delimiter.kind == EnvelopeDelimiter::kEnd) {
-      ReadIntoRegion(ExpressionsAheadOfDelimiter(line, delimiter), line_num,
-                     &state.in_effect, &state.region);
-      RegionEncryption how =
-          RegionEncryptionFor(state.in_effect, state.region, state.exchange_key,
-                              state.keys, line_num);
-      ReportClosedRegion(state.in_effect, how, state.keys, state.diag,
-                         state.region.opened);
-      transformed.append(ClosedRegionText(state.region, state.in_effect, line,
-                                          delimiter, how));
-      state.in_envelope = false;
-      ReadOutsideRegion(ExpressionsBehindDelimiter(line, delimiter), line_num,
-                        &state.in_effect);
-    } else if (state.in_envelope) {
-      // §34.5.1 rules out a second opening expression here, this region not
-      // having been closed yet, so a line carrying one is reported before it is
-      // taken as text of the region.
-      ReportNestedRegion(delimiter, state.diag, loc);
-      // §34.5.3 and §34.5.4 have the two expressions delimiting a previously
-      // generated block, and everything between them, encrypted into the block
-      // of the envelope enclosing them. Adding the line unread is what does
-      // that: an already-protected model travels into the larger one as the
-      // bytes it is written with.
-      AppendEnvelopeLine(line, line_num, input.previously_protected,
-                         &state.region);
-    } else if (delimiter.kind == EnvelopeDelimiter::kBegin) {
-      ReadOutsideRegion(ExpressionsAheadOfDelimiter(line, delimiter), line_num,
-                        &state.in_effect);
-      state.in_envelope = true;
-      state.region.opening_line = line;
-      state.region.opened = loc;
-      state.region.opening_directive =
-          OpeningDirectiveOf(line, delimiter, kBeginDecryptionKeyword);
-      state.region.source_body.clear();
-      state.region.body.clear();
-      state.region.written_inside = {};
-      // What the region wrote for itself is collected apart from what stands
-      // over it, but the coding scheme is not one of the things collected: it
-      // decides how the region's own lines are read, and the scheme in effect
-      // where the region opens is in effect inside it until the region says
-      // otherwise.
-      state.region.written_inside.encoding = state.in_effect.encoding;
-      ReadIntoRegion(ExpressionsBehindDelimiter(line, delimiter), line_num,
-                     &state.in_effect, &state.region);
-    } else {
-      // Text no encryption envelope contains is carried across as the bytes it
-      // was written with, whatever it says.
-      transformed.append(line);
-    }
+    EncryptLine(*state_, line, LineOf(file_id, line_num), &transformed);
   }
   return transformed;
 }
@@ -845,7 +865,7 @@ std::string EnvelopeEncryptor::Encrypt(std::string_view source_text,
 // nothing was replaced: the opening directive and the lines after it are text
 // of the source like any other, and go back as they stand.
 std::string EnvelopeEncryptor::Finish() {
-  State& state = *state_;
+  EnvelopeEncryptionState& state = *state_;
   if (!state.in_envelope) return {};
   state.in_envelope = false;
   std::string text(state.region.opening_line);

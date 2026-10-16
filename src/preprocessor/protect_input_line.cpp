@@ -118,7 +118,9 @@ std::string ClosingDirectiveOf(std::string_view line,
                                std::string_view replacement) {
   std::string_view body;
   ProtectPragmaLine(line, &body);
-  auto opens = static_cast<size_t>(body.data() - line.data());
+  // The list begins past the space separating it from the pragma's name, which
+  // is kept with the name.
+  auto opens = static_cast<size_t>(TrimLeading(body).data() - line.data());
   auto at = static_cast<size_t>(delimiter.keyword.data() - line.data());
   std::string transformed(line.substr(0, opens));
   transformed.append(replacement);
@@ -138,7 +140,7 @@ static std::string ExpressionsBesideDelimiter(std::string_view line,
   for (const ListedKeyword& listed : TopLevelKeywords(body)) {
     if (listed.name.data() == delimiter.keyword.data()) continue;
     if ((listed.name.data() < delimiter.keyword.data()) == ahead) {
-      expressions.push_back(ListedExpressionText(listed));
+      expressions.push_back(ListedExpressionText(body, listed));
     }
   }
   return ProtectDirectiveWriting(expressions);

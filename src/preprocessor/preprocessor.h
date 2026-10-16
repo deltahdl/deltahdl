@@ -423,6 +423,8 @@ class Preprocessor {
   // decrypt_license the recovered `cleartext` writes for its own model is asked
   // about first, each refusal reported at its line of `block_id`.
   bool RecoveredTextLicensed(std::string_view cleartext, uint32_t block_id);
+  bool LicencesOfDirectiveGranted(std::string_view body, uint32_t block_id,
+                                  uint32_t line_num, int* sealed_inside);
   bool AskDecryptLicense(const ProtectLicense& license, SourceLoc loc);
   // Finishes the run of pragma expressions gathered for the block a decryption
   // envelope carries. §34.5.4.2 has the expression closing such an envelope
@@ -509,6 +511,9 @@ class Preprocessor {
   };
   std::optional<RecoveredText> recovered_text_;
   void ReadRecoveredText(std::string& output);
+  // At the end of a text: a block whose lines ran to it, and a recovered text
+  // whose envelope it never closed, have nothing left to wait for.
+  void FinishProtectedReading(int depth, std::string& output);
   // Takes `line` as the encoded value announced by a key_public_key expression
   // on the line before it, and says whether it did. A line taken this way is
   // the designation of a key rather than text of the design, so the caller

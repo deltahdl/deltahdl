@@ -142,9 +142,9 @@ bool NamesKeyword(std::string_view line, std::string_view keyword);
 
 // The text of the expression `listed` stands for on its list: its name, and,
 // where one was written, the '=' and the value after it, as the directive
-// spelled them. `listed` is one TopLevelKeywords returned, its views pointing
-// into the one body.
-std::string_view ListedExpressionText(const ListedKeyword& listed);
+// spelled them. `listed` is one TopLevelKeywords returned for `body`.
+std::string_view ListedExpressionText(std::string_view body,
+                                      const ListedKeyword& listed);
 
 // A protect pragma directive line writing `expressions` in order, separated by
 // commas; empty where there are none, there being no directive to write.

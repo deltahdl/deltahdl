@@ -895,11 +895,13 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
   // further line that could belong to it. Reading it here is also what keeps a
   // block begun inside a recovered block from being carried out into the text
   // that carried it, this function being what runs such text.
-  FinishGatheredProtectBlock(depth, output);
-  // The same of a recovered text whose envelope this text never closed: there
-  // is no end_protected left to wait for.
-  ReadRecoveredText(output);
+  FinishProtectedReading(depth, output);
   return output;
+}
+
+void Preprocessor::FinishProtectedReading(int depth, std::string& output) {
+  FinishGatheredProtectBlock(depth, output);
+  ReadRecoveredText(output);
 }
 
 void Preprocessor::OutputText(std::string_view text, uint32_t file_id,

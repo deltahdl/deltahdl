@@ -28,7 +28,6 @@
 #include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_envelope.h"
-#include "preprocessor/protect_processing.h"
 
 using namespace delta;
 

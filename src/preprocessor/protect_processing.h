@@ -125,6 +125,8 @@ bool DecryptProtectedRegion(std::string_view data_block, std::string_view key,
 // effect at the start of the next. Each text's output is what stands where its
 // lines were; a region opened in one text and closed in a later one is written
 // out with the later text, where it closes.
+struct EnvelopeEncryptionState;
+
 class EnvelopeEncryptor {
  public:
   EnvelopeEncryptor(std::string_view exchange_key, const ProtectKeyList& keys,
@@ -144,8 +146,7 @@ class EnvelopeEncryptor {
   std::string Finish();
 
  private:
-  struct State;
-  std::unique_ptr<State> state_;
+  std::unique_ptr<EnvelopeEncryptionState> state_;
 };
 
 // Envelope encryption over a whole source text. Every encryption envelope in

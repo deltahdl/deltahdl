@@ -233,10 +233,13 @@ bool NamesKeyword(std::string_view line, std::string_view keyword) {
   return false;
 }
 
-std::string_view ListedExpressionText(const ListedKeyword& listed) {
+std::string_view ListedExpressionText(std::string_view body,
+                                      const ListedKeyword& listed) {
   if (!listed.has_value) return listed.name;
-  const char* kEnd = listed.value.data() + listed.value.size();
-  return {listed.name.data(), static_cast<size_t>(kEnd - listed.name.data())};
+  auto starts = static_cast<size_t>(listed.name.data() - body.data());
+  auto ends = static_cast<size_t>(listed.value.data() - body.data()) +
+              listed.value.size();
+  return body.substr(starts, ends - starts);
 }
 
 std::string ProtectDirectiveWriting(

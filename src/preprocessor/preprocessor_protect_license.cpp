@@ -95,7 +95,30 @@ bool Preprocessor::AskDecryptLicense(const ProtectLicense& license,
 
 // A model sealed inside this one carries licences of its own, which are asked
 // about when its own text is recovered, so the lines between its delimiters
-// are passed over here.
+// are passed over here: `sealed_inside` counts how deep the reading stands in
+// them. Answers whether every licence the directive `body` writes, at line
+// `line_num` of `block_id`, was granted.
+bool Preprocessor::LicencesOfDirectiveGranted(std::string_view body,
+                                              uint32_t block_id,
+                                              uint32_t line_num,
+                                              int* sealed_inside) {
+  bool granted = true;
+  for (const ListedKeyword& listed : TopLevelKeywords(body)) {
+    if (listed.name == kBeginDecryptionKeyword) {
+      ++*sealed_inside;
+    } else if (listed.name == kEndDecryptionKeyword) {
+      --*sealed_inside;
+    } else if (*sealed_inside == 0 && listed.name == kDecryptLicenseKeyword) {
+      ProtectLicense license = ParseProtectLicense(listed.value);
+      if (!license.stated) continue;
+      asked_licence_lines_.emplace_back(block_id, line_num);
+      granted = AskDecryptLicense(license, SourceLoc{block_id, line_num, 1}) &&
+                granted;
+    }
+  }
+  return granted;
+}
+
 bool Preprocessor::RecoveredTextLicensed(std::string_view cleartext,
                                          uint32_t block_id) {
   bool granted = true;
@@ -105,20 +128,9 @@ bool Preprocessor::RecoveredTextLicensed(std::string_view cleartext,
     ++line_num;
     std::string_view body;
     if (!ProtectPragmaLine(line, &body)) continue;
-    for (const ListedKeyword& listed : TopLevelKeywords(body)) {
-      if (listed.name == kBeginDecryptionKeyword) {
-        ++sealed_inside;
-      } else if (listed.name == kEndDecryptionKeyword) {
-        --sealed_inside;
-      } else if (sealed_inside == 0 && listed.name == kDecryptLicenseKeyword) {
-        ProtectLicense license = ParseProtectLicense(listed.value);
-        if (!license.stated) continue;
-        asked_licence_lines_.emplace_back(block_id, line_num);
-        if (!AskDecryptLicense(license, SourceLoc{block_id, line_num, 1})) {
-          granted = false;
-        }
-      }
-    }
+    granted =
+        LicencesOfDirectiveGranted(body, block_id, line_num, &sealed_inside) &&
+        granted;
   }
   return granted;
 }

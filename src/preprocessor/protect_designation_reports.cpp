@@ -98,12 +98,11 @@ void ReportDisagreeingDesignations(const RegionKeyNames& names,
         under_name == under_public) {
       continue;
     }
-    std::string prefix(pair.prefix);
-    diag->Error(opened,
-                "protect pragma " + prefix + "_public_key and " + prefix +
-                    "_keyname designate different keys of the " + prefix +
-                    "_keyowner in effect",
-                Subclause(pair.subclause));
+    std::string message = "protect pragma ";
+    message.append(pair.prefix).append("_public_key and ");
+    message.append(pair.prefix).append("_keyname designate different keys of ");
+    message.append("the ").append(pair.prefix).append("_keyowner in effect");
+    diag->Error(opened, message, Subclause(pair.subclause));
   }
 }
 
