@@ -292,4 +292,24 @@ TEST(HierarchicalNameFormat, ElementOfAnArrayOfInstancesIsNamedByItsIndex) {
             "top.u[0]\ntop.u[1]\n");
 }
 
+// §21.2.1.5: a static variable's initializer is written in the instance that
+// declares the variable, so %m there names that instance, `top.u1.u2`, though
+// the initializer is evaluated before any process runs. With no process %m
+// fell back to the first top module's name, `top`.
+TEST(HierarchicalNameFormat, StaticInitializerNamesItsInstance) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module leaf;\n"
+                       "  string s = $sformatf(\"%m\");\n"
+                       "  initial #1 $display(\"%s\", s);\n"
+                       "endmodule\n"
+                       "module mid;\n"
+                       "  leaf u2();\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  mid u1();\n"
+                       "endmodule\n",
+                       f),
+            "top.u1.u2\n");
+}
+
 }  // namespace
