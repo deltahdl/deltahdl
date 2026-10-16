@@ -1,5 +1,6 @@
 #include "elaborator/library_cell_writes.h"
 
+#include <cstdint>
 #include <format>
 #include <map>
 #include <string_view>
@@ -11,8 +12,6 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "parser/ast_design.h"
-#include "parser/ast_module.h"
-#include "parser/ast_specify.h"
 
 namespace delta {
 
@@ -22,7 +21,12 @@ using CellKey = std::pair<std::string_view, std::string_view>;
 
 // Which of the unit's lists a cell came from; within one list the order of the
 // list is the order the cells were encountered in.
-enum class CellList { kModules, kInterfaces, kPrograms, kPrimitives };
+enum class CellList : std::uint8_t {
+  kModules,
+  kInterfaces,
+  kPrograms,
+  kPrimitives
+};
 
 // The cell a library holds so far under one name.
 struct WrittenCell {
