@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <deque>
 #include <format>
 #include <functional>
 #include <initializer_list>
@@ -19,6 +20,7 @@
 #include "common/source_loc.h"
 #include "elaborator/class_member_names.h"
 #include "elaborator/elaborator_enclosing_subroutines.h"
+#include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/operator_result_members.h"
 #include "elaborator/std_package.h"
@@ -63,6 +65,9 @@ struct DataScope {
   std::vector<std::pair<std::string_view, DeclaredVar>> blocks = {};
   std::unordered_set<std::string_view> uncallable = {};
   std::unordered_set<std::string_view> subroutines = {};
+  // The numbered constants of the scope's ranged enumeration members (§6.19.2),
+  // which no source text spells for `module_vars` to key them by.
+  std::deque<std::string> numbered_names = {};
   // The kind of scope `items` belong to, which the types of the scope's
   // variables are looked up from.
   SiteKind site = SiteKind::kModule;
@@ -677,13 +682,20 @@ void AddImportedData(const CompilationUnit& unit, const ImportItem& import,
 }
 
 // §6.19.3: each named constant the enumeration `type` writes, as a value of
-// `scope` of that enumeration; one a range names, R[2], goes by the numbered
-// names §6.19.2 gives it, not by its own, and is left out. A variable of the
-// constant's name keeps its own declaration.
+// `scope` of that enumeration; a member a range names, R[2], declares the
+// numbered constants §6.19.2 gives it, R0 and R1, and not its own name, which
+// one whose bound folds to no literal, T[N], is answered under and leaves
+// unjudged. A variable of the constant's name keeps its own declaration.
 void DeclareEnumConstants(const DataType& type, DataScope& scope) {
   for (const EnumMember& member : type.enum_members) {
     if (member.range_start == nullptr) {
       scope.module_vars.emplace(member.name, DeclaredVar{&type, 0});
+      continue;
+    }
+    for (const std::string& name : EnumMemberDeclaredNames(member, {})) {
+      if (name == member.name) continue;
+      const std::string& kept = scope.numbered_names.emplace_back(name);
+      scope.module_vars.emplace(kept, DeclaredVar{&type, 0});
     }
   }
 }
