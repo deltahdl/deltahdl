@@ -45,38 +45,6 @@ TEST(NameSpaceElaboration, SameNameDifferentModulesElab) {
   EXPECT_FALSE(diag.HasErrors());
 }
 
-TEST(NameSpaceElaboration, DuplicateModuleDefinition) {
-  ElabFixture f;
-  EXPECT_FALSE(
-      ElabOk("module m; endmodule\n"
-             "module m; endmodule\n",
-             f));
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "duplicate definition of 'm'",
-                            2, "3.13"));
-}
-
-TEST(NameSpaceElaboration, ModuleAndInterfaceSameName) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module foo; endmodule\n"
-      "interface foo; endinterface\n",
-      f);
-  // The interface loop in elaborator_validate_config.cpp runs after the module
-  // loop, so the interface is the later insertion and carries the report.
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "duplicate definition of 'foo'", 2, "3.13"));
-}
-
-TEST(NameSpaceElaboration, ModuleAndProgramSameName) {
-  ElabFixture f;
-  ElaborateSrc(
-      "module bar; endmodule\n"
-      "program bar; endprogram\n",
-      f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "duplicate definition of 'bar'", 2, "3.13"));
-}
-
 TEST(NameSpaceElaboration, DuplicatePackageDefinition) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -95,61 +63,6 @@ TEST(NameSpaceElaboration, DistinctPackagesOk) {
       ElabOk("package p1; endpackage\n"
              "package p2; endpackage\n"
              "module m; endmodule\n"));
-}
-
-TEST(NameSpaceElaboration, DuplicateUdpDefinition) {
-  ElabFixture f;
-  EXPECT_FALSE(
-      ElabOk("primitive p(output y, input a);\n"
-             "  table 0 : 1 ; 1 : 0 ; endtable\n"
-             "endprimitive\n"
-             "primitive p(output y, input a);\n"
-             "  table 0 : 1 ; 1 : 0 ; endtable\n"
-             "endprimitive\n"
-             "module m; endmodule\n",
-             f));
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "duplicate definition of 'p'",
-                            4, "3.13"));
-}
-
-TEST(NameSpaceElaboration, ModuleAndPrimitiveSameName) {
-  // §3.13(a): the definitions name space unifies module AND primitive
-  // identifiers, so a UDP may not reuse a name already taken by a module.
-  ElabFixture f;
-  EXPECT_FALSE(
-      ElabOk("module foo; endmodule\n"
-             "primitive foo(output y, input a);\n"
-             "  table 0 : 1 ; 1 : 0 ; endtable\n"
-             "endprimitive\n",
-             f));
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "duplicate definition of 'foo'", 2, "3.13"));
-}
-
-TEST(NameSpaceElaboration, DuplicateInterfaceDefinition) {
-  // §3.13(a): interfaces share the single definitions name space, so an
-  // interface name may not be reused for another interface.
-  ElabFixture f;
-  EXPECT_FALSE(
-      ElabOk("interface ifc; endinterface\n"
-             "interface ifc; endinterface\n"
-             "module m; endmodule\n",
-             f));
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "duplicate definition of 'ifc'", 2, "3.13"));
-}
-
-TEST(NameSpaceElaboration, DuplicateProgramDefinition) {
-  // §3.13(a): programs share the single definitions name space, so a program
-  // name may not be reused for another program.
-  ElabFixture f;
-  EXPECT_FALSE(
-      ElabOk("program pr; endprogram\n"
-             "program pr; endprogram\n"
-             "module m; endmodule\n",
-             f));
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "duplicate definition of 'pr'", 2, "3.13"));
 }
 
 TEST(NameSpaceElaboration, DistinctDefinitionNamesOk) {

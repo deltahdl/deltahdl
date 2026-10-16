@@ -140,6 +140,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/body_decl_scopes.cpp
     elaborator/nba_dynamic_element.cpp
     elaborator/lhs_pattern_widths.cpp
+    elaborator/library_cell_writes.cpp
     elaborator/type_key_match.cpp
     elaborator/struct_pattern_checks.cpp
     elaborator/unit_scope_order.cpp

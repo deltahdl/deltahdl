@@ -173,8 +173,6 @@ class Elaborator : public ElaboratorClassRules {
   ModuleDecl* FindModule(std::string_view name) const;
   // FindModule's library-list search, before any cell clause's use expansion.
   ModuleDecl* SearchModule(std::string_view name) const;
-  // §33.4.1.5: the list a configuration selected for `name`, or null.
-  const std::vector<std::string>* SelectedLiblist(std::string_view name) const;
   // §33.2.2, §33.4.1.1: `cell` from `library` alone (the configuration's where
   // the design statement wrote none), or any where empty; else null.
   ModuleDecl* FindDesignCell(std::string_view library,

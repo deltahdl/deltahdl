@@ -614,9 +614,41 @@ ElaboratorData::UseTargetInForce(CompilationUnit* unit, const std::string& path,
   return std::nullopt;
 }
 
+// The list of the rule in `overrides` nearest above or at `inst_path`, a later
+// rule of one path standing ahead of an earlier one, with the length of the
+// path it names; null and 0 where none is at or above it.
+static std::pair<const std::vector<std::string>*, size_t> NearestLiblistRule(
+    const std::string& inst_path,
+    const std::vector<std::pair<std::string, std::vector<std::string>>>&
+        overrides) {
+  if (inst_path.empty()) return {nullptr, 0};
+  const std::vector<std::string>* inherited = nullptr;
+  size_t best_match_len = 0;
+  for (const auto& [rule_path, libs] : overrides) {
+    bool matches = inst_path == rule_path ||
+                   (inst_path.size() > rule_path.size() &&
+                    inst_path.compare(0, rule_path.size(), rule_path) == 0 &&
+                    inst_path[rule_path.size()] == '.');
+    if (matches && rule_path.size() >= best_match_len) {
+      inherited = &libs;
+      best_match_len = rule_path.size();
+    }
+  }
+  return {inherited, best_match_len};
+}
+
+// The list of an instance clause naming the instance at `inst_path` itself.
+static const std::vector<std::string>* OwnInstanceLiblist(
+    const std::string& inst_path,
+    const std::vector<std::pair<std::string, std::vector<std::string>>>&
+        overrides) {
+  auto [libs, len] = NearestLiblistRule(inst_path, overrides);
+  return len == inst_path.size() ? libs : nullptr;
+}
+
 void ElaboratorData::RecordCellClauseListBinding(std::string_view cell) {
   if (!in_config_elaboration_ || config_inst_path_.empty() ||
-      InstanceLiblistForPath(config_inst_path_, instance_liblist_overrides_) !=
+      OwnInstanceLiblist(config_inst_path_, instance_liblist_overrides_) !=
           nullptr) {
     return;
   }
@@ -640,12 +672,7 @@ bool ElaboratorData::ReportConfigRuleBindingNothing(CompilationUnit* unit,
                Subclause("33.4.1.6"));
     return true;
   }
-  const std::vector<std::string>* libs =
-      InstanceLiblistForPath(path, instance_liblist_overrides_);
-  if (libs == nullptr) {
-    auto it = cell_clause_liblist_overrides_.find(std::string(name));
-    if (it != cell_clause_liblist_overrides_.end()) libs = &it->second;
-  }
+  const std::vector<std::string>* libs = SelectedLiblist(name);
   std::string_view which = "library list";
   if (libs == nullptr &&
       SelectedLibraryListInForce(library_order_, library_order_strict_)) {
@@ -688,20 +715,7 @@ const std::vector<std::string>* InstanceLiblistForPath(
     const std::string& inst_path,
     const std::vector<std::pair<std::string, std::vector<std::string>>>&
         overrides) {
-  if (inst_path.empty()) return nullptr;
-  const std::vector<std::string>* inherited = nullptr;
-  size_t best_match_len = 0;
-  for (const auto& [rule_path, libs] : overrides) {
-    bool matches = inst_path == rule_path ||
-                   (inst_path.size() > rule_path.size() &&
-                    inst_path.compare(0, rule_path.size(), rule_path) == 0 &&
-                    inst_path[rule_path.size()] == '.');
-    if (matches && rule_path.size() >= best_match_len) {
-      inherited = &libs;
-      best_match_len = rule_path.size();
-    }
-  }
-  return inherited;
+  return NearestLiblistRule(inst_path, overrides).first;
 }
 
 // Chooses among `candidates` using the global library order, applying strict
@@ -718,21 +732,26 @@ static ModuleDecl* PickCandidateByGlobalOrder(
   return PickByLibraryOrder(candidates, library_order);
 }
 
-const std::vector<std::string>* Elaborator::SelectedLiblist(
+const std::vector<std::string>* ElaboratorData::SelectedLiblist(
     std::string_view name) const {
-  // §33.4.1.4, §33.4.1.5: the most specific instance-scoped list, inherited
-  // from the nearest instance clause above, comes first; then a cell clause
-  // selecting this cell; then a list a cell clause selected for an instance
-  // above, which its subinstances inherit as they are bound.
-  if (const auto* inst = InstanceLiblistForPath(config_inst_path_,
-                                                instance_liblist_overrides_)) {
-    return inst;
+  // §33.4.1.3, §33.4.1.4, §33.4.1.5: an instance clause naming this instance
+  // selects it most specifically; a cell clause selects every instance of its
+  // cell, so it replaces a list the instance would inherit; failing both, the
+  // list the nearest instance above was given is inherited, whichever kind of
+  // clause gave it there.
+  if (const auto* own =
+          OwnInstanceLiblist(config_inst_path_, instance_liblist_overrides_)) {
+    return own;
   }
   if (auto it = cell_clause_liblist_overrides_.find(std::string(name));
       it != cell_clause_liblist_overrides_.end()) {
     return &it->second;
   }
-  return InstanceLiblistForPath(config_inst_path_, cell_liblist_bindings_);
+  auto [inst, inst_len] =
+      NearestLiblistRule(config_inst_path_, instance_liblist_overrides_);
+  auto [cell, cell_len] =
+      NearestLiblistRule(config_inst_path_, cell_liblist_bindings_);
+  return cell_len > inst_len ? cell : inst;
 }
 
 ModuleDecl* Elaborator::FindModule(std::string_view name) const {

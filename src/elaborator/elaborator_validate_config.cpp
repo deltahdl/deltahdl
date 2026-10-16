@@ -17,6 +17,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/library_cell_writes.h"
 #include "elaborator/rtlir_attribute.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_design.h"
@@ -74,40 +75,16 @@ namespace {
 using DefinitionNames =
     std::map<std::pair<std::string_view, std::string_view>, SourceRange>;
 
-// §3.13(a): reports each of `decls` whose name its library already defines.
-// §23.5: an extern module declaration declares a module's ports without
-// defining the module itself, so it is a prototype rather than a definition
-// and does not participate in the duplicate-definition check. Syntax 24-1 and
-// Syntax 25-1 give a program and an interface the same extern header, and
-// Syntax 29-1's extern UDP declaration is a prototype in the same way. The
-// prototype is matched against its actual definition in
-// elaborator_extern_modules.
-template <typename Decls>
-void CheckDefinitionNames(const Decls& decls, DefinitionNames& def_names,
-                          DiagEngine& diag) {
-  for (const auto* d : decls) {
-    if (d->is_extern) continue;
-    if (!def_names.try_emplace({d->library, d->name}, d->range).second) {
-      diag.Error(d->range.start,
-                 std::format("duplicate definition of '{}'", d->name),
-                 Subclause("3.13"));
-    }
-  }
-}
-
 void ValidateNameSpaceDefinitions(const CompilationUnit* unit,
                                   DiagEngine& diag) {
   // §3.13(a) states the prohibition for a module, a primitive, a program and
-  // an interface, and names no config. §33.2 is what puts a config into the
-  // same name space: a config is a design element, much like a module, of the
-  // SystemVerilog name space. A collision involving a config therefore enforces
-  // §33.2, and is reported below.
-  DefinitionNames def_names;
-  CheckDefinitionNames(unit->modules, def_names, diag);
-  CheckDefinitionNames(unit->programs, def_names, diag);
-  CheckDefinitionNames(unit->interfaces, def_names, diag);
-  CheckDefinitionNames(unit->udps, def_names, diag);
-
+  // an interface, and names no config. Two of those of one name in one
+  // library are §33.3.1.1's case, which WriteCellsToLibraries settled before
+  // this ran by keeping the one encountered last. §33.2 is what puts a config
+  // into the same name space: a config is a design element, much like a
+  // module, of the SystemVerilog name space. A collision involving a config
+  // therefore enforces §33.2, and is reported below.
+  //
   // A config shares its name with a module or primitive lawfully. §33.2.1
   // (printed page 935): the optional :config extension names a config
   // explicitly where a config shares its name with a module or primitive, and
@@ -225,6 +202,7 @@ void ValidateNameSpaceCompilationUnit(const CompilationUnit* unit,
 }  // namespace
 
 void Elaborator::ValidateNameSpaces() {
+  WriteCellsToLibraries(*unit_, diag_);
   ValidateNameSpaceDefinitions(unit_, diag_);
   ValidateNameSpacePackages(unit_, diag_);
   // §3.13: each unit of a compilation where every file is one has a

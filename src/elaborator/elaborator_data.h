@@ -810,8 +810,11 @@ class ElaboratorData {
   std::vector<std::pair<std::string, std::vector<std::string>>>
       cell_liblist_bindings_;
   // Records the list a cell clause selected for the instance of `cell` at
-  // config_inst_path_, where no instance clause's list governs it.
+  // config_inst_path_, where no instance clause names that instance.
   void RecordCellClauseListBinding(std::string_view cell);
+  // §33.4.1.5: the list a configuration selected for the instance of `name` at
+  // config_inst_path_, or null.
+  const std::vector<std::string>* SelectedLiblist(std::string_view name) const;
 
   // §33.4.2: every table above that one configuration's rules fill, set aside
   // for the configurations whose subtrees enclose a delegated instance while

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -407,6 +408,128 @@ TEST(ConfigLiblistClause, ListHoldingNoCellReportsTheList) {
       diags,
       "library list (gateLib) holds no cell 'adder' for instance 'top.a1'", 2,
       "33.4.1.5"));
+}
+
+// `top` instantiates `adder` as a1 and a2, `adder` instantiates `m` as f1, and
+// `m` instantiates `leaf` as u. Each of leaf, m and adder is declared twice and
+// `top` once, the seven modules taking `libs` in that order, and the design is
+// elaborated under `config c` with `body` as its rules.
+RtlirDesign* ElaborateTwoAdderDesign(
+    SourceManager& mgr, Arena& arena, DiagEngine& diag, const std::string& body,
+    const std::array<std::string_view, 7>& libs) {
+  std::string src =
+      "module leaf; endmodule\n"
+      "module leaf; endmodule\n"
+      "module m; leaf u(); endmodule\n"
+      "module m; leaf u(); endmodule\n"
+      "module adder; m f1(); endmodule\n"
+      "module adder; m f1(); endmodule\n"
+      "module top; adder a1(); adder a2(); endmodule\n"
+      "config c; design rtlLib.top;\n" +
+      body + "endconfig\n";
+  auto fid = mgr.AddFile("<test>", std::move(src));
+  Lexer lex(mgr.FileContent(fid), fid, diag);
+  Parser parser(lex, arena, diag);
+  auto* cu = parser.Parse();
+  for (size_t i = 0; i < cu->modules.size(); ++i) {
+    cu->modules[i]->library = libs[i];
+  }
+  for (auto* cfg : cu->configs) cfg->library = "rtlLib";
+  Elaborator elab(arena, diag, cu);
+  return elab.Elaborate(cu->configs[0]);
+}
+
+// Every leaf, m and adder in gateLib first and aLib second, top in rtlLib.
+constexpr std::array<std::string_view, 7> kGateThenALib{
+    "gateLib", "aLib", "gateLib", "aLib", "gateLib", "aLib", "rtlLib"};
+
+// The cell bound at `top.<adder>.f1`, or nullptr.
+const RtlirModule* BoundM(const RtlirDesign* design, size_t adder) {
+  if (design == nullptr || design->top_modules.empty()) return nullptr;
+  const auto& adders = design->top_modules[0]->children;
+  if (adders.size() <= adder || adders[adder].resolved == nullptr) {
+    return nullptr;
+  }
+  const auto& ms = adders[adder].resolved->children;
+  return ms.empty() ? nullptr : ms[0].resolved;
+}
+
+// §33.4.1.4 has a cell clause select every instance bound to its cell, and
+// §33.4.1.5 has the selection clauses choose the current list, so the cell
+// clause on m replaces the aLib list top.a2.f1 would inherit from the instance
+// clause on top.a2: gateLib.m. top.a1.f1 binds gateLib.m under the default
+// list either way.
+TEST(ConfigLiblistClause, ACellClauseReplacesAListInheritedFromAnInstance) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  auto* design = ElaborateTwoAdderDesign(mgr, arena, diag,
+                                         "  default liblist gateLib rtlLib;\n"
+                                         "  instance top.a2 liblist aLib;\n"
+                                         "  cell m liblist gateLib;\n",
+                                         kGateThenALib);
+  ASSERT_NE(design, nullptr);
+  ASSERT_NE(design->top_modules[0]->children[1].resolved, nullptr);
+  EXPECT_EQ(design->top_modules[0]->children[1].resolved->library, "aLib");
+  ASSERT_NE(BoundM(design, 1), nullptr);
+  EXPECT_EQ(BoundM(design, 1)->library, "gateLib");
+  ASSERT_NE(BoundM(design, 0), nullptr);
+  EXPECT_EQ(BoundM(design, 0)->library, "gateLib");
+}
+
+// §33.4.1.3: an instance clause naming top.a2.f1 itself selects that instance
+// specifically, so its aLib list stands ahead of the cell clause on m.
+TEST(ConfigLiblistClause,
+     AnInstanceClauseNamingTheInstanceOutranksACellClause) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  auto* design = ElaborateTwoAdderDesign(mgr, arena, diag,
+                                         "  default liblist gateLib rtlLib;\n"
+                                         "  instance top.a2.f1 liblist aLib;\n"
+                                         "  cell m liblist gateLib;\n",
+                                         kGateThenALib);
+  ASSERT_NE(BoundM(design, 1), nullptr);
+  EXPECT_EQ(BoundM(design, 1)->library, "aLib");
+}
+
+// §33.4.1.5: the list the cell clause selected for top.a2.f1 is what its own
+// subinstance inherits, being the nearer of the two above it: gateLib.leaf,
+// not the aLib.leaf of the instance clause on top.a2.
+TEST(ConfigLiblistClause, ACellClauseListUnderAnInstanceClauseIsInherited) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  auto* design = ElaborateTwoAdderDesign(mgr, arena, diag,
+                                         "  default liblist gateLib rtlLib;\n"
+                                         "  instance top.a2 liblist aLib;\n"
+                                         "  cell m liblist gateLib;\n",
+                                         kGateThenALib);
+  const RtlirModule* m = BoundM(design, 1);
+  ASSERT_NE(m, nullptr);
+  ASSERT_FALSE(m->children.empty());
+  ASSERT_NE(m->children[0].resolved, nullptr);
+  EXPECT_EQ(m->children[0].resolved->library, "gateLib");
+}
+
+// With m held by otherLib and aLib, the cell clause's gateLib list holds no m
+// for top.a1.f1, which the instance clause on top.a1 would have bound out of
+// aLib, and the report names the list that was searched.
+TEST(ConfigLiblistClause, ACellClauseListHoldingNoCellUnderAnInstanceReports) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  ElaborateTwoAdderDesign(
+      mgr, arena, diag,
+      "  default liblist gateLib rtlLib;\n"
+      "  instance top.a1 liblist aLib;\n"
+      "  cell m liblist gateLib;\n",
+      {{"gateLib", "aLib", "otherLib", "aLib", "gateLib", "aLib", "rtlLib"}});
+  EXPECT_TRUE(ReportedError(diag.Diagnostics(),
+                            "unknown module 'm': the configuration's library "
+                            "list (gateLib) holds no cell 'm' for instance "
+                            "'top.a1.f1'",
+                            6, "33.4.1.5"));
 }
 
 }  // namespace
