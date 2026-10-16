@@ -252,11 +252,13 @@ class SourceDelaysOfARun : public VpiDesignRun {
         "endprimitive\n"
         "module m(input a, input b, output o, output y);\n"
         "  wire p, q, n;\n"
+        "  tri r;\n"
         "  and #(2, 3) g(o, a, b);\n"
         "  buf #4 g1(y, a);\n"
         "  inv #(14, 15) u(n, a);\n"
         "  assign #5 p = a;\n"
         "  assign #(6, 7) q = b;\n"
+        "  assign #(16, 17, 18) r = a;\n"
         "  specify\n"
         "    (a => o) = (8, 9);\n"
         "    (b => y) = 10;\n"
@@ -312,14 +314,15 @@ TEST_F(SourceDelaysOfARun, APrimitivesWrittenDelaysAreReached) {
             (std::vector<int>{14, 15}));
 }
 
-// #7232: a continuous assignment's delays.
+// #7232: a continuous assignment's delays, its turn-off delay among them where
+// it writes one.
 TEST_F(SourceDelaysOfARun, AContinuousAssignmentsWrittenDelaysAreReached) {
   std::vector<std::vector<int>> delays;
   for (vpiHandle assign : AllOf(vpiContAssign)) {
     delays.push_back(DelaysOf(assign));
   }
   std::ranges::sort(delays);
-  EXPECT_EQ(delays, (std::vector<std::vector<int>>{{5}, {6, 7}}));
+  EXPECT_EQ(delays, (std::vector<std::vector<int>>{{5}, {6, 7}, {16, 17, 18}}));
 }
 
 // #7233: a module path's delays, as the path declaration wrote them.
