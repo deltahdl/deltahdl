@@ -28,6 +28,7 @@
 #include "simulator/covergroup_instance.h"
 #include "simulator/dpi_formal_type.h"
 #include "simulator/dpi_runtime.h"
+#include "simulator/eval_class_params.h"
 #include "simulator/evaluation.h"
 #include "simulator/expr_walk.h"
 #include "simulator/lowerer.h"
@@ -554,13 +555,23 @@ void RegisterPackageScopedSubroutines(const RtlirDesign* design,
 // RegisterPackageParams folds it: against the package's parameters and
 // constants declared before it, which §6.20.1 and §6.19 let a member's value
 // name, and at the width of the enumeration's base type.
+std::optional<int64_t> FoldPackageParamValue(const ModuleItem& item,
+                                             const PackageDecl& pkg,
+                                             const ScopeMap& values,
+                                             const SimContext& ctx) {
+  DataType type = InPackageScope(item.data_type, pkg);
+  return FoldParamValueAtWidth(item.init_expr, values,
+                               SimParamTypeWidth(type, values, ctx),
+                               SimParamTypeIsSigned(type, ctx));
+}
+
 static void RegisterPackageItemEnumConstants(const ModuleItem* item,
-                                             std::string_view pkg_name,
+                                             const PackageDecl& pkg,
                                              ScopeMap& values, SimContext& ctx,
                                              Arena& arena) {
+  std::string_view pkg_name = pkg.name;
   if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
-    if (auto v =
-            FoldDeclaredParamValue(item->init_expr, item->data_type, values))
+    if (auto v = FoldPackageParamValue(*item, pkg, values, ctx))
       values[item->name] = *v;
     return;
   }
@@ -588,7 +599,7 @@ void RegisterPackageEnumConstants(const RtlirDesign* design, SimContext& ctx,
   for (auto* pkg : design->packages) {
     ScopeMap values;
     for (auto* item : pkg->items)
-      RegisterPackageItemEnumConstants(item, pkg->name, values, ctx, arena);
+      RegisterPackageItemEnumConstants(item, *pkg, values, ctx, arena);
   }
 }
 

@@ -506,4 +506,64 @@ TEST(ValueParameterSimulation, BlockParameterTakesRealAndWrittenSigning) {
       "1.500000 8 -16 4294967295 44 9\n");
 }
 
+// §6.20.2: a class parameter whose type is a typedef name holds its value at
+// that type, so `nib P = 12'hFFF` on `typedef bit [3:0] nib` is 15 when a
+// method reads it. Its storage was sized with no typedef but the class's type
+// parameters in reach, which left the name unsized and P at the
+// initializer's twelve bits, 4095.
+TEST(ValueParameterSimulation, ClassParameterOfATypedefTypeIsConverted) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("typedef bit [3:0] nib;\n"
+                       "class C #(nib P = 12'hFFF);\n"
+                       "  function int get(); return P; endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  initial begin\n"
+                       "    C #() c = new;\n"
+                       "    $display(\"%0d\", c.get());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "15\n");
+}
+
+// §6.20.2 with §6.19: a package parameter of a typedef type is converted to
+// it before an enumeration member names it, so `A = P` over `nib P = 12'hFFF`
+// is 15, and `B = W` over `nib [1:0] W`, whose dimensions multiply the
+// typedef's four bits (§7.4.4), is 255. The lowerer folded both uncut while
+// creating the package's enumeration constants.
+TEST(ValueParameterSimulation, PackageEnumMemberFromATypedefParameter) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n"
+                       "  typedef bit [3:0] nib;\n"
+                       "  parameter nib P = 12'hFFF;\n"
+                       "  parameter nib [1:0] W = 20'hFFFFF;\n"
+                       "  typedef enum int {A = P, B = W} e;\n"
+                       "endpackage\n"
+                       "module t;\n"
+                       "  initial $display(\"%0d %0d\", p::A, p::B);\n"
+                       "endmodule\n",
+                       f),
+            "15 255\n");
+}
+
+// §6.20.2 with §6.12.1: a class parameter whose typedef names a real type is
+// a real, so `r_t R = 2.5` keeps its fraction rather than being cut to the
+// bits of an integral type as wide as the real.
+TEST(ValueParameterSimulation, ClassParameterOfARealTypedefStaysReal) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("typedef real r_t;\n"
+                       "class C #(r_t R = 2.5);\n"
+                       "  function real get(); return R; endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  initial begin\n"
+                       "    C #() c = new;\n"
+                       "    $display(\"%g\", c.get());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "2.5\n");
+}
+
 }  // namespace

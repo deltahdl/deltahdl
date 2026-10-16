@@ -560,9 +560,14 @@ static bool DeclaredParamTypeIsSigned(const DataType& type) {
 std::optional<int64_t> FoldDeclaredParamValue(const Expr* expr,
                                               const DataType& type,
                                               const ScopeMap& scope) {
-  return FoldValueInContext(
-      expr, scope, FoldContext{DeclaredParamTypeWidth(type, scope), false},
-      DeclaredParamTypeIsSigned(type));
+  return FoldParamValueAtWidth(expr, scope, DeclaredParamTypeWidth(type, scope),
+                               DeclaredParamTypeIsSigned(type));
+}
+
+std::optional<int64_t> FoldParamValueAtWidth(const Expr* expr,
+                                             const ScopeMap& scope,
+                                             uint32_t width, bool is_signed) {
+  return FoldValueInContext(expr, scope, FoldContext{width, false}, is_signed);
 }
 
 // §6.20.2 (printed pages 126-127) with §23.10.2 (printed 766) and §23.10.1

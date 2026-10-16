@@ -2,10 +2,12 @@
 #define DELTA_SIMULATOR_LOWERER_REGISTER_H_
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 
 #include "common/types.h"
+#include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "simulator/sim_context_types.h"
@@ -18,6 +20,7 @@ struct ClassTypeInfo;
 struct DataType;
 struct Expr;
 struct ModuleItem;
+struct PackageDecl;
 struct QueueObject;
 struct RtlirDesign;
 struct RtlirModule;
@@ -355,6 +358,16 @@ void ConstructDataClassInitializers(const RtlirDesign* design, SimContext& ctx,
 // definition stands in lowerer_import.cpp beside the export walk.
 void AliasPackageExports(const RtlirDesign* design, SimContext& ctx,
                          Arena& arena);
+// §6.20.2 (printed pages 126-127) with §6.19: the value of the package
+// parameter `item` of `pkg`, folded over `values`, the package's constants
+// before it, at the width and sign of its declared type (SimParamTypeWidth,
+// SimParamTypeIsSigned) -- a typedef name the package declares read under
+// its "pkg::name" key -- as RegisterPackageEnumConstants and the export walk
+// fold it before numbering the enumerations after it.
+std::optional<int64_t> FoldPackageParamValue(const ModuleItem& item,
+                                             const PackageDecl& pkg,
+                                             const ScopeMap& values,
+                                             const SimContext& ctx);
 // §6.19 with §26.3: each package's enumeration constants under their
 // "pk.name" keys, the keys a read through the package scope resolution
 // operator resolves by, each at the value its declaration folds to.

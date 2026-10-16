@@ -24,6 +24,30 @@
 
 namespace delta {
 
+// The key the design's type tables record a typedef name under: "Scope::name"
+// behind a scope prefix, the bare name otherwise.
+static std::string TypeTableKey(const DataType& type) {
+  if (type.scope_name.empty()) return std::string(type.type_name);
+  return std::string(type.scope_name) + "::" + std::string(type.type_name);
+}
+
+uint32_t SimParamTypeWidth(const DataType& type, const ScopeMap& scope,
+                           const SimContext& ctx) {
+  uint32_t width = DeclaredParamTypeWidth(type, scope);
+  if (width != 0 || type.kind != DataTypeKind::kNamed) return width;
+  std::string key = TypeTableKey(type);
+  if (!IsIntegralType(ctx.FindTypeKind(key))) return 0;
+  uint32_t base = ctx.FindTypeWidth(key);
+  uint32_t outer = PackedDimProduct(type, scope);
+  return outer > 0 ? base * outer : base;
+}
+
+bool SimParamTypeIsSigned(const DataType& type, const SimContext& ctx) {
+  if (type.kind != DataTypeKind::kNamed || type.packed_dim_left != nullptr)
+    return type.is_signed;
+  return ctx.FindTypeSigned(TypeTableKey(type));
+}
+
 // The declared type of the class's i-th value parameter, or null where the
 // declaration records none or the parameter is a type parameter, whose entry
 // is its default type and sizes no value.
@@ -87,7 +111,7 @@ Logic4Vec ClassParamSizer::Value(std::string_view name, const DataType* type,
   if (type != nullptr && type->kind != DataTypeKind::kReal &&
       type->kind != DataTypeKind::kShortreal &&
       type->kind != DataTypeKind::kRealtime)
-    width = DeclaredParamTypeWidth(*type, scope_);
+    width = SimParamTypeWidth(InClassScope(*type, *decl_), scope_, ctx);
   Logic4Vec val = ParamDefaultValue(expr, width, ctx, arena);
   if (!name.empty() && !val.is_real)
     scope_[name] = static_cast<int64_t>(val.ToUint64());

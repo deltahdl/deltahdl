@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <string_view>
 #include <vector>
@@ -20,6 +21,24 @@ struct Expr;
 class SimContext;
 struct Variable;
 
+// §6.20.2 (printed pages 126-127) with §7.4.4 (printed 155): the width a
+// parameter declared with `type` is read at in the simulator.
+// DeclaredParamTypeWidth answers wherever it can. A typedef name it leaves
+// unsized -- no TypedefRegistryGuard holding the design's typedefs is live
+// while the simulator runs -- is read from the design's type table
+// (SimContext::FindTypeWidth) under its "Scope::name" or bare key, times the
+// packed dimensions written on the name, where the name stands for an
+// integral type. 0 where neither answers, and for a real, which is kept a
+// real rather than cut to its bits.
+uint32_t SimParamTypeWidth(const DataType& type, const ScopeMap& scope,
+                           const SimContext& ctx);
+
+// §6.20.2 with §7.4.1 (printed page 153): whether that parameter is signed. A
+// typedef name written bare has the sign the design's type table records for
+// it; any other type, a typedef name with packed dimensions written on it
+// among them, has the sign written with it.
+bool SimParamTypeIsSigned(const DataType& type, const SimContext& ctx);
+
 // §8.25 (printed page 203) with §6.20.2 (printed 126-127) and §11.6.1: a
 // class's value parameters, each sized by the type its declaration writes.
 // A default or a specialization's actual is the right-hand side of an
@@ -27,9 +46,9 @@ struct Variable;
 // an unbased unsized literal filling `logic [W-1:0]` (§5.7.1), a wider actual
 // cut to it -- and §8.25.1 lets the range name an earlier parameter, so the
 // parameters are taken in header order and each one's value is recorded for
-// the ranges after it. A type that fixes no width, one whose bounds do not
-// fold, a real and a typedef name leave the value self-determined, as every
-// parameter was before.
+// the ranges after it. A typedef name is sized by SimParamTypeWidth. A type
+// that fixes no width, one whose bounds do not fold and a real leave the
+// value self-determined, as every parameter was before.
 class ClassParamSizer {
  public:
   explicit ClassParamSizer(const ClassDecl* decl) : decl_(decl) {}

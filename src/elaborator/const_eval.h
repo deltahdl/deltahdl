@@ -217,6 +217,14 @@ std::optional<int64_t> FoldDeclaredParamValue(const Expr* expr,
                                               const DataType& type,
                                               const ScopeMap& scope);
 
+// The same fold at a width and signedness the caller has found for the
+// declared type itself, as the simulator does from the design's type tables
+// for a typedef name no TypedefRegistryGuard resolves; 0 leaves the value
+// self-determined. Defined in const_eval_bits.cpp.
+std::optional<int64_t> FoldParamValueAtWidth(const Expr* expr,
+                                             const ScopeMap& scope,
+                                             uint32_t width, bool is_signed);
+
 // The width a parameter declared with `type` is read at, as
 // PopulateParamTypeInfo (elaborator_module_params.cpp) and HasDeclaredWidth
 // (const_eval_bits.cpp) read it off an RtlirParamDecl: a range's, its bounds

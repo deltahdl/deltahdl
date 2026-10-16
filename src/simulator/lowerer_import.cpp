@@ -590,13 +590,13 @@ void CollectEnumConstantNames(const DataType& type, ScopeMap& values,
 // the enumerations after them, as RegisterPackageItemEnumConstants folds
 // them, so a bound naming one expands to the same constants.
 std::vector<std::string_view> PackageEnumConstantNames(const PackageDecl* pkg,
+                                                       const SimContext& ctx,
                                                        Arena& arena) {
   std::vector<std::string_view> names;
   ScopeMap values;
   for (const ModuleItem* item : pkg->items) {
     if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
-      if (auto v =
-              FoldDeclaredParamValue(item->init_expr, item->data_type, values))
+      if (auto v = FoldPackageParamValue(*item, *pkg, values, ctx))
         values[item->name] = *v;
       continue;
     }
@@ -618,8 +618,9 @@ std::vector<std::string_view> PackageEnumConstantNames(const PackageDecl* pkg,
 // ends a cycle of exports.
 class ExportedNameWalk {
  public:
-  ExportedNameWalk(const RtlirDesign* design, Arena& arena)
-      : design_(design), arena_(arena) {}
+  ExportedNameWalk(const RtlirDesign* design, const SimContext& ctx,
+                   Arena& arena)
+      : design_(design), ctx_(ctx), arena_(arena) {}
 
   void CollectExported(const PackageDecl* pkg, PackageSet visited,
                        std::vector<ExportedName>& out);
@@ -643,6 +644,7 @@ class ExportedNameWalk {
                     const PackageSet& visited, std::vector<ExportedName>& out);
 
   const RtlirDesign* design_;
+  const SimContext& ctx_;
   Arena& arena_;
   // Each package's enumeration constants, expanded once: a package is asked
   // for them by every wildcard import of it the walk follows.
@@ -661,7 +663,8 @@ const std::vector<std::string_view>& ExportedNameWalk::EnumConstantNames(
     const PackageDecl* pkg) {
   auto it = enum_names_.find(pkg);
   if (it == enum_names_.end()) {
-    it = enum_names_.emplace(pkg, PackageEnumConstantNames(pkg, arena_)).first;
+    it = enum_names_.emplace(pkg, PackageEnumConstantNames(pkg, ctx_, arena_))
+             .first;
   }
   return it->second;
 }
@@ -810,7 +813,7 @@ void AliasExportedName(const PackageDecl* pkg, const ExportedName& e,
 // p3's imports, in a declaration initializer of p3 as in a subroutine body.
 void AliasPackageExports(const RtlirDesign* design, SimContext& ctx,
                          Arena& arena) {
-  ExportedNameWalk walk(design, arena);
+  ExportedNameWalk walk(design, ctx, arena);
   for (const PackageDecl* pkg : design->packages) {
     std::vector<ExportedName> names;
     walk.CollectExported(pkg, {}, names);
@@ -847,7 +850,7 @@ void Lowerer::AliasExportedClassKeys(const PackageDecl* pkg,
   if (design_ == nullptr) return;
   ClassTypeInfo* info = ctx_.FindClassType(QualifiedClassKey(pkg, cls, arena_));
   if (info == nullptr) return;
-  ExportedNameWalk walk(design_, arena_);
+  ExportedNameWalk walk(design_, ctx_, arena_);
   for (const PackageDecl* exporter : design_->packages) {
     bool own =
         exporter == pkg || FindNamedPackageItem(exporter, cls->name) != nullptr;
