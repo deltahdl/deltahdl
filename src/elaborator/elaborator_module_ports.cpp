@@ -304,6 +304,9 @@ static void DeclareAggregatePortVariable(const PortDecl& port,
   var.elem_type_kind = port.data_type.kind;
   var.decl_kind = port.data_type.kind;
   var.dtype = aggregate;
+  // §37.17: the typespec the variable relates to is the type the port's
+  // header wrote, a typedef name kept as the name.
+  var.written_type = &port.data_type;
   ctx.mod->variables.push_back(var);
 }
 

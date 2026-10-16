@@ -776,6 +776,18 @@ TEST_F(VariablesOfARun, AVariablesTypespecIsTheUnitsTypedef) {
                "ue_t");
 }
 
+// ...and so does the variable a structure or union port with no port kind
+// declares (§23.2.2.3).
+TEST_F(VariablesOfARun, AnAggregatePortVariablesTypespecIsItsTypedefs) {
+  Run("typedef struct { int a; int b; } ps_t;\n"
+      "typedef union { int a; bit [31:0] b; } pu_t;\n"
+      "module top (output ps_t p, output pu_t q); endmodule\n");
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiTypespec, Var("top.p"))),
+               "ps_t");
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiTypespec, Var("top.q"))),
+               "pu_t");
+}
+
 // The right side of the continuous assignment that drives `target`, read off
 // the instance `top`.
 vpiHandle RhsDriving(const char* target) {
