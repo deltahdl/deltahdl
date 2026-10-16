@@ -481,6 +481,7 @@ SpecifyItem* Parser::ParseSpecifyPathDecl() {
   auto* item = arena_.Create<SpecifyItem>();
   item->kind = SpecifyItemKind::kPathDecl;
   item->loc = CurrentLoc();
+  item->path.loc = item->loc;
 
   Expect(TokenKind::kLParen, Subclause("30.4"));
   item->path.edge = ParseSpecifyEdge();
