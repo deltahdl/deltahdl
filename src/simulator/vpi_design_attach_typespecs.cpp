@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -136,13 +137,12 @@ const ModuleDecl* ElementNamed(const CompilationUnit& unit,
   return nullptr;
 }
 
-// §37.17: the typespec of the typedef `var` was declared with, its own scope's
-// or else the compilation unit's; null where its type names no typedef either
-// declares.
-VpiObject* DeclaredTypespec(const RtlirVariable& var,
+// §37.17: the typespec of the typedef a variable declared with the type
+// `written` was declared with, its own scope's or else the compilation unit's;
+// null where its type names no typedef either declares.
+VpiObject* DeclaredTypespec(const DataType* written,
                             const TypespecsByName& local,
                             const TypespecsByName& unit) {
-  const DataType* written = var.written_type;
   if (written == nullptr || written->kind != DataTypeKind::kNamed) {
     return nullptr;
   }
@@ -151,6 +151,13 @@ VpiObject* DeclaredTypespec(const RtlirVariable& var,
     if (it != scope->end()) return it->second;
   }
   return nullptr;
+}
+
+// Whether the module `mod`'s variables list holds a variable named `name`.
+bool HasVariable(const RtlirModule& mod, std::string_view name) {
+  return std::ranges::any_of(mod.variables, [name](const RtlirVariable& var) {
+    return var.name == name;
+  });
 }
 
 // §37.10 detail 1: a package is an instance too, whose typedefs are its
@@ -228,12 +235,24 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
     const TypespecsByName kLocal = MakeTypespecs(
         decl->items, {scope, &mod->enum_types, build, answered, mod->imports});
     MakeGenBlockTypespecs(*mod, scope, build, answered);
-    for (const RtlirVariable& var : mod->variables) {
-      VpiObject* typespec = DeclaredTypespec(var, kLocal, kUnit);
+    const auto kRelate = [&](std::string_view name, const DataType* written) {
+      VpiObject* typespec = DeclaredTypespec(written, kLocal, kUnit);
       VpiObject* obj =
-          FindObjectForFlatName(objects, VpiFlatName(prefix, var.name));
+          FindObjectForFlatName(objects, VpiFlatName(prefix, name));
       if (typespec != nullptr && obj != nullptr) {
         obj->children.push_back(typespec);
+      }
+    };
+    for (const RtlirVariable& var : mod->variables) {
+      kRelate(var.name, var.written_type);
+    }
+    // §23.2.2.3: a variable port declares a variable, which the module's
+    // variables list holds where the port is of a structure or union type or
+    // the body declares it again; any other relates to the type the port's
+    // declaration wrote.
+    for (const RtlirPort& port : mod->ports) {
+      if (port.is_var && !HasVariable(*mod, port.name)) {
+        kRelate(port.name, port.declared_type);
       }
     }
   });
