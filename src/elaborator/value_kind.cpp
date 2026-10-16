@@ -310,6 +310,11 @@ ValueKind KindOfConcatenation(const Expr* e, const ValueScope& scope) {
 
 }  // namespace
 
+const StructMember* SelectedStructMember(const Expr* e,
+                                         const ValueScope& scope) {
+  return MemberOf(e, scope);
+}
+
 ValueKind KindOfElement(const ElaboratorData::VarArrayInfo& info,
                         const ValueScope& scope) {
   if (info.elem_is_unpacked_aggregate) return ValueKind::kOther;

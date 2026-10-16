@@ -1,14 +1,23 @@
+#include <algorithm>
 #include <format>
+#include <iterator>
 #include <string_view>
+#include <unordered_map>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/queue_dim.h"
 #include "elaborator/value_kind.h"
+#include "parser/ast_class.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -20,6 +29,10 @@ namespace {
 struct ArrayMethodScan {
   const ValueScope& values;
   DiagEngine& diag;
+  // The class each class variable of the module holds a handle of, and the
+  // unit those classes are found in, for an array reached through a handle.
+  const std::unordered_map<std::string_view, std::string_view>& class_vars;
+  const CompilationUnit* unit;
 };
 
 // §7.12.2: the array ordering methods. reverse() and shuffle() take no with
@@ -259,6 +272,60 @@ void CheckArrayMethodSite(const Expr* e, const ArrayMethodSite& site,
   }
 }
 
+// §7.8: whether the unpacked dimension `dim` is an index type, which makes the
+// declaration an associative array: a keyword index type, the `*` wildcard,
+// or a name the scope's typedefs or classes declare.
+bool IsIndexTypeDim(const Expr& dim, const ValueScope& values) {
+  static constexpr std::string_view kIndexTypes[] = {
+      "string", "int",   "integer", "byte", "shortint", "longint",
+      "bit",    "logic", "reg",     "time", "*"};
+  if (dim.kind != ExprKind::kIdentifier) return false;
+  return std::ranges::find(kIndexTypes, dim.text) != std::end(kIndexTypes) ||
+         values.typedefs.contains(dim.text) ||
+         values.class_names.contains(dim.text);
+}
+
+// The unpacked dimensions the member `base` selects is declared with: a member
+// of a structure variable, s.q, or a property of the class a variable holds a
+// handle of, h.q; null where `base` is neither.
+const std::vector<Expr*>* MemberDims(const Expr& base,
+                                     const ArrayMethodScan& scan) {
+  if (base.kind != ExprKind::kMemberAccess || base.is_scope_resolution ||
+      base.lhs->kind != ExprKind::kIdentifier) {
+    return nullptr;
+  }
+  if (const StructMember* m = SelectedStructMember(&base, scan.values)) {
+    return &m->unpacked_dims;
+  }
+  auto handle = scan.class_vars.find(base.lhs->text);
+  if (handle == scan.class_vars.end()) return nullptr;
+  const ClassMember* property = FindMemberInClass(
+      FindClassDecl(handle->second, scan.unit), base.rhs->text, scan.unit);
+  return property != nullptr ? &property->unpacked_dims : nullptr;
+}
+
+// §7.5, §7.9, §7.10.2 and §7.12: the same rule for an array reached through a
+// member, whose kind its first unpacked dimension makes as a variable's does.
+void CheckMemberArrayMethod(const Expr* e, const ArrayMethodSite& site,
+                            const ArrayMethodScan& scan) {
+  const std::vector<Expr*>* dims = MemberDims(*site.base, scan);
+  if (dims == nullptr || dims->empty() || IsManipulationMethod(site.method)) {
+    return;
+  }
+  Elaborator::VarArrayInfo info;
+  const Expr* dim = dims->front();
+  info.is_dynamic = dim == nullptr;
+  info.is_queue = dim != nullptr && IsQueueDim(dim);
+  info.is_assoc = dim != nullptr && IsIndexTypeDim(*dim, scan.values);
+  if (IsKindMethod(info, site.method)) return;
+  const ArrayKind kKind = KindOf(info);
+  scan.diag.Error(e->range.start,
+                  std::format("'{}' is not a built-in method of the {} '{}.{}'",
+                              site.method, kKind.words, site.base->lhs->text,
+                              site.base->rhs->text),
+                  Subclause(kKind.subclause));
+}
+
 void CheckArrayMethodExpr(const Expr* e, const ArrayMethodScan& scan) {
   if (!e) return;
   ArrayMethodSite site;
@@ -267,6 +334,8 @@ void CheckArrayMethodExpr(const Expr* e, const ArrayMethodScan& scan) {
     auto it = scan.values.arrays.find(site.base->text);
     if (it != scan.values.arrays.end())
       CheckArrayMethodSite(e, site, it->second, scan);
+  } else if (matched) {
+    CheckMemberArrayMethod(e, site, scan);
   }
   // The method access under a call is the site itself, already checked, so
   // only its receiver is walked below it.
@@ -301,7 +370,7 @@ void WalkStmtsForArrayMethods(const Stmt* s, const ArrayMethodScan& scan) {
 void Elaborator::ValidateArrayOrderingMethods(const ModuleDecl* decl) {
   const ValueScope kValues{var_types_,  var_named_types_, var_array_info_,
                            func_decls_, typedefs_,        class_names_};
-  const ArrayMethodScan kScan{kValues, diag_};
+  const ArrayMethodScan kScan{kValues, diag_, class_var_types_, unit_};
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
       CheckArrayMethodExpr(item->assign_lhs, kScan);

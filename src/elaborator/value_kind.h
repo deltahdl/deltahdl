@@ -59,4 +59,9 @@ ValueKind KindOfValue(const Expr* e, const ValueScope& scope);
 ValueKind KindOfElement(const ElaboratorData::VarArrayInfo& info,
                         const ValueScope& scope);
 
+// The member of a structure or union the member select `e` names, where the
+// declarations `scope` holds trace its operand; null where they do not.
+const StructMember* SelectedStructMember(const Expr* e,
+                                         const ValueScope& scope);
+
 }  // namespace delta

@@ -52,6 +52,75 @@ TEST(ArrayMethodValidation, NameNoMethodOfTheArraysKindIsRejected) {
   }
 }
 
+// The same of an array reached through members: a structure's member, s.q,
+// and a property of the class a variable holds a handle of, h.q. The methods
+// of each kind are still accepted there.
+TEST(ArrayMethodValidation, AMemberArraysNameOfNoMethodIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef struct { int q[$]; int fx[2]; } s_t;\n"
+      "  class C; int q[$]; int aa[string]; endclass\n"
+      "  s_t s; C h = new; int n;\n"
+      "  initial begin\n"
+      "    s.q.foo();\n"
+      "    h.q.bar();\n"
+      "    s.fx.delete();\n"
+      "    h.aa.pop_front();\n"
+      "    s.q.delete();\n"
+      "    n = h.q.size();\n"
+      "    n = h.aa.num();\n"
+      "    s.fx.sort();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "'foo' is not a built-in method of the queue 's.q'", 6, "7.10.2"));
+  EXPECT_TRUE(ReportedError(
+      diags, "'bar' is not a built-in method of the queue 'h.q'", 7, "7.10.2"));
+  EXPECT_TRUE(ReportedError(
+      diags, "'delete' is not a built-in method of the fixed-size array 's.fx'",
+      8, "7.12"));
+  EXPECT_TRUE(ReportedError(
+      diags,
+      "'pop_front' is not a built-in method of the associative array 'h.aa'", 9,
+      "7.9"));
+  for (const auto& d : diags) {
+    EXPECT_FALSE(d.loc.line >= 10 && d.loc.line <= 13)
+        << d.loc.line << ": " << d.message;
+  }
+}
+
+// What that rule passes over: a receiver it cannot trace to one member of a
+// variable -- a member of a member, a package's array, an element of an
+// array, an instance's array -- and a member that is no array, each written
+// with a method of its own kind, so nothing is reported.
+TEST(ArrayMethodValidation, ReceiversNotOneMemberOfAVariablePassClean) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p; int q[$]; endpackage\n"
+      "module child; int q[$]; endmodule\n"
+      "module top;\n"
+      "  typedef struct { int q[$]; } in_t;\n"
+      "  typedef struct { in_t in; string str; } out_t;\n"
+      "  out_t ss; int ar[2][$]; int n;\n"
+      "  child u();\n"
+      "  initial begin\n"
+      "    ss.in.q.delete();\n"
+      "    p::q.delete();\n"
+      "    ar[0].delete();\n"
+      "    u.q.delete();\n"
+      "    n = ss.str.len();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  for (const auto& d : f.diag.Diagnostics()) {
+    EXPECT_FALSE(d.loc.line >= 9 && d.loc.line <= 13)
+        << d.loc.line << ": " << d.message;
+  }
+}
+
 // §7.12, §7.12.1 and §7.12.5: an iterator argument without a with clause, a
 // find locator without one and map without one are each reported as the
 // design is elaborated, whether or not the call ever runs.
