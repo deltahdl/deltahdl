@@ -711,13 +711,6 @@ std::string HierInstancePath(std::string_view parent, const HierPath& gen_steps,
   return path;
 }
 
-const std::vector<std::string>* InstanceLiblistForPath(
-    const std::string& inst_path,
-    const std::vector<std::pair<std::string, std::vector<std::string>>>&
-        overrides) {
-  return NearestLiblistRule(inst_path, overrides).first;
-}
-
 // Chooses among `candidates` using the global library order, applying strict
 // library-order filtering. Returns nullptr when no candidate survives
 // filtering.

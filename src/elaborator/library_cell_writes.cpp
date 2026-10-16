@@ -25,7 +25,8 @@ enum class CellList : std::uint8_t {
   kModules,
   kInterfaces,
   kPrograms,
-  kPrimitives
+  kPrimitives,
+  kCheckers
 };
 
 // The cell a library holds so far under one name.
@@ -104,6 +105,11 @@ void WriteCellsToLibraries(CompilationUnit& unit, DiagEngine& diag) {
   DropOverwritten(unit.interfaces, writes.overwritten);
   DropOverwritten(unit.programs, writes.overwritten);
   DropOverwritten(unit.udps, writes.overwritten);
+  // §3.13 leaves a checker's name out of the definitions name space a module's
+  // is in, so a checker replaces only a checker of its name.
+  CellWrites checker_writes;
+  WriteCells(unit.checkers, CellList::kCheckers, checker_writes, diag);
+  DropOverwritten(unit.checkers, checker_writes.overwritten);
 }
 
 }  // namespace delta

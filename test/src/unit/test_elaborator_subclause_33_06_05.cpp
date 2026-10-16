@@ -28,7 +28,7 @@
 // the outer hierarchy. Elaborator::FindModule consults the use override ahead
 // of every library list (src/elaborator/elaborator_resolve.cpp), which is how
 // the inner design statement outranks both default clauses at the selected
-// instance, and InstanceLiblistForPath there takes the longest matching path,
+// instance, and SelectedLiblist there takes the longest matching path,
 // which is how an inner instance clause outranks the inner default clause below
 // it. A path that is not written against the inner configuration's own design
 // cell is reported by ValidateConfigInstanceClauses

@@ -540,11 +540,6 @@ inline std::pair<std::string_view, std::string_view> SplitLibCell(
   return {name.substr(0, kDot), name.substr(kDot + 1)};
 }
 
-const std::vector<std::string>* InstanceLiblistForPath(
-    const std::string& inst_path,
-    const std::vector<std::pair<std::string, std::vector<std::string>>>&
-        overrides);
-
 // §33.4.3: whether an expression of kind `k` is a literal, the only value a
 // configuration's localparam may be set to.
 bool IsLiteralKind(ExprKind k);

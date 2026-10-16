@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstddef>
+#include <initializer_list>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -530,6 +531,72 @@ TEST(ConfigLiblistClause, ACellClauseListHoldingNoCellUnderAnInstanceReports) {
                             "list (gateLib) holds no cell 'm' for instance "
                             "'top.a1.f1'",
                             6, "33.4.1.5"));
+}
+
+// Two primitives `p`, the first in rtlLib and the second in gateLib, the one
+// passing its input through and the other inverting it, ahead of `rest`, whose
+// modules take `module_libs` in order. Elaborated under its first config.
+RtlirDesign* ElaborateTwoPrimitiveDesign(
+    SourceManager& mgr, Arena& arena, DiagEngine& diag, const std::string& rest,
+    std::initializer_list<std::string_view> module_libs) {
+  auto fid = mgr.AddFile(
+      "<test>",
+      "primitive p(output y, input a); table 0 : 0 ; 1 : 1 ; endtable "
+      "endprimitive\n"
+      "primitive p(output y, input a); table 0 : 1 ; 1 : 0 ; endtable "
+      "endprimitive\n" +
+          rest);
+  Lexer lex(mgr.FileContent(fid), fid, diag);
+  Parser parser(lex, arena, diag);
+  auto* cu = parser.Parse();
+  cu->udps[0]->library = "rtlLib";
+  cu->udps[1]->library = "gateLib";
+  auto lib = module_libs.begin();
+  for (auto* mod : cu->modules) mod->library = *lib++;
+  for (auto* cfg : cu->configs) cfg->library = "rtlLib";
+  Elaborator elab(arena, diag, cu);
+  return elab.Elaborate(cu->configs[0]);
+}
+
+// §33.4 lets a configuration rebind a primitive instance, and §33.4.1.4 has a
+// cell clause select every instance of the cell it names: the clause on p puts
+// gateLib in force over top.u, ahead of the default list naming rtlLib first.
+TEST(ConfigLiblistClause, ACellClauseOnAPrimitiveSelectsItsList) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  auto* design = ElaborateTwoPrimitiveDesign(
+      mgr, arena, diag,
+      "module top; wire y, a; p u(y, a); endmodule\n"
+      "config c; design rtlLib.top; default liblist rtlLib gateLib;\n"
+      "  cell p liblist gateLib; endconfig\n",
+      {"rtlLib"});
+  ASSERT_NE(design, nullptr);
+  const RtlirModule* top = design->top_modules[0];
+  ASSERT_EQ(top->udp_insts.size(), 1u);
+  EXPECT_EQ(top->udp_insts[0].decl->library, "gateLib");
+}
+
+// §33.4.1.5: the gateLib list a cell clause selected for top.w is inherited by
+// what w instantiates, a primitive among the rest.
+TEST(ConfigLiblistClause, APrimitiveInheritsTheListACellClauseGaveItsParent) {
+  SourceManager mgr;
+  Arena arena;
+  DiagEngine diag(mgr);
+  auto* design = ElaborateTwoPrimitiveDesign(
+      mgr, arena, diag,
+      "module wrap; wire y, a; p u(y, a); endmodule\n"
+      "module top; wrap w(); endmodule\n"
+      "config c; design rtlLib.top; default liblist rtlLib gateLib;\n"
+      "  cell wrap liblist gateLib; endconfig\n",
+      {"gateLib", "rtlLib"});
+  ASSERT_NE(design, nullptr);
+  const auto& children = design->top_modules[0]->children;
+  ASSERT_EQ(children.size(), 1u);
+  const RtlirModule* wrap = children[0].resolved;
+  ASSERT_NE(wrap, nullptr);
+  ASSERT_EQ(wrap->udp_insts.size(), 1u);
+  EXPECT_EQ(wrap->udp_insts[0].decl->library, "gateLib");
 }
 
 }  // namespace

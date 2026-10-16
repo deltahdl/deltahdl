@@ -8,9 +8,11 @@
 
 #include <gtest/gtest.h>
 
+#include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
+#include "helpers_separate_units.h"
 
 using namespace delta;
 
@@ -146,6 +148,35 @@ TEST(LibraryCellRewrite, APrimitiveAfterAModuleOfItsNameNeitherErrsNorWarns) {
              "module m; endmodule\n",
              f));
   EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+// §3.2 counts a checker a design element and §33.2.1 a design element a cell,
+// so of two checkers of one name in work the one encountered last is bound.
+// Each unit has a compilation-unit scope of its own (§3.12.1), so §3.13(c)
+// finds no redeclaration between them. The second unit's checker stands on its
+// line 2, the first's on line 1.
+TEST(LibraryCellRewrite, TheCheckerEncounteredLastAcrossUnitsIsBound) {
+  ElabFixture f;
+  Elaborator elab(f.arena, f.diag,
+                  ParseUnitsApart({"checker chk(input logic x);\n"
+                                   "endchecker\n",
+                                   "\n"
+                                   "checker chk(input logic x);\n"
+                                   "endchecker\n"
+                                   "module top;\n"
+                                   "  logic v;\n"
+                                   "  chk c(v);\n"
+                                   "endmodule\n"},
+                                  f.mgr, f.arena, f.diag));
+  auto* design = elab.Elaborate("top");
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+  ASSERT_NE(design, nullptr);
+  ASSERT_EQ(design->top_modules[0]->children.size(), 1u);
+  const RtlirModule* bound = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(bound, nullptr);
+  EXPECT_TRUE(bound->is_checker);
+  EXPECT_EQ(bound->loc.line, 2u);
 }
 
 }  // namespace

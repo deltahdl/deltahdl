@@ -13,9 +13,9 @@
 // The rule is applied at the elaborator stage. An instance clause's library
 // list reaches the elaborator through CollectInstanceLiblistOverrides
 // (src/elaborator/elaborator.cpp) and decides which list governs a binding in
-// InstanceLiblistForPath (src/elaborator/elaborator_helpers.h), which
-// Elaborator::FindModule consults through SelectOverrideLiblist ahead of the
-// order the default clause installed (src/elaborator/elaborator_resolve.cpp).
+// ElaboratorData::SelectedLiblist, which Elaborator::FindModule consults ahead
+// of the order the default clause installed
+// (src/elaborator/elaborator_resolve.cpp).
 // A primitive is settled against the same list in Elaborator::FindUdpByName,
 // under the path Elaborator::ReclassifyForwardUdpInstances puts the searched
 // instantiation at (src/elaborator/elaborator_items_udp.cpp).

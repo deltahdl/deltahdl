@@ -79,8 +79,8 @@ void ValidateNameSpaceDefinitions(const CompilationUnit* unit,
                                   DiagEngine& diag) {
   // §3.13(a) states the prohibition for a module, a primitive, a program and
   // an interface, and names no config. Two of those of one name in one
-  // library are §33.3.1.1's case, which WriteCellsToLibraries settled before
-  // this ran by keeping the one encountered last. §33.2 is what puts a config
+  // library are §33.3.1.1's case, which WriteCellsToLibraries settles by
+  // keeping the one encountered last. §33.2 is what puts a config
   // into the same name space: a config is a design element, much like a
   // module, of the SystemVerilog name space. A collision involving a config
   // therefore enforces §33.2, and is reported below.
@@ -202,18 +202,21 @@ void ValidateNameSpaceCompilationUnit(const CompilationUnit* unit,
 }  // namespace
 
 void Elaborator::ValidateNameSpaces() {
-  WriteCellsToLibraries(*unit_, diag_);
   ValidateNameSpaceDefinitions(unit_, diag_);
   ValidateNameSpacePackages(unit_, diag_);
   // §3.13: each unit of a compilation where every file is one has a
   // compilation-unit scope name space of its own.
   if (units_.views.empty()) {
     ValidateNameSpaceCompilationUnit(unit_, diag_);
-    return;
+  } else {
+    for (const auto* view : units_.views) {
+      ValidateNameSpaceCompilationUnit(view, diag_);
+    }
   }
-  for (const auto* view : units_.views) {
-    ValidateNameSpaceCompilationUnit(view, diag_);
-  }
+  // After the checks above, so that two checkers of one name in one unit are
+  // still §3.13(c)'s redeclaration there, the one encountered first being
+  // among those §33.3.1.1 then drops.
+  WriteCellsToLibraries(*unit_, diag_);
 }
 
 std::unordered_set<std::string_view> NonConfigCellNames(

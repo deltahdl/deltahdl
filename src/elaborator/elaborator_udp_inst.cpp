@@ -129,15 +129,14 @@ UdpDecl* Elaborator::FindUdpByName(std::string_view name) const {
     return *bound;
   }
 
-  // The list the instance selection clause covering this instance passes down,
-  // where there is one, in place of the one the default clause put in force. A
-  // clause names its list outright, so the list it hands down is a list in
-  // force wherever it reaches.
-  const std::vector<std::string>* inherited =
-      InstanceLiblistForPath(config_inst_path_, instance_liblist_overrides_);
+  // The list the configuration selected for this instance, as for any other
+  // cell (§33.4.1.4, §33.4.1.5), in place of the one the default clause put in
+  // force. A clause names its list outright, so the list it selects is a list
+  // in force wherever it reaches.
+  const std::vector<std::string>* selected = SelectedLiblist(name);
   const std::vector<std::string>& order =
-      inherited == nullptr ? library_order_ : *inherited;
-  bool strict = inherited != nullptr || library_order_strict_;
+      selected == nullptr ? library_order_ : *selected;
+  bool strict = selected != nullptr || library_order_strict_;
 
   size_t nearest_pos = 0;
   UdpDecl* nearest =
