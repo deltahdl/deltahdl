@@ -18,6 +18,7 @@ struct MailboxObject;
 struct Process;
 struct QueueObject;
 struct Scope;
+struct StructTypeInfo;
 class SimContext;
 struct Variable;
 
@@ -26,10 +27,11 @@ struct Variable;
 // and a handle can be held in any value the run stores: a variable, an element
 // of a queue or an associative array (as a value or a key), a mailbox message,
 // a static or instance property, a member of an unpacked struct. The marker
-// reads every 64-bit word of each such value and takes one that names an
-// object as a reference to it. That is conservative -- an integer equal to an
-// object's handle keeps the object -- but never reclaims an object a handle
-// still refers to, whatever type the value has.
+// reads every 64-bit word of each such value, and a structure's class-typed
+// members where its layout puts them, and takes one that names an object as
+// a reference to it. That is conservative -- an integer equal to an
+// object's handle keeps the object -- but reclaims no object a handle held in
+// those places refers to.
 class ClassGcMarker {
  public:
   ClassGcMarker(const std::unordered_map<uint64_t, ClassObject*>& objects,
@@ -37,6 +39,10 @@ class ClassGcMarker {
 
   void Handle(uint64_t handle);
   void Words(const Logic4Vec& value);
+  // The class-typed members of the structure value `value`, laid out as
+  // `layout` says from bit `base` up.
+  void Fields(const Logic4Vec& value, const StructTypeInfo& layout,
+              uint32_t base = 0);
   void Var(const Variable* var);
   void Queue(const QueueObject* queue);
   void Assoc(const AssocArrayObject* assoc);
@@ -59,8 +65,6 @@ class ClassGcMarker {
   const std::unordered_map<uint64_t, ClassObject*>& objects_;
   std::unordered_set<uint64_t>& live_;
   std::vector<uint64_t> pending_;
-  // The highest handle among `objects_`, above which no window names one.
-  uint64_t max_handle_ = 0;
 };
 
 // §8.29: keeps the class objects `value` refers to reachable for as long as

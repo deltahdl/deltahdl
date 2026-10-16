@@ -1,6 +1,5 @@
 #include "simulator/class_gc_roots.h"
 
-#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <unordered_map>
@@ -20,14 +19,26 @@
 
 namespace delta {
 
+namespace {
+
+// The 64 bits of `value` from bit `at` up, zero past its last word.
+uint64_t WindowAt(const Logic4Vec& value, uint32_t at) {
+  const uint32_t kWord = at / 64;
+  const uint32_t kShift = at % 64;
+  if (kWord >= value.nwords) return 0;
+  uint64_t window = value.words[kWord].aval >> kShift;
+  if (kShift != 0 && kWord + 1 < value.nwords) {
+    window |= value.words[kWord + 1].aval << (64 - kShift);
+  }
+  return window;
+}
+
+}  // namespace
+
 ClassGcMarker::ClassGcMarker(
     const std::unordered_map<uint64_t, ClassObject*>& objects,
     std::unordered_set<uint64_t>& live)
-    : objects_(objects), live_(live) {
-  for (const auto& [handle, obj] : objects_) {
-    max_handle_ = std::max(max_handle_, handle);
-  }
-}
+    : objects_(objects), live_(live) {}
 
 void ClassGcMarker::Handle(uint64_t handle) {
   if (handle == kNullClassHandle || !objects_.contains(handle)) return;
@@ -35,23 +46,22 @@ void ClassGcMarker::Handle(uint64_t handle) {
 }
 
 void ClassGcMarker::Words(const Logic4Vec& value) {
-  if (value.nwords == 0) return;
-  if (value.width <= 64) {
-    Handle(value.words[0].aval);
-    return;
-  }
-  // §7.2: a member of an unpacked structure sits at whatever bit its earlier
-  // members end at, so a handle in a wider value can start at any bit. Each
-  // 64-bit window is read, and one is looked up only where it could name an
-  // object, nonzero and no greater than the highest handle the run has made.
-  for (uint32_t bit = 0; bit + 64 <= value.nwords * 64; ++bit) {
-    const uint32_t kWord = bit / 64;
-    const uint32_t kShift = bit % 64;
-    uint64_t window = value.words[kWord].aval >> kShift;
-    if (kShift != 0 && kWord + 1 < value.nwords) {
-      window |= value.words[kWord + 1].aval << (64 - kShift);
+  for (uint32_t i = 0; i < value.nwords; ++i) Handle(value.words[i].aval);
+}
+
+void ClassGcMarker::Fields(const Logic4Vec& value, const StructTypeInfo& layout,
+                           uint32_t base) {
+  // §7.2: a member of an unpacked structure sits at whatever bit its layout
+  // puts it, which a reading of whole words misses unless it starts one, so a
+  // member of a class type is read where it stands, and a nested structure
+  // member at the bits its own layout gives within it.
+  for (const StructFieldInfo& field : layout.fields) {
+    const uint32_t kAt = base + field.bit_offset;
+    if (field.nested != nullptr) {
+      Fields(value, *field.nested, kAt);
+    } else if (field.type_kind == DataTypeKind::kNamed) {
+      Handle(WindowAt(value, kAt));
     }
-    if (window != 0 && window <= max_handle_) Handle(window);
   }
 }
 

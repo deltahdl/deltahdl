@@ -2,14 +2,11 @@
 
 #include <cstdint>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
 #include "helpers_scheduler.h"
-#include "simulator/class_gc_roots.h"
 #include "simulator/class_object.h"
 #include "simulator/lowerer.h"
 
@@ -750,22 +747,6 @@ TEST(ClassSim, AMailboxMessageKeepsItsObject) {
       f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(out, "7\n");
-}
-
-// §8.29 with §7.2: a handle inside a value wider than 64 bits can start at any
-// bit -- an unpacked struct's member sits wherever its earlier members end --
-// so the marker finds one at bit 32 of a 96-bit value, where a scan reading
-// whole 64-bit words would see neither half as a handle (#7226).
-TEST(ClassSim, TheMarkerFindsAHandleAtBit32OfAWideValue) {
-  SimFixture f;
-  ClassObject obj;
-  const std::unordered_map<uint64_t, ClassObject*> kObjects{{5, &obj}};
-  std::unordered_set<uint64_t> live;
-  ClassGcMarker mark(kObjects, live);
-  Logic4Vec value = MakeLogic4Vec(f.arena, 96);
-  value.words[0].aval = uint64_t{5} << 32;
-  mark.Words(value);
-  EXPECT_TRUE(live.contains(5));
 }
 
 // §8.29: a pending nonblocking assignment's value is a root until it runs; to

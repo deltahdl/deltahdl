@@ -22,6 +22,7 @@
 #include "simulator/scope.h"
 #include "simulator/scope_hier_name.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_name_tables.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/sva_engine_queues.h"
 #include "simulator/sync_objects.h"
@@ -117,18 +118,24 @@ void SweepDeadObjects(
   }
 }
 
-// §8.29: the roots of the run's named storage: the design's variables, the
+// §8.29: the roots of the run's named storage: the design's variables, each
+// structure among them read by its layout `tables` records, the
 // scopes of the process the run last switched to, the static frames, and the
 // objects that process's method calls run on.
 void MarkStorage(
-    ClassGcMarker& mark,
+    ClassGcMarker& mark, const DeclaredNameTables& tables,
     const std::unordered_map<std::string_view, Variable*>& variables,
     const std::vector<Scope>& scopes,
     const std::unordered_map<std::string_view,
                              std::unordered_map<std::string_view, Variable*>>&
         static_frames,
     const std::vector<ClassObject*>& this_stack) {
-  for (const auto& [name, var] : variables) mark.Var(var);
+  for (const auto& [name, var] : variables) {
+    mark.Var(var);
+    // §7.2: a structure's class-typed members, where its layout puts them.
+    const StructTypeInfo* layout = tables.GetVariableStructType(name);
+    if (layout != nullptr) mark.Fields(var->value, *layout);
+  }
   for (const Scope& scope : scopes) mark.InScope(scope);
   for (const auto& [owner, frame] : static_frames) {
     for (const auto& [name, var] : frame) mark.Var(var);
@@ -211,7 +218,8 @@ void SimContext::CollectGarbage() {
   // the objects any of them reach are reachable too.
   std::unordered_set<uint64_t> live;
   ClassGcMarker mark(class_objects_, live);
-  MarkStorage(mark, variables_, scope_stack_, static_frames_, this_stack_);
+  MarkStorage(mark, *this, variables_, scope_stack_, static_frames_,
+              this_stack_);
   MarkProcesses(mark, scheduler_, monitor_caller_.get(), file_monitors_);
   MarkContainers(mark, {queues_, assoc_arrays_, mailboxes_, HeldMailboxes(),
                         class_types_});
