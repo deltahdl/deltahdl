@@ -519,6 +519,8 @@ void AttachInstanceProcedures(VpiObject* instance,
     const BlockParent kParent{scope, scope->full_name};
     if (!proc.is_static_assertion) {
       walk.process = MakeProcess(proc, scope, instance_walk.build);
+      // §37.3.3: where the procedure was written.
+      VpiRecordWrittenLocation(walk.process, proc.loc, instance_walk.calls.ctx);
       walk.process->body = WalkProcessBody(proc, kParent, walk);
     } else if (proc.body->is_deferred) {
       // §16.4.3: a deferred assertion item is the statement it runs (§37.55).

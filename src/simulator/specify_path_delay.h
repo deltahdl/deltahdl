@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "common/source_loc.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -78,6 +79,9 @@ struct PathDelay {
   // vpiDelay reaches as expressions; `delays` holds them counted in ticks and
   // spread over the transitions. Empty on a path no declaration made.
   std::vector<const Expr*> source_delays;
+  // §37.3.3: where the path declaration was written; invalid on a path no
+  // declaration made.
+  SourceLoc loc;
 
   uint64_t reject_limit[12] = {};
   uint64_t error_limit[12] = {};

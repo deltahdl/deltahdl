@@ -777,6 +777,8 @@ void MakeContinuousAssignment(const RtlirContAssign& ca, VpiObject* scope,
   if (build.sim != nullptr) {
     VpiFillContAssignDelays(obj, ca, VpiFlatName(build.names.prefix, ""),
                             *build.sim, build.alloc);
+    // §37.3.3: where the assignment, or the net declaration, was written.
+    VpiRecordWrittenLocation(obj, item->loc, *build.sim);
   }
 
   std::vector<std::string_view> names;

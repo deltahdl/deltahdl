@@ -225,6 +225,7 @@ void MakePrimitiveArray(const ModuleItem& item, const PrimSite& site,
     VpiObject* prim = MakePrimitiveObject(ShapeOf(item.gate_kind), kName,
                                           terminals, site.instance, build);
     prim->delay_expr = kDelay;
+    VpiRecordWrittenLocation(prim, item.loc, ctx);
     VpiAddArrayElement(array, prim, index, build);
   }
 }
@@ -251,6 +252,8 @@ void MakeUdpObject(const RtlirUdpInst& inst, const PrimSite& site,
   udp->udp_defn = defn;
   udp->delay_expr =
       PrimitiveDelayExpression({inst.delay, inst.delay_fall}, site, ctx, build);
+  // §37.3.3: where the instantiation was written.
+  VpiRecordWrittenLocation(udp, inst.loc, ctx);
 }
 
 }  // namespace
@@ -275,10 +278,12 @@ void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
             MakePrimitiveArray(*item, kSite, ctx, build);
             continue;
           }
-          MakePrimitiveObject(ShapeOf(item->gate_kind), item->gate_inst_name,
-                              TerminalObjects(*item, kSite, ctx, build),
-                              instance, build)
-              ->delay_expr = GateDelayExpression(*item, kSite, ctx, build);
+          VpiObject* prim = MakePrimitiveObject(
+              ShapeOf(item->gate_kind), item->gate_inst_name,
+              TerminalObjects(*item, kSite, ctx, build), instance, build);
+          prim->delay_expr = GateDelayExpression(*item, kSite, ctx, build);
+          // §37.3.3: where the instantiation was written.
+          VpiRecordWrittenLocation(prim, item->loc, ctx);
         }
         for (const RtlirUdpInst& inst : mod->udp_insts) {
           MakeUdpObject(inst, {instance, prefix, objects},

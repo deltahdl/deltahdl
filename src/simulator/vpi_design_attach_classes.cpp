@@ -224,7 +224,7 @@ VpiObject* MakeProperty(const MadeClassDefn& owner, const ClassMember& member,
 // was declared virtual or pure virtual (§8.20, §8.21), and automatic, the
 // one lifetime §8.6 gives a method.
 void MakeMethod(const MadeClassDefn& owner, const ClassMember& member,
-                const VpiAttachBuild& build) {
+                SimContext& ctx, const VpiAttachBuild& build) {
   const ModuleItem* item = member.method;
   if (item == nullptr) return;
   VpiObject* method = build.alloc();
@@ -236,6 +236,8 @@ void MakeMethod(const MadeClassDefn& owner, const ClassMember& member,
   method->visibility = DeclaredVisibility(member);
   method->is_virtual = member.is_virtual || member.is_pure_virtual;
   method->automatic = true;
+  // §37.3.3: where the method was written.
+  VpiRecordWrittenLocation(method, item->loc, ctx);
   owner.defn->children.push_back(method);
 }
 
@@ -247,7 +249,7 @@ void MakeMembers(const MadeClassDefn& owner, const RtlirDesign& design,
   for (const ClassMember* member : owner.decl->members) {
     if (member == nullptr) continue;
     if (member->kind == ClassMemberKind::kMethod) {
-      MakeMethod(owner, *member, build);
+      MakeMethod(owner, *member, ctx, build);
     } else if (member->kind == ClassMemberKind::kProperty &&
                !member->is_param) {
       VpiObject* var = MakeProperty(owner, *member, design, made, build);
@@ -297,6 +299,8 @@ VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
   MakePackageClassDefns(*design, objects, build, made);
   MakeUnitClassDefns(*design, objects, build, made);
   for (const MadeClassDefn& owner : made) {
+    // §37.3.3: where the class was written.
+    VpiRecordWrittenLocation(owner.defn, owner.decl->range.start, ctx);
     MakeMembers(owner, *design, made, ctx, build);
     if (!owner.decl->base_class.empty()) {
       MakeExtends(owner, made, objects, ctx, build);

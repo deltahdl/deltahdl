@@ -258,6 +258,8 @@ VpiObject* MakeSubroutine(const SubroutineScope& where, const ModuleItem* item,
   tf->automatic = item->is_automatic || (where.automatic && !item->is_static);
   if (where.scope != nullptr) where.scope->children.push_back(tf);
   sb.made[{item, where.key}] = tf;
+  // §37.3.3: where the task or function was written.
+  VpiRecordWrittenLocation(tf, item->loc, sb.ctx);
   // A declared width or range reads the parameters of the scope declaring it.
   InstancePrefixOverride scope(sb.ctx.InstancePrefixOverride(), where.params);
   MakeIoDecls(tf, *item, where, sb);

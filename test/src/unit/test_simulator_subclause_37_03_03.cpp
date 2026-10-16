@@ -10,6 +10,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_simulator.h"
+#include "fixture_vpi_run.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 #include "simulator/vpi_context.h"
@@ -344,6 +345,67 @@ TEST_F(VpiLocationInARun, ASystemTaskCallReportsItsOwnLineAndFile) {
 
   EXPECT_EQ(WhereCallLocations(), (std::vector<std::pair<int, std::string>>{
                                       {4, "<test>"}, {2, "<test>"}}));
+}
+
+// §37.3.3 against a design: the objects a module's other constructs stand as
+// report the line they were written on -- a primitive (#7238), a continuous
+// assignment (#7237), a task (#7239), a class defn (#7240), a process
+// (#7235), a module path (#7241) and a timing check (#7242). None recorded
+// where it was written, so each answered line 0.
+class WrittenLinesOfARun : public VpiDesignRun {
+ protected:
+  void SetUp() override {
+    VpiDesignRun::SetUp();
+    Run("module m(input a, input b, output o, output y);\n"
+        "  wire p;\n"
+        "  and g(o, a, b);\n"
+        "  assign p = a;\n"
+        "  task t; endtask\n"
+        "  class C; endclass\n"
+        "  initial begin end\n"
+        "  specify\n"
+        "    (a => y) = 1;\n"
+        "    $setup(a, posedge b, 2);\n"
+        "  endspecify\n"
+        "endmodule\n"
+        "module top; reg a, b; wire o, y; m m1(a, b, o, y); endmodule\n");
+  }
+
+  // The line of the first object of `type` the instance m1 reaches, -1 for
+  // none.
+  static int LineOfFirst(int type) {
+    vpiHandle it = vpi_iterate(type, By("top.m1"));
+    vpiHandle obj = it == nullptr ? nullptr : vpi_scan(it);
+    return obj == nullptr ? -1 : vpi_get(vpiLineNo, obj);
+  }
+};
+
+TEST_F(WrittenLinesOfARun, APrimitiveReportsTheLineItWasWrittenOn) {
+  EXPECT_EQ(LineOfFirst(vpiPrimitive), 3);
+}
+
+TEST_F(WrittenLinesOfARun, AContinuousAssignmentReportsItsLine) {
+  EXPECT_EQ(LineOfFirst(vpiContAssign), 4);
+}
+
+TEST_F(WrittenLinesOfARun, ATaskReportsTheLineItWasWrittenOn) {
+  EXPECT_EQ(LineOfFirst(vpiTask), 5);
+}
+
+TEST_F(WrittenLinesOfARun, AClassDefnReportsTheLineItWasWrittenOn) {
+  EXPECT_EQ(LineOfFirst(vpiClassDefn), 6);
+}
+
+TEST_F(WrittenLinesOfARun, AProcessReportsTheLineItWasWrittenOn) {
+  EXPECT_EQ(LineOfFirst(vpiProcess), 7);
+}
+
+TEST_F(WrittenLinesOfARun, AModulePathReportsTheLineItWasWrittenOn) {
+  EXPECT_EQ(LineOfFirst(vpiModPath), 9);
+}
+
+TEST_F(WrittenLinesOfARun, ATimingCheckReportsTheLineItWasWrittenOn) {
+  EXPECT_EQ(LineOfFirst(vpiTchk), 10);
 }
 
 }  // namespace

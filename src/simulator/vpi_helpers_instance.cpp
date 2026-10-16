@@ -22,6 +22,7 @@
 #include "simulator/vpi_alloc_scheme.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers3.h"
@@ -296,6 +297,8 @@ void VpiContext::AttachModulePathDelays(SimContext& sim_ctx) {
     obj->delay_expr =
         VpiSourceDelayExpression(path.source_delays, path.inst_prefix, sim_ctx,
                                  [this] { return AllocObject(); });
+    // §37.3.3: where the path declaration was written.
+    VpiRecordWrittenLocation(obj, path.loc, sim_ctx);
     // §38.10: the s_vpi_delay array the application allocated holds the delays
     // in the order the SystemVerilog description writes them, which for a
     // module path is the order of its transition slots, and the
@@ -409,6 +412,8 @@ void VpiContext::AttachTimingChecks(SimContext& sim_ctx) {
     obj->delay_expr =
         VpiSourceDelayExpression(check.source_limits, check.inst_prefix,
                                  sim_ctx, [this] { return AllocObject(); });
+    // §37.3.3: where the check was written.
+    VpiRecordWrittenLocation(obj, check.loc, sim_ctx);
 
     // §37.40 (figure): "-> limit", retrieved with vpi_get_delays(). §31.2
     // writes a check's limit as the one time it is given, so the object
