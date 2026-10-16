@@ -41,7 +41,6 @@ bool Elaborator::IsNameInModuleScope(std::string_view name) const {
   if (specparam_names_.count(name)) return true;
   if (class_names_.count(name)) return true;
   if (class_var_names_.count(name)) return true;
-  if (task_names_.count(name)) return true;
   if (func_decls_.count(name)) return true;
   if (interface_inst_types_.count(name)) return true;
   if (checker_inst_names_.count(name)) return true;
