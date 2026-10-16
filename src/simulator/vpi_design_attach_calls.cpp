@@ -226,22 +226,28 @@ bool IsAssocDim(const Expr& dim, const BodyWalk& walk) {
          FindClassDecl(walk, dim.text).decl != nullptr;
 }
 
-// The kind of built-in value a block declares with `decl`: an array of the kind
-// its first unpacked dimension makes, a dynamic array's `[]` being recorded as
-// no dimension and a queue's as `[$]`; else a string or an enum, written as
-// one or through a typedef.
-VpiBuiltInHolder BlockHolder(const Stmt& decl, const BodyWalk& walk) {
-  if (!decl.var_unpacked_dims.empty()) {
-    const Expr* dim = decl.var_unpacked_dims.front();
+// The kind of built-in value a declaration with the unpacked dimensions `dims`
+// and the variable kind `kind` holds: an array of the kind its first unpacked
+// dimension makes, a dynamic array's `[]` being recorded as no dimension and a
+// queue's as `[$]`; else a string or an enum.
+VpiBuiltInHolder DeclaredHolder(const std::vector<Expr*>& dims, int kind,
+                                const BodyWalk& walk) {
+  if (!dims.empty()) {
+    const Expr* dim = dims.front();
     if (dim == nullptr) return VpiBuiltInHolder::kDynamicArray;
     if (IsQueueDim(dim)) return VpiBuiltInHolder::kQueue;
     return IsAssocDim(*dim, walk) ? VpiBuiltInHolder::kAssocArray
                                   : VpiBuiltInHolder::kFixedArray;
   }
-  const int kKind = TypeVariableKind(decl.var_decl_type, walk);
-  if (kKind == vpiStringVar) return VpiBuiltInHolder::kString;
-  return kKind == vpiEnumVar ? VpiBuiltInHolder::kEnum
-                             : VpiBuiltInHolder::kNone;
+  if (kind == vpiStringVar) return VpiBuiltInHolder::kString;
+  return kind == vpiEnumVar ? VpiBuiltInHolder::kEnum : VpiBuiltInHolder::kNone;
+}
+
+// The same of the variable a block declares with `decl`, its type written
+// directly or through a typedef.
+VpiBuiltInHolder BlockHolder(const Stmt& decl, const BodyWalk& walk) {
+  return DeclaredHolder(decl.var_unpacked_dims,
+                        TypeVariableKind(decl.var_decl_type, walk), walk);
 }
 
 // The same, of a variable of the instance's module.
@@ -501,6 +507,9 @@ struct HandleType {
   std::string_view vif;
   // §8.25: the arguments the specialization the class is held as gives it.
   std::span<const DataType> args = {};
+  // The kind of built-in value the member is, whose methods a call through it
+  // may be (§37.42 details 2 and 11).
+  VpiBuiltInHolder holder = VpiBuiltInHolder::kNone;
 };
 
 // The same for the property `name` of the class `cls`, or of a class it
@@ -514,7 +523,9 @@ HandleType PropertyType(const BodyWalk& walk, std::string_view cls,
   const DataType& type = member->data_type;
   return {
       type.kind == DataTypeKind::kNamed ? type.type_name : std::string_view(),
-      VifInterface(&type), type.type_params};
+      VifInterface(&type), type.type_params,
+      DeclaredHolder(member->unpacked_dims, TypeVariableKind(type, walk),
+                     walk)};
 }
 
 // §6.18: the type the typedef `name` the walked module declares stands for;
@@ -544,11 +555,21 @@ const DataType* StructTypeOf(const BodyWalk& walk, const DataType* type) {
 
 // §7.2 with §8.4: the class the member `name` of the structure `aggregate`
 // holds a handle of, named as its declaration wrote it, with the arguments its
-// specialization gives the class (§8.25).
-HandleType StructMemberType(const DataType& aggregate, std::string_view name) {
+// specialization gives the class (§8.25), and the kind of built-in value the
+// member is.
+HandleType StructMemberType(const DataType& aggregate, std::string_view name,
+                            const BodyWalk& walk) {
   HandleType type;
   for (const StructMember& member : aggregate.struct_members) {
-    if (member.name == name) type = {member.type_name, {}, member.type_params};
+    if (member.name != name) continue;
+    const int kKind =
+        member.type_kind == DataTypeKind::kNamed
+            ? VpiNamedTypeVariableKind(walk.design, walk.mod, member.type_name)
+            : VpiDataTypeVariableKind(member.type_kind);
+    type = {member.type_name,
+            {},
+            member.type_params,
+            DeclaredHolder(member.unpacked_dims, kKind, walk)};
   }
   return type;
 }
@@ -735,7 +756,9 @@ CallShape ExprCallShape(const Expr& access, const BlockParent& parent,
 // that member in the object the var references, which is read when the
 // prefix is asked for. A method that class does not declare may be one of the
 // built-in methods of the member itself, h.x.rand_mode(0) or
-// h.c.constraint_mode(0) (§18.8, §18.9).
+// h.c.constraint_mode(0) (§18.8, §18.9). A member that is a string, an enum or
+// an unpacked array takes the built-in methods of its kind instead,
+// s.q.delete() or h.q.size() (§37.42 details 2 and 11).
 CallShape MemberChainCallShape(const Expr& access, const BlockParent& parent,
                                const BodyWalk& walk) {
   std::vector<std::string_view> names;
@@ -753,7 +776,7 @@ CallShape MemberChainCallShape(const Expr& access, const BlockParent& parent,
   const DataType* aggregate =
       first < names.size() ? StructTypeOf(kAt, kHead.var.type) : nullptr;
   if (aggregate != nullptr) {
-    type = StructMemberType(*aggregate, names[first]);
+    type = StructMemberType(*aggregate, names[first], kAt);
     prefix = ChildNamed(prefix, names[first]);
     ++first;
   }
@@ -763,9 +786,15 @@ CallShape MemberChainCallShape(const Expr& access, const BlockParent& parent,
   if (!type.vif.empty()) {
     return InterfaceCallShape(kAt, type.vif, access.rhs->text);
   }
-  MethodCall call =
-      ClassMethodCall(kAt, type.cls, access.rhs->text, {}, type.args);
-  if (call.type == 0) call.type = VpiMemberBuiltInCallKind(access.rhs->text);
+  MethodCall call;
+  if (type.holder != VpiBuiltInHolder::kNone) {
+    if (VpiIsBuiltInMethod(type.holder, access.rhs->text)) {
+      call.type = vpiMethodFuncCall;
+    }
+  } else {
+    call = ClassMethodCall(kAt, type.cls, access.rhs->text, {}, type.args);
+    if (call.type == 0) call.type = VpiMemberBuiltInCallKind(access.rhs->text);
+  }
   CallShape shape = MethodShape(call, access.rhs->text, prefix, kAt);
   if (shape.type != 0) {
     shape.prefix_members.assign(
