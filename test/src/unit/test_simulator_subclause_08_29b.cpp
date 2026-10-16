@@ -58,9 +58,10 @@ TEST_F(ClassGcMarking, NothingIsMarkedThroughAnEmptyStore) {
 }
 
 // §7.2: a structure's class-typed members are read where its layout puts them
-// (#7226): a handle at bit 32, after the int below it, and one in a nested
-// structure's member; a member of another type, and one the value is too short
-// to hold, are not read as handles.
+// (#7226): a handle at bit 32, after the int below it, one in a nested
+// structure's member, and one starting the last word; a member of another
+// type, one running off the value's end, and one the value is too short to
+// hold, are not read as handles.
 TEST_F(ClassGcMarking, AStructuresClassMembersAreMarkedWhereTheyStand) {
   StructTypeInfo inner;
   inner.fields.push_back({"n", 0, 64, DataTypeKind::kNamed});
@@ -70,12 +71,15 @@ TEST_F(ClassGcMarking, AStructuresClassMembersAreMarkedWhereTheyStand) {
   StructFieldInfo nested{"s", 96, 64, DataTypeKind::kStruct};
   nested.nested = &inner;
   layout.fields.push_back(nested);
+  layout.fields.push_back({"last", 192, 64, DataTypeKind::kNamed});
+  layout.fields.push_back({"tail", 200, 64, DataTypeKind::kNamed});
   layout.fields.push_back({"far", 400, 64, DataTypeKind::kNamed});
-  Logic4Vec value = MakeLogic4Vec(arena_, 160);
+  Logic4Vec value = MakeLogic4Vec(arena_, 256);
   value.words[0].aval = (uint64_t{2} << 32) | 3;
   value.words[1].aval = uint64_t{1} << 32;
+  value.words[3].aval = 3;
   mark_.Fields(value, layout);
-  EXPECT_EQ(live_, (std::unordered_set<uint64_t>{1, 2}));
+  EXPECT_EQ(live_, (std::unordered_set<uint64_t>{1, 2, 3}));
 }
 
 // A variable's value and the value a pending nonblocking assignment will write
