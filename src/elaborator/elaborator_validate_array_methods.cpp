@@ -285,31 +285,40 @@ bool IsIndexTypeDim(const Expr& dim, const ValueScope& values) {
          values.class_names.contains(dim.text);
 }
 
-// The unpacked dimensions the member `base` selects is declared with: a member
-// of a structure variable, s.q, or a property of the class a variable holds a
-// handle of, h.q; null where `base` is neither.
-const std::vector<Expr*>* MemberDims(const Expr& base,
-                                     const ArrayMethodScan& scan) {
+// What the member `base` selects is declared with: its unpacked dimensions,
+// and whether it is declared rand or randc, which gives it §18.8's rand_mode
+// whatever its type.
+struct DeclaredMember {
+  const std::vector<Expr*>* dims = nullptr;
+  bool random = false;
+};
+
+// That of a member of a structure variable, s.q, or of a property of the class
+// a variable holds a handle of, h.q; no dimensions where `base` is neither.
+DeclaredMember MemberDeclared(const Expr& base, const ArrayMethodScan& scan) {
   if (base.kind != ExprKind::kMemberAccess || base.is_scope_resolution ||
       base.lhs->kind != ExprKind::kIdentifier) {
-    return nullptr;
+    return {};
   }
   if (const StructMember* m = SelectedStructMember(&base, scan.values)) {
-    return &m->unpacked_dims;
+    return {&m->unpacked_dims, m->is_rand || m->is_randc};
   }
   auto handle = scan.class_vars.find(base.lhs->text);
-  if (handle == scan.class_vars.end()) return nullptr;
+  if (handle == scan.class_vars.end()) return {};
   const ClassMember* property = FindMemberInClass(
       FindClassDecl(handle->second, scan.unit), base.rhs->text, scan.unit);
-  return property != nullptr ? &property->unpacked_dims : nullptr;
+  if (property == nullptr) return {};
+  return {&property->unpacked_dims, property->is_rand || property->is_randc};
 }
 
 // §7.5, §7.9, §7.10.2 and §7.12: the same rule for an array reached through a
 // member, whose kind its first unpacked dimension makes as a variable's does.
 void CheckMemberArrayMethod(const Expr* e, const ArrayMethodSite& site,
                             const ArrayMethodScan& scan) {
-  const std::vector<Expr*>* dims = MemberDims(*site.base, scan);
-  if (dims == nullptr || dims->empty() || IsManipulationMethod(site.method)) {
+  const DeclaredMember kMember = MemberDeclared(*site.base, scan);
+  const std::vector<Expr*>* dims = kMember.dims;
+  if (dims == nullptr || dims->empty() || IsManipulationMethod(site.method) ||
+      (kMember.random && site.method == "rand_mode")) {
     return;
   }
   Elaborator::VarArrayInfo info;

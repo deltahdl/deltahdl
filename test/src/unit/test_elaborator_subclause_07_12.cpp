@@ -54,13 +54,14 @@ TEST(ArrayMethodValidation, NameNoMethodOfTheArraysKindIsRejected) {
 
 // The same of an array reached through members: a structure's member, s.q,
 // and a property of the class a variable holds a handle of, h.q. The methods
-// of each kind are still accepted there.
+// of each kind are still accepted there, and so is §18.8's rand_mode on an
+// array declared rand.
 TEST(ArrayMethodValidation, AMemberArraysNameOfNoMethodIsRejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
       "  typedef struct { int q[$]; int fx[2]; } s_t;\n"
-      "  class C; int q[$]; int aa[string]; endclass\n"
+      "  class C; int q[$]; int aa[string]; rand int ra[2]; endclass\n"
       "  s_t s; C h = new; int n;\n"
       "  initial begin\n"
       "    s.q.foo();\n"
@@ -71,6 +72,7 @@ TEST(ArrayMethodValidation, AMemberArraysNameOfNoMethodIsRejected) {
       "    n = h.q.size();\n"
       "    n = h.aa.num();\n"
       "    s.fx.sort();\n"
+      "    h.ra.rand_mode(0);\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -87,7 +89,7 @@ TEST(ArrayMethodValidation, AMemberArraysNameOfNoMethodIsRejected) {
       "'pop_front' is not a built-in method of the associative array 'h.aa'", 9,
       "7.9"));
   for (const auto& d : diags) {
-    EXPECT_FALSE(d.loc.line >= 10 && d.loc.line <= 13)
+    EXPECT_FALSE(d.loc.line >= 10 && d.loc.line <= 14)
         << d.loc.line << ": " << d.message;
   }
 }
