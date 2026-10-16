@@ -349,9 +349,6 @@ class DeclaredNameTables {
   SemaphoreObject* ContainedSemaphore(uint64_t identity) const;
   void RecordContainedMailbox(MailboxObject* mbx);
   MailboxObject* ContainedMailbox(uint64_t identity) const;
-  // §8.29: every mailbox a handle variable or a container holds, whose
-  // messages the class garbage collector reads as roots.
-  std::vector<const MailboxObject*> HeldMailboxes() const;
 
   void RegisterInstanceType(std::string_view prefix, std::string_view type);
   std::string_view FindInstanceType(std::string_view prefix) const;

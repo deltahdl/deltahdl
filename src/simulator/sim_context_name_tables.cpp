@@ -566,13 +566,6 @@ void DeclaredNameTables::RecordContainedMailbox(MailboxObject* mbx) {
   if (mbx != nullptr) contained_mailboxes_[SyncObjectIdentity(mbx)] = mbx;
 }
 
-std::vector<const MailboxObject*> DeclaredNameTables::HeldMailboxes() const {
-  std::vector<const MailboxObject*> held;
-  for (const auto& [var, mbx] : mailbox_handles_) held.push_back(mbx);
-  for (const auto& [identity, mbx] : contained_mailboxes_) held.push_back(mbx);
-  return held;
-}
-
 MailboxObject* DeclaredNameTables::ContainedMailbox(uint64_t identity) const {
   auto it = contained_mailboxes_.find(identity);
   return it != contained_mailboxes_.end() ? it->second : nullptr;

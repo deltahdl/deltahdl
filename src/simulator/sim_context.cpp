@@ -596,9 +596,6 @@ void SimContext::CopyCarriedStacksTo(Process& child) const {
   child.saved_this_stack = this_stack_;
   child.saved_method_class_stack = method_class_stack_;
   child.saved_scope_stack = scope_stack_;
-  // §8.29: what a branch carries before it first runs keeps the objects it
-  // refers to reachable. A stand-in's stacks are its holder's to report.
-  if (!child.stand_in) scheduler_.NoteCarrier(&child);
 }
 
 void SimContext::ExitFunction() {
