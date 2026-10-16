@@ -1,0 +1,6 @@
+--load-lib
+two.lib
+--top
+sc_two_tops_a
+--top
+sc_two_tops_b

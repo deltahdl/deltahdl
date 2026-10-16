@@ -286,11 +286,20 @@ void AddMapConfigs(delta::CompilationUnit& cu,
   for (auto* cfg : lib_map.DeclaredConfigs()) cu.configs.push_back(cfg);
 }
 
+// The top-level cell a run from source descriptions is rooted at: the last
+// --top names, or none where it names none.
+std::string_view SourceTopModule(const delta::CliOptions& opts) {
+  if (opts.top_modules.empty()) return {};
+  return opts.top_modules.back();
+}
+
 // The top-level instance a dump named on the command line is rooted at: the
 // one --top names, else the first the design roots.
 std::string DumpTopModule(const delta::CliOptions& opts,
                           const delta::RtlirDesign* design) {
-  if (!opts.top_module.empty()) return opts.top_module;
+  if (std::string_view top = SourceTopModule(opts); !top.empty()) {
+    return std::string(top);
+  }
   if (design->top_modules.empty()) return "";
   return std::string(design->top_modules.front()->name);
 }
@@ -358,7 +367,7 @@ Elaboration ElaborateDesign(const delta::CliOptions& opts,
   // the standard's own §23.5 example, `module top` followed by `module m (.*)`
   // and `module a (.*)` -- elaborated one of those alone and ran nothing.
   const auto* design = delta::ElaborateCommandLine(
-      elaborator, *units.cu, opts.top_module, opts.config, diag);
+      elaborator, *units.cu, SourceTopModule(opts), opts.config, diag);
   if (diag.HasErrors()) return {.failed = true};
   if (design == nullptr) return {.failed = !units.cu->DeclaresNothing()};
   if (opts.dump_ir) DumpIr(design);
@@ -592,8 +601,11 @@ int RunSeparateCompilationBind(const delta::CliOptions& opts,
   const delta::RtlirDesign* design = nullptr;
   if (!opts.config.empty()) {
     design = binder.BindConfig(opts.config);
-  } else if (!opts.top_module.empty()) {
-    design = binder.Bind({opts.top_module});
+  } else if (!opts.top_modules.empty()) {
+    // §33.5.3 (printed page 944): the binding tool is told the top-level
+    // module or modules of the design, so every cell --top names roots it.
+    design = binder.Bind(std::vector<std::string_view>(opts.top_modules.begin(),
+                                                       opts.top_modules.end()));
   } else {
     std::cerr << "a separate compilation bind names --config or --top\n";
     return 1;

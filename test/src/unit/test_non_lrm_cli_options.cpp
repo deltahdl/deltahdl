@@ -270,7 +270,7 @@ TEST(OptionsFile, HashWordCommentsOutTheRestOfItsLine) {
 
   CliOptions opts;
   EXPECT_TRUE(ParseCommandLine({"-f", kOptionsFile}, opts));
-  EXPECT_EQ(opts.top_module, "adder");
+  EXPECT_EQ(opts.top_modules, std::vector<std::string>{"adder"});
   EXPECT_EQ(opts.seed, 7U);
   EXPECT_EQ(opts.source_files, std::vector<std::string>{"a#b.sv"});
 }

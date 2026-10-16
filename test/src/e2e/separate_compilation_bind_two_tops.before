@@ -1,0 +1,4 @@
+--precompile-into
+two_lib
+--precompile-out
+two.lib

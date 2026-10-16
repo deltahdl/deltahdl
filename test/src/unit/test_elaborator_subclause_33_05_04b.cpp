@@ -83,6 +83,14 @@ TEST(SeparateCompilationCommandLine, LoadLibWrittenTwiceKeepsBothInOrder) {
             (std::vector<std::string>{"rtl.dlib", "gates.dlib"}));
 }
 
+// §33.5.3 (printed page 944): the binding tool is told the top-level module or
+// modules of the design, so --top written twice names two tops, in order.
+TEST(SeparateCompilationCommandLine, TopWrittenTwiceKeepsBothInOrder) {
+  CliOptions opts;
+  EXPECT_TRUE(ParseCommandLine({"--top", "t1", "--top", "t2"}, opts));
+  EXPECT_EQ(opts.top_modules, (std::vector<std::string>{"t1", "t2"}));
+}
+
 TEST(SeparateCompilationCommandLine, LoadLibAndConfigNameSeparateThings) {
   CliOptions opts;
   EXPECT_TRUE(
@@ -235,7 +243,7 @@ TEST(SeparateCompilationCommandLine, OptionsFileCarriesAnOptionToItsField) {
 
   CliOptions opts;
   EXPECT_TRUE(ParseCommandLine({"-f", kOptionsFile}, opts));
-  EXPECT_EQ(opts.top_module, "adder");
+  EXPECT_EQ(opts.top_modules, std::vector<std::string>{"adder"});
 }
 
 TEST(SeparateCompilationCommandLine,

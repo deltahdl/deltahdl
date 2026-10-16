@@ -25,7 +25,9 @@ class SpecifyManager;
 // #3425 is that gap.
 struct CliOptions {
   std::vector<std::string> source_files;
-  std::string top_module;
+  // §33.5.3 (printed page 944): the top-level module or modules --top names, in
+  // the order written.
+  std::vector<std::string> top_modules;
   std::string vcd_file;
   std::vector<std::string> include_dirs;
 

@@ -256,7 +256,7 @@ bool TryParseVpiCompatModeArg(std::string_view arg, int& i, int argc,
 bool TryParseSimArg(std::string_view arg, int& i, int argc,
                     const char* const argv[], CliOptions& opts) {
   ArgCursor cur{i, argc, argv, opts};
-  if (TakeValue(arg, "--top", cur, opts.top_module)) return true;
+  if (TakeValue(arg, "--top", cur, opts.top_modules)) return true;
   if (TakeValue(arg, "--vcd", cur, opts.vcd_file)) return true;
   if (TryParseSimNumericArg(arg, i, argc, argv, opts)) return true;
   if (TryParseMinTypMaxArg(arg, i, argc, argv, opts)) return true;
