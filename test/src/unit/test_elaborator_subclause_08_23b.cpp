@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "fixture_elaborator.h"
+#include "helpers_param_value.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
 
@@ -133,6 +134,50 @@ TEST(ClassScopeResolutionElaboration,
                               "is not cast compatible with the type of formal",
                               line, "11.12"));
   }
+}
+
+// §8.23 with §6.20.1: the class scope resolution operator reaches a member of
+// a class nested in another, and a class body's parameter is a localparam,
+// so `Outer::Inner::N` is a constant a module localparam may be set to. The
+// nested class's parameters were recorded under no key and only a name with
+// one identifier before `::` was read as one, so A had no value.
+TEST(ClassScopeResolutionElaboration, NestedClassParameterIsAConstant) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class Outer;\n"
+      "  class Inner;\n"
+      "    localparam int N = 5;\n"
+      "  endclass\n"
+      "endclass\n"
+      "module m;\n"
+      "  localparam int A = Outer::Inner::N;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "A"), 5);
+}
+
+// The same for classes declared in the module (§8.26), whose parameters are
+// registered as the module's items are elaborated: `logic
+// [Outer::Inner::N-1:0] v` after the classes is five bits wide.
+TEST(ClassScopeResolutionElaboration, NestedModuleClassParameterSizesAVar) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  class Outer;\n"
+      "    class Inner;\n"
+      "      localparam int N = 5;\n"
+      "    endclass\n"
+      "  endclass\n"
+      "  logic [Outer::Inner::N-1:0] v;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* v = FindVar(design, "m", "v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(v->width, 5u);
 }
 
 }  // namespace

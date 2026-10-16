@@ -61,15 +61,20 @@ DataType InPackageScope(const DataType& type, const PackageDecl& package) {
   return scoped;
 }
 
-DataType InClassScope(const DataType& type, const ClassDecl& cls) {
+DataType InClassScope(const DataType& type, const ClassDecl& cls,
+                      std::string_view scope) {
   DataType scoped = type;
   if (!IsBareTypeName(type)) return scoped;
   for (const ClassMember* m : cls.members) {
     if (m->kind == ClassMemberKind::kTypedef && m->name == type.type_name) {
-      scoped.scope_name = cls.name;
+      scoped.scope_name = scope;
     }
   }
   return scoped;
+}
+
+DataType InClassScope(const DataType& type, const ClassDecl& cls) {
+  return InClassScope(type, cls, cls.name);
 }
 
 const DataType& LastTypeInChain(const DataType& dtype,

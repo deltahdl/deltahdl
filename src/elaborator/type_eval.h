@@ -143,6 +143,12 @@ DataType InPackageScope(const DataType& type, const PackageDecl& package);
 // the class, which may declare one of its own under that name.
 DataType InClassScope(const DataType& type, const ClassDecl& cls);
 
+// The same, `scope` being the path the class's typedefs are keyed under, as
+// RegisterClassTypedefKeys builds it: "Outer::Inner" for a class nested in
+// another (§8.23), whose typedefs stand under "Outer::Inner::name".
+DataType InClassScope(const DataType& type, const ClassDecl& cls,
+                      std::string_view scope);
+
 // The type `dtype` stands for, following each typedef or user-defined nettype
 // name (§6.18, §6.6.7) to the type it was declared with as far as the table
 // holds one: a type, or the last name on the way the table holds nothing for,

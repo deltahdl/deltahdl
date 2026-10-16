@@ -52,11 +52,16 @@ namespace delta {
 // it stands. `values` is `cu_param_scope` with the values recorded so far
 // layered over it under their bare names, which is what §6.20.1 requires when
 // it lets a parameter in a list of parameter constants depend on earlier ones.
-// The three fields that follow are where a recorded value goes and how a
-// breach is reported.
+// `key_prefix` is the class's path in the keys its parameters are recorded
+// under, "Outer.Inner" for a class nested in another (§8.23), and
+// `type_scope` the same path as its typedefs are keyed, "Outer::Inner". The
+// three fields that follow are where a recorded value goes and how a breach
+// is reported.
 struct ClassParamRegistration {
   const ClassDecl* cls;
   std::unordered_set<std::string_view> formals;
+  std::string_view key_prefix;
+  std::string_view type_scope;
   ScopeMap values;
   ScopeMap& cu_param_scope;
   Arena& arena;
@@ -148,8 +153,8 @@ static void RecordClassParam(std::string_view pname, const Expr* pexpr,
     return;
   }
   if (is_array || is_real) return;
-  auto* qname = reg.arena.Create<std::string>(std::string(reg.cls->name) + "." +
-                                              std::string(pname));
+  auto* qname = reg.arena.Create<std::string>(std::string(reg.key_prefix) +
+                                              "." + std::string(pname));
   reg.cu_param_scope[*qname] = *val;
   reg.values[pname] = *val;
 }
@@ -170,9 +175,31 @@ static void RegisterOneClassParams(ClassParamRegistration& reg) {
   }
   for (const auto* m : reg.cls->members) {
     if (m->kind != ClassMemberKind::kProperty || !m->is_param) continue;
-    DataType type = InClassScope(m->data_type, *reg.cls);
+    DataType type = InClassScope(m->data_type, *reg.cls, reg.type_scope);
     RecordClassParam(m->name, m->init_expr, &type, !m->unpacked_dims.empty(),
                      reg);
+  }
+}
+
+// The parameters of the class `reg` registers, and then those of each class
+// nested in it (§8.23), which a constant expression reaches through the chain
+// of class names, `Outer::Inner::N`: each is recorded under the full path,
+// "Outer.Inner.N", and folded over the enclosing class's values with its own
+// names layered over them.
+static void RegisterClassTreeParams(ClassParamRegistration& reg) {
+  RegisterOneClassParams(reg);
+  for (const auto* m : reg.cls->members) {
+    if (m->kind != ClassMemberKind::kClassDecl || m->nested_class == nullptr)
+      continue;
+    const ClassDecl* inner = m->nested_class;
+    auto* prefix = reg.arena.Create<std::string>(
+        std::string(reg.key_prefix) + "." + std::string(inner->name));
+    auto* scope = reg.arena.Create<std::string>(
+        std::string(reg.type_scope) + "::" + std::string(inner->name));
+    ClassParamRegistration nested{
+        inner,      ClassParamNames(inner), *prefix,   *scope,
+        reg.values, reg.cu_param_scope,     reg.arena, reg.diag};
+    RegisterClassTreeParams(nested);
   }
 }
 
@@ -182,9 +209,15 @@ void RegisterClassParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
     // cu_param_scope appears twice: once copied into `values`, which the class
     // layers its own bare names over, and once bound as the scope the qualified
     // "Class.name" keys are written to.
-    ClassParamRegistration reg{
-        cls, ClassParamNames(cls), cu_param_scope, cu_param_scope, arena, diag};
-    RegisterOneClassParams(reg);
+    ClassParamRegistration reg{cls,
+                               ClassParamNames(cls),
+                               cls->name,
+                               cls->name,
+                               cu_param_scope,
+                               cu_param_scope,
+                               arena,
+                               diag};
+    RegisterClassTreeParams(reg);
   }
 }
 
@@ -208,8 +241,9 @@ void RegisterModuleClassParams(const ClassDecl* cls,
                                ScopeMap& cu_param_scope, Arena& arena,
                                DiagEngine& diag) {
   ClassParamRegistration reg{
-      cls, ClassParamNames(cls), module_scope, cu_param_scope, arena, diag};
-  RegisterOneClassParams(reg);
+      cls,          ClassParamNames(cls), cls->name, cls->name,
+      module_scope, cu_param_scope,       arena,     diag};
+  RegisterClassTreeParams(reg);
 }
 
 // Whether `e` mentions any name in `names`, at any depth. Every identifier the

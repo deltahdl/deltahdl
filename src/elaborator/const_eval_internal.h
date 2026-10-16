@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
@@ -476,5 +477,12 @@ SpecializationArg ConstEvalSpecializedClassParam(const Expr* expr,
 // parameter lookup, since a class may declare a parameter called `size`.
 std::optional<bool> BuiltinMethodCallIsConstant(const Expr* expr,
                                                 const ScopeMap& scope);
+
+// §8.23 with §26.3: the key a name written with the scope resolution operator
+// is recorded under in a ScopeMap -- "Class.name" or "pkg.name", and
+// "Outer.Inner.name" for a class nested in another -- read off a chain of
+// member accesses every part of which is an identifier; empty for any other
+// expression. Defined in const_eval_func.cpp.
+std::optional<std::string> ScopedNameKey(const Expr* expr);
 
 }  // namespace delta

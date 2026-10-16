@@ -103,6 +103,16 @@ std::optional<PackedRange> RegisteredParamRange(std::string_view name) {
   return std::nullopt;
 }
 
+std::optional<std::string> ScopedNameKey(const Expr* expr) {
+  if (expr->kind == ExprKind::kIdentifier) return std::string(expr->text);
+  if (expr->kind != ExprKind::kMemberAccess ||
+      expr->rhs->kind != ExprKind::kIdentifier)
+    return std::nullopt;
+  auto base = ScopedNameKey(expr->lhs);
+  if (!base) return std::nullopt;
+  return *base + "." + std::string(expr->rhs->text);
+}
+
 static std::optional<ConstVal> ConstEvalMemberAccessFull(
     const Expr* expr, const ScopeMap& scope) {
   // §8.25.1 makes the override the value of `C#(args)::name`, so an override
@@ -115,11 +125,10 @@ static std::optional<ConstVal> ConstEvalMemberAccessFull(
   // access rather than a call and is folded here as well as from the kCall arm
   // of ConstEvalFull.
   if (auto builtin = ConstEvalBuiltinMethodFull(expr, scope)) return builtin;
-  if (expr->lhs && expr->rhs && expr->lhs->kind == ExprKind::kIdentifier &&
-      expr->rhs->kind == ExprKind::kIdentifier) {
-    std::string compound =
-        std::string(expr->lhs->text) + "." + std::string(expr->rhs->text);
-    auto it = scope.find(compound);
+  // §8.23: a chain of scope resolutions, `Outer::Inner::N`, is read under
+  // the key its class's registration records for the full path.
+  if (auto key = ScopedNameKey(expr)) {
+    auto it = scope.find(*key);
     if (it != scope.end()) return ConstVal{it->second, 32, true};
   }
   return std::nullopt;

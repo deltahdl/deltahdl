@@ -446,4 +446,25 @@ TEST(TypedefParameterType, ModuleClassParameterOfTheClassTypedefIsCut) {
   EXPECT_EQ(v->width, 15u);
 }
 
+// The same for a class nested in another (§8.23), whose typedefs are keyed
+// under the full path, `Outer::Inner::t`: P read as `Outer::Inner::P` is 15
+// and not the 4095 a lookup under `Inner::t` alone left it.
+TEST(TypedefParameterType, NestedClassParameterOfItsOwnTypedefIsCut) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class Outer;\n"
+      "  class Inner;\n"
+      "    typedef bit [3:0] t;\n"
+      "    localparam t P = 12'hFFF;\n"
+      "  endclass\n"
+      "endclass\n"
+      "module m;\n"
+      "  localparam int Q = Outer::Inner::P;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "Q"), 15);
+}
+
 }  // namespace
