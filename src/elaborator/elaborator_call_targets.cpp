@@ -683,9 +683,9 @@ void AddImportedData(const CompilationUnit& unit, const ImportItem& import,
 
 // §6.19.3: each named constant the enumeration `type` writes, as a value of
 // `scope` of that enumeration; a member a range names, R[2], declares the
-// numbered constants §6.19.2 gives it, R0 and R1, and not its own name, which
-// one whose bound folds to no literal, T[N], is answered under and leaves
-// unjudged. A variable of the constant's name keeps its own declaration.
+// numbered constants §6.19.2 gives it, R0 and R1, and not its own name, its
+// bounds being numbers, which fold with no scope. A variable of the
+// constant's name keeps its own declaration.
 void DeclareEnumConstants(const DataType& type, DataScope& scope) {
   for (const EnumMember& member : type.enum_members) {
     if (member.range_start == nullptr) {
@@ -693,7 +693,6 @@ void DeclareEnumConstants(const DataType& type, DataScope& scope) {
       continue;
     }
     for (const std::string& name : EnumMemberDeclaredNames(member, {})) {
-      if (name == member.name) continue;
       const std::string& kept = scope.numbered_names.emplace_back(name);
       scope.module_vars.emplace(kept, DeclaredVar{&type, 0});
     }

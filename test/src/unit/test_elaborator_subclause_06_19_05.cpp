@@ -122,32 +122,25 @@ TEST(EnumMethodElaboration, NameNoEnumMethodThroughAConstantIsReported) {
 }
 
 // §6.19.2: each numbered constant a ranged member declares, R0 and R1 of
-// R[2] or S3 and S4 of S[3:4], is a value of its enumeration too; a member
-// whose range bound the module's parameters give, T[N], is left unjudged.
+// R[2] or S3 and S4 of S[3:4], is a value of its enumeration too.
 TEST(EnumMethodElaboration,
      NameNoEnumMethodThroughANumberedConstantIsReported) {
   ElabFixture f;
   ElabOk(
       "module m;\n"
-      "  parameter int N = 2;\n"
       "  enum {R[2], S[3:4]} r;\n"
-      "  enum {T[N]} t;\n"
       "  initial begin\n"
       "    R0.foo();\n"
       "    S4.bar();\n"
-      "    T.baz();\n"
       "  end\n"
       "endmodule\n",
       f);
   const auto& diags = f.diag.Diagnostics();
   EXPECT_TRUE(ReportedError(
-      diags, "'foo' is not a built-in method of the enumeration 'R0'", 6,
+      diags, "'foo' is not a built-in method of the enumeration 'R0'", 4,
       "6.19.5"));
   EXPECT_TRUE(ReportedError(
-      diags, "'bar' is not a built-in method of the enumeration 'S4'", 7,
-      "6.19.5"));
-  EXPECT_FALSE(ReportedError(
-      diags, "'baz' is not a built-in method of the enumeration 'T'", 8,
+      diags, "'bar' is not a built-in method of the enumeration 'S4'", 5,
       "6.19.5"));
 }
 
