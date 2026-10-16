@@ -49,6 +49,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_protect_encoding.h"
 #include "helpers_protect_keys.h"
 #include "helpers_protect_keyword_value.h"
 #include "preprocessor/preprocessor.h"
@@ -349,6 +350,37 @@ TEST(ProtectDigestDecryptKeyDefault, TheDataBlocksDigestOpensUnderTheDataKey) {
   EXPECT_EQ(run.DigestCheck(), ProtectDigestCheck::kMatched);
 }
 
+// The value on the line beneath `keyword` standing alone in `text`, as the
+// scheme wrote it; empty where `text` writes no such line.
+std::string ValueBeneath(std::string_view text, std::string_view keyword) {
+  std::string opening = "`pragma protect ";
+  opening.append(keyword).append("\n");
+  size_t at = text.find(opening);
+  if (at == std::string_view::npos) return {};
+  size_t starts = at + opening.size();
+  return std::string(text.substr(starts, text.find('\n', starts) - starts));
+}
+
+// The default on the encrypting side. The region that envelope is written for
+// names no key of its own for its digests or for its data, so the tool makes
+// the data's key, and §34.5.20.2 makes that key the digest's as well: the key
+// block, opened, carries the same key beneath both keywords. A key of the
+// digest's own made beside the data's would carry two different ones.
+TEST(ProtectDigestDecryptKeyDefault, ARegionNamingNoneSealsItsDigestsLikeData) {
+  std::string envelope = EnvelopeWithASignedKeyBlock();
+  std::string key_block;
+  ASSERT_TRUE(DecodeProtectBlock(
+      BlockLinesAfter(envelope, "`pragma protect key_block\n"),
+      DefaultProtectEncoding().enctype, &key_block))
+      << envelope;
+  std::string content;
+  ASSERT_TRUE(DecryptProtectedBlock(key_block, kBlockKey, &content))
+      << envelope;
+  std::string data_key = ValueBeneath(content, "data_decrypt_key");
+  ASSERT_FALSE(data_key.empty()) << content;
+  EXPECT_EQ(ValueBeneath(content, "digest_decrypt_key"), data_key) << content;
+}
+
 // §34.5.20.2 lets the author make the key that opens the digests and write it
 // on the line beneath the keyword in the input, so the region's digest is
 // encrypted under that key rather than under one made here.
@@ -427,9 +459,9 @@ TEST(ProtectDigestDecryptKeyDecryptionInput,
   EXPECT_TRUE(run.Holds("module sealed_m")) << run.text;
 }
 
-// The same round trip, on the digest. The key that sealed it is neither the key
-// the reader supplied nor the key the block states for the data, so a digest
-// that opens says the reading took the digest's own key out of the block.
+// The same round trip, on the digest. The key that sealed it is not the key the
+// reader supplied, so a digest that opens says the reading took the key for it
+// out of the block.
 TEST(ProtectDigestDecryptKeyDecryptionInput, TheDigestOpensUnderTheCarriedKey) {
   ReadUnderKeys run(EnvelopeWithASignedKeyBlock(), TheBlockKey());
   EXPECT_EQ(run.DigestCheck(), ProtectDigestCheck::kMatched);

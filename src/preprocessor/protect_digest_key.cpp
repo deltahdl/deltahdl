@@ -4,7 +4,6 @@
 #include <string_view>
 
 #include "preprocessor/protect_digest.h"
-#include "preprocessor/protect_digest_algorithms.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_key_method.h"
 #include "preprocessor/protect_keywords.h"
@@ -16,12 +15,6 @@ namespace {
 // under. It is spelled here because §34.5.17 settles its own default by sending
 // the reader to that keyword; the keyword's own definition is written
 // elsewhere, and nothing here decides what it may say.
-
-// What the derivation of a digest's key is run over along with the key the data
-// are under, so that the two keys differ. Without it the derivation of one key
-// from the other would have to be an identity, and a digest encrypted under the
-// key its data are under is opened by everyone the data are.
-constexpr std::string_view kDigestKeyDerivationMarker = "digest-key:";
 
 // One directive carrying one keyword and the value it records, spelled as the
 // source spelled it.
@@ -132,18 +125,6 @@ std::string ProtectDigestDecryptionContent(
         EncodeProtectValue(digest.decrypt_key, encoding)));
   }
   return text;
-}
-
-// The derivation is a message digest, which is the one computation in this
-// implementation that turns a text of any length into a short value that no
-// other text shares. Running the data's key through it under a marker of this
-// derivation's own is what puts the digest under a key of its own: the result
-// depends on the data's key and reveals it no more than a digest reveals the
-// text it was computed from.
-std::string ProtectGeneratedDigestKey(std::string_view data_key) {
-  std::string material(kDigestKeyDerivationMarker);
-  material.append(data_key);
-  return Sha1Digest(material);
 }
 
 }  // namespace delta

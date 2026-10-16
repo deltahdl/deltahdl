@@ -244,8 +244,10 @@ ProtectKeyBlocks ProtectKeyBlocksFor(const ProtectKeyBlockRequests& requests,
       blocks.data_key = region.data_key.empty()
                             ? ProtectGeneratedDataKey(region.cleartext, key)
                             : std::string(region.data_key);
+      // §34.5.20.2: an input specifying no digest_decrypt_key has the current
+      // value of data_decrypt_key for it, which is the key just settled.
       blocks.digest_key = region.digest_key.empty()
-                              ? ProtectGeneratedDigestKey(blocks.data_key)
+                              ? blocks.data_key
                               : std::string(region.digest_key);
     }
     if (first == nullptr) {

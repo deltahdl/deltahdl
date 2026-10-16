@@ -271,6 +271,25 @@ TEST(ProtectDigestBlockEncryptionInput, ARequestInsideAProtectedBlockAsksNot) {
   EXPECT_EQ(TimesWritten(produced, kDigestBlockLine), 1U) << produced;
 }
 
+// A request written inside the region asks as one written ahead of it does,
+// and it is the encrypting tool's to act on, not a line of the design. Were it
+// encrypted with the region, the reading would find the keyword announcing a
+// digest in the text it recovered and take the design line beneath it as that
+// digest's value, so the design would never come back. Read back with the key,
+// the envelope gives the design alone, the digest it carries agreeing with it.
+TEST(ProtectDigestBlockEncryptionInput, ARequestInsideTheRegionStaysOutOfIt) {
+  constexpr std::string_view kDesign = "module asked_inside_m; endmodule\n";
+  std::string source = "`pragma protect begin\n";
+  source.append(kDigestBlockLine).append(kDesign);
+  source.append("`pragma protect end\n");
+  std::string envelope = EncryptEnvelopes(source, kEncodingExchangeKey);
+  ReadEnvelope run(envelope);
+  EXPECT_FALSE(run.diag.HasErrors()) << run.text;
+  EXPECT_TRUE(Holds(run.text, kDesign)) << envelope;
+  EXPECT_FALSE(Holds(run.text, kDigestBlockLine)) << run.text;
+  EXPECT_EQ(run.DigestCheck(), ProtectDigestCheck::kMatched) << envelope;
+}
+
 // -- One digest for each block ----------------------------------------------
 
 // §34.5.22.2: a digest_block is generated for each key_block and each

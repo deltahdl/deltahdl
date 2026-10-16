@@ -152,15 +152,25 @@ bool IsLiftedExpression(const ListedKeyword& listed) {
          listed.name == kCommentKeyword;
 }
 
-// What of a directive lifted into the clear still goes into the block: the
-// expressions written beside the lifted ones, which §34.5.1 has encrypted with
-// the rest of the region. Empty where nothing else was written.
+// Whether `line` asks for a message digest from inside the region. §34.5.22.2
+// makes a digest_block written outside every previously generated protected
+// block a request to the encrypting tool, which that tool answers with digest
+// blocks of its own; the request is no part of the design, and left in the
+// block it would have the reading take the design line beneath it as a digest.
+// It is asked of the spelling TakeAnnouncements reads the request off.
+bool RequestsADigest(std::string_view line, bool previously_protected) {
+  return !previously_protected && NamesKeyword(line, kDigestBlockKeyword);
+}
+
+// What of a directive lifted into the clear, or asking for a digest, still goes
+// into the block: the expressions written beside those, which §34.5.1 has
+// encrypted with the rest of the region. Empty where nothing else was written.
 std::string LeftInTheBlock(std::string_view line) {
   std::string_view body;
   ProtectPragmaLine(line, &body);
   std::vector<std::string_view> kept;
   for (const ListedKeyword& listed : TopLevelKeywords(body)) {
-    if (!IsLiftedExpression(listed)) {
+    if (!IsLiftedExpression(listed) && listed.name != kDigestBlockKeyword) {
       kept.push_back(ListedExpressionText(body, listed));
     }
   }
@@ -185,7 +195,8 @@ bool HoldsAnAuthorsKey(std::string_view line, const RegionKeyReader& inside) {
 void AppendEnvelopeExpressions(std::string_view line, uint32_t line_num,
                                bool previously_protected, ReadRegion* region) {
   if (!HoldsAnAuthorsKey(line, region->written_inside)) {
-    region->body.append(LiftedIntoTheClear(line, previously_protected)
+    region->body.append(LiftedIntoTheClear(line, previously_protected) ||
+                                RequestsADigest(line, previously_protected)
                             ? LeftInTheBlock(line)
                             : std::string(line));
   }

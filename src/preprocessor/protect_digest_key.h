@@ -149,20 +149,4 @@ struct ProtectDigestDecryption {
 std::string ProtectDigestDecryptionContent(
     const ProtectDigestDecryption& digest, const ProtectEncoding& encoding);
 
-// The key §34.5.20 has an IP author generate and encrypt a region's digests
-// with, derived from the key that region's data are under.
-//
-// It is a key of the digest's own rather than the data's. §34.5.20 gives the
-// digest a key it carries separately, and the two coincide only where a text
-// wrote none: a digest encrypted under the very key its data are under would be
-// opened by everyone the data are opened by, which leaves the keyword carrying
-// it saying nothing that could not be read without it.
-//
-// Deriving it from the data's key rather than drawing it at random is what lets
-// one input text be encrypted twice and come out the same, which a reader
-// comparing two runs of a tool depends on; the data's key is already the secret
-// this arrangement keeps, so a derivation from it gives away nothing a holder
-// of that key did not have.
-std::string ProtectGeneratedDigestKey(std::string_view data_key);
-
 }  // namespace delta
