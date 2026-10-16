@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <format>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -182,6 +185,35 @@ TEST(Elaboration, EnumRangeNMNegativeIsError) {
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "enumeration range bound must be an integral number", 2, "6.19.2"));
+}
+
+// Table 6-10: a bound with an x or z digit is no integral number, whether it
+// is the N of name[N] or either bound of name[N:M], and whatever its other
+// digits fold to; one whose digits are all x is reported as that, not as a
+// count below one.
+TEST(Elaboration, EnumRangeBoundWithXOrZDigitIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef enum {r[4'bx1]} E1;\n"
+      "  typedef enum {s[2'bz1:3]} E2;\n"
+      "  typedef enum {t[1:4'bx0]} E3;\n"
+      "  typedef enum {u[4'bx]} E4;\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  uint32_t line = 2;
+  for (const char* name : {"r", "s", "t", "u"}) {
+    EXPECT_TRUE(ReportedError(
+        diags,
+        std::format("enum range bound of '{}' has to be an integer, and a "
+                    "number with an x or z digit is none",
+                    name),
+        line++, "6.19.2"));
+  }
+  EXPECT_FALSE(ReportedError(
+      diags, "enum range count of 'u' has to be an integer of one or more", 5,
+      "6.19.2"));
 }
 
 TEST(Elaboration, EnumRangeNOneProducesSingle) {

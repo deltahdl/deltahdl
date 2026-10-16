@@ -178,6 +178,16 @@ static void CheckEnumMemberValueRefs(
 static int64_t ComputeEnumRangeCount(const EnumMember& member, SourceLoc loc,
                                      DiagEngine& diag) {
   if (!member.range_start) return 1;
+  // Table 6-10: each bound is an integral number, which one with an x or z
+  // digit is not, whatever its other digits fold to.
+  if (ExprContainsXZ(member.range_start) || ExprContainsXZ(member.range_end)) {
+    diag.Error(loc,
+               std::format("enum range bound of '{}' has to be an integer, "
+                           "and a number with an x or z digit is none",
+                           member.name),
+               Subclause("6.19.2"));
+    return 1;
+  }
   auto n = ConstEvalInt(member.range_start).value_or(0);
   int64_t count = 1;
   if (member.range_end) {
