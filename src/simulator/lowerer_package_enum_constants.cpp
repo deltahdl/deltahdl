@@ -14,7 +14,6 @@
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
-#include "parser/ast_design.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/eval_class_params.h"
