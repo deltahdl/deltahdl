@@ -55,12 +55,13 @@ TEST(ArrayMethodValidation, NameNoMethodOfTheArraysKindIsRejected) {
 // The same of an array reached through members: a structure's member, s.q,
 // and a property of the class a variable holds a handle of, h.q. The methods
 // of each kind are still accepted there, and so is §18.8's rand_mode on an
-// array declared rand.
+// array property declared rand, which gives it no other method. A structure
+// variable is no object, so a member declared rand gains no rand_mode.
 TEST(ArrayMethodValidation, AMemberArraysNameOfNoMethodIsRejected) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
-      "  typedef struct { int q[$]; int fx[2]; } s_t;\n"
+      "  typedef struct { int q[$]; int fx[2]; rand int ra[2]; } s_t;\n"
       "  class C; int q[$]; int aa[string]; rand int ra[2]; endclass\n"
       "  s_t s; C h = new; int n;\n"
       "  initial begin\n"
@@ -68,6 +69,8 @@ TEST(ArrayMethodValidation, AMemberArraysNameOfNoMethodIsRejected) {
       "    h.q.bar();\n"
       "    s.fx.delete();\n"
       "    h.aa.pop_front();\n"
+      "    h.ra.baz();\n"
+      "    s.ra.rand_mode(0);\n"
       "    s.q.delete();\n"
       "    n = h.q.size();\n"
       "    n = h.aa.num();\n"
@@ -88,8 +91,38 @@ TEST(ArrayMethodValidation, AMemberArraysNameOfNoMethodIsRejected) {
       diags,
       "'pop_front' is not a built-in method of the associative array 'h.aa'", 9,
       "7.9"));
+  EXPECT_TRUE(ReportedError(
+      diags, "'baz' is not a built-in method of the fixed-size array 'h.ra'",
+      10, "7.12"));
+  EXPECT_TRUE(ReportedError(
+      diags,
+      "'rand_mode' is not a built-in method of the fixed-size array 's.ra'", 11,
+      "7.12"));
   for (const auto& d : diags) {
-    EXPECT_FALSE(d.loc.line >= 10 && d.loc.line <= 14)
+    EXPECT_FALSE(d.loc.line >= 12 && d.loc.line <= 16)
+        << d.loc.line << ": " << d.message;
+  }
+}
+
+// §7.8: a member whose index type is a name the scope declares, a typedef or a
+// class, is an associative array, and takes that kind's methods, num among
+// them, which no fixed-size array has.
+TEST(ArrayMethodValidation, AMembersNamedIndexTypeMakesItAssociative) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef int idx_t;\n"
+      "  class K; endclass\n"
+      "  class C; int bt[idx_t]; int bk[K]; endclass\n"
+      "  C h = new; int n;\n"
+      "  initial begin\n"
+      "    n = h.bt.num();\n"
+      "    n = h.bk.num();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (const auto& d : f.diag.Diagnostics()) {
+    EXPECT_FALSE(d.loc.line >= 7 && d.loc.line <= 8)
         << d.loc.line << ": " << d.message;
   }
 }

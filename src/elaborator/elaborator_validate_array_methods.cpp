@@ -286,22 +286,24 @@ bool IsIndexTypeDim(const Expr& dim, const ValueScope& values) {
 }
 
 // What the member `base` selects is declared with: its unpacked dimensions,
-// and whether it is declared rand or randc, which gives it §18.8's rand_mode
-// whatever its type.
+// and whether it is a random variable of an object, a property declared rand
+// or randc, which gives it §18.8's rand_mode whatever its type.
 struct DeclaredMember {
   const std::vector<Expr*>* dims = nullptr;
   bool random = false;
 };
 
 // That of a member of a structure variable, s.q, or of a property of the class
-// a variable holds a handle of, h.q; no dimensions where `base` is neither.
+// a variable holds a handle of, h.q; no dimensions where `base` is neither. A
+// structure variable is no object, so its member is no random variable even
+// when declared rand.
 DeclaredMember MemberDeclared(const Expr& base, const ArrayMethodScan& scan) {
   if (base.kind != ExprKind::kMemberAccess || base.is_scope_resolution ||
       base.lhs->kind != ExprKind::kIdentifier) {
     return {};
   }
   if (const StructMember* m = SelectedStructMember(&base, scan.values)) {
-    return {&m->unpacked_dims, m->is_rand || m->is_randc};
+    return {&m->unpacked_dims, false};
   }
   auto handle = scan.class_vars.find(base.lhs->text);
   if (handle == scan.class_vars.end()) return {};

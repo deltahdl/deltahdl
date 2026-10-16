@@ -786,11 +786,12 @@ CallShape MemberChainCallShape(const Expr& access, const BlockParent& parent,
   if (!type.vif.empty()) {
     return InterfaceCallShape(kAt, type.vif, access.rhs->text);
   }
+  // A member holding a string, an enum or an unpacked array is called with a
+  // method of its kind: the elaborator reports any other name (§6.16, §6.19.5,
+  // §7.12).
   MethodCall call;
   if (type.holder != VpiBuiltInHolder::kNone) {
-    if (VpiIsBuiltInMethod(type.holder, access.rhs->text)) {
-      call.type = vpiMethodFuncCall;
-    }
+    call.type = vpiMethodFuncCall;
   } else {
     call = ClassMethodCall(kAt, type.cls, access.rhs->text, {}, type.args);
     if (call.type == 0) call.type = VpiMemberBuiltInCallKind(access.rhs->text);
