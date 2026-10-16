@@ -270,4 +270,117 @@ TEST(TypedParameterSign, ClassParameterOfAnUnsignedTypeReadsUnsigned) {
   EXPECT_EQ(ParamValue(design, "Q"), 8);
 }
 
+// §6.20.2: a parameter whose type is a typedef name has that type, so a
+// package's `nib P = 12'hFFF` on `typedef bit [3:0] nib` holds four bits, 15.
+// The fold resolved no typedef name and left the value uncut, 4095.
+TEST(TypedefParameterType, PackageParameterIsCutToTheTypedefWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  typedef bit [3:0] nib;\n"
+      "  parameter nib P = 12'hFFF;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  localparam int Q = p::P;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "Q"), 15);
+}
+
+// The same for a compilation-unit parameter of a compilation-unit typedef.
+TEST(TypedefParameterType, CompilationUnitParameterIsCutToTheTypedefWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "typedef bit [3:0] nib;\n"
+      "parameter nib R = 12'hFFF;\n"
+      "module m;\n"
+      "  localparam int Q = R;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "Q"), 15);
+}
+
+// §6.20.2 with §8.25: a class parameter's default is converted to its typedef
+// type, so `nib P = 12'hFFF` read through `C#()::P` is 15.
+TEST(TypedefParameterType, ClassParameterIsCutToTheTypedefWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "typedef bit [3:0] nib;\n"
+      "class C #(nib P = 12'hFFF);\n"
+      "endclass\n"
+      "module m;\n"
+      "  localparam int Q = C#()::P;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "Q"), 15);
+}
+
+// §6.20.2: a typedef of a signed type gives the parameter that sign, so
+// `sb B = 8'd200` on `typedef byte sb` is the eight bits of 200 read signed,
+// -56, though the sized literal is unsigned.
+TEST(TypedefParameterType, PackageParameterOfASignedTypedefReadsSigned) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  typedef byte sb;\n"
+      "  parameter sb B = 8'd200;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  localparam int Q = p::B;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "Q"), -56);
+}
+
+// §7.4.4 with §7.4.1: packed dimensions written on a typedef name multiply its
+// width, and the packed array is unsigned unless declared signed, so `sb [1:0]`
+// on `typedef byte sb` is sixteen unsigned bits: 20'hFFFFF is cut to 65535,
+// and `'1` fills all sixteen.
+TEST(TypedefParameterType, DimensionsOnASignedTypedefMakeAnUnsignedArray) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  typedef byte sb;\n"
+      "  parameter sb [1:0] W = 20'hFFFFF;\n"
+      "  parameter sb [1:0] F = '1;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  localparam int QW = p::W;\n"
+      "  localparam int QF = p::F;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "QW"), 65535);
+  EXPECT_EQ(ParamValue(design, "QF"), 65535);
+}
+
+// §6.20.1 with §6.20.2: a package typedef's range may name an earlier
+// parameter of the package, so `t` on `typedef bit [N-1:0] t` under
+// `parameter int N = 4` is four bits and `t P = 12'hFFF` is 15.
+TEST(TypedefParameterType, TypedefRangeNamingAPackageParameterSizesTheCut) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  parameter int N = 4;\n"
+      "  typedef bit [N-1:0] t;\n"
+      "  parameter t P = 12'hFFF;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  localparam int Q = p::P;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "Q"), 15);
+}
+
 }  // namespace

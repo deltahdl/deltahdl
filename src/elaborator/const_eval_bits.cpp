@@ -520,15 +520,36 @@ std::optional<int64_t> FoldParamValue(const RtlirParamDecl& pd,
   return FoldValueInContext(expr, scope, DeclaredFoldContext(pd), std::nullopt);
 }
 
-// A typedef name answers 0 with its dimensions or without: §7.4.4 has the
-// dimensions written on the name multiply the width it stands for, which
-// takes the typedef map this has none of, so their product alone is the
-// count of elements and not the width.
+// The type a typedef name stands for in the typedef table of the scope being
+// elaborated, or null where no table is installed or it holds no such name.
+static const DataType* RegisteredNamedType(const DataType& type) {
+  return g_typedefs == nullptr ? nullptr : FindNamedType(type, *g_typedefs);
+}
+
+// A typedef name is read through the typedef table of the scope being
+// elaborated (TypedefRegistryGuard), §7.4.4 having the packed dimensions
+// written on the name multiply the width it stands for, and answers 0 where
+// no table holds the name, since their product alone counts elements and
+// not bits.
 uint32_t DeclaredParamTypeWidth(const DataType& type, const ScopeMap& scope) {
-  if (type.kind == DataTypeKind::kNamed) return 0;
+  if (type.kind == DataTypeKind::kNamed) {
+    if (RegisteredNamedType(type) == nullptr) return 0;
+    return EvalTypeWidth(type, *g_typedefs, scope);
+  }
   if (type.packed_dim_left != nullptr) return PackedDimProduct(type, scope);
   if (type.kind == DataTypeKind::kImplicit) return 0;
   return EvalTypeWidth(type);
+}
+
+// Whether a parameter declared with `type` is signed. §7.4.1 (printed page
+// 153) makes a packed array signed only where it is declared signed, so
+// dimensions written on a typedef name leave the sign written with them; a
+// typedef name written bare has the sign of the type it stands for.
+static bool DeclaredParamTypeIsSigned(const DataType& type) {
+  if (type.kind != DataTypeKind::kNamed || type.packed_dim_left != nullptr)
+    return type.is_signed;
+  return RegisteredNamedType(type) != nullptr &&
+         IsSignedType(type, *g_typedefs);
 }
 
 // §6.20.2 (printed pages 126-127): the cut bits are read with the declared
@@ -541,7 +562,7 @@ std::optional<int64_t> FoldDeclaredParamValue(const Expr* expr,
                                               const ScopeMap& scope) {
   return FoldValueInContext(
       expr, scope, FoldContext{DeclaredParamTypeWidth(type, scope), false},
-      type.is_signed);
+      DeclaredParamTypeIsSigned(type));
 }
 
 // §6.20.2 (printed pages 126-127) with §23.10.2 (printed 766) and §23.10.1

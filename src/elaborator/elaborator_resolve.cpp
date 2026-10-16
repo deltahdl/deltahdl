@@ -200,7 +200,7 @@ void RecordPackageConstant(std::string_view pkg_name, std::string_view name,
 // which §6.20.1 lets a later declaration read, and `cu_param_scope` is where
 // each is recorded under its qualified key.
 struct PackageRegistration {
-  std::string_view pkg_name;
+  const PackageDecl& pkg;
   ScopeMap values;
   ScopeMap& cu_param_scope;
   Arena& arena;
@@ -215,13 +215,15 @@ struct PackageRegistration {
 // compilation-unit scope alone left R unrecorded and `pkg::R` unresolved. It
 // is folded at the width the declaration fixes (FoldDeclaredParamValue), as
 // a module's parameter is, so `parameter logic [11:0] W = '1` records 4095
-// and not the 1 the literal is self-determined (§5.7.1, §6.20.2).
+// and not the 1 the literal is self-determined (§5.7.1, §6.20.2). A type
+// written as one of the package's typedef names is read under the package's
+// scope (InPackageScope), the key RegisterPackageTypedefs records it under.
 void RegisterOnePackageParam(ModuleItem* item, PackageRegistration& reg) {
   if (item->kind != ModuleItemKind::kParamDecl || !item->init_expr) return;
-  auto val =
-      FoldDeclaredParamValue(item->init_expr, item->data_type, reg.values);
+  auto val = FoldDeclaredParamValue(
+      item->init_expr, InPackageScope(item->data_type, reg.pkg), reg.values);
   if (!val) return;
-  RecordPackageConstant(reg.pkg_name, item->name, *val, reg.cu_param_scope,
+  RecordPackageConstant(reg.pkg.name, item->name, *val, reg.cu_param_scope,
                         reg.arena);
   reg.values[item->name] = *val;
 }
@@ -236,7 +238,7 @@ void RegisterOnePackageParam(ModuleItem* item, PackageRegistration& reg) {
 void RegisterPackageParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
                            Arena& arena) {
   for (auto* pkg : unit->packages) {
-    PackageRegistration reg{pkg->name, cu_param_scope, cu_param_scope, arena};
+    PackageRegistration reg{*pkg, cu_param_scope, cu_param_scope, arena};
     for (auto* item : pkg->items) {
       BindPackageImportConstants(pkg, item, cu_param_scope, reg.values);
       for (const auto& m : BindEnumConstantsOfItem(item, reg.values, arena))
@@ -481,6 +483,11 @@ bool CellUseOverrideApplies(std::string_view src_lib, std::string_view name,
 
 void Elaborator::RegisterCuScopeItems() {
   RegisterBuiltinClassNames(class_names_);
+  // §6.20.2: a compilation-unit, package or class parameter whose type is a
+  // typedef name is converted to the type the name stands for, which the fold
+  // (FoldDeclaredParamValue) reads from the table this installs, as a
+  // module's items read it under Elaborator::ElaborateItems.
+  TypedefRegistryGuard typedef_guard(&typedefs_, &aggregate_typedef_names_);
   CuScope cu_scope{cu_scope_names_,
                    typedefs_,
                    aggregate_typedef_names_,
@@ -511,15 +518,18 @@ void Elaborator::RegisterCuScopeItems() {
   RegisterCuClasses(unit_, class_names_, cu_scope_names_,
                     parameterized_class_names_);
   RegisterAnonymousProgramNames(unit_, anonymous_program_names_);
-  RegisterPackageParams(unit_, cu_param_scope_, arena_);
-  RegisterClassParams(unit_, cu_param_scope_, arena_, diag_);
+  // The packages' and classes' typedefs are registered ahead of their
+  // parameters, whose values are converted to the types those name.
   RegisterPackageTypedefs(unit_, typedefs_, td_array_dims_, arena_);
   MarkPackageStagedArrays(unit_);
   RegisterClassTypedefs(unit_, typedefs_, td_array_dims_, arena_);
-  // §13.3 with §7.2.1: after the two registrations above, which are what give
-  // the table the "pkg::T" and "Class::T" names a formal's member may be
-  // written with; a package's and a compilation-unit class's subroutines are
-  // reached by no module's item walk (elaborator_items_formals.cpp).
+  RegisterPackageParams(unit_, cu_param_scope_, arena_);
+  RegisterClassParams(unit_, cu_param_scope_, arena_, diag_);
+  // §13.3 with §7.2.1: after the two typedef registrations above, which are
+  // what give the table the "pkg::T" and "Class::T" names a formal's member
+  // may be written with; a package's and a compilation-unit class's
+  // subroutines are reached by no module's item walk
+  // (elaborator_items_formals.cpp).
   ResolveUnitScopeFormalTypes(unit_, typedefs_, arena_);
   // Seed the unions ItemElaborationStateSaver folds each module's entries into.
   // A compilation unit with no module to elaborate never reaches that fold, and

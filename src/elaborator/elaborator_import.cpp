@@ -70,7 +70,8 @@ void RegisterImportItem(const ModuleItem* pi, const PackageDecl& pkg,
       scope.cu_param_scope[name] = it->second;
       return;
     }
-    auto val = FoldDeclaredParamValue(pi->init_expr, pi->data_type,
+    auto val = FoldDeclaredParamValue(pi->init_expr,
+                                      InPackageScope(pi->data_type, pkg),
                                       scope.cu_param_scope);
     if (val) scope.cu_param_scope[name] = *val;
   }
