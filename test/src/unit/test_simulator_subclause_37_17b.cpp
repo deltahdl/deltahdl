@@ -788,6 +788,18 @@ TEST_F(VariablesOfARun, AnAggregatePortVariablesTypespecIsItsTypedefs) {
                "pu_t");
 }
 
+// ...and so does the variable a port declaration declares for an object a
+// non-ANSI port expression names (§23.2.2.1).
+TEST_F(VariablesOfARun, APortExpressionObjectsTypespecIsItsTypedef) {
+  Run("typedef struct { int a; int b; } s_t;\n"
+      "typedef enum {A, B} e_t;\n"
+      "module top (.g(h), .f(k)); output s_t h; output e_t k; endmodule\n");
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiTypespec, Var("top.h"))),
+               "s_t");
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiTypespec, Var("top.k"))),
+               "e_t");
+}
+
 // The right side of the continuous assignment that drives `target`, read off
 // the instance `top`.
 vpiHandle RhsDriving(const char* target) {

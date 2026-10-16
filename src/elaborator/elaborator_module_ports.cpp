@@ -656,6 +656,9 @@ static void DeclarePortExprObjects(const ModuleDecl* decl, RtlirModule* mod,
     var.is_signed = rp.is_signed;
     var.is_4state = Is4stateType(obj.data_type, ctx.typedefs);
     var.dtype = rp.dtype;
+    // §37.17: the typespec the variable relates to is the type its port
+    // declaration wrote, a typedef name kept as the name.
+    var.written_type = &obj.data_type;
     mod->variables.push_back(var);
   }
 }
