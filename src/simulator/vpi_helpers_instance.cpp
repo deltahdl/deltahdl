@@ -26,6 +26,7 @@
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_source_delay.h"
 
 namespace delta {
 
@@ -289,7 +290,12 @@ void VpiContext::AttachModulePathDelays(SimContext& sim_ctx) {
     auto* obj = AllocObject();
     obj->type = vpiModPath;
     obj->parent = module;
-    module->children.push_back(obj);
+    module->children.push_back(obj);  // §37.3.4: the delays the path
+                                      // declaration wrote, as vpiDelay reaches
+    // them.
+    obj->delay_expr =
+        VpiSourceDelayExpression(path.source_delays, path.inst_prefix, sim_ctx,
+                                 [this] { return AllocObject(); });
     // §38.10: the s_vpi_delay array the application allocated holds the delays
     // in the order the SystemVerilog description writes them, which for a
     // module path is the order of its transition slots, and the
@@ -398,7 +404,11 @@ void VpiContext::AttachTimingChecks(SimContext& sim_ctx) {
     obj->type = vpiTchk;
     obj->tchk_type = VpiTchkTypeOf(check.kind);
     obj->parent = module;
-    module->children.push_back(obj);
+    module->children.push_back(
+        obj);  // §37.3.4: the limits the check wrote, as vpiDelay reaches them.
+    obj->delay_expr =
+        VpiSourceDelayExpression(check.source_limits, check.inst_prefix,
+                                 sim_ctx, [this] { return AllocObject(); });
 
     // §37.40 (figure): "-> limit", retrieved with vpi_get_delays(). §31.2
     // writes a check's limit as the one time it is given, so the object

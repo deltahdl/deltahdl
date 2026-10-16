@@ -23,7 +23,6 @@
 #include "simulator/evaluation.h"
 #include "simulator/pattern_type_key.h"
 #include "simulator/sim_context.h"
-#include "simulator/stmt_exec_internal.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_constants.h"
@@ -36,6 +35,7 @@
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_source_delay.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -751,28 +751,6 @@ void HangOn(VpiObject* assign, const std::vector<std::string_view>& found,
 
 // §37.47: the continuous assignment `ca` stands for, in `scope`, with its two
 // sides; and §37.46: a driver of what it writes and a load of what it reads.
-// §37.47 with §37.3.4 and §10.3.3: the delays the assignment `ca` was
-// written with, in ticks, as vpi_get_delays reads them off `obj`: a rise, a
-// fall that is the rise where none was written, and a turn-off that is the
-// smaller of the two where none was.
-void FillContAssignDelays(VpiObject* obj, const RtlirContAssign& ca,
-                          SimContext& sim) {
-  Arena& arena = sim.GetArena();
-  const auto kTicks = [&sim, &arena](const Expr* delay) {
-    return static_cast<double>(
-        DelayValueToTicks(EvalExpr(delay, sim, arena), sim));
-  };
-  const double kRise = kTicks(ca.delay);
-  const double kFall = ca.delay_fall != nullptr ? kTicks(ca.delay_fall) : kRise;
-  const double kOff = ca.delay_decay != nullptr ? kTicks(ca.delay_decay)
-                                                : std::min(kRise, kFall);
-  for (const double kDelay : {kRise, kFall, kOff}) {
-    VpiDelayInfo info;
-    info.delay = kDelay;
-    obj->delays.push_back(info);
-  }
-}
-
 void MakeContinuousAssignment(const RtlirContAssign& ca, VpiObject* scope,
                               const AssignBuild& build) {
   const ModuleItem* item = ca.source_item;
@@ -793,8 +771,9 @@ void MakeContinuousAssignment(const RtlirContAssign& ca, VpiObject* scope,
   obj->lhs = ExpressionObject(lhs, build);
   obj->rhs = AssignedExpressionObject(rhs, obj->lhs, build);
 
-  if (ca.delay != nullptr && build.sim != nullptr) {
-    FillContAssignDelays(obj, ca, *build.sim);
+  if (build.sim != nullptr) {
+    VpiFillContAssignDelays(obj, ca, VpiFlatName(build.names.prefix, ""),
+                            *build.sim, build.alloc);
   }
 
   std::vector<std::string_view> names;

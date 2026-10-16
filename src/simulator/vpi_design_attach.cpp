@@ -18,7 +18,6 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_specify.h"
 #include "parser/ast_type.h"
-#include "simulator/evaluation.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/specify.h"
@@ -34,6 +33,7 @@
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_source_delay.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -483,45 +483,6 @@ void VpiContext::AttachDesignInterModPaths(const RtlirDesign* design) {
   }
 }
 
-VpiObject* VpiContext::NetSourceDelayExpression(SimContext& sim_ctx,
-                                                const RtlirNet& net) {
-  // §37.3.4: the vpiDelay expression is a constant expression when one delay
-  // is given, and an operation whose vpiOpType is vpiListOp when there are
-  // several.
-  //
-  // §28.16's rise, fall and turn-off delays survive elaboration on RtlirNet in
-  // the order the declaration wrote them, and the slots fill left to right, so
-  // the first empty one ends the list the source specified.
-  Expr* const kWritten[3] = {net.delay_rise, net.delay_fall, net.delay_turnoff};
-  std::vector<VpiObject*> constants;
-  for (Expr* delay : kWritten) {
-    if (delay == nullptr) break;
-    // Each written delay stands as a constant expression carrying the value
-    // evaluating it produced. The storage goes on the run's arena rather than
-    // through SimContext::CreateVariable, which would enter the delay under a
-    // name the design never declared.
-    auto* constant = AllocObject();
-    constant->type = vpiConstant;
-    constant->const_type = vpiIntConst;
-    auto* storage = sim_ctx.GetArena().Create<Variable>();
-    storage->value = EvalExpr(delay, sim_ctx, sim_ctx.GetArena());
-    constant->var = storage;
-    constant->size = static_cast<int>(storage->value.width);
-    constants.push_back(constant);
-  }
-
-  if (constants.empty()) return nullptr;
-  if (constants.size() == 1) return constants.front();
-
-  // The operands of an operation are its expression children (§36.10.3), so the
-  // delays hang there in the order the declaration wrote them.
-  auto* op = AllocObject();
-  op->type = vpiOperation;
-  op->op_type = vpiListOp;
-  for (VpiObject* constant : constants) op->children.push_back(constant);
-  return op;
-}
-
 void VpiContext::AttachSourceDelayExpressions(SimContext& sim_ctx,
                                               const RtlirDesign* design) {
   // §37.3.4: the delay expressions the source code writes are reached through
@@ -534,15 +495,20 @@ void VpiContext::AttachSourceDelayExpressions(SimContext& sim_ctx,
   // question, the actual delays the tool is using.
   if (design == nullptr) return;
 
-  WalkInstancePaths(
-      design, [&](const RtlirModule* mod, const std::string& prefix) {
-        for (const RtlirNet& net : mod->nets) {
-          VpiHandle obj =
-              FindObjectForFlatName(object_map_, VpiFlatName(prefix, net.name));
-          if (obj == nullptr) continue;
-          obj->delay_expr = NetSourceDelayExpression(sim_ctx, net);
-        }
-      });
+  WalkInstancePaths(design, [&](const RtlirModule* mod,
+                                const std::string& prefix) {
+    for (const RtlirNet& net : mod->nets) {
+      VpiHandle obj =
+          FindObjectForFlatName(object_map_, VpiFlatName(prefix, net.name));
+      if (obj == nullptr) continue;
+      // §28.16's rise, fall and turn-off delays survive elaboration on
+      // RtlirNet in the order the declaration wrote them, and the slots
+      // fill left to right, so the first empty one ends the list.
+      obj->delay_expr = VpiSourceDelayExpression(
+          {net.delay_rise, net.delay_fall, net.delay_turnoff},
+          VpiFlatName(prefix, ""), sim_ctx, [this] { return AllocObject(); });
+    }
+  });
 }
 
 // §37.36 (figure): the UDP definitions of the design. A udp defn is drawn from

@@ -74,6 +74,10 @@ struct PathDelay {
   bool is_ifnone = false;
   uint8_t delay_count = 1;
   uint64_t delays[12] = {};
+  // §37.3.4: the delays the path declaration wrote, in its order, which
+  // vpiDelay reaches as expressions; `delays` holds them counted in ticks and
+  // spread over the transitions. Empty on a path no declaration made.
+  std::vector<const Expr*> source_delays;
 
   uint64_t reject_limit[12] = {};
   uint64_t error_limit[12] = {};

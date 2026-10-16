@@ -16,6 +16,7 @@
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_source_delay.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -151,6 +152,23 @@ VpiObject* MakePrimitiveObject(const PrimShape& shape, std::string_view name,
   return prim;
 }
 
+// §37.3.4: the delay expression vpiDelay reaches from a primitive whose
+// instantiation at `site` wrote `delays`; null where it wrote none.
+VpiObject* PrimitiveDelayExpression(const std::vector<const Expr*>& delays,
+                                    const PrimSite& site, SimContext& ctx,
+                                    const VpiAttachBuild& build) {
+  return VpiSourceDelayExpression(delays, VpiFlatName(site.prefix, ""), ctx,
+                                  build.alloc);
+}
+
+// The same for a gate or switch instantiation `item`.
+VpiObject* GateDelayExpression(const ModuleItem& item, const PrimSite& site,
+                               SimContext& ctx, const VpiAttachBuild& build) {
+  return PrimitiveDelayExpression(
+      {item.gate_delay, item.gate_delay_fall, item.gate_delay_decay}, site, ctx,
+      build);
+}
+
 // The expressions `item`'s terminals are written as at `site`.
 std::vector<VpiObject*> TerminalObjects(const ModuleItem& item,
                                         const PrimSite& site, SimContext& ctx,
@@ -191,6 +209,9 @@ void MakePrimitiveArray(const ModuleItem& item, const PrimSite& site,
       item.gate_inst_name, kRange, build);
   const std::vector<VpiObject*> kWhole =
       TerminalObjects(item, site, ctx, build);
+  // Each element is an instance of the primitive the array writes, delay and
+  // all (§28.3.6).
+  VpiObject* const kDelay = GateDelayExpression(item, site, ctx, build);
   for (int64_t index = kRange.LowIndex(); index <= kRange.HighIndex();
        ++index) {
     std::vector<VpiObject*> terminals;
@@ -201,10 +222,10 @@ void MakePrimitiveArray(const ModuleItem& item, const PrimSite& site,
     }
     const std::string kName =
         std::string(item.gate_inst_name) + "[" + std::to_string(index) + "]";
-    VpiAddArrayElement(array,
-                       MakePrimitiveObject(ShapeOf(item.gate_kind), kName,
-                                           terminals, site.instance, build),
-                       index, build);
+    VpiObject* prim = MakePrimitiveObject(ShapeOf(item.gate_kind), kName,
+                                          terminals, site.instance, build);
+    prim->delay_expr = kDelay;
+    VpiAddArrayElement(array, prim, index, build);
   }
 }
 
@@ -225,8 +246,11 @@ void MakeUdpObject(const RtlirUdpInst& inst, const PrimSite& site,
   const PrimShape kShape{inst.decl->name,
                          inst.decl->is_sequential ? vpiSeqPrim : vpiCombPrim,
                          vpiUdp};
-  MakePrimitiveObject(kShape, inst.name, terminals, site.instance, build)
-      ->udp_defn = defn;
+  VpiObject* udp =
+      MakePrimitiveObject(kShape, inst.name, terminals, site.instance, build);
+  udp->udp_defn = defn;
+  udp->delay_expr =
+      PrimitiveDelayExpression({inst.delay, inst.delay_fall}, site, ctx, build);
 }
 
 }  // namespace
@@ -235,30 +259,32 @@ void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
                       const VpiUdpDefnOf& udp_defn_of, SimContext& ctx,
                       const VpiAttachBuild& build) {
   // §37.35: an instance reaches the gates, switches and udps it instantiates,
-  // each with its terminals. RtlirModule::gate_insts kept each gate and switch
-  // instantiation and udp_insts each UDP one, and no pass read either, so
-  // vpiPrimitive reached nothing for any design.
-  WalkInstanceObjects(design, objects,
-                      [&](const RtlirModule* mod, const std::string& prefix,
-                          VpiObject* instance) {
-                        for (const ModuleItem* item : mod->gate_insts) {
-                          const PrimSite kSite{instance, prefix, objects};
-                          // §28.3.6: an instantiation declaring a range is an
-                          // instance array.
-                          if (item->inst_range_left != nullptr) {
-                            MakePrimitiveArray(*item, kSite, ctx, build);
-                            continue;
-                          }
-                          MakePrimitiveObject(
-                              ShapeOf(item->gate_kind), item->gate_inst_name,
+  // each with its terminals and, §37.3.4, the delay it was written with.
+  // RtlirModule::gate_insts kept each gate and switch instantiation and
+  // udp_insts each UDP one, and no pass read either, so vpiPrimitive reached
+  // nothing for any design.
+  WalkInstanceObjects(
+      design, objects,
+      [&](const RtlirModule* mod, const std::string& prefix,
+          VpiObject* instance) {
+        for (const ModuleItem* item : mod->gate_insts) {
+          const PrimSite kSite{instance, prefix, objects};
+          // §28.3.6: an instantiation declaring a range is an
+          // instance array.
+          if (item->inst_range_left != nullptr) {
+            MakePrimitiveArray(*item, kSite, ctx, build);
+            continue;
+          }
+          MakePrimitiveObject(ShapeOf(item->gate_kind), item->gate_inst_name,
                               TerminalObjects(*item, kSite, ctx, build),
-                              instance, build);
-                        }
-                        for (const RtlirUdpInst& inst : mod->udp_insts) {
-                          MakeUdpObject(inst, {instance, prefix, objects},
-                                        udp_defn_of(inst.decl), ctx, build);
-                        }
-                      });
+                              instance, build)
+              ->delay_expr = GateDelayExpression(*item, kSite, ctx, build);
+        }
+        for (const RtlirUdpInst& inst : mod->udp_insts) {
+          MakeUdpObject(inst, {instance, prefix, objects},
+                        udp_defn_of(inst.decl), ctx, build);
+        }
+      });
 }
 
 }  // namespace delta

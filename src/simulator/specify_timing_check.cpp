@@ -193,6 +193,7 @@ TimingCheckEntry BuildTimingCheckUnderOptions(
   TimingCheckEntry entry;
   entry.kind = decl.check_kind;
   entry.decl = &decl;
+  entry.source_limits.assign(decl.limits.begin(), decl.limits.end());
   // A terminal written through an interface port, `b.d`, is named by both
   // names, as the module's text reads it: A.7.3's input_identifier admits
   // `interface_identifier . port_identifier`, and the signal is the member of

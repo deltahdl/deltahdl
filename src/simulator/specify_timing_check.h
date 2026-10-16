@@ -90,6 +90,10 @@ struct TimingCheckEntry {
   // an instantiated module is named under.
   std::string inst_prefix;
 
+  // §37.3.4: the limits the check wrote, in its order, which vpiDelay
+  // reaches as expressions; `limit` and `limit2` hold them counted in ticks.
+  // Empty on a check no declaration made.
+  std::vector<const Expr*> source_limits;
   uint64_t limit = 0;
   uint64_t limit2 = 0;
 

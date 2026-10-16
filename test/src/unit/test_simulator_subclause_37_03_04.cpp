@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <vector>
+
 #include "fixture_simulator.h"
+#include "fixture_vpi_run.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
@@ -231,6 +235,107 @@ TEST(SourceDelayDesign, ANetsDeclaredDelaysAreReachedThroughVpiDelay) {
   EXPECT_EQ(g_two_delay_operands, 2);
 
   SetGlobalVpiContext(nullptr);
+}
+
+// §37.3.4 against a design: each kind of object whose source writes delays,
+// beside the net, reaches them through vpiDelay -- a primitive (gate and
+// udp), a continuous assignment, a module path and a timing check. One delay
+// is a constant of the value written, several an operation of vpiOpType
+// vpiListOp over constants in the order written. Only the net's had been
+// built, so the four answered null whatever the source wrote.
+class SourceDelaysOfARun : public VpiDesignRun {
+ protected:
+  void SetUp() override {
+    VpiDesignRun::SetUp();
+    Run("primitive inv(output o, input i);\n"
+        "  table 0 : 1; 1 : 0; endtable\n"
+        "endprimitive\n"
+        "module m(input a, input b, output o, output y);\n"
+        "  wire p, q, n;\n"
+        "  and #(2, 3) g(o, a, b);\n"
+        "  buf #4 g1(y, a);\n"
+        "  inv #(14, 15) u(n, a);\n"
+        "  assign #5 p = a;\n"
+        "  assign #(6, 7) q = b;\n"
+        "  specify\n"
+        "    (a => o) = (8, 9);\n"
+        "    (b => y) = 10;\n"
+        "    $setup(a, posedge b, 11);\n"
+        "    $setuphold(posedge b, a, 12, 13);\n"
+        "  endspecify\n"
+        "endmodule\n"
+        "module top; reg a, b; wire o, y; m m1(a, b, o, y); endmodule\n");
+  }
+
+  // The values vpiDelay reaches from `obj`: one constant's, or each operand's
+  // of a vpiListOp operation in order; -1 for a delay of any other shape, and
+  // none for no delay.
+  static std::vector<int> DelaysOf(vpiHandle obj) {
+    vpiHandle delay = vpi_handle(vpiDelay, obj);
+    if (delay == nullptr) return {};
+    if (vpi_get(vpiType, delay) == vpiConstant) return {ValueOf(delay)};
+    if (vpi_get(vpiOpType, delay) != vpiListOp) return {-1};
+    std::vector<int> values;
+    vpiHandle it = vpi_iterate(vpiOperand, delay);
+    while (vpiHandle operand = vpi_scan(it)) {
+      values.push_back(
+          vpi_get(vpiType, operand) == vpiConstant ? ValueOf(operand) : -1);
+    }
+    return values;
+  }
+
+  static int ValueOf(vpiHandle constant) {
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(constant, &value);
+    return value.value.integer;
+  }
+
+  // The objects of `type` the instance m1 reaches, in the order it reaches
+  // them.
+  static std::vector<vpiHandle> AllOf(int type) {
+    std::vector<vpiHandle> found;
+    vpiHandle it = vpi_iterate(type, By("top.m1"));
+    if (it == nullptr) return found;
+    while (vpiHandle obj = vpi_scan(it)) found.push_back(obj);
+    return found;
+  }
+};
+
+// #6967: a gate's and a udp's instantiation delays.
+TEST_F(SourceDelaysOfARun, APrimitivesWrittenDelaysAreReached) {
+  EXPECT_EQ(DelaysOf(Named(vpiPrimitive, By("top.m1"), "g")),
+            (std::vector<int>{2, 3}));
+  EXPECT_EQ(DelaysOf(Named(vpiPrimitive, By("top.m1"), "g1")),
+            (std::vector<int>{4}));
+  EXPECT_EQ(DelaysOf(Named(vpiPrimitive, By("top.m1"), "u")),
+            (std::vector<int>{14, 15}));
+}
+
+// #7232: a continuous assignment's delays.
+TEST_F(SourceDelaysOfARun, AContinuousAssignmentsWrittenDelaysAreReached) {
+  std::vector<std::vector<int>> delays;
+  for (vpiHandle assign : AllOf(vpiContAssign)) {
+    delays.push_back(DelaysOf(assign));
+  }
+  std::ranges::sort(delays);
+  EXPECT_EQ(delays, (std::vector<std::vector<int>>{{5}, {6, 7}}));
+}
+
+// #7233: a module path's delays, as the path declaration wrote them.
+TEST_F(SourceDelaysOfARun, AModulePathsWrittenDelaysAreReached) {
+  std::vector<std::vector<int>> delays;
+  for (vpiHandle path : AllOf(vpiModPath)) delays.push_back(DelaysOf(path));
+  std::ranges::sort(delays);
+  EXPECT_EQ(delays, (std::vector<std::vector<int>>{{8, 9}, {10}}));
+}
+
+// #7234: a timing check's limits.
+TEST_F(SourceDelaysOfARun, ATimingChecksWrittenLimitsAreReached) {
+  std::vector<std::vector<int>> delays;
+  for (vpiHandle check : AllOf(vpiTchk)) delays.push_back(DelaysOf(check));
+  std::ranges::sort(delays);
+  EXPECT_EQ(delays, (std::vector<std::vector<int>>{{11}, {12, 13}}));
 }
 
 }  // namespace
