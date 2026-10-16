@@ -160,6 +160,43 @@ bool HasVariable(const RtlirModule& mod, std::string_view name) {
   });
 }
 
+// Where the variables of one instance find their typespecs: the typedefs of
+// its module and of the compilation unit, by name, and the instance's objects,
+// keyed under `prefix` in `objects`.
+struct InstanceTypespecs {
+  const TypespecsByName& local;
+  const TypespecsByName& unit;
+  const VpiObjectMap& objects;
+  const std::string& prefix;
+
+  // §37.17: relates the variable `name` of the instance, declared with the type
+  // `written`, to the typespec of the typedef that type names, if any.
+  void Relate(std::string_view name, const DataType* written) const {
+    VpiObject* typespec = DeclaredTypespec(written, local, unit);
+    VpiObject* obj = FindObjectForFlatName(objects, VpiFlatName(prefix, name));
+    if (typespec != nullptr && obj != nullptr) {
+      obj->children.push_back(typespec);
+    }
+  }
+};
+
+// §37.17: relates each variable of an instance of `mod` to its typespec: each
+// the module's variables list holds, and each variable port it does not.
+// §23.2.2.3 has a variable port declare a variable, which the list holds where
+// the port is of a structure or union type or the body declares it again; any
+// other relates to the type the port's declaration wrote.
+void RelateVariableTypespecs(const RtlirModule& mod,
+                             const InstanceTypespecs& at) {
+  for (const RtlirVariable& var : mod.variables) {
+    at.Relate(var.name, var.written_type);
+  }
+  for (const RtlirPort& port : mod.ports) {
+    if (port.is_var && !HasVariable(mod, port.name)) {
+      at.Relate(port.name, port.declared_type);
+    }
+  }
+}
+
 // §37.10 detail 1: a package is an instance too, whose typedefs are its
 // typespecs, answered in `answered` under the package's name and "::" for a
 // scope that imports them (§26.3) to reach.
@@ -235,26 +272,7 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
     const TypespecsByName kLocal = MakeTypespecs(
         decl->items, {scope, &mod->enum_types, build, answered, mod->imports});
     MakeGenBlockTypespecs(*mod, scope, build, answered);
-    const auto kRelate = [&](std::string_view name, const DataType* written) {
-      VpiObject* typespec = DeclaredTypespec(written, kLocal, kUnit);
-      VpiObject* obj =
-          FindObjectForFlatName(objects, VpiFlatName(prefix, name));
-      if (typespec != nullptr && obj != nullptr) {
-        obj->children.push_back(typespec);
-      }
-    };
-    for (const RtlirVariable& var : mod->variables) {
-      kRelate(var.name, var.written_type);
-    }
-    // §23.2.2.3: a variable port declares a variable, which the module's
-    // variables list holds where the port is of a structure or union type or
-    // the body declares it again; any other relates to the type the port's
-    // declaration wrote.
-    for (const RtlirPort& port : mod->ports) {
-      if (port.is_var && !HasVariable(*mod, port.name)) {
-        kRelate(port.name, port.declared_type);
-      }
-    }
+    RelateVariableTypespecs(*mod, {kLocal, kUnit, objects, prefix});
   });
   return answered;
 }
