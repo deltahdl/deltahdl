@@ -434,6 +434,10 @@ class Lowerer {
   // §17.5: the processes being lowered are a checker's, whose always_ff
   // procedures read sampled values.
   bool lowering_checker_ = false;
+  // §32.4.4 with §32.9: the design calls $sdf_annotate, so an interconnect
+  // delay can reach an inout port while it runs, and each inout port binding
+  // is kept as its two nets (LinkInoutPortNets) rather than merged.
+  bool interconnect_annotatable_ = false;
   // §17.3: the prefix of the procedural checker instance being lowered, the
   // outermost one where checkers nest, and empty outside one.
   std::string procedural_checker_root_;

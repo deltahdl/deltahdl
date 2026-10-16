@@ -19,8 +19,10 @@
 #include "simulator/checker_actuals.h"
 #include "simulator/clocking.h"
 #include "simulator/evaluation.h"
+#include "simulator/inout_port_link.h"
 #include "simulator/lowerer.h"
 #include "simulator/lowerer_register.h"
+#include "simulator/net.h"
 #include "simulator/sequence_flatten.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -739,6 +741,28 @@ static void JoinInoutPortBinding(const RtlirPortBinding& binding,
   scope.ctx.AliasNet(local, target);
 }
 
+// §32.4.4: in a design an interconnect delay can reach while it runs, an
+// inout port binding of a net to a net is kept as the two nets, joined by
+// LinkInoutPortNets, so that a delay annotated to the port sits between them.
+// Answers false, linking nothing, where either side is not a net of its own.
+static bool LinkInoutPortBinding(const RtlirPortBinding& binding,
+                                 const InoutJoinScope& scope) {
+  if (binding.connection->kind != ExprKind::kIdentifier) return false;
+  std::string local =
+      scope.local_prefix + std::string(PortStorageName(binding));
+  std::string target =
+      scope.parent_prefix + std::string(binding.connection->text);
+  Net* inner = scope.ctx.FindNet(local);
+  Net* outer = scope.ctx.FindNet(target);
+  if (inner == nullptr || outer == nullptr || inner == outer) return false;
+  std::string load = SdfHierName(local);
+  std::string source = SdfHierName(target);
+  LinkInoutPortNets({*outer, *inner, scope.parent_prefix, scope.local_prefix,
+                     std::move(local), std::move(source), std::move(load)},
+                    scope.ctx);
+  return true;
+}
+
 // §16.18 with §17.3: an input formal of a checker bound to a clocking block
 // variable, `cb.a`, stands for that variable in the checker's assertions,
 // which read what the block sampled rather than a sample of the formal; the
@@ -865,8 +889,13 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
     if (binding.direction == Direction::kInout ||
         binding.direction == Direction::kRef ||
         BoundPortType(inst, binding) == DataTypeKind::kEvent) {
-      JoinInoutPortBinding(binding, {ctx_, arena_, inst_prefix_ + inst_seg,
-                                     inst_prefix_, inout_joins});
+      const InoutJoinScope kScope{ctx_, arena_, inst_prefix_ + inst_seg,
+                                  inst_prefix_, inout_joins};
+      if (binding.direction == Direction::kInout && interconnect_annotatable_ &&
+          LinkInoutPortBinding(binding, kScope)) {
+        continue;
+      }
+      JoinInoutPortBinding(binding, kScope);
       continue;
     }
 

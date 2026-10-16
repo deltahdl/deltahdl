@@ -450,4 +450,111 @@ TEST(InterconnectDelaySim, AConstantConnectionsPendingDriveStillArrives) {
   EXPECT_EQ(captured.str(), "00\n11\n");
 }
 
+// §32.4.4: an inout port is a load like an input port, and a reference at the
+// load sees the delayed value while one before it sees the undelayed value.
+// u drives n from 0 to 1 at 2 and the delay from u/o to c/p is 5, so at 4 n
+// holds 1 and c.p still 0, and at 8 c.p holds 1. One merged net would show 1
+// at c.p from 2 on.
+TEST(InterconnectDelaySim, AnInoutLoadSeesTheDelayedValueAndItsNetDoesNot) {
+  const std::string kSdf =
+      WriteSdfFile("inout_load.sdf", DelayFile("(INTERCONNECT u/o c/p (5))"));
+  SimFixture f;
+  auto* ok = RunAndFindVar(
+      "module drv(output wire o);\n"
+      "  reg d = 1'b0;\n"
+      "  assign o = d;\n"
+      "  initial #2 d = 1'b1;\n"
+      "endmodule\n"
+      "module child(inout wire p);\n"
+      "  assign p = 1'bz;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire n;\n"
+      "  logic ok = 1'b0;\n"
+      "  drv u(.o(n));\n"
+      "  child c(.p(n));\n"
+      "  initial begin\n"
+      "    #1 $sdf_annotate(\"" +
+          kSdf +
+          "\");\n"
+          "    #3 ok = (n === 1'b1) && (c.p === 1'b0);\n"
+          "    #4 ok = ok && (n === 1'b1) && (c.p === 1'b1);\n"
+          "  end\n"
+          "endmodule\n",
+      f, "ok");
+  ASSERT_NE(ok, nullptr);
+  EXPECT_EQ(ok->value.ToUint64(), 1u);
+}
+
+// The two nets of an inout port drive each other with what each one's own
+// drivers resolve to, so a value the child drives out reaches the parent's net
+// and goes away again when the child lets go: c drives p to 1 at 2 and
+// releases it at 6, and at 4 n holds 1 and at 8 z. A link that passed each
+// net's whole value back would hold the 1 between the two nets for good. The
+// design calls $sdf_annotate from a task, which keeps the port's two nets
+// apart as a call from a procedure does.
+TEST(InterconnectDelaySim, AValueAnInoutDrivesOutGoesWhenItLetsGo) {
+  const std::string kSdf = WriteSdfFile("inout_out.sdf", "(DELAYFILE)");
+  SimFixture f;
+  auto* ok = RunAndFindVar(
+      "module child(inout wire p);\n"
+      "  reg e = 1'bz;\n"
+      "  assign p = e;\n"
+      "  initial begin\n"
+      "    #2 e = 1'b1;\n"
+      "    #4 e = 1'bz;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire n;\n"
+      "  logic ok = 1'b0;\n"
+      "  child c(.p(n));\n"
+      "  task annotate;\n"
+      "    $sdf_annotate(\"" +
+          kSdf +
+          "\");\n"
+          "  endtask\n"
+          "  initial begin\n"
+          "    annotate();\n"
+          "    #4 ok = (n === 1'b1) && (c.p === 1'b1);\n"
+          "    #4 ok = ok && (n === 1'bz) && (c.p === 1'bz);\n"
+          "  end\n"
+          "endmodule\n",
+      f, "ok");
+  ASSERT_NE(ok, nullptr);
+  EXPECT_EQ(ok->value.ToUint64(), 1u);
+}
+
+// §32.4.4: an inout port is a source as well as a load, so a delay runs from
+// one inout port to another on the same net. c1 drives its port to 1 at 2 and
+// the delay from c1/p to c2/p is 5: at 4 n holds 1 and c2.p still z, and at 8
+// c2.p holds 1.
+TEST(InterconnectDelaySim, AnInoutSourceReachesAnInoutLoadAcrossItsDelay) {
+  const std::string kSdf =
+      WriteSdfFile("inout_pair.sdf", DelayFile("(INTERCONNECT c1/p c2/p (5))"));
+  SimFixture f;
+  auto* ok = RunAndFindVar(
+      "module child(inout wire p);\n"
+      "  reg e = 1'bz;\n"
+      "  assign p = e;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire n;\n"
+      "  logic ok = 1'b0;\n"
+      "  child c1(.p(n));\n"
+      "  child c2(.p(n));\n"
+      "  initial begin\n"
+      "    #1 $sdf_annotate(\"" +
+          kSdf +
+          "\");\n"
+          "    #1 c1.e = 1'b1;\n"
+          "    #2 ok = (n === 1'b1) && (c2.p === 1'bz);\n"
+          "    #4 ok = ok && (c2.p === 1'b1);\n"
+          "  end\n"
+          "endmodule\n",
+      f, "ok");
+  ASSERT_NE(ok, nullptr);
+  EXPECT_EQ(ok->value.ToUint64(), 1u);
+}
+
 }  // namespace

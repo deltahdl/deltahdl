@@ -141,7 +141,7 @@ TEST_F(SdfTimingCheckMapping, HoldReachesHoldAndTheHoldValueOfSetuphold) {
 // the setup value of 11 and 13 stays while the hold value of 80 lands, and the
 // entry after it is read in step and lands too.
 TEST_F(SdfTimingCheckMapping, EmptyValueHoldsWhatItStandsFor) {
-  Run("(SETUPHOLD d (posedge clk) () (80)) (RECOVERY rst (posedge clk) (55))");
+  Run("(SETUPHOLD d (posedge clk) () (80)) (RECOVERY (posedge clk) rst (55))");
 
   EXPECT_EQ(Limit(TimingCheckKind::kSetup), 11u);
   EXPECT_EQ(Limit(TimingCheckKind::kHold), 80u);
@@ -239,7 +239,7 @@ TEST(SdfTimingCheckNegativeValues, NegativeValuesKeepTheirSign) {
                                   f, mgr));
 
   Annotate(SdfWith("(SETUPHOLD d (posedge clk) (-2) (5))"
-                   " (NOCHANGE d (posedge clk) (-1) (2))"),
+                   " (NOCHANGE (posedge clk) d (-1) (2))"),
            mgr);
   ASSERT_EQ(mgr.TimingCheckCount(), 2u);
   const TimingCheckEntry& setuphold = mgr.GetTimingChecks()[0];
@@ -303,7 +303,7 @@ TEST_F(SdfTimingCheckMapping, SetupholdReachesSetupHoldAndSetuphold) {
 // which shares both signals, not a target.
 TEST_F(SdfTimingCheckMapping,
        RecoveryReachesRecoveryAndTheRecoveryValueOfRecrem) {
-  Run("(RECOVERY rst (posedge clk) (55))");
+  Run("(RECOVERY (posedge clk) rst (55))");
 
   EXPECT_EQ(Limit(TimingCheckKind::kRecovery), 55u);
   EXPECT_EQ(Limit(TimingCheckKind::kRecrem), 55u);
@@ -314,7 +314,7 @@ TEST_F(SdfTimingCheckMapping,
 // Table 32-2 row 5: REMOVAL mirrors HOLD -- $removal and the second value of
 // $recrem, written as $recrem(x,v1).
 TEST_F(SdfTimingCheckMapping, RemovalReachesRemovalAndTheRemovalValueOfRecrem) {
-  Run("(REMOVAL rst (posedge clk) (65))");
+  Run("(REMOVAL (posedge clk) rst (65))");
 
   EXPECT_EQ(Limit(TimingCheckKind::kRemoval), 65u);
   EXPECT_EQ(Limit(TimingCheckKind::kRecrem), 17u);
@@ -325,7 +325,7 @@ TEST_F(SdfTimingCheckMapping, RemovalReachesRemovalAndTheRemovalValueOfRecrem) {
 // Table 32-2 row 6: RECREM's two values reach $recovery, $removal and both
 // values of $recrem.
 TEST_F(SdfTimingCheckMapping, RecremReachesRecoveryRemovalAndRecrem) {
-  Run("(RECREM rst (posedge clk) (75) (85))");
+  Run("(RECREM (posedge clk) rst (75) (85))");
 
   EXPECT_EQ(Limit(TimingCheckKind::kRecovery), 75u);
   EXPECT_EQ(Limit(TimingCheckKind::kRemoval), 85u);
@@ -336,7 +336,7 @@ TEST_F(SdfTimingCheckMapping, RecremReachesRecoveryRemovalAndRecrem) {
 // Table 32-2 row 7: SKEW's single value reaches both $skew and $timeskew, and
 // not $fullskew, which shares the same two signals.
 TEST_F(SdfTimingCheckMapping, SkewReachesSkewAndTimeskew) {
-  Run("(SKEW (posedge clk2) (posedge clk) (90))");
+  Run("(SKEW (posedge clk) (posedge clk2) (90))");
 
   EXPECT_EQ(Limit(TimingCheckKind::kSkew), 90u);
   EXPECT_EQ(Limit(TimingCheckKind::kTimeskew), 90u);
@@ -348,7 +348,7 @@ TEST_F(SdfTimingCheckMapping, SkewReachesSkewAndTimeskew) {
 // only $fullskew, which is the only two-value skew check. $skew and $timeskew,
 // declared on the same signals, are not targets.
 TEST_F(SdfTimingCheckMapping, BidirectskewReachesOnlyFullskew) {
-  Run("(BIDIRECTSKEW (posedge clk2) (posedge clk) (91) (92))");
+  Run("(BIDIRECTSKEW (posedge clk) (posedge clk2) (91) (92))");
 
   EXPECT_EQ(Limit(TimingCheckKind::kFullskew), 91u);
   EXPECT_EQ(Limit2(TimingCheckKind::kFullskew), 92u);
@@ -386,7 +386,7 @@ TEST_F(SdfTimingCheckMapping, PeriodReachesOnlyPeriod) {
 
 // Table 32-2 row 11: NOCHANGE's two values are $nochange's two edge offsets.
 TEST_F(SdfTimingCheckMapping, NochangeReachesNochangeEdgeOffsets) {
-  Run("(NOCHANGE d (posedge clk) (7) (8))");
+  Run("(NOCHANGE (posedge clk) d (7) (8))");
 
   const auto* nc = Check(mgr, TimingCheckKind::kNochange);
   ASSERT_NE(nc, nullptr);
@@ -422,7 +422,7 @@ TEST_F(SdfTimingCheckMapping, CheckOnAnUndeclaredSignalReachesNothing) {
 TEST_F(SdfTimingCheckMapping, AnnotatedSkewLimitIsTheOneTheCheckRunsOn) {
   EXPECT_TRUE(mgr.CheckSkewViolation("clk", 100, "clk2", 150));
 
-  Run("(SKEW (posedge clk2) (posedge clk) (90))");
+  Run("(SKEW (posedge clk) (posedge clk2) (90))");
 
   EXPECT_FALSE(mgr.CheckSkewViolation("clk", 100, "clk2", 150));
   EXPECT_TRUE(mgr.CheckSkewViolation("clk", 100, "clk2", 200));

@@ -464,6 +464,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/module_path_delay.cpp
     simulator/module_path_drive.cpp
     simulator/interconnect_drive.cpp
+    simulator/inout_port_link.cpp
     simulator/specify.cpp
     simulator/specify_sdf_device.cpp
     simulator/specify_sdf_timing_check.cpp

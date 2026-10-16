@@ -485,7 +485,7 @@ TEST(NegativeTimingCheckSwitches, AnnotatedNochangeOffsetsAreMoved) {
   SimFixture f;
   SpecifyManager& mgr =
       ManagerWithClkDelayed("$nochange(posedge clk, e, 0, 0);", f);
-  AnnotateOntoTop("(NOCHANGE e (posedge clk) (3) (4))", mgr);
+  AnnotateOntoTop("(NOCHANGE (posedge clk) e (3) (4))", mgr);
   const TimingCheckEntry& check = CheckOfKind(mgr, TimingCheckKind::kNochange);
   EXPECT_EQ(check.start_edge_offset, 14);
   EXPECT_EQ(check.end_edge_offset, -7);

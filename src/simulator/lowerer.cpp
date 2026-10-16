@@ -33,6 +33,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/expr_walk.h"
 #include "simulator/fsm_coverage.h"
+#include "simulator/inout_port_link.h"
 #include "simulator/lowerer_always_comb.h"
 #include "simulator/lowerer_child.h"
 #include "simulator/lowerer_register.h"
@@ -839,6 +840,7 @@ void Lowerer::Lower(const RtlirDesign* design) {
   // any part of it so the scheduler sees an empty event calendar.
   if (design->simulation_blocked) return;
   design_ = design;
+  interconnect_annotatable_ = DesignCallsSdfAnnotate(*design);
   RegisterDesignScopes(design, ctx_);
   LowerDesignData();
 
