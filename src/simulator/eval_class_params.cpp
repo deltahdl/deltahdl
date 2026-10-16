@@ -296,7 +296,7 @@ ParamValueStore ClassStaticStore(ClassTypeInfo* info) {
 void FoldClassBodyParams(ClassParamSizer sizer, const ParamValueLookup& header,
                          const ParamValueStore& store, SimContext& ctx,
                          Arena& arena) {
-  const ClassDecl* decl = sizer.decl();
+  const ClassDecl* decl = sizer.Decl();
   ctx.PushScope();
   for (const auto& [pname, pexpr] : decl->params) {
     if (decl->type_param_names.count(pname) != 0) continue;

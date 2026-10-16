@@ -60,7 +60,7 @@ class ClassParamSizer {
       : decl_(decl), type_scope_(type_scope) {}
 
   // The class whose parameters this sizes.
-  const ClassDecl* decl() const { return decl_; }
+  const ClassDecl* Decl() const { return decl_; }
 
   // The value of the class's i-th parameter from `expr`, and recorded.
   Logic4Vec Value(size_t i, const Expr* expr, SimContext& ctx, Arena& arena);
