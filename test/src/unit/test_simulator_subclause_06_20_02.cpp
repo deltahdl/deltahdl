@@ -566,4 +566,26 @@ TEST(ValueParameterSimulation, ClassParameterOfARealTypedefStaysReal) {
             "2.5\n");
 }
 
+// §6.20.2 with §8.23: a class nested in another may declare a typedef and a
+// parameter of it, which holds its value at that type, so `t P = 12'hFFF` on
+// `typedef bit [3:0] t` reads 15 through an `Outer::Inner` object's method.
+// The parameter was sized by a lookup of the typedef under `Inner` alone,
+// where the design records it under `Outer::Inner`, and kept 4095.
+TEST(ValueParameterSimulation, NestedClassParameterOfItsOwnTypedef) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class Outer;\n"
+                       "  class Inner;\n"
+                       "    typedef bit [3:0] t;\n"
+                       "    localparam t P = 12'hFFF;\n"
+                       "    function int get(); return P; endfunction\n"
+                       "  endclass\n"
+                       "endclass\n"
+                       "module top;\n"
+                       "  Outer::Inner in = new;\n"
+                       "  initial $display(\"%0d\", in.get());\n"
+                       "endmodule\n",
+                       f),
+            "15\n");
+}
+
 }  // namespace

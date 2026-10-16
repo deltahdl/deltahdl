@@ -622,7 +622,9 @@ static void StoreClassParam(ClassTypeInfo* info, std::string_view pname,
 // eight bits of ones and not the literal's one bit.
 static void InitClassParams(ClassTypeInfo* info, const ClassDecl* cls,
                             SimContext& ctx, Arena& arena) {
-  ClassParamSizer sizer(cls);
+  // The class's own typedefs are keyed under the name it is registered by,
+  // "Outer::Inner" for a nested one (LowerNestedClass).
+  ClassParamSizer sizer(cls, info->name);
   // §6.20: parameters supplied through the class's parameter port list.
   for (size_t i = 0; i < cls->params.size(); ++i) {
     const auto& [pname, pexpr] = cls->params[i];

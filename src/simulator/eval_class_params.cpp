@@ -111,7 +111,10 @@ Logic4Vec ClassParamSizer::Value(std::string_view name, const DataType* type,
   if (type != nullptr && type->kind != DataTypeKind::kReal &&
       type->kind != DataTypeKind::kShortreal &&
       type->kind != DataTypeKind::kRealtime)
-    width = SimParamTypeWidth(InClassScope(*type, *decl_), scope_, ctx);
+    width = SimParamTypeWidth(
+        InClassScope(*type, *decl_,
+                     type_scope_.empty() ? decl_->name : type_scope_),
+        scope_, ctx);
   Logic4Vec val = ParamDefaultValue(expr, width, ctx, arena);
   if (!name.empty() && !val.is_real)
     scope_[name] = static_cast<int64_t>(val.ToUint64());

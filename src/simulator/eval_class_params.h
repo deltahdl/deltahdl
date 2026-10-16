@@ -53,6 +53,12 @@ class ClassParamSizer {
  public:
   explicit ClassParamSizer(const ClassDecl* decl) : decl_(decl) {}
 
+  // `type_scope` is the path the class's typedefs are keyed under,
+  // "Outer::Inner" for a class nested in another (§8.23); the class's own
+  // name where none is given.
+  ClassParamSizer(const ClassDecl* decl, std::string_view type_scope)
+      : decl_(decl), type_scope_(type_scope) {}
+
   // The value of the class's i-th parameter from `expr`, and recorded.
   Logic4Vec Value(size_t i, const Expr* expr, SimContext& ctx, Arena& arena);
 
@@ -67,6 +73,7 @@ class ClassParamSizer {
 
  private:
   const ClassDecl* decl_;
+  std::string_view type_scope_;
   ScopeMap scope_;
 };
 
