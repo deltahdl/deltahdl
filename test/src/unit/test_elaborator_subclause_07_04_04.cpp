@@ -2,6 +2,7 @@
 
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_param_value.h"
 
 using namespace delta;
 
@@ -161,6 +162,42 @@ TEST(MultidimensionalArrayValidation, CommaSeparatedSharePackedDims) {
   auto* mod = design->top_modules[0];
   ASSERT_GE(mod->variables.size(), 2u);
   EXPECT_EQ(mod->variables[0].width, mod->variables[1].width);
+}
+
+// §7.4.4 with §6.20.2: packed dimensions written on a typedef name multiply
+// the width the name stands for, so a package parameter of `nib [1:0]` on a
+// `typedef bit [3:0] nib` is eight bits and holds all of 8'hFF, 255. The fold
+// cut the value to the two bits the outer range counts alone, 3.
+TEST(StagedPackedDimensions, PackageParameterOfATypedefWithDimensionsIsNotCut) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  typedef bit [3:0] nib;\n"
+      "  parameter nib [1:0] P = 8'hFF;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  localparam int Q = p::P;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "Q"), 255);
+}
+
+// The same for a class parameter's default, read through `C#()::P`.
+TEST(StagedPackedDimensions, ClassParameterOfATypedefWithDimensionsIsNotCut) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "typedef bit [3:0] nib;\n"
+      "class C #(nib [1:0] P = 8'hFF);\n"
+      "endclass\n"
+      "module m;\n"
+      "  localparam int Q = C#()::P;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "Q"), 255);
 }
 
 }  // namespace

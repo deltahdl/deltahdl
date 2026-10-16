@@ -223,8 +223,9 @@ std::optional<int64_t> FoldDeclaredParamValue(const Expr* expr,
 // folded against `scope`, where the declaration writes one -- §6.20.1 and
 // §8.25.1 let the bounds name an earlier parameter -- else the type's, and 0
 // where the declaration writes neither, the value then sizing the parameter
-// (§6.20.2), where a bound does not fold, and for a typedef name, which
-// EvalTypeWidth has no map to resolve. Defined in const_eval_bits.cpp.
+// (§6.20.2), where a bound does not fold, and for a typedef name, with
+// packed dimensions written on it or without, which EvalTypeWidth has no map
+// to resolve. Defined in const_eval_bits.cpp.
 uint32_t DeclaredParamTypeWidth(const DataType& type, const ScopeMap& scope);
 
 // §6.20.2 (printed pages 126-127): the width and signedness a value

@@ -520,7 +520,12 @@ std::optional<int64_t> FoldParamValue(const RtlirParamDecl& pd,
   return FoldValueInContext(expr, scope, DeclaredFoldContext(pd), std::nullopt);
 }
 
+// A typedef name answers 0 with its dimensions or without: §7.4.4 has the
+// dimensions written on the name multiply the width it stands for, which
+// takes the typedef map this has none of, so their product alone is the
+// count of elements and not the width.
 uint32_t DeclaredParamTypeWidth(const DataType& type, const ScopeMap& scope) {
+  if (type.kind == DataTypeKind::kNamed) return 0;
   if (type.packed_dim_left != nullptr) return PackedDimProduct(type, scope);
   if (type.kind == DataTypeKind::kImplicit) return 0;
   return EvalTypeWidth(type);
