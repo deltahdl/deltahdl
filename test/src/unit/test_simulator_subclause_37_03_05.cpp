@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <string_view>
+#include <vector>
+
 #include "fixture_simulator.h"
+#include "fixture_vpi_run.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_internal.h"
@@ -274,6 +278,114 @@ TEST(SideEffectClassification, ASystemTaskArgumentCarriesItsSideEffects) {
   EXPECT_EQ(g_arg_side_effect_count, 1);
 
   SetGlobalVpiContext(nullptr);
+}
+
+// Whether the last VPI routine called recorded the §37.3.5 refusal of a put
+// through an index expression with side effects, rather than no error or one
+// of another kind.
+bool RefusedForASideEffectingIndex() {
+  s_vpi_error_info info = {};
+  if (vpi_chk_error(&info) == 0 || info.message == nullptr) return false;
+  return std::string_view(info.message)
+             .find(
+                 "index expression with side "
+                 "effects") != std::string_view::npos;
+}
+
+// Puts 3 to `obj` with no delay.
+void PutThree(vpiHandle obj) {
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  value.value.integer = 3;
+  vpi_put_value(obj, &value, nullptr, vpiNoDelay);
+}
+
+std::vector<bool> g_args_refused;
+
+PLI_INT32 PutEachArgumentCalltf(PLI_BYTE8*) {
+  vpiHandle call = vpi_handle(vpiSysTfCall, nullptr);
+  vpiHandle itr = call == nullptr ? nullptr : vpi_iterate(vpiArgument, call);
+  if (itr == nullptr) return 0;
+  while (vpiHandle arg = vpi_scan(itr)) {
+    // An omitted argument (§37.42 detail 8) holds nothing to write.
+    if (vpi_get(vpiOpType, arg) == vpiNullOp) {
+      g_args_refused.push_back(false);
+      continue;
+    }
+    PutThree(arg);
+    g_args_refused.push_back(RefusedForASideEffectingIndex());
+  }
+  return 0;
+}
+
+// Claim B, against a design (#6969): an argument written as a select whose
+// index has side effects, `a[i++]`, and one over such a select, `b[i--][1]`,
+// are refused by vpi_put_value() for it; `a[i]` and an omitted argument are
+// not. The argument was marked as a whole and never listed its index
+// expressions, so the put went through.
+TEST(SideEffectingIndexDesign,
+     APutThroughAnArgumentsSideEffectingIndexIsRefused) {
+  VpiContext vpi_ctx;
+  SetGlobalVpiContext(&vpi_ctx);
+  g_args_refused.clear();
+
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = VpiText("$put_each");
+  data.calltf = &PutEachArgumentCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  integer i;\n"
+      "  int a[4];\n"
+      "  bit [3:0] b[4];\n"
+      "  initial begin\n"
+      "    i = 1;\n"
+      "    $put_each(a[i++], , b[i--][1], a[i]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  EXPECT_EQ(g_args_refused, (std::vector<bool>{true, false, true, false}));
+
+  SetGlobalVpiContext(nullptr);
+}
+
+class SideEffectingIndexOfARun : public VpiDesignRun {
+ protected:
+  // The right side of the assignment that is the body of `scope`'s procedure
+  // number `n`, counting from 0.
+  static vpiHandle RhsOfProcess(vpiHandle scope, int n) {
+    vpiHandle it = vpi_iterate(vpiProcess, scope);
+    vpiHandle proc = it == nullptr ? nullptr : vpi_scan(it);
+    for (int i = 0; i < n && proc != nullptr; ++i) proc = vpi_scan(it);
+    if (proc == nullptr) return nullptr;
+    return vpi_handle(vpiRhs, vpi_handle(vpiStmt, proc));
+  }
+};
+
+// Claim B, walking the design (#6969): the select a statement writes,
+// `a[i++]`, is refused by vpi_put_value() as the argument is; `a[i]` is not.
+// Its index expression object was never marked, so nothing was refused.
+TEST_F(SideEffectingIndexOfARun,
+       APutThroughAStatementsSideEffectingIndexIsRefused) {
+  Run("module top;\n"
+      "  int a[4], x, y, i;\n"
+      "  initial x = a[i++];\n"
+      "  initial y = a[i];\n"
+      "endmodule\n");
+  vpiHandle side_effecting = RhsOfProcess(By("top"), 0);
+  vpiHandle plain = RhsOfProcess(By("top"), 1);
+  ASSERT_NE(side_effecting, nullptr);
+  ASSERT_NE(plain, nullptr);
+  PutThree(side_effecting);
+  EXPECT_TRUE(RefusedForASideEffectingIndex());
+  PutThree(plain);
+  EXPECT_FALSE(RefusedForASideEffectingIndex());
 }
 
 }  // namespace

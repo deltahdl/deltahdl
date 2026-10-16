@@ -22,6 +22,7 @@
 #include "simulator/vpi_expr_decompile.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_select_indexes.h"
 #include "simulator/vpi_user.h"
 
 // The object a system task or function call stands as while a PLI application
@@ -235,6 +236,9 @@ void AppendSystfCallArguments(VpiObject* call, const Expr& call_site,
           build.arena);
     } else {
       SystfCallArgument(arg, actual, build.ctx, build.arena, build.evaluate);
+      // §37.3.5: an argument written `a[i++]` is written through by no
+      // vpi_put_value().
+      if (actual != nullptr) VpiNoteSelectIndexes(arg, actual, build.alloc);
     }
     call->arguments.push_back(arg);
   }

@@ -35,6 +35,7 @@
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_select_indexes.h"
 #include "simulator/vpi_source_delay.h"
 #include "simulator/vpi_user.h"
 
@@ -411,9 +412,6 @@ VpiObject* BitSelectObject(const Expr* expr, const AssignBuild& build) {
     select->parent = base;
     select->size = 1;
     select->index_expr = ExpressionObject(expr->index, build);
-    if (select->index_expr != nullptr) {
-      select->index_expressions.push_back(select->index_expr);
-    }
     return select;
   }
   if (!base->packed_dims.empty() || base->select_dim) {
@@ -691,6 +689,11 @@ VpiObject* ExpressionObject(const Expr* expr, const AssignBuild& build) {
         VpiExprScope{expr, VpiFlatName(build.names.prefix, ""),
                      std::vector<std::string>(build.names.gen.begin(),
                                               build.names.gen.end())});
+  }
+  // §37.3.5: a select whose index has side effects is written through by no
+  // vpi_put_value().
+  if (obj != nullptr && expr->kind == ExprKind::kSelect) {
+    VpiNoteSelectIndexes(obj, expr, build.alloc);
   }
   // §37.59 detail 2: an expression object made for what the source wrote
   // decompiles to it. A name stands for the net or variable it resolves to,
