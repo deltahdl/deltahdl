@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -11,13 +12,19 @@
 #include "common/source_loc.h"
 #include "common/types.h"
 #include "parser/ast_stmt.h"
+#include "simulator/class_gc_roots.h"
 #include "simulator/class_object.h"
+#include "simulator/dyn_struct_member.h"
+#include "simulator/file_monitor.h"
 #include "simulator/procedural_assertion.h"
 #include "simulator/process.h"
+#include "simulator/scheduler.h"
 #include "simulator/scope.h"
 #include "simulator/scope_hier_name.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/sva_engine_queues.h"
+#include "simulator/sync_objects.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -37,6 +44,7 @@ uint64_t SimContext::AllocateClassObject(ClassObject* obj) {
   class_objects_[id] = obj;
   obj->handle = id;
   obj->ref_count = 1;
+  scheduler_.NoteClassObjectMade();
   return id;
 }
 
@@ -80,70 +88,6 @@ Reachability SimContext::GetReachability(uint64_t handle) const {
 
 namespace {
 
-// Records the class handle held by a single variable (and its pending NBA
-// value, if any) into the live set, mirroring the original scan_var lambda.
-void ScanVarForLiveHandles(
-    std::string_view name, Variable* var,
-    const std::unordered_map<std::string_view, std::string_view>&
-        var_class_types,
-    std::unordered_set<uint64_t>& live) {
-  if (!var || !var_class_types.count(name)) return;
-  uint64_t h = var->value.ToUint64();
-  if (h != kNullClassHandle) live.insert(h);
-  if (var->has_pending_nba) {
-    uint64_t ph = var->pending_nba.ToUint64();
-    if (ph != kNullClassHandle) live.insert(ph);
-  }
-}
-
-// Seeds the live set with the class handles directly reachable from the
-// global variable map, every local scope and every static frame.
-void CollectRootLiveHandles(
-    const std::unordered_map<std::string_view, Variable*>& variables,
-    const std::vector<Scope>& scope_stack,
-    const std::unordered_map<std::string_view,
-                             std::unordered_map<std::string_view, Variable*>>&
-        static_frames,
-    const std::unordered_map<std::string_view, std::string_view>&
-        var_class_types,
-    std::unordered_set<uint64_t>& live) {
-  for (const auto& [name, var] : variables) {
-    ScanVarForLiveHandles(name, var, var_class_types, live);
-  }
-  for (const auto& scope : scope_stack) {
-    for (const auto& [name, var] : scope.vars) {
-      ScanVarForLiveHandles(name, var, var_class_types, live);
-    }
-  }
-  for (const auto& [func, frame] : static_frames) {
-    for (const auto& [name, var] : frame) {
-      ScanVarForLiveHandles(name, var, var_class_types, live);
-    }
-  }
-}
-
-// Expands the live set to its transitive closure by following class handles
-// stored in the properties of objects already known to be live.
-void PropagateLiveHandles(
-    const std::unordered_map<uint64_t, ClassObject*>& class_objects,
-    std::unordered_set<uint64_t>& live) {
-  std::vector<uint64_t> worklist(live.begin(), live.end());
-  while (!worklist.empty()) {
-    uint64_t h = worklist.back();
-    worklist.pop_back();
-    auto it = class_objects.find(h);
-    if (it == class_objects.end()) continue;
-    for (const auto& [pname, pval] : it->second->properties) {
-      uint64_t ph = pval.ToUint64();
-      if (ph != kNullClassHandle && class_objects.count(ph) &&
-          !live.count(ph)) {
-        live.insert(ph);
-        worklist.push_back(ph);
-      }
-    }
-  }
-}
-
 // Clears every weak reference whose referent is no longer in the live set.
 void ClearDeadWeakReferences(
     const std::unordered_set<WeakReference*>& weak_references,
@@ -156,21 +100,80 @@ void ClearDeadWeakReferences(
   }
 }
 
-// Erases every class object that is neither live nor pinned by an active
-// `this` pointer, zeroing its ref count before removal, and tells the VPI of
-// each, whose handles the reclaim releases (§37.2.2).
+// Erases every class object that is not live, zeroing its ref count before
+// removal, and tells the VPI of each, whose handles the reclaim releases
+// (§37.2.2).
 void SweepDeadObjects(
     const std::unordered_set<uint64_t>& live,
-    const std::unordered_set<ClassObject*>& this_live,
     std::unordered_map<uint64_t, ClassObject*>& class_objects) {
   for (auto it = class_objects.begin(); it != class_objects.end();) {
-    if (!live.count(it->first) && !this_live.count(it->second)) {
+    if (!live.count(it->first)) {
       GetGlobalVpiContext().NoteObjectReclaimed(*it->second);
       it->second->ref_count = 0;
       it = class_objects.erase(it);
     } else {
       ++it;
     }
+  }
+}
+
+// §8.29: the roots of the run's named storage: the design's variables, the
+// scopes of the process the run last switched to, the static frames, and the
+// objects that process's method calls run on.
+void MarkStorage(
+    ClassGcMarker& mark,
+    const std::unordered_map<std::string_view, Variable*>& variables,
+    const std::vector<Scope>& scopes,
+    const std::unordered_map<std::string_view,
+                             std::unordered_map<std::string_view, Variable*>>&
+        static_frames,
+    const std::vector<ClassObject*>& this_stack) {
+  for (const auto& [name, var] : variables) mark.Var(var);
+  for (const Scope& scope : scopes) mark.InScope(scope);
+  for (const auto& [owner, frame] : static_frames) {
+    for (const auto& [name, var] : frame) mark.Var(var);
+  }
+  for (const ClassObject* obj : this_stack) {
+    if (obj != nullptr) mark.Handle(obj->handle);
+  }
+}
+
+// §8.29: the stacks every other process parked or carries, and those the
+// $monitor and $fmonitor callers keep.
+void MarkProcesses(
+    ClassGcMarker& mark, const Scheduler& scheduler,
+    const Process* monitor_caller,
+    const std::vector<std::unique_ptr<FileMonitor>>& file_monitors) {
+  for (const Process* proc : scheduler.Threads()) mark.Stacks(*proc);
+  for (const Process* proc : scheduler.Carriers()) mark.Stacks(*proc);
+  if (monitor_caller != nullptr) mark.Stacks(*monitor_caller);
+  for (const auto& monitor : file_monitors) {
+    if (monitor->caller != nullptr) mark.Stacks(*monitor->caller);
+  }
+}
+
+// The run's containers and classes, which MarkContainers reads as roots.
+struct RunContainers {
+  const std::unordered_map<std::string_view, QueueObject*>& queues;
+  const std::unordered_map<std::string_view, AssocArrayObject*>& assocs;
+  const std::unordered_map<std::string_view, MailboxObject*>& mailboxes;
+  const std::vector<const MailboxObject*>& held_mailboxes;
+  const std::unordered_map<std::string_view, ClassTypeInfo*>& class_types;
+};
+
+// §8.29: the queues, associative arrays and mailboxes the run holds by name,
+// by handle or in a container, the arrays dynamic structure members hold, and
+// each class's static properties.
+void MarkContainers(ClassGcMarker& mark, const RunContainers& run) {
+  for (const auto& [name, queue] : run.queues) mark.Queue(queue);
+  for (const QueueObject* queue : DynMemberQueues()) mark.Queue(queue);
+  for (const auto& [name, assoc] : run.assocs) mark.Assoc(assoc);
+  for (const auto& [name, mailbox] : run.mailboxes) mark.Mailbox(mailbox);
+  for (const MailboxObject* mailbox : run.held_mailboxes) {
+    mark.Mailbox(mailbox);
+  }
+  for (const auto& [name, type] : run.class_types) {
+    if (type != nullptr) mark.Statics(*type);
   }
 }
 
@@ -182,8 +185,8 @@ void SimContext::NotifyClassHandleWatchers(uint64_t handle) {
     if (!var || !var_class_types_.count(name)) return;
     if (var->value.ToUint64() == handle) var->NotifyWatchers();
   };
-  // The same three places a handle can be held that CollectRootLiveHandles
-  // scans: the design's variables, every open scope, and every static frame.
+  // The variables a handle can be held in by name: the design's variables,
+  // every open scope, and every static frame.
   for (const auto& [name, var] : variables_) notify_if_designates(name, var);
   for (const auto& scope : scope_stack_) {
     for (const auto& [name, var] : scope.vars) notify_if_designates(name, var);
@@ -198,20 +201,28 @@ void SimContext::NotifyClassHandleWatchers(uint64_t handle) {
 }
 
 void SimContext::CollectGarbage() {
-  if (class_objects_.empty()) return;
-
-  std::unordered_set<uint64_t> live;
-  CollectRootLiveHandles(variables_, scope_stack_, static_frames_,
-                         var_class_types_, live);
-
-  std::unordered_set<ClassObject*> this_live;
-  for (auto* obj : this_stack_) {
-    if (obj) this_live.insert(obj);
+  if (class_objects_.empty()) {
+    scheduler_.NoteClassCollection(0);
+    return;
   }
 
-  PropagateLiveHandles(class_objects_, live);
+  // §8.29: an object is strongly reachable while a class handle in any active
+  // scope refers to it, and the places the run keeps one are the roots below;
+  // the objects any of them reach are reachable too.
+  std::unordered_set<uint64_t> live;
+  ClassGcMarker mark(class_objects_, live);
+  MarkStorage(mark, variables_, scope_stack_, static_frames_, this_stack_);
+  MarkProcesses(mark, scheduler_, monitor_caller_.get(), file_monitors_);
+  MarkContainers(mark, {queues_, assoc_arrays_, mailboxes_, HeldMailboxes(),
+                        class_types_});
+  for (const auto& [handle, count] : scheduler_.PinnedHandles()) {
+    mark.Handle(handle);
+  }
+  mark.Propagate();
+
   ClearDeadWeakReferences(weak_references_, live);
-  SweepDeadObjects(live, this_live, class_objects_);
+  SweepDeadObjects(live, class_objects_);
+  scheduler_.NoteClassCollection(class_objects_.size());
 }
 
 void SimContext::RegisterWeakReference(WeakReference* wr) {

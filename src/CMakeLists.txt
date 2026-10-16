@@ -709,6 +709,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/sdf_annotate_timing_check.cpp
     simulator/sdf_annotate_task.cpp
     simulator/sim_context_classgc.cpp
+    simulator/class_gc_roots.cpp
     simulator/sim_context_name_tables.cpp
     simulator/sim_context_random_stability.cpp
     simulator/sim_context_systask_state.cpp

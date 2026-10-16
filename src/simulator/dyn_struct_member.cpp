@@ -39,6 +39,16 @@ QueueObject* DynMemberQueue(const Logic4Vec& handle) {
   return index < table.size() ? table[index].get() : nullptr;
 }
 
+std::vector<const QueueObject*> DynMemberQueues() {
+  const auto& table = Table();
+  std::vector<const QueueObject*> queues;
+  queues.reserve(table.size());
+  for (const auto& queue : table) {
+    if (queue != nullptr) queues.push_back(queue.get());
+  }
+  return queues;
+}
+
 QueueObject* DynMemberEmpty(const StructFieldInfo& field) {
   static std::map<std::tuple<uint32_t, bool, bool>,
                   std::unique_ptr<QueueObject>>

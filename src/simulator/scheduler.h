@@ -107,6 +107,40 @@ class Scheduler {
   }
   const std::vector<Process*>& Threads() const { return threads_; }
 
+  // §8.29: a process made with stacks of its own before it first runs -- a
+  // fork branch carrying its parent's locals, an embedded covergroup's
+  // sampling process carrying its object -- whose stacks the class garbage
+  // collector reads as roots alongside those of the threads above.
+  void NoteCarrier(Process* proc) { carriers_.push_back(proc); }
+  const std::vector<Process*>& Carriers() const { return carriers_; }
+
+  // §8.29: the class handles a scheduled assignment carries in a value until it
+  // runs, counted per handle, which the class garbage collector reads as roots
+  // (PinClassHandles in class_gc_roots.h).
+  void PinHandle(uint64_t handle) { ++pinned_handles_[handle]; }
+  void UnpinHandle(uint64_t handle) {
+    auto it = pinned_handles_.find(handle);
+    if (it != pinned_handles_.end() && --it->second == 0) {
+      pinned_handles_.erase(it);
+    }
+  }
+  const std::map<uint64_t, uint32_t>& PinnedHandles() const {
+    return pinned_handles_;
+  }
+
+  // §8.29: when the class garbage collector runs during a run -- at the end of
+  // a time slot, once as many objects have been made since its last pass as
+  // that pass left live, and at least one. The work it does is then
+  // proportional to the objects the run makes.
+  void NoteClassObjectMade() { ++class_objects_made_; }
+  void NoteClassCollection(size_t live) {
+    class_objects_made_ = 0;
+    class_collection_due_at_ = live > 0 ? live : 1;
+  }
+  bool ClassCollectionDue() const {
+    return class_objects_made_ >= class_collection_due_at_;
+  }
+
   Region CurrentRegion() const { return current_region_; }
   bool HasEvents() const { return !event_calendar_.empty(); }
 
@@ -255,6 +289,10 @@ class Scheduler {
   // resume and is one thread however many times it runs.
   std::vector<Process*> threads_;
   std::unordered_set<Process*> threads_seen_;
+  std::vector<Process*> carriers_;
+  std::map<uint64_t, uint32_t> pinned_handles_;
+  size_t class_objects_made_ = 0;
+  size_t class_collection_due_at_ = 1;
 
   SimTime current_time_{0};
   Region current_region_ = Region::kCOUNT;

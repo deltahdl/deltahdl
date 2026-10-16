@@ -532,6 +532,8 @@ void StartEmbeddedSampling(const CovergroupInstance& inst, SimContext& ctx,
   }
   p->saved_this_stack = {inst.owner};
   p->saved_method_class_stack = {inst.owner->type};
+  // §8.29: the sampling process keeps the object it samples reachable.
+  ctx.GetScheduler().NoteCarrier(p);
   p->rng_seed = ctx.DrawSeedForChild();
   p->coro = EmbeddedSamplingCoroutine(EmbeddedSamplingWait(*inst.decl, arena),
                                       ctx, arena)

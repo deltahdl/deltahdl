@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 #include "common/types.h"
 
@@ -21,6 +22,9 @@ struct StructFieldInfo;
 // The elements the handle `handle` holds names; null for the zero handle,
 // which a member never written holds, and for one with an unknown bit.
 QueueObject* DynMemberQueue(const Logic4Vec& handle);
+// §8.29: every array of elements a handle has named, whose elements the class
+// garbage collector reads as roots.
+std::vector<const QueueObject*> DynMemberQueues();
 
 // An empty array of the elements the dynamic member `field` declares, which
 // a member holding the zero handle reads as; shared, so never written.

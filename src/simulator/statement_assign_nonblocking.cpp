@@ -14,6 +14,7 @@
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
+#include "simulator/class_gc_roots.h"
 #include "simulator/class_object.h"
 #include "simulator/clocking.h"
 #include "simulator/eval_array.h"
@@ -140,6 +141,7 @@ static void ScheduleArrayConcatNbaElements(const Stmt* stmt,
     auto val = ResizeToWidth(elems[i], ainfo->elem_width, slot.arena);
     auto* event = slot.ctx.GetScheduler().GetEventPool().Acquire();
     SetupWholeVarNbaCallback(event, var, val);
+    PinEventHandles(*event, slot.ctx, {val});
     slot.ctx.GetScheduler().ScheduleEvent(slot.time, slot.region, event);
   }
 }
@@ -202,6 +204,7 @@ static void ScheduleQueueConcatNba(QueueObject* q, const Stmt* stmt,
   SimContext& ctx = slot.ctx;
   auto* event = ctx.GetScheduler().GetEventPool().Acquire();
   event->kind = EventKind::kUpdate;
+  const std::vector<Logic4Vec> kCarried = elems;
   event->callback = [q, &ctx, loc = stmt->rhs->range.start,
                      elems = std::move(elems)]() {
     q->elements = elems;
@@ -213,6 +216,7 @@ static void ScheduleQueueConcatNba(QueueObject* q, const Stmt* stmt,
     q->AssignFreshIds();
     ++q->generation;
   };
+  PinEventHandles(*event, ctx, kCarried);
   ctx.GetScheduler().ScheduleEvent(slot.time, slot.region, event);
 }
 
@@ -432,6 +436,7 @@ static void ScheduleDeferredLhsWrite(const DeferredLhsWrite& w,
     w.write(w.lhs, w.value, ctx, arena);
     ClearLhsIndexSnapshots(snaps, ctx);
   };
+  PinEventHandles(*event, ctx, {w.value});
   ScheduleNbaEvent(event, delay_ticks, ctx);
 }
 
@@ -784,6 +789,7 @@ static void ScheduleResolvedFieldNba(const FieldTarget& target,
   event->callback = [target, value = sample.value, &ctx, &arena]() {
     WriteResolvedField(target, value, ctx, arena);
   };
+  PinEventHandles(*event, ctx, {sample.value}, target.obj);
   AttachUpdateTag(event, nullptr, sample.tag, ctx);
   ScheduleNbaEvent(event, delay_ticks, ctx);
 }
@@ -873,6 +879,7 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const NbaSample& sample,
     // tag the right-hand side gave it, set once the bits have landed.
     AttachUpdateTag(event, var, sample.tag, ctx);
   }
+  PinEventHandles(*event, ctx, {rhs_val});
   ScheduleNbaEvent(event, delay_ticks, ctx);
 }
 

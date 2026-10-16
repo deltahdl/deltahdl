@@ -16,6 +16,7 @@
 #include "simulator/awaiters.h"
 #include "simulator/awaiters_event_control.h"
 #include "simulator/class_event_property.h"
+#include "simulator/class_gc_roots.h"
 #include "simulator/covergroup_instance.h"
 #include "simulator/dpi_task_call.h"
 #include "simulator/eval_call_result.h"
@@ -82,19 +83,17 @@ bool BuildEventTargetName(const Expr* expr, std::string& out) {
 }
 
 // The stable name a trigger target's event variable is looked up by: a bare
-// identifier as written, the token the scope-aware FindVariable resolves, and
-// a member-access path flattened and interned in the arena so the view holds
-// for the deferred ->> scheduling and the triggered() map, both string_view
-// keyed.
+// identifier as written, the token the scope-aware FindVariable resolves, and a
+// member-access path flattened and interned in the arena so the view holds for
+// the deferred ->> scheduling and the triggered() map, both string_view keyed.
 std::string_view ResolveEventTargetName(const Expr* expr, SimContext& ctx) {
   if (!expr) return {};
   if (expr->kind == ExprKind::kIdentifier) return expr->text;
   if (expr->kind != ExprKind::kMemberAccess) return {};
   std::string name;
-  // §23.6 with §27.4: a path through a loop generate block instance,
-  // `g[1].e`, selects the instance by a literal index, which the hierarchical
-  // name spells as the waiting process's lookup does
-  // (HierarchicalReferenceName).
+  // §23.6 with §27.4: a path through a loop generate block instance, `g[1].e`,
+  // selects the instance by a literal index, which the hierarchical name spells
+  // as the waiting process's lookup does (HierarchicalReferenceName).
   if (!BuildEventTargetName(expr, name)) name = HierarchicalReferenceName(expr);
   if (name.empty()) return {};
   auto* stored = ctx.GetArena().Create<std::string>(std::move(name));
@@ -418,12 +417,11 @@ static ExecTask ExecFork(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     state->parent_proc = spawning_proc;
 
     // §9.6.1: wait fork blocks until every immediate child subprocess of the
-    // current process has terminated, however the child was spawned. Each
-    // child is registered against the spawning process's wait-fork tally for
-    // every join kind, not join_none alone: after join_any the unblocked
-    // siblings keep running and a later wait fork must still wait on them, and
-    // for plain join the count is drained by the join site, so the
-    // bookkeeping is inert.
+    // current process has terminated, however the child was spawned. Each child
+    // is registered against the spawning process's wait-fork tally for every
+    // join kind, not join_none alone: after join_any the unblocked siblings
+    // keep running and a later wait fork must still wait on them, and for plain
+    // join the count is drained by the join site, so the bookkeeping is inert.
     Process* parent_proc = spawning_proc;
     WaitForkState* parent_wfs =
         parent_proc ? &parent_proc->wait_fork_state : nullptr;
@@ -663,7 +661,7 @@ static ExecTask ExecInlineTaskCall(const Stmt* stmt, SimContext& ctx,
 
 static ExecTask ExecBlockingAssignTimed(const Stmt* stmt, SimContext& ctx,
                                         Arena& arena) {
-  auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
+  auto [rhs_val, pin] = PinValue(ctx, EvalExpr(stmt->rhs, ctx, arena));
   auto delay_val = EvalExpr(stmt->delay, ctx, arena);
   // §10.4.1's intra-assignment delay is a §9.4.1 delay control: the value is
   // normalized by the shared rules (unknown or high-Z to zero, negative to the
@@ -675,7 +673,7 @@ static ExecTask ExecBlockingAssignTimed(const Stmt* stmt, SimContext& ctx,
 
 static ExecTask ExecBlockingAssignEvent(const Stmt* stmt, SimContext& ctx,
                                         Arena& arena) {
-  auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
+  auto [rhs_val, pin] = PinValue(ctx, EvalExpr(stmt->rhs, ctx, arena));
   co_await EventAwaiter{ctx, stmt->events, arena};
   // §12.4.2.1 with §9.4.5: an intra-assignment `@(...)` is an event control,
   // and resuming after suspending on one is a violation report flush point.
@@ -693,7 +691,7 @@ static uint64_t EvalRepeatCount(const Expr* count_expr, SimContext& ctx,
 
 static ExecTask ExecBlockingAssignRepeatEvent(const Stmt* stmt, SimContext& ctx,
                                               Arena& arena) {
-  auto rhs_val = EvalExpr(stmt->rhs, ctx, arena);
+  auto [rhs_val, pin] = PinValue(ctx, EvalExpr(stmt->rhs, ctx, arena));
   uint64_t count = EvalRepeatCount(stmt->repeat_event_count, ctx, arena);
   if (count > 0) {
     co_await RepeatEventAwaiter{ctx, stmt->events, arena, count};
