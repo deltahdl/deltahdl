@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "common/types.h"
+#include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/process.h"
 #include "simulator/scheduler.h"

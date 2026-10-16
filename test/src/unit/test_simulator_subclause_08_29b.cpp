@@ -6,6 +6,7 @@
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "parser/ast_type.h"
 #include "simulator/assoc_index.h"
 #include "simulator/class_gc_roots.h"
 #include "simulator/class_object.h"
