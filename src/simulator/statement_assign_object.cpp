@@ -26,11 +26,13 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/variable.h"
@@ -336,6 +338,45 @@ bool TryMemberClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (field_type.empty()) return false;
   auto handle =
       EvalClassNew(field_type, stmt->rhs, ctx, arena, stmt->rhs->range.start);
+  WriteStructField(stmt->lhs, handle, ctx);
+  return true;
+}
+
+// §7.2 with §8.7: the class a member of a structure variable is declared with,
+// `s.h` of `st s` under `typedef struct { int i; C h; } st;`, found through the
+// layout the variable records, nested structure members along the path
+// included. Empty where the target is no member of a structure variable or the
+// member's type names no class.
+static std::string_view StructMemberClassName(const Expr* lhs,
+                                              SimContext& ctx) {
+  const std::string kPath = HierarchicalReferenceName(lhs);
+  const size_t kDot = kPath.find('.');
+  if (kDot == std::string::npos) return {};
+  const StructTypeInfo* layout =
+      ctx.GetVariableStructType(std::string_view(kPath).substr(0, kDot));
+  if (layout == nullptr) return {};
+  uint32_t offset = 0;
+  const StructFieldInfo* field = ResolveStructField(
+      layout, std::string_view(kPath).substr(kDot + 1), &offset);
+  if (field == nullptr || field->type_kind != DataTypeKind::kNamed ||
+      ctx.FindClassType(field->type_name) == nullptr) {
+    return {};
+  }
+  return field->type_name;
+}
+
+bool TryStructMemberClassNewAssign(const Stmt* stmt, SimContext& ctx,
+                                   Arena& arena) {
+  if (!stmt->rhs || stmt->rhs->kind != ExprKind::kCall) return false;
+  if (stmt->rhs->text != "new") return false;
+  if (!stmt->lhs || stmt->lhs->kind != ExprKind::kMemberAccess ||
+      stmt->lhs->is_scope_resolution) {
+    return false;
+  }
+  std::string_view type_name = StructMemberClassName(stmt->lhs, ctx);
+  if (type_name.empty()) return false;
+  auto handle =
+      EvalClassNew(type_name, stmt->rhs, ctx, arena, stmt->rhs->range.start);
   WriteStructField(stmt->lhs, handle, ctx);
   return true;
 }

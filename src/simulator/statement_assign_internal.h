@@ -535,6 +535,11 @@ bool TryAssocLiteralAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 // simulator/statement_assign.h declares.
 bool TryTypedClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 bool TryMemberClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
+// §7.2 with §8.7: `s.h = new` on a member of a structure variable declared
+// with a class type, the class read from the member's type in the variable's
+// layout and the handle written into the member's bits.
+bool TryStructMemberClassNewAssign(const Stmt* stmt, SimContext& ctx,
+                                   Arena& arena);
 
 // Defined in statement_assign_stream_widen.cpp; also used by the §11.4.2
 // nonblocking path in statement_assign_nonblocking.cpp. §11.4.14: left-align

@@ -694,7 +694,8 @@ static bool TryDispatchSyncAssign(const Stmt* stmt, SimContext& ctx,
 // §7.5.1 and §8.4: `new[]` to a dynamic array property, and `new` to a class
 // handle, a typed one or a member one, one arm of the dispatch below. The
 // array form is asked first, since the property's element type may be a
-// class, whose handle forms would construct one object for it. §19.3 and
+// class, whose handle forms would construct one object for it; a member of a
+// structure variable is asked last, after a property of a handle. §19.3 and
 // §19.7: before them, `new` to a covergroup variable, and a write to an
 // instance option of a covergroup instance, which names no variable.
 static bool TryDispatchNewAssign(const Stmt* stmt, SimContext& ctx,
@@ -704,7 +705,8 @@ static bool TryDispatchNewAssign(const Stmt* stmt, SimContext& ctx,
          TryClassArrayNewAssign(stmt, ctx, arena) ||
          TryClassNewAssign(stmt, ctx, arena) ||
          TryTypedClassNewAssign(stmt, ctx, arena) ||
-         TryMemberClassNewAssign(stmt, ctx, arena);
+         TryMemberClassNewAssign(stmt, ctx, arena) ||
+         TryStructMemberClassNewAssign(stmt, ctx, arena);
 }
 
 // §10.9 (printed page 261): the elements of the unpacked array the right-hand

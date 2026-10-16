@@ -453,4 +453,36 @@ TEST(ClassConstructorSim, NewIntoANamedBlocksHandleByItsPath) {
             6u);
 }
 
+// §8.7 with §7.2: `new` assigned to a member of a structure declared with a
+// class type constructs an object of the member's class, passing the
+// constructor its argument, for a typedef's structure, a nested structure's
+// member and a structure written in the declaration (#7230). Before, the
+// statement found no class under the member's dotted name and made nothing.
+TEST(ClassConstructorSim, NewIntoAStructuresClassMember) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int v;\n"
+                      "  function new(int a); v = a; endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  typedef struct { int i; C h; } in_t;\n"
+                      "  typedef struct { byte b; in_t n; C k; } st;\n"
+                      "  st s;\n"
+                      "  struct { int j; C m; } u;\n"
+                      "  C x, y, z;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    s.k = new(3);\n"
+                      "    s.n.h = new(5);\n"
+                      "    u.m = new(7);\n"
+                      "    x = s.k;\n"
+                      "    y = s.n.h;\n"
+                      "    z = u.m;\n"
+                      "    r = (x == null || y == null || z == null)\n"
+                      "        ? 0 : x.v * 100 + y.v * 10 + z.v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            357u);
+}
+
 }  // namespace
