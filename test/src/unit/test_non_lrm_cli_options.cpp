@@ -143,12 +143,11 @@ TEST(MinTypMaxOption, TypWrittenAfterMinSelectsTyp) {
 
 // Each option whose value is a name reaches its own field. The value is the
 // option's own spelling, so a value landing in another option's field is seen
-// there as well as missing from its own.
+// there as well as missing from its own. --top keeps a list of the names it is
+// given, so it is read through that list.
 TEST(ValueOptions, EachNameReachesItsOwnField) {
   const std::pair<const char*, std::string CliOptions::*> kOptions[] = {
-      {"--vcd", &CliOptions::vcd_file},
-      {"--top", &CliOptions::top_module},
-      {"--config", &CliOptions::config}};
+      {"--vcd", &CliOptions::vcd_file}, {"--config", &CliOptions::config}};
   for (const auto& [name, field] : kOptions) {
     CliOptions opts;
     EXPECT_TRUE(ParseCommandLine({name, name}, opts)) << name;
@@ -156,6 +155,13 @@ TEST(ValueOptions, EachNameReachesItsOwnField) {
       EXPECT_EQ(opts.*other_field, std::string_view(other) == name ? name : "")
           << name << " as seen in " << other;
     }
+    EXPECT_TRUE(opts.top_modules.empty()) << name << " as seen in --top";
+  }
+  CliOptions opts;
+  EXPECT_TRUE(ParseCommandLine({"--top", "--top"}, opts));
+  EXPECT_EQ(opts.top_modules, std::vector<std::string>{"--top"});
+  for (const auto& [other, other_field] : kOptions) {
+    EXPECT_EQ(opts.*other_field, "") << "--top as seen in " << other;
   }
 }
 
