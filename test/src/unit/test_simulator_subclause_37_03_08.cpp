@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <vector>
 
 #include "fixture_simulator.h"
@@ -153,6 +154,100 @@ TEST_F(TransientObjectCallbacks, ARunDeliversTheStartOfAThreadAndAFrame) {
   }
   EXPECT_GT(threads, 0);
   EXPECT_GT(frames, 0);
+}
+
+// The ending half of the list, against a run: the initial procedure's thread
+// and the fork branch it spawns end, and the frame its call activated ends
+// before them, so cbEndOfThread and cbEndOfFrame each report a transient
+// object's end. §37.2.2 item 2 has those ends release the handles to the frame
+// and the threads, which the routines were handed while they were still live.
+// The branch was made an object as it began (cbStartOfThread), the initial
+// procedure's thread only as it ends.
+TEST_F(TransientObjectCallbacks, ARunDeliversTheEndOfAThreadAndAFrame) {
+  RegisterFor(cbStartOfThread);
+  RegisterFor(cbEndOfThread);
+  RegisterFor(cbEndOfFrame);
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  function integer f(input integer x);\n"
+      "    f = x + 1;\n"
+      "  endfunction\n"
+      "  integer r;\n"
+      "  initial fork r = f(1); join\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  int threads = 0;
+  int frames = 0;
+  for (size_t i = 0; i < g_reasons.size(); ++i) {
+    if (g_reasons[i] == cbStartOfThread) continue;
+    if (g_reasons[i] == cbEndOfThread) ++threads;
+    if (g_reasons[i] == cbEndOfFrame) ++frames;
+    EXPECT_TRUE(ctx_.HandleReleased(VpiObjectOf(g_objects[i])));
+  }
+  EXPECT_GE(threads, 2);
+  EXPECT_GT(frames, 0);
+}
+
+// The design below makes a class object and drops it, so the garbage
+// collector's next pass reclaims it.
+constexpr const char* kDroppedObject =
+    "module t;\n"
+    "  class C;\n"
+    "    int x;\n"
+    "  endclass\n"
+    "  C c;\n"
+    "  initial begin\n"
+    "    c = new;\n"
+    "    c = null;\n"
+    "  end\n"
+    "endmodule\n";
+
+// Runs kDroppedObject and then the garbage collector.
+void RunAndCollect() {
+  SimFixture f;
+  auto* design = ElaborateSrc(kDroppedObject, f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  f.ctx.CollectGarbage();
+}
+
+// Reclaiming the object delivers cbReclaimObj and cbEndOfObject and, by
+// §37.2.2 item 3, releases the handle cbCreateObj was given for the object...
+TEST_F(TransientObjectCallbacks, ReclaimingARunsObjectDeliversBothReasons) {
+  RegisterFor(cbCreateObj);
+  RegisterFor(cbReclaimObj);
+  RegisterFor(cbEndOfObject);
+  RunAndCollect();
+  EXPECT_EQ(g_reasons,
+            (std::vector<int>{cbCreateObj, cbReclaimObj, cbEndOfObject}));
+  ASSERT_FALSE(g_objects.empty());
+  EXPECT_TRUE(ctx_.HandleReleased(VpiObjectOf(g_objects[0])));
+}
+
+// ...each reason delivered to an application that registered for it alone,
+// though no handle to the object was handed out before...
+TEST_F(TransientObjectCallbacks, ReclaimingDeliversReclaimObjAlone) {
+  RegisterFor(cbReclaimObj);
+  RunAndCollect();
+  EXPECT_EQ(g_reasons, (std::vector<int>{cbReclaimObj}));
+}
+
+TEST_F(TransientObjectCallbacks, ReclaimingDeliversEndOfObjectAlone) {
+  RegisterFor(cbEndOfObject);
+  RunAndCollect();
+  EXPECT_EQ(g_reasons, (std::vector<int>{cbEndOfObject}));
+}
+
+// ...and nothing told to an application that registered for neither.
+TEST_F(TransientObjectCallbacks, ReclaimingTellsNoOneWhoDidNotAsk) {
+  RegisterFor(cbEndOfFrame);
+  RunAndCollect();
+  EXPECT_TRUE(g_reasons.empty());
 }
 
 }  // namespace

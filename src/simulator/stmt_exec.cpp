@@ -221,6 +221,7 @@ static StmtResult ExecNbEventTriggerImpl(const Stmt* stmt, SimContext& ctx,
 // blocked on its await(). No-op for a process that was killed.
 static void FinalizeForkChildProcess(SimContext& ctx) {
   if (auto* child_proc = ctx.CurrentProcess()) child_proc->Finish();
+  GetGlobalVpiContext().NoteThreadEnded(ctx.CurrentProcess());
 }
 
 // Decrements the join/wait-fork tallies for one child that has terminated --

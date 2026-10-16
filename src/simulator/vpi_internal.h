@@ -189,4 +189,7 @@ std::vector<std::string_view> VpiNamePathComponents(
 // vpi_systf.cpp.
 std::vector<std::string_view> VpiHandleNameComponents(std::string_view name);
 
+// Whether any `reason` registration is still live among `callbacks`.
+bool HasCallbackFor(const std::vector<s_cb_data>& callbacks, int reason);
+
 }  // namespace delta

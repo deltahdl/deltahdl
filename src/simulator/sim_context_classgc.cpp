@@ -19,6 +19,8 @@
 #include "simulator/sim_context.h"
 #include "simulator/sva_engine_queues.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_globals.h"
 
 namespace delta {
 
@@ -155,13 +157,15 @@ void ClearDeadWeakReferences(
 }
 
 // Erases every class object that is neither live nor pinned by an active
-// `this` pointer, zeroing its ref count before removal.
+// `this` pointer, zeroing its ref count before removal, and tells the VPI of
+// each, whose handles the reclaim releases (§37.2.2).
 void SweepDeadObjects(
     const std::unordered_set<uint64_t>& live,
     const std::unordered_set<ClassObject*>& this_live,
     std::unordered_map<uint64_t, ClassObject*>& class_objects) {
   for (auto it = class_objects.begin(); it != class_objects.end();) {
     if (!live.count(it->first) && !this_live.count(it->second)) {
+      GetGlobalVpiContext().NoteObjectReclaimed(*it->second);
       it->second->ref_count = 0;
       it = class_objects.erase(it);
     } else {

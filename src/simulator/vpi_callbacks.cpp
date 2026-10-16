@@ -208,6 +208,11 @@ void VpiCollectCallbackObjects(VpiHandle ref,
   }
 }
 
+bool HasCallbackFor(const std::vector<s_cb_data>& callbacks, int reason) {
+  return std::ranges::any_of(
+      callbacks, [reason](const s_cb_data& cb) { return cb.reason == reason; });
+}
+
 namespace {
 
 // §38.36.1: whether a `reason` registration placed on `obj` is still live
@@ -218,12 +223,6 @@ bool IsPlacedOn(const std::vector<s_cb_data>& callbacks, int reason,
     return cb.reason == reason && cb.obj != nullptr &&
            VpiObjectOf(cb.obj) == obj;
   });
-}
-
-// Whether any `reason` registration is still live among `callbacks`.
-bool HasCallbackFor(const std::vector<s_cb_data>& callbacks, int reason) {
-  return std::ranges::any_of(
-      callbacks, [reason](const s_cb_data& cb) { return cb.reason == reason; });
 }
 
 // The aval and bval words of the bits `obj` stands for: its variable's, or,

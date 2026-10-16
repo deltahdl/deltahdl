@@ -487,9 +487,15 @@ void VpiContext::ReleaseHandle(VpiHandle handle) {
   // §37.2.2: vpi_release_handle() causes the tool to release a handle. Marking
   // the handle released is all that is needed: the underlying object is not
   // touched, so a distinct handle to the same object - held perhaps by another
-  // VPI program - is unaffected and can still refer to that object. A null
-  // handle names nothing.
+  // VPI program - is unaffected and can still refer to that object. A handle
+  // the tool handed out more than once stays live until every hand-out is
+  // released (HandOut in vpi.cpp). A null handle names nothing.
   if (!handle) return;
+  if (handle->handles_held > 1) {
+    --handle->handles_held;
+    return;
+  }
+  handle->handles_held = 0;
   handle->released = true;
 }
 
@@ -589,22 +595,25 @@ void VpiContext::ReleaseHandleWithCallbacks(VpiObject* object) {
 void VpiContext::ReleaseHandleSubtree(VpiObject* root) {
   if (!root) return;
   ReleaseHandleWithCallbacks(root);
-  for (VpiObject* child : root->children) ReleaseHandleSubtree(child);
+  // §37.44: a thread a fork spawned is a thread of its own, which its own end
+  // releases, rather than an object belonging to the one that spawned it.
+  for (VpiObject* child : root->children) {
+    if (child->type != vpiThread) ReleaseHandleSubtree(child);
+  }
 }
 
 void VpiContext::ReleaseFrameOrThreadObject(VpiHandle root) {
-  // §37.2.2 (frame/thread free): release the freed object, all of its
-  // subelements, and the callbacks placed on any of them.
-  ReleaseHandleSubtree(root);
-
   // §37.3.8: callbacks can follow a transient object through its life, and a
-  // frame and a thread are two of the kinds it names. The end
-  // of one is where cbEndOfFrame and cbEndOfThread are delivered; an
-  // application that registered either was called by nothing at all, so the
-  // life it was registered to track ran its course unreported.
+  // frame and a thread are two of the kinds it names. The end of one is where
+  // cbEndOfFrame and cbEndOfThread are delivered, while the object is still a
+  // live handle the routine can read.
   if (root == nullptr) return;
   if (root->type == vpiFrame) DispatchCallbacks(cbEndOfFrame, root);
   if (root->type == vpiThread) DispatchCallbacks(cbEndOfThread, root);
+
+  // §37.2.2 (frame/thread free): release the freed object, all of its
+  // subelements, and the callbacks placed on any of them.
+  ReleaseHandleSubtree(root);
 }
 
 void VpiContext::ReleaseClassObject(VpiHandle class_object) {
@@ -613,17 +622,17 @@ void VpiContext::ReleaseClassObject(VpiHandle class_object) {
   // subelements. Non-automatic (static) data members are left live - they are
   // not reclaimed with the class object.
   if (!class_object) return;
+  // §37.3.8: reclaiming the memory of a class object is the end of that
+  // object's life, and the subclause gives it two of the callbacks it lists -
+  // cbReclaimObj for the reclaim itself and cbEndOfObject for the object
+  // ceasing to exist, delivered while it is still a live handle.
+  DispatchCallbacks(cbReclaimObj, class_object);
+  DispatchCallbacks(cbEndOfObject, class_object);
+
   ReleaseHandleWithCallbacks(class_object);
   for (VpiObject* member : class_object->children) {
     if (member->automatic) ReleaseHandleSubtree(member);
   }
-
-  // §37.3.8: reclaiming the memory of a class object is the end of that
-  // object's life, and the subclause gives it two of the callbacks it lists -
-  // cbReclaimObj for the reclaim itself and cbEndOfObject for the object
-  // ceasing to exist. Neither was delivered from anywhere.
-  DispatchCallbacks(cbReclaimObj, class_object);
-  DispatchCallbacks(cbEndOfObject, class_object);
 }
 
 bool VpiContext::SetDefaultCompatibilityMode(int mode) {

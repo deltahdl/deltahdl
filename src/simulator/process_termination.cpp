@@ -4,6 +4,8 @@
 #include "simulator/process.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
+#include "simulator/vpi_context.h"
+#include "simulator/vpi_globals.h"
 
 namespace delta {
 
@@ -17,6 +19,7 @@ static bool IsProcessKillable(const Process& proc) {
 void TerminateProcess(Process& proc, SimContext& ctx) {
   if (!IsProcessKillable(proc)) return;
   proc.Kill();
+  GetGlobalVpiContext().NoteThreadEnded(&proc);
   auto* event = ctx.GetScheduler().GetEventPool().Acquire();
   Process* released = &proc;
   event->callback = [released]() { released->ReleaseFromFork(); };

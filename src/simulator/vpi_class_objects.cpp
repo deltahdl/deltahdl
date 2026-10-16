@@ -19,6 +19,7 @@
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 
 namespace delta {
@@ -185,6 +186,21 @@ VpiHandle VpiContext::ClassObjectOf(VpiObject& class_var) {
   ClassObject* obj = sim_ctx_->GetClassObject(class_var.var->value.ToUint64());
   if (obj == nullptr) return nullptr;
   return MadeClassObject(*obj);
+}
+
+void VpiContext::NoteObjectReclaimed(ClassObject& obj) {
+  // §37.2.2 item 3 and §37.3.8: a class object the garbage collector reclaims
+  // releases the handles to it and to its automatic members, and cbReclaimObj
+  // and cbEndOfObject report the reclaim. An object no application asked for
+  // has no object of the model, and is made one only where a callback is there
+  // to be told of its end.
+  if (sim_ctx_ == nullptr) return;
+  if (!run_objects_.contains(&obj) &&
+      !HasCallbackFor(callbacks_, cbReclaimObj) &&
+      !HasCallbackFor(callbacks_, cbEndOfObject)) {
+    return;
+  }
+  ReleaseClassObject(MadeClassObject(obj));
 }
 
 VpiHandle VpiContext::MadeClassObject(ClassObject& obj) {

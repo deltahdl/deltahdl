@@ -5,6 +5,7 @@
 #include "common/source_mgr.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
+#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_object.h"
@@ -59,6 +60,27 @@ TEST_F(VpiHandleReleaseSim, ReleasingOneHandleLeavesDistinctHandleUsable) {
   EXPECT_FALSE(vpi_ctx_.HandleReleased(other));
   // The distinct handle still refers to the same object.
   EXPECT_EQ(vpi_compare_objects(VpiHandleOf(other), VpiHandleOf(mod)), 1);
+}
+
+// §37.2.2 with §37.2.1: a tool that hands two requests for one object the same
+// handle shares it, and that sharing shall not alter what either program sees:
+// releasing the handle one request got leaves the other's live, and a handle
+// asked for again after every earlier one was released is live too.
+TEST_F(VpiHandleReleaseSim, ReleasingOneHandedOutHandleLeavesTheOtherLive) {
+  vpi_ctx_.CreateModule("top", "top");
+  PLI_BYTE8 name[] = "top";
+  vpiHandle first = vpi_handle_by_name(name, nullptr);
+  vpiHandle second = vpi_handle_by_name(name, nullptr);
+  ASSERT_NE(first, nullptr);
+
+  EXPECT_EQ(vpi_release_handle(first), 1);
+  EXPECT_FALSE(vpi_ctx_.HandleReleased(VpiObjectOf(second)));
+  EXPECT_EQ(vpi_release_handle(second), 1);
+  EXPECT_TRUE(vpi_ctx_.HandleReleased(VpiObjectOf(second)));
+
+  vpiHandle again = vpi_handle_by_name(name, nullptr);
+  EXPECT_FALSE(vpi_ctx_.HandleReleased(VpiObjectOf(again)));
+  EXPECT_EQ(vpi_release_handle(again), 1);
 }
 
 // §37.2.2: a null handle names nothing to release, and releasing a handle more
@@ -121,6 +143,22 @@ TEST_F(VpiHandleReleaseSim, FreeingFrameObjectReleasesSubelementsAndCallbacks) {
   EXPECT_TRUE(vpi_ctx_.HandleReleased(frame_obj));
   EXPECT_TRUE(vpi_ctx_.HandleReleased(subelement));
   EXPECT_TRUE(vpi_ctx_.HandleReleased(cb));
+}
+
+// §37.2.2 (frame/thread free) with §37.44: a thread a fork spawned is a thread
+// of its own, so the end of the thread that spawned it leaves its handle live
+// while it runs on.
+TEST_F(VpiHandleReleaseSim, EndingAThreadLeavesTheThreadsItSpawnedLive) {
+  auto* parent = vpi_ctx_.CreateModule("p", "p");
+  auto* child = vpi_ctx_.CreateModule("c", "c");
+  parent->type = vpiThread;
+  child->type = vpiThread;
+  parent->children.push_back(child);
+
+  vpi_ctx_.ReleaseFrameOrThreadObject(parent);
+
+  EXPECT_TRUE(vpi_ctx_.HandleReleased(parent));
+  EXPECT_FALSE(vpi_ctx_.HandleReleased(child));
 }
 
 // §37.2.2 (class reclaim, list item 3): reclaiming a class object's memory

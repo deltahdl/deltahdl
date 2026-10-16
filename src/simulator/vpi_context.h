@@ -48,16 +48,15 @@ class VpiContext {
 
   VpiHandle RegisterSystf(s_vpi_systf_data* data);
 
-  // §38.37.1: run the calltf of the application a registration associated
-  // with `name`, as each invocation of the system task or function during
-  // simulation calls for, and answer whether one did. §36.3.2 has a PLI
-  // application override a built-in of the same name, so the registry is
-  // asked ahead of what the tool implements. `result` is what a system
-  // function's application wrote back through vpi_put_value on the call
-  // (§37.42), a 32-bit zero where it wrote nothing. compiletf and sizetf run
-  // when the design is built (VpiSystfCallbackFiresAtBuild, vpi_control.cpp),
-  // not here. `call_site` is what the arguments are read off (§36.4,
-  // MakeSystfCallObject).
+  // §38.37.1: run the calltf of the application a registration associated with
+  // `name`, as each invocation of the system task or function during simulation
+  // calls for, and answer whether one did. §36.3.2 has a PLI application
+  // override a built-in of the same name, so the registry is asked ahead of
+  // what the tool implements. `result` is what a system function's application
+  // wrote back through vpi_put_value on the call (§37.42), a 32-bit zero where
+  // it wrote nothing. compiletf and sizetf run when the design is built
+  // (VpiSystfCallbackFiresAtBuild, vpi_control.cpp), not here. `call_site` is
+  // what the arguments are read off (§36.4, MakeSystfCallObject).
   bool CallRegisteredSystf(const char* name, const Expr* call_site,
                            SimContext& ctx, Logic4Vec& result, Arena& arena);
 
@@ -65,12 +64,11 @@ class VpiContext {
   // source description wrote, with that call standing where the application
   // looks for it. The clause has the routine verify the arguments the source
   // code passes to the user-defined system task or system function, and §36.4
-  // leaves an application no other way of
-  // reaching those arguments -- a compiletf is handed its own user_data and
-  // nothing else -- so a compiletf called with no current call is one that can
-  // check nothing. `call_site` is the expression the source wrote, and its
-  // arguments are hung on the call unevaluated, this period standing before the
-  // first event.
+  // leaves an application no other way of reaching those arguments -- a
+  // compiletf is handed its own user_data and nothing else -- so a compiletf
+  // called with no current call is one that can check nothing. `call_site` is
+  // the expression the source wrote, and its arguments are hung on the call
+  // unevaluated, this period standing before the first event.
   void CallCompiletfForSourceCall(const s_vpi_systf_data& data,
                                   const Expr* call_site, SimContext& ctx,
                                   Arena& arena);
@@ -247,12 +245,14 @@ class VpiContext {
   // for `stmt`, run in the instance `prefix` names, as it is about to execute.
   void DispatchStmtCallbacks(const Stmt* stmt, std::string prefix);
   // §38.36.1: what the run tells the simulation-event callbacks of, each
-  // costing nothing where none of its reason is registered: a process it
-  // created (cbStartOfThread), an object constructed (cbCreateObj), a
-  // variable `stmt` in the instance `prefix` forced or released (cbForce,
-  // cbRelease), and the named block `label` there disabled (cbDisable).
+  // costing nothing where none of its reason is registered: a process created
+  // or ended, an object constructed or reclaimed, a variable `stmt` in the
+  // instance `prefix` forced or released (cbForce, cbRelease), and the named
+  // block `label` there disabled (cbDisable).
   void NoteThreadCreated(Process* proc);
+  void NoteThreadEnded(Process* proc);
   void NoteObjectCreated(ClassObject& obj);
+  void NoteObjectReclaimed(ClassObject& obj);
   void NoteForce(int reason, const Variable* var, const Stmt* stmt,
                  std::string prefix);
   void NoteDisabled(std::string_view label, std::string prefix);

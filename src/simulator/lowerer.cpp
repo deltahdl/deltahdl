@@ -71,6 +71,7 @@ static SimCoroutine MakeInitialCoroutine(const Stmt* body, SimContext& ctx,
   Process* self = ctx.CurrentProcess();
   co_await ExecStmt(body, ctx, arena);
   if (self != nullptr) self->Finish();
+  GetGlobalVpiContext().NoteThreadEnded(self);
 }
 
 static SimCoroutine MakeProgramInitialCoroutine(const Stmt* body,
@@ -79,6 +80,7 @@ static SimCoroutine MakeProgramInitialCoroutine(const Stmt* body,
   co_await ExecStmt(body, ctx, arena);
   ctx.OnProgramInitialComplete(ctx.CurrentProcess());
   if (self != nullptr) self->Finish();
+  GetGlobalVpiContext().NoteThreadEnded(self);
 }
 
 static SimCoroutine MakeAlwaysCoroutine(const Stmt* body, SimContext& ctx,

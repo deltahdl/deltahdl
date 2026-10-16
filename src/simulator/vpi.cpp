@@ -45,6 +45,19 @@ class VpiRoutineErrorScope {
   VpiRoutineErrorScope& operator=(const VpiRoutineErrorScope&) = delete;
 };
 
+// §37.2.1 lets a tool hand two requests for one object the same handle, so
+// long as the sharing alters nothing a program sees (§37.2.2). Each hand-out
+// of a live object of the model is counted, and the object is a live handle
+// again however many earlier hand-outs were released; vpi_release_handle()
+// releases it only when the last outstanding hand-out is released.
+vpiHandle HandOut(delta::VpiObject* object) {
+  if (object != nullptr && object->object_exists) {
+    ++object->handles_held;
+    object->released = false;
+  }
+  return delta::VpiHandleOf(object);
+}
+
 }  // namespace
 
 vpiHandle vpi_register_systf(s_vpi_systf_data* data) {
@@ -103,33 +116,33 @@ void* vpi_get_userdata(vpiHandle obj) {
 
 vpiHandle vpi_handle(PLI_INT32 type, vpiHandle ref) {
   VpiRoutineErrorScope error_scope;
-  return delta::VpiHandleOf(
+  return HandOut(
       delta::GetGlobalVpiContext().Handle(type, delta::VpiObjectOf(ref)));
 }
 
 vpiHandle vpi_handle_by_name(PLI_BYTE8* name, vpiHandle scope) {
   VpiRoutineErrorScope error_scope;
-  return delta::VpiHandleOf(delta::GetGlobalVpiContext().HandleByName(
+  return HandOut(delta::GetGlobalVpiContext().HandleByName(
       name, delta::VpiObjectOf(scope)));
 }
 
 vpiHandle vpi_handle_by_index(vpiHandle parent, PLI_INT32 index) {
   VpiRoutineErrorScope error_scope;
-  return delta::VpiHandleOf(delta::GetGlobalVpiContext().HandleByIndex(
+  return HandOut(delta::GetGlobalVpiContext().HandleByIndex(
       index, delta::VpiObjectOf(parent)));
 }
 
 vpiHandle vpi_handle_by_multi_index(vpiHandle parent, PLI_INT32 num_index,
                                     PLI_INT32* index_array) {
   VpiRoutineErrorScope error_scope;
-  return delta::VpiHandleOf(delta::GetGlobalVpiContext().HandleByMultiIndex(
+  return HandOut(delta::GetGlobalVpiContext().HandleByMultiIndex(
       num_index, index_array, delta::VpiObjectOf(parent)));
 }
 
 vpiHandle vpi_handle_multi(PLI_INT32 type, vpiHandle ref1, vpiHandle ref2,
                            ...) {
   VpiRoutineErrorScope error_scope;
-  return delta::VpiHandleOf(delta::GetGlobalVpiContext().HandleMulti(
+  return HandOut(delta::GetGlobalVpiContext().HandleMulti(
       type, delta::VpiObjectOf(ref1), delta::VpiObjectOf(ref2)));
 }
 
@@ -160,7 +173,7 @@ vpiHandle vpi_iterate(PLI_INT32 type, vpiHandle ref) {
 
 vpiHandle vpi_scan(vpiHandle iterator) {
   VpiRoutineErrorScope error_scope;
-  return delta::VpiHandleOf(
+  return HandOut(
       delta::GetGlobalVpiContext().Scan(delta::VpiObjectOf(iterator)));
 }
 
