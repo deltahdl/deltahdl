@@ -650,8 +650,8 @@ static void InitClassParams(ClassTypeInfo* info, const ClassDecl* cls,
   }
   // §6.20.4: a body parameter naming a header one, `N = W * 2`, is folded
   // with the defaults just stored, which the loop above had no name for.
-  FoldClassBodyParams(cls, ClassStaticLookup(info), ClassStaticStore(info), ctx,
-                      arena);
+  FoldClassBodyParams(ClassParamSizer(cls, info->name), ClassStaticLookup(info),
+                      ClassStaticStore(info), ctx, arena);
 }
 
 // The enumeration `member` declares, inline on a property, `enum {a, b} e;`,

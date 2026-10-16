@@ -679,8 +679,9 @@ static ClassTypeInfo* MakeSpecialization(ClassTypeInfo* generic,
   OwnVTableEntries(spec);
   // §6.20.4 with §8.25: the body's parameters are the specialization's too,
   // `C#(4)::N` 8 where the declaration's copy, folded with W's default, is 16.
-  FoldClassBodyParams(generic->decl, ClassStaticLookup(spec),
-                      ClassStaticStore(spec), ctx, arena);
+  FoldClassBodyParams(ClassParamSizer(generic->decl, generic->name),
+                      ClassStaticLookup(spec), ClassStaticStore(spec), ctx,
+                      arena);
   ctx.RegisterClassType(spec->name, spec);
   // §8.25: a class-scope typedef whose actuals name a type parameter of this
   // class resolves to a type only once the actuals are known, so the aliases

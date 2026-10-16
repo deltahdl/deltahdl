@@ -268,7 +268,7 @@ void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
   // copy was folded with the declaration's defaults.
   std::string_view cls = obj->type->name;
   FoldClassBodyParams(
-      obj->type->decl,
+      ClassParamSizer(obj->type->decl),
       [obj](std::string_view name) -> const Logic4Vec* {
         auto it = obj->properties.find(std::string(name));
         return it != obj->properties.end() ? &it->second : nullptr;
@@ -293,9 +293,10 @@ ParamValueStore ClassStaticStore(ClassTypeInfo* info) {
   };
 }
 
-void FoldClassBodyParams(const ClassDecl* decl, const ParamValueLookup& header,
+void FoldClassBodyParams(ClassParamSizer sizer, const ParamValueLookup& header,
                          const ParamValueStore& store, SimContext& ctx,
                          Arena& arena) {
+  const ClassDecl* decl = sizer.decl();
   ctx.PushScope();
   for (const auto& [pname, pexpr] : decl->params) {
     if (decl->type_param_names.count(pname) != 0) continue;
@@ -303,7 +304,6 @@ void FoldClassBodyParams(const ClassDecl* decl, const ParamValueLookup& header,
     if (value == nullptr) continue;
     ctx.CreateLocalVariable(pname, value->width)->value = *value;
   }
-  ClassParamSizer sizer(decl);
   for (const auto* m : decl->members) {
     // A type parameter, `localparam type U = T`, carries void as its data
     // type and names a type rather than a value.

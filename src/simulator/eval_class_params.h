@@ -59,6 +59,9 @@ class ClassParamSizer {
   ClassParamSizer(const ClassDecl* decl, std::string_view type_scope)
       : decl_(decl), type_scope_(type_scope) {}
 
+  // The class whose parameters this sizes.
+  const ClassDecl* decl() const { return decl_; }
+
   // The value of the class's i-th parameter from `expr`, and recorded.
   Logic4Vec Value(size_t i, const Expr* expr, SimContext& ctx, Arena& arena);
 
@@ -113,12 +116,14 @@ using ParamValueStore = std::function<void(std::string_view, const Logic4Vec&)>;
 
 // §6.20.4 with §8.25: a parameter declared in a class's body, `localparam int
 // N = W * 2`, is a constant of each specialization, folded over that
-// specialization's header parameters. Each value parameter of `decl`'s
-// header that `header` answers is bound in a scope of its own, and each body
-// parameter with an initializer is folded there, in declaration order, and
-// handed to `store`. Folded with no header parameter bound, as the class was
-// lowered, the name read nothing and every specialization's N was 0.
-void FoldClassBodyParams(const ClassDecl* decl, const ParamValueLookup& header,
+// specialization's header parameters. Each value parameter of the header of
+// the class `sizer` sizes that `header` answers is bound in a scope of its
+// own, and each body parameter with an initializer is folded there by
+// `sizer`, in declaration order, and handed to `store`; the sizer carries the
+// path the class's typedefs are keyed under. Folded with no header parameter
+// bound, as the class was lowered, the name read nothing and every
+// specialization's N was 0.
+void FoldClassBodyParams(ClassParamSizer sizer, const ParamValueLookup& header,
                          const ParamValueStore& store, SimContext& ctx,
                          Arena& arena);
 
