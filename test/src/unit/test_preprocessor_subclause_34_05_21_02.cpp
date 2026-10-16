@@ -83,6 +83,7 @@
 #include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_digest.h"
+#include "preprocessor/protect_digest_algorithms.h"
 #include "preprocessor/protect_digest_block.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_keywords.h"
@@ -687,6 +688,41 @@ TEST(ProtectDigestMethodDecryptionInput, AnUnprovidedOneRegeneratesNoDigest) {
   Preprocessor pp(mgr, diag, config);
   pp.Preprocess(mgr.AddFile("<test>", envelope));
   EXPECT_EQ(pp.LastDigestBlockCheck(), ProtectDigestCheck::kUnreadable);
+}
+
+// The digest `digest` written in lowercase hex, the way FIPS 180-2 and RFC 1321
+// print their examples.
+std::string LowercaseHex(std::string_view digest) {
+  constexpr std::string_view kNibbles = "0123456789abcdef";
+  std::string hex;
+  for (char c : digest) {
+    auto byte = static_cast<unsigned char>(c);
+    hex.push_back(kNibbles[byte >> 4U]);
+    hex.push_back(kNibbles[byte & 0x0FU]);
+  }
+  return hex;
+}
+
+// Table 34-4 has sha1 compute the digest FIPS 180-2 defines, so it gives that
+// document's own examples: the one-block message of Appendix A.1 and the
+// two-block message of A.2.
+TEST(ProtectDigestAlgorithms, Sha1GivesFips1802sExamples) {
+  EXPECT_EQ(LowercaseHex(Sha1Digest("abc")),
+            "a9993e364706816aba3e25717850c26c9cd0d89d");
+  EXPECT_EQ(LowercaseHex(Sha1Digest(
+                "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq")),
+            "84983e441c3bd26ebaae4aa1f95129e5e54670f1");
+}
+
+// Table 34-4 has md5 compute the digest IETF RFC 1321 defines, so it gives the
+// test suite of that document's §A.5.
+TEST(ProtectDigestAlgorithms, Md5GivesRfc1321sExamples) {
+  EXPECT_EQ(LowercaseHex(Md5Digest("")), "d41d8cd98f00b204e9800998ecf8427e");
+  EXPECT_EQ(LowercaseHex(Md5Digest("abc")), "900150983cd24fb0d6963f7d28e17f72");
+  EXPECT_EQ(LowercaseHex(Md5Digest(
+                "1234567890123456789012345678901234567890123456789012345678901"
+                "2345678901234567890")),
+            "57edf4a22be3c955ac49da2e2107b67a");
 }
 
 }  // namespace

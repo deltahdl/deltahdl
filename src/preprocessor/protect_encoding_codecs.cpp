@@ -251,12 +251,19 @@ std::string EncodeBase64(std::string_view bytes) {
   return EncodeSixBitGroups(bytes, kBase64Alphabet, kBase64Pad);
 }
 
-// The padding says how short the final group was, and the transformation that
-// reads a short group reads that from the group's own length, so the padding
-// is taken off before the reading rather than read as data.
+// RFC 2045 §6.8: a reading ignores every character outside the alphabet, a
+// line break, a blank or whatever else a transport put in, and the padding
+// marks where the data end. The padding says how short the final group was,
+// and the transformation that reads a short group reads that from the group's
+// own length, so the padding is not read as data.
 bool DecodeBase64(std::string_view text, std::string* bytes) {
-  while (!text.empty() && text.back() == kBase64Pad) text.remove_suffix(1);
-  return DecodeSixBitGroups(text, kBase64Alphabet, bytes);
+  std::string kept;
+  kept.reserve(text.size());
+  for (char c : text) {
+    if (c == kBase64Pad) break;
+    if (kBase64Alphabet.find(c) != std::string_view::npos) kept.push_back(c);
+  }
+  return DecodeSixBitGroups(kept, kBase64Alphabet, bytes);
 }
 
 std::string EncodeProtectBlockAlphabet(std::string_view bytes) {
@@ -320,20 +327,39 @@ std::string EncodeQuotedPrintable(std::string_view bytes, size_t line_length) {
   return text;
 }
 
+// RFC 2045 §6.7 rule 3: the writing never ends a line in a space or a tab, so
+// one standing there was put in on the way, and the text is read without it.
+static std::string WithoutTrailingBlanks(std::string_view text) {
+  std::string kept;
+  kept.reserve(text.size());
+  std::string blanks;
+  for (char c : text) {
+    if (c == ' ' || c == '\t') {
+      blanks.push_back(c);
+      continue;
+    }
+    if (c != '\n' && c != '\r') kept += blanks;
+    blanks.clear();
+    kept.push_back(c);
+  }
+  return kept;
+}
+
 bool DecodeQuotedPrintable(std::string_view text, std::string* bytes) {
+  const std::string kRead = WithoutTrailingBlanks(text);
   std::string decoded;
   size_t i = 0;
-  while (i < text.size()) {
-    if (text[i] == '\n' || text[i] == '\r') {
+  while (i < kRead.size()) {
+    if (kRead[i] == '\n' || kRead[i] == '\r') {
       ++i;
       continue;
     }
-    if (text[i] != '=') {
-      decoded.push_back(text[i]);
+    if (kRead[i] != '=') {
+      decoded.push_back(kRead[i]);
       ++i;
       continue;
     }
-    if (!AppendQuotedPrintableEscape(text, &i, &decoded)) return false;
+    if (!AppendQuotedPrintableEscape(kRead, &i, &decoded)) return false;
   }
   bytes->assign(decoded);
   return true;

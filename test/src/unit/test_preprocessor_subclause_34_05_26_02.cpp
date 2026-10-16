@@ -214,17 +214,19 @@ TEST(ProtectKeyPublicKeyDescription, TheNameWrittenLastCompletesThePair) {
 
 // §34.5.26.2: the value is encoded as the encoding pragma expression in effect
 // specifies. A line that is not written in that scheme is no encoded value, and
-// §34.5.9.2 reports it where the reading meets it.
+// §34.5.9.2 reports it where the reading meets it. RFC 2045 steps over the
+// space and the exclamation mark, and the nine letters and digits left end part
+// way through a byte.
 TEST(ProtectKeyPublicKeyDescription, AValueOutsideTheSchemeInEffectIsReported) {
   std::string src = EnvelopeCarrying(
       "`pragma protect encoding=(enctype=\"base64\")\n"
       "`pragma protect key_public_key\n"
-      "not base64 at all!!\n");
+      "not base64!\n");
   PreprocFixture f;
   Preprocess(src, f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(), "value is not written in the encoding in effect",
-      LineHolding(src, "not base64 at all!!"), "34.5.9.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "value is not written in the encoding in effect",
+                            LineHolding(src, "not base64!"), "34.5.9.2"));
 }
 
 // A line the scheme in effect never wrote designates no key, so the keyword
@@ -237,7 +239,7 @@ TEST(ProtectKeyPublicKeyDescription, AValueOutsideTheSchemeDesignatesNothing) {
       "<test>",
       EnvelopeCarrying("`pragma protect encoding=(enctype=\"base64\")\n"
                        "`pragma protect key_public_key\n"
-                       "not base64 at all!!\n")));
+                       "not base64!\n")));
   EXPECT_TRUE(pp.ProtectKeywords().ValueOf(kKeyPublicKeyKeyword).value.empty());
 }
 

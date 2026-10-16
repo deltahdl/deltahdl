@@ -5,7 +5,9 @@
 // reads each of them on a designation no part of this tool wrote; this one
 // writes each through EncodeProtectBlock, holds the writing to what the
 // published algorithm produces, reads it back, and refuses the characters
-// neither algorithm writes.
+// neither algorithm writes. base64, which RFC 2045 defines beside
+// quoted-printable, writes lines as well, and its line length and its reading
+// are held to RFC 2045 here too.
 //
 // Most of the writing is driven through EncodeProtectBlock, which holds it to
 // the published algorithm alone. The cases at the end drive it through an
@@ -220,6 +222,55 @@ TEST(ProtectQuotedPrintableReading, AnEscapeTheAlgorithmNeverWritesIsRefused) {
   EXPECT_FALSE(DecodeProtectBlock("acme=2", kQuotedPrintableEnctype, &bytes));
   EXPECT_FALSE(DecodeProtectBlock("acme=G0", kQuotedPrintableEnctype, &bytes));
   EXPECT_FALSE(DecodeProtectBlock("acme=0G", kQuotedPrintableEnctype, &bytes));
+}
+
+// RFC 2045 §6.7 rule 3: the writing never ends a line in a space or a tab, so
+// one there was put in on the way and is deleted before the line is read,
+// whether it follows data or the equals sign of a soft break.
+TEST(ProtectQuotedPrintableReading, BlanksEndingALineAreNotData) {
+  EXPECT_TRUE(ReadsBackAs("ab=  \ncd", kQuotedPrintableEnctype, "abcd"));
+  EXPECT_TRUE(ReadsBackAs("ab \t\ncd", kQuotedPrintableEnctype, "abcd"));
+  EXPECT_TRUE(ReadsBackAs("ab=\t\r\ncd  ", kQuotedPrintableEnctype, "abcd"));
+  EXPECT_TRUE(ReadsBackAs("a b=20\ncd", kQuotedPrintableEnctype, "a b cd"));
+}
+
+// ---------------------------------------------------------------------------
+// base64: the data six bits to a character, in lines RFC 2045 bounds.
+// ---------------------------------------------------------------------------
+
+// RFC 2045 §6.8 holds a line of the writing to 76 characters, which is the
+// length an encoding expression stating no line_length leaves it at.
+TEST(ProtectBase64Writing, WithNoLengthALineRunsToSeventySix) {
+  std::string data = EveryByteUpTo(256);
+  std::string written = EncodeProtectBlock(data, Stated(kBase64Enctype, 0));
+  EXPECT_EQ(LongestLine(written), 76U) << written;
+  EXPECT_TRUE(ReadsBackAs(written, kBase64Enctype, data));
+}
+
+TEST(ProtectBase64Writing, AStatedLengthBoundsEveryLine) {
+  std::string data = EveryByteUpTo(256);
+  std::string written = EncodeProtectBlock(data, Stated(kBase64Enctype, 10));
+  EXPECT_EQ(LongestLine(written), 10U) << written;
+  EXPECT_TRUE(ReadsBackAs(written, kBase64Enctype, data));
+}
+
+// RFC 2045 §6.8 has a reading ignore every character outside the alphabet, so
+// a block indented, padded with blanks or broken where its writing never broke
+// it reads as the same bytes.
+TEST(ProtectBase64Reading, CharactersOutsideTheAlphabetAreSteppedOver) {
+  std::string data = EveryByteUpTo(40);
+  std::string clean = EncodeProtectBlock(data, Stated(kBase64Enctype, 0));
+  std::string padded = "  " + clean.substr(0, 21) + " \t\r\n\t" +
+                       clean.substr(21, 11) + "*" + clean.substr(32) + "  ";
+  EXPECT_TRUE(ReadsBackAs(padded, kBase64Enctype, data));
+}
+
+// What is left once those characters are stepped over is still read by the
+// algorithm, so a single character ending it stops part way through a byte.
+TEST(ProtectBase64Reading, AGroupEndingPartWayThroughAByteIsRefused) {
+  std::string bytes;
+  EXPECT_FALSE(DecodeProtectBlock("QUJD R", kBase64Enctype, &bytes));
+  EXPECT_TRUE(ReadsBackAs("QUJD Rg==", kBase64Enctype, "ABCF"));
 }
 
 // §34.5.9.2 ENCRYPTION INPUT: the encoding expression a text states decides how

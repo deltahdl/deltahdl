@@ -78,6 +78,7 @@
 #include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_des.h"
+#include "preprocessor/protect_digest_algorithms.h"
 #include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_envelope_output.h"
 #include "preprocessor/protect_key_method.h"
@@ -711,6 +712,38 @@ TEST(ProtectDataMethodCipher, AnEmptyKeyEncryptsNothing) {
   EXPECT_EQ(
       EncryptProtectedRegion(kSealedDesign, "", kRawEnctype, kDesCbcMethod),
       "");
+}
+
+// §34.5.15.2: what des-cbc encrypts is the region's contents, so a block holds
+// the IV cipher-block and the region padded to whole blocks, and nothing more.
+// Four bytes pad to one block; a four-byte prefix ahead of them would have made
+// two.
+TEST(ProtectDataMethodCipher, ADesCbcBlockRecordsTheRegionAlone) {
+  std::string block =
+      EncryptProtectedRegion("abcd", kRegionKey, kRawEnctype, kDesCbcMethod);
+  EXPECT_EQ(block.size(), 2 * kDesBlockBytes);
+  EXPECT_EQ(ProtectedRegionBlockSize("abcd", kDesCbcMethod),
+            2 * kDesBlockBytes);
+  std::string recovered;
+  ASSERT_TRUE(
+      DecryptProtectedBlock(block, kRegionKey, &recovered, kDesCbcMethod));
+  EXPECT_EQ(recovered, "abcd");
+}
+
+// A block written by another tool under the same DES key: the IV, then the
+// region alone encrypted under FIPS 46-3 in CBC mode. The DES key is the first
+// eight bytes of the SHA-1 digest of the region's key followed by a zero
+// counter, which is how this tool derives one from a key of any length.
+TEST(ProtectDataMethodCipher, ADesCbcBlockWithoutAPrefixIsOpened) {
+  std::string counter(4, '\0');
+  std::string des_key = Sha1Digest(std::string(kRegionKey) + counter);
+  des_key.resize(kDesKeyBytes);
+  const std::string kIv = "\x13\x57\x9b\xdf\x02\x46\x8a\xce";
+  std::string block = kIv + DesCbcEncrypt(kSealedDesign, des_key, kIv);
+  std::string recovered;
+  ASSERT_TRUE(
+      DecryptProtectedBlock(block, kRegionKey, &recovered, kDesCbcMethod));
+  EXPECT_EQ(recovered, kSealedDesign);
 }
 
 }  // namespace

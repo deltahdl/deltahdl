@@ -55,12 +55,13 @@ inline constexpr std::string_view kDataBlockKeyword = "data_block";
 // whatever reads the block knows how much data the characters stand for without
 // decoding them first.
 //
-// It is more than the length of the cleartext, because a block records what the
-// region was as well as the region itself. Under §34.5.11.2's des-cbc it is
-// more again: a block cipher writes whole blocks, so the recording is padded up
-// to one, and §34.5.15.2 has the IV cipher-block travel ahead of the encrypted
-// data. An empty method is this implementation's own cipher, whose block is as
-// long as what went into it.
+// Under this implementation's own cipher, which an empty method names, it is
+// more than the length of the cleartext, because a block records what the
+// region was as well as the region itself, and the cipher's output is as long
+// as what went into it. Under §34.5.11.2's des-cbc the block records the region
+// alone, but a block cipher writes whole blocks, so the region is padded up to
+// one, and §34.5.15.2 has the IV cipher-block travel ahead of the encrypted
+// data.
 size_t ProtectedRegionBlockSize(std::string_view cleartext,
                                 std::string_view method = {});
 

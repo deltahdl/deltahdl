@@ -268,6 +268,10 @@ std::string ProtectEncodedValueDirective(const ProtectEncoding& encoding,
   return ProtectEncodingDirective(described);
 }
 
+// RFC 2045 §6.8: the longest line of the base64 writing, the length it is
+// broken at where the encoding expression states none.
+constexpr size_t kBase64MaxLine = 76;
+
 // The identity transformation is the one scheme a line length asks nothing of.
 // Table 34-2 has it perform no encoding at all, so there is no encoded text
 // standing beside the data to be broken, and a break put in would be a byte
@@ -282,7 +286,9 @@ std::string EncodeProtectBlock(std::string_view bytes,
     return EncodeQuotedPrintable(bytes, encoding.line_length);
   }
   if (encoding.enctype == kBase64Enctype) {
-    return WrapLines(EncodeBase64(bytes), encoding.line_length);
+    return WrapLines(EncodeBase64(bytes), encoding.line_length == 0
+                                              ? kBase64MaxLine
+                                              : encoding.line_length);
   }
   if (encoding.enctype == kBlockEnctype) {
     return WrapLines(EncodeProtectBlockAlphabet(bytes), encoding.line_length);
@@ -292,8 +298,9 @@ std::string EncodeProtectBlock(std::string_view bytes,
 
 // The two line-oriented schemes are handed the text as it stands, a line
 // meaning something to each of them, and the identity transformation is handed
-// it as it stands because there every byte is data. What is left are the two
-// that write one long run of characters, and there a break was put in by the
+// it as it stands because there every byte is data. base64 is too, its reading
+// stepping over whatever stands outside its alphabet. The tool's own scheme
+// writes one long run of characters, and there a break was put in by the
 // writing rather than by the data.
 bool DecodeProtectBlock(std::string_view text, std::string_view enctype,
                         std::string* bytes) {
@@ -306,7 +313,7 @@ bool DecodeProtectBlock(std::string_view text, std::string_view enctype,
     return DecodeQuotedPrintable(text, bytes);
   }
   if (enctype == kBase64Enctype) {
-    return DecodeBase64(WithoutLineBreaks(text), bytes);
+    return DecodeBase64(text, bytes);
   }
   if (enctype == kBlockEnctype) {
     return DecodeProtectBlockAlphabet(WithoutLineBreaks(text), bytes);
