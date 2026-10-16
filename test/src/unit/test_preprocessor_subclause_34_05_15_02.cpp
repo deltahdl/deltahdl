@@ -116,6 +116,16 @@ std::string BlockBeneathTheKeyword(std::string_view envelope) {
   return std::string(beneath.substr(0, beneath.find('\n')));
 }
 
+// Every line of the block beneath the keyword, up to the directive after it: a
+// scheme that breaks its writing carries one block over several lines.
+std::string BlockLinesBeneathTheKeyword(std::string_view envelope) {
+  size_t announced = envelope.find(kAnnouncingDirective);
+  if (announced == std::string_view::npos) return {};
+  std::string_view beneath =
+      envelope.substr(announced + kAnnouncingDirective.size());
+  return std::string(beneath.substr(0, beneath.find("\n`pragma")));
+}
+
 // What a reading is configured with to open the regions sealed above, which is
 // the key and nothing besides.
 PreprocConfig KeyOnly() {
@@ -154,7 +164,7 @@ TEST(ProtectDataBlockDescription, TheBlockStandsOnTheLineBeneathTheKeyword) {
   ASSERT_EQ(envelope.find("`pragma protect data_block=\""), std::string::npos)
       << envelope;
   std::string cleartext;
-  ASSERT_TRUE(DecryptProtectedRegion(BlockBeneathTheKeyword(envelope),
+  ASSERT_TRUE(DecryptProtectedRegion(BlockLinesBeneathTheKeyword(envelope),
                                      kRegionKey, &cleartext, kNamedScheme))
       << envelope;
   // The region's own encoding directive travels into the block along with the

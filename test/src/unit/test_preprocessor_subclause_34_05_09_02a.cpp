@@ -105,8 +105,8 @@ TEST(ProtectEncodingEncryptionInput, TheSchemeARegionNamesWritesItsBlock) {
   std::string envelope = EnvelopeAround(NamesScheme(kBase64Enctype));
   ASSERT_TRUE(Holds(envelope, "enctype=\"base64\""));
   std::string block;
-  ASSERT_TRUE(DecodeProtectBlock(EncodingDataBlockOf(envelope), kBase64Enctype,
-                                 &block));
+  ASSERT_TRUE(DecodeProtectBlock(EncodingDataBlockLinesOf(envelope),
+                                 kBase64Enctype, &block));
   std::string recovered;
   EXPECT_TRUE(DecryptProtectedBlock(block, kEncodingExchangeKey, &recovered));
   EXPECT_TRUE(Holds(recovered, kEncodingSealedDesign));
@@ -142,8 +142,8 @@ TEST(ProtectEncodingEncryptionInput, ASchemeNamedAheadOfARegionWritesItsBlock) {
   std::string envelope = EnvelopeOf(source);
   ASSERT_TRUE(Holds(envelope, "enctype=\"base64\""));
   std::string block;
-  ASSERT_TRUE(DecodeProtectBlock(EncodingDataBlockOf(envelope), kBase64Enctype,
-                                 &block));
+  ASSERT_TRUE(DecodeProtectBlock(EncodingDataBlockLinesOf(envelope),
+                                 kBase64Enctype, &block));
   std::string recovered;
   EXPECT_TRUE(DecryptProtectedBlock(block, kEncodingExchangeKey, &recovered));
   EXPECT_TRUE(Holds(recovered, kEncodingSealedDesign));
@@ -491,7 +491,7 @@ TEST(ProtectEncodingEncryptionOutput, AKeyBlockAndTheKeyInItAreUnderTheScheme) {
   ASSERT_FALSE(Holds(envelope, kEncodingSealedDesign));
   ASSERT_TRUE(Holds(envelope, "enctype=\"base64\""));
   std::string block;
-  ASSERT_TRUE(DecodeProtectBlock(LineAfter(envelope, kKeyBlockLine),
+  ASSERT_TRUE(DecodeProtectBlock(BlockLinesAfter(envelope, kKeyBlockLine),
                                  kBase64Enctype, &block));
   std::string carried;
   ASSERT_TRUE(DecryptProtectedBlock(block, kProviderKey, &carried));
@@ -499,8 +499,8 @@ TEST(ProtectEncodingEncryptionOutput, AKeyBlockAndTheKeyInItAreUnderTheScheme) {
   ASSERT_TRUE(DecodeProtectBlock(LineAfter(carried, kDataDecryptKeyLine),
                                  kBase64Enctype, &region_key));
   std::string design;
-  EXPECT_TRUE(DecryptProtectedRegion(EncodingDataBlockOf(envelope), region_key,
-                                     &design, kBase64Enctype));
+  EXPECT_TRUE(DecryptProtectedRegion(EncodingDataBlockLinesOf(envelope),
+                                     region_key, &design, kBase64Enctype));
   EXPECT_TRUE(Holds(design, kEncodingSealedDesign));
 }
 
