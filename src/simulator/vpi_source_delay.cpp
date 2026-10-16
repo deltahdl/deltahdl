@@ -14,6 +14,7 @@
 #include "simulator/sim_context.h"
 #include "simulator/stmt_exec_internal.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_constants.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
