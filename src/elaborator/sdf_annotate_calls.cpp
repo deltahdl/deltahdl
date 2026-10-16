@@ -54,17 +54,23 @@ void WarnUwireNotMerged(DiagEngine& diag, SourceLoc loc, std::string_view port,
                Subclause("23.3.3.6"));
 }
 
+// The uwire inout connections of `inst` whose two nets are kept apart.
+static void WarnInstanceUwireNetsKeptApart(const RtlirModuleInst& inst,
+                                           DiagEngine& diag) {
+  for (const RtlirPortBinding& binding : inst.port_bindings) {
+    if (!binding.uwire_net_join || binding.direction != Direction::kInout) {
+      continue;
+    }
+    WarnUwireNotMerged(diag, binding.connection->range.start, binding.port_name,
+                       inst.inst_name);
+  }
+}
+
 void WarnUwireNetsKeptApart(const RtlirDesign& design, DiagEngine& diag) {
   if (!DesignCallsSdfAnnotate(design)) return;
   for (const auto& [name, mod] : design.all_modules) {
     for (const RtlirModuleInst& inst : mod->children) {
-      for (const RtlirPortBinding& binding : inst.port_bindings) {
-        if (!binding.uwire_net_join || binding.direction != Direction::kInout) {
-          continue;
-        }
-        WarnUwireNotMerged(diag, binding.connection->loc, binding.port_name,
-                           inst.inst_name);
-      }
+      WarnInstanceUwireNetsKeptApart(inst, diag);
     }
   }
 }
