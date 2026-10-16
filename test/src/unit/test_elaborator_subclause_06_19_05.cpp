@@ -87,6 +87,48 @@ TEST(EnumMethodElaboration, PortsAreChecked) {
       "'foo' is not a built-in method of the enumeration 'e'", 2, "6.19.5"));
 }
 
+// §6.19.3: a named constant is a value of its enumeration, so a call naming
+// anything else through one is reported, whether a typedef, a variable or a
+// port declares the enumeration; a constant a range names, R[2], goes by the
+// numbered names §6.19.2 gives it, R0 and R1, not by R.
+TEST(EnumMethodElaboration, NameNoEnumMethodThroughAConstantIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "module m(input enum {P, Q} e);\n"
+      "  typedef enum {A, B} e_t;\n"
+      "  enum {C, D} v;\n"
+      "  enum {R[2]} r;\n"
+      "  initial begin\n"
+      "    A.foo();\n"
+      "    D.bar();\n"
+      "    Q.baz();\n"
+      "    R.qux();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "'foo' is not a built-in method of the enumeration 'A'", 6,
+      "6.19.5"));
+  EXPECT_TRUE(ReportedError(
+      diags, "'bar' is not a built-in method of the enumeration 'D'", 7,
+      "6.19.5"));
+  EXPECT_TRUE(ReportedError(
+      diags, "'baz' is not a built-in method of the enumeration 'Q'", 8,
+      "6.19.5"));
+  EXPECT_FALSE(ReportedError(
+      diags, "'qux' is not a built-in method of the enumeration 'R'", 9,
+      "6.19.5"));
+}
+
+TEST(EnumMethodElaboration, EnumMethodsThroughAConstantAreAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  typedef enum {A, B, C} e_t;\n"
+             "  initial $display(A.name(), B.num(), C.next());\n"
+             "endmodule\n"));
+}
+
 // §6.19.5 with §13.4.1: the result of a call returning an enumeration has the
 // built-in methods of one and no others, whether the call is of a function of
 // the module, f(), of a method of the class a handle holds, k.get(), or of

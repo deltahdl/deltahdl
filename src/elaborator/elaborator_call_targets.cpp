@@ -18,7 +18,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/class_member_names.h"
-#include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_enclosing_subroutines.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/operator_result_members.h"
 #include "elaborator/std_package.h"
@@ -160,15 +160,6 @@ void ReportStatementCall(const Stmt& stmt, const DataScope& scope,
   }
   diag.Error(stmt.range.start, std::format("undeclared identifier '{}'", kName),
              Subclause("23.9"));
-}
-
-// Whether `item` declares a task or a function a call may call: one the
-// source writes, or one a DPI import or export names (§35.5).
-bool IsSubroutineItem(const ModuleItem& item) {
-  return item.kind == ModuleItemKind::kTaskDecl ||
-         item.kind == ModuleItemKind::kFunctionDecl ||
-         item.kind == ModuleItemKind::kDpiImport ||
-         item.kind == ModuleItemKind::kDpiExport;
 }
 
 // Whether the interface `unit` declares under `iface` declares a task or a
@@ -685,42 +676,29 @@ void AddImportedData(const CompilationUnit& unit, const ImportItem& import,
   }
 }
 
-}  // namespace
-
-std::unordered_set<std::string_view> EnclosingSubroutineNames(
-    const CompilationUnit& unit, std::string_view module) {
-  std::unordered_set<std::string_view> names;
-  std::unordered_set<std::string_view> reached{module};
-  std::vector<std::string_view> work{module};
-  while (!work.empty()) {
-    const std::string_view kChild = work.back();
-    work.pop_back();
-    for (const ModuleDecl* parent : unit.modules) {
-      std::unordered_set<std::string_view> children;
-      CollectInstantiatedNames(parent->items, children);
-      if (!children.contains(kChild) || !reached.insert(parent->name).second) {
-        continue;
-      }
-      for (const ModuleItem* item : parent->items) {
-        if (IsSubroutineItem(*item)) names.insert(item->name);
-      }
-      work.push_back(parent->name);
+// §6.19.3: each named constant the enumeration `type` writes, as a value of
+// `scope` of that enumeration; one a range names, R[2], goes by the numbered
+// names §6.19.2 gives it, not by its own, and is left out. A variable of the
+// constant's name keeps its own declaration.
+void DeclareEnumConstants(const DataType& type, DataScope& scope) {
+  for (const EnumMember& member : type.enum_members) {
+    if (member.range_start == nullptr) {
+      scope.module_vars.emplace(member.name, DeclaredVar{&type, 0});
     }
   }
-  return names;
 }
-
-namespace {
 
 // The declaration of each variable the module `decl` declares, as a variable
 // of `scope`: each of its ports (§23.2.2), each object an explicitly named
 // port of it stands for (§23.2.2.1), and each variable its items declare, a
-// body declaration of a port's name giving the port its type.
+// body declaration of a port's name giving the port its type; and each named
+// constant of an enumeration a port or an item writes.
 void DeclareModuleVars(const ModuleDecl& decl, DataScope& scope) {
   for (const auto* ports : {&decl.ports, &decl.port_expr_objects}) {
     for (const PortDecl& port : *ports) {
       scope.module_vars[port.name] =
           DeclaredVar{&port.data_type, port.unpacked_dims.size()};
+      DeclareEnumConstants(port.data_type, scope);
     }
   }
   for (const ModuleItem* item : decl.items) {
@@ -728,6 +706,8 @@ void DeclareModuleVars(const ModuleDecl& decl, DataScope& scope) {
       scope.module_vars[item->name] =
           DeclaredVar{&item->data_type, item->unpacked_dims.size()};
     }
+    DeclareEnumConstants(item->data_type, scope);
+    DeclareEnumConstants(item->typedef_type, scope);
   }
 }
 

@@ -2,19 +2,12 @@
 
 #include <functional>
 #include <string_view>
-#include <unordered_set>
 
 namespace delta {
 
 class DiagEngine;
 struct CompilationUnit;
 struct ModuleDecl;
-
-// §23.8: the tasks and functions the modules of `unit` that instantiate
-// `module`, directly or through instances between, declare, which a call the
-// module writes by a name it does not declare may name.
-std::unordered_set<std::string_view> EnclosingSubroutineNames(
-    const CompilationUnit& unit, std::string_view module);
 
 // A.8.2 and A.6.9: a tf_call names a task or a function. Reports each call in
 // the procedures `decl` declares whose name, written alone, the module, a

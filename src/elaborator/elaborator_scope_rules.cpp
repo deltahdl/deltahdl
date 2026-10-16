@@ -19,6 +19,7 @@
 #include "elaborator/covergroup_variables.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_call_targets.h"
+#include "elaborator/elaborator_enclosing_subroutines.h"
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_scope_rules_names.h"
