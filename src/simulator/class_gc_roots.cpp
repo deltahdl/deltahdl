@@ -174,9 +174,11 @@ void PinEventHandles(Event& event, SimContext& ctx,
   std::vector<uint64_t> handles;
   for (const Logic4Vec& value : values) AddObjectHandles(ctx, value, handles);
   if (target != nullptr) handles.push_back(target->handle);
+  // A pin owns no pointer, only the deleter that unpins its handles, so it is
+  // the handles and not the pin that say whether there is anything to keep.
+  if (handles.empty()) return;
   std::shared_ptr<void> pin =
       PinHandles(ctx.GetScheduler(), std::move(handles));
-  if (pin == nullptr) return;
   event.callback = [pin, run = std::move(event.callback)]() { run(); };
 }
 
