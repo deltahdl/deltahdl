@@ -12,7 +12,6 @@
 // Preprocessor::ReadEncodedProtectValue turns the characters into bytes under
 // the coding scheme in effect and spends the byte count that scheme stated.
 
-#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
