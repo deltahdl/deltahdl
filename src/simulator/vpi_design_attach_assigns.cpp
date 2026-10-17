@@ -868,8 +868,7 @@ VpiObject* VpiCallSiteAssignedExpression(const VpiAssignedSide& side,
 }
 
 void VpiContext::AttachContinuousAssignments(const RtlirDesign* design,
-                                             const VpiCallBuild& calls,
-                                             const VpiAttachBuild& attach) {
+                                             const VpiCallBuild& calls) {
   // §37.47: a module reaches the continuous assignments it holds. Nothing made
   // one, so the relation reached none and no net had a driver or a load
   // (§37.46).
@@ -878,6 +877,12 @@ void VpiContext::AttachContinuousAssignments(const RtlirDesign* design,
     return;
   }
   const std::string kFirstTop(design->top_modules.front()->name);
+  const VpiAttachBuild kAttach{[this] { return AllocObject(); },
+                               [this](std::string name) {
+                                 name_pool_.push_back(std::move(name));
+                                 return std::string_view(name_pool_.back());
+                               },
+                               sim_ctx_->GetArena()};
   WalkInstancePaths(
       design, [&](const RtlirModule* mod, const std::string& prefix) {
         VpiHandle scope = FindObjectForFlatName(
@@ -897,20 +902,17 @@ void VpiContext::AttachContinuousAssignments(const RtlirDesign* design,
           // block instance's gen scope.
           VpiObject* within = VpiGenScopeOf(scope, ca.gen_block_path);
           AssignBuild build{
-              [this] { return AllocObject(); },
+              kAttach.alloc,
               sim_ctx_,
               AssignNames{object_map_, prefix, ca.gen_block_prefixes, nullptr,
                           ca.gen_block_consts, scope},
               VpiCalleesAt({*design, *mod, prefix,
                             CalleeScope(*mod, ca.gen_block_prefixes, scope),
                             calls.subroutines}),
-              [this](std::string name) {
-                name_pool_.push_back(std::move(name));
-                return std::string_view(name_pool_.back());
-              },
+              kAttach.keep,
               VpiItemCallShaper(
                   {*design, *mod, prefix, ca.gen_block_prefixes, within},
-                  object_map_, calls, attach),
+                  object_map_, calls, kAttach),
               &mod->node_attrs};
           MakeContinuousAssignment(ca, within, build);
         }

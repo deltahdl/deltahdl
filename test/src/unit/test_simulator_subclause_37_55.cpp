@@ -195,6 +195,14 @@ class ImmediateAssertionsOfARun : public VpiDesignRun {
     const char* name = vpi_get_str(vpiName, reached);
     return name == nullptr ? "" : name;
   }
+
+  // What the action `relation` reaches from `assertion` calls, empty for
+  // nothing: an action written as a call statement has no name of its own
+  // (§37.60 detail 1).
+  static std::string ActionReached(int relation, vpiHandle assertion) {
+    vpiHandle reached = vpi_handle(relation, assertion);
+    return reached == nullptr ? "" : CalleeOf(reached);
+  }
 };
 
 // An assertion statement reaches the expression it asserts and its pass and
@@ -214,11 +222,11 @@ TEST_F(ImmediateAssertionsOfARun, AnAssertionStatementReachesItsParts) {
   ASSERT_NE(a1, nullptr);
   ASSERT_NE(c1, nullptr);
   EXPECT_EQ(NameReached(vpiExpr, a1), "a");
-  EXPECT_EQ(NameReached(vpiStmt, a1), "$display");
-  EXPECT_EQ(NameReached(vpiElseStmt, a1), "$write");
+  EXPECT_EQ(ActionReached(vpiStmt, a1), "$display");
+  EXPECT_EQ(ActionReached(vpiElseStmt, a1), "$write");
   EXPECT_EQ(vpi_get(vpiIsDeferred, a1), 0);
   EXPECT_EQ(NameReached(vpiExpr, c1), "b");
-  EXPECT_EQ(NameReached(vpiStmt, c1), "$display");
+  EXPECT_EQ(ActionReached(vpiStmt, c1), "$display");
   EXPECT_EQ(vpi_handle(vpiElseStmt, c1), nullptr);
 }
 
@@ -236,8 +244,8 @@ TEST_F(ImmediateAssertionsOfARun, ADeferredAssertionItemReachesItsParts) {
   ASSERT_NE(d1, nullptr);
   ASSERT_NE(d2, nullptr);
   EXPECT_EQ(NameReached(vpiExpr, d1), "a");
-  EXPECT_EQ(NameReached(vpiStmt, d1), "$display");
-  EXPECT_EQ(NameReached(vpiElseStmt, d1), "$write");
+  EXPECT_EQ(ActionReached(vpiStmt, d1), "$display");
+  EXPECT_EQ(ActionReached(vpiElseStmt, d1), "$write");
   EXPECT_EQ(vpi_get(vpiIsDeferred, d1), 1);
   EXPECT_EQ(vpi_get(vpiIsFinal, d1), 1);
   EXPECT_EQ(NameReached(vpiExpr, d2), "b");
@@ -256,7 +264,7 @@ TEST_F(ImmediateAssertionsOfARun, AFailActionAloneIsTheElseStatement) {
   vpiHandle a1 = Named(vpiAssertion, By("top"), "a1");
   ASSERT_NE(a1, nullptr);
   EXPECT_EQ(vpi_handle(vpiStmt, a1), nullptr);
-  EXPECT_EQ(NameReached(vpiElseStmt, a1), "$write");
+  EXPECT_EQ(ActionReached(vpiElseStmt, a1), "$write");
 }
 
 }  // namespace

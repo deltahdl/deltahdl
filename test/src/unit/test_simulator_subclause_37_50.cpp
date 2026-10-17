@@ -264,6 +264,14 @@ class ConcurrentAssertionsOfARun : public VpiDesignRun {
     return reached == nullptr ? "" : vpi_get_str(vpiName, reached);
   }
 
+  // What the action `relation` reaches from `ref` calls, empty for nothing:
+  // an action written as a call statement has no name of its own (§37.60
+  // detail 1).
+  static std::string ActionReached(int relation, vpiHandle ref) {
+    vpiHandle reached = ref == nullptr ? nullptr : vpi_handle(relation, ref);
+    return reached == nullptr ? "" : CalleeOf(reached);
+  }
+
   // The edge operation `event` stands for and the name of what it is taken
   // of, as "posedge clk"; empty where it is no edge operation.
   static std::string EdgeOf(vpiHandle event) {
@@ -290,10 +298,10 @@ TEST_F(ConcurrentAssertionsOfARun, AnItemReachesBothActions) {
   vpiHandle c1 = Named(vpiAssertion, By("top"), "c1");
   ASSERT_NE(a1, nullptr);
   ASSERT_NE(c1, nullptr);
-  EXPECT_EQ(NameReached(vpiStmt, a1), "$display");
-  EXPECT_EQ(NameReached(vpiElseStmt, a1), "$write");
-  EXPECT_EQ(NameReached(vpiStmt, c1), "$display");
-  EXPECT_EQ(NameReached(vpiElseStmt, c1), "");
+  EXPECT_EQ(ActionReached(vpiStmt, a1), "$display");
+  EXPECT_EQ(ActionReached(vpiElseStmt, a1), "$write");
+  EXPECT_EQ(ActionReached(vpiStmt, c1), "$display");
+  EXPECT_EQ(ActionReached(vpiElseStmt, c1), "");
 }
 
 // A fail action written alone is reached through vpiElseStmt and is no pass
@@ -304,8 +312,8 @@ TEST_F(ConcurrentAssertionsOfARun, AFailActionAloneIsTheElseStatement) {
       "endmodule\n");
   vpiHandle a1 = Named(vpiAssertion, By("top"), "a1");
   ASSERT_NE(a1, nullptr);
-  EXPECT_EQ(NameReached(vpiStmt, a1), "");
-  EXPECT_EQ(NameReached(vpiElseStmt, a1), "$write");
+  EXPECT_EQ(ActionReached(vpiStmt, a1), "");
+  EXPECT_EQ(ActionReached(vpiElseStmt, a1), "$write");
 }
 
 // An assertion embedded in a procedure reaches its actions the same way
@@ -317,8 +325,8 @@ TEST_F(ConcurrentAssertionsOfARun, AProceduralAssertionReachesBothActions) {
       "endmodule\n");
   vpiHandle p1 = Named(vpiAssertion, By("top"), "p1");
   ASSERT_NE(p1, nullptr);
-  EXPECT_EQ(NameReached(vpiStmt, p1), "$display");
-  EXPECT_EQ(NameReached(vpiElseStmt, p1), "$write");
+  EXPECT_EQ(ActionReached(vpiStmt, p1), "$display");
+  EXPECT_EQ(ActionReached(vpiElseStmt, p1), "$write");
 }
 
 // An assertion reaches the clock it writes through vpiClockingEvent, which was

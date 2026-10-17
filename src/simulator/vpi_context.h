@@ -786,8 +786,7 @@ class VpiContext {
   void AttachInstanceContents(const RtlirDesign* design);
   void AttachInstanceDefinitions(const RtlirDesign* design);
   void AttachContinuousAssignments(const RtlirDesign* design,
-                                   const VpiCallBuild& calls,
-                                   const VpiAttachBuild& attach);
+                                   const VpiCallBuild& calls);
   void AttachVariableFacts(const RtlirDesign* design);
 
   // §37.23: the declaration object a design's user-defined nettype stands as,

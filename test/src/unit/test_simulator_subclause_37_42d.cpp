@@ -199,11 +199,19 @@ TEST_F(CallsWithinADesign, ANullArgumentIsANullConstant) {
   EXPECT_EQ(vpi_get(vpiConstType, kWritten[0]), vpiNullConst);
 }
 
+// A design whose one system task call passes a call of a function bumping i,
+// the argument's side effect (§37.3.5).
+constexpr const char* kSteppingArgument =
+    "module top; int i = 5;\n"
+    "  function automatic int bump(); i = i + 1; return i; endfunction\n"
+    "  initial $args(bump());\n"
+    "endmodule\n";
+
 // Detail 7: an argument is evaluated only when an application asks for its
-// value, so $args(i++) leaves i as it was where the calltf reads nothing...
+// value, so $args(bump()) leaves i as it was where the calltf reads nothing...
 TEST_F(CallsWithinADesign, AnArgumentNoApplicationReadsIsNeverEvaluated) {
   ASSERT_NE(RegisterArgs(0), nullptr);
-  Run("module top; int i = 5; initial $args(i++); endmodule\n");
+  Run(kSteppingArgument);
   ASSERT_EQ(g_args_seen.size(), 1U);
   EXPECT_EQ(IntValueOf("top.i"), 5);
 }
@@ -212,7 +220,7 @@ TEST_F(CallsWithinADesign, AnArgumentNoApplicationReadsIsNeverEvaluated) {
 // reads add two (§37.3.5, #6968).
 TEST_F(CallsWithinADesign, AnArgumentIsEvaluatedEachTimeItIsRead) {
   ASSERT_NE(RegisterArgs(2), nullptr);
-  Run("module top; int i = 5; initial $args(i++); endmodule\n");
+  Run(kSteppingArgument);
   ASSERT_EQ(g_args_seen.size(), 1U);
   EXPECT_EQ(IntValueOf("top.i"), 7);
 }
@@ -268,6 +276,7 @@ TEST_F(CallsWithinADesign, AFunctionBodysCallBuildsEachArgumentKind) {
       "  initial r = g();\n"
       "endmodule\n");
   std::vector<int> kinds;
+  kinds.reserve(g_args_seen.size());
   for (vpiHandle arg : g_args_seen) kinds.push_back(vpi_get(vpiType, arg));
   EXPECT_EQ(kinds, (std::vector<int>{vpiFuncCall, vpiSysFuncCall, vpiConstant,
                                      vpiConstant, vpiConstant, vpiConstant,

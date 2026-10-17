@@ -261,7 +261,7 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
         // Attach made a udp defn for every UDP declaration of the design.
         [this](const UdpDecl* decl) { return run_objects_.at(decl); },
         *sim_ctx_, kBuild);
-    AttachContinuousAssignments(design, kCalls, kBuild);
+    AttachContinuousAssignments(design, kCalls);
   }
   AttachGenBlockStorage(design, object_map_);
   AttachGenBlockInstances(design, object_map_, [this](std::string name) {
