@@ -371,5 +371,45 @@ TEST(CaseModel, NoObjectAndStatementChildrenReachNoConditions) {
   EXPECT_TRUE(VpiCaseItemMatchExprs(&item).empty());
 }
 
+// A case matches item's patterns are pattern objects: `tagged V .n` a tagged
+// pattern named after its member, reaching the any pattern `.n` named after
+// the variable it binds; `tagged N` a tagged pattern reaching none; and `.*`
+// an any pattern binding no name.
+TEST_F(CaseStatementsOfARun, ACaseMatchesItemReachesItsPatterns) {
+  Run("module top;\n"
+      "  typedef union tagged { int V; void N; } u_t;\n"
+      "  u_t u; int r;\n"
+      "  initial case (u) matches\n"
+      "    tagged V .n: r = n;\n"
+      "    tagged N: r = 0;\n"
+      "    .*: r = 1;\n"
+      "  endcase\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kProcs =
+      Scanned(vpi_iterate(vpiProcess, By("top")));
+  ASSERT_EQ(kProcs.size(), 1U);
+  const std::vector<vpiHandle> kItems =
+      Scanned(vpi_iterate(vpiCaseItem, vpi_handle(vpiStmt, kProcs[0])));
+  ASSERT_EQ(kItems.size(), 3U);
+  const std::vector<vpiHandle> kFirst =
+      Scanned(vpi_iterate(vpiExpr, kItems[0]));
+  ASSERT_EQ(kFirst.size(), 1U);
+  EXPECT_EQ(vpi_get(vpiType, kFirst[0]), vpiTaggedPattern);
+  EXPECT_STREQ(vpi_get_str(vpiName, kFirst[0]), "V");
+  vpiHandle bound = vpi_handle(vpiPattern, kFirst[0]);
+  ASSERT_NE(bound, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, bound), vpiAnyPattern);
+  EXPECT_STREQ(vpi_get_str(vpiName, bound), "n");
+  const std::vector<vpiHandle> kSecond =
+      Scanned(vpi_iterate(vpiExpr, kItems[1]));
+  ASSERT_EQ(kSecond.size(), 1U);
+  EXPECT_STREQ(vpi_get_str(vpiName, kSecond[0]), "N");
+  EXPECT_EQ(vpi_handle(vpiPattern, kSecond[0]), nullptr);
+  const std::vector<vpiHandle> kThird =
+      Scanned(vpi_iterate(vpiExpr, kItems[2]));
+  ASSERT_EQ(kThird.size(), 1U);
+  EXPECT_EQ(vpi_get(vpiType, kThird[0]), vpiAnyPattern);
+}
+
 }  // namespace
 }  // namespace delta

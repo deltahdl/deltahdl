@@ -165,6 +165,34 @@ int QualifierOf(const Stmt& stmt) {
   return qualifier;
 }
 
+// §37.72: the object the pattern `pattern` of a case matches item stands as,
+// hung from `parent`: an any pattern for `.name`, named after the variable it
+// binds, or for `.*`, which binds none; a tagged pattern, named after the
+// member it is tagged with and holding the pattern of the member; and the
+// expression it is for any other.
+VpiObject* PatternObject(const Expr* pattern, VpiObject* parent,
+                         const VpiStmtBuild& with) {
+  if (pattern == nullptr) return nullptr;
+  const bool kWildcard =
+      pattern->kind == ExprKind::kIdentifier && pattern->text == ".*";
+  if (kWildcard || pattern->is_pattern_binding) {
+    VpiObject* any = with.build.alloc();
+    any->type = vpiAnyPattern;
+    any->parent = parent;
+    if (!kWildcard) any->name = with.build.keep(std::string(pattern->text));
+    return any;
+  }
+  if (pattern->kind == ExprKind::kTagged) {
+    VpiObject* tagged = with.build.alloc();
+    tagged->type = vpiTaggedPattern;
+    tagged->parent = parent;
+    tagged->name = with.build.keep(std::string(pattern->rhs->text));
+    AddChild(tagged, PatternObject(pattern->lhs, tagged, with));
+    return tagged;
+  }
+  return with.expression(pattern);
+}
+
 // §37.72: a case statement's type, the keyword it opens with, its qualifier,
 // the expression it selects on, and an item per case item of §12.5 grouping
 // the expressions that branch to its statement (detail 1); a default item
@@ -183,7 +211,8 @@ void FillCase(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
     made->default_case_item = item.is_default;
     obj->children.push_back(made);
     for (const Expr* pattern : item.patterns) {
-      AddChild(made, with.expression(pattern));
+      AddChild(made, stmt.case_matches ? PatternObject(pattern, made, with)
+                                       : with.expression(pattern));
     }
     with.statement(item.body, made);
   }
