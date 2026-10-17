@@ -54,6 +54,11 @@ TEST_F(DynamicPrefixing, PrefixSourceClassifier) {
 
   EXPECT_FALSE(VpiIsDynamicPrefixSourceType(vpiMethodFuncCall));
   EXPECT_FALSE(VpiIsDynamicPrefixSourceType(vpiModule));
+  // §37.58: the simple expressions beyond a ref obj and a bit select.
+  for (int simple : {vpiNet, vpiNetBit, vpiIntVar, vpiRegBit, vpiParameter,
+                     vpiSpecParam, vpiVarSelect}) {
+    EXPECT_TRUE(VpiIsDynamicPrefixSourceType(simple)) << simple;
+  }
 }
 
 // D1: vpiPrefix of a dynamically prefixed object reaches the object that
@@ -365,11 +370,13 @@ class PrefixingOfARun : public VpiDesignRun {
 };
 
 // Detail 3: an object that is all or part of a statically declared object of
-// the elaborated design has an actual, a named event the module declares
-// among them.
+// the elaborated design has an actual - a named event, a net, a variable and a
+// bit of a net, each a simple expression (§37.58).
 TEST_F(PrefixingOfARun, AStaticallyDeclaredObjectHasAnActual) {
-  Run("module top; event e; endmodule\n");
-  EXPECT_EQ(vpi_get(vpiHasActual, By("top.e")), 1);
+  Run("module top; event e; wire [3:0] w; int v; endmodule\n");
+  for (const char* name : {"top.e", "top.w", "top.v", "top.w[1]"}) {
+    EXPECT_EQ(vpi_get(vpiHasActual, By(name)), 1) << name;
+  }
 }
 
 // Detail 1: an expression written through a virtual interface reaches the

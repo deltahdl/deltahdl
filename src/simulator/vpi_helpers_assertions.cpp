@@ -12,6 +12,7 @@
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
+#include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 
 namespace delta {
@@ -875,14 +876,20 @@ bool VpiBitSelectConstantSelectOf(VpiHandle select) {
 // ===========================================================================
 
 bool VpiIsDynamicPrefixSourceType(int type) {
-  // §37.61 detail 1: the object kinds whose vpiPrefix relation this subclause
-  // serves - a simple expression (its concrete reference and bit-select kinds),
-  // a part-select, an indexed part-select, a named event, and a named event
-  // array. A tf call is in the diagram too, but a method call's prefix is owned
-  // by §37.42, so tf-call kinds are deliberately left out here.
+  // §37.61 detail 1: the object kinds whose vpiPrefix relation and
+  // vpiHasActual property this subclause serves - §37.58's simple expressions
+  // (the nets, the variables, a ref obj, a parameter, a spec param, a var
+  // select and a bit select), a part-select, an indexed part-select, a named
+  // event, and a named event array. A tf call is in the diagram too, but a
+  // method call's prefix is owned by §37.42, so tf-call kinds are deliberately
+  // left out here.
+  if (VpiIsNetsType(type) || VpiIsVariablesType(type)) return true;
   switch (type) {
-    case vpiRefObj:     // the concrete simple expression
-    case vpiBitSelect:  // a bit-select is also a simple expression
+    case vpiRefObj:
+    case vpiParameter:
+    case vpiSpecParam:
+    case vpiVarSelect:
+    case vpiBitSelect:
     case vpiPartSelect:
     case vpiIndexedPartSelect:
     case vpiNamedEvent:
