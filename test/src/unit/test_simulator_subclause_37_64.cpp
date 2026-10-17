@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <array>
+#include <cstddef>
 #include <string>
 
 #include "fixture_vpi_run.h"
@@ -108,6 +110,34 @@ class AssignmentsOfARun : public VpiDesignRun {
     return value.value.integer;
   }
 };
+
+// §11.4.2: an increment or decrement written as a statement is the blocking
+// assignment it behaves as, its vpiOpType the operator written (detail 1):
+// the post forms for `i++` and `j--`, the pre forms for `++i` and `--j`. Its
+// left side is the variable stepped, and no right side is written.
+TEST_F(AssignmentsOfARun, AnIncrementOrDecrementIsAnAssignment) {
+  Run("module top; int i, j;\n"
+      "  initial begin i++; j--; ++i; --j; end\n"
+      "endmodule\n");
+  vpiHandle block = BodyOf("top");
+  ASSERT_NE(block, nullptr);
+  vpiHandle it = vpi_iterate(vpiStmt, block);
+  ASSERT_NE(it, nullptr);
+  const std::array<int, 4> kOps = {vpiPostIncOp, vpiPostDecOp, vpiPreIncOp,
+                                   vpiPreDecOp};
+  const std::array<const char*, 4> kTargets = {"top.i", "top.j", "top.i",
+                                               "top.j"};
+  for (std::size_t k = 0; k < kOps.size(); ++k) {
+    vpiHandle step = vpi_scan(it);
+    ASSERT_NE(step, nullptr);
+    EXPECT_EQ(vpi_get(vpiType, step), vpiAssignment);
+    EXPECT_EQ(vpi_get(vpiOpType, step), kOps[k]);
+    EXPECT_EQ(vpi_get(vpiBlocking, step), 1);
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, step)),
+              VpiObjectOf(By(kTargets[k])));
+    EXPECT_EQ(vpi_handle(vpiRhs, step), nullptr);
+  }
+}
 
 // A blocking assignment is an assignment of the run, reaching the variables
 // its two sides name, reporting vpiAssignmentOp and blocking.

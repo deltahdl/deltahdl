@@ -293,6 +293,21 @@ TEST_F(ForLoopsOfARun, AForLoopIsAnObjectOfTheRun) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, body)), VpiObjectOf(By("top.s")));
 }
 
+// A for loop stepping its variable with `i++` reaches that step through
+// vpiForIncStmt, the assignment §11.4.2 makes of it.
+TEST_F(ForLoopsOfARun, AnIncrementStepIsTheLoopsIncrementStatement) {
+  Run("module top; int i, s;\n"
+      "  initial for (i = 0; i < 3; i++) s = i;\n"
+      "endmodule\n");
+  vpiHandle loop = TheLoop();
+  ASSERT_NE(loop, nullptr);
+  vpiHandle step = vpi_handle(vpiForIncStmt, loop);
+  ASSERT_NE(step, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, step), vpiAssignment);
+  EXPECT_EQ(vpi_get(vpiOpType, step), vpiPostIncOp);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, step)), VpiObjectOf(By("top.i")));
+}
+
 // A for loop declaring its variable has local variables, which §37.12 detail
 // 2 makes it a scope for: it is one of the instance's scopes.
 TEST_F(ForLoopsOfARun, AForLoopDeclaringItsVariableIsAScope) {
