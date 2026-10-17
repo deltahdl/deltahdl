@@ -772,7 +772,8 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
   // §16.4.3: a module-item deferred immediate assertion is a static deferred
   // assertion, modeled as an implicit always_comb procedure.
   if (IsStaticDeferredAssertion(item)) {
-    AddProcess(RtlirProcessKind::kAlwaysComb, item, mod, kEnv);
+    AddProcess(RtlirProcessKind::kAlwaysComb, item, mod, kEnv,
+               BuildParamScope(mod));
     mod->processes.back().is_static_assertion = true;
     return;
   }
@@ -782,7 +783,8 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
   // item->body; model it as a clocked process so the property is checked at
   // each leading clock edge.
   if (item->body != nullptr && !item->sensitivity.empty()) {
-    AddProcess(RtlirProcessKind::kAlwaysFF, item, mod, kEnv);
+    AddProcess(RtlirProcessKind::kAlwaysFF, item, mod, kEnv,
+               BuildParamScope(mod));
     mod->processes.back().is_static_assertion = true;
     // §16.5: the process just added carries a concurrent assertion's property.
     // The mark is taken from the statement the parser built for that property

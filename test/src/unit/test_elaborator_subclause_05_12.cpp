@@ -2,8 +2,10 @@
 
 #include <cstdint>
 #include <optional>
+#include <vector>
 
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_attribute.h"
 #include "fixture_elaborator.h"
 
 using namespace delta;
@@ -345,6 +347,44 @@ TEST(LexicalConventionElaboration, AttrValueFromParameterOverride) {
   EXPECT_EQ(leaf->variables[0].attrs[0].name, "mem_width");
   ASSERT_NE(leaf->variables[0].attrs[0].resolved_value, std::nullopt);
   EXPECT_EQ(leaf->variables[0].attrs[0].resolved_value.value_or(INT64_MIN), 16);
+}
+
+// An attribute's value is a constant expression, which may name a parameter
+// of the module the attribute is written in, on whatever it is written on: a
+// net, an instance, a procedure and a continuous assignment each fold it to
+// the parameter's value.
+TEST(LexicalConventionElaboration, AttrValueNamingAParameterFoldsOnEachItem) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module sub; endmodule\n"
+      "module m #(parameter P = 6);\n"
+      "  (* depth = P *) wire w;\n"
+      "  (* depth = P + 1 *) sub u();\n"
+      "  (* depth = P + 2 *) initial begin end\n"
+      "  (* depth = P + 3 *) assign w = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  const RtlirModule* mod = nullptr;
+  for (const RtlirModule* top : design->top_modules) {
+    if (top->name == "m") mod = top;
+  }
+  ASSERT_NE(mod, nullptr);
+  const auto kValueOf = [](const std::vector<ResolvedAttribute>& attrs) {
+    return attrs.empty() ? std::nullopt : attrs[0].resolved_value;
+  };
+  std::optional<int64_t> net;
+  for (const RtlirNet& n : mod->nets) {
+    if (n.name == "w") net = kValueOf(n.attrs);
+  }
+  EXPECT_EQ(net, std::optional<int64_t>{6});
+  ASSERT_EQ(mod->children.size(), 1u);
+  EXPECT_EQ(kValueOf(mod->children[0].attrs), std::optional<int64_t>{7});
+  ASSERT_EQ(mod->processes.size(), 1u);
+  EXPECT_EQ(kValueOf(mod->processes[0].attrs), std::optional<int64_t>{8});
+  ASSERT_EQ(mod->assigns.size(), 1u);
+  EXPECT_EQ(kValueOf(mod->assigns[0].attrs), std::optional<int64_t>{9});
 }
 
 }  // namespace

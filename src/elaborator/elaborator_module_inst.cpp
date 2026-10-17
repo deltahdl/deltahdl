@@ -671,7 +671,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
 
   CheckInstancePorts(inst, item, mod);
   CoerceDrivenInputPorts(inst, mod);
-  inst.attrs = ResolveAttributes(item->attrs, diag_);
+  inst.attrs = ResolveAttributes(item->attrs, diag_, BuildParamScope(mod));
   // §28.3.5: an instance-array range shall be given by two constant
   // expressions; a non-constant bound in a [lhi:rhi] range is an error, the
   // same rule the gate/switch-array path enforces.

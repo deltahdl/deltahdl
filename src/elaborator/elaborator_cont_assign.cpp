@@ -97,7 +97,8 @@ void ValidateContAssignVarTarget(ModuleItem* item, DiagEngine& diag) {
 }
 
 RtlirContAssign BuildContAssignFor(ModuleItem* item, Expr* lhs, Expr* rhs,
-                                   uint32_t width, DiagEngine& diag) {
+                                   uint32_t width, DiagEngine& diag,
+                                   const ScopeMap& scope) {
   RtlirContAssign ca;
   ca.lhs = lhs;
   ca.rhs = rhs;
@@ -108,14 +109,14 @@ RtlirContAssign BuildContAssignFor(ModuleItem* item, Expr* lhs, Expr* rhs,
   ca.delay = item->assign_delay;
   ca.delay_fall = item->assign_delay_fall;
   ca.delay_decay = item->assign_delay_decay;
-  ca.attrs = ResolveAttributes(item->attrs, diag);
+  ca.attrs = ResolveAttributes(item->attrs, diag, scope);
   return ca;
 }
 
 RtlirContAssign BuildContAssign(ModuleItem* item, RtlirModule* mod,
-                                DiagEngine& diag) {
+                                DiagEngine& diag, const ScopeMap& scope) {
   return BuildContAssignFor(item, item->assign_lhs, item->assign_rhs,
-                            LookupLhsWidth(item->assign_lhs, mod), diag);
+                            LookupLhsWidth(item->assign_lhs, mod), diag, scope);
 }
 
 }  // namespace
@@ -265,7 +266,7 @@ void EmitConcatContAssigns(const ConcatContAssignCtx& cx, Expr* lhs,
       EmitConcatContAssigns(cx, el, elem_rhs);
     } else {
       cx.mod->assigns.push_back(
-          BuildContAssignFor(cx.item, el, elem_rhs, w, cx.diag));
+          BuildContAssignFor(cx.item, el, elem_rhs, w, cx.diag, cx.scope));
     }
   }
 }
@@ -523,13 +524,14 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
                 Subclause("10.3.3"));
   }
   ValidateGetpatternContAssign(item, mod);
+  // §5.12: the scope the assignment's attributes fold their values against.
+  ScopeMap scope = BuildParamScope(mod);
   if (item->assign_lhs->kind == ExprKind::kConcatenation) {
-    ScopeMap scope = BuildParamScope(mod);
     ConcatContAssignCtx cx{item, mod, arena_, diag_, scope};
     EmitConcatContAssigns(cx, item->assign_lhs, item->assign_rhs);
     return;
   }
-  mod->assigns.push_back(BuildContAssign(item, mod, diag_));
+  mod->assigns.push_back(BuildContAssign(item, mod, diag_, scope));
 }
 
 }  // namespace delta

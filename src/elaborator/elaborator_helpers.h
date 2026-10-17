@@ -115,8 +115,10 @@ struct ProcessBuildEnv {
   // reference with no declaration in scope is the only account of it.
   const std::vector<EventExpr>* global_clocking_event = nullptr;
 };
+// §5.12: `params` is the parameter scope the attributes the process is written
+// with fold their values against.
 void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
-                const ProcessBuildEnv& env);
+                const ProcessBuildEnv& env, const ScopeMap& params);
 
 void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena,
                        const ScopeMap& scope);

@@ -127,10 +127,10 @@ static RtlirProcess BuildProcessWithSensitivity(RtlirProcessKind kind,
 }
 
 void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
-                const ProcessBuildEnv& env) {
+                const ProcessBuildEnv& env, const ScopeMap& params) {
   RtlirProcess proc = BuildProcessWithSensitivity(kind, item, env);
   ValidateProcess(kind, item, proc, env.diag);
-  proc.attrs = ResolveAttributes(item->attrs, env.diag);
+  proc.attrs = ResolveAttributes(item->attrs, env.diag, params);
   mod->processes.push_back(proc);
 }
 

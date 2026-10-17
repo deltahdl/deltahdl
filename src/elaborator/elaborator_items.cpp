@@ -755,7 +755,7 @@ void Elaborator::AddProcedure(ModuleItem* item, RtlirModule* mod,
   const ProcessBuildEnv kEnv{
       arena_, diag_, infers ? &inference_funcs_ : nullptr,
       infers ? &const_names_ : nullptr, module_global_clocking_event_};
-  AddProcess(kind, item, mod, kEnv);
+  AddProcess(kind, item, mod, kEnv, BuildParamScope(mod));
   mod->processes.back().checker_instances = std::move(sites);
 }
 
@@ -784,7 +784,8 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       AddProcedure(item, mod, RtlirProcessKind::kInitial);
       return true;
     case ModuleItemKind::kFinalBlock:
-      AddProcess(RtlirProcessKind::kFinal, item, mod, kNoInferenceEnv);
+      AddProcess(RtlirProcessKind::kFinal, item, mod, kNoInferenceEnv,
+                 BuildParamScope(mod));
       return true;
     case ModuleItemKind::kAlwaysBlock:
     case ModuleItemKind::kAlwaysCombBlock:
