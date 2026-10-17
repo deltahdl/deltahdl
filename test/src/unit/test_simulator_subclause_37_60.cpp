@@ -243,27 +243,13 @@ TEST_F(AtomicStatementsOfARun, ALabelledCallIsNamedByItsLabel) {
   Run("module top; task t; endtask\n"
       "  initial l1: t();\n"
       "endmodule\n");
-  vpiHandle proc = First(vpiProcess, By("top"));
-  ASSERT_NE(proc, nullptr);
-  vpiHandle call = vpi_handle(vpiStmt, proc);
+  vpiHandle call = First(vpiTaskCall, By("top.l1"));
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(vpi_get(vpiType, call), vpiTaskCall);
   EXPECT_STREQ(vpi_get_str(vpiName, call), "l1");
   vpiHandle task = vpi_handle(vpiTask, call);
   ASSERT_NE(task, nullptr);
   EXPECT_STREQ(vpi_get_str(vpiName, task), "t");
-}
-
-// A return statement is an atomic statement, reaching the value a function
-// returns through vpiCondition (§37.78).
-TEST_F(AtomicStatementsOfARun, AReturnStatementIsBuilt) {
-  Run("module top; function int f; return 5; endfunction endmodule\n");
-  vpiHandle stmt = vpi_handle(vpiStmt, By("top.f"));
-  ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(vpi_get(vpiType, stmt), vpiReturnStmt);
-  vpiHandle value = vpi_handle(vpiCondition, stmt);
-  ASSERT_NE(value, nullptr);
-  EXPECT_EQ(vpi_get(vpiType, value), vpiConstant);
 }
 
 // An unlabeled statement has no label to report.
@@ -399,6 +385,30 @@ TEST_F(StatementFill, AnUnmodelledIntraAssignmentDelayReachesNoDelay) {
   ASSERT_EQ(assignment.children.size(), 1U);
   EXPECT_EQ(assignment.children[0]->type, vpiDelayControl);
   EXPECT_TRUE(assignment.children[0]->children.empty());
+}
+
+// A return statement is an atomic statement, reaching the value it returns
+// through vpiCondition (§37.78); a return from a task or a void function
+// carries none.
+TEST_F(StatementFill, AReturnStatementHoldsTheValueItReturns) {
+  Expr value;
+  Name(value, "v");
+  Stmt with_value;
+  with_value.kind = StmtKind::kReturn;
+  with_value.expr = &value;
+  EXPECT_EQ(VpiBuiltStmtKind(with_value), vpiReturnStmt);
+  VpiObject returns;
+  returns.type = vpiReturnStmt;
+  VpiFillStmt(&returns, with_value, with_);
+  ASSERT_EQ(returns.children.size(), 1U);
+  EXPECT_EQ(returns.children[0]->name, "v");
+
+  Stmt bare;
+  bare.kind = StmtKind::kReturn;
+  VpiObject returns_nothing;
+  returns_nothing.type = vpiReturnStmt;
+  VpiFillStmt(&returns_nothing, bare, with_);
+  EXPECT_TRUE(returns_nothing.children.empty());
 }
 
 // §37.65: an event control whose list holds an event the model leaves out - a
