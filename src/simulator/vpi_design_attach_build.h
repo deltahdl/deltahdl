@@ -25,6 +25,7 @@ struct DataType;
 struct EventExpr;
 enum class DataTypeKind : uint8_t;
 enum class StmtKind : uint8_t;
+enum class TokenKind : uint16_t;
 struct Expr;
 struct ModuleItem;
 struct PackageDecl;
@@ -311,9 +312,36 @@ void AttachDeclaredRanges(VpiObject* obj, const DataType& type,
 // significant end of its storage; null where it has none.
 VpiObject* VpiBitAtOffset(const VpiObject& root, int64_t offset);
 
+// §37.59: the vpiOpType of a binary operator, and 0 for one the table does
+// not hold. An event expression passed as an actual (§16.12.18) joins its
+// events with `or` and guards one with `iff`, as §9.4.2 writes them.
+int VpiBinaryOpType(TokenKind op);
+
+// §37.59: the vpiOpType of a prefix unary operator, and 0 for one the table
+// does not hold. An event expression passed as an actual (§16.12.18) writes
+// its edge as one.
+int VpiUnaryOpType(TokenKind op);
+
 // §37.61 (figure): whether an object of `type` can prefix an expression - a
 // class var, a virtual interface var or a clocking block.
 bool VpiIsDynamicPrefixHolderType(int type);
+
+// §37.59: gives an operation, a part select or an indexed part select built
+// with no size its self-determined width (§11.6.1), read off its operands and
+// its range; any other expression is left as it is.
+void VpiSizeExpression(VpiObject* expr);
+
+// `scope` where it is given, and otherwise the instance `objects` holds under
+// `instance`; null for neither.
+const VpiObject* VpiScopeOrInstance(const VpiObject* scope,
+                                    const VpiObjectMap& objects,
+                                    const std::string& instance);
+
+// §37.59 details 3 and 5: `op`, the cast operation `cast` stands as, related
+// to the typespec of the type it casts to - a built-in type a keyword names,
+// or a typedef `from`, or a scope around it, declares. Answers `op`.
+VpiObject* VpiTypedCast(VpiObject* op, const Expr& cast, const VpiObject* from,
+                        const std::function<VpiObject*()>& alloc);
 
 // §14.3 with §23.9: the clocking block named `name` that `scope`, or a scope
 // around it, declares - from the instance `objects` holds under `instance`

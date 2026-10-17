@@ -27,6 +27,14 @@ VpiObject* ClockingBlockOutFrom(const VpiObject* from, std::string_view name) {
 
 }  // namespace
 
+const VpiObject* VpiScopeOrInstance(const VpiObject* scope,
+                                    const VpiObjectMap& objects,
+                                    const std::string& instance) {
+  if (scope != nullptr) return scope;
+  const auto kAt = objects.find(instance);
+  return kAt != objects.end() ? kAt->second : nullptr;
+}
+
 VpiObject* VpiClockingBlockAround(const VpiObject* scope,
                                   const VpiObjectMap& objects,
                                   const std::string& instance,
@@ -35,9 +43,8 @@ VpiObject* VpiClockingBlockAround(const VpiObject* scope,
   // it, found from the blocks around the expression out to the instance, and
   // in the instance itself where those blocks are not yet hung from it.
   if (VpiObject* block = ClockingBlockOutFrom(scope, name)) return block;
-  const auto kAt = objects.find(instance);
-  return kAt != objects.end() ? ClockingBlockOutFrom(kAt->second, name)
-                              : nullptr;
+  return ClockingBlockOutFrom(VpiScopeOrInstance(nullptr, objects, instance),
+                              name);
 }
 
 VpiObject* VpiPrefixedReference(VpiObject* holder, std::string_view written,

@@ -343,17 +343,25 @@ TEST(ExpressionModel, ProtectedExpressionStillGuardsOtherProperties) {
   EXPECT_NE(ctx.LastError().level, 0);
 }
 
-// Detail 8 (scope): the carve-out is keyed on the object being an expression. A
-// protected non-expression (a variable) still has vpiSize guarded, so the
-// carve- out does not leak to other object kinds.
-TEST(ExpressionModel, ProtectedNonExpressionStillGuardsVpiSize) {
+// Detail 8 (scope): the carve-out is keyed on the object being an expression,
+// and §37.58 makes a net and a variable simple expressions, so each permits
+// vpiSize while protected. A protected module, no expression, still has
+// vpiSize guarded, so the carve-out does not leak to other object kinds.
+TEST(ExpressionModel, ProtectedSimpleExpressionsPermitVpiSize) {
   VpiContext ctx;
-  VpiObject reg;
-  reg.type = vpiReg;
-  reg.size = 16;
-  reg.is_protected = true;
-
-  EXPECT_EQ(ctx.Get(vpiSize, &reg), vpiUndefined);
+  for (int type : {vpiReg, vpiNet, vpiIntVar}) {
+    VpiObject simple;
+    simple.type = type;
+    simple.size = 16;
+    simple.is_protected = true;
+    EXPECT_EQ(ctx.Get(vpiSize, &simple), 16) << type;
+    EXPECT_EQ(ctx.LastError().level, 0) << type;
+  }
+  VpiObject module;
+  module.type = vpiModule;
+  module.size = 16;
+  module.is_protected = true;
+  EXPECT_EQ(ctx.Get(vpiSize, &module), vpiUndefined);
   EXPECT_NE(ctx.LastError().level, 0);
 }
 

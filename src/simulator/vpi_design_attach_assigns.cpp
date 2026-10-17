@@ -44,110 +44,6 @@ namespace delta {
 
 namespace {
 
-// §37.59: the vpiOpType of a binary operator, and 0 for one this table does
-// not hold. An event expression passed as an actual (§16.12.18) joins its
-// events with `or` and guards one with `iff`, as §9.4.2 writes them.
-int BinaryOpType(TokenKind op) {
-  switch (op) {
-    case TokenKind::kPlus:
-      return vpiAddOp;
-    case TokenKind::kMinus:
-      return vpiSubOp;
-    case TokenKind::kStar:
-      return vpiMultOp;
-    case TokenKind::kSlash:
-      return vpiDivOp;
-    case TokenKind::kPercent:
-      return vpiModOp;
-    case TokenKind::kPower:
-      return vpiPowerOp;
-    case TokenKind::kAmp:
-      return vpiBitAndOp;
-    case TokenKind::kPipe:
-      return vpiBitOrOp;
-    case TokenKind::kCaret:
-      return vpiBitXorOp;
-    case TokenKind::kTildeCaret:
-    case TokenKind::kCaretTilde:
-      return vpiBitXnorOp;
-    case TokenKind::kAmpAmp:
-      return vpiLogAndOp;
-    case TokenKind::kPipePipe:
-      return vpiLogOrOp;
-    case TokenKind::kEqEq:
-      return vpiEqOp;
-    case TokenKind::kBangEq:
-      return vpiNeqOp;
-    case TokenKind::kEqEqEq:
-      return vpiCaseEqOp;
-    case TokenKind::kBangEqEq:
-      return vpiCaseNeqOp;
-    case TokenKind::kEqEqQuestion:
-      return vpiWildEqOp;
-    case TokenKind::kBangEqQuestion:
-      return vpiWildNeqOp;
-    case TokenKind::kLt:
-      return vpiLtOp;
-    case TokenKind::kGt:
-      return vpiGtOp;
-    case TokenKind::kLtEq:
-      return vpiLeOp;
-    case TokenKind::kGtEq:
-      return vpiGeOp;
-    case TokenKind::kLtLt:
-      return vpiLShiftOp;
-    case TokenKind::kGtGt:
-      return vpiRShiftOp;
-    case TokenKind::kLtLtLt:
-      return vpiArithLShiftOp;
-    case TokenKind::kGtGtGt:
-      return vpiArithRShiftOp;
-    case TokenKind::kArrow:
-      return vpiImplyOp;
-    case TokenKind::kKwOr:
-      return vpiEventOrOp;
-    case TokenKind::kKwIff:
-      return vpiIffOp;
-    default:
-      return 0;
-  }
-}
-
-// §37.59: the vpiOpType of a prefix unary operator, and 0 for one this table
-// does not hold. An event expression passed as an actual (§16.12.18) writes
-// its edge as one.
-int UnaryOpType(TokenKind op) {
-  switch (op) {
-    case TokenKind::kMinus:
-      return vpiMinusOp;
-    case TokenKind::kPlus:
-      return vpiPlusOp;
-    case TokenKind::kBang:
-      return vpiNotOp;
-    case TokenKind::kTilde:
-      return vpiBitNegOp;
-    case TokenKind::kAmp:
-      return vpiUnaryAndOp;
-    case TokenKind::kTildeAmp:
-      return vpiUnaryNandOp;
-    case TokenKind::kPipe:
-      return vpiUnaryOrOp;
-    case TokenKind::kTildePipe:
-      return vpiUnaryNorOp;
-    case TokenKind::kCaret:
-      return vpiUnaryXorOp;
-    case TokenKind::kTildeCaret:
-    case TokenKind::kCaretTilde:
-      return vpiUnaryXNorOp;
-    case TokenKind::kKwPosedge:
-      return vpiPosedgeOp;
-    case TokenKind::kKwNegedge:
-      return vpiNegedgeOp;
-    default:
-      return 0;
-  }
-}
-
 // Where the names of one assignment resolve: the instance it was elaborated
 // in, keyed as the simulator keys it; the generate blocks it stands in,
 // innermost last, whose declarations a name finds first; and, for an
@@ -320,8 +216,10 @@ VpiObject* VarSelectObject(VpiObject* base, const Expr* index,
 
 // §37.19: a select through the var select `outer`: a var select of its own
 // where `outer` selects a subarray -- the chain of var selects down from the
-// array var indexes fewer of its unpacked dimensions than it has -- and null
-// where `outer` selects an element, whose bits a further index selects.
+// array var indexes fewer of its unpacked dimensions than it has -- and where
+// `outer` selects an element, a bit select of it (§37.58), whose vpiParent is
+// `outer`, as Table 37-1 has a part select into it reach (§37.59 detail 10).
+// It is one element of the element's outermost packed dimension wide.
 VpiObject* SelectThroughVarSelect(VpiObject* outer, const Expr* index,
                                   const AssignBuild& build) {
   const VpiObject* array = outer;
@@ -330,7 +228,19 @@ VpiObject* SelectThroughVarSelect(VpiObject* outer, const Expr* index,
   if (depth < array->array_dim_indices.size()) {
     return VarSelectObject(outer, index, build);
   }
-  return nullptr;
+  VpiObject* select = build.alloc();
+  select->type = vpiBitSelect;
+  select->parent = outer;
+  select->index_expr = ExpressionObject(index, build);
+  select->size = 1;
+  for (const VpiObject* element : array->children) {
+    if (!element->array_member || element->packed_dims.empty()) continue;
+    const PackedRange& kOuter = element->packed_dims.front();
+    const int64_t kCount = kOuter.HighIndex() - kOuter.LowIndex() + 1;
+    select->size = static_cast<int>(element->size / kCount);
+    break;
+  }
+  return select;
 }
 
 // §37.16 detail 31, §37.17 detail 26: the kind a select out of `root` that
@@ -557,22 +467,42 @@ const Expr* KeyedValue(const Expr* pattern, const VpiObject* slot,
   return typed != nullptr ? typed : fallback;
 }
 
+VpiObject* AssignedExpressionObject(const Expr* expr, const VpiObject* target,
+                                    const AssignBuild& build);
+
 // §37.59 detail 6: the keyed assignment pattern `pattern` assigned to
 // `target` as an assignment pattern operation over its expressions in the
 // positional order of `target`'s members or elements, left first (§37.17
 // details 3 and 18), or of a struct typespec's typespec members (§37.26),
-// each in the place its keys give it. Null where `target` has none.
+// each in the place its keys give it and built against that place, so a
+// pattern nested in it is laid out by the member or element it fills. A
+// typespec member is laid out by its typespec's members. Null where `target`
+// has none.
 VpiObject* KeyedPatternObject(const Expr* pattern, const VpiObject* target,
                               const AssignBuild& build) {
-  std::vector<const Expr*> placed;
-  for (const VpiObject* child : target->children) {
-    if (child->member_of == target || child->array_member ||
-        child->type == vpiTypespecMember) {
-      placed.push_back(KeyedValue(pattern, child, build));
+  if (target->type == vpiTypespecMember) {
+    for (const VpiObject* child : target->children) {
+      if (VpiIsTypespecType(child->type)) target = child;
     }
   }
-  if (placed.empty()) return nullptr;
-  return OperationObject(vpiAssignmentPatternOp, placed, build);
+  VpiObject* op = nullptr;
+  for (const VpiObject* child : target->children) {
+    if (child->member_of != target && !child->array_member &&
+        child->type != vpiTypespecMember) {
+      continue;
+    }
+    if (op == nullptr) {
+      op = build.alloc();
+      op->type = vpiOperation;
+      op->op_type = vpiAssignmentPatternOp;
+    }
+    const Expr* value = KeyedValue(pattern, child, build);
+    VpiObject* placed = value != nullptr
+                            ? AssignedExpressionObject(value, child, build)
+                            : nullptr;
+    if (placed != nullptr) op->children.push_back(placed);
+  }
+  return op;
 }
 
 // The expression object `expr` stands for, assigned to `target`, whose
@@ -651,9 +581,9 @@ VpiObject* ModelledExpression(const Expr* expr, const AssignBuild& build) {
     case ExprKind::kStringLiteral:
       return ConstantObject(expr, build);
     case ExprKind::kUnary:
-      return OperationObject(UnaryOpType(expr->op), {expr->lhs}, build);
+      return OperationObject(VpiUnaryOpType(expr->op), {expr->lhs}, build);
     case ExprKind::kBinary:
-      return OperationObject(BinaryOpType(expr->op), {expr->lhs, expr->rhs},
+      return OperationObject(VpiBinaryOpType(expr->op), {expr->lhs, expr->rhs},
                              build);
     case ExprKind::kTernary:
       return OperationObject(
@@ -671,7 +601,11 @@ VpiObject* ModelledExpression(const Expr* expr, const AssignBuild& build) {
     case ExprKind::kAssignmentPattern:
       return PatternObject(expr, build);
     case ExprKind::kCast:
-      return OperationObject(vpiCastOp, {expr->lhs}, build);
+      return VpiTypedCast(
+          OperationObject(vpiCastOp, {expr->lhs}, build), *expr,
+          VpiScopeOrInstance(build.names.scope, build.names.objects,
+                             build.names.prefix),
+          build.alloc);
     case ExprKind::kMinTypMax:
       return OperationObject(vpiMinTypMaxOp,
                              {expr->lhs, expr->condition, expr->rhs}, build);
@@ -690,14 +624,17 @@ VpiObject* ModelledExpression(const Expr* expr, const AssignBuild& build) {
 VpiObject* ExpressionObject(const Expr* expr, const AssignBuild& build) {
   if (expr == nullptr) return nullptr;
   VpiObject* obj = ModelledExpression(expr, build);
-  // §37.3.5 with §38.15: an operation and a function, method function or
-  // system function call hold no storage, so the value of each is its
-  // expression evaluated where
-  // the source wrote it, in the instance and the generate blocks the
+  VpiSizeExpression(obj);
+  // §37.3.5 with §38.15: an operation, a function, method function or system
+  // function call, and a bit select, part select or indexed part select
+  // (§37.59) hold no storage, so the value of each is its expression evaluated
+  // where the source wrote it, in the instance and the generate blocks the
   // expression stands in.
   if (obj != nullptr &&
       (obj->type == vpiOperation || obj->type == vpiFuncCall ||
-       obj->type == vpiMethodFuncCall || obj->type == vpiSysFuncCall)) {
+       obj->type == vpiMethodFuncCall || obj->type == vpiSysFuncCall ||
+       obj->type == vpiBitSelect || obj->type == vpiPartSelect ||
+       obj->type == vpiIndexedPartSelect)) {
     obj->expr_scope = std::make_shared<const VpiExprScope>(
         VpiExprScope{expr, VpiFlatName(build.names.prefix, ""),
                      std::vector<std::string>(build.names.gen.begin(),

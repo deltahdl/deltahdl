@@ -27,10 +27,14 @@ namespace {
 // query except vpiType and vpiIsProtected, with one extra exception - a
 // protected *expression* still permits vpiSize. Reports whether the (property,
 // obj) pair must be refused as a protected-access error.
+// The expressions are §37.59's, the simple expressions of §37.58 among them,
+// so a protected net or variable permits vpiSize as well.
 bool VpiGetProtectedRefused(int property, VpiHandle obj) {
+  const bool kExpression = VpiIsExprType(obj->type) ||
+                           VpiIsNetsType(obj->type) ||
+                           VpiIsVariablesType(obj->type);
   return VpiReadSealed(*obj) && property != kVpiType &&
-         property != vpiIsProtected &&
-         (property != kVpiSize || !VpiIsExprType(obj->type));
+         property != vpiIsProtected && (property != kVpiSize || !kExpression);
 }
 
 // §37.85/§37.47/§37.14/§37.35: computes vpiSize for the kinds whose size is not
@@ -232,6 +236,27 @@ bool VpiNetOrVariableConstantSelect(VpiHandle obj) {
   return VpiConstantSelect(query);
 }
 
+// §37.59 detail 9: a part select or an indexed part select is a constant
+// select when its parent is, the parent is an array with static bounds, and
+// each range expression it is written with - the two bounds, or the base and
+// the width - is an elaboration-time constant.
+int VpiGetConstantSelect(VpiHandle obj);
+
+bool VpiPartSelectConstantSelect(VpiHandle select) {
+  const VpiHandle kParent = select->parent;
+  if (kParent == nullptr || VpiGetConstantSelect(kParent) == 0) return false;
+  if (kParent->array_type != 0 && kParent->array_type != vpiStaticArray) {
+    return false;
+  }
+  const auto kConstant = [](const VpiObject* range) {
+    return range != nullptr && range->type == vpiConstant;
+  };
+  if (select->type == vpiIndexedPartSelect) {
+    return kConstant(select->base_expr) && kConstant(select->width_expr);
+  }
+  return kConstant(select->left_range) && kConstant(select->right_range);
+}
+
 // §37.19: the figure draws "-> constant selection / bool: vpiConstantSelect" on
 // a var select, and §37.4.2's key reads a Boolean property with vpi_get().
 // Nothing answered the property at all, so the one normative detail §37.19 owns
@@ -244,6 +269,9 @@ bool VpiNetOrVariableConstantSelect(VpiHandle obj) {
 int VpiGetConstantSelect(VpiHandle obj) {
   if (VpiIsNetsType(obj->type) || VpiIsVariablesType(obj->type)) {
     return VpiNetOrVariableConstantSelect(obj) ? 1 : 0;
+  }
+  if (obj->type == vpiPartSelect || obj->type == vpiIndexedPartSelect) {
+    return VpiPartSelectConstantSelect(obj) ? 1 : 0;
   }
   if (VpiVarSelectConstantSelectOf(obj)) return 1;
   return VpiBitSelectConstantSelectOf(obj) ? 1 : 0;
@@ -843,9 +871,7 @@ PLI_INT64 VpiContext::Get64(int property, VpiHandle obj) {
   // vpiUndefined. The vpiType and vpiIsProtected properties stay accessible for
   // every object, and a protected expression still permits vpiSize, mirroring
   // the carve-outs vpi_get() applies (§37.3.6, §37.59).
-  if (VpiReadSealed(*obj) && property != kVpiType &&
-      property != vpiIsProtected &&
-      (property != kVpiSize || !VpiIsExprType(obj->type))) {
+  if (VpiGetProtectedRefused(property, obj)) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message =
