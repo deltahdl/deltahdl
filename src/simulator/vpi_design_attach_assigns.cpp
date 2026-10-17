@@ -267,11 +267,12 @@ VpiObject* ConstantObject(const Expr* expr, const AssignBuild& build) {
   return constant;
 }
 
-// §27.4: a loop generate block's genvar named in a continuous assignment the
-// block holds, as a constant of the value it holds in the block instance; the
-// run holds no storage for a genvar, so no name resolves to one. Null where
-// `name` is no such genvar.
-VpiObject* GenvarConstant(std::string_view name, const AssignBuild& build) {
+// §27.4 with §37.85 detail 3: a loop generate block's genvar named in a
+// continuous assignment the block holds, as the local parameter §27.4 declares
+// in the block instance under the genvar's name, holding the value it holds
+// there; no name the run keys resolves to it. Null where `name` is no such
+// genvar.
+VpiObject* GenvarParameter(std::string_view name, const AssignBuild& build) {
   const auto kGenvar = std::ranges::find_if(
       build.names.genvars,
       [name](const auto& genvar) { return genvar.first == name; });
@@ -281,12 +282,13 @@ VpiObject* GenvarConstant(std::string_view name, const AssignBuild& build) {
   storage->value =
       MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(kGenvar->second));
   storage->value.is_signed = true;
-  VpiObject* constant = build.alloc();
-  constant->type = vpiConstant;
-  constant->const_type = vpiIntConst;
-  constant->var = storage;
-  constant->size = 32;
-  return constant;
+  VpiObject* param = build.alloc();
+  param->type = vpiParameter;
+  param->name = build.keep(std::string(name));
+  param->local_param = true;
+  param->var = storage;
+  param->size = 32;
+  return param;
 }
 
 // `first` followed by `rest`, as the operands of an operation.
@@ -629,7 +631,7 @@ VpiObject* ModelledExpression(const Expr* expr, const AssignBuild& build) {
   switch (expr->kind) {
     case ExprKind::kIdentifier: {
       VpiObject* named = Resolve(build.names, expr->text);
-      return named != nullptr ? named : GenvarConstant(expr->text, build);
+      return named != nullptr ? named : GenvarParameter(expr->text, build);
     }
     case ExprKind::kIntegerLiteral:
     case ExprKind::kUnbasedUnsizedLiteral:

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <vector>
 
 #include "fixture_vpi_run.h"
@@ -28,10 +29,11 @@ namespace {
 //     governed by detail 2: the implicit scope created for an unnamed generate
 //     reports TRUE.
 // Every other relation in the diagram (vpiInstance, vpiInternalScope,
-// vpiMemory, vpiParameter, vpiTypedef, vpiNetTypedef, the names, and the
-// deprecated vpiArray/vpiArrayMember/vpiProtected booleans) is served by
-// generic scope, instance, typedef, and property machinery owned by §37.10,
-// §37.12, §37.23, and §37.25, so it is not re-tested here. Details 5 and 6 (the
+// vpiMemory, vpiParameter, vpiTypedef, vpiNetTypedef and the names) is served
+// by generic scope, instance, typedef, and property machinery owned by §37.10,
+// §37.12, §37.23, and §37.25, so it is not re-tested here; the gen var, and the
+// gen scope's vpiProtected and deprecated vpiArray, are tested on a run below.
+// Details 5 and 6 (the
 // vpiTypedef/vpiNetTypedef iterations) restate the instance rule already
 // implemented for §37.10, so they add no production for this clause.
 //
@@ -202,34 +204,6 @@ TEST_F(Generates, ParameterInAGenScopeIsALocalParameter) {
   EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&outside)), 0);
 }
 
-// Detail 3: a reference to a gen var within the gen scope is treated as a local
-// parameter too. What makes it one is the object it is bound to (§37.15 detail
-// 3), so a reference to something else in the same scope is not one.
-TEST_F(Generates, GenVarReferenceInAGenScopeIsALocalParameter) {
-  VpiObject gen_scope;
-  gen_scope.type = vpiGenScope;
-
-  VpiObject gen_var;
-  gen_var.type = vpiGenVar;
-
-  VpiObject gen_var_ref;
-  gen_var_ref.type = vpiRefObj;
-  gen_var_ref.actual = &gen_var;
-  gen_var_ref.parent = &gen_scope;
-
-  EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&gen_var_ref)), 1);
-
-  VpiObject a_net;
-  a_net.type = vpiNet;
-
-  VpiObject net_ref;
-  net_ref.type = vpiRefObj;
-  net_ref.actual = &a_net;
-  net_ref.parent = &gen_scope;
-
-  EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&net_ref)), 0);
-}
-
 // The generates of a run: those a design writes, built from the elaborated
 // design rather than by hand (#4958, #5069).
 class GeneratesOfARun : public VpiDesignRun {};
@@ -385,6 +359,74 @@ TEST_F(GeneratesOfARun, AnInstanceOfAGenerateBlockIsInItsGenScope) {
   ASSERT_NE(call, nullptr);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, call)),
             VpiObjectOf(Named(vpiTaskFunc, By("top"), "t")));
+}
+
+// The gen var of a loop generate (§27.4): the gen scope array of the loop's
+// blocks reaches it, named and full-named as the genvar the loop iterates
+// over, and it reaches the array back; an unnamed loop's array, genblk<n>
+// (§27.6), reaches its own. It is no element of the array, which no index
+// selects it as and whose size counts it not (detail 1).
+TEST_F(GeneratesOfARun, ALoopsGenScopeArrayReachesItsGenVar) {
+  Run("module top;\n"
+      "  for (genvar i = 0; i < 3; i++) begin : g logic v; end\n"
+      "  for (genvar j = 0; j < 2; j++) begin end\n"
+      "endmodule\n");
+  vpiHandle g = vpi_handle(vpiGenScopeArray, By("top.g[0]"));
+  ASSERT_NE(g, nullptr);
+  vpiHandle i = vpi_handle(vpiGenVar, g);
+  ASSERT_NE(i, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, i), vpiGenVar);
+  EXPECT_STREQ(vpi_get_str(vpiName, i), "i");
+  EXPECT_STREQ(vpi_get_str(vpiFullName, i), "top.i");
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiGenScopeArray, i)), VpiObjectOf(g));
+  EXPECT_EQ(vpi_get(vpiSize, g), 3);
+  EXPECT_EQ(vpi_handle_by_index(g, -1), nullptr);
+  vpiHandle unnamed = vpi_handle(vpiGenScopeArray, By("top.genblk2[1]"));
+  ASSERT_NE(unnamed, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiGenVar, unnamed)), "j");
+}
+
+// The gen scope's vpiProtected, FALSE for a gen scope no decryption envelope
+// seals, and the deprecated vpiArray, which reports what vpiArrayMember does:
+// TRUE for an element of a loop's array and FALSE for a conditional block's
+// scope.
+TEST_F(GeneratesOfARun, AGenScopeAnswersProtectedAndArray) {
+  Run(kGenerates);
+  EXPECT_EQ(vpi_get(vpiProtected, By("top.g[1]")), 0);
+  EXPECT_EQ(vpi_get(vpiArray, By("top.g[1]")), 1);
+  EXPECT_EQ(vpi_get(vpiProtected, By("top.c")), 0);
+  EXPECT_EQ(vpi_get(vpiArray, By("top.c")), 0);
+}
+
+// Detail 3 with §27.4: a reference to a gen var within the gen scope is the
+// local parameter §27.4 declares in each block instance under the genvar's
+// name, holding the genvar's value in that instance.
+TEST_F(GeneratesOfARun, AGenVarReferenceIsALocalParameter) {
+  Run("module top;\n"
+      "  for (genvar i = 0; i < 2; i++) begin : g\n"
+      "    wire [31:0] w;\n"
+      "    assign w = i + 5;\n"
+      "  end\n"
+      "endmodule\n");
+  std::vector<int> values;
+  vpiHandle it = vpi_iterate(vpiContAssign, By("top"));
+  ASSERT_NE(it, nullptr);
+  for (vpiHandle assign = vpi_scan(it); assign != nullptr;
+       assign = vpi_scan(it)) {
+    const std::vector<vpiHandle> kOperands =
+        OperandsOf(vpi_handle(vpiRhs, assign));
+    ASSERT_EQ(kOperands.size(), 2u);
+    vpiHandle ref = kOperands[0];
+    EXPECT_EQ(vpi_get(vpiType, ref), vpiParameter);
+    EXPECT_EQ(vpi_get(vpiLocalParam, ref), 1);
+    EXPECT_STREQ(vpi_get_str(vpiName, ref), "i");
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(ref, &value);
+    values.push_back(value.value.integer);
+  }
+  std::ranges::sort(values);
+  EXPECT_EQ(values, (std::vector<int>{0, 1}));
 }
 
 }  // namespace

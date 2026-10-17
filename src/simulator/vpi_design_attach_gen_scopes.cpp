@@ -33,6 +33,26 @@ VpiObject* GenScopeArrayOf(VpiObject* scope, std::string_view name,
   return array;
 }
 
+// §37.85: the gen var of the loop generate whose gen scope array is `array`,
+// the genvar `genvar` the loop iterates over (§27.4), named in the scope the
+// array is, made under the array the first time it is asked for. It is no
+// element of the array, so no index selects it (§38.19).
+void MakeGenVar(VpiObject* array, std::string_view genvar,
+                const VpiAttachBuild& build) {
+  for (VpiObject* child : array->children) {
+    if (child->type == vpiGenVar) return;
+  }
+  VpiObject* var = build.alloc();
+  var->type = vpiGenVar;
+  var->name = build.keep(std::string(genvar));
+  var->full_name =
+      array->full_name.substr(0, array->full_name.size() - array->name.size()) +
+      std::string(genvar);
+  var->index = -1;
+  var->parent = array;
+  array->children.push_back(var);
+}
+
 // §37.85: `block`, a gen scope of an iteration of a loop generate, as an
 // element of the gen scope array `array`, reached by its index - the value
 // of the loop's genvar in the iteration, which vpiIndex reaches as a constant
@@ -66,7 +86,8 @@ VpiObject* BlockNamed(VpiObject* scope, const std::string& name,
 // §37.85: the generate block instances the path `path` names below
 // `instance`, outermost first, each made the gen scope it is, named by its
 // external name (§27.6), and each iteration of a loop generate an element of
-// its gen scope array. Detail 2: an unnamed block's is an implicit scope.
+// its gen scope array, which reaches the loop's gen var. Detail 2: an unnamed
+// block's is an implicit scope.
 void MakeGenScopes(VpiObject* instance, const HierPath& path,
                    const VpiAttachBuild& build) {
   VpiObject* scope = instance;
@@ -77,8 +98,9 @@ void MakeGenScopes(VpiObject* instance, const HierPath& path,
     block->type = vpiGenScope;
     block->implicit_decl = step.name.empty();
     if (step.has_index) {
-      MakeArrayElement(block, GenScopeArrayOf(scope, step.external_name, build),
-                       step.index, build);
+      VpiObject* array = GenScopeArrayOf(scope, step.external_name, build);
+      MakeArrayElement(block, array, step.index, build);
+      MakeGenVar(array, step.genvar, build);
     }
     scope = block;
   }

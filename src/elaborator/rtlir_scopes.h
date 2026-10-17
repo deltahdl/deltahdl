@@ -88,11 +88,17 @@ inline bool ParamVisibleFromScopes(std::string_view decl_prefix,
 // (§37.85) know a generate block instance by: the name written, or genblk<n>
 // for an unnamed block. It is set on the steps of the paths the elaborator
 // records for generate block instances and empty on a path a source wrote.
+//
+// `genvar` is the name of the genvar a loop generate block's step iterates
+// over (§27.4), which §37.85 draws as the gen var of its gen scope array. It is
+// set on the loop steps of the paths the elaborator records for generate block
+// instances and empty on every other step.
 struct HierStep {
   std::string_view name;
   bool has_index = false;
   int64_t index = 0;
   std::string_view external_name;
+  std::string_view genvar;
 };
 
 // §23.6: a hierarchical path name as a sequence of its steps. Two things are

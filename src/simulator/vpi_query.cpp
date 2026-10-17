@@ -147,19 +147,15 @@ int VpiGetBlocking(VpiHandle obj) {
   return obj->blocking ? 1 : 0;
 }
 
-// §37.85 details 3 and 4: an object one elaboration of a generate has made a
-// local parameter of - a parameter declared within the gen scope, or a
-// reference to a gen var within it. Both a reference to a gen var and a
-// parameter within the gen scope count as local parameters, whatever the
-// declaration wrote:
-// the generate has fixed the value for that elaboration of the scope, so there
-// is nothing an override could reach. A gen var reference is told by what it is
-// bound to (§37.15 detail 3), not by its own kind.
+// §37.85 detail 4: a parameter declared within a gen scope, which counts as a
+// local parameter whatever the declaration wrote: the generate has fixed the
+// value for that elaboration of the scope, so there is nothing an override
+// could reach. A reference to a gen var within it, which detail 3 counts as
+// one too, is built as the local parameter §27.4 declares under the genvar's
+// name, which reports as one of itself.
 bool VpiIsGenScopeLocalParam(VpiHandle obj) {
   if (obj->parent == nullptr || obj->parent->type != vpiGenScope) return false;
-  if (obj->type == vpiParameter) return true;
-  return obj->type == vpiRefObj && obj->actual != nullptr &&
-         obj->actual->type == vpiGenVar;
+  return obj->type == vpiParameter;
 }
 
 // §37.83: vpiDefAttribute is drawn only on the attribute object; any other kind
@@ -665,6 +661,18 @@ int VpiGetSimplePropertyB(int property, VpiHandle obj, bool& handled) {
           ((obj->type == vpiGenScope || VpiIsInstanceType(obj->type) ||
             VpiIsPrimitiveType(obj->type)) &&
            obj->array_member));
+    // §37.85: a gen scope reports through vpiProtected whether it is protected
+    // code (§37.3.6), and through vpiArray, which the figure keeps beside
+    // vpiArrayMember as its deprecated name, what vpiArrayMember reports. Any
+    // other object leaves both to the properties after these.
+    case vpiProtected:
+    case vpiArray:
+      if (obj->type != vpiGenScope) {
+        handled = false;
+        return 0;
+      }
+      return VpiBool(property == vpiArray ? obj->array_member
+                                          : obj->is_protected);
     // §37.20 (figure): a reg array reports whether it is a memory. §37.20
     // detail 1 turned vpiMemory and vpiMemoryWord into methods returning
     // vpiRegArray and vpiReg, so what tells a memory from any other array
