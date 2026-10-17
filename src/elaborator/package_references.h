@@ -7,6 +7,13 @@
 
 namespace delta {
 
+struct CompilationUnit;
+
+// §26.3: the variables and nets the package `import` names brings in, by its
+// item name or with a wildcard, added to `names`.
+void AddImportedData(const CompilationUnit& unit, const ImportItem& import,
+                     std::unordered_set<std::string_view>& names);
+
 // §26.6 (printed page 815) with §26.3 (printed 810): the names the package
 // `pkg`'s own declarations write, in their expressions and as the names of
 // types, which are the candidates of its wildcard imports it actually imports

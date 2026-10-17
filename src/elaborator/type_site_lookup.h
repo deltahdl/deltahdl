@@ -19,11 +19,14 @@ enum class SiteKind : std::uint8_t { kModule, kUnit, kPackage };
 
 // Where a type name is looked up: among the items of the scope it is written
 // in, those before `end` alone, as a typedef names only a type declared before
-// it (§6.18), then in the scopes around that one.
+// it (§6.18), then in the scopes around that one: for a generate block, which
+// is a scope of its own (§27.5), the site of the scope around the block,
+// `outer`, and null for any other scope.
 struct TypeSite {
   const std::vector<ModuleItem*>* items = nullptr;
   std::size_t end = 0;
   SiteKind kind = SiteKind::kModule;
+  const TypeSite* outer = nullptr;
 };
 
 // An item a lookup found, with the site the names its declaration writes are

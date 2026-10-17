@@ -23,6 +23,7 @@
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/operator_result_members.h"
+#include "elaborator/package_references.h"
 #include "elaborator/std_package.h"
 #include "elaborator/struct_member_selects.h"
 #include "elaborator/type_eval.h"
@@ -38,11 +39,14 @@ namespace delta {
 
 namespace {
 
-// A variable's declaration: the type it was declared with and the number of
-// unpacked dimensions it writes after its name (§7.4).
+// A variable's declaration: the type it was declared with, the number of
+// unpacked dimensions it writes after its name (§7.4), and, for one declared in
+// a generate block, the site of the block, whose typedefs its type names first
+// (§27.5); null for one declared in no generate block.
 struct DeclaredVar {
   const DataType* type = nullptr;
   std::size_t dims = 0;
+  const TypeSite* site = nullptr;
 };
 
 // The names a walk of one module's procedures sees as variables or nets: the
@@ -83,6 +87,15 @@ struct DataScope {
   // In a method of a class, the class, whose methods a call by a name alone
   // calls first (§8.13).
   const ClassDecl* cls = nullptr;
+  // Inside a generate block, the module's site and then the site of each
+  // generate block around the item walked, the innermost last (§27.5).
+  std::deque<TypeSite> generate_sites = {};
+
+  // The site of the innermost generate block around the item walked; null
+  // outside every generate block.
+  const TypeSite* BlockSite() const {
+    return generate_sites.empty() ? nullptr : &generate_sites.back();
+  }
 
   bool Names(std::string_view name) const {
     return module.contains(name) ||
@@ -168,21 +181,6 @@ void ReportStatementCall(const Stmt& stmt, const DataScope& scope,
              Subclause("23.9"));
 }
 
-// Whether the interface `unit` declares under `iface` declares a task or a
-// function `name`.
-bool InterfaceDeclaresSubroutine(const CompilationUnit& unit,
-                                 std::string_view iface,
-                                 std::string_view name) {
-  bool declares = false;
-  for (const ModuleDecl* decl : unit.interfaces) {
-    if (decl->name != iface) continue;
-    for (const ModuleItem* item : decl->items) {
-      if (IsSubroutineItem(*item) && item->name == name) declares = true;
-    }
-  }
-  return declares;
-}
-
 // The interface a value declared with `type` refers to an instance of, where
 // it is a virtual interface (§25.9); empty for any other type.
 std::string_view VifInterface(const DataType& type) {
@@ -198,15 +196,20 @@ SitedType ThroughTypedefs(const DataScope& scope, const DataType& type) {
 }
 
 // The type the variable `root` names is declared with, as written in the
-// scope, with the unpacked dimensions written after its name; no type where
-// `root` names no variable, or one whose type is a type parameter, typedef or
-// class the scope declares for itself alone.
+// scope or the generate block declaring it, with the unpacked dimensions
+// written after its name; no type where `root` names no variable, or one whose
+// type is a type parameter, typedef or class the scope declares for itself
+// alone.
 SitedType DeclaredType(const Expr& root, const DataScope& scope) {
   const DeclaredVar* var = scope.Declared(root.text);
   if (var == nullptr || scope.local_types.contains(var->type->type_name)) {
     return {};
   }
-  return {var->type, {&scope.items, scope.items.size(), scope.site}, var->dims};
+  const TypeSite kSite =
+      var->site != nullptr
+          ? *var->site
+          : TypeSite{&scope.items, scope.items.size(), scope.site};
+  return {var->type, kSite, var->dims};
 }
 
 // §8.3 with §7.4: the class declaration whose handle the element of the
@@ -624,7 +627,8 @@ void CheckStmtCalls(const Stmt* stmt, DataScope& scope, DiagEngine& diag) {
       if (item->kind == StmtKind::kVarDecl) {
         scope.blocks.emplace_back(
             item->var_name,
-            DeclaredVar{&item->var_decl_type, item->var_unpacked_dims.size()});
+            DeclaredVar{&item->var_decl_type, item->var_unpacked_dims.size(),
+                        scope.BlockSite()});
       }
     }
   }
@@ -646,35 +650,21 @@ void CheckSubroutineCalls(const ModuleItem& item, DataScope& scope,
   const std::size_t kOuter = scope.blocks.size();
   for (const FunctionArg& arg : item.func_args) {
     scope.blocks.emplace_back(
-        arg.name, DeclaredVar{&arg.data_type, arg.unpacked_dims.size()});
+        arg.name, DeclaredVar{&arg.data_type, arg.unpacked_dims.size(),
+                              scope.BlockSite()});
   }
   for (const Stmt* stmt : item.func_body_stmts) {
     if (stmt->kind == StmtKind::kVarDecl) {
       scope.blocks.emplace_back(
           stmt->var_name,
-          DeclaredVar{&stmt->var_decl_type, stmt->var_unpacked_dims.size()});
+          DeclaredVar{&stmt->var_decl_type, stmt->var_unpacked_dims.size(),
+                      scope.BlockSite()});
     }
   }
   for (const Stmt* stmt : item.func_body_stmts) {
     CheckStmtCalls(stmt, scope, diag);
   }
   scope.blocks.resize(kOuter);
-}
-
-// §26.3: the variables and nets the package `import` names brings in, by its
-// item name or with a wildcard, added to `names`.
-void AddImportedData(const CompilationUnit& unit, const ImportItem& import,
-                     std::unordered_set<std::string_view>& names) {
-  for (const PackageDecl* package : unit.packages) {
-    if (package->name != import.package_name) continue;
-    for (const ModuleItem* item : package->items) {
-      const bool kData = item->kind == ModuleItemKind::kVarDecl ||
-                         item->kind == ModuleItemKind::kNetDecl;
-      if (kData && (import.is_wildcard || item->name == import.item_name)) {
-        names.insert(item->name);
-      }
-    }
-  }
 }
 
 // §6.19.3: each named constant the enumeration `type` writes, as a value of
@@ -837,18 +827,26 @@ void CheckItemCalls(const std::vector<ModuleItem*>& items, DataScope& scope,
 
 // §27: each call the generate block whose items are `items` writes, the
 // variables and nets it declares in scope over its items as a block's are,
-// and the tasks and functions it declares callable there (§23.9).
+// their types named at the block's site (§27.5), and the tasks and functions
+// it declares callable there (§23.9).
 void CheckGenerateBlockCalls(const std::vector<ModuleItem*>& items,
                              DataScope& scope, DiagEngine& diag) {
   const std::size_t kOuter = scope.blocks.size();
   const std::unordered_set<std::string_view> kOuterSubroutines =
       scope.subroutines;
+  const std::size_t kOuterSites = scope.generate_sites.size();
+  if (kOuterSites == 0) {
+    scope.generate_sites.push_back(
+        {&scope.items, scope.items.size(), scope.site});
+  }
+  const TypeSite* outer = &scope.generate_sites.back();
+  scope.generate_sites.push_back({&items, items.size(), scope.site, outer});
   for (const ModuleItem* item : items) {
     if (item->kind == ModuleItemKind::kVarDecl ||
         item->kind == ModuleItemKind::kNetDecl) {
       scope.blocks.emplace_back(
-          item->name,
-          DeclaredVar{&item->data_type, item->unpacked_dims.size()});
+          item->name, DeclaredVar{&item->data_type, item->unpacked_dims.size(),
+                                  scope.BlockSite()});
     } else if (IsSubroutineItem(*item)) {
       scope.subroutines.insert(item->name);
     }
@@ -856,6 +854,7 @@ void CheckGenerateBlockCalls(const std::vector<ModuleItem*>& items,
   CheckItemCalls(items, scope, diag);
   scope.blocks.resize(kOuter);
   scope.subroutines = kOuterSubroutines;
+  scope.generate_sites.resize(kOuterSites);
 }
 
 // §27.4 and §27.5: each call the blocks of the generate construct `construct`

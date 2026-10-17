@@ -17,6 +17,19 @@ bool IsSubroutineItem(const ModuleItem& item) {
          item.kind == ModuleItemKind::kDpiExport;
 }
 
+bool InterfaceDeclaresSubroutine(const CompilationUnit& unit,
+                                 std::string_view iface,
+                                 std::string_view name) {
+  bool declares = false;
+  for (const ModuleDecl* decl : unit.interfaces) {
+    if (decl->name != iface) continue;
+    for (const ModuleItem* item : decl->items) {
+      if (IsSubroutineItem(*item) && item->name == name) declares = true;
+    }
+  }
+  return declares;
+}
+
 std::unordered_set<std::string_view> EnclosingSubroutineNames(
     const CompilationUnit& unit, std::string_view module) {
   std::unordered_set<std::string_view> names;

@@ -19,18 +19,16 @@ std::string_view DeclaredName(const ModuleItem& item) {
                                                  : item.name;
 }
 
-// The last item of kind `kind` among the first `end` of `items` declaring
-// `name`, a forward typedef (§6.18), which names no type, excepted; `kind`
-// is the kind of scope `items` belong to.
-FoundItem ItemBefore(const std::vector<ModuleItem*>& items, std::size_t end,
-                     ModuleItemKind kind, std::string_view name,
-                     SiteKind scope) {
+// The last item of kind `kind` among the items of the site `site` declaring
+// `name`, a forward typedef (§6.18), which names no type, excepted.
+FoundItem ItemBefore(const TypeSite& site, ModuleItemKind kind,
+                     std::string_view name) {
   FoundItem found;
-  for (std::size_t i = 0; i < end; ++i) {
-    const ModuleItem& item = *items[i];
+  for (std::size_t i = 0; i < site.end; ++i) {
+    const ModuleItem& item = *(*site.items)[i];
     if (item.kind == kind && DeclaredName(item) == name &&
         item.forward_type_kind == DataTypeKind::kImplicit) {
-      found = {&item, {&items, i, scope}};
+      found = {&item, {site.items, i, site.kind, site.outer}};
     }
   }
   return found;
@@ -43,8 +41,8 @@ FoundItem PackageItem(const CompilationUnit& unit, std::string_view package,
   FoundItem found;
   for (const PackageDecl* decl : unit.packages) {
     if (decl->name == package) {
-      found = ItemBefore(decl->items, decl->items.size(), kind, name,
-                         SiteKind::kPackage);
+      found = ItemBefore({&decl->items, decl->items.size(), SiteKind::kPackage},
+                         kind, name);
     }
   }
   return found;
@@ -68,12 +66,16 @@ FoundItem ImportedItem(const CompilationUnit& unit,
 
 // §23.9 with §26.3: the item of kind `kind` named `name` the site `site` sees:
 // one its scope declares, else one an import of its scope brings in, else,
-// for a module, one the compilation unit declares or imports.
+// for a generate block, one the scope around it sees (§27.5), else, for a
+// module, one the compilation unit declares or imports.
 FoundItem SiteItem(const CompilationUnit& unit, const TypeSite& site,
                    ModuleItemKind kind, std::string_view name) {
-  FoundItem found = ItemBefore(*site.items, site.end, kind, name, site.kind);
+  FoundItem found = ItemBefore(site, kind, name);
   if (found.item == nullptr) {
     found = ImportedItem(unit, *site.items, site.end, kind, name);
+  }
+  if (found.item == nullptr && site.outer != nullptr) {
+    return SiteItem(unit, *site.outer, kind, name);
   }
   if (found.item == nullptr && site.kind == SiteKind::kModule) {
     const TypeSite kUnit{&unit.cu_items, unit.cu_items.size(), SiteKind::kUnit};
@@ -86,7 +88,7 @@ FoundItem SiteItem(const CompilationUnit& unit, const TypeSite& site,
 
 const ClassDecl* ClassIn(const CompilationUnit& unit, const TypeSite& site,
                          std::string_view name) {
-  const TypeSite kWhole{site.items, site.items->size(), site.kind};
+  const TypeSite kWhole{site.items, site.items->size(), site.kind, site.outer};
   const FoundItem kFound =
       SiteItem(unit, kWhole, ModuleItemKind::kClassDecl, name);
   if (kFound.item != nullptr) return kFound.item->class_decl;

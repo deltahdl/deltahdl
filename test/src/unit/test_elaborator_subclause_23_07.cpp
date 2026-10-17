@@ -355,6 +355,34 @@ TEST(DottedNameElaboration, SelectsOfDeclaredStructMembersAreAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §27.5 makes a generate block a scope of its own: the type a variable or a
+// formal declared in it names is the block's typedef of that name, which
+// stands over the module's (§23.9), and else the module's.
+TEST(DottedNameElaboration, GenerateBlockSelectReadsTheBlocksTypedef) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef struct { int a; } pair_t;\n"
+      "  typedef struct { int k; } st;\n"
+      "  if (1) begin : g\n"
+      "    typedef struct { int a, b; } pair_t;\n"
+      "    st s;\n"
+      "    function int f(pair_t p);\n"
+      "      return p.a + p.b;\n"
+      "    endfunction\n"
+      "    int x;\n"
+      "    initial x = s.zz;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "structure 'st' has no member named 'zz'", 11,
+                            "23.7"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "structure 'pair_t' has no member named 'b'", 8,
+                             "23.7"));
+}
+
 // What follows a member declared with a class type is a property of the class
 // (§8), as what follows a property of a class handle is, and a random
 // structure property of a class has rand_mode (§18.8): none of them is a

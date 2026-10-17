@@ -10,6 +10,7 @@
 
 #include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast_class.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -111,6 +112,20 @@ std::unordered_set<std::string_view> PackageReferencedNames(
   ReferencedNames walk;
   for (const ModuleItem* item : pkg->items) walk.Item(item);
   return std::move(walk.names);
+}
+
+void AddImportedData(const CompilationUnit& unit, const ImportItem& import,
+                     std::unordered_set<std::string_view>& names) {
+  for (const PackageDecl* package : unit.packages) {
+    if (package->name != import.package_name) continue;
+    for (const ModuleItem* item : package->items) {
+      const bool kData = item->kind == ModuleItemKind::kVarDecl ||
+                         item->kind == ModuleItemKind::kNetDecl;
+      if (kData && (import.is_wildcard || item->name == import.item_name)) {
+        names.insert(item->name);
+      }
+    }
+  }
 }
 
 }  // namespace delta
