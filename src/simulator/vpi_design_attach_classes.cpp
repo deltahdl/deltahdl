@@ -33,6 +33,9 @@ struct MadeClassDefn {
   VpiObject* defn;
   std::string prefix;
   const RtlirNodeAttributes* attrs;
+  // §37.42: the module declaring the class, whose declarations a call written
+  // in it finds its callee among; null for a package's or the unit's class.
+  const RtlirModule* mod = nullptr;
 };
 
 // §37.31: the class defn `decl` stands as, hung from the scope declaring it
@@ -63,7 +66,10 @@ void MakeInstanceClassDefns(const RtlirDesign& design,
         if (scope == nullptr) return;
         for (const ClassDecl* decl : mod->class_decls) {
           MakeClassDefn(scope, decl, prefix, build, made);
-          if (decl != nullptr) made.back().attrs = &mod->node_attrs;
+          if (decl != nullptr) {
+            made.back().attrs = &mod->node_attrs;
+            made.back().mod = mod;
+          }
         }
       });
 }
@@ -167,10 +173,14 @@ void MakeExtends(const MadeClassDefn& derived,
   typespec->parent = extends;
   extends->children.push_back(typespec);
   static const std::vector<std::string_view> kNoGenBlocks;
+  // §37.42: a call an argument makes stands in the derived class.
+  const VpiCallStand kStand{derived.defn, derived.mod};
   for (const Expr* arg : derived.decl->extends_args) {
-    VpiObject* obj = VpiGenBlockExpression(
-        arg, {objects, derived.prefix, kNoGenBlocks, nullptr, derived.attrs},
-        ctx, build);
+    VpiObject* obj =
+        VpiGenBlockExpression(arg,
+                              {objects, derived.prefix, kNoGenBlocks, nullptr,
+                               derived.attrs, &kStand},
+                              ctx, build);
     if (obj == nullptr) continue;
     obj->parent = extends;
     extends->children.push_back(obj);
@@ -277,13 +287,16 @@ void MakeConstraints(const MadeClassDefn& owner, const VpiObjectMap& objects,
                      SimContext& ctx, const VpiAttachBuild& build) {
   static const std::vector<std::string_view> kNoGenBlocks;
   VpiObject* scope = VpiClassNameScope(owner.defn, owner.defn->parent, build);
+  // §37.42: a call a constraint makes stands in the class.
+  const VpiCallStand kStand{owner.defn, owner.mod};
   for (const ClassMember* member : owner.decl->members) {
     if (member == nullptr || member->kind != ClassMemberKind::kConstraint) {
       continue;
     }
     VpiObject* constraint = VpiMakeConstraint(
         *member, owner.defn,
-        {objects, owner.prefix, kNoGenBlocks, scope, ctx, owner.attrs}, build);
+        {objects, owner.prefix, kNoGenBlocks, scope, ctx, owner.attrs, &kStand},
+        build);
     owner.defn->children.push_back(constraint);
     // §37.83: the attributes the constraint is written with.
     VpiAttachAttributes(constraint, VpiNodeAttributes(owner.attrs, member),

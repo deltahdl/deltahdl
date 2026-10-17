@@ -121,16 +121,21 @@ void AttachPortConnections(const RtlirDesign* design,
   // instance. Neither was linked but an interconnect port's lower one, so both
   // relations were null for every port of every design. A vector port holds a
   // port bit per bit, which no design had either.
-  if (design == nullptr) return;
-  WalkInstancePaths(design,
-                    [&](const RtlirModule* mod, const std::string& prefix) {
-                      for (const RtlirModuleInst& inst : mod->children) {
-                        ConnectPorts(inst,
-                                     {objects, prefix, inst.gen_block_prefixes,
-                                      nullptr, &mod->node_attrs},
-                                     ctx, build);
-                      }
-                    });
+  WalkInstanceObjects(
+      design, objects,
+      [&](const RtlirModule* mod, const std::string& prefix,
+          VpiObject* instance) {
+        for (const RtlirModuleInst& inst : mod->children) {
+          // §37.42: a call a connection makes stands in the instance writing
+          // it, or in the gen scope the instantiation stands in (§37.85).
+          const VpiCallStand kStand{
+              VpiGenScopeOf(instance, inst.gen_block_path), mod};
+          ConnectPorts(inst,
+                       {objects, prefix, inst.gen_block_prefixes, nullptr,
+                        &mod->node_attrs, &kStand},
+                       ctx, build);
+        }
+      });
 }
 
 }  // namespace delta

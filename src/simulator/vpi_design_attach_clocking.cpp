@@ -74,19 +74,24 @@ struct ClockingSite {
   const std::vector<std::string_view>& gen_prefixes;
   // §37.83: the instance's table of operator attributes.
   const RtlirNodeAttributes* attrs = nullptr;
+  // §37.42: the instance's module, whose declarations a call written in the
+  // block finds its callee among.
+  const RtlirModule* mod = nullptr;
 };
 
-// What a clocking block is built with: its site, the run and the attach.
+// What a clocking block is built with: its site, the run and the attach, and
+// where a call its expressions make stands (§37.42), none before the block is.
 struct ClockingBuild {
   const ClockingSite& site;
   SimContext& ctx;
   const VpiAttachBuild& build;
+  const VpiCallStand* stand = nullptr;
 
   VpiObject* Expression(const Expr* expr) const {
     return VpiGenBlockExpression(
         expr,
         VpiExprNames{site.objects, site.prefix, site.gen_prefixes, nullptr,
-                     site.attrs},
+                     site.attrs, stand},
         ctx, build);
   }
 };
@@ -177,8 +182,12 @@ VpiObject* MakeClockingBlock(const ModuleItem& item,
   block->default_clocking = item.is_default_clocking;
   block->global_clocking = item.is_global_clocking;
   holder->children.push_back(block);
+  // §37.42 with §37.12: a call the block's expressions make stands in the
+  // block, a scope of its own.
+  const VpiCallStand kStand{block, with.site.mod};
+  const ClockingBuild kInBlock{with.site, with.ctx, with.build, &kStand};
   const VpiStmtBuild kWith{
-      with.build, [&](const Expr* expr) { return with.Expression(expr); },
+      with.build, [&](const Expr* expr) { return kInBlock.Expression(expr); },
       nullptr,    nullptr,
       nullptr,    nullptr};
   VpiObject* event = with.build.alloc();
@@ -191,9 +200,9 @@ VpiObject* MakeClockingBlock(const ModuleItem& item,
                     item.default_input_skew_delay};
   const Skew kOutput{item.default_output_skew_edge,
                      item.default_output_skew_delay};
-  SetSkews(block, kInput, kOutput, with);
+  SetSkews(block, kInput, kOutput, kInBlock);
   for (const ClockingSignalDecl& signal : item.clocking_signals) {
-    MakeIoDecl(signal, block, kInput, kOutput, with);
+    MakeIoDecl(signal, block, kInput, kOutput, kInBlock);
   }
   return block;
 }
@@ -236,7 +245,8 @@ void AttachClockingBlocks(const RtlirDesign* design,
               prefix,
               objects,
               gen == nullptr ? kNoGenPrefixes : gen->gen_block_prefixes,
-              &mod->node_attrs};
+              &mod->node_attrs,
+              mod};
           VpiObject* block =
               MakeClockingBlock(*item, ClockingBuild{kSite, ctx, build});
           // §37.83: the attributes the block is written with.

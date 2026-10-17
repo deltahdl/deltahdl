@@ -41,6 +41,7 @@ struct RtlirPort;
 struct RtlirVariable;
 struct Stmt;
 struct UdpDecl;
+struct VpiDeferredCall;
 struct VpiObject;
 
 // What an attach step that adds objects to the VPI model builds with:
@@ -51,6 +52,10 @@ struct VpiAttachBuild {
   std::function<VpiObject*()> alloc;
   std::function<std::string_view(std::string)> keep;
   Arena& arena;
+  // §37.42: where a call an expression written outside every procedure makes
+  // is held until it can be shaped (VpiShapeDeferredCalls); null where such a
+  // call is left as it is built.
+  std::vector<VpiDeferredCall>* deferred_calls = nullptr;
 };
 
 // What keeps a name for as long as the model lives, answering the kept copy.
@@ -373,6 +378,15 @@ VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
                                  const std::string& prefix, SimContext& ctx,
                                  const VpiAttachBuild& build);
 
+// §37.42 with §37.12: where a call written outside every procedure stands:
+// the scope its vpiScope reaches - the instance, gen scope, clocking block or
+// class defn it is written in - and the module whose declarations its callee
+// is found among, null where it stands in no module.
+struct VpiCallStand {
+  VpiObject* scope;
+  const RtlirModule* mod = nullptr;
+};
+
 // Where the names of an expression written in an instance resolve: the
 // instance, whose objects `objects` keys under `prefix`, and the generate
 // block instances it stands in, by their prefixes, innermost last, whose
@@ -387,12 +401,26 @@ struct VpiExprNames {
   // §37.83: the attributes elaboration resolved on the operators written
   // where the expression is, its instance's or the design's; null for none.
   const RtlirNodeAttributes* attrs = nullptr;
+  // §37.42: where a call the expression makes stands, which makes it a tf
+  // call as a procedure's is once shaped; null to leave it unshaped.
+  const VpiCallStand* stand = nullptr;
 };
 
 // The same of an expression written in the generate block instances `names`
 // carries.
 VpiObject* VpiGenBlockExpression(const Expr* expr, const VpiExprNames& names,
                                  SimContext& ctx, const VpiAttachBuild& build);
+
+// §37.42: a call `call`, made as `made` where `stand` says, with the flat name
+// of the instance and the generate block instances its names resolve in, held
+// for VpiShapeDeferredCalls.
+struct VpiDeferredCall {
+  const Expr* call;
+  VpiObject* made;
+  VpiCallStand stand;
+  std::string prefix;
+  std::vector<std::string_view> gen_prefixes;
+};
 
 // §37.58, §37.59: the expression object `expr` stands for, written at `site`
 // in the instance whose objects `objects` keys, a name in it resolving first
@@ -638,6 +666,24 @@ struct VpiCallBuild {
   const VpiObjectMap& unit_typespecs;
 };
 
+// What a VpiCallBuild reaches besides the run and its records: the class
+// defns, the tasks and functions and the compilation unit's typespecs made.
+struct VpiCallObjects {
+  VpiClassDefnObjects classes;
+  VpiSubroutineObjects subroutines;
+  VpiObjectMap unit_typespecs;
+};
+
+// §37.42: shapes each call of `deferred` as a call a procedure's expression
+// writes where it stands is shaped, once every task, function and class defn
+// of `design` it may reach has its object, and any call shaping one holds in
+// turn. A call no shape resolves keeps the arguments it is written with.
+void VpiShapeDeferredCalls(const RtlirDesign& design,
+                           const VpiObjectMap& objects,
+                           std::vector<VpiDeferredCall>& deferred,
+                           const VpiCallBuild& calls,
+                           const VpiAttachBuild& build);
+
 // §11.5.1: the range written `[left:right]`, its bounds evaluated in the scope
 // the attach set.
 PackedRange VpiEvaluatedRange(Expr* left, Expr* right, SimContext& ctx);
@@ -827,6 +873,8 @@ struct VpiConstraintNames {
   SimContext& ctx;
   // §37.83: the table the operators' attributes are kept in; null for none.
   const RtlirNodeAttributes* attrs = nullptr;
+  // §37.42: where a call the constraint makes stands; null to leave it as made.
+  const VpiCallStand* stand = nullptr;
 };
 
 // §37.34: the constraint object the constraint block `block` stands as, held

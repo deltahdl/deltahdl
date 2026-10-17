@@ -835,6 +835,16 @@ VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
 
 VpiObject* VpiGenBlockExpression(const Expr* expr, const VpiExprNames& names,
                                  SimContext& ctx, const VpiAttachBuild& build) {
+  // §37.42: a call made where the names stand is held, unshaped and without
+  // its arguments, until VpiShapeDeferredCalls makes it the tf call it is.
+  std::function<bool(const Expr&, VpiObject*)> defer = nullptr;
+  if (names.stand != nullptr && build.deferred_calls != nullptr) {
+    defer = [&names, &build](const Expr& call, VpiObject* made) {
+      build.deferred_calls->push_back(
+          {&call, made, *names.stand, names.prefix, names.gen_prefixes});
+      return true;
+    };
+  }
   return ExpressionObject(
       expr, AssignBuild{build.alloc,
                         &ctx,
@@ -842,7 +852,7 @@ VpiObject* VpiGenBlockExpression(const Expr* expr, const VpiExprNames& names,
                                     names.gen_prefixes, names.scope},
                         {},
                         build.keep,
-                        nullptr,
+                        defer,
                         names.attrs});
 }
 

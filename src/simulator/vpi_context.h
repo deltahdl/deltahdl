@@ -855,6 +855,10 @@ class VpiContext {
   // whether a cbStmt has been registered, before which none is looked up.
   VpiStmtObjects stmt_objects_;
   bool stmt_callbacks_registered_ = false;
+  // §37.42: the class defns, tasks and functions and unit typespecs a call is
+  // shaped against (CallBuild), kept for the port connections made after them.
+  VpiCallObjects call_objects_;
+  VpiCallBuild CallBuild();
 
   // §37.82: the $timeformat() call that set the active time format, returned by
   // vpi_handle(vpiActiveTimeFormat, NULL). Null until $timeformat() is called.
@@ -881,18 +885,15 @@ class VpiContext {
   void Deliver(s_cb_data data);
   VpiHandle MadeClassObject(ClassObject& obj);
 
-  // §38.36.2: simulation-time-callback placement state, driven by the scheduler
-  // as simulation advances. The first is set once execution has progressed into
-  // a time slice (past time zero); the second while the time slice is in its
-  // read-only synch region. Both gate the zero-delay placement errors in
-  // RegisterCb. Default: simulation has not yet entered any time slice.
+  // §38.36.2: where the scheduler has the run, set as simulation advances: past
+  // time zero into a time slice, and in a time slice's read-only synch region.
+  // Both gate RegisterCb's zero-delay placement errors; neither holds at first.
   bool sim_progressed_into_time_slice_ = false;
   bool at_read_only_synch_time_ = false;
 
-  // §38.9 / §38.32: the save/restart byte store keyed by save/restart id, plus
-  // a per-id read cursor so successive vpi_get_data() calls resume where the
-  // previous one stopped. SeedSaveData appends bytes (standing in for
-  // vpi_put_data, §38.32); GetData reads and advances the cursor.
+  // §38.9 and §38.32: the save/restart bytes by id, which SeedSaveData appends
+  // to as vpi_put_data would, and each id's read cursor, which GetData advances
+  // so successive vpi_get_data() calls resume where the last one stopped.
   std::unordered_map<int, std::vector<char>> save_data_;
   std::unordered_map<int, std::size_t> save_data_cursor_;
 
@@ -921,10 +922,9 @@ class VpiContext {
   // period, each kept as one component when a flat name is split.
   std::unordered_set<std::string_view> dotted_escaped_names_;
 
-  // §36.10.1: whether an error-callback pass is already running. A callback may
-  // call VPI routines of its own and one of those may record an error in turn,
-  // and delivering that one from inside this pass would re-enter the same
-  // callbacks with an error they have not returned from yet.
+  // §36.10.1: whether an error-callback pass is running. A callback's own VPI
+  // calls may record an error, and delivering it from inside the pass would
+  // re-enter callbacks that have not yet returned from the error before it.
   bool dispatching_error_callbacks_ = false;
 
   // §37.44 and §37.33: the run attached to, the object standing for each of

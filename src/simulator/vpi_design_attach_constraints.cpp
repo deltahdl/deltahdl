@@ -31,10 +31,12 @@ struct ItemBuild {
   const VpiAttachBuild& build;
   // §37.83: the table the operators' attributes are kept in; null for none.
   const RtlirNodeAttributes* attrs = nullptr;
+  // §37.42: where a call an item makes stands; null to leave it as made.
+  const VpiCallStand* stand = nullptr;
 
   VpiObject* Expression(const Expr* expr) const {
-    return VpiGenBlockExpression(expr, {objects, prefix, gen, scope, attrs},
-                                 ctx, build);
+    return VpiGenBlockExpression(
+        expr, {objects, prefix, gen, scope, attrs, stand}, ctx, build);
   }
 };
 
@@ -77,8 +79,8 @@ VpiObject* ForeachItem(const ConstraintItem& item, const ItemBuild& at) {
     }
     loop->loop_vars.push_back(index);
   }
-  const ItemBuild kBody{at.objects, at.prefix, at.gen,  loop,
-                        at.ctx,     at.build,  at.attrs};
+  const ItemBuild kBody{at.objects, at.prefix, at.gen,   loop,
+                        at.ctx,     at.build,  at.attrs, at.stand};
   loop->constraint_exprs = MakeItems(item.body, kBody);
   return loop;
 }
@@ -222,9 +224,10 @@ VpiObject* VpiMakeConstraint(const ClassMember& block, VpiObject* holder,
   constraint->automatic = !block.is_static;
   constraint->access_type = block.is_constraint_prototype ? vpiExternAcc : 0;
   constraint->constraint_enabled = true;
-  constraint->children = MakeItems(
-      block.constraint_items, {names.objects, names.prefix, names.gen,
-                               names.scope, names.ctx, build, names.attrs});
+  constraint->children =
+      MakeItems(block.constraint_items,
+                {names.objects, names.prefix, names.gen, names.scope, names.ctx,
+                 build, names.attrs, names.stand});
   return constraint;
 }
 

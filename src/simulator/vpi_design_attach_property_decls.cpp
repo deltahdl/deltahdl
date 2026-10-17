@@ -328,10 +328,13 @@ void AttachPackagePropertyDecls(const RtlirDesign& design,
   const std::vector<std::string_view> kNoGenBlocks;
   for (const PackageDecl* pkg : design.packages) {
     const std::string kPrefix(pkg->name);
+    VpiObject* package = FindObjectForFlatName(objects, pkg->name);
+    // §37.42: a call a property makes stands in the package.
+    const VpiCallStand kStand{package};
     // §37.83: an operation carries the attributes its operator is written
     // with, which elaboration kept for a package's items on the design.
-    const VpiExprNames kNames{objects, kPrefix, kNoGenBlocks, nullptr,
-                              &design.node_attrs};
+    const VpiExprNames kNames{
+        objects, kPrefix, kNoGenBlocks, nullptr, &design.node_attrs, &kStand};
     const VpiStmtBuild kWith{build,
                              [&](const Expr* expr) {
                                return VpiGenBlockExpression(expr, kNames, ctx,
@@ -344,9 +347,7 @@ void AttachPackagePropertyDecls(const RtlirDesign& design,
     for (const ModuleItem* item : pkg->items) {
       if (item->kind != ModuleItemKind::kPropertyDecl) continue;
       VpiMakePropertyDecl(RtlirPropertyDecl{item, {}, {}, nullptr},
-                          {FindObjectForFlatName(objects, pkg->name),
-                           unit_typespecs, ctx, kNoImports},
-                          kWith);
+                          {package, unit_typespecs, ctx, kNoImports}, kWith);
     }
   }
 }

@@ -118,14 +118,20 @@ struct PrimSite {
   const VpiObjectMap& objects;
   // §37.83: the instance's table of operator attributes.
   const RtlirNodeAttributes* attrs = nullptr;
+  // §37.42: the instance's module, whose declarations a terminal's call finds
+  // its callee among.
+  const RtlirModule* mod = nullptr;
 };
 
-// The expression object of the terminal `terminal` written at `site`.
+// The expression object of the terminal `terminal` written at `site`, a call
+// in it standing in the instance (§37.42).
 VpiObject* TerminalExpression(const Expr* terminal, const PrimSite& site,
                               SimContext& ctx, const VpiAttachBuild& build) {
   static const std::vector<std::string_view> kNoGenBlocks;
+  const VpiCallStand kStand{site.instance, site.mod};
   return VpiGenBlockExpression(
-      terminal, {site.objects, site.prefix, kNoGenBlocks, nullptr, site.attrs},
+      terminal,
+      {site.objects, site.prefix, kNoGenBlocks, nullptr, site.attrs, &kStand},
       ctx, build);
 }
 
@@ -282,7 +288,8 @@ void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
       [&](const RtlirModule* mod, const std::string& prefix,
           VpiObject* instance) {
         for (const ModuleItem* item : mod->gate_insts) {
-          const PrimSite kSite{instance, prefix, objects, &mod->node_attrs};
+          const PrimSite kSite{instance, prefix, objects, &mod->node_attrs,
+                               mod};
           // §28.3.6: an instantiation declaring a range is an
           // instance array.
           if (item->inst_range_left != nullptr) {
@@ -300,9 +307,9 @@ void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
                               build);
         }
         for (const RtlirUdpInst& inst : mod->udp_insts) {
-          VpiObject* udp =
-              MakeUdpObject(inst, {instance, prefix, objects, &mod->node_attrs},
-                            udp_defn_of(inst.decl), ctx, build);
+          VpiObject* udp = MakeUdpObject(
+              inst, {instance, prefix, objects, &mod->node_attrs, mod},
+              udp_defn_of(inst.decl), ctx, build);
           VpiAttachAttributes(udp, VpiNodeAttributes(mod, inst.source_item),
                               false, ctx, build);
         }

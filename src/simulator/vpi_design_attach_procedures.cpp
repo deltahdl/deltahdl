@@ -212,11 +212,14 @@ VpiObject* InlineConstraint(const ClassMember& block, VpiObject* call,
                             const VpiObject* defn, const BlockParent& parent,
                             const BodyWalk& walk) {
   static const GenBlockPrefixes kNoGenBlocks;
+  // §37.42: a call the block makes stands where the call of randomize does.
+  const VpiCallStand kStand{parent.scope, &walk.mod};
   VpiObject* constraint = VpiMakeConstraint(
       block, call,
       {walk.objects, walk.prefix,
        walk.gen_prefixes != nullptr ? *walk.gen_prefixes : kNoGenBlocks,
-       VpiClassNameScope(defn, parent.scope, walk.build), walk.calls.ctx},
+       VpiClassNameScope(defn, parent.scope, walk.build), walk.calls.ctx,
+       nullptr, &kStand},
       walk.build);
   constraint->inline_constraint = true;
   return constraint;
@@ -621,6 +624,30 @@ std::function<bool(const Expr& call, VpiObject* made)> VpiItemCallShaper(
     const BlockParent kParent{site.scope, site.scope->full_name};
     return ShapeExprCall(call, made, kParent, walk);
   };
+}
+
+void VpiShapeDeferredCalls(const RtlirDesign& design,
+                           const VpiObjectMap& objects,
+                           std::vector<VpiDeferredCall>& deferred,
+                           const VpiCallBuild& calls,
+                           const VpiAttachBuild& build) {
+  // A call standing in a package or a class no module declares finds its
+  // callee among the compilation unit's and the packages' declarations alone.
+  static const RtlirModule kNoModule{};
+  // Shaping a call builds its arguments, which may hold a call of their own
+  // held here in turn, so each is taken by its place and copied out.
+  for (std::size_t index = 0; index < deferred.size(); ++index) {
+    const VpiDeferredCall held = deferred[index];
+    BodyWalk walk{
+        design,  held.stand.mod != nullptr ? *held.stand.mod : kNoModule,
+        objects, held.prefix,
+        calls,   build};
+    walk.gen_prefixes = &held.gen_prefixes;
+    const BlockParent kParent{held.stand.scope, held.stand.scope->full_name};
+    if (!ShapeExprCall(*held.call, held.made, kParent, walk)) {
+      MakeCallArguments(held.made, *held.call, kParent, walk);
+    }
+  }
 }
 
 void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,

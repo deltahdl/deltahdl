@@ -91,6 +91,9 @@ struct ModportScope {
   const VpiAttachBuild& build;
   // §37.83: the interface instance's table of operator attributes.
   const RtlirNodeAttributes* attrs = nullptr;
+  // §37.42: the interface, whose declarations a call written in a port
+  // expression finds its callee among.
+  const RtlirModule* mod = nullptr;
 };
 
 // §37.13 detail 2: what the io decl `io_decl` of the modport port `port`
@@ -101,10 +104,12 @@ VpiObject* ModportPortExpr(const ModportScope& scope, VpiObject* io_decl,
                            const ModportPort& port) {
   if (port.is_named_port) {
     static const std::vector<std::string_view> kNoGenBlocks;
-    return VpiGenBlockExpression(
-        port.expr,
-        {scope.objects, scope.prefix, kNoGenBlocks, nullptr, scope.attrs},
-        scope.ctx, scope.build);
+    // §37.42: a call the expression makes stands in the interface instance.
+    const VpiCallStand kStand{scope.iface, scope.mod};
+    return VpiGenBlockExpression(port.expr,
+                                 {scope.objects, scope.prefix, kNoGenBlocks,
+                                  nullptr, scope.attrs, &kStand},
+                                 scope.ctx, scope.build);
   }
   VpiObject* item = FindObjectForFlatName(scope.objects,
                                           VpiFlatName(scope.prefix, port.name));
@@ -191,16 +196,41 @@ void VpiContext::AttachPackages(const RtlirDesign* design) {
   MarkInCompilationUnit(unit->second);
 }
 
+VpiCallBuild VpiContext::CallBuild() {
+  // §37.42: a system call finds the registration its name resolves to, and
+  // with it the systf object that registration returned.
+  return {*sim_ctx_,
+          [this](std::string_view name) {
+            VpiRegisteredSystf found;
+            const s_vpi_systf_data* data =
+                ResolveSystf(std::string(name).c_str());
+            if (data == nullptr) return found;
+            found.type = data->type;
+            if (data->type == vpiSysFunc) found.sysfunctype = data->sysfunctype;
+            found.object =
+                systf_objects_[static_cast<std::size_t>(data - systfs_.data())];
+            return found;
+          },
+          call_site_objects_,
+          stmt_objects_,
+          call_objects_.classes,
+          call_objects_.subroutines,
+          call_objects_.unit_typespecs};
+}
+
 void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
   AttachInstanceDefinitions(design);
   AttachVariableFacts(design);
   if (design != nullptr) {
+    // §37.42: the calls the passes below make outside every procedure, held
+    // until every task, function and class defn they may reach is made.
+    std::vector<VpiDeferredCall> deferred;
     const VpiAttachBuild kBuild{[this] { return AllocObject(); },
                                 [this](std::string name) {
                                   name_pool_.push_back(std::move(name));
                                   return std::string_view(name_pool_.back());
                                 },
-                                sim_ctx_->GetArena()};
+                                sim_ctx_->GetArena(), &deferred};
     // The scopes the passes below hang a generate block's objects from are
     // the gen scopes this makes.
     AttachGenScopes(design, object_map_, kBuild);
@@ -214,47 +244,28 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     // A net's bits and members are made while it is still a logic net, the
     // kind both passes above look for, so its own kind comes after them.
     RecordNetObjectKinds(design, object_map_);
-    const VpiObjectMap kUnitTypespecs =
-        AttachTypespecs(design, object_map_, kBuild);
-    AttachParameters(design, object_map_, kUnitTypespecs, *sim_ctx_, kBuild);
+    call_objects_.unit_typespecs = AttachTypespecs(design, object_map_, kBuild);
+    AttachParameters(design, object_map_, call_objects_.unit_typespecs,
+                     *sim_ctx_, kBuild);
     AttachAttributes(design, object_map_, *sim_ctx_, kBuild);
-    const VpiClassDefnObjects kClasses =
+    call_objects_.classes =
         AttachClassDefinitions(design, object_map_, *sim_ctx_, kBuild);
     // §37.32: the class defn a run's class obj reaches through its typespec,
     // kept per declaration. A class a module declares has one per instance,
     // and ClassDefnOf in vpi_class_objects.cpp takes the one under the
     // instance the object was created in, this one standing for a first top's.
-    for (const auto& [key, defn] : kClasses) {
+    for (const auto& [key, defn] : call_objects_.classes) {
       run_objects_.try_emplace(key.first, defn);
     }
-    const VpiSubroutineObjects kSubroutines =
+    call_objects_.subroutines =
         AttachSubroutines(*design, object_map_, *sim_ctx_, kBuild);
     AttachVariableRanges(*design, object_map_, *sim_ctx_, kBuild);
     AttachModports(design, object_map_, *sim_ctx_, kBuild);
-    // §37.42: a system call finds the registration its name resolves to, and
-    // with it the systf object that registration returned.
-    const VpiCallBuild kCalls{
-        *sim_ctx_,
-        [this](std::string_view name) {
-          VpiRegisteredSystf found;
-          const s_vpi_systf_data* data =
-              ResolveSystf(std::string(name).c_str());
-          if (data == nullptr) return found;
-          found.type = data->type;
-          if (data->type == vpiSysFunc) found.sysfunctype = data->sysfunctype;
-          found.object =
-              systf_objects_[static_cast<std::size_t>(data - systfs_.data())];
-          return found;
-        },
-        call_site_objects_,
-        stmt_objects_,
-        kClasses,
-        kSubroutines,
-        kUnitTypespecs};
+    const VpiCallBuild kCalls = CallBuild();
     // §37.51: a package's properties are built ahead of the assertions
     // instantiating them.
-    AttachPackagePropertyDecls(*design, object_map_, kUnitTypespecs, *sim_ctx_,
-                               kBuild);
+    AttachPackagePropertyDecls(*design, object_map_,
+                               call_objects_.unit_typespecs, *sim_ctx_, kBuild);
     AttachProcedures(design, object_map_, kCalls, kBuild);
     AttachPrimitives(
         design, object_map_,
@@ -262,6 +273,7 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
         [this](const UdpDecl* decl) { return run_objects_.at(decl); },
         *sim_ctx_, kBuild);
     AttachContinuousAssignments(design, kCalls);
+    VpiShapeDeferredCalls(*design, object_map_, deferred, kCalls, kBuild);
   }
   AttachGenBlockStorage(design, object_map_);
   AttachGenBlockInstances(design, object_map_, [this](std::string name) {
@@ -278,8 +290,8 @@ void AttachModports(const RtlirDesign* design, const VpiObjectMap& objects,
   WalkInstanceObjects(
       design, objects,
       [&](const RtlirModule* mod, const std::string& prefix, VpiObject* iface) {
-        const ModportScope kScope{iface, objects, prefix,
-                                  ctx,   build,   &mod->node_attrs};
+        const ModportScope kScope{iface, objects,          prefix, ctx,
+                                  build, &mod->node_attrs, mod};
         for (const ModportDecl* decl : mod->modports) {
           MakeModport(kScope, *decl);
         }
