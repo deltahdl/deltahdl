@@ -193,6 +193,27 @@ TEST_F(EventControlsOfARun, AnEventControlIsAnObjectOfTheRun) {
             VpiObjectOf(vpi_handle(vpiProcess, control)));
 }
 
+// §9.4.2: an edge event is detected whenever a posedge or a negedge is, so
+// an event control on `edge clk` is written over the or of the posedge and
+// the negedge of clk.
+TEST_F(EventControlsOfARun, AnEdgeEventIsItsPosedgeOrItsNegedge) {
+  Run("module top; bit clk; initial @(edge clk) ; endmodule\n");
+  vpiHandle control = BodyOf("top");
+  ASSERT_NE(control, nullptr);
+  vpiHandle condition = vpi_handle(vpiCondition, control);
+  ASSERT_NE(condition, nullptr);
+  EXPECT_EQ(vpi_get(vpiOpType, condition), vpiEventOrOp);
+  const std::vector<vpiHandle> kEdges = OperandsOf(condition);
+  ASSERT_EQ(kEdges.size(), 2U);
+  EXPECT_EQ(vpi_get(vpiOpType, kEdges[0]), vpiPosedgeOp);
+  EXPECT_EQ(vpi_get(vpiOpType, kEdges[1]), vpiNegedgeOp);
+  for (vpiHandle edge : kEdges) {
+    const std::vector<vpiHandle> kSignal = OperandsOf(edge);
+    ASSERT_EQ(kSignal.size(), 1U);
+    EXPECT_EQ(VpiObjectOf(kSignal[0]), VpiObjectOf(By("top.clk")));
+  }
+}
+
 // A bare named event is the condition itself, the object its declaration
 // stands as.
 TEST_F(EventControlsOfARun, ANamedEventIsTheConditionItself) {
