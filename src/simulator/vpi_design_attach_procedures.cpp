@@ -219,12 +219,12 @@ VpiObject* InlineConstraint(const ClassMember& block, VpiObject* call,
 // constraint block of a call of randomize (§18.7), a constraint §37.31 detail 3
 // calls inline, or the with expression of a locator method's call. Any other
 // call, with clause or not, has no vpiWith.
-void MakeWithClause(VpiObject* call, const Expr& expr,
+void MakeWithClause(VpiObject* call, std::string_view method, const Expr& expr,
                     const BlockParent& parent, const BodyWalk& walk) {
   call->tf_with_method =
       call->type == vpiMethodFuncCall &&
-      (call->name == "randomize" ||
-       std::ranges::find(kLocatorMethods, call->name) != kLocatorMethods.end());
+      (method == "randomize" ||
+       std::ranges::find(kLocatorMethods, method) != kLocatorMethods.end());
   if (!call->tf_with_method) return;
   // §18.7: the identifier list of a restricted block, randomize() with (a)
   // {...}, is kept as a with expression too, so the block is looked for first.
@@ -247,14 +247,17 @@ void MakeWithClause(VpiObject* call, const Expr& expr,
 void FillCall(VpiObject* call, const CallShape& shape, const Expr& called,
               const BlockParent& parent, const BodyWalk& walk) {
   call->type = shape.type;
-  call->name = walk.build.keep(std::string(shape.name));
+  // §37.60 detail 1: a call written as a labelled statement is named by its
+  // label, which MakeAtomicStatement gave it; the callee is reached through
+  // vpiTask or vpiFunction.
+  if (call->name.empty()) call->name = walk.build.keep(std::string(shape.name));
   call->tf_prefix = shape.prefix;
   call->prefix_members = shape.prefix_members;
   call->tf_decl = shape.called;
   call->user_defined = shape.user_defined;
   call->user_systf = shape.systf;
   MakeCallArguments(call, called, parent, walk);
-  MakeWithClause(call, called, parent, walk);
+  MakeWithClause(call, shape.name, called, parent, walk);
 }
 
 // §37.42 with §37.60: the call statement `stmt` stands as, null for a

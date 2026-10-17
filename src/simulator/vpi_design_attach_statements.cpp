@@ -501,6 +501,8 @@ int VpiBuiltStmtKind(const Stmt& stmt) {
       return AssertionStmtKind(stmt);
     case StmtKind::kExpect:
       return vpiExpectStmt;
+    case StmtKind::kReturn:
+      return vpiReturnStmt;
     default:
       return 0;
   }
@@ -564,6 +566,11 @@ void VpiFillStmt(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
       return;
     case StmtKind::kWaitFork:
     case StmtKind::kDisableFork:
+      return;
+    case StmtKind::kReturn:
+      // §37.78: the value returned, which vpiCondition reaches; none for a
+      // return from a task or a void function.
+      AddChild(obj, with.expression(stmt.expr));
       return;
     case StmtKind::kAssertImmediate:
     case StmtKind::kAssumeImmediate:

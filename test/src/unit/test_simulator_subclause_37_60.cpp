@@ -237,6 +237,35 @@ TEST_F(AtomicStatementsOfARun, ALabeledStatementReportsItsLabel) {
   EXPECT_STREQ(vpi_get_str(vpiName, stmt), "trig");
 }
 
+// Detail 1: a call written as a labelled statement is named by its label, the
+// task it calls being reached through vpiTask (§37.42).
+TEST_F(AtomicStatementsOfARun, ALabelledCallIsNamedByItsLabel) {
+  Run("module top; task t; endtask\n"
+      "  initial l1: t();\n"
+      "endmodule\n");
+  vpiHandle proc = First(vpiProcess, By("top"));
+  ASSERT_NE(proc, nullptr);
+  vpiHandle call = vpi_handle(vpiStmt, proc);
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, call), vpiTaskCall);
+  EXPECT_STREQ(vpi_get_str(vpiName, call), "l1");
+  vpiHandle task = vpi_handle(vpiTask, call);
+  ASSERT_NE(task, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, task), "t");
+}
+
+// A return statement is an atomic statement, reaching the value a function
+// returns through vpiCondition (§37.78).
+TEST_F(AtomicStatementsOfARun, AReturnStatementIsBuilt) {
+  Run("module top; function int f; return 5; endfunction endmodule\n");
+  vpiHandle stmt = vpi_handle(vpiStmt, By("top.f"));
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, stmt), vpiReturnStmt);
+  vpiHandle value = vpi_handle(vpiCondition, stmt);
+  ASSERT_NE(value, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, value), vpiConstant);
+}
+
 // An unlabeled statement has no label to report.
 TEST_F(AtomicStatementsOfARun, AnUnlabeledStatementReportsNoLabel) {
   Run("module top; event e; initial -> e; endmodule\n");
