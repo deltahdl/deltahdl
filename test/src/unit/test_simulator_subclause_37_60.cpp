@@ -373,9 +373,8 @@ TEST_F(StatementFill, AnUnmodelledIntraAssignmentDelayReachesNoDelay) {
 }
 
 // §37.65: an event control whose list holds an event the model leaves out - a
-// sequence (§9.4.2.4), the edge keyword, or an edge or an iff over an
-// expression not modelled - reaches no condition, rather than one standing
-// for the other events alone.
+// sequence (§9.4.2.4), or an edge or an iff over an expression not modelled -
+// reaches no condition, rather than one standing for the other events alone.
 TEST_F(StatementFill, AnEventLeftOutLeavesTheControlNoCondition) {
   Expr clk;
   Name(clk, "clk");
@@ -386,16 +385,13 @@ TEST_F(StatementFill, AnEventLeftOutLeavesTheControlNoCondition) {
   EventExpr sequence;
   sequence.signal = &clk;
   sequence.is_sequence_event = true;
-  EventExpr edge;
-  edge.signal = &clk;
-  edge.edge = Edge::kEdge;
   EventExpr posedge;
   posedge.signal = &one;
   posedge.edge = Edge::kPosedge;
   EventExpr guarded;
   guarded.signal = &clk;
   guarded.iff_condition = &one;
-  const std::vector<EventExpr> kLeftOut = {sequence, edge, posedge, guarded};
+  const std::vector<EventExpr> kLeftOut = {sequence, posedge, guarded};
   for (const EventExpr& left_out : kLeftOut) {
     Stmt stmt;
     stmt.kind = StmtKind::kEventControl;
