@@ -374,6 +374,31 @@ TEST(InheritanceSimulation, InheritedStaticThroughPackageQualifiedScope) {
             88u);
 }
 
+// §8.13 with §26.3: `extends p::B` inherits the package's B, whose b is 3 and
+// whose get() doubles it, though the module declares a B of its own whose b
+// is 9 and which has no get(): 3 and 6 read as 36. Kept as a bare B, the
+// base was the module's.
+TEST(InheritanceSimulation, ABaseNamedThroughAPackageIsThePackagesClass) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  class B;\n"
+                      "    int b = 3;\n"
+                      "    function int get(); return b * 2; endfunction\n"
+                      "  endclass\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  class B;\n"
+                      "    int b = 9;\n"
+                      "  endclass\n"
+                      "  class D extends p::B;\n"
+                      "  endclass\n"
+                      "  D d = new;\n"
+                      "  int result;\n"
+                      "  initial result = d.b * 10 + d.get();\n"
+                      "endmodule\n",
+                      "result"),
+            36u);
+}
+
 // §8.13 with §8.9 and §8.7 (printed page 184): `D::m_inst = new` constructs
 // into the static handle C declares, so `C::m_inst.k` reads the new object's
 // 9 and `D::m_inst == null` reads 0, 90; declined for D's own

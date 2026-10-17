@@ -290,6 +290,9 @@ struct ClassMember {
 struct InterfaceRef {
   std::string_view name;
   std::vector<DataType> type_params;
+  // A.2.2.1: the identifier written before the last `::` of the name, a
+  // package (§26.3) or an enclosing class; empty for a bare name.
+  std::string_view scope;
 };
 
 struct ClassDecl {
@@ -300,6 +303,8 @@ struct ClassDecl {
   bool is_final = false;
   bool is_interface = false;
   std::string_view base_class;
+  // §8.13 with A.2.2.1: as InterfaceRef::scope, for base_class.
+  std::string_view base_class_scope;
   std::vector<DataType> base_class_type_params;
   std::vector<Expr*> extends_args;
   bool extends_has_default = false;

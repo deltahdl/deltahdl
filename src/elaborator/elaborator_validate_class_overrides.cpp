@@ -13,6 +13,7 @@
 #include "elaborator/class_member_names.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_classes.h"
 #include "elaborator/elaborator_validate_classes_internal.h"
@@ -631,7 +632,7 @@ void ElaboratorClassRules::ValidateRegularClassInheritance(
                                        {"implement", "implemented", "class"})) {
       continue;
     }
-    const auto* impl = FindClassDecl(impl_name, unit_);
+    const auto* impl = FindReferencedClass(ref, unit_);
     if (impl && !impl->is_interface) {
       diag_.Error(cls->range.start,
                   std::format("class '{}' cannot implement non-interface "

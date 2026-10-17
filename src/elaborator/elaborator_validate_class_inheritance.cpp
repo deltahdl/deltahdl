@@ -12,6 +12,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_classes.h"
 #include "elaborator/elaborator_validate_classes_internal.h"
@@ -239,7 +240,7 @@ static void CollectInScopeInterfaceMethods(const ClassDecl* cls,
     CollectImplementedInterfaces(cls, look.unit, all_ifaces);
     std::unordered_set<std::string> seen_iface;
     for (const auto& iref : all_ifaces) {
-      const auto* iface = FindClassDecl(iref.name, look.unit);
+      const auto* iface = FindReferencedClass(iref, look.unit);
       if (!iface || !iface->is_interface) continue;
       auto spec =
           MakeIfaceSpec(iface, iref.name, iref.type_params, outer, look.params);
@@ -467,7 +468,7 @@ void ElaboratorClassRules::ValidateImplementsInterfaceMethods(
   for (const auto& iref : all_ifaces) {
     auto iface_key = MakeSpecKey(iref.name, iref.type_params, cu_param_scope_);
     if (!seen.insert(iface_key).second) continue;
-    const auto* iface = FindClassDecl(iref.name, unit_);
+    const auto* iface = FindReferencedClass(iref, unit_);
     // §8.26 poses the obligation to implement a pure virtual method only for an
     // interface class: its Fifo example implements the PutImp and GetImp
     // interface classes and so has to implement put and get (printed page 209
@@ -515,7 +516,7 @@ void ElaboratorClassRules::ValidateVirtualClassInterfaceObligations(
   TypeSubst outer;
   ClassLookup look{unit_, params};
   for (const auto& iref : cls->implements_types) {
-    const auto* iface = FindClassDecl(iref.name, unit_);
+    const auto* iface = FindReferencedClass(iref, unit_);
     if (!iface || !iface->is_interface) continue;
     auto spec =
         MakeIfaceSpec(iface, iref.name, iref.type_params, outer, params);
@@ -566,7 +567,7 @@ static void ForEachInterfaceParent(
     }
   }
   for (const auto& ref : cls->extends_interfaces) {
-    const auto* ext = FindClassDecl(ref.name, look.unit);
+    const auto* ext = FindReferencedClass(ref, look.unit);
     if (ext && ext->is_interface) {
       fn(ext, ref.name, ref.type_params);
     }
@@ -699,7 +700,7 @@ static std::unordered_map<std::string_view, std::string_view>
 CollectImplementedTypedefOwners(const ClassDecl* cls, const ClassLookup& look) {
   std::unordered_map<std::string_view, std::string_view> owning_iface;
   for (const auto& iref : cls->implements_types) {
-    const auto* iface = FindClassDecl(iref.name, look.unit);
+    const auto* iface = FindReferencedClass(iref, look.unit);
     if (!iface || !iface->is_interface) continue;
     std::unordered_set<std::string_view> names;
     std::unordered_set<const ClassDecl*> visited;

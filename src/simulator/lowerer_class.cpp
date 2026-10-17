@@ -725,6 +725,22 @@ static void InheritInterfaceMembers(ClassTypeInfo* info) {
     InheritInterfaceStaticsAndEnums(info, iface);
 }
 
+// §26.3: the class `name` names written through the package scope `scope`,
+// held under the key "scope::name" (Lowerer::LowerPackageClass) whatever the
+// bare name names here; null for a bare name or a scope naming no package.
+static ClassTypeInfo* PackageClassType(std::string_view scope,
+                                       std::string_view name, SimContext& ctx) {
+  if (scope.empty()) return nullptr;
+  return ctx.FindClassType(std::string(scope) + "::" + std::string(name));
+}
+
+// §8.26.2 with §26.3: the interface class `ref` names.
+static ClassTypeInfo* InterfaceClassType(const InterfaceRef& ref,
+                                         SimContext& ctx) {
+  ClassTypeInfo* in_package = PackageClassType(ref.scope, ref.name, ctx);
+  return in_package != nullptr ? in_package : ctx.FindClassType(ref.name);
+}
+
 // §8.25: the class the extends clause of `cls` names as its base. The base
 // may be named by a type parameter of the derived class, `class D4 #(type P =
 // C#(byte)) extends P;`, which §8.25 has resolve to a class type after
@@ -737,8 +753,12 @@ static void InheritInterfaceMembers(ClassTypeInfo* info) {
 // as each object is constructed (BaseTypeBindings in eval_class_new.cpp). A
 // parameter given no default, or a default that is no named type, names no
 // base. Looked up by the parameter's name, the base was never found, and the
-// derived class inherited nothing.
+// derived class inherited nothing. A base written through a package scope,
+// `extends p::B`, is the package's class (PackageClassType).
 static ClassTypeInfo* BaseClassOf(const ClassDecl* cls, SimContext& ctx) {
+  ClassTypeInfo* in_package =
+      PackageClassType(cls->base_class_scope, cls->base_class, ctx);
+  if (in_package != nullptr) return in_package;
   if (cls->type_param_names.count(cls->base_class) == 0)
     return ctx.FindClassType(cls->base_class);
   const DataType* def = TypeParamActual(nullptr, cls, cls->base_class);
@@ -759,11 +779,11 @@ static void PopulateClassType(ClassTypeInfo* info, const ClassDecl* cls,
   if (!cls->base_class.empty()) info->parent = BaseClassOf(cls, ctx);
   info->unit_constants = &scope.constants;
   for (const auto& ref : cls->extends_interfaces) {
-    auto* iface = ctx.FindClassType(ref.name);
+    auto* iface = InterfaceClassType(ref, ctx);
     if (iface) info->extended_interfaces.push_back(iface);
   }
   for (const auto& ref : cls->implements_types) {
-    auto* iface = ctx.FindClassType(ref.name);
+    auto* iface = InterfaceClassType(ref, ctx);
     if (iface) info->extended_interfaces.push_back(iface);
   }
   CollectClassMembers(info, cls, scope.constants, ctx);

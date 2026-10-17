@@ -269,7 +269,8 @@ const ClassDecl* FindClassDecl(std::string_view name,
                                const CompilationUnit* unit);
 
 // §8.13: the class `cls` extends, its `extends` name resolved from the scope
-// declaring `cls` (§3.13, §23.9, §26.3): that scope's own class of the name,
+// declaring `cls` (§3.13, §23.9, §26.3): the class of the name the package its
+// name is written through declares, else that scope's own class of the name,
 // one it imports, or the compilation unit's. A class standing in a generate
 // block or in another class, whose scope is none of those, and a name that
 // scope does not resolve, are answered by FindClassDecl. Null for a class

@@ -38,6 +38,11 @@ const ClassDecl* FindClassInPackage(std::string_view pkg_name,
                                     std::string_view cls_name,
                                     const CompilationUnit* unit);
 
+// §8.26 with §26.3: the interface class `ref` names, the class of its name
+// the package its scope names declares, else FindClassDecl's of its name.
+const ClassDecl* FindReferencedClass(const InterfaceRef& ref,
+                                     const CompilationUnit* unit);
+
 // The class named `name` among the classes declared directly inside `cls`,
 // which §8.23 names from outside as `cls::name`.
 const ClassDecl* FindNestedClass(const ClassDecl* cls, std::string_view name);

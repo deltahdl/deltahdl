@@ -121,22 +121,25 @@ namespace {
 // every other entry is collected as an implemented interface or an additional
 // extended interface. has_type_params distinguishes 'base #(...)' from a bare
 // 'base' so the no-parameter case leaves base_class_type_params untouched.
-// Returns whether this base was the primary base, so the caller can route its
-// following '(...)' argument list correctly.
-bool RecordClassExtendsBase(ClassDecl* decl, std::string_view name,
+// Each keeps the scope written before its name's last '::'. Returns whether
+// this base was the primary base, so the caller can route its following
+// '(...)' argument list correctly.
+bool RecordClassExtendsBase(ClassDecl* decl, std::string_view scope,
+                            std::string_view name,
                             std::vector<DataType> tparams, bool is_implements,
                             bool has_type_params) {
   bool is_first_base = !is_implements && decl->base_class.empty();
   if (is_first_base) {
     decl->base_class = name;
+    decl->base_class_scope = scope;
   }
   if (has_type_params && is_first_base) {
     decl->base_class_type_params = tparams;
   }
   if (is_implements) {
-    decl->implements_types.push_back({name, std::move(tparams)});
+    decl->implements_types.push_back({name, std::move(tparams), scope});
   } else if (!is_first_base) {
-    decl->extends_interfaces.push_back({name, std::move(tparams)});
+    decl->extends_interfaces.push_back({name, std::move(tparams), scope});
   }
   return is_first_base;
 }
@@ -148,8 +151,10 @@ void Parser::ParseClassExtendsClause(ClassDecl* decl, bool is_implements) {
   // rule a malformed base name breaches depends on which clause is being read.
   Subclause subclause(is_implements ? "8.26.2" : "8.13");
   do {
+    std::string_view scope;
     auto name = Expect(TokenKind::kIdentifier, subclause).text;
     while (Match(TokenKind::kColonColon)) {
+      scope = name;
       name = Expect(TokenKind::kIdentifier, subclause).text;
     }
     std::vector<DataType> tparams;
@@ -158,7 +163,7 @@ void Parser::ParseClassExtendsClause(ClassDecl* decl, bool is_implements) {
       Consume();
       tparams = ParseTypeParamList();
     }
-    RecordClassExtendsBase(decl, name, std::move(tparams), is_implements,
+    RecordClassExtendsBase(decl, scope, name, std::move(tparams), is_implements,
                            has_type_params);
 
     if (Check(TokenKind::kLParen)) {

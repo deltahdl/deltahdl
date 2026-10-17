@@ -145,7 +145,8 @@ bool NamesClassBeside(const MadeClassDefn& candidate,
 // where the design declares none of that name.
 VpiObject* BaseClassDefn(const MadeClassDefn& derived,
                          const std::vector<MadeClassDefn>& made) {
-  const ClassReference kRef = SplitClassReference(derived.decl->base_class);
+  const ClassReference kRef{derived.decl->base_class_scope,
+                            derived.decl->base_class};
   VpiObject* in_unit = nullptr;
   for (const MadeClassDefn& candidate : made) {
     if (candidate.decl->name != kRef.name) continue;
@@ -171,8 +172,7 @@ void MakeExtends(const MadeClassDefn& derived,
   derived.defn->children.push_back(extends);
   VpiObject* typespec = build.alloc();
   typespec->type = vpiClassTypespec;
-  typespec->name = build.keep(
-      std::string(SplitClassReference(derived.decl->base_class).name));
+  typespec->name = build.keep(std::string(derived.decl->base_class));
   typespec->parent = extends;
   extends->children.push_back(typespec);
   static const std::vector<std::string_view> kNoGenBlocks;

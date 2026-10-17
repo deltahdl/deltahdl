@@ -141,6 +141,42 @@ TEST(InterfaceClassImplements, SingleInterfaceImplementationOk) {
              "endmodule\n"));
 }
 
+// §8.26.2 with §26.3: `implements p::I` is checked against the package's
+// interface class, whose g the class implements, not the module's I, whose f
+// it does not...
+TEST(InterfaceClassImplements, ImplementsThroughAPackageIsThePackagesClass) {
+  EXPECT_TRUE(
+      ElabOk("package p;\n"
+             "  interface class I; pure virtual function void g(); endclass\n"
+             "endpackage\n"
+             "module m;\n"
+             "  interface class I; pure virtual function void f(); endclass\n"
+             "  class C implements p::I;\n"
+             "    virtual function void g(); endfunction\n"
+             "  endclass\n"
+             "endmodule\n"));
+}
+
+// ...so implementing the module's f leaves the package's g unimplemented.
+TEST(InterfaceClassImplements,
+     ImplementsThroughAPackageNeedsThePackagesMethod) {
+  ElabFixture f;
+  ElabOk(
+      "package p;\n"
+      "  interface class I; pure virtual function void g(); endclass\n"
+      "endpackage\n"
+      "module m;\n"
+      "  interface class I; pure virtual function void f(); endclass\n"
+      "  class C implements p::I;\n"
+      "    virtual function void f(); endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "does not implement pure virtual method 'g'", 6,
+                            "8.26"));
+}
+
 TEST(InterfaceClassImplements, ClassImplementsMultipleInterfaces) {
   EXPECT_TRUE(
       ElabOk("interface class A;\n"

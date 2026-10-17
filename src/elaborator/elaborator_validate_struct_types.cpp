@@ -12,6 +12,7 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/type_site_lookup.h"
@@ -237,6 +238,9 @@ static void TakeDeclaringSite(const ClassDecl* cls,
 const ClassDecl* FindBaseClass(const ClassDecl* cls,
                                const CompilationUnit* unit) {
   if (cls->base_class.empty()) return nullptr;
+  const ClassDecl* in_package =
+      FindClassInPackage(cls->base_class_scope, cls->base_class, unit);
+  if (in_package != nullptr) return in_package;
   TypeSite site;
   TakeDeclaringSite(cls, unit->cu_items, SiteKind::kUnit, site);
   for (const auto* group :

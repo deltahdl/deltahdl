@@ -359,6 +359,21 @@ TEST_F(ClassDefinitionsOfARun, ADerivedClassReachesItsBaseThroughExtends) {
   EXPECT_EQ(vpi_handle(vpiExtends, base), nullptr);
 }
 
+// ...the base named through a package scope being the package's class, not
+// one of the name the deriving module declares (§26.3, #7293)...
+TEST_F(ClassDefinitionsOfARun, ABaseNamedThroughAPackageIsThePackagesClass) {
+  Run("package p; class Base; endclass endpackage\n"
+      "module top; class Base; endclass\n"
+      "  class Derived extends p::Base; endclass endmodule\n");
+  vpiHandle typespec = vpi_handle(
+      vpiClassTypespec, vpi_handle(vpiExtends, DefnIn(By("top"), "Derived")));
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, typespec), "Base");
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiClassDefn, typespec)),
+            VpiObjectOf(DefnIn(By("p"), "Base")));
+  EXPECT_TRUE(NamesOf(vpiDerivedClasses, DefnIn(By("top"), "Base")).empty());
+}
+
 // ...and detail 5: a base class iterates the classes derived from it.
 TEST_F(ClassDefinitionsOfARun, ABaseClassIteratesItsDerivedClasses) {
   Run("module top; class Base; endclass class A extends Base; endclass\n"

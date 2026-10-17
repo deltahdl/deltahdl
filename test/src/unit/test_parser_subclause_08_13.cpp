@@ -13,6 +13,9 @@ TEST(InheritanceParsing, ExtendsScopedName) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 
   EXPECT_EQ(r.cu->classes[0]->name, "Child");
+  // §26.3 with A.2.2.1: the package scope is kept beside the class's name.
+  EXPECT_EQ(r.cu->classes[0]->base_class, "Base");
+  EXPECT_EQ(r.cu->classes[0]->base_class_scope, "pkg");
 }
 
 TEST(InheritanceParsing, ClassExtends) {
@@ -21,6 +24,7 @@ TEST(InheritanceParsing, ClassExtends) {
   auto* cls = r.cu->classes[0];
   EXPECT_EQ(cls->name, "child");
   EXPECT_EQ(cls->base_class, "parent");
+  EXPECT_TRUE(cls->base_class_scope.empty());
 }
 
 TEST(InheritanceParsing, SubclassInheritsAndAddsMembers) {

@@ -36,6 +36,29 @@ TEST(ExtendsVsImplementsParsing, ImplementsMultipleInterfaces) {
   EXPECT_EQ(cls->implements_types[2].name, "IFace3");
 }
 
+// A.2.2.1 with §26.3: an interface class implemented or extended through a
+// package scope keeps the package beside its name, and a bare one keeps none.
+TEST(ExtendsVsImplementsParsing, ScopedInterfaceClassesKeepTheirPackage) {
+  auto r = Parse(
+      "class C implements p::I, J;\n"
+      "endclass\n"
+      "interface class K extends q::A, r::B;\n"
+      "endclass\n");
+  ASSERT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->classes.size(), 2u);
+  const auto& implemented = r.cu->classes[0]->implements_types;
+  ASSERT_EQ(implemented.size(), 2u);
+  EXPECT_EQ(implemented[0].name, "I");
+  EXPECT_EQ(implemented[0].scope, "p");
+  EXPECT_EQ(implemented[1].name, "J");
+  EXPECT_TRUE(implemented[1].scope.empty());
+  const auto* k = r.cu->classes[1];
+  EXPECT_EQ(k->base_class_scope, "q");
+  ASSERT_EQ(k->extends_interfaces.size(), 1u);
+  EXPECT_EQ(k->extends_interfaces[0].name, "B");
+  EXPECT_EQ(k->extends_interfaces[0].scope, "r");
+}
+
 TEST(ExtendsVsImplementsParsing, ImplementsWithParamAssignment) {
   auto r = Parse(
       "class C implements IFace#(int);\n"

@@ -50,6 +50,12 @@ const ClassDecl* FindClassInPackage(std::string_view pkg_name,
   return nullptr;
 }
 
+const ClassDecl* FindReferencedClass(const InterfaceRef& ref,
+                                     const CompilationUnit* unit) {
+  const ClassDecl* in_package = FindClassInPackage(ref.scope, ref.name, unit);
+  return in_package != nullptr ? in_package : FindClassDecl(ref.name, unit);
+}
+
 const ClassDecl* FindNestedClass(const ClassDecl* cls, std::string_view name) {
   for (const auto* m : cls->members) {
     if (m->kind == ClassMemberKind::kClassDecl && m->nested_class &&

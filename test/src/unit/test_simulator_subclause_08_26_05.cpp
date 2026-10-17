@@ -186,6 +186,40 @@ TEST(InterfaceClassCastingAndRefAssignment, E2eCastObjectToInterfaceSucceeds) {
             1u);
 }
 
+// §8.26.2 with §26.3: a class implementing `p::I` is one of the package's
+// interface class, though the module declares an I of its own, so the cast
+// from a handle of its base class succeeds and the call through it reads 4:
+// 14. Kept as a bare I, the class implemented the module's and the cast
+// failed.
+TEST(InterfaceClassCastingAndRefAssignment,
+     ACastReachesTheInterfaceClassNamedThroughAPackage) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  interface class I;\n"
+                      "    pure virtual function int g();\n"
+                      "  endclass\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  interface class I;\n"
+                      "    pure virtual function int f();\n"
+                      "  endclass\n"
+                      "  class Base;\n"
+                      "  endclass\n"
+                      "  class C extends Base implements p::I;\n"
+                      "    virtual function int g(); return 4; endfunction\n"
+                      "  endclass\n"
+                      "  C c_obj = new;\n"
+                      "  Base b;\n"
+                      "  p::I h;\n"
+                      "  int result;\n"
+                      "  initial begin\n"
+                      "    b = c_obj;\n"
+                      "    result = $cast(h, b) * 10 + h.g();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "result"),
+            14u);
+}
+
 TEST(InterfaceClassCastingAndRefAssignment,
      E2eCastInterfaceBackToImplSucceeds) {
   EXPECT_EQ(RunAndGet("interface class IC;\n"
