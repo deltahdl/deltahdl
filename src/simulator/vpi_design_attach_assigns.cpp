@@ -584,10 +584,6 @@ VpiObject* HierarchicalObject(const Expr* expr, const AssignBuild& build) {
                           : FindObjectForFlatName(build.names.objects, dotted);
 }
 
-// The object standing for one side of an assignment: the net or variable a
-// name stands for, a constant, a select, a call, or an operation over these.
-// The kinds of expression the switch does not name are not modelled and give
-// null.
 // §37.59 details 3 and 5: a cast, an operation related to the typespec of the
 // type it casts its operand to. Where the cast names no type, the expression
 // it was written with is a size cast's width (§6.24.1), whose value it has
@@ -614,12 +610,21 @@ VpiObject* UnaryObject(const Expr* expr, const AssignBuild& build) {
                          {expr->lhs}, build);
 }
 
+// The net, variable or parameter the simple name `expr` resolves to, or the
+// parameter a genvar it names stands as.
+VpiObject* NamedObject(const Expr* expr, const AssignBuild& build) {
+  VpiObject* named = Resolve(build.names, expr->text);
+  return named != nullptr ? named : GenvarParameter(expr->text, build);
+}
+
+// The object standing for one side of an assignment: the net or variable a
+// name stands for, a constant, a select, a call, or an operation over these.
+// A kind of expression the switch does not name is no dotted name either, so
+// HierarchicalObject gives null for it: such a kind is not modelled.
 VpiObject* ModelledExpression(const Expr* expr, const AssignBuild& build) {
   switch (expr->kind) {
-    case ExprKind::kIdentifier: {
-      VpiObject* named = Resolve(build.names, expr->text);
-      return named != nullptr ? named : GenvarParameter(expr->text, build);
-    }
+    case ExprKind::kIdentifier:
+      return NamedObject(expr, build);
     case ExprKind::kIntegerLiteral:
     case ExprKind::kUnbasedUnsizedLiteral:
     case ExprKind::kRealLiteral:
@@ -658,9 +663,8 @@ VpiObject* ModelledExpression(const Expr* expr, const AssignBuild& build) {
     case ExprKind::kSystemCall:
       return CallObject(expr, build);
     case ExprKind::kMemberAccess:
-      return HierarchicalObject(expr, build);
     default:
-      return nullptr;
+      return HierarchicalObject(expr, build);
   }
 }
 
