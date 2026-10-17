@@ -38,6 +38,7 @@ struct AssertionTextScan {
   std::vector<OpenInstance> open;
   int braces = 0;
   std::vector<int> patterns;
+  bool in_attribute = false;
 
   void CountArgToken(const Token& t) {
     if (open.empty() || parens < open.back().depth) return;
@@ -155,6 +156,13 @@ struct AssertionTextScan {
   }
 
   void Step(const Token& t, const Token& next) {
+    // §5.12: an attribute instance, written after an operator, names the
+    // attribute rather than an object of the scope, and is passed over whole
+    // as though it were not written.
+    if (in_attribute || t.Is(TokenKind::kAttrStart)) {
+      in_attribute = !t.Is(TokenKind::kAttrEnd);
+      return;
+    }
     if (t.Is(TokenKind::kLParen)) {
       OpenParen(t);
     } else if (t.Is(TokenKind::kRParen)) {

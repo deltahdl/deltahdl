@@ -541,5 +541,27 @@ TEST_F(AttributesOfARun, AnOperationOutsideAnAssignmentCarriesItsAttributes) {
             std::vector<std::string>{"t6"});
 }
 
+// The operation a property declaration's body is carries the attributes its
+// operator is written with, whether a module or a package declares the
+// property.
+TEST_F(AttributesOfARun, APropertysOperationCarriesItsOperatorsAttributes) {
+  Run("package p; logic x, y;\n"
+      "  property q; x ^ (* in_pkg *) y; endproperty\n"
+      "endpackage\n"
+      "module top; logic a, b;\n"
+      "  property r; a || (* in_mod *) b; endproperty\n"
+      "endmodule\n");
+  const auto kBodyOf = [](vpiHandle scope, const char* name) {
+    vpiHandle decl = Named(vpiPropertyDecl, scope, name);
+    return decl == nullptr
+               ? nullptr
+               : vpi_handle(vpiPropertyExpr, vpi_handle(vpiPropertySpec, decl));
+  };
+  EXPECT_EQ(NamesOf(vpiAttribute, kBodyOf(By("p"), "q")),
+            std::vector<std::string>{"in_pkg"});
+  EXPECT_EQ(NamesOf(vpiAttribute, kBodyOf(By("top"), "r")),
+            std::vector<std::string>{"in_mod"});
+}
+
 }  // namespace
 }  // namespace delta

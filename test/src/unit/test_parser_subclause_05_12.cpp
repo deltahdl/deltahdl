@@ -1,8 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <string_view>
+#include <vector>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_assertion_text.h"
 #include "parser/ast_class.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -337,6 +341,29 @@ TEST(LexicalConventionParsing, TopLevelAttributesStayWithTheirDeclaration) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
   ASSERT_EQ(r.cu->classes[0]->attrs.size(), 1u);
   EXPECT_EQ(r.cu->classes[0]->attrs[0].name, "on_class");
+}
+
+// An attribute instance after an operator in a property body names the
+// attribute, so the names the body reads are its operands alone, whatever
+// operator the attribute follows.
+TEST(LexicalConventionParsing, PropertyBodyAttributeIsNoRead) {
+  auto r = Parse(
+      "module m; logic a, b, c;\n"
+      "  property r; a || (* t1 *) b ^ (* t2 = c *) b; endproperty\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  const ModuleItem* decl = nullptr;
+  for (const ModuleItem* item : r.cu->modules[0]->items) {
+    if (item->kind == ModuleItemKind::kPropertyDecl) decl = item;
+  }
+  ASSERT_NE(decl, nullptr);
+  std::vector<std::string_view> reads;
+  for (const AssertionRead& read : decl->assertion_reads) {
+    reads.push_back(read.name);
+  }
+  EXPECT_EQ(reads, (std::vector<std::string_view>{"a", "b", "b"}));
 }
 
 }  // namespace
