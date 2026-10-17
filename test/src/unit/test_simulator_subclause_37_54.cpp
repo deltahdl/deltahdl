@@ -238,7 +238,7 @@ TEST(SequenceExprModel, SequenceInstResolvesItsDeclaration) {
   inst.type = vpiSequenceInst;
   VpiObject decl;
   decl.type = vpiSequenceDecl;
-  inst.children = {&decl};
+  inst.sequence_decl = &decl;
   EXPECT_EQ(VpiSequenceInstDecl(&inst), &decl);
 
   VpiObject lone;
@@ -247,17 +247,16 @@ TEST(SequenceExprModel, SequenceInstResolvesItsDeclaration) {
   EXPECT_EQ(VpiSequenceInstDecl(nullptr), nullptr);
 }
 
-// D4 edge: the relation matches by the declaration kind, so an instance whose
-// children are all something other than a sequence declaration resolves to
-// none.
-TEST(SequenceExprModel, SequenceInstWithOnlyOtherChildrenResolvesNone) {
+// D4 edge: the declaration belongs to the scope declaring it (§37.12), so a
+// sequence decl among an instance's children is not the one it instantiates.
+TEST(SequenceExprModel, SequenceInstWithADeclChildResolvesNone) {
   VpiObject inst;
   inst.type = vpiSequenceInst;
-  VpiObject named_event;
-  named_event.type = vpiNamedEvent;
+  VpiObject decl;
+  decl.type = vpiSequenceDecl;
   VpiObject operand;
   operand.type = vpiOperation;
-  inst.children = {&named_event, &operand};
+  inst.children = {&decl, &operand};
 
   EXPECT_EQ(VpiSequenceInstDecl(&inst), nullptr);
 }
@@ -300,6 +299,11 @@ constexpr const char* kSequenceOperators =
     "  d1: assert property (@(posedge clk) a ##1 b);\n"
     "  d2: assert property (@(posedge clk) a ##[1:3] b);\n"
     "  d3: assert property (@(posedge clk) ##2 a);\n"
+    "  d4: assert property (@(posedge clk) ##0 a);\n"
+    "  sequence s(x, y = c); x ##1 y; endsequence\n"
+    "  sequence u; a; endsequence\n"
+    "  i1: assert property (@(posedge clk) s(a) ##1 b);\n"
+    "  i2: assert property (@(posedge clk) u);\n"
     "  r1: assert property (@(posedge clk) a[*2] ##1 b);\n"
     "  r2: assert property (@(posedge clk) a[->1:2] ##1 b);\n"
     "  r3: assert property (@(posedge clk) a[=3] ##1 b);\n"
@@ -354,6 +358,43 @@ TEST_F(SequenceExprsOfARun, CycleDelaysTakeTheirRanges) {
             (std::vector<std::string>{"a", "b", "1", "3"}));
   EXPECT_EQ(OpOf(PropertyOf("d3")), vpiUnaryCycleDelayOp);
   EXPECT_EQ(Spelled(PropertyOf("d3")), (std::vector<std::string>{"a", "2"}));
+}
+
+// A leading `##0` is a unary cycle delay over its sequence and its range, as
+// any other leading delay is, rather than the sequence alone (detail 3)
+// (#7184).
+TEST_F(SequenceExprsOfARun, ALeadingZeroDelayIsAUnaryCycleDelay) {
+  EXPECT_EQ(OpOf(PropertyOf("d4")), vpiUnaryCycleDelayOp);
+  EXPECT_EQ(Spelled(PropertyOf("d4")), (std::vector<std::string>{"a", "0"}));
+}
+
+// A named sequence an operand writes is a sequence inst, reaching the sequence
+// decl it instantiates and its arguments in the order of the formals, a
+// default standing for one not given (detail 1); one written as the whole
+// property is one too (#7183).
+TEST_F(SequenceExprsOfARun, ANamedSequenceIsASequenceInst) {
+  vpiHandle chain = PropertyOf("i1");
+  EXPECT_EQ(OpOf(chain), vpiCycleDelayOp);
+  const std::vector<vpiHandle> kParts = OperandsOf(chain);
+  ASSERT_EQ(kParts.size(), 3u);
+  vpiHandle inst = kParts[0];
+  EXPECT_EQ(vpi_get(vpiType, inst), vpiSequenceInst);
+  vpiHandle decl = vpi_handle(vpiSequenceDecl, inst);
+  ASSERT_NE(decl, nullptr);
+  EXPECT_TRUE(
+      vpi_compare_objects(decl, Named(vpiSequenceDecl, By("top"), "s")));
+  std::vector<std::string> arguments;
+  for (vpiHandle argument : ObjectsOf(vpiArgument, inst)) {
+    arguments.emplace_back(vpi_get_str(vpiName, argument));
+  }
+  EXPECT_EQ(arguments, (std::vector<std::string>{"a", "c"}));
+  EXPECT_EQ(vpi_handle(vpiExpr, inst), nullptr);
+  vpiHandle whole = PropertyOf("i2");
+  ASSERT_NE(whole, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, whole), vpiSequenceInst);
+  vpiHandle whole_decl = vpi_handle(vpiSequenceDecl, whole);
+  ASSERT_NE(whole_decl, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, whole_decl), "u");
 }
 
 // A repetition takes the sequence repeated and its bounds, the right only

@@ -16,6 +16,7 @@
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_design_attach_assertion_decls.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_attach_procedures_internal.h"
 #include "simulator/vpi_design_walk.h"
@@ -355,27 +356,36 @@ void WalkSubStmts(const Stmt& stmt, const BlockParent& parent,
 
 // What a statement at `parent` builds with, while `parent` and `walk` live.
 VpiStmtBuild StmtBuildAt(const BlockParent& parent, const BodyWalk& walk) {
-  return {walk.build,
-          [site = CallSiteOf(parent, walk), &walk](const Expr* expr) {
-            return VpiCallSiteExpression(expr, walk.objects, site,
-                                         walk.calls.ctx, walk.build);
-          },
-          [&parent, &walk](const Stmt* held, VpiObject* holder) {
-            return WalkStmt(
-                held, BlockParent{holder, parent.path, nullptr, &parent}, walk);
-          },
-          [&parent, &walk](const Expr* array) {
-            return ForeachIndexKind(array, parent, walk);
-          },
-          [site = CallSiteOf(parent, walk), &walk](const Expr* expr,
-                                                   const VpiObject* target) {
-            return VpiCallSiteAssignedExpression(
-                {expr, target}, walk.objects, site, walk.calls.ctx, walk.build);
-          },
-          [&walk](std::string_view name) {
-            return VpiImportedPropertyDecl(name, walk.mod.imports,
-                                           walk.objects);
-          }};
+  return {
+      walk.build,
+      [site = CallSiteOf(parent, walk), &walk](const Expr* expr) {
+        return VpiCallSiteExpression(expr, walk.objects, site, walk.calls.ctx,
+                                     walk.build);
+      },
+      [&parent, &walk](const Stmt* held, VpiObject* holder) {
+        return WalkStmt(
+            held, BlockParent{holder, parent.path, nullptr, &parent}, walk);
+      },
+      [&parent, &walk](const Expr* array) {
+        return ForeachIndexKind(array, parent, walk);
+      },
+      [site = CallSiteOf(parent, walk), &walk](const Expr* expr,
+                                               const VpiObject* target) {
+        return VpiCallSiteAssignedExpression({expr, target}, walk.objects, site,
+                                             walk.calls.ctx, walk.build);
+      },
+      [&walk](std::string_view name) {
+        return VpiImportedPropertyDecl(name, walk.mod.imports, walk.objects);
+      },
+      // §16.8 with §26.3: a sequence a scope around the statement
+      // declares, or else one a package declares, which an import makes
+      // visible.
+      [&parent, &walk](std::string_view name) {
+        VpiObject* declared = VpiSequenceDeclAround(parent.scope, name);
+        return declared != nullptr ? declared
+                                   : VpiImportedSequenceDecl(
+                                         name, walk.mod.imports, walk.objects);
+      }};
 }
 
 // The object a statement the builder of vpi_design_attach_statements.cpp
@@ -539,23 +549,64 @@ void AttachScopedItems(VpiObject* instance, const BodyWalk& instance_walk,
   }
 }
 
+// What builds the declaration of a property or a sequence, VpiMakePropertyDecl
+// or VpiMakeSequenceDecl.
+using DeclMaker = VpiObject* (*)(const RtlirAssertionItemDecl&,
+                                 const VpiPropertyDeclSite&,
+                                 const VpiStmtBuild&);
+
+// §37.12 with §37.83: the declaration `make` builds for `declared` in
+// `scope`, walked with `instance_walk`, carrying the attributes it is written
+// with.
+VpiObject* MakeAttributedDecl(DeclMaker make,
+                              const RtlirAssertionItemDecl& declared,
+                              VpiObject* scope, const VpiStmtBuild& with,
+                              const BodyWalk& instance_walk) {
+  const VpiCallBuild& calls = instance_walk.calls;
+  VpiObject* made =
+      make(declared,
+           {scope, calls.unit_typespecs, calls.ctx, instance_walk.mod.imports},
+           with);
+  VpiAttachAttributes(made,
+                      VpiNodeAttributes(&instance_walk.mod, declared.item),
+                      false, calls.ctx, instance_walk.build);
+  return made;
+}
+
+// The sequences one instance declares, each in the generate block instance
+// writing it, walked with `instance_walk`: every one declared before any body
+// is built, a body instantiating sequences declared after it (§16.8).
+void AttachInstanceSequences(VpiObject* instance,
+                             const BodyWalk& instance_walk) {
+  const auto& declared = instance_walk.mod.declared_sequences;
+  std::vector<VpiObject*> made;
+  made.reserve(declared.size());
+  AttachScopedItems(
+      instance, instance_walk, declared,
+      [&instance_walk, &made](const RtlirAssertionItemDecl& sequence,
+                              VpiObject* scope, const VpiStmtBuild& with) {
+        made.push_back(MakeAttributedDecl(VpiMakeSequenceDecl, sequence, scope,
+                                          with, instance_walk));
+      });
+  size_t next = 0;
+  AttachScopedItems(instance, instance_walk, declared,
+                    [&made, &next](const RtlirAssertionItemDecl& sequence,
+                                   VpiObject*, const VpiStmtBuild& with) {
+                      VpiFillSequenceDeclBody(made[next++], *sequence.item,
+                                              with);
+                    });
+}
+
 // The properties one instance declares, each in the generate block instance
 // writing it, walked with `instance_walk`.
 void AttachInstanceProperties(VpiObject* instance,
                               const BodyWalk& instance_walk) {
   AttachScopedItems(
       instance, instance_walk, instance_walk.mod.declared_properties,
-      [&instance_walk](const RtlirPropertyDecl& declared, VpiObject* scope,
+      [&instance_walk](const RtlirAssertionItemDecl& declared, VpiObject* scope,
                        const VpiStmtBuild& with) {
-        const VpiCallBuild& calls = instance_walk.calls;
-        VpiObject* made = VpiMakePropertyDecl(
-            declared,
-            {scope, calls.unit_typespecs, calls.ctx, instance_walk.mod.imports},
-            with);
-        // §37.83: the attributes the declaration is written with.
-        VpiAttachAttributes(
-            made, VpiNodeAttributes(&instance_walk.mod, declared.item), false,
-            calls.ctx, instance_walk.build);
+        MakeAttributedDecl(VpiMakePropertyDecl, declared, scope, with,
+                           instance_walk);
       });
 }
 
@@ -693,8 +744,9 @@ void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,
     return;
   }
   // The first top carries the empty prefix and is keyed under its own name.
-  // §37.51: every instance's properties are built ahead of every assertion,
-  // which may instantiate one through an instance below its own (§23.6).
+  // §37.51 and §37.53: every instance's sequences, and then its properties,
+  // are built ahead of every assertion, which may instantiate one through an
+  // instance below its own (§23.6).
   const std::string kFirstTop(design->top_modules.front()->name);
   const auto kWalk = [&](void (*attach)(VpiObject*, const BodyWalk&)) {
     WalkInstancePaths(
@@ -704,6 +756,7 @@ void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,
                  BodyWalk{*design, *mod, objects, prefix, calls, build});
         });
   };
+  kWalk(AttachInstanceSequences);
   kWalk(AttachInstanceProperties);
   kWalk(AttachInstanceProcedures);
 }

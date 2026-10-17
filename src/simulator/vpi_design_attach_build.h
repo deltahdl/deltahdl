@@ -32,7 +32,6 @@ struct PackageDecl;
 struct PropertyExprNode;
 struct SeqLinearBody;
 struct RtlirAssertion;
-struct RtlirPropertyDecl;
 struct RtlirDesign;
 struct RtlirImport;
 struct RtlirModule;
@@ -530,6 +529,10 @@ struct VpiStmtBuild {
   std::function<int(const Expr*)> index_kind;
   std::function<VpiObject*(const Expr*, const VpiObject*)> assigned;
   std::function<VpiObject*(std::string_view)> imported_property;
+  // §37.54: the sequence decl a sequence named `name` where the statement
+  // stands instantiates, null where the name declares none; null for a
+  // builder no sequence is instantiated through.
+  std::function<VpiObject*(std::string_view)> sequence_decl;
 };
 
 // §37.64 to §37.68, §37.70 to §37.72 and §37.74 to §37.79: the kind of object
@@ -597,53 +600,11 @@ VpiObject* VpiMakePropertySpecOf(VpiObject* holder,
                                  const VpiPropertySpecParts& parts,
                                  const VpiStmtBuild& with);
 
-// §26.3 with §37.51: the property decl named `name` a package declares that
-// one of `imports` makes visible, among the property decls of the package
-// objects `objects` keys; null where no import reaches one.
-VpiObject* VpiImportedPropertyDecl(std::string_view name,
-                                   const std::vector<RtlirImport>& imports,
-                                   const VpiObjectMap& objects);
-
-// §16.12 with §37.10 detail 1: give each package a property decl per property
-// it declares, as VpiMakePropertyDecl makes one, with `unit_typespecs`, the
-// typespecs AttachTypespecs answered, for its formals' types to name.
-void AttachPackagePropertyDecls(const RtlirDesign& design,
-                                const VpiObjectMap& objects,
-                                const VpiObjectMap& unit_typespecs,
-                                SimContext& ctx, const VpiAttachBuild& build);
-
-// §37.51: the property inst the spec `instance` writes, an instance of a
-// declared property, hung from the assertion `holder`, reaching the property
-// decl of that name the scope around `holder` declares and its arguments, each
-// built through `with`.
-VpiObject* VpiMakePropertyInst(VpiObject* holder, const Expr& instance,
-                               const VpiStmtBuild& with);
-
 // §37.22: a range object under `parent` of the dimension `bounds`, an empty
 // range where it has none.
 VpiObject* VpiRangeObject(VpiObject* parent,
                           const std::optional<PackedRange>& bounds,
                           const VpiAttachBuild& build);
-
-// Where a property decl is built: `scope`, the instance or the generate block
-// instance declaring it; the typespecs AttachTypespecs answered, the
-// compilation unit's and the packages', which a formal's type may name; the
-// run its packed dimensions are evaluated in; and the imports of the module
-// declaring it, through which a formal's type may name a package's typedef.
-struct VpiPropertyDeclSite {
-  VpiObject* scope;
-  const VpiObjectMap& unit_typespecs;
-  SimContext& ctx;
-  const std::vector<RtlirImport>& imports;
-};
-
-// §37.12 and §37.51: the property decl of the property `declared` stands
-// for, hung from the scope declaring it, `at.scope` or the clocking block it
-// holds that declares it, with its formals, their typespecs, its variables
-// and its property spec, each built through `with`.
-VpiObject* VpiMakePropertyDecl(const RtlirPropertyDecl& declared,
-                               const VpiPropertyDeclSite& at,
-                               const VpiStmtBuild& with);
 
 // The objects `obj`, made for `stmt` with the kind above, reaches: the
 // expressions its figure draws and the statements it holds, each built

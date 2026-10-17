@@ -724,9 +724,11 @@ struct RtlirModule {
   std::vector<ModuleItem*> clocking_blocks;
   // §16.14 and §16.4: the assertions written as items of the module, the
   // concurrent ones and the deferred immediate ones, in source order; §37.12:
-  // the properties it and its generate blocks declare, each of its scope.
+  // the properties and the sequences it and its generate blocks declare, each
+  // of its scope.
   std::vector<RtlirAssertion> assertions;
-  std::vector<RtlirPropertyDecl> declared_properties;
+  std::vector<RtlirAssertionItemDecl> declared_properties;
+  std::vector<RtlirAssertionItemDecl> declared_sequences;
   // §25.5 with §37.7: an interface's modport declarations, in source order;
   // empty for every other kind of definition.
   std::vector<const ModportDecl*> modports;

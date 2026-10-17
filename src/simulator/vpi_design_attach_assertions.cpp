@@ -16,6 +16,7 @@
 #include "parser/ast_stmt.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_design_attach_assertion_decls.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
@@ -144,10 +145,10 @@ VpiObject* WithMatchItems(VpiObject* object,
 
 // §16.9.2: the operand `index` of the chain `body` with its match items,
 // under the repetition it carries, the sequence repeated first and then its
-// bounds (detail 3).
+// bounds (detail 3); an operand naming a sequence its instance (§37.54).
 VpiObject* RepeatedOperand(const SeqLinearBody& body, size_t index,
                            const VpiStmtBuild& with) {
-  VpiObject* operand = with.expression(body.operands[index]);
+  VpiObject* operand = VpiSequenceOperandObject(body.operands[index], with);
   if (index < body.match_items.size()) {
     operand = WithMatchItems(operand, body.match_items[index], with);
   }
@@ -180,13 +181,13 @@ struct ChainElement {
 
 // §16.9.1 and §16.9.2: `elements` joined left to right by the cycle delays
 // between them, each with its two sequences and its range, and a delay
-// before the first a unary cycle delay over it (detail 3).
+// before the first, `##0` among them, a unary cycle delay over it (detail 3).
 VpiObject* JoinChain(const std::vector<ChainElement>& elements,
                      const VpiStmtBuild& with) {
   if (elements.empty()) return nullptr;
   VpiObject* chain = elements[0].sequence;
   const SeqCycleDelay& lead = elements[0].before;
-  if (lead.min != 0 || lead.max != 0) {
+  if (lead.written || lead.min != 0 || lead.max != 0) {
     std::vector<VpiObject*> operands{chain};
     AppendBounds(operands, lead.min, lead.max, with.build);
     chain =
@@ -232,9 +233,11 @@ VpiObject* ThroughoutExpr(const SeqLinearBody& body, const SeqThroughout& span,
                           const VpiStmtBuild& with) {
   std::vector<ChainElement> held =
       ChainElements(body, span.first, span.last + 1, &span, with);
+  // The delay written before the throughout is the chain's around it.
   if (!held.empty()) {
     held[0].before.min = span.lead;
     held[0].before.max = span.lead;
+    held[0].before.written = false;
   }
   return PropertyOperation(vpiThroughoutOp,
                            {with.expression(span.cond), JoinChain(held, with)},
@@ -373,6 +376,7 @@ VpiObject* ClockedRun(const SeqLinearBody& body, size_t start, size_t end,
   if (start > 0 && !run.empty()) {
     run[0].before.min = 0;
     run[0].before.max = 0;
+    run[0].before.written = false;
   }
   VpiObject* clocked = with.build.alloc();
   clocked->type = vpiClockedSeq;
@@ -581,14 +585,15 @@ VpiObject* CaseProperty(const PropertyExprNode& node, const VpiStmtBuild& with,
 }
 
 // §37.52: the property expr `node` stands for, its own clock aside, the
-// clock `flowing` into it flowing into its operands (§16.13.3).
+// clock `flowing` into it flowing into its operands (§16.13.3). A Boolean
+// naming a sequence is the sequence inst it writes (§37.54).
 VpiObject* UnclockedPropertyExpr(const PropertyExprNode* node,
                                  const VpiStmtBuild& with,
                                  const std::vector<EventExpr>* flowing) {
   using Kind = PropertyExprNode::Kind;
   switch (node->kind) {
     case Kind::kBoolean:
-      return with.expression(node->boolean);
+      return VpiSequenceOperandObject(node->boolean, with);
     case Kind::kSequence:
       return SequenceOperand(node->sequence, with, flowing);
     case Kind::kNot:

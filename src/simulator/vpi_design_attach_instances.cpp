@@ -16,6 +16,7 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/unit_scopes.h"
 #include "simulator/vpi_context.h"
+#include "simulator/vpi_design_attach_assertion_decls.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_model_helpers1.h"
@@ -264,10 +265,10 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     AttachVariableRanges(*design, object_map_, *sim_ctx_, kBuild);
     AttachModports(design, object_map_, *sim_ctx_, kBuild);
     const VpiCallBuild kCalls = CallBuild();
-    // §37.51: a package's properties are built ahead of the assertions
-    // instantiating them.
-    AttachPackagePropertyDecls(*design, object_map_,
-                               call_objects_.unit_typespecs, *sim_ctx_, kBuild);
+    // §37.51 and §37.53: a package's sequences and properties are built ahead
+    // of the assertions instantiating them.
+    AttachPackageAssertionItemDecls(
+        *design, object_map_, call_objects_.unit_typespecs, *sim_ctx_, kBuild);
     AttachProcedures(design, object_map_, kCalls, kBuild);
     AttachPrimitives(
         design, object_map_,

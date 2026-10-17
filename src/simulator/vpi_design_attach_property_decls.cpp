@@ -3,6 +3,7 @@
 #include <iterator>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/packed_range.h"
@@ -16,6 +17,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_design_attach_assertion_decls.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_model_helpers1.h"
@@ -128,7 +130,10 @@ VpiObject* ClassTypespec(VpiObject* formal, std::string_view name,
 void MakeFormalTypespec(const ModuleItem& decl, size_t index, VpiObject* formal,
                         const VpiPropertyDeclSite& at,
                         const VpiAttachBuild& build) {
-  const DataType* type = decl.prop_formal_types[index];
+  // A sequence's formals carry their type keyword alone (§16.8).
+  const DataType* type = index < decl.prop_formal_types.size()
+                             ? decl.prop_formal_types[index]
+                             : nullptr;
   if (type != nullptr && type->kind == DataTypeKind::kNamed) {
     VpiObject* named = TypedefTypespec(formal->parent, type->type_name, at);
     formal->children.push_back(
@@ -171,22 +176,61 @@ void MakePropFormal(const ModuleItem& decl, size_t index, VpiObject* property,
   property->children.push_back(formal);
 }
 
-// §37.51 with §16.10: the variable the local variable `local` a property
-// declares stands as, hung from the property decl `property` and named in
-// it, of the kind its type is (§37.17), the kind the type name it is
-// declared with stands for where it names one (§6.18), resolved in `ctx`.
-// §37.52 detail 1 gives its value no access, so it holds none.
-void MakePropertyVariable(const SeqLocalDecl& local, VpiObject* property,
+// §37.53: the vpiDirection of the formal `index` of the sequence `decl`:
+// none unless it is a local variable argument, which has the direction
+// §16.8.2 gives it, written or inferred, `decl` recording one per such
+// argument in the order declared.
+int SeqFormalDirection(const ModuleItem& decl, size_t index) {
+  if (!decl.prop_formal_is_local[index]) return vpiNoDirection;
+  const size_t kLocal = static_cast<size_t>(std::count(
+      decl.prop_formal_is_local.begin(),
+      decl.prop_formal_is_local.begin() + static_cast<std::ptrdiff_t>(index),
+      true));
+  switch (decl.prop_seq_local_lvar_directions[kLocal]) {
+    case Direction::kOutput:
+      return vpiOutput;
+    case Direction::kInout:
+      return vpiInout;
+    default:
+      return vpiInput;
+  }
+}
+
+// §37.53: the seq formal decl the formal `index` of `decl` stands as, hung
+// from `sequence`: named, of the direction SeqFormalDirection gives it
+// (detail 4), reaching the typespec of the type it is declared with (detail
+// 2) and the default value it declares, where it declares one, through
+// vpiExpr (detail 3).
+void MakeSeqFormal(const ModuleItem& decl, size_t index, VpiObject* sequence,
+                   const VpiPropertyDeclSite& at, const VpiStmtBuild& with) {
+  VpiObject* formal = with.build.alloc();
+  formal->type = vpiSeqFormalDecl;
+  formal->parent = sequence;
+  formal->name = with.build.keep(std::string(decl.prop_formals[index]));
+  formal->direction = SeqFormalDirection(decl, index);
+  MakeFormalTypespec(decl, index, formal, at, with.build);
+  VpiObject* value = with.expression(decl.prop_formal_defaults[index]);
+  if (value != nullptr) formal->children.push_back(value);
+  sequence->children.push_back(formal);
+}
+
+// §37.51 and §37.53 with §16.10: the variable the local variable `local` a
+// property or a sequence declares stands as, hung from its declaration
+// `declared` and named in it, of the kind its type is (§37.17), the kind the
+// type name it is declared with stands for where it names one (§6.18),
+// resolved in `ctx`. §37.52 detail 1 gives its value no access, so it holds
+// none.
+void MakeDeclaredVariable(const SeqLocalDecl& local, VpiObject* declared,
                           const SimContext& ctx, const VpiAttachBuild& build) {
   VpiObject* var = build.alloc();
   var->type =
       VpiDataTypeVariableKind(local.named_type.kind == DataTypeKind::kNamed
                                   ? DeclaredTypeKind(local.named_type, ctx)
                                   : KeywordDataType(local.type_kw));
-  var->parent = property;
+  var->parent = declared;
   var->name = build.keep(std::string(local.name));
-  var->full_name = VpiScopedFullName(property, local.name);
-  property->children.push_back(var);
+  var->full_name = VpiScopedFullName(declared, local.name);
+  declared->children.push_back(var);
 }
 
 // The child of `scope` of `type` named `name`; null where none is.
@@ -208,19 +252,20 @@ VpiObject* PropertyHolderNamed(const VpiObject* scope,
   return block != nullptr ? block : ChildOfType(scope, vpiInterface, prefix);
 }
 
-// §37.51: the property decl named `name` the scope standing around `holder`
+// §37.51 and §37.53: the declaration of `type`, a property decl or a
+// sequence decl, named `name` that `from` or a scope standing around it
 // declares, the nearest from a generate block instance out to the instance;
 // null where none was built. A name written through a clocking block or an
-// interface instance is the property that block or instance declares.
-VpiObject* PropertyDeclAround(const VpiObject* holder, std::string_view name) {
+// interface instance is the declaration that block or instance holds.
+VpiObject* DeclAround(const VpiObject* from, int type, std::string_view name) {
   const size_t kDot = name.find('.');
-  for (VpiObject* scope = holder->parent; scope != nullptr;
+  for (const VpiObject* scope = from; scope != nullptr;
        scope = VpiIsInstanceType(scope->type) ? nullptr : scope->parent) {
     VpiObject* found = kDot == std::string_view::npos
-                           ? ChildOfType(scope, vpiPropertyDecl, name)
+                           ? ChildOfType(scope, type, name)
                            : PropertyHolderNamed(scope, name.substr(0, kDot));
     if (found != nullptr && kDot != std::string_view::npos) {
-      return ChildOfType(found, vpiPropertyDecl, name.substr(kDot + 1));
+      return ChildOfType(found, type, name.substr(kDot + 1));
     }
     if (found != nullptr) return found;
   }
@@ -258,6 +303,104 @@ VpiObject* ActualArgument(const Expr* actual, const VpiObject* target,
   return dollar;
 }
 
+// §37.51 and §37.53 with §37.12: the declaration of `type` the property or
+// sequence `declared` stands for, hung from the scope declaring it,
+// `at.scope` or the clocking block it holds that declares it, named in it.
+VpiObject* MakeDeclHead(const RtlirAssertionItemDecl& declared, int type,
+                        const VpiPropertyDeclSite& at,
+                        const VpiAttachBuild& build) {
+  VpiObject* scope = at.scope;
+  // §37.12 with §14.3: a declaration a clocking block holds is of that block,
+  // which AttachClockingBlocks has made under the same scope, the generate
+  // block instance both are stamped with or the instance.
+  if (declared.clocking_block != nullptr) {
+    scope = ChildOfType(scope, vpiClockingBlock, declared.clocking_block->name);
+  }
+  const ModuleItem& decl = *declared.item;
+  VpiObject* obj = build.alloc();
+  obj->type = type;
+  obj->parent = scope;
+  // §16.16 (b): the run keys a clocking block's declaration under the block's
+  // name and its own, `cb.p`, the block being its scope here.
+  const std::string_view kName =
+      declared.clocking_block == nullptr
+          ? decl.name
+          : decl.name.substr(decl.name.rfind('.') + 1);
+  obj->name = build.keep(std::string(kName));
+  obj->full_name = VpiScopedFullName(scope, kName);
+  scope->children.push_back(obj);
+  return obj;
+}
+
+// §26.3: the declaration of `type` named `name` a package declares that one
+// of `imports` makes visible. The first import naming it, the module's own
+// or, ahead of them, the compilation unit's (§3.12.1), gives it. §26.7: the
+// std package every scope imports has no object of its own.
+VpiObject* ImportedDecl(int type, std::string_view name,
+                        const std::vector<RtlirImport>& imports,
+                        const VpiObjectMap& objects) {
+  VpiObject* found = nullptr;
+  for (const RtlirImport& imported : imports) {
+    if (found != nullptr ||
+        (!imported.is_wildcard && imported.item_name != name)) {
+      continue;
+    }
+    const VpiObject* pkg =
+        FindObjectForFlatName(objects, imported.package_name);
+    found = pkg != nullptr ? ChildOfType(pkg, type, name) : nullptr;
+  }
+  return found;
+}
+
+// §37.53 with §37.56: the sequence the body of `decl` is, built through
+// `with`: a multiclock sequence expr where its operands name clocks, the
+// clock the body opens with flowing into its first run, and otherwise the
+// sequence expr it is, under a clocked seq of a multiclock sequence expr of
+// its own where the body opens with a clock, which no sequence expr reaches;
+// null where the parser read no body of the shapes §37.54 builds.
+VpiObject* SequenceDeclBody(const ModuleItem& decl, const VpiStmtBuild& with) {
+  VpiObject* body =
+      VpiSequenceExprObject(decl.seq_linear, with, &decl.seq_clock);
+  if (body == nullptr || decl.seq_clock.empty() ||
+      body->type == vpiMulticlockSequenceExpr) {
+    return body;
+  }
+  VpiObject* multiclock = with.build.alloc();
+  multiclock->type = vpiMulticlockSequenceExpr;
+  VpiObject* clocked = with.build.alloc();
+  clocked->type = vpiClockedSeq;
+  clocked->parent = multiclock;
+  clocked->clocking_event = VpiEventCondition(decl.seq_clock, with);
+  clocked->children.push_back(body);
+  multiclock->children.push_back(clocked);
+  return multiclock;
+}
+
+// §37.54: the sequence inst `instance`, a name or a call naming the sequence
+// `decl` declares, writes, reaching `decl` and an argument per formal of it
+// in the order declared, each built through `with` (detail 1).
+VpiObject* MakeSequenceInst(VpiObject* decl, const Expr& instance,
+                            const VpiStmtBuild& with) {
+  VpiObject* inst = with.build.alloc();
+  inst->type = vpiSequenceInst;
+  inst->sequence_decl = decl;
+  // §37.54 detail 1: an argument per formal, in the order declared, the
+  // formal's default standing for an actual the instance leaves out. One that
+  // stands for no object, an actual not modelled, the vpiArgument iteration
+  // passes over.
+  const std::vector<VpiHandle> kFormals = VpiSeqFormals(decl);
+  std::vector<VpiHandle> provided;
+  std::vector<VpiSequenceFormal> formals;
+  formals.reserve(kFormals.size());
+  for (std::size_t i = 0; i < kFormals.size(); ++i) {
+    const Expr* actual = i < instance.args.size() ? instance.args[i] : nullptr;
+    provided.push_back(ActualArgument(actual, TypespecOf(kFormals[i]), with));
+    formals.push_back(VpiSequenceFormal{VpiSeqFormalInitExpr(kFormals[i])});
+  }
+  inst->arguments = VpiSequenceInstArguments(formals, provided);
+  return inst;
+}
+
 }  // namespace
 
 VpiObject* VpiMakePropertyInst(VpiObject* holder, const Expr& instance,
@@ -267,7 +410,7 @@ VpiObject* VpiMakePropertyInst(VpiObject* holder, const Expr& instance,
   inst->parent = holder;
   const std::string_view kName =
       instance.kind == ExprKind::kCall ? instance.callee : instance.text;
-  inst->property_decl = PropertyDeclAround(holder, kName);
+  inst->property_decl = DeclAround(holder->parent, vpiPropertyDecl, kName);
   // §26.3: a property a package declares, which an import makes visible.
   if (inst->property_decl == nullptr) {
     inst->property_decl = with.imported_property(kName);
@@ -302,34 +445,46 @@ VpiObject* VpiMakePropertyInst(VpiObject* holder, const Expr& instance,
 VpiObject* VpiImportedPropertyDecl(std::string_view name,
                                    const std::vector<RtlirImport>& imports,
                                    const VpiObjectMap& objects) {
-  // The first import naming it, the module's own or, ahead of them, the
-  // compilation unit's (§3.12.1), gives the property. §26.7: the std package
-  // every scope imports has no object of its own.
-  VpiObject* found = nullptr;
-  for (const RtlirImport& imported : imports) {
-    if (found != nullptr ||
-        (!imported.is_wildcard && imported.item_name != name)) {
-      continue;
-    }
-    const VpiObject* pkg =
-        FindObjectForFlatName(objects, imported.package_name);
-    found = pkg != nullptr ? ChildOfType(pkg, vpiPropertyDecl, name) : nullptr;
-  }
-  return found;
+  return ImportedDecl(vpiPropertyDecl, name, imports, objects);
 }
 
-void AttachPackagePropertyDecls(const RtlirDesign& design,
-                                const VpiObjectMap& objects,
-                                const VpiObjectMap& unit_typespecs,
-                                SimContext& ctx, const VpiAttachBuild& build) {
-  // §16.12 with §37.10 detail 1: a property a package declares is a property
-  // decl of the package, its expressions resolving among the package's names.
+VpiObject* VpiImportedSequenceDecl(std::string_view name,
+                                   const std::vector<RtlirImport>& imports,
+                                   const VpiObjectMap& objects) {
+  return ImportedDecl(vpiSequenceDecl, name, imports, objects);
+}
+
+VpiObject* VpiSequenceDeclAround(const VpiObject* scope,
+                                 std::string_view name) {
+  return DeclAround(scope, vpiSequenceDecl, name);
+}
+
+VpiObject* VpiSequenceOperandObject(const Expr* operand,
+                                    const VpiStmtBuild& with) {
+  if (operand != nullptr && (operand->kind == ExprKind::kIdentifier ||
+                             operand->kind == ExprKind::kCall)) {
+    VpiObject* decl = with.sequence_decl(
+        operand->kind == ExprKind::kCall ? operand->callee : operand->text);
+    if (decl != nullptr) return MakeSequenceInst(decl, *operand, with);
+  }
+  return with.expression(operand);
+}
+
+void AttachPackageAssertionItemDecls(const RtlirDesign& design,
+                                     const VpiObjectMap& objects,
+                                     const VpiObjectMap& unit_typespecs,
+                                     SimContext& ctx,
+                                     const VpiAttachBuild& build) {
+  // §16.8 and §16.12 with §37.10 detail 1: a sequence or a property a package
+  // declares is a sequence decl or a property decl of the package, its
+  // expressions resolving among the package's names, and a sequence it names
+  // among the package's sequences.
   const std::vector<RtlirImport> kNoImports;
   const std::vector<std::string_view> kNoGenBlocks;
   for (const PackageDecl* pkg : design.packages) {
     const std::string kPrefix(pkg->name);
     VpiObject* package = FindObjectForFlatName(objects, pkg->name);
-    // §37.42: a call a property makes stands in the package.
+    // §37.42: a call a declaration makes stands in the package.
     const VpiCallStand kStand{package, nullptr, pkg->name};
     // §37.83: an operation carries the attributes its operator is written
     // with, which elaboration kept for a package's items on the design.
@@ -343,43 +498,42 @@ void AttachPackagePropertyDecls(const RtlirDesign& design,
                              nullptr,
                              nullptr,
                              nullptr,
-                             nullptr};
+                             nullptr,
+                             [package](std::string_view name) {
+                               return VpiSequenceDeclAround(package, name);
+                             }};
+    const VpiPropertyDeclSite kAt{package, unit_typespecs, ctx, kNoImports};
+    // §16.8: a sequence may name one the package declares after it, so each
+    // is declared before any body is built.
+    std::vector<std::pair<VpiObject*, const ModuleItem*>> sequences;
+    for (const ModuleItem* item : pkg->items) {
+      if (item->kind != ModuleItemKind::kSequenceDecl) continue;
+      sequences.emplace_back(
+          VpiMakeSequenceDecl(RtlirAssertionItemDecl{item, {}, {}, nullptr},
+                              kAt, kWith),
+          item);
+    }
+    for (const auto& [made, item] : sequences) {
+      VpiFillSequenceDeclBody(made, *item, kWith);
+    }
     for (const ModuleItem* item : pkg->items) {
       if (item->kind != ModuleItemKind::kPropertyDecl) continue;
-      VpiMakePropertyDecl(RtlirPropertyDecl{item, {}, {}, nullptr},
-                          {package, unit_typespecs, ctx, kNoImports}, kWith);
+      VpiMakePropertyDecl(RtlirAssertionItemDecl{item, {}, {}, nullptr}, kAt,
+                          kWith);
     }
   }
 }
 
-VpiObject* VpiMakePropertyDecl(const RtlirPropertyDecl& declared,
+VpiObject* VpiMakePropertyDecl(const RtlirAssertionItemDecl& declared,
                                const VpiPropertyDeclSite& at,
                                const VpiStmtBuild& with) {
-  VpiObject* scope = at.scope;
-  // §37.12 with §14.3: a property a clocking block declares is of that block,
-  // which AttachClockingBlocks has made under the same scope, the generate
-  // block instance both are stamped with or the instance.
-  if (declared.clocking_block != nullptr) {
-    scope = ChildOfType(scope, vpiClockingBlock, declared.clocking_block->name);
-  }
   const ModuleItem& decl = *declared.item;
-  VpiObject* obj = with.build.alloc();
-  obj->type = vpiPropertyDecl;
-  obj->parent = scope;
-  // §16.16 (b): the run keys a clocking block's property under the block's
-  // name and its own, `cb.p`, the block being its scope here.
-  const std::string_view kName =
-      declared.clocking_block == nullptr
-          ? decl.name
-          : decl.name.substr(decl.name.rfind('.') + 1);
-  obj->name = with.build.keep(std::string(kName));
-  obj->full_name = VpiScopedFullName(scope, kName);
-  scope->children.push_back(obj);
+  VpiObject* obj = MakeDeclHead(declared, vpiPropertyDecl, at, with.build);
   for (size_t i = 0; i < decl.prop_formals.size(); ++i) {
     MakePropFormal(decl, i, obj, at, with);
   }
   for (const SeqLocalDecl& local : decl.prop_locals) {
-    MakePropertyVariable(local, obj, at.ctx, with.build);
+    MakeDeclaredVariable(local, obj, at.ctx, with.build);
   }
   // §37.52: the body the parser read, its clock, its disable condition and,
   // for a Boolean property, its expression; a body of another shape was not
@@ -390,6 +544,25 @@ VpiObject* VpiMakePropertyDecl(const RtlirPropertyDecl& declared,
       obj, VpiPropertySpecParts{decl.prop_clock, decl.prop_disable_iff, tree},
       with);
   return obj;
+}
+
+VpiObject* VpiMakeSequenceDecl(const RtlirAssertionItemDecl& declared,
+                               const VpiPropertyDeclSite& at,
+                               const VpiStmtBuild& with) {
+  const ModuleItem& decl = *declared.item;
+  VpiObject* obj = MakeDeclHead(declared, vpiSequenceDecl, at, with.build);
+  for (size_t i = 0; i < decl.prop_formals.size(); ++i) {
+    MakeSeqFormal(decl, i, obj, at, with);
+  }
+  for (const SeqLocalDecl& local : decl.seq_linear.locals) {
+    MakeDeclaredVariable(local, obj, at.ctx, with.build);
+  }
+  return obj;
+}
+
+void VpiFillSequenceDeclBody(VpiObject* sequence, const ModuleItem& decl,
+                             const VpiStmtBuild& with) {
+  sequence->body = SequenceDeclBody(decl, with);
 }
 
 }  // namespace delta

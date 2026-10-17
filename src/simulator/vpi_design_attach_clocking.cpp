@@ -186,10 +186,13 @@ VpiObject* MakeClockingBlock(const ModuleItem& item,
   // block, a scope of its own.
   const VpiCallStand kStand{block, with.site.mod};
   const ClockingBuild kInBlock{with.site, with.ctx, with.build, &kStand};
+  // A clocking event instantiates no sequence: §16.5.2 marks a sequence event
+  // of an assertion's clock alone (§9.4.2.4).
   const VpiStmtBuild kWith{
       with.build, [&](const Expr* expr) { return kInBlock.Expression(expr); },
       nullptr,    nullptr,
-      nullptr,    nullptr};
+      nullptr,    nullptr,
+      nullptr};
   VpiObject* event = with.build.alloc();
   event->type = vpiEventControl;
   event->parent = block;

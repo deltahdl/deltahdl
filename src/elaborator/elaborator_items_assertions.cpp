@@ -471,6 +471,8 @@ void PromotePropertyInstanceBoolean(ModuleItem* item, Arena& arena,
 void Elaborator::ElaborateSequenceDeclItem(ModuleItem* item, RtlirModule* mod) {
   sequence_names_.insert(item->name);
   mod->sequence_decls.push_back(item);
+  mod->declared_sequences.push_back(
+      RtlirAssertionItemDecl{item, {}, {}, nullptr});
   item->seq_triggered_unread = !unit_->triggered_names.contains(item->name);
   // §16.8: a cyclic dependency among named sequences is an error. All sequence
   // decls are registered before elaboration (see ElaborateModule), so this DFS
@@ -570,7 +572,8 @@ void PromoteSequenceInstancesInProperties(const ModuleDecl* decl,
 
 void Elaborator::ElaboratePropertyDeclItem(ModuleItem* item, RtlirModule* mod) {
   mod->property_decls.push_back(item);
-  mod->declared_properties.push_back(RtlirPropertyDecl{item, {}, {}, nullptr});
+  mod->declared_properties.push_back(
+      RtlirAssertionItemDecl{item, {}, {}, nullptr});
   // §16.12.22: the sequences the body uses as properties and as antecedents
   // are checked where the body is declared, once for every instance.
   ValidateSequenceDegeneracy(item->prop_body_tree, item->loc,
@@ -826,9 +829,12 @@ static void RecordClockingBlock(ModuleItem* item, RtlirModule* mod) {
   for (ModuleItem* decl : item->clocking_decls) {
     if (decl->kind == ModuleItemKind::kPropertyDecl) {
       mod->property_decls.push_back(decl);
-      mod->declared_properties.push_back(RtlirPropertyDecl{decl, {}, {}, item});
+      mod->declared_properties.push_back(
+          RtlirAssertionItemDecl{decl, {}, {}, item});
     } else {
       mod->sequence_decls.push_back(decl);
+      mod->declared_sequences.push_back(
+          RtlirAssertionItemDecl{decl, {}, {}, item});
     }
   }
 }

@@ -410,13 +410,10 @@ bool VpiIsSequenceArgumentType(int type) {
 
 VpiHandle VpiSequenceInstDecl(VpiHandle sequence_inst) {
   // §37.54 (D4): a sequence instance resolves to the sequence declaration it
-  // instantiates, modeled as a vpiSequenceDecl child. Report the first one, or
-  // null when the handle is null or no declaration is attached.
-  if (!sequence_inst) return nullptr;
-  for (auto* child : sequence_inst->children) {
-    if (child->type == vpiSequenceDecl) return child;
-  }
-  return nullptr;
+  // instantiates, which belongs to the scope declaring it (§37.12) and so is
+  // held apart from the instance's children. Null when the handle is null or
+  // no declaration is attached.
+  return sequence_inst == nullptr ? nullptr : sequence_inst->sequence_decl;
 }
 
 bool VpiIsMatchItemType(int type) {
@@ -722,16 +719,10 @@ std::vector<VpiHandle> VpiSeqFormals(VpiHandle sequence_decl) {
 VpiHandle VpiSeqDeclBodyExpr(VpiHandle sequence_decl) {
   // §37.53: a sequence declaration's body is reached through vpiExpr; the
   // diagram draws its target as a sequence expression (the sequence-expr class)
-  // or a multiclock sequence expression. Report the first such child, or null
-  // when none is present.
-  if (!sequence_decl) return nullptr;
-  for (auto* child : sequence_decl->children) {
-    if (VpiIsSequenceExprType(child->type) ||
-        child->type == vpiMulticlockSequenceExpr) {
-      return child;
-    }
-  }
-  return nullptr;
+  // or a multiclock sequence expression. A body naming a net or variable is
+  // that object, which no child kind tells from the declaration's variables,
+  // so the body is held apart from them. Null when none is present.
+  return sequence_decl == nullptr ? nullptr : sequence_decl->body;
 }
 
 int VpiSeqFormalDirection(bool is_local_variable_argument,
@@ -755,10 +746,13 @@ VpiHandle VpiSeqFormalTypespec(VpiHandle formal) {
 VpiHandle VpiSeqFormalInitExpr(VpiHandle formal) {
   // §37.53 detail 3: a formal's initialization expression is reached through
   // vpiExpr; the diagram draws its target as a named event or a sequence
-  // expression. Report the first such child, or null when the formal has none.
+  // expression, a net or variable named standing as the Boolean expression it
+  // reads (§37.58). Report the first such child, or null when the formal has
+  // none.
   if (!formal) return nullptr;
   for (auto* child : formal->children) {
-    if (child->type == vpiNamedEvent || VpiIsSequenceExprType(child->type)) {
+    if (child->type == vpiNamedEvent || VpiIsSequenceExprType(child->type) ||
+        VpiIsOperandObject(child)) {
       return child;
     }
   }

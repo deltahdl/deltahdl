@@ -255,6 +255,24 @@ TEST_F(EventControlsOfARun, AnEventListIsAnEventOrOperation) {
   EXPECT_EQ(VpiObjectOf(kIff[1]), VpiObjectOf(By("top.en")));
 }
 
+// §9.4.2.4: an event control on a sequence is written over the sequence inst
+// its name writes, which reaches the sequence decl it instantiates (§37.54)
+// (#7272).
+TEST_F(EventControlsOfARun, ASequenceEventIsItsSequenceInst) {
+  Run("module top; bit clk, a, b;\n"
+      "  sequence s; @(posedge clk) a ##1 b; endsequence\n"
+      "  initial @(s) ;\n"
+      "endmodule\n");
+  vpiHandle control = BodyOf("top");
+  ASSERT_NE(control, nullptr);
+  vpiHandle condition = vpi_handle(vpiCondition, control);
+  ASSERT_NE(condition, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, condition), vpiSequenceInst);
+  vpiHandle decl = vpi_handle(vpiSequenceDecl, condition);
+  ASSERT_NE(decl, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, decl), "top.s");
+}
+
 // The implicit event list of §9.4.2.2 writes no condition, while the control
 // still guards its statement.
 TEST_F(EventControlsOfARun, AnImplicitEventListWritesNoCondition) {

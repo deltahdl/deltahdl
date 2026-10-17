@@ -321,6 +321,9 @@ struct SeqCycleDelay {
   uint32_t max = 1;
   Expr* min_expr = nullptr;
   Expr* max_expr = nullptr;
+  // §16.7: whether a chain opens with this delay written, `##0 a`, which a
+  // delay of no ticks does not tell from the chain `a` written with none.
+  bool written = false;
 };
 
 // §16.10: one assignment of a sequence_match_item, `lvar = rhs` or `lvar op=

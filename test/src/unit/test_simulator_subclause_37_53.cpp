@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_model_helpers1.h"
@@ -56,27 +58,28 @@ TEST(SequenceDeclModel, NullDeclarationHasNoFormals) {
 
 // Diagram (sequence decl -- vpiExpr --> sequence expr | multiclock sequence
 // expr): the body of a sequence declaration is reached through vpiExpr and is
-// either a sequence expression or a multiclock sequence expression.
+// either a sequence expression or a multiclock sequence expression, held apart
+// from the declaration's children.
 TEST(SequenceDeclModel, BodyExprReachesSequenceExprOrMulticlock) {
   VpiObject with_seq;
   with_seq.type = vpiSequenceDecl;
   VpiObject seq;
   seq.type = vpiSequenceInst;  // a sequence-expr kind (see §37.54)
-  with_seq.children = {&seq};
+  with_seq.body = &seq;
   EXPECT_EQ(VpiSeqDeclBodyExpr(&with_seq), &seq);
 
   VpiObject with_multiclock;
   with_multiclock.type = vpiSequenceDecl;
   VpiObject mc;
   mc.type = vpiMulticlockSequenceExpr;
-  with_multiclock.children = {&mc};
+  with_multiclock.body = &mc;
   EXPECT_EQ(VpiSeqDeclBodyExpr(&with_multiclock), &mc);
 
   VpiObject bodiless;
   bodiless.type = vpiSequenceDecl;
-  VpiObject formal;
-  formal.type = vpiSeqFormalDecl;  // a formal is not a body expression
-  bodiless.children = {&formal};
+  VpiObject variable;
+  variable.type = vpiIntVar;  // a variable it declares is not its body
+  bodiless.children = {&variable};
   EXPECT_EQ(VpiSeqDeclBodyExpr(&bodiless), nullptr);
   EXPECT_EQ(VpiSeqDeclBodyExpr(nullptr), nullptr);
 }
@@ -176,5 +179,175 @@ TEST(SequenceFormal, TypespecFoundPastOtherChildren) {
   formal.children = {&attribute, &typespec};
   EXPECT_EQ(VpiSeqFormalTypespec(&formal), &typespec);
 }
+
+// The sequence decls of a run: those a design's scopes declare, built from the
+// elaborated design rather than by hand (#7037).
+class SequenceDeclsOfARun : public VpiDesignRun {
+ protected:
+  // The kind of what `relation` reaches from `ref`, 0 for nothing.
+  static int KindReached(int relation, vpiHandle ref) {
+    vpiHandle reached = ref == nullptr ? nullptr : vpi_handle(relation, ref);
+    return reached == nullptr ? 0 : vpi_get(vpiType, reached);
+  }
+
+  // The names of the objects of `type` `ref` reaches, in the order reached.
+  static std::vector<std::string> OrderedNamesOf(int type, vpiHandle ref) {
+    std::vector<std::string> names;
+    for (vpiHandle obj : ObjectsOf(type, ref)) {
+      names.emplace_back(vpi_get_str(vpiName, obj));
+    }
+    return names;
+  }
+};
+
+// A sequence a module declares is a sequence decl of its instance, named in
+// it, reaching its formals in the order declared (detail 1), each of no
+// direction unless it is a local variable argument (detail 4), the typespec
+// of a typed one and none for an untyped one (detail 2), and a default value
+// through vpiExpr (detail 3).
+TEST_F(SequenceDeclsOfARun, AnInstanceReachesTheSequenceItDeclares) {
+  Run("module top; logic clk, a, b;\n"
+      "  sequence s(x, local input int n, untyped y = b, bit z);\n"
+      "    a ##1 b;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  vpiHandle decl = Named(vpiSequenceDecl, By("top"), "s");
+  ASSERT_NE(decl, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, decl), "top.s");
+  EXPECT_EQ(OrderedNamesOf(vpiSeqFormalDecl, decl),
+            (std::vector<std::string>{"x", "n", "y", "z"}));
+  vpiHandle x = Named(vpiSeqFormalDecl, decl, "x");
+  vpiHandle n = Named(vpiSeqFormalDecl, decl, "n");
+  vpiHandle y = Named(vpiSeqFormalDecl, decl, "y");
+  vpiHandle z = Named(vpiSeqFormalDecl, decl, "z");
+  ASSERT_NE(x, nullptr);
+  ASSERT_NE(n, nullptr);
+  ASSERT_NE(y, nullptr);
+  ASSERT_NE(z, nullptr);
+  EXPECT_EQ(vpi_get(vpiDirection, x), vpiNoDirection);
+  EXPECT_EQ(vpi_get(vpiDirection, n), vpiInput);
+  EXPECT_EQ(vpi_get(vpiDirection, y), vpiNoDirection);
+  EXPECT_EQ(KindReached(vpiTypespec, x), 0);
+  EXPECT_EQ(KindReached(vpiTypespec, n), vpiIntTypespec);
+  EXPECT_EQ(KindReached(vpiTypespec, y), 0);
+  EXPECT_EQ(KindReached(vpiTypespec, z), vpiBitTypespec);
+  vpiHandle value = vpi_handle(vpiExpr, y);
+  ASSERT_NE(value, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, value), "b");
+  EXPECT_EQ(vpi_handle(vpiExpr, x), nullptr);
+}
+
+// Detail 4: a local variable argument written as an output or an inout has
+// that direction (§16.8.2).
+TEST_F(SequenceDeclsOfARun, AnOutputAndAnInoutFormalHaveTheirDirections) {
+  Run("module top; logic a;\n"
+      "  sequence s(local inout int x, local output int y);\n"
+      "    (a, x += 1, y = 2);\n"
+      "  endsequence\n"
+      "endmodule\n");
+  vpiHandle decl = Named(vpiSequenceDecl, By("top"), "s");
+  ASSERT_NE(decl, nullptr);
+  vpiHandle x = Named(vpiSeqFormalDecl, decl, "x");
+  vpiHandle y = Named(vpiSeqFormalDecl, decl, "y");
+  ASSERT_NE(x, nullptr);
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(vpi_get(vpiDirection, x), vpiInout);
+  EXPECT_EQ(vpi_get(vpiDirection, y), vpiOutput);
+}
+
+// A sequence reaches the local variables it declares (§16.10), each of the
+// kind its type is, and through vpiExpr its body: a sequence expr where it
+// opens with no clock, where it opens with one a multiclock sequence expr
+// holding the clocked seq of that clock and the body, and where its operands
+// name clocks a clocked seq per run of operands on one clock (§37.56).
+TEST_F(SequenceDeclsOfARun, ASequenceReachesItsVariablesAndItsBody) {
+  Run("module top; logic clk, a, b;\n"
+      "  sequence s1;\n"
+      "    int m;\n"
+      "    @(posedge clk) a ##1 b;\n"
+      "  endsequence\n"
+      "  sequence s2; a ##[1:2] b; endsequence\n"
+      "  sequence s3; @(posedge clk) a ##1 @(negedge clk) b; endsequence\n"
+      "endmodule\n");
+  vpiHandle s1 = Named(vpiSequenceDecl, By("top"), "s1");
+  vpiHandle s2 = Named(vpiSequenceDecl, By("top"), "s2");
+  ASSERT_NE(s1, nullptr);
+  ASSERT_NE(s2, nullptr);
+  EXPECT_EQ(OrderedNamesOf(vpiVariables, s1), (std::vector<std::string>{"m"}));
+  EXPECT_EQ(KindsOf(vpiVariables, s1), (std::vector<int>{vpiIntVar}));
+  EXPECT_EQ(FullNameOfChild(s1, "m"), "top.s1.m");
+  vpiHandle multiclock = vpi_handle(vpiExpr, s1);
+  ASSERT_NE(multiclock, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, multiclock), vpiMulticlockSequenceExpr);
+  const std::vector<vpiHandle> kClocked = ObjectsOf(vpiClockedSeq, multiclock);
+  ASSERT_EQ(kClocked.size(), 1U);
+  vpiHandle clock = vpi_handle(vpiClockingEvent, kClocked[0]);
+  ASSERT_NE(clock, nullptr);
+  EXPECT_EQ(vpi_get(vpiOpType, clock), vpiPosedgeOp);
+  EXPECT_EQ(OpOf(vpi_handle(vpiOperation, kClocked[0])), vpiCycleDelayOp);
+  EXPECT_EQ(OpOf(vpi_handle(vpiExpr, s2)), vpiCycleDelayOp);
+  EXPECT_TRUE(ObjectsOf(vpiVariables, s2).empty());
+  vpiHandle runs = vpi_handle(vpiExpr, Named(vpiSequenceDecl, By("top"), "s3"));
+  ASSERT_NE(runs, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, runs), vpiMulticlockSequenceExpr);
+  const std::vector<vpiHandle> kRuns = ObjectsOf(vpiClockedSeq, runs);
+  ASSERT_EQ(kRuns.size(), 2U);
+  const auto kEdgeOf = [](vpiHandle clocked) {
+    vpiHandle event = vpi_handle(vpiClockingEvent, clocked);
+    return event == nullptr ? 0 : vpi_get(vpiOpType, event);
+  };
+  EXPECT_EQ(kEdgeOf(kRuns[0]), vpiPosedgeOp);
+  EXPECT_EQ(kEdgeOf(kRuns[1]), vpiNegedgeOp);
+}
+
+// A sequence a generate block declares is one of that block's instance, and
+// one a clocking block declares is one of that block (§37.12, §27.4, §14.3).
+TEST_F(SequenceDeclsOfARun, AGenerateAndAClockingBlockReachTheirSequences) {
+  Run("module top; logic clk, a;\n"
+      "  for (genvar i = 0; i < 1; i++) begin : g\n"
+      "    sequence s; a; endsequence\n"
+      "  end\n"
+      "  clocking cb @(posedge clk);\n"
+      "    sequence cs; a; endsequence\n"
+      "  endclocking\n"
+      "endmodule\n");
+  vpiHandle in_block = Named(vpiSequenceDecl, By("top.g[0]"), "s");
+  ASSERT_NE(in_block, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, in_block), "top.g[0].s");
+  EXPECT_EQ(Named(vpiSequenceDecl, By("top"), "s"), nullptr);
+  vpiHandle cb = Named(vpiClockingBlock, By("top"), "cb");
+  ASSERT_NE(cb, nullptr);
+  vpiHandle in_clocking = Named(vpiSequenceDecl, cb, "cs");
+  ASSERT_NE(in_clocking, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, in_clocking), "top.cb.cs");
+}
+
+// A sequence a package declares is a sequence decl of the package, and a
+// property of the package naming it reaches its sequence inst (§37.10
+// detail 1, §37.54).
+TEST_F(SequenceDeclsOfARun, APackageReachesTheSequenceItDeclares) {
+  Run("package pk; logic x;\n"
+      "  sequence ps; x; endsequence\n"
+      "  property pp; ps; endproperty\n"
+      "endpackage\n"
+      "module top; endmodule\n");
+  vpiHandle pkg = By("pk");
+  ASSERT_NE(pkg, nullptr);
+  vpiHandle decl = Named(vpiSequenceDecl, pkg, "ps");
+  ASSERT_NE(decl, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiFullName, decl), "pk::ps");
+  vpiHandle body = vpi_handle(vpiExpr, decl);
+  ASSERT_NE(body, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, body), "x");
+  vpiHandle property = Named(vpiPropertyDecl, pkg, "pp");
+  ASSERT_NE(property, nullptr);
+  vpiHandle spec = vpi_handle(vpiPropertySpec, property);
+  ASSERT_NE(spec, nullptr);
+  vpiHandle inst = vpi_handle(vpiPropertyExpr, spec);
+  ASSERT_NE(inst, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, inst), vpiSequenceInst);
+  EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiSequenceDecl, inst), decl));
+}
+
 }  // namespace
 }  // namespace delta

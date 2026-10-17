@@ -9,6 +9,7 @@
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_design_attach_assertion_decls.h"
 #include "simulator/vpi_design_attach_build.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_model_helpers1.h"
@@ -55,10 +56,12 @@ VpiObject* MakeOperation(int op_type,
 // written as - the expression, net, variable or named event it names, under
 // the posedge or negedge operation its edge makes, or both joined by or for
 // the edge keyword, which §37.59 gives no operation of its own, and under the
-// iff operation where a condition guards it. A sequence (§9.4.2.4) is not
-// modelled yet (#7272).
+// iff operation where a condition guards it. A sequence (§9.4.2.4) is the
+// sequence inst its name writes (§37.65 with §37.54).
 VpiObject* EventItem(const EventExpr& event, const VpiStmtBuild& with) {
-  if (event.is_sequence_event) return nullptr;
+  if (event.is_sequence_event) {
+    return VpiSequenceOperandObject(event.signal, with);
+  }
   VpiObject* item = with.expression(event.signal);
   if (event.edge == Edge::kEdge) {
     // §9.4.2: an edge is detected whenever a posedge or a negedge is, and no

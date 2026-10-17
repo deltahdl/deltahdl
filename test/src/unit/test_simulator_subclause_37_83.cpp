@@ -405,6 +405,19 @@ TEST_F(AttributesOfARun, AnAssertionAPropertyAndAClockingBlockCarryTheirs) {
   EXPECT_EQ(kTagOf(Named(vpiClockingBlock, By("top"), "cb")), "3");
 }
 
+// A sequence declaration carries the attributes it is written with, which
+// elaboration resolved (#7260).
+TEST_F(AttributesOfARun, ASequenceDeclarationCarriesItsAttributes) {
+  Run("module top; logic x, y;\n"
+      "  (* tag = 4 *) sequence s; x ##1 y; endsequence\n"
+      "endmodule\n");
+  vpiHandle decl = Named(vpiSequenceDecl, By("top"), "s");
+  ASSERT_NE(decl, nullptr);
+  vpiHandle tag = Named(vpiAttribute, decl, "tag");
+  ASSERT_NE(tag, nullptr);
+  EXPECT_EQ(ValueOf(tag, vpiIntVal), "4");
+}
+
 // A port carries the attributes written before its declaration, an ANSI
 // port's in the module header and a non-ANSI port's before the body
 // declaration that gives it its direction.

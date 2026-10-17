@@ -252,8 +252,8 @@ std::vector<VpiHandle> VpiSequenceInstArguments(
 bool VpiIsSequenceArgumentType(int type);
 
 // §37.54 (D4): the sequence declaration a sequence instance instantiates,
-// traversed to its vpiSequenceDecl child. Returns null for a null handle or an
-// instance with no declaration attached.
+// VpiObject::sequence_decl. Returns null for a null handle or an instance with
+// no declaration attached.
 VpiHandle VpiSequenceInstDecl(VpiHandle sequence_inst);
 
 // §37.54 (D6): the match items a sequence's bare boolean expression may carry
@@ -430,8 +430,8 @@ std::vector<VpiHandle> VpiSeqFormals(VpiHandle sequence_decl);
 
 // §37.53: the body of a sequence declaration, reached through vpiExpr. The
 // diagram draws its target as a sequence expression (the sequence-expr class,
-// §37.54) or a multiclock sequence expression (§37.56). Returns the object's
-// first such child, or null when none is present.
+// §37.54) or a multiclock sequence expression (§37.56). Returns the body the
+// run held apart from the declaration's children, or null where it has none.
 VpiHandle VpiSeqDeclBodyExpr(VpiHandle sequence_decl);
 
 // §37.53 detail 4: a seq formal decl's vpiDirection. A formal that is not a
@@ -447,7 +447,8 @@ VpiHandle VpiSeqFormalTypespec(VpiHandle formal);
 
 // §37.53 detail 3: the initialization expression of a seq formal decl, reached
 // through vpiExpr. The diagram draws its target as a named event or a sequence
-// expression (§37.54); null when the formal has no initialization expression.
+// expression (§37.54), a net or variable named among them; null when the formal
+// has no initialization expression.
 VpiHandle VpiSeqFormalInitExpr(VpiHandle formal);
 
 // §37.57 detail 1: a let formal as seen by the let expression's argument

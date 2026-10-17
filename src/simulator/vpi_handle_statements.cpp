@@ -91,6 +91,25 @@ static VpiHandle PropertySpecExpr(VpiHandle spec) {
   return nullptr;
 }
 
+// §37.53: the edges a sequence decl draws to its body and a seq formal decl
+// to its default value, and §37.54's from a sequence inst to its declaration.
+static bool TryResolveSequenceDeclRelation(int type, VpiHandle ref,
+                                           VpiHandle& out) {
+  if (ref->type != vpiSequenceInst && ref->type != vpiSequenceDecl &&
+      ref->type != vpiSeqFormalDecl) {
+    return false;
+  }
+  if (ref->type == vpiSequenceInst) {
+    if (type != vpiSequenceDecl) return false;
+    out = VpiSequenceInstDecl(ref);
+    return true;
+  }
+  if (type != vpiExpr) return false;
+  out = ref->type == vpiSequenceDecl ? VpiSeqDeclBodyExpr(ref)
+                                     : VpiSeqFormalInitExpr(ref);
+  return true;
+}
+
 // §37.51: the edges a property inst draws to its declaration and its disable
 // condition, and the one a prop formal decl draws to its default value.
 static bool TryResolvePropertyDeclRelation(int type, VpiHandle ref,
@@ -172,6 +191,7 @@ static bool TryResolveAssertionRelation(int type, VpiHandle ref,
 
 bool TryResolveProcessAndStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
   return TryResolveAssertionRelation(type, ref, out) ||
+         TryResolveSequenceDeclRelation(type, ref, out) ||
          TryResolveClockedSeqRelation(type, ref, out) ||
          TryResolveForAndBodyStmtRelation(type, ref, out) ||
          TryResolveStmtProcessRelation(type, ref, out) ||

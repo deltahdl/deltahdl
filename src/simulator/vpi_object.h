@@ -399,6 +399,8 @@ struct VpiObject {
   // where the run set them. A run hangs a body from the scope it stands in,
   // where a name finds it, rather than from the process. §37.52: for a case
   // property item, the property it branches to, apart from its conditions.
+  // §37.53: for a sequence decl, the sequence its body is, apart from its
+  // variables, which a body naming a net or variable would not be told from.
   VpiObject* body = nullptr;
   VpiObject* process = nullptr;
   // §37.55: an assertion's fail action, reached through vpiElseStmt, where a
@@ -519,6 +521,10 @@ struct VpiObject {
   VpiObject* tf_decl = nullptr;
   // §37.51: for a property inst, the property decl it instantiates.
   VpiObject* property_decl = nullptr;
+  // §37.54: for a sequence inst, the sequence decl it instantiates, which
+  // belongs to the scope declaring it (§37.12) and so is held apart from the
+  // instance's children.
+  VpiObject* sequence_decl = nullptr;
   // §37.35: for a udp, the udp defn of the primitive it instantiates.
   VpiObject* udp_defn = nullptr;
 

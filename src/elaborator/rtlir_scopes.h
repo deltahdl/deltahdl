@@ -181,17 +181,18 @@ struct RtlirGenBlockClocking {
   GenBlockPrefixes gen_block_prefixes;
 };
 
-// §37.12 and §37.51 with §27.4: a property a module body declares, with the
-// generate block instance declaring it, which is the scope it belongs to.
-struct RtlirPropertyDecl {
+// §37.12 with §37.51, §37.53 and §27.4: a property or a sequence a module body
+// declares, an assertion_item_declaration of §16's grammar, with the generate
+// block instance declaring it, which is the scope it belongs to.
+struct RtlirAssertionItemDecl {
   const ModuleItem* item = nullptr;
   // The generate block instances between the module and the declaration,
-  // outermost first; empty for a property of the module itself.
+  // outermost first; empty for a declaration of the module itself.
   HierPath gen_block_path;
   // §27.4: the prefixes of those instances, innermost last.
   GenBlockPrefixes gen_block_prefixes;
-  // §14.3: the clocking block declaring the property, whose scope it belongs
-  // to (§37.12); null for a property of the module or the generate block.
+  // §14.3: the clocking block declaring it, whose scope it belongs to
+  // (§37.12); null for a declaration of the module or the generate block.
   const ModuleItem* clocking_block = nullptr;
 };
 

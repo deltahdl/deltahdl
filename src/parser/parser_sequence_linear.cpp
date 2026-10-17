@@ -696,6 +696,7 @@ struct ParserSeqLinearHelpers {
       SeqCycleDelay written;
       if (!ParseLinearSeqCycleDelay(p, written)) return false;
       next = AddSeqDelays(lead, written);
+      next.written = true;
       if (!ParseOperandClock(p, clock)) return false;
     }
     while (!AtChainEnd(p)) {
