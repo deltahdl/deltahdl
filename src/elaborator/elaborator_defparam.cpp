@@ -39,7 +39,7 @@ static bool CollectPathSteps(const Expr* expr, const ScopeMap& scope,
                              HierPath& out) {
   if (expr->kind == ExprKind::kMemberAccess) {
     if (!CollectPathSteps(expr->lhs, scope, out)) return false;
-    out.push_back({expr->rhs->text, false, 0, {}});
+    out.push_back({expr->rhs->text, false, 0, {}, {}});
     return true;
   }
   if (expr->kind == ExprKind::kSelect) {
@@ -52,7 +52,7 @@ static bool CollectPathSteps(const Expr* expr, const ScopeMap& scope,
     return true;
   }
   if (expr->kind == ExprKind::kIdentifier) {
-    out.push_back({expr->text, false, 0, {}});
+    out.push_back({expr->text, false, 0, {}, {}});
     return true;
   }
   return false;

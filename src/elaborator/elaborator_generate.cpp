@@ -840,8 +840,11 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
   // §27.4 indexes this block's instances by the genvar value, so the step is
   // retargeted beside the localparam at the top of every iteration.
   gen_block_path_.push_back(
-      {item->name_is_generated ? std::string_view{} : item->name, true,
-       opening->init_value, item->name});
+      {item->name_is_generated ? std::string_view{} : item->name,
+       true,
+       opening->init_value,
+       item->name,
+       {}});
   // §27.4 puts the index in this block's prefix, so the entry is a different
   // string in every instance and is retargeted at the top of every iteration
   // beside the localparam and the step. It is pushed empty here and read by
