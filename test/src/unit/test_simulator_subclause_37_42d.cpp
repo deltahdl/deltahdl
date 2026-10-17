@@ -90,6 +90,14 @@ class CallsWithinADesign : public VpiDesignRun {
     vpi_get_value(By(name), &value);
     return value.value.integer;
   }
+
+  // The value top.i holds once `src` is run with $args reading its one
+  // argument `reads` times; -1 where $args was not run with one argument.
+  int ValueAfterReads(const char* src, int reads) {
+    if (RegisterArgs(reads) == nullptr) return -1;
+    Run(src);
+    return g_args_seen.size() == 1 ? IntValueOf("top.i") : -1;
+  }
 };
 
 constexpr const char* kAssignedCall =
@@ -210,19 +218,29 @@ constexpr const char* kSteppingArgument =
 // Detail 7: an argument is evaluated only when an application asks for its
 // value, so $args(bump()) leaves i as it was where the calltf reads nothing...
 TEST_F(CallsWithinADesign, AnArgumentNoApplicationReadsIsNeverEvaluated) {
-  ASSERT_NE(RegisterArgs(0), nullptr);
-  Run(kSteppingArgument);
-  ASSERT_EQ(g_args_seen.size(), 1U);
-  EXPECT_EQ(IntValueOf("top.i"), 5);
+  EXPECT_EQ(ValueAfterReads(kSteppingArgument, 0), 5);
 }
 
 // ...and is evaluated each time it is asked, its side effects with it, so two
 // reads add two (§37.3.5, #6968).
 TEST_F(CallsWithinADesign, AnArgumentIsEvaluatedEachTimeItIsRead) {
-  ASSERT_NE(RegisterArgs(2), nullptr);
-  Run(kSteppingArgument);
-  ASSERT_EQ(g_args_seen.size(), 1U);
-  EXPECT_EQ(IntValueOf("top.i"), 7);
+  EXPECT_EQ(ValueAfterReads(kSteppingArgument, 2), 7);
+}
+
+// A design whose one system task call steps i in its argument (§11.4.2).
+constexpr const char* kIncrementArgument =
+    "module top; int i = 5;\n"
+    "  initial $args(i++);\n"
+    "endmodule\n";
+
+// An increment written as an argument is the model's operation, so it, too,
+// steps i only when the calltf reads it, and each time it does (#7280).
+TEST_F(CallsWithinADesign, AnIncrementNoApplicationReadsNeverSteps) {
+  EXPECT_EQ(ValueAfterReads(kIncrementArgument, 0), 5);
+}
+
+TEST_F(CallsWithinADesign, AnIncrementStepsEachTimeItIsRead) {
+  EXPECT_EQ(ValueAfterReads(kIncrementArgument, 2), 7);
 }
 
 // A call a task's body writes is one the model holds no object for, so the

@@ -406,21 +406,6 @@ VpiObject* MakeBlock(const Stmt& stmt, int kind, const BlockParent& parent,
   return block;
 }
 
-// §11.4.2: the operator of the increment or decrement `expr` writes, as
-// sv_vpi_user.h numbers it - the post forms for `i++` and `i--`, the pre forms
-// for `++i` and `--i`; 0 for any other expression.
-int IncDecOpType(const Expr& expr) {
-  const bool kIncrement = expr.op == TokenKind::kPlusPlus;
-  if (!kIncrement && expr.op != TokenKind::kMinusMinus) return 0;
-  if (expr.kind == ExprKind::kPostfixUnary) {
-    return kIncrement ? vpiPostIncOp : vpiPostDecOp;
-  }
-  if (expr.kind == ExprKind::kUnary) {
-    return kIncrement ? vpiPreIncOp : vpiPreDecOp;
-  }
-  return 0;
-}
-
 // §11.4.2 with §37.64: an increment or decrement written as a statement is the
 // blocking assignment its operator behaves as, reporting that operator through
 // vpiOpType (detail 1), the variable it steps on its left and no right side,
@@ -428,7 +413,8 @@ int IncDecOpType(const Expr& expr) {
 VpiObject* MakeIncDecStatement(const Stmt& stmt, const BlockParent& parent,
                                const BodyWalk& walk) {
   if (stmt.kind != StmtKind::kExprStmt || stmt.expr == nullptr) return nullptr;
-  const int kOperator = IncDecOpType(*stmt.expr);
+  const int kOperator = VpiIncDecOpType(
+      stmt.expr->op, stmt.expr->kind == ExprKind::kPostfixUnary);
   if (kOperator == 0) return nullptr;
   VpiObject* obj = MakeAtomicStatement(stmt, vpiAssignment, parent, walk);
   obj->op_type = kOperator;

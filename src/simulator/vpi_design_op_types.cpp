@@ -103,4 +103,15 @@ int VpiUnaryOpType(TokenKind op) {
   }
 }
 
+int VpiIncDecOpType(TokenKind op, bool postfix) {
+  switch (op) {
+    case TokenKind::kPlusPlus:
+      return postfix ? vpiPostIncOp : vpiPreIncOp;
+    case TokenKind::kMinusMinus:
+      return postfix ? vpiPostDecOp : vpiPreDecOp;
+    default:
+      return 0;
+  }
+}
+
 }  // namespace delta

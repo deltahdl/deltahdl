@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <string>
 #include <vector>
 
 #include "fixture_vpi_run.h"
@@ -44,6 +46,20 @@ class AssignedExpressionsOfARun : public VpiDesignRun {
     values.reserve(exprs.size());
     for (vpiHandle expr : exprs) values.push_back(IntOf(expr));
     return values;
+  }
+
+  // The right sides of the assignments top's one procedure runs, in order.
+  static std::vector<vpiHandle> ProcedureRightSides() {
+    const std::vector<vpiHandle> kProcs = ObjectsOf(vpiProcess, By("top"));
+    if (kProcs.size() != 1) return {};
+    const std::vector<vpiHandle> kAssigns =
+        ObjectsOf(vpiStmt, vpi_handle(vpiStmt, kProcs[0]));
+    std::vector<vpiHandle> rights;
+    rights.reserve(kAssigns.size());
+    for (vpiHandle assign : kAssigns) {
+      rights.push_back(vpi_handle(vpiRhs, assign));
+    }
+    return rights;
   }
 };
 
@@ -265,6 +281,63 @@ TEST_F(AssignedExpressionsOfARun, APartSelectThroughAVarSelectHasItsParent) {
   vpiHandle element = vpi_handle(vpiParent, parent);
   ASSERT_NE(element, nullptr);
   EXPECT_EQ(vpi_get(vpiType, element), vpiVarSelect);
+}
+
+// §11.4.2: a design whose one procedure steps i within the right side of each
+// of four assignments, in each of the four forms an increment or decrement
+// takes.
+constexpr const char* kSteppedRightSides =
+    "module top; int i, a, b, c, d;\n"
+    "  initial begin a = i++; b = ++i; c = i--; d = --i; end\n"
+    "endmodule\n";
+
+// An increment or decrement written within an expression is an operation
+// whose operator names which of the four forms it takes and whose one operand
+// is the variable it steps (#7280).
+TEST_F(AssignedExpressionsOfARun, AnIncrementOrDecrementIsAnOperation) {
+  Run(kSteppedRightSides);
+  const std::vector<vpiHandle> kRights = ProcedureRightSides();
+  ASSERT_EQ(kRights.size(), 4U);
+  const std::vector<int> kOps = {vpiPostIncOp, vpiPreIncOp, vpiPostDecOp,
+                                 vpiPreDecOp};
+  for (std::size_t n = 0; n < kRights.size(); ++n) {
+    ASSERT_NE(kRights[n], nullptr) << n;
+    EXPECT_EQ(vpi_get(vpiType, kRights[n]), vpiOperation) << n;
+    EXPECT_EQ(vpi_get(vpiOpType, kRights[n]), kOps[n]) << n;
+    const std::vector<vpiHandle> kOperands = OperandsOf(kRights[n]);
+    ASSERT_EQ(kOperands.size(), 1U) << n;
+    EXPECT_STREQ(vpi_get_str(vpiName, kOperands[0]), "i") << n;
+  }
+}
+
+// Detail 2: each decompiles to the form it was written in, its operator one
+// space from the variable it steps (#7281).
+TEST_F(AssignedExpressionsOfARun, AnIncrementOrDecrementDecompilesAsWritten) {
+  Run(kSteppedRightSides);
+  const std::vector<vpiHandle> kRights = ProcedureRightSides();
+  ASSERT_EQ(kRights.size(), 4U);
+  const std::vector<std::string> kWritten = {"i ++", "++ i", "i --", "-- i"};
+  for (std::size_t n = 0; n < kRights.size(); ++n) {
+    ASSERT_NE(kRights[n], nullptr) << n;
+    const char* decompiled = vpi_get_str(vpiDecompile, kRights[n]);
+    ASSERT_NE(decompiled, nullptr) << n;
+    EXPECT_EQ(decompiled, kWritten[n]) << n;
+  }
+}
+
+// Detail 2: a stepped variable that is a select keeps its brackets and needs
+// no parentheses, and an operator before a postfix step takes it whole.
+TEST_F(AssignedExpressionsOfARun, AStepOfASelectDecompilesWithoutParentheses) {
+  Run("module top; int r [4]; int i, x;\n"
+      "  initial x = -r[i]++;\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kProcs = ObjectsOf(vpiProcess, By("top"));
+  ASSERT_EQ(kProcs.size(), 1U);
+  vpiHandle right = vpi_handle(vpiRhs, vpi_handle(vpiStmt, kProcs[0]));
+  ASSERT_NE(right, nullptr);
+  const char* decompiled = vpi_get_str(vpiDecompile, right);
+  ASSERT_NE(decompiled, nullptr);
+  EXPECT_STREQ(decompiled, "- r[i] ++");
 }
 
 }  // namespace

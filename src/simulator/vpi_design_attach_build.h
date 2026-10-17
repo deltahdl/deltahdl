@@ -322,6 +322,11 @@ int VpiBinaryOpType(TokenKind op);
 // its edge as one.
 int VpiUnaryOpType(TokenKind op);
 
+// §11.4.2: the vpiOpType of the increment or decrement operator `op`, the
+// post forms for `i++` and `i--` written `postfix`, the pre forms for `++i`
+// and `--i`; 0 for an operator that is neither.
+int VpiIncDecOpType(TokenKind op, bool postfix);
+
 // §37.61 (figure): whether an object of `type` can prefix an expression - a
 // class var, a virtual interface var or a clocking block.
 bool VpiIsDynamicPrefixHolderType(int type);

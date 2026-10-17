@@ -604,6 +604,16 @@ VpiObject* CastObject(const Expr* expr, const AssignBuild& build) {
       width, build.alloc);
 }
 
+// §37.59 with §11.4.2: a unary operation over the one operand it is written
+// with, an increment or decrement within an expression among them, whose
+// operand is the variable it steps.
+VpiObject* UnaryObject(const Expr* expr, const AssignBuild& build) {
+  const int kStep =
+      VpiIncDecOpType(expr->op, expr->kind == ExprKind::kPostfixUnary);
+  return OperationObject(kStep != 0 ? kStep : VpiUnaryOpType(expr->op),
+                         {expr->lhs}, build);
+}
+
 VpiObject* ModelledExpression(const Expr* expr, const AssignBuild& build) {
   switch (expr->kind) {
     case ExprKind::kIdentifier: {
@@ -617,7 +627,8 @@ VpiObject* ModelledExpression(const Expr* expr, const AssignBuild& build) {
     case ExprKind::kStringLiteral:
       return ConstantObject(expr, build);
     case ExprKind::kUnary:
-      return OperationObject(VpiUnaryOpType(expr->op), {expr->lhs}, build);
+    case ExprKind::kPostfixUnary:
+      return UnaryObject(expr, build);
     case ExprKind::kBinary:
       return OperationObject(VpiBinaryOpType(expr->op), {expr->lhs, expr->rhs},
                              build);

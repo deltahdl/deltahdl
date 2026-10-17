@@ -64,14 +64,31 @@ std::string Spelling(TokenKind kind) {
   return std::string(kName.substr(1, kName.size() - 2));
 }
 
+// §11.3.2 (Table 11-2): the binding power of a unary operator, an increment
+// or decrement (§11.4.2) sharing the row of the other unary operators.
+int UnaryPower(TokenKind op) {
+  const bool kStep = op == TokenKind::kPlusPlus || op == TokenKind::kMinusMinus;
+  return PrefixBindingPower(kStep ? TokenKind::kPlus : op);
+}
+
 // §11.4: a unary operator before its operand.
 std::optional<Piece> RenderUnary(const Expr& expr) {
-  const int kPower = PrefixBindingPower(expr.op);
+  const int kPower = UnaryPower(expr.op);
   const std::optional<Piece> kOperand = Render(expr.lhs);
   if (kPower < 0 || !kOperand) return std::nullopt;
   const Piece kInner = AsRightOperand(*kOperand, kPower);
   return Piece{VpiDecompileJoin({Spelling(expr.op), kInner.text}), kUnsplit,
                std::min(kPower, kInner.right)};
+}
+
+// §11.4.2: an increment or decrement after the variable it steps.
+std::optional<Piece> RenderPostfix(const Expr& expr) {
+  const int kPower = UnaryPower(expr.op);
+  return Render(expr.lhs).transform([&expr, kPower](const Piece& operand) {
+    const Piece kInner = AsLeftOperand(operand, kPower);
+    return Piece{VpiDecompileJoin({kInner.text, Spelling(expr.op)}),
+                 std::min(kPower, kInner.left), kUnsplit};
+  });
 }
 
 // §11.4: a binary operator between its operands.
@@ -453,6 +470,8 @@ std::optional<Piece> Render(const Expr* expr) {
       return Piece{std::string(expr->text)};
     case ExprKind::kUnary:
       return RenderUnary(*expr);
+    case ExprKind::kPostfixUnary:
+      return RenderPostfix(*expr);
     case ExprKind::kBinary:
       return RenderBinary(*expr);
     case ExprKind::kTernary:
