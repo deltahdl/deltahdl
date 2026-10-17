@@ -58,6 +58,9 @@ struct AssignNames {
   // stands in, each with the value it holds in the block instance; none for
   // any other expression.
   const GenBlockConsts& genvars = NoGenvars();
+  // The instance object a continuous assignment stands in, where `scope` is
+  // none; a top's prefix is empty and keys no object.
+  const VpiObject* instance = nullptr;
 
   static const GenBlockConsts& NoGenvars() {
     static const GenBlockConsts kNone;
@@ -234,9 +237,13 @@ VpiObject* SelectThroughVarSelect(VpiObject* outer, const Expr* index,
   select->index_expr = ExpressionObject(index, build);
   select->size = 1;
   for (const VpiObject* element : array->children) {
-    if (!element->array_member || element->packed_dims.empty()) continue;
-    const PackedRange& kOuter = element->packed_dims.front();
-    const int64_t kCount = kOuter.HighIndex() - kOuter.LowIndex() + 1;
+    if (!element->array_member) continue;
+    const std::vector<PackedRange>& dims = element->packed_dims.empty()
+                                               ? array->packed_dims
+                                               : element->packed_dims;
+    if (dims.empty()) break;
+    const int64_t kCount =
+        dims.front().HighIndex() - dims.front().LowIndex() + 1;
     select->size = static_cast<int>(element->size / kCount);
     break;
   }
@@ -470,6 +477,23 @@ const Expr* KeyedValue(const Expr* pattern, const VpiObject* slot,
 VpiObject* AssignedExpressionObject(const Expr* expr, const VpiObject* target,
                                     const AssignBuild& build);
 
+// What a keyed pattern assigned to `target` is laid out by: `target` itself,
+// or a typespec member's typespec.
+const VpiObject* PatternLayout(const VpiObject* target) {
+  if (target->type != vpiTypespecMember) return target;
+  for (const VpiObject* child : target->children) {
+    if (VpiIsTypespecType(child->type)) return child;
+  }
+  return target;
+}
+
+// Whether `child` of `layout` takes a place in a pattern laid out by it: a
+// member, an element, or a typespec member.
+bool IsPatternSlot(const VpiObject& child, const VpiObject& layout) {
+  return child.member_of == &layout || child.array_member ||
+         child.type == vpiTypespecMember;
+}
+
 // §37.59 detail 6: the keyed assignment pattern `pattern` assigned to
 // `target` as an assignment pattern operation over its expressions in the
 // positional order of `target`'s members or elements, left first (§37.17
@@ -480,17 +504,10 @@ VpiObject* AssignedExpressionObject(const Expr* expr, const VpiObject* target,
 // has none.
 VpiObject* KeyedPatternObject(const Expr* pattern, const VpiObject* target,
                               const AssignBuild& build) {
-  if (target->type == vpiTypespecMember) {
-    for (const VpiObject* child : target->children) {
-      if (VpiIsTypespecType(child->type)) target = child;
-    }
-  }
+  const VpiObject* laid_out = PatternLayout(target);
   VpiObject* op = nullptr;
-  for (const VpiObject* child : target->children) {
-    if (child->member_of != target && !child->array_member &&
-        child->type != vpiTypespecMember) {
-      continue;
-    }
+  for (const VpiObject* child : laid_out->children) {
+    if (!IsPatternSlot(*child, *laid_out)) continue;
     if (op == nullptr) {
       op = build.alloc();
       op->type = vpiOperation;
@@ -603,8 +620,10 @@ VpiObject* ModelledExpression(const Expr* expr, const AssignBuild& build) {
     case ExprKind::kCast:
       return VpiTypedCast(
           OperationObject(vpiCastOp, {expr->lhs}, build), *expr,
-          VpiScopeOrInstance(build.names.scope, build.names.objects,
-                             build.names.prefix),
+          VpiScopeOrInstance(build.names.scope != nullptr
+                                 ? build.names.scope
+                                 : build.names.instance,
+                             build.names.objects, build.names.prefix),
           build.alloc);
     case ExprKind::kMinTypMax:
       return OperationObject(vpiMinTypMaxOp,
@@ -864,7 +883,7 @@ void VpiContext::AttachContinuousAssignments(
               [this] { return AllocObject(); },
               sim_ctx_,
               AssignNames{object_map_, prefix, ca.gen_block_prefixes, nullptr,
-                          ca.gen_block_consts},
+                          ca.gen_block_consts, scope},
               VpiCalleesAt({*design, *mod, prefix,
                             CalleeScope(*mod, ca.gen_block_prefixes, scope),
                             subroutines}),

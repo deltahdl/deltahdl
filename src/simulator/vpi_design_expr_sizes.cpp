@@ -111,11 +111,11 @@ int OperationWidth(const VpiObject& op, const std::vector<int>& sizes,
       return sum;
     }
     case vpiMultiConcatOp: {
-      const Variable* kCount = ConstantValue(operands.front());
-      if (kCount == nullptr) return 0;
+      const Variable* count = ConstantValue(operands.front());
+      if (count == nullptr) return 0;
       int sum = 0;
       for (std::size_t i = 1; i < sizes.size(); ++i) sum += sizes[i];
-      return static_cast<int>(kCount->value.ToUint64()) * sum;
+      return static_cast<int>(count->value.ToUint64()) * sum;
     }
     default:
       return *std::ranges::max_element(sizes);
@@ -126,14 +126,14 @@ int OperationWidth(const VpiObject& op, const std::vector<int>& sizes,
 // select of constant width, selects; 0 where they are not constants.
 int PartSelectWidth(const VpiObject& select) {
   if (select.type == vpiIndexedPartSelect) {
-    const Variable* kWidth = ConstantValue(select.width_expr);
-    return kWidth != nullptr ? static_cast<int>(kWidth->value.ToUint64()) : 0;
+    const Variable* width = ConstantValue(select.width_expr);
+    return width != nullptr ? static_cast<int>(width->value.ToUint64()) : 0;
   }
-  const Variable* kLeft = ConstantValue(select.left_range);
-  const Variable* kRight = ConstantValue(select.right_range);
-  if (kLeft == nullptr || kRight == nullptr) return 0;
-  const auto kSpan = static_cast<int64_t>(kLeft->value.ToUint64()) -
-                     static_cast<int64_t>(kRight->value.ToUint64());
+  const Variable* left = ConstantValue(select.left_range);
+  const Variable* right = ConstantValue(select.right_range);
+  if (left == nullptr || right == nullptr) return 0;
+  const auto kSpan = static_cast<int64_t>(left->value.ToUint64()) -
+                     static_cast<int64_t>(right->value.ToUint64());
   return static_cast<int>(std::abs(kSpan) + 1);
 }
 

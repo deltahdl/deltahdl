@@ -147,25 +147,22 @@ TEST_F(AssignedExpressionsOfARun, APartSelectReadsItsBits) {
 }
 
 // Detail 6: a keyed pattern nested in a keyed pattern keeps its place, laid
-// out positionally by the member it fills, nesting preserved - the default
-// of the last filling each of its members.
+// out positionally by the subarray it fills, nesting preserved - the default
+// of the outer pattern filling the subarray no index key names.
 TEST_F(AssignedExpressionsOfARun, ANestedKeyedPatternKeepsItsPlace) {
-  Run("module top;\n"
-      "  typedef struct packed { logic [1:0] p; logic [1:0] q; } in_t;\n"
-      "  typedef struct packed { in_t i; logic [3:0] n; in_t j; } out_t;\n"
-      "  out_t w;\n"
-      "  assign w = '{i: '{q: 2'd1, p: 2'd2}, n: 4'd5, j: '{default: 2'd3}};\n"
+  Run("module top; logic [1:0] a [0:1][0:1];\n"
+      "  assign a = '{0: '{1: 2'd1, default: 2'd0}, default: '{default: "
+      "2'd3}};\n"
       "endmodule\n");
   vpiHandle pattern = Rhs();
   ASSERT_NE(pattern, nullptr);
   ASSERT_EQ(vpi_get(vpiOpType, pattern), vpiAssignmentPatternOp);
   const std::vector<vpiHandle> kOperands = OperandsOf(pattern);
-  ASSERT_EQ(kOperands.size(), 3U);
+  ASSERT_EQ(kOperands.size(), 2U);
   EXPECT_EQ(vpi_get(vpiOpType, kOperands[0]), vpiAssignmentPatternOp);
-  EXPECT_EQ(ValuesOf(OperandsOf(kOperands[0])), (std::vector<int>{2, 1}));
-  EXPECT_EQ(IntOf(kOperands[1]), 5);
-  EXPECT_EQ(vpi_get(vpiOpType, kOperands[2]), vpiAssignmentPatternOp);
-  EXPECT_EQ(ValuesOf(OperandsOf(kOperands[2])), (std::vector<int>{3, 3}));
+  EXPECT_EQ(ValuesOf(OperandsOf(kOperands[0])), (std::vector<int>{0, 1}));
+  EXPECT_EQ(vpi_get(vpiOpType, kOperands[1]), vpiAssignmentPatternOp);
+  EXPECT_EQ(ValuesOf(OperandsOf(kOperands[1])), (std::vector<int>{3, 3}));
 }
 
 // Detail 10 with Table 37-1: the parent of r[i+1][3][j+:2] is r[i+1][3], a

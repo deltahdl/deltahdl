@@ -78,14 +78,16 @@ TEST_F(VpiObjectProtection, GetIsProtectedIsPermittedOnProtectedObject) {
 
 // Claim: unless otherwise specified, access to a property of a protected object
 // is an error. Any property other than the two permitted exceptions records an
-// error and yields vpiUndefined, the value vpi_get() returns on an error.
+// error and yields vpiUndefined, the value vpi_get() returns on an error. The
+// vpiSize of a variable is otherwise specified, §37.59 detail 8 permitting it
+// on a protected expression, so a variable's vpiLineNo is queried.
 TEST_F(VpiObjectProtection, GetOtherPropertyOnProtectedObjectIsAnError) {
   VpiObject reg;
   reg.type = vpiReg;
-  reg.size = 32;
+  reg.line_no = 7;
   reg.is_protected = true;
 
-  EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(&reg)), vpiUndefined);
+  EXPECT_EQ(vpi_get(vpiLineNo, VpiHandleOf(&reg)), vpiUndefined);
 
   s_vpi_error_info info = {};
   EXPECT_NE(vpi_chk_error(&info), 0);
