@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "elaborator/const_eval.h"
+#include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/type_site_lookup.h"
@@ -45,12 +46,16 @@ void AddOwnMemberNames(const ClassDecl& cls,
   }
 }
 
-// The names of the classes `cls` extends or implements.
-std::vector<std::string_view> BaseNames(const ClassDecl& cls) {
-  std::vector<std::string_view> bases;
-  if (!cls.base_class.empty()) bases.push_back(cls.base_class);
+// The scope and name of each class `cls` extends or implements.
+std::vector<std::pair<std::string_view, std::string_view>> BaseNames(
+    const ClassDecl& cls) {
+  std::vector<std::pair<std::string_view, std::string_view>> bases;
+  if (!cls.base_class.empty()) {
+    bases.emplace_back(cls.base_class_scope, cls.base_class);
+  }
   for (const auto* refs : {&cls.extends_interfaces, &cls.implements_types}) {
-    for (const InterfaceRef& ref : *refs) bases.push_back(ref.name);
+    for (const InterfaceRef& ref : *refs)
+      bases.emplace_back(ref.scope, ref.name);
   }
   return bases;
 }
@@ -102,6 +107,13 @@ const ClassDecl* SoleClassIndex::FindFrom(const ClassDecl& from,
   return seen != nullptr ? seen : Find(name);
 }
 
+const ClassDecl* SoleClassIndex::FindFrom(const ClassDecl& from,
+                                          std::string_view scope,
+                                          std::string_view name) const {
+  const ClassDecl* in_package = FindClassInPackage(scope, name, &unit_);
+  return in_package != nullptr ? in_package : FindFrom(from, name);
+}
+
 bool SoleClassIndex::SelectableNames(
     const ClassDecl& cls, std::unordered_set<std::string_view>& names) const {
   // §18.6 randomize, pre_randomize and post_randomize, §18.8 rand_mode, §18.9
@@ -116,9 +128,9 @@ bool SoleClassIndex::SelectableNames(
     work.pop_back();
     if (!seen.insert(walked).second) continue;
     AddOwnMemberNames(*walked, names, generated_);
-    for (const std::string_view kBase : BaseNames(*walked)) {
-      const ClassDecl* base = FindFrom(*walked, kBase);
-      if (base == nullptr || walked->type_param_names.contains(kBase)) {
+    for (const auto& [scope, name] : BaseNames(*walked)) {
+      const ClassDecl* base = FindFrom(*walked, scope, name);
+      if (base == nullptr || walked->type_param_names.contains(name)) {
         return false;
       }
       work.push_back(base);
@@ -130,7 +142,8 @@ bool SoleClassIndex::SelectableNames(
 void SoleClassIndex::AddLocalTypes(
     const ClassDecl& cls, std::unordered_set<std::string_view>& names) const {
   for (const ClassDecl* walked = &cls; walked != nullptr;
-       walked = FindFrom(*walked, walked->base_class)) {
+       walked =
+           FindFrom(*walked, walked->base_class_scope, walked->base_class)) {
     names.insert(walked->type_param_names.begin(),
                  walked->type_param_names.end());
     for (const ClassMember* member : walked->members) {
@@ -146,7 +159,8 @@ const ClassDecl* SoleClassIndex::PropertyClass(const ClassDecl& cls,
                                                std::string_view name,
                                                std::size_t selects) const {
   for (const ClassDecl* walked = &cls; walked != nullptr;
-       walked = FindFrom(*walked, walked->base_class)) {
+       walked =
+           FindFrom(*walked, walked->base_class_scope, walked->base_class)) {
     for (const ClassMember* member : walked->members) {
       if (member->kind != ClassMemberKind::kProperty || member->name != name) {
         continue;

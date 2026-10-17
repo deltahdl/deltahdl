@@ -115,31 +115,29 @@ void Parser::ParseExtendsArgList(ClassDecl* decl) {
 
 namespace {
 
-// Record one base named in a class's extends/implements clause onto decl. The
-// first non-implements base becomes the class's primary base_class (and carries
-// its type parameters into base_class_type_params when has_type_params is set);
-// every other entry is collected as an implemented interface or an additional
-// extended interface. has_type_params distinguishes 'base #(...)' from a bare
-// 'base' so the no-parameter case leaves base_class_type_params untouched.
-// Each keeps the scope written before its name's last '::'. Returns whether
-// this base was the primary base, so the caller can route its following
-// '(...)' argument list correctly.
-bool RecordClassExtendsBase(ClassDecl* decl, std::string_view scope,
-                            std::string_view name,
-                            std::vector<DataType> tparams, bool is_implements,
-                            bool has_type_params) {
+// Record one base, `ref`, named in a class's extends/implements clause onto
+// decl. The first non-implements base becomes the class's primary base_class
+// (and carries its type parameters into base_class_type_params when
+// has_type_params is set); every other entry is collected as an implemented
+// interface or an additional extended interface. has_type_params distinguishes
+// 'base #(...)' from a bare 'base' so the no-parameter case leaves
+// base_class_type_params untouched. Each keeps the scope written before its
+// name's last '::'. Returns whether this base was the primary base, so the
+// caller can route its following '(...)' argument list correctly.
+bool RecordClassExtendsBase(ClassDecl* decl, InterfaceRef ref,
+                            bool is_implements, bool has_type_params) {
   bool is_first_base = !is_implements && decl->base_class.empty();
   if (is_first_base) {
-    decl->base_class = name;
-    decl->base_class_scope = scope;
+    decl->base_class = ref.name;
+    decl->base_class_scope = ref.scope;
   }
   if (has_type_params && is_first_base) {
-    decl->base_class_type_params = tparams;
+    decl->base_class_type_params = ref.type_params;
   }
   if (is_implements) {
-    decl->implements_types.push_back({name, std::move(tparams), scope});
+    decl->implements_types.push_back(std::move(ref));
   } else if (!is_first_base) {
-    decl->extends_interfaces.push_back({name, std::move(tparams), scope});
+    decl->extends_interfaces.push_back(std::move(ref));
   }
   return is_first_base;
 }
@@ -163,8 +161,8 @@ void Parser::ParseClassExtendsClause(ClassDecl* decl, bool is_implements) {
       Consume();
       tparams = ParseTypeParamList();
     }
-    RecordClassExtendsBase(decl, scope, name, std::move(tparams), is_implements,
-                           has_type_params);
+    RecordClassExtendsBase(decl, {name, std::move(tparams), scope},
+                           is_implements, has_type_params);
 
     if (Check(TokenKind::kLParen)) {
       if (is_implements) {

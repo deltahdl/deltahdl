@@ -50,6 +50,12 @@ const ClassDecl* ScopedClass(const CompilationUnit& unit, const TypeSite& site,
                              std::string_view scope_name,
                              std::string_view name);
 
+// §8.13 with §26.3: the class `cls` extends, as the scope of `site` sees its
+// extends clause: behind the scope the clause writes (ScopedClass), else the
+// one ClassIn gives of its bare name.
+const ClassDecl* BaseClassIn(const CompilationUnit& unit, const TypeSite& site,
+                             const ClassDecl& cls);
+
 // §6.18: the typedef the named type `type`, written at `site`, names: behind
 // its package's scope, p::KT, or else the one the site sees.
 FoundItem TypedefOf(const CompilationUnit& unit, const TypeSite& site,

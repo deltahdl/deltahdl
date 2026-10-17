@@ -367,7 +367,7 @@ const ClassMember* ChainMember(const ClassDecl& cls, ClassMemberKind kind,
                                std::string_view name, const DataScope& scope) {
   const TypeSite kSite = scope.Site();
   for (const ClassDecl* walked = &cls; walked != nullptr;
-       walked = ClassIn(scope.unit, kSite, walked->base_class)) {
+       walked = BaseClassIn(scope.unit, kSite, *walked)) {
     for (const ClassMember* member : walked->members) {
       if (member->kind == kind && member->name == name) return member;
     }
@@ -767,7 +767,7 @@ void DeclareModuleItems(const ModuleDecl& decl, const CompilationUnit& unit,
 void DeclareClassProperties(const ClassDecl& cls, DataScope& scope) {
   const TypeSite kSite = scope.Site();
   for (const ClassDecl* walked = &cls; walked != nullptr;
-       walked = ClassIn(scope.unit, kSite, walked->base_class)) {
+       walked = BaseClassIn(scope.unit, kSite, *walked)) {
     for (const ClassMember* member : walked->members) {
       if (member->kind == ClassMemberKind::kProperty) {
         scope.properties.emplace(

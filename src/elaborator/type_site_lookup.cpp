@@ -115,6 +115,15 @@ const ClassDecl* ScopedClass(const CompilationUnit& unit, const TypeSite& site,
   return nullptr;
 }
 
+const ClassDecl* BaseClassIn(const CompilationUnit& unit, const TypeSite& site,
+                             const ClassDecl& cls) {
+  const ClassDecl* scoped =
+      cls.base_class_scope.empty()
+          ? nullptr
+          : ScopedClass(unit, site, cls.base_class_scope, cls.base_class);
+  return scoped != nullptr ? scoped : ClassIn(unit, site, cls.base_class);
+}
+
 FoundItem TypedefOf(const CompilationUnit& unit, const TypeSite& site,
                     const DataType& type) {
   if (!type.scope_name.empty()) {

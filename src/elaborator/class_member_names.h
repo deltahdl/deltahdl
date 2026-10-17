@@ -68,6 +68,12 @@ class SoleClassIndex {
   // class, whose scope is not recorded.
   const ClassDecl* FindFrom(const ClassDecl& from, std::string_view name) const;
 
+  // As FindFrom, for a name written behind the scope `scope`: the class of
+  // that name the package `scope` names declares (§26.3), where it declares
+  // one; FindFrom's otherwise.
+  const ClassDecl* FindFrom(const ClassDecl& from, std::string_view scope,
+                            std::string_view name) const;
+
   const CompilationUnit& unit_;
   mutable bool built_ = false;
   mutable std::unordered_map<std::string_view, const ClassDecl*> by_name_;
