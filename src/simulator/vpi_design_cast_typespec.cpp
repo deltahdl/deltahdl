@@ -49,15 +49,18 @@ VpiObject* TypedefAround(const VpiObject* from, std::string_view name) {
 VpiObject* VpiTypedCast(VpiObject* op, const Expr& cast, const VpiObject* from,
                         const std::function<VpiObject*()>& alloc) {
   if (op == nullptr) return nullptr;
-  VpiObject* typespec = nullptr;
-  if (!cast.text.empty()) {
-    for (const auto& [keyword, kind] : kKeywordTypespecs) {
-      if (keyword != cast.text) continue;
-      typespec = alloc();
-      typespec->type = kind;
-    }
-  } else if (cast.rhs != nullptr && cast.rhs->kind == ExprKind::kIdentifier) {
-    typespec = TypedefAround(from, cast.rhs->text);
+  // The type is named as text or as an identifier, as the parser read it.
+  const std::string_view kName =
+      !cast.text.empty() ? cast.text
+      : cast.rhs != nullptr && cast.rhs->kind == ExprKind::kIdentifier
+          ? cast.rhs->text
+          : std::string_view{};
+  if (kName.empty()) return op;
+  VpiObject* typespec = TypedefAround(from, kName);
+  for (const auto& [keyword, kind] : kKeywordTypespecs) {
+    if (typespec != nullptr || keyword != kName) continue;
+    typespec = alloc();
+    typespec->type = kind;
   }
   if (typespec != nullptr) op->children.push_back(typespec);
   return op;

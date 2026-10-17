@@ -90,6 +90,10 @@ TEST_F(AssignedExpressionsOfARun, ACastToATypedefReachesItsTypespec) {
   vpiHandle cast = Rhs();
   ASSERT_NE(cast, nullptr);
   ASSERT_EQ(vpi_get(vpiOpType, cast), vpiCastOp);
+  vpiHandle typedefs = vpi_iterate(vpiTypedef, By("top"));
+  ASSERT_NE(typedefs, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_scan(typedefs)), "nib_t");
+  vpi_release_handle(typedefs);
   vpiHandle typespec = vpi_handle(vpiTypespec, cast);
   ASSERT_NE(typespec, nullptr);
   EXPECT_STREQ(vpi_get_str(vpiName, typespec), "nib_t");
@@ -147,12 +151,11 @@ TEST_F(AssignedExpressionsOfARun, APartSelectReadsItsBits) {
 }
 
 // Detail 6: a keyed pattern nested in a keyed pattern keeps its place, laid
-// out positionally by the subarray it fills, nesting preserved - the default
-// of the outer pattern filling the subarray no index key names.
+// out positionally by the subarray it fills, nesting preserved. §10.8 lets no
+// untyped pattern be a default key's value, so each subarray is keyed.
 TEST_F(AssignedExpressionsOfARun, ANestedKeyedPatternKeepsItsPlace) {
   Run("module top; logic [1:0] a [0:1][0:1];\n"
-      "  assign a = '{0: '{1: 2'd1, default: 2'd0}, default: '{default: "
-      "2'd3}};\n"
+      "  assign a = '{0: '{1: 2'd1, default: 2'd0}, 1: '{default: 2'd3}};\n"
       "endmodule\n");
   vpiHandle pattern = Rhs();
   ASSERT_NE(pattern, nullptr);

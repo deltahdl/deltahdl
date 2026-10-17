@@ -238,13 +238,11 @@ VpiObject* SelectThroughVarSelect(VpiObject* outer, const Expr* index,
   select->size = 1;
   for (const VpiObject* element : array->children) {
     if (!element->array_member) continue;
-    const std::vector<PackedRange>& dims = element->packed_dims.empty()
-                                               ? array->packed_dims
-                                               : element->packed_dims;
-    if (dims.empty()) break;
-    const int64_t kCount =
-        dims.front().HighIndex() - dims.front().LowIndex() + 1;
-    select->size = static_cast<int>(element->size / kCount);
+    // §7.4.1: the run's storage for the element keeps the width an index of
+    // its outermost packed dimension selects; the model's objects do not.
+    if (element->var != nullptr && element->var->packed_elem_width != 0) {
+      select->size = static_cast<int>(element->var->packed_elem_width);
+    }
     break;
   }
   return select;
