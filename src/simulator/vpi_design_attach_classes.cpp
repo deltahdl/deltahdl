@@ -274,12 +274,13 @@ struct ClassVarProperty {
 };
 
 // §37.31: the properties and methods of the class `owner` was made for, in
-// the order the class declares them, each property made a class var added to
-// `class_vars`. A parameter is no property of it.
-void MakeMembers(const MadeClassDefn& owner, const RtlirDesign& design,
-                 const std::vector<MadeClassDefn>& made, SimContext& ctx,
-                 const VpiAttachBuild& build,
-                 std::vector<ClassVarProperty>& class_vars) {
+// the order the class declares them; the properties made class vars are
+// returned. A parameter is no property of it.
+std::vector<ClassVarProperty> MakeMembers(
+    const MadeClassDefn& owner, const RtlirDesign& design,
+    const std::vector<MadeClassDefn>& made, SimContext& ctx,
+    const VpiAttachBuild& build) {
+  std::vector<ClassVarProperty> class_vars;
   for (const ClassMember* member : owner.decl->members) {
     if (member == nullptr) continue;
     if (member->kind == ClassMemberKind::kMethod) {
@@ -291,6 +292,7 @@ void MakeMembers(const MadeClassDefn& owner, const RtlirDesign& design,
       if (var->type == vpiClassVar) class_vars.push_back({var, member, &owner});
     }
   }
+  return class_vars;
 }
 
 // §37.31 with §37.34: the constraints of the class `owner` was made for, in
@@ -400,7 +402,10 @@ VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
     // §37.83: the attributes the class is written with.
     VpiAttachAttributes(owner.defn, VpiNodeAttributes(owner.attrs, owner.decl),
                         false, ctx, build);
-    MakeMembers(owner, *design, made, ctx, build, class_vars);
+    const std::vector<ClassVarProperty> kOwnClassVars =
+        MakeMembers(owner, *design, made, ctx, build);
+    class_vars.insert(class_vars.end(), kOwnClassVars.begin(),
+                      kOwnClassVars.end());
     if (!owner.decl->base_class.empty()) {
       MakeExtends(owner, made, objects, ctx, build);
     }
