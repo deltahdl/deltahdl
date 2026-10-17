@@ -1,13 +1,16 @@
+#include <algorithm>
 #include <array>
 #include <functional>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "common/types.h"
 #include "parser/ast_expr.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_design_attach_build.h"
+#include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -70,19 +73,35 @@ int OperandTypespecKind(const VpiObject& operand) {
   return vpiLogicTypespec;
 }
 
-// §6.24.1: the typespec kind of a size cast of `operand`, which keeps its 2-
-// or 4-state nature: a bit vector of a 2-state integral operand, a logic one
-// of any other.
-int SizeCastTypespecKind(const VpiObject& operand) {
-  switch (OperandTypespecKind(operand)) {
+// §6.11 and §11.8.1: whether `expr` is 2-state. A variable is as its type
+// is, a bit or a select of one as what it selects from, and an operation when
+// every operand is; a literal and any other expression are taken as 4-state.
+bool IsTwoState(VpiObject& expr) {
+  if (expr.type == vpiOperation) {
+    const std::vector<VpiHandle> kOperands = VpiOperationOperands(&expr);
+    return !kOperands.empty() &&
+           std::ranges::all_of(kOperands, [](VpiHandle operand) {
+             return operand != nullptr && IsTwoState(*operand);
+           });
+  }
+  switch (expr.type) {
+    case vpiBitSelect:
+    case vpiPartSelect:
+    case vpiIndexedPartSelect:
+    case vpiRegBit:
+      return expr.parent != nullptr && IsTwoState(*expr.parent);
+    default:
+      break;
+  }
+  switch (OperandTypespecKind(expr)) {
     case vpiBitTypespec:
     case vpiByteTypespec:
     case vpiShortIntTypespec:
     case vpiIntTypespec:
     case vpiLongIntTypespec:
-      return vpiBitTypespec;
+      return true;
     default:
-      return vpiLogicTypespec;
+      return false;
   }
 }
 
@@ -107,11 +126,11 @@ VpiObject* NamedTypespec(const Expr& cast, const VpiObject* from,
 }
 
 // §6.24.1: the typespec a cast naming no type makes from `operand`, what it
-// casts. A size cast's is a vector of the operand's state and signedness, as
-// wide as the value `width` holds; a signing cast's is the operand's type of
-// the signedness it names; and a const cast's is the operand's type. Null for
-// any other cast.
-VpiObject* OperandTypespec(const Expr& cast, const VpiObject& operand,
+// casts. A size cast's is a vector of the operand's 2- or 4-state nature and
+// signedness, as wide as the value `width` holds; a signing cast's is the
+// operand's type of the signedness it names; and a const cast's is the
+// operand's type. Null for any other cast.
+VpiObject* OperandTypespec(const Expr& cast, VpiObject& operand,
                            const VpiObject* width,
                            const std::function<VpiObject*()>& alloc) {
   const bool kSigning = cast.text == "signed" || cast.text == "unsigned";
@@ -120,7 +139,8 @@ VpiObject* OperandTypespec(const Expr& cast, const VpiObject& operand,
   if (!kSigning && !kSize && cast.text != "const") return nullptr;
   VpiObject* typespec = alloc();
   typespec->type =
-      kSize ? SizeCastTypespecKind(operand) : OperandTypespecKind(operand);
+      kSize ? (IsTwoState(operand) ? vpiBitTypespec : vpiLogicTypespec)
+            : OperandTypespecKind(operand);
   typespec->decl_signed =
       kSigning ? cast.text == "signed" : operand.decl_signed;
   typespec->size =

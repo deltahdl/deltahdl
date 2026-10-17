@@ -123,6 +123,25 @@ TEST_F(AssignedExpressionsOfARun, ASizeCastOfAFourStateOperandIsALogicVector) {
   EXPECT_EQ(vpi_get(vpiType, typespec), vpiLogicTypespec);
 }
 
+// ...an operation's being 2-state where every operand is (§11.8.1)...
+TEST_F(AssignedExpressionsOfARun, ASizeCastOfATwoStateOperationIsABitVector) {
+  Run("module top; int i, j; wire [7:0] w; assign w = 8'(i + j);\n"
+      "endmodule\n");
+  vpiHandle typespec = CastTypespec(Rhs());
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, typespec), vpiBitTypespec);
+}
+
+// ...and 4-state where one is not...
+TEST_F(AssignedExpressionsOfARun, ASizeCastOfAMixedOperationIsALogicVector) {
+  Run("module top; int i; logic [3:0] r; wire [7:0] w;\n"
+      "  assign w = 8'(i + r);\n"
+      "endmodule\n");
+  vpiHandle typespec = CastTypespec(Rhs());
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, typespec), vpiLogicTypespec);
+}
+
 // ...as wide as its size expression's value, a parameter's included...
 TEST_F(AssignedExpressionsOfARun, ASizeCastIsAsWideAsItsSizeExpression) {
   Run("module top; localparam W = 6; logic [3:0] r; wire [7:0] w;\n"
