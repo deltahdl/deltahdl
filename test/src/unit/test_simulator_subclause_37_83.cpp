@@ -546,10 +546,10 @@ TEST_F(AttributesOfARun, AnOperationOutsideAnAssignmentCarriesItsAttributes) {
 // property.
 TEST_F(AttributesOfARun, APropertysOperationCarriesItsOperatorsAttributes) {
   Run("package p; logic x, y;\n"
-      "  property q; x && (* in_pkg *) y; endproperty\n"
+      "  property q; x ^ (* in_pkg *) y; endproperty\n"
       "endpackage\n"
       "module top; logic a, b;\n"
-      "  property r; a || (* in_mod *) b; endproperty\n"
+      "  property r; a ^ (* in_mod *) b; endproperty\n"
       "endmodule\n");
   const auto kBodyOf = [](vpiHandle scope, const char* name) {
     vpiHandle decl = Named(vpiPropertyDecl, scope, name);
