@@ -264,9 +264,9 @@ TEST_F(AttributesOfARun, ANetAndAVariableCarryTheirAttributes) {
 // as an integer where its expression fixes no width.
 TEST_F(AttributesOfARun, AnAttributeOfAParametersValueIsAnInteger) {
   Run("module top #(parameter P = 7);\n"
-      "  (* depth = P *) wire w;\n"
+      "  (* depth = P *) logic v;\n"
       "endmodule\n");
-  vpiHandle depth = Named(vpiAttribute, By("top.w"), "depth");
+  vpiHandle depth = Named(vpiAttribute, By("top.v"), "depth");
   ASSERT_NE(depth, nullptr);
   EXPECT_EQ(ValueOf(depth, vpiIntVal), "7");
   EXPECT_EQ(ValueOf(depth, vpiBinStrVal).size(), 32u);
