@@ -719,6 +719,42 @@ TEST_F(ClassObjectsOfARun, AClassTypedPropertyReachesItsDeclaredTypespec) {
                "D");
 }
 
+// ...a property of a package's class written through its scope, with nothing
+// importing the package, is a class var under a class obj too (#7300)...
+TEST_F(ClassObjectsOfARun, APackageScopedClassPropertyIsAClassVarOfTheObject) {
+  Run("package p; class P; endclass endpackage\n"
+      "module top; class A; p::P q; endclass\n"
+      "  A a = new;\n"
+      "endmodule\n");
+  vpiHandle q = Named(vpiVariables, vpi_handle(vpiClassObj, By("top.a")), "q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, q), vpiClassVar);
+  vpiHandle typespec = vpi_handle(vpiClassTypespec, q);
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, typespec), "P");
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiClassDefn, typespec)),
+            VpiObjectOf(Named(vpiClassDefn, By("p"), "P")));
+}
+
+// ...and one declared through a typedef of a class reaches that class's
+// typespec, under the class defn and the class obj alike (§6.18, #7301).
+TEST_F(ClassObjectsOfARun, ATypedefDeclaredClassPropertyReachesItsClass) {
+  Run("module top; class C; endclass typedef C c_t;\n"
+      "  class A; c_t x; endclass\n"
+      "  A a = new;\n"
+      "endmodule\n");
+  vpiHandle c_defn = Named(vpiClassDefn, By("top"), "C");
+  for (vpiHandle holder : {Named(vpiClassDefn, By("top"), "A"),
+                           vpi_handle(vpiClassObj, By("top.a"))}) {
+    vpiHandle typespec =
+        vpi_handle(vpiClassTypespec, Named(vpiVariables, holder, "x"));
+    ASSERT_NE(typespec, nullptr);
+    EXPECT_STREQ(vpi_get_str(vpiName, typespec), "C");
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiClassDefn, typespec)),
+              VpiObjectOf(c_defn));
+  }
+}
+
 // ...where the object's class has a class defn: an object of a nested class,
 // which has none yet (§8.23, #7124), still holds its class-typed property as a
 // class var.

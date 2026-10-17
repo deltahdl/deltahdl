@@ -36,13 +36,18 @@ namespace delta {
 namespace {
 
 // §37.17 with §8.3: the kind of variable a property declared as `member` is,
-// a class var where its type names a class the run knows and an array var
+// a class var where its type names a class the run knows, a package's through
+// its scope by the "p::P" key the run holds it under (§26.3), and an array var
 // where it declares unpacked dimensions.
 int PropertyVariableKind(const ClassMember& member, SimContext& ctx) {
   if (!member.unpacked_dims.empty()) return vpiArrayVar;
   const DataType& type = member.data_type;
-  const bool kNamesClass = type.kind == DataTypeKind::kNamed &&
-                           ctx.FindClassType(type.type_name) != nullptr;
+  const std::string kKey =
+      type.scope_name.empty()
+          ? std::string(type.type_name)
+          : std::string(type.scope_name) + "::" + std::string(type.type_name);
+  const bool kNamesClass =
+      type.kind == DataTypeKind::kNamed && ctx.FindClassType(kKey) != nullptr;
   return kNamesClass ? vpiClassVar : VpiDataTypeVariableKind(type.kind);
 }
 

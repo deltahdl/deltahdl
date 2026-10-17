@@ -366,11 +366,16 @@ void AttachDeclaredClassTypespec(VpiObject* var, std::string_view written,
   var->children.push_back(typespec);
 }
 
-// The class type `type` as written, `p::B` behind its package's scope.
-std::string WrittenClassType(const DataType& type) {
-  return type.scope_name.empty() ? std::string(type.type_name)
-                                 : std::string(type.scope_name) +
-                                       "::" + std::string(type.type_name);
+// The class type `type` names, `p::B` behind its package's scope, and the
+// class a typedef of one names (§6.18) as the design records it.
+std::string WrittenClassType(const DataType& type, const RtlirDesign& design) {
+  std::string written =
+      type.scope_name.empty()
+          ? std::string(type.type_name)
+          : std::string(type.scope_name) + "::" + std::string(type.type_name);
+  const auto kTarget = design.type_targets.find(written);
+  return kTarget == design.type_targets.end() ? written
+                                              : std::string(kTarget->second);
 }
 }  // namespace
 
@@ -422,9 +427,9 @@ VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
   // from the scope declaring the class whose property it is. None was made,
   // so vpiClassTypespec of such a property was null.
   for (const ClassVarProperty& property : class_vars) {
-    AttachDeclaredClassTypespec(property.var,
-                                WrittenClassType(property.member->data_type),
-                                defns, property.owner->prefix, build);
+    AttachDeclaredClassTypespec(
+        property.var, WrittenClassType(property.member->data_type, *design),
+        defns, property.owner->prefix, build);
   }
   return defns;
 }
