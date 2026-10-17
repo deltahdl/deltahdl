@@ -69,7 +69,7 @@ void VpiAttachAttributes(VpiObject* owner,
   for (const ResolvedAttribute& attr : attrs) {
     VpiObject* obj = build.alloc();
     obj->type = vpiAttribute;
-    obj->name = attr.name;
+    obj->name = build.keep(std::string(attr.name));
     obj->def_attribute = on_definition;
     obj->var = AttributeValue(attr, build.arena);
     // The definition location is where the attribute instance was written,

@@ -277,21 +277,21 @@ TEST_F(AttributesOfARun, AnAttributeOfAParametersValueIsAnInteger) {
 // with; a top module carries its declaration's. Each reports where it was
 // written, in the file the module is.
 TEST_F(AttributesOfARun, AnInstanceCarriesItsOwnAndItsDefinitionsAttributes) {
-  Run("(* cell = 3 *) module sub; endmodule\n"
+  Run("(* area = 3 *) module sub; endmodule\n"
       "(* root *) module top;\n"
       "  (* place = \"left\" *) sub u();\n"
       "endmodule\n");
   vpiHandle u = By("top.u");
   EXPECT_EQ(NamesOf(vpiAttribute, u),
-            (std::vector<std::string>{"cell", "place"}));
-  vpiHandle cell = Named(vpiAttribute, u, "cell");
+            (std::vector<std::string>{"area", "place"}));
+  vpiHandle area = Named(vpiAttribute, u, "area");
   vpiHandle place = Named(vpiAttribute, u, "place");
-  ASSERT_NE(cell, nullptr);
+  ASSERT_NE(area, nullptr);
   ASSERT_NE(place, nullptr);
-  EXPECT_EQ(vpi_get(vpiDefAttribute, cell), 1);
-  EXPECT_EQ(ValueOf(cell, vpiIntVal), "3");
+  EXPECT_EQ(vpi_get(vpiDefAttribute, area), 1);
+  EXPECT_EQ(ValueOf(area, vpiIntVal), "3");
   EXPECT_EQ(vpi_get(vpiDefAttribute, place), 0);
-  EXPECT_EQ(vpi_get(vpiDefLineNo, cell), 1);
+  EXPECT_EQ(vpi_get(vpiDefLineNo, area), 1);
   EXPECT_EQ(vpi_get(vpiDefLineNo, place), 3);
   EXPECT_STREQ(vpi_get_str(vpiDefFile, place), vpi_get_str(vpiDefFile, u));
   vpiHandle root = Named(vpiAttribute, By("top"), "root");
