@@ -1,8 +1,11 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <vector>
 
 #include "fixture_simulator.h"
+#include "fixture_vpi_run.h"
+#include "parser/ast_expr.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 #include "simulator/vpi_object.h"
@@ -29,12 +32,22 @@ namespace {
 // runs the task.
 
 // The fixture installs a context so the public vpi_handle entry point runs its
-// real dispatch.
+// real dispatch, and holds two $timeformat calls for the run to note, neither
+// of them a statement of a model the context holds.
 class ActiveTimeFormat : public ::testing::Test {
  protected:
-  void SetUp() override { SetGlobalVpiContext(&ctx_); }
+  void SetUp() override {
+    SetGlobalVpiContext(&ctx_);
+    first_.kind = ExprKind::kSystemCall;
+    first_.callee = "$timeformat";
+    second_.kind = ExprKind::kSystemCall;
+    second_.callee = "$timeformat";
+  }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
   VpiContext ctx_;
+  SimFixture f_;
+  Expr first_;
+  Expr second_;
 };
 
 // Detail 1: with no $timeformat() call recorded - the state of a fresh context
@@ -46,24 +59,26 @@ TEST_F(ActiveTimeFormat, ReturnsNullWhenTimeformatNotCalled) {
 
 // Diagram edge: once a $timeformat() call has set the active time format,
 // vpi_handle(vpiActiveTimeFormat, NULL) reaches that call - an object of a kind
-// §37.42's `tf call` class groups, carrying the task's name.
+// §37.42's `tf call` class groups. With no model statement for the call, it is
+// one of its own, which §37.60 detail 1 leaves unnamed as it does every system
+// task's call statement without a label.
 TEST_F(ActiveTimeFormat, ReachesTheTimeformatCallThatSetTheFormat) {
-  ctx_.NoteTimeFormatCall();
+  ctx_.NoteTimeFormatCall(&first_, f_.ctx);
 
   vpiHandle reached = vpi_handle(vpiActiveTimeFormat, nullptr);
   ASSERT_NE(reached, nullptr);
-  EXPECT_EQ(VpiObjectOf(reached)->type, vpiSysTaskCall);
-  EXPECT_EQ(VpiObjectOf(reached)->name, "$timeformat");
+  EXPECT_EQ(vpi_get(vpiType, reached), vpiSysTaskCall);
+  EXPECT_EQ(vpi_get_str(vpiName, reached), nullptr);
 }
 
 // §20.4.3 has a later $timeformat replace the configuration, so the call the
 // active format came from is the later one and that is what the edge reaches.
 TEST_F(ActiveTimeFormat, ReachesTheLatestCallWhenTheTaskRunsAgain) {
-  ctx_.NoteTimeFormatCall();
+  ctx_.NoteTimeFormatCall(&first_, f_.ctx);
   vpiHandle first = vpi_handle(vpiActiveTimeFormat, nullptr);
   ASSERT_NE(first, nullptr);
 
-  ctx_.NoteTimeFormatCall();
+  ctx_.NoteTimeFormatCall(&second_, f_.ctx);
   vpiHandle second = vpi_handle(vpiActiveTimeFormat, nullptr);
   ASSERT_NE(second, nullptr);
   EXPECT_NE(second, first);
@@ -75,7 +90,7 @@ TEST_F(ActiveTimeFormat, ReachesTheLatestCallWhenTheTaskRunsAgain) {
 // for vpiActiveTimeFormat relative to a concrete object must not reach that
 // recorded call.
 TEST_F(ActiveTimeFormat, DoesNotReachTheTimeformatCallFromANonNullReference) {
-  ctx_.NoteTimeFormatCall();
+  ctx_.NoteTimeFormatCall(&first_, f_.ctx);
   vpiHandle recorded = vpi_handle(vpiActiveTimeFormat, nullptr);
   ASSERT_NE(recorded, nullptr);
 
@@ -105,10 +120,15 @@ TEST(ActiveTimeFormatSim, ADesignsTimeformatCallIsWhatTheEdgeReaches) {
       f);
   ASSERT_EQ(out, "   5.00 ns\n");  // the task ran and installed its format
 
+  // A run that builds no VPI model has no statement for the call, so the call
+  // it reaches is one of its own, standing for the call written (§37.42
+  // detail 9) and unnamed (§37.60 detail 1).
   vpiHandle reached = vpi_handle(vpiActiveTimeFormat, nullptr);
   ASSERT_NE(reached, nullptr);
-  EXPECT_EQ(VpiObjectOf(reached)->type, vpiSysTaskCall);
-  EXPECT_EQ(VpiObjectOf(reached)->name, "$timeformat");
+  EXPECT_EQ(vpi_get(vpiType, reached), vpiSysTaskCall);
+  EXPECT_EQ(vpi_get_str(vpiName, reached), nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiDecompile, reached),
+               "$timeformat(- 9, 2, \" ns\", 10)");
 
   SetGlobalVpiContext(nullptr);
 }
@@ -128,6 +148,55 @@ TEST(ActiveTimeFormatSim, ADesignThatNeverCallsTheTaskReachesNothing) {
   EXPECT_EQ(vpi_handle(vpiActiveTimeFormat, nullptr), nullptr);
 
   SetGlobalVpiContext(nullptr);
+}
+
+// A run that builds its VPI model holds the statement making the call, and that
+// statement is what the edge reaches, so the handle the edge gives and the one
+// a walk of the design reaches are one object under §38.3.
+class ActiveTimeFormatOfAModel : public VpiDesignRun {
+ protected:
+  // The statement of each process `scope` writes.
+  static std::vector<vpiHandle> BodiesOf(const std::string& scope) {
+    std::vector<vpiHandle> bodies;
+    for (vpiHandle process : ObjectsOf(vpiProcess, By(scope))) {
+      bodies.push_back(vpi_handle(vpiStmt, process));
+    }
+    return bodies;
+  }
+};
+
+TEST_F(ActiveTimeFormatOfAModel, TheEdgeReachesTheModelsCallStatement) {
+  Run("module top;\n"
+      "  initial $timeformat(-9, 2, \" ns\", 10);\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kBodies = BodiesOf("top");
+  ASSERT_EQ(kBodies.size(), 1U);
+  vpiHandle reached = vpi_handle(vpiActiveTimeFormat, nullptr);
+  ASSERT_NE(reached, nullptr);
+  EXPECT_EQ(vpi_compare_objects(reached, kBodies[0]), 1);
+  EXPECT_EQ(vpi_get_str(vpiName, reached), nullptr);
+  EXPECT_EQ(vpi_get(vpiLineNo, reached), 2);
+}
+
+// §20.4.3 has the later call replace the format, so of two calls in the model
+// the edge reaches the statement of the one that ran last.
+TEST_F(ActiveTimeFormatOfAModel, TheEdgeReachesTheStatementOfTheLatestCall) {
+  Run("module top;\n"
+      "  initial $timeformat(-9, 2, \" ns\", 10);\n"
+      "  initial #1 $timeformat(-6, 0, \" us\", 8);\n"
+      "endmodule\n");
+  vpiHandle reached = vpi_handle(vpiActiveTimeFormat, nullptr);
+  ASSERT_NE(reached, nullptr);
+  EXPECT_EQ(vpi_get(vpiLineNo, reached), 3);
+  // The second process's statement is its delay control, which the call it
+  // delays stands under (§37.64).
+  int matches = 0;
+  for (vpiHandle body : BodiesOf("top")) {
+    for (vpiHandle stmt : {body, vpi_handle(vpiStmt, body)}) {
+      if (stmt != nullptr && vpi_compare_objects(reached, stmt) == 1) ++matches;
+    }
+  }
+  EXPECT_EQ(matches, 1);
 }
 
 }  // namespace

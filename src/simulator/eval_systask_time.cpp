@@ -347,7 +347,7 @@ Logic4Vec EvalTimeformatTask(const Expr* expr, SimContext& ctx, Arena& arena) {
   // came from through vpi_handle(vpiActiveTimeFormat, NULL), and detail 1 keeps
   // NULL for a run where the task has not been called - so this call is what it
   // reaches from here on.
-  GetGlobalVpiContext().NoteTimeFormatCall();
+  GetGlobalVpiContext().NoteTimeFormatCall(expr, ctx);
   return MakeLogic4VecVal(arena, 1, 0);
 }
 

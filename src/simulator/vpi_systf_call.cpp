@@ -352,4 +352,25 @@ VpiHandle VpiContext::MakeSystfCallObject(const s_vpi_systf_data& data,
   return call;
 }
 
+void VpiContext::NoteTimeFormatCall(const Expr* call_site, SimContext& ctx) {
+  // §37.82: the clause's one edge reaches the $timeformat() call that
+  // established the active time format, a tf call (§37.42), so where the model
+  // holds the statement making the call, that statement is what stands here
+  // and the handle reached and the one a walk of the design reaches are one
+  // object under §38.3. A call the model builds no statement for stands up an
+  // object of its own, unnamed as a system task's call is (§37.60 detail 1).
+  // Detail 1 reserves NULL for a run where $timeformat() has not been called.
+  // The call the format came from is the most recent, a later one replacing it
+  // as it replaces the format.
+  VpiObject* call =
+      CallSiteObject(call_site_objects_, call_site, ctx.ActiveInstancePrefix());
+  if (call == nullptr) {
+    call = AllocObject();
+    call->type = vpiSysTaskCall;
+    VpiRecordWrittenLocation(call, call_site->range.start, ctx);
+    call->decompile = VpiExprDecompile(call_site);
+  }
+  active_time_format_call_ = call;
+}
+
 }  // namespace delta
