@@ -313,4 +313,26 @@ TEST(LexicalConventionParsing, MultipleAttributesOnModule) {
   EXPECT_GE(r.cu->modules[0]->attrs.size(), 2u);
 }
 
+// An attribute instance is the declaration's it is written before: one before
+// an interface or a program is that declaration's, and one before a package
+// or a class is no module's, whatever modules the compilation unit holds.
+TEST(LexicalConventionParsing, TopLevelAttributesStayWithTheirDeclaration) {
+  auto r = Parse(
+      "module m; endmodule\n"
+      "(* on_if *) interface i; endinterface\n"
+      "(* on_prog *) program p; endprogram\n"
+      "(* on_pkg *) package q; endpackage\n"
+      "(* on_class *) class C; endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(r.cu->modules[0]->attrs.empty());
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  ASSERT_EQ(r.cu->interfaces[0]->attrs.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces[0]->attrs[0].name, "on_if");
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  ASSERT_EQ(r.cu->programs[0]->attrs.size(), 1u);
+  EXPECT_EQ(r.cu->programs[0]->attrs[0].name, "on_prog");
+}
+
 }  // namespace

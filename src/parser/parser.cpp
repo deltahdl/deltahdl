@@ -565,18 +565,48 @@ bool Parser::TryParsePrimaryTopLevel(CompilationUnit* unit) {
   return false;
 }
 
+namespace {
+
+// How many UDPs, modules, interfaces and programs a compilation unit holds.
+struct TopLevelSizes {
+  size_t udps;
+  size_t modules;
+  size_t interfaces;
+  size_t programs;
+};
+
+TopLevelSizes SizesOf(const CompilationUnit& unit) {
+  return {unit.udps.size(), unit.modules.size(), unit.interfaces.size(),
+          unit.programs.size()};
+}
+
+// §5.12: the attributes of the declaration `unit` gained since it held
+// `before`, which those written before it are given: a UDP's, a module's, an
+// interface's or a program's. Null for a package or a class, whose records
+// keep none (#7263), and for anything else.
+std::vector<Attribute>* AttributesOfNewest(CompilationUnit& unit,
+                                           const TopLevelSizes& before) {
+  if (unit.udps.size() > before.udps) return &unit.udps.back()->attrs;
+  if (unit.modules.size() > before.modules) return &unit.modules.back()->attrs;
+  if (unit.interfaces.size() > before.interfaces) {
+    return &unit.interfaces.back()->attrs;
+  }
+  if (unit.programs.size() > before.programs) {
+    return &unit.programs.back()->attrs;
+  }
+  return nullptr;
+}
+
+}  // namespace
+
 void Parser::ParseTopLevel(CompilationUnit* unit) {
   current_compilation_unit_ = unit;
   if (Match(TokenKind::kSemicolon)) return;
   auto top_attrs = ParseAttributes();
-  auto udp_count = unit->udps.size();
+  const TopLevelSizes kBefore = SizesOf(*unit);
   if (TryParsePrimaryTopLevel(unit)) {
-    if (!top_attrs.empty()) {
-      if (unit->udps.size() > udp_count) {
-        unit->udps.back()->attrs = std::move(top_attrs);
-      } else if (!unit->modules.empty()) {
-        unit->modules.back()->attrs = std::move(top_attrs);
-      }
+    if (std::vector<Attribute>* attrs = AttributesOfNewest(*unit, kBefore)) {
+      *attrs = std::move(top_attrs);
     }
     return;
   }
@@ -584,8 +614,8 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
   if (TryParseCuTypeDeclaration(unit)) return;
   if (TryParseUnitBindDirective(unit)) return;
   if (TryParseSecondaryTopLevel(unit)) {
-    if (!top_attrs.empty() && unit->udps.size() > udp_count) {
-      unit->udps.back()->attrs = std::move(top_attrs);
+    if (std::vector<Attribute>* attrs = AttributesOfNewest(*unit, kBefore)) {
+      *attrs = std::move(top_attrs);
     }
     return;
   }
