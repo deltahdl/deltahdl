@@ -56,18 +56,17 @@ VpiObject* VpiImportedPropertyDecl(std::string_view name,
                                    const std::vector<RtlirImport>& imports,
                                    const VpiObjectMap& objects);
 
-// §26.3 with §37.53: the sequence decl named `name` a package declares that
-// one of `imports` makes visible, among the sequence decls of the package
-// objects `objects` keys; null where no import reaches one.
-VpiObject* VpiImportedSequenceDecl(std::string_view name,
-                                   const std::vector<RtlirImport>& imports,
-                                   const VpiObjectMap& objects);
-
-// §37.53 with §37.12: the sequence decl named `name` that `scope` or a scope
-// standing around it declares, the nearest from a generate block instance
-// out to the instance, `cb.s` the one the clocking block or interface
-// instance `cb` holds; null where none was built.
-VpiObject* VpiSequenceDeclAround(const VpiObject* scope, std::string_view name);
+// §37.53 with §37.12 and §26.3: the sequence decl named `name` written
+// through the package path `package`, `pk::s`, where it is not empty, the one
+// that package declares; and otherwise the one `scope` or a scope standing
+// around it declares, the nearest from a generate block instance out to the
+// instance, `cb.s` the one the clocking block or interface instance `cb`
+// holds, or else the one a package declares that one of `imports` makes
+// visible, among the package objects `objects` keys; null where none is.
+VpiObject* VpiSequenceDeclNamed(const VpiObject* scope,
+                                std::string_view package, std::string_view name,
+                                const std::vector<RtlirImport>& imports,
+                                const VpiObjectMap& objects);
 
 // §16.8 and §16.12 with §37.10 detail 1: give each package a sequence decl per
 // sequence and a property decl per property it declares, as

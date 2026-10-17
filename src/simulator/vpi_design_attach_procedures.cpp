@@ -13,6 +13,7 @@
 #include "elaborator/rtlir_scopes.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "simulator/sv_vpi_user.h"
@@ -356,36 +357,34 @@ void WalkSubStmts(const Stmt& stmt, const BlockParent& parent,
 
 // What a statement at `parent` builds with, while `parent` and `walk` live.
 VpiStmtBuild StmtBuildAt(const BlockParent& parent, const BodyWalk& walk) {
-  return {
-      walk.build,
-      [site = CallSiteOf(parent, walk), &walk](const Expr* expr) {
-        return VpiCallSiteExpression(expr, walk.objects, site, walk.calls.ctx,
-                                     walk.build);
-      },
-      [&parent, &walk](const Stmt* held, VpiObject* holder) {
-        return WalkStmt(
-            held, BlockParent{holder, parent.path, nullptr, &parent}, walk);
-      },
-      [&parent, &walk](const Expr* array) {
-        return ForeachIndexKind(array, parent, walk);
-      },
-      [site = CallSiteOf(parent, walk), &walk](const Expr* expr,
-                                               const VpiObject* target) {
-        return VpiCallSiteAssignedExpression({expr, target}, walk.objects, site,
-                                             walk.calls.ctx, walk.build);
-      },
-      [&walk](std::string_view name) {
-        return VpiImportedPropertyDecl(name, walk.mod.imports, walk.objects);
-      },
-      // §16.8 with §26.3: a sequence a scope around the statement
-      // declares, or else one a package declares, which an import makes
-      // visible.
-      [&parent, &walk](std::string_view name) {
-        VpiObject* declared = VpiSequenceDeclAround(parent.scope, name);
-        return declared != nullptr ? declared
-                                   : VpiImportedSequenceDecl(
-                                         name, walk.mod.imports, walk.objects);
-      }};
+  return {walk.build,
+          [site = CallSiteOf(parent, walk), &walk](const Expr* expr) {
+            return VpiCallSiteExpression(expr, walk.objects, site,
+                                         walk.calls.ctx, walk.build);
+          },
+          [&parent, &walk](const Stmt* held, VpiObject* holder) {
+            return WalkStmt(
+                held, BlockParent{holder, parent.path, nullptr, &parent}, walk);
+          },
+          [&parent, &walk](const Expr* array) {
+            return ForeachIndexKind(array, parent, walk);
+          },
+          [site = CallSiteOf(parent, walk), &walk](const Expr* expr,
+                                                   const VpiObject* target) {
+            return VpiCallSiteAssignedExpression(
+                {expr, target}, walk.objects, site, walk.calls.ctx, walk.build);
+          },
+          [&walk](std::string_view name) {
+            return VpiImportedPropertyDecl(name, walk.mod.imports,
+                                           walk.objects);
+          },
+          // §16.8 with §26.3: a sequence a scope around the statement
+          // declares, or else one a package declares, which its path or an
+          // import makes visible.
+          [&parent, &walk](std::string_view package, std::string_view name) {
+            return VpiSequenceDeclNamed(parent.scope, package, name,
+                                        walk.mod.imports, walk.objects);
+          }};
 }
 
 // The object a statement the builder of vpi_design_attach_statements.cpp
@@ -573,18 +572,23 @@ VpiObject* MakeAttributedDecl(DeclMaker make,
   return made;
 }
 
+// Whether `declared` is a sequence's declaration rather than a property's.
+bool IsSequenceDecl(const RtlirAssertionItemDecl& declared) {
+  return declared.item->kind == ModuleItemKind::kSequenceDecl;
+}
+
 // The sequences one instance declares, each in the generate block instance
 // writing it, walked with `instance_walk`: every one declared before any body
 // is built, a body instantiating sequences declared after it (§16.8).
 void AttachInstanceSequences(VpiObject* instance,
                              const BodyWalk& instance_walk) {
-  const auto& declared = instance_walk.mod.declared_sequences;
+  const auto& declared = instance_walk.mod.assertion_item_decls;
   std::vector<VpiObject*> made;
-  made.reserve(declared.size());
   AttachScopedItems(
       instance, instance_walk, declared,
       [&instance_walk, &made](const RtlirAssertionItemDecl& sequence,
                               VpiObject* scope, const VpiStmtBuild& with) {
+        if (!IsSequenceDecl(sequence)) return;
         made.push_back(MakeAttributedDecl(VpiMakeSequenceDecl, sequence, scope,
                                           with, instance_walk));
       });
@@ -592,6 +596,7 @@ void AttachInstanceSequences(VpiObject* instance,
   AttachScopedItems(instance, instance_walk, declared,
                     [&made, &next](const RtlirAssertionItemDecl& sequence,
                                    VpiObject*, const VpiStmtBuild& with) {
+                      if (!IsSequenceDecl(sequence)) return;
                       VpiFillSequenceDeclBody(made[next++], *sequence.item,
                                               with);
                     });
@@ -602,9 +607,10 @@ void AttachInstanceSequences(VpiObject* instance,
 void AttachInstanceProperties(VpiObject* instance,
                               const BodyWalk& instance_walk) {
   AttachScopedItems(
-      instance, instance_walk, instance_walk.mod.declared_properties,
+      instance, instance_walk, instance_walk.mod.assertion_item_decls,
       [&instance_walk](const RtlirAssertionItemDecl& declared, VpiObject* scope,
                        const VpiStmtBuild& with) {
+        if (IsSequenceDecl(declared)) return;
         MakeAttributedDecl(VpiMakePropertyDecl, declared, scope, with,
                            instance_walk);
       });

@@ -296,6 +296,7 @@ TEST(SequenceExprModel, MatchItemsCollectAssignmentAndTfCallChildren) {
 // shows.
 constexpr const char* kSequenceOperators =
     "module top; logic clk, a, b, c, d;\n"
+    "  struct packed { logic f; } st;\n"
     "  d1: assert property (@(posedge clk) a ##1 b);\n"
     "  d2: assert property (@(posedge clk) a ##[1:3] b);\n"
     "  d3: assert property (@(posedge clk) ##2 a);\n"
@@ -304,6 +305,7 @@ constexpr const char* kSequenceOperators =
     "  sequence u; a; endsequence\n"
     "  i1: assert property (@(posedge clk) s(a) ##1 b);\n"
     "  i2: assert property (@(posedge clk) u);\n"
+    "  e1: assert property (@(posedge clk) st.f ##1 b);\n"
     "  r1: assert property (@(posedge clk) a[*2] ##1 b);\n"
     "  r2: assert property (@(posedge clk) a[->1:2] ##1 b);\n"
     "  r3: assert property (@(posedge clk) a[=3] ##1 b);\n"
@@ -395,6 +397,16 @@ TEST_F(SequenceExprsOfARun, ANamedSequenceIsASequenceInst) {
   vpiHandle whole_decl = vpi_handle(vpiSequenceDecl, whole);
   ASSERT_NE(whole_decl, nullptr);
   EXPECT_STREQ(vpi_get_str(vpiName, whole_decl), "u");
+}
+
+// A member of a structure an operand selects is the member, no sequence inst
+// (#7183).
+TEST_F(SequenceExprsOfARun, AMemberOperandIsNoSequenceInst) {
+  vpiHandle chain = PropertyOf("e1");
+  EXPECT_EQ(OpOf(chain), vpiCycleDelayOp);
+  const std::vector<vpiHandle> kParts = OperandsOf(chain);
+  ASSERT_EQ(kParts.size(), 3u);
+  EXPECT_NE(vpi_get(vpiType, kParts[0]), vpiSequenceInst);
 }
 
 // A repetition takes the sequence repeated and its bounds, the right only

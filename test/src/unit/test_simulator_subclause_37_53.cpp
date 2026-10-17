@@ -204,10 +204,11 @@ class SequenceDeclsOfARun : public VpiDesignRun {
 // it, reaching its formals in the order declared (detail 1), each of no
 // direction unless it is a local variable argument (detail 4), the typespec
 // of a typed one and none for an untyped one (detail 2), and a default value
-// through vpiExpr (detail 3).
+// through vpiExpr (detail 3). The local variable argument is written last,
+// as §16.8.2 carries `local` on to the formals after it.
 TEST_F(SequenceDeclsOfARun, AnInstanceReachesTheSequenceItDeclares) {
   Run("module top; logic clk, a, b;\n"
-      "  sequence s(x, local input int n, untyped y = b, bit z);\n"
+      "  sequence s(x, untyped y = b, bit z, local input int n);\n"
       "    a ##1 b;\n"
       "  endsequence\n"
       "endmodule\n");
@@ -215,7 +216,7 @@ TEST_F(SequenceDeclsOfARun, AnInstanceReachesTheSequenceItDeclares) {
   ASSERT_NE(decl, nullptr);
   EXPECT_STREQ(vpi_get_str(vpiFullName, decl), "top.s");
   EXPECT_EQ(OrderedNamesOf(vpiSeqFormalDecl, decl),
-            (std::vector<std::string>{"x", "n", "y", "z"}));
+            (std::vector<std::string>{"x", "y", "z", "n"}));
   vpiHandle x = Named(vpiSeqFormalDecl, decl, "x");
   vpiHandle n = Named(vpiSeqFormalDecl, decl, "n");
   vpiHandle y = Named(vpiSeqFormalDecl, decl, "y");
@@ -323,12 +324,15 @@ TEST_F(SequenceDeclsOfARun, AGenerateAndAClockingBlockReachTheirSequences) {
 }
 
 // A sequence a package declares is a sequence decl of the package, and a
-// property of the package naming it reaches its sequence inst (§37.10
-// detail 1, §37.54).
+// property of the package naming it, bare or called, reaches its sequence
+// inst (§37.10 detail 1, §37.54), elaboration having written each name the
+// package's declarations read through the package's path (§26.3).
 TEST_F(SequenceDeclsOfARun, APackageReachesTheSequenceItDeclares) {
   Run("package pk; logic x;\n"
       "  sequence ps; x; endsequence\n"
+      "  sequence pc(v); v; endsequence\n"
       "  property pp; ps; endproperty\n"
+      "  property pq; pc(x); endproperty\n"
       "endpackage\n"
       "module top; endmodule\n");
   vpiHandle pkg = By("pk");
@@ -347,6 +351,14 @@ TEST_F(SequenceDeclsOfARun, APackageReachesTheSequenceItDeclares) {
   ASSERT_NE(inst, nullptr);
   EXPECT_EQ(vpi_get(vpiType, inst), vpiSequenceInst);
   EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiSequenceDecl, inst), decl));
+  vpiHandle called = vpi_handle(
+      vpiPropertyExpr,
+      vpi_handle(vpiPropertySpec, Named(vpiPropertyDecl, pkg, "pq")));
+  ASSERT_NE(called, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, called), vpiSequenceInst);
+  EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiSequenceDecl, called),
+                                  Named(vpiSequenceDecl, pkg, "pc")));
+  EXPECT_EQ(NamesOf(vpiArgument, called), (std::vector<std::string>{"x"}));
 }
 
 }  // namespace

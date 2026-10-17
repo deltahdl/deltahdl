@@ -401,6 +401,26 @@ VpiObject* MakeSequenceInst(VpiObject* decl, const Expr& instance,
   return inst;
 }
 
+// §37.54: the sequence decl the operand `operand` names, written bare, `s`,
+// called, `s(a)`, or through a package's path, `pk::s` or `pk::s(a)`, which
+// is how elaboration writes the names a package's own sequences and
+// properties read (§26.3); null where it names none.
+VpiObject* NamedSequenceDecl(const Expr& operand, const VpiStmtBuild& with) {
+  switch (operand.kind) {
+    case ExprKind::kIdentifier:
+      return with.sequence_decl({}, operand.text);
+    case ExprKind::kCall:
+      return operand.callee.empty() ? NamedSequenceDecl(*operand.lhs, with)
+                                    : with.sequence_decl({}, operand.callee);
+    case ExprKind::kMemberAccess:
+      return operand.is_scope_resolution
+                 ? with.sequence_decl(operand.lhs->text, operand.rhs->text)
+                 : nullptr;
+    default:
+      return nullptr;
+  }
+}
+
 }  // namespace
 
 VpiObject* VpiMakePropertyInst(VpiObject* holder, const Expr& instance,
@@ -448,26 +468,30 @@ VpiObject* VpiImportedPropertyDecl(std::string_view name,
   return ImportedDecl(vpiPropertyDecl, name, imports, objects);
 }
 
-VpiObject* VpiImportedSequenceDecl(std::string_view name,
-                                   const std::vector<RtlirImport>& imports,
-                                   const VpiObjectMap& objects) {
-  return ImportedDecl(vpiSequenceDecl, name, imports, objects);
-}
-
-VpiObject* VpiSequenceDeclAround(const VpiObject* scope,
-                                 std::string_view name) {
-  return DeclAround(scope, vpiSequenceDecl, name);
+VpiObject* VpiSequenceDeclNamed(const VpiObject* scope,
+                                std::string_view package, std::string_view name,
+                                const std::vector<RtlirImport>& imports,
+                                const VpiObjectMap& objects) {
+  // §26.3: a name written through a package's path, `pk::s`, is the sequence
+  // that package declares, as an import of it would make it visible.
+  if (!package.empty()) {
+    RtlirImport path;
+    path.package_name = package;
+    path.item_name = name;
+    return ImportedDecl(vpiSequenceDecl, name, {path}, objects);
+  }
+  VpiObject* declared = DeclAround(scope, vpiSequenceDecl, name);
+  return declared != nullptr
+             ? declared
+             : ImportedDecl(vpiSequenceDecl, name, imports, objects);
 }
 
 VpiObject* VpiSequenceOperandObject(const Expr* operand,
                                     const VpiStmtBuild& with) {
-  if (operand != nullptr && (operand->kind == ExprKind::kIdentifier ||
-                             operand->kind == ExprKind::kCall)) {
-    VpiObject* decl = with.sequence_decl(
-        operand->kind == ExprKind::kCall ? operand->callee : operand->text);
-    if (decl != nullptr) return MakeSequenceInst(decl, *operand, with);
-  }
-  return with.expression(operand);
+  VpiObject* decl =
+      operand != nullptr ? NamedSequenceDecl(*operand, with) : nullptr;
+  return decl != nullptr ? MakeSequenceInst(decl, *operand, with)
+                         : with.expression(operand);
 }
 
 void AttachPackageAssertionItemDecls(const RtlirDesign& design,
@@ -490,18 +514,18 @@ void AttachPackageAssertionItemDecls(const RtlirDesign& design,
     // with, which elaboration kept for a package's items on the design.
     const VpiExprNames kNames{
         objects, kPrefix, kNoGenBlocks, nullptr, &design.node_attrs, &kStand};
-    const VpiStmtBuild kWith{build,
-                             [&](const Expr* expr) {
-                               return VpiGenBlockExpression(expr, kNames, ctx,
-                                                            build);
-                             },
-                             nullptr,
-                             nullptr,
-                             nullptr,
-                             nullptr,
-                             [package](std::string_view name) {
-                               return VpiSequenceDeclAround(package, name);
-                             }};
+    const VpiStmtBuild kWith{
+        build,
+        [&](const Expr* expr) {
+          return VpiGenBlockExpression(expr, kNames, ctx, build);
+        },
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        [&](std::string_view path, std::string_view name) {
+          return VpiSequenceDeclNamed(package, path, name, kNoImports, objects);
+        }};
     const VpiPropertyDeclSite kAt{package, unit_typespecs, ctx, kNoImports};
     // §16.8: a sequence may name one the package declares after it, so each
     // is declared before any body is built.

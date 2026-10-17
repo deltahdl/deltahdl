@@ -234,10 +234,13 @@ std::vector<VpiHandle> VpiOperationOperands(VpiHandle operation) {
   // every operation over the design's nets with no operand at all.
   std::vector<VpiHandle> operands;
   if (!operation || operation->type != vpiOperation) return operands;
-  // §37.52 draws a property operation's operands as property exprs.
+  // §37.52 draws a property operation's operands as property exprs, and
+  // §37.54 a sequence operation's as sequence exprs, a sequence inst among
+  // them.
   for (auto* child : operation->children) {
     if (VpiIsExprOperandType(child->type) ||
-        VpiIsPropertyExprType(child->type)) {
+        VpiIsPropertyExprType(child->type) ||
+        VpiIsSequenceExprType(child->type)) {
       operands.push_back(child);
     }
   }

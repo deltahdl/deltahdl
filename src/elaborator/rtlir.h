@@ -727,8 +727,7 @@ struct RtlirModule {
   // the properties and the sequences it and its generate blocks declare, each
   // of its scope.
   std::vector<RtlirAssertion> assertions;
-  std::vector<RtlirAssertionItemDecl> declared_properties;
-  std::vector<RtlirAssertionItemDecl> declared_sequences;
+  std::vector<RtlirAssertionItemDecl> assertion_item_decls;
   // §25.5 with §37.7: an interface's modport declarations, in source order;
   // empty for every other kind of definition.
   std::vector<const ModportDecl*> modports;

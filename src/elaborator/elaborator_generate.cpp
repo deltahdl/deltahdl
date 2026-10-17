@@ -230,8 +230,7 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
   size_t first_udp = mod->udp_insts.size();
   size_t first_child = mod->children.size();
   size_t first_assertion = mod->assertions.size();
-  size_t first_property = mod->declared_properties.size();
-  size_t first_sequence = mod->declared_sequences.size();
+  size_t first_assertion_item = mod->assertion_item_decls.size();
   size_t first_alias = mod->aliases.size();
   ElaborateItem(item, mod);
   ValidateGeneratedItem(item);
@@ -256,17 +255,15 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
                         gen_prefix_scopes_);
   // §21.2.1.5: a process reports the block instances as levels of its name;
   // §37.85, §37.49 and §37.12: an assignment and an assertion the block
-  // writes, and a property it declares, are objects of this instance.
+  // writes, and a property or sequence it declares, are of this instance.
   StampGenBlockScope(mod->processes, first_proc, gen_block_path_,
                      gen_prefix_scopes_);
   StampGenBlockScope(mod->assigns, first_assign, gen_block_path_,
                      gen_prefix_scopes_);
   StampGenBlockScope(mod->assertions, first_assertion, gen_block_path_,
                      gen_prefix_scopes_);
-  StampGenBlockScope(mod->declared_properties, first_property, gen_block_path_,
-                     gen_prefix_scopes_);
-  StampGenBlockScope(mod->declared_sequences, first_sequence, gen_block_path_,
-                     gen_prefix_scopes_);
+  StampGenBlockScope(mod->assertion_item_decls, first_assertion_item,
+                     gen_block_path_, gen_prefix_scopes_);
   StampGenBlockInstance(mod->assigns, first_assign, gen_loop_consts_,
                         gen_prefix_scopes_);
   StampGenBlockInstance(mod->udp_insts, first_udp, gen_loop_consts_,
