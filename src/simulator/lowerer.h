@@ -262,8 +262,9 @@ class Lowerer {
   // extends clause names through its scope, `class D extends p::B`, lowered
   // as LowerUnimportedClassesOf lowers them ahead of the unit's classes, which
   // are lowered before the packages' others, so that D finds its base under
-  // "p::B"; every bare name those classes have is then given back to what
-  // held it, nothing included, as the unit's own scope does not see them.
+  // "p::B", with the package's own typedefs naming them; every bare name
+  // those classes have is then given back to what held it, nothing included,
+  // as the unit's own scope does not see them.
   // Defined in lowerer_data_init.cpp.
   void LowerUnitClassPackageBases();
   // Lowers the class `cls` that package `pkg` declares and binds it under

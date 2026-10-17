@@ -381,11 +381,12 @@ void RegisterPackageEnumConstants(const RtlirDesign* design, SimContext& ctx,
 void RegisterTypeTargets(const RtlirDesign* design, SimContext& ctx);
 
 // §6.18 with §8.25.1: each typedef name whose chain ends in a class, bound
-// to that class after every class of the design is lowered; and, §8.3, each
-// class's own typedef naming a class, bound under `Class::alias`, the key
-// built in `arena` as a nested class's is.
+// to that class after every class of the design is lowered, those alone whose
+// name starts with `alias_prefix`, a package's "p::" (§26.3), where it is
+// given; and, §8.3, each class's own typedef naming a class, bound under
+// `Class::alias`, the key built in `arena` as a nested class's is.
 void RegisterClassTypeAliases(const RtlirDesign* design, SimContext& ctx,
-                              Arena& arena);
+                              Arena& arena, std::string_view alias_prefix = {});
 // §6.18 with §8.3: the class's own typedefs naming a class the run already
 // holds, bound under `Class::alias`; the rest wait for
 // RegisterClassTypeAliases. §8.25: a typedef writing a parameter list,
