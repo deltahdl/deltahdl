@@ -126,19 +126,24 @@ struct MailboxMessageType {
   bool is_signed = false;
   States states = States::kUnknown;
   std::string_view class_name;
+  // §37.33 detail 4: the kind of the value put() placed, kept apart from
+  // `kind` because a parameterized mailbox places each message under the
+  // wildcard (§15.4.9) while the message's constant still has the kind of its
+  // value; kAny where the placing caller records none.
+  Kind value_kind = Kind::kAny;
 
   static constexpr MailboxMessageType Integral(uint32_t width, bool is_signed,
                                                States states) {
-    return {Kind::kIntegral, width, is_signed, states, {}};
+    return {Kind::kIntegral, width, is_signed, states, {}, Kind::kIntegral};
   }
   static constexpr MailboxMessageType Real(uint32_t width) {
-    return {Kind::kReal, width, false, States::kUnknown, {}};
+    return {Kind::kReal, width, false, States::kUnknown, {}, Kind::kReal};
   }
   static constexpr MailboxMessageType String() {
-    return {Kind::kString, 0, false, States::kUnknown, {}};
+    return {Kind::kString, 0, false, States::kUnknown, {}, Kind::kString};
   }
   static constexpr MailboxMessageType Class(std::string_view name) {
-    return {Kind::kClass, 0, false, States::kUnknown, name};
+    return {Kind::kClass, 0, false, States::kUnknown, name, Kind::kClass};
   }
 
   // §6.22.2: whether two message types are equivalent. kAny on either side

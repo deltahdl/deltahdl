@@ -71,13 +71,30 @@ void MakeVifArrayElements(VpiObject* var, const VpiAttachBuild& build) {
   }
 }
 
+// §37.33 detail 5: the class typespec the class var `var` was declared with,
+// as the property of its name the class defn `defn` holds it.
+void CopyDeclaredClassTypespec(VpiObject& var, const VpiObject& defn,
+                               const VpiAttachBuild& build) {
+  for (const VpiObject* declared : defn.children) {
+    if (declared->type != vpiClassVar || declared->name != var.name) continue;
+    for (const VpiObject* typespec : declared->children) {
+      VpiObject* copy = build.alloc();
+      *copy = *typespec;
+      copy->parent = &var;
+      var.children.push_back(copy);
+    }
+  }
+}
+
 // §37.33 detail 6 with §37.17 detail 24: the variable the property `member`
 // of the object `obj` stands as, under the class obj `holder`, automatic or
 // static as declared, with the indices of its fixed unpacked dimensions, the
-// visibility it was declared with and a copy of the value the object holds.
+// visibility it was declared with, a copy of the value the object holds and,
+// for a class var, the class typespec the property of its class's defn
+// `defn` was declared with (detail 5).
 void MakePropertyVariable(VpiObject* holder, ClassObject& obj,
-                          const ClassMember& member, SimContext& ctx,
-                          const VpiAttachBuild& build) {
+                          const ClassMember& member, const VpiObject* defn,
+                          SimContext& ctx, const VpiAttachBuild& build) {
   VpiObject* var = build.alloc();
   var->type = PropertyVariableKind(member, ctx);
   VpiRecordWrittenDims(*var, member.unpacked_dims, ctx);
@@ -90,6 +107,9 @@ void MakePropertyVariable(VpiObject* holder, ClassObject& obj,
     var->visibility = vpiProtectedVis;
   }
   var->property_of = &obj;
+  if (var->type == vpiClassVar && defn != nullptr) {
+    CopyDeclaredClassTypespec(*var, *defn, build);
+  }
   if (member.data_type.kind == DataTypeKind::kVirtualInterface &&
       !member.unpacked_dims.empty()) {
     MakeVifArrayElements(var, build);
@@ -231,10 +251,10 @@ void MakeObjectParameter(VpiObject* holder, const ClassDecl& decl,
 }
 
 // §37.33 detail 4 with §15.4.5: the kind of constant a message is, as the
-// type the mailbox placed it with says: a literal's value carries no string
-// mark of its own.
+// kind of the value the mailbox placed says, a parameterized mailbox's among
+// them (§15.4.9): a literal's value carries no string mark of its own.
 int MessageConstType(const MailboxMessageType& type) {
-  switch (type.kind) {
+  switch (type.value_kind) {
     case MailboxMessageType::Kind::kReal:
       return vpiRealConst;
     case MailboxMessageType::Kind::kString:
@@ -290,7 +310,7 @@ VpiObject* VpiMakeClassObject(ClassObject& obj, const VpiClassObjDefn& of,
     for (const ClassMember* member : cls.type->decl->members) {
       if (member != nullptr && member->kind == ClassMemberKind::kProperty &&
           !member->is_param) {
-        MakePropertyVariable(made, obj, *member, ctx, build);
+        MakePropertyVariable(made, obj, *member, cls.defn, ctx, build);
       }
     }
   }

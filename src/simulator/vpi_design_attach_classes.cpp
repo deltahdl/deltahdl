@@ -265,11 +265,21 @@ void MakeMethod(const MadeClassDefn& owner, const ClassMember& member,
   owner.defn->children.push_back(method);
 }
 
+// A property made as a class var, which reaches the class typespec it was
+// declared with once every class defn is made (§37.33 detail 5).
+struct ClassVarProperty {
+  VpiObject* var;
+  const ClassMember* member;
+  const MadeClassDefn* owner;
+};
+
 // §37.31: the properties and methods of the class `owner` was made for, in
-// the order the class declares them. A parameter is no property of it.
+// the order the class declares them, each property made a class var added to
+// `class_vars`. A parameter is no property of it.
 void MakeMembers(const MadeClassDefn& owner, const RtlirDesign& design,
                  const std::vector<MadeClassDefn>& made, SimContext& ctx,
-                 const VpiAttachBuild& build) {
+                 const VpiAttachBuild& build,
+                 std::vector<ClassVarProperty>& class_vars) {
   for (const ClassMember* member : owner.decl->members) {
     if (member == nullptr) continue;
     if (member->kind == ClassMemberKind::kMethod) {
@@ -278,6 +288,7 @@ void MakeMembers(const MadeClassDefn& owner, const RtlirDesign& design,
                !member->is_param) {
       VpiObject* var = MakeProperty(owner, *member, design, made, build);
       VpiRecordWrittenDims(*var, member->unpacked_dims, ctx);
+      if (var->type == vpiClassVar) class_vars.push_back({var, member, &owner});
     }
   }
 }
@@ -335,6 +346,30 @@ VpiObject* NamedClassDefn(const VpiClassDefnObjects& defns,
   }
   return best;
 }
+
+// §37.33 detail 5: the class typespec the class var `var` was declared with,
+// the class type written `written`, reaching the class defn NamedClassDefn
+// finds for it from the scope keyed under `prefix`.
+void AttachDeclaredClassTypespec(VpiObject* var, std::string_view written,
+                                 const VpiClassDefnObjects& defns,
+                                 const std::string& prefix,
+                                 const VpiAttachBuild& build) {
+  VpiObject* typespec = build.alloc();
+  typespec->type = vpiClassTypespec;
+  typespec->name = build.keep(std::string(SplitClassReference(written).name));
+  typespec->parent = var;
+  if (VpiObject* defn = NamedClassDefn(defns, written, prefix)) {
+    typespec->children.push_back(defn);
+  }
+  var->children.push_back(typespec);
+}
+
+// The class type `type` as written, `p::B` behind its package's scope.
+std::string WrittenClassType(const DataType& type) {
+  return type.scope_name.empty() ? std::string(type.type_name)
+                                 : std::string(type.scope_name) +
+                                       "::" + std::string(type.type_name);
+}
 }  // namespace
 
 std::string VpiScopedFullName(const VpiObject* scope, std::string_view name) {
@@ -355,6 +390,7 @@ VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
   // the compilation unit. Nothing made one, so vpiClassDefn reached none.
   if (design == nullptr) return {};
   std::vector<MadeClassDefn> made;
+  std::vector<ClassVarProperty> class_vars;
   MakeInstanceClassDefns(*design, objects, build, made);
   MakePackageClassDefns(*design, objects, build, made);
   MakeUnitClassDefns(*design, objects, build, made);
@@ -364,7 +400,7 @@ VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
     // §37.83: the attributes the class is written with.
     VpiAttachAttributes(owner.defn, VpiNodeAttributes(owner.attrs, owner.decl),
                         false, ctx, build);
-    MakeMembers(owner, *design, made, ctx, build);
+    MakeMembers(owner, *design, made, ctx, build, class_vars);
     if (!owner.decl->base_class.empty()) {
       MakeExtends(owner, made, objects, ctx, build);
     }
@@ -376,6 +412,14 @@ VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
   for (const MadeClassDefn& owner : made) {
     defns[{owner.decl, owner.prefix}] = owner.defn;
     sites[owner.defn] = {owner.mod, owner.package};
+  }
+  // §37.33 detail 5 with §37.31: a property of a class type, its class found
+  // from the scope declaring the class whose property it is. None was made,
+  // so vpiClassTypespec of such a property was null.
+  for (const ClassVarProperty& property : class_vars) {
+    AttachDeclaredClassTypespec(property.var,
+                                WrittenClassType(property.member->data_type),
+                                defns, property.owner->prefix, build);
   }
   return defns;
 }
@@ -393,16 +437,8 @@ void AttachClassVarTypespecs(const RtlirDesign* design,
           VpiObject* obj =
               FindObjectForFlatName(objects, VpiFlatName(prefix, var.name));
           if (obj == nullptr || obj->type != vpiClassVar) continue;
-          VpiObject* typespec = build.alloc();
-          typespec->type = vpiClassTypespec;
-          typespec->name = build.keep(
-              std::string(SplitClassReference(var.class_type_name).name));
-          typespec->parent = obj;
-          if (VpiObject* defn =
-                  NamedClassDefn(defns, var.class_type_name, prefix)) {
-            typespec->children.push_back(defn);
-          }
-          obj->children.push_back(typespec);
+          AttachDeclaredClassTypespec(obj, var.class_type_name, defns, prefix,
+                                      build);
         }
       });
 }

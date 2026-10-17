@@ -597,8 +597,12 @@ void VpiContext::ReleaseHandleSubtree(VpiObject* root) {
   ReleaseHandleWithCallbacks(root);
   // §37.44: a thread a fork spawned is a thread of its own, which its own end
   // releases, rather than an object belonging to the one that spawned it.
+  // §37.33 detail 5: the class defn a class var's class typespec reaches is
+  // the class's, which lives on with the design (§37.31).
   for (VpiObject* child : root->children) {
-    if (child->type != vpiThread) ReleaseHandleSubtree(child);
+    if (child->type != vpiThread && child->type != vpiClassDefn) {
+      ReleaseHandleSubtree(child);
+    }
   }
 }
 

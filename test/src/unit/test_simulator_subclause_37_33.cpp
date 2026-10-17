@@ -680,6 +680,45 @@ TEST_F(ClassObjectsOfARun, AClassVarReachesTheTypespecItWasDeclaredWith) {
             VpiObjectOf(Named(vpiClassDefn, By("pk"), "P")));
 }
 
+// ...and so does a property a class declares of a class type, a class var
+// under the class defn and under an object's class obj alike: A's `b`, of the
+// module's B though it holds a D, and its `q`, of the package's P, each reach
+// their class defn (#7295).
+TEST_F(ClassObjectsOfARun, AClassTypedPropertyReachesItsDeclaredTypespec) {
+  Run("package p; class P; endclass endpackage\n"
+      "module top;\n"
+      "  class B; endclass\n"
+      "  class D extends B; endclass\n"
+      "  class A; B b; p::P q; int n; endclass\n"
+      "  A a = new;\n"
+      "  D d = new;\n"
+      "  initial a.b = d;\n"
+      "endmodule\n");
+  vpiHandle b_defn = Named(vpiClassDefn, By("top"), "B");
+  vpiHandle a_defn = Named(vpiClassDefn, By("top"), "A");
+  vpiHandle typespec =
+      vpi_handle(vpiClassTypespec, Named(vpiVariables, a_defn, "b"));
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, typespec), "B");
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiClassDefn, typespec)),
+            VpiObjectOf(b_defn));
+  vpiHandle q_typespec =
+      vpi_handle(vpiClassTypespec, Named(vpiVariables, a_defn, "q"));
+  ASSERT_NE(q_typespec, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, q_typespec), "P");
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiClassDefn, q_typespec)),
+            VpiObjectOf(Named(vpiClassDefn, By("p"), "P")));
+  vpiHandle b = Named(vpiVariables, vpi_handle(vpiClassObj, By("top.a")), "b");
+  ASSERT_NE(b, nullptr);
+  vpiHandle held = vpi_handle(vpiClassTypespec, b);
+  ASSERT_NE(held, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, held), "B");
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiClassDefn, held)), VpiObjectOf(b_defn));
+  EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiClassTypespec,
+                                               vpi_handle(vpiClassObj, b))),
+               "D");
+}
+
 // §15.3 and §15.4: a mailbox or semaphore variable reaches the class obj of the
 // object it holds, of the built-in class, reaching no class defn (§37.32)
 // (#7294); detail 4: a mailbox's iterates the messages it holds, in queue
@@ -717,6 +756,23 @@ TEST_F(ClassObjectsOfARun, AMailboxsClassObjIteratesItsMessagesAndWaiters) {
       vpi_get_str(vpiName, vpi_handle(vpiClassTypespec,
                                       vpi_handle(vpiClassObj, By("top.s")))),
       "semaphore");
+}
+
+// ...a parameterized mailbox's as the type its parameter fixes (§15.4.9): a
+// string's and a real's, each placed under no run-time type check (#7296).
+TEST_F(ClassObjectsOfARun,
+       AParameterizedMailboxsMessagesHaveItsTypesConstType) {
+  Run("module top; mailbox #(string) t = new; mailbox #(real) u = new;\n"
+      "  initial begin t.put(\"ab\"); u.put(2.5); end\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kStrings =
+      ObjectsOf(vpiMessages, vpi_handle(vpiClassObj, By("top.t")));
+  ASSERT_EQ(kStrings.size(), 1U);
+  EXPECT_EQ(vpi_get(vpiConstType, kStrings[0]), vpiStringConst);
+  const std::vector<vpiHandle> kReals =
+      ObjectsOf(vpiMessages, vpi_handle(vpiClassObj, By("top.u")));
+  ASSERT_EQ(kReals.size(), 1U);
+  EXPECT_EQ(vpi_get(vpiConstType, kReals[0]), vpiRealConst);
 }
 
 // Detail 7: a class obj's vpiVirtualInterfaceVar iteration returns each

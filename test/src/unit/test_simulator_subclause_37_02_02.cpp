@@ -202,6 +202,29 @@ TEST_F(VpiHandleReleaseSim, ReclaimingClassObjectReleasesAutomaticNotStatic) {
   EXPECT_FALSE(vpi_ctx_.HandleReleased(method));
 }
 
+// ...and an automatic class var's class typespec is a subelement released with
+// it, but the class defn the typespec reaches is the class's (§37.33 detail 5,
+// §37.31) and stays live.
+TEST_F(VpiHandleReleaseSim, ReclaimingClassObjectKeepsAClassVarsClassDefn) {
+  auto* class_obj = vpi_ctx_.CreateModule("obj", "obj");
+  auto* class_var = vpi_ctx_.CreateModule("obj.b", "obj.b");
+  class_var->type = vpiClassVar;
+  class_var->automatic = true;
+  auto* typespec = vpi_ctx_.CreateModule("B", "B");
+  typespec->type = vpiClassTypespec;
+  auto* defn = vpi_ctx_.CreateModule("B", "B");
+  defn->type = vpiClassDefn;
+  typespec->children.push_back(defn);
+  class_var->children.push_back(typespec);
+  class_obj->children.push_back(class_var);
+
+  vpi_ctx_.ReleaseClassObject(class_obj);
+
+  EXPECT_TRUE(vpi_ctx_.HandleReleased(class_var));
+  EXPECT_TRUE(vpi_ctx_.HandleReleased(typespec));
+  EXPECT_FALSE(vpi_ctx_.HandleReleased(defn));
+}
+
 // §37.2.2 (list item a): some VPI calls release a handle as part of what they
 // do, and vpi_remove_callback() is one, releasing the handle of the callback it
 // removes. Removing a callback stopped it from being delivered and left its

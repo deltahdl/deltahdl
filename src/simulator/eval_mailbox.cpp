@@ -543,6 +543,7 @@ static MailboxMessage MailboxMessageArg(const Expr* expr, SimContext& ctx,
   msg.refused = RefusesParameterizedArg(expr, actual, ctx, arena);
   msg.type =
       IsParameterizedMailbox(expr, ctx, arena) ? MailboxMessageType{} : actual;
+  msg.type.value_kind = actual.kind;
   return msg;
 }
 
