@@ -315,7 +315,8 @@ TEST_F(ContinuousAssignmentsOfARun, AnInstanceReachesItsOwnAssignments) {
 
 // §27.4 with §37.47 and §37.46: a loop generate block makes an instance of
 // itself per iteration, each holding its own instance of the continuous
-// assignment the block writes, so a two-iteration loop makes two, each the
+// assignment the block writes, so a two-iteration loop makes two, one in each
+// block instance's gen scope (§37.85) and none in the module's, each the
 // driver of its own block instance's net. They were one, made for the first
 // block instance alone, every instance's assignment coming from the one
 // statement a split concatenation's elements do.
@@ -327,7 +328,11 @@ TEST_F(ContinuousAssignmentsOfARun,
       "  end\n"
       "endmodule\n");
   EXPECT_EQ(CountOf(vpiContAssign, vpi_handle_by_name(VpiText("top"), nullptr)),
-            2);
+            0);
+  for (const char* scope : {"top.gb[0]", "top.gb[1]"}) {
+    EXPECT_EQ(
+        CountOf(vpiContAssign, vpi_handle_by_name(VpiText(scope), nullptr)), 1);
+  }
   EXPECT_EQ(
       CountOf(vpiDriver, vpi_handle_by_name(VpiText("top.gb[1].y"), nullptr)),
       1);
