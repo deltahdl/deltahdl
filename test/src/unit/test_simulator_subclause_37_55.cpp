@@ -195,14 +195,6 @@ class ImmediateAssertionsOfARun : public VpiDesignRun {
     const char* name = vpi_get_str(vpiName, reached);
     return name == nullptr ? "" : name;
   }
-
-  // What the action `relation` reaches from `assertion` calls, empty for
-  // nothing: an action written as a call statement has no name of its own
-  // (§37.60 detail 1).
-  static std::string ActionReached(int relation, vpiHandle assertion) {
-    vpiHandle reached = vpi_handle(relation, assertion);
-    return reached == nullptr ? "" : CalleeOf(reached);
-  }
 };
 
 // An assertion statement reaches the expression it asserts and its pass and

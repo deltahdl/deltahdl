@@ -108,6 +108,14 @@ class VpiDesignRun : public ::testing::Test {
     return nullptr;
   }
 
+  // What the action `relation` reaches from `ref`, an assertion's or an
+  // expect's, calls, empty for nothing: an action written as a call statement
+  // has no name of its own (§37.60 detail 1).
+  static std::string ActionReached(int relation, vpiHandle ref) {
+    vpiHandle reached = ref == nullptr ? nullptr : vpi_handle(relation, ref);
+    return reached == nullptr ? "" : CalleeOf(reached);
+  }
+
   // §37.50 and §37.52: the property expr the property spec of the assertion
   // `name` of `top` reaches, null for none.
   static vpiHandle PropertyOf(const char* name) {

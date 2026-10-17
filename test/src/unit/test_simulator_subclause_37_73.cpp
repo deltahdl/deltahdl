@@ -183,8 +183,8 @@ TEST_F(ExpectsOfARun, AnExpectStatementReachesBothActions) {
   vpiHandle expect = FirstHeldStatement();
   ASSERT_NE(expect, nullptr);
   EXPECT_EQ(vpi_get(vpiType, expect), vpiExpectStmt);
-  EXPECT_EQ(NameReached(vpiStmt, expect), "$display");
-  EXPECT_EQ(NameReached(vpiElseStmt, expect), "$write");
+  EXPECT_EQ(ActionReached(vpiStmt, expect), "$display");
+  EXPECT_EQ(ActionReached(vpiElseStmt, expect), "$write");
 }
 
 // An expect statement written with a fail action alone reaches it through
@@ -197,8 +197,8 @@ TEST_F(ExpectsOfARun, AFailActionAloneIsTheElseStatement) {
       "endmodule\n");
   vpiHandle expect = FirstHeldStatement();
   ASSERT_NE(expect, nullptr);
-  EXPECT_EQ(NameReached(vpiStmt, expect), "");
-  EXPECT_EQ(NameReached(vpiElseStmt, expect), "$write");
+  EXPECT_EQ(ActionReached(vpiStmt, expect), "");
+  EXPECT_EQ(ActionReached(vpiElseStmt, expect), "$write");
 }
 
 // An expect statement reaches the property spec it watches, and the spec its

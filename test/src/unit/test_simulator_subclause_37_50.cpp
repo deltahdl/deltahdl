@@ -264,14 +264,6 @@ class ConcurrentAssertionsOfARun : public VpiDesignRun {
     return reached == nullptr ? "" : vpi_get_str(vpiName, reached);
   }
 
-  // What the action `relation` reaches from `ref` calls, empty for nothing:
-  // an action written as a call statement has no name of its own (§37.60
-  // detail 1).
-  static std::string ActionReached(int relation, vpiHandle ref) {
-    vpiHandle reached = ref == nullptr ? nullptr : vpi_handle(relation, ref);
-    return reached == nullptr ? "" : CalleeOf(reached);
-  }
-
   // The edge operation `event` stands for and the name of what it is taken
   // of, as "posedge clk"; empty where it is no edge operation.
   static std::string EdgeOf(vpiHandle event) {
