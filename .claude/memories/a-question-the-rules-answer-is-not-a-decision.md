@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 51a015a3-4652-42ac-8c15-ce1bc6f6ae12
-  modified: 2026-10-17T00:48:21.577Z
+  modified: 2026-10-17T12:24:19.987Z
 ---
 
 # A question the rules answer is not a decision
@@ -62,7 +62,13 @@ are not the whole clause: read every numbered detail through to the end,
 examples included. The vpiParent and prefix details often name the object
 outright. §37.17 detail 26 and §37.16 detail 31 make a partly indexed packed
 select a vpiLogicVar or vpiLogicNet vector, which the object list alone
-seemed to leave unnamed. A closed set of values that lacks an exact
+seemed to leave unnamed. Other diagrams count too: look for every arrow in
+Clause 37 that reaches the class in question, not just the arrows drawn in
+its own subclause. §37.72 alone seemed to leave open how a struct pattern,
+which has one name and one pattern, could stand for a whole `'{a: .x, b: .*}`.
+But §37.59 draws an operation's vpiOperand arrow to `pattern`. That makes the
+written pattern a vpiAssignmentPatternOp whose operands are the struct
+patterns, one per member. A closed set of values that lacks an exact
 match for a construct does not leave the value open: the construct takes the
 one defined value whose meaning holds for it, and a value outside the
 normative header is never an option. Annex M gives vpiQualifier no unique0
