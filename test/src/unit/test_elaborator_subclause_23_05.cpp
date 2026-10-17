@@ -356,4 +356,52 @@ TEST(ExternModuleElaboration, ValueParamTypeMismatchErrors) {
       ReportedError(f.diag.Diagnostics(), "module 'b' parameter", 5, "23.5"));
 }
 
+// §23.5: a localparam of the extern declaration's parameter port list stays
+// local on the `.*` module that takes the header, so an instance's parameter
+// value assignment naming it is refused, as §23.10.2.2 refuses one naming a
+// localparam port of a module that declares the list itself.
+TEST(ExternModuleElaboration, WildcardKeepsExternLocalparamPortLocal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "extern module a #(parameter int W = 4, localparam int L = W * 2)\n"
+      "  (input logic [W-1:0] x);\n"
+      "module a (.*);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [7:0] x;\n"
+      "  a #(.W(8), .L(3)) u (.x(x));\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'a' has no parameter 'L'", 7, "23.10.2.2"));
+}
+
+TEST(ExternModuleElaboration, WildcardExternLocalparamPortFollowsParameter) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "extern module a #(parameter int W = 4, localparam int L = W * 2)\n"
+      "  (input logic [W-1:0] x);\n"
+      "module a (.*);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic [7:0] x;\n"
+      "  a #(.W(8)) u (.x(x));\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  auto* child = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(child, nullptr);
+  bool found = false;
+  for (const auto& p : child->params) {
+    if (p.name == "L") {
+      found = true;
+      EXPECT_TRUE(p.is_localparam);
+      EXPECT_TRUE(p.is_resolved);
+      EXPECT_EQ(p.resolved_value, 16);
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
 }  // namespace

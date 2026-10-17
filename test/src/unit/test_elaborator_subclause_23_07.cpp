@@ -284,4 +284,109 @@ TEST(DottedNameElaboration, RandModeOfARandomIntegralPropertyIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+// §23.7 a) with §7.2: a dotted name whose first name is a variable of a
+// structure type is a member select, which names one of the members the type
+// declares.
+TEST(DottedNameElaboration, SelectOfAnUndeclaredStructMemberIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef struct { int i; int j; } st;\n"
+      "  st s;\n"
+      "  int x;\n"
+      "  initial x = s.zz;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "structure 'st' has no member named 'zz'", 5,
+                            "23.7"));
+}
+
+// The member a select names is looked for in the type reached at that point:
+// an element of an array of structures, the inline structure a member is
+// declared with, and the union type a member is declared with by its name.
+TEST(DottedNameElaboration, SelectOfAnUndeclaredNestedMemberIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef union { int a; shortint b; } u_t;\n"
+      "  typedef struct { struct { int k; } n; u_t u; } st;\n"
+      "  st s [2];\n"
+      "  int x, y;\n"
+      "  initial x = s[1].n.zz;\n"
+      "  initial y = s[0].u.c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the structure of 'n' has no member named 'zz'", 6,
+                            "23.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "union 'u_t' has no member named 'c'", 7, "23.7"));
+}
+
+// The members declared reach as far as a select names them: an element of an
+// unpacked array of structures, a member of an inline structure and of a
+// union type, a structure variable of a package, and an element of a packed
+// array of packed structures, which no unpacked select reaches.
+TEST(DottedNameElaboration, SelectsOfDeclaredStructMembersAreAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n"
+      "  typedef struct { int i; } pt;\n"
+      "  pt v;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  typedef union { int a; shortint b; } u_t;\n"
+      "  typedef struct { int i; struct { int k; } n; u_t u; } st;\n"
+      "  typedef struct packed { logic [3:0] a; logic [3:0] b; } ps;\n"
+      "  st s [2];\n"
+      "  ps [1:0] pa;\n"
+      "  int w, x, y, z;\n"
+      "  logic [3:0] q;\n"
+      "  initial begin\n"
+      "    w = p::v.i;\n"
+      "    x = s[0].i;\n"
+      "    y = s[1].n.k;\n"
+      "    z = s[0].u.b;\n"
+      "    q = pa[1].a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+// What follows a member declared with a class type is a property of the class
+// (§8), as what follows a property of a class handle is, and a random
+// structure property of a class has rand_mode (§18.8): none of them is a
+// member of the structure. Nor is a property of a structure type the class
+// declares for itself read as one.
+TEST(DottedNameElaboration, ClassMemberAndRandModeOfAStructAreAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class k;\n"
+      "  int v;\n"
+      "endclass\n"
+      "class j;\n"
+      "  k h;\n"
+      "endclass\n"
+      "module m;\n"
+      "  typedef struct { int i; } r_t;\n"
+      "  class c;\n"
+      "    typedef struct { int i; } q_t;\n"
+      "    rand r_t r;\n"
+      "    q_t q;\n"
+      "    function void off(); r.rand_mode(0); endfunction\n"
+      "    function int get(); return q.i; endfunction\n"
+      "  endclass\n"
+      "  typedef struct { int i; k h; } st;\n"
+      "  st s;\n"
+      "  j g;\n"
+      "  int x, y;\n"
+      "  initial x = s.h.v;\n"
+      "  initial y = g.h.v;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

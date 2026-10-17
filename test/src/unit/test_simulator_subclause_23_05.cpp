@@ -131,4 +131,23 @@ TEST(ExternModuleSimulation, NestedExternModuleSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 0x3Cu);
 }
 
+// §23.5 with §6.20.1: a parameter port the extern declaration writes with an
+// unpacked dimension is an array on the `.*` module too, its assignment
+// pattern default giving each element its value.
+TEST(ExternModuleSimulation, WildcardExternUnpackedParameterPortIsArray) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "extern module a #(parameter int P [2] = '{3, 5}) (output int y);\n"
+      "module a (.*);\n"
+      "  assign y = P[1];\n"
+      "endmodule\n"
+      "module top;\n"
+      "  int y;\n"
+      "  a u (.y(y));\n"
+      "endmodule\n",
+      f, "y");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 5u);
+}
+
 }  // namespace

@@ -178,6 +178,9 @@ static void CheckExternParamMatch(const ModuleDecl* mod,
 // otherwise a `.*` module whose ports are typed by an imported type parameter
 // would leave that parameter with no default type. §37.3.3: the positions
 // the extern wrote the parameters at come too, parallel to params alike.
+// §6.20.1: so do the unpacked dimensions a port was written with, without
+// which an array parameter would be a scalar, and which ports were declared
+// `localparam`, without which §23.10 would let an instance override them.
 static void ImportExternWildcardHeader(ModuleDecl* mod,
                                        const ModuleDecl* extern_decl) {
   if (mod->ports.empty()) mod->ports = extern_decl->ports;
@@ -185,6 +188,8 @@ static void ImportExternWildcardHeader(ModuleDecl* mod,
   mod->params = extern_decl->params;
   mod->param_types = extern_decl->param_types;
   mod->param_port_locs = extern_decl->param_port_locs;
+  mod->param_port_unpacked_dims = extern_decl->param_port_unpacked_dims;
+  mod->localparam_port_names = extern_decl->localparam_port_names;
   mod->type_param_names = extern_decl->type_param_names;
   mod->has_param_port_list = extern_decl->has_param_port_list;
 }

@@ -24,6 +24,7 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/operator_result_members.h"
 #include "elaborator/std_package.h"
+#include "elaborator/struct_member_selects.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/type_site_lookup.h"
 #include "parser/ast_class.h"
@@ -189,31 +190,23 @@ std::string_view VifInterface(const DataType& type) {
                                                       : std::string_view();
 }
 
-// A type written in a scope, the site it is written at, and the unpacked
-// dimensions the typedefs it was reached through write after their names
-// (§6.18, §7.4).
-struct SitedType {
-  const DataType* type = nullptr;
-  TypeSite site = {};
-  std::size_t dims = 0;
-};
-
 // §6.18 with §26.3: the type the type `type` of a variable of the module
-// stands for, through each typedef it is written as, each typedef's own type
-// looked up as the scope declaring that typedef sees it before the typedef.
-// Each step reaches a declaration before the last in its scope, or a scope
-// around it or a package, which leads to no module; a package reaches only
-// one declared before it, a typedef naming no type the parser has not yet
-// read, so the walk ends.
+// stands for, through each typedef it is written as (ThroughTypedefsAt).
 SitedType ThroughTypedefs(const DataScope& scope, const DataType& type) {
-  SitedType named{&type, {&scope.items, scope.items.size(), scope.site}};
-  for (FoundItem def = TypedefOf(scope.unit, named.site, *named.type);
-       def.item != nullptr;
-       def = TypedefOf(scope.unit, named.site, *named.type)) {
-    named = {&def.item->typedef_type, def.site,
-             named.dims + def.item->unpacked_dims.size()};
+  return ThroughTypedefsAt(
+      scope.unit, {&type, {&scope.items, scope.items.size(), scope.site}});
+}
+
+// The type the variable `root` names is declared with, as written in the
+// scope, with the unpacked dimensions written after its name; no type where
+// `root` names no variable, or one whose type is a type parameter, typedef or
+// class the scope declares for itself alone.
+SitedType DeclaredType(const Expr& root, const DataScope& scope) {
+  const DeclaredVar* var = scope.Declared(root.text);
+  if (var == nullptr || scope.local_types.contains(var->type->type_name)) {
+    return {};
   }
-  return named;
+  return {var->type, {&scope.items, scope.items.size(), scope.site}, var->dims};
 }
 
 // §8.3 with §7.4: the class declaration whose handle the element of the
@@ -597,6 +590,9 @@ void CheckExprCalls(const Expr* expr, const DataScope& scope, DiagEngine& diag,
   if (expr->kind == ExprKind::kMemberAccess && !expr->is_scope_resolution) {
     ReportUndeclaredMember(*expr, rule, scope, diag);
     ReportNoBuiltInMethod(*expr, scope, diag);
+    ReportUndeclaredAggregateMember(
+        *expr, scope.unit,
+        [&scope](const Expr& root) { return DeclaredType(root, scope); }, diag);
     ReportOperatorResultMember(
         *expr, [&scope](const Expr& e) { return ValueOf(e, 0, scope).kind; },
         kStringMethods, diag);
