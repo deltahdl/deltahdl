@@ -485,4 +485,26 @@ TEST(ClassConstructorSim, NewIntoAStructuresClassMember) {
             357u);
 }
 
+// §8.7 with §7.2: a property is read straight through a structure's class
+// member, s.k.v and s.n.h.v, without first copying the handle to a variable.
+TEST(ClassConstructorSim, PropertyReadThroughAStructuresClassMember) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int v;\n"
+                      "  function new(int a); v = a; endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  typedef struct { int i; C h; } in_t;\n"
+                      "  typedef struct { byte b; in_t n; C k; } st;\n"
+                      "  st s;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    s.k = new(3);\n"
+                      "    s.n.h = new(5);\n"
+                      "    r = s.k.v * 10 + s.n.h.v;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            35u);
+}
+
 }  // namespace

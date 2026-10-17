@@ -806,4 +806,41 @@ TEST(ClassSim, ARefCellBoundToAMemberKeepsItsObject) {
   EXPECT_EQ(out, "7\n");
 }
 
+// §8.29: of two nonblocking assignments pending on one class variable, each
+// value is a root until its own update; the later-scheduled one's object
+// survives the earlier one's update to null and the collections between.
+TEST(ClassSim, TwoPendingNonblockingAssignmentsToOneVariableKeepTheirObjects) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C; int x = 7; endclass\n"
+      "module t;\n"
+      "  C h, t, z;\n"
+      "  initial begin t = new; h <= #10 t; h <= #5 null; t = null; end\n"
+      "  initial #2 z = new;\n"
+      "  initial #7 z = new;\n"
+      "  initial #12 $display(\"%0d\", h.x);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "7\n");
+}
+
+// §8.29: an object a delayed nonblocking assignment stores in a property of
+// its own class's type is kept by the pending assignment, then by the property.
+TEST(ClassSim, ASelfTypedPropertySetByADelayedNonblockingKeepsItsObject) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C; int x = 7; C n; endclass\n"
+      "module t;\n"
+      "  C p, t, z;\n"
+      "  initial begin p = new; t = new; t.x = 9; p.n <= #5 t; t = null; end\n"
+      "  initial #2 z = new;\n"
+      "  initial #6 z = new;\n"
+      "  initial #8 $display(\"%0d\", p.n.x);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "9\n");
+}
+
 }  // namespace
