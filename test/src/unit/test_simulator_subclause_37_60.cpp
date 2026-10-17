@@ -363,8 +363,9 @@ class StatementFill : public ::testing::Test {
       [this](const Expr* expr, const VpiObject*) {
         return with_.expression(expr);
       },
-      [](std::string_view) -> VpiObject* { return nullptr; },
-      [](std::string_view, std::string_view) -> VpiObject* { return nullptr; }};
+      [](int, std::string_view, std::string_view) -> VpiObject* {
+        return nullptr;
+      }};
 };
 
 // §37.64 detail 1: only an assignment whose right side is an operation over

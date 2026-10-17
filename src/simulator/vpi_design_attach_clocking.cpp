@@ -191,8 +191,7 @@ VpiObject* MakeClockingBlock(const ModuleItem& item,
   const VpiStmtBuild kWith{
       with.build, [&](const Expr* expr) { return kInBlock.Expression(expr); },
       nullptr,    nullptr,
-      nullptr,    nullptr,
-      nullptr};
+      nullptr,    nullptr};
   VpiObject* event = with.build.alloc();
   event->type = vpiEventControl;
   event->parent = block;

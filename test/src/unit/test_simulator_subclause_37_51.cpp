@@ -375,6 +375,30 @@ TEST_F(PropertyDeclsOfARun, AProceduralAssertionReachesItsPropertyInst) {
   EXPECT_EQ(NamesOf(vpiArgument, inst), (std::vector<std::string>{"a"}));
 }
 
+// A property inst reaches the disable condition it is evaluated under: the one
+// its property declares, the actuals in the formals' places, and otherwise
+// the default disable iff in scope (§16.15), in a procedure as at an item
+// (#7178).
+TEST_F(PropertyDeclsOfARun, APropertyInstReachesItsDisableCondition) {
+  Run("module top; logic clk, rst, a, b;\n"
+      "  default disable iff rst;\n"
+      "  property p(x); @(posedge clk) x; endproperty\n"
+      "  property q(x, r); @(posedge clk) disable iff (r) x; endproperty\n"
+      "  a1: assert property (p(a));\n"
+      "  a2: assert property (q(a, b));\n"
+      "  always @(posedge clk) p1: assert property (p(a));\n"
+      "endmodule\n");
+  const auto kConditionOf = [](const char* name) {
+    vpiHandle assertion = Named(vpiAssertion, By("top"), name);
+    return NameReached(
+        vpiDisableCondition,
+        assertion == nullptr ? nullptr : vpi_handle(vpiProperty, assertion));
+  };
+  EXPECT_EQ(kConditionOf("a1"), "rst");
+  EXPECT_EQ(kConditionOf("a2"), "b");
+  EXPECT_EQ(kConditionOf("p1"), "rst");
+}
+
 // A formal declared with a type reaches a typespec of that type, and an
 // untyped one none (detail 3) (#5091). §16.12 adds property to the types a
 // property's formal may have, and §6.12 makes realtime a synonym for real

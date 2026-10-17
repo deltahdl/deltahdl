@@ -401,44 +401,39 @@ VpiObject* MakeSequenceInst(VpiObject* decl, const Expr& instance,
   return inst;
 }
 
-// §37.54: the sequence decl the operand `operand` names, written bare, `s`,
-// called, `s(a)`, or through a package's path, `pk::s` or `pk::s(a)`, which
-// is how elaboration writes the names a package's own sequences and
-// properties read (§26.3); null where it names none.
-VpiObject* NamedSequenceDecl(const Expr& operand, const VpiStmtBuild& with) {
+// §37.51 and §37.54: the declaration of `type` the operand `operand` names,
+// written bare, `s`, called, `s(a)`, or through a package's path, `pk::s` or
+// `pk::s(a)`, which is how elaboration writes the names a package's own
+// sequences and properties read (§26.3); null where it names none.
+VpiObject* NamedDecl(const Expr& operand, int type, const VpiStmtBuild& with) {
   switch (operand.kind) {
     case ExprKind::kIdentifier:
-      return with.sequence_decl({}, operand.text);
+      return with.assertion_decl(type, {}, operand.text);
     case ExprKind::kCall:
-      return operand.callee.empty() ? NamedSequenceDecl(*operand.lhs, with)
-                                    : with.sequence_decl({}, operand.callee);
+      return operand.callee.empty()
+                 ? NamedDecl(*operand.lhs, type, with)
+                 : with.assertion_decl(type, {}, operand.callee);
     case ExprKind::kMemberAccess:
       return operand.is_scope_resolution
-                 ? with.sequence_decl(operand.lhs->text, operand.rhs->text)
+                 ? with.assertion_decl(type, operand.lhs->text,
+                                       operand.rhs->text)
                  : nullptr;
     default:
       return nullptr;
   }
 }
 
-}  // namespace
-
-VpiObject* VpiMakePropertyInst(VpiObject* holder, const Expr& instance,
-                               const VpiStmtBuild& with) {
+// §37.51: the property inst `instance`, a name or a call naming the property
+// `decl` declares, writes, reaching `decl` and an argument per formal of it in
+// the order declared, the formal's default standing for an actual the
+// instance leaves out (detail 2); with no declaration built, the actuals as
+// written.
+VpiObject* PropertyInstOf(VpiObject* decl, const Expr& instance,
+                          const VpiStmtBuild& with) {
   VpiObject* inst = with.build.alloc();
   inst->type = vpiPropertyInst;
-  inst->parent = holder;
-  const std::string_view kName =
-      instance.kind == ExprKind::kCall ? instance.callee : instance.text;
-  inst->property_decl = DeclAround(holder->parent, vpiPropertyDecl, kName);
-  // §26.3: a property a package declares, which an import makes visible.
-  if (inst->property_decl == nullptr) {
-    inst->property_decl = with.imported_property(kName);
-  }
-  // §37.51 detail 2: an argument per formal, in the order declared, the
-  // formal's default standing for an actual the instance leaves out; with no
-  // declaration built, the actuals as written.
-  const std::vector<VpiHandle> kFormals = VpiPropFormals(inst->property_decl);
+  inst->property_decl = decl;
+  const std::vector<VpiHandle> kFormals = VpiPropFormals(decl);
   std::vector<const VpiObject*> targets(instance.args.size(), nullptr);
   for (std::size_t i = 0; i < std::min(targets.size(), kFormals.size()); ++i) {
     targets[i] = TypespecOf(kFormals[i]);
@@ -458,37 +453,50 @@ VpiObject* VpiMakePropertyInst(VpiObject* holder, const Expr& instance,
                                 : VpiPropertyInstArguments(formals, provided)) {
     if (argument != nullptr) inst->arguments.push_back(argument);
   }
+  return inst;
+}
+
+}  // namespace
+
+VpiObject* VpiMakePropertyInst(VpiObject* holder, const Expr& instance,
+                               const Expr* disable, const VpiStmtBuild& with) {
+  VpiObject* inst = PropertyInstOf(NamedDecl(instance, vpiPropertyDecl, with),
+                                   instance, with);
+  inst->parent = holder;
+  // §37.51 with §16.15: the condition the instance is disabled under, the one
+  // its property declares or else the default disable iff in scope.
+  inst->disable_condition = with.expression(disable);
   holder->children.push_back(inst);
   return inst;
 }
 
-VpiObject* VpiImportedPropertyDecl(std::string_view name,
-                                   const std::vector<RtlirImport>& imports,
-                                   const VpiObjectMap& objects) {
-  return ImportedDecl(vpiPropertyDecl, name, imports, objects);
+VpiObject* VpiPropertyOperandObject(const Expr& operand,
+                                    const VpiStmtBuild& with) {
+  VpiObject* decl = NamedDecl(operand, vpiPropertyDecl, with);
+  return decl != nullptr ? PropertyInstOf(decl, operand, with)
+                         : VpiSequenceOperandObject(operand, with);
 }
 
-VpiObject* VpiSequenceDeclNamed(const VpiObject* scope,
-                                std::string_view package, std::string_view name,
-                                const std::vector<RtlirImport>& imports,
-                                const VpiObjectMap& objects) {
-  // §26.3: a name written through a package's path, `pk::s`, is the sequence
-  // that package declares, as an import of it would make it visible.
-  if (!package.empty()) {
+VpiObject* VpiAssertionDeclNamed(const VpiAssertionDeclName& named,
+                                 const std::vector<RtlirImport>& imports,
+                                 const VpiObjectMap& objects) {
+  // §26.3: a name written through a package's path, `pk::s`, is the one that
+  // package declares, as an import of it would make it visible.
+  if (!named.package.empty()) {
     RtlirImport path;
-    path.package_name = package;
-    path.item_name = name;
-    return ImportedDecl(vpiSequenceDecl, name, {path}, objects);
+    path.package_name = named.package;
+    path.item_name = named.name;
+    return ImportedDecl(named.type, named.name, {path}, objects);
   }
-  VpiObject* declared = DeclAround(scope, vpiSequenceDecl, name);
+  VpiObject* declared = DeclAround(named.scope, named.type, named.name);
   return declared != nullptr
              ? declared
-             : ImportedDecl(vpiSequenceDecl, name, imports, objects);
+             : ImportedDecl(named.type, named.name, imports, objects);
 }
 
 VpiObject* VpiSequenceOperandObject(const Expr& operand,
                                     const VpiStmtBuild& with) {
-  VpiObject* decl = NamedSequenceDecl(operand, with);
+  VpiObject* decl = NamedDecl(operand, vpiSequenceDecl, with);
   return decl != nullptr ? MakeSequenceInst(decl, operand, with)
                          : with.expression(&operand);
 }
@@ -500,8 +508,8 @@ void AttachPackageAssertionItemDecls(const RtlirDesign& design,
                                      const VpiAttachBuild& build) {
   // §16.8 and §16.12 with §37.10 detail 1: a sequence or a property a package
   // declares is a sequence decl or a property decl of the package, its
-  // expressions resolving among the package's names, and a sequence it names
-  // among the package's sequences.
+  // expressions resolving among the package's names, and a sequence or a
+  // property it names among the package's.
   const std::vector<RtlirImport> kNoImports;
   const std::vector<std::string_view> kNoGenBlocks;
   for (const PackageDecl* pkg : design.packages) {
@@ -521,28 +529,24 @@ void AttachPackageAssertionItemDecls(const RtlirDesign& design,
         nullptr,
         nullptr,
         nullptr,
-        nullptr,
-        [&](std::string_view path, std::string_view name) {
-          return VpiSequenceDeclNamed(package, path, name, kNoImports, objects);
+        [&](int type, std::string_view path, std::string_view name) {
+          return VpiAssertionDeclNamed({package, type, path, name}, kNoImports,
+                                       objects);
         }};
     const VpiPropertyDeclSite kAt{package, unit_typespecs, ctx, kNoImports};
-    // §16.8: a sequence may name one the package declares after it, so each
-    // is declared before any body is built.
-    std::vector<std::pair<VpiObject*, const ModuleItem*>> sequences;
+    // §16.8 and §16.12: a sequence or a property may name one the package
+    // declares after it, so each is declared before any body is built.
+    std::vector<std::pair<VpiObject*, const ModuleItem*>> made;
     for (const ModuleItem* item : pkg->items) {
-      if (item->kind != ModuleItemKind::kSequenceDecl) continue;
-      sequences.emplace_back(
-          VpiMakeSequenceDecl(RtlirAssertionItemDecl{item, {}, {}, nullptr},
-                              kAt, kWith),
-          item);
+      const RtlirAssertionItemDecl kDeclared{item, {}, {}, nullptr};
+      if (item->kind == ModuleItemKind::kSequenceDecl) {
+        made.emplace_back(VpiMakeSequenceDecl(kDeclared, kAt, kWith), item);
+      } else if (item->kind == ModuleItemKind::kPropertyDecl) {
+        made.emplace_back(VpiMakePropertyDecl(kDeclared, kAt, kWith), item);
+      }
     }
-    for (const auto& [made, item] : sequences) {
-      VpiFillSequenceDeclBody(made, *item, kWith);
-    }
-    for (const ModuleItem* item : pkg->items) {
-      if (item->kind != ModuleItemKind::kPropertyDecl) continue;
-      VpiMakePropertyDecl(RtlirAssertionItemDecl{item, {}, {}, nullptr}, kAt,
-                          kWith);
+    for (const auto& [declared, item] : made) {
+      VpiFillAssertionItemDeclBody(declared, *item, kWith);
     }
   }
 }
@@ -558,14 +562,6 @@ VpiObject* VpiMakePropertyDecl(const RtlirAssertionItemDecl& declared,
   for (const SeqLocalDecl& local : decl.prop_locals) {
     MakeDeclaredVariable(local, obj, at.ctx, with.build);
   }
-  // §37.52: the body the parser read, its clock, its disable condition and,
-  // for a Boolean property, its expression; a body of another shape was not
-  // read and stands for no spec.
-  const PropertyExprNode* tree = decl.prop_body_tree;
-  if (tree == nullptr) return obj;
-  VpiMakePropertySpecOf(
-      obj, VpiPropertySpecParts{decl.prop_clock, decl.prop_disable_iff, tree},
-      with);
   return obj;
 }
 
@@ -583,9 +579,20 @@ VpiObject* VpiMakeSequenceDecl(const RtlirAssertionItemDecl& declared,
   return obj;
 }
 
-void VpiFillSequenceDeclBody(VpiObject* sequence, const ModuleItem& decl,
-                             const VpiStmtBuild& with) {
-  sequence->body = SequenceDeclBody(decl, with);
+void VpiFillAssertionItemDeclBody(VpiObject* made, const ModuleItem& decl,
+                                  const VpiStmtBuild& with) {
+  if (made->type == vpiSequenceDecl) {
+    made->body = SequenceDeclBody(decl, with);
+    return;
+  }
+  // §37.52: the body the parser read, its clock, its disable condition and,
+  // for a Boolean property, its expression; a body of another shape was not
+  // read and stands for no spec.
+  const PropertyExprNode* tree = decl.prop_body_tree;
+  if (tree == nullptr) return;
+  VpiMakePropertySpecOf(
+      made, VpiPropertySpecParts{decl.prop_clock, decl.prop_disable_iff, tree},
+      with);
 }
 
 }  // namespace delta

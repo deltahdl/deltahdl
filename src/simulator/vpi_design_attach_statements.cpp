@@ -380,9 +380,11 @@ void FillAssertion(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
       spec->clocking_event = EventCondition(stmt.assert_clock, with);
       spec->disable_condition = with.expression(stmt.assert_disable_iff);
       obj->children.push_back(spec);
-      VpiMakePropertyInst(spec, *stmt.assert_instance, with);
+      VpiMakePropertyInst(spec, *stmt.assert_instance, stmt.assert_disable_iff,
+                          with);
     } else if (stmt.assert_instance != nullptr) {
-      VpiMakePropertyInst(obj, *stmt.assert_instance, with);
+      VpiMakePropertyInst(obj, *stmt.assert_instance, stmt.assert_disable_iff,
+                          with);
     } else {
       VpiMakePropertySpec(obj, stmt, with);
     }
@@ -420,6 +422,9 @@ VpiObject* VpiMakePropertySpec(VpiObject* holder, const Stmt& property,
   PropertyExprNode sequence;
   sequence.kind = PropertyExprNode::Kind::kSequence;
   sequence.sequence = property.assert_sequence;
+  // §16.12.2: written strong(...), or in a statement that evaluates a bare
+  // sequence as strong, a cover's or an expect's.
+  sequence.strong = property.assert_strong;
   const PropertyExprNode* tree = property.assert_property;
   if (tree == nullptr && property.assert_sequence != nullptr) {
     tree = &sequence;

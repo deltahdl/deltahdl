@@ -374,16 +374,13 @@ VpiStmtBuild StmtBuildAt(const BlockParent& parent, const BodyWalk& walk) {
             return VpiCallSiteAssignedExpression(
                 {expr, target}, walk.objects, site, walk.calls.ctx, walk.build);
           },
-          [&walk](std::string_view name) {
-            return VpiImportedPropertyDecl(name, walk.mod.imports,
-                                           walk.objects);
-          },
-          // §16.8 with §26.3: a sequence a scope around the statement
-          // declares, or else one a package declares, which its path or an
-          // import makes visible.
-          [&parent, &walk](std::string_view package, std::string_view name) {
-            return VpiSequenceDeclNamed(parent.scope, package, name,
-                                        walk.mod.imports, walk.objects);
+          // §16.8 and §16.12 with §26.3: a sequence or a property a scope
+          // around the statement declares, or else one a package declares,
+          // which its path or an import makes visible.
+          [&parent, &walk](int type, std::string_view package,
+                           std::string_view name) {
+            return VpiAssertionDeclNamed({parent.scope, type, package, name},
+                                         walk.mod.imports, walk.objects);
           }};
 }
 
@@ -577,43 +574,29 @@ bool IsSequenceDecl(const RtlirAssertionItemDecl& declared) {
   return declared.item->kind == ModuleItemKind::kSequenceDecl;
 }
 
-// The sequences one instance declares, each in the generate block instance
-// writing it, walked with `instance_walk`: every one declared before any body
-// is built, a body instantiating sequences declared after it (§16.8).
-void AttachInstanceSequences(VpiObject* instance,
-                             const BodyWalk& instance_walk) {
+// The sequences and properties one instance declares, each in the generate
+// block instance writing it, walked with `instance_walk`: every one declared
+// before any body is built, a body instantiating sequences and properties
+// declared after it (§16.8, §16.12).
+void AttachInstanceAssertionItemDecls(VpiObject* instance,
+                                      const BodyWalk& instance_walk) {
   const auto& declared = instance_walk.mod.assertion_item_decls;
   std::vector<VpiObject*> made;
   AttachScopedItems(
       instance, instance_walk, declared,
-      [&instance_walk, &made](const RtlirAssertionItemDecl& sequence,
+      [&instance_walk, &made](const RtlirAssertionItemDecl& item,
                               VpiObject* scope, const VpiStmtBuild& with) {
-        if (!IsSequenceDecl(sequence)) return;
-        made.push_back(MakeAttributedDecl(VpiMakeSequenceDecl, sequence, scope,
-                                          with, instance_walk));
+        made.push_back(MakeAttributedDecl(
+            IsSequenceDecl(item) ? VpiMakeSequenceDecl : VpiMakePropertyDecl,
+            item, scope, with, instance_walk));
       });
   size_t next = 0;
   AttachScopedItems(instance, instance_walk, declared,
-                    [&made, &next](const RtlirAssertionItemDecl& sequence,
+                    [&made, &next](const RtlirAssertionItemDecl& item,
                                    VpiObject*, const VpiStmtBuild& with) {
-                      if (!IsSequenceDecl(sequence)) return;
-                      VpiFillSequenceDeclBody(made[next++], *sequence.item,
-                                              with);
+                      VpiFillAssertionItemDeclBody(made[next++], *item.item,
+                                                   with);
                     });
-}
-
-// The properties one instance declares, each in the generate block instance
-// writing it, walked with `instance_walk`.
-void AttachInstanceProperties(VpiObject* instance,
-                              const BodyWalk& instance_walk) {
-  AttachScopedItems(
-      instance, instance_walk, instance_walk.mod.assertion_item_decls,
-      [&instance_walk](const RtlirAssertionItemDecl& declared, VpiObject* scope,
-                       const VpiStmtBuild& with) {
-        if (IsSequenceDecl(declared)) return;
-        MakeAttributedDecl(VpiMakePropertyDecl, declared, scope, with,
-                           instance_walk);
-      });
 }
 
 // The assertions one instance writes as items, each in the generate block
@@ -762,8 +745,7 @@ void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,
                  BodyWalk{*design, *mod, objects, prefix, calls, build});
         });
   };
-  kWalk(AttachInstanceSequences);
-  kWalk(AttachInstanceProperties);
+  kWalk(AttachInstanceAssertionItemDecls);
   kWalk(AttachInstanceProcedures);
 }
 

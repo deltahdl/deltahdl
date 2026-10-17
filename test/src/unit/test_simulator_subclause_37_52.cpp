@@ -399,6 +399,13 @@ constexpr const char* kPropertyOperators =
     "  j2: assert property (@(posedge clk) (a |-> b) or (a |-> c));\n"
     "  j3: assert property (@(posedge clk) (a |-> b) implies (a |-> c));\n"
     "  j4: assert property (@(posedge clk) (a |-> b) iff (a |-> c));\n"
+    "  w2: assert property (@(posedge clk) always [2:$] a);\n"
+    "  e2: assert property (@(posedge clk) s_eventually [2:$] a);\n"
+    "  w3: assert property (@(posedge clk) always a);\n"
+    "  g1: assert property (@(posedge clk) strong(a ##1 b));\n"
+    "  g2: assert property (@(posedge clk) a ##1 b);\n"
+    "  g3: assert property (@(posedge clk) a |-> strong(b ##1 c));\n"
+    "  g4: cover property (@(posedge clk) a ##1 b);\n"
     "endmodule\n";
 
 // What reads the property expr of an assertion back from a run.
@@ -506,6 +513,75 @@ TEST_F(PropertyOperationsOfARun, BinaryOperatorsJoinTwoProperties) {
     EXPECT_EQ(OpOf(kSides[0]), vpiOverlapImplyOp) << join.name;
     EXPECT_EQ(OpOf(kSides[1]), vpiOverlapImplyOp) << join.name;
   }
+}
+
+// An always or an eventually whose range ends in `$` takes the unbounded
+// constant as its right bound (detail 2, §37.59 detail 4), and one written
+// with no range its property alone (#7181).
+TEST_F(PropertyOperationsOfARun, ARangeToDollarEndsInTheUnboundedConstant) {
+  for (const char* name : {"w2", "e2"}) {
+    const std::vector<vpiHandle> kOperands = OperandsOf(PropertyOf(name));
+    ASSERT_EQ(kOperands.size(), 3u) << name;
+    EXPECT_STREQ(vpi_get_str(vpiName, kOperands[0]), "a") << name;
+    EXPECT_NE(vpi_get(vpiConstType, kOperands[1]), vpiUnboundedConst) << name;
+    EXPECT_EQ(vpi_get(vpiType, kOperands[2]), vpiConstant) << name;
+    EXPECT_EQ(vpi_get(vpiConstType, kOperands[2]), vpiUnboundedConst) << name;
+  }
+  EXPECT_EQ(OperandsOf(PropertyOf("w3")).size(), 1u);
+}
+
+// A sequence expression written strong(...) is the strong version, and so is
+// a cover's bare one, which §16.12.2 evaluates as strong; an assert's bare one
+// is weak (detail 3) (#7182).
+TEST_F(PropertyOperationsOfARun, AStrongSequenceReportsItsStrength) {
+  vpiHandle strong = PropertyOf("g1");
+  EXPECT_EQ(OpOf(strong), vpiCycleDelayOp);
+  EXPECT_EQ(vpi_get(vpiOpStrong, strong), 1);
+  vpiHandle weak = PropertyOf("g2");
+  EXPECT_EQ(OpOf(weak), vpiCycleDelayOp);
+  EXPECT_EQ(vpi_get(vpiOpStrong, weak), 0);
+  const std::vector<vpiHandle> kSides = OperandsOf(PropertyOf("g3"));
+  ASSERT_EQ(kSides.size(), 2u);
+  EXPECT_EQ(OpOf(kSides[1]), vpiCycleDelayOp);
+  EXPECT_EQ(vpi_get(vpiOpStrong, kSides[1]), 1);
+  vpiHandle covered = PropertyOf("g4");
+  EXPECT_EQ(OpOf(covered), vpiCycleDelayOp);
+  EXPECT_EQ(vpi_get(vpiOpStrong, covered), 1);
+}
+
+// A property named inside a property expression is a property inst, reaching
+// its declaration and an argument per formal, rather than a func call
+// (§16.12) (#7180).
+TEST_F(PropertyExprsOfARun, ANamedPropertyOperandIsAPropertyInst) {
+  Run("module top; logic clk, a, b;\n"
+      "  property p1(x); x; endproperty\n"
+      "  property p2(x, y); x |-> y; endproperty\n"
+      "  property p3(x); b |-> strong(x ##1 b); endproperty\n"
+      "  k1: assert property (@(posedge clk) p1(a) and b);\n"
+      "  k2: assert property (@(posedge clk) b |-> p2(a, b));\n"
+      "  k3: assert property (@(posedge clk) p3(a) or b);\n"
+      "endmodule\n");
+  const auto kDeclOf = [](vpiHandle inst) -> std::string {
+    vpiHandle decl = vpi_handle(vpiPropertyDecl, inst);
+    return decl == nullptr ? "" : vpi_get_str(vpiName, decl);
+  };
+  const std::vector<vpiHandle> kJoined = OperandsOf(PropertyOf("k1"));
+  ASSERT_EQ(kJoined.size(), 2u);
+  EXPECT_EQ(vpi_get(vpiType, kJoined[0]), vpiPropertyInst);
+  EXPECT_EQ(kDeclOf(kJoined[0]), "p1");
+  EXPECT_EQ(NamesOf(vpiArgument, kJoined[0]), (std::vector<std::string>{"a"}));
+  EXPECT_STREQ(vpi_get_str(vpiName, kJoined[1]), "b");
+  const std::vector<vpiHandle> kImplied = OperandsOf(PropertyOf("k2"));
+  ASSERT_EQ(kImplied.size(), 2u);
+  EXPECT_EQ(vpi_get(vpiType, kImplied[1]), vpiPropertyInst);
+  EXPECT_EQ(kDeclOf(kImplied[1]), "p2");
+  EXPECT_EQ(NamesOf(vpiArgument, kImplied[1]),
+            (std::vector<std::string>{"a", "b"}));
+  const std::vector<vpiHandle> kEither = OperandsOf(PropertyOf("k3"));
+  ASSERT_EQ(kEither.size(), 2u);
+  EXPECT_EQ(vpi_get(vpiType, kEither[0]), vpiPropertyInst);
+  EXPECT_EQ(kDeclOf(kEither[0]), "p3");
+  EXPECT_EQ(NamesOf(vpiArgument, kEither[0]), (std::vector<std::string>{"a"}));
 }
 
 // A clocked property and a case property, each named for what it shows.

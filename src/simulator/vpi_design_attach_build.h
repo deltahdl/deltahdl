@@ -528,12 +528,13 @@ struct VpiStmtBuild {
   std::function<VpiObject*(const Stmt*, VpiObject*)> statement;
   std::function<int(const Expr*)> index_kind;
   std::function<VpiObject*(const Expr*, const VpiObject*)> assigned;
-  std::function<VpiObject*(std::string_view)> imported_property;
-  // §37.54: the sequence decl a sequence named `name` where the statement
-  // stands instantiates, written through the package path given where it is
-  // not empty, null where the name declares none; null for a builder no
-  // sequence is instantiated through.
-  std::function<VpiObject*(std::string_view, std::string_view)> sequence_decl;
+  // §37.51 and §37.54: the declaration of the type given, a property decl or a
+  // sequence decl, that a property or sequence named `name` where the
+  // statement stands instantiates, written through the package path given
+  // where it is not empty, null where the name declares none; null for a
+  // builder nothing is instantiated through.
+  std::function<VpiObject*(int, std::string_view, std::string_view)>
+      assertion_decl;
 };
 
 // §37.64 to §37.68, §37.70 to §37.72 and §37.74 to §37.79: the kind of object

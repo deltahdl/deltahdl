@@ -499,10 +499,14 @@ VpiObject* CountedOperation(int op_type, const PropertyExprNode& node,
         op_type, VpiNexttimeOperands(property, with.expression(count), !kOne),
         node.strong, with.build);
   }
+  // §37.59 detail 4: a range written to `$` ends in the unbounded constant.
+  VpiObject* right = node.range_min != nullptr && node.range_unbounded
+                         ? BoundConstant(SeqCycleDelay::kUnbounded, with.build)
+                         : with.expression(node.range_max);
   return PropertyOperation(
       op_type,
       VpiAlwaysEventuallyOperands(property, with.expression(node.range_min),
-                                  with.expression(node.range_max)),
+                                  right),
       node.strong, with.build);
 }
 
@@ -584,18 +588,30 @@ VpiObject* CaseProperty(const PropertyExprNode& node, const VpiStmtBuild& with,
   return obj;
 }
 
+// §37.52 detail 3: `sequence`, a sequence expr, the strong version where
+// `strong` says it was written strong(...) or is evaluated as though it were
+// (§16.12.2); only an operation reports its strength.
+VpiObject* WithStrength(VpiObject* sequence, bool strong) {
+  if (sequence != nullptr && sequence->type == vpiOperation) {
+    sequence->op_strong = strong;
+  }
+  return sequence;
+}
+
 // §37.52: the property expr `node` stands for, its own clock aside, the
 // clock `flowing` into it flowing into its operands (§16.13.3). A Boolean
-// naming a sequence is the sequence inst it writes (§37.54).
+// naming a property is the property inst it writes (§16.12), and one naming
+// a sequence the sequence inst (§37.54).
 VpiObject* UnclockedPropertyExpr(const PropertyExprNode* node,
                                  const VpiStmtBuild& with,
                                  const std::vector<EventExpr>* flowing) {
   using Kind = PropertyExprNode::Kind;
   switch (node->kind) {
     case Kind::kBoolean:
-      return VpiSequenceOperandObject(*node->boolean, with);
+      return VpiPropertyOperandObject(*node->boolean, with);
     case Kind::kSequence:
-      return SequenceOperand(node->sequence, with, flowing);
+      return WithStrength(SequenceOperand(node->sequence, with, flowing),
+                          node->strong);
     case Kind::kNot:
       return NotOperation(*node, with, flowing);
     case Kind::kOr:
@@ -721,7 +737,9 @@ VpiObject* VpiMakeItemAssertion(const RtlirAssertion& assertion,
     }
   }
   if (!item.prop_instance_name.empty() && item.assert_expr != nullptr) {
-    VpiMakePropertyInst(obj, *item.assert_expr, with);
+    VpiMakePropertyInst(
+        obj, *item.assert_expr,
+        item.body != nullptr ? item.body->assert_disable_iff : nullptr, with);
   } else if (item.body != nullptr) {
     VpiMakePropertySpec(obj, *item.body, with);
   }
