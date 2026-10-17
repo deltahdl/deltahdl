@@ -325,12 +325,17 @@ void AttachPackagePropertyDecls(const RtlirDesign& design,
   // §16.12 with §37.10 detail 1: a property a package declares is a property
   // decl of the package, its expressions resolving among the package's names.
   const std::vector<RtlirImport> kNoImports;
+  const std::vector<std::string_view> kNoGenBlocks;
   for (const PackageDecl* pkg : design.packages) {
     const std::string kPrefix(pkg->name);
+    // §37.83: an operation carries the attributes its operator is written
+    // with, which elaboration kept for a package's items on the design.
+    const VpiExprNames kNames{objects, kPrefix, kNoGenBlocks, nullptr,
+                              &design.node_attrs};
     const VpiStmtBuild kWith{build,
                              [&](const Expr* expr) {
-                               return VpiInstanceExpression(
-                                   expr, objects, kPrefix, ctx, build);
+                               return VpiGenBlockExpression(expr, kNames, ctx,
+                                                            build);
                              },
                              nullptr,
                              nullptr,

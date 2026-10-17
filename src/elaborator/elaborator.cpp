@@ -616,9 +616,9 @@ RtlirDesign* Elaborator::ElaborateTops(
       DesignMetadata{elab_simulation_blocked_, elab_last_severity_,
                      elab_last_severity_msg_, elab_last_severity_scope_,
                      elab_last_severity_loc_});
-  // §37.83: the attributes of the classes outside every module, which the
-  // tail has just put on the design.
-  RecordDesignClassAttributes(*design, diag_, cu_param_scope_);
+  // §37.83: the attributes of the classes and package properties outside
+  // every module, which the tail has just put on the design.
+  RecordDesignAttributes(*design, diag_, cu_param_scope_);
   UnitScopeTables::PopulateUnitTypeFacts(*this, design);
   return design;
 }

@@ -28,10 +28,11 @@ void RecordModportAttributes(RtlirModule& mod, DiagEngine& diag,
                              const std::function<ScopeMap()>& params);
 
 // §5.12 with §37.83: resolve the attribute instances written on each class
-// the compilation unit or a package declares, and on its items, into
-// RtlirDesign::node_attrs of `design`, folded against `params`, the
-// compilation unit's parameters and those its packages make visible.
-void RecordDesignClassAttributes(RtlirDesign& design, DiagEngine& diag,
-                                 const ScopeMap& params);
+// the compilation unit or a package declares and on its items, and on the
+// operators of the properties a package declares, into RtlirDesign::node_attrs
+// of `design`, folded against `params`, the compilation unit's parameters and
+// those its packages make visible.
+void RecordDesignAttributes(RtlirDesign& design, DiagEngine& diag,
+                            const ScopeMap& params);
 
 }  // namespace delta

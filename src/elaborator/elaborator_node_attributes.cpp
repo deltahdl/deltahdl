@@ -107,13 +107,43 @@ struct NodeAttributeRecord {
     }
   }
 
-  // §14.3 with §5.12: the operators a clocking block's event and signals are
+  // §9.4.2 with §5.12: the operators the event expressions `events` are
   // written with.
-  void RecordClocking(const ModuleItem& item) {
-    for (const EventExpr& event : item.clocking_event) {
+  void RecordEvents(const std::vector<EventExpr>& events) {
+    for (const EventExpr& event : events) {
       RecordExpr(event.signal);
       RecordExpr(event.iff_condition);
     }
+  }
+
+  // §16.12 with §5.12: the operators a property expression's Boolean leaves,
+  // ranges, case values and clocks are written with, and its operands'.
+  void RecordProperty(const PropertyExprNode* node) {
+    if (node == nullptr) return;
+    RecordExpr(node->boolean);
+    RecordExpr(node->range_min);
+    RecordExpr(node->range_max);
+    for (const std::vector<Expr*>& values : node->case_values) {
+      for (const Expr* value : values) RecordExpr(value);
+    }
+    RecordEvents(node->clock);
+    for (const PropertyExprNode* operand : node->operands) {
+      RecordProperty(operand);
+    }
+  }
+
+  // §16.12 with §5.12: the operators the property `item` declares or asserts
+  // is written with: its clock, its disable condition and its body.
+  void RecordPropertyItem(const ModuleItem& item) {
+    RecordEvents(item.prop_clock);
+    RecordExpr(item.prop_disable_iff);
+    RecordProperty(item.prop_body_tree);
+  }
+
+  // §14.3 with §5.12: the operators a clocking block's event and signals are
+  // written with.
+  void RecordClocking(const ModuleItem& item) {
+    RecordEvents(item.clocking_event);
     for (const ClockingSignalDecl& signal : item.clocking_signals) {
       RecordExpr(signal.skew_delay);
       RecordExpr(signal.out_skew_delay);
@@ -139,6 +169,7 @@ void RecordNodeAttributes(const ModuleItem& item, RtlirModule& mod,
     record.RecordExpr(connection);
   }
   record.RecordClocking(item);
+  record.RecordPropertyItem(item);
   record.RecordClass(item.class_decl);
 }
 
@@ -150,14 +181,16 @@ void RecordModportAttributes(RtlirModule& mod, DiagEngine& diag,
   }
 }
 
-void RecordDesignClassAttributes(RtlirDesign& design, DiagEngine& diag,
-                                 const ScopeMap& params) {
+void RecordDesignAttributes(RtlirDesign& design, DiagEngine& diag,
+                            const ScopeMap& params) {
   const std::function<ScopeMap()> kParams = [&params] { return params; };
   NodeAttributeRecord record{design.node_attrs, diag, kParams, std::nullopt};
   for (const ClassDecl* decl : design.cu_class_decls) record.RecordClass(decl);
   for (const PackageDecl* pkg : design.packages) {
     for (const ModuleItem* item : pkg->items) {
-      if (item != nullptr) record.RecordClass(item->class_decl);
+      if (item == nullptr) continue;
+      record.RecordClass(item->class_decl);
+      record.RecordPropertyItem(*item);
     }
   }
 }
