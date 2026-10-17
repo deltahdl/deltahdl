@@ -29,6 +29,7 @@
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
+#include "simulator/eval_struct_property.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -354,12 +355,9 @@ static std::string_view StructMemberClassName(const Expr* lhs,
   const size_t kDot = kView.find('.');
   uint32_t offset = 0;
   const StructFieldInfo* field =
-      ResolveStructField(ctx.GetVariableStructType(kView.substr(0, kDot)),
-                         kView.substr(kDot + 1), &offset);
-  if (field == nullptr || ctx.FindClassType(field->type_name) == nullptr) {
-    return {};
-  }
-  return field->type_name;
+      StructMemberOfClassType(ctx.GetVariableStructType(kView.substr(0, kDot)),
+                              kView.substr(kDot + 1), ctx, &offset);
+  return field == nullptr ? std::string_view{} : field->type_name;
 }
 
 // The statement is a blocking assignment, whose two sides the arms before this

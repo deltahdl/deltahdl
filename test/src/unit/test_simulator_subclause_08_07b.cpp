@@ -507,4 +507,24 @@ TEST(ClassConstructorSim, PropertyReadThroughAStructuresClassMember) {
             35u);
 }
 
+// §8.4 with §7.2: a structure's class member never assigned is null, and the
+// result of reading a property through it is indeterminate, so the run is
+// asked only to go on past the read rather than follow the null handle.
+TEST(ClassConstructorSim, PropertyReadThroughANullStructureMemberLetsRunGoOn) {
+  EXPECT_EQ(RunAndGet("class C;\n"
+                      "  int v;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  typedef struct { int i; C k; } st;\n"
+                      "  st s;\n"
+                      "  int x, r;\n"
+                      "  initial begin\n"
+                      "    x = s.k.v;\n"
+                      "    r = 7;\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            7u);
+}
+
 }  // namespace

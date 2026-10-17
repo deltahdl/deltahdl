@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string_view>
 
 #include "common/types.h"
@@ -8,6 +9,7 @@ namespace delta {
 
 class Arena;
 class SimContext;
+struct StructFieldInfo;
 struct StructTypeInfo;
 struct Variable;
 
@@ -19,6 +21,27 @@ struct Variable;
 // where the path names no member.
 Logic4Vec ExtractStructField(Variable* base_var, const StructTypeInfo* info,
                              std::string_view field, Arena& arena);
+
+// §7.2 with §8.7: the member `path` (a dotted path through nested members) of
+// a structure whose layout is `info`, where that member is declared with a
+// class type and so holds a handle, `h` of `typedef struct { int i; C h; }`;
+// its offset in the structure goes to *bit_offset. Null where the path names
+// no member, or a member of a type that names no class.
+const StructFieldInfo* StructMemberOfClassType(const StructTypeInfo* info,
+                                               std::string_view path,
+                                               SimContext& ctx,
+                                               uint32_t* bit_offset);
+
+// §7.2 with §8.4: a structure's member declared with a class type holds a
+// handle, not a structure, so in `s.k.v` and `s.n.h.v` the path past that
+// member names a property of the object the handle refers to, which no
+// member of the structure's layout does. True with `out` that property's
+// value where a member along `field` of the structure `base_var` holds, whose
+// layout is `info`, is of a class type and refers to an object; false where
+// none is, or its handle is null, which leaves the read to the structure.
+bool TryStructMemberObjectRead(Variable* base_var, const StructTypeInfo* info,
+                               std::string_view field, SimContext& ctx,
+                               Arena& arena, Logic4Vec& out);
 
 // §8.11: inside a method, a property of the enclosing class may be named
 // without a `this.` prefix -- the clause resolves an unqualified name by
