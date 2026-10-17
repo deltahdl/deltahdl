@@ -231,5 +231,24 @@ TEST_F(DelayControlsOfARun, ADelayWrittenAsANameIsWhatItNames) {
   EXPECT_EQ(vpi_get(vpiType, delayed), vpiNullStmt);
 }
 
+// A delay control gives through vpi_get_delays() the one delay it waits, the
+// value its delay expression holds, read in simulation time units: 5 in a
+// module of 1ns units under a 1ps precision is 5000 of them.
+TEST_F(DelayControlsOfARun, ADelayControlGivesItsDelayThroughGetDelays) {
+  Run("`timescale 1ns/1ps\n"
+      "module top; int a; initial #5 a = 1; endmodule\n");
+  vpiHandle control = Control();
+  ASSERT_NE(control, nullptr);
+  s_vpi_time slot = {};
+  s_vpi_delay delay = {};
+  delay.da = &slot;
+  delay.no_of_delays = 1;
+  delay.time_type = vpiSimTime;
+  vpi_get_delays(control, &delay);
+  EXPECT_EQ(slot.type, vpiSimTime);
+  EXPECT_EQ(slot.high, 0U);
+  EXPECT_EQ(slot.low, 5000U);
+}
+
 }  // namespace
 }  // namespace delta

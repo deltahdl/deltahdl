@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <functional>
 #include <string_view>
 #include <unordered_set>
 #include <vector>
@@ -22,6 +23,7 @@
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_data_structs.h"
 #include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -343,6 +345,8 @@ bool VpiNoOfDelaysLegal(int type, int n, size_t available) {
   // rise, a fall and a turn-off.
   if (type == vpiContAssign) return n == 2 || n == 3;
   if (type == vpiTchk) return n == static_cast<int>(available);
+  // §37.68: a delay control waits one delay.
+  if (type == vpiDelayControl) return n == 1;
   return false;
 }
 
@@ -465,6 +469,28 @@ void VpiReadDelayRun(DelayCursor& cur, bool mtm, bool pulsere,
 
 }  // namespace
 
+// §37.68: the one delay the delay control `control` waits, the value its delay
+// expression holds now, read through `value_of`, scaled from the time unit of
+// the instance writing it to the simulation time unit `sim_unit` (§3.14.1),
+// in which a continuous assignment's delays are kept too; none where it
+// reaches no delay expression.
+static std::vector<VpiDelayInfo> DelayControlDelays(
+    VpiHandle control, int sim_unit,
+    const std::function<double(VpiHandle)>& value_of) {
+  VpiHandle expr = VpiDelayControlDelayExpr(control);
+  if (expr == nullptr) return {};
+  int unit = sim_unit;
+  for (const VpiObject* at = control->parent; at != nullptr; at = at->parent) {
+    if (VpiIsInstanceType(at->type)) {
+      unit = at->time_unit;
+      break;
+    }
+  }
+  VpiDelayInfo info;
+  info.delay = value_of(expr) * std::pow(10.0, unit - sim_unit);
+  return {info};
+}
+
 void VpiContext::GetDelays(VpiHandle obj, s_vpi_delay* delay_p) {
   // §38.10 / §38.1: the structure and its da array are application-allocated.
   // With nothing to fill, or no object to read delays from, there is nothing
@@ -485,8 +511,16 @@ void VpiContext::GetDelays(VpiHandle obj, s_vpi_delay* delay_p) {
   // §38.10: the legal values for the number of delays are fixed by the object's
   // category. A request that is not legal for this object is an error; record
   // it (§38.2) and leave the caller's array untouched.
-  if (!VpiNoOfDelaysLegal(obj->type, delay_p->no_of_delays,
-                          obj->delays.size())) {
+  const std::vector<VpiDelayInfo> kDelays =
+      obj->type != vpiDelayControl
+          ? obj->delays
+          : DelayControlDelays(obj, sim_time_unit_, [this](VpiHandle expr) {
+              s_vpi_value value = {};
+              value.format = vpiRealVal;
+              GetValue(expr, &value);
+              return value.value.real;
+            });
+  if (!VpiNoOfDelaysLegal(obj->type, delay_p->no_of_delays, kDelays.size())) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
     last_error_.message = VpiText(
@@ -506,9 +540,8 @@ void VpiContext::GetDelays(VpiHandle obj, s_vpi_delay* delay_p) {
   // delays in order, emitting each delay's run before moving to the next.
   DelayCursor cur{delay_p, 0, kTt};
   for (int i = 0; i < delay_p->no_of_delays; ++i) {
-    const VpiDelayInfo kD = (static_cast<size_t>(i) < obj->delays.size())
-                                ? obj->delays[i]
-                                : VpiDelayInfo{};
+    const VpiDelayInfo kD =
+        (static_cast<size_t>(i) < kDelays.size()) ? kDelays[i] : VpiDelayInfo{};
     VpiWriteDelayRun(cur, kMtm, kPulsere, kD);
   }
 }
