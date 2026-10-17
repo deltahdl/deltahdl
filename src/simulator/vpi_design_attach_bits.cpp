@@ -217,4 +217,14 @@ void AttachVectorBits(const RtlirDesign* design, const VpiObjectMap& objects,
       });
 }
 
+VpiObject* VpiBitAtOffset(const VpiObject& root, int64_t offset) {
+  for (VpiObject* child : root.children) {
+    if ((child->type == vpiNetBit || child->type == vpiRegBit) &&
+        child->bit_offset == offset) {
+      return child;
+    }
+  }
+  return nullptr;
+}
+
 }  // namespace delta

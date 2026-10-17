@@ -554,6 +554,8 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
     VpiHandle obj = DesignObjectForFlatName(name);
     if (obj == nullptr || var == nullptr) continue;
     obj->type = kVpiReg;
+    // §37.61 detail 3: a variable the run declares statically has an actual.
+    obj->actual_origin = kVpiActualStaticElab;
     obj->var = var;
     obj->size = static_cast<int>(var->value.width);
   }
@@ -563,6 +565,7 @@ void VpiContext::Attach(SimContext& sim_ctx, const RtlirDesign* design) {
     VpiHandle obj = DesignObjectForFlatName(name);
     if (obj == nullptr || net == nullptr) continue;
     obj->type = kVpiNet;
+    obj->actual_origin = kVpiActualStaticElab;
     obj->net = net;
     // The same pairing CreateNetObj makes: a net answers a value query out of
     // the storage its resolution writes, so the object carries that storage

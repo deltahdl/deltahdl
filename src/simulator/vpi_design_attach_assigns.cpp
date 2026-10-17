@@ -617,6 +617,9 @@ VpiObject* HierarchicalObject(const Expr* expr, const AssignBuild& build) {
   const std::string_view kFirst =
       std::string_view(dotted).substr(0, dotted.find('.'));
   if (VpiObject* holder = Resolve(build.names, kFirst)) {
+    if (VpiIsDynamicPrefixHolderType(holder->type)) {
+      return VpiPrefixedReference(holder, dotted, build.alloc, build.keep);
+    }
     return FindObjectForFlatName(VpiObjectMap{{kFirst, holder}}, dotted);
   }
   VpiObject* below = FindObjectForFlatName(
@@ -829,16 +832,6 @@ const VpiObject* CalleeScope(const RtlirModule& mod,
 }
 
 }  // namespace
-
-VpiObject* VpiBitAtOffset(const VpiObject& root, int64_t offset) {
-  for (VpiObject* child : root.children) {
-    if ((child->type == vpiNetBit || child->type == vpiRegBit) &&
-        child->bit_offset == offset) {
-      return child;
-    }
-  }
-  return nullptr;
-}
 
 VpiObject* VpiInstanceExpression(const Expr* expr, const VpiObjectMap& objects,
                                  const std::string& prefix, SimContext& ctx,

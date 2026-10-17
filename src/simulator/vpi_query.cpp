@@ -120,8 +120,14 @@ int VpiGetHasActual(VpiHandle obj) {
   // that it had no actual, the reference carrying none of its own. An object
   // with no prefix has only its own binding to answer from.
   const VpiObject* bound = obj->prefix != nullptr ? obj->prefix : obj;
-  return VpiObjectHasActual(obj->actual_origin, bound->actual != nullptr) ? 1
-                                                                          : 0;
+  // A part of an object, a bit or a member, is as the object it is part of:
+  // the nearest of the objects holding it that records where it came from.
+  int origin = obj->actual_origin;
+  for (const VpiObject* at = obj;
+       origin == kVpiActualBySimTime && at != nullptr; at = at->parent) {
+    origin = at->actual_origin;
+  }
+  return VpiObjectHasActual(origin, bound->actual != nullptr) ? 1 : 0;
 }
 
 // §37.16 detail 21: vpiExpanded on a net bit reports the parent net's value;

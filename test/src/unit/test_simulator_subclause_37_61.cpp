@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
@@ -335,5 +336,66 @@ TEST(DynamicPrefixHasActual, AnUnlistedOriginTracksTheCurrentActual) {
   EXPECT_TRUE(VpiObjectHasActual(999, true));
   EXPECT_FALSE(VpiObjectHasActual(999, false));
 }
+// The prefixing of a run: expressions a design writes through a virtual
+// interface, a class var or a clocking block, and the objects it declares.
+class PrefixingOfARun : public VpiDesignRun {
+ protected:
+  // The right side of the assignment the first procedure of `top` runs.
+  static vpiHandle RhsOfFirst() {
+    vpiHandle it = vpi_iterate(vpiProcess, By("top"));
+    if (it == nullptr) return nullptr;
+    return vpi_handle(vpiRhs, vpi_handle(vpiStmt, vpi_scan(it)));
+  }
+
+  // That right side is a ref obj reaching an object of kind `holder` through
+  // vpiPrefix.
+  static void ExpectRhsPrefixedBy(int holder) {
+    vpiHandle ref = RhsOfFirst();
+    ASSERT_NE(ref, nullptr);
+    EXPECT_EQ(vpi_get(vpiType, ref), vpiRefObj);
+    vpiHandle prefix = vpi_handle(vpiPrefix, ref);
+    ASSERT_NE(prefix, nullptr);
+    EXPECT_EQ(vpi_get(vpiType, prefix), holder);
+  }
+};
+
+// Detail 3: an object that is all or part of a statically declared object of
+// the elaborated design has an actual, a named event the module declares
+// among them.
+TEST_F(PrefixingOfARun, AStaticallyDeclaredObjectHasAnActual) {
+  Run("module top; event e; endmodule\n");
+  EXPECT_EQ(vpi_get(vpiHasActual, By("top.e")), 1);
+}
+
+// Detail 1: an expression written through a virtual interface reaches the
+// virtual interface var it is written through by vpiPrefix.
+TEST_F(PrefixingOfARun, AnExpressionThroughAVirtualInterfaceReachesIt) {
+  Run("interface ifc; logic a; endinterface\n"
+      "module top; ifc i0(); virtual ifc vif; logic y;\n"
+      "  initial y = vif.a;\n"
+      "endmodule\n");
+  ExpectRhsPrefixedBy(vpiVirtualInterfaceVar);
+}
+
+// Detail 1: a class property written through a class var reaches the class
+// var by vpiPrefix.
+TEST_F(PrefixingOfARun, APropertyThroughAClassVarReachesIt) {
+  Run("class C; int x; endclass\n"
+      "module top; C c; int y;\n"
+      "  initial y = c.x;\n"
+      "endmodule\n");
+  ExpectRhsPrefixedBy(vpiClassVar);
+}
+
+// Detail 1: an expression written through a clocking block reaches the
+// clocking block by vpiPrefix.
+TEST_F(PrefixingOfARun, AnExpressionThroughAClockingBlockReachesIt) {
+  Run("module top; logic clk, d, y;\n"
+      "  clocking cb @(posedge clk); input d; endclocking\n"
+      "  initial y = cb.d;\n"
+      "endmodule\n");
+  ExpectRhsPrefixedBy(vpiClockingBlock);
+}
+
 }  // namespace
 }  // namespace delta

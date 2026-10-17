@@ -311,6 +311,17 @@ void AttachDeclaredRanges(VpiObject* obj, const DataType& type,
 // significant end of its storage; null where it has none.
 VpiObject* VpiBitAtOffset(const VpiObject& root, int64_t offset);
 
+// §37.61 (figure): whether an object of `type` can prefix an expression - a
+// class var, a virtual interface var or a clocking block.
+bool VpiIsDynamicPrefixHolderType(int type);
+
+// §37.61 detail 1: the simple expression written through `holder`, one of the
+// three, as `written`: a ref obj named as written whose vpiPrefix is `holder`.
+// Which object it stands for is fixed only as the run goes, so it holds none.
+VpiObject* VpiPrefixedReference(VpiObject* holder, std::string_view written,
+                                const std::function<VpiObject*()>& alloc,
+                                const VpiNameKeeper& keep);
+
 // §37.58, §37.59: the expression object `expr` stands for, written in the
 // instance whose objects `objects` keys under `prefix`; null for a kind of
 // expression not modelled.
