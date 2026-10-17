@@ -20,6 +20,7 @@
 #include "elaborator/elaborator_gen_block_interfaces.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
+#include "elaborator/elaborator_node_attributes.h"
 #include "elaborator/interface_property_instance.h"
 #include "elaborator/property_instance.h"
 #include "elaborator/property_rewrite.h"
@@ -591,6 +592,9 @@ void Elaborator::ElaborateItemsInOrder(const ModuleDecl* decl,
   for (auto* item : TimingCheckDelayedSignalItems(decl, arena_)) {
     ElaborateItem(item, mod);
   }
+  // §37.83: the attributes of the operators an interface's modports' port
+  // expressions are written with, once the parameters they fold against are.
+  RecordModportAttributes(*mod, diag_, [&] { return BuildParamScope(mod); });
 }
 
 void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {

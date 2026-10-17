@@ -518,9 +518,9 @@ TEST_F(AttributesOfARun, AnOperationOutsideAnAssignmentCarriesItsAttributes) {
             std::vector<std::string>{"t2"});
   vpiHandle cb = Named(vpiClockingBlock, By("top"), "cb");
   ASSERT_NE(cb, nullptr);
-  EXPECT_EQ(
-      NamesOf(vpiAttribute, vpi_handle(vpiExpr, Named(vpiIODecl, cb, "w"))),
-      std::vector<std::string>{"t3"});
+  EXPECT_EQ(NamesOf(vpiAttribute,
+                    vpi_handle(vpiExpr, Named(vpiClockingIODecl, cb, "w"))),
+            std::vector<std::string>{"t3"});
   vpiHandle mp = Named(vpiModport, By("top.i0"), "mp");
   ASSERT_NE(mp, nullptr);
   EXPECT_EQ(
