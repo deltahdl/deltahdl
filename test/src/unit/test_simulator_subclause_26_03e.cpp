@@ -352,4 +352,39 @@ TEST(PackageImportSim, AUnitClassExtendsAClassNamedThroughAPackage) {
             379u);
 }
 
+// §6.18 with §26.3: a variable declared through a package's typedef of a
+// class is a handle of that class, with nothing imported: p's `bt` names its
+// B, whose b is 3; its `ct` names q's C, whose c is 5; and its `bt2` names
+// `bt` and so B: 3, 5 and 3 read as 353. The same holds when a unit class
+// extending p::B has p lowered ahead of the unit's classes. Declared through
+// the typedef, the variable was no handle and its `new` constructed nothing.
+TEST(PackageImportSim, APackagesClassTypedefDeclaresAHandleOfItsClass) {
+  for (const char* unit : {"", "class D extends p::B;\nendclass\n"}) {
+    EXPECT_EQ(RunAndGet(std::string("package q;\n"
+                                    "  class C;\n"
+                                    "    int c = 5;\n"
+                                    "  endclass\n"
+                                    "endpackage\n"
+                                    "package p;\n"
+                                    "  class B;\n"
+                                    "    int b = 3;\n"
+                                    "  endclass\n"
+                                    "  typedef B bt;\n"
+                                    "  typedef q::C ct;\n"
+                                    "  typedef bt bt2;\n"
+                                    "endpackage\n") +
+                            unit +
+                            "module t;\n"
+                            "  p::bt h = new;\n"
+                            "  p::ct g = new;\n"
+                            "  p::bt2 k = new;\n"
+                            "  int r;\n"
+                            "  initial r = h.b * 100 + g.c * 10 + k.b;\n"
+                            "endmodule\n",
+                        "r"),
+              353u)
+        << unit;
+  }
+}
+
 }  // namespace

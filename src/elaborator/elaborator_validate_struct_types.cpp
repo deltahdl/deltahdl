@@ -325,16 +325,22 @@ std::string_view NestedClassKey(const DataType& dtype,
 }
 
 std::string_view PackageClassKey(const DataType& dtype,
+                                 const TypedefMap& typedefs,
                                  const CompilationUnit* unit, Arena& arena) {
   if (dtype.kind != DataTypeKind::kNamed || dtype.scope_name.empty()) return {};
+  // §6.18: a typedef stands for the name its chain ends at, which the
+  // package's own typedefs leave bare (InPackageScope) and which a typedef of
+  // another package's class writes behind that package.
+  DataType end = LastTypeInChain(dtype, typedefs);
+  if (end.scope_name.empty()) end.scope_name = dtype.scope_name;
   for (const auto* pkg : unit->packages) {
-    if (pkg->name != dtype.scope_name) continue;
+    if (pkg->name != end.scope_name) continue;
     for (const auto* item : pkg->items) {
       if (item->kind != ModuleItemKind::kClassDecl || !item->class_decl ||
-          item->class_decl->name != dtype.type_name)
+          item->class_decl->name != end.type_name)
         continue;
-      return *arena.Create<std::string>(std::string(dtype.scope_name) +
-                                        "::" + std::string(dtype.type_name));
+      return *arena.Create<std::string>(std::string(end.scope_name) +
+                                        "::" + std::string(end.type_name));
     }
   }
   return {};

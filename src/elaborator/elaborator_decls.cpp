@@ -818,11 +818,14 @@ void Elaborator::SetVariableTypeInfo(const ModuleItem* item,
   // scopes declare and never a nested one, so the declaration was sized as a
   // value and its `new` constructed nothing.
   // §26.3: `p::C h` declares a handle of package p's class whether or not
-  // the scope imports p; class_names_ holds the bare names that scope reaches,
-  // so without the import the declaration was sized as a value and its `new`
-  // constructed nothing.
+  // the scope imports p, and so does `p::bt h` under p's `typedef C bt`
+  // (§6.18); class_names_ holds the bare names that scope reaches, so without
+  // the import the declaration was sized as a value and its `new` constructed
+  // nothing.
   std::string_view nested = NestedClassKey(item->data_type, unit_, arena_);
-  if (nested.empty()) nested = PackageClassKey(item->data_type, unit_, arena_);
+  if (nested.empty()) {
+    nested = PackageClassKey(item->data_type, typedefs_, unit_, arena_);
+  }
   if (!nested.empty()) {
     var.class_type_name = nested;
     var.class_data_type = &item->data_type;

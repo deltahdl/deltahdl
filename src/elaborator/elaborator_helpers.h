@@ -411,10 +411,13 @@ void ValidateCycleDelayCounts(const ModuleDecl* decl, const ScopeMap& scope,
 
 // §26.3 (printed page 808): the key the simulator holds a package's class
 // under, `p::C`, when `dtype` is written `p::C` and the package `p` declares a
-// class named `C`; empty for any other type. The package scope resolution
-// operator reaches the class without an import of the package. Defined in
+// class named `C`, or is written through a typedef of `p`'s, `p::bt`, whose
+// chain of `typedefs` ends at a class, `C` of `p` or `q::C` of `q` (§6.18);
+// empty for any other type. The package scope resolution operator reaches the
+// class without an import of the package. Defined in
 // elaborator_validate_struct_types.cpp.
 std::string_view PackageClassKey(const DataType& dtype,
+                                 const TypedefMap& typedefs,
                                  const CompilationUnit* unit, Arena& arena);
 
 // §8.25: rewrites `dtype` in place when it names a member of a specialization
