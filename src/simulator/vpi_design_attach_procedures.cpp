@@ -521,6 +521,9 @@ void AttachInstanceProcedures(VpiObject* instance,
       walk.process = MakeProcess(proc, scope, instance_walk.build);
       // §37.3.3: where the procedure was written.
       VpiRecordWrittenLocation(walk.process, proc.loc, instance_walk.calls.ctx);
+      // §37.83: the attributes the procedure is written with.
+      VpiAttachAttributes(walk.process, proc.attrs, false,
+                          instance_walk.calls.ctx, instance_walk.build);
       walk.process->body = WalkProcessBody(proc, kParent, walk);
     } else if (proc.body->is_deferred) {
       // §16.4.3: a deferred assertion item is the statement it runs (§37.55).

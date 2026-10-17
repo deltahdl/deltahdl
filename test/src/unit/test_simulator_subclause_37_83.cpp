@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <vector>
+
 #include "common/types.h"
+#include "fixture_vpi_run.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -209,6 +213,117 @@ TEST_F(Attribute, ValueReportedThroughVpiGetValue) {
   untouched.value.integer = 99;
   vpi_get_value(VpiHandleOf(&no_value), &untouched);
   EXPECT_EQ(untouched.value.integer, 99);
+}
+
+// The attributes of a run: those a design is written with, built from the
+// elaborated design rather than by hand.
+class AttributesOfARun : public VpiDesignRun {
+ protected:
+  // The value `attr` reports in `format`, as a string; empty for none.
+  static std::string ValueOf(vpiHandle attr, int format) {
+    s_vpi_value value = {};
+    value.format = format;
+    vpi_get_value(attr, &value);
+    if (format == vpiIntVal) return std::to_string(value.value.integer);
+    return value.value.str == nullptr ? "" : value.value.str;
+  }
+};
+
+// A net and a variable carry the attributes they are declared with, in the
+// order written, each reaching the net or variable through vpiParent and
+// written on it rather than on a definition. One written with no value is a
+// bit of 1 (§5.12); one written with a sized literal has that literal's width;
+// one written with a string is that string.
+TEST_F(AttributesOfARun, ANetAndAVariableCarryTheirAttributes) {
+  Run("module top;\n"
+      "  (* keep, weight = 8'd5 *) wire w;\n"
+      "  (* tag = \"fast\" *) logic v;\n"
+      "  wire plain;\n"
+      "endmodule\n");
+  vpiHandle w = By("top.w");
+  vpiHandle it = vpi_iterate(vpiAttribute, w);
+  ASSERT_NE(it, nullptr);
+  vpiHandle keep = vpi_scan(it);
+  vpiHandle weight = vpi_scan(it);
+  EXPECT_EQ(vpi_scan(it), nullptr);
+  ASSERT_NE(keep, nullptr);
+  ASSERT_NE(weight, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, keep), "keep");
+  EXPECT_EQ(vpi_get(vpiDefAttribute, keep), 0);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, keep)), VpiObjectOf(w));
+  EXPECT_EQ(ValueOf(keep, vpiBinStrVal), "1");
+  EXPECT_STREQ(vpi_get_str(vpiName, weight), "weight");
+  EXPECT_EQ(ValueOf(weight, vpiBinStrVal), "00000101");
+  vpiHandle tag = Named(vpiAttribute, By("top.v"), "tag");
+  ASSERT_NE(tag, nullptr);
+  EXPECT_EQ(ValueOf(tag, vpiStringVal), "fast");
+  EXPECT_EQ(vpi_iterate(vpiAttribute, By("top.plain")), nullptr);
+}
+
+// An attribute written with a parameter's name holds the parameter's value,
+// as an integer where its expression fixes no width.
+TEST_F(AttributesOfARun, AnAttributeOfAParametersValueIsAnInteger) {
+  Run("module top #(parameter P = 7);\n"
+      "  (* depth = P *) wire w;\n"
+      "endmodule\n");
+  vpiHandle depth = Named(vpiAttribute, By("top.w"), "depth");
+  ASSERT_NE(depth, nullptr);
+  EXPECT_EQ(ValueOf(depth, vpiIntVal), "7");
+  EXPECT_EQ(ValueOf(depth, vpiBinStrVal).size(), 32u);
+}
+
+// An instance carries the attributes its instantiation is written with, and,
+// as attributes on its definition, those its module's declaration is written
+// with; a top module carries its declaration's. Each reports where it was
+// written, in the file the module is.
+TEST_F(AttributesOfARun, AnInstanceCarriesItsOwnAndItsDefinitionsAttributes) {
+  Run("(* cell = 3 *) module sub; endmodule\n"
+      "(* root *) module top;\n"
+      "  (* place = \"left\" *) sub u();\n"
+      "endmodule\n");
+  vpiHandle u = By("top.u");
+  EXPECT_EQ(NamesOf(vpiAttribute, u),
+            (std::vector<std::string>{"cell", "place"}));
+  vpiHandle cell = Named(vpiAttribute, u, "cell");
+  vpiHandle place = Named(vpiAttribute, u, "place");
+  ASSERT_NE(cell, nullptr);
+  ASSERT_NE(place, nullptr);
+  EXPECT_EQ(vpi_get(vpiDefAttribute, cell), 1);
+  EXPECT_EQ(ValueOf(cell, vpiIntVal), "3");
+  EXPECT_EQ(vpi_get(vpiDefAttribute, place), 0);
+  EXPECT_EQ(vpi_get(vpiDefLineNo, cell), 1);
+  EXPECT_EQ(vpi_get(vpiDefLineNo, place), 3);
+  EXPECT_STREQ(vpi_get_str(vpiDefFile, place), vpi_get_str(vpiDefFile, u));
+  vpiHandle root = Named(vpiAttribute, By("top"), "root");
+  ASSERT_NE(root, nullptr);
+  EXPECT_EQ(vpi_get(vpiDefAttribute, root), 1);
+}
+
+// A procedure carries the attributes it is written with.
+TEST_F(AttributesOfARun, AProcessCarriesItsAttributes) {
+  Run("module top;\n"
+      "  (* stage = 4 *) initial begin end\n"
+      "endmodule\n");
+  vpiHandle it = vpi_iterate(vpiProcess, By("top"));
+  ASSERT_NE(it, nullptr);
+  vpiHandle process = vpi_scan(it);
+  ASSERT_NE(process, nullptr);
+  vpiHandle stage = Named(vpiAttribute, process, "stage");
+  ASSERT_NE(stage, nullptr);
+  EXPECT_EQ(ValueOf(stage, vpiIntVal), "4");
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, stage)), VpiObjectOf(process));
+}
+
+// An attribute is written on its holder, not declared in it: a name it shares
+// with what the holder declares reaches the declaration, and an index selects
+// no attribute, here where the vector it is written on has no bit 0.
+TEST_F(AttributesOfARun, NoNameOrIndexReachesAnAttribute) {
+  Run("(* w = 2 *) module top;\n"
+      "  wire w;\n"
+      "  (* keep *) wire [2:1] bus;\n"
+      "endmodule\n");
+  EXPECT_EQ(vpi_get(vpiType, By("top.w")), vpiNet);
+  EXPECT_EQ(vpi_handle_by_index(By("top.bus"), 0), nullptr);
 }
 
 }  // namespace

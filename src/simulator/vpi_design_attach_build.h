@@ -28,6 +28,7 @@ struct Expr;
 struct ModuleItem;
 struct PackageDecl;
 struct PropertyExprNode;
+struct ResolvedAttribute;
 struct SeqLinearBody;
 struct RtlirAssertion;
 struct RtlirPropertyDecl;
@@ -642,6 +643,19 @@ void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
 // of the gen scope array the instance holds for the loop's block.
 void AttachGenScopes(const RtlirDesign* design, const VpiObjectMap& objects,
                      const VpiAttachBuild& build);
+
+// §37.83: make each attribute of `attrs` an attribute object, a child of
+// `owner`, the object it is written on, on its definition where
+// `on_definition`, with its name, value and the place it was written.
+void VpiAttachAttributes(VpiObject* owner,
+                         const std::vector<ResolvedAttribute>& attrs,
+                         bool on_definition, SimContext& ctx,
+                         const VpiAttachBuild& build);
+
+// §37.83: the attribute objects of each instance, from its instantiation and
+// its module's declaration, and of each net and variable it declares.
+void AttachAttributes(const RtlirDesign* design, const VpiObjectMap& objects,
+                      SimContext& ctx, const VpiAttachBuild& build);
 
 // §27.4 with §37.17 and §37.28: give each variable, net and parameter a
 // generate block instance declares the object the passes built for it, named

@@ -30,6 +30,8 @@ static ResolvedAttribute EvalAttribute(const Attribute& attr,
                                        const ScopeMap& scope) {
   ResolvedAttribute ra;
   ra.name = attr.name;
+  ra.value = attr.value;
+  ra.loc = attr.loc;
   if (!attr.value) {
     ra.resolved_value = 1;
     return ra;

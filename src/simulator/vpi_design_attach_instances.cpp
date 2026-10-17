@@ -211,6 +211,7 @@ void VpiContext::AttachInstanceContents(const RtlirDesign* design) {
     const VpiObjectMap kUnitTypespecs =
         AttachTypespecs(design, object_map_, kBuild);
     AttachParameters(design, object_map_, kUnitTypespecs, *sim_ctx_, kBuild);
+    AttachAttributes(design, object_map_, *sim_ctx_, kBuild);
     const VpiClassDefnObjects kClasses =
         AttachClassDefinitions(design, object_map_, *sim_ctx_, kBuild);
     // §37.32: the class defn a run's class obj reaches through its typespec,
