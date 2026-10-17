@@ -383,6 +383,50 @@ TEST(DottedNameElaboration, GenerateBlockSelectReadsTheBlocksTypedef) {
                              "23.7"));
 }
 
+// §23.9 makes a task, a function and a begin-end block each a scope, whose
+// own typedef of a name stands over the module's (§6.18): the type a
+// variable declared there names is the scope's own, and else the type of the
+// scope around it, a block inside a function seeing the function's.
+TEST(DottedNameElaboration, SubroutineAndBlockSelectsReadTheirOwnTypedefs) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef struct { int a; } pair_t;\n"
+      "  function int f();\n"
+      "    typedef struct { int a, b; } pair_t;\n"
+      "    pair_t p;\n"
+      "    return p.b;\n"
+      "  endfunction\n"
+      "  function int g();\n"
+      "    typedef struct { int k; } q_t;\n"
+      "    q_t q;\n"
+      "    begin\n"
+      "      q_t r;\n"
+      "      return q.zz + r.yy;\n"
+      "    end\n"
+      "  endfunction\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    typedef struct { int k; } s_t;\n"
+      "    s_t s;\n"
+      "    x = s.ww;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "structure 'pair_t' has no member named 'b'", 6,
+                             "23.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "structure 'q_t' has no member named 'zz'", 13,
+                            "23.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "structure 'q_t' has no member named 'yy'", 13,
+                            "23.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "structure 's_t' has no member named 'ww'", 20,
+                            "23.7"));
+}
+
 // What follows a member declared with a class type is a property of the class
 // (§8), as what follows a property of a class handle is, and a random
 // structure property of a class has rand_mode (§18.8): none of them is a

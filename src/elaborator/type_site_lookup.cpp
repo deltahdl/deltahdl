@@ -66,8 +66,8 @@ FoundItem ImportedItem(const CompilationUnit& unit,
 
 // §23.9 with §26.3: the item of kind `kind` named `name` the site `site` sees:
 // one its scope declares, else one an import of its scope brings in, else,
-// for a generate block, one the scope around it sees (§27.5), else, for a
-// module, one the compilation unit declares or imports.
+// for a scope within a module, one the scope around it sees (§23.9), else,
+// for a module, one the compilation unit declares or imports.
 FoundItem SiteItem(const CompilationUnit& unit, const TypeSite& site,
                    ModuleItemKind kind, std::string_view name) {
   FoundItem found = ItemBefore(site, kind, name);

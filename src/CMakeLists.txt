@@ -541,6 +541,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_enclosing_subroutines.cpp
     elaborator/operator_result_members.cpp
     elaborator/struct_member_selects.cpp
+    elaborator/local_type_sites.cpp
     elaborator/type_site_lookup.cpp
     elaborator/elaborator_scope_rules.cpp
     elaborator/scope_resolution_bases.cpp

@@ -22,6 +22,7 @@
 #include "elaborator/elaborator_enclosing_subroutines.h"
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/local_type_sites.h"
 #include "elaborator/operator_result_members.h"
 #include "elaborator/package_references.h"
 #include "elaborator/std_package.h"
@@ -40,9 +41,9 @@ namespace delta {
 namespace {
 
 // A variable's declaration: the type it was declared with, the number of
-// unpacked dimensions it writes after its name (§7.4), and, for one declared in
-// a generate block, the site of the block, whose typedefs its type names first
-// (§27.5); null for one declared in no generate block.
+// unpacked dimensions it writes after its name (§7.4), and, for one a scope
+// within the module declares, the site of that scope, whose typedefs its type
+// names first (LocalTypeSites); null for one the module declares.
 struct DeclaredVar {
   const DataType* type = nullptr;
   std::size_t dims = 0;
@@ -87,15 +88,11 @@ struct DataScope {
   // In a method of a class, the class, whose methods a call by a name alone
   // calls first (§8.13).
   const ClassDecl* cls = nullptr;
-  // Inside a generate block, the module's site and then the site of each
-  // generate block around the item walked, the innermost last (§27.5).
-  std::deque<TypeSite> generate_sites = {};
+  // The sites of the scopes within the module around the item walked.
+  LocalTypeSites local_sites = {};
 
-  // The site of the innermost generate block around the item walked; null
-  // outside every generate block.
-  const TypeSite* BlockSite() const {
-    return generate_sites.empty() ? nullptr : &generate_sites.back();
-  }
+  // The site of the scope `items` belong to, seeing each of them.
+  TypeSite Site() const { return {&items, items.size(), site}; }
 
   bool Names(std::string_view name) const {
     return module.contains(name) ||
@@ -191,12 +188,11 @@ std::string_view VifInterface(const DataType& type) {
 // §6.18 with §26.3: the type the type `type` of a variable of the module
 // stands for, through each typedef it is written as (ThroughTypedefsAt).
 SitedType ThroughTypedefs(const DataScope& scope, const DataType& type) {
-  return ThroughTypedefsAt(
-      scope.unit, {&type, {&scope.items, scope.items.size(), scope.site}});
+  return ThroughTypedefsAt(scope.unit, {&type, scope.Site()});
 }
 
 // The type the variable `root` names is declared with, as written in the
-// scope or the generate block declaring it, with the unpacked dimensions
+// scope or the scope within it declaring it, with the unpacked dimensions
 // written after its name; no type where `root` names no variable, or one whose
 // type is a type parameter, typedef or class the scope declares for itself
 // alone.
@@ -205,11 +201,8 @@ SitedType DeclaredType(const Expr& root, const DataScope& scope) {
   if (var == nullptr || scope.local_types.contains(var->type->type_name)) {
     return {};
   }
-  const TypeSite kSite =
-      var->site != nullptr
-          ? *var->site
-          : TypeSite{&scope.items, scope.items.size(), scope.site};
-  return {var->type, kSite, var->dims};
+  return {var->type, var->site != nullptr ? *var->site : scope.Site(),
+          var->dims};
 }
 
 // §8.3 with §7.4: the class declaration whose handle the element of the
@@ -361,7 +354,7 @@ constexpr std::string_view kEnumMethods[] = {"first", "last", "next",
 // the scope's site; no class is its own ancestor (§8.13), so the walk ends.
 const ClassMember* ChainMember(const ClassDecl& cls, ClassMemberKind kind,
                                std::string_view name, const DataScope& scope) {
-  const TypeSite kSite{&scope.items, scope.items.size(), scope.site};
+  const TypeSite kSite = scope.Site();
   for (const ClassDecl* walked = &cls; walked != nullptr;
        walked = ClassIn(scope.unit, kSite, walked->base_class)) {
     for (const ClassMember* member : walked->members) {
@@ -616,19 +609,22 @@ void CheckExprCalls(const Expr* expr, const DataScope& scope, DiagEngine& diag,
 
 // The calls `stmt` and the statements it holds make by a plain name: a bare
 // call statement, `x;`, and each call an expression of theirs holds, with the
-// variables a block declares in scope over the statements the block holds.
+// variables a block declares in scope over the statements the block holds,
+// their types named at the block's site.
 void CheckStmtCalls(const Stmt* stmt, DataScope& scope, DiagEngine& diag) {
   if (stmt == nullptr) return;
   const std::size_t kOuter = scope.blocks.size();
+  const LocalTypeSites::Depth kOuterSites = scope.local_sites.Here();
   if (stmt->kind == StmtKind::kBlock || stmt->kind == StmtKind::kFork) {
     const std::vector<Stmt*>& items =
         stmt->kind == StmtKind::kFork ? stmt->fork_stmts : stmt->stmts;
+    scope.local_sites.OpenStmts(items, scope.Site());
     for (const Stmt* item : items) {
       if (item->kind == StmtKind::kVarDecl) {
         scope.blocks.emplace_back(
             item->var_name,
             DeclaredVar{&item->var_decl_type, item->var_unpacked_dims.size(),
-                        scope.BlockSite()});
+                        scope.local_sites.Innermost()});
       }
     }
   }
@@ -640,31 +636,36 @@ void CheckStmtCalls(const Stmt* stmt, DataScope& scope, DiagEngine& diag) {
   ForEachChildStmt(stmt,
                    [&](Stmt* const& sub) { CheckStmtCalls(sub, scope, diag); });
   scope.blocks.resize(kOuter);
+  scope.local_sites.Restore(kOuterSites);
 }
 
 // §13.3: each call the body of the task or function `item` writes, the
 // subroutine's formal arguments and the variables its body declares in scope
-// over its statements as a block's are (§23.9).
+// over its statements as a block's are (§23.9), the body's types named at the
+// body's site.
 void CheckSubroutineCalls(const ModuleItem& item, DataScope& scope,
                           DiagEngine& diag) {
   const std::size_t kOuter = scope.blocks.size();
+  const LocalTypeSites::Depth kOuterSites = scope.local_sites.Here();
   for (const FunctionArg& arg : item.func_args) {
     scope.blocks.emplace_back(
         arg.name, DeclaredVar{&arg.data_type, arg.unpacked_dims.size(),
-                              scope.BlockSite()});
+                              scope.local_sites.Innermost()});
   }
+  scope.local_sites.OpenStmts(item.func_body_stmts, scope.Site());
   for (const Stmt* stmt : item.func_body_stmts) {
     if (stmt->kind == StmtKind::kVarDecl) {
       scope.blocks.emplace_back(
           stmt->var_name,
           DeclaredVar{&stmt->var_decl_type, stmt->var_unpacked_dims.size(),
-                      scope.BlockSite()});
+                      scope.local_sites.Innermost()});
     }
   }
   for (const Stmt* stmt : item.func_body_stmts) {
     CheckStmtCalls(stmt, scope, diag);
   }
   scope.blocks.resize(kOuter);
+  scope.local_sites.Restore(kOuterSites);
 }
 
 // §6.19.3: each named constant the enumeration `type` writes, as a value of
@@ -753,7 +754,7 @@ void DeclareModuleItems(const ModuleDecl& decl, const CompilationUnit& unit,
 // Each base is looked up from the scope's site; no class is its own ancestor
 // (§8.13), so the walk ends at a class that extends none.
 void DeclareClassProperties(const ClassDecl& cls, DataScope& scope) {
-  const TypeSite kSite{&scope.items, scope.items.size(), scope.site};
+  const TypeSite kSite = scope.Site();
   for (const ClassDecl* walked = &cls; walked != nullptr;
        walked = ClassIn(scope.unit, kSite, walked->base_class)) {
     for (const ClassMember* member : walked->members) {
@@ -805,7 +806,7 @@ void CheckSiteClasses(const DataScope& site,
                       const std::vector<ClassDecl*>& classes,
                       DiagEngine& diag) {
   for (const ClassDecl* cls : classes) CheckClassCalls(*cls, site, diag);
-  const TypeSite kSite{&site.items, site.items.size(), site.site};
+  const TypeSite kSite = site.Site();
   for (const ModuleItem* item : site.items) {
     if (item->kind == ModuleItemKind::kClassDecl) {
       CheckClassCalls(*item->class_decl, site, diag);
@@ -834,19 +835,14 @@ void CheckGenerateBlockCalls(const std::vector<ModuleItem*>& items,
   const std::size_t kOuter = scope.blocks.size();
   const std::unordered_set<std::string_view> kOuterSubroutines =
       scope.subroutines;
-  const std::size_t kOuterSites = scope.generate_sites.size();
-  if (kOuterSites == 0) {
-    scope.generate_sites.push_back(
-        {&scope.items, scope.items.size(), scope.site});
-  }
-  const TypeSite* outer = &scope.generate_sites.back();
-  scope.generate_sites.push_back({&items, items.size(), scope.site, outer});
+  const LocalTypeSites::Depth kOuterSites = scope.local_sites.Here();
+  scope.local_sites.OpenItems(items, scope.Site());
   for (const ModuleItem* item : items) {
     if (item->kind == ModuleItemKind::kVarDecl ||
         item->kind == ModuleItemKind::kNetDecl) {
       scope.blocks.emplace_back(
           item->name, DeclaredVar{&item->data_type, item->unpacked_dims.size(),
-                                  scope.BlockSite()});
+                                  scope.local_sites.Innermost()});
     } else if (IsSubroutineItem(*item)) {
       scope.subroutines.insert(item->name);
     }
@@ -854,7 +850,7 @@ void CheckGenerateBlockCalls(const std::vector<ModuleItem*>& items,
   CheckItemCalls(items, scope, diag);
   scope.blocks.resize(kOuter);
   scope.subroutines = kOuterSubroutines;
-  scope.generate_sites.resize(kOuterSites);
+  scope.local_sites.Restore(kOuterSites);
 }
 
 // §27.4 and §27.5: each call the blocks of the generate construct `construct`
